@@ -1,0 +1,408 @@
+﻿# SDD_Pro — Loader Manifest
+#
+# Source de vérité unique de ce que CHAQUE agent charge en lecture
+# pendant son exécution. Permet :
+# - audit rapide du contexte chargé par invocation
+# - détection des chevauchements (anti-cross-contamination)
+# - documentation des coûts tokens par agent
+#
+# Cette source est descriptive, pas exécutoire : chaque agent (`.claude/
+# agents/*.md`) liste lui-même ses lectures dans son STEP de chargement.
+# Ce fichier est un miroir consolidé pour vérification.
+#
+# Toute modification d'un agent → mise à jour synchrone de cette section.
+
+version: "6.0.0"
+updated: "2026-05-06"
+
+# =========================================================================
+# Convention de langue (v5.0 — décision documentée, pas un bug)
+# =========================================================================
+# - Identifiants techniques (US, AC, SFD, FD, BR, ADR, classes d'erreur
+#   `[STACK_LIBRARY_MISSING]`, `[QA_TEST_FAILED]`, etc.) → ANGLAIS
+#   (parsing scripts + conventions agile universelles)
+# - Documentation utilisateur (CLAUDE.md, docs/, rules/, agents prompts) → FRANÇAIS
+#   (public cible Tech Lead francophone)
+# - Code généré (Razor, services C#, etc.) → ANGLAIS (convention universelle)
+# - Mockups HTML libellés métier → FRANÇAIS (métier francophone)
+#
+# Le mix est intentionnel et ne fait pas l'objet d'un fix unilatéral.
+# =========================================================================
+
+# =========================================================================
+# Sérialisation des writes sur workspace/output/context/constitution.md (v3+)
+# =========================================================================
+# Plusieurs agents écrivent dans constitution.md, mais JAMAIS en parallèle.
+# La sérialisation est garantie par la séquence des phases :
+#
+# Phase 1   : /spec-generate    → §1 Identité (bootstrap), §2-3 (init)
+# Phase 1.5 : elicitor          → §7 Risques/Hypothèses (append-only)
+# Phase 2   : po                → §3 Acteurs (append-only, procédure §8.5)
+#                               + §2 Glossaire (append-only termes nouveaux)
+# Phase 4   : arch              → §4 Stack (Update) + §6 ADRs index (append-only)
+# Phase 5   : dev-*             → INTERDITS d'écrire dans constitution.md
+#                                 (créent uniquement leurs ADRs en fichiers
+#                                  indépendants — index §6 rebuild par arch)
+#
+# Détail : @.claude/rules/file-ownership.md §2 + agents/po.md STEP 8.5
+#          + agents/arch.md STEP 12.5/12.6 (read-back validation v5.0)
+# =========================================================================
+
+# -------------------------------------------------------------------------
+# Agent: po (Sonnet 4.6)
+# Phase: 2 (US generation)
+# Token footprint estimé: ~5-15 KB par invocation
+# -------------------------------------------------------------------------
+po:
+  reads:
+    - workspace/input/specs/{n}-*.md           # SPEC parente (1 fichier)
+    - .claude/templates/us.template.md
+    - workspace/output/context/constitution.md # v3 — si présent (lecture acteurs/glossaire)
+    # v5.0 Inline Rules (dans agents/po.md, plus de Read mandatory) :
+    #   - responsibilities.md §5-§6
+    #   - us-granularity.md §1-§4 (5 anti-patterns détaillés)
+    #   - .claude/rules/constitution.md (procédure §3 inline en STEP 8.5)
+    # v5.0 Économie : ~16-20k tokens/invocation
+  writes:
+    - workspace/output/us/{n}-{m}-*.md         # 1 à 6 fichiers par SPEC (cible 1-3)
+    - workspace/output/context/constitution.md # v3 — append-only §3 (acteurs), §2 (glossaire)
+  forbidden_reads:
+    - workspace/input/stack/                   # hors périmètre PO
+    - workspace/input/ui/                      # hors périmètre PO (mockups HTML)
+    - workspace/output/us/{m}-*.md             # autres specs
+    - workspace/output/src/                    # responsabilité dev-*
+
+# -------------------------------------------------------------------------
+# Agent UI : SUPPRIMÉ en v4.0.0
+# Les mockups HTML déposés dans workspace/input/ui/ sont lus directement par
+# dev-frontend (pas d'extraction PNG → markdown intermédiaire).
+# -------------------------------------------------------------------------
+
+# -------------------------------------------------------------------------
+# Agent: arch (Sonnet 4.6)
+# Phase: 3 (bootstrap + DB scaffolding + digest)
+# Token footprint estimé: ~10-30 KB (lecture stacks complète)
+# Une seule invocation par projet (idempotent)
+# -------------------------------------------------------------------------
+arch:
+  reads:
+    - workspace/input/stack/stack.md
+    - .claude/stacks/{cat}/{active}.md   # tous stacks actifs (sélectif)
+    - .claude/templates/adr.template.md  # v3 — nécessaire pour Phase D
+    - workspace/output/context/constitution.md     # v3 — si présent
+    - workspace/output/context/adrs/ADR-*.md       # v3 — index existants (idempotence)
+    # v5.0 Inline Rules (dans agents/arch.md, plus de Read mandatory) :
+    #   - responsibilities.md §7-§8
+    #   - .claude/rules/constitution.md (writes par §, ADR atomique)
+    #   - file-ownership.md §1 (matrice owner arch)
+    #   - library-policy.md (résumé, détail @rule on-demand)
+    # v6.1 Read mandatory ajouté (depuis 2026-05-08) :
+    #   - .claude/rules/error-classification.md
+    # v5.0 Économie : ~12-18k tokens/invocation
+  writes:
+    - workspace/output/src/{AppName}.sln
+    - workspace/output/src/{AppName}/             # projet frontend vide
+    - workspace/output/src/{BackendName}/         # projet backend vide
+    - workspace/output/src/{LibName}/             # lib partagée si configurée
+    - workspace/output/db/schema.json             # si DatabaseType ≠ none
+    - workspace/output/db/schema.prev.json        # backup ancienne version
+    - workspace/output/db/schema.md               # si DatabaseType ≠ none
+    - workspace/output/db/schema.diff.md          # diff vs prev
+    - workspace/output/src/{BackendName}/Entities/ # scaffolding Database-First
+    - workspace/output/src/{BackendName}/CLAUDE.md # contexte projet backend
+    - workspace/output/src/{AppName}/CLAUDE.md    # contexte projet frontend
+    - workspace/output/src/{LibName}/CLAUDE.md    # contexte projet lib
+    - workspace/output/context/adrs/ADR-{YYYYMMDDTHHmmss}-*.md # timestamp atomique
+    - workspace/output/context/constitution.md    # update §4 stack + append §6 ADRs
+  reads_env:                            # uniquement si DatabaseType ≠ none
+    - DB_HOST
+    - DB_PORT
+    - DB_NAME
+    - DB_USER
+    - DB_PASSWORD
+  forbidden_reads:
+    - workspace/input/specs/
+    - workspace/output/us/
+    - workspace/input/ui/                         # mockups HTML hors scope arch
+  forbidden_writes:
+    - workspace/output/src/**/*.cs                # code applicatif (sauf Entities)
+    - workspace/output/src/**/*.razor             # responsabilité dev-frontend
+
+# -------------------------------------------------------------------------
+# Agent: dev-backend (Opus 4.7 — depuis 2026-05-08, split modèles)
+# Phase: 4 (génération code serveur)
+# Token footprint estimé: ~3-7 KB par US (grâce à CLAUDE.md projet)
+# Invocations parallèles : 1 par US backend
+# -------------------------------------------------------------------------
+dev-backend:
+  reads:
+    - workspace/output/us/{n}-{m}-*.md            # US ciblée (1 fichier)
+    - workspace/input/ui/{n}-{m}-*.html           # HTML mockup si présent (passif,
+                                        # pour identifier formulaires/tables
+                                        # déclenchant des endpoints/DTOs)
+    - workspace/output/plans/{n}-{m}-*.back.md    # plan existant si /dev-plan
+                                        # a tourné — mode From Plan
+    - workspace/output/src/{Project}/CLAUDE.md    # CLAUDE.md par projet (auto-load
+                                        # Claude Code conv)
+    - workspace/input/stack/stack.md              # lu UNE FOIS en STEP 0 Phase B (v5.0)
+    - .claude/stacks/backend/{active}.md  # fallback si CLAUDE.md insuffisant
+    - .claude/stacks/auth/{active}.md     # patterns d'injection auth
+    - workspace/output/db/schema.json             # si présent (Mappers/DTOs)
+    # v5.0 Inline Rules (dans agents/dev-backend.md, plus de Read mandatory) :
+    #   - responsibilities.md §9-§10
+    #   - stack-completeness.md
+    #   - file-ownership.md §1-§2
+    #   - qa-ownership.md §1, §4
+    # v6.1 Read mandatory ajouté (depuis 2026-05-08) :
+    #   - .claude/rules/error-classification.md (taxonomie 8 classes,
+    #     pilotage build_loop CORRECTIBLE vs BLOCKING)
+    # v5.0 Reads conditionnels (lazy) :
+    #   - workspace/output/context/constitution.md  # uniquement si terme ambigu
+    #   - workspace/output/context/adrs/INDEX.md    # uniquement au STEP 5 avant création ADR
+    #   - workspace/output/context/adrs/*.md        # fallback si INDEX.md absent
+    # v5.0 Économie : ~16-20k tokens/dispatch
+  writes:
+    - workspace/output/src/{BackendName}/Services/
+    - workspace/output/context/adrs/ADR-{YYYYMMDDTHHmmss}-*.md # timestamp atomique
+    - workspace/output/src/{BackendName}/Endpoints/
+    - workspace/output/src/{BackendName}/DTOs/
+    - workspace/output/src/{BackendName}/Mappers/
+    - workspace/output/src/{BackendName}/Program.cs  # augment
+    - workspace/output/plans/{n}-{m}-*.back.md    # mode :plan uniquement
+  forbidden_reads:
+    - workspace/output/us/{other}                 # autres US
+    - workspace/input/specs/
+    - workspace/input/ui/{other}.html             # mockups HTML d'autres US
+    - .claude/stacks/frontend/
+    - .claude/stacks/ui/
+  modes:
+    - normal: "{n}-{m}"                 # plan inline + code + build
+    - plan_only: "{n}-{m}:plan"         # produit plan, STOP avant code
+    - from_plan: "{n}-{m} + plan exists" # consomme plan, code + build
+  exit_silent_when:
+    - "frontend-only US"                # skipped sans erreur
+
+# -------------------------------------------------------------------------
+# Agent: dev-frontend (Opus 4.7 — depuis 2026-05-08, split modèles)
+# Phase: 4 (génération code client)
+# Token footprint estimé: ~5-10 KB par US (HTML + CLAUDE.md + stacks)
+# Invocations parallèles : 1 par US frontend
+# v4.0.0 : plus de PNG vision, plus de UI markdown intermédiaire.
+# Lecture directe du mockup HTML statique (texte).
+# -------------------------------------------------------------------------
+dev-frontend:
+  reads:
+    - workspace/output/us/{n}-{m}-*.md            # US ciblée (1 fichier)
+    - workspace/input/ui/{n}-{m}-*.html           # mockup HTML statique = source
+                                        # de vérité visuelle (libellés,
+                                        # structure, classes, couleurs
+                                        # inline). Lecture texte directe.
+    - workspace/output/plans/{n}-{m}-*.front.md   # plan existant si /dev-plan
+                                        # a tourné — mode From Plan
+    - workspace/output/src/{Project}/CLAUDE.md    # CLAUDE.md par projet
+    - workspace/input/stack/stack.md              # lu UNE FOIS en STEP 0 Phase B (v5.0)
+    - .claude/stacks/frontend/{active}.md  # fallback si CLAUDE.md insuffisant
+    - .claude/stacks/ui/{active}.md        # mapping composants DS (§2 + §7)
+    - .claude/stacks/auth/{active}.md      # patterns d'injection auth client
+    # v5.0 Inline Rules (dans agents/dev-frontend.md, plus de Read mandatory) :
+    #   - responsibilities.md §11-§12
+    #   - stack-completeness.md
+    #   - file-ownership.md §1-§2
+    #   - qa-ownership.md §1, §4
+    # v6.1 Read mandatory ajouté (depuis 2026-05-08) :
+    #   - .claude/rules/error-classification.md
+    # v5.0 Reads conditionnels (lazy) :
+    #   - workspace/output/context/constitution.md  # uniquement si terme ambigu
+    #   - workspace/output/context/adrs/INDEX.md    # uniquement au STEP 6 avant création ADR
+    #   - workspace/output/context/adrs/*.md        # fallback si INDEX.md absent
+    # v5.0 Économie : ~16-20k tokens/dispatch
+  writes:
+    - workspace/output/src/{AppName}/Pages/
+    - workspace/output/context/adrs/ADR-{YYYYMMDDTHHmmss}-*.md # timestamp atomique
+    - workspace/output/src/{AppName}/Components/
+    - workspace/output/src/{AppName}/Layouts/
+    - workspace/output/src/{AppName}/wwwroot/css/theme.css  # augment
+    - "**/*.razor.css"                  # CSS isolé adjacent
+    - workspace/output/src/{AppName}/Program.cs   # augment éventuel
+    - workspace/output/plans/{n}-{m}-*.front.md   # mode :plan uniquement
+  forbidden_reads:
+    - workspace/output/us/{other}                 # autres US
+    - workspace/input/specs/
+    - workspace/input/ui/{other}.html             # mockups HTML des autres US
+    - .claude/stacks/backend/           # hors auth
+  exit_silent_when:
+    - "backend-only US"                 # skipped sans erreur
+  modes:
+    - normal: "{n}-{m}"                 # plan inline + code + build + fidelity check
+    - plan_only: "{n}-{m}:plan"         # produit plan, STOP avant code
+    - from_plan: "{n}-{m} + plan exists" # consomme plan, code + build + fidelity check
+  fidelity_check:                       # v4 — STEP 11 dev-frontend (text-based)
+    - extraire libellés, classes-clés, structure du HTML source
+    - grep le markup généré pour vérifier présence des libellés
+    - vérifier que les composants HTML mappés vers le DS ont leur
+      pendant dans le markup (RadzenButton, RadzenDataGrid, etc.)
+    - STOP + ERROR sur libellé/structure absent
+
+# -------------------------------------------------------------------------
+# Agent: validator — RETIRÉ EN v6.0
+# -------------------------------------------------------------------------
+# La validation sémantique (mesurabilité ACs, ambiguïtés, hypothèses) a
+# été retirée pour économie tokens (~1.4M par /sdd-full). La commande
+# /spec-validate est désormais 100% déterministe via PowerShell
+# (validate-readiness.ps1). La review sémantique est à la charge du
+# PO humain lors de la review de la SPEC.
+#
+# Pour re-introduire localement, restaurer agents/validator.md depuis
+# git history < v6.0 et restaurer la STEP 4 dans commands/spec-validate.md.
+# -------------------------------------------------------------------------
+
+# -------------------------------------------------------------------------
+# Agent: elicitor (Sonnet 4.6) — v3, P3
+# Phase: 1.5 (élicitation structurée, optionnelle)
+# Token footprint estimé:
+#   - interactif: ~10-15 KB (5×1-2 questions + synthèse)
+#   - --quick: ~5-8 KB (génération directe)
+# -------------------------------------------------------------------------
+elicitor:
+  reads:
+    - workspace/input/specs/{n}-*.md             # SPEC ciblée
+    - .claude/templates/risks-assumptions.template.md
+    - workspace/output/context/constitution.md   # si présent (acteurs cumulés)
+    # v5.0 Inline Rules (dans agents/elicitor.md, plus de Read mandatory) :
+    #   - responsibilities.md
+    # v5.0 Économie : ~6-8k tokens/invocation
+  writes:
+    - workspace/input/specs/{n}-*.md             # APPEND-ONLY 5 sections enrichies
+    - workspace/output/context/constitution.md   # APPEND-ONLY §7 (risques + hypothèses)
+  forbidden_reads:
+    - workspace/input/stack/                     # hors scope élicitation
+    - workspace/input/ui/                        # hors scope élicitation
+    - workspace/output/us/                       # antérieur dans le pipeline
+    - workspace/output/src/                      # post-implementation
+  techniques:                          # 5 techniques d'élicitation
+    - 1_pre_mortem: "risques projet (3-5 risques classifiés)"
+    - 2_first_principles: "hypothèses implicites (max 7)"
+    - 3_red_team: "edge cases (max 8)"
+    - 4_stakeholder_mapping: "RACI (max 6)"
+    - 5_inversion: "failure modes (max 4)"
+  modes:
+    - interactive: "5×1-2 questions, default"
+    - quick: "--quick flag, génération directe sans question"
+
+# -------------------------------------------------------------------------
+# Agent: qa (Sonnet 4.6) — v3.1.0
+# Phase: 5 (tests unitaires + coverage + quality scan)
+# Token footprint estimé:
+#   - quality-only: ~3 KB (rapport seulement, scan déterministe)
+#   - tests-only: ~17-27 KB (génération tests Sonnet)
+#   - tests+coverage: ~17-27 KB (coverage parsing gratuit en tokens)
+#   - full: ~20-30 KB (recommandé)
+# -------------------------------------------------------------------------
+qa:
+  reads:
+    - workspace/input/specs/{n}-*.md             # SPEC parente (passif, ACs)
+    - workspace/output/us/{n}-*.md               # US ciblées
+    - workspace/input/ui/{n}-*.html              # HTML mockups (passif, comportements UI)
+    - workspace/output/src/{BackendName}/CLAUDE.md  # architecture backend (passif)
+    - workspace/output/src/{AppName}/CLAUDE.md      # architecture frontend (passif)
+    - workspace/output/db/schema.json            # schema DB pour fixtures
+    - workspace/output/src/{BackendName}/**/*    # code production (read-only sélectif)
+    - workspace/output/src/{AppName}/**/*        # code production (read-only sélectif)
+    - workspace/output/src/{LibName}/**/*        # contrats partagés
+    - .claude/stacks/qa/{active}.md    # tous QA stacks actifs (sélectif)
+    # v5.0 Inline Rules (dans agents/qa.md, plus de Read mandatory) :
+    #   - responsibilities.md
+    #   - qa-ownership.md §1-§3
+    #   - qa-coverage.md §2-§3
+    #   - stack-completeness.md (scope étendu : tous stacks actifs §2.4)
+    # v6.1 Read mandatory ajouté (depuis 2026-05-08) :
+    #   - .claude/rules/error-classification.md (taxonomie QA §1.7)
+    # v5.0 Reads conditionnels (lazy) :
+    #   - workspace/output/context/constitution.md  # uniquement si terme ambigu
+    # v5.0 Économie : ~25-35k tokens/invocation
+  writes:
+    - workspace/output/src/{BackendName}.Tests/**     # tests backend (xUnit/JUnit/pytest)
+    - workspace/output/src/{AppName}.Tests/**         # tests Blazor (bUnit) si applicable
+    - "workspace/output/src/**/__tests__/**"          # tests Node/React/Vue
+    - "workspace/output/src/**/*.spec.ts"             # tests Angular Jasmine
+    - "workspace/output/src/**/*.test.ts"             # tests Vitest adjacents
+    - "workspace/output/src/**/test_*.py"             # tests Python
+    - "workspace/output/src/**/*Test.kt"              # tests Kotlin JUnit
+    - workspace/output/qa/feat-{n}/report.md          # rapport consolidé
+    - workspace/output/qa/feat-{n}/coverage.json      # schéma normalisé (via parse-coverage.ps1)
+    - workspace/output/qa/feat-{n}/quality.json       # sonar-like (via quality-scan.ps1)
+  forbidden_reads:
+    - workspace/input/stack/                     # hors scope QA (lecture indirecte via QA stacks)
+  forbidden_writes:
+    - workspace/output/src/{BackendName}/Services/  # code production (read-only strict)
+    - workspace/output/src/{AppName}/Pages/         # code production (read-only strict)
+    - workspace/output/src/{LibName}/Models/        # code production (read-only strict)
+    - workspace/output/context/constitution.md      # constitution read-only
+    - workspace/output/context/adrs/                # ADRs read-only
+  modes:                               # selon QAMode dans Project Config
+    - off: "agent jamais invoqué"
+    - quality-only: "skip génération tests + coverage, ne fait que quality scan + linter"
+    - tests-only: "skip quality scan + coverage, ne fait que génération + run tests"
+    - tests+coverage: "skip quality scan, fait tests + run + coverage parsing"
+    - full: "tous les STEP (recommandé)"
+    - manual: "skip auto-invoke par /sdd-full ; user lance /qa-generate manuellement"
+
+# -------------------------------------------------------------------------
+# Agent: dashboard (Haiku 4.5) — depuis 2026-05-08
+# Phase: fin de pipeline (sdd-full STEP 4.7, dev-run STEP 6.5,
+#        qa-generate STEP 6.5, arch STEP 12.7) ou manuel via /doc-refresh
+# Token footprint estimé: ~2-5 KB (rendu déterministe Haiku)
+# -------------------------------------------------------------------------
+dashboard:
+  reads:
+    - .claude/templates/dashboard-readme.template.html
+    - .claude/templates/adrs-index.template.md
+    - .claude/templates/qa-dashboard.template.html
+    - .claude/rules/error-classification.md
+    - workspace/input/specs/*.md           # Glob, lecture passive
+    - workspace/output/us/*.md             # Glob, statuts
+    - workspace/output/validation/*.md     # Glob, readiness
+    - workspace/output/plans/*.md          # Glob, plans
+    - workspace/output/qa/feat-*/coverage.json
+    - workspace/output/qa/feat-*/quality.json
+    - workspace/output/qa/feat-*/api-tests.json
+    - workspace/output/context/adrs/ADR-*.md  # Glob
+  writes:
+    - workspace/output/dashboard/README.html
+    - workspace/output/context/adrs/INDEX.md
+    - workspace/output/qa/feat-{n}/dashboard.html  # 1 fichier par feature avec QA
+  forbidden_reads:
+    - workspace/input/stack/                # hors scope rendu
+    - workspace/output/src/                 # hors scope rendu
+    - .claude/stacks/                       # hors scope rendu
+  forbidden_writes:
+    - workspace/output/us/                  # responsabilité po
+    - workspace/output/src/                 # responsabilité dev-* / arch / qa
+    - workspace/output/context/constitution.md  # responsabilité po / arch / elicitor
+    - workspace/output/context/adrs/ADR-*.md    # responsabilité arch / dev-*
+    - workspace/output/qa/feat-*/coverage.json  # responsabilité qa
+    - workspace/output/qa/feat-*/quality.json   # responsabilité qa
+    - workspace/output/qa/feat-*/report.md      # responsabilité qa
+  idempotent: true                          # peut être ré-invoqué sans risque
+
+# -------------------------------------------------------------------------
+# v4.0.0 — Suppression agent UI + bascule HTML direct
+# -------------------------------------------------------------------------
+# - Agent UI supprimé : plus d'extraction PNG → markdown
+# - Mockups HTML statiques dans workspace/input/ui/{n}-{m}-{Name}.html
+# - dev-frontend lit l'HTML directement en texte (pas multimodal)
+# - Mapping HTML → composant DS dans stacks/ui/*.md §2 + §7
+# - Plus de workspace/output/ui/ (dossier supprimé)
+# - Économie tokens : -10-25 KB/PNG (agent UI) + -3-5 KB/US (vision dev-frontend)
+# - Économie tokens totale : ~15-30 KB par US ayant un mockup
+# - Fidelity check devient text-based (grep libellés HTML vs markup généré)
+
+# -------------------------------------------------------------------------
+# Économie tokens v3.1.0 (Phase 5 QA)
+# -------------------------------------------------------------------------
+# - Coverage parsing 100% déterministe (PowerShell parse-coverage.ps1) → 0 token
+# - Quality scan 100% déterministe (PowerShell quality-scan.ps1) → 0 token
+# - Linter / type checker stack-native (Bash) → 0 token
+# - Sonnet 4.6 (pas Opus) sur génération de tests
+# - Lecture sélective stricte par US (jamais Glob *)
+# - Total Phase 5 : ~17-27k tokens par feature en mode "full"

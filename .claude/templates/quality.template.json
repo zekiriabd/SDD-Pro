@@ -1,0 +1,64 @@
+{
+  "spec": 0,
+  "extractedAt": "2026-05-05T14:32:18Z",
+  "summary": {
+    "total_files": 0,
+    "errors": 0,
+    "warnings": 0,
+    "info": 0
+  },
+  "errors": [
+    {
+      "category": "todo",
+      "severity": "error",
+      "file": "output/src/SIMBackend/Services/AuthService.cs",
+      "line": 42,
+      "tag": "TODO",
+      "message": "TODO: implement token refresh"
+    }
+  ],
+  "warnings": [
+    {
+      "category": "debug-output",
+      "severity": "warning",
+      "file": "output/src/SIM/Pages/Login.razor.cs",
+      "line": 15,
+      "tag": "js-debug",
+      "message": "Debug output left in production code"
+    },
+    {
+      "category": "hardcoded-hex",
+      "severity": "warning",
+      "file": "output/src/SIM/Components/Header.razor",
+      "line": 8,
+      "tag": "hex-outside-theme",
+      "message": "Hex value #FF6600 hardcoded outside theme.css - use CSS var or token"
+    },
+    {
+      "category": "long-method",
+      "severity": "warning",
+      "file": "output/src/SIMBackend/Services/AuthService.cs",
+      "line": 120,
+      "tag": "method-over-50-lines",
+      "message": "Method spans approximately 75 lines - consider refactoring"
+    }
+  ],
+  "info": [
+    {
+      "category": "commented-code",
+      "severity": "info",
+      "file": "output/src/SIM/Pages/Dashboard.razor.cs",
+      "line": 50,
+      "tag": "commented-out-code",
+      "message": "Block of 8 commented-out code lines - consider removing"
+    },
+    {
+      "category": "magic-number",
+      "severity": "info",
+      "file": "output/src/SIMBackend/Services/PaginationService.cs",
+      "line": 25,
+      "tag": "literal-numeric",
+      "message": "Magic number '500' - consider extracting to a named constant"
+    }
+  ]
+}

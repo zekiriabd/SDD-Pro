@@ -1,0 +1,787 @@
+﻿# Tech Spec: react (frontend)
+
+Status: Draft  
+Tech Spec ID: tech-react  
+Scope: frontend uniquement (React SPA)
+
+---
+
+## 1. Architecture
+
+### 1.1 Pattern applicatif
+React SPA consommant les APIs backend via **TanStack Query** (server
+state cache + retry + invalidation). Routing **TanStack Router**
+file-based avec generation auto du routeTree par plugin Vite. Forms
+via **React Hook Form + Zod** (validation type-safe inferee des
+schemas). Internationalisation **i18next + react-i18next** (FR/EN).
+Monorepo orchestre par **Turborepo** avec versions centralisees via
+**pnpm workspaces `catalog:` protocol**.
+
+Architecture standard :
+
+Route → Page → Component → Hook (useQuery / useMutation) → API client → Backend
+
+Les modeles de donnees (DTO, `ApiResponse<T>`) sont partages avec le
+backend via un package `{LibName}` du monorepo lorsque disponible
+(ex. `packages/contracts/` consomme par `apps/web/`).
+
+---
+
+### 1.2 Couches
+
+- **Route** : fichier sous `src/routes/` (file-based TanStack Router) ; le `routeTree.gen.ts` est genere par `@tanstack/router-plugin` au build et au dev.
+- **Page** : composant rendu par une route, sous `src/pages/` (vue principale d'une URL).
+- **Component metier** : composant reutilisable applicatif, sous `src/components/`.
+- **Component UI** : primitives shadcn/ui style new-york, sous `src/components/ui/` (generes par `npx shadcn@latest add`).
+- **Layout** : wrapper global (header/sidebar/footer) sous `src/layouts/`, monte via `<Outlet />` TanStack Router.
+- **Hook (server state)** : `useXxxQuery` / `useXxxMutation` encapsulant `@tanstack/react-query`, sous `src/hooks/`.
+- **API client** : fetch typed depuis `src/api/` (1 client par domaine, contrat partage avec backend via `{LibName}`).
+- **Form** : `useForm({ resolver: zodResolver(schema) })` collocates avec la page/component qui l'utilise. Schema Zod sous `src/schemas/`.
+- **Auth** : configuration MSAL React (provider) + hooks d'acces token, sous `src/auth/`.
+- **i18n** : fichiers de traduction sous `src/i18n/{lang}/`, init de i18next dans `src/i18n/index.ts`.
+
+---
+
+### 1.3 Mapping couche → repertoire
+
+Convention Vite + pnpm workspaces 2026 : tout sous
+`workspace/output/src/{AppName}/apps/web/src/` sauf les fichiers de
+config racine du workspace et de l'app. Path aliases `@/*` → `./src/*`
+(vite.config.ts + tsconfig.json) imposes pour permettre les imports
+shadcn `@/components/ui/...`.
+
+**Code applicatif** (sous `apps/web/src/`) :
+
+- Route (file-based) → `workspace/output/src/{AppName}/apps/web/src/routes/`
+- Route tree genere → `workspace/output/src/{AppName}/apps/web/src/routeTree.gen.ts` (auto, jamais main-edit)
+- Page → `workspace/output/src/{AppName}/apps/web/src/pages/`
+- Component metier → `workspace/output/src/{AppName}/apps/web/src/components/`
+- **Component UI shadcn** → `workspace/output/src/{AppName}/apps/web/src/components/ui/` (genere par `npx shadcn@latest add <component>`, jamais main-edit)
+- Layout → `workspace/output/src/{AppName}/apps/web/src/layouts/`
+- Hook (TanStack Query wrappers) → `workspace/output/src/{AppName}/apps/web/src/hooks/`
+- API client → `workspace/output/src/{AppName}/apps/web/src/api/`
+- Schema Zod → `workspace/output/src/{AppName}/apps/web/src/schemas/`
+- Auth → `workspace/output/src/{AppName}/apps/web/src/auth/`
+- **Lib (shadcn helpers)** → `workspace/output/src/{AppName}/apps/web/src/lib/` (contient `utils.ts` avec `cn()`)
+- Utils metier → `workspace/output/src/{AppName}/apps/web/src/utils/`
+- i18n → `workspace/output/src/{AppName}/apps/web/src/i18n/` (`{lang}/translation.json` + `index.ts`)
+- Assets → `workspace/output/src/{AppName}/apps/web/src/assets/`
+
+**Entry points** :
+
+- Root → `workspace/output/src/{AppName}/apps/web/src/main.tsx`
+- App → `workspace/output/src/{AppName}/apps/web/src/App.tsx` (monte `RouterProvider` + `QueryClientProvider` + `I18nextProvider`)
+- Global CSS (Tailwind v4 `@theme` + tokens shadcn) → `workspace/output/src/{AppName}/apps/web/src/index.css`
+
+**Contrats partages cross-package** (monorepo) :
+
+- DTOs / contrats API → `workspace/output/src/{AppName}/packages/{LibName}/src/` (consomme par l'app via `import { ... } from '@{AppName}/{LibName}'`)
+
+**Config racine workspace** (jamais sous src/) :
+
+- pnpm workspace + version catalog → `workspace/output/src/{AppName}/pnpm-workspace.yaml`
+- Turbo task graph → `workspace/output/src/{AppName}/turbo.json`
+- Workspace root manifest → `workspace/output/src/{AppName}/package.json` (private, `"workspaces"` pnpm uniquement)
+
+**Config app** (sous `apps/web/`) :
+
+- App manifest → `workspace/output/src/{AppName}/apps/web/package.json` (depend de `catalog:`)
+- Vite config → `workspace/output/src/{AppName}/apps/web/vite.config.ts` (plugins `@vitejs/plugin-react`, `@tailwindcss/vite`, `@tanstack/router-plugin`)
+- TS config → `workspace/output/src/{AppName}/apps/web/tsconfig.json` + `tsconfig.app.json`
+- Tailwind v4 → directement dans `index.css` (`@import "tailwindcss"; @theme { ... }`) — plus de `tailwind.config.ts` ni `postcss.config.js`
+- shadcn manifest → `workspace/output/src/{AppName}/apps/web/components.json` (style: "new-york")
+
+---
+
+### 1.4 Principes non negociables
+
+- Aucune logique metier dans composants UI.
+- Aucun appel HTTP direct depuis composants.
+- Tous appels via services.
+- Retry jamais manuel.
+- Retry via TanStack Query.
+- Aucun console.log brut.
+- Logging structure obligatoire.
+- Traductions jamais codees en dur.
+- Toujours utiliser i18next.
+- Toujours utiliser hooks React.
+- Aucun state global hors store.
+- Lazy loading obligatoire.
+- DTO strictement typés.
+
+---
+
+## 2. Stack
+
+### 2.1 Identite
+
+- **Stack ID** : `front-react`
+- **Langage** : TypeScript
+- **Runtime** : Node.js 22+
+- **Framework principal** : React 19+
+- **Build tool** : Vite
+- **Namespace racine** : `{AppNamespace}`
+
+---
+
+### 2.2 Outils
+
+- **Project file** : `workspace/output/src/{AppName}/package.json`
+- **Build** : `npm --prefix workspace/output/src/{AppName} run build`
+- **Dev** : `npm --prefix workspace/output/src/{AppName} run dev`
+- **Preview** : `npm --prefix workspace/output/src/{AppName} run preview`
+- **Smoke Command** :
+
+```bash
+npm --prefix workspace/output/src/{AppName} run build
+test -f workspace/output/src/{AppName}/dist/index.html
+```
+
+- **Package manager** : npm
+- **Lint** : ESLint
+- **Format** : Prettier
+- **Type-check** : TypeScript
+
+---
+
+### 2.2.1 Init Commands
+
+Setup canonique React 19 + TypeScript + Vite + Tailwind v4 + shadcn/ui
+(version 2026, conforme officiel `npx shadcn@latest init`).
+
+```bash
+# 1. Vite + React TS scaffolding
+mkdir -p workspace/output/src
+cd workspace/output/src
+npm create vite@latest {AppName} -- --template react-ts
+cd {AppName}
+npm install
+
+# 2. TypeScript path aliases (requis par shadcn pour @/components/ui)
+#    Remplacer tsconfig.json + tsconfig.app.json compilerOptions.paths :
+#      "baseUrl": ".",
+#      "paths": { "@/*": ["./src/*"] }
+#    Et vite.config.ts : ajouter `resolve: { alias: { "@": path.resolve(__dirname, "./src") } }`
+#    + import path from "path" + import "@types/node"
+npm install --save-dev @types/node
+
+# 3. Tailwind v4 (CSS-first, plus simple que v3)
+npm install tailwindcss @tailwindcss/vite
+
+# 4. shadcn/ui CLI init (genere components.json, src/lib/utils.ts,
+#    src/index.css avec tokens shadcn, configure tailwind.config si v3)
+#    Flags: -d default theme (Slate, neutral), -y skip prompts
+npx shadcn@latest init -d -y
+
+# 5. Components shadcn de base (couvre 80% des UI courantes)
+#    Chaque add pulle automatiquement les @radix-ui/* deps necessaires
+npx shadcn@latest add button card input label textarea select checkbox switch \
+    form dialog dropdown-menu badge avatar tabs tooltip toast skeleton \
+    alert progress separator
+
+# 6-7. Packages applicatifs (versions pinned via react.libs.json)
+#    Variante pnpm workspaces + Turborepo (recommandee) : voir manifest.versionCatalogPath.
+```
+
+<!-- CORE_PACKAGES_START -->
+```bash
+# Auto-genere depuis react.libs.json -- ne pas editer (utiliser sync-stack-md.ps1).
+(cd workspace/output/src/{AppName} && pnpm add \
+  react@19.0.0 \
+  react-dom@19.0.0 \
+  @types/react@19.0.2 \
+  @types/react-dom@19.0.2 \
+  vite@6.0.5 \
+  @vitejs/plugin-react@4.3.4 \
+  typescript@5.7.2 \
+  tailwindcss@4.0.0 \
+  @tailwindcss/vite@4.0.0 \
+  tailwind-merge@2.5.5 \
+  clsx@2.1.1 \
+  class-variance-authority@0.7.1 \
+  lucide-react@0.468.0 \
+  @tanstack/react-query@5.62.7 \
+  @tanstack/react-query-devtools@5.62.7 \
+  @tanstack/react-router@1.95.0 \
+  @tanstack/router-plugin@1.95.0 \
+  @tanstack/router-devtools@1.95.0 \
+  react-hook-form@7.54.1 \
+  zod@3.24.1 \
+  @hookform/resolvers@3.10.0 \
+  i18next@24.1.0 \
+  react-i18next@15.2.0 \
+  i18next-browser-languagedetector@8.0.2 \
+  turbo@2.3.3 \
+  eslint@9.17.0 \
+  typescript-eslint@8.18.1)
+```
+<!-- CORE_PACKAGES_END -->
+
+```bash
+# 8. Verification finale
+cd workspace/output/src/{AppName}
+npm run build  # doit passer sans erreur de resolution d'import
+```
+
+<!-- ONDEMAND_PACKAGES_START -->
+```bash
+# Auto-genere depuis react.libs.json (on-demand) -- installe par dev-* si l'US declenche un trigger.
+# capability: i18n-http-loading
+(cd workspace/output/src/{AppName} && pnpm add i18next-http-backend@3.0.1)
+
+# capability: auth-azure-ad
+(cd workspace/output/src/{AppName} && pnpm add @azure/msal-browser@3.27.0 @azure/msal-react@2.2.0)
+```
+<!-- ONDEMAND_PACKAGES_END -->
+
+**Note Tailwind v4 vs v3** : `shadcn@latest init` detecte automatiquement
+la version installee. v4 est preferee (CSS-first config, pas de
+`postcss.config.js` ni `tailwind.config.ts` requis ; les tokens shadcn
+vivent dans `src/index.css` via `@theme`). Si v3 est imposee par une
+contrainte projet, le CLI bascule sur la config classique
+`tailwind.config.ts` + `postcss.config.js`.
+
+**Idempotence** : si `package.json` existe deja, sauter STEP 1. Si
+`components.json` existe deja, sauter STEP 4. Le STEP 5 (`shadcn add`)
+re-genere uniquement si le component manque (idempotent par design).
+
+---
+
+### 2.3 Patterns erreurs compilation
+
+Format standard TypeScript :
+
+error TSxxxx: message
+
+Codes prioritaires :
+
+- TS2307
+- TS2322
+- TS7006
+- TS2339
+- TS2554
+
+---
+
+<!-- LIBS_CATALOG_START -->
+### 2.4 Librairies
+
+> Source de verite : `.claude/stacks/frontend/react.libs.json`. Ne pas editer cette section manuellement -- utiliser `.claude/scripts/sync-stack-md.ps1 -StackId react`.
+
+#### 2.4.a Librairies CORE (installees par arch en section 2.2.1, toujours)
+
+| Lib | Version | Role |
+|-----|---------|------|
+| react | 19.0.0 |  |
+| react-dom | 19.0.0 |  |
+| @types/react | 19.0.2 |  |
+| @types/react-dom | 19.0.2 |  |
+| vite | 6.0.5 |  |
+| @vitejs/plugin-react | 4.3.4 |  |
+| typescript | 5.7.2 |  |
+| tailwindcss | 4.0.0 |  |
+| @tailwindcss/vite | 4.0.0 |  |
+| tailwind-merge | 2.5.5 |  |
+| clsx | 2.1.1 |  |
+| class-variance-authority | 0.7.1 |  |
+| lucide-react | 0.468.0 |  |
+| @tanstack/react-query | 5.62.7 |  |
+| @tanstack/react-query-devtools | 5.62.7 |  |
+| @tanstack/react-router | 1.95.0 |  |
+| @tanstack/router-plugin | 1.95.0 |  |
+| @tanstack/router-devtools | 1.95.0 |  |
+| react-hook-form | 7.54.1 |  |
+| zod | 3.24.1 |  |
+| @hookform/resolvers | 3.10.0 |  |
+| i18next | 24.1.0 |  |
+| react-i18next | 15.2.0 |  |
+| i18next-browser-languagedetector | 8.0.2 |  |
+| turbo | 2.3.3 |  |
+| eslint | 9.17.0 |  |
+| typescript-eslint | 8.18.1 |  |
+
+### 2.4.b Librairies ON-DEMAND (installees si l'US declenche)
+
+Triggers (regex case-insensitive) cherches par `detect-capabilities.ps1` dans l'US + ACs.
+
+| Capability | Lib | Version | Triggers |
+|---|---|---|---|
+| i18n-http-loading | i18next-http-backend | 3.0.1 | traductions.*serveur, i18n.*lazy, load.*translations.*remote |
+| auth-azure-ad | @azure/msal-browser | 3.27.0 | azure ad, msal, single sign-on, sso, oauth2.*spa, @azure/msal |
+| auth-azure-ad | @azure/msal-react | 2.2.0 | azure ad, msal, single sign-on, sso, oauth2.*spa, @azure/msal |
+<!-- LIBS_CATALOG_END -->
+
+## 3. Conventions d'usage
+
+### 3.1 API client — fetch typed centralise (plus d'Axios)
+
+Profil 2026 : appeler les APIs via un module typed dans `src/api/`,
+avec `fetch` natif (pas de dependance Axios). Le wrapping `useQuery` /
+`useMutation` (TanStack Query) gere retry, cache, backoff. Le seul
+role du module API client est :
+
+- composer l'URL (`import.meta.env.VITE_API_BASE_URL`)
+- attacher le header `Authorization: Bearer <token>` (via auth provider
+  actif, ex. MSAL pour azure-ad)
+- decoder JSON + valider la forme via Zod (optional mais recommande)
+- mapper 4xx/5xx vers une exception typee
+
+Fichier : `apps/web/src/api/httpClient.ts` — fonction
+`apiFetch<TResponse>(input, init)` re-utilisee par tous les domaines.
+
+Interdits :
+- `axios` (retire du stack au profit du fetch natif + TanStack Query)
+- `fetch` direct dans un composant (toujours via `apiFetch`)
+- Instanciation HTTP client dans un component / hook UI
+
+---
+
+### 3.2 TanStack Query — server state
+
+Tous les appels backend passent par un hook colocate dans
+`src/hooks/{domain}/useXxxQuery.ts` ou `useXxxMutation.ts` :
+
+```ts
+export function usePointsDeVenteQuery(page: number, pageSize: number) {
+  return useQuery({
+    queryKey: ['pointsDeVente', { page, pageSize }],
+    queryFn:  ({ signal }) => apiFetch<PagedOutput<PointDeVenteDto>>(
+      `/api/v1/points-de-vente?page=${page}&pageSize=${pageSize}`,
+      { signal }
+    )
+  });
+}
+```
+
+Retry, cache (staleTime, gcTime), invalidation : configures
+globalement dans `QueryClient` au mount de l'app, surcharges au cas
+par cas dans le hook.
+
+Aucun `useState + useEffect + fetch` pour appeler une API. Si le hook
+n'est pas idempotent par construction → `useMutation` (POST/PUT/DELETE).
+
+---
+
+### 3.3 TanStack Router — routing file-based type-safe
+
+- **Definition** : un fichier par route sous `src/routes/` (convention
+  file-based). Le plugin `@tanstack/router-plugin` regenere
+  `routeTree.gen.ts` au dev/build — ce fichier ne doit JAMAIS etre
+  edite manuellement.
+- **Layouts** : route parent rend `<Outlet />` ; routes enfants
+  herit ent.
+- **Lazy loading** : convention `_layout.tsx` + `index.lazy.tsx`
+  (route splitting automatique).
+- **Type safety** : params, search params, loaders typed end-to-end —
+  `Link`, `useNavigate`, `useParams`, `useSearch` derivent les types
+  depuis `routeTree.gen.ts`.
+
+Aucun `react-router-dom`. Aucun routing imperatif via
+`window.location`.
+
+---
+
+### 3.4 React Hook Form + Zod — formulaires
+
+Pattern unique pour tout formulaire :
+
+```ts
+const schema = z.object({
+  nom:        z.string().min(1, 'Nom requis'),
+  surface:    z.number().int().nonnegative()
+});
+type FormValues = z.infer<typeof schema>;
+
+const { register, handleSubmit, formState: { errors } } = useForm<FormValues>({
+  resolver: zodResolver(schema),
+  defaultValues: { nom: '', surface: 0 }
+});
+```
+
+- Le schema Zod est la **source unique** des regles de validation
+  cote client (le backend FluentValidation reste source de verite
+  serveur — duplication assumee, on ne suppose JAMAIS).
+- Schemas sous `src/schemas/{domain}.ts`, importables aussi par les
+  hooks de mutation (validation pre-call optionnelle).
+- Aucun `useState` de champ par champ ; aucun handler `onChange`
+  manuel ; aucun validateur `regex` inline.
+
+---
+
+### 3.5 i18next + react-i18next — internationalisation
+
+- Init dans `src/i18n/index.ts` (charge `LanguageDetector` + ressources).
+- Fichiers de traduction : `src/i18n/{lang}/translation.json` (FR + EN
+  par defaut, etendre via fichier additionnel).
+- Usage : `const { t } = useTranslation();` puis `t('key.path')`.
+- Cle i18n obligatoire pour TOUTE chaine UI affichee. Aucun string
+  litteral hardcode dans les composants.
+- Pluriel + interpolation natifs (`t('items', { count })`).
+
+---
+
+### 3.6 Hooks React — usage standard
+
+Hooks de base (`useState`, `useEffect`, `useMemo`, `useCallback`,
+`useRef`, `useId`) + hooks React 19 (`use`, `useOptimistic`,
+`useActionState`) selon besoin. Custom hooks dans `src/hooks/`,
+nommes `useXxx`.
+
+`useEffect` reste reserve aux side-effects synchronises avec un
+DOM/timer/subscription externe — JAMAIS pour declencher un appel API
+(c'est `useQuery` qui le fait).
+
+---
+
+### 3.7 Error Boundaries
+
+Boundary global au niveau App (capture des erreurs render). Boundary
+local optionnel sur sections critiques (route detail) pour eviter
+qu'une erreur isole ne casse toute l'app.
+
+Fichier : `apps/web/src/components/ErrorBoundary.tsx`.
+
+---
+
+### 3.8 Caching navigateur
+
+TanStack Query gere : cache, retry (default 3 avec backoff exponentiel),
+invalidation par `queryKey`, refetch on focus/reconnect (opt-in).
+
+Aucune gestion manuelle (`localStorage`/`sessionStorage` pour cache
+data). Le storage navigateur sert uniquement aux preferences UI
+(theme, langue) et aux artefacts auth (geres par le provider auth).
+
+---
+
+## 4. Integration back -> front
+
+- **Payload** : JSON, DTOs partages via package monorepo `{LibName}`
+  (ex. `import type { PointDeVenteDto } from '@{AppName}/contracts'`).
+- **Versioning API** : `/api/v{N}/...` (cf. `dotnet-minimalapi.md §2.6`
+  cote backend).
+- **Errors** : RFC 7807 `ProblemDetails` decode par `apiFetch` et
+  remonte sous forme d'exception typee.
+- **Client HTTP** : `fetch` natif via `apiFetch` (cf. §3.1) + TanStack
+  Query (cf. §3.2). Pas d'Axios.
+- **Auth** : provider declare dans `workspace/input/stack/stack.md
+  ## Active Auth Specs` (ex. `auth-local`, `azure-ad`, `oauth2`). Le
+  stack auth actif fournit le composant provider racine, le hook
+  d'acces token consomme par `apiFetch`, et les flows login/logout.
+  Voir `.claude/stacks/auth/*.md`.
+
+---
+
+## 5. URLs de developpement
+
+Frontend dev :
+
+http://localhost:5173
+
+Backend :
+
+http://localhost:5099
+
+Configuration API :
+
+.env
+
+VITE_API_BASE_URL=http://localhost:5099
+
+---
+
+## 6. State Management
+
+Profil 2026 : pas de store global generique. Le state est decoupe par
+nature :
+
+- **Server state** (donnees provenant du backend) → TanStack Query
+  (cache automatique, invalidation, retry). Voir §3.2.
+- **URL state** (filtres, pagination, onglet actif persistable dans
+  l'URL) → search params TanStack Router (`Route.useSearch()` typed).
+- **Form state** → React Hook Form (`useForm`). Voir §3.4.
+- **Local UI state** (open/close de menu, hover, focus) → `useState`
+  colocate dans le composant.
+- **Auth state** → fourni par le provider auth (MSAL, etc.), expose
+  via hook (`useAuth()`). Voir §3.1 / §3.4 du stack auth actif.
+- **Settings persistent** (theme, langue) → `localStorage` + petit
+  hook `useLocalStorage` ou `useStoredState` (3 cles max).
+
+Pas de store global type Zustand/Redux/Pinia. Si un besoin de state
+global complexe emerge sur une feature → le justifier dans un ADR
+avant d'ajouter une lib.
+
+---
+
+## 7. Multilingue
+
+Gestion via :
+
+i18next.
+
+Structure :
+
+i18n/
+
+fr.json  
+en.json  
+
+Langue :
+
+?langue=fr
+
+---
+
+## 8. Authentification
+
+Pas de provider auth fixe dans ce stack. L'integration est decouplee :
+le stack auth actif declare dans `workspace/input/tech/stack.md ## Active Auth Specs`
+fournit le provider, les flows login/logout, et le wiring Bearer token.
+
+Patterns supportes (selon `## Active Auth Specs`) :
+
+- **auth-local** — formulaire credentials → POST `/api/auth/login` →
+  JWT stocke (httpOnly cookie ou Authorization header) → context React
+- **azure-ad** — MSAL React popup/redirect → token cache MSAL → context
+- **oauth2** — flow PKCE → token endpoint → storage securise → context
+- **cognito** — Amplify Auth ou amazon-cognito-identity-js
+
+**Contrats croises (tous providers)** :
+
+- Token transmis sur chaque requete API via `apiFetch` (cf. §3.1) :
+  `Authorization: Bearer {token}` (le token est lu depuis le provider auth
+  actif — `useAuth().token` ou equivalent MSAL)
+- Refresh transparent (gere par le SDK auth, ex. MSAL renew silencieux ;
+  401 retourne par `apiFetch` → relance via `useAuth().refresh()` puis retry)
+- Provider expose un context React `useAuth()` avec `{ user, login, logout, token }`
+- Composant `<ProtectedRoute>` route guard standard sur les pages metier
+- Logout = clear context + clear token storage + redirect `/login`
+
+---
+
+## 9. Layout System
+
+Layouts obligatoires.
+
+Structure :
+
+layouts/
+
+MainLayout.tsx  
+AuthLayout.tsx  
+
+---
+
+## 10. Forms
+
+Gestion via :
+
+React Hook Form.
+
+Validation via :
+
+Zod.
+
+Jamais validation manuelle.
+
+---
+
+## 11. Styling
+
+**Tailwind CSS est OBLIGATOIRE** pour ce stack. Le projet shadcn/ui en
+depend integralement (toutes les primitives shadcn sont stylisees via
+Tailwind utility classes + CSS variables).
+
+Hierarchie de styling :
+
+1. **Tokens globaux** (`src/index.css`) — variables CSS shadcn
+   (`--background`, `--foreground`, `--primary`, etc.) injectees par
+   `shadcn init`. Surcharge possible via `.claude/rules/ui-tokens.md §3`
+   pour matcher la fidelite design-spec.md §8.
+2. **Utility classes Tailwind** sur les composants — preferred path.
+   Ex : `className="flex gap-4 px-6 py-4 rounded-lg bg-card"`.
+3. **`cn()` helper** (`src/lib/utils.ts`, genere par `shadcn init`) pour
+   composer des classes conditionnelles + resoudre les conflits.
+   Ex : `cn("base-class", isActive && "bg-primary", className)`.
+4. **CSS isole** (`*.module.css`) — uniquement pour cas exceptionnels
+   non-couvrables par Tailwind (animations complexes, selecteurs
+   parents/sibling avances). Privilegier Tailwind d'abord.
+
+Structure :
+
+- `src/index.css` — directives Tailwind + tokens shadcn (genere par CLI)
+- `src/lib/utils.ts` — `cn()` helper (genere par CLI)
+- `src/components/ui/` — primitives shadcn (genere par `shadcn add`)
+- `src/styles/` — CSS isole exceptionnel uniquement
+
+**Interdits styling** :
+
+- Hex hardcode dans les composants → utiliser `bg-primary`, `text-foreground`, etc.
+- `style={{ ... }}` inline → utiliser className + cn()
+- CSS-in-JS (styled-components, emotion) → out of scope, conflit avec Tailwind
+- Classes Tailwind dupliquees / conflictuelles non resolues par `cn()`
+
+---
+
+## 12. Logging
+
+Logging structure obligatoire.
+
+Logger :
+
+utils/logger.ts
+
+Logs obligatoires :
+
+- HTTP errors
+- UI errors
+- Auth events
+
+Interdits :
+
+console.log
+
+---
+
+## 13. Performance
+
+Optimisations obligatoires :
+
+- React.memo
+- useMemo
+- useCallback
+
+Lazy loading obligatoire :
+
+React.lazy
+
+---
+
+## 14. SEO / Meta
+
+Gestion meta via :
+
+React Helmet.
+
+---
+
+## 15. Structure finale projet (monorepo pnpm + Turborepo)
+
+```
+workspace/output/
+└── src/
+    └── {AppName}/                         # racine workspace (monorepo)
+        ├── pnpm-workspace.yaml             # workspaces + catalog: versions
+        ├── turbo.json                      # task graph (build, dev, lint, test)
+        ├── package.json                    # private root, gere les scripts globaux
+        ├── apps/
+        │   └── web/                        # app frontend (consomme catalog:)
+        │       ├── package.json
+        │       ├── vite.config.ts          # plugins: react, tailwindcss, tanstack-router
+        │       ├── tsconfig.json + tsconfig.app.json + tsconfig.node.json
+        │       ├── components.json         # shadcn manifest (style: new-york)
+        │       ├── .env                    # VITE_API_BASE_URL=http://localhost:5099
+        │       ├── index.html              # entry HTML Vite
+        │       ├── public/                 # assets statiques
+        │       └── src/
+        │           ├── main.tsx            # bootstrap React + Router + Query + i18n providers
+        │           ├── App.tsx             # composition providers + RouterProvider
+        │           ├── routeTree.gen.ts    # GENERE par @tanstack/router-plugin (READ-ONLY)
+        │           ├── index.css           # @import "tailwindcss"; @theme { ... } v4
+        │           ├── routes/             # file-based routes TanStack
+        │           ├── pages/              # vues principales (rendues par routes)
+        │           ├── layouts/            # MainLayout, AuthLayout (Outlet)
+        │           ├── components/         # composants metier
+        │           │   └── ui/             # primitives shadcn (genere, READ-ONLY)
+        │           ├── api/
+        │           │   └── httpClient.ts   # apiFetch<T>() — fetch typed + auth Bearer
+        │           ├── hooks/              # useXxxQuery / useXxxMutation (TanStack Query)
+        │           ├── schemas/            # schemas Zod par domaine
+        │           ├── auth/               # provider auth (selon stack auth actif)
+        │           ├── lib/
+        │           │   └── utils.ts        # cn() helper (genere par shadcn init)
+        │           ├── utils/              # utils metier (logger, formatters, ...)
+        │           ├── i18n/               # fr/translation.json, en/, index.ts
+        │           └── assets/             # images, fonts (statiques)
+        └── packages/
+            └── {LibName}/                  # contrats partages (DTOs, types backend<->front)
+                ├── package.json
+                └── src/
+                    └── index.ts            # exports types & schemas Zod partages
+```
+
+Note : pas de `tailwind.config.ts` ni `postcss.config.js` (Tailwind v4 :
+config CSS-first via `@theme` dans `index.css`). Pas de `router.tsx`
+manuel (TanStack Router en file-based). Pas de `services/` Axios ni
+`store/` Zustand (cf. §3.1, §6).
+
+---
+
+## 16. Commandes runtime
+
+Toutes les commandes utilisent `--prefix workspace/output/src/{AppName}` pour respecter
+l'invariant SDD "Per-stack project-scoped build" — pas de `cd` requis, pas
+d'ambiguïté sur le `package.json` ciblé quand plusieurs stacks coexistent
+sous `workspace/output/src/`.
+
+Dev :
+
+npm --prefix workspace/output/src/{AppName} run dev
+
+Build :
+
+npm --prefix workspace/output/src/{AppName} run build
+
+Preview :
+
+npm --prefix workspace/output/src/{AppName} run preview
+
+Smoke :
+
+npm --prefix workspace/output/src/{AppName} run build
+
+---
+
+## 17. Interdits projet (frontend)
+
+**Architecture / data flow** :
+
+- `fetch` direct dans composants (toujours via `apiFetch` + `useQuery`/`useMutation`)
+- Axios (retire du stack — cf. §3.1)
+- Zustand / Redux / store global generique (cf. §6 — pas de store global, decouper par nature de state)
+- `react-router-dom` (utiliser TanStack Router file-based)
+- Retry manuel (gere par TanStack Query)
+- Logique metier dans UI / composants (toujours dans hooks/services)
+- Traduction en dur (toujours via i18next, cf. §3.5)
+- Validation manuelle (toujours via Zod + react-hook-form, cf. §3.4)
+- Duplication de logique HTTP
+
+**Code quality** :
+
+- `console.log` brut (utiliser `utils/logger.ts` structure)
+- `TODO`, `FIXME` dans le code livre
+- Hardcoded API URL (utiliser `import.meta.env.VITE_API_BASE_URL`)
+- Hardcoded token / secret
+- `any` injustifie dans les types
+
+**Styling / UI design system (shadcn)** :
+
+- Hex hardcode dans les composants → utiliser tokens Tailwind/shadcn
+  (`bg-primary`, `text-foreground`, etc.) ou `var(--color-*)`
+- `style={{ ... }}` inline → utiliser className + `cn()`
+- Edition manuelle des fichiers `src/components/ui/*` generes par
+  `shadcn add` (sont READ-ONLY, regenerer via CLI si surcharge necessaire)
+- **Mix de design systems** : importer un autre kit UI (`@mui/*`,
+  `react-bootstrap`, `antd`, `chakra-ui`) en parallele de shadcn → un
+  seul design system actif par projet (declaration dans `## Active UI Specs`)
+- Recreer un primitive shadcn deja disponible (Button, Card, Input, etc.)
+  manuellement dans `src/components/` au lieu de `npx shadcn add`
+- CSS-in-JS (styled-components, emotion) — incompatible avec Tailwind utility-first
+
+**Build / packaging** :
+
+- Imports relatifs profonds `../../../` au-dela de 2 niveaux → utiliser alias `@/`
+- Edition manuelle de `components.json` apres `shadcn init` (regenerer si besoin)
+- Engager `node_modules/`, `dist/`, `.env` dans le git
+
+# FIN SPEC

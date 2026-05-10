@@ -1,0 +1,115 @@
+{
+  "permissions": {
+    "allow": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Write",
+      "Edit",
+      "MultiEdit",
+      "NotebookEdit",
+      "Skill",
+      "Agent",
+      "Bash(dotnet:*)",
+      "Bash(npm:*)",
+      "Bash(pnpm:*)",
+      "Bash(yarn:*)",
+      "Bash(npx:*)",
+      "Bash(node:*)",
+      "Bash(python:*)",
+      "Bash(pip:*)",
+      "Bash(uv:*)",
+      "Bash(mkdir:*)",
+      "Bash(mv:*)",
+      "Bash(cp:*)",
+      "Bash(rm:*)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(echo:*)",
+      "Bash(env)",
+      "Bash(env:*)",
+      "Bash(curl:*)",
+      "Bash(git:*)",
+      "Bash(cd:*)",
+      "Bash(test:*)",
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(awk:*)",
+      "Bash(sed:*)",
+      "Bash(powershell:*)",
+      "Bash(pwsh:*)",
+      "Bash(xxd)",
+      "Bash(if:*)",
+      "Bash(for:*)",
+      "Bash(while:*)",
+      "Bash(missing:*)",
+      "Bash(bash:*)",
+      "Bash(sh:*)",
+      "Bash(touch:*)",
+      "Bash(diff:*)",
+      "Bash(wc:*)",
+      "Bash(sort:*)",
+      "Bash(uniq:*)",
+      "Bash(jq:*)",
+      "Bash(yq:*)",
+      "Bash(tr:*)",
+      "Bash(cut:*)",
+      "Bash(tee:*)",
+      "Bash(xargs:*)",
+      "Bash(timeout:*)",
+      "Bash(printenv:*)",
+      "PowerShell(*)",
+      "Bash(powershell.exe -NoProfile -ExecutionPolicy Bypass -File .claude/scripts/sdd-clear.ps1)"
+    ],
+    "deny": [
+      "Bash(dotnet ef migrations*)",
+      "Bash(dotnet ef database update*)",
+      "Bash(dotnet ef database drop*)",
+      "Bash(git push*)",
+      "Bash(rm -rf /*)",
+      "Bash(rmdir /*)"
+    ],
+    "additionalDirectories": [
+      "g:\\Templates\\New SDD\\SDD_Pro\\.claude\\agents",
+      "g:\\Templates\\New SDD\\SDD_Pro\\.claude\\stacks\\qa",
+      "G:\\Templates\\New SDD\\SDD_Pro\\output\\ui"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File .claude/hooks/protect-framework.ps1"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File .claude/scripts/validate-augment-contract.ps1"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": "dev-backend|dev-frontend|qa|dashboard",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File .claude/scripts/audit-file-ownership.ps1"
+          }
+        ]
+      }
+    ]
+  }
+}

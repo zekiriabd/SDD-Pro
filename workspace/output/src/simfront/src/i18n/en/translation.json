@@ -1,0 +1,36 @@
+{
+  "brand": {
+    "line1": "media",
+    "line2": "performances"
+  },
+  "lang": {
+    "fr": "FR",
+    "en": "EN"
+  },
+  "nav": {
+    "pointsDeVente": "Points of sale",
+    "perimetres": "Operating Perimeters",
+    "configuration": "Royalties Configuration",
+    "perimetreExploitation": "Operating Perimeter",
+    "configurationRedevances": "Royalties Configuration",
+    "bascule": "Switch platform",
+    "voirProfil": "View profile",
+    "seDeconnecter": "Sign out",
+    "placeholder": "Coming soon",
+    "logout": "Sign out",
+    "user": {
+      "name": "SDD-Pro maintainer",
+      "role": "Admin"
+    }
+  },
+  "context": {
+    "simPatrimoine": "SIM/Patrimoine",
+    "adminOperations": "Administration Operations",
+    "operations": "Operations",
+    "erp": "ERP",
+    "portailClient": "Client Portal",
+    "powerBi": "Power BI",
+    "administration": "Administration",
+    "portailEnseigne": "Brand Portal"
+  }
+}

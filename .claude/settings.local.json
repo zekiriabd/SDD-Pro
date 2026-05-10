@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//g/tmp/**)"
+    ],
+    "additionalDirectories": [
+      "G:\\Templates\\New SDD\\SDD_Pro\\workspace\\output\\src\\SIM.Lib",
+      "\\tmp"
+    ]
+  }
+}

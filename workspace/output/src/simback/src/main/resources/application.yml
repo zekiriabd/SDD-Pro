@@ -1,0 +1,54 @@
+spring:
+  application:
+    name: simback
+  datasource:
+    url: jdbc:sqlserver://${DB_HOST}:${DB_PORT};databaseName=${DB_NAME};encrypt=true;trustServerCertificate=true
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+    driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
+  jpa:
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.SQLServerDialect
+  flyway:
+    enabled: false
+    locations: classpath:db/migration
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # issuer-uri utilisé par NimbusJwtDecoder dans SecurityConfig (JwtIssuerValidator)
+          # Le decoder est construit manuellement depuis AzureAdProperties.tenantId
+          issuer-uri: ${AZURE_ISSUER_URI:}
+
+# Binding AzureAdProperties (@ConfigurationProperties prefix = "azure.activedirectory")
+# Toutes les valeurs proviennent des variables d'environnement (azure-ad.md §2)
+azure:
+  activedirectory:
+    tenant-id: ${AZ_TENANTID}
+    client-id: ${AZ_CLIENTID}
+    domain: ${AZ_DOMAIN:}
+    instance: ${AZ_INSTANCE:https://login.microsoftonline.com/}
+    audiences: ${AZ_AUDIENCES:}
+    fe-callback-path: ${AZ_FE_CALLBACKPATH:/auth/callback}
+    be-callback-path: ${AZ_BE_CALLBACKPATH:/signin-oidc}
+    scopes: ${AZ_SCOPES:}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+server:
+  port: 44328
+
+springdoc:
+  api-docs:
+    path: /openapi
+  swagger-ui:
+    path: /swagger
+    url: /openapi

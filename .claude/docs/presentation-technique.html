@@ -1,0 +1,867 @@
+﻿<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SDD_Pro v6.0 — Présentation Technique</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --bg-elev: #161b22;
+    --bg-elev2: #21262d;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text-dim: #8b949e;
+    --accent: #58a6ff;
+    --accent-2: #d2a8ff;
+    --green: #3fb950;
+    --yellow: #d29922;
+    --red: #f85149;
+    --orange: #f0883e;
+    --code-bg: #1c2128;
+    --shadow: 0 8px 24px rgba(0,0,0,0.4);
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    font-size: 15px;
+  }
+  .layout {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    min-height: 100vh;
+  }
+  /* ==================== Sidebar TOC ==================== */
+  aside.toc {
+    background: var(--bg-elev);
+    border-right: 1px solid var(--border);
+    padding: 24px 20px;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+  }
+  aside.toc h1 {
+    font-size: 18px;
+    margin: 0 0 4px 0;
+    color: var(--accent);
+    letter-spacing: 0.5px;
+  }
+  aside.toc .version {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-bottom: 24px;
+    display: block;
+  }
+  aside.toc ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  aside.toc li { margin: 6px 0; }
+  aside.toc a {
+    color: var(--text-dim);
+    text-decoration: none;
+    font-size: 13px;
+    padding: 6px 10px;
+    display: block;
+    border-radius: 6px;
+    transition: all 0.15s ease;
+    border-left: 2px solid transparent;
+  }
+  aside.toc a:hover {
+    background: var(--bg-elev2);
+    color: var(--text);
+    border-left-color: var(--accent);
+  }
+  aside.toc .toc-section {
+    margin-top: 18px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--accent-2);
+    padding: 6px 10px;
+    font-weight: 600;
+  }
+  /* ==================== Main ==================== */
+  main {
+    padding: 40px 56px;
+    max-width: 1200px;
+  }
+  .hero {
+    background: linear-gradient(135deg, rgba(88,166,255,0.08), rgba(210,168,255,0.08));
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 32px;
+    margin-bottom: 40px;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: "";
+    position: absolute;
+    top: -50%; right: -10%;
+    width: 300px; height: 300px;
+    background: radial-gradient(circle, rgba(88,166,255,0.15), transparent 70%);
+    border-radius: 50%;
+  }
+  .hero h1 {
+    font-size: 36px;
+    margin: 0 0 8px 0;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .hero .subtitle {
+    color: var(--text-dim);
+    font-size: 16px;
+    margin: 0 0 20px 0;
+  }
+  .hero .badges {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .badge {
+    display: inline-block;
+    padding: 4px 12px;
+    background: var(--bg-elev2);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+  .badge.green { color: var(--green); border-color: rgba(63,185,80,0.4); }
+  .badge.blue  { color: var(--accent); border-color: rgba(88,166,255,0.4); }
+  .badge.purple { color: var(--accent-2); border-color: rgba(210,168,255,0.4); }
+
+  h2 {
+    font-size: 26px;
+    margin: 56px 0 16px 0;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  h2 .icon {
+    font-size: 28px;
+  }
+  h2 .pill {
+    font-size: 12px;
+    padding: 4px 10px;
+    background: var(--bg-elev2);
+    border-radius: 999px;
+    color: var(--text-dim);
+    font-weight: normal;
+  }
+  h3 {
+    font-size: 18px;
+    margin: 32px 0 12px 0;
+    color: var(--accent);
+  }
+  p { margin: 12px 0; }
+  p.lead {
+    color: var(--text-dim);
+    font-size: 15px;
+    margin-bottom: 24px;
+  }
+
+  /* ==================== Tables ==================== */
+  .table-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin: 16px 0 24px 0;
+    box-shadow: var(--shadow);
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
+  }
+  thead {
+    background: var(--bg-elev2);
+  }
+  th {
+    text-align: left;
+    padding: 12px 16px;
+    font-weight: 600;
+    color: var(--accent);
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+  }
+  td {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  tbody tr {
+    background: var(--bg-elev);
+    transition: background 0.1s;
+  }
+  tbody tr:hover {
+    background: var(--bg-elev2);
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td code, th code {
+    background: var(--code-bg);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: "JetBrains Mono", "Cascadia Code", "Consolas", monospace;
+    font-size: 12.5px;
+    color: var(--accent-2);
+    white-space: nowrap;
+  }
+  td.col-name { white-space: nowrap; font-weight: 600; }
+  td.col-name code { font-size: 13px; }
+
+  /* ==================== Cards ==================== */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+    margin: 16px 0 24px 0;
+  }
+  .card {
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    transition: transform 0.15s, border-color 0.15s;
+  }
+  .card:hover {
+    transform: translateY(-2px);
+    border-color: var(--accent);
+  }
+  .card .card-icon {
+    font-size: 24px;
+    margin-bottom: 8px;
+  }
+  .card h4 {
+    margin: 0 0 8px 0;
+    font-size: 16px;
+    color: var(--accent);
+  }
+  .card p {
+    margin: 0;
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+
+  /* ==================== Code/Pre ==================== */
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    padding: 16px 20px;
+    border-radius: 8px;
+    overflow-x: auto;
+    font-family: "JetBrains Mono", "Cascadia Code", "Consolas", monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--text);
+  }
+  code {
+    font-family: "JetBrains Mono", "Cascadia Code", "Consolas", monospace;
+  }
+
+  /* ==================== Status colors ==================== */
+  .status-green  { color: var(--green); font-weight: 600; }
+  .status-yellow { color: var(--yellow); font-weight: 600; }
+  .status-red    { color: var(--red); font-weight: 600; }
+  .status-blue   { color: var(--accent); font-weight: 600; }
+
+  /* Anchor offset */
+  section { scroll-margin-top: 20px; }
+
+  footer {
+    margin-top: 80px;
+    padding: 24px;
+    border-top: 1px solid var(--border);
+    color: var(--text-dim);
+    font-size: 13px;
+    text-align: center;
+  }
+
+  /* Responsive */
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; }
+    aside.toc { position: static; height: auto; }
+    main { padding: 24px; }
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+
+<!-- ==================== TOC ==================== -->
+<aside class="toc">
+  <h1>SDD_Pro</h1>
+  <span class="version">v6.0.0 — Doc technique</span>
+  <ul>
+    <li><a href="#overview">🏠 Vue d'ensemble</a></li>
+    <li><a href="#dirs">📁 Répertoires .claude</a></li>
+
+    <li class="toc-section">Cœur fonctionnel</li>
+    <li><a href="#agents">🤖 Agents</a></li>
+    <li><a href="#skills">⚡ Skills / Commands</a></li>
+    <li><a href="#rules">📜 Rules</a></li>
+
+    <li class="toc-section">Détail fichiers</li>
+    <li><a href="#files-root">📄 Racine</a></li>
+    <li><a href="#files-agents">📄 agents/</a></li>
+    <li><a href="#files-commands">📄 commands/</a></li>
+    <li><a href="#files-rules">📄 rules/</a></li>
+    <li><a href="#files-stacks">📄 stacks/</a></li>
+    <li><a href="#files-templates">📄 templates/</a></li>
+    <li><a href="#files-scripts">📄 scripts/</a></li>
+    <li><a href="#files-docs">📄 docs/</a></li>
+  </ul>
+</aside>
+
+<!-- ==================== MAIN ==================== -->
+<main>
+
+<!-- ============ HERO ============ -->
+<section id="overview" class="hero">
+  <h1>SDD_Pro v6.0</h1>
+  <p class="subtitle">Spec-Driven Development pour Claude Code — SPEC fonctionnelle → User Stories → Code (back/front en parallèle)</p>
+  <div class="badges">
+    <span class="badge green">v6.0.0</span>
+    <span class="badge blue">4 agents cœur + 2 support</span>
+    <span class="badge purple">~1800 combinaisons stack</span>
+    <span class="badge">13 commandes</span>
+    <span class="badge">9 règles load-bearing</span>
+    <span class="badge">11 scripts PowerShell</span>
+  </div>
+</section>
+
+<!-- ============ DIRS ============ -->
+<section id="dirs">
+  <h2><span class="icon">📁</span> Répertoires <code>.claude/</code> <span class="pill">framework</span></h2>
+  <p class="lead">Tout le cerveau du framework SDD vit ici. Le dossier <code>workspace/</code> est l'espace projet (entrées humaines + sorties générées) — non documenté ici.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Répertoire</th><th>Rôle</th><th>Contenu clé</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="col-name"><code>.claude/agents/</code></td>
+        <td>Définition des <strong>6 agents</strong> autonomes (cœur + support). Chaque agent = prompt système + scope strict (reads/writes).</td>
+        <td><code>po</code>, <code>arch</code>, <code>dev-backend</code>, <code>dev-frontend</code>, <code>qa</code>, <code>elicitor</code></td>
+      </tr>
+      <tr>
+        <td class="col-name"><code>.claude/commands/</code></td>
+        <td>Slash commands invocables par l'utilisateur. Orchestrateurs du pipeline 4 phases. Délèguent aux agents.</td>
+        <td><code>/spec-generate</code>, <code>/sdd-full</code>, <code>/dev-run</code>, <code>/qa-generate</code>…</td>
+      </tr>
+      <tr>
+        <td class="col-name"><code>.claude/docs/</code></td>
+        <td>Documentation chargée à la demande (slim entry CLAUDE.md ~150 lignes). Architecture, workflow, conventions, trade-offs.</td>
+        <td><code>architecture.md</code>, <code>workflow.md</code>, <code>conventions.md</code>, <code>accepted-tradeoffs.md</code></td>
+      </tr>
+      <tr>
+        <td class="col-name"><code>.claude/rules/</code></td>
+        <td><strong>Règles load-bearing</strong> (anti-derive, ownership, granularité, qualité). Inlinées partiellement dans les agents depuis v5.0.</td>
+        <td>9 règles : responsibilities, file-ownership, qa-coverage, chat-output…</td>
+      </tr>
+      <tr>
+        <td class="col-name"><code>.claude/scripts/</code></td>
+        <td>Scripts PowerShell <strong>déterministes (0 token LLM)</strong>. Validation, parsing coverage, scan qualité, smoke tests.</td>
+        <td><code>validate-readiness.ps1</code>, <code>parse-coverage.ps1</code>, <code>sdd-clear.ps1</code>…</td>
+      </tr>
+      <tr>
+        <td class="col-name"><code>.claude/stacks/</code></td>
+        <td>Catalogue des stacks supportés (~1800 combinaisons théoriques). 5 sous-dossiers thématiques.</td>
+        <td><code>backend/</code>, <code>frontend/</code>, <code>ui/</code>, <code>auth/</code>, <code>qa/</code></td>
+      </tr>
+      <tr>
+        <td class="col-name"><code>.claude/templates/</code></td>
+        <td>Templates Markdown / JSON pour la génération d'artefacts (US, ADRs, rapports QA…).</td>
+        <td><code>us.template.md</code>, <code>adr.template.md</code>, <code>spec.template.md</code>…</td>
+      </tr>
+      <tr>
+        <td class="col-name"><code>.claude/.metrics/</code></td>
+        <td>Baselines de mesure tokens/durée par version (référence économique).</td>
+        <td><code>baseline-v4.0.0-pvlist.csv</code></td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>📌 Fichiers racine <code>.claude/</code></h3>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Fichier</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td class="col-name"><code>CLAUDE.md</code></td><td>Slim entry point (~150 lignes). Convention nommage, commandes, agents, démarrage rapide.</td></tr>
+      <tr><td class="col-name"><code>CHANGELOG.md</code></td><td>Historique versions v4 → v6 (BREAKING CHANGES, nouvelles features, retraits).</td></tr>
+      <tr><td class="col-name"><code>MIGRATION.md</code></td><td>Guide migration entre versions majeures (étapes, scripts, points d'attention).</td></tr>
+      <tr><td class="col-name"><code>loader.yml</code></td><td>Manifest descriptif des reads/writes par agent. Source de vérité audit contexte + estimation tokens.</td></tr>
+      <tr><td class="col-name"><code>settings.json</code></td><td>Configuration Claude Code partagée (hooks, permissions, env vars projet).</td></tr>
+      <tr><td class="col-name"><code>settings.local.json</code></td><td>Configuration locale (machine du dev), non commitée.</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<!-- ============ AGENTS ============ -->
+<section id="agents">
+  <h2><span class="icon">🤖</span> Agents <span class="pill">4 cœur + 2 support</span></h2>
+  <p class="lead">Tous les agents sont <strong>strictement autonomes</strong> : aucun ne pose de question utilisateur. Sur ambiguïté → <code>STOP + ERROR (CAUSE / FIX)</code>.</p>
+
+  <h3>🎯 Cœur (4)</h3>
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Agent</th><th>Phase</th><th>Rôle</th><th>Lit</th><th>Écrit</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="col-name"><code>po</code> 📋</td>
+        <td><span class="status-blue">2</span></td>
+        <td><strong>Product Owner</strong> — découpe la SPEC en User Stories structurées (cible 1-3, warning 4-6, hard cap 6). Garantit traçabilité 100% (chaque SFD/BR/AC/FD couvert).</td>
+        <td><code>input/specs/</code>, <code>rules/us-granularity.md</code>, <code>constitution.md</code></td>
+        <td><code>output/us/{n}-{m}-*.md</code>, constitution §2-§3 (append-only)</td>
+      </tr>
+      <tr>
+        <td class="col-name"><code>arch</code> 🏗️</td>
+        <td><span class="status-blue">3</span></td>
+        <td><strong>Architecte</strong> — bootstrap idempotent : projets vides via Init Commands + scaffolding DB <strong>READ-ONLY</strong> + ADRs majeurs.</td>
+        <td><code>input/stack/stack.md</code>, <code>stacks/**/*.md</code> (sélectif), DB metadata</td>
+        <td><code>output/src/{App|Backend|Lib}/</code> (squelette), <code>output/db/schema.json</code>, ADRs §6</td>
+      </tr>
+      <tr>
+        <td class="col-name"><code>dev-backend</code> ⚙️</td>
+        <td><span class="status-blue">4</span></td>
+        <td><strong>Dev Serveur</strong> — pour <strong>1 US</strong> : lit US + mockup HTML (passif) + stack backend/auth → planifie inline → code services / endpoints / DTOs / mappers + build loop max 3.</td>
+        <td><code>output/us/{n}-{m}-*.md</code>, <code>input/ui/{n}-{m}-*.html</code>, <code>output/db/schema.json</code></td>
+        <td><code>output/src/{BackendName}/**</code> (Edit-augment exclusif)</td>
+      </tr>
+      <tr>
+        <td class="col-name"><code>dev-frontend</code> 🎨</td>
+        <td><span class="status-blue">4</span></td>
+        <td><strong>Dev Client</strong> — pour <strong>1 US</strong> : lit US + mockup HTML (<strong>source de vérité visuelle</strong>) + stack frontend/UI → traduit HTML→composants DS via mapping §2/§7 → code Pages / Components / theme + fidelity check.</td>
+        <td><code>output/us/{n}-{m}-*.md</code>, <code>input/ui/{n}-{m}-*.html</code> (texte direct), <code>stacks/ui/*.md</code></td>
+        <td><code>output/src/{AppName}/**</code> (Edit-augment exclusif)</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>🛟 Support (2)</h3>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Agent</th><th>Phase</th><th>Rôle</th><th>Quand invoqué</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="col-name"><code>elicitor</code> 🔍</td>
+        <td><span class="status-blue">1.5</span></td>
+        <td><strong>Élicitation structurée</strong> — enrichit la SPEC via 5 techniques (Pre-mortem, First Principles, Red Team, Stakeholder Mapping, Inversion). Append 5 sections en fin de SPEC + maj constitution §7 (risques).</td>
+        <td>Optionnel via <code>/spec-deepen {n}</code> · forcé en mode strict <code>/sdd-full</code></td>
+      </tr>
+      <tr>
+        <td class="col-name"><code>qa</code> ✅</td>
+        <td><span class="status-blue">5</span></td>
+        <td><strong>Quality Assurance</strong> — génère tests unitaires (back + front), parse coverage (seuil 80%), exécute quality scan sonar-like. <strong>Strict scope test</strong> : ne modifie JAMAIS le code de prod.</td>
+        <td>Selon <code>QAMode</code> Project Config : <code>off</code> / <code>manual</code> / <code>tests-only</code> / <code>tests+coverage</code> / <code>quality-only</code> / <code>full</code></td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>🪦 Agent retiré (v6.0)</h3>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Agent</th><th>Statut</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="col-name"><code>validator</code></td>
+        <td><span class="status-red">Retiré v6.0</span> — économie ~1.4M tokens/run. Remplacé par <code>/spec-validate</code> 100% déterministe (script PowerShell <code>validate-readiness.ps1</code>). Review sémantique = PO humain.</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<!-- ============ SKILLS / COMMANDS ============ -->
+<section id="skills">
+  <h2><span class="icon">⚡</span> Skills / Commandes <span class="pill">13 commandes</span></h2>
+  <p class="lead">Slash commands invocables. Chaque commande définit son flux STEP par STEP, ses pré-conditions et son output. La plupart sont idempotentes.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Commande</th><th>Phase</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="col-name"><code>/spec-generate [Nom]</code></td>
+        <td><span class="status-blue">1</span></td>
+        <td>Cadrage interactif d'une SPEC fonctionnelle (3-6 questions). Bootstrap aussi <code>constitution.md</code> au premier appel projet (§1 Identité, §2 Glossaire vide, §3 Acteurs).</td>
+      </tr>
+      <tr>
+        <td class="col-name"><code>/spec-deepen {n} [--quick]</code></td>
+        <td><span class="status-blue">1.5</span></td>
+        <td>Élicitation structurée via agent <code>elicitor</code> : 5 techniques (Pre-mortem, First Principles, Red Team, Stakeholder Mapping, Inversion). Mode interactif ou one-shot.</td>
+      </tr>
+      <tr>
+        <td class="col-name"><code>/us-generate {n}</code></td>
+        <td><span class="status-blue">2</span></td>
+        <td>Découpe la SPEC en User Stories via agent <code>po</code>. Cible 1-3 US, hard cap 6. Traçabilité 100% obligatoire.</td>
+      </tr>
+      <tr>
+        <td class="col-name"><code>/spec-validate {n} [--json]</code></td>
+        <td><span class="status-blue">2.6</span></td>
+        <td><strong>Implementation Readiness Gate</strong> 100% déterministe (script PowerShell, 0 LLM). Décision GO / WARN / NO-GO. Sortie <code>output/validation/{n}-readiness.md</code>.</td>
+      </tr>
+      <tr>
+        <td class="col-name"><code>/arch-init</code></td>
+        <td><span class="status-blue">3</span></td>
+        <td>Bootstrap solution + projets vides via Init Commands + scaffolding DB READ-ONLY + ADRs majeurs. Idempotent (skip si déjà init).</td>
+      </tr>
+      <tr>
+        <td class="col-name"><code>/dev-plan {n}</code></td>
+        <td><span class="status-blue">3.5</span></td>
+        <td>Mode <strong>Plan Only</strong> : produit les plans techniques <code>output/plans/*.{back|front}.md</code> SANS coder. Permet review humaine avant exécution.</td>
+      </tr>
+      <tr>
+        <td class="col-name"><code>/dev-backend {n}-{m}[:plan]</code></td>
+        <td><span class="status-blue">4</span></td>
+        <td>Code serveur d'<strong>1 US</strong>. Suffixe <code>:plan</code> = Plan Only (pas d'écriture code). Build loop max 3 itérations.</td>
+      </tr>
+      <tr>
+        <td class="col-name"><code>/dev-frontend {n}-{m}[:plan]</code></td>
+        <td><span class="status-blue">4</span></td>
+        <td>Code client d'<strong>1 US</strong>. Lit le mockup HTML directement (texte). Suffixe <code>:plan</code> = Plan Only. Fidelity check textuel obligatoire.</td>
+      </tr>
+      <tr>
+        <td class="col-name"><code>/dev-run {n} [--force] [--max-parallel N]</code></td>
+        <td><span class="status-blue">3 → 4</span></td>
+        <td><strong>Orchestrateur dev</strong> : arch+db (séquentiel) → back + front en parallèle borné (default <code>MaxParallel: 3</code> US, range 1-12).</td>
+      </tr>
+      <tr>
+        <td class="col-name"><code>/sdd-full {n} [--plan] [--force]</code></td>
+        <td><span class="status-blue">2 → 5</span></td>
+        <td><strong>Pipeline complet de A à Z</strong> pour 1 SPEC : us-generate → spec-validate → arch-init → dev-run → qa-generate. Flags : <code>--no-plan-on-warn</code>, <code>--no-validate</code>.</td>
+      </tr>
+      <tr>
+        <td class="col-name"><code>/qa-generate {n} [--mode M]</code></td>
+        <td><span class="status-blue">5</span></td>
+        <td>Génère tests unitaires + parse coverage + quality scan via agent <code>qa</code>. Modes : <code>off / quality-only / tests-only / tests+coverage / full / manual</code>.</td>
+      </tr>
+      <tr>
+        <td class="col-name"><code>/sdd-status [{n}]</code></td>
+        <td><span class="status-yellow">diag</span></td>
+        <td>Diagnostic du pipeline SDD (lecture seule). Affiche état SPEC / US / build / QA pour 1 SPEC ou toutes.</td>
+      </tr>
+      <tr>
+        <td class="col-name"><code>/sdd-clear [{n}] [--force] [--all] [--quiet]</code></td>
+        <td><span class="status-yellow">maint</span></td>
+        <td>Nettoyage des artefacts générés sous <code>workspace/output/</code>. <strong>Dry-run par défaut</strong>, <code>--force</code> requis pour exécuter.</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<!-- ============ RULES ============ -->
+<section id="rules">
+  <h2><span class="icon">📜</span> Rules <span class="pill">9 règles load-bearing</span></h2>
+  <p class="lead">Les règles définissent les invariants opérationnels du framework. Certaines sont <strong>inlinées</strong> dans les agents (substance v5.0), d'autres sont chargées on-demand.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Règle</th><th>Description</th><th>Consommateurs</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="col-name"><code>responsibilities.md</code></td>
+        <td>Périmètre <strong>Allowed / Forbidden</strong> de chaque acteur (PO humain, UX Designer, Tech Lead, agents PO/Arch/Dev/QA). Aucun chevauchement.</td>
+        <td>Tous les agents</td>
+      </tr>
+      <tr>
+        <td class="col-name"><code>us-granularity.md</code></td>
+        <td>Contrat de découpage SPEC → US. Cible 1-3, warning 4-6, hard cap 6. Anti-patterns interdits (1:1 SFD→US, US technique, US par couche…).</td>
+        <td>Agent <code>po</code></td>
+      </tr>
+      <tr>
+        <td class="col-name"><code>constitution.md</code></td>
+        <td>Source de vérité partagée (glossaire, acteurs, stack, ADRs). Append-only par section, jamais réécrite intégralement. ADRs en numérotation atomique par timestamp.</td>
+        <td><code>/spec-generate</code>, <code>po</code>, <code>arch</code>, <code>elicitor</code></td>
+      </tr>
+      <tr>
+        <td class="col-name"><code>file-ownership.md</code></td>
+        <td>Matrice ownership des fichiers partagés. Évite les race conditions sur runs parallèles <code>/dev-run</code>. Lock files pour <code>{LibName}/</code>.</td>
+        <td>Tous les agents (inlinée §1-§2 dans dev-*)</td>
+      </tr>
+      <tr>
+        <td class="col-name"><code>stack-completeness.md</code></td>
+        <td><strong>Anti-derive sur les libs</strong> : toute lib utilisée doit figurer en §2.4 du stack actif. §2.4.a CORE (auto-install) vs §2.4.b ON-DEMAND (trigger US). STOP + ERROR si absente.</td>
+        <td><code>dev-backend</code>, <code>dev-frontend</code>, <code>qa</code></td>
+      </tr>
+      <tr>
+        <td class="col-name"><code>library-policy.md</code></td>
+        <td>Politique CVE / origine / version pinnée. Registry canonique uniquement (NuGet, npm, PyPI…). Pas de pre-release sans justification. Vérif CVE post-install.</td>
+        <td><code>arch</code> (on-demand)</td>
+      </tr>
+      <tr>
+        <td class="col-name"><code>qa-ownership.md</code></td>
+        <td>Agent QA = <strong>seul propriétaire</strong> des fichiers de test (patterns <code>*.Tests/</code>, <code>*.spec.ts</code>, <code>__tests__/</code>…). Réciproquement, QA est read-only sur le code prod.</td>
+        <td>Agent <code>qa</code> + dev-* (lecture passive scan forbidden)</td>
+      </tr>
+      <tr>
+        <td class="col-name"><code>qa-coverage.md</code></td>
+        <td>Seuil 80% (configurable). Schéma <code>coverage.json</code> normalisé cross-stack (coverlet, c8, pytest-cov, JaCoCo, istanbul). Décision YELLOW si gap, RED si test failed.</td>
+        <td>Agent <code>qa</code></td>
+      </tr>
+      <tr>
+        <td class="col-name"><code>chat-output.md</code></td>
+        <td><strong>Verbosité minimale</strong> du chat : succès = 1L, warning = 1L, erreur = 2L max. Détail dans fichiers <code>output/...</code>. Pas de récap multi-section.</td>
+        <td>Toutes commandes + agents</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<!-- ============ FILES — agents ============ -->
+<section id="files-agents">
+  <h2><span class="icon">📄</span> Fichiers <code>.claude/agents/</code></h2>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Fichier</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td class="col-name"><code>po.md</code></td><td>Prompt système agent <strong>PO</strong> : découpe SPEC → US structurées, cible 1-3, traçabilité 100%, append constitution §2-§3.</td></tr>
+      <tr><td class="col-name"><code>arch.md</code></td><td>Prompt système agent <strong>Arch</strong> : bootstrap projets (Phase A, idempotent) + scaffolding DB READ-ONLY (Phase B) + ADRs (Phase C). Politique librairies inlinée §2.2.</td></tr>
+      <tr><td class="col-name"><code>dev-backend.md</code></td><td>Prompt système agent <strong>Dev-Backend</strong> : pour 1 US, lit stack backend/auth, planifie inline, code services/endpoints/DTOs, build loop max 3.</td></tr>
+      <tr><td class="col-name"><code>dev-frontend.md</code></td><td>Prompt système agent <strong>Dev-Frontend</strong> : pour 1 US, lit mockup HTML directement (texte), traduit via mapping UI §2/§7, code Pages/Components, fidelity check textuel.</td></tr>
+      <tr><td class="col-name"><code>qa.md</code></td><td>Prompt système agent <strong>QA</strong> : génère tests unitaires (back+front), parse coverage, quality scan. Read-only sur code prod, écrit uniquement dans <code>*.Tests/</code> et <code>output/qa/</code>.</td></tr>
+      <tr><td class="col-name"><code>elicitor.md</code></td><td>Prompt système agent <strong>Elicitor</strong> : 5 techniques d'élicitation (Pre-mortem, First Principles, Red Team, Stakeholder Mapping, Inversion). Append SPEC + maj constitution §7.</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<!-- ============ FILES — commands ============ -->
+<section id="files-commands">
+  <h2><span class="icon">📄</span> Fichiers <code>.claude/commands/</code></h2>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Fichier</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td class="col-name"><code>spec-generate.md</code></td><td>Cadrage interactif SPEC (3-6 questions ciblées) + bootstrap <code>constitution.md</code> au premier appel projet. Phase 1.</td></tr>
+      <tr><td class="col-name"><code>spec-deepen.md</code></td><td>Délègue à agent <code>elicitor</code> pour enrichissement structuré de la SPEC. Modes interactif et <code>--quick</code>. Phase 1.5.</td></tr>
+      <tr><td class="col-name"><code>us-generate.md</code></td><td>Délègue à agent <code>po</code> pour découpage SPEC → US. Phase 2.</td></tr>
+      <tr><td class="col-name"><code>spec-validate.md</code></td><td>Implementation Readiness Gate 100% déterministe (PowerShell, 0 LLM). Sortie GO / WARN / NO-GO + rapport markdown. Phase 2.6.</td></tr>
+      <tr><td class="col-name"><code>arch-init.md</code></td><td>Délègue à agent <code>arch</code> pour bootstrap solution/projets + scaffolding DB. Idempotent. Phase 3.</td></tr>
+      <tr><td class="col-name"><code>dev-plan.md</code></td><td>Mode <strong>Plan Only</strong> : invoque dev-* en suffixe <code>:plan</code> sur toutes les US. Produit <code>output/plans/*.{back|front}.md</code>. Phase 3.5.</td></tr>
+      <tr><td class="col-name"><code>dev-backend.md</code></td><td>Délègue à agent <code>dev-backend</code> pour 1 US. Suffixe <code>:plan</code> supporté. Phase 4.</td></tr>
+      <tr><td class="col-name"><code>dev-frontend.md</code></td><td>Délègue à agent <code>dev-frontend</code> pour 1 US. Suffixe <code>:plan</code> supporté. Phase 4.</td></tr>
+      <tr><td class="col-name"><code>dev-run.md</code></td><td>Orchestrateur : arch+db (séquentiel) → dev-backend + dev-frontend en parallèle borné <code>MaxParallel</code>. Phases 3-4.</td></tr>
+      <tr><td class="col-name"><code>sdd-full.md</code></td><td>Pipeline A→Z : us-generate → spec-validate → arch-init → dev-run → qa-generate. Flags <code>--plan</code>, <code>--force</code>, <code>--no-plan-on-warn</code>, <code>--no-validate</code>.</td></tr>
+      <tr><td class="col-name"><code>qa-generate.md</code></td><td>Délègue à agent <code>qa</code>. Modes contrôlés par <code>QAMode</code>. Phase 5.</td></tr>
+      <tr><td class="col-name"><code>sdd-status.md</code></td><td>Diagnostic lecture-seule du pipeline (état SPEC / US / build / QA). Pas d'écriture.</td></tr>
+      <tr><td class="col-name"><code>sdd-clear.md</code></td><td>Nettoyage artefacts <code>workspace/output/</code>. Dry-run par défaut, <code>--force</code> requis. Flag <code>--all</code> pour purge totale.</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<!-- ============ FILES — rules ============ -->
+<section id="files-rules">
+  <h2><span class="icon">📄</span> Fichiers <code>.claude/rules/</code></h2>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Fichier</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td class="col-name"><code>responsibilities.md</code></td><td>Allowed / Forbidden de chaque acteur. Le contrat le plus structurant du framework — délimite tout chevauchement potentiel.</td></tr>
+      <tr><td class="col-name"><code>us-granularity.md</code></td><td>Cible 1-3 US, warning 4-6, hard cap 6. Anti-patterns "1 SFD = 1 US", "US technique", "US par couche", "US de configuration", "US de fallback".</td></tr>
+      <tr><td class="col-name"><code>constitution.md</code></td><td>Règles d'écriture <code>output/context/constitution.md</code> + ADRs. Append-only, numérotation timestamp atomique pour ADRs (anti-race).</td></tr>
+      <tr><td class="col-name"><code>file-ownership.md</code></td><td>Matrice exclusive owner par fichier/répertoire. Modes : Edit-augment, Create exclusif, First-write+lock, Sérialisé. Procédure lock <code>{LibName}/.locks/</code>.</td></tr>
+      <tr><td class="col-name"><code>stack-completeness.md</code></td><td>Anti-derive libs. §2.4.a CORE vs §2.4.b ON-DEMAND. Triggers keywords. Format ERROR <code>[STACK_LIBRARY_MISSING]</code> + 1-3 suggestions.</td></tr>
+      <tr><td class="col-name"><code>library-policy.md</code></td><td>Origine canonique uniquement, version pinnée stable, sans CVE ≥ moderate. Workflow Tech Lead pour ajouter une lib.</td></tr>
+      <tr><td class="col-name"><code>qa-ownership.md</code></td><td>Patterns fichiers test exclusifs QA. QA read-only sur code prod. Pas d'auto-correction. Trigger d'invocation selon <code>QAMode</code>.</td></tr>
+      <tr><td class="col-name"><code>qa-coverage.md</code></td><td>Format <code>coverage.json</code> normalisé. Seuil <code>CoverageMin</code> (default 80, range 0-100). Classes erreur <code>[QA_TEST_FAILED]</code>, <code>[QA_COVERAGE_GAP]</code>…</td></tr>
+      <tr><td class="col-name"><code>chat-output.md</code></td><td>Quotas par statut (1L succès, 1L warning, 2L erreur). Interdictions (récap décoratif, logs progression, narration, énumération fichiers). Pointeurs vers fichiers préférés aux dumps.</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<!-- ============ FILES — stacks ============ -->
+<section id="files-stacks">
+  <h2><span class="icon">📄</span> Fichiers <code>.claude/stacks/</code></h2>
+  <p class="lead">5 catégories × variantes = ~1800 combinaisons théoriques. Sélection humaine via <code>workspace/input/stack/stack.md</code>.</p>
+
+  <h3>🔧 backend/</h3>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Fichier</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td class="col-name"><code>dotnet-minimalapi.md</code></td><td>.NET 8+ Minimal API. EF Core, AutoMapper, Serilog, FluentValidation, Polly, Swashbuckle. §2.4.b : EPPlus, QuestPDF, MediatR, Mapster…</td></tr>
+      <tr><td class="col-name"><code>node-express.md</code></td><td>Node.js + Express + TypeScript. Prisma/TypeORM, Zod, Pino, helmet.</td></tr>
+      <tr><td class="col-name"><code>python-fastapi.md</code></td><td>Python 3.11+ FastAPI. SQLAlchemy, Pydantic, Alembic, structlog.</td></tr>
+      <tr><td class="col-name"><code>java-spring-boot.md</code></td><td>Java 21+ Spring Boot 3.x. Spring Data JPA, MapStruct, Logback, Hibernate Validator.</td></tr>
+      <tr><td class="col-name"><code>kotlin-spring-boot.md</code></td><td>Kotlin Spring Boot 3.x. Idiomatic Kotlin (data classes, coroutines), Exposed/JPA, kotlinx.serialization.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>🎨 frontend/</h3>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Fichier</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td class="col-name"><code>blazor-server.md</code></td><td>Blazor Server (SignalR). Razor + C#. Pour apps interactives avec server-side rendering.</td></tr>
+      <tr><td class="col-name"><code>blazor-webassembly.md</code></td><td>Blazor WASM (client-side). Pour SPA .NET pures côté navigateur.</td></tr>
+      <tr><td class="col-name"><code>react.md</code></td><td>React 18+ + TypeScript + Vite. React Router, TanStack Query, Zustand/Redux Toolkit.</td></tr>
+      <tr><td class="col-name"><code>vue.md</code></td><td>Vue 3 Composition API + TypeScript + Vite. Vue Router, Pinia, VueUse.</td></tr>
+      <tr><td class="col-name"><code>angular.md</code></td><td>Angular 17+ standalone components. RxJS, Signals, Angular Router, Forms reactive.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>🖌️ ui/ (Design Systems)</h3>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Fichier</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td class="col-name"><code>radzen-blazor.md</code></td><td>Radzen Blazor Components. Mapping <code>&lt;table&gt; → RadzenDataGrid</code>, <code>&lt;button&gt; → RadzenButton</code>, etc. (§2 + §7).</td></tr>
+      <tr><td class="col-name"><code>shadcn.md</code></td><td>shadcn/ui (React + Radix + Tailwind). Composants copiés-collés. Mapping HTML→Card/Dialog/DataTable…</td></tr>
+      <tr><td class="col-name"><code>vuetify.md</code></td><td>Vuetify 3 (Vue 3 Material Design). Mapping HTML→<code>v-data-table</code>, <code>v-btn</code>, <code>v-dialog</code>…</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>🔐 auth/</h3>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Fichier</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td class="col-name"><code>azure-ad.md</code></td><td>Azure AD / Microsoft Entra ID. <code>Microsoft.Identity.Web</code>, MSAL.js. Variables : <code>AZ_TENANTID</code>, <code>AZ_CLIENTID</code>, <code>AZ_DOMAIN</code>, <code>AZ_AUDIENCES</code>…</td></tr>
+      <tr><td class="col-name"><code>auth-auth0.md</code></td><td>Auth0 (universal login). SDK officiels par stack frontend/backend.</td></tr>
+      <tr><td class="col-name"><code>auth-keycloak.md</code></td><td>Keycloak self-hosted. OIDC + adapters par framework.</td></tr>
+      <tr><td class="col-name"><code>auth-local.md</code></td><td>Auth local (DB + JWT). Pour POC, projets internes ou usage hors SSO.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>✅ qa/</h3>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Fichier</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td class="col-name"><code>dotnet-xunit.md</code></td><td>xUnit + FluentAssertions + coverlet. Test runner <code>dotnet test</code>.</td></tr>
+      <tr><td class="col-name"><code>blazor-bunit.md</code></td><td>bUnit pour composants Blazor. Stub services, render check.</td></tr>
+      <tr><td class="col-name"><code>node-vitest.md</code></td><td>Vitest + @testing-library/react/vue + c8 coverage.</td></tr>
+      <tr><td class="col-name"><code>angular-jasmine.md</code></td><td>Jasmine + Karma + istanbul. Configuration TestBed Angular.</td></tr>
+      <tr><td class="col-name"><code>python-pytest.md</code></td><td>pytest + pytest-cov + httpx (pour FastAPI TestClient).</td></tr>
+      <tr><td class="col-name"><code>kotlin-junit.md</code></td><td>JUnit 5 + Kotest (assertions) + JaCoCo coverage.</td></tr>
+      <tr><td class="col-name"><code>code-quality.md</code></td><td>Quality scan sonar-like (cross-stack) : LoC, complexité cyclomatique, duplications, smells. Script <code>quality-scan.ps1</code>.</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<!-- ============ FILES — templates ============ -->
+<section id="files-templates">
+  <h2><span class="icon">📄</span> Fichiers <code>.claude/templates/</code></h2>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Fichier</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td class="col-name"><code>spec.template.md</code></td><td>Squelette SPEC fonctionnelle : Context, Objective, Actors, Functional Needs (SFD-N), Business Rules, ACs, Dependencies, Functional Deliverables (FD-N), Out of Scope.</td></tr>
+      <tr><td class="col-name"><code>us.template.md</code></td><td>Squelette User Story : "As a... I want... So that..." + ACs + Covers (SFD/BR/AC/FD références).</td></tr>
+      <tr><td class="col-name"><code>constitution.template.md</code></td><td>Bootstrap <code>output/context/constitution.md</code> : §1 Identité, §2 Glossaire, §3 Acteurs (placeholder), §4 Stack, §5 Conventions, §6 ADRs, §7 Risques, §8 Index écrivains.</td></tr>
+      <tr><td class="col-name"><code>adr.template.md</code></td><td>Format ADR : Status / Context / Decision / Consequences. Status initial = <code>Accepted</code> (SDD_Pro trace décisions prises, pas propositions).</td></tr>
+      <tr><td class="col-name"><code>readiness.template.md</code></td><td>Squelette rapport <code>output/validation/{n}-readiness.md</code> : score, issues bloquantes (errors), warnings, recommandations.</td></tr>
+      <tr><td class="col-name"><code>qa-report.template.md</code></td><td>Squelette <code>output/qa/feat-{n}/report.md</code> : tests passed/failed, coverage, quality findings, décision GREEN/YELLOW/RED.</td></tr>
+      <tr><td class="col-name"><code>coverage.template.json</code></td><td>Schéma JSON normalisé pour <code>coverage.json</code>. Stacks, tools, files, summary, thresholds.</td></tr>
+      <tr><td class="col-name"><code>quality.template.json</code></td><td>Schéma JSON normalisé pour <code>quality.json</code>. Métriques sonar-like : complexity, duplication, code smells.</td></tr>
+      <tr><td class="col-name"><code>risks-assumptions.template.md</code></td><td>Append section §7 constitution post <code>/spec-deepen</code> : risques identifiés + hypothèses fortes du projet.</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<!-- ============ FILES — scripts ============ -->
+<section id="files-scripts">
+  <h2><span class="icon">📄</span> Fichiers <code>.claude/scripts/</code></h2>
+  <p class="lead">Scripts PowerShell <strong>déterministes (0 token LLM)</strong>. Exécutables hors Claude Code pour audit/maintenance.</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Script</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td class="col-name"><code>validate-readiness.ps1</code></td><td>Implementation Readiness Gate (Phase 2.6). Vérifie SPEC + US + stack + ACs + traçabilité + IDs stables. Sortie GO / WARN / NO-GO. Remplace agent <code>validator</code> retiré v6.0.</td></tr>
+      <tr><td class="col-name"><code>parse-coverage.ps1</code></td><td>Parse les outputs de coverage tools (cobertura XML, lcov, JSON) et normalise vers schéma <code>coverage.json</code> (cf. <code>qa-coverage.md §2</code>). Cross-stack.</td></tr>
+      <tr><td class="col-name"><code>quality-scan.ps1</code></td><td>Quality scan sonar-like cross-stack. Métriques : LoC, complexité, duplications, smells. Sortie <code>quality.json</code>.</td></tr>
+      <tr><td class="col-name"><code>sdd-clear.ps1</code></td><td>Backend de <code>/sdd-clear</code>. Supprime artefacts <code>workspace/output/</code>. Dry-run par défaut, <code>-Force</code> requis.</td></tr>
+      <tr><td class="col-name"><code>framework-smoke.ps1</code></td><td>Smoke test cohérence interne du framework. Vérifie que tous les fichiers référencés (rules, templates, stacks) existent et sont parseables.</td></tr>
+      <tr><td class="col-name"><code>validate-inline-rules.ps1</code></td><td>Détecte le drift Inline Rules : compare la substance inlinée dans <code>agents/dev-*.md</code> avec les fichiers <code>rules/*.md</code> source de vérité.</td></tr>
+      <tr><td class="col-name"><code>validate-fidelity.ps1</code></td><td>Fidelity check texte-based : grep des libellés/composants extraits du HTML mockup dans le code généré (Phase 4 STEP 11 dev-frontend).</td></tr>
+      <tr><td class="col-name"><code>measure-batch.ps1</code></td><td>Agrège les tokens consommés par session (lecture <code>.metrics/</code> + transcripts). Suivi économique des runs.</td></tr>
+      <tr><td class="col-name"><code>acquire-libname-lock.ps1</code></td><td>Acquiert lock file atomique sur <code>{LibName}/.locks/{Entity}.lock</code> avant écriture parallèle. Anti-race dev-backend / dev-frontend (cf. <code>file-ownership.md §4</code>).</td></tr>
+      <tr><td class="col-name"><code>detect-capabilities.ps1</code></td><td>Scanne les US d'une SPEC pour détecter les <strong>trigger keywords</strong> (excel, pdf, redis-cache, cqrs…) et déduit les libs §2.4.b à installer.</td></tr>
+      <tr><td class="col-name"><code>mark-breaking-resolved.ps1</code></td><td>Marque les sections <code>BREAKING CHANGES</code> du <code>CLAUDE.md</code> projet comme RESOLVED post-build vert (cf. <code>file-ownership.md §6.bis</code>).</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<!-- ============ FILES — docs ============ -->
+<section id="files-docs">
+  <h2><span class="icon">📄</span> Fichiers <code>.claude/docs/</code></h2>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Fichier</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td class="col-name"><code>architecture.md</code></td><td>Vision globale, modèles structurels, cartographie des agents, catalogue des stacks, scope du framework. Référencé par CLAUDE.md §3-§7.</td></tr>
+      <tr><td class="col-name"><code>workflow.md</code></td><td>Détail des 4 phases du pipeline (Cadrage → Découpe → Bootstrap → Dev). Flux de données entre artefacts. Historique BREAKING CHANGES.</td></tr>
+      <tr><td class="col-name"><code>conventions.md</code></td><td>Anti-derive, idempotence, parallélisme, plan inline, capabilities core/on-demand, index rules + templates. Référencé par CLAUDE.md §8.</td></tr>
+      <tr><td class="col-name"><code>accepted-tradeoffs.md</code></td><td>Compromis structurels acceptés (v5.0+) : verbosité prompts, redondances inlining, coût bootstrap arch, etc. Documente les choix non-évidents.</td></tr>
+      <tr><td class="col-name"><code>presentation.html</code></td><td>Présentation visuelle du framework (existante).</td></tr>
+      <tr><td class="col-name"><code>readme.html</code></td><td>README HTML du framework (existant).</td></tr>
+      <tr><td class="col-name"><code>presentation-technique.html</code></td><td><strong>Ce fichier</strong> — doc technique consolidée (répertoires, agents, skills, rules, fichiers).</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<!-- ============ FILES root reminders ============ -->
+<section id="files-root">
+  <h2><span class="icon">📄</span> Fichiers racine <code>.claude/</code></h2>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Fichier</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td class="col-name"><code>CLAUDE.md</code></td><td><strong>Slim entry point ~150 lignes</strong>. Convention nommage cross-fichiers, IDs stables (SFD-N, BR-N, AC-N, FD-N), commandes, agents, démarrage rapide. Charge à la demande <code>docs/*.md</code>.</td></tr>
+      <tr><td class="col-name"><code>CHANGELOG.md</code></td><td>Historique versions : v4.0 (mockups HTML), v5.0 (slim entry, inline rules), v6.0 (validator retiré). BREAKING CHANGES + nouvelles features.</td></tr>
+      <tr><td class="col-name"><code>MIGRATION.md</code></td><td>Guide migration entre versions majeures (v4→v5, v5→v6). Étapes, scripts, points d'attention, rollback.</td></tr>
+      <tr><td class="col-name"><code>loader.yml</code></td><td>Manifest YAML descriptif des reads/writes par agent. Source de vérité audit contexte + estimation tokens. Cross-vérifié par <code>framework-smoke.ps1</code>.</td></tr>
+      <tr><td class="col-name"><code>settings.json</code></td><td>Configuration Claude Code partagée projet : hooks, permissions allowlist, env vars projet (versionnée Git).</td></tr>
+      <tr><td class="col-name"><code>settings.local.json</code></td><td>Configuration locale machine (non versionnée). Override personnel par dev.</td></tr>
+      <tr><td class="col-name"><code>.metrics/baseline-v4.0.0-pvlist.csv</code></td><td>Baseline tokens/durée mesurée sur le run référence pvlist (v4.0.0). Sert de comparatif perf entre versions.</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<footer>
+  SDD_Pro v6.0.0 · Spec-Driven Development pour Claude Code · Doc technique générée automatiquement<br>
+  Pour aller plus loin : <code>@.claude/docs/architecture.md</code>, <code>@.claude/docs/workflow.md</code>, <code>@.claude/docs/conventions.md</code>
+</footer>
+
+</main>
+</div>
+</body>
+</html>

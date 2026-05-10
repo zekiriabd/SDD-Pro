@@ -1,0 +1,32 @@
+{
+  "$schema": "../../templates/libs-catalog.schema.json",
+  "stackId": "python-pytest",
+  "category": "qa",
+  "schemaVersion": 1,
+  "buildSystem": "uv",
+  "manifest": {
+    "files": ["workspace/output/src/{BackendName}/pyproject.toml"]
+  },
+  "versions": {
+    "pytest": "8.3.4",
+    "pytest-asyncio": "0.25.0",
+    "pytest-cov": "6.0.0",
+    "pytest-mock": "3.14.0",
+    "httpx": "0.28.0",
+    "respx": "0.22.0",
+    "coverage": "7.6.9"
+  },
+  "core": [
+    { "module": "pytest", "ref": "pytest" },
+    { "module": "pytest-asyncio", "ref": "pytest-asyncio" },
+    { "module": "pytest-cov", "ref": "pytest-cov" },
+    { "module": "pytest-mock", "ref": "pytest-mock" },
+    { "module": "httpx", "ref": "httpx" },
+    { "module": "coverage", "ref": "coverage" }
+  ],
+  "onDemand": [
+    { "module": "respx", "ref": "respx", "capability": "http-mock", "triggers": ["respx", "mock.*http", "intercept.*requests"] }
+  ],
+  "plugins": [],
+  "metadata": { "lastUpdated": "2026-05-07", "format": "compact (v2)" }
+}

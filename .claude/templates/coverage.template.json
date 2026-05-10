@@ -1,0 +1,39 @@
+{
+  "spec": "{n}-{SpecName}",
+  "extractedAt": "2026-05-05T14:32:18Z",
+  "stacks": [
+    {
+      "stack": "qa-dotnet-xunit",
+      "tool": "coverlet",
+      "toolVersion": "6.0.2",
+      "tests": {
+        "total": 0,
+        "passed": 0,
+        "failed": 0,
+        "skipped": 0
+      },
+      "coverage": {
+        "lines": {
+          "covered": 0,
+          "total": 0,
+          "percent": 0.0
+        },
+        "branches": {
+          "covered": 0,
+          "total": 0,
+          "percent": 0.0
+        }
+      },
+      "files": []
+    }
+  ],
+  "summary": {
+    "total_tests": 0,
+    "passed": 0,
+    "failed": 0,
+    "skipped": 0,
+    "coverage_lines_pct": 0.0,
+    "coverage_min": 80,
+    "coverage_passed": false
+  }
+}
