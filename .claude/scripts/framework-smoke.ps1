@@ -89,7 +89,7 @@ $scriptsDir = Join-Path $claudeRoot "scripts"
 $expectedScripts = @(
   'validate-readiness.ps1','parse-coverage.ps1','quality-scan.ps1',
   'measure-batch.ps1','detect-capabilities.ps1','validate-inline-rules.ps1',
-  'sdd-clear.ps1','framework-smoke.ps1',
+  'framework-smoke.ps1',
   'validate-fidelity.ps1','mark-breaking-resolved.ps1','acquire-libname-lock.ps1'
 )
 foreach ($s in $expectedScripts) {
@@ -106,7 +106,7 @@ $commandsDir = Join-Path $claudeRoot "commands"
 $expectedCommands = @(
   'spec-generate','spec-deepen','spec-validate','us-generate','arch-init',
   'dev-plan','dev-backend','dev-frontend','dev-run','sdd-full','qa-generate',
-  'sdd-status','sdd-clear'
+  'sdd-status'
 )
 foreach ($c in $expectedCommands) {
   $f = Join-Path $commandsDir "$c.md"

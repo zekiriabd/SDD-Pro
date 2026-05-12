@@ -46,6 +46,18 @@ en RAM uniquement, jamais stockée sur disque.
 
 ---
 
+## STEP 0.5 - HARD-GATE context budget
+
+Avant tout `Read`, executer :
+
+```bash
+$PS_BIN -File .claude/scripts/context-budget.ps1 -Agent arch
+```
+
+Exit non-zero -> STOP. Le ledger est ecrit dans `workspace/output/.audit/context-budget.jsonl`.
+
+---
+
 ## STEP 1 — Charger le contexte minimal
 
 Read **uniquement** :
@@ -127,6 +139,48 @@ ERROR: agent arch — DatabaseType inconnu
 CAUSE: "{value}" n'est pas dans {none, SqlServer, PostgreSQL, MySql, Sqlite}
 FIX: corriger DatabaseType dans workspace/input/stack/stack.md
 ```
+
+---
+
+## STEP 2.bis — Hard-gate Front/Back isolation (depuis 2026-05-12)
+
+**Bloquant avant toute exécution d'Init Commands.**
+
+Après lecture du `## Project Config`, vérifier l'isolation des projets :
+
+1. `AppName` ≠ `BackendName` (case-sensitive). Si égaux → ERROR :
+   ```
+   ERROR: arch — AppName == BackendName
+   CAUSE: [STACK_MALFORMED] Project Config : AppName et BackendName identiques ("{value}")
+   FIX: distinguer les deux dans workspace/input/stack/stack.md (ex. AppName=cmsfront, BackendName=cmsback)
+   ```
+
+2. Aucun nom ne doit être un préfixe / sous-chemin de l'autre (anti-imbrication). Si
+   `{AppName} == startswith {BackendName}` ou inversement, OU si l'un
+   contient l'autre comme segment (ex. AppName=`back-front`, BackendName=`back`)
+   → ERROR `[STACK_MALFORMED]` avec FIX = renommer pour éviter l'ambiguïté.
+
+3. Chaque projet sera scaffoldé sous **`workspace/output/src/{Name}/`** au
+   premier niveau. Aucun stack actif ne doit produire un layout imbriqué
+   (ex. monorepo avec `apps/cmsfront/` est OK car `apps/` ≠ `cmsback/`,
+   mais `cmsback/cmsfront/` est INTERDIT).
+
+4. Avant chaque `mkdir`/`new`/`init` exécuté en STEP 4 (Init Commands), le
+   path cible doit matcher EXACTEMENT l'un des patterns canoniques :
+   - `workspace/output/src/{AppName}/...`
+   - `workspace/output/src/{BackendName}/...`
+   - `workspace/output/src/{LibName}/...`
+   - `workspace/output/src/*.sln` (stacks .NET)
+
+   Tout autre path (variantes runtime comme `Kotlin/{AppName}/`,
+   `frontend/`, `src/{BackendName}/web/`, etc.) → STOP + ERROR
+   `[FILE_OWNERSHIP_NESTED]` (cf. `.claude/rules/file-ownership.md §1.bis`).
+
+5. **Création des répertoires `workspace/output/...`** : si le parent
+   n'existe pas (`workspace/output/`, `workspace/output/src/`, `workspace/output/db/`,
+   `workspace/output/context/`), créer avec `mkdir -p` AVANT toute écriture.
+   Ne jamais échouer sur "parent directory not found" — la création
+   est implicite, mais subordonnée à la validation du pattern canonique.
 
 ---
 
@@ -337,6 +391,32 @@ ERROR: agent arch — variable d'environnement DB manquante
 CAUSE: {liste des variables manquantes parmi DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD}
 FIX: définir les variables manquantes (ex. PowerShell : $env:DB_HOST="...")
 ```
+
+> **Piège propagation env vars en sous-agent (post-mortem 2026-05-11)** :
+> quand l'agent arch est invoqué via le tool `Agent` (cf. `/dev-run` Phase
+> A) plutôt qu'en direct, **le shell Bash interne au sub-agent peut ne PAS
+> hériter** des env vars définies dans le shell parent Claude Code. Symptôme :
+> arch reporte `[ENV_MISSING] DB_HOST...` alors que `printenv DB_HOST` côté
+> parent répond bien. Diagnostic :
+>
+> 1. Au début de Phase B, l'agent **DOIT** vérifier la visibilité réelle des
+>    5 vars via `printenv` dans **son propre process Bash** (pas se fier
+>    aveuglément à la pré-validation côté `/dev-run` STEP 4)
+> 2. Si une var est invisible côté sub-shell → 2 stratégies de récupération :
+>    - **Stratégie A** : exporter explicitement avant chaque sous-commande
+>      gradle / dotnet / python (`env DB_HOST=$DB_HOST ... gradle bootRun`)
+>    - **Stratégie B** : créer un `.env` local au projet (`workspace/output/src/{BackendName}/.env`)
+>      contenant les 5 vars + utiliser le support natif du framework
+>      (Spring `spring-dotenv`, .NET `DotNetEnv`, Node `dotenv`) — **PRÉFÉRÉ**
+>      car découple le runtime du shell parent
+> 3. Si malgré ça aucune stratégie ne fonctionne → ne PAS abort silencieusement
+>    Phase B : émettre ERROR explicite `[ENV_PROPAGATION_FAILED]` pour que
+>    l'humain ou `dev-backend` puisse créer les entities manuellement à partir
+>    de la SPEC (mode dégradé documenté dans CLAUDE.md projet)
+>
+> **Anti-pattern** : skipper Phase B en silence avec un WARN dans CLAUDE.md
+> `Scaffolding DB: SKIPPED` quand les vars existent réellement côté Tech
+> Lead. La Phase B est load-bearing pour la cohérence entities ↔ DB réelle.
 
 ### 8.1 Composition selon le langage du stack backend
 

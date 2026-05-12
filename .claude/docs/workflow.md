@@ -94,10 +94,15 @@ PHASE 5   /qa-generate {n} [--mode M]   → workspace/output/qa/feat-{n}/{report
 
 - `/us-generate {n}` exécute la phase 2 (US) avec récap des HTML déposés.
 - `/dev-run {n}` enchaîne phases 3 → 4 : pré-step `arch` (idempotent,
-  inclut le scaffolding DB), puis Dev-Backend + Dev-Frontend **en
-  parallèle** sur toutes les US.
+  inclut le scaffolding DB) **avec short-circuit STEP 4.bis** (depuis
+  2026-05-10) qui skippe l'invocation arch quand le bootstrap est
+  stable (CLAUDE.md projet présents, `db/schema.json` présent si DB,
+  `stack.md` non modifié) ; puis Dev-Backend + Dev-Frontend gated
+  back→API gate→front. Forcer arch via `--rebuild-arch`.
 - `/sdd-full {n}` = pipeline complet de A à Z (us-generate → spec-validate
-  → dev-plan optionnel → arch → dev-run → qa-generate).
+  → dev-plan optionnel → arch → dev-run → qa-generate). Sur SPECs
+  ≥ 2 (ou re-runs), l'étape arch est typiquement skippée par le
+  short-circuit ci-dessus.
 
 ## 4. Historique BREAKING CHANGES
 

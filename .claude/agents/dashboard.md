@@ -33,6 +33,20 @@ un autre agent.
 
 ---
 
+## STEP 0.5 - HARD-GATE context budget
+
+Avant tout `Read`, executer :
+
+```bash
+$PS_BIN -File .claude/scripts/context-budget.ps1 -Agent dashboard -SpecNumber {n}
+```
+
+Exit non-zero -> STOP. Les globs globaux non bornes doivent etre remplaces
+par des reads bornes avant invocation dashboard. Le ledger est ecrit dans
+`workspace/output/.audit/context-budget.jsonl`.
+
+---
+
 ## STEP 1 — Charger le contexte minimal
 
 Read **uniquement** :

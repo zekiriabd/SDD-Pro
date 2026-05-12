@@ -52,6 +52,18 @@ Read manuel à effectuer ici. Détail script : `.claude/scripts/preflight.ps1`.
 
 ---
 
+## STEP 0.5 - HARD-GATE context budget
+
+Avant tout `Read` hors preflight, executer :
+
+```bash
+$PS_BIN -File .claude/scripts/context-budget.ps1 -Agent dev-backend -SpecNumber {n} -UsId {n}-{m}
+```
+
+Exit non-zero -> STOP. Le ledger est ecrit dans `workspace/output/.audit/context-budget.jsonl`.
+
+---
+
 ## STEP 1 — Détection mode From Plan
 
 > Préconditions A1-A3 + B1-B4 déjà validées par STEP 0 HARD-GATE.
@@ -80,6 +92,36 @@ Modes en sortie de STEP 1 :
   `/dev-plan`)
 
 L'agent ne traite **jamais** plusieurs US dans la même invocation.
+
+---
+
+## STEP 1.bis — Hard-gate path safety (Front/Back isolation, depuis 2026-05-12)
+
+**Bloquant avant tout Write/Edit sous `workspace/output/src/`.**
+
+Récupérer `AppName` et `BackendName` depuis `## Project Config`
+(`workspace/input/stack/stack.md`, déjà lu par preflight).
+
+Pour **chaque** path qu'on s'apprête à écrire :
+
+1. Le path DOIT commencer par `workspace/output/src/{BackendName}/` OU
+   `workspace/output/src/{LibName}/` (si `LibStrategy=shared`).
+2. Le path NE DOIT JAMAIS contenir `/{AppName}/` comme segment imbriqué.
+3. Le path NE DOIT JAMAIS être imbriqué sous une variante front
+   (`{BackendName}/Kotlin/{AppName}/`, `{BackendName}/web/`,
+   `{BackendName}/front/`, `{BackendName}/spa/`, etc.).
+
+Si violation → STOP + ERROR :
+```
+ERROR: dev-backend {n}-{m} — path interdit
+CAUSE: [FILE_OWNERSHIP_NESTED] tentative d'écrire {path} (front imbriqué dans back ou hors arbo {BackendName})
+FIX: corriger le plan/code pour écrire sous workspace/output/src/{BackendName}/ uniquement, frontend reste sous {AppName}/ au même niveau
+```
+
+**Création répertoire** : si le parent n'existe pas, `mkdir -p`
+implicite — APRÈS validation du pré-check 1-3.
+
+Cf. `.claude/rules/file-ownership.md §1.bis` pour la règle complète.
 
 ---
 

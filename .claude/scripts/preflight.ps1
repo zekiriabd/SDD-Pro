@@ -133,7 +133,13 @@ if ($pcBlock -match "(?m)^\s*$($keyName)\s*:\s*(\S+)") {
 if ($result.appOrBackendName) {
     $projDigest = "workspace/output/src/$($result.appOrBackendName)/CLAUDE.md"
     if (-not (Test-Path $projDigest)) {
-        Add-Err 'STACK_DIGEST_MISSING' "lancer /dev-run avant /dev-$Family (ou bootstrap arch)"
+        $hint = "lancer /dev-run avant /dev-$Family (ou bootstrap arch)"
+        if ($result.planOnly) {
+            # En mode :plan, B3 est WARN-only — log mais ne bloque pas (idem B4)
+            [void]$result.errors.Add([ordered]@{ code = 'STACK_DIGEST_MISSING_WARN'; hint = "$hint (WARN-only en mode :plan)" })
+        } else {
+            Add-Err 'STACK_DIGEST_MISSING' $hint
+        }
     }
 }
 

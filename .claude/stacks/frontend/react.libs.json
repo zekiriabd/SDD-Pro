@@ -26,7 +26,7 @@
     "clsx": "2.1.1",
     "lucide-react": "0.468.0",
     "tanstack-query": "5.62.7",
-    "tanstack-router": "1.95.0",
+    "react-router-dom": "7.15.0",
     "react-hook-form": "7.54.1",
     "zod": "3.24.1",
     "hookform-resolvers": "3.10.0",
@@ -37,8 +37,14 @@
     "turbo": "2.3.3",
     "eslint": "9.17.0",
     "typescript-eslint": "8.18.1",
-    "msal-browser": "3.27.0",
-    "msal-react": "2.2.0"
+    "msal-browser": "5.10.1",
+    "msal-react": "5.4.1",
+    "tanstack-react-table": "8.20.5",
+    "tanstack-react-router": "1.166.0",
+    "tanstack-router-plugin": "1.166.0",
+    "vite-plugin-basic-ssl": "2.0.0",
+    "papaparse": "5.4.1",
+    "papaparse-types": "5.3.15"
   },
   "core": [
     { "module": "react", "ref": "react" },
@@ -56,9 +62,7 @@
     { "module": "lucide-react", "ref": "lucide-react" },
     { "module": "@tanstack/react-query", "ref": "tanstack-query" },
     { "module": "@tanstack/react-query-devtools", "ref": "tanstack-query" },
-    { "module": "@tanstack/react-router", "ref": "tanstack-router" },
-    { "module": "@tanstack/router-plugin", "ref": "tanstack-router" },
-    { "module": "@tanstack/router-devtools", "ref": "tanstack-router" },
+    { "module": "react-router-dom", "ref": "react-router-dom" },
     { "module": "react-hook-form", "ref": "react-hook-form" },
     { "module": "zod", "ref": "zod" },
     { "module": "@hookform/resolvers", "ref": "hookform-resolvers" },
@@ -72,8 +76,14 @@
   "onDemand": [
     { "module": "i18next-http-backend", "ref": "i18next-http-backend", "capability": "i18n-http-loading", "triggers": ["traductions.*serveur", "i18n.*lazy", "load.*translations.*remote"] },
     { "module": "@azure/msal-browser", "ref": "msal-browser", "capability": "auth-azure-ad", "triggers": ["azure ad", "msal", "single sign-on", "sso", "oauth2.*spa", "@azure/msal"] },
-    { "module": "@azure/msal-react", "ref": "msal-react", "capability": "auth-azure-ad", "triggers": ["azure ad", "msal", "single sign-on", "sso", "oauth2.*spa", "@azure/msal"] }
+    { "module": "@azure/msal-react", "ref": "msal-react", "capability": "auth-azure-ad", "triggers": ["azure ad", "msal", "single sign-on", "sso", "oauth2.*spa", "@azure/msal"] },
+    { "module": "@tanstack/react-table", "ref": "tanstack-react-table", "capability": "data-grid", "triggers": ["datagrid", "data grid", "tanstack.*table", "react-table", "tableau.*colonnes", "grille.*filtre"] },
+    { "module": "papaparse", "ref": "papaparse", "capability": "csv-client", "triggers": ["csv.*client", "export.*csv.*frontend", "papaparse", "blob.*csv", "csv.*download.*navigateur"] },
+    { "module": "@types/papaparse", "ref": "papaparse-types", "capability": "csv-client", "triggers": ["csv.*client", "export.*csv.*frontend", "papaparse", "blob.*csv", "csv.*download.*navigateur"] },
+    { "module": "@tanstack/react-router", "ref": "tanstack-react-router", "capability": "router-tanstack", "triggers": ["tanstack.*router", "@tanstack/react-router", "file-based.*routing", "routes/__root", "routeTree.gen"] },
+    { "module": "@tanstack/router-plugin", "ref": "tanstack-router-plugin", "capability": "router-tanstack", "triggers": ["tanstack.*router", "@tanstack/react-router", "file-based.*routing", "routes/__root", "routeTree.gen"] },
+    { "module": "@vitejs/plugin-basic-ssl", "ref": "vite-plugin-basic-ssl", "capability": "dev-https", "triggers": ["https.*dev", "basic-ssl", "https.*localhost", "azure ad.*spa", "msal.*redirect.*localhost", "vite.*https"] }
   ],
   "plugins": [],
-  "metadata": { "lastUpdated": "2026-05-07", "format": "compact (v2)" }
+  "metadata": { "lastUpdated": "2026-05-12", "format": "compact (v2)", "patchNotes": "bump msal-react 2.2.0->5.4.1 + msal-browser 3.27.0->5.10.1 (React 19 peer-dep), add tanstack-react-router 1.166 (replaces react-router-dom for new projects), add vite-plugin-basic-ssl 2.0.0 (dev HTTPS for Azure AD MSAL popup)" }
 }

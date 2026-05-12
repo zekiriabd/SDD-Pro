@@ -100,6 +100,34 @@ Si l'US n'a pas de contrepartie pour la famille → exit silent
 
 ---
 
+## STEP 4.5 — Compactage des plans frontend (idempotent)
+
+Une fois **toutes** les invocations dev-* terminées, exécuter via Bash :
+
+```bash
+powershell -NoProfile -ExecutionPolicy Bypass -File .claude/scripts/compact-front-plans.ps1
+```
+
+Le script :
+- parcourt `workspace/output/plans/*.front.md`
+- pour chaque plan > 12 KB : archive l'original sous
+  `workspace/output/.audit/plan-archive/{basename}.{ts}.full.md` puis
+  remplace le `.front.md` par une version courte (~12 KB) contenant
+  contrat d'exécution + fichiers + arbitrages essentiels
+- skip silencieux pour les plans déjà ≤ 12 KB
+
+Justification : les plans frontend non compactés (50-70 KB observés)
+sont relus par `dev-frontend` à chaque US en mode From Plan → coût
+tokens × N invocations. Compactage idempotent → -80% en moyenne.
+
+Si le script échoue (exit ≠ 0) → émettre WARNING 1 ligne et continuer
+(non bloquant) :
+```
+🟡 /dev-plan {n} — compactage front partiel (cf. stderr)
+```
+
+---
+
 ## STEP 5 — Récap final
 
 Émettre **un seul bloc final** :

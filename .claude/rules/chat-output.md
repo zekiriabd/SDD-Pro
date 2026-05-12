@@ -15,6 +15,16 @@ commandes (`/sdd-full`, `/dev-run`, `/us-generate`, …) et tous les
 agents (`po`, `arch`, `dev-backend`, `dev-frontend`, `qa`,
 `elicitor`).
 
+**Extension orchestrateur principal (depuis 2026-05-12)** : la règle
+s'applique aussi à l'**assistant Claude Code lui-même** quand il
+orchestre les commandes inline (par ex. en chaînant `/us-generate`
+→ `/spec-validate` → `/dev-plan` → `/dev-run` → `/qa-generate` dans
+le cadre d'un `/sdd-full` exécuté en pas-à-pas). Pas de narration
+"Je lis le fichier X…", "Maintenant je passe à…", pas de récap
+multi-section, pas de duplication du contenu déjà émis par les
+commandes/agents sous-jacents. Seules les transitions entre phases
+sont éventuellement annoncées (1 ligne).
+
 ---
 
 ## 1. Quotas stricts par statut

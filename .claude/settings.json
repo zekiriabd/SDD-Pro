@@ -1,5 +1,6 @@
 {
   "permissions": {
+    "defaultMode": "acceptEdits",
     "allow": [
       "Read",
       "Glob",
@@ -10,6 +11,11 @@
       "NotebookEdit",
       "Skill",
       "Agent",
+      "Task",
+      "TodoWrite",
+      "WebFetch",
+      "WebSearch",
+      "Bash",
       "Bash(dotnet:*)",
       "Bash(npm:*)",
       "Bash(pnpm:*)",
@@ -60,8 +66,7 @@
       "Bash(xargs:*)",
       "Bash(timeout:*)",
       "Bash(printenv:*)",
-      "PowerShell(*)",
-      "Bash(powershell.exe -NoProfile -ExecutionPolicy Bypass -File .claude/scripts/sdd-clear.ps1)"
+      "PowerShell(*)"
     ],
     "deny": [
       "Bash(dotnet ef migrations*)",
@@ -85,6 +90,15 @@
           {
             "type": "command",
             "command": "powershell -NoProfile -ExecutionPolicy Bypass -File .claude/hooks/protect-framework.ps1"
+          }
+        ]
+      },
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File .claude/hooks/preflight-agent-budget.ps1"
           }
         ]
       }

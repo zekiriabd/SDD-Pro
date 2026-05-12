@@ -313,7 +313,9 @@ Resoudre les placeholders `{AppName}`, `{AppNamespace}` depuis
 
 ```bash
 # Prerequis : Microsoft.EntityFrameworkCore.SqlServer deja declare en §2.4
-CONN="Server=${DB_HOST},${DB_PORT};Database=${DB_NAME};User Id=${DB_USER};Password=${DB_PASSWORD};Encrypt=False;TrustServerCertificate=True;"
+# v6.1 hardening : Encrypt=True + TrustServerCertificate=False par defaut.
+TRUST_CERT="${DB_TRUST_SERVER_CERT:-false}"
+CONN="Server=${DB_HOST},${DB_PORT};Database=${DB_NAME};User Id=${DB_USER};Password=${DB_PASSWORD};Encrypt=True;TrustServerCertificate=${TRUST_CERT};"
 
 dotnet ef dbcontext scaffold "$CONN" \
   Microsoft.EntityFrameworkCore.SqlServer \
@@ -667,7 +669,9 @@ static string BuildConnectionString()
     var dbPassword = RequireEnv("DB_PASSWORD");
     var dbHost = RequireEnv("DB_HOST");
     var dbPort = RequireEnv("DB_PORT");
-    return $"Server={dbHost},{dbPort};Database={dbName};User Id={dbUser};Password={dbPassword};TrustServerCertificate=True;";
+    // v6.1 hardening : Encrypt=True ; TrustServerCertificate=False par defaut.
+    var trustCert = bool.TryParse(Environment.GetEnvironmentVariable("DB_TRUST_SERVER_CERT"), out var t) && t;
+    return $"Server={dbHost},{dbPort};Database={dbName};User Id={dbUser};Password={dbPassword};Encrypt=True;TrustServerCertificate={trustCert};";
 }
 
 static void AddAuthorizationPolicies(IServiceCollection services, IConfiguration configuration)

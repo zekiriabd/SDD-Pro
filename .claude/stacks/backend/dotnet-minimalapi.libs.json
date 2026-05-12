@@ -28,7 +28,9 @@
     "mediatr": "12.4.1",
     "stackexchange-redis": "2.8.16",
     "caching-redis": "9.0.0",
-    "mapster": "7.4.0"
+    "mapster": "7.4.0",
+    "mailkit": "4.8.0",
+    "mimekit": "4.8.0"
   },
   "dbDrivers": {
     "sqlserver": { "module": "Microsoft.EntityFrameworkCore.SqlServer", "ref": "ef-core" }
@@ -62,7 +64,9 @@
     { "module": "MediatR", "ref": "mediatr", "capability": "cqrs", "triggers": ["\\bcqrs\\b", "mediatr", "command.*handler", "query.*handler"] },
     { "module": "StackExchange.Redis", "ref": "stackexchange-redis", "capability": "redis-cache", "triggers": ["\\bredis\\b", "cache distribu", "distributed cache"] },
     { "module": "Microsoft.Extensions.Caching.StackExchangeRedis", "ref": "caching-redis", "capability": "redis-cache", "triggers": ["\\bredis\\b", "cache distribu", "distributed cache"] },
-    { "module": "Mapster", "ref": "mapster", "capability": "fast-mapping", "triggers": ["mapster\\b", "mapping perf", "high.?performance.*mapp"] }
+    { "module": "Mapster", "ref": "mapster", "capability": "fast-mapping", "triggers": ["mapster\\b", "mapping perf", "high.?performance.*mapp"] },
+    { "module": "MailKit", "ref": "mailkit", "capability": "email", "triggers": ["\\bsmtp\\b", "envoi.*email", "envoi.*courriel", "send.*email", "email.*notification", "notification.*par.*email", "mail.*confirmation", "verifier.*email"] },
+    { "module": "MimeKit", "ref": "mimekit", "capability": "email", "triggers": ["\\bsmtp\\b", "envoi.*email", "envoi.*courriel", "send.*email", "email.*notification", "notification.*par.*email", "mail.*confirmation", "verifier.*email"] }
   ],
   "plugins": [],
   "metadata": { "lastUpdated": "2026-05-07", "format": "compact (v2)" }

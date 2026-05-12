@@ -12,6 +12,55 @@ critères suivants. La politique est inlinée dans `agents/arch.md`
 (section dédiée v2.2) ; ce fichier en est la source canonique pour les
 edge-cases.
 
+## 0. Runtime LTS only (v6.1 hardening)
+
+**Règle stricte** : les stacks SDD_Pro **n'utilisent que des runtimes
+LTS** (Long-Term Support). Les versions STS (Standard Term Support) ou
+prerelease sont interdites en `## Active Tech Specs` pour des projets
+destinés à la prod.
+
+### Matrice runtime LTS (au 2026-05)
+
+| Plateforme | LTS courant | Fin support | Statut SDD_Pro |
+|---|---|---|---|
+| **.NET**    | 10 (Nov 2025) | Nov 2028 | ✅ pin actuel dans `dotnet-minimalapi`, `blazor-*` |
+| **Node.js** | 22 "Jod" (Oct 2024) | Apr 2027 | ✅ pin actuel dans `react`, `vue`, `angular`, `node-express` |
+| **Java**    | 21 (Sep 2023) | Sep 2028 | ✅ pin actuel dans `kotlin-spring-boot` |
+| **Python**  | 3.12 (Oct 2023) | Oct 2028 | ✅ recommandé pour `python-fastapi` (3.13 OK aussi) |
+| **Kotlin**  | 2.1 LTS (2025) | TBD | ✅ pin actuel `kotlin-spring-boot.libs.json:versions.kotlin` |
+
+> Note : Python n'a pas de cycle LTS formel, on aligne sur la
+> politique de bug-fix sur 5 ans de la PSF.
+
+### Interdictions
+
+- **Aucun pin sur version STS** (.NET 9, Node 23, Java 22, etc.) en prod
+- **Aucun pin prerelease** (`-rc`, `-preview`, `-alpha`, `-beta`,
+  `-snapshot`) sans ADR explicite
+- **Aucun "latest"** non-pinné — toutes les versions runtime doivent
+  être pinnées dans le `.libs.json` du stack actif
+
+### Bypass exceptionnels (rares, tracés)
+
+Si un projet nécessite une version STS (lib non-prête pour le LTS) :
+1. Ouvrir un ADR `ADR-{ts}-runtime-sts-exception.md` (pourquoi + date
+   de migration cible vers LTS)
+2. Ajouter en `## Project Config` :
+   `RuntimeException: dotnet9 (fin: 2026-05-12, migration -> dotnet10)`
+3. `validate-libs-catalog.ps1` émet WARN `[RUNTIME_STS_EXCEPTION]` à
+   chaque scan jusqu'à la migration
+
+### Format ERROR sur violation
+
+```
+ERROR: arch — runtime non-LTS detecte
+CAUSE: [STACK_RUNTIME_NOT_LTS] {stack-id} pin {plateforme} {version} (STS, fin support {date})
+FIX: migrer vers la version LTS courante ({lts-version}) dans
+     .claude/stacks/{cat}/{stack-id}.libs.json#versions
+```
+
+---
+
 ## 1. Critères d'acceptation
 
 ### 1.1 Origine officielle

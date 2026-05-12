@@ -1,4 +1,4 @@
-﻿# SDD_Pro v6.0.0 — Spec-Driven Development pour Claude Code
+﻿# SDD_Pro v6.1.0 — Spec-Driven Development pour Claude Code
 
 > Framework SDD strict : SPEC fonctionnelle → User Stories → Code
 > (back/front en parallèle). Lecture sélective, anti-derive, isolation
@@ -73,16 +73,22 @@ Même règle pour `BR-N` et `AC-N`.
 | `/dev-plan {n}`                 | 3.5          | Produit plans `workspace/output/plans/...` sans coder |
 | `/dev-backend {n}-{m}[:plan]`   | 4            | Code serveur pour 1 US (`:plan` = Plan Only) |
 | `/dev-frontend {n}-{m}[:plan]`  | 4            | Code client pour 1 US (`:plan` = Plan Only) |
-| `/dev-run {n} [--force] [--max-parallel N]` | 3 → 4 | Orchestrateur : arch+db → back+front parallèle borné |
-| `/sdd-full {n} [--plan] [--force] [--no-plan-on-warn] [--no-validate]` | 2 → 5 | Pipeline complet de A à Z |
+| `/dev-run {n} [--force] [--max-parallel N] [--rebuild-arch]` | 3 → 4 | Orchestrateur : (short-circuit arch si bootstrap stable) → back+front gated/parallèles |
+| `/sdd-full {n} [--plan] [--force] [--no-plan-on-warn] [--no-validate] [--rebuild-arch] [--manual-gates[=us,readiness,plan,code]] [--no-manual-gates] [--resume]` | 2 → 5 | Pipeline complet de A à Z (arch skipé sur SPECs ≥ 2 si stable). Gates manuels v6.1 → console [workspace/console/](workspace/console/) |
 | `/qa-generate {n} [--mode M]`       | 5            | Tests unitaires + coverage + quality scan sonar-like |
 | `/sdd-status [{n}]`             | diagnostic   | État du pipeline (lecture seule) |
-| `/sdd-clear [{n}] [--force] [--all] [--quiet]` | maintenance | Nettoyage des artefacts générés (dry-run par défaut) |
 | `/doc-refresh`                  | rendu        | Régénère README.html + INDEX.md ADRs + QA dashboards (agent `dashboard` Haiku 4.5) |
+
+> **`/sdd-clear` retiré en v6.1** (commande jugée dangereuse — purge
+> en masse non récupérable). Pour nettoyer manuellement, supprimer
+> sous `workspace/output/` les sous-dossiers concernés
+> (`us/`, `src/`, `plans/`, `qa/`, `validation/`, `.state/`, `.audit/`)
+> ciblés à la main. Aucun outil framework ne fait cette purge — c'est
+> intentionnel.
 
 ---
 
-## 4. Agents (4 cœur + 2 support, depuis v6.0)
+## 4. Agents (4 cœur + 2 support, depuis v6.1)
 
 **Cœur** — invoqués sur tout `/sdd-full` standard :
 
@@ -138,6 +144,14 @@ Règles externes (lues uniquement par leurs consommateurs) :
   LAYER_*, UI_*, QA_*, DERIVE_*, STACK_*, NETWORK_*, etc.) chargée par
   dev-backend, dev-frontend, qa, arch (depuis 2026-05-08). Pilote
   `build_loop` : `[BUILD_CORRECTIBLE]` itère, `[BUILD_BLOCKING]` fail-fast.
+- `source-first.md` — discipline MD-avant-code (depuis 2026-05-12) :
+  tout bug code = trou dans une source MD (SPEC, US, plan, stack, rule).
+  Patcher la source d'abord, le code ensuite. Chargée par dev-backend,
+  dev-frontend (référence sur build_loop échec) + Tech Lead humain.
+- `file-ownership.md §1.bis` — Front/Back isolation stricte (depuis
+  2026-05-12) : Front (`{AppName}/`) et Back (`{BackendName}/`) projets
+  séparés AU MÊME NIVEAU sous `workspace/output/src/`, jamais imbriqués.
+  Hard-gate `[FILE_OWNERSHIP_NESTED]` dans arch, dev-backend, dev-frontend.
 
 Détail complet + index : `@.claude/docs/conventions.md §14`.
 
@@ -186,6 +200,13 @@ combos : 🟡 expérimentales.
 - **Chat Output minimal** : succès = 1 ligne, warning = 1 ligne, erreur
   = 2 lignes max. Pas de récap multi-section, pas de narration. Détail
   → fichiers `workspace/output/...`. Cf. `@.claude/rules/chat-output.md`.
+- **Gates manuels** (depuis 2026-05-10) : 4 points d'arrêt humain
+  optionnels (`afterUS`, `afterReadiness`, `afterPlan`, `afterCode`)
+  pilotés par `ManualGates: true|false|us,plan,code` dans `## Project
+  Config` ou flag CLI `--manual-gates`. Validation via console web
+  [workspace/console/](workspace/console/) (port 5173). Statuts
+  centralisés dans `workspace/console/status.json` (lock partagé Node
+  + PowerShell). Reprise du pipeline via `/sdd-full {n} --resume`.
 
 Détail complet : `@.claude/docs/conventions.md §1-§13`.
 

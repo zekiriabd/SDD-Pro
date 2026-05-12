@@ -21,18 +21,24 @@ if ([string]::IsNullOrWhiteSpace($inputText)) {
     exit 0
 }
 
-# Parser file_path depuis l'input JSON
+# Parser file_path et tool_name depuis l'input JSON
 $filePath = $null
+$toolName = $null
 try {
     $payload = $inputText | ConvertFrom-Json -ErrorAction Stop
     $filePath = $payload.tool_input.file_path
     if ([string]::IsNullOrWhiteSpace($filePath)) {
         $filePath = $payload.file_path
     }
+    $toolName = $payload.tool_name
 } catch {
     $match = [regex]::Match($inputText, '"file_path"\s*:\s*"([^"]+)"')
     if ($match.Success) {
         $filePath = $match.Groups[1].Value
+    }
+    $toolMatch = [regex]::Match($inputText, '"tool_name"\s*:\s*"([^"]+)"')
+    if ($toolMatch.Success) {
+        $toolName = $toolMatch.Groups[1].Value
     }
 }
 
@@ -45,6 +51,16 @@ $normalized = $filePath -replace '\\', '/'
 
 # Skip si hors workspace/output/src/
 if (-not $normalized.Contains('workspace/output/src/')) {
+    exit 0
+}
+
+# Skip total si operation Write (creation de fichier).
+# Note (2026-05-11) : `preserves:` ET `adds:` decrivent ce qui doit
+# etre present APRES une augmentation (Edit/MultiEdit). Sur Write
+# (creation skeleton par arch, ou creation DTO par dev-*), aucune
+# obligation contractuelle n'est evaluee — le contrat s'applique
+# uniquement sur les Edit ulterieurs.
+if ($toolName -eq 'Write') {
     exit 0
 }
 
@@ -93,9 +109,40 @@ if (-not $matchingPlan) {
 
 $planText = Get-Content -Path $matchingPlan.FullName -Raw
 
-# Extraire les preserves: pour ce fichier (regex multiline)
-$preservesPattern = '(?ms)' + [regex]::Escape($fileName) + '.*?preserves:\s*\[([^\]]*)\]'
-$preservesMatch = [regex]::Match($planText, $preservesPattern)
+# Extraire le bloc YAML-like dedie a CE fichier dans le plan
+# Format attendu (dev-backend STEP 5.5 / dev-frontend STEP 6.5) :
+#   - path: workspace/output/src/.../EanService.kt
+#     operation: augment
+#     preserves: [...]
+#     adds: [...]
+#     covers_acs: [AC-3]
+#   - path: ... (bloc suivant)
+# On extrait UNIQUEMENT le bloc dont path: matche $filePath, pour
+# eviter que les preserves:/adds: d'un autre fichier fuient (bug
+# scoping cross-file corrige le 2026-05-11).
+$normalizedFile = $filePath -replace '\\', '/'
+$blockMatches = [regex]::Matches($planText, '(?m)^[-\s]*path:\s*([^\r\n]+?)\s*$')
+$blockText = $null
+for ($i = 0; $i -lt $blockMatches.Count; $i++) {
+    $blockStart = $blockMatches[$i].Index
+    $blockEnd = if ($i + 1 -lt $blockMatches.Count) { $blockMatches[$i + 1].Index } else { $planText.Length }
+    $candidatePath = ($blockMatches[$i].Groups[1].Value -replace '\\', '/').Trim()
+    $candidateLeaf = Split-Path -Leaf $candidatePath
+    if ($candidatePath -eq $normalizedFile -or $normalizedFile.EndsWith($candidatePath) -or $candidateLeaf -eq $fileName) {
+        $blockText = $planText.Substring($blockStart, $blockEnd - $blockStart)
+        break
+    }
+}
+
+# Si aucun bloc dedie trouve : le fichier est mentionne dans le plan
+# mais pas comme entree principale (ex. cite dans adds: d'un autre
+# fichier). Pas de contrat applicable, exit 0.
+if (-not $blockText) {
+    exit 0
+}
+
+# Extraire les preserves: a l'interieur du bloc UNIQUEMENT
+$preservesMatch = [regex]::Match($blockText, '(?ms)preserves:\s*\[([^\]]*)\]')
 
 if ($preservesMatch.Success) {
     $preservesList = $preservesMatch.Groups[1].Value -split ',' | ForEach-Object { $_.Trim().Trim('"').Trim("'") } | Where-Object { $_ }
@@ -112,9 +159,8 @@ if ($preservesMatch.Success) {
     }
 }
 
-# Extraire les adds: pour ce fichier
-$addsPattern = '(?ms)' + [regex]::Escape($fileName) + '.*?adds:\s*\[([^\]]*)\]'
-$addsMatch = [regex]::Match($planText, $addsPattern)
+# Extraire les adds: a l'interieur du bloc dedie UNIQUEMENT
+$addsMatch = [regex]::Match($blockText, '(?ms)adds:\s*\[([^\]]*)\]')
 
 if ($addsMatch.Success) {
     $addsList = $addsMatch.Groups[1].Value -split ',' | ForEach-Object { $_.Trim().Trim('"').Trim("'") } | Where-Object { $_ }

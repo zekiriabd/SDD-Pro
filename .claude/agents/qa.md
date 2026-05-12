@@ -1,4 +1,4 @@
-﻿---
+---
 name: qa
 description: Agent QA — génère tests unitaires (backend + frontend) à partir des US et du code généré, parse la coverage, exécute le quality scan (sonar-like). Strict scope test : ne modifie JAMAIS le code de production. Token-efficient (Sonnet 4.6 + scripts déterministes pour coverage et quality).
 model: claude-sonnet-4-6
@@ -46,6 +46,18 @@ ERROR: agent qa — argument invalide
 CAUSE: numéro de SPEC manquant ou non numérique
 FIX: relancer /qa-generate {n} avec n entier
 ```
+
+---
+
+## STEP 1.5 - HARD-GATE context budget
+
+Avant tout `Glob`/`Read` de code source, executer :
+
+```bash
+$PS_BIN -File .claude/scripts/context-budget.ps1 -Agent qa -SpecNumber {n}
+```
+
+Exit non-zero -> STOP. Le ledger est ecrit dans `workspace/output/.audit/context-budget.jsonl`.
 
 ---
 
@@ -316,8 +328,10 @@ Le script :
 
 **CoverageMin: 80** par défaut (modifiable via `## Project Config`).
 
-Si `coverage_passed = false` → flag `[QA_COVERAGE_GAP]` en WARNING (pas
-ERROR — non-bloquant, cf. décision v3.1.0 §5.3).
+Si `coverage_passed = false` → flag `[QA_COVERAGE_GAP]` **bloquant**
+(décision globale RED, depuis v6.1 hardening). Pour autoriser une SPEC
+sous le seuil, baisser `CoverageMin` dans `## Project Config` (la
+décision est tracée en git blame) — JAMAIS contourner via `--force`.
 
 ---
 

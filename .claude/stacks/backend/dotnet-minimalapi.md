@@ -371,7 +371,11 @@ Resoudre les placeholders `{BackendName}`, `{BackendNamespace}` depuis
 
 ```bash
 # Prerequis : Microsoft.EntityFrameworkCore.SqlServer deja declare en §2.4
-CONN="Server=${DB_HOST},${DB_PORT};Database=${DB_NAME};User Id=${DB_USER};Password=${DB_PASSWORD};Encrypt=False;TrustServerCertificate=True;"
+# v6.1 hardening : Encrypt=True + TrustServerCertificate=False par defaut.
+# Pour dev local avec certificat self-signed, definir DB_TRUST_SERVER_CERT=true
+# dans .env (jamais commit) ; le builder ci-dessous flippera TrustServerCertificate.
+TRUST_CERT="${DB_TRUST_SERVER_CERT:-false}"
+CONN="Server=${DB_HOST},${DB_PORT};Database=${DB_NAME};User Id=${DB_USER};Password=${DB_PASSWORD};Encrypt=True;TrustServerCertificate=${TRUST_CERT};"
 
 dotnet ef dbcontext scaffold "$CONN" \
   Microsoft.EntityFrameworkCore.SqlServer \
@@ -518,14 +522,26 @@ using Microsoft.Data.SqlClient;
 string Required(string n) => Environment.GetEnvironmentVariable(n)
     ?? throw new InvalidOperationException($"Missing required environment variable: {n}");
 
+// v6.1 hardening : Encrypt=true + TrustServerCertificate=false par defaut.
+// Le flag DB_TRUST_SERVER_CERT (optionnel, dev local uniquement) autorise
+// les certificats self-signed pour le dev. Interdit en prod (deploiement
+// rejete au boot si DB_TRUST_SERVER_CERT=true sur ASPNETCORE_ENVIRONMENT=Production).
+bool Optional(string n, bool fallback) =>
+    bool.TryParse(Environment.GetEnvironmentVariable(n), out var v) ? v : fallback;
+
+bool trustCert = Optional("DB_TRUST_SERVER_CERT", false);
+if (trustCert && builder.Environment.IsProduction())
+    throw new InvalidOperationException(
+        "DB_TRUST_SERVER_CERT=true is forbidden in Production (use a valid TLS cert).");
+
 var sqlBuilder = new SqlConnectionStringBuilder
 {
-    DataSource           = $"{Required("DB_HOST")},{Required("DB_PORT")}",
-    InitialCatalog       = Required("DB_NAME"),
-    UserID               = Required("DB_USER"),
-    Password             = Required("DB_PASSWORD"),
-    Encrypt              = false,
-    TrustServerCertificate = true
+    DataSource             = $"{Required("DB_HOST")},{Required("DB_PORT")}",
+    InitialCatalog         = Required("DB_NAME"),
+    UserID                 = Required("DB_USER"),
+    Password               = Required("DB_PASSWORD"),
+    Encrypt                = true,        // v6.1 : chiffrement TLS obligatoire
+    TrustServerCertificate = trustCert    // v6.1 : false par defaut, opt-in dev
 };
 var connectionString = sqlBuilder.ConnectionString;
 
@@ -536,10 +552,51 @@ Aucun litteral `Server=...` n'apparait dans le code source : le builder
 serialise la chaine au runtime, le scanner ne matche rien, l'env_rules.md
 reste respecte.
 
-Anti-pattern rejete par forbidden-scan :
+Anti-patterns rejetes par forbidden-scan (v6.1) :
 ```csharp
 // INTERDIT - declenche [DERIVE_VIOLATION] [env_rules.md]
 var connectionString = $"Server={dbHost},{dbPort};Database={dbName};User Id={dbUser};Password={dbPassword};Encrypt=False;TrustServerCertificate=True;";
+
+// INTERDIT - flag hardcode insecure (v6.1 hardening)
+var sqlBuilder = new SqlConnectionStringBuilder { ..., Encrypt = false, TrustServerCertificate = true };
+```
+
+### 5.bis Envoi d'email — SmtpClient interdit, MailKit obligatoire (v6.1)
+
+Microsoft a déprécié `System.Net.Mail.SmtpClient` depuis .NET 5 ("obsolete,
+do not use") et la documentation officielle recommande **MailKit** comme
+remplaçant. SDD_Pro applique cette recommandation strictement.
+
+**Interdit** :
+```csharp
+// INTERDIT - System.Net.Mail.SmtpClient deprecie depuis .NET 5
+using System.Net.Mail;
+using var smtp = new SmtpClient("smtp.example.com");
+await smtp.SendMailAsync(new MailMessage(...));   // [STACK_LIBRARY_MISSING]
+```
+
+**Obligatoire** (MailKit + MimeKit, capability `email` on-demand §2.4.b) :
+```csharp
+using MailKit.Net.Smtp;
+using MimeKit;
+
+var message = new MimeMessage();
+message.From.Add(new MailboxAddress("App", "noreply@example.com"));
+message.To.Add(new MailboxAddress("User", "user@example.com"));
+message.Subject = "Reset password";
+message.Body = new TextPart("html") { Text = "<p>...</p>" };
+
+using var smtp = new SmtpClient();   // MailKit.Net.Smtp.SmtpClient, PAS System.Net.Mail
+await smtp.ConnectAsync(host, port, SecureSocketOptions.StartTlsWhenAvailable);
+await smtp.AuthenticateAsync(user, password);
+await smtp.SendAsync(message);
+await smtp.DisconnectAsync(true);
+```
+
+Activation : ajouter `## Capabilities Override` dans `## Project Config`
+si trigger US ne suffit pas :
+```yaml
+Capabilities: email   # force install MailKit + MimeKit au bootstrap arch
 ```
 
 ---
@@ -640,7 +697,7 @@ dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package <Prov
 
 | DatabaseType  | Builder C# canonique                              | Pattern de référence |
 |---------------|---------------------------------------------------|----------------------|
-| `SqlServer`   | `Microsoft.Data.SqlClient.SqlConnectionStringBuilder` | DataSource=`{HOST},{PORT}`, InitialCatalog, UserID, Password, Encrypt=false, TrustServerCertificate=true |
+| `SqlServer`   | `Microsoft.Data.SqlClient.SqlConnectionStringBuilder` | DataSource=`{HOST},{PORT}`, InitialCatalog, UserID, Password, **Encrypt=true** (v6.1), **TrustServerCertificate=false** par défaut (opt-in via `DB_TRUST_SERVER_CERT=true` en dev local uniquement) |
 | `PostgreSQL`  | `Npgsql.NpgsqlConnectionStringBuilder`            | Host, Port, Database, Username, Password |
 | `MySql`       | `MySqlConnector.MySqlConnectionStringBuilder`     | Server, Port, Database, UserID, Password |
 | `Sqlite`      | `Microsoft.Data.Sqlite.SqliteConnectionStringBuilder` | DataSource (chemin fichier — autres env vars ignorées) |
@@ -657,12 +714,13 @@ string Required(string n) => Environment.GetEnvironmentVariable(n)
 
 var sqlBuilder = new SqlConnectionStringBuilder
 {
-    DataSource           = $"{Required("DB_HOST")},{Required("DB_PORT")}",
-    InitialCatalog       = Required("DB_NAME"),
-    UserID               = Required("DB_USER"),
-    Password             = Required("DB_PASSWORD"),
-    Encrypt              = false,
-    TrustServerCertificate = true
+    DataSource             = $"{Required("DB_HOST")},{Required("DB_PORT")}",
+    InitialCatalog         = Required("DB_NAME"),
+    UserID                 = Required("DB_USER"),
+    Password               = Required("DB_PASSWORD"),
+    Encrypt                = true,  // v6.1 : TLS obligatoire
+    TrustServerCertificate = bool.TryParse(Environment.GetEnvironmentVariable("DB_TRUST_SERVER_CERT"), out var tc) && tc
+    // ↑ false par defaut. Si true ET prod : throw au boot (cf. STEP 5.2 ci-dessus).
 };
 var connectionString = sqlBuilder.ConnectionString;
 ```

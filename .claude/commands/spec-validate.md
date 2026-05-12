@@ -1,11 +1,15 @@
-# /spec-validate — Implementation Readiness Gate (déterministe pure, v6.0)
+# /spec-validate — Implementation Readiness Gate (déterministe, v6.1)
 
 Vérifie qu'une SPEC + ses US + mockups HTML sont prêts pour `/dev-run`.
-**Validation 100% déterministe** via PowerShell (`validate-readiness.ps1`,
-0 token LLM, 0 agent invoqué). L'agent validator a été retiré en v6.0
-pour économie tokens — la review sémantique (AC vagues, ambiguïtés)
-est désormais à la charge du PO/Tech Lead lors de la review humaine
-de la SPEC.
+**Validation 100% déterministe** via PowerShell (`validate-readiness.ps1`
++ `validate-semantic.ps1`, 0 token LLM, 0 agent invoqué).
+
+**v6.1 (réintroduction validation sémantique low-cost)** : à la couche
+structurelle (readiness) s'ajoute une couche sémantique déterministe
+(vocabulaire + regex) qui détecte ambiguïtés, AC non mesurables,
+keywords sécurité sans mécanisme de protection, PII sans mention de
+privacy, et routes `/api/*` mentionnées sans endpoint backend déclaré.
+Toujours 0 token LLM ; WARN non bloquant par défaut.
 
 **Usage :**
 - `/spec-validate {n}` — valide la SPEC `{n}` et produit le rapport
@@ -90,18 +94,41 @@ ce WARN bloque le pipeline sauf `--force`.
 
 ---
 
-## STEP 4 — (retiré v6.0)
+## STEP 4 — Validations sémantiques déterministes (PowerShell, 0 token)
 
-> **Anciennement** : invocation de l'agent `validator` (Sonnet 4.6) pour
-> validation sémantique (AC vagues, ambiguïtés cross-artefact, hypothèses
-> implicites). **Retiré en v6.0** pour économie ~1.4M tokens par
-> `/sdd-full`. La review sémantique est désormais à la charge du PO
-> humain lors de la relecture de la SPEC.
->
-> Si tu veux retrouver une review sémantique, options :
-> 1. Relire toi-même la SPEC avant `/dev-run`
-> 2. Demander à Claude (en chat libre, hors framework) un audit sémantique
-> 3. Réintroduire l'agent validator localement (cf. git history < v6.0)
+**Réintroduit en v6.1** sous forme purement déterministe (vocabulaire +
+regex). Aucun agent LLM, aucun coût token.
+
+Lire la valeur `SemanticValidationStrictness` dans `## Project Config`
+de `workspace/input/stack/stack.md` (défaut `standard`). Valeurs valides :
+`conservative` (~2-5 WARN/SPEC), `standard` (~5-15 WARN/SPEC), `strict`
+(~20-40 WARN/SPEC).
+
+Exécuter via Bash :
+
+```bash
+$PS_BIN -NoProfile -ExecutionPolicy Bypass `
+  -File .claude/scripts/validate-semantic.ps1 -SpecNumber {n} -Strictness {strictness}
+```
+
+Capturer `stdout` (= section §2 du rapport readiness) et `exit_code`
+(toujours 0 — sémantique = WARN uniquement, jamais bloquant).
+
+### Checks couverts
+
+| ID check | Type | Description |
+|---|---|---|
+| `VAGUE_TERM` | Ambiguïté | Mots qualitatifs non mesurables (`fast`, `easy`, `scalable`, `user-friendly`…) dans AC/BR/SFD/Objective |
+| `SECURITY_GAP` | Sécurité | Mention de `password`/`token`/`auth`/`credential` sans mention de mécanisme (`hash`, `bcrypt`, `encrypt`, `https`, `httponly`…) |
+| `SENSITIVE_DATA` | PII | Mention de `email`/`phone`/`adresse`/`iban`/`ssn` sans mention de privacy (`encrypt`, `mask`, `anonymis`, `gdpr/rgpd`) |
+| `ROUTE_CONTRACT_GAP` | Contrat back/front | Route `/api/*` mentionnée dans SPEC/US sans endpoint correspondant dans `workspace/output/src/{BackendName}/` (skip si code pas encore généré) |
+
+### Mode opt-in d'escalation (futur v6.2)
+
+`SemanticValidationMode: hybrid` (futur) déclenchera un agent
+`validator-lite` (Haiku 4.5) **uniquement** si ≥ N WARN sémantiques, pour
+distinguer les faux positifs des vraies ambiguïtés. Aujourd'hui (v6.1) :
+mode `deterministic` exclusivement, 0 token.
 
 ---
 
@@ -111,12 +138,17 @@ Read `.claude/templates/readiness.template.md`.
 
 Composer le rapport final :
 - En-tête (date, décision finale)
-- §1 = stdout du script PowerShell (STEP 3)
-- §2 = (retiré v6.0 — section sémantique vide ou absente du template)
-- §3 = liste consolidée des erreurs déterministes
-- §4 = liste consolidée des warnings déterministes
+- §1 = stdout de `validate-readiness.ps1` (STEP 3, structurel)
+- §2 = stdout de `validate-semantic.ps1` (STEP 4, sémantique — v6.1)
+- §3 = liste consolidée des erreurs déterministes (toujours `validate-readiness`)
+- §4 = liste consolidée des warnings déterministes (readiness + semantic mergés)
 - §5 = bloc "Décision finale" selon le résultat
 - §6 = prochaines actions
+
+**Décision finale** : `NO-GO` si readiness exit_code ≠ 0 ; sinon `WARN`
+si readiness OU semantic produisent ≥ 1 warning ; sinon `GO`. La couche
+sémantique ne peut pas escalader en NO-GO (par design — WARN non
+bloquant, cf. STEP 4).
 
 Write `workspace/output/validation/{n}-readiness.md` (mode `create`, écrase si
 existe). Créer le répertoire `workspace/output/validation/` si absent.
@@ -130,9 +162,9 @@ existe). Créer le répertoire `workspace/output/validation/` si absent.
 ```
 {🟢|🟡|🔴} /spec-validate {n}-{SpecName} → {GO|WARN|NO-GO}
 
-Validations  : {N_pass}/{N_total} déterministes (sémantiques retirées v6.0)
-Erreurs      : {E} (bloquantes)
-Warnings     : {W} (non bloquantes)
+Validations  : {N_pass_struct} struct + {N_pass_sem} sém (déterministes, 0 token)
+Erreurs      : {E} (bloquantes, struct uniquement)
+Warnings     : {W_struct} struct + {W_sem} sém (non bloquantes)
 
 Rapport      : workspace/output/validation/{n}-readiness.md
 
@@ -152,17 +184,19 @@ Prochaine étape :
 ## Mode JSON (pour CI/CD)
 
 Si l'argument `--json` est fourni :
-- Exécuter uniquement le script PowerShell avec `-Json`
-- Émettre directement la sortie JSON sur stdout
+- Exécuter `validate-readiness.ps1 -Json` ET `validate-semantic.ps1 -Json`
+- Fusionner en un objet `{ readiness: {...}, semantic: {...} }` sur stdout
 - Ne PAS écrire `workspace/output/validation/{n}-readiness.md`
-- Exit code identique au script
+- Exit code = exit code de `validate-readiness.ps1` (la sémantique
+  est toujours 0)
 
 ---
 
 ## Règles de cette commande
 
-- **100% déterministe (v6.0)** : 0 token LLM, 0 agent invoqué.
-  Tout le travail est fait par `validate-readiness.ps1`.
+- **100% déterministe (v6.1)** : 0 token LLM, 0 agent invoqué. Le travail
+  est fait par `validate-readiness.ps1` (structurel) + `validate-semantic.ps1`
+  (sémantique low-cost, vocabulaire + regex).
 - **Idempotente** : relancer `/spec-validate {n}` régénère le rapport.
 - **Read-only sur SPEC/US/HTML** : aucune modification des artefacts
   (l'humain corrige manuellement après NO-GO).

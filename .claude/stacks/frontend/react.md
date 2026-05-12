@@ -231,6 +231,12 @@ npm run build  # doit passer sans erreur de resolution d'import
 
 # capability: auth-azure-ad
 (cd workspace/output/src/{AppName} && pnpm add @azure/msal-browser@3.27.0 @azure/msal-react@2.2.0)
+
+# capability: data-grid
+(cd workspace/output/src/{AppName} && pnpm add @tanstack/react-table@8.20.5)
+
+# capability: csv-client
+(cd workspace/output/src/{AppName} && pnpm add papaparse@5.4.1 @types/papaparse@5.3.15)
 ```
 <!-- ONDEMAND_PACKAGES_END -->
 
@@ -309,6 +315,9 @@ Triggers (regex case-insensitive) cherches par `detect-capabilities.ps1` dans l'
 | i18n-http-loading | i18next-http-backend | 3.0.1 | traductions.*serveur, i18n.*lazy, load.*translations.*remote |
 | auth-azure-ad | @azure/msal-browser | 3.27.0 | azure ad, msal, single sign-on, sso, oauth2.*spa, @azure/msal |
 | auth-azure-ad | @azure/msal-react | 2.2.0 | azure ad, msal, single sign-on, sso, oauth2.*spa, @azure/msal |
+| data-grid | @tanstack/react-table | 8.20.5 | datagrid, data grid, tanstack.*table, react-table, tableau.*colonnes, grille.*filtre |
+| csv-client | papaparse | 5.4.1 | csv.*client, export.*csv.*frontend, papaparse, blob.*csv, csv.*download.*navigateur |
+| csv-client | @types/papaparse | 5.3.15 | csv.*client, export.*csv.*frontend, papaparse, blob.*csv, csv.*download.*navigateur |
 <!-- LIBS_CATALOG_END -->
 
 ## 3. Conventions d'usage

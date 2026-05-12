@@ -236,16 +236,90 @@ Si aucun role :
 - formulaire login obligatoire
 - appel HTTPS vers backend
 
-Stockage :
+#### 7.2.a Layout des pages d'authentification (OBLIGATOIRE)
 
-- prefere : memory + refresh controlle
-- acceptable : storage securise via lib
+Toutes les pages d'authentification suivantes utilisent un **layout
+dédié, vide, totalement découplé du layout principal de l'application** :
 
-Regles :
+- `/login` (connexion)
+- `/register` (création de compte)
+- `/forgot-password` (mot de passe oublié)
+- `/reset-password` (réinitialisation)
+- `/login-callback`, `/logout-callback` (si flow OIDC ou retour SSO)
+- toute page exposée à un utilisateur **non authentifié**
 
-- aucun stockage brut non protege
-- aucun log du token
-- ajout automatique via interceptor HTTP
+**Contraintes** :
+
+- **JAMAIS** de rendu de menu principal, sidebar, navigation applicative,
+  user-menu, breadcrumb, ou tout composant qui suppose un utilisateur
+  connecté
+- Le layout d'auth est un **fichier dédié** (ex. Blazor : `AuthLayout.razor` ;
+  React : `AuthLayout.tsx` ; Vue : `AuthLayout.vue` ; Angular : `auth-layout.component.ts`),
+  pas une variante conditionnelle (`@if (isAuthPage) { ... }`) du layout principal
+- Le layout d'auth est **par défaut entièrement vide** (uniquement
+  `<main>{children}</main>` ou équivalent + reset CSS minimal). Le PO/UX
+  décide explicitement par US ultérieure d'ajouter header/footer/branding —
+  jamais par dérive du dev
+- Le routing déclare explicitement quel layout chaque page utilise.
+  Anti-pattern : laisser le layout par défaut s'appliquer aux pages d'auth
+  par oubli de configuration
+
+**Pourquoi cette règle** : un menu principal sur une page de login
+révèle des entrées de navigation à un utilisateur non authentifié
+(information leak), peut afficher des données utilisateur stale, peut
+référencer l'utilisateur courant côté JS (crash si non connecté), et
+brouille l'UX (l'utilisateur croit être déjà connecté). Un layout vide
+est un **invariant de sécurité**, pas une préférence UX.
+
+**Mapping par stack frontend** :
+
+| Stack frontend       | Layout d'auth attendu | Routing |
+|----------------------|----------------------|---------|
+| `blazor-webassembly` | `Layouts/AuthLayout.razor` (vide) | `@layout AuthLayout` en tête de page |
+| `blazor-server`      | `Pages/Shared/_AuthLayout.cshtml` | `@{ Layout = "_AuthLayout"; }` |
+| `react`              | `src/layouts/AuthLayout.tsx`     | `<Route element={<AuthLayout/>}><Route .../></Route>` |
+| `vue`                | `src/layouts/AuthLayout.vue`     | `meta: { layout: 'auth' }` ou route nested |
+| `angular`            | `src/app/layouts/auth-layout/`   | `loadChildren` ou route group |
+
+#### 7.2.b Stockage du token JWT (durci par profil)
+
+Stockage selon le **profil d'exécution** déclaré (`development` /
+`staging` / `production`) :
+
+| Profil      | Stockage autorisé | Stockage interdit |
+|-------------|-------------------|-------------------|
+| development | memory, sessionStorage (avec WARNING), cookie httpOnly | localStorage en clair |
+| staging     | memory, cookie httpOnly+Secure+SameSite=Strict | localStorage, sessionStorage en clair |
+| **production** | **cookie httpOnly+Secure+SameSite=Strict UNIQUEMENT** | **localStorage / sessionStorage interdits absolument (XSS exfiltration)** |
+
+Le frontend détecte le profil via `import.meta.env.MODE` (Vite),
+`process.env.NODE_ENV` (CRA/Next), `environment.production` (Angular),
+ou équivalent. Le code de stockage **doit branche-or** sur ce flag et
+faire échouer le build (ou émettre un ERROR runtime) si une stratégie
+JS storage est sélectionnée en production.
+
+Anti-pattern strict (déclenche `[BUILD_BLOCKING]` côté QA si détecté) :
+```js
+// INTERDIT en prod — XSS exfiltration en 1 ligne
+localStorage.setItem('jwt', token);
+sessionStorage.setItem('jwt', token);
+```
+
+Pattern recommandé : le backend dépose le JWT dans un cookie
+`HttpOnly; Secure; SameSite=Strict; Path=/` à la réponse `/auth/login`.
+Le client ne manipule jamais le token directement ; chaque appel API
+le porte automatiquement via le cookie.
+
+#### 7.2.c Règles transverses (toutes plateformes)
+
+- aucun stockage brut non protégé
+- aucun log du token (`console.log(token)`, `Console.WriteLine(jwt)`,
+  `logger.info(token)` — tous interdits)
+- ajout automatique via interceptor HTTP (cf. responsibilities.md §12 et
+  conventions de chaque stack frontend)
+- aucun decodage manuel du JWT côté client (utiliser une lib comme
+  `jwt-decode`, et UNIQUEMENT pour lire `exp` afin de pré-rafraîchir —
+  jamais pour faire confiance au contenu, qui n'est pas vérifié côté client)
 
 ---
 

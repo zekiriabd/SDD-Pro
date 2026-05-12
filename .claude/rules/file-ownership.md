@@ -35,9 +35,88 @@ ou des résultats non déterministes entre runs identiques.
 | `workspace/output/plans/{n}-{m}-*.{back\|front}.md` | `dev-backend` (`.back`) ou `dev-frontend` (`.front`) | Create exclusif (mode `:plan`) | 2.7 |
 | `workspace/output/validation/{n}-readiness.md` | `/spec-validate` | Create exclusif | 2.6 |
 | `workspace/input/specs/{n}-*.md` | `/spec-generate` puis `elicitor` (append-only) | Sérialisé | 1, 1.5 |
+| `workspace/console/status.json` | console web (`POST /api/validate`, `POST /api/gate-decide`) **+** `/sdd-full` (via `.claude/scripts/gate-decide.ps1`) | **Atomic write avec lock partagé** `workspace/console/.status.lock` (O_EXCL, TTL 10s, retry 5×) | LOT 2-3, depuis 2026-05-10 |
+| `workspace/console/.status.lock` | console web OU `/sdd-full` (un seul à la fois) | Création atomique O_EXCL, supprimé après write | LOT 2-3 |
+| `workspace/console/{server.js,app.jsx,index.html,styles.css,data-loader.js,lib/*.js,package.json,README.md}` | dev humain (Tech Lead) | Edit manuel — aucun agent SDD ne touche | hors pipeline |
 | `workspace/output/dashboard/README.html` | `dashboard` (Haiku 4.5) | Create overwrite (idempotent) | fin de pipeline |
 | `workspace/output/qa/feat-{n}/dashboard.html` | `dashboard` (Haiku 4.5) | Create overwrite (idempotent) | fin de `/qa-generate` |
 | `workspace/output/context/adrs/INDEX.md` | `dashboard` (Haiku 4.5, depuis 2026-05-08) ; `arch` continue à pouvoir l'écrire en idempotent | Create overwrite | fin d'`arch` STEP 12.7 ou manuel `/doc-refresh` |
+
+---
+
+## 1.bis Anti-pattern strict — Front/Back isolation (depuis 2026-05-12)
+
+**Règle bloquante** : un projet frontend ne doit **JAMAIS** être créé,
+scaffoldé ou écrit **à l'intérieur** du répertoire d'un projet backend
+(et symétriquement). Les projets vivent **au même niveau** sous
+`workspace/output/src/`.
+
+### Layout canonique
+
+```
+workspace/output/src/
+  ├── {BackendName}/        ← projet backend (cmsback, SIMBackend, …)
+  │     └── src/main/kotlin/  (ou Services/, Endpoints/, etc. selon stack)
+  ├── {AppName}/            ← projet frontend (cmsfront, SIM, …)
+  │     └── src/  (ou Pages/, Components/, etc.)
+  ├── {LibName}/            ← projet lib partagé (si LibStrategy=shared)
+  └── *.sln                 ← (stacks .NET) référence les 3 projets
+```
+
+### Anti-pattern interdit
+
+```
+workspace/output/src/
+  └── {BackendName}/
+        └── {AppName}/      ← ❌ INTERDIT
+        └── kotlin/{AppName}/ ← ❌ INTERDIT (même variante avec préfixe runtime)
+        └── front/          ← ❌ INTERDIT
+```
+
+### Pré-check obligatoire (avant tout Write/Edit/Bash mkdir)
+
+Tout agent (`arch`, `dev-backend`, `dev-frontend`) qui s'apprête à écrire
+sous `workspace/output/src/` exécute mentalement :
+
+```
+1. Soit P = path absolu cible
+2. P doit matcher EXACTEMENT l'un de :
+   - workspace/output/src/{BackendName}/...   (owner = arch | dev-backend)
+   - workspace/output/src/{AppName}/...       (owner = arch | dev-frontend)
+   - workspace/output/src/{LibName}/...       (owner = arch | dev-* via lock)
+   - workspace/output/src/{*.sln}            (owner = arch)
+3. {AppName} et {BackendName} et {LibName} doivent être les valeurs LITTÉRALES
+   de `## Project Config` de `workspace/input/stack/stack.md`,
+   pas un dérivé (kotlin/{AppName}, /front, /web, etc.)
+4. Si P ne matche aucun pattern OU contient {AppName} imbriqué dans
+   {BackendName} (ou inverse) → STOP + ERROR [FILE_OWNERSHIP_NESTED]
+```
+
+### Format ERROR sur violation
+
+```
+ERROR: {agent} — projet front imbriqué dans le projet back
+CAUSE: [FILE_OWNERSHIP_NESTED] tentative d'écrire {path} (AppName={AppName} imbriqué sous BackendName={BackendName})
+FIX: créer/scaffolder le projet frontend sous workspace/output/src/{AppName}/ AU MÊME NIVEAU que {BackendName}/, jamais imbriqué
+```
+
+### Pourquoi (post-mortem CMS-Back 2026-05-11)
+
+Observé sur un projet réel : dossier `cmsback/Kotlin/cms-front/` créé
+par confusion runtime. Symptômes :
+- Build backend casse (Gradle ramasse les `.tsx` du front)
+- QA scope pollué (tests front exécutés dans la suite back)
+- File-ownership §1 violé silencieusement (dev-frontend écrit dans
+  territoire dev-backend)
+- Migration impossible vers monorepo type Nx/Turborepo (déjà mal placé)
+
+### Création automatique des répertoires output
+
+Tout agent qui s'apprête à écrire sous `workspace/output/...` doit
+**créer le répertoire parent** s'il est absent (`mkdir -p` équivalent),
+**après** avoir validé le pré-check ci-dessus. Aucun agent ne doit
+échouer sur `parent directory not found` — la création est implicite,
+mais elle est subordonnée à la validation du pattern canonique.
 
 ---
 
@@ -189,8 +268,8 @@ différentes** (cas conceptuel, pas timing) :
 
 #### Préservation du dossier `.locks/`
 
-`/sdd-clear` purge `workspace/output/src/{LibName}/**` y compris `.locks/` —
-chaque run repart de zéro côté verrous. Le dossier `.locks/` n'est
+Toute purge manuelle de `workspace/output/src/{LibName}/**` doit inclure
+`.locks/` — chaque run repart de zéro côté verrous. Le dossier `.locks/` n'est
 **jamais commité** (à ajouter au `.gitignore` du projet généré, géré
 par arch en Phase A).
 

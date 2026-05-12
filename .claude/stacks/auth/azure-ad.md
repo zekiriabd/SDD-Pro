@@ -33,7 +33,15 @@ Chargees au demarrage. L’application doit s’arreter si une variable est abse
 - AZ_TENANTID : identifiant du tenant Azure AD
 - AZ_CLIENTID : identifiant de l’application enregistree (frontend OU API selon contexte)
 - AZ_DOMAIN : domaine du tenant
-- AZ_AUDIENCES : liste des audiences acceptees par le backend (separees par virgule)
+- AZ_AUDIENCES : liste des audiences acceptees par le backend (separees
+  par virgule). **Format strict** : GUIDs (ou `api://{guid}`) separes par
+  une seule virgule, **sans guillemets, sans espaces**. Inclure les deux
+  formes `api://{guid},{guid}` par App Reg pour etre robuste au flag
+  `accessTokenAcceptedVersion` du manifest (v1 emet `aud=api://{guid}`,
+  v2 emet `aud={guid}`). Exemple valide pour 2 App Reg :
+  `api://<REDACTED>-...,<REDACTED>-...,api://<REDACTED>-...,<REDACTED>-...`.
+  Voir Piege 7 (§3) pour le binding Spring robuste aux quotes parasites
+  Windows.
 - AZ_BE_CALLBACKPATH : chemin de retour backend (ex: /signin-oidc)
 - AZ_FE_CALLBACKPATH : chemin de retour frontend (ex: /auth/callback)
 
@@ -353,6 +361,138 @@ upgrade springdoc >= 2.7.0 + path custom + `WebSecurityCustomizer.ignoring`.
 (meme `[AllowAnonymous]`) au demarrage doit retourner 200/401, jamais
 500 IDW10106. Si IDW10106 → l'env var est bien lue MAIS jamais
 appliquee aux options du handler.
+
+#### Piege 7 — AZ_AUDIENCES binding fragile cote Spring (post-mortem 2026-05-12)
+
+**Bug** : Spring Boot bind
+`spring.security.oauth2.resourceserver.jwt.audiences: ${AZ_AUDIENCES}`
+dans une `List<String>` en splittant sur la virgule **sans stripper les
+guillemets ni les espaces**. Sur Windows, l'utilisateur tape
+typiquement dans System Properties / `setx` une valeur du genre
+`"guid1", "guid2"` (par mimetisme avec les conventions PowerShell / CSV) — la
+liste effective devient `["\"guid1\"", " \"guid2\""]`. Le `aud` du JWT (sans
+guillemets, sans espace) ne matche aucune entree → **tous les appels
+authentifies retournent 401 silencieusement**, sans log Spring expliquant
+le rejet (le validateur audience echoue avant le filter chain qui logge).
+
+**Symptome** : login MSAL passe cote front, token visible dans
+`sessionStorage.cms.accessToken`, mais `GET /api/v1/{ressource}` repond
+401 systematiquement. Aucun log backend hors le 401 lui-meme.
+
+**Fix obligatoire — `JwtDecoder` custom + parite .NET (audiences ET issuer)**.
+
+Trois ecarts entre Spring resource server natif et Microsoft.Identity.Web
+sont corriges en un seul bean :
+1. `AZ_AUDIENCES` lu directement via `@Value` (evite le piege
+   relaxed-binding `AZ_AUDIENCES` → `az.audiences` et non `az.audiences-raw`).
+2. Auto-inclusion de `AZ_CLIENTID` + `api://{AZ_CLIENTID}` en audiences
+   valides (`Audiences` .NET est additif, Spring natif est exhaustif).
+3. Auto-acceptation des **deux issuers** Azure AD : v2
+   (`login.microsoftonline.com/{tid}/v2.0`) ET v1
+   (`sts.windows.net/{tid}/`). Le manifest Azure App Reg controle la
+   version emise via `accessTokenAcceptedVersion` (default historique
+   = `1` -> tokens v1 -> `iss=sts.windows.net/...`). Sans ce dual-issuer,
+   tous les tokens v1 sont rejetes par Spring avec
+   `"The iss claim is not valid"` (parite avec .NET MS.Identity.Web
+   IssuerValidator multi-tenant).
+
+```kotlin
+// SecurityConfig.kt — bean JwtDecoder + helper buildAudiences
+@Bean
+fun jwtDecoder(
+    @Value("\${spring.security.oauth2.resourceserver.jwt.issuer-uri}") issuerUri: String,
+    @Value("\${AZ_TENANTID:}") tenantId: String,
+    @Value("\${AZ_CLIENTID:}") clientId: String,
+    @Value("\${AZ_AUDIENCES:}") audiencesRaw: String,
+): JwtDecoder {
+    // JwtDecoders.fromIssuerLocation hit le OIDC discovery v2 pour les JWKS
+    // (clefs publiques) — meme JWKS valide pour tokens v1 et v2.
+    val decoder = JwtDecoders.fromIssuerLocation(issuerUri) as NimbusJwtDecoder
+    val audiences = buildAudiences(clientId, audiencesRaw)
+    require(audiences.isNotEmpty()) {
+        "Audiences vide : AZ_CLIENTID='$clientId' et AZ_AUDIENCES='$audiencesRaw'."
+    }
+    val tid = tenantId.trim().trim('"').trim('\'').trim()
+    require(tid.isNotBlank()) { "AZ_TENANTID vide" }
+    val validIssuers = setOf(
+        "https://login.microsoftonline.com/$tid/v2.0",
+        "https://sts.windows.net/$tid/",
+    )
+    val issValidator = JwtClaimValidator<String>(JwtClaimNames.ISS) { iss ->
+        iss != null && iss in validIssuers
+    }
+    val audValidator = JwtClaimValidator<List<String>>(JwtClaimNames.AUD) { tokenAud ->
+        tokenAud != null && tokenAud.any { it in audiences }
+    }
+    decoder.setJwtValidator(DelegatingOAuth2TokenValidator(
+        JwtTimestampValidator(), // built-in : exp + nbf
+        issValidator,
+        audValidator,
+    ))
+    return decoder
+}
+
+// Parite Microsoft.Identity.Web : auto-inclusion implicite de
+// AZ_CLIENTID + api://{AZ_CLIENTID} (couvre v1 aud=api://{cid} ET v2
+// aud={cid}), plus liste AZ_AUDIENCES explicite (audiences additionnelles).
+// Strip quotes parasites Windows (setx tape "guid1","guid2") + espaces + vides.
+private fun buildAudiences(clientId: String, audiencesRaw: String): List<String> {
+    val cid = clientId.trim().trim('"').trim('\'').trim()
+    val implicit = if (cid.isBlank()) emptyList() else listOf(cid, "api://$cid")
+    val explicit = audiencesRaw.split(",")
+        .map { it.trim().trim('"').trim('\'').trim() }
+        .filter { it.isNotBlank() }
+    return (implicit + explicit).distinct()
+}
+```
+
+**Parite Microsoft.Identity.Web** : en .NET (`AddMicrosoftIdentityWebApi`),
+`Audiences` du `appsettings.json` est **additive** : `ClientId` et
+`api://{ClientId}` sont valides automatiquement, `Audiences` ajoute des
+audiences supplementaires (cas multi-tenant, scope partage entre apps).
+Spring resource server natif est **exhaustif** (rien implicite) — cette
+implementation reproduit la semantique .NET pour eviter aux equipes
+qui migrent un backend .NET → Kotlin de devoir repeter le ClientId dans
+AZ_AUDIENCES. Resultat : `AZ_AUDIENCES` ne contient QUE les audiences
+**additionnelles** (autres App Reg dont l'API accepte les tokens).
+
+```yaml
+# application.yml — retirer "audiences:" sous jwt: (delegate au bean)
+spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: https://login.microsoftonline.com/${AZ_TENANTID}/v2.0
+```
+
+**Pourquoi cette forme** :
+- `@Value("\${AZ_AUDIENCES:}")` lit l'env var **directement**. Tentative
+  initiale via `@ConfigurationProperties(prefix="az")` + champ
+  `audiencesRaw` echoue silencieusement : Spring mappe `AZ_AUDIENCES` →
+  `az.audiences` (relaxed binding camelCase ne devine pas le suffixe
+  `-raw`). `@Value` court-circuite cette ambiguite.
+- `JwtDecoder` custom = on contourne completement le binding fragile de
+  `spring.security.oauth2.resourceserver.jwt.audiences` (List<String>).
+- `parseAudiences()` est testable unitairement (un test JUnit suffit
+  pour les variantes `"a", "b"`, `'a','b'`, `a,b`, `a , b`, etc.).
+- `JwtClaimValidator<List<String>>` accepte la forme array de la
+  claim `aud` (specifiee par RFC 7519 §4.1.3, certains tokens emettent
+  `aud=[...]` au lieu de scalaire).
+- `require(audiences.isNotEmpty())` fail-fast au demarrage si l'env var
+  est vide ou mal formee — pas de surprise 401 silencieux en prod. Le
+  message inclut la valeur brute recue pour diagnostic immediat.
+
+**Anti-pattern rejette** :
+- ❌ Conserver `spring.security.oauth2.resourceserver.jwt.audiences:
+  ${AZ_AUDIENCES}` sans le bean custom (vulnerable aux quotes)
+- ❌ Strip cote env var uniquement (fragile : depend de qui declare la
+  variable — Windows GUI, ansible, docker-compose, .env CI peuvent tous
+  rajouter des quotes)
+
+**Trigger pour dev-backend** : des qu'`auth/azure-ad` est actif sur un
+stack Spring Boot (Kotlin ou Java), generer `AzureAdAudienceProperties`
++ `JwtDecoder` bean. Ne pas attendre qu'un humain debug un 401.
 
 ---
 
@@ -684,6 +824,414 @@ Lors d'une feature, `dev-frontend` doit :
 `dev-frontend` ne planifie PAS ces 3 fichiers dans son plan inline sauf
 si la feature elle-meme modifie leur contenu (cas rare — typiquement
 jamais).
+
+---
+
+### 5.2.6 Déconnexion (Logout) — AUCUN CODE MÉTIER À ÉCRIRE
+
+**Principe** : la déconnexion est **entièrement déléguée à Azure AD**. Il
+n'y a **aucun endpoint backend de logout** à coder, **aucune logique
+métier** côté backend, **aucune invalidation de session serveur** (les
+SPA n'ont pas de session serveur).
+
+#### Backend (API REST + JWT Bearer) — 0 ligne de code
+
+- Pas d'endpoint `/auth/logout`, pas de `SignOutAsync`, pas de
+  blacklist de tokens. Le JWT est stateless et expire de lui-même
+  (`exp` claim, typiquement 1h).
+- Si une feature mentionne « logout backend », il s'agit d'un
+  **anti-pattern** — STOP + ERROR `[DERIVE_VIOLATION]` côté agent
+  `dev-backend`.
+
+#### Frontend SPA (React / Vue / Angular / Blazor WASM) — 1 ligne MSAL
+
+| Stack | API logout | Effet |
+|---|---|---|
+| React + MSAL.js | `msalInstance.logoutRedirect({ postLogoutRedirectUri })` | Clear cache MSAL local + redirect Azure AD `/oauth2/v2.0/logout` + retour `postLogoutRedirectUri` |
+| Vue 3 + MSAL.js | Idem React | Idem |
+| Angular + MSAL Angular | `msalService.logoutRedirect({ postLogoutRedirectUri })` | Idem |
+| Blazor WASM | `NavigationManager.NavigateToLogout("authentication/logout")` + `RemoteAuthenticatorView Action="logout"` | Idem (handler déjà bootstrapé par arch — cf. §5.2 Piege 5) |
+
+**Configuration unique requise** : `postLogoutRedirectUri` doit être
+déclaré **dans l'App Registration Azure AD** (portail → Authentication
+→ Single-page application → Redirect URIs) et passé à MSAL au moment
+de l'appel `logoutRedirect`.
+
+**Anti-patterns** :
+- ❌ Implémenter un endpoint `/api/logout` côté backend → inutile (JWT stateless)
+- ❌ Effacer `localStorage`/`sessionStorage` manuellement → MSAL fait ça via `logoutRedirect`
+- ❌ Décoder le JWT pour invalider une « session » côté serveur → pas de session
+- ❌ Maintenir une « liste noire » de tokens → coûteux et inutile (TTL court suffit)
+
+**Pour SDD_Pro — agents dev-\* doivent skip toute US `*-Deconnexion`** :
+si une SPEC liste explicitement la déconnexion comme livrable, c'est
+purement de la **configuration** (1 ligne MSAL côté frontend, 0 ligne
+backend). Le PO ne doit normalement pas générer d'US dédiée — si
+généré, l'US se résume à un bouton qui appelle `logoutRedirect()`.
+
+#### Cas particulier — Blazor Server / ASP.NET MVC cookie (5.3)
+
+Ces stacks **ne sont PAS des SPA**. La déconnexion utilise une session
+serveur (cookie) et nécessite l'endpoint auto-mappé
+`/MicrosoftIdentity/Account/SignOut` fourni par `Microsoft.Identity.Web`.
+**Ce code est généré par la lib elle-même, pas par dev-backend**.
+
+---
+
+### 5.2.7 Conventions SPA + Azure AD — anti-patterns récurrents (post-mortem 2026-05-11)
+
+> **Pourquoi cette section** : sur le projet `cms-front` v6.1, 5 anti-patterns
+> identiques ont été produits par `dev-frontend` en l'absence d'orientation
+> explicite. Ce paragraphe codifie la convention pour empêcher la
+> reproduction. **Load-bearing pour tout SPA avec auth=azure-ad.**
+
+#### 5.2.7.1 Endpoint `/auth/config` — OBLIGATOIRE côté backend
+
+Dès que `auth/azure-ad` est actif ET qu'un stack backend (`kotlin-spring-boot`,
+`dotnet-minimalapi`, `python-fastapi`, `node-express`) est actif, le backend
+**DOIT** exposer `GET /auth/config` (route publique, hors filtre JWT) qui
+retourne :
+
+```json
+{ "authority": "https://login.microsoftonline.com/{AZ_TENANTID}",
+  "clientId": "{AZ_CLIENTID}",
+  "scopes": ["api://{AZ_CLIENTID}/access_as_user"],
+  "redirectUri": "{AZ_FE_CALLBACKPATH}" }
+```
+
+> **CRITIQUE — scope FE singleton, dérivé de `AZ_CLIENTID` (jamais `AZ_AUDIENCES`)**.
+> MSAL.js v3 exige que tous les scopes d'un `loginPopup`/`acquireToken`
+> appartiennent à **UN SEUL resource**. Construire `scopes` à partir de
+> `AZ_AUDIENCES` (multi-valeurs, ex. `"guid1","guid2"`) produit deux
+> `api://{guid}/access_as_user` de resources différents → MSAL construit
+> une URL OAuth malformée → Azure répond `AADSTS900971 No reply address
+> provided` (variante observée 2026-05-12 sur cms-front React + MSAL
+> 3.27) ou `AADSTS28000 invalid_scope`. Le scope FE est **toujours**
+> `api://${AZ_CLIENTID}/access_as_user` (le resource de l'app cliente
+> elle-même). `AZ_AUDIENCES` reste utilisé **côté backend uniquement**
+> dans `spring.security.oauth2.resourceserver.jwt.audiences` (§3) pour
+> accepter des JWT émis pour plusieurs apps. Si un second resource est
+> nécessaire côté FE, faire un `acquireTokenSilent({ scopes: ["api://{other}/access_as_user"] })`
+> **séparé** — jamais un combo dans le `loginPopup` initial.
+
+Cet endpoint est **scope arch** (Phase A bootstrap si stack backend + auth
+azure-ad actifs) **OU** scope `dev-backend` de l'US auth fondatrice (US 1-1
+typique). **Anti-pattern récurrent** : aucune US ne le matérialise, le
+frontend lit `VITE_AZ_*` directement → cassé.
+
+#### 5.2.7.2 Frontend MSAL — `VITE_AZ_*` INTERDIT
+
+Vite ne propage **que** les vars préfixées `VITE_` au navigateur. L'agent
+`dev-frontend` NE DOIT JAMAIS faire :
+
+```ts
+// ❌ ANTI-PATTERN — variable indéfinie à runtime
+const clientId = import.meta.env.VITE_AZ_CLIENTID
+```
+
+À la place, **fetch `/auth/config` au bootstrap** puis initialise MSAL :
+
+```ts
+// ✅ Pattern canonique (cf. §5.2 Piege 4)
+async function bootstrap() {
+  const cfg = await fetch("/auth/config").then(r => r.json())
+  const msal = new PublicClientApplication({ auth: { clientId: cfg.clientId, authority: cfg.authority, ... }})
+  await msal.initialize()
+  // render <MsalProvider instance={msal}>...
+}
+```
+
+Format ERROR si violation détectée par hook ou self-check :
+```
+ERROR: dev-frontend {n}-{m} — anti-pattern MSAL config
+CAUSE: [DERIVE_VIOLATION] lecture directe de VITE_AZ_CLIENTID / VITE_AZ_TENANTID
+       — Vite ne propage pas AZ_* sans préfixe VITE_, et le SPEC azure-ad §5.2.7.1
+       impose la fetch de /auth/config
+FIX: bootstrap async via /auth/config, instance MSAL créée APRÈS résolution
+```
+
+#### 5.2.7.3 Mode popup vs redirect
+
+**Default obligatoire** : `loginPopup()` / `logoutPopup()` — pas
+`loginRedirect`. Justification : le SPA ne perd jamais son état, le retour
+Azure AD est transitoire, le DX est meilleur. Exception : mobile (envisager
+redirect si popup bloqué). À tracer dans un ADR si dérive.
+
+#### 5.2.7.3.bis Redirect URI MSAL — composition runtime obligatoire (post-mortem 2026-05-11)
+
+L'App Registration Azure AD enregistre une **URI complète** dans
+`Authentication → Single-page application → Redirect URIs`, typiquement :
+- Dev : `http://localhost:5173/login-callback`
+- Prod : `https://app.exemple.com/login-callback`
+
+Le path partagé entre dev/prod (`/login-callback` ici) est exporté côté env
+backend sous `AZ_FE_CALLBACKPATH`. **Le frontend DOIT composer l'URI complète
+runtime** :
+
+```ts
+// ✅ Pattern canonique
+const cfg = await fetch("/auth/config").then(r => r.json())
+const msal = new PublicClientApplication({
+  auth: {
+    clientId: cfg.clientId,
+    authority: cfg.authority,
+    redirectUri: window.location.origin + cfg.redirectUri, // ← composition runtime
+    postLogoutRedirectUri: window.location.origin + "/login",
+  },
+  ...
+})
+```
+
+```ts
+// ❌ ANTI-PATTERN — Azure rejette avec AADSTS900971 / AADSTS50011
+redirectUri: window.location.origin                       // path manquant
+redirectUri: cfg.redirectUri                              // origin manquant (URI relative)
+redirectUri: "http://localhost:5173/login-callback"       // hardcode (cassé en prod)
+```
+
+**Format ERROR si détecté** :
+```
+ERROR: dev-frontend {n}-{m} — redirectUri MSAL incomplet
+CAUSE: [DERIVE_VIOLATION] redirectUri = window.location.origin (sans path) — Azure
+       AD attend une URI complète enregistrée dans l'App Registration. Symptôme
+       AADSTS900971 "No reply address provided" ou AADSTS50011 "redirect URI mismatch"
+FIX: composer redirectUri = window.location.origin + cfg.redirectUri (cf. azure-ad.md §5.2.7.3.bis)
+```
+
+**Côté backend AuthConfigController** : `redirectUri` retourné par `/auth/config`
+DOIT être un path commençant par `/` (jamais une URL complète, jamais vide).
+Le strip Git Bash MSYS (§2.102) garantit ce format.
+
+---
+
+#### 5.2.7.4 Route `/login` publique + autonome
+
+Toute application SPA avec `auth/azure-ad` actif **DOIT** définir :
+
+- **Route `/login`** : composant `LoginPage` rendu **sans** le `MainLayout`
+  (page autonome, branding centré, bouton "Se connecter avec Microsoft")
+- Si un mockup HTML `1-1-Connexion.html` (ou équivalent basename US 1-1) est
+  présent dans `workspace/input/ui/`, il **fait foi** pour le visuel
+- Si aucun mockup → page minimaliste générique (logo + bouton) sans MainLayout
+
+#### 5.2.7.5 Auth guard global dans `__root.tsx`
+
+Le composant racine du router doit appliquer :
+
+```tsx
+// ✅ Pattern canonique
+const PUBLIC = new Set(["/login"])
+function RootComponent() {
+  const isAuth = useIsAuthenticated()
+  const location = useLocation()
+  const isPublic = PUBLIC.has(location.pathname)
+  if (!isPublic && !isAuth) return <Navigate to="/login" />
+  if (isPublic) return <Outlet />
+  return <MainLayout><Outlet /></MainLayout>
+}
+```
+
+Effet : `/login` rendue sans menu, toutes les autres routes wrappées dans
+`MainLayout` (menu global SPEC `2-Menu`).
+
+#### 5.2.7.6 Token sessionStorage — clé partagée
+
+Convention nommage : la clé `sessionStorage` du token Bearer est nommée
+`{slug-projet}.accessToken` (ex. `cms.accessToken`). Cette même clé est
+lue par `httpClient.ts` (US `3-1` typique) et **DOIT** être écrite par
+`LoginPage` après `loginPopup` :
+
+```ts
+const result = await msal.loginPopup(request)
+if (result.accessToken) sessionStorage.setItem("cms.accessToken", result.accessToken)
+```
+
+À nettoyer dans le bouton Déconnexion du MainLayout :
+```ts
+sessionStorage.removeItem("cms.accessToken")
+await msal.logoutPopup({...})
+```
+
+#### 5.2.7.7 Route racine `/` — redirect auth-aware
+
+Le bootstrap définit la route `/` (index) avec une `beforeLoad` qui :
+- Si user authentifié (MSAL `getAllAccounts().length > 0`) → `redirect /campagnes` (ou page d'accueil par défaut documentée dans la SPEC)
+- Sinon → `redirect /login`
+
+**Anti-pattern récurrent** : oublier de définir `/` → TanStack Router rend
+"Not Found" sur l'URL racine. Le PO doit toujours déclarer une **page d'accueil
+authentifiée par défaut** dans la SPEC (typiquement la 1ère feature post-login).
+
+#### 5.2.7.10 HTTPS obligatoire en dev (post-mortem 2026-05-11)
+
+Azure AD refuse les Redirect URIs non-HTTPS sauf `http://localhost` strict (sans
+port custom HTTPS-attendu). Quand l'App Registration enregistre une URI
+`https://localhost:{port-custom}/login-callback`, l'environnement de dev DOIT
+servir le SPA et le backend en HTTPS sur ces ports exacts.
+
+##### Configuration Vite (frontend)
+
+```ts
+// vite.config.ts
+import basicSsl from "@vitejs/plugin-basic-ssl"
+// ...
+export default defineConfig({
+  plugins: [react(), tailwindcss(), basicSsl()],
+  server: {
+    https: {},   // active via plugin basic-ssl (cert auto-signé en cache)
+    port: 5185,  // doit matcher l'App Registration
+    strictPort: true,
+  },
+  preview: { https: {}, port: 5185 },
+})
+```
+
+Lib à ajouter : `@vitejs/plugin-basic-ssl` (capability `dev-https` du
+catalogue `react.libs.json` `onDemand`).
+
+##### Configuration Spring Boot (backend)
+
+```yaml
+# src/main/resources/application.yml
+server:
+  port: 44328
+  ssl:
+    enabled: true
+    key-store: classpath:keystore.p12
+    key-store-password: changeit
+    key-store-type: PKCS12
+    key-alias: backend
+    key-password: changeit
+```
+
+Keystore généré une fois côté projet via `keytool` (script idempotent dans
+`scripts/generate-dev-keystore.{ps1,sh}`) :
+
+```bash
+keytool -genkeypair -alias backend -keyalg RSA -keysize 2048 \
+  -storetype PKCS12 -keystore src/main/resources/keystore.p12 \
+  -validity 3650 -dname "CN=localhost,OU=Dev,O=cms,L=Paris,C=FR" \
+  -storepass changeit -keypass changeit \
+  -ext "san=dns:localhost,ip:127.0.0.1"
+```
+
+Le keystore `src/main/resources/keystore.p12` est ajouté au `.gitignore`
+projet (le password est `changeit`, donc à ne JAMAIS commiter même en dev).
+
+##### Variables d'environnement supplémentaires
+
+```env
+# workspace/output/src/cms-front/apps/web/.env.local
+VITE_API_BASE_URL=https://localhost:44328
+```
+
+```env
+# système (PowerShell setx ou .env backend)
+APP_CORS_ALLOWED_ORIGINS=https://localhost:5185
+```
+
+##### Acceptation du certificat auto-signé
+
+L'utilisateur visite **une fois** `https://localhost:5185/` puis
+`https://localhost:44328/auth/config` dans son navigateur et clique
+"Avancé → Procéder vers localhost (non sécurisé)". Sinon le SPA ne peut
+fetch le backend (NET::ERR_CERT_AUTHORITY_INVALID).
+
+##### Anti-pattern
+
+- ❌ App Registration liste `https://localhost:5185` mais SPA sert HTTP sur :5173 → `AADSTS900971`
+- ❌ Cert auto-signé non accepté → `TypeError: Failed to fetch` (CORS apparent mais c'est en fait TLS refusé silencieusement)
+- ❌ Mixed content : SPA HTTPS + backend HTTP → navigateur bloque
+
+---
+
+#### 5.2.7.9 CORS — config OBLIGATOIRE côté backend (dev + prod)
+
+Tout SPA hébergé sur un origin différent du backend (cas standard en dev :
+`http://localhost:5173` ↔ `http://localhost:8080`) requiert une config CORS
+explicite côté backend, sinon **toute requête `fetch` échoue silencieusement
+avec `TypeError: Failed to fetch`** dans le navigateur (la pré-flight OPTIONS
+ne reçoit pas les headers `Access-Control-Allow-*`).
+
+**Symptômes** :
+- Page front blanche avec error boundary "Backend indisponible"
+- DevTools Console : `Access to fetch at 'http://localhost:8080/auth/config'
+  from origin 'http://localhost:5173' has been blocked by CORS policy`
+- Backend logs : aucun signe (la pré-flight OPTIONS n'arrive même pas)
+
+**Fix obligatoire — bean `CorsConfigurationSource` côté Spring Security** :
+
+```kotlin
+// workspace/output/src/{BackendName}/src/main/kotlin/.../config/CorsConfig.kt
+@Configuration
+class CorsConfig(
+    @Value("\${APP_CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:4173}")
+    private val allowedOriginsCsv: String,
+) {
+    @Bean
+    fun corsConfigurationSource(): CorsConfigurationSource {
+        val config = CorsConfiguration().apply {
+            allowedOrigins = allowedOriginsCsv.split(",").map { it.trim() }
+            allowedMethods = listOf("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
+            allowedHeaders = listOf("*")
+            exposedHeaders = listOf("Location", "Content-Disposition")
+            allowCredentials = true
+            maxAge = 3600
+        }
+        return UrlBasedCorsConfigurationSource().apply {
+            registerCorsConfiguration("/**", config)
+        }
+    }
+}
+```
+
+**ET** brancher `cors()` dans `SecurityFilterChain` (sinon le bean est ignoré) :
+
+```kotlin
+http.cors { } // active la CorsConfigurationSource bean
+   .csrf { it.disable() }
+   ...
+```
+
+**Default des origins** : `http://localhost:5173` (Vite dev) + `http://localhost:4173`
+(Vite preview). En prod : variable d'environnement `APP_CORS_ALLOWED_ORIGINS`
+(CSV) configurée par l'opérateur.
+
+**Pour les stacks non-Kotlin** :
+| Stack backend | Pattern CORS |
+|---|---|
+| `dotnet-minimalapi` | `services.AddCors(o => o.AddDefaultPolicy(b => b.WithOrigins(...).AllowAnyMethod().AllowAnyHeader().AllowCredentials()))` + `app.UseCors()` |
+| `python-fastapi` | `app.add_middleware(CORSMiddleware, allow_origins=[...], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])` |
+| `node-express` | `app.use(cors({ origin: [...], credentials: true }))` |
+
+**Alternative dev only — Vite proxy** (évite CORS en redirigeant /api et /auth
+vers le backend depuis le même origin) :
+
+```ts
+// vite.config.ts
+export default defineConfig({
+  server: { proxy: {
+    "/api": "http://localhost:8080",
+    "/auth": "http://localhost:8080",
+  }}
+})
+```
+
+À utiliser **uniquement en dev** ; prod requiert CORS backend ou même-origin.
+
+**Anti-pattern** : oublier `cors()` dans `SecurityFilterChain` → bean
+`CorsConfigurationSource` présent mais ignoré → comportement aléatoire.
+
+---
+
+#### 5.2.7.8 Anti-récap (à grep en self-check dev-frontend)
+
+- ❌ `import.meta.env.VITE_AZ_*` dans le code applicatif
+- ❌ `new PublicClientApplication({ auth: { clientId: "<litéral>" }})` (hardcode)
+- ❌ Routes protégées définies sans guard dans `__root.tsx`
+- ❌ `MainLayout` enveloppant `/login`
+- ❌ Token Bearer attendu par `httpClient` mais jamais écrit en sessionStorage par `LoginPage`
+- ❌ Pas de route `/` index → "Not Found" runtime
 
 ---
 

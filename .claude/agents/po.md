@@ -32,6 +32,18 @@ FIX: relancer /us-generate {n} avec n entier
 
 ---
 
+## STEP 1.5 - HARD-GATE context budget
+
+Avant tout `Glob`/`Read`, executer :
+
+```bash
+$PS_BIN -File .claude/scripts/context-budget.ps1 -Agent po -SpecNumber {n}
+```
+
+Exit non-zero -> STOP. Le ledger est ecrit dans `workspace/output/.audit/context-budget.jsonl`.
+
+---
+
 ## STEP 2 — Localiser la SPEC
 
 Glob `workspace/input/specs/{n}-*.md`.

@@ -187,7 +187,7 @@ Calculer la décision globale :
 
 ```
 si tests.failed > 0:                    → RED
-elif coverage_passed == false:          → YELLOW
+elif coverage_passed == false:          → RED   (depuis v6.1 hardening, cf. qa-coverage.md §3.1)
 elif quality.errors > 0:                → YELLOW
 else:                                   → GREEN
 ```

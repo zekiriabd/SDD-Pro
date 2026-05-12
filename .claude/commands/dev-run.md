@@ -42,6 +42,21 @@ Arguments :
 
   Stocker la valeur résolue dans `$max_parallel` consommé par STEP 6.2.
 
+- `--rebuild-arch` (optionnel, depuis 2026-05-10) — force l'invocation
+  de l'agent `arch` (STEP 5) même quand le short-circuit STEP 4.bis
+  détecte un bootstrap stable. À utiliser quand :
+  - le schéma DB a changé côté serveur (nouvelles tables, colonnes)
+  - une lib a été ajoutée à `.libs.json` d'un stack actif
+  - `## Project Config` a été modifié (AppName, BackendName,
+    DatabaseType, etc.)
+  - un projet a été supprimé manuellement et doit être re-bootstrappé
+
+  Sans ce flag, les SPECs ≥ 2 (ou les re-runs d'une même SPEC) sautent
+  l'étape arch dès que les artefacts de bootstrap sont cohérents
+  (cf. STEP 4.bis).
+
+  Stocker `$rebuild_arch ∈ {true, false}` consommé par STEP 4.bis et 5.
+
 Si `{n}` absent → demander :
 ```
 Quel est le numéro de la SPEC à matérialiser ? (ex. : 1)
@@ -149,9 +164,86 @@ prérequis ne sont pas en place.
 
 ---
 
+## STEP 4.bis — Détection short-circuit arch (depuis 2026-05-10)
+
+**But** : sur les SPECs ≥ 2 (ou les re-runs d'une même SPEC), éviter
+de payer le coût arch (build de validation, ré-introspection DB,
+ré-écriture des CLAUDE.md, refresh INDEX.md ADRs) quand le bootstrap
+est déjà stable. L'idempotence interne de l'agent arch (cf.
+`agents/arch.md` STEP 3) garantit qu'un re-run ne casse rien — mais
+elle ne supprime pas l'invocation. Ce STEP 4.bis ajoute le
+short-circuit en amont.
+
+### 4.bis.0 — Bypass via flag
+
+Si `$rebuild_arch == true` (flag `--rebuild-arch` passé) → forcer
+`$arch_required = true`, skip 4.bis.1 et aller directement à STEP 5.
+Émettre 1 ligne :
+```
+SPEC {n} — arch forcé (--rebuild-arch)
+```
+
+### 4.bis.1 — Conditions de skip
+
+Vérifier que **toutes** les conditions ci-dessous sont vraies :
+
+1. **Project Config** lu en STEP 4 (récupérer `AppName`,
+   `BackendName`, `LibName` optionnel, `DatabaseType`).
+
+2. **CLAUDE.md par projet présents** (anchor du bootstrap arch
+   réussi — écrits par arch STEP 12 uniquement après build OK et
+   scaffolding DB OK) :
+   - Si stack backend actif : `workspace/output/src/{BackendName}/CLAUDE.md`
+   - Si stack frontend actif : `workspace/output/src/{AppName}/CLAUDE.md`
+   - Si `LibName` défini : `workspace/output/src/{LibName}/CLAUDE.md`
+
+3. **Schema DB** (uniquement si `DatabaseType ≠ none`) :
+   - `workspace/output/db/schema.json` existe
+
+4. **stack.md non modifié depuis le dernier arch** :
+   - mtime de `workspace/input/stack/stack.md` ≤ mtime du plus ancien
+     CLAUDE.md de projet (= aucun CLAUDE.md n'est plus vieux que
+     stack.md)
+   - Heuristique simple, équivalente fonctionnellement au check de
+     hash `stack-md-hash` du frontmatter pour 99 % des cas, sans
+     parser de YAML (depuis 2026-05-10).
+
+### 4.bis.2 — Décision
+
+| Toutes vraies ? | `$arch_required` | Action |
+|---|---|---|
+| Oui | `false` | Skip STEP 5. Émettre 1 ligne (cf. ci-dessous), aller à STEP 6 |
+| Au moins une fausse | `true` | Continuer STEP 5 (l'agent arch fera ses propres skips internes pour ce qui est déjà OK) |
+
+### 4.bis.3 — Émission (1 ligne)
+
+**Cas skip** :
+```
+SPEC {n} — arch skip (bootstrap stable{, schema DB présent}, CLAUDE.md cohérents)
+```
+
+**Cas requis** (mention concise de la première condition non remplie) :
+```
+SPEC {n} — arch requis ({raison} : ex. "stack.md modifié" | "schema.json absent" | "CLAUDE.md backend manquant" | "premier run")
+```
+
+### 4.bis.4 — Anti-derive
+
+- Ne PAS lire le contenu des CLAUDE.md (juste leur existence + mtime)
+- Ne PAS calculer de hash sha256 (le check mtime suffit)
+- Ne PAS skipper si une seule des 4 conditions est ambiguë —
+  préférer invoquer arch (qui est lui-même idempotent en interne)
+- Le skip est purement un raccourci de performance, jamais un
+  raccourci de correction
+
+---
+
 ## STEP 5 — Pré-step arch (bootstrap + scaffolding DB idempotents)
 
-Invoquer l'agent `arch` (équivalent `/arch-init`). L'agent gère
+**Conditionnel** : si `$arch_required == false` (cf. STEP 4.bis), skip
+ce STEP entièrement et passer à STEP 6.
+
+Sinon, invoquer l'agent `arch` (équivalent `/arch-init`). L'agent gère
 intégralement :
 - l'idempotence du bootstrap (skip si projets déjà initialisés)
 - l'introspection DB et le scaffolding Database-First si
@@ -344,11 +436,18 @@ cf. `.claude/rules/chat-output.md §4`) :
 ✅ SPEC {n} — phase dev terminée (gated)
 
 Workflow      : gated back→API gate→front (MaxParallel={$max_parallel})
-Bootstrap + DB : {init|skipped} ({N_tables} tables | DB=none)
+Bootstrap + DB : {init | skipped (short-circuit) | invoked} ({N_tables} tables | DB=none)
 Backend       : {Tb_ok}/{U} US ({Tb_skip} skipped, {F_back} échec)
 API Gate      : {Tg_passed}/{Tg_total} tests · {N_endpoints} endpoints couverts → {🟢 GREEN | 🟡 YELLOW | 🔴 RED}
 Frontend      : {Tf_ok}/{U} US ({Tf_skip} skipped, {F_front} échec) | not run (gate RED)
 ```
+
+Notation `Bootstrap + DB` :
+- `skipped (short-circuit)` : STEP 4.bis a détecté un bootstrap stable
+  (cf. depuis 2026-05-10) — l'agent arch n'a pas été invoqué
+- `invoked` : agent arch invoqué, idempotence interne (skip Init
+  Commands, scaffolding incrémental)
+- `init` : premier run (projets créés depuis zéro)
 
 Cas succès complet :
 ```

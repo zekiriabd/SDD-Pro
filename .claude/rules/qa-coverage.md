@@ -30,9 +30,22 @@ CoverageMin: 80           # entier 0-100, défaut 80 (SDD_Pro v3.1.0)
 `CoverageMin: 0` est valide (= seuil désactivé, métrique reportée mais
 non bloquante même en WARNING).
 
-**Décision SDD_Pro v3.1.0** : `CoverageMin < 80` produit un **🟡 WARN**
-(non bloquant), pas un 🔴 NO-GO. Atteindre 80% pile sur du code généré
-LLM est difficile ; ne pas bloquer le pipeline.
+**Décision SDD_Pro v6.1 (hardening)** : `coverage_lines_pct < CoverageMin`
+produit un **🔴 RED bloquant** (`[QA_COVERAGE_GAP]`). La règle
+antérieure v3.1.0 (WARN non bloquant) est révoquée — atteindre la
+couverture est désormais une condition d'acceptation, pas un
+"nice-to-have".
+
+**Bypass explicite** :
+- baisser `CoverageMin` dans `## Project Config` (décision tracée en git blame)
+- mettre `CoverageMin: 0` (seuil désactivé, équivalent au mode v3.1.0)
+- ne **JAMAIS** utiliser `--force` pour contourner — le bypass passe par
+  la configuration
+
+Précédence (cf. `error-classification.md §1.7`) :
+```
+[QA_TEST_FAILED] > [QA_COVERAGE_GAP]    (les deux RED, tests d'abord)
+```
 
 ---
 
@@ -123,8 +136,8 @@ N'EST PAS écrit (pas de fichier corrompu).
 summary.coverage_passed = (summary.coverage_lines_pct >= CoverageMin)
 ```
 
-Si `false` → flag `[QA_COVERAGE_GAP]` en **WARNING** dans le rapport.
-Décision globale = `YELLOW` (pas `RED`).
+Si `false` → flag `[QA_COVERAGE_GAP]` **bloquant** dans le rapport.
+Décision globale = `RED` (depuis v6.1 hardening).
 
 ### 3.2 Threshold = 0
 

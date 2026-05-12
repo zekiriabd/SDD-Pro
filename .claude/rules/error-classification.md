@@ -51,6 +51,7 @@ Cette règle unifie les classifications historiques dispersées dans :
 | `[ADDS_VIOLATED]` | Identifier `adds:` non present apres ecriture | dev-* post-Edit |
 | `[LAYER_VIOLATION]` | Code dans une couche interdite (ex. business in UI) | dev-* STEP build |
 | `[FILE_OWNERSHIP]` | Agent écrit dans path interdit par `file-ownership.md §1` | hook SubagentStop |
+| `[FILE_OWNERSHIP_NESTED]` | Projet front imbriqué dans projet back (ou inverse) — viole `file-ownership.md §1.bis` (depuis 2026-05-12) | arch STEP 2.bis, dev-* STEP 1.bis |
 | `[STATUS_FLIP_FAILED]` | `Status: Done` flip pas persiste sur disque | dev-* post-write |
 
 ### 1.4 Classes build (compile / lint / type)
@@ -89,7 +90,7 @@ structurel qui ne sera pas résolu par une nouvelle tentative — fail-fast.
 | Préfixe | Quand l'utiliser | Phase concernée |
 |---|---|---|
 | `[QA_TEST_FAILED]` | Au moins un test unitaire échoue → décision RED | qa STEP 5 |
-| `[QA_COVERAGE_GAP]` | `coverage_lines_pct < CoverageMin` → décision YELLOW | qa STEP 6 |
+| `[QA_COVERAGE_GAP]` | `coverage_lines_pct < CoverageMin` → décision RED (bloquant, depuis v6.1 hardening) | qa STEP 6 |
 | `[QA_FRAMEWORK_MISSING]` | Test runner CLI absent OU `## Active QA Specs` vide | qa STEP 2 / 5 |
 | `[QA_INIT_FAILED]` | Bootstrap test project échoue | qa STEP 2.5 |
 | `[QA_TEST_INVALID]` | Forbidden patterns détectés (sleep, DB réelle, état partagé) | qa STEP 3 / 4 |

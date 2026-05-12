@@ -6,14 +6,16 @@
 # - détection des chevauchements (anti-cross-contamination)
 # - documentation des coûts tokens par agent
 #
-# Cette source est descriptive, pas exécutoire : chaque agent (`.claude/
-# agents/*.md`) liste lui-même ses lectures dans son STEP de chargement.
-# Ce fichier est un miroir consolidé pour vérification.
+# Cette source est executable via `.claude/scripts/context-budget.ps1`.
+# Chaque agent (`.claude/agents/*.md`) liste toujours lui-même ses lectures
+# dans son STEP de chargement, mais ce manifest sert maintenant de contrat
+# de budget : expansion des fichiers lus, refus des globs non bornes,
+# estimation tokens/cout et ledger JSONL par run.
 #
 # Toute modification d'un agent → mise à jour synchrone de cette section.
 
-version: "6.0.0"
-updated: "2026-05-06"
+version: "6.1.0"
+updated: "2026-05-11"
 
 # =========================================================================
 # Convention de langue (v5.0 — décision documentée, pas un bug)
@@ -359,14 +361,14 @@ dashboard:
     - .claude/templates/adrs-index.template.md
     - .claude/templates/qa-dashboard.template.html
     - .claude/rules/error-classification.md
-    - workspace/input/specs/*.md           # Glob, lecture passive
-    - workspace/output/us/*.md             # Glob, statuts
-    - workspace/output/validation/*.md     # Glob, readiness
-    - workspace/output/plans/*.md          # Glob, plans
-    - workspace/output/qa/feat-*/coverage.json
-    - workspace/output/qa/feat-*/quality.json
-    - workspace/output/qa/feat-*/api-tests.json
-    - workspace/output/context/adrs/ADR-*.md  # Glob
+    - workspace/input/specs/{n}-*.md       # SPEC cible uniquement
+    - workspace/output/us/{n}-*.md         # US de la SPEC cible
+    - workspace/output/validation/{n}-readiness.md
+    - workspace/output/plans/{n}-*.md      # Plans de la SPEC cible
+    - workspace/output/qa/feat-{n}/coverage.json
+    - workspace/output/qa/feat-{n}/quality.json
+    - workspace/output/qa/feat-{n}/api-tests.json
+    - workspace/output/context/adrs/INDEX.md
   writes:
     - workspace/output/dashboard/README.html
     - workspace/output/context/adrs/INDEX.md

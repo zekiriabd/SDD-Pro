@@ -88,6 +88,100 @@ exécutable (hors annotations, hors strings). Exclut les codes communs
 
 **Sévérité** : `info`.
 
+### 3.7 Scan supply-chain — CVE / SBOM / licences (v6.1)
+
+Trois sous-checks lancés par `quality-scan.ps1` selon le `buildSystem`
+détecté dans le catalogue stack actif. Tous trois écrivent leurs
+artefacts sous `workspace/output/qa/feat-{n}/supply-chain/`.
+
+#### 3.7.a CVE scan (errors si gravité ≥ moderate)
+
+Cible : packages installés avec vulnérabilité connue dans la base
+publique GitHub Advisory / NVD.
+
+| BuildSystem | Commande |
+|---|---|
+| `dotnet`        | `dotnet list package --vulnerable --include-transitive --format json` |
+| `npm`/`pnpm`/`yarn` | `npm audit --omit=dev --audit-level=moderate --json` |
+| `uv`/`pip`/`poetry` | `pip-audit --format=json` (depuis `pyproject.toml` ou `requirements.txt`) |
+| `maven`/`gradle`    | `mvn org.owasp:dependency-check-maven:check -DfailBuildOnCVSS=4 -f pom.xml -Dformat=JSON` ou plugin Gradle `org.owasp.dependencycheck` |
+| `cargo`             | `cargo audit --json` |
+
+**Sévérité** : `error` si CVSS ≥ 4.0 (moderate), `warning` si < 4.0.
+
+Sortie consolidée : `workspace/output/qa/feat-{n}/supply-chain/cve.json`
+schéma minimal :
+```json
+{
+  "scanner": "dotnet|npm|pip-audit|cargo-audit|...",
+  "extractedAt": "ISO",
+  "vulnerabilities": [
+    { "package": "Foo.Bar", "version": "1.2.3", "advisory": "GHSA-...", "severity": "high", "cvss": 7.5, "url": "https://..." }
+  ],
+  "summary": { "errors": 1, "warnings": 0 }
+}
+```
+
+#### 3.7.b SBOM generation (info, archive)
+
+Génère un **Software Bill of Materials** au format CycloneDX (standard
+OWASP). Pas de pass/fail — artefact requis pour audit / compliance /
+SLSA niveau 1+.
+
+| BuildSystem | Outil canonique |
+|---|---|
+| `dotnet`        | `dotnet CycloneDX` (NuGet `CycloneDX` global tool) → `bom.xml` ou `bom.json` |
+| `npm`/`pnpm`/`yarn` | `@cyclonedx/cyclonedx-npm` |
+| `pip`/`uv`/`poetry` | `cyclonedx-py` |
+| `maven`/`gradle`    | plugin `org.cyclonedx:cyclonedx-maven-plugin` / `org.cyclonedx.bom` |
+| Universel (fallback) | `syft` (Anchore) — détecte automatiquement le buildSystem |
+
+Sortie : `workspace/output/qa/feat-{n}/supply-chain/sbom.cyclonedx.json`.
+
+#### 3.7.c Licences (warnings sur licences non autorisées)
+
+Cible : détecter des licences copyleft virales (GPL-3.0, AGPL-3.0), des
+licences "Polyform Noncommercial" (ex. EPPlus ≥ 5), ou des licences
+absentes/inconnues qui empêchent la distribution.
+
+| BuildSystem | Outil |
+|---|---|
+| `dotnet`        | `dotnet nuget-license` (NuGet `dotnet-project-licenses` global tool) |
+| `npm`           | `license-checker --json` |
+| `pip`           | `pip-licenses --format=json` |
+| `maven`/`gradle` | plugin `org.gaul:modernizer-maven-plugin` ou `com.github.jk1.dependency-license-report` |
+
+**Liste blanche par défaut** (configurable via `## Project Config` →
+`LicensesAllowed`) :
+- `MIT`, `Apache-2.0`, `BSD-2-Clause`, `BSD-3-Clause`, `ISC`,
+  `MPL-2.0`, `LGPL-2.1`, `0BSD`, `Unlicense`, `CC0-1.0`,
+  `MS-EULA` (Microsoft pour packages officiels)
+
+**Sévérité** :
+- `warning` : licence hors liste blanche (ex. `GPL-3.0`, `AGPL-3.0`,
+  `Polyform-Noncommercial-1.0.0`, `SSPL-1.0`)
+- `error` : aucune licence détectée (package sans manifest licence —
+  bloquant pour distribution)
+
+Sortie : `workspace/output/qa/feat-{n}/supply-chain/licenses.json`.
+
+#### 3.7.d Activation et bypass
+
+Activation pilotée par `## Project Config` :
+```yaml
+SupplyChainScan: full           # full | cve-only | sbom-only | licenses-only | off
+LicensesAllowed: MIT,Apache-2.0,BSD-3-Clause   # override liste blanche (séparé par virgules)
+CveMaxSeverity: moderate        # moderate (CVSS 4) | high (7) | critical (9) — défaut moderate
+```
+
+`off` = skip total (NON recommandé en prod). `CveMaxSeverity: high`
+laisse passer les CVE moderate sans bloquer.
+
+**Pré-requis outillage** : si l'outil canonique d'un sous-check n'est
+pas installé (ex. `dotnet CycloneDX` global tool), `quality-scan.ps1`
+émet WARN `[SUPPLY_CHAIN_TOOL_MISSING]` et skip le sous-check (pas
+bloquant — l'install se fait `dotnet tool install --global CycloneDX`).
+
 ---
 
 ## 4. Exclusions
@@ -137,20 +231,25 @@ Le script produit `workspace/output/qa/feat-{n}/quality.json` :
 
 ---
 
-## 6. Règle d'évaluation (non bloquante)
+## 6. Règle d'évaluation
 
-Le quality scan **ne bloque jamais** le pipeline. Il est purement
-informatif :
+Le quality scan **traditionnel** (§3.1-§3.6) ne bloque jamais le
+pipeline. Le scan supply-chain (§3.7) **peut bloquer** selon la
+sévérité CVE détectée.
 
-| Niveau | Présence | Effet sur la décision globale `/qa-generate` |
-|---|---|---|
-| `errors` | 0 | GREEN (si tests + coverage OK) |
-| `errors` | ≥ 1 | YELLOW |
-| `warnings` | toujours informatif | n'affecte pas la décision |
-| `info` | toujours informatif | n'affecte pas la décision |
+| Catégorie | Source | Sévérité | Effet sur décision globale `/qa-generate` |
+|---|---|---|---|
+| Quality traditionnel | §3.1-§3.6 | `errors` 0 | GREEN (si tests + coverage OK) |
+| Quality traditionnel | §3.1-§3.6 | `errors` ≥ 1 | YELLOW |
+| Quality traditionnel | §3.1-§3.6 | `warnings` / `info` | informatif, pas de changement |
+| Supply-chain CVE | §3.7.a | CVSS ≥ `CveMaxSeverity` | **RED bloquant** (depuis v6.1) |
+| Supply-chain CVE | §3.7.a | CVSS < `CveMaxSeverity` | warning, pas de bloquage |
+| Supply-chain licenses | §3.7.c | licence absente | **RED bloquant** (pas de licence = pas de distribution) |
+| Supply-chain licenses | §3.7.c | licence hors whitelist | YELLOW (revue humaine recommandée) |
+| Supply-chain SBOM | §3.7.b | toujours info | jamais bloquant (artefact compliance) |
 
-**Pas de seuil bloquant** : un projet avec 50 warnings reste GREEN si
-les tests passent. C'est de l'**audit**, pas une **gate**.
+**Bypass CVE** : baisser `CveMaxSeverity: critical` dans `## Project
+Config` (la décision est tracée en git blame). JAMAIS via `--force`.
 
 ---
 

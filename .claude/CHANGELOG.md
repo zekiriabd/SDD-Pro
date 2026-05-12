@@ -4,6 +4,122 @@ Format : [version] — date courte. Sections : `Breaking`, `Added`, `Changed`, `
 
 ---
 
+## [6.1.0] — 2026-05-11 (gated workflow, split modèles, gates manuels, short-circuit arch)
+
+> Itération de robustesse / observabilité sur v6.0. Aucune Breaking côté
+> SPEC ou US (rétrocompatible). Features étalées du 2026-05-07 au
+> 2026-05-10, consolidées en v6.1.0.
+
+### Added — Workflow gated back→API gate→front (2026-05-07)
+- `.claude/rules/backend-first.md` : nouveau workflow par défaut.
+  `/dev-run` exécute en séquence : (a) dev-backend ALL US parallèle,
+  (b) QA API Gate (tests intégration HTTP, in-memory DB), (c)
+  dev-frontend ALL US parallèle — uniquement si (b) 🟢. Élimine les
+  mismatches silencieux frontend→backend (404 runtime sur routes
+  inventées).
+- `commands/qa-generate.md` mode `--mode api-tests` : génération
+  WebApplicationFactory + EF Core InMemory + TestAuthHandler.
+  Critère gate : `failed == 0 AND total >= 2 × N_endpoints`.
+- `responsibilities.md §12` durci : interdiction stricte d'inventer
+  une route HTTP backend côté frontend. Grep obligatoire avant tout
+  client HTTP. ERROR `[FRONTEND_BACKEND_CONTRACT_GAP]` si endpoint
+  manquant.
+- Convention URL canonique backend : `/api/v{N}/{resource-kebab-pluriel}`.
+  Pas de `/count`/`/exists` (total via `PagedOutput.TotalCount`,
+  existence via 404 GET by id).
+
+### Added — Catalogue machine `.libs.json` (2026-05-07)
+- 14 stacks équipés de `{stack-id}.libs.json` (source de vérité
+  versions/libs core/on-demand/triggers/plugins). Schéma
+  `templates/libs-catalog.schema.json`.
+- `.claude/scripts/validate-libs-catalog.ps1` + `sync-stack-md.ps1`
+  (régénère §2.4 markdown depuis JSON).
+- Dé-duplication QA : libs de tests purgées des catalogues backend
+  (now dans `qa/*.libs.json` exclusivement).
+
+### Added — Split modèles + dashboard agent (2026-05-08)
+- `dev-backend` et `dev-frontend` passent en **Opus 4.7** (raisonnement
+  fin sur génération de code, `preserves:`/`adds:`, layer mapping,
+  fidélité HTML). po/arch/elicitor/qa restent en Sonnet 4.6.
+- Nouvel agent `dashboard` (**Haiku 4.5**) : régénère
+  `workspace/output/dashboard/README.html`, `context/adrs/INDEX.md`,
+  `qa/feat-{n}/dashboard.html`. Auto en fin de `/sdd-full`,
+  `/dev-run`, `/qa-generate` ; manuel via `/doc-refresh`.
+- `.claude/rules/error-classification.md` : taxonomie 8 classes
+  (`BUILD_CORRECTIBLE`/`BUILD_BLOCKING`/`SCHEMA_MISMATCH`/
+  `LAYER_VIOLATION`/`UI_*`/`QA_*`/`DERIVE_*`/`STACK_*`/`NETWORK_*`...).
+  Pilote `build_loop` : `[BUILD_CORRECTIBLE]` itère,
+  `[BUILD_BLOCKING]` fail-fast.
+
+### Added — Short-circuit arch SPECs ≥ 2 (2026-05-10)
+- `commands/dev-run.md` STEP 4.bis : skip arch si bootstrap stable
+  (CLAUDE.md projet présents, `workspace/output/db/schema.json` présent
+  si DB, `stack.md` mtime ≤ mtime des CLAUDE.md). Émet 1 ligne
+  `SPEC {n} — arch skip (bootstrap stable, …)`.
+- Flag `--rebuild-arch` sur `/dev-run` et `/sdd-full` pour forcer
+  l'invocation arch (changement schéma DB, ajout lib stack, modif
+  Project Config, projet supprimé manuellement).
+
+### Added — Gates manuels LOT 3 + console web (2026-05-10)
+- 4 points d'arrêt humain optionnels : `afterUS`, `afterReadiness`,
+  `afterPlan`, `afterCode`. Pilotage via `ManualGates: true|false|us,plan,code`
+  dans `## Project Config` ou flag CLI `--manual-gates[=us,plan,code]`.
+- `workspace/console/` : serveur Fastify (port 5173) +
+  `status.json` centralisé avec lock partagé Node + PowerShell
+  (`.status.lock`, O_EXCL, TTL 10s, retry 5×).
+- `.claude/scripts/gate-decide.ps1` : pose-pending / set
+  validated|skipped / read decision.
+- Reprise pipeline via `/sdd-full {n} --resume`.
+
+### Added — Observabilité Phase 0 (v6.1)
+- `.claude/scripts/sdd-state.ps1` : émission `run-{id}.json` +
+  `events.jsonl` append-only dans `workspace/output/.state/`.
+- `commands/sdd-full.md` STEPs 1.quart, 3, 3.5, 4, 4.5, 4.7, 5 :
+  `set-phase` aux bornes de phase. Pattern best-effort (non bloquant).
+- Read mandatory `error-classification.md` ajouté aux agents arch,
+  dev-backend, dev-frontend, qa (cf. `loader.yml` lignes 101, 158,
+  214, 320).
+
+### Added — Hardening QA (v6.1)
+- `coverage_lines_pct < CoverageMin` produit désormais **🔴 RED
+  bloquant** (`[QA_COVERAGE_GAP]`) au lieu du WARN non-bloquant v3.1.0.
+  Bypass via `CoverageMin: 0` ou abaisser le seuil (décision tracée
+  en git blame). Cf. `rules/qa-coverage.md §1`.
+- Politique runtime LTS only : `.NET 10`, `Node 22 LTS`, `Java 21 LTS`,
+  `Python 3.12`, `Kotlin 2.1`. STS interdits sans ADR explicite. Cf.
+  `rules/library-policy.md §0`.
+
+### Changed
+- `commands/dev-run.md` STEP 5 : invocation arch désormais
+  conditionnelle (`$arch_required`). STEP 6 séquence
+  back → API gate → front (default `GatedWorkflow: true`).
+  STEP 7 récap : ligne `Bootstrap + DB` distingue
+  `init` / `invoked` / `skipped (short-circuit)`.
+- `commands/sdd-full.md` STEP 4 : propagation `--rebuild-arch`,
+  `--manual-gates`, `--resume`. Récap STEP 5 enrichi.
+- `docs/workflow.md` §3 : mention du short-circuit et du gated workflow.
+- `CLAUDE.md` §3 : tableau commandes enrichi avec nouveaux flags ;
+  §4 ajout colonne "Quand invoqué" pour les agents support ;
+  §8 mention gates manuels.
+
+### Removed
+- Commande `/sdd-clear` retirée (purge en masse non récupérable jugée
+  dangereuse). Cleanup manuel documenté en `CLAUDE.md §3`.
+
+### Pourquoi
+v6.1 consolide **3 axes complémentaires** :
+1. **Robustesse contractuelle** (API Gate, route invention interdite,
+   catalogue libs JSON) — supprime les bugs silencieux frontend ↔ backend.
+2. **Économie** (short-circuit arch, split modèles, dashboard Haiku) —
+   sur SPECs ≥ 2 le bootstrap est skipé, les rendus déterministes
+   passent sur Haiku 4.5.
+3. **Industrialisation légère** (gates manuels via console, state
+   tracking, error-classification, QA coverage gap bloquant) —
+   prépare le terrain pour les revues humaines multi-équipes sans
+   alourdir le pipeline en runs nominaux.
+
+---
+
 ## [6.0.0] — 2026-05-06 (ultra-lean : 2 axes — suppression validator + scripts dev-*)
 
 ### Breaking (Point 1 — suppression validator)

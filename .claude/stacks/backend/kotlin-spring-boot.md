@@ -289,6 +289,85 @@ Triggers (regex case-insensitive) cherches par `detect-capabilities.ps1` dans l'
 - **Tests** : `@Test fun \`describe scenario expected\`()` (backticks
   pour lisibilité)
 
+### 2.6 Conventions REST API (load-bearing — anti-divergence cross-US)
+
+> **Pourquoi cette section** : sans contrat URL explicite, deux US qui
+> exposent la même ressource (`POST /eans` US 4-2 vs `POST /ean/bulk`
+> US 4-3) divergent silencieusement → 404 runtime côté frontend, build
+> vert, bug visible seulement à l'usage. Cette règle est **load-bearing**
+> et s'applique à `dev-backend`, `dev-frontend` et `qa` (API gate).
+
+#### 2.6.1 Ressources au pluriel, jamais singulier
+- ✅ `/api/v1/campagnes`, `/api/v1/eans`, `/api/v1/annonceurs`, `/api/v1/marques`, `/api/v1/users`
+- ❌ `/api/v1/campagne`, `/api/v1/ean`, `/api/v1/user`
+- Exception unique : ressource singleton (`/api/v1/me` pour l'utilisateur courant authentifié) — à tracer dans un ADR explicite
+
+#### 2.6.2 Verbes HTTP sémantiques, jamais RPC dans l'URL
+- ✅ `GET /api/v1/campagnes/{id}`, `POST /api/v1/campagnes`, `DELETE /api/v1/campagnes/{id}`
+- ❌ `GET /api/v1/getCampagne/{id}`, `POST /api/v1/createCampagne`, `POST /api/v1/CampagneDelete`
+- Pas de verbe dans le path : c'est le verbe HTTP qui porte l'action
+- Tolérance pragmatique pour les sous-actions non-CRUD : `POST /api/v1/eans/bulk` (import batch), `GET /api/v1/eans/template` (download asset), `POST /api/v1/orders/{id}/confirm` (transition d'état). Ces patterns sont acceptés s'ils sont **rares** et **documentés** dans la SPEC (BR ou FD).
+
+#### 2.6.3 Préfixe versionné `/api/v{N}/` systématique
+- Tous les endpoints applicatifs sous `/api/v1/` (incrémenter à v2 si breaking change)
+- Exceptions tolérées (hors `/api/v{N}/`) : `/actuator/**` (Spring), `/swagger`, `/openapi`, `/health`. Toute autre exception → ADR.
+
+#### 2.6.4 Composition de ressources (nesting)
+- Quand B appartient à A → `/api/v1/{a-plural}/{aId}/{b-plural}` :
+  - `/api/v1/campagnes/{campagneId}/eans` (EAN appartient à une campagne)
+  - `/api/v1/users/{userId}/permissions`
+- **Cohérence stricte** : le même couple parent/enfant utilise toujours le même pluriel — toute US qui ajoute un endpoint sous cette racine **doit conserver le pluriel exact**.
+
+#### 2.6.5 Status codes par verbe
+| Verbe | Succès | Headers obligatoires |
+|---|---|---|
+| `GET` (liste) | `200` | `Content-Type: application/json` |
+| `GET` (item) | `200` ou `404` | — |
+| `POST` (create) | **`201`** | **`Location: /api/v1/{ressource}/{id-créé}`** |
+| `POST` (action) | `200` ou `201` | — |
+| `PUT` (replace) | `200` ou `204` | — |
+| `PATCH` (partial) | `200` ou `204` | — |
+| `DELETE` | **`204`** (pas de body) | — |
+| Erreur client | `400` / `401` / `403` / `404` / `409` / `422` | `Content-Type: application/problem+json` (`ProblemDetail` RFC 7807) |
+| Erreur serveur | `500` | idem ProblemDetail |
+
+#### 2.6.6 Snake-case interdit, kebab-case toléré, camelCase interdit dans le path
+- ✅ `/api/v1/campagnes`, `/api/v1/order-items`
+- ❌ `/api/v1/campagne_list`, `/api/v1/orderItems`
+- Pour la longue chaîne de mots : préférer pluriel simple (`/orders`) plutôt que kebab. Kebab uniquement si nécessaire.
+
+#### 2.6.7 Format ERROR sur violation détectée
+
+Pendant la planification ou l'exécution, si un agent dev-* détecte un
+chemin qui viole §2.6.1 ou §2.6.4 (singulier vs pluriel incohérent
+avec une US précédente) :
+
+```
+ERROR: dev-{backend|frontend} {n}-{m} — violation contrat REST
+CAUSE: [REST_CONTRACT_VIOLATION] endpoint {verbe} {path} diverge du
+       pluriel {/eans} défini par US {n-m'} sibling OU SPEC BR-X
+FIX: aligner le path sur {/eans} (cf. stack §2.6.1) OU réviser la SPEC
+     si le contrat URL est ambigu
+```
+
+`[REST_CONTRACT_VIOLATION]` est non-itérable par `build_loop` → fail-fast,
+le Tech Lead corrige le plan/la SPEC manuellement.
+
+#### 2.6.8 Procédure de planification (dev-backend STEP 5)
+
+Avant d'écrire `@RequestMapping(...)` ou `MapGet/MapPost(...)`, l'agent
+dev-backend doit :
+1. Grep `workspace/output/src/{BackendName}/...` pour repérer les
+   endpoints **déjà existants** sur la même racine de ressource
+2. Si trouvé → réutiliser **strictement** le même pluriel et la même
+   structure de nesting
+3. Sinon → suivre §2.6.1 (pluriel) + §2.6.4 (nesting)
+4. Si la SPEC parente définit explicitement le contrat URL (BR ou FD)
+   → la SPEC **fait foi**, même si elle utilise une convention atypique
+
+Cette procédure est **inlinée dans l'agent dev-backend** ; le présent
+§2.6 est la source canonique.
+
 ---
 
 ## 3. Conventions d'usage (lib clé)
@@ -413,7 +492,7 @@ import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
 @RestController
-@RequestMapping("/api/v1/users")
+@RequestMapping("/api/v1/users")  // §2.6.1 pluriel obligatoire, §2.6.3 préfixe /api/v1/
 class UserController(
     private val userService: UserService
 ) {
@@ -421,9 +500,18 @@ class UserController(
     fun findById(@PathVariable id: Long): ResponseEntity<UserOutputDto> =
         ResponseEntity.ok(userService.findById(id))
 
-    @PostMapping
-    fun create(@Valid @RequestBody input: UserInputDto): ResponseEntity<UserOutputDto> =
-        ResponseEntity.status(HttpStatus.CREATED).body(userService.create(input))
+    @PostMapping  // §2.6.5 POST create → 201 + Location obligatoires
+    fun create(@Valid @RequestBody input: UserInputDto): ResponseEntity<UserOutputDto> {
+        val created = userService.create(input)
+        val location = URI.create("/api/v1/users/${created.id}")
+        return ResponseEntity.created(location).body(created)
+    }
+
+    @DeleteMapping("/{id}")  // §2.6.5 DELETE → 204 No Content
+    fun delete(@PathVariable id: Long): ResponseEntity<Void> {
+        userService.delete(id)
+        return ResponseEntity.noContent().build()
+    }
 }
 ```
 
