@@ -68,7 +68,8 @@ Basename `{n}-{m}-{Name}` rigoureusement identique à travers tous les artefacts
 **4 cœur** : `po`, `arch` (Sonnet 4.6) ; `dev-backend`, `dev-frontend` (Opus 4.7).
 **Support** : `elicitor`, `constitutioner`, `qa` (Sonnet 4.6) ; `dashboard` (Haiku 4.5).
 **Auditors** (Sonnet 4.6) : `accessibility-auditor` (Haiku), `code-reviewer`, `security-reviewer`, `performance-auditor`, `spec-compliance-reviewer`, `arch-reviewer`.
-**Variants strict v6.2** : `dev-backend-strict`, `dev-frontend-strict` (Sonnet 4.6, opt-in `PlanCacheStrict: true`).
+
+> `dev-backend-strict` / `dev-frontend-strict` (v6.2 opt-in) **retirés en v7.0.0**. Plan v2 + `## Inline Digest` préservés pour review humaine, sans routing alternatif. Cf. `ADR-20260519T153000-governance-major-prompts-trim`.
 
 > Détail modèles, rôles, phases, isolation reads/writes : `@.claude/docs/architecture.md §2-§3`.
 > Tous autonomes (aucune question utilisateur). Ambiguïté → `STOP + ERROR [CLASS]`.
@@ -165,7 +166,7 @@ Contrat : `@.claude/WORKING-AGREEMENT.md`.
 - `@.claude/docs/conventions.md` — anti-derive, idempotence
 - `@.claude/docs/quickstart.md` — démarrage pas à pas
 - `@.claude/docs/version-notes.md` — notes par version
-- `@.claude/docs/DESIGN-FROMPLAN-STRICT.md` — design strict
+- ~~`@.claude/docs/DESIGN-FROMPLAN-STRICT.md`~~ — retiré v7.0.0 (variants strict supprimés)
 - `@.claude/docs/MCP-SERVER.md` — serveur MCP (clients tiers)
 - `@.claude/VERSIONING.md` — SemVer + freeze window
 - `@.claude/CHANGELOG.md` — historique versions

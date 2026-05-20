@@ -162,7 +162,7 @@
     ],
     "SubagentStop": [
       {
-        "matcher": "dev-backend|dev-backend-strict|dev-frontend|dev-frontend-strict|qa|dashboard|accessibility-auditor|code-reviewer|security-reviewer|performance-auditor|spec-compliance-reviewer|constitutioner",
+        "matcher": "dev-backend|dev-frontend|qa|dashboard|accessibility-auditor|code-reviewer|security-reviewer|performance-auditor|spec-compliance-reviewer|constitutioner",
         "hooks": [
           {
             "type": "command",

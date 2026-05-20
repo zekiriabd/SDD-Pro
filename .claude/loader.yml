@@ -248,104 +248,16 @@ dev-frontend:
     - STOP + ERROR sur libellé/structure absent
 
 # -------------------------------------------------------------------------
-# Agent: dev-backend-strict (Sonnet 4.6) — depuis v6.2
-# Phase: 4 (matérialisation pure From-Plan strict)
-# Token footprint estimé: ~5-10 KB par US (digest auto-suffisant, pas
-#   de re-Read stacks ni CLAUDE.md ni schema.json)
-# Activation: PlanCacheStrict: true + plan v2 strict-ready (validate_plan.py exit 0)
-# Refuse mode :plan ; refuse mode inline ; fallback dev-backend si digest insuffisant
+# Agents: dev-backend-strict / dev-frontend-strict — RETIRÉS EN v7.0.0
 # -------------------------------------------------------------------------
-dev-backend-strict:
-  reads:
-    - workspace/output/plans/{n}-{m}-*.back.md    # plan v2 strict-ready (SSOT)
-    - workspace/output/us/{n}-{m}-*.md            # US (libellés métier, passif)
-    - .claude/rules/error-classification.md
-    - .claude/rules/dev-shared.md
-    # Lectures INTERDITES en strict (déjà digérées dans le plan) :
-    #   - .claude/stacks/backend/*.md     → utiliser ## Inline Digest > Stack §1.3 mapping
-    #   - .claude/stacks/auth/*.md        → utiliser ## Inline Digest
-    #   - workspace/output/src/{BackendName}/CLAUDE.md → utiliser ## Inline Digest > CLAUDE.md (extrait)
-    #   - workspace/output/db/schema.json → utiliser ## Inline Digest > Schema.json (entités)
-    # Budget cible : ≤ 10 KB par invocation (vs 16-20k pour dev-backend Opus)
-  writes:
-    - workspace/output/src/{BackendName}/Services/
-    - workspace/output/src/{BackendName}/Endpoints/
-    - workspace/output/src/{BackendName}/DTOs/
-    - workspace/output/src/{BackendName}/Mappers/
-    - workspace/output/src/{BackendName}/Program.cs  # augment
-    - workspace/output/src/{BackendName}/CLAUDE.md   # Edit narrow §6.bis (BREAKING CHANGES RESOLVED)
-  forbidden_reads:
-    - workspace/output/us/{other}                 # autres US
-    - workspace/input/feats/
-    - workspace/input/ui/{other}.html
-    - .claude/stacks/frontend/
-    - .claude/stacks/ui/
-    - .claude/stacks/backend/                     # INTERDIT en strict — utiliser le digest
-    - .claude/stacks/auth/                        # INTERDIT en strict — utiliser le digest
-  forbidden_writes:
-    - workspace/output/plans/                     # cet agent consomme, ne génère pas
-    - workspace/output/.sys/.context/             # constitution/ADRs hors scope
-  modes:
-    - from_plan_strict: "{n}-{m} + plan v2 strict-ready"
-                                                 # SEUL mode supporté
-  exit_silent_when:
-    - "frontend-only US"
-  refuses:
-    - ":plan suffix"                              # mode planning interdit
-    - "plan v1 (legacy)"                          # fallback dev-backend
-    - "plan v2 not-strict-ready (missing ## Inline Digest)" # fallback dev-backend
-  fallback_to: dev-backend                        # si refus ou [PLAN_DIGEST_INSUFFICIENT]
-
+# Variants Sonnet 4.6 introduits en v6.2 (opt-in PlanCacheStrict: true)
+# pour consommer des plans v2 strict-ready (digest auto-suffisant).
+# Retirés en v7.0.0 (cf. ADR governance-major-prompts-trim) — la
+# maintenance double (sync dev-* normal ↔ strict) > ROI sur runs réels.
+# Plan v2 schema (## Inline Digest) reste utile pour review humaine
+# mais ne route plus vers un agent alternatif.
+# Pour réintroduire localement : restaurer depuis git history d4330c5.
 # -------------------------------------------------------------------------
-# Agent: dev-frontend-strict (Sonnet 4.6) — depuis v6.2
-# Phase: 4 (matérialisation pure From-Plan strict + fidelity check)
-# Token footprint estimé: ~8-15 KB par US (plan + HTML + US, pas de
-#   re-Read stacks frontend/ui/auth ni CLAUDE.md)
-# Activation: PlanCacheStrict: true + plan v2 strict-ready + API Gate GREEN/YELLOW
-# Refuse mode :plan ; refuse mode inline ; fallback dev-frontend si digest insuffisant
-# -------------------------------------------------------------------------
-dev-frontend-strict:
-  reads:
-    - workspace/output/plans/{n}-{m}-*.front.md   # plan v2 strict-ready (SSOT)
-    - workspace/input/ui/{n}-{m}-*.html           # HTML mockup (source vérité visuelle)
-    - workspace/output/us/{n}-{m}-*.md            # US (workflow + libellés conditionnels)
-    - .claude/rules/error-classification.md
-    - .claude/rules/dev-shared.md
-    # Lectures INTERDITES en strict :
-    #   - .claude/stacks/frontend/*.md → ## Inline Digest > Stack §1.3 mapping
-    #   - .claude/stacks/ui/*.md       → ## Inline Digest > UI Design System mapping
-    #   - .claude/stacks/auth/*.md     → digéré si auth dans US
-    #   - workspace/output/src/{AppName}/CLAUDE.md → ## Inline Digest > CLAUDE.md (extrait)
-    # Budget cible : ≤ 15 KB par invocation (vs 16-20k pour dev-frontend Opus)
-  writes:
-    - workspace/output/src/{AppName}/Pages/
-    - workspace/output/src/{AppName}/Components/
-    - workspace/output/src/{AppName}/Layouts/
-    - workspace/output/src/{AppName}/wwwroot/css/theme.css  # augment
-    - "**/*.razor.css"                            # CSS isolé adjacent
-    - workspace/output/src/{AppName}/Program.cs   # augment éventuel
-    - workspace/output/src/{AppName}/CLAUDE.md    # Edit narrow §6.bis
-  forbidden_reads:
-    - workspace/output/us/{other}
-    - workspace/input/feats/
-    - workspace/input/ui/{other}.html
-    - .claude/stacks/backend/
-    - .claude/stacks/frontend/                    # INTERDIT en strict
-    - .claude/stacks/ui/                          # INTERDIT en strict
-    - .claude/stacks/auth/                        # INTERDIT en strict
-  forbidden_writes:
-    - workspace/output/plans/
-    - workspace/output/.sys/.context/
-  modes:
-    - from_plan_strict: "{n}-{m} + plan v2 strict-ready + fidelity check"
-  exit_silent_when:
-    - "backend-only US"
-  refuses:
-    - ":plan suffix"
-    - "plan v1 (legacy)"
-    - "plan v2 not-strict-ready"
-  fallback_to: dev-frontend
-  fidelity_check: true                            # actif en strict mode (load-bearing)
 
 # -------------------------------------------------------------------------
 # Agent: validator — RETIRÉ EN v6.0

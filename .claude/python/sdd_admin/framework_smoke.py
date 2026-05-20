@@ -119,8 +119,7 @@ def _write_cache(claude_root: Path, status: str) -> None:
 EXPECTED_AGENTS = (
     # Cœur (4)
     "po", "arch", "dev-backend", "dev-frontend",
-    # Variants strict v6.2 (2)
-    "dev-backend-strict", "dev-frontend-strict",
+    # Variants strict v6.2 — REMOVED v7.0.0 (governance-major-prompts-trim)
     # Support (3)
     "elicitor", "qa", "constitutioner",
     # Rendering (1)
