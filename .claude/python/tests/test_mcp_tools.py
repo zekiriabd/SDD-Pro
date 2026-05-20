@@ -85,7 +85,7 @@ class TestSubprocessHelper(unittest.TestCase):
 class TestStatusTools(unittest.TestCase):
     def test_validate_readiness_no_feat_returns_error(self) -> None:
         from sdd_mcp.tools.status import _handle_validate_readiness  # type: ignore[attr-defined]
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp)
             _setup_fake_repo(root)
             cwd = os.getcwd()
@@ -99,7 +99,7 @@ class TestStatusTools(unittest.TestCase):
 
     def test_sdd_status_list_runs_empty(self) -> None:
         from sdd_mcp.tools.status import _handle_sdd_status  # type: ignore[attr-defined]
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp)
             _setup_fake_repo(root)
             cwd = os.getcwd()
@@ -123,7 +123,7 @@ class TestUsOpsTools(unittest.TestCase):
 
     def test_set_us_status_get_on_real_us(self) -> None:
         from sdd_mcp.tools.us_ops import _handle_set_us_status  # type: ignore[attr-defined]
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp)
             _setup_fake_repo(root, with_us=True)
             cwd = os.getcwd()
@@ -144,7 +144,7 @@ class TestUsOpsTools(unittest.TestCase):
 
     def test_validate_us_deps_on_fake_feat(self) -> None:
         from sdd_mcp.tools.us_ops import _handle_validate_us_deps  # type: ignore[attr-defined]
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp)
             _setup_fake_repo(root, with_us=True)
             cwd = os.getcwd()
@@ -164,7 +164,7 @@ class TestUsOpsTools(unittest.TestCase):
 
     def test_compute_us_complexity_on_real_us(self) -> None:
         from sdd_mcp.tools.us_ops import _handle_compute_us_complexity  # type: ignore[attr-defined]
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp)
             _setup_fake_repo(root, with_us=True)
             cwd = os.getcwd()
@@ -189,7 +189,7 @@ class TestUsOpsTools(unittest.TestCase):
 
     def test_migrate_us_v1_to_v2_dry_run(self) -> None:
         from sdd_mcp.tools.us_ops import _handle_migrate_us_v1_to_v2  # type: ignore[attr-defined]
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp)
             _setup_fake_repo(root, with_us=True)
             cwd = os.getcwd()

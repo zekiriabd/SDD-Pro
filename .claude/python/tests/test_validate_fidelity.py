@@ -59,7 +59,7 @@ class TestPureFunctions(unittest.TestCase):
 
 class TestFidelityIntegration(unittest.TestCase):
     def setUp(self) -> None:
-        self.tmp = tempfile.TemporaryDirectory()
+        self.tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
         self.root = Path(self.tmp.name)
         self.html_path = self.root / "1-2-Bebes.html"
         self.gen_dir = self.root / "generated"

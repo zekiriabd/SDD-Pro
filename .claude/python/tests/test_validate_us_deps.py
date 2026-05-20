@@ -97,7 +97,7 @@ class TestShortIdFromFilename(unittest.TestCase):
 
 class TestBuildGraph(unittest.TestCase):
     def test_linear_chain(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             (tmp_p / ".claude").mkdir()
             _make_us(tmp_p, 1, 1, "A", [])
@@ -110,7 +110,7 @@ class TestBuildGraph(unittest.TestCase):
             self.assertEqual(graph["1-3"], {"1-2"})
 
     def test_diamond(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             _make_us(tmp_p, 1, 1, "Root", [])
             _make_us(tmp_p, 1, 2, "Left", ["1-1"])
@@ -227,7 +227,7 @@ class TestMainEndToEnd(unittest.TestCase):
             _make_us(tmp_p, fid, m, name, deps)
 
     def test_valid_linear_feat(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             self._setup(tmp_p, [(1, 1, "A", []), (1, 2, "B", ["1-1"])])
             with mock.patch.object(vud, "repo_root", return_value=tmp_p), \
@@ -237,7 +237,7 @@ class TestMainEndToEnd(unittest.TestCase):
             self.assertEqual(rc, 0)
 
     def test_cycle_returns_3(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             self._setup(tmp_p, [(1, 1, "A", ["1-2"]), (1, 2, "B", ["1-1"])])
             with mock.patch.object(vud, "repo_root", return_value=tmp_p), \
@@ -247,7 +247,7 @@ class TestMainEndToEnd(unittest.TestCase):
             self.assertEqual(rc, 3)
 
     def test_missing_returns_4(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             self._setup(tmp_p, [(1, 1, "A", ["9-9"])])
             with mock.patch.object(vud, "repo_root", return_value=tmp_p), \
@@ -257,7 +257,7 @@ class TestMainEndToEnd(unittest.TestCase):
             self.assertEqual(rc, 4)
 
     def test_no_us_returns_1(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             (tmp_p / ".claude").mkdir()
             with mock.patch.object(vud, "repo_root", return_value=tmp_p), \
@@ -267,7 +267,7 @@ class TestMainEndToEnd(unittest.TestCase):
             self.assertEqual(rc, 1)
 
     def test_topo_mode_prints_order(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             self._setup(tmp_p, [
                 (1, 1, "A", []),
@@ -281,7 +281,7 @@ class TestMainEndToEnd(unittest.TestCase):
             self.assertEqual(rc, 0)
 
     def test_topo_mode_on_cycle_returns_3(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             self._setup(tmp_p, [(1, 1, "A", ["1-2"]), (1, 2, "B", ["1-1"])])
             with mock.patch.object(vud, "repo_root", return_value=tmp_p), \
@@ -291,7 +291,7 @@ class TestMainEndToEnd(unittest.TestCase):
             self.assertEqual(rc, 3)
 
     def test_invalid_us_id_returns_2(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             self._setup(tmp_p, [(1, 1, "A", [])])
             with mock.patch.object(vud, "repo_root", return_value=tmp_p), \

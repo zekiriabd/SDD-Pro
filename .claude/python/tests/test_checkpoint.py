@@ -41,7 +41,7 @@ def _make_repo_with_state(
 
 class TestComputeInputHash(unittest.TestCase):
     def test_deterministic_with_same_inputs(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             (tmp_p / ".claude").mkdir()
             (tmp_p / "a.md").write_text("hello", encoding="utf-8")
@@ -53,7 +53,7 @@ class TestComputeInputHash(unittest.TestCase):
             self.assertEqual(len(h1), 64)
 
     def test_order_independent(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             (tmp_p / ".claude").mkdir()
             (tmp_p / "a.md").write_text("A", encoding="utf-8")
@@ -64,7 +64,7 @@ class TestComputeInputHash(unittest.TestCase):
             self.assertEqual(h1, h2)
 
     def test_content_change_changes_hash(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             (tmp_p / ".claude").mkdir()
             f = tmp_p / "a.md"
@@ -75,7 +75,7 @@ class TestComputeInputHash(unittest.TestCase):
             self.assertNotEqual(h1, h2)
 
     def test_missing_file_uses_sentinel(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             (tmp_p / ".claude").mkdir()
             (tmp_p / "a.md").write_text("hello", encoding="utf-8")
@@ -87,7 +87,7 @@ class TestComputeInputHash(unittest.TestCase):
             self.assertNotEqual(h, h_just_a)
 
     def test_accepts_string_paths(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             (tmp_p / ".claude").mkdir()
             (tmp_p / "a.md").write_text("hello", encoding="utf-8")
@@ -96,7 +96,7 @@ class TestComputeInputHash(unittest.TestCase):
             self.assertEqual(h1, h2)
 
     def test_relative_paths_resolved_via_root(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             (tmp_p / ".claude").mkdir()
             (tmp_p / "sub").mkdir()
@@ -108,7 +108,7 @@ class TestComputeInputHash(unittest.TestCase):
 
 class TestRecordInputHash(unittest.TestCase):
     def test_records_hash_in_state(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             _make_repo_with_state(tmp_p, run_id="run-1")
             (tmp_p / "feat-1.md").write_text("content", encoding="utf-8")
@@ -120,7 +120,7 @@ class TestRecordInputHash(unittest.TestCase):
             self.assertEqual(state["phases"]["us-generate"]["payload"]["input_hash"], h)
 
     def test_raises_when_state_missing(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             (tmp_p / ".claude").mkdir()
             (tmp_p / "workspace" / "output" / ".sys" / ".state").mkdir(parents=True)
@@ -129,7 +129,7 @@ class TestRecordInputHash(unittest.TestCase):
             self.assertIn("CHECKPOINT_STATE_UNREADABLE", str(ctx.exception))
 
     def test_preserves_existing_payload_fields(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             _make_repo_with_state(
                 tmp_p,
@@ -148,7 +148,7 @@ class TestRecordInputHash(unittest.TestCase):
 
 class TestIsPhaseResumable(unittest.TestCase):
     def test_resumable_when_pass_and_hash_match(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             (tmp_p / "feat-1.md").write_text("content", encoding="utf-8")
             h = cp.compute_input_hash([tmp_p / "feat-1.md"], root=tmp_p)
@@ -166,7 +166,7 @@ class TestIsPhaseResumable(unittest.TestCase):
             self.assertEqual(reason, "ok")
 
     def test_not_resumable_when_hash_mismatch(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             (tmp_p / "feat-1.md").write_text("initial", encoding="utf-8")
             old_hash = cp.compute_input_hash([tmp_p / "feat-1.md"], root=tmp_p)
@@ -186,7 +186,7 @@ class TestIsPhaseResumable(unittest.TestCase):
             self.assertIn("CHECKPOINT_HASH_MISMATCH", reason)
 
     def test_not_resumable_when_phase_not_pass(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             (tmp_p / "feat-1.md").write_text("content", encoding="utf-8")
             h = cp.compute_input_hash([tmp_p / "feat-1.md"], root=tmp_p)
@@ -203,7 +203,7 @@ class TestIsPhaseResumable(unittest.TestCase):
             self.assertIn("status='fail'", reason)
 
     def test_warn_accepted_by_default(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             (tmp_p / "feat-1.md").write_text("content", encoding="utf-8")
             h = cp.compute_input_hash([tmp_p / "feat-1.md"], root=tmp_p)
@@ -219,7 +219,7 @@ class TestIsPhaseResumable(unittest.TestCase):
             self.assertTrue(resumable)
 
     def test_warn_rejected_when_accept_warn_false(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             (tmp_p / "feat-1.md").write_text("content", encoding="utf-8")
             h = cp.compute_input_hash([tmp_p / "feat-1.md"], root=tmp_p)
@@ -235,7 +235,7 @@ class TestIsPhaseResumable(unittest.TestCase):
             self.assertFalse(resumable)
 
     def test_not_resumable_when_no_state(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             (tmp_p / ".claude").mkdir()
             resumable, reason = cp.is_phase_resumable(
@@ -245,7 +245,7 @@ class TestIsPhaseResumable(unittest.TestCase):
             self.assertIn("CHECKPOINT_STATE_UNREADABLE", reason)
 
     def test_not_resumable_when_phase_missing(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             _make_repo_with_state(tmp_p, feat=1, run_id="r1", phases={})
             resumable, reason = cp.is_phase_resumable(
@@ -255,7 +255,7 @@ class TestIsPhaseResumable(unittest.TestCase):
             self.assertIn("absent from state", reason)
 
     def test_not_resumable_when_no_input_hash_legacy(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             _make_repo_with_state(
                 tmp_p,
@@ -270,7 +270,7 @@ class TestIsPhaseResumable(unittest.TestCase):
             self.assertIn("no recorded", reason)
 
     def test_not_resumable_when_inputs_missing(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             (tmp_p / "feat-1.md").write_text("content", encoding="utf-8")
             h = cp.compute_input_hash([tmp_p / "feat-1.md"], root=tmp_p)
@@ -288,7 +288,7 @@ class TestIsPhaseResumable(unittest.TestCase):
             self.assertIn("CHECKPOINT_INPUT_MISSING", reason)
 
     def test_picks_latest_run_for_feat(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             (tmp_p / "feat-1.md").write_text("content", encoding="utf-8")
             h_match = cp.compute_input_hash([tmp_p / "feat-1.md"], root=tmp_p)
@@ -319,7 +319,7 @@ class TestIsPhaseResumable(unittest.TestCase):
 
 class TestGetPhasePayload(unittest.TestCase):
     def test_returns_payload(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             _make_repo_with_state(
                 tmp_p, feat=1, run_id="r1",
@@ -329,13 +329,13 @@ class TestGetPhasePayload(unittest.TestCase):
             self.assertEqual(payload, {"foo": 42})
 
     def test_returns_none_when_no_state(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             (tmp_p / ".claude").mkdir()
             self.assertIsNone(cp.get_phase_payload(1, "us-generate", root=tmp_p))
 
     def test_returns_none_when_phase_missing(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             _make_repo_with_state(tmp_p, feat=1, run_id="r1", phases={})
             self.assertIsNone(cp.get_phase_payload(1, "us-generate", root=tmp_p))

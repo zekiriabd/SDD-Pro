@@ -84,7 +84,7 @@ class TestSpawnAsync(unittest.TestCase):
     def test_spawn_writes_stdout_file(self) -> None:
         import tempfile
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             out = Path(tmp) / "out.log"
             err = Path(tmp) / "err.log"
             with mock.patch.dict(os.environ, {claude_invoker.FAKE_FLAG_ENV: "1"}, clear=False):

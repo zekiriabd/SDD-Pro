@@ -267,7 +267,7 @@ class TestScriptInvocation(unittest.TestCase):
     """Integration: invoke script with missing FEAT → exit 1."""
 
     def test_missing_feat_returns_error(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             # Invoke in a sandbox where FEAT 999 doesn't exist
             result = subprocess.run(
                 [sys.executable, str(SCRIPT), "--feat-number", "999", "--json"],

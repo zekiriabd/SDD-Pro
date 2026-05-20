@@ -269,7 +269,7 @@ class TestCli(unittest.TestCase):
     def test_main_report_path_green(self):
         from sdd_scripts.validate_spec_compliance import main
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             path = Path(tmp) / "1-spec-compliance.json"
             path.write_text(json.dumps(_make_valid_report()), encoding="utf-8")
             from io import StringIO
@@ -299,7 +299,7 @@ class TestCli(unittest.TestCase):
         report = _make_valid_report(
             verdict="🔴 RED", total=1, verified=0, critical=1, us_acs=us_acs,
         )
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             path = Path(tmp) / "1-spec-compliance.json"
             path.write_text(json.dumps(report), encoding="utf-8")
             from io import StringIO
@@ -317,7 +317,7 @@ class TestCli(unittest.TestCase):
     def test_main_missing_report_returns_2(self):
         from sdd_scripts.validate_spec_compliance import main
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             path = Path(tmp) / "absent.json"
             from io import StringIO
             old_err = sys.stderr

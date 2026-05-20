@@ -206,7 +206,7 @@ class _PlanFixture:
         self.us_path: Path | None = None
 
     def __enter__(self):
-        self.tmp = tempfile.TemporaryDirectory()
+        self.tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
         root = Path(self.tmp.name)
         self.plan_path = root / "plan.back.md"
         self.plan_path.write_text(self.plan_content, encoding="utf-8")

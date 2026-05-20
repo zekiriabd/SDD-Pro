@@ -241,7 +241,7 @@ class TestScanIntegration(unittest.TestCase):
     """Black-box scan() over a temp directory with real-ish manifests."""
 
     def test_full_stack_dotnet_react(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp)
             # Backend
             be = root / "backend"
@@ -293,13 +293,13 @@ class TestScanIntegration(unittest.TestCase):
             self.assertIn("azure-ad", report["auth_indicators"])
 
     def test_empty_dir_warning(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             report = scan(Path(tmp))
             self.assertEqual(report["manifests"], [])
             self.assertTrue(any("SCAN_NO_MANIFESTS" in w for w in report["warnings"]))
 
     def test_skips_node_modules(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp)
             (root / "package.json").write_text(
                 json.dumps({"name": "main", "dependencies": {"react": "^19"}}),

@@ -69,7 +69,7 @@ class TestBackwardCompat(unittest.TestCase):
     """If base.yml + team.yml absent, behavior must == read_project_config."""
 
     def test_no_base_no_team_returns_project_only(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             _make_repo(tmp_p, stack_md="""# stack
 ## Project Config
@@ -84,7 +84,7 @@ CoverageMin: 80
 
 class TestLayering(unittest.TestCase):
     def test_base_provides_defaults(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             _make_repo(
                 tmp_p,
@@ -103,7 +103,7 @@ SpecComplianceMode: manual
             self.assertEqual(result["SpecComplianceMode"], "manual")  # from base
 
     def test_project_overrides_base(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             _make_repo(
                 tmp_p,
@@ -118,7 +118,7 @@ CoverageMin: 90
             self.assertEqual(result["CoverageMin"], "90")  # project wins
 
     def test_team_overrides_base(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             _make_repo(
                 tmp_p,
@@ -135,7 +135,7 @@ AppName: ProjectApp
             self.assertEqual(result["CoverageMin"], "80")  # team overrides base
 
     def test_full_precedence_chain(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             _make_repo(
                 tmp_p,
@@ -155,7 +155,7 @@ SpecComplianceMode: full
 
 class TestSecurityDowngradeGuard(unittest.TestCase):
     def test_project_cannot_relax_team_severity(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             _make_repo(
                 tmp_p,
@@ -173,7 +173,7 @@ SecurityFailOn: moderate
                 self.assertIn("SecurityFailOn", ctx.exception.cause)
 
     def test_project_can_harden_team_severity(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             _make_repo(
                 tmp_p,
@@ -189,7 +189,7 @@ SecurityFailOn: critical
             self.assertEqual(result["SecurityFailOn"], "critical")
 
     def test_project_cannot_relax_coverage_min(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             _make_repo(
                 tmp_p,
@@ -206,7 +206,7 @@ CoverageMin: 50
                 self.assertIn("CoverageMin", ctx.exception.cause)
 
     def test_project_can_raise_coverage_min(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             _make_repo(
                 tmp_p,
@@ -223,7 +223,7 @@ CoverageMin: 90
 
     def test_no_guard_when_team_silent(self):
         """If team doesn't set a security key, project is free to set anything."""
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             _make_repo(
                 tmp_p,
@@ -241,7 +241,7 @@ SecurityFailOn: minor
 
 class TestKeysFilter(unittest.TestCase):
     def test_keys_filter_restricts_output(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             _make_repo(
                 tmp_p,
@@ -259,7 +259,7 @@ CoverageMin: 80
 
 class TestDumpEffectiveConfig(unittest.TestCase):
     def test_dump_writes_audit_file(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             _make_repo(
                 tmp_p,

@@ -202,7 +202,7 @@ class TestMainEndToEnd(unittest.TestCase):
         return us_path
 
     def test_compute_no_apply(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             us_path = self._setup_repo(tmp_p, SIMPLE_US)
             with mock.patch.object(cuc, "repo_root", return_value=tmp_p), \
@@ -214,7 +214,7 @@ class TestMainEndToEnd(unittest.TestCase):
             self.assertEqual(us_path.read_text(encoding="utf-8"), SIMPLE_US)
 
     def test_compute_with_apply_modifies_file(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             us_path = self._setup_repo(tmp_p, SIMPLE_US)
             with mock.patch.object(cuc, "repo_root", return_value=tmp_p), \
@@ -228,7 +228,7 @@ class TestMainEndToEnd(unittest.TestCase):
             self.assertIn('"effort_estimate"', content)
 
     def test_us_not_found_returns_1(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             (tmp_p / ".claude").mkdir()
             with mock.patch.object(cuc, "repo_root", return_value=tmp_p), \

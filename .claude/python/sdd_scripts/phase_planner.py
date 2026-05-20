@@ -397,19 +397,28 @@ def _decide_a11y(
     has_frontend_stack: bool,
     has_frontend_code: bool,
 ) -> dict[str, object]:
-    # NOTE v7.0.0 : accessibility-auditor agent REMOVED (governance-major-auditors-trim),
-    # but planner phase entry kept for callers reading the plan JSON. The agent
-    # binary is gone so /sdd-full simply skips invocation — see CLAUDE.md §4 for
-    # the axe-core replacement path in the generated project's CI.
+    # NOTE v7.0.0 : accessibility-auditor agent REMOVED (governance-major-auditors-trim).
+    # The phase entry is preserved in the planner JSON for backward-compat with
+    # consumers reading the plan ; an `agent_removed: True` field flags the
+    # deletion so new consumers can short-circuit and use axe-core in CI
+    # instead. /sdd-full STEP 6.4 already skips the spawn (commit 5902d50).
     if a11y_mode == "off":
-        return _phase("a11y_audit", enabled=False, reason="A11yMode=off")
-    if a11y_mode == "manual":
-        return _phase("a11y_audit", enabled=False, reason="A11yMode=manual (Tech Lead invoque à la demande)")
-    if not has_frontend_stack:
-        return _phase("a11y_audit", enabled=False, reason="no frontend stack active (backend-only project)")
-    if not has_frontend_code:
-        return _phase("a11y_audit", enabled=False, reason="workspace/output/src/{AppName}/ absent ou vide (markup pas généré)")
-    return _phase("a11y_audit", enabled=True, reason=None)
+        ph = _phase("a11y_audit", enabled=False, reason="A11yMode=off")
+    elif a11y_mode == "manual":
+        ph = _phase("a11y_audit", enabled=False,
+                    reason="A11yMode=manual (Tech Lead invoque à la demande)")
+    elif not has_frontend_stack:
+        ph = _phase("a11y_audit", enabled=False,
+                    reason="no frontend stack active (backend-only project)")
+    elif not has_frontend_code:
+        ph = _phase("a11y_audit", enabled=False,
+                    reason="workspace/output/src/{AppName}/ absent ou vide (markup pas généré)")
+    else:
+        ph = _phase("a11y_audit", enabled=True,
+                    reason="agent removed v7.0.0 — phase logically planned but no spawn ; use axe-core in CI")
+    ph["agent_removed"] = True
+    ph["replacement"] = "axe-core CI step in the generated project"
+    return ph
 
 
 def _decide_code_review(
@@ -490,27 +499,32 @@ def _decide_perf(
     has_backend_code: bool,
     has_frontend_code: bool,
 ) -> dict[str, object]:
-    # NOTE v7.0.0 : performance-auditor agent REMOVED (governance-major-auditors-trim),
-    # but planner phase entry kept for callers reading the plan JSON. The agent
-    # binary is gone so /sdd-full simply skips invocation — see CLAUDE.md §4 for
-    # the Lighthouse CI replacement path in the generated project's CI.
+    # NOTE v7.0.0 : performance-auditor agent REMOVED (governance-major-auditors-trim).
+    # Same pattern as _decide_a11y — phase entry preserved, agent_removed flag
+    # surfaced for new consumers. Replacement = Lighthouse CI + wrk/k6.
     if perf_mode == "off":
-        return _phase("perf_audit", enabled=False, reason="PerfMode=off")
-    if perf_mode == "manual" and not has_perf_ac:
-        return _phase(
+        ph = _phase("perf_audit", enabled=False, reason="PerfMode=off")
+    elif perf_mode == "manual" and not has_perf_ac:
+        ph = _phase(
             "perf_audit",
             enabled=False,
             reason="PerfMode=manual + no AC mentions perf metric (lcp/p95/...)",
         )
-    if perf_mode == "manual" and has_perf_ac:
-        return _phase(
+    elif perf_mode == "manual" and has_perf_ac:
+        ph = _phase(
             "perf_audit",
             enabled=True,
-            reason="forced by explicit perf metric in AC (PerfMode=manual override)",
+            reason="forced by explicit perf metric in AC (PerfMode=manual override) ; agent removed v7.0.0",
         )
-    if not has_backend_code and not has_frontend_code:
-        return _phase("perf_audit", enabled=False, reason="aucun code production (/dev-run pas exécuté)")
-    return _phase("perf_audit", enabled=True, reason=None)
+    elif not has_backend_code and not has_frontend_code:
+        ph = _phase("perf_audit", enabled=False,
+                    reason="aucun code production (/dev-run pas exécuté)")
+    else:
+        ph = _phase("perf_audit", enabled=True,
+                    reason="agent removed v7.0.0 — phase logically planned but no spawn ; use Lighthouse CI + wrk/k6")
+    ph["agent_removed"] = True
+    ph["replacement"] = "Lighthouse CI + wrk/k6 in the generated project"
+    return ph
 
 
 def _phase(name: str, *, enabled: bool, reason: str | None) -> dict[str, object]:

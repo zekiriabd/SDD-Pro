@@ -56,11 +56,11 @@ class TestSafeRead(unittest.TestCase):
         self.assertEqual(dc.safe_read(""), "")
 
     def test_missing_file_returns_empty(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             self.assertEqual(dc.safe_read(str(Path(tmp) / "nope.md")), "")
 
     def test_reads_existing_file(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             f = Path(tmp) / "x.md"
             f.write_text("hello", encoding="utf-8")
             self.assertEqual(dc.safe_read(str(f)), "hello")
@@ -75,7 +75,7 @@ class TestLoadOndemandFromLibsJson(unittest.TestCase):
         return libs
 
     def test_loads_capabilities(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             libs = self._setup(tmp_p)
             caps = dc.load_ondemand_from_libs_json(str(libs))
@@ -84,7 +84,7 @@ class TestLoadOndemandFromLibsJson(unittest.TestCase):
             self.assertEqual(names, ["excel", "pdf"])
 
     def test_resolves_md_to_libs_json(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             self._setup(tmp_p)
             md_path = (tmp_p / ".claude" / "stacks" / "backend"
@@ -94,20 +94,20 @@ class TestLoadOndemandFromLibsJson(unittest.TestCase):
             self.assertEqual(len(caps), 2)
 
     def test_missing_libs_returns_empty(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             caps = dc.load_ondemand_from_libs_json(
                 str(Path(tmp) / "nope.libs.json"))
             self.assertEqual(caps, [])
 
     def test_malformed_json_returns_empty(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             libs = tmp_p / "bad.libs.json"
             libs.write_text("not json {{", encoding="utf-8")
             self.assertEqual(dc.load_ondemand_from_libs_json(str(libs)), [])
 
     def test_resolves_version_from_ref(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             libs = self._setup(tmp_p)
             caps = dc.load_ondemand_from_libs_json(str(libs))
@@ -184,7 +184,7 @@ class TestMainIntegration(unittest.TestCase):
         return json.loads(buf.getvalue())
 
     def test_us_with_excel_keyword_triggers(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             paths = self._setup(
                 Path(tmp),
                 us_text="Export Excel des transactions",
@@ -197,7 +197,7 @@ class TestMainIntegration(unittest.TestCase):
             self.assertTrue(excel["install_required"])
 
     def test_us_without_trigger_skipped(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             paths = self._setup(
                 Path(tmp),
                 us_text="Afficher la liste des bébés",
@@ -208,7 +208,7 @@ class TestMainIntegration(unittest.TestCase):
                 self.assertEqual(cap["status"], "SKIPPED-NO-TRIGGER")
 
     def test_forced_via_config(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             paths = self._setup(
                 Path(tmp),
                 us_text="rien de spécial",
@@ -221,7 +221,7 @@ class TestMainIntegration(unittest.TestCase):
             self.assertTrue(excel["forced_via_config"])
 
     def test_override_applied(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             paths = self._setup(
                 Path(tmp),
                 us_text="Export Excel",
@@ -237,7 +237,7 @@ class TestMainIntegration(unittest.TestCase):
             self.assertTrue(excel["override_applied"])
 
     def test_lib_already_present_use_existing(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             paths = self._setup(
                 Path(tmp),
                 us_text="Export Excel",

@@ -38,7 +38,7 @@ def init_status(path: Path) -> None:
 
 class TestGateDecide(unittest.TestCase):
     def setUp(self) -> None:
-        self.tmp = tempfile.TemporaryDirectory()
+        self.tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
         self.status_path = Path(self.tmp.name) / "status.json"
         init_status(self.status_path)
 

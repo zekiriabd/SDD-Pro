@@ -56,7 +56,7 @@ class TestLoadLedger(unittest.TestCase):
         from unittest import mock
         from sdd_lib import console_db
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_root = Path(tmp)
             (tmp_root / ".claude").mkdir()
             with mock.patch.object(console_db, "repo_root", return_value=tmp_root):
@@ -69,7 +69,7 @@ class TestLoadLedger(unittest.TestCase):
         from sdd_lib import console_db
         from sdd_lib.console_db import connect, ensure_initialized, insert_token_usage
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_root = Path(tmp)
             (tmp_root / ".claude").mkdir()
             with mock.patch.object(console_db, "repo_root", return_value=tmp_root):
@@ -185,7 +185,7 @@ class TestAggregate(unittest.TestCase):
 
 class TestCli(unittest.TestCase):
     def test_main_no_ledger_returns_zero(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             ledger = Path(tmp) / "absent.jsonl"
             # capture stdout
             from io import StringIO
@@ -202,7 +202,7 @@ class TestCli(unittest.TestCase):
         from sdd_lib import console_db
         from sdd_lib.console_db import connect, ensure_initialized, insert_token_usage
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_root = Path(tmp)
             (tmp_root / ".claude").mkdir()
             with mock.patch.object(console_db, "repo_root", return_value=tmp_root):
@@ -232,7 +232,7 @@ class TestCli(unittest.TestCase):
         from sdd_lib import console_db
         from sdd_lib.console_db import connect, ensure_initialized, insert_token_usage
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_root = Path(tmp)
             (tmp_root / ".claude").mkdir()
             with mock.patch.object(console_db, "repo_root", return_value=tmp_root):

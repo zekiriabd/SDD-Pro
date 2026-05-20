@@ -57,7 +57,7 @@ class TestMainPaths(unittest.TestCase):
             return mbr.main()
 
     def test_file_not_found_returns_3(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             missing = Path(tmp) / "nope.md"
             rc = self._run(
                 "--claude-md", str(missing),
@@ -67,7 +67,7 @@ class TestMainPaths(unittest.TestCase):
             self.assertEqual(rc, 3)
 
     def test_no_breaking_section_returns_0(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             cm = Path(tmp) / "CLAUDE.md"
             cm.write_text(CLAUDE_MD_NO_BREAKING, encoding="utf-8")
             rc = self._run(
@@ -80,7 +80,7 @@ class TestMainPaths(unittest.TestCase):
                              CLAUDE_MD_NO_BREAKING)
 
     def test_already_resolved_returns_0(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             cm = Path(tmp) / "CLAUDE.md"
             cm.write_text(CLAUDE_MD_RESOLVED, encoding="utf-8")
             rc = self._run(
@@ -91,7 +91,7 @@ class TestMainPaths(unittest.TestCase):
             self.assertEqual(rc, 0)
 
     def test_coherent_files_marks_resolved(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             cm = Path(tmp) / "CLAUDE.md"
             cm.write_text(CLAUDE_MD_WITH_BREAKING, encoding="utf-8")
             rc = self._run(
@@ -106,7 +106,7 @@ class TestMainPaths(unittest.TestCase):
             self.assertIn("dotnet build", after)
 
     def test_no_coherence_returns_2(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             cm = Path(tmp) / "CLAUDE.md"
             cm.write_text(CLAUDE_MD_WITH_BREAKING, encoding="utf-8")
             rc = self._run(
@@ -121,7 +121,7 @@ class TestMainPaths(unittest.TestCase):
 
     def test_basename_match_coherent(self):
         """Modified files passed with path but section mentions basename only."""
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             cm = Path(tmp) / "CLAUDE.md"
             cm.write_text(CLAUDE_MD_WITH_BREAKING, encoding="utf-8")
             rc = self._run(
@@ -132,7 +132,7 @@ class TestMainPaths(unittest.TestCase):
             self.assertEqual(rc, 1)
 
     def test_dry_run_does_not_write(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             cm = Path(tmp) / "CLAUDE.md"
             original = CLAUDE_MD_WITH_BREAKING
             cm.write_text(original, encoding="utf-8")

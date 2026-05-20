@@ -197,7 +197,7 @@ class TestMainBehaviour(unittest.TestCase):
 
         with mock.patch.dict(os.environ, {"SDD_TOKEN_USAGE_MODE": "record"}, clear=False):
             with mock.patch.object(mod, "read_hook_input", return_value=payload):
-                with tempfile.TemporaryDirectory() as tmp:
+                with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
                     tmp_root = Path(tmp)
                     (tmp_root / ".claude").mkdir()
                     # Patch repo_root in BOTH modules so default_db_path() resolves
@@ -242,7 +242,7 @@ class TestMainBehaviour(unittest.TestCase):
 
         with mock.patch.dict(os.environ, {"SDD_TOKEN_USAGE_MODE": "record"}, clear=False):
             with mock.patch.object(mod, "read_hook_input", return_value=payload):
-                with tempfile.TemporaryDirectory() as tmp:
+                with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
                     tmp_root = Path(tmp)
                     (tmp_root / ".claude").mkdir()
                     with mock.patch.object(mod, "repo_root", return_value=tmp_root), \

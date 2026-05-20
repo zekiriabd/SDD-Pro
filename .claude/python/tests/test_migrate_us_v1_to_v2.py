@@ -102,7 +102,7 @@ class TestMigrateContent(unittest.TestCase):
 
 class TestProcessOne(unittest.TestCase):
     def test_dry_run_does_not_write(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             us = tmp_p / "us.md"
             us.write_text(US_V1_NO_STATUS_NO_META, encoding="utf-8")
@@ -111,7 +111,7 @@ class TestProcessOne(unittest.TestCase):
             self.assertEqual(us.read_text(encoding="utf-8"), US_V1_NO_STATUS_NO_META)
 
     def test_apply_writes(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             us = tmp_p / "us.md"
             us.write_text(US_V1_NO_STATUS_NO_META, encoding="utf-8")
@@ -122,7 +122,7 @@ class TestProcessOne(unittest.TestCase):
             self.assertIn("Status: Draft", after)
 
     def test_skip_already_v2(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             us = tmp_p / "us.md"
             us.write_text(US_V2_COMPLETE, encoding="utf-8")
@@ -139,7 +139,7 @@ class TestDiscoverAndMain(unittest.TestCase):
             (us_dir / name).write_text(content, encoding="utf-8")
 
     def test_discover_all_us_globs_correctly(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             self._setup_repo(tmp_p, {
                 "1-1-Auth.md": US_V1_NO_STATUS_NO_META,
@@ -154,7 +154,7 @@ class TestDiscoverAndMain(unittest.TestCase):
             self.assertNotIn("README.md", names)
 
     def test_main_all_dry_run(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             self._setup_repo(tmp_p, {
                 "1-1-Auth.md": US_V1_NO_STATUS_NO_META,
@@ -174,7 +174,7 @@ class TestDiscoverAndMain(unittest.TestCase):
             )
 
     def test_main_all_apply(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             self._setup_repo(tmp_p, {
                 "1-1-Auth.md": US_V1_NO_STATUS_NO_META,
@@ -189,7 +189,7 @@ class TestDiscoverAndMain(unittest.TestCase):
             self.assertIn("## Metadata", content)
 
     def test_main_no_us_returns_1(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             (tmp_p / ".claude").mkdir()
             with mock.patch.object(mig, "repo_root", return_value=tmp_p), \
@@ -199,7 +199,7 @@ class TestDiscoverAndMain(unittest.TestCase):
             self.assertEqual(rc, 1)
 
     def test_main_single_us_unknown_returns_1(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             (tmp_p / ".claude").mkdir()
             (tmp_p / "workspace" / "output" / "us").mkdir(parents=True)

@@ -128,7 +128,7 @@ class TestResolvePattern(unittest.TestCase):
 
 class TestExpandFiles(unittest.TestCase):
     def setUp(self) -> None:
-        self.tmp = tempfile.TemporaryDirectory()
+        self.tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
         self.root = Path(self.tmp.name)
         # Crée 3 fichiers test
         (self.root / "a.md").write_text("aaa", encoding="utf-8")
@@ -191,7 +191,7 @@ def _run_budget(args: list[str], cwd: Path) -> subprocess.CompletedProcess:
 
 class TestIntegration(unittest.TestCase):
     def setUp(self) -> None:
-        self.tmp = tempfile.TemporaryDirectory()
+        self.tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
         self.fake_repo = Path(self.tmp.name)
 
     def tearDown(self) -> None:

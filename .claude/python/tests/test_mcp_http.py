@@ -45,21 +45,35 @@ def _stub_registry() -> Registry:
     return r
 
 
-def _free_port() -> int:
-    import socket
+def _start_server(registry: Registry) -> tuple[ThreadingHTTPServer, int]:
+    """Bind on an ephemeral port atomically, then start serving in a thread.
 
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(("127.0.0.1", 0))
-        return s.getsockname()[1]
+    Anti-flake fix (v7.0.0) : the previous _free_port() + _start_server(port)
+    pattern had a TOCTOU race where another process or parallel test could
+    grab the port between the free-port probe close and the server bind.
+    We now bind directly on port 0 and read the OS-assigned port via
+    ``server_address[1]`` after the atomic bind.
 
-
-def _start_server(port: int, registry: Registry) -> ThreadingHTTPServer:
-    httpd = ThreadingHTTPServer(("127.0.0.1", port), MCPHttpHandler)
+    Also waits for the server to actually be listening before returning,
+    instead of a flaky time.sleep(0.05).
+    """
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), MCPHttpHandler)
     httpd.registry = registry  # type: ignore[attr-defined]
+    port = httpd.server_address[1]
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
-    # Tiny wait so the listening socket is ready
-    time.sleep(0.05)
-    return httpd
+    # Poll until the listening socket actually accepts connections.
+    import socket as _sk
+
+    deadline = time.monotonic() + 2.0  # 2 s budget — generous for CI
+    while time.monotonic() < deadline:
+        try:
+            with _sk.socket(_sk.AF_INET, _sk.SOCK_STREAM) as probe:
+                probe.settimeout(0.1)
+                probe.connect(("127.0.0.1", port))
+            break
+        except OSError:
+            time.sleep(0.01)
+    return httpd, port
 
 
 def _post_json(port: int, path: str, body: dict[str, Any], headers: dict[str, str] | None = None) -> tuple[int, dict[str, Any] | None]:
@@ -96,8 +110,7 @@ class TestHttpTransport(unittest.TestCase):
     def setUp(self) -> None:
         # Ensure no auth token leaks between tests
         os.environ.pop(AUTH_TOKEN_ENV, None)
-        self.port = _free_port()
-        self.httpd = _start_server(self.port, _stub_registry())
+        self.httpd, self.port = _start_server(_stub_registry())
 
     def tearDown(self) -> None:
         self.httpd.shutdown()
@@ -185,8 +198,7 @@ class TestHttpTransport(unittest.TestCase):
 class TestHttpAuth(unittest.TestCase):
     def setUp(self) -> None:
         os.environ[AUTH_TOKEN_ENV] = "secret-abc"
-        self.port = _free_port()
-        self.httpd = _start_server(self.port, _stub_registry())
+        self.httpd, self.port = _start_server(_stub_registry())
 
     def tearDown(self) -> None:
         os.environ.pop(AUTH_TOKEN_ENV, None)

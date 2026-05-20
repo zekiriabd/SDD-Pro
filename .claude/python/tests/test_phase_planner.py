@@ -209,7 +209,12 @@ class TestDecideA11y:
     def test_a11y_enabled(self) -> None:
         ph = _decide_a11y(a11y_mode="full", has_frontend_stack=True, has_frontend_code=True)
         assert ph["enabled"] is True
-        assert ph["skip_reason"] is None
+        # v7.0.0 : skip_reason is non-None because the agent was removed —
+        # it documents the removal and the replacement path.
+        assert ph["skip_reason"] is not None
+        assert "agent removed v7.0.0" in ph["skip_reason"]
+        assert ph["agent_removed"] is True
+        assert "axe-core" in ph["replacement"]
         assert ph["estimated_tokens"] == PHASE_COST_ESTIMATE["a11y_audit"]
 
 

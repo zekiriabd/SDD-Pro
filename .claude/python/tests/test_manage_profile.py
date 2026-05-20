@@ -44,7 +44,7 @@ class TestValidateProfileName(unittest.TestCase):
 
 class TestExport(unittest.TestCase):
     def test_export_creates_file(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             (tmp_p / "team.yml").write_text("Key: value\n", encoding="utf-8")
             with mock.patch.dict(os.environ, _setup_env(tmp_p)):
@@ -57,7 +57,7 @@ class TestExport(unittest.TestCase):
             self.assertTrue((tmp_p / "profiles" / "strict-prod.yml").is_file())
 
     def test_export_fails_when_no_team_config(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             with mock.patch.dict(os.environ, _setup_env(tmp_p)):
                 sys.stderr = StringIO()
@@ -68,7 +68,7 @@ class TestExport(unittest.TestCase):
             self.assertEqual(rc, 1)
 
     def test_export_refuses_overwrite_without_force(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             (tmp_p / "team.yml").write_text("Key: value\n", encoding="utf-8")
             with mock.patch.dict(os.environ, _setup_env(tmp_p)):
@@ -83,7 +83,7 @@ class TestExport(unittest.TestCase):
             self.assertEqual(rc, 2)
 
     def test_export_force_overwrites(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             (tmp_p / "team.yml").write_text("Key: v1\n", encoding="utf-8")
             with mock.patch.dict(os.environ, _setup_env(tmp_p)):
@@ -101,7 +101,7 @@ class TestExport(unittest.TestCase):
 
 class TestImport(unittest.TestCase):
     def test_import_creates_team_yml(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             profile_dir = tmp_p / "profiles"
             profile_dir.mkdir()
@@ -120,7 +120,7 @@ class TestImport(unittest.TestCase):
             )
 
     def test_import_backs_up_existing_team(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             profile_dir = tmp_p / "profiles"
             profile_dir.mkdir()
@@ -138,7 +138,7 @@ class TestImport(unittest.TestCase):
             self.assertIn("60", (tmp_p / "team.yml.bak").read_text(encoding="utf-8"))
 
     def test_import_fails_when_profile_absent(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             with mock.patch.dict(os.environ, _setup_env(tmp_p)):
                 sys.stderr = StringIO()
@@ -151,7 +151,7 @@ class TestImport(unittest.TestCase):
 
 class TestList(unittest.TestCase):
     def test_list_empty(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             with mock.patch.dict(os.environ, _setup_env(tmp_p)):
                 sys.stdout = StringIO()
@@ -164,7 +164,7 @@ class TestList(unittest.TestCase):
             self.assertIn("No profiles", out)
 
     def test_list_shows_profiles_and_active(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             pd = tmp_p / "profiles"
             pd.mkdir()
@@ -186,7 +186,7 @@ class TestList(unittest.TestCase):
 
 class TestDelete(unittest.TestCase):
     def test_delete_removes_profile(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             pd = tmp_p / "profiles"
             pd.mkdir()
@@ -201,7 +201,7 @@ class TestDelete(unittest.TestCase):
             self.assertFalse((pd / "old.yml").exists())
 
     def test_delete_missing_returns_1(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             with mock.patch.dict(os.environ, _setup_env(tmp_p)):
                 sys.stderr = StringIO()
@@ -214,7 +214,7 @@ class TestDelete(unittest.TestCase):
 
 class TestShow(unittest.TestCase):
     def test_show_prints_content(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             pd = tmp_p / "profiles"
             pd.mkdir()
@@ -232,7 +232,7 @@ class TestShow(unittest.TestCase):
 
 class TestMainDispatch(unittest.TestCase):
     def test_main_invalid_name_returns_2(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             (tmp_p / "team.yml").write_text("x: 1", encoding="utf-8")
             with mock.patch.dict(os.environ, _setup_env(tmp_p)):

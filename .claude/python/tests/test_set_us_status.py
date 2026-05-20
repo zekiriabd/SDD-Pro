@@ -109,7 +109,7 @@ class TestStatusLineRegexPreservesBlankLine(unittest.TestCase):
 
 class TestResolveUSPathEndToEnd(unittest.TestCase):
     def test_resolve_and_update(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             (tmp_p / ".claude").mkdir()
             us_path = _make_us(tmp_p, 1, 2, "Auth", status="Draft")
@@ -120,7 +120,7 @@ class TestResolveUSPathEndToEnd(unittest.TestCase):
                 self.assertEqual(resolved.name, us_path.name)
 
     def test_unresolvable_returns_none(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             (tmp_p / ".claude").mkdir()
             (tmp_p / "workspace" / "output" / "us").mkdir(parents=True)
@@ -128,7 +128,7 @@ class TestResolveUSPathEndToEnd(unittest.TestCase):
                 self.assertIsNone(sus.resolve_us_path("9-9"))
 
     def test_bad_id_format_returns_none(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             with mock.patch.object(sus, "repo_root", return_value=tmp_p):
                 self.assertIsNone(sus.resolve_us_path("invalid"))
@@ -139,7 +139,7 @@ class TestMainEndToEnd(unittest.TestCase):
     """Exercise main() with patched argv + repo_root."""
 
     def test_get_returns_current(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             (tmp_p / ".claude").mkdir()
             _make_us(tmp_p, 3, 1, "Status", status="InProgress")
@@ -150,7 +150,7 @@ class TestMainEndToEnd(unittest.TestCase):
             self.assertEqual(rc, 0)
 
     def test_invalid_transition_returns_3(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             (tmp_p / ".claude").mkdir()
             _make_us(tmp_p, 3, 1, "Status", status="Draft")
@@ -162,7 +162,7 @@ class TestMainEndToEnd(unittest.TestCase):
             self.assertEqual(rc, 3)
 
     def test_us_not_found_returns_1(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             (tmp_p / ".claude").mkdir()
             with mock.patch.object(sus, "repo_root", return_value=tmp_p), \
@@ -173,7 +173,7 @@ class TestMainEndToEnd(unittest.TestCase):
             self.assertEqual(rc, 1)
 
     def test_happy_forward_chain(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             (tmp_p / ".claude").mkdir()
             us_path = _make_us(tmp_p, 1, 1, "Auth", status="Draft")
@@ -190,7 +190,7 @@ class TestMainEndToEnd(unittest.TestCase):
                     )
 
     def test_terminal_reopen_without_force_fails(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             (tmp_p / ".claude").mkdir()
             _make_us(tmp_p, 1, 1, "Auth", status="Done")
@@ -202,7 +202,7 @@ class TestMainEndToEnd(unittest.TestCase):
             self.assertEqual(rc, 3)
 
     def test_terminal_reopen_with_force_succeeds(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             (tmp_p / ".claude").mkdir()
             _make_us(tmp_p, 1, 1, "Auth", status="Done")

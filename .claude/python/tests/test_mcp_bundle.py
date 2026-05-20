@@ -18,7 +18,7 @@ from sdd_mcp import build_mcpb  # noqa: E402
 
 class TestMcpbBundle(unittest.TestCase):
     def test_build_produces_zip_with_required_entries(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             output = Path(tmp) / "sdd-pro.mcpb"
             result = build_mcpb.build(output=output)
             self.assertEqual(result, output)
@@ -41,7 +41,7 @@ class TestMcpbBundle(unittest.TestCase):
                 self.assertEqual(len(manifest["tools"]), 14)
 
     def test_no_caches_in_bundle(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             output = Path(tmp) / "sdd-pro.mcpb"
             build_mcpb.build(output=output)
             with zipfile.ZipFile(output) as zf:

@@ -36,7 +36,7 @@ class TestComputePlanMetadata(unittest.TestCase):
 
     def test_yaml_output_minimal(self) -> None:
         """Minimal invocation (us only) emits required YAML lines."""
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             us = Path(tmp) / "us.md"
             us.write_text("# US 1-2-Login\n## ACs\n- AC-1: foo\n", encoding="utf-8")
             result = self._run("--us-path", str(us))
@@ -52,7 +52,7 @@ class TestComputePlanMetadata(unittest.TestCase):
 
     def test_yaml_output_with_claude_md_and_capabilities(self) -> None:
         """Full invocation emits all v2 fields."""
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             us = Path(tmp) / "us.md"
             cm = Path(tmp) / "CLAUDE.md"
             us_content = "US content\n"
@@ -74,7 +74,7 @@ class TestComputePlanMetadata(unittest.TestCase):
 
     def test_json_output_structure(self) -> None:
         """--json emits structured payload."""
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             us = Path(tmp) / "us.md"
             us_content = "US content\n"
             us.write_text(us_content, encoding="utf-8")
@@ -92,7 +92,7 @@ class TestComputePlanMetadata(unittest.TestCase):
 
     def test_capabilities_empty_string_passthrough(self) -> None:
         """Empty --capabilities does not emit capabilities-triggered line."""
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             us = Path(tmp) / "us.md"
             us.write_text("US\n", encoding="utf-8")
             result = self._run("--us-path", str(us), "--capabilities", "")
@@ -111,7 +111,7 @@ class TestComputePlanMetadata(unittest.TestCase):
 
     def test_missing_claude_md_exit_2(self) -> None:
         """Present US but missing CLAUDE.md → exit 2."""
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             us = Path(tmp) / "us.md"
             us.write_text("US\n", encoding="utf-8")
             result = self._run(
@@ -123,7 +123,7 @@ class TestComputePlanMetadata(unittest.TestCase):
 
     def test_us_hash_matches_validate_plan_expectation(self) -> None:
         """us-hash format matches what validate_plan.py expects (sha256:hex)."""
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             us = Path(tmp) / "us.md"
             us.write_text("US\n", encoding="utf-8")
             result = self._run("--us-path", str(us), "--json")

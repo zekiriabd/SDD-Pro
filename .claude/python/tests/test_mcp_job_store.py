@@ -29,7 +29,7 @@ class TestJobIdAndPaths(unittest.TestCase):
         self.assertEqual(len(ids), 50)
 
     def test_paths_under_workspace(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp)
             _make_fake_repo(root)
             sp = job_store.state_path("abc", root)
@@ -39,7 +39,7 @@ class TestJobIdAndPaths(unittest.TestCase):
 
 class TestWriteReadState(unittest.TestCase):
     def test_round_trip(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp)
             _make_fake_repo(root)
             state = job_store.JobState(
@@ -60,7 +60,7 @@ class TestWriteReadState(unittest.TestCase):
             self.assertEqual(loaded.pid, 42)
 
     def test_read_missing_returns_none(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp)
             _make_fake_repo(root)
             self.assertIsNone(job_store.read_state("ghost", root))
@@ -68,7 +68,7 @@ class TestWriteReadState(unittest.TestCase):
 
 class TestListJobs(unittest.TestCase):
     def test_list_sorted_desc_by_started_at(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp)
             _make_fake_repo(root)
             s1 = job_store.JobState(
@@ -87,7 +87,7 @@ class TestListJobs(unittest.TestCase):
 
 class TestFinalize(unittest.TestCase):
     def test_finalize_success(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp)
             _make_fake_repo(root)
             state = job_store.JobState(
@@ -103,7 +103,7 @@ class TestFinalize(unittest.TestCase):
             self.assertIsNotNone(loaded.ended_at)
 
     def test_finalize_failure(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp)
             _make_fake_repo(root)
             state = job_store.JobState(
@@ -117,7 +117,7 @@ class TestFinalize(unittest.TestCase):
             self.assertEqual(loaded.exit_code, 2)
 
     def test_finalize_timeout(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp)
             _make_fake_repo(root)
             state = job_store.JobState(
