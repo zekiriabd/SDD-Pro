@@ -128,6 +128,14 @@ def _read_us_files(root: Path, feat_number: int) -> list[str]:
     return contents
 
 
+def _count_us_files(root: Path, feat_number: int) -> int:
+    """Count US files for a FEAT (used by LeanReviewersPreset heuristic v7.0.0 P2 #12)."""
+    us_dir = root / "workspace" / "output" / "us"
+    if not us_dir.is_dir():
+        return 0
+    return len(list(us_dir.glob(f"{feat_number}-*.md")))
+
+
 def _active_stacks(root: Path) -> dict[str, str | None]:
     """Détecte les stacks actifs depuis ## Active Tech Specs + UI + Auth de stack.md."""
     stack_md = root / "workspace" / "input" / "stack" / "stack.md"
@@ -236,6 +244,14 @@ def plan(feat_number: int) -> dict[str, object]:
     security_threat_model_enabled = _bool_flag(config.get("SecurityThreatModelEnabled"), default=True)
     security_scan_enabled = _bool_flag(config.get("SecurityScanEnabled"), default=True)
 
+    # v7.0.0 P2 #12 — Lean reviewers auto-routing (heuristique taille FEAT) :
+    # Si LeanReviewersPreset: true ET FEAT S (≤ 2 US) ET pas d'AC sécurité,
+    # downgrade security/spec/arch reviewers à "manual" pour économiser
+    # ~$1.50-3 par FEAT S. code-reviewer reste toujours `full` (seul reviewer
+    # avec preuve empirique de valeur sur petites FEATs).
+    lean_preset = _bool_flag(config.get("LeanReviewersPreset"), default=False)
+    us_count_for_lean = _count_us_files(root, feat_number)
+
     app_name = config.get("AppName")
     backend_name = config.get("BackendName")
 
@@ -260,6 +276,20 @@ def plan(feat_number: int) -> dict[str, object]:
     combined_text = feat_content + "\n" + "\n".join(us_contents)
     has_perf_ac = bool(PERF_AC_HINTS.search(combined_text))
     has_security_ac = bool(SECURITY_AC_HINTS.search(combined_text))
+
+    # v7.0.0 P2 #12 — Apply lean preset BEFORE building phases.
+    # Heuristique : FEAT S = ≤ 2 US ET sans AC sécurité ET sans AC perf.
+    # Sous ces conditions, downgrade security/spec/arch à "manual" (le Tech
+    # Lead invoque à la demande). code_review reste full (preuve empirique
+    # value sur petites FEATs).
+    if lean_preset and us_count_for_lean > 0:
+        is_feat_s = (us_count_for_lean <= 2 and not has_security_ac and not has_perf_ac)
+        if is_feat_s:
+            if security_mode == "full":
+                security_mode = "manual"
+            if spec_compliance_mode == "full":
+                spec_compliance_mode = "manual"
+            # arch_review_mode lu plus bas — laissé en lecture config (déjà manual default)
 
     # 5. Construction des phases
     phases: dict[str, dict[str, object]] = {}
@@ -370,25 +400,48 @@ def _decide_threat_model(
     has_security_ac: bool,
     stacks: dict[str, str | None],
 ) -> dict[str, object]:
+    # NOTE v7.0.0 : security-reviewer --mode threat-model REMOVED
+    # (governance-major-auditors-trim). The phase entry is preserved in
+    # the planner JSON for backward-compat with consumers reading the plan ;
+    # an `agent_removed: True` field flags the deletion so new consumers can
+    # short-circuit and use templates/threat-model.template.md (humain) instead.
+    # /dev-run STEP 5.5 already skips the spawn (this commit).
     if security_mode == "off":
-        return _phase("threat_model", enabled=False, reason="SecurityMode=off")
-    if security_mode == "manual" and not has_security_ac:
-        return _phase(
+        ph = _phase("threat_model", enabled=False, reason="SecurityMode=off")
+    elif not threat_model_enabled:
+        ph = _phase(
             "threat_model",
             enabled=False,
-            reason="SecurityMode=manual + no AC mentions security (lcp/owasp/jwt/...)",
+            reason="SecurityThreatModelEnabled=false (default v7.0.0 — agent removed)",
         )
-    if not threat_model_enabled:
-        return _phase("threat_model", enabled=False, reason="SecurityThreatModelEnabled=false")
-    # v6.7.5 : fullstack et mobile projects ont aussi une surface d'attaque (auth, API distante, etc.)
-    if (
+    elif security_mode == "manual" and not has_security_ac:
+        ph = _phase(
+            "threat_model",
+            enabled=False,
+            reason="SecurityMode=manual + no AC mentions security",
+        )
+    elif (
         stacks.get("backend") is None
         and stacks.get("frontend") is None
         and stacks.get("fullstack") is None
         and stacks.get("mobiles") is None
     ):
-        return _phase("threat_model", enabled=False, reason="no backend/frontend/fullstack/mobiles stack active")
-    return _phase("threat_model", enabled=True, reason=None)
+        ph = _phase(
+            "threat_model",
+            enabled=False,
+            reason="no backend/frontend/fullstack/mobiles stack active",
+        )
+    else:
+        # Even when all gates pass, the agent is GONE — phase is logically
+        # planned (consumers see the slot) but never spawned.
+        ph = _phase(
+            "threat_model",
+            enabled=False,
+            reason="agent removed v7.0.0 — fill templates/threat-model.template.md manually",
+        )
+    ph["agent_removed"] = True
+    ph["replacement"] = "templates/threat-model.template.md (humain, STRIDE light, ~15-30 min)"
+    return ph
 
 
 def _decide_a11y(

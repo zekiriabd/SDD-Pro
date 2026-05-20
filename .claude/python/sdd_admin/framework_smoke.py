@@ -132,19 +132,25 @@ EXPECTED_AGENTS = (
 )
 
 EXPECTED_RULES = (
-    # v7.0.0 consolidated (5 new files, codex audit Prio 2)
-    "build-and-loop",       # = backend-first + dev-shared
-    "quality",              # = qa-coverage + ui-tokens
-    "ownership",            # = file-ownership + constitution
-    "library-and-stack",    # = stack-completeness + cors
-    "error-classification", # untouched (still primary, trimmed to 489 LOC)
-    # v7.0.0 legacy stubs (preserved for backward-compat agent reads,
-    # to be removed in v7.1 once all agents migrate to new paths)
-    "backend-first", "dev-shared",
-    "qa-coverage", "ui-tokens",
-    "file-ownership", "constitution",
-    "stack-completeness", "cors",
-    "source-first", "us-granularity",
+    # v7.0.0 final — 5 consolidated rules only (stubs swept post-v7.0.0-alpha).
+    # The 8 backward-compat stubs (backend-first, dev-shared, qa-coverage,
+    # ui-tokens, file-ownership, constitution, stack-completeness, cors)
+    # were removed after migrating all `Read @.claude/rules/X.md` references
+    # in agents/commands/python to the consolidated rule files.
+    # The 2 principles (source-first, us-granularity) moved to
+    # `.claude/docs/principles/` (Tech Lead discipline / mono-agent po,
+    # respectively — neither is cross-cutting).
+    "build-and-loop",       # = was backend-first + dev-shared
+    "quality",              # = was qa-coverage + ui-tokens
+    "ownership",            # = was file-ownership + constitution
+    "library-and-stack",    # = was stack-completeness + cors
+    "error-classification", # untouched (still primary, 489 LOC)
+)
+
+# v7.0.0 — 2 principles relocated to docs/principles/ (not cross-cutting rules)
+EXPECTED_PRINCIPLES = (
+    "source-first",
+    "us-granularity",
 )
 
 EXPECTED_TEMPLATES = (
@@ -246,6 +252,15 @@ def main() -> int:
             checks.add(f"rule-{r}", "FAIL", f"Missing: {f}")
         else:
             checks.add(f"rule-{r}", "OK", f"rules/{r}.md present")
+
+    # 2.bis Principles (v7.0.0 relocated from rules/ to docs/principles/)
+    principles_dir = claude_root / "docs" / "principles"
+    for p in EXPECTED_PRINCIPLES:
+        f = principles_dir / f"{p}.md"
+        if not f.is_file():
+            checks.add(f"principle-{p}", "FAIL", f"Missing: {f}")
+        else:
+            checks.add(f"principle-{p}", "OK", f"docs/principles/{p}.md present")
 
     # 3. Templates
     templates_dir = claude_root / "templates"

@@ -574,34 +574,82 @@ def main() -> int:
             score += 1
             reasons.append(f"{oos_count} Out-of-Scope")
 
-        # v6.10.5 (audit 2026-05-19) — threshold relevé de 2 à 4 (score sur 5)
-        # ET sévérité passée WARN → INFO. Rationale : /feat-deepen est une
-        # étape d'élicitation OPTIONNELLE. Le précédent threshold ≥2 (any
-        # FEAT avec DB + ≥10 SFD/8 BR/15 AC) déclenchait WARN sur toute
-        # FEAT réaliste → bypass `--force` chronique observé sur CMS Sprint.
-        # Au-dessus de score 4/5 (4 indicateurs sur 5 simultanés) la
-        # recommandation reste pertinente mais informationnelle.
-        is_complex = score >= 4
+        # v7.0.0 (audit 2026-05-20 §6.3) — revert leniency v6.10.5.
+        # Threshold lu depuis config layered (FeatDeepenThreshold, default 3).
+        # FeatDeepenMode pilote la sévérité : warn (default) ou strict (NO-GO).
+        try:
+            from sdd_lib.layered_config import read_layered_config
+            _cfg = read_layered_config()
+            _thresh = int(_cfg.get("FeatDeepenThreshold") or 3)
+            _mode = str(_cfg.get("FeatDeepenMode") or "warn").lower()
+        except Exception:
+            _thresh, _mode = 3, "warn"
+        is_complex = score >= _thresh
         deepen_run = detect_deepen_run(const_content) if const_content else False
 
         if is_complex:
             if deepen_run:
                 rep.add_pass(
                     "FEAT-DEEPEN-DONE",
-                    f"FEAT tres complexe (score {score}/5: {', '.join(reasons)}) et /feat-deepen execute "
+                    f"FEAT complexe (score {score}/5: {', '.join(reasons)}) et /feat-deepen execute "
                     "(constitution §7 peuplee)",
                 )
             else:
-                rep.add_info(
-                    "FEAT-DEEPEN-RECOMMENDED",
-                    f"FEAT tres complexe (score {score}/5: {', '.join(reasons)}). "
-                    f"`/feat-deepen {args.feat_number}` recommande pour identifier risques/hypotheses "
-                    "avant /dev-run (etape optionnelle, non bloquant).",
-                )
+                # v7.0.0 — sévérité pilotée par FeatDeepenMode
+                if _mode == "strict":
+                    rep.add_err(
+                        "FEAT-DEEPEN-REQUIRED",
+                        f"FEAT complexe (score {score}/{_thresh}: {', '.join(reasons)}) sans elicitation",
+                        f"executer `/feat-deepen {args.feat_number}` puis relancer "
+                        f"/feat-validate (idempotent). Bypass : FeatDeepenMode=warn ou off.",
+                    )
+                elif _mode == "warn":
+                    rep.add_warn(
+                        "FEAT-DEEPEN-RECOMMENDED",
+                        f"FEAT complexe (score {score}/{_thresh}: {', '.join(reasons)}). "
+                        f"`/feat-deepen {args.feat_number}` recommande pour identifier "
+                        "risques/hypotheses avant /dev-run.",
+                    )
+                else:  # off
+                    rep.add_info(
+                        "FEAT-DEEPEN-RECOMMENDED",
+                        f"FEAT complexe (score {score}/{_thresh}). /feat-deepen disponible "
+                        "(FeatDeepenMode=off, non bloquant).",
+                    )
         else:
             rep.add_pass(
                 "FEAT-COMPLEXITY-LOW",
                 f"FEAT simple (score {score}/5) - /feat-deepen optionnel",
+            )
+
+        # 1.7 v7.0.0 anti-GIGO — quantified goal + non-functional constraints
+        # Check that the new structured fields from feat.template.md v7 are
+        # filled (not just empty/absent). WARN only — backward-compat with
+        # FEATs written pre-v7.0.0. NO-GO bypass via Project Config flag
+        # `FeatAntiGigoMode: off`.
+        qg_body = section_body(feat_content, "Quantified Goal") or ""
+        nfc_body = section_body(feat_content, "Non-Functional Constraints") or ""
+
+        if not qg_body.strip():
+            rep.add_warn(
+                "FEAT-NO-QUANTIFIED-GOAL",
+                "Section `## Quantified Goal` absente (v7.0.0 anti-GIGO). "
+                "Une FEAT senior doit declarer Metric/Target/Deadline mesurables. "
+                "Ajouter la section ou ecrire `<a preciser>` explicite. Non bloquant (WARN).",
+            )
+        elif "<a preciser>" in qg_body.lower() or "<à préciser>" in qg_body.lower():
+            rep.add_info(
+                "FEAT-QUANTIFIED-GOAL-TBD",
+                "## Quantified Goal contient `<a preciser>` - la lacune est tracee (OK), "
+                "completer avant /dev-run pour eviter GIGO.",
+            )
+
+        if not nfc_body.strip():
+            rep.add_warn(
+                "FEAT-NO-NFC",
+                "Section `## Non-Functional Constraints` absente (v7.0.0 anti-GIGO). "
+                "Champs requis : Volume, Performance, Retention, Compliance, Integration, "
+                "Degraded mode. Ecrire `n/a` explicitement si non applicable.",
             )
 
     # Output

@@ -21,13 +21,19 @@ Usage:
     python validate_us_deps.py --us-id 1-2               # report on single US
     python validate_us_deps.py --all                     # all US in workspace/output/us/
 
-Exit codes:
+Exit codes (granular — documented exception to sdd_lib/exit_codes.py convention) :
     0  Graph valid (no cycles, no missing refs); orphans only -> warn, exit 0
     1  No US found / cannot resolve [US_NOT_FOUND]
     2  Invalid args [INVALID_ARG]
     3  Cycle(s) detected [US_DEPS_CYCLE]
     4  Missing references detected [US_DEPS_MISSING]
     5  I/O error
+
+Note (v7.0.0 P1 #10) : This script uses 6 distinct exit codes (vs the
+canonical 0/1/2/3 of sdd_lib/exit_codes.py) because callers (`/dev-run`
+STEP 2.bis) need to distinguish cycle (3) from missing-ref (4) for
+different error messaging. For callers that don't need granularity :
+treat any non-zero as FAIL_FAST. Documented exception, not drift.
 """
 from __future__ import annotations
 
@@ -176,6 +182,48 @@ def detect_orphans(graph: dict[str, set[str]]) -> list[str]:
     return sorted(node for node in graph if node not in referenced)
 
 
+def layered_kahn_batches(graph: dict[str, set[str]]) -> list[list[str]] | None:
+    """Layered Kahn's algorithm — v7.0.0 audit P0 R3.
+
+    Returns batches such that NO node in batch K depends on ANY node in
+    batch K (strict). All deps of nodes in batch K are in batches 0..K-1.
+    This is the STRICT version of topological_sort that prevents
+    intra-batch races on shared files (e.g. {LibName}/, schema.json).
+
+    Returns None if a cycle exists.
+
+    Ties within a layer broken alphabetically for determinism.
+    Missing refs ignored (treated as no-op deps), same as topological_sort.
+
+    Caller chunks each layer further by `MaxParallel` ; the chunk-level
+    parallelism is safe because all nodes in a layer are pairwise independent.
+    """
+    known = set(graph)
+    adj: dict[str, set[str]] = {n: {d for d in deps if d in known}
+                                for n, deps in graph.items()}
+    dependents: dict[str, set[str]] = {n: set() for n in adj}
+    for node, deps in adj.items():
+        for d in deps:
+            dependents.setdefault(d, set()).add(node)
+    indegree: dict[str, int] = {n: len(adj[n]) for n in adj}
+
+    batches: list[list[str]] = []
+    remaining = set(adj)
+    while remaining:
+        # Layer = all nodes with indegree 0 RIGHT NOW (sorted for determinism)
+        layer = sorted(n for n in remaining if indegree[n] == 0)
+        if not layer:
+            return None  # cycle — nodes remain but none is ready
+        batches.append(layer)
+        # Consume the layer atomically (decrement indegree of dependents)
+        for node in layer:
+            remaining.discard(node)
+            for dep_of_node in dependents.get(node, set()):
+                if dep_of_node in remaining:
+                    indegree[dep_of_node] -= 1
+    return batches
+
+
 def topological_sort(graph: dict[str, set[str]]) -> list[str] | None:
     """Kahn's algorithm. Returns None if a cycle exists.
 
@@ -226,6 +274,11 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--json", action="store_true", help="Machine-readable output")
     p.add_argument("--topo", action="store_true",
                    help="Print topological order (one short id per line)")
+    p.add_argument("--layered-batches", action="store_true",
+                   help="v7.0.0 R3 — print layered Kahn batches : one batch per line, "
+                        "space-separated US ids. Within a batch, US are pairwise "
+                        "independent (no dep). Use this output for strict-safe "
+                        "parallel scheduling in /dev-run STEP 6.a/6.c.")
     return p.parse_args()
 
 
@@ -290,6 +343,20 @@ def main() -> int:
             return 3
         for node in topo:
             print(node)
+        return 0
+
+    # --layered-batches: emit strict-safe parallel batches (v7.0.0 R3)
+    if args.layered_batches:
+        batches = layered_kahn_batches(graph)
+        if batches is None:
+            error_block(
+                "validate_us_deps — layered batches failed (cycle)",
+                f"[US_DEPS_CYCLE] {len(cycles)} cycle(s) detected: {cycles}",
+                "break the cycle by adjusting `## Dependencies` in offending US",
+            )
+            return 3
+        for batch in batches:
+            print(" ".join(batch))
         return 0
 
     if args.json:

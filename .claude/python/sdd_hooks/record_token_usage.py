@@ -4,11 +4,21 @@
 Fires on `PostToolUse` (matcher=Agent) and `SubagentStop` to capture token
 usage exposed by Claude Code in the tool_response payload.
 
-Mode controlled by env $SDD_TOKEN_USAGE_MODE:
-    - "off"    (default) : silent skip, exit 0 (v6.4.2 strict behaviour)
-    - "record"           : insert row into workspace/output/db/console.db
-                            (table token_usage)
-    - "debug"            : record + dump full payload to .audit/token-debug/
+Mode resolved with explicit precedence (highest wins) :
+    1. env $SDD_TOKEN_USAGE_MODE (debug override, dev/CI)
+    2. effective layered config `TokenUsageMode`
+       (base.yml ← team.yml ← project stack.md ## Project Config)
+    3. "off" (hard default if config unreadable)
+
+Modes:
+    - "off"    : silent skip, exit 0 (v6.4.2 strict behaviour)
+    - "record" : insert row into workspace/output/db/console.db (token_usage)
+    - "debug"  : record + dump full payload to .audit/token-debug/
+
+v7.0.0 — config-aware mode resolution. Previous versions only read the env
+var, which silently ignored the v7.0.0 default flip in config.base.yml
+(TokenUsageMode: "record"). Now the layered config is honored, env var
+remains a debug escape hatch.
 
 v6.10 — telemetry now persists in console.db (token_usage table). The
 former token-usage.jsonl ledger has been retired; readers must query the
@@ -60,6 +70,48 @@ from sdd_lib.hook_input import (  # noqa: E402
     read_hook_input,
 )
 from sdd_lib.paths import iso_now_ms, repo_root  # noqa: E402
+
+# layered_config is optional — telemetry must never break on import errors.
+try:
+    from sdd_lib.layered_config import read_layered_config  # noqa: E402
+except Exception:  # pragma: no cover — defensive
+    read_layered_config = None  # type: ignore[assignment]
+
+
+# Valid modes (lower-cased, env + config normalized to these)
+VALID_MODES: frozenset[str] = frozenset({"off", "record", "debug"})
+
+
+def _resolve_mode() -> str:
+    """Resolve effective token-usage mode.
+
+    Precedence (highest wins):
+      1. env $SDD_TOKEN_USAGE_MODE (debug override)
+      2. effective layered config `TokenUsageMode`
+         (base.yml ← team.yml ← project stack.md)
+      3. "off" (hard default)
+
+    Any unknown value normalizes to "off" (defensive — never break the run).
+    """
+    # 1. env var override
+    env_val = (os.environ.get("SDD_TOKEN_USAGE_MODE") or "").strip().lower()
+    if env_val in VALID_MODES:
+        return env_val
+
+    # 2. layered config (best-effort, defensive)
+    if read_layered_config is not None:
+        try:
+            cfg = read_layered_config()
+            cfg_val = str(cfg.get("TokenUsageMode") or "").strip().lower()
+            if cfg_val in VALID_MODES:
+                return cfg_val
+        except Exception:
+            # Config layering is opt-in and may fail on partial repos;
+            # telemetry MUST NOT raise — fall through to hard default.
+            pass
+
+    # 3. hard default
+    return "off"
 
 
 # Candidate paths in the payload where `usage` may live.
@@ -148,14 +200,21 @@ def _persist_to_db(entry: dict[str, Any]) -> None:
     """Insert one row into console.db (table token_usage).
 
     Concurrent inserts are handled by SQLite WAL + busy_timeout=5s,
-    so we don't need a per-file lock anymore."""
+    so we don't need a per-file lock anymore.
+
+    v7.0.0 audit P1 fix 2026-05-20 — scope par run_id (env $SDD_RUN_ID,
+    set par sdd_state.py au début de /sdd-full). Permet à
+    preflight_cost_cap.py de filtrer par run_id exact au lieu de la
+    fenêtre temporelle started_at/ended_at (fragile en concurrence)."""
     ensure_initialized()
+    run_id = (os.environ.get("SDD_RUN_ID") or "").strip() or None
     with connect() as conn:
         insert_token_usage(
             conn,
             agent=entry.get("subagent_type") or entry.get("hook_event") or "unknown",
             model=entry.get("model"),
             ts=entry.get("ts"),
+            run_id=run_id,
             feat_n=entry.get("feat"),
             us_id=entry.get("us_id"),
             input_tokens=int(entry.get("input_tokens") or 0),
@@ -181,9 +240,9 @@ def _debug_dump_payload(payload: dict[str, Any], audit_dir: Path) -> None:
 
 
 def main() -> int:
-    mode = os.environ.get("SDD_TOKEN_USAGE_MODE", "off").strip().lower()
+    mode = _resolve_mode()
     if mode not in {"record", "debug"}:
-        return 0  # off / unknown -> silent skip, no-op vs v6.4.2
+        return 0  # off -> silent skip, no-op vs v6.4.2
 
     try:
         payload = read_hook_input()
@@ -225,11 +284,49 @@ def main() -> int:
 
     try:
         _persist_to_db(entry)
-    except Exception:
-        # Telemetry must never break the pipeline.
+    except Exception as exc:
+        # Telemetry must never break the pipeline — but we must NOT swallow
+        # silently either, or we regress to pre-fix state (0 rows accumulated).
+        # v7.0.0 audit fix : log failure to a fail counter file ; preflight hook
+        # reads it and emits a visible WARN when telemetry is going dark.
+        _record_telemetry_failure(audit_dir, exc)
         return 0
 
     return 0
+
+
+def _record_telemetry_failure(audit_dir: Path, exc: Exception) -> None:
+    """Append failure to .audit/token-telemetry-failures.log + maintain counter.
+
+    Schema (one JSON line) :
+        {"ts": "...", "error_type": "OperationalError", "message": "..."}
+
+    Counter file `.audit/token-telemetry-failure-count` holds the integer
+    count since last successful insert. Read by preflight_cost_cap to emit
+    a visible operator alert when telemetry is broken (≥ 3 consecutive
+    failures or any failure within last 5 min)."""
+    try:
+        audit_dir.mkdir(parents=True, exist_ok=True)
+        log_path = audit_dir / "token-telemetry-failures.log"
+        counter_path = audit_dir / "token-telemetry-failure-count"
+        # Append failure line (rotation handled by sdd_admin/rotate_audit_logs.py)
+        log_path.open("a", encoding="utf-8").write(
+            json.dumps({
+                "ts": iso_now_ms(),
+                "error_type": type(exc).__name__,
+                "message": str(exc)[:200],
+            }) + "\n"
+        )
+        # Bump counter atomically (best-effort, eventual consistency OK)
+        try:
+            cur = int(counter_path.read_text(encoding="utf-8").strip() or "0")
+        except (OSError, ValueError):
+            cur = 0
+        counter_path.write_text(str(cur + 1), encoding="utf-8")
+    except OSError:
+        # Last resort — even the failure log failed. Nothing more we can do
+        # without breaking the pipeline contract.
+        pass
 
 
 if __name__ == "__main__":

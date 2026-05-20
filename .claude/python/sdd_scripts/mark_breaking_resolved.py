@@ -14,11 +14,18 @@ Usage:
         --build-command "dotnet build" \\
         [--dry-run]
 
-Exit codes:
-    0  Section absent or already RESOLVED → silent skip
-    1  Section present, marked RESOLVED successfully
-    2  Section present but no coherence with modified files → skip
-    3  Error (file missing, parse failure)
+Exit codes (v7.0.0 standardized — sdd_lib/exit_codes.py convention) :
+    0  SUCCESS — operation completed (marked OR skip, pipeline continues)
+    3  INFRA_BLOCKED — file missing / parse failure / write error
+
+Action taken indicated via structured stdout (`[OK]` / `[SKIP]` / `[DRY-RUN]`
+prefixes) AND via env-export `SDD_MARK_BREAKING_ACTION=marked|skipped|dryrun`
+when caller exports `SDD_MARK_BREAKING_CAPTURE=1`.
+
+**Breaking v7.0.0** : previously, this script returned exit 1 for "marked"
+and exit 0 for "skip" (non-standard, broke `cmd || handle_error` pattern).
+Now both cases return 0. Callers that distinguished via exit code MUST
+migrate to stdout pattern matching ([OK] vs [SKIP]) or the env-export.
 
 Migrated from .claude/scripts/mark-breaking-resolved.ps1 (2026-05-13).
 """
@@ -100,7 +107,7 @@ def main() -> int:
             "[SKIP] Section BREAKING CHANGES présente mais aucun fichier modifié par "
             "cette US n'est mentionné — laisser l'autre US la résoudre"
         )
-        return 2
+        return 0  # v7.0.0 — was 2, now 0 (SUCCESS — skip is a valid outcome)
 
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     resolved_header = f"## BREAKING CHANGES — RESOLVED {today}"
@@ -113,16 +120,21 @@ def main() -> int:
 
     if args.dry_run:
         print(f"[DRY-RUN] Marquerait RESOLVED — fichiers concordants : {', '.join(matching)}")
-        return 1
+        return 0  # v7.0.0 — was 1, now 0 (SUCCESS — dry-run is informational)
 
-    # Atomic write via .tmp + rename
-    tmp_path = path.with_suffix(path.suffix + ".tmp")
-    tmp_path.write_text(new_content, encoding="utf-8", newline="")
-    tmp_path.replace(path)
+    # Atomic write via .sddtmp + rename (cf. sdd_lib/atomic_write.py pattern)
+    try:
+        from sdd_lib.atomic_write import atomic_write_text
+        atomic_write_text(path, new_content, newline="")
+    except ImportError:
+        # Fallback if atomic_write helper not importable (legacy/standalone)
+        tmp_path = path.with_suffix(path.suffix + ".tmp")
+        tmp_path.write_text(new_content, encoding="utf-8", newline="")
+        tmp_path.replace(path)
 
     print(f"[OK] Section BREAKING CHANGES marquée RESOLVED ({today})")
     print(f"      Fichiers concordants : {', '.join(matching)}")
-    return 1
+    return 0  # v7.0.0 — was 1, now 0 (SUCCESS standard convention)
 
 
 if __name__ == "__main__":

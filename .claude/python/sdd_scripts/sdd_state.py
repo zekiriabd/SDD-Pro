@@ -184,9 +184,27 @@ def action_set_phase(args: argparse.Namespace) -> int:
             )
             event_type = "phase.start"
         else:
+            # v7.0.0 audit fix 2026-05-20 — phase timing trou #3.
+            # Historically, callers in /sdd-full only emitted `set-phase ...
+            # --status {pass|fail|warn|skip}` at the END of each phase, never
+            # at the START. Result : every run_phases row had started_at=NULL,
+            # so report_roi.py phase_timing was always 0.0s.
+            # Defensive fix : when emitting end without prior start, query
+            # the existing row's started_at — if NULL, set it to `now` so
+            # at least the row is complete (duration = 0ms is preferable to
+            # NULL for downstream aggregations).
+            existing = conn.execute(
+                "SELECT started_at FROM run_phases "
+                "WHERE run_id = ? AND phase = ?",
+                (args.run_id, args.phase),
+            ).fetchone()
+            started_fallback = None
+            if existing is None or not existing["started_at"]:
+                # No prior start row → backfill started_at = now (defensive)
+                started_fallback = now
             upsert_run_phase(
                 conn, run_id=args.run_id, phase=args.phase, status=args.status,
-                ended_at=now, payload=payload,
+                started_at=started_fallback, ended_at=now, payload=payload,
             )
             event_type = "phase.end"
 

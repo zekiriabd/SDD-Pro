@@ -249,6 +249,106 @@ def fetch_findings(feat_n: int) -> tuple[list[Finding], list[str]]:
 # STEP 5-6 — Triage + verdict
 # ---------------------------------------------------------------------------
 
+def _normalize_path(p: str | None) -> str:
+    """v7.0.0 audit §6.R3 — normalize finding file paths for cross-source dedup.
+
+    Auditors emit paths in different formats :
+      - `code-reviewer` may emit `workspace/output/src/X/Auth.cs` (full repo-relative)
+      - `security-reviewer` may emit `src/X/Auth.cs` (project-relative)
+      - `arch-reviewer` may emit `X/Auth.cs` (module-relative)
+      - Some use backslashes on Windows, others forward slashes
+
+    Without normalization, `(file_path, line)` keys diverge → dedup rate
+    silently → verdict consolidated inflated. This function returns a
+    canonical form : lowercased, forward-slashes, leading-stripped of
+    common prefixes (`workspace/output/`, `./`, project root segments).
+
+    Idempotent. Empty input → empty string.
+    """
+    if not p:
+        return ""
+    # Normalize separators + strip leading ./ and redundant slashes
+    s = p.replace("\\", "/").lstrip("./").lower()
+    while "//" in s:
+        s = s.replace("//", "/")
+    # Strip well-known repo prefixes so paths from different scopes converge
+    PREFIXES = (
+        "workspace/output/src/",
+        "workspace/output/",
+        "workspace/input/",
+        "workspace/",
+        "src/",
+    )
+    for prefix in PREFIXES:
+        idx = s.find(prefix)
+        if idx >= 0:
+            # Keep everything from the first match of the prefix forward
+            # (this handles both absolute paths and relative ones uniformly)
+            s = s[idx + len(prefix):]
+            break
+    return s.strip("/")
+
+
+def deduplicate_findings(findings: list[Finding]) -> tuple[list[Finding], int]:
+    """v7.0.0 audit §6.10 + R3 fix 2026-05-20 — cross-source dedup on
+    (normalized_path, line, canonical_class).
+
+    Auditors overlap on a few well-known classes :
+      - `[REVIEW_SECRETS_HARDCODED]` (code-reviewer) ≈ `[SEC_SECRET_HARDCODED]` (security)
+      - `[LAYER_VIOLATION]` (code-reviewer §5.2) ≈ `[ARCH_LAYER_BYPASS]` (arch-reviewer §5.2)
+      - `[REVIEW_ANTI_PATTERN_N_PLUS_ONE]` (code-reviewer) ≈ `[PERF_N_PLUS_ONE_RISK]` (legacy)
+
+    Without dedup, the same file:line gets counted twice in the consolidated
+    report, inflating the verdict severity. This function groups by
+    (normalized_path, line, canonical_class) — keeps the finding with the
+    HIGHEST severity (most specific), drops duplicates.
+
+    R3 fix : key uses `_normalize_path(file_path)` instead of raw file_path,
+    so reviewers emitting paths at different prefixes (full repo-relative
+    vs project-relative vs module-relative) still get deduplicated.
+
+    Returns (deduplicated_findings, suppressed_count).
+    """
+    # Canonical class mapping — maps overlapping classes to a single key
+    CANONICAL_CLASS = {
+        # secrets hardcoded duo
+        "REVIEW_SECRETS_HARDCODED": "SECRET_HARDCODED",
+        "SEC_SECRET_HARDCODED":      "SECRET_HARDCODED",
+        # layer violation duo
+        "LAYER_VIOLATION":      "LAYER_VIOLATION_GROUP",
+        "ARCH_LAYER_BYPASS":    "LAYER_VIOLATION_GROUP",
+        "ARCH_PATTERN_VIOLATION": "LAYER_VIOLATION_GROUP",
+        # N+1 query duo
+        "REVIEW_ANTI_PATTERN_N_PLUS_ONE": "N_PLUS_ONE_GROUP",
+        "PERF_N_PLUS_ONE_RISK":           "N_PLUS_ONE_GROUP",
+    }
+
+    def canonical_key(f: Finding) -> tuple:
+        # Group key : normalized file + line + canonical class
+        cls = f.issue_class or ""
+        canonical = CANONICAL_CLASS.get(cls.strip("[]"), cls)
+        return (_normalize_path(f.file_path), f.line or 0, canonical)
+
+    groups: dict[tuple, list[Finding]] = {}
+    for f in findings:
+        groups.setdefault(canonical_key(f), []).append(f)
+
+    deduped: list[Finding] = []
+    suppressed = 0
+    for key, group in groups.items():
+        if len(group) == 1:
+            deduped.append(group[0])
+            continue
+        # Keep the highest-severity, then alphabetical source for determinism
+        group.sort(
+            key=lambda f: (-SEVERITY_RANK.get(f.severity, 0), f.source),
+        )
+        deduped.append(group[0])
+        suppressed += len(group) - 1
+
+    return deduped, suppressed
+
+
 def compute_report(
     feat_n: int, findings: list[Finding], missing: list[str], fail_on: str
 ) -> ReviewReport:
@@ -256,6 +356,9 @@ def compute_report(
     # Apply owner
     for f in findings:
         f.owner = classify_path(f.file_path or "", names)
+
+    # v7.0.0 audit §6.10 — cross-source dedup before counting/verdict
+    findings, dedup_suppressed = deduplicate_findings(findings)
 
     counts_by_owner    = dict(Counter(f.owner for f in findings))
     counts_by_source   = dict(Counter(f.source for f in findings))
@@ -275,7 +378,7 @@ def compute_report(
     else:
         verdict = "green"
 
-    return ReviewReport(
+    report = ReviewReport(
         feat_n=feat_n,
         extracted_at=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         verdict=verdict,
@@ -288,6 +391,9 @@ def compute_report(
         all_findings=findings,
         skipped_sources=missing,
     )
+    # Attach dedup stat as side-channel (not in dataclass to preserve API)
+    setattr(report, "_dedup_suppressed", dedup_suppressed)
+    return report
 
 
 # ---------------------------------------------------------------------------

@@ -38,17 +38,27 @@ from sdd_lib.stderr import warn  # noqa: E402
 
 
 ALLOWED_AGENTS: set[str] = {
-    # Core + support (4 + 3 + 1)
+    # Core + support (4 + 3) — v7.0.0 : `dashboard` retiré
+    # (remplacé par script déterministe index_adrs.py).
     "po", "arch", "dev-backend", "dev-frontend",
     "qa", "elicitor", "constitutioner",
-    "dashboard",
     # Auditors retained in v7.0.0 (4) — accessibility-auditor and
     # performance-auditor were removed in v7.0.0
-    # (governance-major-auditors-trim) ; their context_budget script
-    # entries remain for legacy reading of historical runs but the
-    # hook intentionally rejects new invocations.
+    # (governance-major-auditors-trim).
     "code-reviewer", "security-reviewer",
     "spec-compliance-reviewer", "arch-reviewer",
+}
+
+# Agents explicitly removed in v7.0.0 — the hook ACTIVELY rejects these
+# invocations with [AGENT_REMOVED_V7] (exit 2 in strict, WARN in soft mode)
+# instead of silently skipping. This catches stale callers (commands, hooks,
+# scripts) that haven't been migrated yet.
+REJECTED_AGENTS_V7: dict[str, str] = {
+    "accessibility-auditor": "axe-core CI step in the generated project",
+    "performance-auditor":   "Lighthouse CI + wrk/k6 in the generated project",
+    "dashboard":             "sdd_scripts/index_adrs.py (0 token, deterministic)",
+    "dev-backend-strict":    "dev-backend (Opus 4.7) — strict variant removed v7.0.0",
+    "dev-frontend-strict":   "dev-frontend (Opus 4.7) — strict variant removed v7.0.0",
 }
 
 
@@ -110,7 +120,25 @@ def main() -> int:
         return 0
 
     subagent = get_subagent_type(payload)
-    if not subagent or subagent not in ALLOWED_AGENTS:
+    if not subagent:
+        return 0
+
+    # v7.0.0 — explicitly reject removed agents (strict in CI, WARN otherwise).
+    if subagent in REJECTED_AGENTS_V7:
+        replacement = REJECTED_AGENTS_V7[subagent]
+        warn(f"ERROR: preflight-agent-budget — agent '{subagent}' retire en v7.0.0")
+        warn(f"CAUSE: [AGENT_REMOVED_V7] {subagent} supprime "
+             f"(governance-major-auditors-trim)")
+        warn(f"FIX: utiliser remplacement : {replacement}")
+        # In strict mode (CI), block the invocation. In warn mode (interactive),
+        # the operator sees the WARN but can proceed.
+        if mode == "strict":
+            return 2
+        return 0
+
+    if subagent not in ALLOWED_AGENTS:
+        # Unknown agent — silent skip preserves backward-compat with custom
+        # agents not registered in SDD_Pro framework.
         return 0
 
     prompt = get_nested(payload, "tool_input", "prompt", default="") or ""

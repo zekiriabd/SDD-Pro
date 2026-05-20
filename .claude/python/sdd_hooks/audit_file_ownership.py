@@ -26,6 +26,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sdd_lib.hook_input import get_subagent_type, read_hook_input  # noqa: E402
 from sdd_lib.paths import normalize, repo_root  # noqa: E402
+from sdd_lib.stderr import warn  # noqa: E402
 
 
 # Matrix extracted from file-ownership.md §1 (must stay in sync)
@@ -65,11 +66,8 @@ OWNERSHIP_MATRIX: dict[str, list[str]] = {
         r"^workspace/output/src/.+test_.+\.py$",
         r"^workspace/output/qa/feat-.+/(report\.md|coverage\.json|quality\.json|api-tests\.(json|md))$",
     ],
-    "dashboard": [
-        r"^workspace/output/dashboard/README\.html$",
-        r"^workspace/output/\.sys/\.context/adrs/INDEX\.md$",
-        r"^workspace/output/qa/feat-[^/]+/dashboard\.html$",
-    ],
+    # `dashboard` retiré v7.0.0 (governance-major-auditors-trim) — remplacé par
+    # script déterministe index_adrs.py. Aucune entrée matrice nécessaire.
     "elicitor": [
         r"^workspace/input/feats/.+\.md$",  # append-only
         r"^workspace/output/\.sys/\.context/constitution\.md$",  # append-only §7
@@ -156,10 +154,40 @@ def main() -> int:
         for v in violations:
             fh.write(
                 f"{timestamp} [FILE_OWNERSHIP] {subagent} wrote {v} "
-                f"(pattern hors matrice file-ownership.md §1)\n"
+                f"(pattern hors matrice ownership.md §1)\n"
             )
 
-    # Silent on stderr (audit accumulates in log)
+    # v7.0.0 audit hardening 2026-05-20 — mode resolution :
+    #   - $SDD_AUDIT_OWNERSHIP_MODE = warn|strict|off
+    #   - default : 'strict' in CI (any CI env var), 'warn' otherwise
+    # strict mode emits visible WARN + exit 0 (still non-blocking : we
+    # don't want to fail a SubagentStop event that completed successfully).
+    # The strict-vs-warn difference is in stderr verbosity — CI logs surface
+    # the violation count immediately, interactive accumulates silently.
+    mode = (os.environ.get("SDD_AUDIT_OWNERSHIP_MODE") or "").strip().lower()
+    if mode not in ("warn", "strict", "off"):
+        ci = any(
+            (os.environ.get(v, "").strip().lower() not in ("", "0", "false", "no"))
+            for v in (
+                "CI", "GITHUB_ACTIONS", "GITLAB_CI", "CIRCLECI",
+                "JENKINS_URL", "BUILDKITE", "TRAVIS", "TF_BUILD",
+                "BITBUCKET_BUILD_NUMBER",
+            )
+        )
+        mode = "strict" if ci else "warn"
+
+    if mode != "off":
+        msg_level = "ERROR" if mode == "strict" else "WARN"
+        warn(
+            f"{msg_level} audit-file-ownership : {subagent} a viole la matrice "
+            f"ownership.md §1 ({len(violations)} fichier(s) hors perimetre) — "
+            f"voir {log_file.relative_to(root).as_posix()}"
+        )
+        if mode == "strict":
+            warn(f"CAUSE: [FILE_OWNERSHIP] cf. log ci-dessus pour la liste")
+            warn(f"FIX: (a) corriger le prompt agent ou la matrice ownership.md")
+            warn(f"     (b) bypass interactif : export SDD_AUDIT_OWNERSHIP_MODE=warn")
+
     return 0
 
 

@@ -110,6 +110,30 @@ def detect(feat_number: int | None = None) -> dict[str, object]:
                 "reason": f"DatabaseType={db_type} mais workspace/output/db/schema.json absent",
                 "checks": checks,
             }
+        # v7.0.0 audit P0 R2 — schema.json présent mais potentiellement corrompu.
+        # Avant : fallback safe arch (qui relisait la corruption et la propageait
+        # aux dev-*). Maintenant : émet [CHECKPOINT_STATE_UNREADABLE] qui force
+        # un STOP côté caller (dev-run STEP 4.bis) — Tech Lead arbitre.
+        # Validation minimale : parsable + clé `tables` (présent dans tous les schemas).
+        try:
+            data = json.loads(schema_json.read_text(encoding="utf-8"))
+            if not isinstance(data, dict):
+                raise ValueError("schema.json top-level n'est pas un objet JSON")
+            if "tables" not in data:
+                raise KeyError("schema.json: clé 'tables' absente (schema mal formé)")
+            checks["schemaJsonValid"] = True
+        except (json.JSONDecodeError, OSError, ValueError, KeyError) as e:
+            checks["schemaJsonValid"] = False
+            checks["schemaJsonError"] = str(e)
+            return {
+                "required": True,
+                "reason": (
+                    f"[CHECKPOINT_STATE_UNREADABLE] workspace/output/db/schema.json "
+                    f"présent mais corrompu/invalide : {e}"
+                ),
+                "error_class": "CHECKPOINT_STATE_UNREADABLE",
+                "checks": checks,
+            }
 
     stack_mtime = stack_md.stat().st_mtime
     claude_mtimes = [(p, p.stat().st_mtime) for p in claude_md_paths]

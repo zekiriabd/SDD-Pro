@@ -272,6 +272,86 @@ def _check_experimental_stacks(
             )
 
 
+def _check_feat_hash(
+    *,
+    us_path: Path,
+    feat_number: int,
+    root: Path,
+    add_err,
+    add_warn,
+) -> None:
+    """v7.0.0 audit P0 R2 — Verify FEAT hash inscribed in US frontmatter
+    still matches current FEAT content.
+
+    Frontmatter expected (v7.0.0 template) :
+        Parent FEAT hash: sha256:{first 8 hex chars of sha256(feat_file)}
+
+    Behavior :
+      - Frontmatter absent (pre-v7 US)         → WARN [FEAT_HASH_LEGACY] (non-blocking)
+      - FEAT file not found                    → ERR  [FEAT_NOT_FOUND]
+      - Hash mismatch                          → ERR  [FEAT_HASH_MISMATCH] (blocking ; Tech Lead re-run /us-generate)
+      - Hash match                             → silent OK
+    """
+    import hashlib
+
+    # Parse Parent FEAT hash from US frontmatter (first ~20 lines)
+    try:
+        us_head = us_path.read_text(encoding="utf-8", errors="replace")[:2000]
+    except OSError:
+        return  # Can't read US — A2 will catch it elsewhere
+    hash_match = re.search(
+        r"^Parent FEAT hash:\s*sha256:([0-9a-fA-F]{6,64})\s*$",
+        us_head,
+        re.MULTILINE,
+    )
+    if not hash_match:
+        add_warn(
+            "FEAT_HASH_LEGACY",
+            f"US {us_path.name} sans `Parent FEAT hash:` (US pre-v7.0.0). "
+            "Re-run /us-generate pour beneficier de la detection FEAT_HASH_MISMATCH.",
+        )
+        return
+
+    expected_hash = hash_match.group(1).lower()[:8]
+
+    # Locate FEAT file (glob workspace/input/feats/{n}-*.md)
+    feats_dir = root / "workspace" / "input" / "feats"
+    feat_files = sorted(feats_dir.glob(f"{feat_number}-*.md")) if feats_dir.is_dir() else []
+    if not feat_files:
+        add_err(
+            "FEAT_NOT_FOUND",
+            f"FEAT {feat_number} reference par {us_path.name} mais aucun "
+            f"fichier workspace/input/feats/{feat_number}-*.md trouve.",
+        )
+        return
+    if len(feat_files) > 1:
+        add_err(
+            "FEAT_AMBIGUOUS",
+            f"plusieurs fichiers workspace/input/feats/{feat_number}-*.md trouves",
+        )
+        return
+
+    feat_path = feat_files[0]
+    try:
+        actual_hash = hashlib.sha256(feat_path.read_bytes()).hexdigest()[:8]
+    except OSError as e:
+        add_warn(
+            "FEAT_HASH_UNREADABLE",
+            f"impossible de lire {feat_path.name} pour calculer sha256 ({e})",
+        )
+        return
+
+    if expected_hash != actual_hash:
+        add_err(
+            "FEAT_HASH_MISMATCH",
+            f"FEAT {feat_path.name} modifiee apres generation US {us_path.name} "
+            f"(hash inscrit sha256:{expected_hash} != actuel sha256:{actual_hash}). "
+            "Covers: potentiellement obsolete. "
+            "FIX: re-run /us-generate {n} (idempotent) pour regenerer les US avec le nouveau hash, "
+            "ou revert la modification FEAT.",
+        )
+
+
 def main() -> int:
     args = parse_args()
     root = Path(args.workspace_root).resolve() if args.workspace_root else repo_root()
@@ -332,6 +412,22 @@ def main() -> int:
         m_name = re.match(r"^\d+-\d+-(.+)$", us_files[0].stem)
         if m_name:
             result["name"] = m_name.group(1)
+
+    # A2.bis — FEAT hash check (v7.0.0 audit fix 2026-05-20 — R2 P0)
+    # Vérifie que le hash sha256 inscrit dans le frontmatter US
+    # (`Parent FEAT hash: sha256:{8 hex}`) correspond toujours au contenu
+    # actuel de la FEAT parente. Si mismatch → FEAT modifiée post-`/us-generate`
+    # → Covers: potentiellement obsolète, refusé sans `--force`.
+    # Bypass : `Parent FEAT hash:` absent du frontmatter (US pre-v7.0.0) →
+    # WARN informationnel, non bloquant.
+    if us_files and not result["errors"]:
+        _check_feat_hash(
+            us_path=us_files[0],
+            feat_number=int(result["n"]),
+            root=root,
+            add_err=add_err,
+            add_warn=add_warn,
+        )
 
     # A3 — stack.md exists
     stack_path = root / "workspace" / "input" / "stack" / "stack.md"

@@ -28,7 +28,7 @@ from typing import Any, Iterable, Iterator
 
 from sdd_lib.paths import iso_now_ms, repo_root
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 3  # v7.0.0 : v2 +qa_mutation, v3 +qa_e2e (Playwright opt-in)
 # BASE_SCHEMA_VERSION is the version represented by ``console_db_schema.sql``
 # itself (the "v1" full snapshot). When ``SCHEMA_VERSION`` exceeds it, the
 # difference is bridged by forward migrations under ``migrations/``.
@@ -330,12 +330,18 @@ def upsert_run_phase(
     ended_at: str | None = None,
     payload: Any = None,
 ) -> None:
-    """Upsert (run_id, phase) row. New rows get started_at; updates preserve it."""
+    """Upsert (run_id, phase) row.
+
+    v7.0.0 audit fix 2026-05-20 — also backfills started_at on update when
+    the existing row has NULL (defensive : callers historically only emitted
+    end events, never start, so started_at was lost and phase timing = 0).
+    """
     conn.execute(
         """
         INSERT INTO run_phases(run_id, phase, started_at, ended_at, status, payload_json)
         VALUES(?, ?, ?, ?, ?, ?)
         ON CONFLICT(run_id, phase) DO UPDATE SET
+            started_at   = COALESCE(run_phases.started_at, excluded.started_at),
             ended_at     = COALESCE(excluded.ended_at, run_phases.ended_at),
             status       = excluded.status,
             payload_json = COALESCE(excluded.payload_json, run_phases.payload_json)
