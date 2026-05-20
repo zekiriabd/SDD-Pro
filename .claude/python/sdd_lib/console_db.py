@@ -19,7 +19,9 @@ Pragmas appliqués automatiquement à la connexion :
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
+import sys
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterable, Iterator
@@ -27,7 +29,13 @@ from typing import Any, Iterable, Iterator
 from sdd_lib.paths import iso_now_ms, repo_root
 
 SCHEMA_VERSION = 1
+# BASE_SCHEMA_VERSION is the version represented by ``console_db_schema.sql``
+# itself (the "v1" full snapshot). When ``SCHEMA_VERSION`` exceeds it, the
+# difference is bridged by forward migrations under ``migrations/``.
+BASE_SCHEMA_VERSION = 1
 SCHEMA_SQL_PATH = Path(__file__).resolve().parent / "console_db_schema.sql"
+MIGRATIONS_DIR = Path(__file__).resolve().parent / "migrations"
+_MIGRATION_FILE_RE = re.compile(r"^(\d{4})_[a-z0-9-]+\.sql$")
 
 
 def default_db_path() -> Path:
@@ -119,21 +127,92 @@ def current_schema_version(conn: sqlite3.Connection) -> int | None:
     return row[0] if row else None
 
 
+def _list_pending_migrations(current: int) -> list[tuple[int, Path]]:
+    """Return ``(target_version, sql_path)`` pairs to apply, sorted ascending.
+
+    Filters files matching the canonical naming ``NNNN_slug.sql`` whose target
+    version is strictly greater than ``current`` AND ≤ ``SCHEMA_VERSION``.
+    See ``migrations/README.md`` for the convention.
+    """
+    if not MIGRATIONS_DIR.is_dir():
+        return []
+    pending: list[tuple[int, Path]] = []
+    for sql_path in sorted(MIGRATIONS_DIR.glob("*.sql")):
+        m = _MIGRATION_FILE_RE.match(sql_path.name)
+        if m is None:
+            continue
+        target = int(m.group(1))
+        if target <= current or target > SCHEMA_VERSION:
+            continue
+        pending.append((target, sql_path))
+    return pending
+
+
+def apply_pending_migrations(conn: sqlite3.Connection) -> list[int]:
+    """Apply all migrations strictly newer than the current schema version.
+
+    Each migration file is executed inside ``executescript()`` (single
+    implicit transaction). On success, a ``schema_version`` row is inserted
+    with the target version. Forward-only — no rollback, no down-migration.
+
+    Returns the list of applied target versions (empty if none).
+    """
+    current = current_schema_version(conn) or 0
+    applied: list[int] = []
+    for target, sql_path in _list_pending_migrations(current):
+        sql = sql_path.read_text(encoding="utf-8")
+        conn.executescript(sql)
+        conn.execute(
+            "INSERT INTO schema_version(version, applied_at) VALUES(?, ?)",
+            (target, iso_now_ms()),
+        )
+        applied.append(target)
+    return applied
+
+
 def ensure_initialized(db_path: Path | str | None = None) -> None:
-    """Initialize the DB lazily if it does not yet exist.
+    """Initialize the DB lazily if it does not yet exist, or migrate it.
 
     Allows writer scripts to be safe even if /sdd-full has not run init_console_db
     explicitly. Idempotent: no-op if the DB is already at SCHEMA_VERSION.
+
+    Cases:
+    - ``current is None`` → fresh DB, load full ``console_db_schema.sql`` (v1).
+    - ``current < SCHEMA_VERSION`` → apply pending migrations from
+      ``sdd_lib/migrations/`` (see README.md there).
+    - ``current == SCHEMA_VERSION`` → no-op.
+    - ``current > SCHEMA_VERSION`` → DB ahead of framework (likely another
+      checkout), emit WARN to stderr and continue (read-side will still work
+      for known tables).
     """
     with connect(db_path) as conn:
         v = current_schema_version(conn)
         if v == SCHEMA_VERSION:
             return
         if v is None:
+            # Fresh DB → load full base schema (v=BASE_SCHEMA_VERSION) then
+            # fall through to apply any pending migrations up to SCHEMA_VERSION.
             conn.executescript(load_schema_sql())
             conn.execute(
                 "INSERT INTO schema_version(version, applied_at) VALUES(?, ?)",
-                (SCHEMA_VERSION, iso_now_ms()),
+                (BASE_SCHEMA_VERSION, iso_now_ms()),
+            )
+            v = BASE_SCHEMA_VERSION
+            if v == SCHEMA_VERSION:
+                return
+        if v > SCHEMA_VERSION:
+            print(
+                f"WARN sdd_lib.console_db: DB schema v{v} ahead of framework "
+                f"SCHEMA_VERSION={SCHEMA_VERSION} — no migration applied",
+                file=sys.stderr,
+            )
+            return
+        applied = apply_pending_migrations(conn)
+        if applied:
+            print(
+                f"sdd_lib.console_db: applied migrations {applied} "
+                f"(v{v} → v{SCHEMA_VERSION})",
+                file=sys.stderr,
             )
 
 
