@@ -98,17 +98,30 @@ ciblée ; **utilisateur final : préférer une commande orchestrante**) :
 
 ## 5. Règles
 
-**9 règles cross-cutting** dans `.claude/rules/` (v7.0.0, was 11) :
-`backend-first`, `constitution`, `cors`, `dev-shared`, `error-classification`,
-`file-ownership`, `qa-coverage`, `stack-completeness`, `ui-tokens`.
+**5 règles cross-cutting consolidées v7.0.0** dans `.claude/rules/`
+(codex audit Prio 2 — was 11) :
 
-> **Déplacés v7.0.0** vers `.claude/docs/principles/` (principes
-> philosophiques, non cross-cutting) : `source-first` (Tech Lead
-> discipline, pas de mécanique agent), `us-granularity` (règle mono-agent
-> `po`). Stubs préservés dans `rules/` pour les `Read @.claude/rules/X.md`
-> historiques. Consolidation finale 11 → 5 (codex audit Prio 2)
-> reportée post-freeze : nécessite sweep cross-agent risqué dans
-> session fatigue.
+| Nouvelle règle | Substance |
+|---|---|
+| `build-and-loop.md` | Backend-first gated workflow + Dev-shared patterns (was `backend-first` + `dev-shared`) |
+| `quality.md` | QA Coverage seuil + UI Tokens anti-hex (was `qa-coverage` + `ui-tokens`) |
+| `ownership.md` | File ownership matrix + Constitution & ADRs governance (was `file-ownership` + `constitution`) |
+| `library-and-stack.md` | Stack completeness (libs anti-derive, runtime LTS) + CORS patterns (was `stack-completeness` + `cors`) |
+| `error-classification.md` | Vocabulaire d'erreur unifié `[CLASS]` cross-agent (unchanged) |
+
+**8 stubs** préservés (backward-compat des `Read @.claude/rules/X.md`
+historiques dans agents) : `backend-first`, `dev-shared`, `qa-coverage`,
+`ui-tokens`, `file-ownership`, `constitution`, `stack-completeness`,
+`cors`. Chaque stub pointe vers la nouvelle règle consolidée.
+
+**2 principes** déplacés vers `.claude/docs/principles/` : `source-first`
+(Tech Lead discipline, non cross-agent), `us-granularity` (mono-agent po).
+Stubs aussi conservés dans `rules/`.
+
+> **Migration utilisateur** : les agents continuent de Read les anciens
+> paths via stubs (zéro régression). Post-v7.0.0 final, sweep des
+> `Read @.claude/rules/X.md` vers les nouveaux paths, puis suppression
+> des stubs en v7.1.
 
 Index commenté + détail : `@.claude/docs/conventions.md §14`.
 

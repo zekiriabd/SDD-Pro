@@ -132,12 +132,19 @@ EXPECTED_AGENTS = (
 )
 
 EXPECTED_RULES = (
-    "us-granularity", "constitution", "file-ownership",
-    "qa-coverage", "stack-completeness",
-    "backend-first", "error-classification", "source-first",
-    "dev-shared",
-    # Ajoutées v6.9.0 (consolidation patterns inlinés)
-    "cors", "ui-tokens",
+    # v7.0.0 consolidated (5 new files, codex audit Prio 2)
+    "build-and-loop",       # = backend-first + dev-shared
+    "quality",              # = qa-coverage + ui-tokens
+    "ownership",            # = file-ownership + constitution
+    "library-and-stack",    # = stack-completeness + cors
+    "error-classification", # untouched (still primary, trimmed to 489 LOC)
+    # v7.0.0 legacy stubs (preserved for backward-compat agent reads,
+    # to be removed in v7.1 once all agents migrate to new paths)
+    "backend-first", "dev-shared",
+    "qa-coverage", "ui-tokens",
+    "file-ownership", "constitution",
+    "stack-completeness", "cors",
+    "source-first", "us-granularity",
 )
 
 EXPECTED_TEMPLATES = (
