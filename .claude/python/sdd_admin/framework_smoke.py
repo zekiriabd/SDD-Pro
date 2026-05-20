@@ -122,11 +122,11 @@ EXPECTED_AGENTS = (
     # Variants strict v6.2 — REMOVED v7.0.0 (governance-major-prompts-trim)
     # Support (3)
     "elicitor", "qa", "constitutioner",
-    # Rendering (1)
-    "dashboard",
+    # Rendering (1) — REMOVED v7.0.0 (governance-major-auditors-trim)
+    # → replaced by sdd_scripts/index_adrs.py (0 token, deterministic)
     # Auditors v6.3+ (4 after v7.0.0 trim)
     # accessibility-auditor + performance-auditor REMOVED v7.0.0
-    # (governance-major-auditors-trim) → axe-core + Lighthouse CI
+    # → axe-core + Lighthouse CI
     "code-reviewer", "security-reviewer",
     "spec-compliance-reviewer", "arch-reviewer",
 )

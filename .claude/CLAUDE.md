@@ -68,8 +68,9 @@ Basename `{n}-{m}-{Name}` rigoureusement identique à travers tous les artefacts
 ## 4. Agents
 
 **4 cœur** : `po`, `arch` (Sonnet 4.6) ; `dev-backend`, `dev-frontend` (Opus 4.7).
-**Support** : `elicitor`, `constitutioner`, `qa` (Sonnet 4.6) ; `dashboard` (Haiku 4.5).
+**Support** (3) : `elicitor`, `constitutioner`, `qa` (Sonnet 4.6).
 **Auditors** (4 après v7.0.0 trim, Sonnet 4.6) : `code-reviewer`, `security-reviewer` (mode `scan` uniquement), `spec-compliance-reviewer`, `arch-reviewer`.
+**Rendering** : `dashboard` (Haiku 4.5) **retiré v7.0.0** — remplacé par script `sdd_scripts/index_adrs.py` (0 token, ~50 ms).
 
 > **Retirés en v7.0.0** (cf. `ADR-20260519T120000-governance-major-auditors-trim`) :
 > - `accessibility-auditor` (Haiku 4.5) → remplacé par **axe-core** intégré au CI du projet généré.

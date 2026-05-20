@@ -694,19 +694,27 @@ python .claude/python/sdd_scripts/sdd_state.py set-phase \
 
 ---
 
-## STEP 6.5 — Refresh INDEX ADRs (auto, depuis 2026-05-08 ; réduit en v6.10)
+## STEP 6.5 — Refresh INDEX ADRs (auto, depuis 2026-05-08 ; déterministe en v7.0.0)
 
-Invoquer **systématiquement** `Agent: dashboard` (Haiku 4.5) après
-exécution du gated workflow pour régénérer :
+> **v7.0.0** : agent `dashboard` retiré (cf. STEP 4.7 de `/sdd-full`
+> pour la migration). Remplacé par script Python `index_adrs.py`.
 
-- `workspace/output/.sys/.context/adrs/INDEX.md` (utile : `dev-*` ont peut-être
-  créé des ADRs phase 5 que `arch` n'a pas indexés)
+Exécuter **systématiquement** après le gated workflow pour régénérer :
 
-> **v6.10 BREAKING** : les rendus HTML (`dashboard/README.html`,
-> `qa/feat-{n}/dashboard.html`) sont retirés. Les métriques vivent dans
-> `console.db` ; le rendu graphique est délégué à la console web.
+```bash
+python -m sdd_scripts.index_adrs
+```
 
-Non bloquant : sur échec, WARNING + continuer vers STEP 6.6 puis STEP 7.
+Sortie : `workspace/output/.sys/.context/adrs/INDEX.md` (utile : `dev-*`
+ont peut-être créé des ADRs phase 5 que `arch` n'a pas indexés).
+
+> **v6.10 BREAKING (préservé)** : les rendus HTML
+> (`dashboard/README.html`, `qa/feat-{n}/dashboard.html`) restent
+> retirés. Les métriques vivent dans `console.db` ; le rendu graphique
+> est délégué à la console web.
+
+Coût : **0 token**, latence < 100 ms. Non bloquant : sur exit ≠ 0,
+émettre WARNING + continuer vers STEP 6.6 puis STEP 7.
 
 ---
 

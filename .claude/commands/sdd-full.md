@@ -524,22 +524,31 @@ sont propagés au récap STEP 5.
 
 ---
 
-## STEP 4.7 — Refresh INDEX ADRs (auto, depuis 2026-05-08 ; réduit en v6.10)
+## STEP 4.7 — Refresh INDEX ADRs (auto, depuis 2026-05-08 ; déterministe en v7.0.0)
 
-> **v6.10 BREAKING** — les rendus HTML (`dashboard/README.html`,
-> `qa/feat-{n}/dashboard.html`) sont **retirés**. Les métriques vivent
-> dans `workspace/output/db/console.db` (SQLite SSoT) et le rendu
-> graphique est délégué à un consommateur externe (console web
-> `workspace/console/`, BI tool, script). Cf. `agents/dashboard.md §STEP 0`
-> et `loader.yml §dashboard`.
+> **v7.0.0 BREAKING** — l'agent `dashboard` (Haiku 4.5) est retiré
+> (cf. ADR `governance-major-auditors-trim`). Le script
+> `sdd_scripts/index_adrs.py` le remplace : 0 token, ~50 ms, même
+> output. Pattern : `Bash` direct au lieu de `Agent: dashboard`.
+>
+> **v6.10 BREAKING (préservé)** : les rendus HTML
+> (`dashboard/README.html`, `qa/feat-{n}/dashboard.html`) restent
+> retirés. Les métriques vivent dans `workspace/output/db/console.db`
+> (SQLite SSoT) et le rendu graphique est délégué à un consommateur
+> externe (console web `workspace/console/`, BI tool).
 
-Invoquer **systématiquement** `Agent: dashboard` (Haiku 4.5) en
-fin de pipeline pour régénérer **un seul fichier** :
+Exécuter **systématiquement** :
+
+```bash
+python -m sdd_scripts.index_adrs
+```
+
+Régénère **un seul fichier** :
 
 - `workspace/output/.sys/.context/adrs/INDEX.md` — table-des-matières
   chronologique des ADRs
 
-Coût : ~1-2 k tokens (Haiku), latence < 2 s. Non bloquant : sur échec,
+Coût : **0 token**, latence < 100 ms. Non bloquant : sur exit ≠ 0,
 émettre WARNING et continuer vers STEP 5. L'INDEX ADRs est un artefact
 de navigation, pas une dépendance fonctionnelle du pipeline.
 

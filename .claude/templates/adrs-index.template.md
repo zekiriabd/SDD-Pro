@@ -1,6 +1,7 @@
 # ADRs Index — {ProjectName}
 
-> Auto-généré par l'agent `dashboard` (Haiku 4.5).
+> Auto-généré par `python -m sdd_scripts.index_adrs` (déterministe v7.0.0,
+> remplace l'agent `dashboard` Haiku 4.5 retiré).
 > Source de vérité : Glob `workspace/output/.sys/.context/adrs/ADR-*.md`.
 > Tri chronologique par timestamp ISO du filename.
 > Idempotent — re-générer via `/doc-refresh` ou en fin d'`arch`.

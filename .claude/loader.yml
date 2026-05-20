@@ -362,39 +362,17 @@ qa:
     - manual: "skip auto-invoke par /sdd-full ; user lance /qa-generate manuellement"
 
 # -------------------------------------------------------------------------
-# Agent: dashboard (Haiku 4.5) — depuis 2026-05-08
-# Phase: fin de pipeline (sdd-full STEP 4.7, dev-run STEP 6.5,
-#        qa-generate STEP 6.5, arch STEP 12.7) ou manuel via /doc-refresh
-# Token footprint estimé: ~1-2 KB (rendu déterministe Haiku, INDEX ADRs seul)
-#
-# v6.10 BREAKING — l'agent ne produit plus qu'un seul fichier :
-#   workspace/output/.sys/.context/adrs/INDEX.md
-# Les anciens rendus HTML (`dashboard/README.html`, `qa/feat-{n}/dashboard.html`)
-# sont RETIRÉS — les métriques vivent dans workspace/output/db/console.db,
-# le rendu graphique est délégué à la console web (workspace/console/) ou un
-# autre consommateur externe. Cf. agents/dashboard.md §STEP 0.
+# Agent: dashboard — REMOVED v7.0.0 (governance-major-auditors-trim)
 # -------------------------------------------------------------------------
-dashboard:
-  reads:
-    - .claude/templates/adrs-index.template.md
-    - .claude/rules/error-classification.md
-    - workspace/output/.sys/.context/adrs/                 # source de vérité ADRs (Glob)
-    - workspace/output/.sys/.context/adrs/INDEX.md         # lecture pour idempotence
-  writes:
-    - workspace/output/.sys/.context/adrs/INDEX.md
-  forbidden_reads:
-    - workspace/input/stack/                # hors scope rendu
-    - workspace/output/src/                 # hors scope rendu
-    - .claude/stacks/                       # hors scope rendu
-    - workspace/output/qa/                  # télémétrie QA dans console.db (v6.10)
-  forbidden_writes:
-    - workspace/output/us/                  # responsabilité po
-    - workspace/output/src/                 # responsabilité dev-* / arch / qa
-    - workspace/output/.sys/.context/constitution.md  # responsabilité po / arch / elicitor
-    - workspace/output/.sys/.context/adrs/ADR-*.md    # responsabilité arch / dev-*
-    - workspace/output/qa/                            # ownership qa (et plus de HTML rendu)
-    - workspace/output/dashboard/                     # retiré v6.10 (HTML obsolète)
-  idempotent: true                          # peut être ré-invoqué sans risque
+# Haiku 4.5 agent that produced INDEX.md of ADRs (sole remaining output
+# after v6.10 BREAKING). Retired in v7.0.0 because the task is 100 %
+# mechanical (glob + parse + render template) and never required LLM
+# reasoning. Replaced by `sdd_scripts/index_adrs.py` (0 token, ~50 ms).
+#
+# Callers historiques migrated to direct Bash invocation :
+#   python -m sdd_scripts.index_adrs
+# See commands/doc-refresh.md for the migration path.
+# -------------------------------------------------------------------------
 
 # -------------------------------------------------------------------------
 # Agent: accessibility-auditor — REMOVED v7.0.0
