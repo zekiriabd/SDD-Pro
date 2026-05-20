@@ -142,6 +142,54 @@ def collect_feat_data(conn, feat_n: int) -> dict[str, Any]:
     # Rework signal : how many separate `/sdd-full` runs on the same FEAT
     full_runs = [r for r in runs if r["command"] in ("/sdd-full", "sdd-full")]
     out["rework"] = max(0, len(full_runs) - 1)
+    # Rework rate : reworks / (total successful runs) — 0.0 if no successful runs
+    successful = sum(1 for r in runs if r["status"] in ("success", "partial"))
+    out["rework_rate"] = round(out["rework"] / successful, 3) if successful else 0.0
+    # Failed/partial runs flag — every failed run is implicit rework signal
+    out["failed_runs"] = sum(1 for r in runs if r["status"] in ("failed", "cancelled"))
+
+    # Phase-by-phase timing (codex audit follow-up) :
+    # Aggregate run_phases across all runs for this FEAT, group by phase
+    # name, sum durations.
+    run_ids = [r["run_id"] for r in runs]
+    phase_rows: list[dict[str, Any]] = []
+    if run_ids:
+        placeholders = ",".join("?" for _ in run_ids)
+        ph_rows = conn.execute(
+            f"SELECT phase, started_at, ended_at, status "
+            f"FROM run_phases WHERE run_id IN ({placeholders}) "
+            f"ORDER BY phase, started_at",
+            run_ids,
+        ).fetchall()
+        # Group by phase
+        by_phase: dict[str, dict[str, Any]] = {}
+        for r in ph_rows:
+            ph_name = r["phase"]
+            d = duration_ms(r["started_at"], r["ended_at"])
+            bucket = by_phase.setdefault(ph_name, {
+                "phase": ph_name,
+                "executions": 0,
+                "total_ms": 0,
+                "pass_count": 0,
+                "fail_count": 0,
+                "warn_count": 0,
+                "skip_count": 0,
+            })
+            bucket["executions"] += 1
+            if d is not None:
+                bucket["total_ms"] += d
+            status = (r["status"] or "").lower()
+            if status == "pass":
+                bucket["pass_count"] += 1
+            elif status == "fail":
+                bucket["fail_count"] += 1
+            elif status == "warn":
+                bucket["warn_count"] += 1
+            elif status == "skip":
+                bucket["skip_count"] += 1
+        # Sort by total duration descending — highlight expensive phases
+        phase_rows = sorted(by_phase.values(), key=lambda b: -b["total_ms"])
+    out["phases"] = phase_rows
 
     # Token usage : real billed tokens per model
     tk_rows = conn.execute(
@@ -287,8 +335,8 @@ def render_markdown(payloads: list[dict[str, Any]]) -> str:
     lines.append("")
     lines.append("## Summary")
     lines.append("")
-    lines.append("| FEAT | Runs | Wall-clock | Tokens billed | Cost USD | Coverage | ACs verified | Issues C/S/M | Rework |")
-    lines.append("|---|---:|---:|---:|---:|---:|---:|---|---:|")
+    lines.append("| FEAT | Runs | Wall-clock | Tokens billed | Cost USD | Coverage | ACs verified | Issues C/S/M | Rework | Rework rate |")
+    lines.append("|---|---:|---:|---:|---:|---:|---:|---|---:|---:|")
 
     totals_cost = 0.0
     totals_tokens = 0
@@ -297,45 +345,60 @@ def render_markdown(payloads: list[dict[str, Any]]) -> str:
         cov = p["coverage"] or {}
         sc = p["spec_compliance"] or {}
         i = p["issues"]
-        cov_str = f"{cov.get('lines_pct', '—')}%" if cov else "—"
+        cov_str = f"{cov.get('lines_pct', '-')}%" if cov else "-"
         ac_str = (
-            f"{sc.get('verification_rate_pct', '—')}% ({sc.get('verified', 0)}/{sc.get('total_acs', 0)})"
-            if sc else "—"
+            f"{sc.get('verification_rate_pct', '-')}% ({sc.get('verified', 0)}/{sc.get('total_acs', 0)})"
+            if sc else "-"
         )
         issue_str = f"{i.get('critical', 0)}/{i.get('serious', 0)}/{i.get('moderate', 0)}"
         token_str = f"{p['tokens']['billed_total']:,}" if p["tokens_recorded"] else "(no record)"
-        cost_str = f"${p['cost_usd']:.2f}" if p["tokens_recorded"] else "—"
+        cost_str = f"${p['cost_usd']:.2f}" if p["tokens_recorded"] else "-"
+        rework_rate_str = f"{p['rework_rate']*100:.0f}%" if p["rework_rate"] else "0%"
 
         lines.append(
             f"| {n} | {p['run_count']} | {fmt_duration(p['wall_clock_ms'])} | "
             f"{token_str} | {cost_str} | {cov_str} | {ac_str} | "
-            f"{issue_str} | {p['rework']} |"
+            f"{issue_str} | {p['rework']} | {rework_rate_str} |"
         )
         if p["tokens_recorded"]:
             totals_cost += p["cost_usd"]
             totals_tokens += p["tokens"]["billed_total"]
 
     lines.append("")
-    lines.append(f"**Totals** : ${totals_cost:.2f} · {totals_tokens:,} billed tokens "
+    lines.append(f"**Totals** : ${totals_cost:.2f} | {totals_tokens:,} billed tokens "
                  f"across {len(payloads)} FEATs.")
     lines.append("")
 
-    # Per-FEAT detail (tokens by agent if recorded)
+    # Per-FEAT detail
     for p in payloads:
-        if not p["tokens_by_agent"]:
-            continue
-        lines.append(f"## FEAT {p['feat_n']} — tokens by agent")
-        lines.append("")
-        lines.append("| Agent | Model | Calls | Input | Output | Cache C | Cache R | Cost |")
-        lines.append("|---|---|---:|---:|---:|---:|---:|---:|")
-        for a in p["tokens_by_agent"]:
-            lines.append(
-                f"| {a['agent']} | {a['model'] or '?'} | {a['calls']} | "
-                f"{a['input_tokens']:,} | {a['output_tokens']:,} | "
-                f"{a['cache_creation_tokens']:,} | {a['cache_read_tokens']:,} | "
-                f"${a['cost_usd']:.4f} |"
-            )
-        lines.append("")
+        feat_label = f"FEAT {p['feat_n']}"
+        # Tokens by agent (only if recorded)
+        if p["tokens_by_agent"]:
+            lines.append(f"## {feat_label} -- tokens by agent")
+            lines.append("")
+            lines.append("| Agent | Model | Calls | Input | Output | Cache C | Cache R | Cost |")
+            lines.append("|---|---|---:|---:|---:|---:|---:|---:|")
+            for a in p["tokens_by_agent"]:
+                lines.append(
+                    f"| {a['agent']} | {a['model'] or '?'} | {a['calls']} | "
+                    f"{a['input_tokens']:,} | {a['output_tokens']:,} | "
+                    f"{a['cache_creation_tokens']:,} | {a['cache_read_tokens']:,} | "
+                    f"${a['cost_usd']:.4f} |"
+                )
+            lines.append("")
+        # Phase-by-phase timing (codex audit follow-up)
+        if p.get("phases"):
+            lines.append(f"## {feat_label} -- phase timing")
+            lines.append("")
+            lines.append("| Phase | Executions | Total time | Pass | Fail | Warn | Skip |")
+            lines.append("|---|---:|---:|---:|---:|---:|---:|")
+            for ph in p["phases"]:
+                lines.append(
+                    f"| {ph['phase']} | {ph['executions']} | "
+                    f"{fmt_duration(ph['total_ms'])} | {ph['pass_count']} | "
+                    f"{ph['fail_count']} | {ph['warn_count']} | {ph['skip_count']} |"
+                )
+            lines.append("")
 
     # Warnings (ASCII-only to avoid Windows cp1252 codec issues on stdout)
     no_token_feats = [p["feat_n"] for p in payloads if not p["tokens_recorded"]]

@@ -187,8 +187,48 @@ class TestCollectFeatData(unittest.TestCase):
                 with connect() as conn:
                     data = collect_feat_data(conn, 1)
             self.assertEqual(data["run_count"], 3)
-            # 3 sdd-full runs → 2 reworks
+            # 3 sdd-full runs successful → 2 reworks, rework_rate = 2/3
             self.assertEqual(data["rework"], 2)
+            self.assertAlmostEqual(data["rework_rate"], 2 / 3, places=2)
+            self.assertEqual(data["failed_runs"], 0)
+
+    def test_phase_timing_aggregation(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            root = _fake_repo(tmp)
+            with mock.patch.object(console_db, "repo_root", return_value=root):
+                ensure_initialized()
+                with connect() as conn:
+                    _seed_run(conn, 7,
+                              "2026-05-20T08:00:00.000Z",
+                              "2026-05-20T09:00:00.000Z",
+                              run_id="rA")
+                    # 2 phases : dev (30 min, pass) + qa (15 min, fail)
+                    conn.execute(
+                        "INSERT INTO run_phases(run_id, phase, started_at, "
+                        "ended_at, status) VALUES(?,?,?,?,?)",
+                        ("rA", "dev",
+                         "2026-05-20T08:00:00.000Z",
+                         "2026-05-20T08:30:00.000Z", "pass"),
+                    )
+                    conn.execute(
+                        "INSERT INTO run_phases(run_id, phase, started_at, "
+                        "ended_at, status) VALUES(?,?,?,?,?)",
+                        ("rA", "qa",
+                         "2026-05-20T08:30:00.000Z",
+                         "2026-05-20T08:45:00.000Z", "fail"),
+                    )
+                with connect() as conn:
+                    data = collect_feat_data(conn, 7)
+            phases = data["phases"]
+            self.assertEqual(len(phases), 2)
+            # Sorted by total_ms descending → dev (30m) first, qa (15m) second
+            self.assertEqual(phases[0]["phase"], "dev")
+            self.assertEqual(phases[0]["total_ms"], 1_800_000)
+            self.assertEqual(phases[0]["pass_count"], 1)
+            self.assertEqual(phases[0]["fail_count"], 0)
+            self.assertEqual(phases[1]["phase"], "qa")
+            self.assertEqual(phases[1]["total_ms"], 900_000)
+            self.assertEqual(phases[1]["fail_count"], 1)
 
     def test_coverage_aggregation(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
@@ -230,6 +270,9 @@ class TestRenderMarkdown(unittest.TestCase):
             "issues": {"critical": 0, "serious": 1, "moderate": 2,
                        "minor": 3, "info": 4},
             "rework": 0,
+            "rework_rate": 0.0,
+            "failed_runs": 0,
+            "phases": [],
             "runs": [],
         }]
         md = render_markdown(payloads)
@@ -238,7 +281,7 @@ class TestRenderMarkdown(unittest.TestCase):
         self.assertIn("82.5%", md)
         self.assertIn("100.0%", md)
         # Per-agent table
-        self.assertIn("FEAT 1 — tokens by agent", md)
+        self.assertIn("FEAT 1 -- tokens by agent", md)
         self.assertIn("claude-opus-4-7", md)
 
     def test_warning_when_tokens_not_recorded(self) -> None:
@@ -256,6 +299,9 @@ class TestRenderMarkdown(unittest.TestCase):
             "issues": {"critical": 0, "serious": 0, "moderate": 0,
                        "minor": 0, "info": 0},
             "rework": 0,
+            "rework_rate": 0.0,
+            "failed_runs": 0,
+            "phases": [],
             "runs": [],
         }]
         md = render_markdown(payloads)

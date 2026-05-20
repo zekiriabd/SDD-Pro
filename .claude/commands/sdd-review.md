@@ -23,9 +23,28 @@ le path, calcul du verdict 🟢/🟡/🔴 contre `ReviewFailOn`, persistance dan
 ```bash
 /sdd-review {n}                       # audit FEAT {n}, verdict + report
 /sdd-review {n} --skip-scans          # lecture DB seule (sans re-scan)
+/sdd-review {n} --ensure-scans        # v7.0.0 : exit 3 si une source QA obligatoire manque
 /sdd-review {n} --fail-on critical    # override seuil (info|minor|moderate|serious|critical)
 /sdd-review {n} --json                # sortie JSON pour CI/tooling
 ```
+
+`--ensure-scans` (v7.0.0, codex audit follow-up) : exige que toutes les
+sources auditeur obligatoires soient présentes dans `console.db` avant
+de produire le verdict consolidé. Évite le faux 🟢 GREEN quand un agent
+auditor a simplement été oublié pour cette FEAT.
+
+| Source | Requise par défaut | Conditionnelle |
+|---|:---:|---|
+| `quality` (quality_scan.py) | ✅ | — |
+| `code-review` (code-reviewer agent) | ✅ | — |
+| `security` (security-reviewer agent, mode scan) | ✅ | — |
+| `spec` (spec-compliance-reviewer agent) | ✅ | — |
+| `arch` (arch-reviewer agent) | optionnel | requise SI `ArchReviewMode: full` |
+| `a11y` (deprecated v7.0.0) | optionnel | jamais requise — agent supprimé |
+| `perf` (deprecated v7.0.0) | optionnel | jamais requise — agent supprimé |
+
+Exit code `3` avec `[REVIEW_SOURCES_MISSING]` + liste exacte des
+invocations à lancer pour combler les manques.
 
 Argument **obligatoire** : `{n}` (entier ≥ 1, numéro de FEAT).
 
@@ -100,6 +119,7 @@ reste utile).
 python .claude/python/sdd_scripts/sdd_review.py \
   --feat-number {n} \
   [--skip-scans] \
+  [--ensure-scans] \
   [--fail-on {info|minor|moderate|serious|critical}] \
   [--json]
 ```
@@ -108,6 +128,7 @@ Exit codes :
 - `0` → 🟢 GREEN ou 🟡 YELLOW (verdict sous le seuil)
 - `1` → 🔴 RED (verdict ≥ ReviewFailOn)
 - `2` → erreur infra (FEAT absente, DB inaccessible, args malformés)
+- `3` → `--ensure-scans` actif et au moins une source obligatoire manquante (v7.0.0)
 
 Le script effectue automatiquement :
 1. **STEP 3.1** — Re-run `quality_scan.py --feat-number {n}` (sauf `--skip-scans`)

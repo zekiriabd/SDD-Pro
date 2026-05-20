@@ -6,9 +6,16 @@ FEAT/US identifiers from the prompt, delegates to context_budget script
 which writes the JSONL ledger.
 
 Mode controlled by env $SDD_BUDGET_MODE:
-    - "warn"   (default) : ledger + WARN on stderr, exit 0
+    - "warn"   (default in interactive) : ledger + WARN on stderr, exit 0
     - "strict"            : block invocation if budget exceeded (exit 2)
     - "off"               : silent skip (exit 0)
+
+v7.0.0 (codex audit P0 #6 follow-up) : default flips to "strict"
+automatically when CI env is detected (any of CI, GITHUB_ACTIONS,
+GITLAB_CI, CIRCLECI, JENKINS_URL, BUILDKITE, TRAVIS env vars set
+truthy). This converts the soft context_budget warning into a hard CI
+gate without breaking interactive dev workflows. Override : explicit
+SDD_BUDGET_MODE=warn in the CI env wins back the soft behavior.
 
 Migrated from .claude/hooks/preflight-agent-budget.ps1 (2026-05-13).
 """
@@ -65,8 +72,36 @@ def extract_us_and_feat(haystack: str) -> tuple[int, str]:
     return feat_number, us_id
 
 
+def _detect_ci() -> bool:
+    """Best-effort CI detection : any common CI env var set to a truthy value."""
+    ci_signals = (
+        "CI", "GITHUB_ACTIONS", "GITLAB_CI", "CIRCLECI",
+        "JENKINS_URL", "BUILDKITE", "TRAVIS", "TF_BUILD",   # TF_BUILD = Azure DevOps
+        "BITBUCKET_BUILD_NUMBER",
+    )
+    for var in ci_signals:
+        v = os.environ.get(var, "").strip().lower()
+        if v and v not in ("0", "false", "no"):
+            return True
+    return False
+
+
+def _resolve_mode() -> str:
+    """Resolve the operative mode :
+    1. SDD_BUDGET_MODE env var if explicitly set
+    2. "strict" if CI env detected (codex P0 follow-up)
+    3. "warn" otherwise
+    """
+    explicit = os.environ.get("SDD_BUDGET_MODE", "").strip().lower()
+    if explicit:
+        return explicit
+    if _detect_ci():
+        return "strict"
+    return "warn"
+
+
 def main() -> int:
-    mode = os.environ.get("SDD_BUDGET_MODE", "warn").lower()
+    mode = _resolve_mode()
     if mode == "off":
         return 0
 

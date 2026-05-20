@@ -447,12 +447,37 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--feat-number", type=int, required=True)
     p.add_argument("--skip-scans", action="store_true",
                    help="Do not re-run quality_scan (read DB as-is)")
+    p.add_argument("--ensure-scans", action="store_true",
+                   help="v7.0.0: exit non-zero (3) if any required auditor "
+                        "source has 0 rows in console.db for this FEAT. "
+                        "Sources required by default: quality, code-review, "
+                        "security, spec. Optional (skipped on missing): "
+                        "arch (only if ArchReviewMode=full), a11y/perf "
+                        "(legacy — agents removed v7.0.0).")
     p.add_argument("--fail-on", default=None,
                    help="Severity threshold (info|minor|moderate|serious|critical). "
                         "Default: from Project Config ReviewFailOn, else 'serious'.")
     p.add_argument("--json", action="store_true",
                    help="Emit JSON summary on stdout instead of human text")
     return p.parse_args()
+
+
+# Sources required when --ensure-scans is set. a11y/perf are LEGACY in
+# v7.0.0 (agents removed → no SDD_Pro agent emits them anymore — they
+# only repopulate via future axe-core / Lighthouse CI ingest hooks).
+# arch is gated on ArchReviewMode=full (cf. resolve_arch_required()).
+ENSURE_SCANS_REQUIRED_DEFAULT = ("quality", "code-review", "security", "spec")
+ENSURE_SCANS_OPTIONAL = ("arch", "a11y", "perf")
+
+
+def resolve_arch_required() -> bool:
+    """Return True iff ArchReviewMode is `full` in Project Config."""
+    try:
+        from sdd_lib.project_config import read_project_config
+        cfg = read_project_config(keys=("ArchReviewMode",))
+        return (cfg.get("ArchReviewMode") or "").strip().lower() == "full"
+    except Exception:
+        return False
 
 
 def resolve_fail_on(cli_value: str | None) -> str:
@@ -498,6 +523,53 @@ def main() -> int:
 
     # STEP 4 — fetch
     findings, missing = fetch_findings(feat_n)
+
+    # STEP 4.5 — --ensure-scans gate (v7.0.0, codex audit follow-up)
+    if args.ensure_scans:
+        required = set(ENSURE_SCANS_REQUIRED_DEFAULT)
+        if resolve_arch_required():
+            required.add("arch")
+        truly_missing = [s for s in missing if s in required]
+        if truly_missing:
+            print(
+                f"ERROR: /sdd-review --ensure-scans — required auditor "
+                f"sources missing in console.db for FEAT {feat_n}",
+                file=sys.stderr,
+            )
+            print(f"CAUSE: [REVIEW_SOURCES_MISSING] no rows for: "
+                  f"{', '.join(truly_missing)}", file=sys.stderr)
+            invoc_lines = []
+            if "quality" in truly_missing:
+                invoc_lines.append(
+                    "  - quality        : python -m sdd_scripts.quality_scan "
+                    f"--feat-number {feat_n}"
+                )
+            if "code-review" in truly_missing:
+                invoc_lines.append(
+                    "  - code-review    : Agent: code-reviewer "
+                    f"(prompt: \"audit FEAT {feat_n}\")"
+                )
+            if "security" in truly_missing:
+                invoc_lines.append(
+                    "  - security       : Agent: security-reviewer "
+                    f"(prompt: \"audit FEAT {feat_n}\")"
+                )
+            if "spec" in truly_missing:
+                invoc_lines.append(
+                    "  - spec-compliance: Agent: spec-compliance-reviewer "
+                    f"(prompt: \"verify FEAT {feat_n}\")"
+                )
+            if "arch" in truly_missing:
+                invoc_lines.append(
+                    "  - arch           : Agent: arch-reviewer "
+                    f"(prompt: \"audit pattern + ADRs FEAT {feat_n}\")"
+                )
+            print("FIX: re-run the missing scans then /sdd-review {n} "
+                  "(without --ensure-scans, or with it).",
+                  file=sys.stderr)
+            for ln in invoc_lines:
+                print(ln, file=sys.stderr)
+            return 3
 
     # STEP 5-6 — triage + verdict
     report = compute_report(feat_n, findings, missing, fail_on)

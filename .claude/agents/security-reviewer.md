@@ -85,7 +85,7 @@ Lire `## Project Config` de `workspace/input/stack/stack.md` :
 
 ```yaml
 ## Project Config
-SecurityMode: off | full | manual                        # default: manual
+SecurityMode: off | full | manual                        # default: full (v7.0.0, was: manual)
 SecurityScanEnabled: true | false                         # default: true
 SecurityFailOn: critical | serious | moderate | minor    # default: critical
 ```
