@@ -339,7 +339,13 @@ def main() -> int:
         from sdd_admin.validate_libs_catalog import validate_catalog  # noqa: E402
 
         stacks_dir = claude_root / "stacks"
-        catalogs = sorted(stacks_dir.rglob("*.libs.json")) if stacks_dir.is_dir() else []
+        # Skip _drafts/ subtree — those are quarantined stacks
+        # (fullstack/mobiles/ddd/microservice) not part of the active surface.
+        catalogs = (
+            sorted(p for p in stacks_dir.rglob("*.libs.json")
+                   if "_drafts" not in p.parts)
+            if stacks_dir.is_dir() else []
+        )
         cat_errors = 0
         for f in catalogs:
             _, errs, _ = validate_catalog(f, root)

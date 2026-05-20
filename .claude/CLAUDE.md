@@ -98,20 +98,20 @@ Liste : `@.claude/docs/conventions.md §15`.
 
 ## 7. Stacks supportés
 
-**28 stacks applicatifs + 3 patterns archi** (table compacte) :
+**16 stacks actifs + 1 pattern archi** (post-quarantaine v7.0.0) :
 
 | Catégorie | Stacks 🟢 reference | 🟡 Phase 2 (experimental ou non déclaré) |
 |---|---|---|
 | Backend (4) | `dotnet-minimalapi`, `kotlin-spring-boot` | `python-fastapi`, `node-express` |
 | Frontend (4) | `react`, `blazor-webassembly` | `vue`, `angular` |
 | UI DS (3) | `shadcn` | `vuetify`, `radzen-blazor` ⚠️ |
-| Fullstack (6) | — | `node-react`, `blazor-server`, `next`, `nuxt`, `angular-universal`, `kotlin-mustache` |
-| Mobiles (2) | — | `react-native`, `maui` |
 | QA (7) | `code-quality` | `dotnet-xunit` ⚠️, `kotlin-junit` ⚠️, `node-vitest` ⚠️, `blazor-bunit` ⚠️, `python-pytest` ⚠️, `angular-jasmine` ⚠️ |
 | Auth (2) | `azure-ad` | `auth-local` |
-| Archi (3) | `mvc` | `ddd` ⚠️, `microservice` |
+| Archi (1) | `mvc` | — |
 
-> **Vérité terrain** : 🟢 = stack avec entête `Validation: 🟢 reference` ET inclus dans un combo validé bout-en-bout. 🟡 = entête `Validation: 🟡 experimental`. ⚠️ = stack **sans entête `Validation:`** (8 cas — drift documentaire à corriger en post-freeze, classés 🟡 par défaut conservateur). La source de vérité reste l'entête `Validation:` de chaque `.claude/stacks/{cat}/{id}.md`.
+> **Quarantaine v7.0.0** — 10 stacks déplacés vers `.claude/stacks/_drafts/` : 6 fullstack (`node-react`, `blazor-server`, `next`, `nuxt`, `angular-universal`, `kotlin-mustache`), 2 mobiles (`react-native`, `maui`), 2 archi (`ddd`, `microservice`). **Non chargés par le framework actif**. Voir `.claude/stacks/_drafts/README.md` pour la procédure de réactivation. ADR `governance-major-stacks-quarantine`.
+
+> **Vérité terrain** : 🟢 = stack avec entête `Validation: 🟢 reference` ET inclus dans un combo validé bout-en-bout. 🟡 = entête `Validation: 🟡 experimental`. ⚠️ = stack **sans entête `Validation:`** (7 cas — drift documentaire à corriger en post-freeze, classés 🟡 par défaut conservateur). La source de vérité reste l'entête `Validation:` de chaque `.claude/stacks/{cat}/{id}.md`.
 
 **AppType auto-détecté** depuis `## Active Tech Specs` (v6.7.7+) : `backend/* + frontend/*` → `back-front/web` ; `+ mobiles/*` → `back-front/mobile` ; `fullstack/*` seul → `fullstack`. Mix interdits → `[STACK_COMBO_INVALID]`.
 

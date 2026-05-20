@@ -213,7 +213,13 @@ def main() -> int:
     root = Path(args.repo_root).resolve() if args.repo_root else repo_root()
     stacks_dir = root / ".claude" / "stacks"
 
-    catalogs = sorted(stacks_dir.rglob("*.libs.json")) if stacks_dir.is_dir() else []
+    # Skip _drafts/ subtree — quarantined stacks (fullstack/mobiles/ddd/
+    # microservice) not part of the active validated surface.
+    catalogs = (
+        sorted(p for p in stacks_dir.rglob("*.libs.json")
+               if "_drafts" not in p.parts)
+        if stacks_dir.is_dir() else []
+    )
     all_errors: list[dict[str, Any]] = []
     all_warnings: list[dict[str, Any]] = []
     summaries: list[dict[str, Any]] = []
