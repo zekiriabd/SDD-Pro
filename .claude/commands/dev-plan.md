@@ -1,6 +1,6 @@
-# /dev-plan — Génère les plans techniques d'1 SPEC sans coder
+# /dev-plan — Génère les plans techniques d'1 FEAT sans coder
 
-Pour chaque US de la SPEC `{n}`, invoque les agents `dev-backend` et
+Pour chaque US de la FEAT `{n}`, invoque les agents `dev-backend` et
 `dev-frontend` en **mode Plan Only** : ils lisent l'US (+ mockup HTML
 en lecture texte directe pour le front), planifient inline les
 fichiers à produire, **écrivent le plan dans
@@ -11,7 +11,7 @@ L'humain peut relire et éditer ces fichiers de plan, puis lancer
 `/dev-run {n}` qui détectera les plans et les consommera tels quels
 au lieu de re-planifier.
 
-**Usage :** `/dev-plan {n}` — où `{n}` est le numéro de la SPEC.
+**Usage :** `/dev-plan {n}` — où `{n}` est le numéro de la FEAT.
 
 **Cas d'emploi** :
 - Tu veux valider le découpage technique avant la génération
@@ -28,7 +28,7 @@ Argument **obligatoire** : `{n}` (entier ≥ 1).
 
 Si absent → demander :
 ```
-Quel est le numéro de la SPEC à planifier ? (ex. : 1)
+Quel est le numéro de la FEAT à planifier ? (ex. : 1)
 ```
 
 Si non numérique →
@@ -53,7 +53,7 @@ FIX: lancer /us-generate {n} pour générer les US d'abord
 
 Émettre 1 ligne :
 ```
-SPEC {n} — {U} US à planifier (back + front en parallèle, mode Plan Only)
+FEAT {n} — {U} US à planifier (back + front en parallèle, mode Plan Only)
 ```
 
 ---
@@ -65,8 +65,9 @@ Lire `workspace/input/stack/stack.md`.
 - Si aucun `## Active Tech Specs` `backend-*` ET aucun `frontend-*` →
   ERROR comme dans `/dev-run`.
 
-(Pas de validation env vars ici — la planification ne lit pas la DB,
-ne se connecte à rien.)
+(Pas de validation des blocs `## Active Database` / `## Active Auth
+Specs` ici — la planification ne lit pas la DB, ne se connecte à
+rien.)
 
 ---
 
@@ -87,8 +88,7 @@ Chaque agent en mode `:plan` :
   actifs et le CLAUDE.md projet (s'il existe)
 - Construit le plan inline normal (STEPs 5/6 selon agent)
 - **Écrit le plan dans `workspace/output/plans/{n}-{m}-{Name}.{back|front}.md`**
-  au format défini (cf. `agents/dev-backend.md §STEP 5.5` et
-  `agents/dev-frontend.md §STEP 6.5`)
+  au format défini (cf. `@.claude/rules/dev-shared.md §7.4`)
 - Émet UNE ligne :
   ```
   dev-backend {n}-{m}-{Name}: plan written → workspace/output/plans/{n}-{m}-{Name}.back.md (X fichiers)
@@ -105,13 +105,13 @@ Si l'US n'a pas de contrepartie pour la famille → exit silent
 Une fois **toutes** les invocations dev-* terminées, exécuter via Bash :
 
 ```bash
-powershell -NoProfile -ExecutionPolicy Bypass -File .claude/scripts/compact-front-plans.ps1
+python .claude/python/sdd_scripts/compact_front_plans.py
 ```
 
 Le script :
 - parcourt `workspace/output/plans/*.front.md`
 - pour chaque plan > 12 KB : archive l'original sous
-  `workspace/output/.audit/plan-archive/{basename}.{ts}.full.md` puis
+  `workspace/output/.sys/.audit/plan-archive/{basename}.{ts}.full.md` puis
   remplace le `.front.md` par une version courte (~12 KB) contenant
   contrat d'exécution + fichiers + arbitrages essentiels
 - skip silencieux pour les plans déjà ≤ 12 KB
@@ -128,12 +128,74 @@ Si le script échoue (exit ≠ 0) → émettre WARNING 1 ligne et continuer
 
 ---
 
+## STEP 4.7 — Validation strict-readiness des plans (depuis v6.2)
+
+Pour chaque plan généré (back et front), invoquer `validate_plan.py`
+en mode strict pour confirmer la conformité v2 (frontmatter
+`plan-schema-version: 2`, `us-hash` cohérent, section `## Inline Digest`
+non vide, AC coverage complète) :
+
+```bash
+python .claude/python/sdd_scripts/validate_plan.py \
+  --plan-path "workspace/output/plans/{n}-{m}-{Name}.{back|front}.md" \
+  --us-path "workspace/output/us/{n}-{m}-{Name}.md" \
+  --strict \
+  --json
+```
+
+| Exit | Comportement |
+|---|---|
+| `0` | Plan strict-ready → log compteur `$S_strict++` |
+| `1` | Plan v1/incomplet → log compteur `$S_classic++` + WARN 1L |
+| `2` | Plan stale/corrompu → ERROR + nettoyer le plan (sera regénéré au re-run) |
+
+**Émettre un event state.jsonl** par plan validé (si `$RUN_ID` disponible) :
+```bash
+python .claude/python/sdd_scripts/sdd_state.py emit-event \
+  --run-id $RUN_ID --event-type plan_validate_postgen \
+  --payload-json '{"us":"{n}-{m}","family":"{back|front}","exit":N,"result":"ready|not_strict_ready|invalid"}'
+```
+
+**Non bloquant** : un plan exit 1 reste utilisable en mode From-Plan
+classique (Opus). Exit 2 nettoie le plan pour éviter qu'un re-run
+ultérieur ne le consomme à tort.
+
+Si tous les plans sont exit 0 → émettre 1 ligne récap :
+```
+FEAT {n} — plans v2 strict-ready : {S_strict_back}/{P_back} back + {S_strict_front}/{P_front} front
+```
+
+Si au moins un exit 1 → émettre WARNING 1 ligne :
+```
+🟡 FEAT {n} — {N_not_ready} plan(s) v1 ou incomplet(s) (PlanCacheStrict aura fallback classic Opus sur ces US)
+```
+
+---
+
+## STEP 4.bis — Status flip US (v6.10.5, fix CRIT-2)
+
+Pour chaque US dont un plan a été écrit avec succès (`.back.md` ou
+`.front.md`), flipper `Ready → InProgress`. Idempotent et non-bloquant.
+
+```bash
+for plan_file in workspace/output/plans/{n}-*.{back,front}.md; do
+  [ -f "$plan_file" ] || continue
+  us_id=$(basename "$plan_file" | grep -oE '^[0-9]+-[0-9]+')
+  python .claude/python/sdd_scripts/set_us_status.py \
+    --us "$us_id" --status InProgress 2>/dev/null || true
+done
+```
+
+Skip pour les US sans plan écrit (erreur isolée, cf. STEP 4).
+
+---
+
 ## STEP 5 — Récap final
 
 Émettre **un seul bloc final** :
 
 ```
-✅ SPEC {n} — plans techniques écrits
+✅ FEAT {n} — plans techniques écrits
 
 Plans backend  : workspace/output/plans/{n}-*-*.back.md  ({Tb_ok} US, {Tb_skip} skipped)
 Plans frontend : workspace/output/plans/{n}-*-*.front.md ({Tf_ok} US, {Tf_skip} skipped)
@@ -147,7 +209,7 @@ Prochaine étape :
 
 Si tout passe sans accroc :
 ```
-✅ SPEC {n} — {Tb_ok} plans backend + {Tf_ok} plans frontend écrits dans workspace/output/plans/.
+✅ FEAT {n} — {Tb_ok} plans backend + {Tf_ok} plans frontend écrits dans workspace/output/plans/.
 ```
 
 ---

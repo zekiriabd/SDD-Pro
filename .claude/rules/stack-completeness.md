@@ -2,44 +2,77 @@
 
 ## Principe
 
-Quand un agent dev-* (`dev-backend`, `dev-frontend`) a besoin d'une
-**librairie** pour matérialiser une User Story, cette librairie DOIT
-figurer **explicitement** dans la section §2.4 (Librairies pinnées) du
-stack actif correspondant (`.claude/stacks/{cat}/{stack-id}.md`).
+Toute librairie utilisée par dev-* pour matérialiser une US DOIT figurer
+**explicitement** dans §2.4 du stack actif
+(`.claude/stacks/{cat}/{stack-id}.md`) ou son `.libs.json`.
 
-Si la librairie n'y figure pas → **STOP + ERROR**. Pas d'installation
-"silencieuse", pas de "découverte autonome", pas de "dernière version
-trouvée sur Stack Overflow". Le Tech Lead arbitre.
+Absente → **STOP + ERROR**. Pas d'install silencieuse, pas de "découverte
+autonome", pas de "lib trouvée sur Stack Overflow". Tech Lead arbitre.
 
-Cette règle est **load-bearing pour la sécurité, la traçabilité et la
-reproductibilité** des projets générés. Elle prévient :
-- L'introduction silencieuse de librairies obsolètes ou vulnérables
-- La fragmentation du stack entre projets
-- Les erreurs de scaffolding (lib installée mais pas dans le `.csproj` /
-  `package.json` / `requirements.txt` / `build.gradle.kts`)
-- Les faux-amis (lib similaire au nom mais usage différent)
+**Load-bearing** pour sécurité, traçabilité, reproductibilité. Prévient
+libs obsolètes/vulnérables, fragmentation cross-projets, erreurs de
+scaffolding, faux-amis.
+
+---
+
+## 0. Runtime LTS only (fusionné depuis library-policy.md, v6.1)
+
+Stacks SDD_Pro **n'utilisent que des runtimes LTS**. STS ou prerelease
+interdits en `## Active Tech Specs` pour prod.
+
+### Matrice runtime LTS (2026-05)
+
+| Plateforme | LTS courant | Fin support | Statut |
+|---|---|---|---|
+| **.NET**    | 10 (Nov 2025) | Nov 2028 | ✅ `dotnet-minimalapi`, `blazor-*` |
+| **Node.js** | 22 "Jod" (Oct 2024) | Apr 2027 | ✅ `react`, `vue`, `angular`, `node-express` |
+| **Java**    | 21 (Sep 2023) | Sep 2028 | ✅ `kotlin-spring-boot` |
+| **Python**  | 3.12 (Oct 2023) | Oct 2028 | ✅ `python-fastapi` (3.13 OK) |
+| **Kotlin**  | 2.1 LTS (2025) | TBD | 🟡 pin `kotlin-spring-boot.libs.json` = 2.3.21 (STS exception tracée) |
+
+**Interdictions** : pin sur version STS (.NET 9, Node 23, Java 22…),
+prerelease (`-rc/-preview/-alpha/-beta/-snapshot`) sans ADR, version
+`latest` non-pinnée.
+
+**Bypass STS** (rare, tracé) : ADR `ADR-{ts}-runtime-sts-exception.md`
++ `RuntimeException: dotnet9 (fin: 2026-05-12, migration -> dotnet10)`
+dans Project Config → `validate_libs_catalog.py` émet WARN
+`[RUNTIME_STS_EXCEPTION]`.
+
+**Registries canoniques** : NuGet (`api.nuget.org`), npm
+(`registry.npmjs.org`), PyPI (`pypi.org`), Maven Central
+(`repo1.maven.org/maven2`), Gradle plugins portal. Pas de fork, mirror
+tiers, ou feed privé non documenté.
+
+**CVE check post-install** :
+- NuGet : `dotnet list package --vulnerable --include-transitive`
+- npm : `npm audit --omit=dev --audit-level=moderate`
+- pip : `pip-audit`
+- Maven/Gradle : `mvn dependency:check` (OWASP) ou plugin Gradle
+
+**Format ERROR runtime LTS** :
+```
+ERROR: arch — runtime non-LTS detecte
+CAUSE: [STACK_RUNTIME_NOT_LTS] {stack-id} pin {plateforme} {version} (STS, fin {date})
+FIX: migrer vers LTS courante ({lts-version}) dans .claude/stacks/{cat}/{stack-id}.libs.json#versions
+```
 
 ---
 
 ## 1.0 Source de vérité : catalogue JSON `.libs.json` (depuis 2026-05-07)
 
-Chaque stack a désormais **deux fichiers compagnons** :
+Chaque stack a **deux fichiers compagnons** :
 
 | Fichier | Rôle | Audience |
 |---|---|---|
-| `.claude/stacks/{cat}/{stack-id}.md` | Documentation humaine : architecture, conventions, pièges, patterns | Tech Lead, agents (lecture passive du contexte applicatif) |
-| `.claude/stacks/{cat}/{stack-id}.libs.json` | **Catalogue machine** : versions, libs core, libs on-demand, plugins, triggers regex | Agent `arch` (install), agent `dev-backend` (capability gating), scripts de validation |
+| `{stack-id}.md` | Documentation humaine (architecture, conventions, pièges) | Tech Lead, agents (lecture passive) |
+| `{stack-id}.libs.json` | **Catalogue machine** (versions, libs core/onDemand, plugins, triggers regex) | `arch` (install), `dev-backend` (capability gating), validation scripts |
 
-**Le `.libs.json` est la source de vérité** pour tout ce qui touche à
-l'installation et la résolution de dépendances. Le `.md` ne doit plus
-contenir de table `§2.4` éditée manuellement — elle est régénérée à
-partir du JSON via `sync-stack-md.ps1`.
+Le `.libs.json` est la **source de vérité** install/résolution. Le `.md`
+ne contient plus de §2.4 manuel — régénéré via `sync_stack_md.py`.
 
-### Schéma JSON
-
-`.claude/templates/libs-catalog.schema.json` (JSON Schema draft 2020-12).
-
-Structure résumée :
+**Schéma JSON** : `.claude/templates/libs-catalog.schema.json` (draft 2020-12).
+Structure :
 ```json
 {
   "stackId": "kotlin-spring-boot",
@@ -49,161 +82,109 @@ Structure résumée :
   "manifest": { "files": [...], "versionCatalogPath": "..." },
   "versions": { "kotlin": "2.3.21", "spring-boot": "4.0.6" },
   "core":     [ { "id", "module", "versionRef", "rationale", "installCommand", "license" } ],
-  "onDemand": [ { "id", "module", "versionRef", "rationale", "installCommand",
-                  "capability", "triggers": [...], "alternative": false, "license" } ],
+  "onDemand": [ { ..., "capability", "triggers": [...], "alternative": false } ],
   "plugins":  [ { "id", "versionRef", "rationale" } ]
 }
 ```
 
 ### Workflow agent
 
-**arch (Phase A, bootstrap)** :
-1. Pour chaque stack actif, charger `{stack-id}.libs.json`
-2. Pour chaque `core[].installCommand`, substituer `{BackendName}`,
-   `{AppName}`, `{LibName}`, `{AppNamespace}`, `{version}` puis exécuter
-3. Pour chaque `plugins[]`, configurer le manifest (Gradle DSL,
-   Maven `<plugin>`, etc.)
-4. Si `Capabilities: [...]` dans `## Project Config`, forcer l'install
-   des libs `onDemand[]` matchant ces capabilities au bootstrap
+**arch Phase A** : charger `.libs.json`, exécuter `core[].installCommand`
+avec substitution `{BackendName|AppName|LibName|AppNamespace|version}`,
+configurer `plugins[]`, forcer install `onDemand[]` matchant
+`Capabilities:` Project Config si présent.
 
-**dev-backend (STEP 5.bis, capability gating)** :
-1. Charger `{stack-id}.libs.json`
-2. Invoquer `detect-capabilities.ps1` qui matche les `triggers[]` regex
-   contre le texte de l'US courante + ACs
-3. Pour chaque capability détectée, installer la lib `onDemand[]`
-   correspondante (default + override Project Config)
+**dev-backend STEP 5.bis** : charger `.libs.json`, invoquer
+`detect_capabilities.py` qui matche les `triggers[]` regex contre US +
+ACs, installer la `onDemand[]` correspondante (default + override
+Project Config).
 
-### Scripts
+### Scripts admin (`.claude/python/sdd_admin/`)
 
-- **`.claude/scripts/validate-libs-catalog.ps1`** — valide tous les
-  `.libs.json` contre le schéma + checks (versionRef pointe sur clé
-  existante, capability/triggers pour onDemand, kebab-case versions,
-  pre-release warning, etc.). Lancer après toute édition d'un catalogue.
-- **`.claude/scripts/sync-stack-md.ps1 -StackId {id}`** — régénère
-  `§2.4` du `.md` à partir du `.libs.json` (tableau lisible humain
-  + triggers + plugins). Idempotent. `-DryRun` pour preview.
+- `validate_libs_catalog.py` — valide schéma + cohérence (versionRef
+  pointe sur clé existante, capability/triggers pour onDemand, etc.)
+- `sync_stack_md.py --stack-id {id}` — régénère §2.4 du `.md` depuis
+  `.libs.json`. Idempotent. `--dry-run` pour preview.
 
-### Maintenance — mettre à jour une version
+### Maintenance
 
-```
-1. Éditer .claude/stacks/{cat}/{stack-id}.libs.json
-   → modifier versions.{key} (1 ligne)
-2. .claude/scripts/validate-libs-catalog.ps1
-   → vérifier cohérence
-3. .claude/scripts/sync-stack-md.ps1 -StackId {stack-id}
-   → régénérer le tableau du .md
-4. Commit JSON + MD
-```
+| Action | Étapes |
+|---|---|
+| MAJ version | éditer `versions.{key}` → `validate_libs_catalog.py` → `sync_stack_md.py` → commit |
+| Ajout lib core | append `core[]` (id, module, versionRef, rationale, installCommand, license) → idem |
+| Ajout capability on-demand | append `onDemand[]` avec `capability` + `triggers[]` regex case-insensitive → idem |
 
-### Maintenance — ajouter une lib core
+### Stacks migrés (17 catalogues au 2026-05-13)
 
-```
-1. Éditer .libs.json → append core[] avec id, module, versionRef,
-   rationale, installCommand, license
-2. Si nouvelle version : ajouter à versions{}
-3. Validation + sync (idem ci-dessus)
-```
+**Backend** : `dotnet-minimalapi`, `kotlin-spring-boot`, `python-fastapi`,
+`node-express`.
 
-### Maintenance — ajouter une capability on-demand
+**Frontend** : `blazor-webassembly`, `react` (React 19 + Vite 6 +
+Tailwind v4 + shadcn + TanStack + RHF/Zod + Turborepo), `vue` (Vue 3.5 +
+Pinia + TanStack + VeeValidate), `angular` (19 standalone + signals).
 
-```
-1. Éditer .libs.json → append onDemand[] avec capability +
-   triggers[] (≥ 1 regex case-insensitive)
-2. Validation + sync
-```
+**QA** (séparation stricte propriété QA, dé-dupliqué) : `dotnet-xunit`,
+`blazor-bunit`, `node-vitest`, `python-pytest`, `kotlin-junit`,
+`angular-jasmine`.
 
-### Migration progressive
+**UI Design Systems** : `radzen-blazor`, `shadcn` (7 core + 15 onDemand
+Radix par capability), `vuetify`.
 
-Les stacks **non encore migrés** continuent à fonctionner avec leur
-table `§2.4` markdown. arch lit le `.libs.json` en priorité, fallback
-sur le `.md` parsing si absent.
-
-Stacks migrés au 2026-05-07 (14 catalogues) :
-
-**Backend** :
-- `backend/dotnet-minimalapi.libs.json` (buildSystem=dotnet)
-- `backend/kotlin-spring-boot.libs.json` (buildSystem=gradle)
-- `backend/python-fastapi.libs.json` (buildSystem=uv)
-- `backend/node-express.libs.json` (buildSystem=pnpm)
-
-**Frontend** :
-- `frontend/blazor-webassembly.libs.json` (buildSystem=dotnet)
-- `frontend/react.libs.json` (buildSystem=pnpm — React 19 + Vite 6 + Tailwind v4 + shadcn + TanStack Query/Router + RHF/Zod + i18next + Turborepo + pnpm workspaces avec `catalog:` protocol)
-- `frontend/vue.libs.json` (buildSystem=npm — Vue 3.5 + Pinia + TanStack Vue Query + VeeValidate/Zod + vue-i18n)
-- `frontend/angular.libs.json` (buildSystem=npm — Angular 19 standalone + signals + control flow)
-
-**QA** (depuis 2026-05-07 — séparation stricte propriété QA) :
-- `qa/dotnet-xunit.libs.json` (xUnit + NSubstitute + coverlet + WebApplicationFactory pour API Gate)
-- `qa/blazor-bunit.libs.json` (bUnit + xUnit + NSubstitute)
-- `qa/node-vitest.libs.json` (Vitest + happy-dom/jsdom + testing-library + supertest pour API Gate)
-- `qa/python-pytest.libs.json` (pytest + pytest-cov + pytest-mock + httpx pour API Gate)
-- `qa/kotlin-junit.libs.json` (JUnit 5 + MockK + spring-boot-starter-test)
-- `qa/angular-jasmine.libs.json` (Jasmine + Karma + istanbul)
+**Hors périmètre `.libs.json`** (par design) :
+- `auth/*` : protocoles cross-langage (env vars, flux JWT/OIDC). Les
+  libs auth concrètes (`Microsoft.Identity.Web`, `@azure/msal-browser`,
+  `spring-security-oauth2-resource-server`, etc.) vivent dans le
+  `.libs.json` du backend/frontend consommateur.
+- `qa/code-quality.md` : règles QA pures (seuils sonar-like).
+- `frontend/blazor-server` : **déplacé en `fullstack/blazor-server.md` (2026-05-13)**
+  — le pattern monolithique est incompatible avec l'isolation front/back du
+  scope `back-front` (cf. `file-ownership.md §1.bis`), mais reste valide en
+  scope `fullstack` (single-project UI+API intégrés). Le `.libs.json`
+  compagnon a été régénéré dans `fullstack/`.
 
 ### Dé-duplication QA (post-mortem 2026-05-07)
 
-Initialement les libs de tests (vitest, supertest, pytest, etc.) avaient
-été placées en `onDemand` des catalogues backend. **Erreur de
-modélisation** : `qa-ownership.md` rappelle que l'agent QA est seul
-propriétaire des fichiers de test ; dev-* n'installe **jamais** de lib
-test dans le projet de production.
-
-**Correction appliquée** :
-- Catalogues backend `onDemand` ne contiennent que des **capabilities
-  runtime production** (excel, pdf, redis-cache, cqrs, fast-mapping,
-  file-upload, http-client, uuid-gen, etc.)
-- Catalogues QA portent **toutes** les libs de tests + frameworks
-  intégration HTTP (WebApplicationFactory, supertest, httpx) + mocking
-  (NSubstitute, MockK, pytest-mock, ng-mocks)
-- Aucun chevauchement entre les deux familles
-
-À migrer (work in progress) : `java-spring-boot`, `blazor-server`,
-stacks `ui/*` (radzen, shadcn, vuetify), `auth/*` (azure-ad, auth0,
-keycloak, local), `qa/code-quality.md` (pas de libs — purement règles
-règles, peut rester sans `.libs.json`).
+Libs de tests initialement en `onDemand` des catalogues backend.
+**Erreur** : QA seul propriétaire des tests (cf. `qa.md` §Ownership) ;
+dev-* n'installe JAMAIS de lib test en prod. Corrigé : backends
+`onDemand` = capabilities **runtime prod** uniquement (excel, pdf,
+redis-cache, cqrs, fast-mapping, file-upload, http-client) ; QA porte
+toutes les libs test + frameworks intégration HTTP + mocking.
 
 ---
 
-## 1.bis Capabilities core vs on-demand (depuis v3.1.3)
+## 1.bis Capabilities core vs on-demand (v3.1.3)
 
-Depuis SDD_Pro v3.1.3, le tableau §2.4 de chaque stack backend est
-**scindé en deux sous-sections** pour éviter l'installation de libs
-non utilisées (audit C4).
+Tableau §2.4 de chaque stack backend **scindé en deux** :
 
-### §2.4.a — Librairies CORE (installées par arch, toujours)
+### §2.4.a CORE (installé par arch, toujours)
 
 Libs sans lesquelles le pattern applicatif ne tient pas : ORM, mapping,
-logging, validation, OpenAPI, auth (selon le stack auth actif),
-résilience HTTP. arch les installe au bootstrap (§2.2.1), dev-* peut
-les utiliser librement sans déclencheur.
+logging, validation, OpenAPI, auth, résilience HTTP. arch installe au
+bootstrap ; dev-* utilise sans déclencheur.
 
 Exemples .NET : `Microsoft.EntityFrameworkCore.*`, `AutoMapper`,
 `Serilog.*`, `FluentValidation.*`, `Polly`, `Swashbuckle.*`,
-`Microsoft.Identity.Web` (si auth Azure AD), `Microsoft.Extensions.Caching.Memory`.
+`Microsoft.Identity.Web`, `Microsoft.Extensions.Caching.Memory`.
 
-### §2.4.b — Librairies ON-DEMAND (installées par dev-backend si trigger US)
+### §2.4.b ON-DEMAND (installé par dev-backend si trigger US)
 
-Libs liées à des **capabilities optionnelles** (export Excel/PDF,
-CQRS, Redis, mapping rapide, etc.). Une lib §2.4.b n'est installée
-que si l'US courante contient un **trigger keyword** documenté dans
-le stack §2.4.b (colonne "Triggers"). Voir `agents/dev-backend.md
-§STEP 5.bis` pour le workflow d'installation.
+Libs liées à des capabilities optionnelles. Installée uniquement si l'US
+contient un **trigger keyword** (cf. `detect_capabilities.py` STEP 5.bis).
 
-Exemples .NET : `EPPlus`/`ClosedXML` (capability `excel`),
-`QuestPDF`/`iText7` (`pdf`), `MediatR` (`cqrs`), `StackExchange.Redis`
-(`redis-cache`), `Mapster` (`fast-mapping`).
+Exemples .NET : `EPPlus`/`ClosedXML` (`excel`), `QuestPDF`/`iText7`
+(`pdf`), `MediatR` (`cqrs`), `StackExchange.Redis` (`redis-cache`),
+`Mapster` (`fast-mapping`).
 
 ### Tableau de décision dev-*
 
-| Cas | Lib §2.4.a (core) | Lib §2.4.b (on-demand) | Lib hors §2.4 |
+| Cas | §2.4.a core | §2.4.b on-demand | Hors §2.4 |
 |---|---|---|---|
-| US déclenche la lib | ✅ usable | ✅ install + usable | ❌ STOP + ERROR |
-| US ne déclenche pas | ✅ usable | ❌ pas d'install, pas d'usage | ❌ STOP + ERROR |
-| Déjà en csproj (héritée) | ✅ usable | ⚠️ tolérer, ne pas utiliser sans trigger | ⚠️ STOP + ERROR |
+| US déclenche | ✅ usable | ✅ install + usable | ❌ STOP + ERROR |
+| US ne déclenche pas | ✅ usable | ❌ pas d'install | ❌ STOP + ERROR |
+| Déjà en csproj (héritée) | ✅ usable | ⚠️ tolérer, pas d'usage sans trigger | ⚠️ STOP + ERROR |
 
-### Overrides (Project Config)
-
-L'humain peut piloter via `## Project Config` de `workspace/input/stack/stack.md` :
+### Overrides Project Config
 
 ```yaml
 Capabilities: excel, pdf            # force install au bootstrap arch
@@ -212,18 +193,11 @@ Capabilities: excel, pdf            # force install au bootstrap arch
   pdf: itext7                       # alternative à QuestPDF default
 ```
 
-Une capability listée en `Capabilities:` se comporte comme TRIGGERED
-même sans trigger keyword US — utile pour pré-installer des libs
-futures attendues. L'override redirige vers une lib alternative au
-sein de la même capability (ex. ClosedXML MIT au lieu d'EPPlus
-Polyform).
+`Capabilities:` = comme TRIGGERED même sans keyword US (pré-install).
+Override = lib alternative dans la même capability.
 
-### Anti-derive maintenu
-
-La règle "lib hors §2.4 → STOP + ERROR" reste **stricte**. Les
-catégories §2.4.a et §2.4.b sont **exhaustives** : aucune lib
-externe ne peut être installée sans figurer dans l'une des deux
-sous-sections.
+**Anti-derive maintenu** : "lib hors §2.4 → STOP + ERROR" reste strict.
+§2.4.a/§2.4.b sont **exhaustives**.
 
 ---
 
@@ -232,297 +206,149 @@ sous-sections.
 ### 1.1 Stacks concernés
 
 | Catégorie | Fichier | §2.4 obligatoire |
-|---|---|---|
+|---|---|:---:|
 | Backend | `.claude/stacks/backend/*.md` | ✅ |
 | Frontend | `.claude/stacks/frontend/*.md` | ✅ |
 | UI Design System | `.claude/stacks/ui/*.md` | ✅ (composants natifs) |
-| Auth | `.claude/stacks/auth/*.md` | ✅ |
+| Auth | `.claude/stacks/auth/*.md` | hors périmètre (cf. §1.0) |
 | QA | `.claude/stacks/qa/*.md` | ✅ |
 
-### 1.2 Agents soumis à la règle
+### 1.2 Agents soumis
 
-Tous les agents qui **écrivent du code** :
-- `dev-backend` (services, endpoints, mappers, validators, ...)
-- `dev-frontend` (pages, components, layouts, services HTTP, ...)
-- `qa` (génération de tests — soumis aux libs §2.4 du stack QA actif)
+Tous les agents qui **écrivent du code** : `dev-backend`, `dev-frontend`,
+`qa`. `arch` n'est pas soumis (il **installe** §2.2.1) mais vérifie la
+cohérence §2.4 ↔ §2.2.1.
 
-L'agent `arch` n'est **pas** soumis à la règle pour les libs §2.4
-(il les **installe** justement à partir des Init Commands §2.2.1) —
-mais il vérifie que §2.4 et §2.2.1 sont **cohérents** entre eux.
+### 1.3 Types couverts
 
-### 1.3 Types de librairies couverts
-
-- Packages NuGet (`.NET`)
-- Packages npm (`Node.js`, frontends JS/TS)
-- Packages PyPI (`pip`)
-- Dépendances Maven / Gradle (`Java`, `Kotlin`)
-- Dépendances Cargo (`Rust`, futur)
-- Dépendances Go modules (`Go`, futur)
-
-Couvre les dépendances **runtime** ET **dev** (linters, formatters
-inclus).
+NuGet, npm, PyPI, Maven/Gradle, Cargo (futur), Go modules (futur).
+Couvre dépendances **runtime ET dev** (linters, formatters inclus).
 
 ---
 
-## 2. Workflow obligatoire des agents dev-*
+## 2. Workflow obligatoire dev-*
 
-Avant d'écrire ou planifier un fichier qui **importe** ou **utilise**
-une librairie :
+Avant d'écrire un fichier qui importe une lib :
 
-### 2.1 Vérification
+1. Identifier la lib nécessaire (par signature d'usage)
+2. Lire §2.4 du stack actif (ou son `.libs.json`)
+3. Si présente → continuer ; sinon → STOP + ERROR §3
 
-```
-1. Identifier la librairie nécessaire (par signature d'usage)
-   ex. "j'ai besoin de mapper Entity → DTO" → AutoMapper
-   ex. "j'ai besoin de valider un input" → FluentValidation
-   ex. "j'ai besoin d'un client HTTP avec retry" → Refit + Polly
+**Variantes équivalentes** : vérifier le **paquet exact**. Si le paquet
+§2.4 est plus restrictif (ex. `Serilog.AspNetCore` mais pas
+`Serilog.Sinks.File` requis) → lib manque → STOP.
 
-2. Lire §2.4 du stack actif (.claude/stacks/{cat}/{stack-id}.md)
-
-3. Si la librairie figure dans le tableau §2.4 → continuer
-
-4. Si la librairie n'y figure PAS → STOP + ERROR (cf. §3 ci-dessous)
-```
-
-### 2.2 Variantes équivalentes
-
-Une librairie peut figurer sous plusieurs noms canoniques :
-- `AutoMapper` ↔ `automapper.extensions.microsoft.dependencyinjection`
-- `Serilog` ↔ `Serilog.AspNetCore` ↔ `Serilog.Sinks.Console`
-- `MapStruct` (Java) — référencé par son artifactId Maven
-
-L'agent vérifie le **paquet exact** qu'il s'apprête à importer. Si le
-paquet en §2.4 est plus restrictif (ex. `Serilog.AspNetCore` mais pas
-`Serilog.Sinks.File`) et que l'agent a besoin du sink File → la lib
-manque → STOP + ERROR.
-
-### 2.3 Ne pas confondre stack §2.4 et conventions §3
-
-§2.4 liste les **paquets installables** (NuGet, npm, etc.).
-§3 (Conventions d'usage) montre **comment utiliser** ces paquets.
-
-Si une convention §3 mentionne un usage qui requiert une lib non
-listée en §2.4 → c'est un bug du stack (à signaler au Tech Lead via
-la même ERROR).
+**§2.4 ≠ §3 Conventions** : §2.4 = paquets installables, §3 = comment
+les utiliser. Si une convention §3 requiert une lib non listée §2.4 →
+bug du stack à signaler.
 
 ---
 
-## 3. Format ERROR obligatoire (3 lignes + HINT)
+## 3. Format ERROR (3 lignes + HINT)
 
-Format strict avec préfixe `[STACK_LIBRARY_MISSING]` (cf.
-`error-classification.md` futur) :
+Préfixe `[STACK_LIBRARY_MISSING]` (cf. `error-classification.md`) :
 
 ```
 ERROR: dev-{backend|frontend} {n}-{m}-{Name} — librairie manquante
-CAUSE: [STACK_LIBRARY_MISSING] besoin de {lib-canonique} pour {usage} (AC-{N} ou §{stack-section})
-       absent du stack {stack-id} §2.4 (Librairies pinnées)
-FIX: 1. Ajouter {lib-canonique} version {recommandation} dans
-        .claude/stacks/{cat}/{stack-id}.md §2.4
-     2. Mettre à jour §2.2.1 (Init Commands) pour installer la lib
+CAUSE: [STACK_LIBRARY_MISSING] besoin de {lib} pour {usage} (AC-{N})
+       absent du stack {stack-id} §2.4
+FIX: 1. Ajouter {lib} version {X} dans .claude/stacks/{cat}/{stack-id}.libs.json
+     2. Régénérer §2.4 du .md via sync_stack_md.py
      3. Relancer /dev-{backend|frontend} {n}-{m} (idempotent)
-HINT: librairie(s) suggérée(s) pour ce besoin :
-   - {lib-A} (rôle: {description}, version stable: {X.Y.Z})
-   - {lib-B} (alternative, rôle: {description})
+HINT: 1-3 libs suggérées :
+   - {lib-A} (rôle, version stable)
+   - {lib-B} (alternative)
 ```
 
-L'agent peut proposer **1-3 librairies suggérées** (sans les
-installer). Le Tech Lead choisit et met à jour le stack.
-
-### 3.1 Exemples concrets
-
-#### Exemple 1 — backend .NET, besoin Excel non listé
-
+**Exemple** (backend .NET, besoin Excel) :
 ```
 ERROR: dev-backend 1-2-Export-Excel — librairie manquante
-CAUSE: [STACK_LIBRARY_MISSING] besoin de génération de fichier .xlsx pour AC-3
-       absent du stack dotnet-minimalapi §2.4 (Librairies pinnées)
-FIX: 1. Ajouter EPPlus version 7.4.0 dans
-        .claude/stacks/backend/dotnet-minimalapi.md §2.4
-     2. Mettre à jour §2.2.1 :
-        dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package EPPlus --version 7.4.0
-     3. Relancer /dev-backend 1-2
-HINT: librairies suggérées pour génération Excel .xlsx en .NET :
-   - EPPlus (recommandé) — licence Polyform Noncommercial OU commerciale
-   - ClosedXML (alternative open-source MIT)
-   - DocumentFormat.OpenXml (Microsoft, plus bas niveau)
-```
-
-#### Exemple 2 — frontend Vue, besoin date-picker non listé
-
-```
-ERROR: dev-frontend 2-1-Calendar — librairie manquante
-CAUSE: [STACK_LIBRARY_MISSING] besoin d'un composant DatePicker pour AC-2
-       absent du stack vue §2.4 (Librairies pinnées)
-FIX: 1. Ajouter @vuepic/vue-datepicker version 8.7.0 dans
-        .claude/stacks/frontend/vue.md §2.4
-     2. Mettre à jour §2.2.1 :
-        npm install @vuepic/vue-datepicker@8.7.0
-     3. Relancer /dev-frontend 2-1
-HINT: librairies suggérées pour DatePicker Vue 3 :
-   - @vuepic/vue-datepicker (recommandé) — riche, accessible, dark mode
-   - vue-datepicker-next (alternative, plus minimaliste)
-   - vuetify (si déjà actif comme UI DS, utiliser <v-date-picker>)
+CAUSE: [STACK_LIBRARY_MISSING] besoin de génération .xlsx pour AC-3
+       absent du stack dotnet-minimalapi §2.4
+FIX: ajouter EPPlus 7.4.0 dans .libs.json, sync_stack_md, relancer
+HINT: EPPlus (Polyform Noncommercial OU commercial), ClosedXML (MIT,
+      alternative), DocumentFormat.OpenXml (Microsoft, bas niveau)
 ```
 
 ---
 
 ## 4. Cas autorisés sans entrée §2.4
 
-L'agent peut utiliser **sans** entrée §2.4 :
-
-### 4.1 Modules built-in du langage / runtime
-
-- `.NET` BCL : `System.*` (System.IO, System.Text.Json, etc.)
-- Node.js : modules natifs `fs`, `path`, `crypto`, `http`, `url`, `events`
-- Python : stdlib (`datetime`, `json`, `pathlib`, `os`, `re`, `typing`)
-- Java : `java.*` / `javax.*` standard
-- Kotlin : `kotlin.*` stdlib
-
-### 4.2 Dépendances transitivement requises par une lib §2.4
-
-Si AutoMapper §2.4 → tire `Microsoft.Extensions.DependencyInjection`,
-l'agent peut l'utiliser sans entrée explicite (transitive auto-installée
-par NuGet).
-
-### 4.3 Types fournis par le framework principal
-
-ASP.NET Core fournit `IConfiguration`, `ILogger<T>`, `IServiceProvider` :
-pas besoin de les lister en §2.4.
-
-Spring Boot fournit `@RestController`, `@Service`, `ResponseEntity` :
-pas besoin de les lister.
-
-### 4.4 Conventions stack
-
-Si §3 (Conventions d'usage) du stack documente un usage **sans nommer
-une lib externe** (ex. `IDbContextFactory` qui est dans EF Core déjà
-listé) → autorisé.
+- **Built-in langage/runtime** : `.NET BCL` (`System.*`), Node natifs
+  (`fs`, `path`, `crypto`, `http`, `url`, `events`), Python stdlib
+  (`datetime`, `json`, `pathlib`, `os`, `re`, `typing`), `java.*`,
+  `kotlin.*` stdlib
+- **Dépendances transitives** auto-installées par le package manager
+  (ex. `Microsoft.Extensions.DependencyInjection` tiré par AutoMapper)
+- **Types fournis nativement** par le framework principal (ASP.NET :
+  `IConfiguration`, `ILogger<T>` ; Spring : `@RestController`,
+  `ResponseEntity`)
+- **Conventions §3** sans lib externe nommée
 
 ---
 
-## 5. Cas interdits (toujours)
+## 5. Cas interdits
 
-- **Lib découverte ad-hoc** : "j'ai trouvé sur Stack Overflow un package
-  qui fait ça, je l'installe" → INTERDIT, STOP + ERROR
-- **Fork / mirror tiers** : seul le registry canonique (NuGet, npm
-  registry, PyPI, Maven Central, MavenCentral via Gradle, Cargo crates,
-  go.dev) est autorisé
-- **Pre-release** (`-alpha`, `-beta`, `-rc`, `-preview`, `-snapshot`)
-  sauf si pinné en §2.4 avec justification
-- **Version "latest"** non pinnée — toujours pinner explicitement
-- **CVE ≥ moderate** — vérifié post-install par `arch` (cf. politique
-  inline `agents/arch.md`)
+- Lib découverte ad-hoc ("trouvée sur Stack Overflow")
+- Fork / mirror tiers (registries canoniques uniquement)
+- Pre-release (`-alpha/-beta/-rc/-preview/-snapshot`) sans ADR
+- Version `latest` non-pinnée
+- CVE ≥ moderate (vérifié post-install par arch)
 
 ---
 
 ## 6. Anti-patterns rejetés
 
 L'agent NE DOIT JAMAIS :
-- Ajouter un `using ...;` / `import ...;` / `package.json devDependency`
-  sans vérifier §2.4 préalablement
-- Modifier `.csproj` / `package.json` / `pyproject.toml` /
-  `build.gradle.kts` / `pom.xml` pour ajouter une dépendance
-  (réservé à `arch` Phase A pour les libs déclarées en §2.2.1)
-- Utiliser une lib via réflexion / chargement dynamique pour contourner
-  la règle
-- Considérer que "le compilateur trouve la dépendance" suffit pour la
-  considérer comme autorisée
+- Ajouter un `using`/`import`/`devDependency` sans vérifier §2.4
+- Modifier `.csproj`/`package.json`/`pyproject.toml`/`build.gradle.kts`/
+  `pom.xml` (réservé arch Phase A pour libs §2.2.1)
+- Utiliser une lib via réflexion / chargement dynamique pour
+  contourner la règle
+- Considérer "le compilateur trouve la dépendance" comme suffisant
 
 ---
 
-## 7. Workflow Tech Lead pour ajouter une lib
+## 7. Workflow Tech Lead (ajout d'une lib)
 
-Quand un STOP + ERROR `[STACK_LIBRARY_MISSING]` est émis :
+Sur STOP + ERROR `[STACK_LIBRARY_MISSING]` :
+1. Lire l'ERROR + HINT (suggestions de l'agent)
+2. Choisir une lib + vérifier CVE et licence (cmds §0)
+3. Éditer `.libs.json` du stack (append `core[]` ou `onDemand[]`)
+4. `validate_libs_catalog.py` → `sync_stack_md.py` → commit
+5. Relancer `/dev-run {n}` (idempotent)
 
-1. **Tech Lead lit l'ERROR** (HINT contient les suggestions de l'agent)
-2. **Choisit une lib** parmi les suggestions ou une autre validée
-3. **Vérifie CVE et licence** :
-   - NuGet : `dotnet list package --vulnerable`
-   - npm : `npm audit --omit=dev`
-   - PyPI : `pip-audit`
-   - Maven : `mvn dependency:check` (OWASP)
-   - Gradle : plugin `dependency-check`
-4. **Édite le stack** :
-   - §2.4 : ajouter ligne `| {lib} | {version} | {rôle} |`
-   - §2.2.1 : ajouter la commande d'install (ex. `dotnet add package ...`)
-   - §3 (Conventions) : optionnel, ajouter pattern d'usage
-5. **Relance** `/dev-run {n}` (idempotent — pas de duplication)
+**Validation manuelle obligatoire** : pas d'auto-update par les
+agents. Le Tech Lead édite manuellement, ce qui préserve la
+traçabilité (`git blame`) et la sécurité (humain vérifie CVE/licence).
 
 ---
 
-## 8. Validation manuelle obligatoire
+## 8. Évolution du stack
 
-L'ajout d'une lib au stack est une **décision humaine** :
-- Pas d'auto-update du stack par les agents
-- Pas de "PR auto" depuis l'agent vers le fichier stack
-- Le Tech Lead **édite manuellement** le stack avec son arbitrage
+Toute évolution passe par décision humaine tracée :
+- **Ajouts** : édition `.libs.json` + sync
+- **Retraits** : vérifier qu'aucune US ne dépend de la lib retirée
+- **Updates version** : vérifier CVE + breaking changes
 
-Cette barrière préserve la **traçabilité** (git blame sur le stack
-dit qui a ajouté quoi quand) et la **sécurité** (un humain a vérifié
-CVE / licence / pertinence).
-
----
-
-## 9. Enforcement par les agents
-
-### 9.1 Agent dev-backend
-
-Au STEP 5 (génération de code), avant chaque fichier produit :
-1. Lister les `using ...;` / `import ...;` du fichier planifié
-2. Pour chaque import non-built-in (cf. §4) → vérifier §2.4
-3. Si manque → STOP + ERROR §3 + ne PAS écrire le fichier
-
-### 9.2 Agent dev-frontend
-
-Au STEP 5 (génération de code), avant chaque fichier produit :
-1. Lister les `import ...;` du fichier planifié + entries `package.json`
-   ajoutées
-2. Pour chaque import non-built-in → vérifier §2.4
-3. Si manque → STOP + ERROR §3
-
-### 9.3 Agent qa
-
-Au STEP 6 (génération tests), avant chaque fichier de test :
-1. Lister les `import` / `using` du fichier de test
-2. Pour chaque import → vérifier §2.4 du stack QA actif
-3. Si manque → STOP + ERROR §3
+Le stack devient une **trace décisionnelle** des libs validées,
+comparable à un `package-lock.json` enrichi.
 
 ---
 
-## 10. Évolution du stack au fil du projet
+## 9. Lien avec autres règles
 
-Cette règle ne fige PAS le stack. Elle impose juste que toute
-évolution passe par une décision humaine tracée :
+- `file-ownership.md §1` : agent dev-* ne touche pas les fichiers projet (réservé arch)
+- `constitution.md` : ajout de lib peut justifier un ADR (créé par Tech Lead)
 
-- **Ajouts** : Tech Lead édite §2.4 + §2.2.1 + §3 (conventions)
-- **Retraits** : Tech Lead édite §2.4 + §2.2.1, vérifie qu'aucune US
-  ne dépend de la lib retirée
-- **Updates de version** : Tech Lead édite §2.4 (pinning), vérifie
-  CVE et breaking changes
-
-Au fil du projet, le stack devient une **trace décisionnelle** des
-libs validées — comparable à un `package-lock.json` enrichi.
+Note : la matrice rôles (Tech Lead = sélection stack ; agent =
+exécution stricte) est inlinée dans chaque agent (po, arch, dev-*, qa).
 
 ---
 
-## 11. Lien avec autres règles
+## 10. Règle mentale
 
-- **`anti-derive.md`** (futur, dans le sens SDD_Lite) : extension
-  naturelle. Anti-derive interdit l'ajout de fonctionnalité non
-  scopée ; cette règle interdit l'ajout de **lib** non scopée.
-- **`responsibilities.md`** : Tech Lead = sélection / édition stack ;
-  agent = exécution stricte de ce qui est déclaré.
-- **`file-ownership.md`** (v3.0.1) : agent dev-* ne touche pas
-  `.csproj` / `package.json` / `build.gradle.kts` (réservé à `arch`).
-- **`constitution.md`** (v3) : un ajout de lib peut justifier un ADR
-  (ex. choix EPPlus vs ClosedXML) — créé par le Tech Lead manuellement.
-
----
-
-## 12. Règle mentale
-
-**"Si la lib n'est pas dans §2.4, je n'écris pas le fichier. Je STOP
-avec une ERROR claire et 1-3 suggestions. Le Tech Lead ajoute la lib
-au stack si pertinent. Puis je continue."**
+**"Si la lib n'est pas dans §2.4, je n'écris pas le fichier. STOP +
+ERROR avec 1-3 suggestions. Le Tech Lead arbitre."**
 
 L'agent est exécutif, jamais autonome dans le choix des outils.

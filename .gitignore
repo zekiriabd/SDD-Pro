@@ -3,3 +3,63 @@
 ################################################################################
 
 /.vs
+
+# Python bytecode (sdd_hooks, sdd_lib, sdd_scripts)
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+
+# Workspace généré par le pipeline SDD (artefacts non-versionnés)
+workspace/output/
+workspace/console/status.json
+workspace/console/.status.lock
+
+# Framework smoke cache (fast-path Stop hook)
+.claude/.cache/
+
+# Local dev secrets — stack.md contient DB_PASSWORD, AUTH_JWT_SECRET,
+# SMTP_PASSWORD etc. en clair pour le dev local. Ne JAMAIS committer.
+# Versionner stack.md.example (placeholders) à la place.
+workspace/input/stack/stack.md
+
+# Layered config team-level (peut contenir des secrets/policy org)
+.sdd/
+~/.sdd/
+
+# Pytest coverage artefact (run-local)
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Console Fastify deps (lourdes, ~27MB, restituables via npm install)
+workspace/console/node_modules/
+
+# Console DB (SQLite local — généré par init_console_db.py, contient stats run-locale)
+workspace/output/db/*.db
+workspace/output/db/*.db-shm
+workspace/output/db/*.db-wal
+
+# MCPB bundle build artifact (régénérable via python -m sdd_mcp.build_mcpb)
+.claude/python/.mcpb-build/
+.claude/python/*.mcpb
+
+# .NET / Java / Node build outputs (au cas où des projets seraient générés à la racine)
+**/bin/
+**/obj/
+**/dist/
+**/build/
+**/.gradle/
+**/target/
+
+# IDE
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Settings local Claude Code (additionalDirectories cross-poste)
+.claude/settings.local.json

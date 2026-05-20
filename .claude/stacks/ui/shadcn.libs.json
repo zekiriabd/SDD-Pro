@@ -1,0 +1,66 @@
+{
+  "$schema": "../../templates/libs-catalog.schema.json",
+  "stackId": "shadcn",
+  "category": "ui",
+  "schemaVersion": 1,
+  "buildSystem": "pnpm",
+  "manifest": {
+    "files": ["workspace/output/src/{AppName}/package.json"]
+  },
+  "versions": {
+    "tailwindcss": "4.0.0",
+    "tailwindcss-vite": "4.0.0",
+    "tailwindcss-animate": "1.0.7",
+    "class-variance-authority": "0.7.0",
+    "clsx": "2.1.1",
+    "tailwind-merge": "2.5.5",
+    "lucide-react": "0.469.0",
+    "radix-react-slot": "1.1.0",
+    "radix-react-dialog": "1.1.2",
+    "radix-react-dropdown-menu": "2.1.2",
+    "radix-react-label": "2.1.0",
+    "radix-react-select": "2.1.2",
+    "radix-react-tabs": "1.1.1",
+    "radix-react-toast": "1.2.2",
+    "radix-react-tooltip": "1.1.4",
+    "radix-react-checkbox": "1.1.2",
+    "radix-react-avatar": "1.1.1",
+    "radix-react-progress": "1.1.0",
+    "radix-react-switch": "1.1.1",
+    "radix-react-separator": "1.1.0",
+    "radix-react-popover": "1.1.2",
+    "sonner": "1.7.1"
+  },
+  "core": [
+    { "module": "tailwindcss", "ref": "tailwindcss", "rationale": "Utility-first CSS (Tailwind v4 native).", "license": "MIT" },
+    { "module": "@tailwindcss/vite", "ref": "tailwindcss-vite", "rationale": "Plugin Vite Tailwind v4.", "license": "MIT" },
+    { "module": "class-variance-authority", "ref": "class-variance-authority", "rationale": "Variantes typées pour composants shadcn (cva).", "license": "Apache-2.0" },
+    { "module": "clsx", "ref": "clsx", "rationale": "Concaténation conditionnelle de classes CSS.", "license": "MIT" },
+    { "module": "tailwind-merge", "ref": "tailwind-merge", "rationale": "Résolution conflits classes Tailwind (helper cn()).", "license": "MIT" },
+    { "module": "lucide-react", "ref": "lucide-react", "rationale": "Pack icônes officiel shadcn (iconLibrary='lucide').", "license": "ISC" },
+    { "module": "@radix-ui/react-slot", "ref": "radix-react-slot", "rationale": "Primitive Radix utilisée par Button asChild.", "license": "MIT" }
+  ],
+  "onDemand": [
+    { "module": "@radix-ui/react-dialog", "ref": "radix-react-dialog", "capability": "dialog", "triggers": ["\\bdialog\\b", "\\bmodal\\b", "popup", "fenetre.*modale"], "rationale": "Primitive Dialog/Modal (shadcn add dialog)." },
+    { "module": "@radix-ui/react-dropdown-menu", "ref": "radix-react-dropdown-menu", "capability": "dropdown-menu", "triggers": ["dropdown", "menu contextuel", "menu deroulant"], "rationale": "Primitive DropdownMenu (shadcn add dropdown-menu)." },
+    { "module": "@radix-ui/react-label", "ref": "radix-react-label", "capability": "label", "triggers": ["\\blabel\\b", "form.*label"], "rationale": "Primitive Label (shadcn add label)." },
+    { "module": "@radix-ui/react-select", "ref": "radix-react-select", "capability": "select", "triggers": ["\\bselect\\b", "\\bcombobox\\b", "liste.*deroulante"], "rationale": "Primitive Select (shadcn add select)." },
+    { "module": "@radix-ui/react-tabs", "ref": "radix-react-tabs", "capability": "tabs", "triggers": ["\\btabs?\\b", "\\bonglets?\\b"], "rationale": "Primitive Tabs (shadcn add tabs)." },
+    { "module": "@radix-ui/react-toast", "ref": "radix-react-toast", "capability": "toast-radix", "triggers": ["radix.*toast"], "rationale": "Primitive Toast Radix (alternative à sonner).", "alternative": true },
+    { "module": "sonner", "ref": "sonner", "capability": "toast", "triggers": ["\\btoast\\b", "\\bnotification\\b", "snackbar"], "rationale": "Toast notifications (recommandé par shadcn 2024+)." },
+    { "module": "@radix-ui/react-tooltip", "ref": "radix-react-tooltip", "capability": "tooltip", "triggers": ["\\btooltip\\b", "infobulle", "info.*bulle"], "rationale": "Primitive Tooltip (shadcn add tooltip)." },
+    { "module": "@radix-ui/react-checkbox", "ref": "radix-react-checkbox", "capability": "checkbox", "triggers": ["\\bcheckbox\\b", "case.*cocher"], "rationale": "Primitive Checkbox (shadcn add checkbox)." },
+    { "module": "@radix-ui/react-avatar", "ref": "radix-react-avatar", "capability": "avatar", "triggers": ["\\bavatar\\b", "photo.*profil"], "rationale": "Primitive Avatar (shadcn add avatar)." },
+    { "module": "@radix-ui/react-progress", "ref": "radix-react-progress", "capability": "progress", "triggers": ["\\bprogress\\b", "barre.*progression", "loader"], "rationale": "Primitive Progress (shadcn add progress)." },
+    { "module": "@radix-ui/react-switch", "ref": "radix-react-switch", "capability": "switch", "triggers": ["\\bswitch\\b", "\\btoggle\\b", "interrupteur"], "rationale": "Primitive Switch (shadcn add switch)." },
+    { "module": "@radix-ui/react-separator", "ref": "radix-react-separator", "capability": "separator", "triggers": ["separator", "\\bdivider\\b", "separateur"], "rationale": "Primitive Separator (shadcn add separator)." },
+    { "module": "@radix-ui/react-popover", "ref": "radix-react-popover", "capability": "popover", "triggers": ["\\bpopover\\b", "\\bpopup\\b"], "rationale": "Primitive Popover (shadcn add popover)." },
+    { "module": "tailwindcss-animate", "ref": "tailwindcss-animate", "capability": "tw3-animations", "triggers": ["tailwind.*v3", "tailwindcss-animate"], "rationale": "Animations Tailwind v3 (v4 native, donc on-demand uniquement si rétro-compat v3).", "alternative": true }
+  ],
+  "plugins": [],
+  "metadata": {
+    "lastUpdated": "2026-05-13",
+    "format": "compact (v2)",
+    "notes": "Setup obligatoire via CLI : npx shadcn@latest init -d -y ; puis shadcn add {component} pulle les @radix-ui/* deps automatiquement. Les versions Radix sont pinées par shadcn CLI lors du add, ce catalogue les expose pour audit/CVE."
+  }
+}

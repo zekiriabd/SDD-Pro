@@ -1,0 +1,54 @@
+{
+  "name": "sdd-pro",
+  "version": "0.2.0",
+  "description": "SDD_Pro MCP server — exposes 14 tools (7 read-only deterministic + 7 LLM-driven pipeline) to non-Claude-Code clients (Cursor, Windsurf, Cline, Claude Desktop, n8n).",
+  "mcpServers": {
+    "sdd-pro": {
+      "command": "python",
+      "args": ["-m", "sdd_mcp.server"],
+      "cwd": "${workspaceFolder}/.claude/python",
+      "env": {
+        "PYTHONIOENCODING": "utf-8"
+      }
+    },
+    "sdd-pro-http": {
+      "command": "python",
+      "args": ["-m", "sdd_mcp.server", "--transport", "http", "--port", "8765"],
+      "cwd": "${workspaceFolder}/.claude/python",
+      "env": {
+        "PYTHONIOENCODING": "utf-8"
+      },
+      "_note": "Opt-in HTTP transport. Endpoints: POST /mcp, GET /healthz, GET /tools. Set SDD_MCP_AUTH_TOKEN env var to require Bearer auth."
+    }
+  },
+  "_meta": {
+    "framework": "SDD_Pro",
+    "framework_version": "6.10.0",
+    "protocol_version": "2024-11-05",
+    "transports": ["stdio", "http"],
+    "tools_phase_1_read_only": [
+      "sdd_status",
+      "validate_readiness",
+      "feat_validate",
+      "set_us_status",
+      "validate_us_deps",
+      "compute_us_complexity",
+      "migrate_us_v1_to_v2"
+    ],
+    "tools_phase_2_llm_driven": [
+      "claude_check",
+      "feat_generate",
+      "us_generate",
+      "sdd_full",
+      "get_sdd_full_status",
+      "cancel_sdd_full",
+      "list_sdd_full_jobs"
+    ],
+    "engine_impact": "none — wrappers around existing sdd_scripts/*.py + claude CLI subprocess; zero modification of agents/rules/templates/pipeline",
+    "distribution": {
+      "stdio_native": "python -m sdd_mcp.server",
+      "http_opt_in": "python -m sdd_mcp.server --transport http",
+      "mcpb_bundle": "python -m sdd_mcp.build_mcpb"
+    }
+  }
+}

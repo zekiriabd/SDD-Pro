@@ -1,10 +1,10 @@
-{
+﻿{
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://sdd-pro.local/schemas/status.schema.json",
   "title": "SDD_Pro — Console human validation status",
   "description": "Source unique de verite des statuts humains (validation manuelle) et des decisions de gates entre phases du pipeline /sdd-full. Ecrit par la console web (clic Valider) et par /sdd-full (pose pending aux gates). Atomic write avec lock file workspace/console/.status.lock.",
   "type": "object",
-  "required": ["version", "updatedAt", "specs", "gates"],
+  "required": ["version", "updatedAt", "FEATs", "gates"],
   "additionalProperties": false,
   "properties": {
     "version": {
@@ -17,16 +17,16 @@
       "format": "date-time",
       "description": "ISO 8601 UTC, timestamp du dernier write."
     },
-    "specs": {
+    "FEATs": {
       "type": "object",
-      "description": "Cle = basename SPEC sans extension (ex: '1-spec-connexion'). Une entree par fichier workspace/input/specs/{n}-{name}.md.",
+      "description": "Cle = basename FEAT sans extension (ex: '1-FEAT-connexion'). Une entree par fichier workspace/input/feats/{n}-{name}.md.",
       "additionalProperties": {
         "type": "object",
         "required": ["humanStatus"],
         "additionalProperties": false,
         "properties": {
           "humanStatus": { "$ref": "#/$defs/humanStatus" },
-          "validatedBy": { "type": "string", "description": "Email du validateur (PO pour spec/US, Tech Lead pour plan)." },
+          "validatedBy": { "type": "string", "description": "Email du validateur (PO pour FEAT/US, Tech Lead pour plan)." },
           "validatedAt": { "type": "string", "format": "date-time" },
           "comment": { "type": "string", "description": "Commentaire libre du validateur." },
           "us": {
@@ -64,7 +64,7 @@
     },
     "gates": {
       "type": "object",
-      "description": "Decisions humaines aux gates manuels du pipeline /sdd-full. Cle = numero SPEC (ex: '1').",
+      "description": "Decisions humaines aux gates manuels du pipeline /sdd-full. Cle = numero FEAT (ex: '1').",
       "additionalProperties": {
         "type": "object",
         "additionalProperties": false,

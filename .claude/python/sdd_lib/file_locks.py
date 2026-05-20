@@ -1,0 +1,125 @@
+"""Cross-platform atomic file lock helpers.
+
+Uses `O_EXCL` semantics via `os.open(O_CREAT | O_EXCL | O_WRONLY)` which is
+atomic on POSIX (Linux/macOS) and Windows alike (via Python's CRT layer).
+"""
+from __future__ import annotations
+
+import errno
+import os
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+
+
+def try_create_exclusive(path: Path, content: str) -> bool:
+    """Atomically create `path` with the given content if it does not exist.
+
+    Returns:
+        True if created (lock acquired), False if the file already exists.
+    Raises:
+        OSError for any failure other than EEXIST.
+    """
+    flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY
+    try:
+        fd = os.open(str(path), flags, 0o644)
+    except OSError as e:
+        if e.errno == errno.EEXIST:
+            return False
+        raise
+    try:
+        os.write(fd, content.encode("ascii", errors="strict"))
+    finally:
+        os.close(fd)
+    return True
+
+
+def read_lock(path: Path) -> tuple[str, int] | None:
+    """Read a `lockfile` of form 'AGENT_ID:UNIX_TIMESTAMP'.
+
+    Returns (agent_id, timestamp) or None if file missing/malformed.
+    """
+    try:
+        raw = path.read_text(encoding="ascii", errors="replace").strip()
+    except (OSError, UnicodeError):
+        return None
+    if not raw:
+        return None
+    parts = raw.split(":", 1)
+    agent = parts[0].strip()
+    try:
+        ts = int(parts[1].strip()) if len(parts) >= 2 else 0
+    except ValueError:
+        ts = 0
+    return (agent, ts)
+
+
+def overwrite_lock(path: Path, content: str) -> None:
+    """Overwrite an existing lock file (used for stale recovery)."""
+    path.write_text(content, encoding="ascii", newline="")
+
+
+def _now_ms() -> int:
+    return int(datetime.now(timezone.utc).timestamp() * 1000)
+
+
+def acquire_with_retry(
+    lock_path: Path,
+    *,
+    payload_prefix: str = "py",
+    ttl_ms: int = 10000,
+    retry_count: int = 5,
+    backoff_ms: int = 50,
+) -> None:
+    """O_EXCL atomic lock acquire with stale detection + retry-with-backoff.
+
+    Lock payload format: `{payload_prefix}:{pid}:{unix_ts_ms}`.
+    Mirrors the console Node.js side (`workspace/console/lib/atomic-write.js`)
+    for cross-language symmetry on `workspace/console/.status.lock`.
+
+    Stale recovery: if the existing lock file is older than `ttl_ms`,
+    it is unlinked and the loop retries.
+
+    Raises RuntimeError ([LOCK_HELD]) after `retry_count` failed attempts.
+    """
+    flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY
+
+    for attempt in range(retry_count):
+        try:
+            fd = os.open(str(lock_path), flags, 0o644)
+        except OSError as e:
+            if e.errno != errno.EEXIST:
+                raise
+            try:
+                content = lock_path.read_text(encoding="ascii", errors="replace").strip()
+                parts = content.split(":")
+                ts_str = parts[-1] if parts else ""
+                ts = int(ts_str) if ts_str.isdigit() else 0
+            except (OSError, ValueError):
+                ts = 0
+            now = _now_ms()
+            if ts and (now - ts) > ttl_ms:
+                try:
+                    lock_path.unlink()
+                except OSError:
+                    pass
+                continue
+            time.sleep((backoff_ms * (attempt + 1)) / 1000.0)
+            continue
+
+        try:
+            payload = f"{payload_prefix}:{os.getpid()}:{_now_ms()}".encode("ascii")
+            os.write(fd, payload)
+        finally:
+            os.close(fd)
+        return
+
+    raise RuntimeError(f"[LOCK_HELD] Cannot acquire {lock_path} after {retry_count} attempts")
+
+
+def release(lock_path: Path) -> None:
+    """Remove a lock file (best effort, no-op if absent)."""
+    try:
+        lock_path.unlink()
+    except OSError:
+        pass

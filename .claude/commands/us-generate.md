@@ -1,9 +1,9 @@
-# /us-generate — Découpe une SPEC en User Stories
+# /us-generate — Découpe une FEAT en User Stories
 
-Invoque l'agent PO pour découper une SPEC fonctionnelle en User
+Invoque l'agent PO pour découper une FEAT fonctionnelle en User
 Stories structurées (cible 1-3, warning 4-6, hard cap 6) dans `workspace/output/`.
 
-**Usage :** `/us-generate {n}` — où `{n}` est le numéro de la SPEC
+**Usage :** `/us-generate {n}` — où `{n}` est le numéro de la FEAT
 
 ---
 
@@ -13,7 +13,7 @@ L'argument `{n}` est obligatoire et doit être un entier ≥ 1.
 
 Si absent → demander :
 ```
-Quel est le numéro de la SPEC à découper ? (ex. : 1 pour workspace/input/specs/1-Auth.md)
+Quel est le numéro de la FEAT à découper ? (ex. : 1 pour workspace/input/feats/1-Auth.md)
 ```
 
 Si non numérique → ERROR :
@@ -25,21 +25,48 @@ FIX: relancer /us-generate {n} avec n entier (ex. /us-generate 1)
 
 ---
 
-## STEP 2 — Vérifier la SPEC existe
+## STEP 2 — Vérifier la FEAT existe
 
-Glob `workspace/input/specs/{n}-*.md`.
+Glob `workspace/input/feats/{n}-*.md`.
 - 0 fichier → ERROR :
   ```
-  ERROR: /us-generate — SPEC introuvable
-  CAUSE: aucun fichier workspace/input/specs/{n}-*.md
-  FIX: créer la SPEC via /spec-generate ou la déposer manuellement
+  ERROR: /us-generate — FEAT introuvable
+  CAUSE: aucun fichier workspace/input/feats/{n}-*.md
+  FIX: créer la FEAT via /feat-generate ou la déposer manuellement
   ```
 - > 1 fichier → ERROR :
   ```
   ERROR: /us-generate — numérotation invalide
-  CAUSE: plusieurs fichiers commencent par {n}- dans workspace/input/specs/
+  CAUSE: plusieurs fichiers commencent par {n}- dans workspace/input/feats/
   FIX: renommer pour qu'un seul fichier ait le préfixe {n}-
   ```
+
+---
+
+## STEP 2.5 — Checkpoint skip (v6.6.4, opt-in)
+
+Si `CheckpointMode: resume` dans Project Config (défaut `off` =
+comportement v6.6.3 strict) :
+
+```python
+from sdd_lib.checkpoint import is_phase_resumable
+
+inputs = [
+    f"workspace/input/feats/{n}-*.md",      # FEAT parent
+    "workspace/input/stack/stack.md",       # Project Config + stacks actifs
+]
+resumable, reason = is_phase_resumable(
+    feat=n, phase="us-generate", input_paths=resolved_inputs,
+)
+if resumable:
+    print(f"⊘ /us-generate {n}: skipped (checkpoint hit)")
+    # STOP avec succès, ne pas re-déléguer à l'agent PO
+```
+
+Si `CheckpointMode ∈ {off, record}` → skip ce STEP, continuer.
+
+Émissions possibles : `[CHECKPOINT_HASH_MISMATCH]`, `[CHECKPOINT_INPUT_MISSING]`,
+`[CHECKPOINT_STATE_UNREADABLE]`. Cf. `error-classification.md §1.16`.
 
 ---
 
@@ -51,6 +78,22 @@ des fichiers US dans `workspace/output/`.
 
 Attendre la fin de l'agent. Relayer sa sortie telle quelle (ligne de succès
 ou bloc ERROR 3 lignes).
+
+### STEP 3.bis — Checkpoint record (v6.6.4, opt-in)
+
+Si l'agent PO a réussi (US écrites) ET `CheckpointMode ∈ {record, resume}` :
+
+```python
+from sdd_lib.checkpoint import record_input_hash
+
+record_input_hash(
+    run_id=$RUN_ID,
+    phase="us-generate",
+    input_paths=resolved_inputs,    # FEAT + stack.md
+)
+```
+
+Erreur silencieuse si state.json absent → WARN, non bloquant.
 
 ---
 
@@ -77,7 +120,7 @@ Si aucun HTML détecté ET au moins une US a une composante UI attendue,
 
 Si l'agent PO réussit, ajouter le récap final :
 ```
-✅ SPEC {n}-{SpecName} — planification terminée
+✅ FEAT {n}-{FeatName} — planification terminée
 
 US générées      : {U} fichiers dans workspace/output/us/
 Mockups HTML     : {H} fichiers dans workspace/input/ui/ (ou "aucun")
@@ -97,6 +140,6 @@ Si l'agent échoue, ne rien ajouter (l'ERROR 3 lignes de l'agent suffit).
 ## Règles de cette commande
 
 - Pas de Q/R utilisateur après le STEP 1 (l'agent est autonome)
-- Pas de modification de la SPEC parente
+- Pas de modification de la FEAT parente
 - Pas de génération de code (réservé à `/dev-backend`, `/dev-frontend`, `/dev-run`)
 - Pas de lecture des mockups HTML ou du stack (réservé aux agents dev-*)

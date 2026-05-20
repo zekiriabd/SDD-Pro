@@ -1,4 +1,4 @@
-﻿# Règle — QA Coverage (seuil 80%, schéma normalisé)
+# Règle — QA Coverage (seuil 80%, schéma normalisé)
 
 ## Principe
 
@@ -19,22 +19,31 @@ se fait au niveau du schéma `coverage.json`.
 ```markdown
 ## Project Config
 QAMode: full              # off | quality-only | tests-only | tests+coverage | full | manual
-CoverageMin: 80           # entier 0-100, défaut 80 (SDD_Pro v3.1.0)
+CoverageMin: 80           # OBLIGATOIRE, entier 0-100 — pas de défaut
 ```
 
-| Clé | Défaut | Range | Hors range |
-|---|---|---|---|
-| `QAMode` | `manual` | `off | quality-only | tests-only | tests+coverage | full | manual` | ERROR `[STACK_MALFORMED]` |
-| `CoverageMin` | `80` | `0-100` | ERROR `[STACK_MALFORMED]` |
+| Clé | Obligatoire | Défaut | Range | Hors range / Absent |
+|---|---|---|---|---|
+| `QAMode` | non | `manual` | `off | quality-only | tests-only | tests+coverage | full | manual` | ERROR `[STACK_MALFORMED]` |
+| `CoverageMin` | **OUI** | — (pas de défaut) | `0-100` | ERROR `[STACK_MALFORMED]` (absent OU hors range) |
 
 `CoverageMin: 0` est valide (= seuil désactivé, métrique reportée mais
-non bloquante même en WARNING).
+non bloquante même en WARNING) — c'est une **décision explicite** du
+Tech Lead, pas un état par défaut.
 
 **Décision SDD_Pro v6.1 (hardening)** : `coverage_lines_pct < CoverageMin`
 produit un **🔴 RED bloquant** (`[QA_COVERAGE_GAP]`). La règle
 antérieure v3.1.0 (WARN non bloquant) est révoquée — atteindre la
 couverture est désormais une condition d'acceptation, pas un
 "nice-to-have".
+
+**Durcissement v6.10.1 (présence obligatoire)** : `CoverageMin` doit
+figurer **explicitement** dans `## Project Config` (ou la couche
+team/base si layered config activée). Absent → STOP + ERROR
+`[STACK_MALFORMED]` dès la lecture du stack.md par `read_layered_config`.
+Aucun défaut framework — l'omission ne peut plus passer pour un
+"j'ai oublié, donc 80 par défaut". Le Tech Lead **décide et trace**
+la valeur (y compris `0` pour bypass).
 
 **Bypass explicite** :
 - baisser `CoverageMin` dans `## Project Config` (décision tracée en git blame)
@@ -55,7 +64,7 @@ L'agent QA écrit `workspace/output/qa/feat-{n}/coverage.json` :
 
 ```json
 {
-  "spec": "{n}-{SpecName}",
+  "FEAT": "{n}-{FeatName}",
   "extractedAt": "2026-05-05T14:32:18Z",
   "stacks": [
     {
@@ -88,7 +97,7 @@ L'agent QA écrit `workspace/output/qa/feat-{n}/coverage.json` :
 
 | Champ | Type | Description |
 |---|---|---|
-| `spec` | string | `{n}-{SpecName}` |
+| `FEAT` | string | `{n}-{FeatName}` |
 | `extractedAt` | ISO-8601 UTC | Timestamp de la mesure |
 | `stacks[]` | array ≥ 1 | Une entrée par stack QA actif |
 | `stacks[].stack` | string | Stack ID (`qa-dotnet-xunit`, etc.) |
@@ -151,13 +160,13 @@ Les autres classes (`[QA_TEST_FAILED]`) peuvent toujours flagger.
 | Préfixe | Quand l'utiliser |
 |---|---|
 | `[QA_TEST_FAILED]` | Au moins un test échoue → décision `RED` |
-| `[QA_COVERAGE_GAP]` | `coverage_lines_pct < CoverageMin` → décision `YELLOW` |
+| `[QA_COVERAGE_GAP]` | `coverage_lines_pct < CoverageMin` → décision `RED` (bloquant, depuis v6.1 hardening) |
 | `[QA_FRAMEWORK_MISSING]` | Test runner CLI absent OU `## Active QA Specs` vide |
 | `[QA_INIT_FAILED]` | Bootstrap test project échoue |
 | `[QA_TEST_INVALID]` | Forbidden patterns détectés (sleep, DB réelle, état partagé) |
 | `[QA_OUTPUT_INVALID]` | `coverage.json` ou `quality.json` non-parseable au self-verify |
-| `[QA_PRECONDITION_FAILED]` | SPEC/US/code production absents |
-| `[QA_OWNERSHIP_VIOLATION]` | Voir `qa-ownership.md §6` |
+| `[QA_PRECONDITION_FAILED]` | FEAT/US/code production absents |
+| `[QA_OWNERSHIP_VIOLATION]` | dev-* tente d'écrire un test OU agent QA tente d'éditer du code production |
 
 **Ordre de priorité** (une seule classe primaire émise dans la décision globale) :
 ```
@@ -168,12 +177,13 @@ Les autres classes (`[QA_TEST_FAILED]`) peuvent toujours flagger.
 
 ## 5. Format ERROR — exemples
 
-### `[QA_COVERAGE_GAP]` (WARNING dans le rapport)
+### `[QA_COVERAGE_GAP]` (RED bloquant, depuis v6.1 hardening)
 
 ```
-WARNING: feat 1-Auth — coverage gap
+ERROR: feat 1-Auth — coverage gap
 CAUSE: [QA_COVERAGE_GAP] lines coverage 62.45% below threshold 80% (8 files measured)
-HINT: ajouter des tests dans workspace/output/src/SIMBackend.Tests/Services/ ciblant AuthService.RefreshToken
+FIX: ajouter des tests dans workspace/output/src/SIMBackend.Tests/Services/ ciblant AuthService.RefreshToken
+     OU baisser CoverageMin dans workspace/input/stack/stack.md ## Project Config (décision tracée)
 ```
 
 ### `[QA_TEST_FAILED]` (rouge)
@@ -222,7 +232,7 @@ qu'un kill du process laisse un JSON tronqué.
 ## 7. Enforcement
 
 - **Agent QA** charge cette règle en STEP 3 (chargement contexte)
-- **Script `parse-coverage.ps1`** applique le format §2 et le calcul
+- **Script `parse_coverage.py`** applique le format §2 et le calcul
   §2.3 sans intervention LLM (déterministe, 0 token)
 - **Commande `/qa-generate`** propage le statut feature selon §3 + §4
 
@@ -233,7 +243,7 @@ qu'un kill du process laisse un JSON tronqué.
 - **Quel test runner / coverage tool utiliser** — c'est dans le QA
   stack actif (`.claude/stacks/qa/*.md`)
 - **Le format intermédiaire produit par le tool** (cobertura XML,
-  lcov, json native) — le script `parse-coverage.ps1` parse et
+  lcov, json native) — le script `parse_coverage.py` parse et
   normalise vers le schéma §2
 - **L'historisation** — out of scope
 - **L'intégration avec services externes** (Codecov, SonarQube Cloud,

@@ -1,7 +1,7 @@
-﻿# /qa-generate — Tests unitaires + Coverage + Quality scan
+# /qa-generate — Tests unitaires + Coverage + Quality scan
 
 Délègue à l'agent `qa` (Sonnet 4.6) pour générer les tests unitaires
-(backend + frontend) d'une SPEC, exécuter le coverage parsing
+(backend + frontend) d'une FEAT, exécuter le coverage parsing
 (PowerShell, 0 token) et le quality scan sonar-like (PowerShell,
 0 token).
 
@@ -24,7 +24,7 @@ Argument **obligatoire** : `{n}` (entier ≥ 1).
 Si absent →
 ```
 ERROR: /qa-generate — argument manquant
-CAUSE: aucun numéro de SPEC fourni
+CAUSE: aucun numéro de FEAT fourni
 FIX: relancer /qa-generate {n} (ex. /qa-generate 1)
 ```
 
@@ -40,17 +40,51 @@ si présent.
 
 ---
 
+## STEP 1.5 — Checkpoint skip (v6.6.3, opt-in)
+
+Si `CheckpointMode: resume` dans Project Config (défaut `off` =
+comportement v6.6.2 strict) :
+
+```python
+from sdd_lib.checkpoint import is_phase_resumable
+
+inputs = [
+    f"workspace/input/feats/{n}-*.md",       # FEAT parent
+    f"workspace/output/us/{n}-*.md",         # toutes les US
+    "workspace/input/stack/stack.md",        # config + stacks actifs
+]
+# Glob les patterns vers paths concrets avant l'appel
+resumable, reason = is_phase_resumable(
+    feat=n, phase="qa-generate", input_paths=resolved_inputs,
+)
+if resumable:
+    print(f"⊘ /qa-generate {n}: skipped (checkpoint hit, reason=ok)")
+    # STOP avec succès, ne pas regénérer
+```
+
+Si `CheckpointMode ∈ {off, record}` → skip ce STEP, continuer
+normalement.
+
+Émissions possibles :
+- `[CHECKPOINT_HASH_MISMATCH]` → inputs modifiés post-run, re-exécuter
+- `[CHECKPOINT_INPUT_MISSING]` → input absent, re-exécuter
+- `[CHECKPOINT_STATE_UNREADABLE]` → pas de state.json antérieur, première exécution
+
+Cf. `error-classification.md §1.16` + `sdd_lib/checkpoint.py`.
+
+---
+
 ## STEP 2 — Vérifier les préconditions
 
-### 2.1 SPEC existe
+### 2.1 FEAT existe
 
-Glob `workspace/input/specs/{n}-*.md`.
+Glob `workspace/input/feats/{n}-*.md`.
 
 - 0 fichier → ERROR :
   ```
-  ERROR: /qa-generate — SPEC introuvable
-  CAUSE: aucun fichier workspace/input/specs/{n}-*.md
-  FIX: créer la SPEC via /spec-generate avant
+  ERROR: /qa-generate — FEAT introuvable
+  CAUSE: aucun fichier workspace/input/feats/{n}-*.md
+  FIX: créer la FEAT via /feat-generate avant
   ```
 - > 1 fichier → ERROR (numérotation invalide).
 
@@ -114,17 +148,10 @@ Si mode invalide → ERROR `[STACK_MALFORMED]`.
 
 Skip si mode = `tests-only` ou `tests+coverage`.
 
-Exécuter `quality-scan.ps1` avec fallback `pwsh → powershell` :
+Exécuter `quality_scan.py` (Python pur, cross-platform) :
 
 ```bash
-if command -v pwsh >/dev/null 2>&1; then
-  PS_BIN=pwsh
-else
-  PS_BIN=powershell
-fi
-$PS_BIN -NoProfile -ExecutionPolicy Bypass \
-  -File .claude/scripts/quality-scan.ps1 \
-  -SpecNumber {n}
+python .claude/python/sdd_scripts/quality_scan.py --feat-number {n}
 ```
 
 Sortie : `workspace/output/qa/feat-{n}/quality.json`.
@@ -165,37 +192,142 @@ L'agent gère :
 
 Modes propagés à l'agent via le mode résolu en STEP 3.
 
+### 6.bis — Ingest api-tests JSON vers console.db (v6.10, si mode=api-tests)
+
+Si `mode == "api-tests"`, l'agent vient d'écrire `api-tests.json`. Le bridge
+Python parse, insère dans `qa_api_tests` + `qa_api_endpoints` (console.db)
+puis supprime le `.json`. Le `.md` est conservé.
+
+```bash
+if [ "$mode" = "api-tests" ]; then
+  python .claude/python/sdd_scripts/ingest_agent_report.py --type api-tests --feat {n}
+fi
+```
+
+Sur exit ≠ 0 → WARN (rapport JSON manquant ou invalide). Non bloquant
+pour le pipeline qa-generate (le `.md` reste lisible humainement).
+
 ---
 
-## STEP 6.5 — Refresh dashboard QA (auto, depuis 2026-05-08)
+## STEP 6.4 — Performance audit (auto, depuis v6.4.2)
 
-Après écriture de `coverage.json` + `quality.json` + `report.md`,
-invoquer `Agent: dashboard` (Haiku 4.5) pour régénérer
-`workspace/output/qa/feat-{n}/dashboard.html` (visualisation HTML des
-métriques).
+**Conditionnel** : invoque l'agent `performance-auditor` (Sonnet 4.6)
+si `phase_planner.py` indique `perf_audit.enabled == true`. **Activé
+par défaut** depuis v6.4.3 (`PerfMode: full`). Désactivable via
+`PerfMode: off` (jamais invoqué) ou `PerfMode: manual` (skip sauf si
+une AC de la FEAT mentionne explicitement une métrique perf —
+LCP/p95/... — override automatique).
 
-Non bloquant : sur échec, WARNING + continuer vers STEP 7.
+### 6.4.1 — Décision
 
----
+```bash
+PHASE_PLAN=$(python .claude/python/sdd_scripts/phase_planner.py \
+  --feat-number {n} --json 2>/dev/null)
+PERF_ENABLED=$(echo "$PHASE_PLAN" | python -c \
+  "import json,sys; d=json.load(sys.stdin); print(d['phases']['perf_audit']['enabled'])" 2>/dev/null)
+```
 
-## STEP 7 — Confirmation et récap
-
-Lire `workspace/output/qa/feat-{n}/coverage.json` (si présent) et
-`workspace/output/qa/feat-{n}/quality.json` (si présent).
-
-Calculer la décision globale :
+### 6.4.2 — Invocation (si enabled)
 
 ```
-si tests.failed > 0:                    → RED
-elif coverage_passed == false:          → RED   (depuis v6.1 hardening, cf. qa-coverage.md §3.1)
-elif quality.errors > 0:                → YELLOW
-else:                                   → GREEN
+Agent(performance-auditor, args="{n}")
+```
+
+L'agent produit `workspace/output/qa/feat-{n}/perf-report.{md,json}`
++ optionnellement `.lighthouse-raw.json` si Lighthouse CI dispo.
+
+### 6.4.3 — Lecture verdict + propagation (v6.10 : depuis console.db)
+
+```bash
+VERDICT=$(python .claude/python/sdd_scripts/query_console_db.py perf --feat {n} \
+  | python -c "import json,sys; print(json.load(sys.stdin).get('verdict') or 'GREEN')")
+```
+
+Le rapport JSON a déjà été ingéré et supprimé par l'agent
+`performance-auditor` (STEP 9.5). Le verdict consolidé vit dans la
+table `qa_performance` de `workspace/output/db/console.db`.
+
+| Verdict | Action |
+|---|---|
+| 🟢 GREEN | continue STEP 6.5 |
+| 🟡 WARN  | continue + log WARN dans STEP 7 récap |
+| 🔴 RED   | log dans STEP 7, **non bloquant** (perf est contextuelle, sauf `[PERF_AC_VIOLATION]` hard-blocking qui ramène à un STOP propagé au caller `/dev-run` si appelé en chaîne) |
+
+### 6.4.4 — Skip silencieux
+
+Si `PERF_ENABLED == false` :
+```
+⊘ performance-auditor : skipped ({skip_reason du planner})
+```
+
+### 6.4.5 — State tracking
+
+```bash
+python .claude/python/sdd_scripts/sdd_state.py set-phase \
+  --run-id $RUN_ID --phase perf_audit --status {pass|warn|fail|skip} \
+  --payload-json '{"verdict":"{verdict}","lcp_ms":N,"bundle_kb":N}'
+```
+
+---
+
+## STEP 6.5 — Refresh dashboard QA (RETIRÉ en v6.10)
+
+**Retiré** depuis v6.10. Les métriques QA vivent maintenant dans
+`workspace/output/db/console.db` (tables `qa_coverage`, `qa_quality`,
+`qa_api_tests`, `qa_a11y`, `qa_code_review`, `qa_security`,
+`qa_performance`, `qa_spec_compliance`). Le rendu HTML est délégué à
+un consommateur externe de la DB (cf. roadmap `workspace/console/`).
+
+Aucun fichier HTML n'est produit ici. STEP no-op conservé pour
+préserver la numérotation des STEPs aval.
+
+---
+
+## STEP 6.bis — Checkpoint record (v6.6.3, opt-in)
+
+Si `CheckpointMode ∈ {record, resume}` (défaut `off` = skip ce STEP) :
+
+```python
+from sdd_lib.checkpoint import record_input_hash
+
+record_input_hash(
+    run_id=$RUN_ID,                  # from sdd_state.py current run
+    phase="qa-generate",
+    input_paths=resolved_inputs,     # même liste que STEP 1.5
+)
+```
+
+Stocke `input_hash` dans `state.json.phases.qa-generate.payload.input_hash`.
+Permet à un futur `--resume` (avec `CheckpointMode: resume`) de skip
+cette phase si les inputs n'ont pas changé.
+
+Erreur silencieuse si state.json absent → WARN dans stderr,
+non bloquant.
+
+---
+
+## STEP 7 — Confirmation et récap (v6.10 : depuis console.db)
+
+Charger les métriques consolidées de la FEAT directement depuis la DB :
+
+```bash
+STATS=$(python .claude/python/sdd_scripts/query_console_db.py feat-stats --feat {n})
+```
+
+Le JSON `STATS` contient les blocs `api_gate`, `coverage`, `quality`,
+`perf`, `a11y`, `security`, `spec`. Calculer la décision globale :
+
+```
+si stats.api_gate.tests_failed > 0:               → RED
+elif stats.coverage.coverage_passed == false:     → RED  (cf. qa-coverage.md §3.1 hardening v6.1)
+elif stats.quality.errors > 0:                    → YELLOW
+else:                                              → GREEN
 ```
 
 Émettre **un seul bloc final** :
 
 ```
-qa-generate {n}-{SpecName} → {GREEN | YELLOW | RED}
+qa-generate {n}-{FeatName} → {GREEN | YELLOW | RED}
 
 Mode           : {mode}
 Tests          : {passed}/{total} passants ({skipped} skipped, {failed} échec(s))
@@ -204,8 +336,7 @@ Quality scan   : {errors} errors / {warnings} warnings / {info} info
 Linter         : {linter_warnings} warnings
 
 Rapport        : workspace/output/qa/feat-{n}/report.md
-Coverage       : workspace/output/qa/feat-{n}/coverage.json
-Quality        : workspace/output/qa/feat-{n}/quality.json
+Données        : workspace/output/db/console.db (qa_coverage, qa_quality, qa_api_tests)
 
 {Si RED ou YELLOW : section rappels}
 Prochaine étape :

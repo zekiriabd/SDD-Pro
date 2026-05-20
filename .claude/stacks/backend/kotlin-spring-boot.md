@@ -1,88 +1,68 @@
-﻿# Tech Spec: kotlin-spring-boot (backend)
+# Tech FEAT: kotlin-spring-boot (backend)
+
+> §2.4 (Librairies) régénérée depuis `kotlin-spring-boot.libs.json` — ne pas éditer manuellement (`python .claude/python/sdd_admin/sync_stack_md.py --stack-id kotlin-spring-boot`).
 
 Status: Stable
-Tech Spec ID: tech-kotlin-spring-boot
+Validation: 🟢 reference (validated combo CMS — kotlin-spring-boot + react + shadcn + azure-ad, 2026-05-13)
+Tech FEAT ID: tech-kotlin-spring-boot
 Scope: backend uniquement (REST API, logique métier, persistance)
 
 ---
 
 ## 1. Architecture
 
-### 1.1 Pattern applicatif
+> **Pattern d'architecture** : ce stack suit l'**architecture canonique** définie dans
+> `.claude/stacks/archi/{ArchiPattern}.md` (défaut `MVC` si `## Active Architecture Pattern`
+> absent du `stack.md`). Section §1 ci-dessous ne décrit QUE les overrides Kotlin/Spring-specific.
 
-Spring Boot 3.4 + Kotlin 2.0 REST API, idiomatique Kotlin :
+### 1.1 Pattern applicatif (Kotlin/Spring idioms)
 
-```
-Controller → Service (interface + impl) → Repository (Spring Data JPA)
-                                       → Entity → MapStruct/Manual → DTO
-```
+Pour `ArchiPattern: MVC` (défaut), suit `archi/mvc.md` avec idioms Spring Boot 4 + Kotlin 2.3 :
+- **Data classes Kotlin** pour DTOs (`val` exclusivement → immuables par construction, `equals/hashCode/toString` auto-générés)
+- **Constructor injection** native Kotlin (`class UsersService(val repo: UsersRepository, ...)`)
+- **Coroutines** pour I/O async (`suspend fun` + Spring WebFlux optionnel) OU pattern bloquant Spring MVC classique
+- **`@RestController`** (Spring stereotype) sur controllers, **`@Service`** sur impls, **`@Repository`** auto via `JpaRepository<T, ID>` extension
+- **Mapper** : extension functions Kotlin (`fun Entity.toModel(): Model`) pour mappings simples, MapStruct pour mappings complexes
+- **`@RestControllerAdvice`** global pour gestion exceptions → ProblemDetails RFC 7807
 
-Pattern **MVC enrichi** avec immutabilité Kotlin :
-- **Data classes** pour DTOs (immuables par défaut, `data class`)
-- **Constructor injection** (Kotlin idiomatique)
-- **Coroutines** pour code async (`suspend fun`)
+Pour `ArchiPattern: DDD` → voir `archi/ddd.md` (Aggregates avec méthodes métier, UseCases via Mediator).
+Pour `ArchiPattern: microservice` → voir `archi/microservice.md` (Resilience4j + Micrometer + Spring Cloud).
 
-### 1.2 Couches
+### 1.3 Mapping couche → répertoire (override Kotlin/Spring)
 
-- **Controller** : `@RestController` Kotlin avec data class params
-- **Service (interface)** : Kotlin `interface` (pas de package séparé)
-- **Service (implémentation)** : Kotlin `class` avec
-  `@Service`
-- **Repository** : `interface` étendant `JpaRepository<T, ID>`
-- **Mapper** : Kotlin extension functions OU MapStruct (au choix par
-  cas — extension functions plus idiomatiques pour mappings simples)
-- **DTO** : Kotlin **data classes** (`val` exclusivement = immuable)
-- **Entity** : `@Entity` JPA Kotlin avec **mutable fields** (JPA
-  exigence) ou Kotlin records (limité)
-- **Exception handler** : `@RestControllerAdvice` global
+| Couche canonique (archi/mvc.md §3) | Path Kotlin/Spring-specific |
+|---|---|
+| Application entry | `src/main/kotlin/{BackendNamespace}/{BackendName}Application.kt` (`@SpringBootApplication`) |
+| Controller | `src/main/kotlin/{BackendNamespace}/controller/` |
+| Service interface | `src/main/kotlin/{BackendNamespace}/service/` (Kotlin `interface` co-localisée — pas de package `interfaces/` séparé idiomatique) |
+| Service impl | `src/main/kotlin/{BackendNamespace}/service/` (même package, classe `@Service`) |
+| Repository | `src/main/kotlin/{BackendNamespace}/repository/` (interface `: JpaRepository<T, ID>`) |
+| Entity | `src/main/kotlin/{BackendNamespace}/entity/` (`@Entity` JPA) |
+| Mapper | `src/main/kotlin/{BackendNamespace}/mapper/` (extension fn ou MapStruct) |
+| Input DTO | `src/main/kotlin/{BackendNamespace}/dto/input/` (data classes) |
+| Output DTO | `src/main/kotlin/{BackendNamespace}/dto/output/` |
+| Model DTO | `src/main/kotlin/{BackendNamespace}/dto/model/` |
+| Config | `src/main/kotlin/{BackendNamespace}/config/` (`@Configuration`) |
+| Exception classes | `src/main/kotlin/{BackendNamespace}/exception/` |
+| GlobalExceptionAdvice | `src/main/kotlin/{BackendNamespace}/advice/` (`@RestControllerAdvice`) |
+| Security | `src/main/kotlin/{BackendNamespace}/security/` |
+| Application config | `src/main/resources/application.yml` + `application-{profile}.yml` |
+| i18n | `src/main/resources/messages/` |
+| Migrations Flyway | `src/main/resources/db/migration/` |
+| Gradle build | `build.gradle.kts` + `settings.gradle.kts` |
 
-### 1.3 Mapping couche → répertoire
+> **Note** : ce stack utilise un mono-projet `{BackendName}/` (pas de `{LibName}` séparé — les DTOs vivent dans `dto/` interne car Kotlin n'a pas de pattern monorepo standard à la Node `pnpm workspaces`).
 
-```
-workspace/output/src/{BackendName}/
-├── build.gradle.kts                                   # Gradle Kotlin DSL
-├── settings.gradle.kts
-├── src/
-│   ├── main/
-│   │   ├── kotlin/{BackendNamespace}/
-│   │   │   ├── {BackendName}Application.kt           # @SpringBootApplication
-│   │   │   ├── controller/                           # REST endpoints
-│   │   │   ├── service/                              # interfaces + impls
-│   │   │   ├── repository/                           # JPA repos
-│   │   │   ├── entity/                               # @Entity classes
-│   │   │   ├── dto/workspace/input/                            # Input data classes
-│   │   │   ├── dto/workspace/output/                           # Output data classes
-│   │   │   ├── dto/model/                            # Shared models
-│   │   │   ├── mapper/                               # Extension fns / MapStruct
-│   │   │   ├── config/                               # @Configuration
-│   │   │   ├── exception/                            # Custom exceptions
-│   │   │   ├── advice/                               # @RestControllerAdvice
-│   │   │   └── security/                             # Spring Security
-│   │   └── resources/
-│   │       ├── application.yml
-│   │       ├── application-dev.yml
-│   │       ├── messages/
-│   │       └── db/migration/                         # Flyway scripts
-│   └── test/
-│       └── kotlin/{BackendNamespace}/
-│           └── ...                                    # cf. qa/kotlin-junit.md
-```
+### 1.4 Override principes (Kotlin-specific)
 
-### 1.4 Principes non négociables
-
+Hérités de `archi/mvc.md §4`. **Ajouts** Kotlin :
 - **Data classes** pour DTOs (`val`, immuables, `equals/hashCode/toString` auto)
-- **Constructor injection** uniquement (Kotlin natif via `class A(val x: X)`)
-- **Aucune logique métier** dans Controllers / Repositories
-- **Mapping** : extension functions OU MapStruct (jamais inline dans
-  Controller / Service)
-- **Coroutines** pour I/O async (Spring WebFlux ou
-  `@Async` + `CompletableFuture` selon contexte)
-- **Lombok interdit** (Kotlin a déjà l'équivalent natif)
-- **`!!` (force unwrap) interdit** sauf justification écrite — utiliser
-  `?:`, `let`, `requireNotNull`
-- **Migrations DB via Flyway** (pas de `ddl-auto: create` en prod)
-- **Logging via SLF4J** : `private val log = LoggerFactory.getLogger(...)`
-  ou `KotlinLogging.logger {}`
+- **Constructor injection** uniquement (Kotlin natif via `class A(val x: X)`) — jamais `@Autowired` field
+- **Lombok interdit** (Kotlin a déjà l'équivalent natif `data class`, `lateinit`, …)
+- **`!!` (force unwrap) interdit** sauf justification écrite — utiliser `?:`, `let`, `requireNotNull`
+- **Coroutines** pour I/O async (Spring WebFlux ou `@Async` + `CompletableFuture` selon contexte)
+- **Migrations DB via Flyway** (pas de `ddl-auto: create` en prod — Database-First)
+- **Logging via SLF4J** : `private val log = LoggerFactory.getLogger(javaClass)` ou `KotlinLogging.logger {}`
 
 ---
 
@@ -91,9 +71,9 @@ workspace/output/src/{BackendName}/
 ### 2.1 Identité
 
 - **Stack ID** : `back-kotlin-spring`
-- **Langage** : Kotlin 2.0.21
+- **Langage** : Kotlin 2.3.21
 - **Runtime** : JDK 21
-- **Framework principal** : Spring Boot 3.4.x
+- **Framework principal** : Spring Boot 4.0.x
 - **Build tool** : **Gradle 8.10** avec **Kotlin DSL** (`build.gradle.kts`)
 - **Package racine** : `{BackendNamespace}` (ex. `com.sdd-pro.sim`)
 
@@ -167,7 +147,7 @@ cd workspace/output/src/{BackendName} && ./gradlew compileKotlin --no-daemon
 
 <!-- CORE_PACKAGES_START -->
 ```bash
-# Auto-genere depuis kotlin-spring-boot.libs.json -- ne pas editer (utiliser sync-stack-md.ps1).
+# Auto-genere depuis kotlin-spring-boot.libs.json -- ne pas editer (utiliser sync_stack_md.py).
 # Gradle managed via build.gradle.kts + gradle/libs.versions.toml.
 # Versions auto-derivees de kotlin-spring-boot.libs.json -- regenerer le catalog Gradle
 # en cas de bump (cf. gradle/libs.versions.toml).
@@ -180,6 +160,10 @@ cd workspace/output/src/{BackendName} && ./gradlew compileKotlin --no-daemon
 # capability: redis-cache
 # Gradle : ajouter les modules en implementation(...) dans build.gradle.kts
 #   implementation("org.springframework.boot:spring-boot-starter-data-redis:")
+
+# capability: sqlserver-flyway
+# Gradle : ajouter les modules en implementation(...) dans build.gradle.kts
+#   implementation("org.flywaydb:flyway-sqlserver:12.5.0")
 ```
 <!-- ONDEMAND_PACKAGES_END -->
 
@@ -224,52 +208,54 @@ Codes prioritaires Kotlin :
 <!-- LIBS_CATALOG_START -->
 ### 2.4 Librairies
 
-> Source de verite : `.claude/stacks/backend/kotlin-spring-boot.libs.json`. Ne pas editer cette section manuellement -- utiliser `.claude/scripts/sync-stack-md.ps1 -StackId kotlin-spring-boot`.
+> Source de verite : `.claude/stacks/backend/kotlin-spring-boot.libs.json`. Ne pas editer cette section manuellement -- utiliser `python .claude/python/sdd_admin/sync_stack_md.py --stack-id kotlin-spring-boot`.
 
 #### 2.4.a Librairies CORE (installees par arch en section 2.2.1, toujours)
 
 | Lib | Version | Role |
 |-----|---------|------|
-| spring-boot-starter-web |  |  |
-| spring-boot-starter-webflux |  |  |
-| spring-boot-starter-actuator |  |  |
-| spring-boot-starter-security |  |  |
-| spring-boot-starter-oauth2-resource-server |  |  |
-| spring-boot-starter-oauth2-client |  |  |
-| spring-boot-starter-data-jpa |  |  |
-| spring-boot-starter-flyway |  |  |
-| flyway-core | 12.5.0 |  |
-| spring-dotenv | 4.0.0 |  |
-| spring-context |  |  |
-| jackson-module-kotlin |  |  |
-| kotlin-reflect | 2.3.21 |  |
-| nimbus-jose-jwt | 9.40 |  |
-| spring-boot-starter-test |  |  |
-| spring-boot-starter-webmvc-test |  |  |
-| spring-security-test |  |  |
-| kotest-runner-junit5 | 5.9.1 |  |
-| kotest-assertions-core | 5.9.1 |  |
-| kotest-extensions-spring | 1.3.0 |  |
-| mockwebserver | 4.12.0 |  |
+| spring-boot-starter-web |  | Web layer (Spring MVC, controllers REST, Jackson JSON) |
+| spring-boot-starter-webflux |  | WebClient reactif (clients HTTP sortants vers APIs tierces) |
+| spring-boot-starter-actuator |  | Endpoints health/info/metrics (monitoring + readiness probe) |
+| spring-boot-starter-security |  | Spring Security core (filtre HTTP, CSRF, password encoder) |
+| spring-boot-starter-oauth2-resource-server |  | JWT Bearer validation (Azure AD / OIDC issuers) |
+| spring-boot-starter-oauth2-client |  | OAuth2 client flow (utilise par certains scenarios M2M) |
+| spring-boot-starter-data-jpa |  | ORM Hibernate + Spring Data repositories (PagingAndSortingRepository, JpaRepository) |
+| spring-boot-starter-validation |  | Bean Validation Jakarta (@Valid, @NotBlank, @Email) sur DTOs entrants |
+| spring-boot-starter-flyway |  | Auto-config Flyway (lance migrations DB au startup) |
+| flyway-core | 12.5.0 | Moteur migrations versionnees V{n}__*.sql (cf. kotlin-spring-boot.md §4.4) |
+| springdoc-openapi-starter-webmvc-ui | 2.7.0 | OpenAPI 3 + Swagger UI auto-generes depuis controllers (path /swagger custom, cf. §5.6) |
+| spring-context |  | DI core (transitive via web, listee explicitement pour clarte) |
+| jackson-module-kotlin |  | Serialization Kotlin data classes (sans no-arg constructor) |
+| kotlin-reflect | 2.3.21 | Reflection runtime requise par Jackson/Spring (DI Kotlin idiomatique) |
+| nimbus-jose-jwt | 9.40 | JWT decoder + JWKS resolver (utilise par JwtDecoder custom Azure AD, cf. auth/azure-ad.md §5.1 Piege 7) |
+| spring-boot-starter-test |  | Test scaffolding (JUnit 5 + AssertJ + Mockito + Spring TestContext) |
+| spring-boot-starter-webmvc-test |  | MockMvc + @WebMvcTest pour tests controllers slices (utilise par QA API Gate, cf. backend-first.md) |
+| spring-security-test |  | @WithMockUser, SecurityMockMvcRequestPostProcessors (auth mockee dans tests) |
+| kotest-runner-junit5 | 5.9.1 | Runner Kotest sur JUnit Platform (style DescribeSpec/StringSpec) |
+| kotest-assertions-core | 5.9.1 | DSL d'assertions Kotest (`shouldBe`, `shouldThrow`, soft assertions) |
+| kotest-extensions-spring | 1.3.0 | Bridge Kotest <-> Spring TestContext (@SpringBootTest dans specs Kotest) |
+| mockwebserver | 4.12.0 | Mock HTTP server pour tester les WebClient outgoing (alternatif a WireMock) |
 
 ### 2.4.b Librairies ON-DEMAND (installees si l'US declenche)
 
-Triggers (regex case-insensitive) cherches par `detect-capabilities.ps1` dans l'US + ACs.
+Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'US + ACs.
 
 | Capability | Lib | Version | Triggers |
 |---|---|---|---|
 | redis-cache | spring-boot-starter-data-redis |  | \bredis\b, cache distribu, distributed cache, session partag |
+| sqlserver-flyway | flyway-sqlserver | 12.5.0 | sqlserver, mssql |
 
 #### 2.4.c Plugins build-system
 
 | Plugin | Version | Role |
 |---|---|---|
-| org.jetbrains.kotlin.jvm | 2.3.21 |  |
-| org.jetbrains.kotlin.plugin.spring | 2.3.21 |  |
-| org.jetbrains.kotlin.plugin.jpa | 2.3.21 |  |
-| org.springframework.boot | 4.0.6 |  |
-| org.jlleitschuh.gradle.ktlint | 14.2.0 |  |
-| org.flywaydb.flyway | 12.5.0 |  |
+| org.jetbrains.kotlin.jvm | 2.3.21 | Compilateur Kotlin/JVM (cible JDK 21) |
+| org.jetbrains.kotlin.plugin.spring | 2.3.21 | Genere all-open pour @Component/@Service/@Configuration (Spring proxies) |
+| org.jetbrains.kotlin.plugin.jpa | 2.3.21 | Genere no-arg constructor pour @Entity (exigence Hibernate) |
+| org.springframework.boot | 4.0.6 | Gere bootRun, bootJar, dependency-management BOM |
+| org.jlleitschuh.gradle.ktlint | 14.2.0 | Lint + auto-format Kotlin (tasks ktlintCheck / ktlintFormat) |
+| org.flywaydb.flyway | 12.5.0 | Tasks Gradle flywayMigrate / flywayInfo / flywayClean (CLI hors runtime) |
 
 #### 2.4.d DB Drivers (selectionne par arch selon DatabaseType)
 
@@ -306,7 +292,7 @@ Triggers (regex case-insensitive) cherches par `detect-capabilities.ps1` dans l'
 - ✅ `GET /api/v1/campagnes/{id}`, `POST /api/v1/campagnes`, `DELETE /api/v1/campagnes/{id}`
 - ❌ `GET /api/v1/getCampagne/{id}`, `POST /api/v1/createCampagne`, `POST /api/v1/CampagneDelete`
 - Pas de verbe dans le path : c'est le verbe HTTP qui porte l'action
-- Tolérance pragmatique pour les sous-actions non-CRUD : `POST /api/v1/eans/bulk` (import batch), `GET /api/v1/eans/template` (download asset), `POST /api/v1/orders/{id}/confirm` (transition d'état). Ces patterns sont acceptés s'ils sont **rares** et **documentés** dans la SPEC (BR ou FD).
+- Tolérance pragmatique pour les sous-actions non-CRUD : `POST /api/v1/eans/bulk` (import batch), `GET /api/v1/eans/template` (download asset), `POST /api/v1/orders/{id}/confirm` (transition d'état). Ces patterns sont acceptés s'ils sont **rares** et **documentés** dans la FEAT (BR ou FD).
 
 #### 2.6.3 Préfixe versionné `/api/v{N}/` systématique
 - Tous les endpoints applicatifs sous `/api/v1/` (incrémenter à v2 si breaking change)
@@ -345,13 +331,13 @@ avec une US précédente) :
 ```
 ERROR: dev-{backend|frontend} {n}-{m} — violation contrat REST
 CAUSE: [REST_CONTRACT_VIOLATION] endpoint {verbe} {path} diverge du
-       pluriel {/eans} défini par US {n-m'} sibling OU SPEC BR-X
-FIX: aligner le path sur {/eans} (cf. stack §2.6.1) OU réviser la SPEC
+       pluriel {/eans} défini par US {n-m'} sibling OU FEAT BR-X
+FIX: aligner le path sur {/eans} (cf. stack §2.6.1) OU réviser la FEAT
      si le contrat URL est ambigu
 ```
 
 `[REST_CONTRACT_VIOLATION]` est non-itérable par `build_loop` → fail-fast,
-le Tech Lead corrige le plan/la SPEC manuellement.
+le Tech Lead corrige le plan/la FEAT manuellement.
 
 #### 2.6.8 Procédure de planification (dev-backend STEP 5)
 
@@ -362,8 +348,8 @@ dev-backend doit :
 2. Si trouvé → réutiliser **strictement** le même pluriel et la même
    structure de nesting
 3. Sinon → suivre §2.6.1 (pluriel) + §2.6.4 (nesting)
-4. Si la SPEC parente définit explicitement le contrat URL (BR ou FD)
-   → la SPEC **fait foi**, même si elle utilise une convention atypique
+4. Si la FEAT parente définit explicitement le contrat URL (BR ou FD)
+   → la FEAT **fait foi**, même si elle utilise une convention atypique
 
 Cette procédure est **inlinée dans l'agent dev-backend** ; le présent
 §2.6 est la source canonique.
@@ -576,10 +562,46 @@ class ExternalApiService(
 | `Oracle` | `com.oracle.database.jdbc:ojdbc11` | 23.6.0.24.10 |
 | `H2` (test) | `com.h2database:h2` | 2.3.232 |
 
-### 4.2 Connection string (`application.yml`)
+### 4.2 Connection string (`application.yml` peuplé par arch, depuis 2026-05-14)
 
-Identique à `java-spring-boot.md §4.2`. Variables d'env : `DB_HOST`,
-`DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`.
+**Source de vérité** : bloc `## Active Database` de
+`workspace/input/stack/stack.md` (clés `DatabaseType`, `DB_HOST`,
+`DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`). L'agent `arch` Phase
+A — STEP 4.5 lit ces valeurs et écrit `application.yml` avec les
+**valeurs littérales** (plus d'interpolation `${DB_*}` env vars).
+
+Exemple `application.yml` généré par arch pour `DatabaseType: postgres` :
+
+```yaml
+spring:
+  datasource:
+    url: jdbc:postgresql://127.0.0.1:5432/CMSPrint    # valeurs littérales depuis ## Active Database
+    username: postgres
+    password: ***REMOVED***
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: none           # Flyway gère les migrations (cf. §4.4)
+    show-sql: false
+    open-in-view: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+```
+
+**Mapping `DatabaseType` → URL + dialect** (appliqué par arch) :
+
+| DatabaseType (## Active Database) | URL pattern                                      | driver-class-name                | dialect Hibernate                                  |
+|-----------------------------------|--------------------------------------------------|----------------------------------|----------------------------------------------------|
+| `postgres` / `postgresql`         | `jdbc:postgresql://{DB_HOST}:{DB_PORT}/{DB_NAME}` | `org.postgresql.Driver`          | `org.hibernate.dialect.PostgreSQLDialect`         |
+| `mysql`                           | `jdbc:mysql://{DB_HOST}:{DB_PORT}/{DB_NAME}`     | `com.mysql.cj.jdbc.Driver`       | `org.hibernate.dialect.MySQLDialect`              |
+| `sqlserver`                       | `jdbc:sqlserver://{DB_HOST}:{DB_PORT};databaseName={DB_NAME};encrypt=true;trustServerCertificate=false` | `com.microsoft.sqlserver.jdbc.SQLServerDriver` | `org.hibernate.dialect.SQLServerDialect` |
+| `oracle`                          | `jdbc:oracle:thin:@{DB_HOST}:{DB_PORT}:{DB_NAME}` | `oracle.jdbc.OracleDriver`       | `org.hibernate.dialect.OracleDialect`             |
+| `h2`                              | `jdbc:h2:mem:{DB_NAME};MODE=PostgreSQL`          | `org.h2.Driver`                  | `org.hibernate.dialect.H2Dialect`                 |
+
+**Code applicatif** : ne lit JAMAIS `System.getenv("DB_*")` ni
+`@Value("${DB_*}")`. Spring Boot bind automatiquement `spring.datasource.*`
+au `DataSource` via auto-configuration — aucun bean custom requis.
 
 ### 4.3 Entity Kotlin avec JPA
 
@@ -617,7 +639,32 @@ class User(
 
 ### 4.4 Migrations Flyway
 
-Identique à `java-spring-boot.md §4.3`.
+Toutes les évolutions de schéma passent par des migrations versionnées
+sous `src/main/resources/db/migration/` :
+
+```
+src/main/resources/db/migration/
+├── V1__init_schema.sql
+├── V2__add_users_table.sql
+└── V3__add_email_index.sql
+```
+
+**Convention de nommage** : `V{n}__{description_snake_case}.sql`
+(double underscore, numéros monotones). Une migration ne se réécrit
+jamais ; corriger via une nouvelle migration `V{n+1}__fix_*.sql`.
+
+**Configuration** (`application.yml`) :
+```yaml
+spring:
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true   # tolère une DB existante (Database-First)
+```
+
+**En Database-First (SDD_Pro)** : la Phase B `arch` introspecte la DB
+existante en READ-ONLY et scaffolde les entities. Les migrations
+Flyway servent uniquement aux évolutions futures pilotées par les US.
 
 #### 4.4.1 Flyway 11+ et SQL Server (post-mortem 2026-05-08)
 
@@ -676,13 +723,19 @@ maintenue → `hibernate-tools`.
 
 ```kotlin
 // build.gradle.kts (tâche scaffold dédiée, exécutée par arch hors prod)
+// IMPORTANT depuis 2026-05-14 : arch passe les valeurs DB en propriétés
+// Gradle (-PdbHost=... -PdbPort=... etc.) issues du bloc ## Active Database
+// de stack.md, JAMAIS via System.getenv (les env vars ne sont plus utilisées).
 tasks.register("dbScaffold") {
     group = "sdd-pro"
     description = "Reverse-engineer DB schema -> Kotlin JPA entities (READ-ONLY)"
     doLast {
-        val dbUrl  = "jdbc:postgresql://${System.getenv("DB_HOST")}:${System.getenv("DB_PORT")}/${System.getenv("DB_NAME")}"
-        val dbUser = System.getenv("DB_USER") ?: error("DB_USER missing")
-        val dbPass = System.getenv("DB_PASSWORD") ?: error("DB_PASSWORD missing")
+        val dbHost = project.findProperty("dbHost") as? String ?: error("dbHost missing (passé par arch via -PdbHost=...)")
+        val dbPort = project.findProperty("dbPort") as? String ?: error("dbPort missing")
+        val dbName = project.findProperty("dbName") as? String ?: error("dbName missing")
+        val dbUser = project.findProperty("dbUser") as? String ?: error("dbUser missing")
+        val dbPass = project.findProperty("dbPass") as? String ?: error("dbPass missing")
+        val dbUrl  = "jdbc:postgresql://$dbHost:$dbPort/$dbName"
 
         // hibernate-tools task (configurée dans buildscript classpath)
         ant.withGroovyBuilder {
@@ -726,16 +779,135 @@ moins de dépendances. À choisir via ADR au moment du bootstrap projet.
 
 ## 5. URLs / CORS / Multilingue / Logging / OpenAPI
 
-Identique à `java-spring-boot.md §5-§8` sauf §5.6 ci-dessous spécifique
-Spring Boot 3.5+. Différence majeure logging : préféré via
-**`KotlinLogging`** (Slf4j sous le capot) plutôt que `@Slf4j` Lombok :
+### 5.1 URLs et versioning
+
+Toutes les ressources REST sont préfixées `/api/v1/` et au pluriel :
+`/api/v1/users`, `/api/v1/orders`, `/api/v1/products`. Exceptions :
+`/actuator/**`, `/swagger`, `/openapi` (cf. §5.6).
+
+```kotlin
+@RestController
+@RequestMapping("/api/v1/users")
+class UsersController(private val service: UserService) {
+    @GetMapping
+    fun list(@PageableDefault pageable: Pageable): Page<UserOutput> = ...
+
+    @PostMapping
+    fun create(@Valid @RequestBody input: CreateUserInput): ResponseEntity<UserOutput> =
+        ResponseEntity.created(URI.create("/api/v1/users/${created.id}")).body(created)
+}
+```
+
+- `POST` create → `201 Created` + header `Location`
+- `DELETE` → `204 No Content`
+- Erreurs → `ProblemDetail` RFC 7807 (`application/problem+json`)
+  via `@RestControllerAdvice` global
+
+### 5.2 CORS
+
+Cross-Origin obligatoire dès que `{AppName}` (SPA front) et
+`{BackendName}` tournent sur des origins distincts. Configurer via
+un bean dédié (jamais via `@CrossOrigin` sur les controllers — cf.
+`source-first.md` post-mortem CMS-Back 2026-05-11).
+
+```kotlin
+@Configuration
+class CorsConfig {
+    @Bean
+    fun corsConfigurationSource(
+        @Value("\${app.cors.allowed-origins}") origins: String
+    ): CorsConfigurationSource {
+        val config = CorsConfiguration().apply {
+            allowedOrigins = origins.split(",").map { it.trim() }
+            allowedMethods = listOf("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
+            allowedHeaders = listOf("*")
+            exposedHeaders = listOf("Location")
+            allowCredentials = true
+            maxAge = 3600
+        }
+        return UrlBasedCorsConfigurationSource().apply {
+            registerCorsConfiguration("/**", config)
+        }
+    }
+}
+```
+
+```yaml
+app:
+  cors:
+    allowed-origins: ${CORS_ORIGINS}   # ex. https://localhost:5185
+```
+
+Activer dans `SecurityConfig` via `http.cors { }`.
+
+### 5.3 Multilingue (i18n)
+
+Messages d'erreur et libellés métier traduits via
+`MessageSource` Spring + bundles `src/main/resources/i18n/messages_{fr,en}.properties`.
+
+```kotlin
+@Configuration
+class I18nConfig : WebMvcConfigurer {
+    @Bean
+    fun messageSource() = ReloadableResourceBundleMessageSource().apply {
+        setBasename("classpath:i18n/messages")
+        setDefaultEncoding("UTF-8")
+        setUseCodeAsDefaultMessage(true)
+    }
+
+    @Bean
+    fun localeResolver() = AcceptHeaderLocaleResolver().apply {
+        setDefaultLocale(Locale.FRENCH)
+        supportedLocales = listOf(Locale.FRENCH, Locale.ENGLISH)
+    }
+}
+```
+
+Locale résolue depuis le header `Accept-Language` envoyé par le
+frontend. Pas de stockage session-side de la locale (stateless).
+
+### 5.4 Logging
+
+**`KotlinLogging`** (Slf4j sous le capot) — pas `@Slf4j` Lombok,
+pas `LoggerFactory.getLogger(...)` verbeux :
 
 ```kotlin
 private val log = KotlinLogging.logger {}
 
 // usage
-log.info { "User $id logged in" }
+log.info { "User $userId logged in" }
+log.error(ex) { "Failed to persist order $orderId" }
 ```
+
+**Format JSON structuré** en prod (`logback-spring.xml` avec
+`logstash-logback-encoder`). Niveaux : `root: INFO`, namespace projet
+`DEBUG` en dev, `INFO` en prod.
+
+**Interdits** : `println`, `print`, `System.out`, `System.err`,
+`e.printStackTrace()`. Toujours passer par `log.{level} { ... }`.
+
+### 5.5 Gestion d'erreurs globale
+
+```kotlin
+@RestControllerAdvice
+class GlobalExceptionHandler {
+
+    @ExceptionHandler(MethodArgumentNotValidException::class)
+    fun handleValidation(ex: MethodArgumentNotValidException): ProblemDetail =
+        ProblemDetail.forStatusAndDetail(BAD_REQUEST, "Validation failed").apply {
+            setProperty("errors", ex.bindingResult.fieldErrors.map {
+                mapOf("field" to it.field, "message" to it.defaultMessage)
+            })
+        }
+
+    @ExceptionHandler(EntityNotFoundException::class)
+    fun handleNotFound(ex: EntityNotFoundException): ProblemDetail =
+        ProblemDetail.forStatusAndDetail(NOT_FOUND, ex.message ?: "Resource not found")
+}
+```
+
+Tous les contrôleurs renvoient `ProblemDetail` (RFC 7807) — pas de
+DTO d'erreur custom.
 
 ### 5.6 OpenAPI / Swagger UI (post-mortem 2026-05-08)
 

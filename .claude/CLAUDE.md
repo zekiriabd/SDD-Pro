@@ -1,163 +1,91 @@
-﻿# SDD_Pro v6.1.0 — Spec-Driven Development pour Claude Code
+# SDD_Pro v6.10.4-LTS — FEAT-Driven Development pour Claude Code
 
-> Framework SDD strict : SPEC fonctionnelle → User Stories → Code
+> ⛔ **FREEZE actif jusqu'au 2026-06-18** — voir `@.claude/VERSIONING.md §4`.
+> Sur `main` : seuls les bumps PATCH. MAJOR/MINOR vivent sur `next`.
+
+> Framework SDD strict : FEAT fonctionnelle → User Stories → Code
 > (back/front en parallèle). Lecture sélective, anti-derive, isolation
 > par US et par famille.
 
-> **Slim entry point (v5.0)** : ce fichier est volontairement court
-> (~150 lignes). Le détail vit dans `.claude/docs/` chargé à la
-> demande :
-> - `@.claude/docs/architecture.md` — vision, modèles, agents, stacks, scope
-> - `@.claude/docs/workflow.md` — 4 phases, flux détaillé, BREAKING CHANGES
-> - `@.claude/docs/conventions.md` — anti-derive, idempotence, parallélisme, plan, capabilities, index rules/templates
+> **Slim entry point** : 150 lignes max (mesuré CI, cf.
+> `ADR-20260519T153000-governance-major-prompts-trim`). Détails dans
+> `@.claude/docs/` :
+> - `architecture.md` — vision, agents, stacks
+> - `workflow.md` — phases, BREAKING CHANGES
+> - `conventions.md` — anti-derive, idempotence, capabilities
+> - `version-notes.md` — notes opérationnelles par version
 
 ---
 
-## 1. Convention de nommage cross-fichiers (CRITIQUE)
+## 1. Convention de nommage (CRITIQUE)
 
-Pour une US donnée, le **basename `{n}-{m}-{Name}` est rigoureusement
-identique** à travers tous les artefacts :
+Basename `{n}-{m}-{Name}` rigoureusement identique à travers tous les artefacts :
 
-| Artefact            | Chemin                                                    |
-|---------------------|-----------------------------------------------------------|
-| Mockup HTML         | `workspace/input/ui/{n}-{m}-{Name}.html` (optionnel, déposé manuellement par UX Designer) |
-| User Story          | `workspace/output/us/{n}-{m}-{Name}.md`                             |
-| Code généré         | `workspace/output/src/{AppName|BackendName|LibName}/...` (paths résolus par mapping stack) |
-| Plan technique      | `workspace/output/plans/{n}-{m}-{Name}.{back|front}.md` (mode `:plan`) |
+| Artefact | Chemin |
+|---|---|
+| Mockup HTML | `workspace/input/ui/{n}-{m}-{Name}.html` (optionnel) |
+| User Story | `workspace/output/us/{n}-{m}-{Name}.md` |
+| Code généré | `workspace/output/src/{AppName\|BackendName\|LibName}/...` (alias `FrontendName` accepté pour `AppName`) |
+| Plan technique | `workspace/output/plans/{n}-{m}-{Name}.{back\|front}.md` |
 
-C'est cette convention qui permet la lecture sélective : pour
-matérialiser `1-2-Menu-Navigation`, Dev-Frontend lit UNIQUEMENT
-`workspace/output/us/1-2-*.md` + `workspace/input/ui/1-2-*.html`.
-
-Le nom `{Name}` :
-- Capitale initiale, pas d'accents, tirets pour les espaces
-- Valides : `Auth`, `Reset-Password`, `Menu-Navigation`
-- Invalides : `auth`, `reset_password`, `Menu Navigation`
+`{Name}` : Capitale initiale, pas d'accents, tirets pour les espaces. Valides : `Auth`, `Reset-Password`, `Menu-Navigation`. Invalides : `auth`, `reset_password`, `Menu Navigation`.
 
 ---
 
-## 2. IDs stables dans la SPEC (CRITIQUE)
+## 2. IDs stables dans la FEAT (CRITIQUE)
 
-Les bullets de `## Functional Needs` et `## Functional Deliverables`
-portent un **identifiant explicite stable** :
-
-```markdown
-## Functional Needs
-- SFD-1: Se connecter via Azure AD
-- SFD-2: Réinitialiser son mot de passe
-
-## Functional Deliverables
-- FD-1: Écran de connexion
-- FD-2: Écran de réinitialisation
-```
-
-**Règles** :
-- Ne jamais réordonner ni renuméroter après génération des US.
-- Ajout : créer `SFD-N+1` en fin de liste.
-- Retrait : supprimer la ligne et **régénérer les US**.
-- Les `Covers` des US référencent ces IDs **par valeur**.
-
-Même règle pour `BR-N` et `AC-N`.
+`## Functional Needs`, `## Functional Deliverables`, `## Business Rules`, `## Acceptance Criteria` portent des IDs explicites stables : `SFD-N`, `FD-N`, `BR-N`, `AC-N`. Jamais réordonner ni renuméroter après génération des US. Ajout = `SFD-N+1`. Retrait = supprimer la ligne et **régénérer les US**. Les `Covers` des US référencent par valeur.
 
 ---
 
 ## 3. Commandes disponibles
 
-| Commande                        | Phase        | Rôle                                              |
-|---------------------------------|--------------|---------------------------------------------------|
-| `/spec-generate [Nom]`          | 1            | Cadrage interactif SPEC + bootstrap constitution |
-| `/spec-deepen {n} [--quick]`    | 1.5          | Élicitation structurée (Pre-mortem, Red Team…) |
-| `/us-generate {n}`              | 2            | Découpe SPEC en User Stories (agent PO) |
-| `/spec-validate {n} [--json]`   | 2.6          | Implementation Readiness Gate (déterministe, PowerShell) |
-| `/arch-init`                    | 3            | ⚠️ legacy — utiliser `/dev-run` (qui invoque arch automatiquement) |
-| `/dev-plan {n}`                 | 3.5          | Produit plans `workspace/output/plans/...` sans coder |
-| `/dev-backend {n}-{m}[:plan]`   | 4            | Code serveur pour 1 US (`:plan` = Plan Only) |
-| `/dev-frontend {n}-{m}[:plan]`  | 4            | Code client pour 1 US (`:plan` = Plan Only) |
-| `/dev-run {n} [--force] [--max-parallel N] [--rebuild-arch]` | 3 → 4 | Orchestrateur : (short-circuit arch si bootstrap stable) → back+front gated/parallèles |
-| `/sdd-full {n} [--plan] [--force] [--no-plan-on-warn] [--no-validate] [--rebuild-arch] [--manual-gates[=us,readiness,plan,code]] [--no-manual-gates] [--resume]` | 2 → 5 | Pipeline complet de A à Z (arch skipé sur SPECs ≥ 2 si stable). Gates manuels v6.1 → console [workspace/console/](workspace/console/) |
-| `/qa-generate {n} [--mode M]`       | 5            | Tests unitaires + coverage + quality scan sonar-like |
-| `/sdd-status [{n}]`             | diagnostic   | État du pipeline (lecture seule) |
-| `/doc-refresh`                  | rendu        | Régénère README.html + INDEX.md ADRs + QA dashboards (agent `dashboard` Haiku 4.5) |
+| Commande | Phase | Rôle |
+|---|---|---|
+| `/feat-generate [Nom]` | 1 | Cadrage FEAT + bootstrap constitution |
+| `/feat-deepen {n} [--quick]` | 1.5 | Élicitation (Pre-mortem, Red Team…) |
+| `/us-generate {n}` | 2 | FEAT → User Stories (agent PO) |
+| `/feat-validate {n} [--json]` | 2.6 | Implementation Readiness Gate |
+| `/arch-init` | 3 | Bootstrap arch (auto via `/dev-run`) |
+| `/dev-plan {n}` | 3.5 | Plans techniques sans coder |
+| `/dev-backend {n}-{m}[:plan]` | 4 | Code serveur d'1 US |
+| `/dev-frontend {n}-{m}[:plan]` | 4 | Code client d'1 US |
+| `/dev-run {n}` | 3→4 | Orchestrateur (arch+back+front gated) |
+| `/sdd-full {n}` | 2→5 | Pipeline complet A→Z |
+| `/qa-generate {n}` | 5 | Tests + coverage + quality scan |
+| `/sdd-review {n}` | audit | Audit consolidé (style Sonar) |
+| `/sdd-status [{n}]` | diagnostic | État pipeline (read-only) |
+| `/sdd-discover-stack` | onboarding | Scan repo → `stack.md.candidate` |
+| `/sdd-profile {cmd}` | gouvernance | Snapshots team config |
+| `/doc-refresh` | rendu | INDEX.md ADRs |
 
-> **`/sdd-clear` retiré en v6.1** (commande jugée dangereuse — purge
-> en masse non récupérable). Pour nettoyer manuellement, supprimer
-> sous `workspace/output/` les sous-dossiers concernés
-> (`us/`, `src/`, `plans/`, `qa/`, `validation/`, `.state/`, `.audit/`)
-> ciblés à la main. Aucun outil framework ne fait cette purge — c'est
-> intentionnel.
+> Flags `/sdd-full` et `/dev-run` : `--force`, `--rebuild-arch`, `--resume`, `--manual-gates`, `--plan`, `--max-parallel N`. Pour la sémantique exhaustive : `@.claude/commands/*.md`.
 
 ---
 
-## 4. Agents (4 cœur + 2 support, depuis v6.1)
+## 4. Agents
 
-**Cœur** — invoqués sur tout `/sdd-full` standard :
+**4 cœur** : `po`, `arch` (Sonnet 4.6) ; `dev-backend`, `dev-frontend` (Opus 4.7).
+**Support** : `elicitor`, `constitutioner`, `qa` (Sonnet 4.6) ; `dashboard` (Haiku 4.5).
+**Auditors** (Sonnet 4.6) : `accessibility-auditor` (Haiku), `code-reviewer`, `security-reviewer`, `performance-auditor`, `spec-compliance-reviewer`, `arch-reviewer`.
+**Variants strict v6.2** : `dev-backend-strict`, `dev-frontend-strict` (Sonnet 4.6, opt-in `PlanCacheStrict: true`).
 
-| Agent          | Modèle | Rôle (résumé)                                            | Phase |
-|----------------|--------|----------------------------------------------------------|-------|
-| `po`           | Sonnet 4.6 | SPEC → User Stories structurées (cible 1-3 US)           | 2     |
-| `arch`         | Sonnet 4.6 | Bootstrap solution + scaffolding DB READ-ONLY + ADRs     | 3     |
-| `dev-backend`  | **Opus 4.7** | US → code serveur (services, endpoints, DTOs, mappers)   | 4     |
-| `dev-frontend` | **Opus 4.7** | US + HTML mockup → code client (Pages, Components, theme) | 4    |
-
-> **Split modèles (depuis 2026-05-08)** : `dev-backend` et `dev-frontend` utilisent
-> Opus 4.7 (raisonnement fin sur génération de code, `preserves:`/`adds:`, layer
-> mapping, fidélité HTML). Les autres agents (transformations déterministes)
-> restent en Sonnet 4.6. `dashboard` (rendu déterministe) en Haiku 4.5.
-
-**Support** — optionnels ou invoqués conditionnellement :
-
-| Agent          | Modèle | Rôle (résumé)                                            | Phase | Quand invoqué |
-|----------------|--------|----------------------------------------------------------|-------|----------------|
-| `elicitor`     | Sonnet 4.6 | Élicitation structurée 5 techniques (`/spec-deepen`)     | 1.5   | Sur SPECs complexes, `/sdd-full` strict force `/spec-deepen` |
-| `qa`           | Sonnet 4.6 | Tests intégration HTTP (api-tests, gate) + tests unitaires + coverage + quality scan | 4 (gate) + 5 | API Gate auto par `/dev-run` (depuis 2026-05-07) ; phase 5 selon `QAMode` |
-| `dashboard`    | **Haiku 4.5** | Régénère README.html projet + INDEX.md ADRs + dashboards QA HTML | fin de pipeline | Auto en fin de `/sdd-full`, `/dev-run`, `/qa-generate` ; manuel via `/doc-refresh` |
-
-> **v6.0** : agent `validator` **retiré** (économie ~1.4M tokens/run).
-> `/spec-validate` est désormais 100% déterministe via PowerShell
-> (`validate-readiness.ps1`). Review sémantique à la charge du PO humain.
-
-**Tous strictement autonomes** : aucun ne pose de question utilisateur.
-Sur ambiguïté → `STOP + ERROR (CAUSE / FIX)`.
-
-Détail (lectures/écritures, isolation, modèles) :
-`@.claude/docs/architecture.md §3`.
+> Détail modèles, rôles, phases, isolation reads/writes : `@.claude/docs/architecture.md §2-§3`.
+> Tous autonomes (aucune question utilisateur). Ambiguïté → `STOP + ERROR [CLASS]`.
+> Méta-orchestrateur : `phase_planner.py` décide quelles auditors tourner par FEAT.
+> Notes opérationnelles par version : `@.claude/docs/version-notes.md`.
 
 ---
 
-## 5. Règles (rules/) — substance opérationnelle
+## 5. Règles
 
-Les règles vivent dans `.claude/rules/`. **Substance inlinée** dans
-les agents `dev-backend` et `dev-frontend` (depuis v5.0) :
-- `responsibilities.md` — périmètre des rôles
-- `stack-completeness.md` — anti-derive sur les libs
-- `file-ownership.md §1-§2` — matrice ownership fichiers partagés
-- `qa-ownership.md §1, §4` — propriété QA exclusive sur tests
+11 règles dans `.claude/rules/` : `backend-first`, `constitution`, `cors`, `dev-shared`, `error-classification`, `file-ownership`, `qa-coverage`, `source-first`, `stack-completeness`, `ui-tokens`, `us-granularity`. Substance des règles critiques inlinée dans les agents (sera dépliée en v7.0.0, cf. `ADR-20260519T153000-governance-major-prompts-trim`).
 
-Règles externes (lues uniquement par leurs consommateurs) :
-- `us-granularity.md` — chargée par agent PO (cible 1-3, hard cap 6)
-- `constitution.md` — chargée par `/spec-generate`, agent PO, agent arch
-- `qa-coverage.md` — chargée par agent QA (seuil 80%, schéma normalisé)
-- `chat-output.md` — verbosité minimale (succès 1L / warn 1L / err 2L)
-- `backend-first.md` — workflow gated back→API gate→front (depuis
-  2026-05-07) ; chargée par `/dev-run` et agent QA mode `api-tests`
-- `error-classification.md` — taxonomie 8 classes (BUILD_*, SCHEMA_*,
-  LAYER_*, UI_*, QA_*, DERIVE_*, STACK_*, NETWORK_*, etc.) chargée par
-  dev-backend, dev-frontend, qa, arch (depuis 2026-05-08). Pilote
-  `build_loop` : `[BUILD_CORRECTIBLE]` itère, `[BUILD_BLOCKING]` fail-fast.
-- `source-first.md` — discipline MD-avant-code (depuis 2026-05-12) :
-  tout bug code = trou dans une source MD (SPEC, US, plan, stack, rule).
-  Patcher la source d'abord, le code ensuite. Chargée par dev-backend,
-  dev-frontend (référence sur build_loop échec) + Tech Lead humain.
-- `file-ownership.md §1.bis` — Front/Back isolation stricte (depuis
-  2026-05-12) : Front (`{AppName}/`) et Back (`{BackendName}/`) projets
-  séparés AU MÊME NIVEAU sous `workspace/output/src/`, jamais imbriqués.
-  Hard-gate `[FILE_OWNERSHIP_NESTED]` dans arch, dev-backend, dev-frontend.
-
-Détail complet + index : `@.claude/docs/conventions.md §14`.
+Index commenté + détail : `@.claude/docs/conventions.md §14`.
 
 ---
 
-## 6. Templates (templates/)
+## 6. Templates
 
 Liste : `@.claude/docs/conventions.md §15`.
 
@@ -165,139 +93,77 @@ Liste : `@.claude/docs/conventions.md §15`.
 
 ## 7. Stacks supportés
 
-5 backend × 5 frontend × 3 UI DS × 4 auth × 6 QA = ~1800 combinaisons
-théoriques. Sélection humaine dans `workspace/input/stack/stack.md`.
+**28 stacks applicatifs + 3 patterns archi** (table compacte) :
 
-Liste détaillée + capabilities on-demand :
-`@.claude/docs/architecture.md §4`.
+| Catégorie | Stacks 🟢 reference | 🟡 Phase 2 |
+|---|---|---|
+| Backend (4) | `dotnet-minimalapi`, `kotlin-spring-boot`, `python-fastapi`, `node-express` | — |
+| Frontend (4) | `react`, `vue`, `angular`, `blazor-webassembly` | — |
+| UI DS (3) | `shadcn`, `vuetify`, `radzen-blazor` | — |
+| Fullstack (6) | — | `node-react`, `blazor-server`, `next`, `nuxt`, `angular-universal`, `kotlin-mustache` |
+| Mobiles (2) | — | `react-native`, `maui` |
+| QA (7) | `dotnet-xunit`, `blazor-bunit`, `node-vitest`, `python-pytest`, `kotlin-junit`, `angular-jasmine`, `code-quality` | — |
+| Auth (2) | `auth-local`, `azure-ad` | — |
+| Archi (3) | `mvc` | `ddd`, `microservice` |
 
-**Catalogue machine (depuis 2026-05-07)** : chaque stack expose
-`{stack-id}.libs.json` (source de vérité pour versions + libs core +
-libs on-demand + triggers + plugins). Le `.md` reste documentation
-humaine ; le tableau `§2.4` est régénéré depuis le JSON via
-`sync-stack-md.ps1`. Schéma : `.claude/templates/libs-catalog.schema.json`.
-Détail : `@.claude/rules/stack-completeness.md §1.0`.
+**AppType auto-détecté** depuis `## Active Tech Specs` (v6.7.7+) : `backend/* + frontend/*` → `back-front/web` ; `+ mobiles/*` → `back-front/mobile` ; `fullstack/*` seul → `fullstack`. Mix interdits → `[STACK_COMBO_INVALID]`.
 
-**Profil de référence validé** : `dotnet-minimalapi` + `blazor-webassembly`
-+ `radzen-blazor` + `azure-ad` + QA dotnet-xunit/blazor-bunit. Autres
-combos : 🟡 expérimentales.
+**Pattern d'archi backend** déclaré dans `## Active Architecture Pattern` (scope `back-front` avec backend uniquement). Défaut MVC.
+
+**Combos validés** : `dotnet-minimalapi × react × shadcn`, `kotlin-spring-boot × react × shadcn`. Hors combos = expérimental.
+
+**Catalogue machine** : chaque stack expose `{id}.libs.json` (versions, libs core/on-demand, triggers). Le `.md` est doc humaine ; §2.4 régénéré via `sync_stack_md.py`.
+
+> Détail combos + capabilities on-demand : `@.claude/docs/architecture.md §4`. Catalogue : `@.claude/rules/stack-completeness.md §1.0`.
 
 ---
 
-## 8. Conventions strictes (résumé)
+## 8. Conventions strictes
 
-- **Anti-derive** universel : aucune invention hors SPEC/US/stack/HTML
-- **Format ERROR** : 3 lignes (ERROR / CAUSE / FIX)
-- **Idempotence** : toutes les commandes idempotentes
-- **Lecture sélective** : 1 US à la fois, pas de Glob aveugle
-- **Parallélisme dev-* borné** : `MaxParallel: 3` US par batch (default)
-- **Plan inline** : pas de phase TASKS séparée
-- **CLAUDE.md par projet** (digest, hash-validé) : produit par arch
-- **HTML mockup** = source de vérité visuelle (texte direct, pas vision)
-- **Mode Plan Only / From Plan** : `/dev-plan` puis `/dev-run` consomme
-- **Capabilities core vs on-demand** : §2.4.a (arch installe) vs §2.4.b
-  (dev-backend installe au trigger)
-- **Chat Output minimal** : succès = 1 ligne, warning = 1 ligne, erreur
-  = 2 lignes max. Pas de récap multi-section, pas de narration. Détail
-  → fichiers `workspace/output/...`. Cf. `@.claude/rules/chat-output.md`.
-- **Gates manuels** (depuis 2026-05-10) : 4 points d'arrêt humain
-  optionnels (`afterUS`, `afterReadiness`, `afterPlan`, `afterCode`)
-  pilotés par `ManualGates: true|false|us,plan,code` dans `## Project
-  Config` ou flag CLI `--manual-gates`. Validation via console web
-  [workspace/console/](workspace/console/) (port 5173). Statuts
-  centralisés dans `workspace/console/status.json` (lock partagé Node
-  + PowerShell). Reprise du pipeline via `/sdd-full {n} --resume`.
+Anti-derive, format ERROR 3 lignes, idempotence, lecture sélective, parallélisme borné (`MaxParallel: 3`), plan inline, CLAUDE.md par projet, capabilities core vs on-demand, chat output minimal, gates manuels opt-in.
 
-Détail complet : `@.claude/docs/conventions.md §1-§13`.
+Détail : `@.claude/docs/conventions.md §1-§13`. From-Plan Strict : `@.claude/docs/DESIGN-FROMPLAN-STRICT.md`.
 
 ---
 
 ## 9. Loader manifest
 
-`@.claude/loader.yml` = miroir consolidé des reads/writes par agent.
-Source de vérité pour l'audit du contexte et l'estimation tokens.
+`@.claude/loader.yml` = miroir consolidé reads/writes par agent. Source de vérité pour audit contexte + estimation tokens. **Régénéré déterministiquement** en v7.0.0 (cf. `ADR-20260519T133000-governance-major-config-ssot.md`).
 
 ---
 
 ## 10. Démarrage rapide
 
-1. Vérifier `workspace/input/stack/stack.md` : activer 1 backend, 1 frontend,
-   1 UI DS, et éventuellement 1 auth. Renseigner `## Project Config`
-   (`AppName`, `BackendName`, `LibName`, `DatabaseType`,
-   `LibStrategy: shared|openapi-codegen|none` — défaut auto selon
-   match des langages back/front).
+1. Éditer `workspace/input/stack/stack.md` (`## Project Config`, `## Active Database`, `## Active Auth Specs`).
+2. `/feat-generate Auth` — répondre aux 3-6 questions.
+3. (Optionnel) déposer mockups HTML dans `workspace/input/ui/`.
+4. `/sdd-full 1` — pipeline complet.
+5. `/sdd-status [{n}]` — vérifier.
 
-2. Vérifier les variables d'environnement déclarées par les stacks
-   activés :
-   - Backend SQL → `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`,
-     `DB_PASSWORD`
-   - Auth Azure AD → `AZ_TENANTID`, `AZ_CLIENTID`, `AZ_DOMAIN`,
-     `AZ_AUDIENCES`, `AZ_BE_CALLBACKPATH`, `AZ_FE_CALLBACKPATH`
-
-3. `/spec-generate Auth` → répondre aux 3-6 questions → fichier créé.
-4. (Optionnel) déposer les mockups HTML dans `workspace/input/ui/` (convention
-   `{n}-{m}-{Name}.html`, basenames identiques aux US).
-5. **`/sdd-full 1`** → pipeline complet de A à Z.
-
-   Variantes plus granulaires :
-   - `/us-generate 1` (US uniquement)
-   - `/dev-run 1` (exécution seule, phases 3-4)
-
-Pour vérifier l'état : `/sdd-status` ou `/sdd-status 1`.
+Détail + variantes : `@.claude/docs/quickstart.md`. Notes par version : `@.claude/docs/version-notes.md`.
 
 ---
 
-## 11. Working Agreement (autorisation de travail dans le workspace)
+## 11. Working Agreement
 
-**Pleine autorisation accordée** dans le répertoire SDD_Pro pour :
-- Créer, éditer, supprimer, déplacer des fichiers (sources, docs, US,
-  workspace, .claude/, etc.)
-- Exécuter shell, builds, lints, tests, scripts PowerShell (`.claude/scripts/`)
-- Opérations git locales : `add`, `commit`, `branch`, `checkout`,
-  `merge`, `rebase`, `stash`
-- Restore de packages : NuGet (`dotnet restore`), npm (`npm install`),
-  pip, etc. depuis registres officiels
+Pleine autorisation dans le répertoire SDD_Pro (fichiers, shell, git local). **3 limites** : pas de modif DB structurelle, pas d'accès hors SDD_Pro, pas de réseau sortant non documenté (cf. `.claude/settings.json`).
 
-**Limites strictes** (déclenchent demande explicite si dépassement) :
-1. **Structure de base de données** : aucune modification du schéma DB
-   réelle. Interdits : `INSERT/UPDATE/DELETE/CREATE/ALTER/DROP/
-   TRUNCATE`, `dotnet ef migrations add|remove|script`, `dotnet ef
-   database update|drop`. L'introspection READ-ONLY (scaffolding
-   Database-First par arch) reste autorisée.
-2. **Hors répertoire SDD_Pro** : aucun accès en lecture/écriture aux
-   autres projets du disque, fichiers système, profils shell, registry.
-3. **Réseau sortant** : seulement ce que requièrent build/test :
-   - ✅ Restore packages depuis NuGet/npm/PyPI/Maven officiels
-   - ✅ Appels HTTP `localhost` (tests intégration, dev server)
-   - ❌ `git push` (toute branche)
-   - ❌ `curl` vers domaines arbitraires (sauf documentation explicite
-     dans une règle / stack)
-   - ❌ Upload, telemetry, analytics
-
-**Conséquence comportementale** : ne JAMAIS demander confirmation
-pour des opérations couvertes par cette autorisation. Demander
-uniquement si l'opération franchit une des 3 limites ci-dessus.
-
-Référence settings : `.claude/settings.json` permissions.allow couvre
-les patterns shell courants ; permissions.deny bloque les opérations
-DB structurelles et `git push`.
+Contrat : `@.claude/WORKING-AGREEMENT.md`.
 
 ---
 
 ## 12. Pour aller plus loin
 
-- `@.claude/docs/architecture.md` — vision, modèles, agents, stacks, scope
-- `@.claude/docs/workflow.md` — 4 phases, flux, BREAKING CHANGES history
-- `@.claude/docs/conventions.md` — anti-derive, idempotence, plan, etc.
-- `@.claude/CHANGELOG.md` — historique versions (v4 → v5)
-- `@.claude/MIGRATION.md` — guide migration entre versions majeures
-- `@.claude/loader.yml` — manifest descriptif des reads/writes par agent
-- `@.claude/rules/responsibilities.md` — périmètre exact de chaque acteur
-- `@.claude/rules/us-granularity.md` — contrat de découpage SPEC → US
-- `@.claude/rules/constitution.md` — constitution projet + ADRs
-- `@.claude/rules/library-policy.md` — politique CVE/origine/version
-
-### Scripts utilitaires (humains, hors Claude Code)
-
-Voir `.claude/scripts/README.md` pour la liste des outils dev (smoke,
-métriques, validation catalogues, sync).
+- `@.claude/docs/architecture.md` — vision, agents, stacks
+- `@.claude/docs/workflow.md` — phases, flux
+- `@.claude/docs/conventions.md` — anti-derive, idempotence
+- `@.claude/docs/quickstart.md` — démarrage pas à pas
+- `@.claude/docs/version-notes.md` — notes par version
+- `@.claude/docs/DESIGN-FROMPLAN-STRICT.md` — design strict
+- `@.claude/docs/MCP-SERVER.md` — serveur MCP (clients tiers)
+- `@.claude/VERSIONING.md` — SemVer + freeze window
+- `@.claude/CHANGELOG.md` — historique versions
+- `@.claude/MIGRATION.md` — guide migration
+- `@.claude/WORKING-AGREEMENT.md` — autorisations + limites
+- `@.claude/rules/` — 11 règles opérationnelles
+- `@.claude/python/README.md` — scripts utilitaires

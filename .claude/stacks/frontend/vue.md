@@ -1,7 +1,10 @@
-﻿# Tech Spec: vue (frontend)
+# Tech FEAT: vue (frontend)
+
+> §2.4 (Librairies) régénérée depuis `vue.libs.json` — ne pas éditer manuellement (`python .claude/python/sdd_admin/sync_stack_md.py --stack-id vue`).
 
 Status: Stable
-Tech Spec ID: tech-vue
+Validation: 🟡 experimental (spec stable, not yet validated end-to-end in production combo)
+Tech FEAT ID: tech-vue
 Scope: frontend uniquement (Vue 3 SPA + TypeScript)
 
 ---
@@ -134,7 +137,7 @@ fi
 
 <!-- CORE_PACKAGES_START -->
 ```bash
-# Auto-genere depuis vue.libs.json -- ne pas editer (utiliser sync-stack-md.ps1).
+# Auto-genere depuis vue.libs.json -- ne pas editer (utiliser sync_stack_md.py).
 (cd workspace/output/src/{AppName} && npm install \
   vue@3.5.13 \
   vue-router@4.5.0 \
@@ -209,7 +212,7 @@ Erreurs spécifiques Vue :
 <!-- LIBS_CATALOG_START -->
 ### 2.4 Librairies
 
-> Source de verite : `.claude/stacks/frontend/vue.libs.json`. Ne pas editer cette section manuellement -- utiliser `.claude/scripts/sync-stack-md.ps1 -StackId vue`.
+> Source de verite : `.claude/stacks/frontend/vue.libs.json`. Ne pas editer cette section manuellement -- utiliser `python .claude/python/sdd_admin/sync_stack_md.py --stack-id vue`.
 
 #### 2.4.a Librairies CORE (installees par arch en section 2.2.1, toujours)
 
@@ -238,7 +241,7 @@ Erreurs spécifiques Vue :
 
 ### 2.4.b Librairies ON-DEMAND (installees si l'US declenche)
 
-Triggers (regex case-insensitive) cherches par `detect-capabilities.ps1` dans l'US + ACs.
+Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'US + ACs.
 
 | Capability | Lib | Version | Triggers |
 |---|---|---|---|

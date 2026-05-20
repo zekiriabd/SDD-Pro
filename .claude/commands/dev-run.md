@@ -1,22 +1,26 @@
-# /dev-run — Orchestrateur dev (arch+db → back + front en parallèle) pour 1 SPEC
+# /dev-run — Orchestrateur dev (arch+db → back + front en parallèle) pour 1 FEAT
 
-Pour la SPEC `{n}`, exécute en séquence :
+> **Dépendance load-bearing au runtime Claude Code** : orchestration
+> parallèle via tool `Agent` (alias `Task`) avec N calls indépendants
+> dans un même message. Contrat externe garanti par Claude Code.
+> Anti-régression : `framework_smoke.py` vérifie la présence de
+> « parallèle » + `Agent` + `dev-backend` + `dev-frontend`.
 
-1. **Pré-step `arch`** (idempotent) — bootstrap solution / projets vides
-   selon les stacks actifs **+** scaffolding DB Database-First si
-   `DatabaseType ≠ none` (les deux phases sont gérées par le même agent
-   `arch` depuis SDD_Pro v2.1)
-2. **`dev-backend` et `dev-frontend` EN PARALLÈLE** sur toutes les US
-   de la SPEC ; chaque agent décide lui-même s'il a du travail (US
-   fullstack, frontend pure, backend pure) ou exit silencieux
+Pour la FEAT `{n}`, en séquence :
+
+1. **Pré-step `arch`** (idempotent) — bootstrap solution/projets selon
+   stacks actifs + scaffolding DB Database-First si `DatabaseType ≠ none`
+   (les deux phases sont gérées par le même agent `arch`)
+2. **`dev-backend` + `dev-frontend` EN PARALLÈLE** sur toutes les US ;
+   chaque agent décide s'il a du travail (fullstack/frontend pure/
+   backend pure) ou exit silencieux
 
 Mode **autonome** : pas de Q/R utilisateur.
 
-**Usage :** `/dev-run {n}` — où `{n}` est le numéro de la SPEC.
+**Usage :** `/dev-run {n}` (`{n}` = numéro FEAT).
 
-**Hors scope :** la phase plan (`/us-generate`) doit avoir tourné
-avant. Cette commande consomme `workspace/output/us/` (US) et `workspace/input/ui/`
-(mockups HTML statiques optionnels).
+**Hors scope :** `/us-generate` doit avoir tourné avant. Consomme
+`workspace/output/us/` (US) et `workspace/input/ui/` (mockups HTML optionnels).
 
 ---
 
@@ -24,42 +28,44 @@ avant. Cette commande consomme `workspace/output/us/` (US) et `workspace/input/u
 
 Arguments :
 - `{n}` (entier ≥ 1, **obligatoire**)
-- `--force` (optionnel, depuis SDD_Pro v3) — bypass un éventuel rapport
-  readiness existant en NO-GO. À utiliser en connaissance de cause.
-- `--max-parallel N` (optionnel, depuis v3.1.3) — nombre maximum d'US
-  traitées simultanément (1 US = jusqu'à 2 invocations dev-* en
-  parallèle). Default : valeur de `MaxParallel` dans `## Project Config`
-  de `workspace/input/stack/stack.md`, sinon **3** (heuristique conservatrice
-  pour 4-6 US fullstack). Range : 1-12. Hors range → ERROR.
+- `--force` (optionnel) — bypass un rapport readiness NO-GO existant.
+- `--max-parallel N` (optionnel) — nombre max d'US simultanées (1 US =
+  jusqu'à 2 invocations dev-*). Default : `MaxParallel` dans `## Project
+  Config` de `workspace/input/stack/stack.md`, sinon **3**. Range 1-12.
+  Hors range → ERROR.
 
   Exemples :
-  - `/dev-run 1` → utilise default (3 US à la fois → max 6 invocations
-    parallèles).
-  - `/dev-run 1 --max-parallel 1` → mode séquentiel (1 US, 2 invocations
-    simultanées back+front, puis suivante).
-  - `/dev-run 1 --max-parallel 6` → 6 US parallèles (max 12 invocations,
-    comportement legacy v3.0.x).
+  - `/dev-run 1` → default (3 US → max 6 invocations parallèles).
+  - `/dev-run 1 --max-parallel 1` → séquentiel (1 US back+front, puis suivante).
+  - `/dev-run 1 --max-parallel 6` → 6 US parallèles (max 12 invocations).
 
-  Stocker la valeur résolue dans `$max_parallel` consommé par STEP 6.2.
+  Stocker dans `$max_parallel` (STEP 6.2).
 
-- `--rebuild-arch` (optionnel, depuis 2026-05-10) — force l'invocation
-  de l'agent `arch` (STEP 5) même quand le short-circuit STEP 4.bis
-  détecte un bootstrap stable. À utiliser quand :
-  - le schéma DB a changé côté serveur (nouvelles tables, colonnes)
-  - une lib a été ajoutée à `.libs.json` d'un stack actif
-  - `## Project Config` a été modifié (AppName, BackendName,
-    DatabaseType, etc.)
-  - un projet a été supprimé manuellement et doit être re-bootstrappé
+- `--rebuild-arch` (optionnel) — force l'invocation `arch` (STEP 5)
+  même si STEP 4.bis détecte un bootstrap stable. À utiliser quand :
+  - schéma DB changé (nouvelles tables/colonnes)
+  - lib ajoutée à `.libs.json` d'un stack actif
+  - `## Project Config` modifié (AppName, BackendName, DatabaseType…)
+  - projet supprimé manuellement et à re-bootstrapper
 
-  Sans ce flag, les SPECs ≥ 2 (ou les re-runs d'une même SPEC) sautent
-  l'étape arch dès que les artefacts de bootstrap sont cohérents
-  (cf. STEP 4.bis).
+  Sans ce flag, FEATs ≥ 2 (ou re-runs) sautent arch dès que les
+  artefacts de bootstrap sont cohérents (STEP 4.bis).
 
-  Stocker `$rebuild_arch ∈ {true, false}` consommé par STEP 4.bis et 5.
+  Stocker `$rebuild_arch ∈ {true, false}` (STEP 4.bis et 5).
+
+- `PlanCacheStrict` (lu depuis `## Project Config` de `stack.md`) —
+  flag opt-in **From-Plan Strict** :
+  - `true` → si plan v2 strict-ready, dev-* tournent en Sonnet 4.6 via
+    `dev-backend-strict` / `dev-frontend-strict`. Gain latence ×3, coût ×5.
+  - `false` (défaut v6.2) → comportement v6.1, dev-* Opus 4.7 classique.
+
+  Stocker `$plan_cache_strict ∈ {true, false}` (STEP 6.0.bis).
+
+  Détail : `@.claude/docs/DESIGN-FROMPLAN-STRICT.md`.
 
 Si `{n}` absent → demander :
 ```
-Quel est le numéro de la SPEC à matérialiser ? (ex. : 1)
+Quel est le numéro de la FEAT à matérialiser ? (ex. : 1)
 ```
 
 Si `{n}` non numérique →
@@ -71,16 +77,15 @@ FIX: relancer /dev-run {n} (ex. /dev-run 1)
 
 ---
 
-## STEP 1.5 — Vérification du rapport readiness (depuis SDD_Pro v3)
+## STEP 1.5 — Vérification du rapport readiness
 
-Read `workspace/output/validation/{n}-readiness.md` **si présent**.
+Read `workspace/output/.sys/.validation/{n}-readiness.md` **si présent**.
 
-- Fichier absent → continuer normalement (la gate n'a pas tourné — cas
-  d'usage direct `/dev-run` sans passer par `/sdd-full`). Émettre un
-  WARNING informationnel :
+- Fichier absent → continuer (gate non exécutée, cas `/dev-run` direct
+  sans `/sdd-full`). WARNING informationnel :
   ```
   WARNING: /dev-run — gate readiness non exécutée
-  HINT: lancer /spec-validate {n} avant pour détecter les trous SPEC en amont
+  HINT: lancer /feat-validate {n} avant pour détecter les trous FEAT en amont
   ```
   puis continuer.
 
@@ -90,18 +95,53 @@ Read `workspace/output/validation/{n}-readiness.md` **si présent**.
   - Si `--force` fourni → continuer + émettre :
     ```
     WARNING: /dev-run — bypass NO-GO via --force
-    Rapport : workspace/output/validation/{n}-readiness.md (consulter §3)
+    Rapport : workspace/output/.sys/.validation/{n}-readiness.md (consulter §3)
     ```
   - Sinon → STOP :
     ```
     🔴 /dev-run {n} — bloqué par rapport readiness (NO-GO)
-    Rapport : workspace/output/validation/{n}-readiness.md
+    Rapport : workspace/output/.sys/.validation/{n}-readiness.md
     FIX :
       1. corriger les erreurs §3 du rapport
-      2. relancer /spec-validate {n}
+      2. relancer /feat-validate {n}
       3. relancer /dev-run {n} une fois GO ou WARN
     Bypass : /dev-run {n} --force (à utiliser en connaissance de cause)
     ```
+
+---
+
+## STEP 1.75 — Checkpoint skip (v6.6.5, opt-in)
+
+Si `CheckpointMode: resume` dans Project Config (défaut `off` =
+comportement v6.6.4 strict) :
+
+```python
+from sdd_lib.checkpoint import is_phase_resumable
+
+inputs = [
+    f"workspace/input/feats/{n}-*.md",        # FEAT parent
+    *glob(f"workspace/output/us/{n}-*.md"),   # toutes les US
+    *glob(f"workspace/input/ui/{n}-*.html"),  # mockups HTML (si présents)
+    "workspace/input/stack/stack.md",         # Project Config + stacks
+]
+resumable, reason = is_phase_resumable(
+    feat=n, phase="dev-run", input_paths=resolved_inputs,
+)
+if resumable:
+    print(f"⊘ /dev-run {n}: skipped (checkpoint hit — code already materialized, inputs unchanged)")
+    # STOP avec succès, ne pas re-dispatcher arch + dev-* + auditors
+```
+
+Si `CheckpointMode ∈ {off, record}` → skip ce STEP, continuer.
+
+**Granularité dev-run** : checkpoint au niveau **dev-run complet** (skip
+arch + dev-back + dev-front + API Gate + auditors d'un coup), pas au
+niveau phase interne. Pour la granularité phase, l'idempotence `Status:
+Done` US-level suffit (cf. `file-ownership.md §6`).
+
+Émissions possibles : `[CHECKPOINT_HASH_MISMATCH]` (US ou mockup modifié),
+`[CHECKPOINT_INPUT_MISSING]` (US supprimée), `[CHECKPOINT_STATE_UNREADABLE]`
+(première exécution).
 
 ---
 
@@ -118,8 +158,43 @@ FIX: lancer /us-generate {n} pour générer les US d'abord
 
 Émettre 1 ligne récap :
 ```
-SPEC {n} — {U} US à matérialiser (back + front en parallèle)
+FEAT {n} — {U} US à matérialiser (back + front en parallèle)
 ```
+
+---
+
+## STEP 2.bis — Valider le graphe de dépendances `## Dependencies` (v6.8+)
+
+Avant batching, valider et ordonner `US_LIST` selon le graphe de dépendances
+déclaré dans les sections `## Dependencies` des US (cf. `templates/us.template.md`).
+
+```bash
+python .claude/python/sdd_scripts/validate_us_deps.py --feat {n} --json
+```
+
+| Exit | Sens | Action |
+|---|---|---|
+| 0 | Graphe valide (orphelins tolérés, INFO) | Continuer ; remplacer `US_LIST` par le topo order |
+| 3 | `[US_DEPS_CYCLE]` | STOP + ERROR, Tech Lead corrige les `## Dependencies` |
+| 4 | `[US_DEPS_MISSING]` | STOP + ERROR, ref vers US inexistante |
+| 1/2/5 | erreur infra | STOP + ERROR |
+
+Sur exit 0, récupérer le topo order :
+```bash
+US_LIST=$(python .claude/python/sdd_scripts/validate_us_deps.py --feat {n} --topo)
+```
+
+**Backward-compat strict** : pour les US legacy sans `## Dependencies` (ou avec
+`NONE`), le graphe est vide, le topo order est alphabétique stable, et le
+comportement est byte-identique à v6.7. Aucune US v1 n'est cassée.
+
+**Invariant aval (STEP 6.a, 6.c)** : `US_LIST` est désormais en ordre
+topologique. Les US sans dépendances apparaissent en premier ; au sein d'un
+batch `chunk(US_LIST, $max_parallel)`, les US peuvent toujours dépendre d'US
+des batches PRÉCÉDENTS (déjà terminés via wait), jamais du batch courant.
+*Note* : la stricte garantie "deps jamais dans le même batch" n'est pas
+encore enforced — le topo order minimise les violations mais ne les élimine
+pas pour des graphes denses. Ajustement futur : layered Kahn batching.
 
 ---
 
@@ -140,39 +215,34 @@ inapplicable.)
 
 ---
 
-## STEP 4 — Validation des variables d'environnement requises
+## STEP 4 — Validation des blocs `## Active Database` + `## Active Auth Specs` de stack.md
 
-La liste des env vars attendues est **dérivée des stacks actifs**, pas
-listée dans `stack.md`. Chaque stack documente ses propres env vars
-canoniques :
+Les valeurs DB et Auth sont des **clés dans `stack.md`** (Tech Lead)
+propagées par `arch` Phase A — STEP 4.5 vers les fichiers de configuration
+applicatifs natifs.
 
-| Source                                            | Env vars déclarées (référence)                   |
+| Source dans stack.md                              | Clés requises (valeur non vide)                 |
 |---------------------------------------------------|--------------------------------------------------|
-| `## Project Config: DatabaseType ≠ none` + stack backend actif | `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` (cf. `dotnet-minimalapi.md §5.1`) |
-| `## Active Auth Specs ⊇ auth/azure-ad`             | `AZ_TENANTID`, `AZ_CLIENTID`, `AZ_DOMAIN`, `AZ_AUDIENCES`, `AZ_BE_CALLBACKPATH`, `AZ_FE_CALLBACKPATH` (cf. `auth/azure-ad.md §3`) |
+| `## Active Database` (si `DatabaseType ≠ none`)   | `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` (cf. `dotnet-minimalapi.md §5.1`) |
+| `## Active Auth Specs ⊇ auth/azure-ad`            | `AZ_TENANTID`, `AZ_CLIENTID`, `AZ_DOMAIN`, `AZ_AUDIENCES`, `AZ_BE_CALLBACKPATH`, `AZ_FE_CALLBACKPATH` (cf. `auth/azure-ad.md §2`) |
 
-Lire la valeur (`$env:VAR` PowerShell, `${VAR}` bash) **sans afficher**
-les valeurs. Si une ou plusieurs sont vides →
+Parser ces blocs (cf. `agents/arch.md §2.ter.1`) **sans afficher** les
+valeurs. Si ≥ 1 clé absente/vide →
 ```
-ERROR: /dev-run — variable(s) d'environnement manquante(s)
-CAUSE: variables non définies : {liste exacte des noms manquants}
-FIX: définir les variables dans l'environnement avant de relancer
+ERROR: /dev-run — clé(s) manquante(s) dans stack.md
+CAUSE: clés non définies : {liste exacte} dans {## Active Database | ## Active Auth Specs}
+FIX: renseigner les valeurs dans workspace/input/stack/stack.md (bloc concerné)
 ```
 
-**STOP** l'orchestration. Aucun agent n'est invoqué tant que les
-prérequis ne sont pas en place.
+**STOP**. Aucun agent invoqué tant que prérequis absents.
 
 ---
 
-## STEP 4.bis — Détection short-circuit arch (depuis 2026-05-10)
+## STEP 4.bis — Détection short-circuit arch (script-driven, v6.1)
 
-**But** : sur les SPECs ≥ 2 (ou les re-runs d'une même SPEC), éviter
-de payer le coût arch (build de validation, ré-introspection DB,
-ré-écriture des CLAUDE.md, refresh INDEX.md ADRs) quand le bootstrap
-est déjà stable. L'idempotence interne de l'agent arch (cf.
-`agents/arch.md` STEP 3) garantit qu'un re-run ne casse rien — mais
-elle ne supprime pas l'invocation. Ce STEP 4.bis ajoute le
-short-circuit en amont.
+**But** : sur FEATs ≥ 2 (ou re-runs), éviter le coût arch (build,
+ré-introspection DB, ré-écriture CLAUDE.md, refresh INDEX.md) quand le
+bootstrap est stable. Logique déterministe déléguée au script Python.
 
 ### 4.bis.0 — Bypass via flag
 
@@ -180,85 +250,127 @@ Si `$rebuild_arch == true` (flag `--rebuild-arch` passé) → forcer
 `$arch_required = true`, skip 4.bis.1 et aller directement à STEP 5.
 Émettre 1 ligne :
 ```
-SPEC {n} — arch forcé (--rebuild-arch)
+FEAT {n} — arch forcé (--rebuild-arch)
 ```
 
-### 4.bis.1 — Conditions de skip
+### 4.bis.1 — Invocation du script déterministe
 
-Vérifier que **toutes** les conditions ci-dessous sont vraies :
+```bash
+python .claude/python/sdd_scripts/detect_arch_shortcircuit.py \
+  --feat-number {n} --json
+```
 
-1. **Project Config** lu en STEP 4 (récupérer `AppName`,
-   `BackendName`, `LibName` optionnel, `DatabaseType`).
+Le script vérifie les 4 conditions (cf. `detect_arch_shortcircuit.py`
+docstring) :
+1. `workspace/input/stack/stack.md` lisible avec `## Project Config` + `## Active Database` exploitables
+2. CLAUDE.md projet présents pour chaque famille active (back, front, lib si LibName)
+3. `workspace/output/db/schema.json` présent si `DatabaseType ≠ none` (lu depuis `## Active Database`)
+4. mtime stack.md ≤ mtime du plus ancien CLAUDE.md projet
 
-2. **CLAUDE.md par projet présents** (anchor du bootstrap arch
-   réussi — écrits par arch STEP 12 uniquement après build OK et
-   scaffolding DB OK) :
-   - Si stack backend actif : `workspace/output/src/{BackendName}/CLAUDE.md`
-   - Si stack frontend actif : `workspace/output/src/{AppName}/CLAUDE.md`
-   - Si `LibName` défini : `workspace/output/src/{LibName}/CLAUDE.md`
+Sortie JSON sur stdout :
+```json
+{
+  "required": false,
+  "reason": "bootstrap stable, schema DB présent, CLAUDE.md cohérents",
+  "checks": { ... }
+}
+```
 
-3. **Schema DB** (uniquement si `DatabaseType ≠ none`) :
-   - `workspace/output/db/schema.json` existe
-
-4. **stack.md non modifié depuis le dernier arch** :
-   - mtime de `workspace/input/stack/stack.md` ≤ mtime du plus ancien
-     CLAUDE.md de projet (= aucun CLAUDE.md n'est plus vieux que
-     stack.md)
-   - Heuristique simple, équivalente fonctionnellement au check de
-     hash `stack-md-hash` du frontmatter pour 99 % des cas, sans
-     parser de YAML (depuis 2026-05-10).
-
-### 4.bis.2 — Décision
-
-| Toutes vraies ? | `$arch_required` | Action |
+| Exit | Sens | Action |
 |---|---|---|
-| Oui | `false` | Skip STEP 5. Émettre 1 ligne (cf. ci-dessous), aller à STEP 6 |
-| Au moins une fausse | `true` | Continuer STEP 5 (l'agent arch fera ses propres skips internes pour ce qui est déjà OK) |
+| `0` + `required: false` | Skip arch | Émettre 1 ligne (cf. 4.bis.3 cas skip), aller à STEP 6 |
+| `0` + `required: true` | Arch nécessaire | Émettre 1 ligne (cf. 4.bis.3 cas requis), continuer STEP 5 |
+| `1` ou `2` | Erreur script | Fallback safe : forcer `$arch_required = true` (arch est idempotent) |
 
 ### 4.bis.3 — Émission (1 ligne)
 
 **Cas skip** :
 ```
-SPEC {n} — arch skip (bootstrap stable{, schema DB présent}, CLAUDE.md cohérents)
+FEAT {n} — arch skip ({reason du JSON})
 ```
 
-**Cas requis** (mention concise de la première condition non remplie) :
+**Cas requis** :
 ```
-SPEC {n} — arch requis ({raison} : ex. "stack.md modifié" | "schema.json absent" | "CLAUDE.md backend manquant" | "premier run")
+FEAT {n} — arch requis ({reason du JSON})
 ```
 
 ### 4.bis.4 — Anti-derive
 
-- Ne PAS lire le contenu des CLAUDE.md (juste leur existence + mtime)
-- Ne PAS calculer de hash sha256 (le check mtime suffit)
-- Ne PAS skipper si une seule des 4 conditions est ambiguë —
-  préférer invoquer arch (qui est lui-même idempotent en interne)
-- Le skip est purement un raccourci de performance, jamais un
-  raccourci de correction
+- Ne PAS dupliquer les checks en LLM (laisser le script faire)
+- Erreur script (exit ≠ 0) → fallback safe `arch_required: true`
+- Skip = raccourci de performance, jamais de correction (arch
+  idempotent en interne)
 
 ---
 
 ## STEP 5 — Pré-step arch (bootstrap + scaffolding DB idempotents)
 
-**Conditionnel** : si `$arch_required == false` (cf. STEP 4.bis), skip
-ce STEP entièrement et passer à STEP 6.
+**Conditionnel** : si `$arch_required == false` (STEP 4.bis), skip et
+passer à STEP 6.
 
-Sinon, invoquer l'agent `arch` (équivalent `/arch-init`). L'agent gère
-intégralement :
-- l'idempotence du bootstrap (skip si projets déjà initialisés)
-- l'introspection DB et le scaffolding Database-First si
-  `DatabaseType ≠ none` (skip silencieux sinon)
+Sinon, invoquer agent `arch` (équivalent `/arch-init`). L'agent gère :
+- idempotence du bootstrap (skip si projets initialisés)
+- introspection DB et scaffolding Database-First si `DatabaseType ≠ none`
+  (skip silencieux sinon)
 
-- Si `arch` réussit → continuer au STEP 6
-- Si `arch` échoue → propager l'ERROR et **STOP**
-  (les agents dev ne peuvent pas tourner sur un projet non initialisé
-  ni sur des entities manquantes quand DB requise)
+- `arch` OK → STEP 5.5
+- `arch` échoue → propager ERROR et **STOP** (dev-* ne peut tourner
+  sans projet initialisé / entities scaffold si DB requise)
 
 ---
 
-## STEP 6 — Workflow gated séquentiel (depuis 2026-05-07, cf. `.claude/rules/backend-first.md`)
+## STEP 5.5 — Threat model pré-dev (security-reviewer mode threat-model, v6.4.2)
 
-**Nouveau défaut** : back→QA API gate→front, plus de parallélisme back+front.
+**Conditionnel + non bloquant**. Décide via `phase_planner.py` si la
+phase doit tourner ; en cas de positif, invoque l'agent
+`security-reviewer --mode threat-model`. Le résultat est
+**informational** uniquement — ne stoppe **jamais** `/dev-run`.
+
+### 5.5.1 — Décision via phase_planner
+
+```bash
+PHASE_PLAN=$(python .claude/python/sdd_scripts/phase_planner.py \
+  --feat-number {n} --json 2>/dev/null)
+THREAT_MODEL_ENABLED=$(echo "$PHASE_PLAN" | python -c \
+  "import json,sys; d=json.load(sys.stdin); print(d['phases']['threat_model']['enabled'])" 2>/dev/null)
+```
+
+- `THREAT_MODEL_ENABLED == True` → invocation (5.5.2)
+- `THREAT_MODEL_ENABLED == False` → skip silencieux + 1 ligne récap
+  (`FEAT {n} — threat-model skip ({skip_reason du planner})`)
+- Erreur script → log WARNING + skip (best-effort, ne bloque pas)
+
+### 5.5.2 — Invocation
+
+```
+Agent(security-reviewer, args="{n} --mode threat-model")
+```
+
+L'agent produit `workspace/output/.sys/.validation/{n}-threat-model.{md,json}`.
+
+### 5.5.3 — Émission
+
+```
+FEAT {n} — threat-model : {N} threats identifiés ({C} critical, {S} serious, {M} moderate) → cf. {path}
+```
+
+Verdict toujours `informational` → **continue STEP 6** quoi qu'il
+arrive (même sur threats critical visibles, c'est au Tech Lead de
+décider d'arrêter manuellement avant `/dev-run`).
+
+### 5.5.4 — State tracking
+
+```bash
+python .claude/python/sdd_scripts/sdd_state.py set-phase \
+  --run-id $RUN_ID --phase threat_model --status pass \
+  --payload-json '{"threats_count":N,"verdict":"informational"}'
+```
+
+---
+
+## STEP 6 — Workflow gated séquentiel (cf. `.claude/rules/backend-first.md`)
+
+**Défaut** : back → QA API gate → front, plus de parallélisme back+front.
 
 ```
 6a. dev-backend ALL US (parallèle bornée par MaxParallel)
@@ -270,51 +382,113 @@ intégralement :
 ```
 
 Lire `## Project Config` :
-- `GatedWorkflow` (default `true`) : si `false`, fallback legacy
-  parallèle (logger dans `workspace/output/.audit/legacy-parallel.log`).
-  Déconseillé.
-- `ApiGateRequired` (default `true`) : si `false`, gate produit WARN
-  au lieu de RED (continue malgré tests rouges, déconseillé).
+- `GatedWorkflow` (default `true`) : si `false`, fallback legacy parallèle
+  (log `workspace/output/.sys/.audit/legacy-parallel.log`). Déconseillé.
+- `ApiGateRequired` (default `true`) : si `false`, gate produit WARN au
+  lieu de RED (continue malgré tests rouges, déconseillé).
 
 ### 6.0 Détection automatique du mode From Plan
 
-Avant d'invoquer les agents, Glob `workspace/output/plans/{n}-*-*.{back,front}.md`.
-Chaque agent dev-* détecte lui-même la présence de son plan au
-démarrage et bascule automatiquement en mode From Plan.
+Avant invocation, Glob `workspace/output/plans/{n}-*-*.{back,front}.md`.
+Chaque dev-* détecte son plan au démarrage et bascule en mode From Plan.
 
 Émettre 1 ligne :
 ```
-SPEC {n} — {U} US : {P_back} plans backend + {P_front} plans frontend détectés (mode From Plan)
+FEAT {n} — {U} US : {P_back} plans backend + {P_front} plans frontend détectés (mode From Plan)
 ```
 
-### 6.a Phase Backend — invocations dev-backend bornées
+### 6.0.bis Routing strict (v6.2, PlanCacheStrict)
 
-Pour chaque US `{n}-{m}-{Name}`, invoquer `dev-backend {n}-{m}` en
-batches de `$max_parallel`. Les invocations frontend sont **différées
-à 6c**.
+**Conditionnel** : exécuté seulement si `$plan_cache_strict == true`.
+Sinon, MARK_STRICT[{us},{family}] = false pour toutes les US, aller à 6.a.
+
+Pour chaque plan détecté en 6.0, valider strict-readiness via script
+déterministe (0 token LLM) :
+
+```bash
+python .claude/python/sdd_scripts/validate_plan.py \
+  --plan-path "workspace/output/plans/{n}-{m}-{Name}.{back|front}.md" \
+  --us-path "workspace/output/us/{n}-{m}-{Name}.md" \
+  --strict \
+  --json
+```
+
+Pour chaque (US, family ∈ {backend, frontend}) :
+
+| Exit script | Mode résultant | Action 6.a/6.c |
+|---|---|---|
+| `0` (strict-ready) | strict | spawn `dev-{family}-strict` (Sonnet 4.6) |
+| `1` (not strict-ready) | classic | spawn `dev-{family}` (Opus 4.7, fallback) |
+| `2` (stale/invalid) | bloquant | STOP + ERROR `[PLAN_STALE]` ou `[PLAN_INVALID]` |
+
+**Exit 2 bloquant** : aucun spawn lancé. Émettre :
+```
+🔴 /dev-run {n} — plan stale ou invalide
+Plan : workspace/output/plans/{n}-{m}-{Name}.{back|front}.md
+Cause : [PLAN_STALE | PLAN_INVALID] {détail depuis JSON}
+FIX :
+  1. relancer /dev-plan {n} pour régénérer le plan
+  2. relancer /dev-run {n}
+```
+
+**Observabilité** : event state.jsonl par validation :
+```bash
+python .claude/python/sdd_scripts/sdd_state.py emit-event \
+  --run-id $RUN_ID \
+  --event-type plan_validate \
+  --payload-json '{"us":"{n}-{m}","family":"{back|front}","exit_code":N,"result":"ready|not_strict_ready|invalid"}'
+```
+
+Event résumé après évaluation de tous les plans :
+```bash
+python .claude/python/sdd_scripts/sdd_state.py emit-event \
+  --run-id $RUN_ID \
+  --event-type plan_cache_evaluation \
+  --payload-json '{"us_strict_back":S_back,"us_strict_front":S_front,"us_classic":C,"rate":(S_back+S_front)/(2*U)}'
+```
+
+Émettre 1 ligne récap au chat :
+```
+FEAT {n} — plan cache : {S_back}/{U} back + {S_front}/{U} front strict-ready (rate {%}, routing : {S} strict + {C} classic)
+```
+
+### 6.a Phase Backend — invocations dev-backend bornées (routing strict-aware)
+
+Pour chaque US `{n}-{m}-{Name}`, invoquer en batches de `$max_parallel`.
+Choix agent selon `MARK_STRICT[{us},backend]` :
 
 ```
 $batches = chunk(US_LIST, size = $max_parallel)
 for batch in $batches:
     invoquer en parallèle :
       pour chaque US dans batch :
-        Agent(dev-backend {n}-{m})
+        if MARK_STRICT[{us},backend] == true:
+          Agent(dev-backend-strict, args="{n}-{m}")  # Sonnet 4.6
+        else:
+          Agent(dev-backend, args="{n}-{m}")         # Opus 4.7 (défaut)
     attendre fin du batch
 ```
 
 Émettre 1 ligne par batch :
 ```
-SPEC {n} — backend batch {i}/{B} : US {liste-{m}} → {U_batch} invocations dev-backend
+FEAT {n} — backend batch {i}/{B} : US {liste-{m}} → {U_batch} invocations ({S_batch} strict + {C_batch} classic)
 ```
 
-Chaque dev-backend :
-- US backend ou fullstack → génère le code serveur
-- US frontend pure → exit `skipped (frontend-only US)` (la phase 6c
-  prendra le relais sans backend pour cette US)
+Chaque agent (strict ou classic) :
+- US backend/fullstack → génère code serveur
+- US frontend pure → exit `skipped (frontend-only US)`
 
-**Échec d'une US backend** : continue les autres invocations du batch
-(comme avant), mais à la fin de 6a si **au moins 1 US backend en
-échec** → émettre :
+**Fallback auto** : si `dev-backend-strict` retourne ERROR
+`[PLAN_DIGEST_INSUFFICIENT]`, relancer avec `dev-backend` (Opus, From-Plan
+classique) **dans le même batch** (pas d'attente). Logger event :
+```bash
+python .claude/python/sdd_scripts/sdd_state.py emit-event \
+  --run-id $RUN_ID --event-type plan_cache_fallback \
+  --payload-json '{"us":"{n}-{m}","family":"backend","reason":"PLAN_DIGEST_INSUFFICIENT"}'
+```
+
+**Échec US backend** : continue les autres invocations du batch. À la
+fin de 6a si ≥ 1 US backend en échec → émettre :
 ```
 🔴 /dev-run {n} — phase backend incomplète ({F_back} US en échec sur {U})
 
@@ -325,23 +499,32 @@ Chaque dev-backend :
 L'API gate ne peut pas tourner sur un backend incomplet. Corriger les
 erreurs (cf. logs dev-backend) puis relancer /dev-run {n}.
 ```
-**STOP**, ne pas exécuter 6b ni 6c.
+**STOP**, pas de 6b ni 6c.
 
 ### 6.b Phase QA API Gate (tests d'intégration HTTP)
 
-Si toutes les US backend sont OK (incl. skipped frontend-only), invoquer
+Si toutes US backend OK (incl. skipped frontend-only), invoquer
 `/qa-generate {n} --mode api-tests` (cf. `.claude/rules/backend-first.md §1`).
 
-Contenu de l'invocation :
-- Génération de tests d'intégration HTTP par endpoint backend exposé
-  (style Postman) avec **in-memory DB** ou mocks selon stack QA actif
-- Couverture minimale `ApiGateMinPerEndpoint` (default 2 — 1 happy + 1
-  négatif)
+Contenu :
+- Tests d'intégration HTTP par endpoint backend (style Postman) avec
+  **in-memory DB** ou mocks selon stack QA actif
+- Couverture min `ApiGateMinPerEndpoint` (default 2 — 1 happy + 1 négatif)
 - Auth mockée (test handler), jamais Azure AD réel
-- Rapport : `workspace/output/qa/feat-{n}/api-tests.{md,json}`
+- Rapport humain : `workspace/output/qa/feat-{n}/api-tests.md`
+- Données interrogeables : `workspace/output/db/console.db`
+  (tables `qa_api_tests` + `qa_api_endpoints`, depuis v6.10)
 
-Lire `workspace/output/qa/feat-{n}/api-tests.json` après exécution.
-Décision selon `summary.gate_passed` :
+Lire le verdict consolidé depuis la DB (le `.json` éphémère a été
+ingéré et supprimé par `qa-generate` STEP 6.bis) :
+
+```bash
+GATE_JSON=$(python .claude/python/sdd_scripts/query_console_db.py api-gate --feat {n})
+GATE_PASSED=$(echo "$GATE_JSON" | python -c "import json,sys; print(json.load(sys.stdin).get('gate_passed', False))")
+TESTS_FAILED=$(echo "$GATE_JSON" | python -c "import json,sys; print(json.load(sys.stdin).get('tests_failed', 0))")
+```
+
+Décision selon `gate_passed` :
 
 | Verdict gate | Action |
 |---|---|
@@ -370,37 +553,53 @@ Pour débloquer :
      6b re-confirme, 6c démarre)
 ```
 
-### 6.c Phase Frontend — invocations dev-frontend bornées
+### 6.c Phase Frontend — invocations dev-frontend bornées (routing strict-aware)
 
 **Uniquement si 6b a passé en 🟢 ou 🟡.** Pour chaque US, invoquer
-`dev-frontend {n}-{m}` en batches de `$max_parallel`.
+en batches de `$max_parallel`. Le choix de l'agent dépend de
+`MARK_STRICT[{us},frontend]` :
 
 ```
 $batches = chunk(US_LIST, size = $max_parallel)
 for batch in $batches:
     invoquer en parallèle :
       pour chaque US dans batch :
-        Agent(dev-frontend {n}-{m})
+        if MARK_STRICT[{us},frontend] == true:
+          Agent(dev-frontend-strict, args="{n}-{m}")  # Sonnet 4.6
+        else:
+          Agent(dev-frontend, args="{n}-{m}")         # Opus 4.7 (défaut)
     attendre fin du batch
 ```
 
 Émettre 1 ligne par batch :
 ```
-SPEC {n} — frontend batch {i}/{B} : US {liste-{m}} → {U_batch} invocations dev-frontend
+FEAT {n} — frontend batch {i}/{B} : US {liste-{m}} → {U_batch} invocations ({S_batch} strict + {C_batch} classic)
 ```
 
-Chaque dev-frontend bénéficie maintenant de la **certitude que les
-endpoints backend honorent leur contrat** (vérifié par 6b). Les
-mismatches `responsibilities.md §12` ne peuvent plus se produire en
-silence.
+Chaque agent (strict ou classic) bénéficie maintenant de la **certitude
+que les endpoints backend honorent leur contrat** (vérifié par 6b). Les
+mismatches `[FRONTEND_BACKEND_CONTRACT_GAP]` ne peuvent plus se
+produire en silence.
 
-**Idempotence (re-run après correction backend)** : au début de 6a,
-comparer le mtime de `workspace/output/qa/feat-{n}/api-tests.json` avec
-le mtime des fichiers backend. Si le rapport est postérieur **et**
-`gate_passed: true`, skip 6a + 6b et passer directement à 6c.
+**Fallback automatique** : si `dev-frontend-strict` retourne ERROR
+`[PLAN_DIGEST_INSUFFICIENT]`, relancer l'US avec `dev-frontend` (Opus)
+au sein du même batch. Logger event `plan_cache_fallback`.
+
+**Idempotence (re-run après correction backend, v6.10)** : au début de
+6a, requêter la DB pour le verdict API Gate le plus récent et son
+`extracted_at`. Comparer avec le mtime des fichiers backend. Si le
+verdict DB est postérieur **et** `gate_passed: true`, skip 6a + 6b et
+passer directement à 6c.
+
+```bash
+GATE=$(python .claude/python/sdd_scripts/query_console_db.py api-gate --feat {n})
+GATE_PASSED=$(echo "$GATE" | python -c "import json,sys; print(json.load(sys.stdin).get('gate_passed', False))")
+GATE_TS=$(echo "$GATE" | python -c "import json,sys; print(json.load(sys.stdin).get('extracted_at', ''))")
+```
+
 Émettre :
 ```
-SPEC {n} — backend stable (api-tests.json GREEN), skip 6a+6b → 6c frontend
+FEAT {n} — backend stable (console.db qa_api_tests GREEN @ {GATE_TS}), skip 6a+6b → 6c frontend
 ```
 
 ### Mode legacy parallèle (`GatedWorkflow: false`)
@@ -408,38 +607,227 @@ SPEC {n} — backend stable (api-tests.json GREEN), skip 6a+6b → 6c frontend
 Si `GatedWorkflow: false` dans Project Config OU flag `--unsequenced`
 sur la ligne de commande : revenir au workflow v3.x (back+front
 parallèles dans un même batch). Logger dans
-`workspace/output/.audit/legacy-parallel.log`. Émettre WARN dans le
+`workspace/output/.sys/.audit/legacy-parallel.log`. Émettre WARN dans le
 récap STEP 7. Supporté uniquement pour projets simples sans contrat
 backend fragile.
 
 ---
 
-## STEP 6.5 — Refresh dashboards (auto, depuis 2026-05-08)
+## STEP 6.4 — Auditor batch parallèle (code-review + a11y + security-scan + spec-compliance, v6.5.2)
+
+**Conditionnel** : invoque les 4 agents auditor **EN PARALLÈLE** (un
+seul message Agent multi-tool-use) pour les phases enabled selon
+`phase_planner.py` (cf. STEP 5.5.1 — réutiliser `$PHASE_PLAN`).
+Lecture mode + verdicts post-exécution. Le verdict consolidé pilote
+le passage à STEP 6.5 ou STOP.
+
+> **Anti-régression `framework_smoke.py`** : les invocations parallèles
+> ci-dessous utilisent le tool `Agent` (alias `Task`) avec multiples
+> calls indépendants dans un même message. Pattern identique à STEP 6.a
+> et 6.c. Ne pas casser.
+
+> **v6.5.2** : ajout de `spec-compliance-reviewer` au batch. Pattern
+> identique aux 3 autres auditeurs — indépendant, paths d'écriture
+> disjoints, opt-in via `SpecComplianceMode: full` (défaut `manual`
+> = skip).
+
+### 6.4.1 — Construction du batch
+
+```python
+BATCH = []  # liste d'invocations à dispatcher en parallèle
+if phases.code_review.enabled:
+    BATCH.append(Agent("code-reviewer", args="{n}"))
+if phases.a11y_audit.enabled:
+    BATCH.append(Agent("accessibility-auditor", args="{n}"))
+if phases.security_scan.enabled:
+    BATCH.append(Agent("security-reviewer", args="{n} --mode scan"))
+if phases.spec_compliance.enabled:                              # v6.5.2
+    BATCH.append(Agent("spec-compliance-reviewer", args="{n}"))
+```
+
+Si `BATCH == []` (toutes phases skipped) → skip STEP 6.4 entier,
+passer à STEP 6.5 (dashboard).
+
+Sinon, dispatcher **toutes les invocations en parallèle dans un seul
+message**. Attendre la fin de l'ensemble. Pattern identique aux batches
+dev-* (STEP 6.a, 6.c) — toutes les invocations sont indépendantes
+(paths d'écriture disjoints, cf. `agents/*.md §Idempotence` et matrice
+`file-ownership.md §1`).
+
+### 6.4.2 — Lecture des verdicts
+
+Après réception des 4 (ou moins) agents, lire les rapports JSON :
+
+| Agent | Verdict path | Champ |
+|---|---|---|
+| code-reviewer | `workspace/output/.sys/.validation/{n}-code-review.json` | `summary.verdict` |
+| accessibility-auditor | `workspace/output/qa/feat-{n}/a11y-report.json` | `summary.verdict` |
+| security-reviewer | `workspace/output/.sys/.validation/{n}-security-scan.json` | `summary.verdict` |
+| spec-compliance-reviewer (v6.5.2) | `workspace/output/.sys/.validation/{n}-spec-compliance.json` | `summary.verdict` |
+
+Si un fichier attendu est absent (agent a STOP en erreur runtime) →
+agent considéré comme `🔴 RED` avec cause `[AUDITOR_RUNTIME_ERROR]`.
+
+### 6.4.3 — Verdict consolidé
+
+```
+verdict_overall = max_severity({verdicts non-skipped})
+# ordering : 🔴 RED > 🟡 WARN > 🟢 GREEN
+```
+
+| Verdict | Action |
+|---|---|
+| 🟢 GREEN | continue STEP 6.5 (dashboard) |
+| 🟡 WARN  | continue STEP 6.5 + log WARN dans STEP 7 récap |
+| 🔴 RED   | STOP — afficher 6.4.STOP ci-dessous, ne pas exécuter dashboard |
+
+### 6.4.STOP — Format STOP sur RED
+
+```
+🔴 /dev-run {n} — auditor batch RED ({N_red} agents en échec)
+
+Verdicts :
+  - code-reviewer       : {🟢|🟡|🔴} (blocking: {class si applicable})
+  - accessibility       : {🟢|🟡|🔴}
+  - security-scan       : {🟢|🟡|🔴}
+  - spec-compliance     : {🟢|🟡|🔴}                              # v6.5.2
+
+Rapports :
+  - workspace/output/.sys/.validation/{n}-code-review.md
+  - workspace/output/qa/feat-{n}/a11y-report.md
+  - workspace/output/.sys/.validation/{n}-security-scan.md
+  - workspace/output/.sys/.validation/{n}-spec-compliance.md     # v6.5.2
+
+Pour débloquer :
+  1. Lire les rapports en 🔴 RED (issues critical/serious + suggestions FIX)
+  2. Corriger (relancer /dev-{backend|frontend} {n}-{m} ciblé OU édit manuel)
+  3. Relancer /dev-run {n} (idempotent : skip 6.a/6.b/6.c si stables, rerun 6.4)
+
+Bypass (à utiliser en connaissance de cause) :
+  - Baisser CodeReviewFailOn / SecurityFailOn / A11yFailOn / SpecComplianceFailOn dans Project Config
+  - Override hard-blocking impossible (secrets, SQL injection, contract drift)
+```
+
+### 6.4.4 — Émission succès (verdict 🟢 ou 🟡)
+
+1 ligne par agent invoqué + 1 ligne consolidée :
+
+```
+✓ code-reviewer       : {🟢 GREEN | 🟡 WARN} — {C}/{S}/{M}/{m} issues
+✓ accessibility       : {🟢 GREEN | 🟡 WARN} — {C}/{S}/{M}/{m} issues
+✓ security-scan       : {🟢 GREEN | 🟡 WARN} — {C}/{S}/{M}/{m} issues
+✓ spec-compliance     : {🟢 GREEN | 🟡 WARN} — {V}/{T} ACs verified  # v6.5.2
+FEAT {n} — auditor batch {🟢 GREEN | 🟡 WARN} (continue → dashboard)
+```
+
+Pour les agents skippés (phase disabled) :
+```
+⊘ {agent_name} : skipped ({skip_reason du phase_planner})
+```
+
+### 6.4.5 — State tracking
+
+```bash
+python .claude/python/sdd_scripts/sdd_state.py set-phase \
+  --run-id $RUN_ID --phase auditor_batch --status {pass|warn|fail} \
+  --payload-json '{"code_review":"{verdict}","a11y":"{verdict}","security_scan":"{verdict}","spec_compliance":"{verdict}"}'
+```
+
+### 6.4.6 — Anti-derive
+
+- Les 4 agents sont **idempotents** (cf. `agents/*.md §Idempotence`) —
+  relancer `/dev-run` les fera ré-tourner et écraser leurs rapports.
+- **Pas de fallback** sur 🔴 RED : le Tech Lead corrige, pas l'agent.
+- Phases auditor n'ont **PAS** de `build_loop` (cf.
+  `error-classification.md §3` — classes `[REVIEW_*]`, `[A11Y_*]`,
+  `[SEC_*]`, `[SPEC_*]` toutes "Itère: NON").
+- Le `phase_planner.py` lui-même n'invoque aucun LLM (Python pur,
+  déterministe, 0 token).
+- **spec-compliance-reviewer ne fait pas confiance** au rapport des
+  autres agents — lit le code indépendamment AC-par-AC (pattern
+  superpowers v5.1, cf. `agents/spec-compliance-reviewer.md §Rôle`).
+
+---
+
+## STEP 6.5 — Refresh INDEX ADRs (auto, depuis 2026-05-08 ; réduit en v6.10)
 
 Invoquer **systématiquement** `Agent: dashboard` (Haiku 4.5) après
 exécution du gated workflow pour régénérer :
 
-- `workspace/output/dashboard/README.html`
-- `workspace/output/context/adrs/INDEX.md` (utile : `dev-*` ont peut-être
+- `workspace/output/.sys/.context/adrs/INDEX.md` (utile : `dev-*` ont peut-être
   créé des ADRs phase 5 que `arch` n'a pas indexés)
 
-Non bloquant : sur échec, WARNING + continuer vers STEP 7.
+> **v6.10 BREAKING** : les rendus HTML (`dashboard/README.html`,
+> `qa/feat-{n}/dashboard.html`) sont retirés. Les métriques vivent dans
+> `console.db` ; le rendu graphique est délégué à la console web.
+
+Non bloquant : sur échec, WARNING + continuer vers STEP 6.6 puis STEP 7.
+
+---
+
+## STEP 6.6 — Checkpoint record (v6.6.5, opt-in)
+
+Si toute la phase dev terminée (build vert, API Gate non-RED, auditeurs
+non-RED) ET `CheckpointMode ∈ {record, resume}` :
+
+```python
+from sdd_lib.checkpoint import record_input_hash
+
+record_input_hash(
+    run_id=$RUN_ID,
+    phase="dev-run",
+    input_paths=resolved_inputs,   # même liste que STEP 1.75
+)
+```
+
+Stocke `input_hash` dans `state.json.phases.dev-run.payload.input_hash`.
+Permet un futur `--resume` (avec `CheckpointMode: resume`) de skip
+l'intégralité de `/dev-run {n}` si les inputs (FEAT + US + mockups +
+stack.md) n'ont pas changé.
+
+Erreur silencieuse si state.json absent → WARN dans stderr, non bloquant.
+
+**Non émis si** :
+- Phase dev a échoué (build_loop exhausted, API Gate RED, auditor RED)
+- `CheckpointMode: off` (défaut)
+
+---
+
+## STEP 6.bis — Status flip US (v6.10.5, fix CRIT-2)
+
+Pour chaque US dont **les builds backend ET frontend** ont réussi (ou
+ont été skippés sans erreur — US frontend-only ou backend-only), flipper
+`InProgress → Review`. Skip si API Gate RED ou build_loop exhausted
+(US reste `InProgress`, signalant le besoin de correction).
+
+```bash
+for us_file in workspace/output/us/{n}-*.md; do
+  us_id=$(basename "$us_file" .md | grep -oE '^[0-9]+-[0-9]+')
+  # Flip uniquement si la phase dev n'a pas échoué pour cette US
+  # (Tb_ok + Tf_ok inclut cette US OU elle est skipped sans erreur)
+  python .claude/python/sdd_scripts/set_us_status.py \
+    --us "$us_id" --status Review 2>/dev/null || true
+done
+```
+
+Idempotent et non-bloquant. Si API Gate RED → SKIP cette phase
+entièrement (le STOP §6.b prend le relais, les US restent `InProgress`).
 
 ---
 
 ## STEP 7 — Récap final
 
-Émettre **un seul bloc final** consolidé (≤ 6 lignes en cas nominal,
-cf. `.claude/rules/chat-output.md §4`) :
+Émettre **un seul bloc final** consolidé (≤ 7 lignes en cas nominal) :
 
 ```
-✅ SPEC {n} — phase dev terminée (gated)
+✅ FEAT {n} — phase dev terminée (gated)
 
 Workflow      : gated back→API gate→front (MaxParallel={$max_parallel})
+Plan Cache    : {S_back}/{U} back + {S_front}/{U} front strict (rate {%}, {F_fb} fallbacks)  # v6.2 ; ligne omise si PlanCacheStrict=false
 Bootstrap + DB : {init | skipped (short-circuit) | invoked} ({N_tables} tables | DB=none)
-Backend       : {Tb_ok}/{U} US ({Tb_skip} skipped, {F_back} échec)
+Backend       : {Tb_ok}/{U} US ({Tb_skip} skipped, {F_back} échec) · {S_back} strict + {C_back} classic
 API Gate      : {Tg_passed}/{Tg_total} tests · {N_endpoints} endpoints couverts → {🟢 GREEN | 🟡 YELLOW | 🔴 RED}
-Frontend      : {Tf_ok}/{U} US ({Tf_skip} skipped, {F_front} échec) | not run (gate RED)
+Frontend      : {Tf_ok}/{U} US ({Tf_skip} skipped, {F_front} échec) · {S_front} strict + {C_front} classic | not run (gate RED)
 ```
 
 Notation `Bootstrap + DB` :

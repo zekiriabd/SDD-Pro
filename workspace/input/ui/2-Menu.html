@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>CMS Print — Menu principal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --pink:#ec3a7a;
+    --pink-deep:#d3296a;
+    --text:#1f2433;
+    --text-muted:#6b7280;
+    --border:#e4e6ec;
+    --bg:#ffffff;
+    --bg-soft:#f6f7fa;
+    --avatar:#d36b6f;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:#f4f5f8;}
+  body{
+    font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    color:var(--text);
+    font-size:14px;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  .nav{
+    display:flex;
+    align-items:center;
+    gap:28px;
+    height:64px;
+    padding:0 28px;
+    background:#fff;
+    border-bottom:1px solid var(--border);
+    box-shadow:0 1px 2px rgba(20,24,40,.02);
+  }
+
+  /* Brand */
+  .brand{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    font-weight:700;
+    font-size:15px;
+    color:var(--text);
+    text-decoration:none;
+    margin-right:4px;
+  }
+  .brand .logo{
+    width:30px;height:30px;border-radius:7px;
+    background:linear-gradient(180deg,#ec3a7a 0%,#d3296a 100%);
+    color:#fff;font-weight:700;font-size:15px;
+    display:grid;place-items:center;
+    letter-spacing:.5px;
+    box-shadow:0 1px 0 rgba(255,255,255,.25) inset;
+  }
+
+  /* Country selector */
+  .country{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    height:34px;
+    padding:0 10px 0 8px;
+    border:1px solid var(--border);
+    border-radius:8px;
+    background:#fff;
+    font-size:12.5px;
+    font-weight:600;
+    color:var(--text);
+    cursor:pointer;
+  }
+  .country:hover{background:var(--bg-soft);}
+  .flag{
+    width:20px;height:14px;border-radius:2px;overflow:hidden;
+    display:inline-block;flex:0 0 auto;
+    background:
+      linear-gradient(90deg,#0055A4 0 33.33%, #fff 33.33% 66.66%, #EF4135 66.66% 100%);
+    box-shadow:0 0 0 1px rgba(0,0,0,.04) inset;
+  }
+  .country .chev{color:var(--text-muted);display:inline-flex;}
+
+  /* Menu items */
+  .menu{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    margin-left:24px;
+    flex:1;
+  }
+  .menu a{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    height:38px;
+    padding:0 14px;
+    border-radius:8px;
+    font-size:13.5px;
+    font-weight:500;
+    color:var(--text);
+    text-decoration:none;
+    white-space:nowrap;
+    transition:background .15s,color .15s;
+  }
+  .menu a:hover{background:var(--bg-soft);}
+  .menu a.active{color:var(--pink);}
+  .menu a svg{color:currentColor;flex:0 0 auto;}
+
+  /* Right side */
+  .right{
+    display:flex;
+    align-items:center;
+    gap:14px;
+  }
+  .icon-btn{
+    width:38px;height:38px;border-radius:50%;
+    border:none;background:transparent;
+    color:var(--text);
+    display:grid;place-items:center;
+    cursor:pointer;
+    position:relative;
+  }
+  .icon-btn:hover{background:var(--bg-soft);}
+  .icon-btn .dot{
+    position:absolute;top:9px;right:10px;
+    width:7px;height:7px;border-radius:50%;
+    background:var(--pink);
+    border:2px solid #fff;
+  }
+
+  .help{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    height:38px;
+    padding:0 14px;
+    border-radius:8px;
+    font-size:13.5px;
+    font-weight:500;
+    color:var(--text);
+    background:transparent;
+    border:none;
+    cursor:pointer;
+  }
+  .help:hover{background:var(--bg-soft);}
+
+  .divider{
+    width:1px;height:24px;background:var(--border);
+  }
+
+  .avatar{
+    width:34px;height:34px;border-radius:50%;
+    background:linear-gradient(140deg,#e07a7f,#c5575c);
+    color:#fff;
+    font-weight:600;
+    font-size:12.5px;
+    letter-spacing:.4px;
+    display:grid;place-items:center;
+    cursor:pointer;
+    box-shadow:0 1px 2px rgba(0,0,0,.08);
+  }
+
+  /* Demo page body */
+  .demo{
+    padding:48px 28px;
+    color:var(--text-muted);
+    font-size:13px;
+  }
+
+  @media (max-width: 1100px){
+    .menu a span.label{display:none}
+    .menu a{padding:0 10px}
+    .help span{display:none}
+  }
+</style>
+</head>
+<body>
+
+<nav class="nav" aria-label="Navigation principale">
+  <a href="#" class="brand">
+    <span class="logo">V</span>
+    <span>CMS Print</span>
+  </a>
+
+  <button class="country" type="button" aria-label="Choisir la langue">
+    <span class="flag" aria-hidden="true"></span>
+    <span>MPF FR</span>
+    <span class="chev" aria-hidden="true">
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+    </span>
+  </button>
+
+  <div class="menu" role="menubar">
+    <a href="#" role="menuitem">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 10 9-7 9 7"/><path d="M5 9.5V21h14V9.5"/><path d="M10 21v-6h4v6"/></svg>
+      <span class="label">Home</span>
+    </a>
+    <a href="#" role="menuitem" class="active">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11a8 8 0 1 1 16 0"/><path d="M3 11v4a3 3 0 0 0 3 3h1v-7H6a3 3 0 0 0-3 3z"/><path d="M19 11v4a3 3 0 0 1-3 3h-1v-7h1a3 3 0 0 1 3 3z"/><path d="M15 18a3 3 0 0 1-3 3"/></svg>
+      <span class="label">Campagnes</span>
+    </a>
+    <a href="#" role="menuitem">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/><path d="M8 4v5"/><path d="M16 4v5"/></svg>
+      <span class="label">Inventaire média</span>
+    </a>
+    <a href="#" role="menuitem">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 8h10"/><path d="M7 12h10"/><path d="M7 16h6"/></svg>
+      <span class="label">Mediaplanning</span>
+    </a>
+    <a href="#" role="menuitem">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m3 18 5-5 4 4 3-3 6 6"/></svg>
+      <span class="label">Médiathèque</span>
+    </a>
+  </div>
+
+  <div class="right">
+    <button class="icon-btn" type="button" aria-label="Notifications">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+    </button>
+
+    <button class="help" type="button">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-1 .5-1 1.2-1 1.7"/><path d="M12 17h.01"/></svg>
+      <span>Besoin d'aide ?</span>
+    </button>
+
+    <span class="divider" aria-hidden="true"></span>
+
+    <div class="avatar" title="KM">KM</div>
+  </div>
+</nav>
+
+<div class="demo">Menu principal — CMS Print</div>
+
+</body>
+</html>

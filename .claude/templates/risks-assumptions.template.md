@@ -1,7 +1,7 @@
 # Sections enrichies — Risques, Hypothèses, Cas Limites, Parties Prenantes, Modes de Défaillance
 
 > Ce fichier est un **fragment de template** : il décrit les 5 sections
-> que `/spec-deepen` ajoute en fin de SPEC après les techniques
+> que `/feat-deepen` ajoute en fin de FEAT après les techniques
 > d'élicitation. Ne pas créer ce fichier manuellement — il est
 > intégré par la commande.
 

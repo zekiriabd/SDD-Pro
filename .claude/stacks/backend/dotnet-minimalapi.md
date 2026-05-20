@@ -1,52 +1,66 @@
-﻿# Tech Spec: minimalapi (backend)
+# Tech FEAT: minimalapi (backend)
+
+> §2.4 (Librairies) régénérée depuis `dotnet-minimalapi.libs.json` — ne pas éditer manuellement (`python .claude/python/sdd_admin/sync_stack_md.py --stack-id dotnet-minimalapi`).
 
 Status: Draft
-Tech Spec ID: tech-minimalapi
+Validation: 🟢 reference (validated combo — dotnet-minimalapi + blazor + radzen + azure-ad + dotnet-xunit + blazor-bunit)
+Tech FEAT ID: tech-minimalapi
 Scope: backend uniquement (API, logique metier, persistance)
 
 ---
 
 ## 1. Architecture
 
-### 1.1 Pattern applicatif
-Minimal API avec separation stricte :
-`Endpoint → Service (via ServiceResolver) → Entity → AutoMapper → DTO → ApiResponse<T>`.
-Le wrapper `ApiResponse<T>` porte les metriques de performance (`QueryTime`, `MappingTime`)
-et est defini dans le projet librairie partagee `{LibName}`.
+> **Pattern d'architecture** : ce stack suit l'**architecture canonique** definie dans
+> `.claude/stacks/archi/{ArchiPattern}.md` (defaut `MVC` si `## Active Architecture Pattern`
+> absent du `stack.md`). Section §1 ci-dessous ne decrit QUE les overrides .NET-specific.
 
-### 1.2 Couches
+### 1.1 Pattern applicatif (.NET Minimal API idioms)
 
-- **Endpoint** : presentation pure (routing, validation d'entree, appel de service). Methodes statiques, mappees dans `Program.cs`.
-- **Service** : logique metier. Contrat dans `Services/Interfaces/`, implementation dans `Services/`. Resolution via `ServiceResolver` + DI .NET.
-- **Mapper** : profils AutoMapper. Aucun mapping manuel ailleurs.
-- **DTO** : structures de transfert (`{LibName}/Inputs`, `{LibName}/Outputs`, `{LibName}/Models`). Immuables.
-- **Entity** : modeles persistants generes par EF Core (Database-First). Aucune logique metier.
-- **DbContext** : contexte EF Core. Etendu de facon incrementale.
+Pour `ArchiPattern: MVC` (defaut), suit `archi/mvc.md` avec idioms ASP.NET Core 10 Minimal API :
+- **Endpoint** = method statique mappee via `MapGroup("/api/v1/...")` dans `Program.cs` (pas de classe Controller — Minimal API delivere les handlers statiques)
+- **Service** = interface `I{Name}Service` + impl concrete enregistree via `AddScoped<,>()` dans `Program.cs`
+- **AutoMapper** centralise via `Profile` classes pour mapping Entity ↔ DTO
+- **DTO** immuables (records C# 9+ `public record XxxOutput(...)` ou classes avec `init`)
+- **`ApiResponse<T>`** wrapper standard (status, data, queryTime, mappingTime, errors) defini dans projet `{LibName}` partage
+- **EF Core Database-First** : entites generees via `dotnet ef dbcontext scaffold`, jamais modifiees manuellement (classes partielles sinon)
+- **ProblemDetails** RFC 7807 via middleware global pour toute exception non geree
 
-### 1.3 Mapping couche → repertoire
-- Endpoint → `workspace/output/src/{BackendName}/Endpoints/`
-- Service (interface) → `workspace/output/src/{BackendName}/Services/Interfaces/`
-- Service (implementation) → `workspace/output/src/{BackendName}/Services/`
-- Mapper → `workspace/output/src/{BackendName}/Mappers/`
-- Entity → `workspace/output/src/{BackendName}/Entities/`
-- DbContext → `workspace/output/src/{BackendName}/Entities/DBcontext/`
-- Input DTO → `workspace/output/src/{LibName}/Inputs/`
-- Output DTO → `workspace/output/src/{LibName}/Outputs/`
-- Model DTO → `workspace/output/src/{LibName}/Models/`
-- Config application → `workspace/output/src/{BackendName}/Program.cs`
-- Ressources multilingue `.resx` → `workspace/output/src/{BackendName}/Resources/`
-- Project (librairie partagee) → `workspace/output/src/{LibName}/{LibName}.csproj`
-- Project (API) → `workspace/output/src/{BackendName}/{BackendName}.csproj`
+Pour `ArchiPattern: DDD` → voir `archi/ddd.md` (Aggregates + UseCases via MediatR — capability `cqrs`).
+Pour `ArchiPattern: microservice` → voir `archi/microservice.md` (Polly + OpenTelemetry + Refit en CORE).
 
-### 1.4 Principes non negociables
-- Aucune logique metier dans les Endpoints.
-- Aucune logique metier dans les Entities.
-- Aucun mapping manuel dans Endpoints ou Services (centralise dans `Mappers/`).
-- DI systematique. Services enregistres dans `Program.cs`.
-- Entites generees EF jamais modifiees manuellement (classes partielles sinon).
-- Scaffolding EF **incremental** : ne jamais regenerer depuis zero, ne jamais supprimer automatiquement d'entites existantes.
-- Gestion des erreurs HTTP via `ProblemDetails` Microsoft uniquement.
-- Middleware global centralise pour transformer toute exception non geree en `ProblemDetails` ; pas de `try/catch` de formatage HTTP dans Endpoints ou Services.
+### 1.3 Mapping couche → repertoire (override .NET)
+
+| Couche canonique (archi/mvc.md §3) | Path .NET Minimal API |
+|---|---|
+| Endpoint | `workspace/output/src/{BackendName}/Endpoints/` (static methods, `MapGroup`) |
+| Service (interface) | `workspace/output/src/{BackendName}/Services/Interfaces/` |
+| Service (implementation) | `workspace/output/src/{BackendName}/Services/` |
+| Mapper | `workspace/output/src/{BackendName}/Mappers/` (AutoMapper `Profile`) |
+| Entity | `workspace/output/src/{BackendName}/Entities/` (`@Entity`-like — EF Core scaffolde) |
+| DbContext | `workspace/output/src/{BackendName}/Entities/DBcontext/` |
+| Input DTO | `workspace/output/src/{LibName}/Inputs/` |
+| Output DTO | `workspace/output/src/{LibName}/Outputs/` |
+| Model DTO | `workspace/output/src/{LibName}/Models/` |
+| Validators FluentValidation | `workspace/output/src/{BackendName}/Validators/` |
+| Middleware | `workspace/output/src/{BackendName}/Middleware/` |
+| App entry | `workspace/output/src/{BackendName}/Program.cs` |
+| Ressources multilingue | `workspace/output/src/{BackendName}/Resources/` (`.resx`) |
+| Project (API) | `workspace/output/src/{BackendName}/{BackendName}.csproj` |
+| Project (Lib partagee) | `workspace/output/src/{LibName}/{LibName}.csproj` |
+| Solution | `workspace/output/src/{AppName}.sln` |
+
+### 1.4 Override principes (.NET-specific)
+
+Herites de `archi/mvc.md §4`. **Ajouts** .NET :
+- **Constructor injection primary** (C# 12 syntax : `public class XxxService(IRepo r, IMapper m) { ... }`)
+- **DTOs immuables** via `record` C# 9+ ou classes avec `init` setters
+- **EF Core scaffolding incremental** : `dotnet ef dbcontext scaffold` avec `--no-onconfiguring --force`, JAMAIS regen depuis zero
+- **AutoMapper Profile** : un Profile par domaine metier (`UsersProfile : Profile`)
+- **FluentValidation** pour validation Input DTOs (registered via `AddValidatorsFromAssembly`)
+- **Async Task<T>** partout (jamais `.Result`, `.Wait()`, `void` async hors event handlers)
+- **ProblemDetails Microsoft** uniquement pour reponses d'erreur (RFC 7807)
+- **Pas de `dynamic` ni `object`** injustifie dans signatures publiques
 
 ---
 
@@ -102,7 +116,7 @@ dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj reference wor
 
 <!-- CORE_PACKAGES_START -->
 ```bash
-# Auto-genere depuis dotnet-minimalapi.libs.json -- ne pas editer (utiliser sync-stack-md.ps1).
+# Auto-genere depuis dotnet-minimalapi.libs.json -- ne pas editer (utiliser sync_stack_md.py).
 dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package Microsoft.EntityFrameworkCore --version 10.0.6
 dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package Microsoft.EntityFrameworkCore.SqlServer --version 10.0.6
 dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package Microsoft.EntityFrameworkCore.Design --version 10.0.6
@@ -194,6 +208,14 @@ dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package Micro
 
 # capability: fast-mapping
 dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package Mapster --version 7.4.0
+
+# capability: email
+dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package MailKit --version 4.8.0
+dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package MimeKit --version 4.8.0
+
+# capability: auth-local
+dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package BCrypt.Net-Next --version 4.0.3
+dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package Microsoft.AspNetCore.Authentication.JwtBearer --version 10.0.6
 ```
 <!-- ONDEMAND_PACKAGES_END -->
 
@@ -213,7 +235,7 @@ Codes prioritaires : CS0246, CS0103, CS1061, CS1002, CS1003, CS1513, CS0029, CS0
 <!-- LIBS_CATALOG_START -->
 ### 2.4 Librairies
 
-> Source de verite : `.claude/stacks/backend/dotnet-minimalapi.libs.json`. Ne pas editer cette section manuellement -- utiliser `.claude/scripts/sync-stack-md.ps1 -StackId dotnet-minimalapi`.
+> Source de verite : `.claude/stacks/backend/dotnet-minimalapi.libs.json`. Ne pas editer cette section manuellement -- utiliser `.claude/python/sdd_admin/sync_stack_md.py --stack-id dotnet-minimalapi`.
 
 #### 2.4.a Librairies CORE (installees par arch en section 2.2.1, toujours)
 
@@ -241,18 +263,22 @@ Codes prioritaires : CS0246, CS0103, CS1061, CS1002, CS1003, CS1513, CS0029, CS0
 
 ### 2.4.b Librairies ON-DEMAND (installees si l'US declenche)
 
-Triggers (regex case-insensitive) cherches par `detect-capabilities.ps1` dans l'US + ACs.
+Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'US + ACs.
 
 | Capability | Lib | Version | Triggers |
 |---|---|---|---|
-| excel | EPPlus | 7.5.3 | \bexcel\b, \.xlsx\b, export.*excel, import.*excel, tableur |
-| excel | ClosedXML (alt) | 0.104.2 | \bexcel\b, \.xlsx\b, export.*excel, import.*excel, tableur |
-| pdf | QuestPDF | 2024.12.3 | \bpdf\b, \.pdf\b, export.*pdf, generer.*pdf, imprim |
-| pdf | itext7 (alt) | 9.0.0 | \bpdf\b, \.pdf\b, export.*pdf, generer.*pdf, imprim |
-| cqrs | MediatR | 12.4.1 | \bcqrs\b, mediatr, command.*handler, query.*handler |
-| redis-cache | StackExchange.Redis | 2.8.16 | \bredis\b, cache distribu, distributed cache |
-| redis-cache | Microsoft.Extensions.Caching.StackExchangeRedis | 9.0.0 | \bredis\b, cache distribu, distributed cache |
-| fast-mapping | Mapster | 7.4.0 | mapster\b, mapping perf, high.?performance.*mapp |
+| excel | EPPlus | 7.5.3 | excel, \.xlsx, export.*excel, import.*excel, tableur |
+| excel | ClosedXML (alt) | 0.104.2 | excel, \.xlsx, export.*excel, import.*excel, tableur |
+| pdf | QuestPDF | 2024.12.3 | pdf, \.pdf, export.*pdf, generer.*pdf, imprim |
+| pdf | itext7 (alt) | 9.0.0 | pdf, \.pdf, export.*pdf, generer.*pdf, imprim |
+| cqrs | MediatR | 12.4.1 | cqrs, mediatr, command.*handler, query.*handler |
+| redis-cache | StackExchange.Redis | 2.8.16 | redis, cache distribu, distributed cache |
+| redis-cache | Microsoft.Extensions.Caching.StackExchangeRedis | 9.0.0 | redis, cache distribu, distributed cache |
+| fast-mapping | Mapster | 7.4.0 | mapster, mapping perf, high.?performance.*mapp |
+| email | MailKit | 4.8.0 | smtp, envoi.*email, envoi.*courriel, send.*email, email.*notification, notification.*par.*email, mail.*confirmation, verifier.*email |
+| email | MimeKit | 4.8.0 | smtp, envoi.*email, envoi.*courriel, send.*email, email.*notification, notification.*par.*email, mail.*confirmation, verifier.*email |
+| auth-local | BCrypt.Net-Next | 4.0.3 | bcrypt, password.*hash, hash.*password, motdepasse.*hash, mot.*passe.*hash, auth-local, password_hash, verify.*password, connexion.*mot.*passe, inscription, register.*user |
+| auth-local | Microsoft.AspNetCore.Authentication.JwtBearer | 10.0.6 | jwt, jsonwebtoken, bearer.*token, auth-local, issue.*token, verify.*token, validate.*token, jwt.*authent, token.*authent, authorize.*attribute, \[Authorize\] |
 
 #### 2.4.d DB Drivers (selectionne par arch selon DatabaseType)
 
@@ -340,7 +366,7 @@ app.MapGet("/api/pointsvente/{id:int}", GetById);
 ```
 
 Cote dev-frontend : avant tout client HTTP, grep le code backend pour
-verifier la signature exacte (cf. `responsibilities.md §12`).
+verifier la signature exacte (anti-pattern `[FRONTEND_BACKEND_CONTRACT_GAP]`).
 
 ---
 
@@ -352,29 +378,44 @@ verifier la signature exacte (cf. `responsibilities.md §12`).
 - **DbContext** : `OperationsDbContext` dans `workspace/output/src/{BackendName}/Entities/DBcontext/`
 - **Strategie de scaffolding** : verifier les entites existantes, generer uniquement les tables manquantes, etendre le DbContext avec les nouveaux `DbSet`, conserver les configurations existantes.
 - **Tables initiales** : `point_vente` (liste incrementale).
-- **Variables d'environnement requises** (conformes a `.claude/rules/env_rules.md`) :
-  `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`.
+- **Source des valeurs DB** (depuis 2026-05-14) : bloc
+  `## Active Database` de `workspace/input/stack/stack.md` (cles
+  `DatabaseType`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`,
+  `DB_PASSWORD`). Le Tech Lead renseigne ces valeurs ; l'agent `arch`
+  les propage vers `appsettings.json` (sections `ConnectionStrings.Default`
+  et `Database.Type`) lors de Phase A — STEP 4.5. Cf. `agents/arch.md
+  §4.5.2.A`.
 
-La chaine de connexion est construite au runtime a partir de ces variables.
-Aucune valeur en dur, aucun fichier de configuration secret. Fail-fast au demarrage.
+La chaine de connexion est lue **uniquement via `IConfiguration`**
+(`builder.Configuration.GetConnectionString("Default")`). Aucune valeur
+en dur, aucune lecture de `Environment.GetEnvironmentVariable`. Fail-fast
+au demarrage si la cle est absente (cf. §5.1 pattern canonique).
 
 ### 3.1 Commandes de scaffolding EF Core
 
-Lire `DatabaseType` dans `workspace/input/tech/stack.md ## Project Config` et executer
-la commande correspondante. **Toutes les valeurs de connexion proviennent
-exclusivement des variables d'environnement — jamais en dur.**
+Lire `DatabaseType` dans `workspace/input/stack/stack.md ## Active Database`
+et executer la commande correspondante. **Toutes les valeurs de
+connexion proviennent exclusivement du bloc `## Active Database` de
+stack.md — jamais d'env vars, jamais en dur.**
 
 Resoudre les placeholders `{BackendName}`, `{BackendNamespace}` depuis
 `## Project Config` avant d'executer.
 
-#### SQLServer (`DatabaseType: SQLServer`)
+Le scaffolding EF Core ci-dessous est invoque par `arch` Phase B avec
+la connection string composee en RAM par le bridge `_bridge.csproj`
+(cf. `agents/arch.md §8`). Les valeurs DB_* dans les exemples bash
+ci-dessous representent les **valeurs lues depuis `## Active Database`
+et injectees en argument du process**, pas des env vars du shell.
+
+#### SQLServer (`DatabaseType: sqlserver`)
 
 ```bash
 # Prerequis : Microsoft.EntityFrameworkCore.SqlServer deja declare en §2.4
 # v6.1 hardening : Encrypt=True + TrustServerCertificate=False par defaut.
-# Pour dev local avec certificat self-signed, definir DB_TRUST_SERVER_CERT=true
-# dans .env (jamais commit) ; le builder ci-dessous flippera TrustServerCertificate.
-TRUST_CERT="${DB_TRUST_SERVER_CERT:-false}"
+# Pour dev local avec certificat self-signed, ajouter
+# `DB_TRUST_SERVER_CERT: true` dans le bloc ## Active Database de stack.md ;
+# arch propagera Encrypt + TrustServerCertificate dans la connection string.
+TRUST_CERT="${DB_TRUST_SERVER_CERT:-false}"  # valeur lue depuis ## Active Database par arch
 CONN="Server=${DB_HOST},${DB_PORT};Database=${DB_NAME};User Id=${DB_USER};Password=${DB_PASSWORD};Encrypt=True;TrustServerCertificate=${TRUST_CERT};"
 
 dotnet ef dbcontext scaffold "$CONN" \
@@ -505,60 +546,197 @@ exploites sont dans `tech-auth-azure.md`.
 
 ---
 
-## 5.1 Connection string SQL Server — construction (post-mortem 2026-05-03)
+## 5.1 Connection string — lecture via IConfiguration (depuis 2026-05-14)
 
-La construction de la chaine de connexion DOIT passer par
-`Microsoft.Data.SqlClient.SqlConnectionStringBuilder`. La concatenation
-litterale `$"Server={...};User Id={...};Password={...};"` declenche le
-pattern forbidden-scan `(server|host)=...;user id=...;password=...` qui
-detecte les chaines de connexion en dur et bloque le commit (cf.
-`.claude/scripts/validate-batch.ps1 -Mode incremental` + `env_rules.md`).
+La chaine de connexion est **lue exclusivement depuis `IConfiguration`**,
+section `ConnectionStrings.Default` peuplée par `arch` Phase A — STEP
+4.5 depuis le bloc `## Active Database` de `stack.md`. Aucune
+construction runtime via `SqlConnectionStringBuilder`, aucune lecture
+de `Environment.GetEnvironmentVariable`.
 
-Pattern canonique :
+Pattern canonique (`Program.cs`) :
 
 ```csharp
-using Microsoft.Data.SqlClient;
+// Lecture directe depuis IConfiguration (appsettings.json peuplé par arch)
+var connectionString = builder.Configuration.GetConnectionString("Default")
+    ?? throw new InvalidOperationException(
+        "ConnectionStrings:Default missing in appsettings.json. " +
+        "Verifier que ## Active Database de stack.md est renseigne et que /arch-init a tourne.");
 
-string Required(string n) => Environment.GetEnvironmentVariable(n)
-    ?? throw new InvalidOperationException($"Missing required environment variable: {n}");
-
-// v6.1 hardening : Encrypt=true + TrustServerCertificate=false par defaut.
-// Le flag DB_TRUST_SERVER_CERT (optionnel, dev local uniquement) autorise
-// les certificats self-signed pour le dev. Interdit en prod (deploiement
-// rejete au boot si DB_TRUST_SERVER_CERT=true sur ASPNETCORE_ENVIRONMENT=Production).
-bool Optional(string n, bool fallback) =>
-    bool.TryParse(Environment.GetEnvironmentVariable(n), out var v) ? v : fallback;
-
-bool trustCert = Optional("DB_TRUST_SERVER_CERT", false);
-if (trustCert && builder.Environment.IsProduction())
-    throw new InvalidOperationException(
-        "DB_TRUST_SERVER_CERT=true is forbidden in Production (use a valid TLS cert).");
-
-var sqlBuilder = new SqlConnectionStringBuilder
+// Selon DatabaseType (lu via builder.Configuration["Database:Type"])
+var dbType = builder.Configuration["Database:Type"]?.ToLowerInvariant() ?? "sqlserver";
+builder.Services.AddDbContext<OperationsDbContext>(o => dbType switch
 {
-    DataSource             = $"{Required("DB_HOST")},{Required("DB_PORT")}",
-    InitialCatalog         = Required("DB_NAME"),
-    UserID                 = Required("DB_USER"),
-    Password               = Required("DB_PASSWORD"),
-    Encrypt                = true,        // v6.1 : chiffrement TLS obligatoire
-    TrustServerCertificate = trustCert    // v6.1 : false par defaut, opt-in dev
-};
-var connectionString = sqlBuilder.ConnectionString;
-
-builder.Services.AddDbContext<OperationsDbContext>(o => o.UseSqlServer(connectionString));
+    "sqlserver" => o.UseSqlServer(connectionString),
+    "postgres" or "postgresql" => o.UseNpgsql(connectionString),
+    "mysql" => o.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)),
+    "sqlite" => o.UseSqlite(connectionString),
+    _ => throw new InvalidOperationException($"DatabaseType inconnu : {dbType}")
+});
 ```
 
-Aucun litteral `Server=...` n'apparait dans le code source : le builder
-serialise la chaine au runtime, le scanner ne matche rien, l'env_rules.md
-reste respecte.
+### 5.1.0 Anti-pattern bloquant — clé `ConnectionStrings:Default` (LITTÉRAL, post-mortem 2026-05-14)
 
-Anti-patterns rejetes par forbidden-scan (v6.1) :
+**Symptôme runtime** : au démarrage, l'app crash avec :
+```
+System.InvalidOperationException: ConnectionStrings:{XXX} missing in appsettings.json
+   at Program.<Main>$(String[] args)
+```
+
+**Cause racine** : l'agent dev-backend a dévié et écrit
+`GetConnectionString("DemoDb")` (ou `"{ProjectName}Db"`,
+`"{AppName}"`, etc.) au lieu de la convention canonique `"Default"`.
+Le `appsettings.json` produit par arch contient bien la clé `Default`
+(cf. §5.1.1 Format), donc `GetConnectionString("DemoDb")` retourne
+`null` → `throw` à `var connectionString = ... ?? throw`.
+
+**Règle stricte (load-bearing)** :
+
+| Élément | Valeur autorisée | Anti-pattern |
+|---|---|---|
+| Argument `GetConnectionString(...)` | `"Default"` (LITTÉRAL) | `"{AppName}"`, `"{BackendName}"`, `"{ProjectName}Db"`, `"{DbName}"`, tout token dérivé |
+| Clé dans `appsettings.json` | `ConnectionStrings.Default` (LITTÉRAL) | toute autre clé |
+| Message d'erreur du `??` | référence `ConnectionStrings:Default` LITTÉRAL | référence à un autre nom |
+
+**Pattern correct (à reproduire à l'identique)** :
 ```csharp
-// INTERDIT - declenche [DERIVE_VIOLATION] [env_rules.md]
-var connectionString = $"Server={dbHost},{dbPort};Database={dbName};User Id={dbUser};Password={dbPassword};Encrypt=False;TrustServerCertificate=True;";
+var connectionString = builder.Configuration.GetConnectionString("Default")
+    ?? throw new InvalidOperationException(
+        "ConnectionStrings:Default missing in appsettings.json. " +
+        "Verifier ## Active Database de stack.md et relancer /arch-init.");
+```
 
-// INTERDIT - flag hardcode insecure (v6.1 hardening)
-var sqlBuilder = new SqlConnectionStringBuilder { ..., Encrypt = false, TrustServerCertificate = true };
+**Anti-pattern à grep en STEP build** (dev-backend STEP 8) :
+```bash
+grep -rnE 'GetConnectionString\("(?!Default")' workspace/output/src/{BackendName}/ && \
+  echo "[STACK_DERIVE_VIOLATION] GetConnectionString avec clé != Default"
+```
+
+Toute occurrence ≠ `"Default"` → STOP + ERROR avant build :
+```
+ERROR: dev-backend {n}-{m} — clé ConnectionStrings non canonique
+CAUSE: [DERIVE_VIOLATION] GetConnectionString("{XXX}") au lieu de GetConnectionString("Default") dans Program.cs:{L}
+       arch écrit la clé "Default" dans appsettings.json (cf. dotnet-minimalapi.md §5.1.0/§5.1.1)
+FIX: remplacer "{XXX}" par "Default" (LITTÉRAL) dans Program.cs et dans le message d'erreur du ??
+```
+
+**Pourquoi pas de paramétrage** : la clé `Default` est volontairement
+fixe pour garantir l'idempotence cross-agent et cross-FEAT. Si un projet
+nécessite plusieurs DBs (multi-tenant), créer des clés additionnelles
+`ConnectionStrings.Tenant1`, `ConnectionStrings.Tenant2` SANS toucher à
+`Default` (qui reste la DB principale).
+
+---
+
+### 5.1.1 Format `appsettings.json` produit par arch
+
+Référence canonique (arch Phase A STEP 4.5 écrit ce fichier depuis
+`## Active Database` + `## Active Auth Specs`). Une seule section auth
+est écrite selon le profil détecté en STEP 2.ter.3 (cf. `agents/arch.md`).
+
+**Profil auth = `azure-ad`** :
+```json
+{
+  "ConnectionStrings": {
+    "Default": "Server={DB_HOST},{DB_PORT};Database={DB_NAME};User Id={DB_USER};Password={DB_PASSWORD};Encrypt=True;TrustServerCertificate=False;"
+  },
+  "Database": {
+    "Type": "sqlserver"
+  },
+  "AzureAd": {
+    "Instance": "https://login.microsoftonline.com/",
+    "TenantId": "{AZ_TENANTID}",
+    "ClientId": "{AZ_CLIENTID}",
+    "Domain": "{AZ_DOMAIN}",
+    "CallbackPath": "{AZ_BE_CALLBACKPATH}",
+    "ValidAudiences": ["{AZ_AUDIENCES split,strip}"]
+  },
+  "Logging": { "LogLevel": { "Default": "Information" } }
+}
+```
+
+**Profil auth = `auth-local`** (depuis 2026-05-14) :
+```json
+{
+  "ConnectionStrings": {
+    "Default": "Server={DB_HOST},{DB_PORT};Database={DB_NAME};User Id={DB_USER};Password={DB_PASSWORD};Encrypt=True;TrustServerCertificate=False;"
+  },
+  "Database": {
+    "Type": "sqlserver"
+  },
+  "Jwt": {
+    "Secret": "{AUTH_JWT_SECRET}",
+    "Issuer": "{AUTH_JWT_ISSUER}",
+    "Audience": "{AUTH_JWT_AUDIENCE}",
+    "ExpirationMinutes": {AUTH_JWT_EXPIRATION}
+  },
+  "Logging": { "LogLevel": { "Default": "Information" } }
+}
+```
+
+Le code applicatif lit la section `Jwt` via `IConfiguration` :
+```csharp
+var jwt = builder.Configuration.GetSection("Jwt");
+var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(
+    jwt["Secret"] ?? throw new InvalidOperationException(
+        "Jwt:Secret missing in appsettings.json. " +
+        "Verifier ## Active Auth Specs (AUTH_JWT_SECRET) et relancer /arch-init.")));
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options => options.TokenValidationParameters = new TokenValidationParameters {
+        ValidateIssuer = true,           ValidIssuer = jwt["Issuer"],
+        ValidateAudience = true,         ValidAudience = jwt["Audience"],
+        ValidateLifetime = true,
+        IssuerSigningKey = key,          ValidateIssuerSigningKey = true,
+    });
+```
+
+Pour la génération du token (`/auth/login`) :
+```csharp
+var expMin = builder.Configuration.GetValue<int>("Jwt:ExpirationMinutes");
+var token = new JwtSecurityToken(
+    issuer:    jwt["Issuer"],
+    audience:  jwt["Audience"],
+    claims:    [ new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()), ... ],
+    expires:   DateTime.UtcNow.AddMinutes(expMin),
+    signingCredentials: new SigningCredentials(key, SecurityAlgorithms.HmacSha256));
+```
+
+Anti-patterns rejetés (`[DERIVE_VIOLATION]`) :
+```csharp
+// INTERDIT — lecture env var
+var secret = Environment.GetEnvironmentVariable("AUTH_JWT_SECRET");
+
+// INTERDIT — secret hardcodé
+var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("hardcoded-secret"));
+
+// INTERDIT — durée hardcodée
+expires: DateTime.UtcNow.AddHours(1);
+```
+
+La construction de la chaîne de connexion (`Server=...;...`) est faite
+**par arch côté builder** (`SqlConnectionStringBuilder` /
+`NpgsqlConnectionStringBuilder` / etc. selon `DatabaseType` du bloc
+`## Active Database`) puis sérialisée dans `appsettings.json`.
+
+### 5.1.2 v6.1 hardening — Encrypt + TrustServerCertificate
+
+- Encrypt=True forcé dans la connection string générée par arch.
+- TrustServerCertificate=False par défaut. Override possible via clé
+  `DB_TRUST_SERVER_CERT: true` dans `## Active Database` (dev local
+  uniquement, jamais en prod). Arch refuse cette clé si
+  `ASPNETCORE_ENVIRONMENT=Production` détecté (override Project Config).
+
+Anti-patterns rejetés :
+```csharp
+// INTERDIT — lecture env var (depuis 2026-05-14)
+var conn = Environment.GetEnvironmentVariable("DB_PASSWORD");
+
+// INTERDIT — construction runtime hors arch
+var builder = new SqlConnectionStringBuilder { DataSource = "..." };  // [DERIVE_VIOLATION]
+
+// INTERDIT — concaténation littérale (forbidden-scan)
+var conn = $"Server={host};Password={pwd};";
 ```
 
 ### 5.bis Envoi d'email — SmtpClient interdit, MailKit obligatoire (v6.1)
@@ -608,29 +786,85 @@ Parametre de requete optionnel `langue`. Traductions dans
 
 ---
 
-## 7. CORS developpement
-Conforme a `.claude/rules/cors.md`. Policy `DevOpen` avec
-`AllowAnyOrigin() / AllowAnyMethod() / AllowAnyHeader()`. `app.UseCors("DevOpen")`
-**avant** `UseAuthentication()` et `UseAuthorization()`. Pas d'`AllowCredentials`.
-Durcissement staging / prod couvert par une future regle de securite.
+## 7. CORS
+Conforme a `.claude/rules/cors.md §2.1`. Policy `Spa` avec origins **explicites**
+lus depuis la configuration (`Cors:AllowedOrigins`, CSV) ; fallback
+`http://localhost:5173` (port Vite par defaut pour React, ajuster si le stack
+frontend utilise un autre port — Vue 5173, Angular 4200, Next 3000).
+
+```csharp
+// Program.cs
+var allowedOrigins = builder.Configuration["Cors:AllowedOrigins"]?
+    .Split(',', StringSplitOptions.RemoveEmptyEntries)
+    ?? new[] { "http://localhost:5173" };
+
+builder.Services.AddCors(options => options.AddPolicy("Spa", policy =>
+    policy.WithOrigins(allowedOrigins)
+          .AllowAnyHeader()
+          .AllowAnyMethod()
+          .AllowCredentials()));
+
+// ... apres UseRouting, AVANT UseAuthentication / UseAuthorization
+app.UseCors("Spa");
+```
+
+`appsettings.Development.json` (genere par arch) :
+```json
+{
+  "Cors": {
+    "AllowedOrigins": "http://localhost:5173,http://localhost:4173"
+  }
+}
+```
+
+Override via env var `Cors__AllowedOrigins=http://localhost:5173,https://staging.example.com`.
+
+**Interdits formellement** (declenche `[SEC_CORS_PERMISSIVE]` du security-reviewer) :
+- `AllowAnyOrigin()` (wildcard incompatible avec `AllowCredentials()` per W3C spec)
+- `WithOrigins("*")`
+- Annotation `[EnableCors]` ad-hoc sur controllers (fragmente la policy)
+- Origins hardcodees dans Program.cs (doit venir de config)
+
+Durcissement staging / prod : remplacer le fallback localhost par les origins
+production reelles, jamais de wildcard. Cf. `rules/cors.md §4` (anti-patterns) +
+`rules/cors.md §5` (verification dev-backend STEP build).
 
 ---
 
 ## 8. URLs de developpement
-- HTTPS : `https://localhost:44328` (aligne avec `Api:BaseAddress` du frontend → voir `tech-blazor.md`)
-- OpenAPI (dev) : `https://localhost:44328/swagger`
 
-`workspace/output/src/{BackendName}/Properties/launchSettings.json` pin cette URL. Tout changement
-DOIT etre reporte dans `Api:BaseAddress` du frontend.
+**Source autoritaire** : `workspace/output/src/{BackendName}/Properties/launchSettings.json`
+(produit par `dotnet new webapi` lors du bootstrap arch). Lire `profiles.http.applicationUrl`
+ET `profiles.https.applicationUrl` pour obtenir les ports effectifs du projet.
+
+Ports par défaut du scaffolding `.NET 10 minimal API` (déterministes mais peuvent
+varier si l'utilisateur a régénéré le projet) :
+
+| Profil | URL canonique | Usage |
+|---|---|---|
+| `http`  | `http://localhost:5143`  | dev sans cert, proxy Vite, curl/Postman |
+| `https` | `https://localhost:7239` | dev avec `dotnet dev-certs https --trust` |
+| OpenAPI/Swagger | `{base}/swagger` (les deux profils) | UI explore endpoints |
+
+**Anti-pattern bloquant (post-mortem 2026-05-14)** : ne JAMAIS hardcoder
+`44328`, `5000`, `5099`, `8080` ou tout autre port "convention historique"
+dans le code, les configs frontend, ou les MD. Toujours lire le port effectif
+depuis `launchSettings.json` (autorité unique).
+
+Tout désalignement entre `launchSettings.json` et la config frontend (proxy
+Vite, `VITE_API_BASE_URL`, `Api:BaseAddress`) → 500 / proxy error silencieux.
+Cf. `.claude/stacks/frontend/react.md §5` pour le grep côté frontend.
 
 ---
 
 ## 9. Interdits projet (backend)
 
-- Secrets, cles d'API, mots de passe en dur
-- Chaines de connexion litterales (cle/valeur ou URI)
+- Secrets, cles d'API, mots de passe en dur dans le code C# (sources `.cs`)
+- Chaines de connexion litterales en dur dans le code C# (cle/valeur ou URI)
 - Hotes litteraux (`localhost`, IP) lies au host BDD dans un Service
-- Lecture de credentials BDD depuis un fichier (`.env`, `appsettings*.json` secrets, etc.)
+- Lecture de credentials BDD via `Environment.GetEnvironmentVariable` ou
+  fichier `.env` (depuis 2026-05-14, lecture exclusive via `IConfiguration`
+  qui charge `appsettings.json` peuple par arch — cf. §5.1)
 - Logique metier dans les Entities ou les Endpoints
 - Mapping manuel dans Endpoints ou Services
 - Modification manuelle des Entities generees par EF (classes partielles sinon)
@@ -638,7 +872,7 @@ DOIT etre reporte dans `Api:BaseAddress` du frontend.
 - Regeneration complete des Entities depuis zero
 - Ecrasement d'un DbSet existant du DbContext lors d'une mise a jour de scaffolding
 - Exception brute exposee au client (toujours `ProblemDetails`)
-- Log de `DB_PASSWORD` ou de la chaine de connexion complete
+- Log de la chaine de connexion complete ou du mot de passe DB (cle DB_PASSWORD)
 - `dynamic` / `object` non justifie
 - Appels statiques a des librairies a effet de bord depuis un Service
 - `TODO`, `FIXME`, code commente, placeholders (`TBD`, `changeme`, `foo`, `bar`)
@@ -653,7 +887,7 @@ DOIT etre reporte dans `Api:BaseAddress` du frontend.
 
 Skills Claude Code disponibles invoquees via le tool `Skill` AVANT
 generation quand le trigger matche. Ces skills sont **guidance technique** —
-elles n'autorisent JAMAIS l'expansion de scope au-dela de la task / spec /
+elles n'autorisent JAMAIS l'expansion de scope au-dela de la task / FEAT /
 stack (voir `.claude/rules/stack-completeness.md`). Toute librairie
 recommandee par une skill mais non listee en §2.4 reste interdite.
 
@@ -687,42 +921,64 @@ Les packages communs `Microsoft.EntityFrameworkCore`,
 `Microsoft.EntityFrameworkCore.Design`, `Microsoft.EntityFrameworkCore.Tools`
 restent installés quel que soit le DatabaseType (déjà en §2.4).
 
-Arch Phase A lit `## Project Config: DatabaseType` puis installe le
+Arch Phase A lit `## Active Database: DatabaseType` puis installe le
 provider correspondant via `dotnet add package` :
 ```bash
 dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package <Provider>
 ```
 
-### 8.2 Connection String Pattern
+### 8.2 Connection String Pattern (composition côté arch, depuis 2026-05-14)
 
-| DatabaseType  | Builder C# canonique                              | Pattern de référence |
-|---------------|---------------------------------------------------|----------------------|
-| `SqlServer`   | `Microsoft.Data.SqlClient.SqlConnectionStringBuilder` | DataSource=`{HOST},{PORT}`, InitialCatalog, UserID, Password, **Encrypt=true** (v6.1), **TrustServerCertificate=false** par défaut (opt-in via `DB_TRUST_SERVER_CERT=true` en dev local uniquement) |
-| `PostgreSQL`  | `Npgsql.NpgsqlConnectionStringBuilder`            | Host, Port, Database, Username, Password |
-| `MySql`       | `MySqlConnector.MySqlConnectionStringBuilder`     | Server, Port, Database, UserID, Password |
-| `Sqlite`      | `Microsoft.Data.Sqlite.SqliteConnectionStringBuilder` | DataSource (chemin fichier — autres env vars ignorées) |
+La connection string est **composée par l'agent `arch` Phase A — STEP
+4.5** à partir des valeurs `DB_HOST/PORT/NAME/USER/PASSWORD` du bloc
+`## Active Database` de `stack.md`, puis **sérialisée dans
+`appsettings.json` section `ConnectionStrings.Default`**. Le code
+applicatif (`Program.cs`) lit cette valeur via
+`builder.Configuration.GetConnectionString("Default")` (cf. §5.1).
+
+| DatabaseType  | Builder utilisé par arch                          | Propriétés mappées depuis ## Active Database |
+|---------------|---------------------------------------------------|----------------------------------------------|
+| `sqlserver`   | `Microsoft.Data.SqlClient.SqlConnectionStringBuilder` | DataSource=`{DB_HOST},{DB_PORT}`, InitialCatalog=`{DB_NAME}`, UserID=`{DB_USER}`, Password=`{DB_PASSWORD}`, **Encrypt=true** (v6.1), **TrustServerCertificate=false** par défaut (opt-in via `DB_TRUST_SERVER_CERT: true` dans `## Active Database` en dev local uniquement) |
+| `postgres`    | `Npgsql.NpgsqlConnectionStringBuilder`            | Host=`{DB_HOST}`, Port=`{DB_PORT}`, Database=`{DB_NAME}`, Username=`{DB_USER}`, Password=`{DB_PASSWORD}` |
+| `mysql`       | `MySqlConnector.MySqlConnectionStringBuilder`     | Server=`{DB_HOST}`, Port=`{DB_PORT}`, Database=`{DB_NAME}`, UserID=`{DB_USER}`, Password=`{DB_PASSWORD}` |
+| `sqlite`      | `Microsoft.Data.Sqlite.SqliteConnectionStringBuilder` | DataSource=`{DB_NAME}` (chemin fichier — DB_HOST/PORT/USER/PASSWORD ignorées) |
 
 Aucune concaténation littérale `$"Server=...;..."` autorisée — viole
-le scan forbidden-pattern de `env_rules.md`.
+le scan forbidden-pattern (depuis 2026-05-14, env_rules.md est obsolète
+mais le pattern de scan reste pour bloquer les secrets hardcodés).
 
-Code template (cas SqlServer — le plus fréquent) :
+Côté **code applicatif** (`Program.cs`) — lecture seule :
 ```csharp
-using Microsoft.Data.SqlClient;
+// Pattern canonique depuis 2026-05-14 : IConfiguration only
+var connectionString = builder.Configuration.GetConnectionString("Default")
+    ?? throw new InvalidOperationException(
+        "ConnectionStrings:Default missing in appsettings.json — verifier ## Active Database de stack.md et relancer /arch-init");
 
-string Required(string n) => Environment.GetEnvironmentVariable(n)
-    ?? throw new InvalidOperationException($"Missing required environment variable: {n}");
+var dbType = builder.Configuration["Database:Type"]?.ToLowerInvariant() ?? "sqlserver";
+builder.Services.AddDbContext<AppDbContext>(o => dbType switch
+{
+    "sqlserver" => o.UseSqlServer(connectionString),
+    "postgres" or "postgresql" => o.UseNpgsql(connectionString),
+    "mysql" => o.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)),
+    "sqlite" => o.UseSqlite(connectionString),
+    _ => throw new InvalidOperationException($"DatabaseType inconnu : {dbType}")
+});
+```
 
+Côté **arch** (composition runtime, ne génère pas de code applicatif) :
+arch invoque le builder approprié en RAM (cas SqlServer ci-dessous) :
+```csharp
+// _bridge.csproj ou Program.cs interne d'arch — JAMAIS dans le code applicatif
 var sqlBuilder = new SqlConnectionStringBuilder
 {
-    DataSource             = $"{Required("DB_HOST")},{Required("DB_PORT")}",
-    InitialCatalog         = Required("DB_NAME"),
-    UserID                 = Required("DB_USER"),
-    Password               = Required("DB_PASSWORD"),
-    Encrypt                = true,  // v6.1 : TLS obligatoire
-    TrustServerCertificate = bool.TryParse(Environment.GetEnvironmentVariable("DB_TRUST_SERVER_CERT"), out var tc) && tc
-    // ↑ false par defaut. Si true ET prod : throw au boot (cf. STEP 5.2 ci-dessus).
+    DataSource             = $"{db_config["DB_HOST"]},{db_config["DB_PORT"]}",
+    InitialCatalog         = db_config["DB_NAME"],
+    UserID                 = db_config["DB_USER"],
+    Password               = db_config["DB_PASSWORD"],
+    Encrypt                = true,
+    TrustServerCertificate = db_config.GetValueOrDefault("DB_TRUST_SERVER_CERT") == "true"
 };
-var connectionString = sqlBuilder.ConnectionString;
+// puis File.WriteAllText("appsettings.json", json) avec ConnectionStrings.Default = sqlBuilder.ConnectionString
 ```
 
 Pour PostgreSQL, MySql, Sqlite : substituer le builder ci-dessus par

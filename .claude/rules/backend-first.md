@@ -80,7 +80,7 @@ ApiGateMinPerEndpoint: 2  # default
 ```
 
 `GatedWorkflow: false` = legacy parallèle (audit log
-`workspace/output/.audit/legacy-parallel.log`). Déconseillé.
+`workspace/output/.sys/.audit/legacy-parallel.log`). Déconseillé.
 
 **Indépendance de `QAMode`** : la gate API (Phase 4) tourne toujours quand
 `GatedWorkflow: true`, indépendamment de `QAMode` (qui pilote uniquement la
@@ -107,6 +107,6 @@ Dossier `Api/` généré uniquement si endpoints HTTP existent.
 
 - ❌ dev-frontend avant que la gate passe
 - ❌ Tester contre la DB réelle (toujours in-memory/mock)
-- ❌ Bypass gate (`--no-validate` couvre `/spec-validate`, pas la gate API)
+- ❌ Bypass gate (`--no-validate` couvre `/feat-validate`, pas la gate API)
 - ❌ Fixtures hors entités scaffoldées par arch
 - ❌ Auth Azure AD réelle dans les tests

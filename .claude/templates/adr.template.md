@@ -3,7 +3,7 @@
 - **Statut** : {Proposed | Accepted | Deprecated | Superseded by ADR-XXX}
 - **Date** : {YYYY-MM-DD}
 - **Auteur** : {agent ou commande, ex: arch / dev-backend / Tech Lead}
-- **Phase** : {1-SPEC | 2-US | 3-UI | 4-ARCH | 5-CODE}
+- **Phase** : {1-FEAT | 2-US | 3-UI | 4-ARCH | 5-CODE}
 
 ---
 
@@ -38,7 +38,7 @@
 ## Alternatives considérées
 
 > Options écartées, avec une phrase de justification chacune. Si la
-> décision est imposée par le stack ou la SPEC, écrire `NONE — imposé
+> décision est imposée par le stack ou la FEAT, écrire `NONE — imposé
 > par {raison}`.
 
 - **<alternative-1>** : écartée car <raison>
@@ -48,7 +48,7 @@
 
 ## Liens
 
-- SPEC : `workspace/input/specs/{n}-{Name}.md` (si applicable)
+- FEAT : `workspace/input/feats/{n}-{Name}.md` (si applicable)
 - US : `workspace/output/us/{n}-{m}-{Name}.md` (si applicable)
 - Stack : `.claude/stacks/{cat}/{stack}.md` (si applicable)
 - ADRs liés : ADR-XXX (si superseded ou dépendance)

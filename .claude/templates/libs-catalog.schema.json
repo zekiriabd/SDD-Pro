@@ -14,7 +14,8 @@
     },
     "category": {
       "type": "string",
-      "enum": ["backend", "frontend", "ui", "auth", "qa"]
+      "enum": ["backend", "frontend", "ui", "auth", "qa", "fullstack", "mobiles"],
+      "description": "Stack category. MUST match the parent directory name under .claude/stacks/. 'mobiles' (plural) and 'fullstack' added 2026-05-16 for single-project multi-target stacks (React Native, MAUI, Next.js, Blazor Server, ...)."
     },
     "schemaVersion": {
       "type": "integer",

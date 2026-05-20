@@ -4,7 +4,7 @@
 > Dev-Backend, Dev-Frontend). Source de vérité unique pour le glossaire
 > métier, les conventions, et l'index des décisions architecturales.
 >
-> **Read-only en phases 2-5** : seuls `/spec-generate` (bootstrap) et
+> **Read-only en phases 2-5** : seuls `/feat-generate` (bootstrap) et
 > les agents listés en §6 peuvent étendre ce fichier. Aucun agent ne le
 > réécrit intégralement.
 
@@ -22,7 +22,7 @@
 ## 2. Glossaire métier
 
 > Termes spécifiques au domaine, partagés par tous les agents et toutes
-> les SPECs. Évite les divergences de vocabulaire entre US, UI, code.
+> les FEATs. Évite les divergences de vocabulaire entre US, UI, code.
 
 | Terme | Définition |
 |---|---|
@@ -31,12 +31,12 @@
 
 ---
 
-## 3. Acteurs (cumul cross-SPEC)
+## 3. Acteurs (cumul cross-FEAT)
 
-> Tous les acteurs identifiés dans l'ensemble des SPECs du projet.
+> Tous les acteurs identifiés dans l'ensemble des FEATs du projet.
 > Étendu automatiquement par l'agent PO à chaque `/us-generate {n}`.
 
-| Acteur | Rôle | SPECs concernées |
+| Acteur | Rôle | FEATs concernées |
 |---|---|---|
 | `<acteur-1>` | <rôle> | `{n1}-{Name}`, `{n2}-{Name}` |
 
@@ -62,7 +62,7 @@
 ### 5.1 Nommage cross-fichiers
 Voir `.claude/CLAUDE.md §3` — convention `{n}-{m}-{Name}` immuable.
 
-### 5.2 IDs stables SPEC
+### 5.2 IDs stables FEAT
 Voir `.claude/CLAUDE.md §4` — `SFD-N`, `BR-N`, `AC-N`, `FD-N`.
 
 ### 5.3 Conventions spécifiques au projet
@@ -76,7 +76,7 @@ Voir `.claude/CLAUDE.md §4` — `SFD-N`, `BR-N`, `AC-N`, `FD-N`.
 ## 6. Architecture Decision Records (ADRs)
 
 > Chaque décision technique structurante est tracée dans
-> `workspace/output/context/adrs/ADR-{nnn}-{slug}.md`. L'index ci-dessous est
+> `workspace/output/.sys/.context/adrs/ADR-{nnn}-{slug}.md`. L'index ci-dessous est
 > maintenu par l'agent Arch (Phase C) et par les agents dev-* lors
 > d'un choix non couvert par les ADRs existants.
 
@@ -90,16 +90,16 @@ Voir `.claude/CLAUDE.md §4` — `SFD-N`, `BR-N`, `AC-N`, `FD-N`.
 
 ## 7. Risques et hypothèses (optionnel — depuis P3)
 
-> Étendu par `/spec-deepen {n}` (technique d'élicitation Pre-mortem +
-> Red Team). Vide tant que `/spec-deepen` n'a pas été lancé.
+> Étendu par `/feat-deepen {n}` (technique d'élicitation Pre-mortem +
+> Red Team). Vide tant que `/feat-deepen` n'a pas été lancé.
 
 ### 7.1 Risques identifiés
 
-- <risque-1> (SPEC : `{n}-{Name}`, sévérité : low/medium/high)
+- <risque-1> (FEAT : `{n}-{Name}`, sévérité : low/medium/high)
 
 ### 7.2 Hypothèses
 
-- <hypothèse-1> (SPEC : `{n}-{Name}`, validation : confirmée/à valider)
+- <hypothèse-1> (FEAT : `{n}-{Name}`, validation : confirmée/à valider)
 
 ---
 
@@ -107,12 +107,12 @@ Voir `.claude/CLAUDE.md §4` — `SFD-N`, `BR-N`, `AC-N`, `FD-N`.
 
 | Agent / Commande | Sections étendues |
 |---|---|
-| `/spec-generate` | §1 (init), §2-3 (acteurs+termes de la SPEC créée) |
+| `/feat-generate` | §1 (init), §2-3 (acteurs+termes de la FEAT créée) |
 | Agent `po` | §3 (cumul acteurs), §2 (termes nouveaux) |
 | Agent `ui` | §2 (composants partagés découverts) |
 | Agent `arch` | §4 (stack final), §6 (ADRs init) |
 | Agents `dev-*` | §6 (ADR sur un choix non couvert) |
-| `/spec-deepen` (P3) | §7 (risques + hypothèses) |
+| `/feat-deepen` (P3) | §7 (risques + hypothèses) |
 
 **Aucun agent** ne réécrit le fichier intégralement. Toutes les
 modifications sont **append-only** ou **update-in-place** sur une ligne

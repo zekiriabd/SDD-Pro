@@ -9,7 +9,7 @@ tools: Read, Write, Edit, Glob, Grep, Bash
 
 ## Rôle
 
-Pour une SPEC `{n}` dont le code a été généré (`/dev-run` Done), produire :
+Pour une FEAT `{n}` dont le code a été généré (`/dev-run` Done), produire :
 
 1. **Tests unitaires backend** selon le QA stack actif (`xUnit`, `pytest`,
    `Vitest`, `JUnit 5`, …)
@@ -22,7 +22,8 @@ Pour une SPEC `{n}` dont le code a été généré (`/dev-run` Done), produire :
 
 **Strictement read-only** sur `workspace/output/src/{App|Backend|Lib}/**` (code de
 production). Tout test généré l'est dans des dossiers adjacents
-(`*.Tests/`, `__tests__/`, etc.) régis par `rules/qa-ownership.md`.
+(`*.Tests/`, `__tests__/`, etc.) — propriété QA exclusive (substance
+inlinée plus bas, §Ownership).
 
 **Token footprint cible** :
 - Tests BE/FE génération : ~5-8 KB par US
@@ -36,14 +37,14 @@ les linters (déterministe), les type checkers (compile-time).
 
 ---
 
-## STEP 1 — Recevoir le numéro de SPEC
+## STEP 1 — Recevoir le numéro de FEAT
 
-Argument d'entrée : `{n}` (numéro de SPEC, entier).
+Argument d'entrée : `{n}` (numéro de FEAT, entier).
 
 Si `{n}` absent ou non numérique → ERROR :
 ```
 ERROR: agent qa — argument invalide
-CAUSE: numéro de SPEC manquant ou non numérique
+CAUSE: numéro de FEAT manquant ou non numérique
 FIX: relancer /qa-generate {n} avec n entier
 ```
 
@@ -54,24 +55,24 @@ FIX: relancer /qa-generate {n} avec n entier
 Avant tout `Glob`/`Read` de code source, executer :
 
 ```bash
-$PS_BIN -File .claude/scripts/context-budget.ps1 -Agent qa -SpecNumber {n}
+python .claude/python/sdd_scripts/context_budget.py --agent qa --feat-number {n}
 ```
 
-Exit non-zero -> STOP. Le ledger est ecrit dans `workspace/output/.audit/context-budget.jsonl`.
+Exit non-zero -> STOP. Le ledger est ecrit dans `console.db` (table `context_budget`, v6.10 SSoT).
 
 ---
 
 ## STEP 2 — Vérifier les préconditions
 
-### 2.1 SPEC + US existent
+### 2.1 FEAT + US existent
 
-Glob `workspace/input/specs/{n}-*.md` → 1 fichier attendu.
+Glob `workspace/input/feats/{n}-*.md` → 1 fichier attendu.
 Glob `workspace/output/us/{n}-*.md` → ≥1 fichier attendu.
 
 Si absent → ERROR :
 ```
 ERROR: agent qa — préconditions manquantes
-CAUSE: [QA_PRECONDITION_FAILED] SPEC ou US absents pour la SPEC {n}
+CAUSE: [QA_PRECONDITION_FAILED] FEAT ou US absents pour la FEAT {n}
 FIX: lancer /us-generate {n} d'abord pour générer les US
 ```
 
@@ -91,7 +92,7 @@ FIX: lancer /dev-run {n} d'abord
 
 Lire `## Project Config` de `workspace/input/stack/stack.md`. Récupérer :
 - `QAMode` (default `manual`)
-- `CoverageMin` (default `70`)
+- `CoverageMin` (default `80`)
 
 Si `QAMode: off` → exit silencieux :
 ```
@@ -123,8 +124,8 @@ Lire les sections `## Active QA Specs` de `workspace/input/stack/stack.md`.
 
 Read **uniquement** :
 
-1. `workspace/input/specs/{n}-*.md` (SPEC parente, lecture passive pour ACs)
-2. `workspace/output/us/{n}-*.md` (toutes les US de la SPEC, sélectif sur `{n}-*`)
+1. `workspace/input/feats/{n}-*.md` (FEAT parente, lecture passive pour ACs)
+2. `workspace/output/us/{n}-*.md` (toutes les US de la FEAT, sélectif sur `{n}-*`)
 3. `workspace/input/ui/{n}-*.html` si présent (passif, pour comprendre les comportements UI à tester)
 4. **`workspace/output/src/{BackendName}/CLAUDE.md`** si présent (architecture backend)
 5. **`workspace/output/src/{AppName}/CLAUDE.md`** si présent (architecture frontend)
@@ -138,16 +139,21 @@ Read **uniquement** :
    `[QA_INIT_FAILED]`, `[QA_TEST_INVALID]`, `[QA_OUTPUT_INVALID]`,
    `[QA_PRECONDITION_FAILED]`, `[QA_OWNERSHIP_VIOLATION]`,
    `[API_GATE_RED]`. Ordre de priorité émission documenté §1.7.
+10. **`.claude/rules/backend-first.md`** (v6.10.5 fix CRIT-4) — contrat
+    API Gate (post-dev backend, pré-dev frontend). Substance opérationnelle
+    inlinée plus bas (§API Gate STEP 2.7-2.9), Read le fichier source si
+    cas-limite (stratégie fixtures in-memory par stack QA §1.2, critère
+    `gate_passed` §1.3, boucle correction RED→GREEN §2).
 
 **Rules inline (depuis SDD_Pro v5.0 — économie tokens)** : les règles
-`responsibilities.md`, `qa-ownership.md`, `qa-coverage.md` et
-`stack-completeness.md` ne sont **PLUS lues** en STEP 3. Substance
+`qa-coverage.md` et `stack-completeness.md` ne sont **PLUS lues** en
+STEP 3. Substance
 opérationnelle inlinée dans la section **Inline Rules** en bas de ce
 fichier. Si cas-limite (ex. format précis schema coverage.json,
 edge-case ownership) : Read `@.claude/rules/{nom}.md` à la demande.
 
 **Read conditionnel (lazy)** :
-- `workspace/output/context/constitution.md` : à Read **uniquement** si un terme
+- `workspace/output/.sys/.context/constitution.md` : à Read **uniquement** si un terme
   ambigu nécessite désambiguïsation via le glossaire.
 
 **Lecture sélective stricte** : ne JAMAIS faire `Glob workspace/output/src/**/*.cs`
@@ -160,7 +166,7 @@ ou équivalent. Lire uniquement les fichiers correspondant aux US ciblées
 
 Skip si `QAMode: tests-only`.
 
-Exécuter le script `quality-scan.ps1` qui détecte :
+Exécuter le script `quality_scan.py` qui détecte :
 - TODO, FIXME, XXX, HACK
 - Magic numbers (constantes hardcodées hors contexte)
 - console.log / Console.WriteLine / print en code prod
@@ -169,17 +175,10 @@ Exécuter le script `quality-scan.ps1` qui détecte :
 - Naming violations selon convention du stack
 - Hex hardcodé hors theme.css
 
-Commande (avec fallback pwsh → powershell) :
+Commande (Python pur, cross-platform) :
 
 ```bash
-if command -v pwsh >/dev/null 2>&1; then
-  PS_BIN=pwsh
-else
-  PS_BIN=powershell
-fi
-$PS_BIN -NoProfile -ExecutionPolicy Bypass \
-  -File .claude/scripts/quality-scan.ps1 \
-  -SpecNumber {n}
+python .claude/python/sdd_scripts/quality_scan.py --feat-number {n}
 ```
 
 Sortie :
@@ -228,7 +227,7 @@ Pour chaque US `{n}-{m}-{Name}` :
 - 1 fichier de test par classe / module / composant testable
 - Pour chaque AC, au moins 1 test correspondant
 - Pour chaque endpoint / service public, tests des cas nominaux + 1-2
-  edge cases déduits de la SPEC (jamais inventés)
+  edge cases déduits de la FEAT (jamais inventés)
 
 **Anti-derive** : ne JAMAIS tester du code qui n'est pas dans le scope
 de l'US. Ne JAMAIS générer des tests pour des fonctionnalités non
@@ -261,13 +260,13 @@ Sur erreur d'init → STOP + ERROR `[QA_INIT_FAILED]`.
 ### 6.4 Génération des fichiers de test
 
 Pour chaque fichier planifié, écrire le test sous le path conforme aux
-patterns du QA stack actif (cf. `rules/qa-ownership.md §1`) :
+patterns du QA stack actif (cf. §Ownership inline plus bas) :
 
 | Convention | Exemples |
 |---|---|
 | `*.Tests/*.cs` | `workspace/output/src/{BackendName}.Tests/AuthServiceTests.cs` |
 | `__tests__/*.test.ts` | `workspace/output/src/{AppName}/__tests__/Login.test.tsx` |
-| `*.spec.ts` (Jasmine) | `workspace/output/src/{AppName}/src/app/auth/login.component.spec.ts` |
+| `*.FEAT.ts` (Jasmine) | `workspace/output/src/{AppName}/src/app/auth/login.component.FEAT.ts` |
 | `test_*.py` | `workspace/output/src/{BackendName}/tests/test_auth_service.py` |
 | `*Test.kt` | `workspace/output/src/{BackendName}/src/test/kotlin/AuthServiceTest.kt` |
 
@@ -307,15 +306,13 @@ flaggué dans le rapport).
 
 Skip si `QAMode: tests-only`.
 
-Exécuter `parse-coverage.ps1` qui consomme les outputs natifs des
+Exécuter `parse_coverage.py` qui consomme les outputs natifs des
 test runners (cobertura XML, lcov.info, coverage.json) et produit le
 schéma normalisé `workspace/output/qa/feat-{n}/coverage.json` (cf.
 `rules/qa-coverage.md §2` pour le format).
 
 ```bash
-$PS_BIN -NoProfile -ExecutionPolicy Bypass \
-  -File .claude/scripts/parse-coverage.ps1 \
-  -SpecNumber {n}
+python .claude/python/sdd_scripts/parse_coverage.py --feat-number {n}
 ```
 
 Le script :
@@ -329,7 +326,7 @@ Le script :
 **CoverageMin: 80** par défaut (modifiable via `## Project Config`).
 
 Si `coverage_passed = false` → flag `[QA_COVERAGE_GAP]` **bloquant**
-(décision globale RED, depuis v6.1 hardening). Pour autoriser une SPEC
+(décision globale RED, depuis v6.1 hardening). Pour autoriser une FEAT
 sous le seuil, baisser `CoverageMin` dans `## Project Config` (la
 décision est tracée en git blame) — JAMAIS contourner via `--force`.
 
@@ -384,11 +381,48 @@ Quality        : workspace/output/qa/feat-{n}/quality.json
 Décision :
 - **GREEN** : tous tests pass + coverage OK + 0 quality error
 - **YELLOW** : tests pass, mais coverage < seuil OU quality errors
-- **RED** : au moins 1 test échoué
+- **RED** : au moins 1 test échoué **OU compilation des tests échoue**
+  (alignment `error-classification.md §1.7` : `[QA_TEST_FAILED]` =
+  RED bloquant, y compris `compileTestKotlin`/`tsc --noEmit` échec
+  sur tests préexistants — v6.10.5 fix CRIT-3)
+
+**Cas particulier — Régression cross-FEAT par refactoring** : si
+`compileTestKotlin`/`tsc`/`pytest --collect-only` échoue sur des
+fichiers de tests **préexistants** à cause d'un refactoring upstream
+(signature de constructeur changée, interface étendue), émettre :
+```
+ERROR: qa feat-{n} — régression test compile
+CAUSE: [QA_TEST_FAILED] {N} tests préexistants ne compilent plus (signatures changées par refactoring FEAT antérieur)
+FIX: re-aligner les test fixtures sur les signatures actuelles OU /qa-generate {n-1} pour régénérer les tests cassés
+```
+Verdict = **RED**. Tech Lead arbitre : (a) corrige manuellement les
+signatures de tests cassés ; (b) supprime + régénère via `/qa-generate`
+sur la FEAT antérieure ; (c) marque les tests obsolètes `@Disabled` avec
+justification. Auto-fix par agent reste hors scope v6.10 (cf. ADR
+v7.0 `governance-auditors-trim` pour roadmap).
 
 **Toujours exit 0** depuis l'agent (sauf erreurs non-récupérables —
 préconditions manquantes, init failed, framework absent). Les échecs
 de test ou de coverage ne bloquent pas — c'est un audit, pas une gate.
+
+### STEP 10.bis — Status flip US (v6.10.5, fix CRIT-2)
+
+Si verdict global = `GREEN`, flipper toutes les US de la FEAT
+`Review → Done`. Si verdict = `YELLOW` ou `RED`, **NE PAS flipper** (les
+US restent `Review`, signalant qu'une correction est attendue avant
+clôture).
+
+```bash
+if [ "$VERDICT" = "GREEN" ]; then
+  for us_file in workspace/output/us/{n}-*.md; do
+    us_id=$(basename "$us_file" .md | grep -oE '^[0-9]+-[0-9]+')
+    python .claude/python/sdd_scripts/set_us_status.py \
+      --us "$us_id" --status Done 2>/dev/null || true
+  done
+fi
+```
+
+Idempotent et non-bloquant. Transition `Review → Done` valide sans `--force`.
 
 ---
 
@@ -400,8 +434,8 @@ de test ou de coverage ne bloquent pas — c'est un audit, pas une gate.
   review hybride (hors scope SDD_Pro v3.1)
 - Ne JAMAIS auto-corriger un test failure (rapporter, ne pas patcher)
 - Ne JAMAIS auto-installer un package non listé dans le QA stack actif
-- Ne JAMAIS modifier les SPECs, US, mockups HTML (read-only)
-- Ne JAMAIS modifier `workspace/output/context/constitution.md` ni les ADRs
+- Ne JAMAIS modifier les FEATs, US, mockups HTML (read-only)
+- Ne JAMAIS modifier `workspace/output/.sys/.context/constitution.md` ni les ADRs
   (read-only)
 - Ne JAMAIS poser de question utilisateur (autonomous)
 - En cas d'ambiguïté → STOP + ERROR (pas de devinette)
@@ -411,13 +445,13 @@ de test ou de coverage ne bloquent pas — c'est un audit, pas une gate.
 ## Règles applicables
 
 **Patterns propriété QA exclusive** (Write/Edit autorisés ici uniquement) :
-`*.Tests/**`, `**/__tests__/**`, `**/*.spec.{ts,tsx,js,jsx}`,
+`*.Tests/**`, `**/__tests__/**`, `**/*.FEAT.{ts,tsx,js,jsx}`,
 `**/*.test.{ts,tsx,js,jsx}`, `**/*Tests.cs`, `**/test_*.py`, `**/*_test.py`,
-`**/*Test.kt`, `**/*Spec.kt`, `**/src/test/kotlin/**`.
+`**/*Test.kt`, `**/*FEAT.kt`, `**/src/test/kotlin/**`.
 
 **Read-only strict** : `workspace/output/src/{App|Backend|Frontend|*Lib}/**`
-(hors patterns ci-dessus), `workspace/input/specs/`, `workspace/output/us/`,
-`workspace/input/ui/`, `workspace/output/context/`, `workspace/output/db/`.
+(hors patterns ci-dessus), `workspace/input/feats/`, `workspace/output/us/`,
+`workspace/input/ui/`, `workspace/output/.sys/.context/`, `workspace/output/db/`.
 
 **Stack-completeness** : chaque `using`/`import` dans un test doit figurer
 en §2.4 d'un stack actif (qa, backend, frontend, ui, auth). Lib absente
@@ -425,7 +459,7 @@ en §2.4 d'un stack actif (qa, backend, frontend, ui, auth). Lib absente
 
 **Pas d'auto-correction** : test échoue → `[QA_TEST_FAILED]` → décision
 `RED`, Tech Lead re-dispatche dev-*. Schéma `coverage.json` normalisé
-géré par `parse-coverage.ps1` (STEP 8).
+géré par `parse_coverage.py` (STEP 8).
 
-**Read on-demand si cas-limite** : `@.claude/rules/qa-ownership.md`,
-`@.claude/rules/qa-coverage.md`, `@.claude/rules/stack-completeness.md`.
+**Read on-demand si cas-limite** : `@.claude/rules/qa-coverage.md`,
+`@.claude/rules/stack-completeness.md`.

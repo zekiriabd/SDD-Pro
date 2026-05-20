@@ -30,21 +30,29 @@ FIX: créer workspace/input/stack/stack.md et activer au moins un backend ou fro
 
 ---
 
-## STEP 2 — Vérifier les env vars DB (si applicable)
+## STEP 2 — Vérifier les blocs `## Active Database` + `## Active Auth Specs`
 
-Lire `workspace/input/stack/stack.md` → récupérer `DatabaseType` du
-`## Project Config`.
+Lire `workspace/input/stack/stack.md` → récupérer le bloc
+`## Active Database` (depuis 2026-05-14, `DatabaseType` n'est plus
+dans `## Project Config`).
 
-- Si `DatabaseType: none` ou absent → SKIP le check env vars
-- Sinon → vérifier que les 5 variables sont définies : `DB_HOST`,
-  `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`. Si une seule manque :
+- Si `## Active Database` absent OU `DatabaseType: none` → SKIP le
+  check DB.
+- Sinon → vérifier que les 5 clés sont présentes (valeur non vide) :
+  `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`. Si une
+  seule manque :
   ```
-  ERROR: /arch-init — variable(s) d'environnement DB manquante(s)
-  CAUSE: variables non définies : {liste}
-  FIX: définir les variables avant de relancer (ex. PowerShell : $env:DB_HOST="...")
+  ERROR: /arch-init — clé(s) DB manquante(s) dans ## Active Database
+  CAUSE: clés non définies : {liste}
+  FIX: renseigner les valeurs dans workspace/input/stack/stack.md ## Active Database
   ```
 
-(Les valeurs ne sont jamais affichées par cette commande.)
+Si un stack auth est listé sous `## Active Auth Specs`, vérifier les
+clés `AZ_*` (cf. `auth/azure-ad.md §2`). Manquantes → ERROR similaire.
+
+(Les valeurs ne sont jamais affichées par cette commande. La
+validation détaillée est aussi faite par `validate_readiness.py` lors
+de `/feat-validate`.)
 
 ---
 
@@ -81,7 +89,7 @@ Si l'agent échoue, ne rien ajouter.
 - Pas de Q/R utilisateur.
 - Pas de génération de code applicatif (responsabilité des agents
   dev-backend / dev-frontend).
-- Pas de modification des SPECs, US, mockups HTML.
+- Pas de modification des FEATs, US, mockups HTML.
 - Exécutée typiquement **avant** `/dev-run {n}` (intégrée en pré-step
   par `/dev-run` directement — la commande `/arch-init` est utile pour
   le debug ou la pré-init manuelle).

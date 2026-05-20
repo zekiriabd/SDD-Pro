@@ -3,14 +3,14 @@
 ## Principe
 
 En méthode SDD strict, **tout bug en code = trou dans une source MD**
-(spec fonctionnelle, US, plan technique, stack MD, agent MD, rule MD).
+(FEAT fonctionnelle, US, plan technique, stack MD, agent MD, rule MD).
 À chaque correction, la propagation va du **MD source → code**, jamais
 l'inverse.
 
 Cette règle est **load-bearing pour la non-régression cross-projet** :
 le framework SDD_Pro génère du code à partir des MD. Si un bug est
 corrigé uniquement dans le code généré, le **prochain projet** (autre
-SPEC, autre run `/sdd-full`, autre client) reproduira exactement le
+FEAT, autre run `/sdd-full`, autre client) reproduira exactement le
 même bug — les agents PO / arch / dev-* ne lisent QUE les MD, pas
 l'historique de chat ni les commits git du projet précédent.
 
@@ -27,7 +27,7 @@ Mapper le bug → quelle(s) source(s) aurait dû le prévenir :
 
 | Niveau de source | Quand patcher | Exemple |
 |---|---|---|
-| **SPEC fonctionnelle** (`workspace/input/specs/{n}-*.md`) | Le bug touche une règle métier ou un AC implicite | CORS manquant → ajouter BR-N : "API accessible depuis origin SPA" + AC-M : "preflight OPTIONS répond 200" |
+| **FEAT fonctionnelle** (`workspace/input/feats/{n}-*.md`) | Le bug touche une règle métier ou un AC implicite | CORS manquant → ajouter BR-N : "API accessible depuis origin SPA" + AC-M : "preflight OPTIONS répond 200" |
 | **User Story** (`workspace/output/us/{n}-{m}-*.md`) | Le bug touche un comportement utilisateur observable | Erreur popup "Failed to fetch" → ajouter AC-X : "message d'erreur lisible si endpoint down" |
 | **Plan technique** (`workspace/output/plans/{n}-{m}-*.{back,front}.md`) | Le bug touche un fichier oublié ou mal scopé | `CorsConfig.kt` absent → ajouter en `create:` |
 | **Stack MD** (`.claude/stacks/{cat}/{stack}.md`) | Le bug touche un pattern réutilisable cross-projet | Pattern CORS Spring → §5.2.7 avec format ERROR + anti-récap grep |
@@ -41,7 +41,7 @@ L'ordre est strict :
 ```
 1. Read la source MD pertinente
 2. Edit/Write la source : ajouter règle, AC, pattern, format ERROR
-3. (optionnel) régénérer les artefacts dérivés (US si SPEC patchée,
+3. (optionnel) régénérer les artefacts dérivés (US si FEAT patchée,
    plan si stack patché) via /us-generate, /dev-plan
 4. ENFIN, appliquer le fix au code (workspace/output/src/...)
 ```
@@ -54,7 +54,7 @@ permanent entre source et code.
 Si plusieurs sources sont concernées, **TOUTES** doivent être à jour :
 
 Exemple (post-mortem CMS-Back 2026-05-11, CORS manquant) :
-- SPEC 1 : BR-12 + AC-15 (CORS obligatoire entre origins distincts)
+- FEAT 1 : BR-12 + AC-15 (CORS obligatoire entre origins distincts)
 - Stack `auth/azure-ad.md` §5.2.7.9 (pattern Spring / .NET / FastAPI /
   Express + alternative Vite proxy + format ERROR)
 - Plan `1-1-Connexion.back.md` : `CorsConfig.kt` listé en `create:`
@@ -114,7 +114,7 @@ FIX: ajouter CorsConfig.kt + http.cors { allowedOrigins=[$env:CORS_ORIGINS] } da
 
 ## 4. Anti-pattern : "fix code-only récurrent"
 
-Si la même classe de bug apparaît dans ≥ 2 projets / SPECs successifs
+Si la même classe de bug apparaît dans ≥ 2 projets / FEATs successifs
 sans patch source MD → **STOP** lors de la troisième correction et
 exiger :
 1. Identification du gap MD
@@ -135,7 +135,7 @@ je passe au suivant" — c'est exactement ce qui crée des projets
   WARNING avec pointer vers la source manquante. Le patch lui-même
   est hors scope agent (Tech Lead humain).
 - **Tech Lead humain** : pour chaque PR de fix sur un projet généré,
-  exiger le patch des sources MD pertinentes (SPEC, stack, rule)
+  exiger le patch des sources MD pertinentes (FEAT, stack, rule)
   avant merge.
 - **Post-mortem** : tout incident production réglé en hotfix doit
   produire un patch source MD dans les 48h, faute de quoi le bug

@@ -1,10 +1,13 @@
-﻿# QA Stack — Code Quality (Sonar-like cross-stack)
+# QA Stack — Code Quality (Sonar-like cross-stack)
+
+Status: ✅ Available
+Validation: 🟢 reference (cross-stack, 0 token, déterministe)
 
 ## 1. Scope
 
 Stack **non-LLM** : règles d'analyse statique appliquées par le script
-`.claude/scripts/quality-scan.ps1` sur le code de production de la
-SPEC ciblée.
+`python .claude/python/sdd_scripts/quality_scan.py` sur le code de
+production de la FEAT ciblée.
 
 **0 token** consommé. Très rapide (< 1s pour ~5000 LOC).
 
@@ -90,7 +93,7 @@ exécutable (hors annotations, hors strings). Exclut les codes communs
 
 ### 3.7 Scan supply-chain — CVE / SBOM / licences (v6.1)
 
-Trois sous-checks lancés par `quality-scan.ps1` selon le `buildSystem`
+Trois sous-checks lancés par `quality_scan.py` selon le `buildSystem`
 détecté dans le catalogue stack actif. Tous trois écrivent leurs
 artefacts sous `workspace/output/qa/feat-{n}/supply-chain/`.
 
@@ -178,7 +181,7 @@ CveMaxSeverity: moderate        # moderate (CVSS 4) | high (7) | critical (9) �
 laisse passer les CVE moderate sans bloquer.
 
 **Pré-requis outillage** : si l'outil canonique d'un sous-check n'est
-pas installé (ex. `dotnet CycloneDX` global tool), `quality-scan.ps1`
+pas installé (ex. `dotnet CycloneDX` global tool), `quality_scan.py`
 émet WARN `[SUPPLY_CHAIN_TOOL_MISSING]` et skip le sous-check (pas
 bloquant — l'install se fait `dotnet tool install --global CycloneDX`).
 
@@ -192,7 +195,7 @@ Le script exclut automatiquement :
 |---|---|
 | Dossiers de build | `bin/`, `obj/`, `dist/`, `build/` |
 | Dépendances | `node_modules/`, `.angular/`, `wwwroot/_framework/` |
-| Tests | `*.Tests/`, `__tests__/`, `*.spec.*`, `*.test.*`, `test_*`, `_test.*` |
+| Tests | `*.Tests/`, `__tests__/`, `*.FEAT.*`, `*.test.*`, `test_*`, `_test.*` |
 | Coverage | `coverage/`, `TestResults/` |
 | IDE | `.vs/`, `.idea/` |
 
@@ -206,7 +209,7 @@ Le script produit `workspace/output/qa/feat-{n}/quality.json` :
 
 ```json
 {
-  "spec": 1,
+  "FEAT": 1,
   "extractedAt": "2026-05-05T14:32:18Z",
   "summary": {
     "total_files": 42,

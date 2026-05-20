@@ -1,0 +1,140 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sdd-pro.local/templates/wcag-checklist.json",
+  "title": "WCAG 2.2 AA — accessibility-auditor scan patterns",
+  "version": "1.0",
+  "generated_at": "2026-05-19",
+  "rationale": "Externalized from .claude/agents/accessibility-auditor.md to support the v7.0.0 'compress accessibility-auditor 635 -> ~250 L' refactor (audit 2026-05-19, ROI #9). Agent reads this template at STEP 3 of its scan loop and produces issues with the codes/severities/WCAG refs declared here. Keep the agent prompt orchestration-only; rules data lives here. Forward-compatible: extending this list does not require touching the agent .md.",
+  "design_systems": {
+    "DS_IMG_TAGS": ["AvatarImage", "RadzenImage", "v-img", "mat-image", "Image"],
+    "DS_BTN_TAGS": ["Button", "RadzenButton", "v-btn", "mat-button", "Btn"],
+    "DS_INPUT_TAGS": ["Input", "RadzenTextBox", "v-text-field", "mat-input", "TextField"]
+  },
+  "checks": [
+    {
+      "id": 1,
+      "wcag": "1.1.1",
+      "code": "A11Y_MISSING_ALT",
+      "severity": "critical",
+      "description": "Element image (<img>, <AvatarImage>, <RadzenImage>, <v-img>, <mat-image>) sans alt/aria-label/aria-labelledby",
+      "pattern": "<({DS_IMG_TAGS}|img)\\b(?![^>]*\\b(alt|aria-label|aria-labelledby)\\b)",
+      "analysis": "regex"
+    },
+    {
+      "id": 2,
+      "wcag": "1.3.1",
+      "code": "A11Y_INPUT_NO_LABEL",
+      "severity": "critical",
+      "description": "Input (<input>, <Input>, <RadzenTextBox>, <v-text-field>) sans association <Label htmlFor> ni aria-label",
+      "pattern": null,
+      "analysis": "cross-reference-by-id"
+    },
+    {
+      "id": 3,
+      "wcag": "2.4.6",
+      "code": "A11Y_BUTTON_NO_LABEL",
+      "severity": "serious",
+      "description": "Bouton icon-only (<button>, <Button>, <RadzenButton>, <v-btn>) sans aria-label, sans texte enfant, sans title",
+      "pattern": "<({DS_BTN_TAGS}|button)[^>]*>\\s*<(svg|Icon|Lucide\\w+|[A-Z]\\w+Icon)",
+      "analysis": "regex-then-adjacency"
+    },
+    {
+      "id": 4,
+      "wcag": "2.4.3",
+      "code": "A11Y_TABINDEX_POSITIVE",
+      "severity": "serious",
+      "description": "tabindex > 0 — anti-pattern qui perturbe le flow tab natif",
+      "pattern": "tabindex=[\"'][1-9]",
+      "analysis": "regex"
+    },
+    {
+      "id": 5,
+      "wcag": "1.3.1",
+      "code": "A11Y_HEADING_SKIP",
+      "severity": "moderate",
+      "description": "Saut de hierarchie heading (ex. H1 -> H3 sans H2)",
+      "pattern": null,
+      "analysis": "stateful-headings-per-file"
+    },
+    {
+      "id": 6,
+      "wcag": "3.1.1",
+      "code": "A11Y_LANG_MISSING",
+      "severity": "serious",
+      "description": "<html> sans attribut lang=",
+      "pattern": "<html(?![^>]*\\slang=)",
+      "analysis": "regex",
+      "scope_files": ["index.html", "_Host.cshtml", "_Layout.cshtml"]
+    },
+    {
+      "id": 7,
+      "wcag": "3.3.2",
+      "code": "A11Y_FORM_NO_SUBMIT",
+      "severity": "moderate",
+      "description": "<form> sans <button type=submit> ni <input type=submit>",
+      "pattern": null,
+      "analysis": "per-form-element-check"
+    },
+    {
+      "id": 8,
+      "wcag": "4.1.2",
+      "code": "A11Y_ROLE_INCOMPLETE",
+      "severity": "serious",
+      "description": "role=... sans attributs ARIA obligatoires (ex. role=checkbox sans aria-checked)",
+      "pattern": null,
+      "analysis": "role-to-required-aria-table",
+      "role_aria_map": {
+        "checkbox": ["aria-checked"],
+        "radio": ["aria-checked"],
+        "switch": ["aria-checked"],
+        "slider": ["aria-valuenow", "aria-valuemin", "aria-valuemax"],
+        "progressbar": ["aria-valuenow", "aria-valuemin", "aria-valuemax"],
+        "combobox": ["aria-expanded", "aria-controls"],
+        "tab": ["aria-selected"],
+        "tabpanel": ["aria-labelledby"],
+        "dialog": ["aria-labelledby"],
+        "alertdialog": ["aria-labelledby", "aria-describedby"],
+        "menuitemcheckbox": ["aria-checked"],
+        "menuitemradio": ["aria-checked"],
+        "scrollbar": ["aria-valuenow", "aria-valuemin", "aria-valuemax", "aria-controls"]
+      }
+    },
+    {
+      "id": 9,
+      "wcag": "2.5.5",
+      "code": "A11Y_TARGET_TOO_SMALL",
+      "severity": "moderate",
+      "description": "Target size — boutons/liens avec width/height inline < 24px (AA), 44px (AAA)",
+      "pattern": null,
+      "analysis": "inline-style-and-css-tokens",
+      "min_size_px_aa": 24,
+      "min_size_px_aaa": 44
+    },
+    {
+      "id": 10,
+      "wcag": "4.1.3",
+      "code": "A11Y_STATUS_NO_LIVE",
+      "severity": "moderate",
+      "description": "Status messages — role=alert ou aria-live=polite|assertive absent sur zones d'erreur (class=error, class=alert)",
+      "pattern": "class=[\"'](error|alert)",
+      "analysis": "regex-then-adjacency-aria"
+    }
+  ],
+  "verdict_rules": {
+    "thresholds": {
+      "fail_on": "configurable via A11yFailOn (config.base.yml | team | project)",
+      "default": "serious"
+    },
+    "severity_order": ["critical", "serious", "moderate", "minor"],
+    "computation": "If any issue.severity index >= A11yFailOn index -> RED. Else if any issue present -> WARN. Else GREEN."
+  },
+  "infra_limits": {
+    "max_files_scanned": 500,
+    "max_file_size_kb": 200,
+    "error_class_when_exceeded": "A11Y_SCAN_TOO_LARGE"
+  },
+  "skip_conditions": [
+    "A11yMode: off",
+    "appType backend-only (no frontend stack active)"
+  ]
+}

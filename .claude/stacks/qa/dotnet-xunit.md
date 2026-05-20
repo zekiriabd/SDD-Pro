@@ -1,4 +1,8 @@
-﻿# QA Stack — .NET xUnit + Coverlet
+# QA Stack — .NET xUnit + Coverlet
+
+> §2.4 (Librairies) régénérée depuis `dotnet-xunit.libs.json` — ne pas éditer manuellement (`python .claude/python/sdd_admin/sync_stack_md.py --stack-id dotnet-xunit`).
+>
+> Validation: 🟢 reference (validated combo — dotnet-minimalapi + blazor + radzen + azure-ad)
 
 ## 1. Scope
 
@@ -25,7 +29,7 @@ Pour les projets Blazor frontend, utiliser `qa/blazor-bunit.md`.
 <!-- LIBS_CATALOG_START -->
 ### 2.4 Librairies
 
-> Source de verite : `.claude/stacks/qa/dotnet-xunit.libs.json`. Ne pas editer cette section manuellement -- utiliser `.claude/scripts/sync-stack-md.ps1 -StackId dotnet-xunit`.
+> Source de verite : `.claude/stacks/qa/dotnet-xunit.libs.json`. Ne pas editer cette section manuellement -- utiliser `python .claude/python/sdd_admin/sync_stack_md.py --stack-id dotnet-xunit`.
 
 #### 2.4.a Librairies CORE (installees par arch en section 2.2.1, toujours)
 
@@ -39,7 +43,7 @@ Pour les projets Blazor frontend, utiliser `qa/blazor-bunit.md`.
 
 ### 2.4.b Librairies ON-DEMAND (installees si l'US declenche)
 
-Triggers (regex case-insensitive) cherches par `detect-capabilities.ps1` dans l'US + ACs.
+Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'US + ACs.
 
 | Capability | Lib | Version | Triggers |
 |---|---|---|---|
@@ -61,7 +65,7 @@ dotnet add workspace/output/src/{BackendName}.Tests/{BackendName}.Tests.csproj r
 
 <!-- CORE_PACKAGES_START -->
 ```bash
-# Auto-genere depuis dotnet-xunit.libs.json -- ne pas editer (utiliser sync-stack-md.ps1).
+# Auto-genere depuis dotnet-xunit.libs.json -- ne pas editer (utiliser sync_stack_md.py).
 dotnet add workspace/output/src/{BackendName}.Tests/{BackendName}.Tests.csproj package xunit --version 2.9.2
 dotnet add workspace/output/src/{BackendName}.Tests/{BackendName}.Tests.csproj package xunit.runner.visualstudio --version 3.0.0
 dotnet add workspace/output/src/{BackendName}.Tests/{BackendName}.Tests.csproj package Microsoft.NET.Test.Sdk --version 17.12.0
@@ -198,7 +202,7 @@ dotnet format workspace/output/src/{BackendName}.Tests/{BackendName}.Tests.cspro
 Format : **Cobertura XML**
 Path : `workspace/output/src/{BackendName}.Tests/TestResults/{guid}/coverage.cobertura.xml`
 
-Le script `parse-coverage.ps1` détecte automatiquement ce format et le
+Le script `parse_coverage.py` détecte automatiquement ce format et le
 parse vers le schéma normalisé.
 
 ---

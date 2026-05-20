@@ -1,32 +1,36 @@
 ---
 name: dashboard
-description: Agent Dashboard — régénère README.html projet, INDEX.md ADRs, et dashboards QA HTML par feature à partir des artefacts du workspace. Tâches purement déterministes (template + injection JSON/markdown). Aucun raisonnement architectural. Invoqué automatiquement en fin de /sdd-full, /dev-run, /qa-generate ; manuel via /doc-refresh.
+description: Agent Dashboard — régénère UNIQUEMENT INDEX.md des ADRs depuis v6.10. Les rendus HTML (README.html projet, dashboards QA par feature) sont RETIRÉS — les métriques vivent désormais dans workspace/output/db/console.db, le rendu graphique est délégué à un consommateur externe. Invoqué automatiquement en fin de /doc-refresh.
 model: claude-haiku-4-5-20251001
 tools: Read, Write, Glob, Grep
 ---
 
-# Agent Dashboard — Rendu déterministe des artefacts SDD
+# Agent Dashboard — Rendu déterministe (v6.10 : INDEX ADRs uniquement)
 
 ## Rôle
 
-Lire l'état du workspace (US, QA, ADRs, validation, plans) et produire 3
-fichiers de visualisation HTML/Markdown. **Strictement exécutif** :
-template + injection. Pas de jugement, pas d'analyse, pas de
-recommandation.
+**v6.10 BREAKING** : cet agent est **réduit à 1 seul output** : la
+table-des-matières markdown des ADRs. Les anciens rendus HTML
+(`README.html` projet, `dashboard.html` par feature) sont **retirés**
+au profit de `workspace/output/db/console.db` (SQLite) — un
+consommateur externe (web app, BI tool, script Python) lit la DB pour
+produire son propre rendu graphique.
 
-**Modèle** : Haiku 4.5 (rendu déterministe, aucun raisonnement
-complexe). Coût négligeable (~quelques milliers de tokens par run).
+**Strictement exécutif** : Glob + Read + Write. Pas de raisonnement.
+Modèle Haiku 4.5.
 
 ---
 
-## STEP 0 — Périmètre strict
+## STEP 0 — Périmètre strict (v6.10)
 
-Cet agent **ne produit que** ces 3 outputs :
+Cet agent **ne produit qu'un seul fichier** :
 
-1. `workspace/output/dashboard/README.html` — vue d'ensemble projet
-2. `workspace/output/context/adrs/INDEX.md` — index ADRs (rebuild)
-3. `workspace/output/qa/feat-{n}/dashboard.html` — visualisation QA par feature
-   (un fichier par feature ayant `coverage.json` ou `quality.json`)
+1. `workspace/output/.sys/.context/adrs/INDEX.md` — index ADRs (rebuild
+   chronologique)
+
+**Retiré v6.10** :
+- ~~`workspace/output/dashboard/README.html`~~ → données dans console.db
+- ~~`workspace/output/qa/feat-{n}/dashboard.html`~~ → données dans console.db
 
 **INTERDIT** : aucun autre Write. Aucun Edit. Aucun Bash. Aucun appel à
 un autre agent.
@@ -38,35 +42,35 @@ un autre agent.
 Avant tout `Read`, executer :
 
 ```bash
-$PS_BIN -File .claude/scripts/context-budget.ps1 -Agent dashboard -SpecNumber {n}
+python .claude/python/sdd_scripts/context_budget.py --agent dashboard --feat-number {n}
 ```
 
 Exit non-zero -> STOP. Les globs globaux non bornes doivent etre remplaces
 par des reads bornes avant invocation dashboard. Le ledger est ecrit dans
-`workspace/output/.audit/context-budget.jsonl`.
+`console.db` (table `context_budget`, v6.10 SSoT).
 
 ---
 
-## STEP 1 — Charger le contexte minimal
+## STEP 1 — Charger le contexte minimal (v6.10 : ADRs only)
 
 Read **uniquement** :
 
-1. `.claude/rules/error-classification.md` — pour interpréter les
-   préfixes `[CLASS]` dans les rapports (visualisation par cause-racine)
-2. `.claude/templates/dashboard-readme.template.html` — squelette projet
-3. `.claude/templates/adrs-index.template.md` — squelette index ADRs
-4. `.claude/templates/qa-dashboard.template.html` — squelette QA feature
+1. `.claude/templates/adrs-index.template.md` — squelette index ADRs
 
 Glob :
 
-5. `workspace/input/specs/*.md` — liste des SPECs
-6. `workspace/output/us/*.md` — toutes les US (statuts)
-7. `workspace/output/validation/*.md` — readiness gates
-8. `workspace/output/plans/*.md` — plans dev-* (mode :plan)
-9. `workspace/output/qa/feat-*/coverage.json` — métriques coverage
-10. `workspace/output/qa/feat-*/quality.json` — métriques quality
-11. `workspace/output/qa/feat-*/api-tests.json` — résultats API gate
-12. `workspace/output/context/adrs/ADR-*.md` — tous ADRs
+2. `workspace/output/.sys/.context/adrs/ADR-*.md` — tous ADRs (extraire
+   frontmatter `Status:` + H1 titre + timestamp depuis filename)
+
+**Retiré v6.10** (les données vivent dans `workspace/output/db/console.db`,
+consultables via `python -m sdd_scripts.query_console_db feat-stats --feat N`) :
+- ~~`workspace/input/feats/*.md`~~
+- ~~`workspace/output/us/*.md`~~
+- ~~`workspace/output/.sys/.validation/*.md`~~
+- ~~`workspace/output/qa/feat-*/coverage.json|quality.json|api-tests.json`~~
+- ~~`workspace/output/.sys/.state/events.jsonl`~~
+- ~~`.claude/templates/dashboard-readme.template.html`~~
+- ~~`.claude/templates/qa-dashboard.template.html`~~
 
 ---
 
@@ -74,7 +78,7 @@ Glob :
 
 Pour chaque fichier listé en STEP 1.5-1.11 :
 
-- **US** : extraire frontmatter (`Status`, `Covers`, `Parent Spec`),
+- **US** : extraire frontmatter (`Status`, `Covers`, `Parent FEAT`),
   compter les ACs.
 - **Readiness** : extraire le verdict (`🟢 GO` / `🟡 WARN` / `🔴 NO-GO`)
   depuis le H1 ou §1 du markdown.
@@ -87,6 +91,13 @@ Pour chaque fichier listé en STEP 1.5-1.11 :
 - **ADR** : extraire H1 (titre court), `Status:` frontmatter, timestamp
   depuis filename, phase (`4-ARCH` / `5-CODE` selon position dans le
   pipeline).
+- **Plan Cache events (v6.2)** : ~~parser `events.jsonl`~~ **RETIRÉ
+  v6.10** — depuis v6.10, ces events vivent dans la table `events` de
+  `console.db` (`event_type IN ('plan_validate', 'plan_cache_evaluation',
+  'plan_cache_fallback')`). Métriques accessibles via
+  `query_console_db.py state --feat N` ou `/api/state`. L'agent
+  `dashboard` (v6.10 BREAKING) ne lit plus les events de Plan Cache —
+  ce reporting est délégué à la console web.
 
 Tolérer les fichiers absents : un projet sans QA n'a pas de
 `coverage.json`, c'est normal.
@@ -95,18 +106,13 @@ Tolérer les fichiers absents : un projet sans QA n'a pas de
 
 ## STEP 3 — Render templates
 
-### 3.1 README.html projet
+### 3.1 ~~README.html projet~~ — RETIRÉ v6.10 BREAKING
 
-Sections du template (à remplir) :
-
-```
-- Header : nom projet (depuis stack.md ## Project Config: AppName)
-- §1 SPECs : 1 ligne par spec (nom, nb US, statut readiness, statut QA)
-- §2 US : table par feature, colonnes (US, Title, Status, ACs count, Coverage)
-- §3 Quality : si quality.json présents, score global + top issues
-- §4 ADRs récents : 5 derniers par ordre chronologique inverse
-- Footer : "Generated by dashboard agent at {ISO timestamp UTC}"
-```
+> Le rendu `workspace/output/dashboard/README.html` est **retiré**
+> depuis v6.10. Les métriques (FEATs, US, Quality, ADRs récents, Plan
+> Cache) vivent dans `console.db` (24 tables) ; le rendu graphique
+> équivalent est fourni par la console web (`workspace/console/`,
+> endpoints `/api/dashboard`, `/api/feat/:n`, `/api/audit`, `/api/state`).
 
 ### 3.2 INDEX.md ADRs
 
@@ -122,21 +128,15 @@ Format strict (cf. `.claude/rules/file-ownership.md §3`) :
 
 Tri : alphabétique sur filename = chronologique (timestamp ISO).
 
-### 3.3 QA feature dashboard.html (1 fichier par feature)
+### 3.3 ~~QA feature dashboard.html (1 fichier par feature)~~ — RETIRÉ v6.10 BREAKING
 
-Pour chaque feature ayant au moins un `coverage.json` ou `quality.json`
-ou `api-tests.json` :
-
-```
-- Header : feat-{n}-{Name}
-- §1 API Gate : verdict (🟢/🟡/🔴), nb endpoints testés, échecs
-- §2 Coverage : barre % lines, % branches, vs CoverageMin
-- §3 Tests : compteur passed/failed/skipped
-- §4 Quality : top 5 issues (sévérité, fichier, ligne)
-- §5 Erreurs classifiées : si présent dans report.md, grouper par
-  préfixe [CLASS] de error-classification.md
-- Footer : "Generated by dashboard agent at {ISO timestamp UTC}"
-```
+> Le rendu `workspace/output/qa/feat-{n}/dashboard.html` est **retiré**
+> depuis v6.10. Toutes les métriques QA (API Gate, Coverage, Tests,
+> Quality, classes d'erreur) vivent dans `console.db` (tables
+> `qa_api_tests`, `qa_coverage`, `qa_quality`, `qa_security`, `qa_perf`,
+> `qa_a11y`, `qa_code_review`, `qa_spec_compliance`). Endpoints console
+> web : `/api/feat/:n` (vue agrégée) + `/api/feat/:n/details` (issues
+> Sonar-style avec drill-down).
 
 ---
 
@@ -155,16 +155,15 @@ Cette séquence évite qu'un kill agent laisse un fichier corrompu.
 
 ## STEP 5 — Output succès
 
-Émettre **1 ligne unique** :
+Émettre **1 ligne unique** (v6.10 : seul output est INDEX.md ADRs) :
 
 ```
-✅ dashboard — README.html + INDEX.md ({N} ADRs) + {K} feature dashboards refreshed
+✅ dashboard — INDEX.md ({N} ADRs) refreshed
 ```
 
 Si aucun ADR : `INDEX.md (0 ADRs, vide)`.
-Si aucune feature avec QA : `0 feature dashboards`.
 
-Sur erreur : 2 lignes max (cf. `chat-output.md`).
+Sur erreur : 2 lignes max (format ERROR/CAUSE compressé chat).
 
 ---
 

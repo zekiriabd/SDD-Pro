@@ -1,4 +1,4 @@
-# QA Report — SPEC {n}-{Name}
+# QA Report — FEAT {n}-{Name}
 
 - **Date** : {YYYY-MM-DD HH:mm}
 - **Décision globale** : {🟢 GREEN | 🟡 YELLOW | 🔴 RED}
@@ -71,7 +71,7 @@
 
 ## 3. Quality scan (sonar-like)
 
-> Détection déterministe via `quality-scan.ps1`. 0 token consommé.
+> Détection déterministe via `quality_scan.py`. 0 token consommé.
 
 ### 3.1 Résumé par catégorie
 
@@ -116,7 +116,7 @@
 
 > L'agent QA NE MODIFIE PAS le code de production. Ces recommandations
 > sont à arbitrer par le Tech Lead, qui peut les transformer en :
-> - Nouvelle SPEC / US (corrections fonctionnelles)
+> - Nouvelle FEAT / US (corrections fonctionnelles)
 > - Re-dispatch via `/dev-run {n}` (corrections de bug)
 > - Ajout d'AC (couverture insuffisante)
 

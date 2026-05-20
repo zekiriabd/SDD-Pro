@@ -1,33 +1,33 @@
-﻿# /sdd-status — Diagnostic du pipeline SDD
+# /sdd-status — Diagnostic du pipeline SDD
 
-Affiche l'état du projet SDD : SPECs présentes, US générées, mockups
+Affiche l'état du projet SDD : FEATs présentes, US générées, mockups
 HTML, code généré. **Lecture seule**, aucune écriture, aucune invocation
 d'agent.
 
 **Usage :**
-- `/sdd-status` — toutes les SPECs
-- `/sdd-status {n}` — une seule SPEC
+- `/sdd-status` — toutes les FEATs
+- `/sdd-status {n}` — une seule FEAT
 
 ---
 
-## STEP 1 — Lister les SPECs
+## STEP 1 — Lister les FEATs
 
-Glob `workspace/input/specs/*.md`. Pour chaque fichier :
+Glob `workspace/input/feats/*.md`. Pour chaque fichier :
 - extraire le préfixe numérique `{n}` avant le premier `-`
-- extraire le `{SpecName}` (suffixe après `{n}-`, sans `.md`)
+- extraire le `{FeatName}` (suffixe après `{n}-`, sans `.md`)
 
-Si argument `{n}` fourni, ne traiter que cette SPEC. Si aucune SPEC
+Si argument `{n}` fourni, ne traiter que cette FEAT. Si aucune FEAT
 trouvée → afficher :
 ```
-Aucune SPEC dans workspace/input/specs/. Lancer /spec-generate pour démarrer.
+Aucune FEAT dans workspace/input/feats/. Lancer /feat-generate pour démarrer.
 ```
 et STOP.
 
 ---
 
-## STEP 2 — Pour chaque SPEC, calculer l'état
+## STEP 2 — Pour chaque FEAT, calculer l'état
 
-Pour `{n}-{SpecName}`, exécuter en parallèle :
+Pour `{n}-{FeatName}`, exécuter en parallèle :
 
 1. **US générées** : Glob `workspace/output/us/{n}-*.md` → lister `{n}-{m}-{Name}`
 2. **Mockups HTML** : Glob `workspace/input/ui/{n}-*.html` → lister
@@ -36,9 +36,9 @@ Indexer chaque ensemble par `{n}-{m}-{Name}` (basename sans extension).
 
 ---
 
-## STEP 2.bis — État global (1 fois, indépendant des SPECs)
+## STEP 2.bis — État global (1 fois, indépendant des FEATs)
 
-Avant le détail par SPEC, calculer en parallèle :
+Avant le détail par FEAT, calculer en parallèle :
 
 - **Arch** : Glob `workspace/output/src/**/*.csproj`, `workspace/output/src/**/package.json`,
   `workspace/output/src/**/pyproject.toml`. Si au moins un fichier projet trouvé,
@@ -49,9 +49,10 @@ Avant le détail par SPEC, calculer en parallèle :
   manquent, `[CONTEXT ✗]` (Arch n'a pas tourné en v2.5+).
 - **DB schema** : Glob `workspace/output/db/schema.json`. Si présent, marquer
   `[DB ✓]` (extraire `extracted_at` pour info). Sinon, lire
-  `workspace/input/stack/stack.md` → si `DatabaseType: none` marquer `[DB —]`,
-  sinon `[DB ✗]`. Mentionner `workspace/output/db/schema.diff.md` si présent
-  (montre les changements depuis le dernier run).
+  `workspace/input/stack/stack.md` → si `## Active Database` contient
+  `DatabaseType: none` (ou bloc absent) marquer `[DB —]`, sinon `[DB ✗]`.
+  Mentionner `workspace/output/db/schema.diff.md` si présent (montre les
+  changements depuis le dernier run).
 
 ---
 
@@ -72,14 +73,14 @@ Cas d'incohérence à flagger explicitement (ligne `⚠️`) :
 ## STEP 4 — Émettre le rapport
 
 Format de sortie en arbre ASCII. Commencer par le bloc **État global**
-(arch + DB) avant les SPECs :
+(arch + DB) avant les FEATs :
 
 ```
 État global :
   [ARCH ✗]  aucun projet initialisé dans workspace/output/src/ — lancer /arch-init (ou /dev-run {n})
   [DB ✗]    DatabaseType=SqlServer mais workspace/output/db/schema.json absent — lancer /arch-init (ou /dev-run {n})
 
-SPEC 1-Layout-Menu (workspace/input/specs/1-Layout-Menu.md)
+FEAT 1-Layout-Menu (workspace/input/feats/1-Layout-Menu.md)
 ├─ US (2) :
 │  ├─ 1-1-Page-Accueil       [US ✓] [HTML —]
 │  └─ 1-2-Menu-Navigation    [US ✓] [HTML ✓]
@@ -87,14 +88,14 @@ SPEC 1-Layout-Menu (workspace/input/specs/1-Layout-Menu.md)
 └─ À faire : /dev-run 1 (lance arch + db + dev-back + dev-front en chaîne)
 ```
 
-Si tout est complet pour une SPEC (US + mockups HTML pour les US à composante UI) :
+Si tout est complet pour une FEAT (US + mockups HTML pour les US à composante UI) :
 ```
-✅ SPEC 1-Layout-Menu — planification complète (2 US, 1 mockup HTML)
+✅ FEAT 1-Layout-Menu — planification complète (2 US, 1 mockup HTML)
 ```
 
 ### 4.bis — Bloc QA (depuis SDD_Pro v3.1.0)
 
-Si `workspace/output/qa/feat-{n}/` existe, ajouter un bloc QA par SPEC :
+Si `workspace/output/qa/feat-{n}/` existe, ajouter un bloc QA par FEAT :
 
 ```
 QA :
@@ -104,18 +105,21 @@ QA :
   └─ Décision    : 🟢 GREEN
 ```
 
-Source de vérité :
-- `workspace/output/qa/feat-{n}/coverage.json` (si présent) → tests + coverage
-- `workspace/output/qa/feat-{n}/quality.json` (si présent) → quality scan
+Source de vérité (v6.10) :
+- `workspace/output/db/console.db` tables `qa_coverage` / `qa_quality` /
+  `qa_api_tests` — interrogées via :
+  ```bash
+  python .claude/python/sdd_scripts/query_console_db.py feat-stats --feat {n}
+  ```
 
-Si `workspace/output/qa/feat-{n}/` absent :
+Si la query retourne `"present": false` pour toutes les sections QA :
 ```
 QA : non exécuté (lancer /qa-generate {n})
 ```
 
 À la fin du rapport, ligne récapitulative globale :
 ```
-Total : {S} SPEC(s), {U} US, {H} mockup(s) HTML, {Q} rapport(s) QA
+Total : {S} FEAT(s), {U} US, {H} mockup(s) HTML, {Q} rapport(s) QA
 ```
 
 ---
@@ -124,7 +128,7 @@ Total : {S} SPEC(s), {U} US, {H} mockup(s) HTML, {Q} rapport(s) QA
 
 Si `[ARCH ✗]` ou `[DB ✗]` → terminer par :
 ```
-Pour matérialiser une SPEC : /dev-run {n} (arch + db + code en chaîne) ou /sdd-full {n}.
+Pour matérialiser une FEAT : /dev-run {n} (arch + db + code en chaîne) ou /sdd-full {n}.
 ```
 
 Sinon (tout le code semble en place) :

@@ -1,4 +1,8 @@
-﻿# QA Stack — Angular Jasmine + Karma + istanbul
+# QA Stack — Angular Jasmine + Karma + istanbul
+
+> §2.4 (Librairies) régénérée depuis `angular-jasmine.libs.json` — ne pas éditer manuellement (`python .claude/python/sdd_admin/sync_stack_md.py --stack-id angular-jasmine`).
+>
+> Validation: 🟡 experimental (not yet validated end-to-end in production combo)
 
 ## 1. Scope
 
@@ -26,7 +30,7 @@ Cette stack documente leur usage standard, sans migration vers Jest.
 <!-- LIBS_CATALOG_START -->
 ### 2.4 Librairies
 
-> Source de verite : `.claude/stacks/qa/angular-jasmine.libs.json`. Ne pas editer cette section manuellement -- utiliser `.claude/scripts/sync-stack-md.ps1 -StackId angular-jasmine`.
+> Source de verite : `.claude/stacks/qa/angular-jasmine.libs.json`. Ne pas editer cette section manuellement -- utiliser `python .claude/python/sdd_admin/sync_stack_md.py --stack-id angular-jasmine`.
 
 #### 2.4.a Librairies CORE (installees par arch en section 2.2.1, toujours)
 
@@ -41,7 +45,7 @@ Cette stack documente leur usage standard, sans migration vers Jest.
 
 ### 2.4.b Librairies ON-DEMAND (installees si l'US declenche)
 
-Triggers (regex case-insensitive) cherches par `detect-capabilities.ps1` dans l'US + ACs.
+Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'US + ACs.
 
 | Capability | Lib | Version | Triggers |
 |---|---|---|---|
@@ -56,7 +60,7 @@ est utile uniquement si vous installez Jasmine/Karma sur un projet existant.
 
 <!-- CORE_PACKAGES_START -->
 ```bash
-# Auto-genere depuis angular-jasmine.libs.json -- ne pas editer (utiliser sync-stack-md.ps1).
+# Auto-genere depuis angular-jasmine.libs.json -- ne pas editer (utiliser sync_stack_md.py).
 (cd workspace/output/src/{AppName} && npm install \
   jasmine-core@5.5.0 \
   @types/jasmine@5.1.4 \
@@ -124,9 +128,9 @@ workspace/output/src/{AppName}/
 │   │   ├── auth/
 │   │   │   ├── login.component.ts
 │   │   │   ├── login.component.html
-│   │   │   ├── login.component.spec.ts          # test (Jasmine)
+│   │   │   ├── login.component.FEAT.ts          # test (Jasmine)
 │   │   │   ├── auth.service.ts
-│   │   │   └── auth.service.spec.ts             # test (Jasmine)
+│   │   │   └── auth.service.FEAT.ts             # test (Jasmine)
 │   │   └── ...
 │   ├── test.ts                                   # bootstrap tests
 │   └── ...
@@ -134,7 +138,7 @@ workspace/output/src/{AppName}/
 └── karma.conf.js
 ```
 
-Convention : tests sont **adjacents** au code (`*.spec.ts`).
+Convention : tests sont **adjacents** au code (`*.FEAT.ts`).
 
 ---
 
@@ -259,14 +263,14 @@ Path :
 - `workspace/output/src/{AppName}/coverage/lcov.info`
 - `workspace/output/src/{AppName}/coverage/coverage-summary.json`
 
-Le script `parse-coverage.ps1` parse les deux. Préférence pour
+Le script `parse_coverage.py` parse les deux. Préférence pour
 lcov (plus stable cross-version).
 
 ---
 
 ## 8. Naming conventions
 
-- Fichiers : `{name}.spec.ts` (adjacent au code)
+- Fichiers : `{name}.FEAT.ts` (adjacent au code)
 - `describe` blocks : nom de la classe/component (`AuthService`, `LoginComponent`)
 - `it` blocks : `{action}_{scenario}_{expected}` (snake_case toléré)
   - Ex. : `login_with_valid_credentials_returns_token`

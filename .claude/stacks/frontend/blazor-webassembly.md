@@ -1,7 +1,10 @@
-﻿# Tech Spec: blazor (frontend)
+# Tech FEAT: blazor (frontend)
+
+> §2.4 (Librairies) régénérée depuis `blazor-webassembly.libs.json` — ne pas éditer manuellement (`python .claude/python/sdd_admin/sync_stack_md.py --stack-id blazor-webassembly`).
 
 Status: Draft
-Tech Spec ID: tech-blazor
+Validation: 🟢 reference (validated combo — dotnet-minimalapi + blazor + radzen + azure-ad)
+Tech FEAT ID: tech-blazor
 Scope: frontend uniquement (Blazor WebAssembly)
 
 ---
@@ -238,7 +241,7 @@ dotnet add workspace/output/src/{AppName}/{AppName}.csproj reference workspace/o
 
 <!-- CORE_PACKAGES_START -->
 ```bash
-# Auto-genere depuis blazor-webassembly.libs.json -- ne pas editer (utiliser sync-stack-md.ps1).
+# Auto-genere depuis blazor-webassembly.libs.json -- ne pas editer (utiliser sync_stack_md.py).
 dotnet add workspace/output/src/{AppName}/{AppName}.csproj package Microsoft.AspNetCore.Components.WebAssembly --version 10.0.6
 dotnet add workspace/output/src/{AppName}/{AppName}.csproj package Microsoft.AspNetCore.Components.WebAssembly.DevServer --version 10.0.6
 dotnet add workspace/output/src/{AppName}/{AppName}.csproj package Microsoft.AspNetCore.Components.WebAssembly.Authentication --version 10.0.6
@@ -262,7 +265,7 @@ dotnet add workspace/output/src/{AppName}/{AppName}.csproj package Microsoft.Ext
 ```bash
 # Microsoft.Authentication.WebAssembly.Msal : NON PINNE — derniere version stable
 # compatible net10. Suit les patches de securite MSAL sans intervention manuelle
-# sur le stack spec. Equivalent SPA de Microsoft.Identity.Web cote serveur.
+# sur le stack FEAT. Equivalent SPA de Microsoft.Identity.Web cote serveur.
 # (volontairement hors .libs.json -- pas de --version pour suivre les patches CVE.)
 dotnet add workspace/output/src/{AppName}/{AppName}.csproj package Microsoft.Authentication.WebAssembly.Msal
 
@@ -347,7 +350,7 @@ Codes prioritaires : CS0246, CS0103, CS1061, CS1002, CS1003, CS1513, CS0029, CS0
 <!-- LIBS_CATALOG_START -->
 ### 2.4 Librairies
 
-> Source de verite : `.claude/stacks/frontend/blazor-webassembly.libs.json`. Ne pas editer cette section manuellement -- utiliser `.claude/scripts/sync-stack-md.ps1 -StackId blazor-webassembly`.
+> Source de verite : `.claude/stacks/frontend/blazor-webassembly.libs.json`. Ne pas editer cette section manuellement -- utiliser `python .claude/python/sdd_admin/sync_stack_md.py --stack-id blazor-webassembly`.
 
 #### 2.4.a Librairies CORE (installees par arch en section 2.2.1, toujours)
 
@@ -373,7 +376,7 @@ Codes prioritaires : CS0246, CS0103, CS1061, CS1002, CS1003, CS1513, CS0029, CS0
 
 ### 2.4.b Librairies ON-DEMAND (installees si l'US declenche)
 
-Triggers (regex case-insensitive) cherches par `detect-capabilities.ps1` dans l'US + ACs.
+Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'US + ACs.
 
 | Capability | Lib | Version | Triggers |
 |---|---|---|---|

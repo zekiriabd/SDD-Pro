@@ -1,6 +1,5 @@
 {
   "permissions": {
-    "defaultMode": "acceptEdits",
     "allow": [
       "Read",
       "Glob",
@@ -28,7 +27,26 @@
       "Bash(mkdir:*)",
       "Bash(mv:*)",
       "Bash(cp:*)",
-      "Bash(rm:*)",
+      "Bash(rm workspace/*)",
+      "Bash(rm -f workspace/*)",
+      "Bash(rm -r workspace/*)",
+      "Bash(rm -rf workspace/*)",
+      "Bash(rm workspace/output/*)",
+      "Bash(rm -rf workspace/output/*)",
+      "Bash(rm -rf node_modules)",
+      "Bash(rm -rf node_modules/*)",
+      "Bash(rm -rf dist)",
+      "Bash(rm -rf dist/*)",
+      "Bash(rm -rf bin)",
+      "Bash(rm -rf bin/*)",
+      "Bash(rm -rf obj)",
+      "Bash(rm -rf obj/*)",
+      "Bash(rm -rf coverage)",
+      "Bash(rm -rf coverage/*)",
+      "Bash(rm -rf .pytest_cache)",
+      "Bash(rm -rf .pytest_cache/*)",
+      "Bash(rm -rf __pycache__)",
+      "Bash(rm -rf __pycache__/*)",
       "Bash(ls:*)",
       "Bash(cat:*)",
       "Bash(head:*)",
@@ -44,8 +62,6 @@
       "Bash(grep:*)",
       "Bash(awk:*)",
       "Bash(sed:*)",
-      "Bash(powershell:*)",
-      "Bash(pwsh:*)",
       "Bash(xxd)",
       "Bash(if:*)",
       "Bash(for:*)",
@@ -65,22 +81,43 @@
       "Bash(tee:*)",
       "Bash(xargs:*)",
       "Bash(timeout:*)",
-      "Bash(printenv:*)",
-      "PowerShell(*)"
+      "Bash(printenv:*)"
     ],
     "deny": [
       "Bash(dotnet ef migrations*)",
       "Bash(dotnet ef database update*)",
       "Bash(dotnet ef database drop*)",
       "Bash(git push*)",
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
       "Bash(rm -rf /*)",
-      "Bash(rmdir /*)"
+      "Bash(rm -rf /)",
+      "Bash(rm -rf ~)",
+      "Bash(rm -rf ~/*)",
+      "Bash(rm -rf $HOME*)",
+      "Bash(rm -rf ..)",
+      "Bash(rm -rf ../*)",
+      "Bash(rm -rf ../..)",
+      "Bash(rm -rf C:*)",
+      "Bash(rm -rf c:*)",
+      "Bash(rm -rf D:*)",
+      "Bash(rm -rf d:*)",
+      "Bash(rm -rf .claude)",
+      "Bash(rm -rf .claude/*)",
+      "Bash(rm -rf .claude/agents*)",
+      "Bash(rm -rf .claude/commands*)",
+      "Bash(rm -rf .claude/rules*)",
+      "Bash(rm -rf .claude/stacks*)",
+      "Bash(rm -rf .claude/python*)",
+      "Bash(rm -rf .git)",
+      "Bash(rm -rf .git/*)",
+      "Bash(rmdir /*)",
+      "Bash(rmdir /s*)",
+      "Bash(del /f /s /q *)",
+      "Bash(format:*)",
+      "Bash(mkfs:*)"
     ],
-    "additionalDirectories": [
-      "g:\\Templates\\New SDD\\SDD_Pro\\.claude\\agents",
-      "g:\\Templates\\New SDD\\SDD_Pro\\.claude\\stacks\\qa",
-      "G:\\Templates\\New SDD\\SDD_Pro\\output\\ui"
-    ]
+    "defaultMode": "acceptEdits"
   },
   "hooks": {
     "PreToolUse": [
@@ -89,7 +126,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File .claude/hooks/protect-framework.ps1"
+            "command": "python -c \"import os,sys,pathlib; r=os.environ.get('CLAUDE_PROJECT_DIR') or next((str(p) for p in [pathlib.Path.cwd()]+list(pathlib.Path.cwd().parents) if (p/'.claude').is_dir()),'.'); sys.path.insert(0,r+'/.claude/python'); import _hook; _hook.run('sdd_hooks.protect_framework')\""
           }
         ]
       },
@@ -98,7 +135,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File .claude/hooks/preflight-agent-budget.ps1"
+            "command": "python -c \"import os,sys,pathlib; r=os.environ.get('CLAUDE_PROJECT_DIR') or next((str(p) for p in [pathlib.Path.cwd()]+list(pathlib.Path.cwd().parents) if (p/'.claude').is_dir()),'.'); sys.path.insert(0,r+'/.claude/python'); import _hook; _hook.run('sdd_hooks.preflight_agent_budget')\""
           }
         ]
       }
@@ -109,18 +146,41 @@
         "hooks": [
           {
             "type": "command",
-            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File .claude/scripts/validate-augment-contract.ps1"
+            "command": "python -c \"import os,sys,pathlib; r=os.environ.get('CLAUDE_PROJECT_DIR') or next((str(p) for p in [pathlib.Path.cwd()]+list(pathlib.Path.cwd().parents) if (p/'.claude').is_dir()),'.'); sys.path.insert(0,r+'/.claude/python'); import _hook; _hook.run('sdd_hooks.validate_augment_contract')\""
+          }
+        ]
+      },
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -c \"import os,sys,pathlib; r=os.environ.get('CLAUDE_PROJECT_DIR') or next((str(p) for p in [pathlib.Path.cwd()]+list(pathlib.Path.cwd().parents) if (p/'.claude').is_dir()),'.'); sys.path.insert(0,r+'/.claude/python'); import _hook; _hook.run('sdd_hooks.record_token_usage')\""
           }
         ]
       }
     ],
     "SubagentStop": [
       {
-        "matcher": "dev-backend|dev-frontend|qa|dashboard",
+        "matcher": "dev-backend|dev-backend-strict|dev-frontend|dev-frontend-strict|qa|dashboard|accessibility-auditor|code-reviewer|security-reviewer|performance-auditor|spec-compliance-reviewer|constitutioner",
         "hooks": [
           {
             "type": "command",
-            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File .claude/scripts/audit-file-ownership.ps1"
+            "command": "python -c \"import os,sys,pathlib; r=os.environ.get('CLAUDE_PROJECT_DIR') or next((str(p) for p in [pathlib.Path.cwd()]+list(pathlib.Path.cwd().parents) if (p/'.claude').is_dir()),'.'); sys.path.insert(0,r+'/.claude/python'); import _hook; _hook.run('sdd_hooks.audit_file_ownership')\""
+          },
+          {
+            "type": "command",
+            "command": "python -c \"import os,sys,pathlib; r=os.environ.get('CLAUDE_PROJECT_DIR') or next((str(p) for p in [pathlib.Path.cwd()]+list(pathlib.Path.cwd().parents) if (p/'.claude').is_dir()),'.'); sys.path.insert(0,r+'/.claude/python'); import _hook; _hook.run('sdd_hooks.record_token_usage')\""
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -c \"import os,sys,pathlib; r=os.environ.get('CLAUDE_PROJECT_DIR') or next((str(p) for p in [pathlib.Path.cwd()]+list(pathlib.Path.cwd().parents) if (p/'.claude').is_dir()),'.'); sys.path.insert(0,r+'/.claude/python'); import _hook; _hook.run('sdd_admin.framework_smoke','--strict','--silent-on-pass')\""
           }
         ]
       }

@@ -1,4 +1,8 @@
-﻿# QA Stack — Vitest + Testing Library + c8
+# QA Stack — Vitest + Testing Library + c8
+
+> §2.4 (Librairies) régénérée depuis `node-vitest.libs.json` — ne pas éditer manuellement (`python .claude/python/sdd_admin/sync_stack_md.py --stack-id node-vitest`).
+>
+> Validation: 🟢 reference (validated combo CMS — kotlin-spring-boot + react + shadcn + azure-ad, 2026-05-13)
 
 ## 1. Scope
 
@@ -29,7 +33,7 @@ natif via `ng test`).
 <!-- LIBS_CATALOG_START -->
 ### 2.4 Librairies
 
-> Source de verite : `.claude/stacks/qa/node-vitest.libs.json`. Ne pas editer cette section manuellement -- utiliser `.claude/scripts/sync-stack-md.ps1 -StackId node-vitest`.
+> Source de verite : `.claude/stacks/qa/node-vitest.libs.json`. Ne pas editer cette section manuellement -- utiliser `python .claude/python/sdd_admin/sync_stack_md.py --stack-id node-vitest`.
 
 #### 2.4.a Librairies CORE (installees par arch en section 2.2.1, toujours)
 
@@ -40,7 +44,7 @@ natif via `ng test`).
 
 ### 2.4.b Librairies ON-DEMAND (installees si l'US declenche)
 
-Triggers (regex case-insensitive) cherches par `detect-capabilities.ps1` dans l'US + ACs.
+Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'US + ACs.
 
 | Capability | Lib | Version | Triggers |
 |---|---|---|---|
@@ -61,7 +65,7 @@ Si Vitest n'est pas dans `package.json` :
 
 <!-- CORE_PACKAGES_START -->
 ```bash
-# Auto-genere depuis node-vitest.libs.json -- ne pas editer (utiliser sync-stack-md.ps1).
+# Auto-genere depuis node-vitest.libs.json -- ne pas editer (utiliser sync_stack_md.py).
 (cd workspace/output/src/{BackendName} && pnpm add \
   vitest@2.1.8 \
   @vitest/coverage-v8@2.1.8)
@@ -249,7 +253,7 @@ Path :
 - `workspace/output/src/{AppName}/coverage/lcov.info`
 - `workspace/output/src/{AppName}/coverage/coverage-summary.json`
 
-Le script `parse-coverage.ps1` détecte les deux et utilise lcov par
+Le script `parse_coverage.py` détecte les deux et utilise lcov par
 défaut (plus stable cross-tool).
 
 ---

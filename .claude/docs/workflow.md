@@ -1,4 +1,4 @@
-﻿# SDD_Pro — Workflow détaillé (référence)
+# SDD_Pro — Workflow détaillé (référence)
 
 > Document chargé **à la demande** (`Read @.claude/docs/workflow.md`).
 > Pas en system prompt.
@@ -7,8 +7,8 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                   PHASE 1 — SPEC (humain)                       │
-│  /spec-generate   → workspace/input/specs/{n}-{Name}.md                   │
+│                   PHASE 1 — FEAT (humain)                       │
+│  /feat-generate   → workspace/input/feats/{n}-{Name}.md                   │
 │  [interactif, max 6 questions]                                  │
 └─────────────────────────────────────────────────────────────────┘
                               ↓
@@ -53,10 +53,10 @@
 ## 2. Flux complet
 
 ```
-PHASE 1   /spec-generate {Nom}     → workspace/input/specs/{n}-{Name}.md
-                                    + bootstrap workspace/output/context/constitution.md
+PHASE 1   /feat-generate {Nom}     → workspace/input/feats/{n}-{Name}.md
+                                    + bootstrap workspace/output/.sys/.context/constitution.md
    ↓
-PHASE 1.5 /spec-deepen {n}          → SPEC enrichie + constitution §7
+PHASE 1.5 /feat-deepen {n}          → FEAT enrichie + constitution §7
           [--quick]                   agent: elicitor
    ↓
 PHASE 2   /us-generate {n}          → workspace/output/us/{n}-{m}-*.md
@@ -66,8 +66,8 @@ PHASE 2   /us-generate {n}          → workspace/output/us/{n}-{m}-*.md
 PHASE 2.5 [humain dépose HTML]      → workspace/input/ui/{n}-{m}-*.html  (optionnel)
                                       pas d'agent — lecture directe par dev-frontend
    ↓
-PHASE 2.6 /spec-validate {n}        → workspace/output/validation/{n}-readiness.md
-                                      script: validate-readiness.ps1 (déterministe)
+PHASE 2.6 /feat-validate {n}        → workspace/output/.sys/.validation/{n}-readiness.md
+                                      script: validate_readiness.py (déterministe)
                                       (v6.0 : 100% déterministe, plus d'agent)
                                       Décision: 🟢 GO / 🟡 WARN / 🔴 NO-GO
    ↓
@@ -85,7 +85,7 @@ PHASE 4   /dev-run {n} [--force]    → workspace/output/src/.../*.cs / *.razor 
                                       agents: dev-backend, qa (api-tests), dev-frontend
 
 PHASE 5   /qa-generate {n} [--mode M]   → workspace/output/qa/feat-{n}/{report.md, coverage.json, quality.json}
-                                      agent: qa + scripts: quality-scan.ps1 + parse-coverage.ps1
+                                      agent: qa + scripts: quality_scan.py + parse_coverage.py
                                       (modes : full | tests-only | tests+coverage |
                                        quality-only | api-tests)
 ```
@@ -99,8 +99,8 @@ PHASE 5   /qa-generate {n} [--mode M]   → workspace/output/qa/feat-{n}/{report
   stable (CLAUDE.md projet présents, `db/schema.json` présent si DB,
   `stack.md` non modifié) ; puis Dev-Backend + Dev-Frontend gated
   back→API gate→front. Forcer arch via `--rebuild-arch`.
-- `/sdd-full {n}` = pipeline complet de A à Z (us-generate → spec-validate
-  → dev-plan optionnel → arch → dev-run → qa-generate). Sur SPECs
+- `/sdd-full {n}` = pipeline complet de A à Z (us-generate → FEAT-validate
+  → dev-plan optionnel → arch → dev-run → qa-generate). Sur FEATs
   ≥ 2 (ou re-runs), l'étape arch est typiquement skippée par le
   short-circuit ci-dessus.
 
@@ -120,13 +120,14 @@ PHASE 5   /qa-generate {n} [--mode M]   → workspace/output/qa/feat-{n}/{report
   (cf. `dotnet-minimalapi.md §2.6`). Pas de `/count`, `/exists` :
   total via `PagedOutput.TotalCount`, existence via 404 du GET by id.
 - **Règle frontend strict** : interdiction d'inventer une route
-  backend (cf. `responsibilities.md §12`). Avant tout client HTTP,
+  backend (classe `[FRONTEND_BACKEND_CONTRACT_GAP]`, inlinée dans
+  `agents/dev-frontend.md` §Anti-derive). Avant tout client HTTP,
   l'agent grep le code backend pour vérifier la route + verbe.
-- **Suppression de l'agent `validator`** : `/spec-validate` est désormais
-  100% déterministe via PowerShell (`validate-readiness.ps1`). Économie
+- **Suppression de l'agent `validator`** : `/feat-validate` est désormais
+  100% déterministe via Python (`validate_readiness.py`). Économie
   ~1.4M tokens par `/sdd-full`. La review sémantique (AC vagues,
   ambiguïtés cross-artefact, hypothèses implicites) est désormais à la
-  charge du PO humain lors de la relecture de la SPEC.
+  charge du PO humain lors de la relecture de la FEAT.
 - **Section §2 « Validations sémantiques » retirée** du
   `readiness.template.md` (le rapport ne contient plus que les
   validations déterministes §1 + §3 erreurs + §4 warnings).
@@ -152,14 +153,13 @@ PHASE 5   /qa-generate {n} [--mode M]   → workspace/output/qa/feat-{n}/{report
   des conventions, architecture, workflow est externalisé en
   `.claude/docs/{architecture,workflow,conventions}.md` chargés à la
   demande.
-- **Inline Rules dans dev-* agents** : `responsibilities.md` et
-  `stack-completeness.md` ne sont plus lus en STEP 3/4 ; leur substance
-  opérationnelle est inlinée dans les agents `dev-backend` et
-  `dev-frontend`. `constitution.md` et `INDEX.md` ADRs deviennent des
+- **Inline Rules dans dev-* agents** : `stack-completeness.md` n'est
+  plus lu en STEP 3/4 ; sa substance opérationnelle est inlinée dans
+  les agents `dev-backend` et `dev-frontend`. `constitution.md` et `INDEX.md` ADRs deviennent des
   reads conditionnels.
-- **Détection capabilities externalisée** : `detect-capabilities.ps1`
+- **Détection capabilities externalisée** : `detect_capabilities.py`
   (workload déterministe, ~0 token LLM).
-- **Audit log `--force`** : `workspace/output/.audit/force-bypass.log`
+- **Audit log `--force`** : `workspace/output/.sys/.audit/force-bypass.log`
   trace tout bypass de readiness.
 
 ### v4.0.0 (depuis v3.2.0)
@@ -176,10 +176,10 @@ PHASE 5   /qa-generate {n} [--mode M]   → workspace/output/qa/feat-{n}/{report
   couleurs inline).
 
 ### Hérité v3
-- **Constitution + ADRs** (P2) : `workspace/output/context/constitution.md` +
-  `workspace/output/context/adrs/` partagés par tous les agents.
-- **Implementation Readiness Gate** (P1) : `/spec-validate {n}` bloque
-  `/dev-run` en cas de SPEC trouée. Bypass via `--force`.
-- **Élicitation structurée** (P3, optionnelle) : `/spec-deepen {n}`
-  enrichit la SPEC via 5 techniques (Pre-mortem, First Principles,
+- **Constitution + ADRs** (P2) : `workspace/output/.sys/.context/constitution.md` +
+  `workspace/output/.sys/.context/adrs/` partagés par tous les agents.
+- **Implementation Readiness Gate** (P1) : `/feat-validate {n}` bloque
+  `/dev-run` en cas de FEAT trouée. Bypass via `--force`.
+- **Élicitation structurée** (P3, optionnelle) : `/feat-deepen {n}`
+  enrichit la FEAT via 5 techniques (Pre-mortem, First Principles,
   Red Team, Stakeholder Mapping, Inversion).

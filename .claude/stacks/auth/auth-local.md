@@ -1,7 +1,8 @@
-# Tech Spec: auth-local
+# Tech FEAT: auth-local
 
 Status: Draft  
-Tech Spec ID: tech-auth-local  
+Validation: 🟡 experimental (not yet validated end-to-end in production combo)  
+Tech FEAT ID: tech-auth-local  
 Scope: authentification et autorisation locale via login / password + JWT — independant de toute stack ou langage. Chaque implementation (backend, SPA, monolithe, mobile) doit appliquer ces regles selon sa technologie.
 
 ---
@@ -23,35 +24,186 @@ Scope: authentification et autorisation locale via login / password + JWT — in
   - Frontend / client : stockage securise + envoi du token
   - Monolithe : session serveur ou JWT interne
 
-- Toutes les configurations proviennent des variables d’environnement et de la configuration applicative (§2).
+- **Toutes les configurations proviennent du bloc `## Active Auth Specs`
+  de `workspace/input/stack/stack.md`** (renseigne par le Tech Lead),
+  propage par l'agent `arch` Phase A — STEP 4.5 vers les fichiers de
+  configuration applicatifs natifs du framework backend (depuis
+  2026-05-14) : `appsettings.json` section `Jwt` (.NET),
+  `application.yml` section `auth.jwt` (Spring), `config/default.json`
+  section `jwt` (Node), `app/config.py` classe `JwtSettings` (Python).
+  Cf. §2 ci-dessous.
 - Aucune logique dependante d’un framework specifique ne doit etre supposee.
 
 ---
 
-## 2. Variables d’environnement
+## 2. Variables de configuration
 
-Chargees au demarrage. L’application doit s’arreter si une variable est absente.
+**Modele depuis 2026-05-14** : les valeurs sont declarees dans le bloc
+`## Active Auth Specs` de `workspace/input/stack/stack.md` (renseigne
+par le Tech Lead). L'agent `arch` Phase A — STEP 4.5 les propage dans
+les fichiers de configuration natifs du framework backend (et lit le
+fichier en runtime pour validation). L'application **n'utilise plus
+de variables d'environnement** ; elle lit son `IConfiguration` /
+`application.yml` / `config/default.json` / `app/config.py` standard.
 
-### Variables obligatoires
+L'application doit s'arreter au boot si une cle est absente dans le
+fichier de config (fail-fast classique du framework).
+
+### Cles de configuration obligatoires (sous `## Active Auth Specs`)
 
 - AUTH_JWT_SECRET : cle secrete utilisee pour signer les tokens JWT
-- AUTH_JWT_ISSUER : emetteur du token
-- AUTH_JWT_AUDIENCE : audience du token
-- AUTH_JWT_EXPIRATION : duree de validite (en secondes ou minutes)
+  (HMAC-SHA256 minimum, **256 bits = 32 caracteres min**)
+- AUTH_JWT_ISSUER : emetteur du token (claim `iss`)
+- AUTH_JWT_AUDIENCE : audience du token (claim `aud`)
+- AUTH_JWT_EXPIRATION : duree de validite (en **minutes**, entier
+  positif ; ex. `4` = 4 minutes, `60` = 1 heure). Une valeur unique
+  par stack auth — la duree par defaut s'applique a tous les tokens
+  emis sauf override explicite documente dans le code.
 
-### Variables recommandees
+### Cles recommandees (sous `## Active Auth Specs`, optionnelles)
 
-- AUTH_HASH_ALGO : algorithme de hash (defaut : argon2id)
+- AUTH_HASH_ALGO : algorithme de hash (defaut : `argon2id`)
 - AUTH_HASH_ITERATIONS : facteur de cout (selon algo)
-- AUTH_HASH_MEMORY : memoire (argon2)
+- AUTH_HASH_MEMORY : memoire (argon2, en KB)
 - AUTH_HASH_PARALLELISM : parallelisme (argon2)
-- AUTH_SALT_LENGTH : taille du sel
+- AUTH_SALT_LENGTH : taille du sel (octets)
+
+### Exemple de bloc `## Active Auth Specs` (auth-local)
+
+```markdown
+## Active Auth Specs
+ - .claude/stacks/auth/auth-local.md
+ - AUTH_JWT_AUDIENCE:Demo
+ - AUTH_JWT_EXPIRATION:60
+ - AUTH_JWT_ISSUER:DemoBack
+ - AUTH_JWT_SECRET:DemoSuperSecretKey@2024!XYZ789AbcDef012345678
+```
 
 ### Contraintes
 
-- aucune valeur ne doit etre hardcodee
-- toutes doivent etre injectees via environnement ou config externe
-- valeurs differentes par environnement (dev/test/prod)
+- aucune valeur ne doit etre hardcodee dans le code applicatif
+- toutes proviennent du bloc `## Active Auth Specs` de stack.md
+- valeurs differentes par environnement (dev/test/prod) : le Tech
+  Lead change `stack.md` puis relance `/arch-init` (idempotent)
+- aucun `.env` projet, aucun `Environment.GetEnvironmentVariable`,
+  aucun `System.getenv`, aucun `process.env`, aucun `os.environ`
+  cote code applicatif ni cote arch (cf. `agents/arch.md §4.5.4`)
+
+### 2.1 Mapping AUTH_JWT_* → fichier de configuration par stack backend
+
+L'agent `arch` Phase A — STEP 4.5 ecrit ces sections dans le fichier
+de config natif du framework. Le code applicatif lit **exclusivement**
+via l'API standard du framework (`IConfiguration`, `@Value`, `config`
+npm, pydantic-settings).
+
+| Stack backend         | Fichier cible                                                            | Section / classe       |
+|-----------------------|--------------------------------------------------------------------------|------------------------|
+| `dotnet-minimalapi`   | `workspace/output/src/{BackendName}/appsettings.json`                    | `Jwt` (JSON object)    |
+| `kotlin-spring-boot`  | `workspace/output/src/{BackendName}/src/main/resources/application.yml`  | `auth.jwt` (YAML)      |
+| `node-express`        | `workspace/output/src/{BackendName}/config/default.json`                 | `jwt` (JSON object)    |
+| `python-fastapi`      | `workspace/output/src/{BackendName}/app/config.py`                       | `JwtSettings` (pydantic)|
+
+#### A. `dotnet-minimalapi` → `appsettings.json` section `Jwt`
+
+```json
+{
+  "Jwt": {
+    "Secret": "{AUTH_JWT_SECRET}",
+    "Issuer": "{AUTH_JWT_ISSUER}",
+    "Audience": "{AUTH_JWT_AUDIENCE}",
+    "ExpirationMinutes": {AUTH_JWT_EXPIRATION}
+  }
+}
+```
+
+Le code lit via `IConfiguration` :
+```csharp
+var jwtSection = builder.Configuration.GetSection("Jwt");
+var secret    = jwtSection["Secret"]    ?? throw new InvalidOperationException("Jwt:Secret missing in appsettings.json");
+var issuer    = jwtSection["Issuer"]    ?? throw new InvalidOperationException("Jwt:Issuer missing");
+var audience  = jwtSection["Audience"]  ?? throw new InvalidOperationException("Jwt:Audience missing");
+var expMin    = jwtSection.GetValue<int>("ExpirationMinutes");
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options => {
+        options.TokenValidationParameters = new TokenValidationParameters {
+            ValidateIssuer = true, ValidIssuer = issuer,
+            ValidateAudience = true, ValidAudience = audience,
+            ValidateLifetime = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret)),
+            ValidateIssuerSigningKey = true,
+        };
+    });
+```
+
+#### B. `kotlin-spring-boot` → `application.yml` section `auth.jwt`
+
+```yaml
+auth:
+  jwt:
+    secret: "{AUTH_JWT_SECRET}"
+    issuer: "{AUTH_JWT_ISSUER}"
+    audience: "{AUTH_JWT_AUDIENCE}"
+    expiration-minutes: {AUTH_JWT_EXPIRATION}
+```
+
+Le code lit via `@ConfigurationProperties(prefix = "auth.jwt")` ou
+`@Value("\${auth.jwt.secret}")`.
+
+#### C. `node-express` → `config/default.json` section `jwt`
+
+```json
+{
+  "jwt": {
+    "secret": "{AUTH_JWT_SECRET}",
+    "issuer": "{AUTH_JWT_ISSUER}",
+    "audience": "{AUTH_JWT_AUDIENCE}",
+    "expirationMinutes": {AUTH_JWT_EXPIRATION}
+  }
+}
+```
+
+Le code lit via `config.get("jwt.secret")` (package `config` npm,
+declare dans `node-express.libs.json`).
+
+#### D. `python-fastapi` → `app/config.py` classe `JwtSettings`
+
+```python
+from pydantic_settings import BaseSettings
+
+class JwtSettings(BaseSettings):
+    secret: str = "{AUTH_JWT_SECRET}"
+    issuer: str = "{AUTH_JWT_ISSUER}"
+    audience: str = "{AUTH_JWT_AUDIENCE}"
+    expiration_minutes: int = {AUTH_JWT_EXPIRATION}
+
+jwt_settings = JwtSettings()
+```
+
+Le code importe `from app.config import jwt_settings` et utilise
+`jwt_settings.secret`, etc.
+
+### 2.2 Cote frontend (SPA) — AUTH_JWT_* NE SONT PAS exposes
+
+**Securite critique** : `AUTH_JWT_SECRET` est une **cle de signature
+serveur** ; elle ne doit JAMAIS apparaitre dans :
+- un fichier `.env` frontend (`VITE_*`, `REACT_APP_*`, `NG_*`)
+- un fichier `appsettings.json` cote Blazor WASM (lu cote client)
+- un bundle JS livre au navigateur
+- une reponse d'endpoint `/auth/config` ou similaire
+
+Le frontend (SPA) :
+- envoie `{login, password}` a `POST /api/auth/login`
+- recoit le JWT (cookie `httpOnly` recommande, ou body JSON selon profil
+  §7.2.b)
+- attache le token aux requetes suivantes (cookie automatique OU
+  `Authorization: Bearer <token>` selon strategie de stockage)
+- **ne valide jamais la signature** du JWT cote client (lecture passive
+  du `exp` via `jwt-decode` autorisee pour pre-refresh)
+
+Le frontend n'a donc **aucun besoin** des cles `AUTH_JWT_*`. La seule
+URL backend est `VITE_API_BASE_URL` (ou equivalent), declaree dans
+`.env` frontend (cf. stack frontend actif §5).
 
 ---
 
@@ -125,10 +277,11 @@ Ce format garantit la portabilite entre :
 
 Tout composant recevant un token doit verifier :
 
-- signature valide (AUTH_JWT_SECRET)
-- issuer valide
-- audience valide
-- expiration valide
+- signature valide (cle lue dans `Jwt:Secret` / `auth.jwt.secret` /
+  `jwt.secret` / `jwt_settings.secret` selon stack — cf. §2.1)
+- issuer valide (claim `iss` == `Jwt:Issuer`)
+- audience valide (claim `aud` == `Jwt:Audience`)
+- expiration valide (claim `exp` non depasse)
 - structure JWT correcte
 
 Regles :
@@ -180,8 +333,11 @@ Le JWT contient :
 Contraintes :
 
 - aucune donnee sensible (mot de passe, hash)
-- expiration obligatoire
-- signature via AUTH_JWT_SECRET
+- expiration obligatoire (lue depuis `Jwt:ExpirationMinutes` /
+  `auth.jwt.expiration-minutes` / `jwt.expirationMinutes` /
+  `jwt_settings.expiration_minutes` selon stack)
+- signature via la cle lue dans la config (jamais hardcodee, jamais
+  lue depuis `Environment.GetEnvironmentVariable`/`process.env`/etc.)
 
 ---
 
@@ -276,7 +432,6 @@ est un **invariant de sécurité**, pas une préférence UX.
 | Stack frontend       | Layout d'auth attendu | Routing |
 |----------------------|----------------------|---------|
 | `blazor-webassembly` | `Layouts/AuthLayout.razor` (vide) | `@layout AuthLayout` en tête de page |
-| `blazor-server`      | `Pages/Shared/_AuthLayout.cshtml` | `@{ Layout = "_AuthLayout"; }` |
 | `react`              | `src/layouts/AuthLayout.tsx`     | `<Route element={<AuthLayout/>}><Route .../></Route>` |
 | `vue`                | `src/layouts/AuthLayout.vue`     | `meta: { layout: 'auth' }` ou route nested |
 | `angular`            | `src/app/layouts/auth-layout/`   | `loadChildren` ou route group |
@@ -315,8 +470,8 @@ le porte automatiquement via le cookie.
 - aucun stockage brut non protégé
 - aucun log du token (`console.log(token)`, `Console.WriteLine(jwt)`,
   `logger.info(token)` — tous interdits)
-- ajout automatique via interceptor HTTP (cf. responsibilities.md §12 et
-  conventions de chaque stack frontend)
+- ajout automatique via interceptor HTTP (cf. conventions de chaque
+  stack frontend, anti-pattern `[FRONTEND_BACKEND_CONTRACT_GAP]`)
 - aucun decodage manuel du JWT côté client (utiliser une lib comme
   `jwt-decode`, et UNIQUEMENT pour lire `exp` afin de pré-rafraîchir —
   jamais pour faire confiance au contenu, qui n'est pas vérifié côté client)

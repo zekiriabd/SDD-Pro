@@ -1,4 +1,8 @@
-﻿# QA Stack — pytest + coverage.py
+# QA Stack — pytest + coverage.py
+
+> §2.4 (Librairies) régénérée depuis `python-pytest.libs.json` — ne pas éditer manuellement (`python .claude/python/sdd_admin/sync_stack_md.py --stack-id python-pytest`).
+>
+> Validation: 🟡 experimental (not yet validated end-to-end in production combo)
 
 ## 1. Scope
 
@@ -25,7 +29,7 @@ S'applique aux projets `workspace/output/src/{BackendName}/` typés Python.
 <!-- LIBS_CATALOG_START -->
 ### 2.4 Librairies
 
-> Source de verite : `.claude/stacks/qa/python-pytest.libs.json`. Ne pas editer cette section manuellement -- utiliser `.claude/scripts/sync-stack-md.ps1 -StackId python-pytest`.
+> Source de verite : `.claude/stacks/qa/python-pytest.libs.json`. Ne pas editer cette section manuellement -- utiliser `python .claude/python/sdd_admin/sync_stack_md.py --stack-id python-pytest`.
 
 #### 2.4.a Librairies CORE (installees par arch en section 2.2.1, toujours)
 
@@ -40,7 +44,7 @@ S'applique aux projets `workspace/output/src/{BackendName}/` typés Python.
 
 ### 2.4.b Librairies ON-DEMAND (installees si l'US declenche)
 
-Triggers (regex case-insensitive) cherches par `detect-capabilities.ps1` dans l'US + ACs.
+Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'US + ACs.
 
 | Capability | Lib | Version | Triggers |
 |---|---|---|---|
@@ -53,7 +57,7 @@ Si `workspace/output/src/{BackendName}/tests/` n'existe pas :
 
 <!-- CORE_PACKAGES_START -->
 ```bash
-# Auto-genere depuis python-pytest.libs.json -- ne pas editer (utiliser sync-stack-md.ps1).
+# Auto-genere depuis python-pytest.libs.json -- ne pas editer (utiliser sync_stack_md.py).
 uv add --project workspace/output/src/{BackendName} \
   pytest==8.3.4 \
   pytest-asyncio==0.25.0 \
@@ -196,7 +200,7 @@ mypy app/
 Format : **coverage.xml** (Cobertura)
 Path : `workspace/output/src/{BackendName}/coverage.xml`
 
-Le script `parse-coverage.ps1` parse ce format via
+Le script `parse_coverage.py` parse ce format via
 `Parse-CoberturaXml`.
 
 ---

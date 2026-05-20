@@ -1,11 +1,11 @@
-﻿# /sdd-full — Pipeline complet de A à Z pour 1 SPEC
+# /sdd-full — Pipeline complet de A à Z pour 1 FEAT
 
-Enchaîne **toutes les phases** du pipeline SDD pour la SPEC `{n}` :
+Enchaîne **toutes les phases** du pipeline SDD pour la FEAT `{n}` :
 
 ```
 PHASE 2    — US generation         (agent po, via /us-generate)
 PHASE 2.5  — HTML mockups          (humain — workspace/input/ui/, pas d'agent)
-PHASE 2.6  — Readiness gate        (PowerShell déterministe v6, via /spec-validate)
+PHASE 2.6  — Readiness gate        (PowerShell déterministe v6, via /feat-validate)
 PHASE 2.7  — Plan-then-review gate (mode :plan, via /dev-plan, conditionnel)
 PHASE 3    — ARCH + DB             (agent arch, via /dev-run)
 PHASE 4    — CODE back+front       (agents dev-*, via /dev-run, parallèle)
@@ -13,7 +13,7 @@ PHASE 5    — QA + Quality          (agent qa, via /qa-generate, conditionnel)
 ```
 
 **Délégation pure** : `/sdd-full` n'invoque AUCUN agent directement —
-elle chaîne `/us-generate` → `/spec-validate` → (`/dev-plan`) →
+elle chaîne `/us-generate` → `/feat-validate` → (`/dev-plan`) →
 `/dev-run` → (`/qa-generate`).
 
 **Checkpoint humain** : un seul, au STEP 3.6 (review des plans), et
@@ -36,7 +36,7 @@ uniquement si readiness ≠ GO ou si `--plan` activé.
 /sdd-full {n} --resume                 # reprise après gate validé depuis la console
 ```
 
-> **Comportement par défaut sur SPECs ≥ 2 (depuis 2026-05-10)** :
+> **Comportement par défaut sur FEATs ≥ 2 (depuis 2026-05-10)** :
 > `/sdd-full N` (avec `N ≥ 2`) ne ré-invoque PAS l'agent arch quand
 > les artefacts de bootstrap sont stables (CLAUDE.md projet présents,
 > `schema.json` présent si DB, `stack.md` non modifié). Le pipeline
@@ -48,6 +48,16 @@ uniquement si readiness ≠ GO ou si `--plan` activé.
 **Activation projet** : `PlanReviewDefault: true` dans `## Project Config`
 de `workspace/input/stack/stack.md` rend `--plan` actif par défaut.
 
+**Chemin From-Plan Strict (v6.2, opt-in)** : `PlanCacheStrict: true` dans
+`## Project Config` active le routing strict — quand un plan v2
+strict-ready existe, `/dev-run` STEP 6.0.bis spawn les forks Sonnet 4.6
+(`dev-backend-strict`, `dev-frontend-strict`) au lieu d'Opus 4.7 (gain
+latence ×3, coût ×5 moins cher). Fallback automatique classic Opus sur
+`[PLAN_DIGEST_INSUFFICIENT]`. Recommandé d'invoquer `/sdd-full {n} --plan`
+pour garantir une phase `/dev-plan` qui produit les plans v2. Détail :
+`@.claude/docs/DESIGN-FROMPLAN-STRICT.md` et `@.claude/MIGRATION.md`
+section "v6.1.x → v6.2.0".
+
 **Gates manuels (LOT 3, depuis 2026-05-10)** : 4 points d'arrêt
 optionnels où l'humain valide via la console
 ([workspace/console/](workspace/console/)) avant que le pipeline n'enchaîne :
@@ -55,7 +65,7 @@ optionnels où l'humain valide via la console
 | Gate | Insertion | Phase status.json | Validateur attendu |
 |---|---|---|---|
 | `afterUS`        | après `/us-generate`        | `gates.{n}.afterUS`        | PO Humain |
-| `afterReadiness` | après `/spec-validate`      | `gates.{n}.afterReadiness` | PO Humain |
+| `afterReadiness` | après `/feat-validate`      | `gates.{n}.afterReadiness` | PO Humain |
 | `afterPlan`      | après `/dev-plan` (mode :plan) | `gates.{n}.afterPlan`   | Tech Lead / Architecte |
 | `afterCode`      | après `/dev-run`            | `gates.{n}.afterCode`      | Équipe (back/front) |
 
@@ -69,7 +79,7 @@ STEP 1.ter.
 
 Argument **obligatoire** : `{n}` (entier ≥ 1).
 
-Si absent → demander `Quel est le numéro de la SPEC à exécuter ? (ex. : 1)`.
+Si absent → demander `Quel est le numéro de la FEAT à exécuter ? (ex. : 1)`.
 Si non numérique → ERROR `[INVALID_ARG]`.
 
 ---
@@ -77,7 +87,7 @@ Si non numérique → ERROR `[INVALID_ARG]`.
 ## STEP 1.quart — Initialiser l'état du run (Phase 0 observability, v6.1)
 
 Cette commande émet désormais un **state.json par run** et un **event log
-JSONL** dans `workspace/output/.state/`, pour observabilité et reprise.
+JSONL** dans `workspace/output/.sys/.state/`, pour observabilité et reprise.
 Adoption progressive : un seul call de chaque primitive aux frontières de
 phase, sans réécriture de la commande.
 
@@ -88,15 +98,13 @@ Construire `$TAGS` (séparé par virgules) à partir des flags actifs :
 Exécuter via Bash :
 
 ```bash
-if command -v pwsh >/dev/null 2>&1; then PS_BIN=pwsh; else PS_BIN=powershell; fi
-RUN_ID=$($PS_BIN -NoProfile -ExecutionPolicy Bypass `
-  -File .claude/scripts/sdd-state.ps1 -Action new-run `
-  -SpecNumber {n} -Command "/sdd-full" -Tags "$TAGS")
+RUN_ID=$(python .claude/python/sdd_scripts/sdd_state.py new-run \
+  --feat-number {n} --command "/sdd-full" --tags "$TAGS")
 ```
 
 Si `--resume` actif → utiliser plutôt :
 ```bash
-RUN_ID=$($PS_BIN -File .claude/scripts/sdd-state.ps1 -Action get-run -SpecNumber {n} -Latest)
+RUN_ID=$(python .claude/python/sdd_scripts/sdd_state.py get-run --feat-number {n} --latest)
 ```
 
 Stocker `$RUN_ID` pour les appels `set-phase` ultérieurs (STEPs 3, 3.5,
@@ -104,19 +112,82 @@ Stocker `$RUN_ID` pour les appels `set-phase` ultérieurs (STEPs 3, 3.5,
 émettre un WARNING 1 ligne et continuer (non bloquant — l'observabilité
 est best-effort).
 
+---
+
+## STEP 1.tiers — Phase planner (méta-orchestrateur conditionnel, v6.4.1)
+
+Cette commande **n'invoque PAS** elle-même les agents auditor v6.3.x +
+v6.4.0 (a11y, code-review, threat-model, security-scan, perf-audit) —
+ils sont auto-invoqués depuis `/dev-run` / `/qa-generate` selon leur
+mode (cf. agent.md §Intégration pipeline). Mais `/sdd-full` peut
+émettre **dès le démarrage** un récap des phases auditor planifiées,
+utile pour l'observabilité du run et l'estimation tokens.
+
+Exécuter via Bash (best-effort, non bloquant) :
+
+```bash
+PHASE_PLAN=$(python .claude/python/sdd_scripts/phase_planner.py \
+  --feat-number {n} --json 2>/dev/null)
+```
+
+Parser le JSON et émettre 1 ligne récap :
+
+```
+FEAT {n} — auditor phases planifiées : {N_enabled}/{N_total} ({tokens_est} KB est., {tokens_saved} KB évités via skip conditionnel)
+  ✓ {phase_name} ({tokens} KB)         # pour chaque phase enabled
+  ⊘ {phase_name} : {skip_reason}       # pour chaque phase skipped
+```
+
+Si le script échoue (Python absent, parse error) → WARNING 1 ligne et
+continuer **sans plan** (les agents auditor tournent quand même selon
+leur mode Project Config — le planner est un raccourci, pas une gate).
+
+**Critique** : ce STEP n'**affecte pas** le pipeline. Les décisions
+runtime restent prises par les agents eux-mêmes via leur STEP 1.2
+(lecture Project Config). Le planner sert à :
+
+1. **Émettre un récap unifié** au démarrage (UX Tech Lead)
+2. **Détecter des incohérences précoces** (ex. CodeReviewMode=full
+   mais aucun code généré encore — early warning)
+3. **Faciliter le debugging** (Tech Lead voit pourquoi telle phase
+   n'a pas tourné via `skip_reason` lisible)
+
+State tracking :
+
+```bash
+python .claude/python/sdd_scripts/sdd_state.py set-phase \
+  --run-id $RUN_ID --phase planning --status pass \
+  --payload-json "$PHASE_PLAN"
+```
+
+(Non bloquant — emit-event si pertinent, sinon skip silencieux.)
+
+---
+
 ### Pattern à propager aux STEPs suivants
 
 À la fin de chaque phase majeure, ajouter un one-liner :
 
 ```bash
-$PS_BIN -File .claude/scripts/sdd-state.ps1 -Action set-phase `
-  -RunId $RUN_ID -Phase {phase} -Status {pass|warn|fail|skip} `
-  -PayloadJson '{"key":value}'
+python .claude/python/sdd_scripts/sdd_state.py set-phase \
+  --run-id $RUN_ID --phase {phase} --status {pass|warn|fail|skip} \
+  --payload-json '{"key":value}'
 ```
 
-Où `{phase}` ∈ { `us-generate`, `spec-validate`, `dev-plan`, `dev-run`,
-`qa-generate`, `doc-refresh` }. Payload optionnel mais recommandé
-(metrics utiles pour le dashboard futur).
+**Phases et schémas payload attendus** (cibles des references "State tracking" dans les STEPs aval) :
+
+| Phase | Status possibles | Payload-json schema |
+|---|---|---|
+| `us-generate` | pass\|fail | `{"usCount":N}` |
+| `FEAT-validate` | pass\|warn\|fail | `{"errors":E,"warnings":W,"decision":"GO|WARN|NO-GO"}` |
+| `dev-plan` | pass\|warn\|fail | `{"plansCount":N}` |
+| `arch` | pass\|fail | `{"shortCircuited":bool}` |
+| `dev-run` | pass\|warn\|fail | `{"backOk":Tb,"frontOk":Tf,"failed":F}` |
+| `qa-generate` | pass\|warn\|fail\|skip | `{"decision":"GREEN|YELLOW|RED","coverage":pct,"tests":N}` |
+| `doc-refresh` | pass\|warn | `{"htmlPages":N}` |
+
+Payload optionnel mais recommandé (metrics utiles pour le dashboard).
+Les STEPs aval référencent ce tableau via "**State tracking** : set-phase phase=X".
 
 ---
 
@@ -147,8 +218,8 @@ Cette procédure est invoquée par chaque STEP de gate (3.bis, 3.5.bis,
 
 ```
 1. Lire la décision actuelle :
-   $decision = powershell -EP Bypass -File .claude/scripts/gate-decide.ps1 \
-                          -Action read -SpecNum {n} -Phase {phase}
+   $decision = $(python .claude/python/sdd_scripts/gate_decide.py read \
+                        --feat-num {n} --phase {phase})
 
 2. Si $decision == "validated" OR "skipped" :
    → gate déjà tranché, skip silencieusement (idempotence). Ne rien afficher.
@@ -168,14 +239,14 @@ Cette procédure est invoquée par chaque STEP de gate (3.bis, 3.5.bis,
      - "Continuer sans valider"
 
    Si "Valider" :
-     - powershell -EP Bypass -File .claude/scripts/gate-decide.ps1 \
-                  -Action pose-pending -SpecNum {n} -Phase {phase}
+     - python .claude/python/sdd_scripts/gate_decide.py pose-pending \
+              --feat-num {n} --phase {phase}
      - STOP propre (même format que cas 3)
 
    Si "Continuer" :
-     - powershell -EP Bypass -File .claude/scripts/gate-decide.ps1 \
-                  -Action set -SpecNum {n} -Phase {phase} -Decision skipped \
-                  -AnsweredBy "$env:SDD_USER_EMAIL"
+     - python .claude/python/sdd_scripts/gate_decide.py set \
+              --feat-num {n} --phase {phase} --decision skipped \
+              --answered-by "$SDD_USER_EMAIL"
      - continuer le pipeline (1 ligne :
        `→ gate {phase} : continuer sans valider (skipped)`)
 ```
@@ -186,29 +257,29 @@ Cette procédure est invoquée par chaque STEP de gate (3.bis, 3.5.bis,
   manuelle" avec 3 boutons : Valider / Refuser / Continuer (LOT 2)
 - Le clic Valider POST `/api/validate` côté US/plans, mais **pas le
   gate lui-même**. Pour résoudre le gate, l'utilisateur doit cliquer le
-  bouton spécifique du bandeau qui appelle `gate-decide.ps1 -Action set
-  -Decision validated` (LOT 3 future itération via API).
+  bouton spécifique du bandeau qui appelle `gate_decide.py set
+  --decision validated` (LOT 3 future itération via API).
 
 > **Note transitoire LOT 3** : tant que le bouton bandeau "Valider et
 > continuer" n'est pas câblé sur `/api/gate-decide`, le validateur peut :
 > - éditer `workspace/console/status.json` à la main (set `gates.{n}.{phase}.decision = "validated"`)
 > - OU appeler le script en CLI :
 >   ```
->   powershell -EP Bypass -File .claude/scripts/gate-decide.ps1 \
->              -Action set -SpecNum {n} -Phase afterUS -Decision validated
+>   python .claude/python/sdd_scripts/gate_decide.py set \
+>          --feat-num {n} --phase afterUS --decision validated
 >   ```
 > Puis `/sdd-full {n} --resume`.
 
 ---
 
-## STEP 2 — Vérifier la SPEC
+## STEP 2 — Vérifier la FEAT
 
-Glob `workspace/input/specs/{n}-*.md`.
-- 0 fichier → ERROR `[SPEC_NOT_FOUND]` (créer via `/spec-generate`)
-- > 1 fichier → ERROR `[SPEC_AMBIGUOUS]` (renommer)
-- 1 fichier → OK, stocker `{SpecName}`, émettre :
+Glob `workspace/input/feats/{n}-*.md`.
+- 0 fichier → ERROR `[FEAT_NOT_FOUND]` (créer via `/feat-generate`)
+- > 1 fichier → ERROR `[FEAT_AMBIGUOUS]` (renommer)
+- 1 fichier → OK, stocker `{FeatName}`, émettre :
   ```
-  SPEC {n}-{SpecName} — pipeline complet démarré (phases 2 → 5)
+  FEAT {n}-{FeatName} — pipeline complet démarré (phases 2 → 5)
   ```
 
 ---
@@ -222,9 +293,7 @@ Exécuter intégralement `/us-generate {n}`.
 | Succès | continuer STEP 3.bis |
 | ERROR | propager + STOP |
 
-**State tracking (v6.1, optionnel)** : après l'exécution, appeler
-`set-phase -Phase us-generate -Status pass -PayloadJson '{"usCount":N}'`
-(succès) ou `-Status fail` (ERROR). Cf. STEP 1.quart pour le pattern.
+**State tracking** : set-phase phase=us-generate (schema payload cf. STEP 1.quart).
 
 ---
 
@@ -246,7 +315,7 @@ Si gate non actif → skip directement vers STEP 3.5.
 Si `--no-validate` → forcer `$readiness_decision = GO`, skip STEP 3.5
 et STEP 3.6, aller à STEP 4.
 
-Sinon, exécuter `/spec-validate {n}`. Stocker `$readiness_decision ∈
+Sinon, exécuter `/feat-validate {n}`. Stocker `$readiness_decision ∈
 {GO, WARN, NO-GO}`.
 
 **Si `readiness ∈ $ManualGates`** (LOT 3), invoquer la procédure GATE
@@ -266,14 +335,14 @@ via `/sdd-full {n} --resume` après validation.
 | WARN  | -       | présent | présent | → STEP 4 directement (escape hatch) |
 | NO-GO | -       | absent | -    | **STOP** |
 | NO-GO | -       | présent | -   | → STEP 3.6 (plan-review assumé) |
-| ERROR `/spec-validate` | -      | -      | -    | propager + STOP |
+| ERROR `/feat-validate` | -      | -      | -    | propager + STOP |
 
 ### Format STOP sur WARN/NO-GO
 
 ```
-{🟡|🔴} /sdd-full {n} — bloqué par /spec-validate ({WARN non assumé | NO-GO})
+{🟡|🔴} /sdd-full {n} — bloqué par /feat-validate ({WARN non assumé | NO-GO})
 
-Rapport : workspace/output/validation/{n}-readiness.md ({W} warnings, {E} errors)
+Rapport : workspace/output/.sys/.validation/{n}-readiness.md ({W} warnings, {E} errors)
 
 Pour débloquer (au choix) :
   - corriger les {warnings|erreurs} listé(e)s dans le rapport §{2|3}
@@ -284,7 +353,7 @@ Pour débloquer (au choix) :
     → continue sans plan-review
 ```
 
-**State tracking (v6.1)** : `set-phase -Phase spec-validate -Status {pass|warn|fail} -PayloadJson '{"errors":E,"warnings":W,"decision":"GO|WARN|NO-GO"}'`.
+**State tracking** : set-phase phase=FEAT-validate (schema payload cf. STEP 1.quart).
 
 ---
 
@@ -317,7 +386,7 @@ FIX: invoquer /dev-plan {n} avant /dev-run {n}, puis review (ok|stop|retry)
 ### 3.6.a — Idempotence
 
 Glob `workspace/output/plans/{n}-*-*.{back,front}.md`.
-- ≥ 1 plan existe ET son mtime > mtime de `workspace/output/validation/{n}-readiness.md`
+- ≥ 1 plan existe ET son mtime > mtime de `workspace/output/.sys/.validation/{n}-readiness.md`
   → plans considérés "déjà reviewés", aller directement à 3.6.c
 - Sinon → 3.6.b
 
@@ -347,7 +416,7 @@ Glob `workspace/output/plans/{n}-*-*.{back,front}.md`.
   ```
   🟡 /sdd-full {n} — readiness {GO|WARN|NO-GO}, plans à relire
 
-  Rapport readiness : workspace/output/validation/{n}-readiness.md ({W} warnings)
+  Rapport readiness : workspace/output/.sys/.validation/{n}-readiness.md ({W} warnings)
   Plans :
     - workspace/output/plans/{n}-1-{Name}.back.md
     - workspace/output/plans/{n}-1-{Name}.front.md
@@ -378,12 +447,12 @@ Glob `workspace/output/plans/{n}-*-*.{back,front}.md`.
 **Déclencheur** : si `--force` a été passé sur cette invocation
 (quel que soit le verdict readiness — WARN ou NO-GO).
 
-**Action** : append 1 ligne dans `workspace/output/.audit/force-bypass.log`
+**Action** : append 1 ligne dans `workspace/output/.sys/.audit/force-bypass.log`
 (crée le fichier si absent) :
 
 ```bash
-mkdir -p workspace/output/.audit
-echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) /sdd-full {n}-{SpecName} --force readiness={WARN|NO-GO} {W} warnings {E} errors --no-plan-on-warn={true|false}" >> workspace/output/.audit/force-bypass.log
+mkdir -p workspace/output/.sys/.audit
+echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) /sdd-full {n}-{FeatName} --force readiness={WARN|NO-GO} {W} warnings {E} errors --no-plan-on-warn={true|false}" >> workspace/output/.sys/.audit/force-bypass.log
 ```
 
 **Pourquoi** : le bypass `--force` est légitime mais doit être
@@ -392,7 +461,7 @@ usage, append-only. Préservé sur toute purge manuelle de `workspace/output/`.
 
 Le récap STEP 5 mentionne la présence du log :
 ```
-Bypass force assumé : oui (cf. workspace/output/.audit/force-bypass.log ligne {N})
+Bypass force assumé : oui (cf. workspace/output/.sys/.audit/force-bypass.log ligne {N})
 ```
 
 Skip silencieusement si pas de `--force`.
@@ -401,9 +470,9 @@ Skip silencieusement si pas de `--force`.
 
 ## STEP 4 — Phase exécution (`/dev-run {n}`)
 
-Exécuter intégralement `/dev-run {n}` (validation env vars →
-short-circuit arch ou bootstrap+DB → dev-backend + dev-frontend
-gated/parallèles bornés).
+Exécuter intégralement `/dev-run {n}` (validation blocs `## Active
+Database` / `## Active Auth Specs` de stack.md → short-circuit arch
+ou bootstrap+DB → dev-backend + dev-frontend gated/parallèles bornés).
 
 **Propagation des flags** : si `/sdd-full` a reçu `--rebuild-arch`,
 passer le flag à `/dev-run` :
@@ -416,11 +485,11 @@ son STEP 4.bis si arch est requis.
 | Sortie | Action |
 |---|---|
 | Succès | → STEP 4.bis |
-| ERROR env vars | propager + STOP (planification reste intacte) |
+| ERROR clés stack.md manquantes | propager + STOP (planification reste intacte) |
 | ERROR arch | propager + STOP |
 | Échecs partiels phase 4 | listés par `/dev-run`, → STEP 4.bis |
 
-**State tracking (v6.1)** : `set-phase -Phase dev-run -Status {pass|warn|fail} -PayloadJson '{"backOk":Tb,"frontOk":Tf,"failed":F}'`. Si arch a tourné, ajouter aussi `set-phase -Phase arch -Status pass` avant.
+**State tracking** : set-phase phase=dev-run (schema payload cf. STEP 1.quart). Si arch a tourné, ajouter aussi set-phase phase=arch en amont.
 
 ---
 
@@ -451,25 +520,63 @@ Lire `QAMode` dans `## Project Config` (default `manual`).
 `/qa-generate` n'est jamais bloquant pour `/sdd-full`. GREEN/YELLOW/RED
 sont propagés au récap STEP 5.
 
-**State tracking (v6.1)** : `set-phase -Phase qa-generate -Status {pass|warn|fail|skip} -PayloadJson '{"decision":"GREEN|YELLOW|RED","coverage":pct,"tests":N}'`. Status `skip` si `QAMode ∈ {off, manual}`.
+**State tracking** : set-phase phase=qa-generate (schema payload cf. STEP 1.quart). Status `skip` si `QAMode ∈ {off, manual}`.
 
 ---
 
-## STEP 4.7 — Refresh dashboards (auto, depuis 2026-05-08)
+## STEP 4.7 — Refresh INDEX ADRs (auto, depuis 2026-05-08 ; réduit en v6.10)
+
+> **v6.10 BREAKING** — les rendus HTML (`dashboard/README.html`,
+> `qa/feat-{n}/dashboard.html`) sont **retirés**. Les métriques vivent
+> dans `workspace/output/db/console.db` (SQLite SSoT) et le rendu
+> graphique est délégué à un consommateur externe (console web
+> `workspace/console/`, BI tool, script). Cf. `agents/dashboard.md §STEP 0`
+> et `loader.yml §dashboard`.
 
 Invoquer **systématiquement** `Agent: dashboard` (Haiku 4.5) en
-fin de pipeline pour régénérer :
+fin de pipeline pour régénérer **un seul fichier** :
 
-- `workspace/output/dashboard/README.html`
-- `workspace/output/context/adrs/INDEX.md`
-- `workspace/output/qa/feat-{n}/dashboard.html` (si artefacts QA présents)
+- `workspace/output/.sys/.context/adrs/INDEX.md` — table-des-matières
+  chronologique des ADRs
 
-Coût : ~quelques k tokens (Haiku), latence ~2-5 s. Non bloquant : sur
-échec, émettre WARNING (non-bloquant) et continuer vers STEP 5. Le
-dashboard est un artefact de visualisation, pas une dépendance
-fonctionnelle du pipeline.
+Coût : ~1-2 k tokens (Haiku), latence < 2 s. Non bloquant : sur échec,
+émettre WARNING et continuer vers STEP 5. L'INDEX ADRs est un artefact
+de navigation, pas une dépendance fonctionnelle du pipeline.
 
-**State tracking (v6.1)** : `set-phase -Phase doc-refresh -Status {pass|warn} -PayloadJson '{"htmlPages":N}'`.
+**State tracking** : set-phase phase=doc-refresh (schema payload cf. STEP 1.quart).
+
+---
+
+## STEP 4.8 — Audit qualité consolidé `/sdd-review` (depuis v6.11.0)
+
+Lire `ReviewMode` dans `## Project Config` (default `full` depuis v6.11.0
+— passe à `manual` pour bypass).
+
+| `ReviewMode` | Action |
+|---|---|
+| `off` | skip silencieusement |
+| `manual` | skip (l'utilisateur lance `/sdd-review {n}` manuellement) |
+| `read-only` | `/sdd-review {n} --skip-scans` (lecture DB seule, pas de re-scan) |
+| `full` (défaut) | `/sdd-review {n}` complet (re-scan quality + agrégation + arch-reviewer si `ArchReviewMode=full`) |
+
+Le pipeline `/sdd-review` :
+1. Re-run [`quality_scan.py`](.claude/python/sdd_scripts/quality_scan.py) (refresh `qa_quality`)
+2. Spawn `arch-reviewer` agent si `ArchReviewMode: full` (Pattern + Layers + ADRs → `qa_code_review` avec `[ARCH_*]`)
+3. Read DB (qa_quality + qa_code_review + qa_security + qa_a11y + qa_performance + qa_spec_compliance)
+4. Triage par owner (backend / frontend / shared / unknown) via [`triage_issues.py`](.claude/python/sdd_scripts/triage_issues.py)
+5. Compute verdict 🟢/🟡/🔴 contre `ReviewFailOn`
+6. Persist `validation_reports(report_type='review')` + emit `workspace/output/qa/feat-{n}/review.md`
+
+**Comportement bloquant** :
+- `ReviewFailOnSddFull: true` dans Project Config (défaut `false`) + verdict
+  RED → STOP `/sdd-full` avant STEP 5, exit code propagation.
+- Sinon → continue vers STEP 5, le verdict est inclus dans le récap.
+
+**State tracking** : set-phase phase=sdd-review (schema payload cf. STEP 1.quart).
+Status `skip` si `ReviewMode ∈ {off, manual}`.
+
+Coût marginal : ~30 s (re-scan déterministe) + ~10-18 KB tokens si
+`ArchReviewMode: full` (Sonnet 4.6).
 
 ---
 
@@ -479,18 +586,19 @@ fonctionnelle du pipeline.
 
 ```bash
 FINAL_STATUS={success|partial|failed}   # success si tout 🟢, partial si ≥1 WARN/SKIP, failed si ERROR
-$PS_BIN -File .claude/scripts/sdd-state.ps1 -Action end-run `
-  -RunId $RUN_ID -Status $FINAL_STATUS
+python .claude/python/sdd_scripts/sdd_state.py end-run \
+  --run-id $RUN_ID --status $FINAL_STATUS
 ```
 
 Le récap textuel ci-dessous peut ajouter une ligne `Run trace : $RUN_ID`
-en pied (utile pour `--resume` futur ou pour ouvrir
-`workspace/output/.state/events.jsonl` à des fins de diagnostic).
+en pied (utile pour `--resume` futur ou pour requêter
+`workspace/output/db/console.db` table `events` à des fins de
+diagnostic — v6.10 : `SELECT * FROM events WHERE run_id = $RUN_ID`).
 
 Émettre **un seul bloc final** :
 
 ```
-✅ /sdd-full {n}-{SpecName} — pipeline complet terminé
+✅ /sdd-full {n}-{FeatName} — pipeline complet terminé
 
 PLANIFICATION (phases 2-2.7) :
   US               : {U} fichiers
@@ -511,6 +619,15 @@ QA (phase 5) :
   Quality          : {qa_errors} errors / {qa_warnings} warnings
   Décision         : {🟢 GREEN | 🟡 YELLOW | 🔴 RED}
 
+Audit qualité consolidé /sdd-review (phase 4.8) :
+  {Si off/manual : "skipped ({raison})"}
+  Sources agrégées : {S} (quality, code-review, security, a11y, perf, spec, arch)
+  Findings total   : {N} ({T} ≥ {ReviewFailOn})
+  Triage owner     : backend={B} · frontend={F} · shared={Sh} · unknown={U}
+  Top class        : {top_class_1} ({n1}), {top_class_2} ({n2}), …
+  Verdict          : {🟢 GREEN | 🟡 YELLOW | 🔴 RED}
+  Rapport          : workspace/output/qa/feat-{n}/review.md
+
 Échecs (phase 4) — si présents :
   - dev-{backend|frontend} {n}-{m}-{Name} : {raison condensée}
 
@@ -522,7 +639,7 @@ Prochaine étape :
 
 Si succès complet sans accroc :
 ```
-✅ /sdd-full {n}-{SpecName} — {U} US, {H} mockups HTML, code dans workspace/output/src/
+✅ /sdd-full {n}-{FeatName} — {U} US, {H} mockups HTML, code dans workspace/output/src/
 ```
 
 ---

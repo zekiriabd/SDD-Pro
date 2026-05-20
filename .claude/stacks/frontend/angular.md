@@ -1,7 +1,10 @@
-﻿# Tech Spec: angular (frontend)
+# Tech FEAT: angular (frontend)
+
+> §2.4 (Librairies) régénérée depuis `angular.libs.json` — ne pas éditer manuellement (`python .claude/python/sdd_admin/sync_stack_md.py --stack-id angular`).
 
 Status: Draft  
-Tech Spec ID: tech-angular  
+Validation: 🟡 experimental (not yet validated end-to-end in production combo)  
+Tech FEAT ID: tech-angular  
 Scope: frontend uniquement (Angular SPA)
 
 ---
@@ -134,7 +137,7 @@ fi
 
 <!-- CORE_PACKAGES_START -->
 ```bash
-# Auto-genere depuis angular.libs.json -- ne pas editer (utiliser sync-stack-md.ps1).
+# Auto-genere depuis angular.libs.json -- ne pas editer (utiliser sync_stack_md.py).
 (cd workspace/output/src/{AppName} && npm install \
   @angular/core@19.0.5 \
   @angular/common@19.0.5 \
@@ -203,7 +206,7 @@ Codes prioritaires :
 <!-- LIBS_CATALOG_START -->
 ### 2.4 Librairies
 
-> Source de verite : `.claude/stacks/frontend/angular.libs.json`. Ne pas editer cette section manuellement -- utiliser `.claude/scripts/sync-stack-md.ps1 -StackId angular`.
+> Source de verite : `.claude/stacks/frontend/angular.libs.json`. Ne pas editer cette section manuellement -- utiliser `python .claude/python/sdd_admin/sync_stack_md.py --stack-id angular`.
 
 #### 2.4.a Librairies CORE (installees par arch en section 2.2.1, toujours)
 
@@ -238,7 +241,7 @@ Codes prioritaires :
 
 ### 2.4.b Librairies ON-DEMAND (installees si l'US declenche)
 
-Triggers (regex case-insensitive) cherches par `detect-capabilities.ps1` dans l'US + ACs.
+Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'US + ACs.
 
 | Capability | Lib | Version | Triggers |
 |---|---|---|---|
@@ -620,4 +623,4 @@ ng build
 
 ---
 
-# FIN SPEC
+# FIN FEAT

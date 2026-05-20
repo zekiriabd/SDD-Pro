@@ -1,0 +1,80 @@
+{
+  "$schema": "../../templates/libs-catalog.schema.json",
+  "stackId": "nuxt",
+  "category": "fullstack",
+  "schemaVersion": 1,
+  "buildSystem": "npm",
+  "manifest": {
+    "files": [
+      "workspace/output/src/{AppName}/package.json",
+      "workspace/output/src/{AppName}/nuxt.config.ts",
+      "workspace/output/src/{AppName}/tsconfig.json"
+    ]
+  },
+  "metadata": {
+    "platforms": ["node-22"],
+    "framework": "Nuxt 3 + Nitro engine + Vue 3.5",
+    "workflow": "single-project-ssr-universal",
+    "notes": "Auto-import (components, composables, server/utils). Deployable serverless via Nitro presets (Vercel, Netlify, Cloudflare)."
+  },
+  "versions": {
+    "nuxt": "3.15.0",
+    "vue": "3.5.13",
+    "vuetify": "3.7.5",
+    "vuetify-nuxt-module": "0.18.6",
+    "typescript": "5.7.0",
+    "zod": "3.24.0",
+    "vee-validate": "4.14.7",
+    "veevalidate-zod": "4.14.7",
+    "pinia": "2.3.0",
+    "pinia-nuxt": "0.9.0",
+    "nuxt-auth": "0.10.0",
+    "nuxt-i18n": "9.1.0",
+    "nuxt-eslint": "0.7.4",
+    "pino": "9.5.0",
+    "pino-pretty": "13.0.0",
+    "prisma": "6.1.0",
+    "prisma-client": "6.1.0",
+    "nuxt-tailwind": "6.13.0",
+    "nuxt-ui": "3.0.0-alpha.10",
+    "msal-node": "3.1.0",
+    "ofetch": "1.4.1",
+    "exceljs": "4.4.0",
+    "pdfkit": "0.15.2",
+    "nodemailer": "6.9.16",
+    "vueuse": "12.0.0",
+    "nuxt-security": "2.0.0",
+    "nuxt-gtag": "3.0.0"
+  },
+  "core": [
+    { "module": "nuxt", "ref": "nuxt", "rationale": "Framework SSR + Nitro" },
+    { "module": "vue", "ref": "vue" },
+    { "module": "vuetify", "ref": "vuetify", "rationale": "Design System defaut" },
+    { "module": "vuetify-nuxt-module", "ref": "vuetify-nuxt-module", "rationale": "Integration Nuxt + Vuetify SSR-ready" },
+    { "module": "typescript", "ref": "typescript" },
+    { "module": "zod", "ref": "zod", "rationale": "Validation schemas" },
+    { "module": "vee-validate", "ref": "vee-validate", "rationale": "Forms validation Vue-idiomatic" },
+    { "module": "@vee-validate/zod", "ref": "veevalidate-zod" },
+    { "module": "pinia", "ref": "pinia", "rationale": "State store client" },
+    { "module": "@pinia/nuxt", "ref": "pinia-nuxt" },
+    { "module": "@sidebase/nuxt-auth", "ref": "nuxt-auth", "rationale": "Auth (NextAuth-like pour Nuxt)" },
+    { "module": "@nuxtjs/i18n", "ref": "nuxt-i18n" },
+    { "module": "@nuxt/eslint", "ref": "nuxt-eslint" },
+    { "module": "pino", "ref": "pino" },
+    { "module": "pino-pretty", "ref": "pino-pretty" }
+  ],
+  "onDemand": [
+    { "module": "prisma", "ref": "prisma", "capability": "prisma", "triggers": ["DatabaseType.*\\b(SqlServer|PostgreSql|MySql|Sqlite)\\b", "orm", "db-first"] },
+    { "module": "@prisma/client", "ref": "prisma-client", "capability": "prisma", "triggers": ["prisma", "orm"] },
+    { "module": "@nuxtjs/tailwindcss", "ref": "nuxt-tailwind", "capability": "tailwind", "triggers": ["tailwind", "atomic.*css"] },
+    { "module": "@nuxt/ui", "ref": "nuxt-ui", "capability": "nuxt-ui", "triggers": ["nuxt-ui", "ui-kit-nuxt"], "alternative": true },
+    { "module": "@azure/msal-node", "ref": "msal-node", "capability": "auth-azure-ad", "triggers": ["auth-azure-ad", "msal"] },
+    { "module": "ofetch", "ref": "ofetch", "capability": "http-client", "triggers": ["appel.*api.*externe"] },
+    { "module": "exceljs", "ref": "exceljs", "capability": "excel", "triggers": ["\\bexcel\\b", "\\.xlsx\\b", "export.*excel"] },
+    { "module": "pdfkit", "ref": "pdfkit", "capability": "pdf", "triggers": ["\\bpdf\\b", "export.*pdf"] },
+    { "module": "nodemailer", "ref": "nodemailer", "capability": "smtp", "triggers": ["email", "smtp"] },
+    { "module": "@vueuse/core", "ref": "vueuse", "capability": "date-utils", "triggers": ["date", "time", "utils.*reactive"] },
+    { "module": "nuxt-security", "ref": "nuxt-security", "capability": "security-headers", "triggers": ["csp", "security.*headers", "helmet"] },
+    { "module": "nuxt-gtag", "ref": "nuxt-gtag", "capability": "analytics", "triggers": ["analytics", "google.*tag"] }
+  ]
+}

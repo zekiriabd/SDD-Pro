@@ -1,3 +1,0 @@
-2026-05-07T17:28:32Z /dev-run 1-pvlist API Gate SKIPPED reason='qa subagent_type not registered in harness' fallback=legacy-parallel
-2026-05-07T17:38:47Z /sdd-full 1-pvlist QA Phase 5 SKIPPED reason='qa subagent_type not registered in harness' QAMode=full
-2026-05-07T21:12:21Z /dev-run 1-pvlist API Gate skipped (qa agent not registered) - legacy mode applied for 6c frontend

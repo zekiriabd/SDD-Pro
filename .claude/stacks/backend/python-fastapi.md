@@ -1,77 +1,68 @@
-﻿# Tech Spec: fastapi (backend)
+# Tech FEAT: fastapi (backend)
+
+> §2.4 (Librairies) régénérée depuis `python-fastapi.libs.json` — ne pas éditer manuellement (`python .claude/python/sdd_admin/sync_stack_md.py --stack-id python-fastapi`).
 
 Status: Stable
-Tech Spec ID: tech-fastapi
+Validation: 🟡 experimental (spec stable, not yet validated end-to-end in production combo)
+Tech FEAT ID: tech-fastapi
 Scope: backend uniquement (API REST async, logique métier, persistance)
 
 ---
 
 ## 1. Architecture
 
-### 1.1 Pattern applicatif
+> **Pattern d'architecture** : ce stack suit l'**architecture canonique** définie dans
+> `.claude/stacks/archi/{ArchiPattern}.md` (défaut `MVC` si `## Active Architecture Pattern`
+> absent du `stack.md`). Section §1 ci-dessous ne décrit QUE les overrides Python/FastAPI-specific.
 
-FastAPI 0.115 + Pydantic v2 + SQLAlchemy 2.x async, séparation stricte :
+### 1.1 Pattern applicatif (Python/FastAPI idioms)
 
-```
-Endpoint → Service (via Depends) → Entity → Mapper → DTO → ApiResponse[T]
-```
+Pour `ArchiPattern: MVC` (défaut), suit `archi/mvc.md` avec idioms FastAPI 0.115 + Pydantic v2 + SQLAlchemy 2.x async :
+- **Endpoint** = `APIRouter` FastAPI avec route decorators (`@router.get`, `@router.post`)
+- **Validation Pydantic** auto sur Input DTOs (FastAPI parse + valide automatiquement le body)
+- **Service interface** = classe abstraite `abc.ABC` dans `services/interfaces/` — convention `IXxxService` (préfixe `I` non-Python idiomatique, mais consistant cross-stack SDD_Pro)
+- **Service impl** = classe concrète injectée via FastAPI `Depends()`
+- **DTO** = `pydantic.BaseModel` avec `model_config = ConfigDict(frozen=True)` (immuables)
+- **Entity** = SQLAlchemy 2.x `DeclarativeBase` (Database-First scaffolding via `sqlacodegen` ou Alembic introspection)
+- **DB Session** = `AsyncSession` SQLAlchemy via `async_sessionmaker()` + `Depends(get_db)` (FastAPI dependency)
+- **ProblemDetails** RFC 7807 via middleware FastAPI custom
 
-Le wrapper `ApiResponse[T]` porte les métriques (`query_time`,
-`mapping_time`) et est défini dans la librairie partagée `{LibName}`.
+Pour `ArchiPattern: DDD` → voir `archi/ddd.md` (Aggregates + UseCases via pattern manuel).
+Pour `ArchiPattern: microservice` → voir `archi/microservice.md` (httpx + tenacity + OpenTelemetry).
 
-### 1.2 Couches
+### 1.3 Mapping couche → répertoire (override Python)
 
-- **Endpoint (Router)** : `APIRouter` FastAPI, validation auto via
-  Pydantic, aucune logique métier
-- **Service (interface)** : classe abstraite (`abc.ABC`) dans
-  `services/interfaces/`
-- **Service (impl)** : classe concrète injectée via `Depends()`
-- **Mapper** : fonctions ou classes statiques dans `mappers/`
-- **DTO** : `pydantic.BaseModel` immuable (`model_config = ConfigDict(frozen=True)`)
-- **Entity** : modèles ORM SQLAlchemy 2.x Declarative (`DeclarativeBase`)
-- **DB Session** : `AsyncSession` SQLAlchemy via `Depends(get_db)`
-- **Exception handler** : middleware global qui transforme toute
-  exception en `ProblemDetails` (RFC 7807 via `fastapi.responses`)
+| Couche canonique (archi/mvc.md §3) | Path Python-specific |
+|---|---|
+| App entry | `workspace/output/src/{BackendName}/main.py` (FastAPI app + routers mount) |
+| Config | `workspace/output/src/{BackendName}/config.py` (Pydantic Settings, depuis 2026-05-14) |
+| Endpoint (APIRouter) | `workspace/output/src/{BackendName}/endpoints/` |
+| Service interface | `workspace/output/src/{BackendName}/services/interfaces/` (abc.ABC) |
+| Service impl | `workspace/output/src/{BackendName}/services/` |
+| Mapper | `workspace/output/src/{BackendName}/mappers/` (fonctions ou classes statiques) |
+| Entity (SQLAlchemy) | `workspace/output/src/{BackendName}/entities/` |
+| DB Session config | `workspace/output/src/{BackendName}/entities/db/` |
+| Middleware | `workspace/output/src/{BackendName}/middleware/` |
+| Resources i18n | `workspace/output/src/{BackendName}/resources/` (`.po`/`.mo`) |
+| Migrations Alembic | `workspace/output/src/{BackendName}/alembic/` |
+| Input DTO | `workspace/output/src/{LibName}/inputs/` (Pydantic) |
+| Output DTO | `workspace/output/src/{LibName}/outputs/` |
+| Model DTO | `workspace/output/src/{LibName}/models/` |
+| Project file | `workspace/output/src/{BackendName}/pyproject.toml` |
 
-### 1.3 Mapping couche → répertoire
+### 1.4 Override principes (Python-specific)
 
-```
-workspace/output/src/{BackendName}/
-├── pyproject.toml
-├── main.py                                       # FastAPI app + routers
-├── config.py                                     # settings Pydantic
-├── endpoints/                                    # APIRouters
-├── services/
-│   ├── interfaces/                               # abstract base classes
-│   └── ...                                       # implementations
-├── mappers/                                      # entity ↔ dto
-├── entities/                                     # SQLAlchemy ORM models
-│   └── db/                                       # DB session + base
-├── middleware/                                   # custom middleware
-├── resources/                                    # i18n .po/.mo files
-├── alembic/                                      # migrations Alembic
-└── tests/                                        # cf. qa/python-pytest.md
-
-workspace/output/src/{LibName}/
-├── inputs/                                       # Input DTOs Pydantic
-├── outputs/                                      # Output DTOs Pydantic
-└── models/                                       # Models partagés
-```
-
-### 1.4 Principes non négociables
-
-- **Type hints** partout (Python 3.12 + `from __future__ import annotations`)
-- Aucune logique métier dans Endpoints ni Entities
-- Mapping centralisé dans `mappers/`
-- DI systématique via `Depends`
-- Async/await pour I/O (DB, HTTP) — jamais bloquant
-- ORM SQLAlchemy 2.x style (pas de legacy 1.x `query()`)
-- DTOs Pydantic immuables (`frozen=True`)
-- Exception handling centralisé (middleware) — pas de `try/except`
-  HTTP dans Endpoints/Services
-- Migrations DB via **Alembic** uniquement
-- Pas de `print()` — utiliser **structlog**
-- Fail-fast au démarrage si env vars manquantes
+Hérités de `archi/mvc.md §4`. **Ajouts** Python :
+- **Type hints partout** (Python 3.12+, `from __future__ import annotations` en tête de fichier)
+- **Pydantic v2** pour DTOs (`BaseModel` + `model_config = ConfigDict(frozen=True)`)
+- **SQLAlchemy 2.x style** uniquement (pas de legacy 1.x `query()` — utiliser `select()` + `await session.execute()`)
+- **`async def`** partout pour I/O (DB, HTTP) — jamais bloquant
+- **DI via `Depends`** FastAPI uniquement — pas de Service Locator
+- **Migrations DB via Alembic** (pas de `Base.metadata.create_all()` en prod — Database-First)
+- **`structlog`** pour logging structuré — pas de `print()`, pas de `logging.info()` brut
+- **Fail-fast au démarrage** si env vars manquantes (Pydantic Settings raise validation error)
+- **Pas de mutable default args** (anti-pattern Python classique)
+- **`Optional[T]`** explicite (ou `T | None` Python 3.10+) — pas de `None` implicite
 
 ---
 
@@ -142,7 +133,7 @@ source .venv/bin/activate 2>/dev/null || .venv\\Scripts\\activate
 
 <!-- CORE_PACKAGES_START -->
 ```bash
-# Auto-genere depuis python-fastapi.libs.json -- ne pas editer (utiliser sync-stack-md.ps1).
+# Auto-genere depuis python-fastapi.libs.json -- ne pas editer (utiliser sync_stack_md.py).
 uv add --project workspace/output/src/{BackendName} \
   fastapi==0.115.5 \
   uvicorn[standard]==0.32.1 \
@@ -239,7 +230,7 @@ Erreurs ruff/mypy :
 <!-- LIBS_CATALOG_START -->
 ### 2.4 Librairies
 
-> Source de verite : `.claude/stacks/backend/python-fastapi.libs.json`. Ne pas editer cette section manuellement -- utiliser `.claude/scripts/sync-stack-md.ps1 -StackId python-fastapi`.
+> Source de verite : `.claude/stacks/backend/python-fastapi.libs.json`. Ne pas editer cette section manuellement -- utiliser `python .claude/python/sdd_admin/sync_stack_md.py --stack-id python-fastapi`.
 
 #### 2.4.a Librairies CORE (installees par arch en section 2.2.1, toujours)
 
@@ -265,7 +256,7 @@ Erreurs ruff/mypy :
 
 ### 2.4.b Librairies ON-DEMAND (installees si l'US declenche)
 
-Triggers (regex case-insensitive) cherches par `detect-capabilities.ps1` dans l'US + ACs.
+Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'US + ACs.
 
 | Capability | Lib | Version | Triggers |
 |---|---|---|---|
@@ -302,26 +293,52 @@ Triggers (regex case-insensitive) cherches par `detect-capabilities.ps1` dans l'
 
 ## 3. Conventions d'usage
 
-### 3.1 Configuration via Pydantic Settings
+### 3.1 Configuration via Pydantic Settings (peuplée par arch, depuis 2026-05-14)
 
-`config.py` :
+**Source de vérité** : blocs `## Active Database` et `## Active Auth
+Specs` de `workspace/input/stack/stack.md`. L'agent `arch` Phase A —
+STEP 4.5 écrit `app/config.py` avec les valeurs en **defaults Python**
+(plus de fichier `.env` requis ; pydantic permet quand même l'override
+par env var native si besoin runtime).
+
+Exemple `app/config.py` généré par arch (valeurs littérales depuis
+stack.md `## Active Database` + `## Active Auth Specs`) :
+
 ```python
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from typing import List
 
-class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+class DBSettings(BaseSettings):
+    type: str = "postgres"          # depuis ## Active Database DatabaseType
+    host: str = "127.0.0.1"         # depuis DB_HOST
+    port: int = 5432                # depuis DB_PORT
+    name: str = "CMSPrint"          # depuis DB_NAME
+    user: str = "postgres"          # depuis DB_USER
+    password: str = "***REMOVED***"     # depuis DB_PASSWORD
+    model_config = SettingsConfigDict(env_prefix="DB_")
 
-    db_host: str
-    db_port: int
-    db_name: str
-    db_user: str
-    db_password: str
+class AzureADSettings(BaseSettings):
+    tenant_id: str = "<REDACTED>-..."         # depuis AZ_TENANTID
+    client_id: str = "<REDACTED>-..."         # depuis AZ_CLIENTID
+    domain: str = "demo.com"           # depuis AZ_DOMAIN
+    audiences: List[str] = ["<REDACTED>-...", "<REDACTED>-..."]  # split/strip de AZ_AUDIENCES
+    backend_callback_path: str = "/signin-oidc"
+    frontend_callback_path: str = "/login-callback"
+    model_config = SettingsConfigDict(env_prefix="AZ_")
 
-    azure_tenant_id: str | None = None
-    azure_client_id: str | None = None
-
-settings = Settings()  # fail-fast au démarrage si env vars manquent
+db_settings = DBSettings()
+azure_settings = AzureADSettings()
 ```
+
+Le code applicatif fait :
+```python
+from app.config import db_settings, azure_settings
+```
+
+**Plus de `.env` requis** : les defaults Python suffisent pour dev. En
+prod, override possible via env var (`DB_PASSWORD=...`) grâce à
+`env_prefix` — sans modifier le code. La classe `AzureADSettings` est
+omise par arch si aucun stack auth actif.
 
 ### 3.2 DB Session (async SQLAlchemy 2.x)
 
@@ -329,15 +346,28 @@ settings = Settings()  # fail-fast au démarrage si env vars manquent
 ```python
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.engine import URL
-from app.config import settings
+from app.config import db_settings
+
+# drivername selon db_settings.type (mappé par arch en STEP 4.5) :
+#   postgres → postgresql+asyncpg
+#   mysql    → mysql+aiomysql
+#   sqlserver→ mssql+aioodbc
+#   sqlite   → sqlite+aiosqlite
+DRIVERS = {
+    "postgres": "postgresql+asyncpg",
+    "postgresql": "postgresql+asyncpg",
+    "mysql": "mysql+aiomysql",
+    "sqlserver": "mssql+aioodbc",
+    "sqlite": "sqlite+aiosqlite",
+}
 
 url = URL.create(
-    drivername="postgresql+asyncpg",
-    username=settings.db_user,
-    password=settings.db_password,
-    host=settings.db_host,
-    port=settings.db_port,
-    database=settings.db_name,
+    drivername=DRIVERS[db_settings.type.lower()],
+    username=db_settings.user,
+    password=db_settings.password,
+    host=db_settings.host,
+    port=db_settings.port,
+    database=db_settings.name,
 )
 
 engine = create_async_engine(url, pool_pre_ping=True, echo=False)
@@ -508,22 +538,32 @@ async def fetch_external(url: str) -> str:
 | `SqlServer` | `aioodbc` (+ `pyodbc`) | `mssql+aioodbc` |
 | `Sqlite` | `aiosqlite` (stdlib `sqlite3`) | `sqlite+aiosqlite` |
 
-### 4.2 Connection string pattern (async)
+### 4.2 Connection string pattern (async, lecture depuis db_settings)
 
 Convention : **`sqlalchemy.engine.URL.create`** (jamais string concat —
-gère l'échappement automatique).
+gère l'échappement automatique). Lecture depuis `app.config.db_settings`
+(peuplée par arch en STEP 4.5 depuis `## Active Database` de stack.md).
 
 ```python
 from sqlalchemy.engine import URL
 from sqlalchemy.ext.asyncio import create_async_engine
+from app.config import db_settings
+
+DRIVERS = {
+    "postgres": "postgresql+asyncpg",
+    "postgresql": "postgresql+asyncpg",
+    "mysql": "mysql+aiomysql",
+    "sqlserver": "mssql+aioodbc",
+    "sqlite": "sqlite+aiosqlite",
+}
 
 url = URL.create(
-    drivername="postgresql+asyncpg",   # selon DatabaseType (§4.1)
-    username=settings.db_user,
-    password=settings.db_password,
-    host=settings.db_host,
-    port=settings.db_port,
-    database=settings.db_name,
+    drivername=DRIVERS[db_settings.type.lower()],
+    username=db_settings.user,
+    password=db_settings.password,
+    host=db_settings.host,
+    port=db_settings.port,
+    database=db_settings.name,
 )
 
 engine = create_async_engine(url, pool_pre_ping=True)
@@ -531,7 +571,7 @@ engine = create_async_engine(url, pool_pre_ping=True)
 
 Pour SQLite (path-based, pas d'host) :
 ```python
-url = URL.create(drivername="sqlite+aiosqlite", database="path/to/db.sqlite")
+url = URL.create(drivername="sqlite+aiosqlite", database=db_settings.name)
 ```
 
 ### 4.3 Migrations Alembic
@@ -542,9 +582,25 @@ cd workspace/output/src/{BackendName}
 alembic init alembic
 ```
 
-Configuration `alembic.ini` :
+Configuration `alembic.ini` — utiliser `env.py` Python plutôt qu'une
+interpolation env var (pour aligner sur la source `db_settings`) :
 ```ini
-sqlalchemy.url = ${DATABASE_URL}    # injecté via env
+# alembic.ini : laisser sqlalchemy.url vide
+sqlalchemy.url =
+```
+
+```python
+# alembic/env.py — résout l'URL depuis db_settings (depuis 2026-05-14)
+from app.config import db_settings
+from sqlalchemy.engine import URL
+
+DRIVERS = {"postgres":"postgresql+psycopg","mysql":"mysql+pymysql","sqlserver":"mssql+pyodbc","sqlite":"sqlite"}
+url = URL.create(
+    drivername=DRIVERS[db_settings.type.lower()],
+    username=db_settings.user, password=db_settings.password,
+    host=db_settings.host, port=db_settings.port, database=db_settings.name,
+)
+config.set_main_option("sqlalchemy.url", str(url))
 ```
 
 Création d'une migration auto (depuis modèles SQLAlchemy) :
@@ -591,9 +647,11 @@ schéma DB existant).
 **Pattern d'invocation** (idempotent, READ-ONLY sur la base) :
 
 ```bash
+# arch compose l'URL en RAM depuis ## Active Database de stack.md (cf. STEP 8)
+# et la passe en argument au sqlacodegen (jamais via env var persistante)
 uv add --dev --project workspace/output/src/{BackendName} sqlacodegen
 uv run --project workspace/output/src/{BackendName} sqlacodegen \
-  "$DB_URL" \
+  "<URL composée par arch en RAM depuis db_config>" \
   --generator declarative \
   --outfile workspace/output/src/{BackendName}/entities/db/models.py
 ```
@@ -623,22 +681,43 @@ temporaire puis merger via diff (avancé, non requis pour MVP).
 
 ---
 
-## 6. CORS développement
+## 6. CORS
+
+Conforme à `.claude/rules/cors.md §2.3`. Origins **explicites** lus depuis env
+(`CORS_ALLOWED_ORIGINS`, CSV) ; fallback `http://localhost:5173` (port Vite par
+défaut pour React, ajuster si le stack frontend utilise un autre port — Vue 5173,
+Angular 4200, Next 3000).
 
 ```python
+import os
 from fastapi.middleware.cors import CORSMiddleware
+
+allowed_origins = os.getenv(
+    "CORS_ALLOWED_ORIGINS",
+    "http://localhost:5173",
+).split(",")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[o.strip() for o in allowed_origins if o.strip()],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    allow_credentials=False,   # incompatible avec "*"
 )
 ```
 
-Conforme à `.claude/rules/cors.md`. Production : remplacer `*` par
-allowlist explicite.
+Override via env :
+```bash
+CORS_ALLOWED_ORIGINS=http://localhost:5173,https://staging.example.com
+```
+
+**Interdits formellement** (déclenche `[SEC_CORS_PERMISSIVE]` du security-reviewer) :
+- `allow_origins=["*"]` (wildcard incompatible avec `allow_credentials=True` per W3C spec)
+- `allow_origin_regex=".*"`
+- Origins hardcodées dans `main.py` (doit venir d'env / config)
+
+Production : remplacer le fallback localhost par les origins prod réelles, jamais
+de wildcard. Cf. `rules/cors.md §4` (anti-patterns).
 
 ---
 

@@ -10,7 +10,7 @@ en est la **TOC commentée**.
 ## 1. Anti-derive (universel)
 
 Aucun agent n'invente :
-- des SFD, BR, AC, FD non présents dans la SPEC parente
+- des SFD, BR, AC, FD non présents dans la FEAT parente
 - une couleur, un libellé, un composant ou une icône non visible dans
   le HTML source (ou non listé dans le stack UI actif)
 - une lib, un pattern, un middleware non déclaré dans le stack actif
@@ -106,7 +106,7 @@ planifient inline puis écrivent le plan dans
 **consomme** (mode From Plan).
 
 **Plan-then-review gate** : `/sdd-full {n}` rend `/dev-plan {n}`
-**obligatoire** quand `/spec-validate` retourne 🟡 WARN ou 🔴 NO-GO
+**obligatoire** quand `/feat-validate` retourne 🟡 WARN ou 🔴 NO-GO
 ET que `--force` est passé. Par défaut, `/sdd-full` **STOP** sur 🟡
 WARN ou 🔴 NO-GO.
 
@@ -141,7 +141,7 @@ Triggers : chaque ligne §2.4.b déclare 1+ patterns regex à chercher
 dans l'US courante (et son mockup HTML).
 
 **v5.0 — détection externalisée** : la détection des capabilities et
-décision install/skip est exécutée par `.claude/scripts/detect-capabilities.ps1`
+décision install/skip est exécutée par `.claude/python/sdd_scripts/detect_capabilities.py`
 (workload déterministe, ~0 token LLM). L'agent dev-backend invoque le
 script et consomme son JSON. Détail : `agents/dev-backend.md STEP 5.bis`.
 
@@ -149,38 +149,75 @@ script et consomme son JSON. Détail : `agents/dev-backend.md STEP 5.bis`.
 
 | Fichier                         | Domaine                                          |
 |---------------------------------|--------------------------------------------------|
-| `responsibilities.md`           | Périmètre strict de chaque rôle (humain + agent) |
-| `us-granularity.md`             | Découpage SPEC → US (cible 1-3, warning 4-6, hard cap 6 ; INVEST) |
+| `us-granularity.md`             | Découpage FEAT → US (cible 1-3, warning 4-6, hard cap 6 ; INVEST) |
 | `constitution.md`               | Constitution projet + ADRs (qui écrit quoi)      |
 | `file-ownership.md`             | Matrice ownership fichiers partagés + ADR timestamp atomique |
-| `qa-ownership.md`               | L'agent QA est seul propriétaire des tests, dev-* read-only |
-| `qa-coverage.md`                | Seuil 80% (WARN si en-dessous), schéma normalisé coverage.json |
-| `stack-completeness.md`         | Anti-derive sur libs : lib non listée en §2.4 → STOP + ERROR |
-| `library-policy.md` **(v5.0)**  | Politique CVE / origine / version pinnée (extracted from arch.md v2.2) |
+| `qa-coverage.md`                | Seuil 80% (RED bloquant si en-dessous), schéma normalisé coverage.json |
+| `stack-completeness.md`         | Anti-derive sur libs + §0 runtime LTS / CVE / origine (ex-`library-policy.md`, fusionné v6.1) |
+| `backend-first.md`              | Workflow gated back → API gate → front |
+| `error-classification.md`       | Taxonomie codes `[CLASS]` cross-agent |
+| `source-first.md`               | Discipline MD-avant-code pour fix bugs |
+| `dev-shared.md`                 | Patterns strictement identiques dev-backend/dev-frontend |
 
-> Substance de `responsibilities.md`, `stack-completeness.md`,
-> `file-ownership.md §1-§2`, `qa-ownership.md`, `qa-coverage.md`,
-> `us-granularity.md`, `.claude/rules/constitution.md` est **inlinée**
-> dans les agents qui en dépendent (depuis v5.0). Les fichiers complets
-> restent disponibles pour les cas-limites.
+> Substance de `stack-completeness.md`, `file-ownership.md §1-§2`,
+> `qa-coverage.md`, `us-granularity.md`, `.claude/rules/constitution.md`
+> est **inlinée** dans les agents qui en dépendent (depuis v5.0). Les
+> fichiers complets restent disponibles pour les cas-limites.
 >
-> **Validation drift** : `.claude/scripts/validate-inline-rules.ps1`
+> **Supprimés v6.1.2 (substance entièrement inlinée)** :
+> `responsibilities.md`, `qa-ownership.md`, `chat-output.md`.
+>
+> **Validation drift** : `.claude/python/sdd_scripts/validate_inline_rules.py`
 > détecte si une rule a été modifiée après l'agent qui l'inline (mtime
 > comparison). Lancer après toute édition de `rules/*.md` ou `agents/*.md`.
 
+### 14.1 Notes opérationnelles (détails utiles ex-CLAUDE.md §5)
+
+- **`backend-first.md`** (depuis 2026-05-07) — chargée par `/dev-run`
+  et agent `qa` mode `api-tests`. Pilote la séquence back → API gate →
+  front (cf. `commands/dev-run.md §6`).
+- **`error-classification.md`** (depuis 2026-05-08) — chargée par
+  `dev-backend`, `dev-frontend`, `qa`, `arch`. Pilote `build_loop` :
+  `[BUILD_CORRECTIBLE]` itère (max `BuildLoopMaxIter`),
+  `[BUILD_BLOCKING]` fail-fast. Taxonomie 8 classes (BUILD_*, SCHEMA_*,
+  LAYER_*, UI_*, QA_*, DERIVE_*, STACK_*, NETWORK_*, etc.).
+- **`source-first.md`** (depuis 2026-05-12) — tout bug code = trou
+  dans une source MD (FEAT, US, plan, stack, rule). Patcher la source
+  d'abord, le code ensuite. Chargée par `dev-backend`, `dev-frontend`
+  (référence sur échec `build_loop`) + Tech Lead humain.
+- **`file-ownership.md §1.bis`** (depuis 2026-05-12) — Front/Back
+  isolation stricte : `{AppName}/` et `{BackendName}/` au même niveau
+  sous `workspace/output/src/`, jamais imbriqués. Hard-gate
+  `[FILE_OWNERSHIP_NESTED]` dans `arch`, `dev-backend`, `dev-frontend`.
+- **`dev-shared.md`** — source de vérité unique pour les patterns
+  strictement identiques `dev-backend`/`dev-frontend` (context budget
+  HARD-GATE, LibName lock, anti-derive bullets, QA ownership interdits,
+  stack-completeness, BREAKING CHANGES cleanup, reads on-demand).
+  Réduit la duplication entre les deux agents.
+
 ## 15. Templates — index `.claude/templates/`
 
-| Fichier                          | Consommé par             |
-|----------------------------------|--------------------------|
-| `spec.template.md`               | `/spec-generate`         |
-| `us.template.md`                 | agent `po`               |
-| `constitution.template.md`       | `/spec-generate` (bootstrap projet) |
-| `adr.template.md`                | agent `arch` + agents dev-* |
-| `readiness.template.md`          | `/spec-validate`         |
-| `risks-assumptions.template.md`  | agent `elicitor`         |
-| `qa-report.template.md`          | agent `qa`               |
-| `coverage.template.json`         | schéma normalisé coverage.json |
-| `quality.template.json`          | schéma quality.json (sonar-like) |
+| Fichier                            | Consommé par             |
+|------------------------------------|--------------------------|
+| `feat.template.md`                 | `/feat-generate`         |
+| `us.template.md`                   | agent `po`               |
+| `constitution.template.md`         | `/feat-generate` (bootstrap projet) |
+| `adr.template.md`                  | agent `arch` + agents dev-* |
+| `readiness.template.md`            | `/feat-validate`         |
+| `risks-assumptions.template.md`    | agent `elicitor`         |
+| `qa-report.template.md`            | agent `qa`               |
+| `api-tests.template.json`          | schéma rapport API Gate (cf. `rules/backend-first.md §1.4`) — produit par `/qa-generate --mode api-tests` |
+| `claude-md-backend.template.md`    | agent `arch` STEP 12 — gabarit CLAUDE.md projet backend |
+| `claude-md-frontend.template.md`   | agent `arch` STEP 12 — gabarit CLAUDE.md projet frontend |
+| `claude-md-shared-lib.template.md` | agent `arch` STEP 12 — gabarit CLAUDE.md projet lib partagée (si `LibName` défini) |
+| ~~`dashboard-readme.template.html`~~ | **retiré v6.10** — HTML dashboards remplacés par `console.db` lecture par consommateur externe |
+| `adrs-index.template.md`           | agent `dashboard` (INDEX.md ADRs — seul output `dashboard` v6.10) |
+| ~~`qa-dashboard.template.html`~~   | **retiré v6.10** — métriques QA dans `console.db` (tables `qa_*`) |
+| `libs-catalog.schema.json`         | JSON Schema des `.libs.json` (cf. `stack-completeness.md §1.0`) |
+| `status.schema.json`               | JSON Schema de `workspace/console/status.json` (console gates manuels) |
+| `runbook.template.md` (v6.4.0)     | Tech Lead humain (mise en prod) — procédure d'intervention on-call |
+| `postmortem.template.md` (v6.4.0)  | Tech Lead humain (post-incident, 48h max cf. `source-first.md §5`) |
+| `slo-sli.template.md` (v6.4.0)     | Tech Lead humain (définition SLO + alerting multi-burn-rate + error budget) |
 
 ## 16. Loader manifest
 

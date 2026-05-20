@@ -83,4 +83,4 @@ Si l'agent réussit en `skipped` ou échoue, ne rien ajouter.
 - Pas de Q/R utilisateur après le STEP 1
 - Pas de modification des US, mockups HTML ou stack
 - Pas de génération de tests (QA hors scope)
-- Pas de lecture des SPECs ou d'autres mockups HTML
+- Pas de lecture des FEATs ou d'autres mockups HTML

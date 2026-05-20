@@ -1,4 +1,8 @@
-﻿# QA Stack — Blazor bUnit + xUnit + Coverlet
+# QA Stack — Blazor bUnit + xUnit + Coverlet
+
+> §2.4 (Librairies) régénérée depuis `blazor-bunit.libs.json` — ne pas éditer manuellement (`python .claude/python/sdd_admin/sync_stack_md.py --stack-id blazor-bunit`).
+>
+> Validation: 🟢 reference (validated combo — dotnet-minimalapi + blazor + radzen + azure-ad)
 
 ## 1. Scope
 
@@ -27,7 +31,7 @@ classique au sein du même projet de test.
 <!-- LIBS_CATALOG_START -->
 ### 2.4 Librairies
 
-> Source de verite : `.claude/stacks/qa/blazor-bunit.libs.json`. Ne pas editer cette section manuellement -- utiliser `.claude/scripts/sync-stack-md.ps1 -StackId blazor-bunit`.
+> Source de verite : `.claude/stacks/qa/blazor-bunit.libs.json`. Ne pas editer cette section manuellement -- utiliser `python .claude/python/sdd_admin/sync_stack_md.py --stack-id blazor-bunit`.
 
 #### 2.4.a Librairies CORE (installees par arch en section 2.2.1, toujours)
 
@@ -42,7 +46,7 @@ classique au sein du même projet de test.
 
 ### 2.4.b Librairies ON-DEMAND (installees si l'US declenche)
 
-Triggers (regex case-insensitive) cherches par `detect-capabilities.ps1` dans l'US + ACs.
+Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'US + ACs.
 
 | Capability | Lib | Version | Triggers |
 |---|---|---|---|
@@ -62,7 +66,7 @@ dotnet add workspace/output/src/{AppName}.Tests/{AppName}.Tests.csproj reference
 
 <!-- CORE_PACKAGES_START -->
 ```bash
-# Auto-genere depuis blazor-bunit.libs.json -- ne pas editer (utiliser sync-stack-md.ps1).
+# Auto-genere depuis blazor-bunit.libs.json -- ne pas editer (utiliser sync_stack_md.py).
 dotnet add workspace/output/src/{AppName}.Tests/{AppName}.Tests.csproj package bunit.web --version 1.36.0
 dotnet add workspace/output/src/{AppName}.Tests/{AppName}.Tests.csproj package xunit --version 2.9.2
 dotnet add workspace/output/src/{AppName}.Tests/{AppName}.Tests.csproj package xunit.runner.visualstudio --version 3.0.0

@@ -1,7 +1,7 @@
-# Implementation Readiness Report — SPEC {n}-{Name}
+# Implementation Readiness Report — FEAT {n}-{Name}
 
 - **Date** : {YYYY-MM-DD HH:mm}
-- **Validateur** : `/spec-validate`
+- **Validateur** : `/feat-validate`
 - **Décision** : {🟢 GO | 🟡 WARN | 🔴 NO-GO}
 - **Bypass disponible** : `--force` (ignore NO-GO)
 
@@ -15,19 +15,19 @@
 
 > **v6.0** : section §2 « Validations sémantiques » retirée (agent
 > `validator` supprimé pour économie tokens). Review sémantique
-> à la charge du PO humain lors de la relecture de la SPEC.
+> à la charge du PO humain lors de la relecture de la FEAT.
 
 ---
 
 ## 1. Validations déterministes (PowerShell, 0 token)
 
-### 1.1 Cohérence numérotation IDs SPEC
+### 1.1 Cohérence numérotation IDs FEAT
 - [ ] SFD-N : continuité, pas de doublons → {pass | fail: liste}
 - [ ] BR-N  : continuité, pas de doublons → {pass | fail | n/a (section vide)}
 - [ ] AC-N  : continuité, pas de doublons → {pass | fail | n/a}
 - [ ] FD-N  : continuité, pas de doublons → {pass | fail | n/a}
 
-### 1.2 Traçabilité 100% SPEC → US
+### 1.2 Traçabilité 100% FEAT → US
 - [ ] Tous les SFD-N couverts par au moins 1 US (`Covers`) → {pass | fail: liste IDs orphelins}
 - [ ] Tous les FD-N couverts → {pass | fail | n/a}
 - [ ] Tous les BR-N couverts → {pass | fail | n/a}
@@ -44,15 +44,15 @@
 - [ ] Aucune US ne pointe vers un mockup HTML inexistant → {pass | fail | n/a}
 
 ### 1.5 Constitution (si SDD_Pro v3)
-- [ ] `workspace/output/context/constitution.md` existe → {pass | fail | n/a (projet pre-v3)}
-- [ ] Acteurs de la SPEC tous présents en §3 → {pass | warn}
+- [ ] `workspace/output/.sys/.context/constitution.md` existe → {pass | fail | n/a (projet pre-v3)}
+- [ ] Acteurs de la FEAT tous présents en §3 → {pass | warn}
 
 ---
 
 ## 2. Validations sémantiques — RETIRÉ EN v6.0
 
 > Section retirée. Le PO humain est responsable de la review sémantique
-> de la SPEC (mesurabilité ACs, ambiguïtés cross-artefact, hypothèses
+> de la FEAT (mesurabilité ACs, ambiguïtés cross-artefact, hypothèses
 > implicites) avant de lancer `/dev-run`.
 
 ---
@@ -83,11 +83,11 @@ ERROR-2: ...
 ## 5. Décision finale
 
 ### {🟢 GO}
-La SPEC est prête pour `/dev-run {n}`. Toutes les validations
+La FEAT est prête pour `/dev-run {n}`. Toutes les validations
 déterministes passent. Aucune ambiguïté sémantique critique détectée.
 
 ### {🟡 WARN}
-La SPEC peut passer en `/dev-run {n}` mais une review humaine est
+La FEAT peut passer en `/dev-run {n}` mais une review humaine est
 recommandée avant. Les warnings ci-dessus n'invalident pas le code
 généré mais peuvent dégrader sa qualité.
 
@@ -104,5 +104,5 @@ utiliser uniquement en connaissance de cause).
 - 🟡 WARN : review puis `/dev-run {n}`
 - 🔴 NO-GO :
   1. Corriger les erreurs listées en §3
-  2. Relancer `/spec-validate {n}`
+  2. Relancer `/feat-validate {n}`
   3. Une fois GO ou WARN, lancer `/dev-run {n}`

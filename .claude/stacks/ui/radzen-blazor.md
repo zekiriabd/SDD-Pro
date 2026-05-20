@@ -1,4 +1,8 @@
-﻿# UI Design System: Radzen (Blazor)
+# UI Design System: Radzen (Blazor)
+
+> §2.4 (Librairies) régénérée depuis `radzen-blazor.libs.json` — ne pas éditer manuellement (`python .claude/python/sdd_admin/sync_stack_md.py --stack-id radzen-blazor`).
+>
+> Validation: 🟢 reference (validated combo — dotnet-minimalapi + blazor + radzen + azure-ad)
 
 > MCP server disponible : le projet peut declarer un serveur MCP Radzen
 > permettant d’acceder a la documentation officielle des composants.
@@ -11,7 +15,7 @@
 ---
 
 Status: Draft  
-UI Spec ID: radzen-blazor  
+UI FEAT ID: radzen-blazor  
 Scope: design system Radzen.Blazor — composants UI pour applications Blazor Server et Blazor WebAssembly
 
 ---

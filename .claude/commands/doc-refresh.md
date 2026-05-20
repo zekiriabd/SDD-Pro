@@ -1,8 +1,13 @@
 # /doc-refresh
 
-> Régénère les artefacts de visualisation SDD_Pro (dashboards HTML +
-> index ADRs Markdown) à partir de l'état actuel du workspace.
+> Régénère l'**INDEX.md des ADRs** depuis l'état du workspace.
 > **Idempotent**. Invoque l'agent `dashboard` (Haiku 4.5).
+>
+> **v6.10 BREAKING** : les rendus HTML (`dashboard/README.html`,
+> `qa/feat-{n}/dashboard.html`) sont **retirés**. Les métriques vivent
+> dans `workspace/output/db/console.db` (SQLite SSoT, 24 tables) et le
+> rendu graphique est délégué à la console web (`workspace/console/`)
+> ou à tout consommateur externe (BI tool, script).
 
 ## Usage
 
@@ -10,20 +15,18 @@
 /doc-refresh
 ```
 
-Aucun argument. La commande lit l'état complet du workspace et
-régénère les 3 outputs.
+Aucun argument. La commande lit les ADRs du workspace et régénère
+l'index.
 
-## Fichiers produits
+## Fichier produit
 
 | Fichier | Description |
 |---|---|
-| `workspace/output/dashboard/README.html` | Vue d'ensemble du projet : SPECs, US par feature, QA scores, ADRs récents |
-| `workspace/output/context/adrs/INDEX.md` | Index ADRs (rebuild depuis `Glob workspace/output/context/adrs/ADR-*.md`) |
-| `workspace/output/qa/feat-{n}/dashboard.html` | 1 dashboard HTML par feature ayant des artefacts QA (coverage, quality, api-tests) |
+| `workspace/output/.sys/.context/adrs/INDEX.md` | Index ADRs (rebuild depuis `Glob workspace/output/.sys/.context/adrs/ADR-*.md`) |
 
 ## Quand l'utiliser
 
-- **Manuel** : après une édition manuelle d'un US/SPEC/ADR pour
+- **Manuel** : après une édition manuelle d'un US/FEAT/ADR pour
   rafraîchir la visualisation
 - **Auto** : invoqué en fin de `/sdd-full`, `/dev-run`, `/qa-generate`
   (cf. wirings dans ces commandes)
@@ -36,15 +39,16 @@ régénère les 3 outputs.
 Agent: dashboard
 ```
 
-L'agent lit le contexte (`.claude/templates/*`, `.claude/rules/error-classification.md`,
-`workspace/output/{us,qa,plans,validation,context}/`) et écrit les 3 outputs.
+L'agent lit `.claude/templates/adrs-index.template.md` +
+`.claude/rules/error-classification.md` + `Glob` sur les ADRs
+et écrit `workspace/output/.sys/.context/adrs/INDEX.md`.
 
 ## STEP 2 — Confirmation
 
-L'agent émet **1 ligne** (`chat-output.md` §1) :
+L'agent émet **1 ligne** (chat minimal succès) :
 
 ```
-✅ dashboard — README.html + INDEX.md (N ADRs) + K feature dashboards refreshed
+✅ dashboard — INDEX.md ({N} ADRs) refreshed
 ```
 
 Sur erreur : 2 lignes max avec préfixe `[CLASS]` (cf. `error-classification.md`).
@@ -52,9 +56,9 @@ Sur erreur : 2 lignes max avec préfixe `[CLASS]` (cf. `error-classification.md`
 ## Idempotence stricte
 
 - Aucun état conservé entre runs
-- Les 3 outputs sont overwritten chaque run
+- Le fichier `INDEX.md` est overwritten à chaque run
 - Peut être ré-invoqué sans risque, en parallèle de tout autre agent
-  (les outputs ne croisent aucune matrice de `file-ownership.md §1`)
+  (l'output ne croise aucune matrice de `file-ownership.md §1`)
 
 ## Coût
 

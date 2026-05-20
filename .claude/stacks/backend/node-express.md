@@ -1,81 +1,62 @@
-﻿# Tech Spec: expressapi (backend)
+# Tech FEAT: expressapi (backend)
+
+> §2.4 (Librairies) régénérée depuis `node-express.libs.json` — ne pas éditer manuellement (`python .claude/python/sdd_admin/sync_stack_md.py --stack-id node-express`).
 
 Status: Draft  
-Tech Spec ID: tech-expressapi  
+Validation: 🟡 experimental (not yet validated end-to-end in production combo)  
+Tech FEAT ID: tech-expressapi  
 Scope: backend uniquement (API, logique metier, persistance)
 
 ---
 
 # 1. Architecture
 
-## 1.1 Pattern applicatif
+> **Pattern d'architecture** : ce stack suit l'**architecture canonique** définie dans
+> `.claude/stacks/archi/{ArchiPattern}.md` (défaut `MVC` si `## Active Architecture Pattern`
+> absent du `stack.md`). Section §1 ci-dessous ne décrit QUE les overrides Node/Express-specific.
 
-API Express moderne avec separation stricte :
+## 1.1 Pattern applicatif (Node/Express idioms)
 
-Route → Controller → Service → Repository → Entity → Mapper → DTO → ApiResponse<T>
+Pour `ArchiPattern: MVC` (défaut), suit `archi/mvc.md` avec idioms Express :
+- Routes via plugin Fastify-like (`registerXxxRoutes(fastify)`) ou Express `router.get()` — pas de classe Controller, fonction handler
+- Service = objet ES module avec méthodes async exportées (`export const usersService = { getList, ... }`)
+- Repository = wrapper autour de `PrismaClient` ou ORM choisi
+- Mapper = plain functions (`mapEntityToOutput(entity): Output`)
+- DTO = types TypeScript dans `{LibName}/inputs|outputs|models/` (cf. §1.3) + schemas Zod pour validation runtime
+- `ApiResponse<T>` wrapper standard (status, data, queryTime, mappingTime, errors) défini dans `{LibName}/models/ApiResponse.ts`
 
-Le wrapper ApiResponse<T> porte les metriques de performance :
+Pour `ArchiPattern: DDD` → voir `archi/ddd.md` (Aggregates + UseCases).
+Pour `ArchiPattern: microservice` → voir `archi/microservice.md` (Polly equivalent + comm patterns).
 
-- QueryTime
-- MappingTime
+## 1.3 Mapping couche → répertoire (override Node)
 
-Il est defini dans le projet librairie partagee `{LibName}`.
+| Couche canonique (archi/mvc.md §3) | Path Node-specific |
+|---|---|
+| Route / Endpoint | `workspace/output/src/{BackendName}/routes/` (1 fichier par domain, `{domain}.routes.ts`) |
+| Controller | `workspace/output/src/{BackendName}/controllers/` |
+| Service Interface | `workspace/output/src/{BackendName}/services/interfaces/` (TypeScript `interface`) |
+| Service Implementation | `workspace/output/src/{BackendName}/services/` |
+| Repository | `workspace/output/src/{BackendName}/repositories/` |
+| Mapper | `workspace/output/src/{BackendName}/mappers/` |
+| Entity | `workspace/output/src/{BackendName}/entities/` (Prisma model dans `prisma/schema.prisma`) |
+| Database | `workspace/output/src/{BackendName}/database/` (Prisma client singleton) |
+| Middleware | `workspace/output/src/{BackendName}/middleware/` |
+| Logger | `workspace/output/src/{BackendName}/logger/` (Pino setup) |
+| Swagger | `workspace/output/src/{BackendName}/swagger/` (cf. §1.6, Express-specific) |
+| Input/Output/Model DTO | `workspace/output/src/{LibName}/{inputs,outputs,models}/` |
+| App / Server | `workspace/output/src/{BackendName}/{app.ts,server.ts}` |
+| Project (API) | `workspace/output/src/{BackendName}/package.json` |
+| Project (Lib) | `workspace/output/src/{LibName}/package.json` |
 
----
+## 1.4 Override principes (Node-specific)
 
-## 1.2 Couches
-
-- Route : routing pur (mapping URL → Controller)
-- Controller : validation + orchestration
-- Service : logique metier
-- Repository : acces base via ORM
-- Mapper : mapping Entity → DTO
-- DTO : structures de transfert
-- Entity : modeles persistants
-- Database : configuration ORM
-- Middleware : erreurs, logs, auth
-
----
-
-## 1.3 Mapping couche → repertoire
-
-Route → `workspace/output/src/{BackendName}/routes/`  
-Controller → `workspace/output/src/{BackendName}/controllers/`  
-Service Interface → `workspace/output/src/{BackendName}/services/interfaces/`  
-Service Implementation → `workspace/output/src/{BackendName}/services/`  
-Repository → `workspace/output/src/{BackendName}/repositories/`  
-Mapper → `workspace/output/src/{BackendName}/mappers/`  
-Entity → `workspace/output/src/{BackendName}/entities/`  
-Database → `workspace/output/src/{BackendName}/database/`  
-Middleware → `workspace/output/src/{BackendName}/middleware/`  
-Logger → `workspace/output/src/{BackendName}/logger/`  
-Swagger → `workspace/output/src/{BackendName}/swagger/`  
-
-Input DTO → `workspace/output/src/{LibName}/inputs/`  
-Output DTO → `workspace/output/src/{LibName}/outputs/`  
-Model DTO → `workspace/output/src/{LibName}/models/`  
-
-App config → `workspace/output/src/{BackendName}/app.ts`  
-Server → `workspace/output/src/{BackendName}/server.ts`  
-
-Project API → `workspace/output/src/{BackendName}/package.json`  
-Project Shared → `workspace/output/src/{LibName}/package.json`
-
----
-
-## 1.4 Principes non negociables
-
-- Aucune logique metier dans Routes
-- Aucune logique metier dans Entities
-- Aucun acces DB direct hors Repository
-- Mapping centralise dans Mappers
-- DTO immuables
-- Middleware global erreurs obligatoire
-- Logging structure obligatoire
-- Validation obligatoire
-- DI logique obligatoire
-- Aucun SQL brut dans Services
-- **Documentation Swagger / OpenAPI obligatoire** : tout backend généré DOIT exposer une UI Swagger sur `/api-docs` et la spec JSON sur `/api-docs.json`. Voir §1.6 pour le contrat.
+Hérités de `archi/mvc.md §4`. **Ajouts** Node :
+- TypeScript strict (`"strict": true, "noUncheckedIndexedAccess": true` dans `tsconfig.json`)
+- ESM (`"type": "module"`, imports avec extension `.js`)
+- Pas de `require()` — `import` uniquement
+- Pino structuré obligatoire (pas de `console.log` même en dev)
+- Schemas Zod **inline** avec les Input DTOs (`z.infer<typeof Schema>` = type Input DTO)
+- **Documentation Swagger / OpenAPI obligatoire** (Express idiom — cf. §1.6) : `/api-docs` UI + `/api-docs.json` spec
 
 ---
 
@@ -118,7 +99,7 @@ Mount AVANT les routes `/api/v1/...` pour que `/api-docs` reste accessible sans 
 
 ### Endpoints exposés
 - `GET /api-docs` — UI Swagger interactive
-- `GET /api-docs.json` — spec OpenAPI JSON brute
+- `GET /api-docs.json` — FEAT OpenAPI JSON brute
 
 ### Génération par feature
 Chaque task qui crée un nouveau controller / route DOIT enrichir `swaggerConfig.ts` (operation: augment, preserves: swaggerSpec, adds: les nouveaux paths). La task `app.ts` initiale (foundational, typiquement feat-auth/us-1/task-2) est la SEULE qui crée `swaggerConfig.ts` (operation: create) et qui mount Swagger UI dans `app.ts`.
@@ -140,7 +121,7 @@ Namespace racine : `{BackendNamespace}`
 <!-- LIBS_CATALOG_START -->
 ### 2.4 Librairies
 
-> Source de verite : `.claude/stacks/backend/node-express.libs.json`. Ne pas editer cette section manuellement -- utiliser `.claude/scripts/sync-stack-md.ps1 -StackId node-express`.
+> Source de verite : `.claude/stacks/backend/node-express.libs.json`. Ne pas editer cette section manuellement -- utiliser `python .claude/python/sdd_admin/sync_stack_md.py --stack-id node-express`.
 
 #### 2.4.a Librairies CORE (installees par arch en section 2.2.1, toujours)
 
@@ -157,7 +138,7 @@ Namespace racine : `{BackendNamespace}`
 | swagger-ui-express | 5.0.1 |  |
 | helmet | 8.0.0 |  |
 | cors | 2.8.5 |  |
-| dotenv | 16.4.7 |  |
+| config | 3.3.12 | Lecture `config/default.json` peuplé par arch (DB + Azure AD), depuis 2026-05-14 |
 | compression | 1.7.5 |  |
 | express-rate-limit | 7.4.1 |  |
 | typescript | 5.6.3 |  |
@@ -173,7 +154,7 @@ Namespace racine : `{BackendNamespace}`
 
 ### 2.4.b Librairies ON-DEMAND (installees si l'US declenche)
 
-Triggers (regex case-insensitive) cherches par `detect-capabilities.ps1` dans l'US + ACs.
+Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'US + ACs.
 
 | Capability | Lib | Version | Triggers |
 |---|---|---|---|
@@ -222,7 +203,7 @@ npm init -y
 
 <!-- CORE_PACKAGES_START -->
 ```bash
-# Auto-genere depuis node-express.libs.json -- ne pas editer (utiliser sync-stack-md.ps1).
+# Auto-genere depuis node-express.libs.json -- ne pas editer (utiliser sync_stack_md.py).
 (cd workspace/output/src/{BackendName} && pnpm add \
   express@4.21.2 \
   prisma@6.1.0 \
@@ -235,7 +216,7 @@ npm init -y
   swagger-ui-express@5.0.1 \
   helmet@8.0.0 \
   cors@2.8.5 \
-  dotenv@16.4.7 \
+  config@3.3.12 \
   compression@1.7.5 \
   express-rate-limit@7.4.1 \
   typescript@5.6.3 \
@@ -391,7 +372,7 @@ Tout backend Express généré expose AU MINIMUM :
 | Endpoint | Auth | Rôle |
 |----------|------|------|
 | `GET /api-docs` | non | UI Swagger interactive |
-| `GET /api-docs.json` | non | Spec OpenAPI 3.0 JSON |
+| `GET /api-docs.json` | non | FEAT OpenAPI 3.0 JSON |
 | `GET /api/v1/health` (optionnel) | non | Liveness probe (si task le demande) |
 
 Les endpoints métier sont déclarés par les features (auth, register, employer, …).
@@ -487,44 +468,66 @@ le moteur Prisma télécharge ses propres binaires natifs au moment
 du `prisma generate` — pas de driver npm explicite nécessaire pour
 les requêtes.
 
-Arch Phase A lit `## Project Config: DatabaseType` puis installe le
+Arch Phase A lit `## Active Database: DatabaseType` puis installe le
 driver correspondant :
 ```bash
 cd workspace/output/src/{BackendName} && npm install <package>
 ```
 
-### 8.2 Connection String Pattern
+### 8.2 Connection String Pattern (lecture `config/default.json`, depuis 2026-05-14)
 
-Convention : **objet config** (pas de string concat). Construction en
-RAM dans `src/config/db.ts` au démarrage.
+**Source de vérité** : bloc `## Active Database` de
+`workspace/input/stack/stack.md`. L'agent `arch` Phase A — STEP 4.5
+sérialise les valeurs dans `config/default.json` (npm package `config`,
+déjà déclaré dans `node-express.libs.json` `core[]`).
 
-Pattern de référence :
+Exemple `config/default.json` produit par arch :
+```json
+{
+  "db": {
+    "type": "postgres",
+    "host": "127.0.0.1",
+    "port": 5432,
+    "name": "CMSPrint",
+    "user": "postgres",
+    "password": "***REMOVED***"
+  }
+}
+```
+
+**Lecture côté code applicatif** (`src/config/db.ts`) :
 ```ts
-function required(name: string): string {
-  const v = process.env[name];
-  if (!v) throw new Error(`Missing required environment variable: ${name}`);
-  return v;
+import config from 'config';
+
+export interface DbConfig {
+  type: string;
+  host: string;
+  port: number;
+  name: string;
+  user: string;
+  password: string;
 }
 
-export const dbConfig = {
-  host:     required('DB_HOST'),
-  port:     parseInt(required('DB_PORT'), 10),
-  database: required('DB_NAME'),
-  user:     required('DB_USER'),
-  password: required('DB_PASSWORD'),
-};
+export const dbConfig: DbConfig = config.get('db');
+// throw si absent — fail-fast au démarrage (npm package config)
 ```
 
-Pour Prisma : la convention est `DATABASE_URL` (URL unique). Construire
-cette URL en RAM au démarrage à partir des 5 env vars canoniques :
+**Plus de `process.env.DB_*`** (depuis 2026-05-14) : le code applicatif
+ne lit JAMAIS `process.env`. La source = fichier `config/default.json`
+peuplé par arch.
+
+Pour **Prisma** : la convention `DATABASE_URL` reste utilisable pour
+le générateur Prisma (qui exige cette env var pour `prisma db pull /
+generate`). Arch passe ce `DATABASE_URL` au process child uniquement
+(`spawn` avec `env: {...process.env, DATABASE_URL: ...}`), JAMAIS dans
+`.env` du repo. Construction :
 ```ts
-process.env.DATABASE_URL = `postgresql://${encodeURIComponent(required('DB_USER'))}:${encodeURIComponent(required('DB_PASSWORD'))}@${required('DB_HOST')}:${required('DB_PORT')}/${required('DB_NAME')}`;
+// scripts/build-prisma-url.ts (exécuté UNIQUEMENT par arch / scripts admin, pas par le code applicatif)
+import config from 'config';
+const db = config.get<DbConfig>('db');
+const url = `${db.type}://${encodeURIComponent(db.user)}:${encodeURIComponent(db.password)}@${db.host}:${db.port}/${db.name}`;
+// → passé au process child Prisma via env, jamais persisté
 ```
-**Important** : `encodeURIComponent` sur user/password pour échapper
-les caractères spéciaux (`@`, `:`, `/`, `&`, etc.).
-
-Ne JAMAIS écrire `DATABASE_URL` dans `.env` du repo. Composition runtime
-uniquement.
 
 ### 8.3 Scaffolding tool (Database-First)
 
@@ -538,8 +541,9 @@ cd workspace/output/src/{BackendName}
 # Init Prisma si absent (idempotent)
 [ ! -f prisma/schema.prisma ] && npx prisma init --datasource-provider <provider>
 
-# Composer DATABASE_URL en RAM (variable d'env du process arch)
-export DATABASE_URL="<url composée selon §8.2>"
+# Composer DATABASE_URL en RAM (variable d'env du process child Prisma uniquement)
+# Lue depuis config/default.json peuplé par arch en STEP 4.5, JAMAIS depuis .env
+export DATABASE_URL="<url composée à partir de config.db (cf. §8.2)>"
 
 # Introspection (schema.prisma rempli)
 npx prisma db pull \

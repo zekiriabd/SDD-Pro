@@ -1,7 +1,10 @@
-﻿# Tech Spec: react (frontend)
+# Tech FEAT: react (frontend)
+
+> §2.4 (Librairies) régénérée depuis `react.libs.json` — ne pas éditer manuellement (`python .claude/python/sdd_admin/sync_stack_md.py --stack-id react`).
 
 Status: Draft  
-Tech Spec ID: tech-react  
+Validation: 🟢 reference (validated combo CMS — kotlin-spring-boot + react + shadcn + azure-ad, 2026-05-13)  
+Tech FEAT ID: tech-react  
 Scope: frontend uniquement (React SPA)
 
 ---
@@ -185,7 +188,7 @@ npx shadcn@latest add button card input label textarea select checkbox switch \
 
 <!-- CORE_PACKAGES_START -->
 ```bash
-# Auto-genere depuis react.libs.json -- ne pas editer (utiliser sync-stack-md.ps1).
+# Auto-genere depuis react.libs.json -- ne pas editer (utiliser sync_stack_md.py).
 (cd workspace/output/src/{AppName} && pnpm add \
   react@19.0.0 \
   react-dom@19.0.0 \
@@ -272,7 +275,7 @@ Codes prioritaires :
 <!-- LIBS_CATALOG_START -->
 ### 2.4 Librairies
 
-> Source de verite : `.claude/stacks/frontend/react.libs.json`. Ne pas editer cette section manuellement -- utiliser `.claude/scripts/sync-stack-md.ps1 -StackId react`.
+> Source de verite : `.claude/stacks/frontend/react.libs.json`. Ne pas editer cette section manuellement -- utiliser `python .claude/python/sdd_admin/sync_stack_md.py --stack-id react`.
 
 #### 2.4.a Librairies CORE (installees par arch en section 2.2.1, toujours)
 
@@ -308,7 +311,7 @@ Codes prioritaires :
 
 ### 2.4.b Librairies ON-DEMAND (installees si l'US declenche)
 
-Triggers (regex case-insensitive) cherches par `detect-capabilities.ps1` dans l'US + ACs.
+Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'US + ACs.
 
 | Capability | Lib | Version | Triggers |
 |---|---|---|---|
@@ -378,7 +381,7 @@ n'est pas idempotent par construction → `useMutation` (POST/PUT/DELETE).
   `routeTree.gen.ts` au dev/build — ce fichier ne doit JAMAIS etre
   edite manuellement.
 - **Layouts** : route parent rend `<Outlet />` ; routes enfants
-  herit ent.
+  héritent.
 - **Lazy loading** : convention `_layout.tsx` + `index.lazy.tsx`
   (route splitting automatique).
 - **Type safety** : params, search params, loaders typed end-to-end —
@@ -387,6 +390,85 @@ n'est pas idempotent par construction → `useMutation` (POST/PUT/DELETE).
 
 Aucun `react-router-dom`. Aucun routing imperatif via
 `window.location`.
+
+#### Piège — Parent route sans `<Outlet />` (post-mortem 2026-05-12, cmsfront)
+
+**Bug** : convention dot-syntax `parent.tsx` + `parent.child.tsx` (ex.
+`campagnes.tsx` + `campagnes.creation.tsx`) crée automatiquement une
+relation parent-enfant dans le routeTree. **Le composant de `parent.tsx`
+DOIT rendre `<Outlet/>`** pour que les enfants apparaissent. Si la route
+parent rend directement un composant de page (sans Outlet), naviguer
+vers `/parent/child` affiche la page parent au lieu du child.
+
+**Symptôme** : `https://{host}/campagnes/creation` montre la liste des
+campagnes (parent) au lieu du formulaire de création (child). Build vert,
+aucun warning au compile.
+
+**Pattern correct (3 routes — layout + index + child)** :
+
+```tsx
+// src/routes/campagnes.tsx — LAYOUT (Outlet pass-through, aucune UI)
+import { createFileRoute, Outlet } from "@tanstack/react-router"
+
+function CampagnesLayoutComponent() {
+  return <Outlet />
+}
+
+export const Route = createFileRoute("/campagnes")({
+  component: CampagnesLayoutComponent,
+})
+```
+
+```tsx
+// src/routes/campagnes.index.tsx — INDEX (rendu sur /campagnes exact)
+import { createFileRoute } from "@tanstack/react-router"
+import { CampagnesListePage } from "@/pages/CampagnesListePage"
+
+export const Route = createFileRoute("/campagnes/")({
+  component: CampagnesListePage,
+})
+```
+
+```tsx
+// src/routes/campagnes.creation.tsx — CHILD (rendu sur /campagnes/creation)
+export const Route = createFileRoute("/campagnes/creation")({
+  component: CampagneCreationPage,
+})
+```
+
+**Anti-pattern** :
+
+```tsx
+// ❌ campagnes.tsx avec composant direct + enfants présents → child masqué
+export const Route = createFileRoute("/campagnes")({
+  component: CampagnesListePage,   // ← rendu sans Outlet, enfants ignorés
+})
+// + sibling campagnes.creation.tsx → /campagnes/creation rend CampagnesListePage
+```
+
+**Règle de planification (dev-frontend STEP 5)** : dès qu'une US génère
+un route fichier `{parent}.{child}.tsx` à côté d'un `{parent}.tsx`
+existant, **renommer le composant parent en layout `<Outlet/>`** et créer
+un `{parent}.index.tsx` séparé pour la route exacte. Ne JAMAIS laisser
+`{parent}.tsx` avec un composant de page direct ET un fichier child sibling.
+
+**Anti-pattern grep checklist** :
+```bash
+# Pour chaque parent.tsx ayant un sibling parent.{child}.tsx :
+# verifier que parent.tsx contient bien `<Outlet`
+grep -L "<Outlet" workspace/output/src/{AppName}/src/routes/{parent}.tsx
+# → 0 ligne attendue (le fichier doit contenir Outlet)
+```
+
+**Format ERROR si violation détectée** :
+```
+ERROR: dev-frontend {n}-{m} — parent route sans Outlet
+CAUSE: [ROUTING_PARENT_NO_OUTLET] routes/{parent}.tsx a des enfants
+       (routes/{parent}.{child}.tsx siblings) mais ne rend pas <Outlet/>
+       → les child routes seront masquées par le parent au runtime.
+FIX: split en 3 fichiers : {parent}.tsx (layout = <Outlet/>),
+     {parent}.index.tsx (rendu /parent), {parent}.{child}.tsx (rendu /parent/child).
+```
 
 ---
 
@@ -487,15 +569,71 @@ Frontend dev :
 
 http://localhost:5173
 
-Backend :
+Backend (port lu dynamiquement) :
 
-http://localhost:5099
+Le port backend dev est **autoritairement défini par le stack backend actif**. Pour
+`dotnet-minimalapi` (cf. `.claude/stacks/backend/dotnet-minimalapi.md §URLs de
+développement`) :
 
-Configuration API :
+| Profil launchSettings.json | URL |
+|---|---|
+| `http`  | `http://localhost:5143`  |
+| `https` | `https://localhost:7239` (+ fallback HTTP 5143) |
 
-.env
+Pour `node-express`, `python-fastapi`, `kotlin-spring-boot` : voir le `## URLs de
+développement` de chaque stack backend.
 
-VITE_API_BASE_URL=http://localhost:5099
+**Anti-pattern bloquant (post-mortem 2026-05-14)** : aucun port backend ne doit
+être hardcodé dans le frontend en dehors de la convention ci-dessous. Tout port
+inventé (`5000`, `5099`, `8080` sans alignement stack) → 500 / proxy error
+silencieux.
+
+Configuration API — **DEUX patterns mutuellement exclusifs** :
+
+**Pattern A — Proxy Vite** (recommandé, dev only, pas de CORS dev) :
+```typescript
+// vite.config.ts
+export default defineConfig({
+  server: {
+    port: 5173,
+    proxy: {
+      "/api": {
+        target: "http://localhost:5143",  // ← port backend HTTP du stack actif (LITTÉRAL)
+        changeOrigin: true,
+        secure: false,
+      },
+    },
+  },
+});
+```
+Côté code applicatif : appeler `fetch("/api/auth/login")` (chemin relatif). Pas
+de `VITE_API_BASE_URL` nécessaire en dev. En prod : `nginx`/`Caddy` rewrite ou
+même origine.
+
+**Pattern B — Variable d'env `VITE_API_BASE_URL`** :
+```
+# .env (dev)
+VITE_API_BASE_URL=http://localhost:5143
+```
+Côté code applicatif : `fetch(\`\${import.meta.env.VITE_API_BASE_URL}/api/auth/login\`)`.
+Pas de proxy Vite. Backend doit déclarer CORS pour `http://localhost:5173` (cf.
+stack backend §CORS).
+
+**Anti-pattern à grep en STEP build** (dev-frontend STEP 9) :
+```bash
+grep -nE 'target:\s*"http://localhost:(5000|5099|8000|8080|3000)"' workspace/output/src/{AppName}/vite.config.ts && \
+  echo "[STACK_DERIVE_VIOLATION] proxy target hors stack backend actif"
+```
+
+Format ERROR :
+```
+ERROR: dev-frontend {n}-{m} — proxy Vite target invalide
+CAUSE: [DERIVE_VIOLATION] vite.config.ts proxy target "{XXX}" ne correspond pas au port backend dev du stack actif
+       (dotnet-minimalapi : 5143 HTTP / 7239 HTTPS ; cf. launchSettings.json)
+FIX: 1. lire le port HTTP depuis workspace/output/src/{BackendName}/Properties/launchSettings.json (profil http.applicationUrl)
+     2. mettre target: "http://localhost:{port}" dans vite.config.ts
+     3. relancer le dev server Vite
+```
 
 ---
 
@@ -606,7 +744,7 @@ Hierarchie de styling :
 1. **Tokens globaux** (`src/index.css`) — variables CSS shadcn
    (`--background`, `--foreground`, `--primary`, etc.) injectees par
    `shadcn init`. Surcharge possible via `.claude/rules/ui-tokens.md §3`
-   pour matcher la fidelite design-spec.md §8.
+   pour matcher la fidelite design-FEAT.md §8.
 2. **Utility classes Tailwind** sur les composants — preferred path.
    Ex : `className="flex gap-4 px-6 py-4 rounded-lg bg-card"`.
 3. **`cn()` helper** (`src/lib/utils.ts`, genere par `shadcn init`) pour
@@ -793,4 +931,4 @@ npm --prefix workspace/output/src/{AppName} run build
 - Edition manuelle de `components.json` apres `shadcn init` (regenerer si besoin)
 - Engager `node_modules/`, `dist/`, `.env` dans le git
 
-# FIN SPEC
+# FIN FEAT

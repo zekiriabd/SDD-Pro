@@ -1,4 +1,8 @@
-﻿# QA Stack — Kotlin JUnit 5 + MockK + JaCoCo
+# QA Stack — Kotlin JUnit 5 + MockK + JaCoCo
+
+> §2.4 (Librairies) régénérée depuis `kotlin-junit.libs.json` — ne pas éditer manuellement (`python .claude/python/sdd_admin/sync_stack_md.py --stack-id kotlin-junit`).
+>
+> Validation: 🟢 reference (validated combo CMS — kotlin-spring-boot + react + shadcn + azure-ad, 2026-05-13)
 
 ## 1. Scope
 
@@ -28,7 +32,7 @@ S'applique aux projets `workspace/output/src/{BackendName}/` typés Kotlin.
 <!-- LIBS_CATALOG_START -->
 ### 2.4 Librairies
 
-> Source de verite : `.claude/stacks/qa/kotlin-junit.libs.json`. Ne pas editer cette section manuellement -- utiliser `.claude/scripts/sync-stack-md.ps1 -StackId kotlin-junit`.
+> Source de verite : `.claude/stacks/qa/kotlin-junit.libs.json`. Ne pas editer cette section manuellement -- utiliser `python .claude/python/sdd_admin/sync_stack_md.py --stack-id kotlin-junit`.
 
 #### 2.4.a Librairies CORE (installees par arch en section 2.2.1, toujours)
 
@@ -40,7 +44,7 @@ S'applique aux projets `workspace/output/src/{BackendName}/` typés Kotlin.
 
 ### 2.4.b Librairies ON-DEMAND (installees si l'US declenche)
 
-Triggers (regex case-insensitive) cherches par `detect-capabilities.ps1` dans l'US + ACs.
+Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'US + ACs.
 
 | Capability | Lib | Version | Triggers |
 |---|---|---|---|
@@ -111,7 +115,7 @@ tasks.jacocoTestCoverageVerification {
 
 <!-- CORE_PACKAGES_START -->
 ```bash
-# Auto-genere depuis kotlin-junit.libs.json -- ne pas editer (utiliser sync-stack-md.ps1).
+# Auto-genere depuis kotlin-junit.libs.json -- ne pas editer (utiliser sync_stack_md.py).
 # Gradle managed via build.gradle.kts + gradle/libs.versions.toml.
 # Versions auto-derivees de kotlin-junit.libs.json -- regenerer le catalog Gradle
 # en cas de bump (cf. gradle/libs.versions.toml).
@@ -260,14 +264,14 @@ cd workspace/output/src/{BackendName}
 Format : **JaCoCo XML**
 Path : `workspace/output/src/{BackendName}/build/reports/jacoco/test/jacocoTestReport.xml`
 
-Le script `parse-coverage.ps1` parse ce format via `Parse-JaCoCoXml`.
+Le script `parse_coverage.py` parse ce format via `Parse-JaCoCoXml`.
 
 ---
 
 ## 8. Naming conventions
 
 - Fichiers : `{ClassName}Test.kt` (suffixe `Test`)
-- Classes : `{ClassName}Test` ou `{ClassName}Spec`
+- Classes : `{ClassName}Test` ou `{ClassName}FEAT`
 - Méthodes : conventions Kotlin permettent les noms en backticks lisibles
   - Ex. : `` `login with valid credentials returns token` ``
   - Alt. : `loginWithValidCredentialsReturnsToken`

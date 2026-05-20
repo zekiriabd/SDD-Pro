@@ -2,33 +2,33 @@
 
 ## Principe
 
-Le fichier `workspace/output/context/constitution.md` est la **source de vérité
+Le fichier `workspace/output/.sys/.context/constitution.md` est la **source de vérité
 partagée** entre tous les agents SDD_Pro. Il garantit la cohérence
-sémantique cross-SPEC (glossaire, acteurs, conventions) et trace les
+sémantique cross-FEAT (glossaire, acteurs, conventions) et trace les
 décisions architecturales (ADRs).
 
-Chaque ADR (`workspace/output/context/adrs/ADR-{nnn}-{slug}.md`) trace **une
+Chaque ADR (`workspace/output/.sys/.context/adrs/ADR-{nnn}-{slug}.md`) trace **une
 décision structurante** au format Context / Decision / Consequences.
 
 ---
 
 ## 1. Création initiale
 
-`/spec-generate` (premier appel sur un projet) bootstrap la constitution
+`/feat-generate` (premier appel sur un projet) bootstrap la constitution
 avec :
 - §1 Identité (`ProjectName` = `AppName` du `workspace/input/stack/stack.md` si
   défini, sinon nom du dossier projet)
 - §2 Glossaire (vide initialement, étendu par les agents)
-- §3 Acteurs (extraits de la SPEC créée)
+- §3 Acteurs (extraits de la FEAT créée)
 - §4 Stack technique (`<à compléter par /arch-init>`)
 - §5 Conventions (références CLAUDE.md §3-§4, vide pour 5.3)
 - §6 ADRs (vide initialement)
-- §7 Risques (vide tant que `/spec-deepen` n'a pas tourné)
+- §7 Risques (vide tant que `/feat-deepen` n'a pas tourné)
 - §8 Index des écrivains (statique)
 
-**Idempotent** : si `workspace/output/context/constitution.md` existe déjà, ne
+**Idempotent** : si `workspace/output/.sys/.context/constitution.md` existe déjà, ne
 JAMAIS l'écraser. Étendre seulement les acteurs (§3) et termes (§2)
-de la nouvelle SPEC.
+de la nouvelle FEAT.
 
 ---
 
@@ -51,14 +51,14 @@ sont :
 
 | Agent / Commande | Sections autorisées | Mode | Phase |
 |---|---|---|---|
-| `/spec-generate` | §1 (bootstrap), §2-3 (init) | Création ou extend | 1 |
-| Agent `elicitor` (`/spec-deepen`) | §7 (risques, hypothèses) | Append-only | 1.5 |
+| `/feat-generate` | §1 (bootstrap), §2-3 (init) | Création ou extend | 1 |
+| Agent `elicitor` (`/feat-deepen`) | §7 (risques, hypothèses) | Append-only | 1.5 |
 | Agent `po` | §2 (nouveaux termes), §3 (nouveaux acteurs) | Append-only | 2 |
 | Agent `arch` | §4 (stack final + DatabaseType), §6 (ADRs index) | Update §4 / Append §6 | 4 |
 
 **Modifié en v3.0.1** : les **agents `dev-*` sont désormais STRICTEMENT
 read-only** sur `constitution.md`. Ils créent leurs ADRs en fichiers
-indépendants (`workspace/output/context/adrs/ADR-{timestamp}-{slug}.md` —
+indépendants (`workspace/output/.sys/.context/adrs/ADR-{timestamp}-{slug}.md` —
 numérotation atomique, voir §4) **sans toucher §6**. L'index §6 est
 rebuild par le prochain `arch` ou ignoré (la source de vérité = les
 fichiers ADR eux-mêmes).
@@ -82,11 +82,11 @@ append simple) est dépréciée :
    `templates/constitution.template.md`) est détectée et **remplacée**
    par le 1er acteur (Edit, pas append).
 2. **Append normal** pour les acteurs suivants ou si pas de placeholder.
-3. **Edit in-place** sur la 3ᵉ colonne (`SPECs concernées`) si l'acteur
-   est déjà listé pour une autre SPEC.
+3. **Edit in-place** sur la 3ᵉ colonne (`FEATs concernées`) si l'acteur
+   est déjà listé pour une autre FEAT.
 4. **Validation read-back obligatoire** : à la fin du STEP, l'agent
    re-Read constitution.md et vérifie que **tous** les acteurs de la
-   section `## Actors` de la SPEC parente apparaissent en colonne 1
+   section `## Actors` de la FEAT parente apparaissent en colonne 1
    du tableau §3, ET qu'il n'y a plus de ligne placeholder.
 5. **STOP + ERROR si validation échoue** : un STEP 8.5 ne peut plus
    se terminer silencieusement vide.
@@ -159,13 +159,13 @@ ADR.
 
 **Comportement par phase** :
 - **Arch (phase 4)** : après création de chaque ADR, append une ligne
-  dans le tableau §6 de `workspace/output/context/constitution.md` :
+  dans le tableau §6 de `workspace/output/.sys/.context/constitution.md` :
   ```markdown
   | ADR-{YYYYMMDDTHHmmss}-{slug} | <titre> | Accepted | 4-ARCH |
   ```
 - **Dev-* (phase 5)** : crée uniquement le fichier ADR. L'index §6
   reste à jour seulement pour les ADRs phase 4. Pour les ADRs phase
-  5, la source de vérité = `Glob workspace/output/context/adrs/*.md`.
+  5, la source de vérité = `Glob workspace/output/.sys/.context/adrs/*.md`.
 
 Pour reconstruire l'index §6 manuellement après une session
 `/dev-run` qui aurait produit des ADRs : prochaine invocation `arch`
@@ -199,7 +199,7 @@ Pour reconstruire l'index §6 manuellement après une session
   rationale)
 - Aucun ADR ne supersede sans le mentionner explicitement (`Superseded
   by ADR-XXX` dans l'ADR antérieur)
-- Aucun ADR ne dépend d'une SPEC ou US qui n'existe pas
+- Aucun ADR ne dépend d'une FEAT ou US qui n'existe pas
 - La constitution n'est jamais réécrite intégralement par un agent —
   uniquement étendue
 - En cas de conflit entre constitution.md et un ADR plus récent, l'ADR
@@ -210,7 +210,7 @@ Pour reconstruire l'index §6 manuellement après une session
 ## 7. Localisation des fichiers
 
 ```
-workspace/output/context/
+workspace/output/.sys/.context/
 ├── constitution.md                    # 1 fichier projet, partagé
 └── adrs/
     ├── ADR-001-{slug}.md

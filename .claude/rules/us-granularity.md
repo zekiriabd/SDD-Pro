@@ -10,18 +10,18 @@ Les **détails techniques** sont planifiés inline par les agents
 `dev-backend` et `dev-frontend` à partir de l'US, pas dans l'US elle-même.
 
 Cette règle s'applique au moment où l'agent PO transforme les SFD bullets
-d'une SPEC en User Stories structurées.
+d'une FEAT en User Stories structurées.
 
 ---
 
 ## 1. Seuils (depuis SDD_Pro v2.5 — soft warning 4-6)
 
-- **Min 1 US par SPEC** : une feature triviale a une seule US.
+- **Min 1 US par FEAT** : une feature triviale a une seule US.
 - **Cible 1-3 US** pour la plupart des features bien scopées.
 - **Zone WARNING 4-6 US** : tolérée, mais l'agent PO émet un WARNING
   invitant à reconsidérer le découpage. Le pipeline continue.
-- **Hard cap 6 US** : au-delà, STOP + ERROR. La SPEC est trop large et
-  doit être splittée en plusieurs SPECs au niveau PO humain.
+- **Hard cap 6 US** : au-delà, STOP + ERROR. La FEAT est trop large et
+  doit être splittée en plusieurs FEATs au niveau PO humain.
 
 Comportement de l'agent PO selon le nombre `N` d'US générées :
 
@@ -33,22 +33,22 @@ Comportement de l'agent PO selon le nombre `N` d'US générées :
 
 WARNING (zone 4-6) :
 ```
-WARNING: spec {n}-{Name} génère {N} US (zone 4-6 — tolérée mais à reconsidérer)
+WARNING: FEAT {n}-{Name} génère {N} US (zone 4-6 — tolérée mais à reconsidérer)
 HINT: vérifier si certaines US ne sont pas des comportements dérivés (ACs) ou des détails techniques (plan inline dev-*)
 ```
 
 ERROR (> 6) :
 ```
-ERROR: spec {n}-{Name} produces {N} US (> 6 hard cap)
-CAUSE: SPEC trop large OU découpage 1:1 SFD → US au lieu de regrouper par flux
-FIX: regrouper les SFD bullets par flux utilisateur OU splitter la SPEC en plusieurs SPECs
+ERROR: FEAT {n}-{Name} produces {N} US (> 6 hard cap)
+CAUSE: FEAT trop large OU découpage 1:1 SFD → US au lieu de regrouper par flux
+FIX: regrouper les SFD bullets par flux utilisateur OU splitter la FEAT en plusieurs FEATs
 ```
 
 ---
 
 ## 2. Règle de regroupement — flux utilisateur, pas bullet 1:1
 
-Pour chaque SFD bullet de la SPEC, classifier :
+Pour chaque SFD bullet de la FEAT, classifier :
 
 1. **Action utilisateur distincte** (verbe actif : se connecter, consulter,
    créer, exporter) → candidat US
@@ -61,7 +61,7 @@ Pour chaque SFD bullet de la SPEC, classifier :
 
 ### Exemple — 11 SFD bullets → 3 US
 
-SPEC `1-Auth.md` avec 11 SFD bullets décrivant authentification Azure AD :
+FEAT `1-Auth.md` avec 11 SFD bullets décrivant authentification Azure AD :
 - Mauvais : 11 US (1:1)
 - Bon : **3 US** (Connexion, Déconnexion, Autorisation par groupes)
 - Chaque SFD reste couvert via le champ `Covers` d'au moins une US.
@@ -109,16 +109,16 @@ US-X : *"Mode dégradé si mapping absent"* ❌
 
 ## 5. Traçabilité 100% (non négociable)
 
-Chaque élément de la SPEC parente DOIT apparaître dans le `Covers` d'au moins
+Chaque élément de la FEAT parente DOIT apparaître dans le `Covers` d'au moins
 une US :
-- Tous les **SFD bullets** (`## Functional Needs` de la SPEC, préfixés `SFD-N:`)
+- Tous les **SFD bullets** (`## Functional Needs` de la FEAT, préfixés `SFD-N:`)
 - Toutes les **Business Rules** (`## Business Rules`)
-- Tous les **Acceptance Criteria** de la SPEC (`## Acceptance Criteria`)
+- Tous les **Acceptance Criteria** de la FEAT (`## Acceptance Criteria`)
 - Tous les **Functional Deliverables** (`## Functional Deliverables`)
 
-Si un élément SPEC n'est couvert par aucune US → STOP + ERROR :
+Si un élément FEAT n'est couvert par aucune US → STOP + ERROR :
 ```
-ERROR: spec {n}-{Name} traceability gap
+ERROR: FEAT {n}-{Name} traceability gap
 CAUSE: {SFD-3, BR-2} non couverts par les US générées
 FIX: ajouter ces éléments au Covers d'une US existante OU créer une US dédiée
 ```

@@ -30,7 +30,9 @@
     "caching-redis": "9.0.0",
     "mapster": "7.4.0",
     "mailkit": "4.8.0",
-    "mimekit": "4.8.0"
+    "mimekit": "4.8.0",
+    "bcrypt-net": "4.0.3",
+    "jwt-bearer": "10.0.6"
   },
   "dbDrivers": {
     "sqlserver": { "module": "Microsoft.EntityFrameworkCore.SqlServer", "ref": "ef-core" }
@@ -66,7 +68,9 @@
     { "module": "Microsoft.Extensions.Caching.StackExchangeRedis", "ref": "caching-redis", "capability": "redis-cache", "triggers": ["\\bredis\\b", "cache distribu", "distributed cache"] },
     { "module": "Mapster", "ref": "mapster", "capability": "fast-mapping", "triggers": ["mapster\\b", "mapping perf", "high.?performance.*mapp"] },
     { "module": "MailKit", "ref": "mailkit", "capability": "email", "triggers": ["\\bsmtp\\b", "envoi.*email", "envoi.*courriel", "send.*email", "email.*notification", "notification.*par.*email", "mail.*confirmation", "verifier.*email"] },
-    { "module": "MimeKit", "ref": "mimekit", "capability": "email", "triggers": ["\\bsmtp\\b", "envoi.*email", "envoi.*courriel", "send.*email", "email.*notification", "notification.*par.*email", "mail.*confirmation", "verifier.*email"] }
+    { "module": "MimeKit", "ref": "mimekit", "capability": "email", "triggers": ["\\bsmtp\\b", "envoi.*email", "envoi.*courriel", "send.*email", "email.*notification", "notification.*par.*email", "mail.*confirmation", "verifier.*email"] },
+    { "module": "BCrypt.Net-Next", "ref": "bcrypt-net", "capability": "auth-local", "triggers": ["bcrypt", "password.*hash", "hash.*password", "motdepasse.*hash", "mot.*passe.*hash", "auth-local", "password_hash", "verify.*password", "connexion.*mot.*passe", "inscription", "register.*user"] },
+    { "module": "Microsoft.AspNetCore.Authentication.JwtBearer", "ref": "jwt-bearer", "capability": "auth-local", "triggers": ["\\bjwt\\b", "jsonwebtoken", "bearer.*token", "auth-local", "issue.*token", "verify.*token", "validate.*token", "jwt.*authent", "token.*authent", "authorize.*attribute", "\\[Authorize\\]"] }
   ],
   "plugins": [],
   "metadata": { "lastUpdated": "2026-05-07", "format": "compact (v2)" }
