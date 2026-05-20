@@ -59,41 +59,45 @@ def _load_ledger(path: Path | None = None) -> list[dict[str, Any]]:
 
     v6.10.4-LTS PATCH: uses ``connect_ro()`` — does not require a writable
     DB directory, does not toggle journal_mode to WAL, and raises a clear
-    ``FileNotFoundError`` if the DB has never been bootstrapped."""
+    ``FileNotFoundError`` if the DB has never been bootstrapped.
+
+    The ``FileNotFoundError`` is raised at ``__enter__`` of the context
+    manager (not at construction), so the try/except must wrap the
+    ``with`` statement, not the ``connect_ro()`` call."""
     entries: list[dict[str, Any]] = []
     try:
-        ro_conn = connect_ro()
+        with connect_ro() as conn:
+            cur = conn.execute(
+                """
+                SELECT ts, agent, model, feat_n, us_id,
+                       input_tokens, output_tokens,
+                       cache_creation_tokens, cache_read_tokens
+                  FROM token_usage
+                 ORDER BY ts ASC
+                """
+            )
+            rows = cur.fetchall()
     except FileNotFoundError as exc:
         warn(str(exc))
         return entries
-    with ro_conn as conn:
-        cur = conn.execute(
-            """
-            SELECT ts, agent, model, feat_n, us_id,
-                   input_tokens, output_tokens,
-                   cache_creation_tokens, cache_read_tokens
-              FROM token_usage
-             ORDER BY ts ASC
-            """
+    for row in rows:
+        has_tokens = any(
+            int(row[k] or 0) > 0
+            for k in ("input_tokens", "output_tokens",
+                      "cache_creation_tokens", "cache_read_tokens")
         )
-        for row in cur:
-            has_tokens = any(
-                int(row[k] or 0) > 0
-                for k in ("input_tokens", "output_tokens",
-                          "cache_creation_tokens", "cache_read_tokens")
-            )
-            entries.append({
-                "ts": row["ts"],
-                "subagent_type": row["agent"],
-                "model": row["model"],
-                "feat": row["feat_n"],
-                "us_id": row["us_id"],
-                "input_tokens": row["input_tokens"],
-                "output_tokens": row["output_tokens"],
-                "cache_creation_input_tokens": row["cache_creation_tokens"],
-                "cache_read_input_tokens": row["cache_read_tokens"],
-                "raw_usage_found": has_tokens,
-            })
+        entries.append({
+            "ts": row["ts"],
+            "subagent_type": row["agent"],
+            "model": row["model"],
+            "feat": row["feat_n"],
+            "us_id": row["us_id"],
+            "input_tokens": row["input_tokens"],
+            "output_tokens": row["output_tokens"],
+            "cache_creation_input_tokens": row["cache_creation_tokens"],
+            "cache_read_input_tokens": row["cache_read_tokens"],
+            "raw_usage_found": has_tokens,
+        })
     return entries
 
 

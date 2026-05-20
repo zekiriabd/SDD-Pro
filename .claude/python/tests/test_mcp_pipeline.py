@@ -116,7 +116,7 @@ class TestSddFullCommandBuilder(unittest.TestCase):
 
 class TestSddFullAsync(unittest.TestCase):
     def test_spawn_returns_job_id_and_persists_state(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp)
             _make_fake_repo(root)
             with (
@@ -146,7 +146,7 @@ class TestSddFullAsync(unittest.TestCase):
             self.assertIn(terminal, ("success", "failed", "running"))
 
     def test_status_unknown_job(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp)
             _make_fake_repo(root)
             with mock.patch.object(Path, "cwd", return_value=root):
@@ -155,7 +155,7 @@ class TestSddFullAsync(unittest.TestCase):
             self.assertEqual(result["_meta"]["exitCode"], 2)
 
     def test_no_claude_returns_127(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp)
             _make_fake_repo(root)
             with (
@@ -176,7 +176,7 @@ class TestSddFullAsync(unittest.TestCase):
 
 class TestListJobs(unittest.TestCase):
     def test_empty_returns_zero(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp)
             _make_fake_repo(root)
             with mock.patch.object(Path, "cwd", return_value=root):
@@ -185,7 +185,7 @@ class TestListJobs(unittest.TestCase):
             self.assertEqual(result["_meta"]["payload"]["total"], 0)
 
     def test_filter_by_status(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp)
             _make_fake_repo(root)
             s1 = job_store.JobState(
@@ -205,7 +205,7 @@ class TestListJobs(unittest.TestCase):
 
 class TestCancel(unittest.TestCase):
     def test_cancel_unknown_returns_error(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp)
             _make_fake_repo(root)
             with mock.patch.object(Path, "cwd", return_value=root):
@@ -213,7 +213,7 @@ class TestCancel(unittest.TestCase):
             self.assertTrue(result["isError"])
 
     def test_cancel_terminal_is_noop(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp)
             _make_fake_repo(root)
             state = job_store.JobState(

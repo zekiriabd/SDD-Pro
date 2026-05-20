@@ -45,7 +45,12 @@ def _setup_fake_repo(root: Path) -> None:
 
 class TestSddState(unittest.TestCase):
     def setUp(self) -> None:
-        self.tmp = tempfile.TemporaryDirectory()
+        # ignore_cleanup_errors=True : on Windows, SQLite keeps -shm/-wal
+        # file handles alive past the test (the subprocess that opened
+        # the DB has exited but the OS lock may linger briefly). Without
+        # this flag, tearDown raises WinError 145 (directory not empty).
+        # The temp dir lives under %TEMP% and is GC'd by the OS anyway.
+        self.tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
         self.fake = Path(self.tmp.name)
         _setup_fake_repo(self.fake)
         self.db_path = self.fake / "workspace" / "output" / "db" / "console.db"
