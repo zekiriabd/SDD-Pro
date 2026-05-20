@@ -702,7 +702,7 @@ python .claude/python/sdd_scripts/sdd_state.py set-phase \
 Exécuter **systématiquement** après le gated workflow pour régénérer :
 
 ```bash
-python -m sdd_scripts.index_adrs
+python .claude/python/sdd_scripts/index_adrs.py
 ```
 
 Sortie : `workspace/output/.sys/.context/adrs/INDEX.md` (utile : `dev-*`

@@ -18,6 +18,201 @@ Format : [version] — date courte. Sections : `Breaking`, `Added`, `Changed`, `
 
 ---
 
+## [Unreleased — v7.0.0-alpha] — 2026-05-20 (branche `next` only, 21 commits)
+
+> **Scope** : implémentation effective des 4 ADRs `governance-major-*` les plus
+> impactants + résolution des P0 du **Codex CTO audit (2026-05-20)**. Le
+> tag v7.0.0 final attend la sortie du freeze (2026-06-19) + revue 2 mainteneurs.
+>
+> **Sur `main` : RIEN ne change** pendant le freeze (politique strict PATCH).
+> Cette entrée documente l'état de la branche `next` au 2026-05-20 pour
+> éviter le drift "21 commits non tracés" que le freeze était précisément
+> censé prévenir.
+
+### Breaking — agents retirés
+
+- **`accessibility-auditor`** (Haiku 4.5, v6.3.0-v6.10.5) supprimé.
+  Remplacement : `axe-core` intégré au CI du projet généré. Classes
+  `[A11Y_*]` (§1.9 error-classification.md) conservées comme schéma
+  de mapping futur. Défaut `A11yMode` flippé `full` → `"off"`.
+- **`performance-auditor`** (Sonnet 4.6, v6.4.0-v6.10.5) supprimé.
+  Remplacement : Lighthouse CI + wrk/k6 au CI du projet généré.
+  Classes `[PERF_*]` (§1.12) conservées. Défaut `PerfMode` flippé `full` → `"off"`.
+- **`dashboard`** (Haiku 4.5) supprimé. Remplacement déterministe :
+  `python .claude/python/sdd_scripts/index_adrs.py` (0 token, ~50 ms,
+  même output `INDEX.md`).
+- **`dev-backend-strict` + `dev-frontend-strict`** (Sonnet 4.6, v6.2)
+  supprimés. Variants opt-in `PlanCacheStrict: true` jamais exercés
+  en prod (défaut `false` 95 % du temps). Plan v2 schema (`## Inline
+  Digest`) **préservé** pour review humaine — n'oriente plus vers un
+  agent alternatif. Clé `PlanCacheStrict` tolérée en lecture, sans
+  effet runtime.
+- **`security-reviewer` mode `threat-model`** supprimé. L'agent reste
+  (mode `scan` OWASP Top 10 uniquement). Remplacement : template humain
+  `.claude/templates/threat-model.template.md` (STRIDE light, ~150 LOC).
+  Flag `--mode threat-model` toléré en lecture, no-op runtime.
+
+### Breaking — defaults Project Config flippés (codex audit P0)
+
+- `CodeReviewMode: manual` → **`full`** (codex P0 #5)
+- `SecurityMode: manual` → **`full`** (codex follow-up #1)
+- `SpecComplianceMode: manual` → **`full`** (codex P0 #5)
+- `TokenUsageMode: "off"` → **`"record"`** (codex P0 #4 — permet de mesurer le coût réel par FEAT)
+- `ReviewFailOnSddFull: false` → **`true`** (codex P0 #9 — /sdd-review verdict RED stoppe /sdd-full)
+- `A11yMode: full` → **`"off"`** (agent retiré)
+- `PerfMode: full` → **`"off"`** (agent retiré)
+- `SecurityThreatModelEnabled: true` → **`false`** (mode retiré)
+
+> Bypass : déclarer la clé explicitement dans `workspace/input/stack/stack.md
+> ## Project Config` (project layer wins).
+
+### Breaking — stacks en quarantaine
+
+10 stacks déplacés vers `.claude/stacks/_drafts/` (non chargés par
+`framework_smoke.py` ni `validate_libs_catalog.py`) :
+- `fullstack/*` × 6 : `angular-universal`, `blazor-server`,
+  `kotlin-mustache`, `next`, `node-react`, `nuxt`
+- `mobiles/*` × 2 : `maui`, `react-native`
+- `archi/*` × 2 : `ddd` (YAML pseudo-DSL non parseable), `microservice`
+
+> Réactivation : PoC ROI validé (`docs/poc-roi-methodology.md`) + ADR
+> `governance-restore-stack-{id}` + `git mv` retour vers la catégorie
+> parente. Cf. `.claude/stacks/_drafts/README.md`.
+
+CLAUDE.md §7 réconcilié avec les entêtes `Validation:` réels des stacks :
+- Backend : `python-fastapi`, `node-express` rétrogradés 🟢 → 🟡
+- Frontend : `vue`, `angular` rétrogradés 🟢 → 🟡
+- Combos validés bout-en-bout : **2 sur ~120 possibles** (dotnet-minimalapi
+  × react × shadcn ; kotlin-spring-boot × react × shadcn).
+
+### Added
+
+- **Infrastructure migration `console.db`** (`sdd_lib/migrations/` + helper
+  `apply_pending_migrations()`) — forward-only, atomique par fichier,
+  nommage `NNNN_slug.sql`. Premier path de migration prêt pour évolution
+  schema sans `--force-recreate` (data loss). Doc :
+  `sdd_lib/migrations/README.md`.
+- **`sdd_scripts/index_adrs.py`** (~150 LOC + 0 LLM) — remplace l'agent
+  `dashboard` retiré. Atomic write + read-back self-check.
+- **`sdd_scripts/report_roi.py`** (~450 LOC, codex P0 #10) — rapport ROI
+  agrégé par FEAT depuis `console.db` : wall-clock, **phase-by-phase
+  timing** (codex follow-up), tokens réels par agent×modèle avec
+  pricing table USD (Opus/Sonnet/Haiku, cache_creation vs cache_read
+  distincts), coverage, AC verification rate, **rework rate** (codex
+  follow-up), issue counts par sévérité. Markdown + JSON outputs.
+- **Flag `/sdd-review --ensure-scans`** (codex follow-up #2) — exit
+  code 3 + `[REVIEW_SOURCES_MISSING]` si une source auditeur obligatoire
+  (quality, code-review, security, spec) a 0 lignes en DB pour la FEAT.
+  Liste les invocations exactes à re-lancer.
+- **Templates** : `.claude/templates/threat-model.template.md` (STRIDE
+  light, 8 sections : assets / actors / surfaces / threats / controls /
+  residual / ADRs / review). Livrable humain ~15-30 min par FEAT.
+- **Auto-détection CI** dans `preflight_agent_budget.py` (codex
+  follow-up #3) — `SDD_BUDGET_MODE` flippe `warn` → `strict` automatiquement
+  si `CI` / `GITHUB_ACTIONS` / `GITLAB_CI` / `CIRCLECI` / `JENKINS_URL` /
+  `BUILDKITE` / `TRAVIS` / `TF_BUILD` / `BITBUCKET_BUILD_NUMBER` détecté.
+- **Tests Python (+45)** :
+  - `tests/test_console_db.py` (12) : init fresh, idempotence,
+    `connect_ro` FileNotFoundError, migrations round-trip, DB ahead-of-framework warn,
+    **WAL concurrent writers** (8 threads), pragma WAL appliqué.
+  - `tests/test_file_locks.py` (14) : `try_create_exclusive` atomique,
+    `read_lock` malformed, stale recovery `acquire_with_retry`,
+    **8-thread race only-one-winner**, payload pid+ts.
+  - `tests/test_report_roi.py` (17) : pricing par modèle, fallback unknown,
+    cache_creation vs cache_read, rework détection + rework_rate, phase
+    timing aggregation.
+
+### Changed
+
+- **`error-classification.md`** : §1.14-§1.19 (taxonomie tooling/governance/
+  arch-review/review-orchestrator) compactée en un seul §1.14
+  "Tooling & Governance (compact)" — 125 LOC → 70 LOC sans perte de
+  classe. §3 build_loop comportement : tableau 19 lignes → décision
+  binaire + §3.1 par famille. §1.9 + §1.12 reçoivent bandeaux
+  "agent retiré v7.0.0 — classes conservées comme mapping schema".
+  Total : 534 → 489 LOC.
+- **CLAUDE.md** : H1 "v6.10.4-LTS" → "v7.0.0-alpha (branche next)" pour
+  refléter la réalité (codex P0 #1 version stability).
+- **`phase_planner.py`** : `_decide_a11y` / `_decide_perf` annotent
+  chaque phase avec `agent_removed: true` + `replacement: "..."` pour
+  signaler aux consumers JSON que la phase est planifiée mais non
+  actionnable.
+
+### Fixed
+
+- **Codex P0 #2** : `/dev-run` STEP 6.4 et `/qa-generate` STEP 6.4 ne
+  spawn plus les agents supprimés (`accessibility-auditor`,
+  `performance-auditor`). Notes de migration ajoutées vers axe-core /
+  Lighthouse CI.
+- **Codex P0 #3** : `preflight_agent_budget.py` hook ALLOWED_AGENTS
+  resynchronisé — inclut désormais les 4 reviewers v7.0.0
+  (`code-reviewer`, `security-reviewer`, `spec-compliance-reviewer`,
+  `arch-reviewer`) qui n'étaient pas dans la whitelist (CRIT v6.5+
+  jamais résolu). Le hook rejette désormais activement
+  `accessibility-auditor` et `performance-auditor` (agents retirés).
+- **Tests rouges réparés** :
+  - `test_report_token_usage::test_empty_when_db_empty` :
+    `_load_ledger()` enroule correctement le contextmanager
+    `connect_ro()` dans son try/except (l'exception lève à `__enter__`,
+    pas à la construction).
+  - `test_sdd_state::test_show_run_emits_full_json` +
+    `test_mcp_pipeline` × 7 + `test_mcp_tools` × 6 +
+    **22 test files Windows tempdir** : ajout systématique
+    `ignore_cleanup_errors=True` sur `TemporaryDirectory()` —
+    SQLite -shm/-wal handles intermittents sur Windows.
+  - `test_mcp_http` port-race : refonte `_start_server()` pour
+    bind atomique sur port 0 + connection probe ready-wait, élimine
+    la fenêtre TOCTOU de l'ancien `_free_port()` + `_start_server(port)`.
+
+### Removed
+
+- 2 fichiers `package.json` orphelins à la racine repo (32 KB de lockfile
+  pour 1 seul dep `@vitejs/plugin-basic-ssl` déjà catalogué dans
+  `frontend/react.libs.json`).
+- 5 agents `.md` (cf. Breaking §Agents) : `accessibility-auditor`,
+  `performance-auditor`, `dashboard`, `dev-backend-strict`,
+  `dev-frontend-strict`.
+
+### Stats v6.10.5 → v7.0.0-alpha
+
+| Métrique | Avant | Après | Δ |
+|---|---:|---:|---:|
+| Tests Python | 732 / 734 (2 red) | **777 / 777** | +45, 0 red |
+| Smoke | 84/84 | 83/83 OK | -1 (dashboard.md retiré) |
+| Agents actifs | 16 | **11** | -5 |
+| Reviewers actifs | 6 | **4** | -2 |
+| Stacks actifs | 31 | **17** | -14 (10 _drafts, 4 supprimés implicite des modes) |
+| LOC framework | ~69 500 | **~62 100** | **-7 400** |
+| Codex CTO P0 résolus | 0/10 | **9/10** | (#7 npm test + #8 pytest basetemp hors scope) |
+| Codex CTO follow-ups | 0/4 | **4/4** | ✓ |
+
+### Hors scope (différé v7.0.0 final ou post)
+
+- **Split `arch.md`** (882 LOC → 3 fichiers ~300 LOC) — ADR
+  `governance-major-prompts-trim` recommande, ~4-6h, session dédiée.
+- **Consolider 11 rules → 5** — ~6-8h, refactor cross-fichier.
+- **Réduire 17 → 8 commands publiques** — ~4h.
+- **Codex #7** : `npm test` console + test API Fastify minimal.
+- **Codex #8** : doc pytest `--basetemp=.pytest_tmp` pour sandboxes Windows.
+- **Vaporware à tenir ou retirer** : scripts `ingest_a11y_axe.py` +
+  `ingest_perf_lighthouse.py` mentionnés dans `error-classification.md`
+  §1.9/§1.12 — n'existent pas encore.
+- **Doc drift secondaire** : `architecture.md`, `glossary.md`,
+  `version-notes.md`, `MIGRATION.md` (guide v6 → v7) — pas mis à jour
+  dans cette pass.
+
+### Pour utilisateurs SDD_Pro
+
+- **Sur `main` v6.10.4-LTS** : aucun changement. Continuer à utiliser.
+- **Pour tester `next` v7.0.0-alpha** : `git checkout next`. Stack
+  experimental `fullstack/*` / `mobiles/*` cassés par défaut
+  (déplacés en `_drafts/`) — restaurer manuellement si nécessaire.
+  Agents `accessibility-auditor` / `performance-auditor` / `dashboard`
+  retirés → si vos workflows custom les invoquent, ils échoueront avec
+  "agent not found".
+
+---
+
 ## [v6.10.5] — 2026-05-19 (PATCH bug-fix CRIT-1 / CRIT-2 / CRIT-3 / CRIT-4)
 
 ### Fixed

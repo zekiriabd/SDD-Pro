@@ -540,7 +540,7 @@ sont propagés au récap STEP 5.
 Exécuter **systématiquement** :
 
 ```bash
-python -m sdd_scripts.index_adrs
+python .claude/python/sdd_scripts/index_adrs.py
 ```
 
 Régénère **un seul fichier** :

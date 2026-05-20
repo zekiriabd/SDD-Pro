@@ -41,13 +41,13 @@ l'index.
 ## STEP 1 — Exécuter le script
 
 ```bash
-python -m sdd_scripts.index_adrs
+python .claude/python/sdd_scripts/index_adrs.py
 ```
 
 Ou avec arguments explicites :
 
 ```bash
-python -m sdd_scripts.index_adrs \
+python .claude/python/sdd_scripts/index_adrs.py \
   --adrs-dir workspace/output/.sys/.context/adrs \
   --output workspace/output/.sys/.context/adrs/INDEX.md \
   --template .claude/templates/adrs-index.template.md
