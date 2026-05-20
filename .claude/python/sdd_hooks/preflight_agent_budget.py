@@ -31,7 +31,17 @@ from sdd_lib.stderr import warn  # noqa: E402
 
 
 ALLOWED_AGENTS: set[str] = {
-    "po", "arch", "dev-backend", "dev-frontend", "qa", "dashboard", "elicitor",
+    # Core + support (4 + 3 + 1)
+    "po", "arch", "dev-backend", "dev-frontend",
+    "qa", "elicitor", "constitutioner",
+    "dashboard",
+    # Auditors retained in v7.0.0 (4) — accessibility-auditor and
+    # performance-auditor were removed in v7.0.0
+    # (governance-major-auditors-trim) ; their context_budget script
+    # entries remain for legacy reading of historical runs but the
+    # hook intentionally rejects new invocations.
+    "code-reviewer", "security-reviewer",
+    "spec-compliance-reviewer", "arch-reviewer",
 }
 
 

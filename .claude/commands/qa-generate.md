@@ -209,64 +209,20 @@ pour le pipeline qa-generate (le `.md` reste lisible humainement).
 
 ---
 
-## STEP 6.4 — Performance audit (auto, depuis v6.4.2)
+## STEP 6.4 — Performance audit (RETIRÉ v7.0.0)
 
-**Conditionnel** : invoque l'agent `performance-auditor` (Sonnet 4.6)
-si `phase_planner.py` indique `perf_audit.enabled == true`. **Activé
-par défaut** depuis v6.4.3 (`PerfMode: full`). Désactivable via
-`PerfMode: off` (jamais invoqué) ou `PerfMode: manual` (skip sauf si
-une AC de la FEAT mentionne explicitement une métrique perf —
-LCP/p95/... — override automatique).
-
-### 6.4.1 — Décision
-
-```bash
-PHASE_PLAN=$(python .claude/python/sdd_scripts/phase_planner.py \
-  --feat-number {n} --json 2>/dev/null)
-PERF_ENABLED=$(echo "$PHASE_PLAN" | python -c \
-  "import json,sys; d=json.load(sys.stdin); print(d['phases']['perf_audit']['enabled'])" 2>/dev/null)
-```
-
-### 6.4.2 — Invocation (si enabled)
-
-```
-Agent(performance-auditor, args="{n}")
-```
-
-L'agent produit `workspace/output/qa/feat-{n}/perf-report.{md,json}`
-+ optionnellement `.lighthouse-raw.json` si Lighthouse CI dispo.
-
-### 6.4.3 — Lecture verdict + propagation (v6.10 : depuis console.db)
-
-```bash
-VERDICT=$(python .claude/python/sdd_scripts/query_console_db.py perf --feat {n} \
-  | python -c "import json,sys; print(json.load(sys.stdin).get('verdict') or 'GREEN')")
-```
-
-Le rapport JSON a déjà été ingéré et supprimé par l'agent
-`performance-auditor` (STEP 9.5). Le verdict consolidé vit dans la
-table `qa_performance` de `workspace/output/db/console.db`.
-
-| Verdict | Action |
-|---|---|
-| 🟢 GREEN | continue STEP 6.5 |
-| 🟡 WARN  | continue + log WARN dans STEP 7 récap |
-| 🔴 RED   | log dans STEP 7, **non bloquant** (perf est contextuelle, sauf `[PERF_AC_VIOLATION]` hard-blocking qui ramène à un STOP propagé au caller `/dev-run` si appelé en chaîne) |
-
-### 6.4.4 — Skip silencieux
-
-Si `PERF_ENABLED == false` :
-```
-⊘ performance-auditor : skipped ({skip_reason du planner})
-```
-
-### 6.4.5 — State tracking
-
-```bash
-python .claude/python/sdd_scripts/sdd_state.py set-phase \
-  --run-id $RUN_ID --phase perf_audit --status {pass|warn|fail|skip} \
-  --payload-json '{"verdict":"{verdict}","lcp_ms":N,"bundle_kb":N}'
-```
+> **v7.0.0 (governance-major-auditors-trim)** : l'agent `performance-auditor`
+> (Sonnet 4.6, v6.4.0-v6.10) est **supprimé**. Le défaut `PerfMode` est
+> flippé `full → off` dans `config.base.yml`. La phase est conservée
+> dans `phase_planner.py` pour backward-compat des consumers JSON, mais
+> aucun spawn n'est tenté ici — passer directement à STEP 7.
+>
+> **Remplacement** : Lighthouse CI + wrk/k6 dans le CI du projet généré
+> (cf. templates `runbook.template.md` et `slo-sli.template.md`).
+>
+> Les tables `qa_performance` de `console.db` et les classes `[PERF_*]`
+> de `error-classification.md §1.12` restent en place pour intégration
+> future avec les sorties Lighthouse CI.
 
 ---
 

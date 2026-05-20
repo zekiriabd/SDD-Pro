@@ -561,9 +561,9 @@ backend fragile.
 
 ---
 
-## STEP 6.4 — Auditor batch parallèle (code-review + a11y + security-scan + spec-compliance, v6.5.2)
+## STEP 6.4 — Auditor batch parallèle (code-review + security-scan + spec-compliance, v7.0.0)
 
-**Conditionnel** : invoque les 4 agents auditor **EN PARALLÈLE** (un
+**Conditionnel** : invoque les 3 agents auditor **EN PARALLÈLE** (un
 seul message Agent multi-tool-use) pour les phases enabled selon
 `phase_planner.py` (cf. STEP 5.5.1 — réutiliser `$PHASE_PLAN`).
 Lecture mode + verdicts post-exécution. Le verdict consolidé pilote
@@ -574,10 +574,11 @@ le passage à STEP 6.5 ou STOP.
 > calls indépendants dans un même message. Pattern identique à STEP 6.a
 > et 6.c. Ne pas casser.
 
-> **v6.5.2** : ajout de `spec-compliance-reviewer` au batch. Pattern
-> identique aux 3 autres auditeurs — indépendant, paths d'écriture
-> disjoints, opt-in via `SpecComplianceMode: full` (défaut `manual`
-> = skip).
+> **v7.0.0** : `accessibility-auditor` **retiré** du batch
+> (governance-major-auditors-trim). Remplacé par axe-core CI dans le
+> projet généré. Si `$PHASE_PLAN.a11y_audit.enabled == true` (legacy
+> Project Config qui n'a pas flippé `A11yMode: off`), l'entrée du batch
+> est **ignorée silencieusement** côté caller — pas d'agent à spawn.
 
 ### 6.4.1 — Construction du batch
 
@@ -585,12 +586,12 @@ le passage à STEP 6.5 ou STOP.
 BATCH = []  # liste d'invocations à dispatcher en parallèle
 if phases.code_review.enabled:
     BATCH.append(Agent("code-reviewer", args="{n}"))
-if phases.a11y_audit.enabled:
-    BATCH.append(Agent("accessibility-auditor", args="{n}"))
 if phases.security_scan.enabled:
-    BATCH.append(Agent("security-reviewer", args="{n} --mode scan"))
-if phases.spec_compliance.enabled:                              # v6.5.2
+    BATCH.append(Agent("security-reviewer", args="{n}"))   # --mode scan supprimé v7.0.0
+if phases.spec_compliance.enabled:
     BATCH.append(Agent("spec-compliance-reviewer", args="{n}"))
+# v7.0.0 : phases.a11y_audit ignored — agent removed.
+# Replacement : axe-core in the generated project's CI step.
 ```
 
 Si `BATCH == []` (toutes phases skipped) → skip STEP 6.4 entier,
@@ -604,14 +605,13 @@ dev-* (STEP 6.a, 6.c) — toutes les invocations sont indépendantes
 
 ### 6.4.2 — Lecture des verdicts
 
-Après réception des 4 (ou moins) agents, lire les rapports JSON :
+Après réception des 3 (ou moins) agents, lire les rapports JSON :
 
 | Agent | Verdict path | Champ |
 |---|---|---|
 | code-reviewer | `workspace/output/.sys/.validation/{n}-code-review.json` | `summary.verdict` |
-| accessibility-auditor | `workspace/output/qa/feat-{n}/a11y-report.json` | `summary.verdict` |
 | security-reviewer | `workspace/output/.sys/.validation/{n}-security-scan.json` | `summary.verdict` |
-| spec-compliance-reviewer (v6.5.2) | `workspace/output/.sys/.validation/{n}-spec-compliance.json` | `summary.verdict` |
+| spec-compliance-reviewer | `workspace/output/.sys/.validation/{n}-spec-compliance.json` | `summary.verdict` |
 
 Si un fichier attendu est absent (agent a STOP en erreur runtime) →
 agent considéré comme `🔴 RED` avec cause `[AUDITOR_RUNTIME_ERROR]`.
@@ -636,15 +636,13 @@ verdict_overall = max_severity({verdicts non-skipped})
 
 Verdicts :
   - code-reviewer       : {🟢|🟡|🔴} (blocking: {class si applicable})
-  - accessibility       : {🟢|🟡|🔴}
   - security-scan       : {🟢|🟡|🔴}
-  - spec-compliance     : {🟢|🟡|🔴}                              # v6.5.2
+  - spec-compliance     : {🟢|🟡|🔴}
 
 Rapports :
   - workspace/output/.sys/.validation/{n}-code-review.md
-  - workspace/output/qa/feat-{n}/a11y-report.md
   - workspace/output/.sys/.validation/{n}-security-scan.md
-  - workspace/output/.sys/.validation/{n}-spec-compliance.md     # v6.5.2
+  - workspace/output/.sys/.validation/{n}-spec-compliance.md
 
 Pour débloquer :
   1. Lire les rapports en 🔴 RED (issues critical/serious + suggestions FIX)
@@ -652,7 +650,7 @@ Pour débloquer :
   3. Relancer /dev-run {n} (idempotent : skip 6.a/6.b/6.c si stables, rerun 6.4)
 
 Bypass (à utiliser en connaissance de cause) :
-  - Baisser CodeReviewFailOn / SecurityFailOn / A11yFailOn / SpecComplianceFailOn dans Project Config
+  - Baisser CodeReviewFailOn / SecurityFailOn / SpecComplianceFailOn dans Project Config
   - Override hard-blocking impossible (secrets, SQL injection, contract drift)
 ```
 
@@ -662,9 +660,8 @@ Bypass (à utiliser en connaissance de cause) :
 
 ```
 ✓ code-reviewer       : {🟢 GREEN | 🟡 WARN} — {C}/{S}/{M}/{m} issues
-✓ accessibility       : {🟢 GREEN | 🟡 WARN} — {C}/{S}/{M}/{m} issues
 ✓ security-scan       : {🟢 GREEN | 🟡 WARN} — {C}/{S}/{M}/{m} issues
-✓ spec-compliance     : {🟢 GREEN | 🟡 WARN} — {V}/{T} ACs verified  # v6.5.2
+✓ spec-compliance     : {🟢 GREEN | 🟡 WARN} — {V}/{T} ACs verified
 FEAT {n} — auditor batch {🟢 GREEN | 🟡 WARN} (continue → dashboard)
 ```
 
@@ -678,7 +675,7 @@ Pour les agents skippés (phase disabled) :
 ```bash
 python .claude/python/sdd_scripts/sdd_state.py set-phase \
   --run-id $RUN_ID --phase auditor_batch --status {pass|warn|fail} \
-  --payload-json '{"code_review":"{verdict}","a11y":"{verdict}","security_scan":"{verdict}","spec_compliance":"{verdict}"}'
+  --payload-json '{"code_review":"{verdict}","security_scan":"{verdict}","spec_compliance":"{verdict}"}'
 ```
 
 ### 6.4.6 — Anti-derive

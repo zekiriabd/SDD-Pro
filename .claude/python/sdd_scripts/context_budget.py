@@ -49,16 +49,20 @@ from sdd_lib.stderr import warn  # noqa: E402
 
 
 ALLOWED_AGENTS: tuple[str, ...] = (
-    # Core + support agents (legacy)
-    "po", "arch", "dev-backend", "dev-frontend", "qa", "dashboard", "elicitor",
-    # Auditors (v6.3+ — accessibility, v6.3.1+ — code, v6.3.2+ — security,
-    # v6.4+ — perf, v6.5.2+ — spec-compliance, v6.11+ — arch-review)
-    "accessibility-auditor",
+    # Core + support
+    "po", "arch", "dev-backend", "dev-frontend",
+    "qa", "elicitor", "constitutioner", "dashboard",
+    # Auditors retained in v7.0.0 (4)
     "code-reviewer",
     "security-reviewer",
-    "performance-auditor",
     "spec-compliance-reviewer",
     "arch-reviewer",
+    # Legacy auditors REMOVED v7.0.0 (governance-major-auditors-trim)
+    # but kept in this whitelist for context_budget READ-side compat
+    # with historical context_budget rows in console.db. The
+    # preflight_agent_budget hook actively rejects new invocations.
+    "accessibility-auditor",
+    "performance-auditor",
 )
 
 # Default byte budgets per agent (mirrors PowerShell defaults)

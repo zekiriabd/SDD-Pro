@@ -28,7 +28,11 @@ MaxParallel: 3
 BuildLoopMaxIter: 3
 
 # --- Auditor modes (v6.3.x + v6.4 + v6.5.2) ---
-A11yMode: full
+# A11yMode v7.0.0 : agent accessibility-auditor RETIRÉ
+# (governance-major-auditors-trim). Remplacé par axe-core CI dans le
+# projet généré. Défaut flippé full → off pour éviter spawn d'agent
+# inexistant. Tolérée en lecture mais le caller doit skip.
+A11yMode: "off"
 A11yFailOn: serious
 CodeReviewMode: manual
 CodeReviewFailOn: critical
@@ -36,7 +40,10 @@ SecurityMode: manual
 SecurityFailOn: critical
 SecurityThreatModelEnabled: true
 SecurityScanEnabled: true
-PerfMode: full
+# PerfMode v7.0.0 : agent performance-auditor RETIRÉ
+# (governance-major-auditors-trim). Remplacé par Lighthouse CI + wrk/k6
+# dans le projet généré. Défaut flippé full → off.
+PerfMode: "off"
 PerfFailOn: serious
 SpecComplianceMode: manual
 SpecComplianceFailOn: serious
