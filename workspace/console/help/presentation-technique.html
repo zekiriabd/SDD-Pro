@@ -362,6 +362,8 @@ FIX: action 1 ligne</code></pre>
 <h2>11 — Versions récentes</h2>
 
 <ul>
+<li><strong>v7.0.0-alpha</strong> (branche <code>next</code>, en cours 2026-05) — Consolidation 11 rules → 5 (<code>build-and-loop</code>, <code>ownership</code>, <code>quality</code>, <code>library-and-stack</code>, <code>error-classification</code>) ; auditors trim (accessibility/performance retirés, remplacés par axe-core / Lighthouse CI dans le projet généré) ; stacks quarantine (9 stacks fullstack/mobile déplacés en <code>_drafts/</code>) ; gated workflow back→API gate→front par défaut ; layered config (base/team/project) durci avec downgrade protection ; auditor_runs table pour présence-vs-findings sur <code>--ensure-scans</code> ; gates DB mirror depuis la console web ; iframe sandbox durci sur les mockups UI.</li>
+<li><strong>v6.10.4-LTS</strong> (branche <code>main</code>, freeze jusqu'au 2026-06-18) — Auto-injection CORS depuis Project Config (allowlist explicite, jamais wildcard) ; alias <code>FrontendName</code>/<code>BackendName</code>/<code>AppNamespace</code> ; durcissement layered config.</li>
 <li><strong>v6.10.0</strong> — Console DB SQLite source-of-truth (BREAKING : retrait JSON stats), refactor 8 writers + 5 auditeurs, console web v2 (dashboard SonarQube-style, theme dark/light, doc inline, vue UX carrousel)</li>
 <li><strong>v6.9.0</strong> — Serveur MCP livré (14 tools, stdio + HTTP + MCPB, 98 tests)</li>
 <li><strong>v6.8.0</strong> — US schema v2 + dependency graph (statuts granulaires, DAG validation)</li>

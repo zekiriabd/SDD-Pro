@@ -28,7 +28,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sdd_lib.console_db import (  # noqa: E402
-    connect, ensure_initialized, insert_qa_quality_batch, replace_qa_quality_for_feat,
+    connect, ensure_initialized, insert_qa_quality_batch, record_auditor_run,
+    replace_qa_quality_for_feat,
 )
 from sdd_lib.paths import normalize, repo_root  # noqa: E402
 
@@ -260,6 +261,20 @@ def main() -> int:
         insert_qa_quality_batch(
             conn, feat_n=args.feat_number, extracted_at=extracted_at,
             issues=all_issues,
+        )
+        # v7.0.0 P0 C3 fix : presence marker for /sdd-review --ensure-scans.
+        # Records a row even when all_issues == [] (clean scan).
+        n_errors = len(results["errors"])
+        n_warnings = len(results["warnings"])
+        verdict = "RED" if n_errors > 0 else ("YELLOW" if n_warnings > 0 else "GREEN")
+        record_auditor_run(
+            conn,
+            feat_n=args.feat_number,
+            auditor="quality",
+            extracted_at=extracted_at,
+            findings_count=len(all_issues),
+            verdict=verdict,
+            payload={"files_scanned": len(source_files)},
         )
 
     print("Quality scan complete:")

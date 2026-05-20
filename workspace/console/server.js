@@ -22,6 +22,7 @@ import {
   dbAvailable, dashboardOverview, featStats,
   auditTokens, stateRuns, gatesHistory,
   rawSql, // v6.10.3+ : shared SQL helper (node:sqlite or python fallback)
+  recordGateDecision, // v7.0.0 P0 C2 : DB mirror for /api/gate-decide
 } from "./lib/console-db.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -521,7 +522,24 @@ fastify.get("/api/help/:id", async (req, reply) => {
 fastify.get("/api/health", async () => ({
   ok: true,
   console: "sdd-console",
+  // Console-app version (Fastify server package — workspace/console/package.json).
+  // Decoupled from the SDD_Pro framework version on purpose (audit M8) :
+  // the console iterates on UI cadence ; the framework on DSL cadence.
   version: "0.4.0",
+  // Framework version read from .claude/loader.yml line `version: "..."`.
+  // Allows the UI to display "alpha / beta / GA" in a banner without
+  // hard-coding it in the console source.
+  framework: (() => {
+    try {
+      const loaderPath = join(ROOT, ".claude", "loader.yml");
+      if (!existsSync(loaderPath)) return null;
+      const txt = readFileSync(loaderPath, "utf8");
+      const m = txt.match(/^\s*version\s*:\s*["']?([^"'\n]+)["']?/m);
+      return m ? m[1].trim() : null;
+    } catch {
+      return null;
+    }
+  })(),
   explain: explainIsAvailable(),
 }));
 
@@ -678,6 +696,37 @@ fastify.post("/api/gate-decide", async (req, reply) => {
   } catch (err) {
     fastify.log.error({ err }, "gate-decide failed");
     return reply.code(500).send({ error: err.message });
+  }
+
+  // v7.0.0 P0 C2 fix : mirror the decision into console.db `gates` table for
+  // historical analytics (cross-FEAT queries, /api/gates endpoint). Best-effort :
+  // status.json is the live source of truth so a DB write failure does NOT fail
+  // the HTTP response. Pending decisions are NOT mirrored (no final answer yet).
+  if (decision !== "pending") {
+    // Map API phase → canonical gate_name (cf. record_gate_decision.py VALID_GATE_NAMES).
+    const PHASE_TO_GATE = {
+      afterUS:        "us",
+      afterReadiness: "readiness",
+      afterPlan:      "plan",
+      afterCode:      "code",
+    };
+    const featNumeric = Number(FeatKey);
+    if (Number.isFinite(featNumeric)) {
+      const dbRes = recordGateDecision({
+        featN:     featNumeric,
+        gateName:  PHASE_TO_GATE[phase],
+        decision,
+        byUser:    answeredBy,
+        decidedAt: answeredAt,
+        comment:   comment && typeof comment === "string" ? comment : null,
+      });
+      if (!dbRes.ok) {
+        fastify.log.warn(
+          { featN: featNumeric, phase, decision, err: dbRes.error },
+          "gate-decide: console.db mirror failed (status.json still canonical)",
+        );
+      }
+    }
   }
 
   broadcast({ type: "gate", payload: { FeatNum: FeatKey, phase, decision, answeredBy, answeredAt } });

@@ -1,4 +1,4 @@
-# /dev-run — Orchestrateur dev (arch+db → back + front en parallèle) pour 1 FEAT
+# /dev-run — Orchestrateur dev (arch+db → back → API gate → front) pour 1 FEAT
 
 > ⚠️ **Commande interne v7.0.0** — invoquée par /sdd-full STEP 4.
 > Orchestrateur dev (arch+back+API+front) — invoqué par /sdd-full.
@@ -12,14 +12,27 @@
 > Anti-régression : `framework_smoke.py` vérifie la présence de
 > « parallèle » + `Agent` + `dev-backend` + `dev-frontend`.
 
-Pour la FEAT `{n}`, en séquence :
+Pour la FEAT `{n}`, en séquence (**workflow gated séquentiel** depuis
+v7.0.0, default `GatedWorkflow: true` — cf. STEP 6 et
+`.claude/rules/build-and-loop.md` Partie A) :
 
 1. **Pré-step `arch`** (idempotent) — bootstrap solution/projets selon
    stacks actifs + scaffolding DB Database-First si `DatabaseType ≠ none`
    (les deux phases sont gérées par le même agent `arch`)
-2. **`dev-backend` + `dev-frontend` EN PARALLÈLE** sur toutes les US ;
-   chaque agent décide s'il a du travail (fullstack/frontend pure/
-   backend pure) ou exit silencieux
+2. **`dev-backend` sur TOUTES les US** (parallélisme intra-back borné
+   par `MaxParallel`, default 3 US simultanées)
+3. **QA API Gate** (tests d'intégration HTTP in-memory) — STOP si
+   `status=FAIL|INFRA_BLOCKED`, continue sur `PASS|WARN|SKIPPED`
+4. **`dev-frontend` sur TOUTES les US** (parallélisme intra-front
+   borné par `MaxParallel`) ; chaque agent décide s'il a du travail
+   (frontend pure / backend pure) ou exit silencieux
+
+> **Anti-régression** : `framework_smoke.py` valide la présence de
+> `Agent` + `parallèle` + `dev-backend` + `dev-frontend` dans ce fichier
+> (le parallélisme intra-phase reste un contrat load-bearing du runtime
+> Claude Code). Le sequencing inter-phase back→gate→front est la
+> nouveauté v7.0.0 vs v6.x parallèle. Legacy v6 disponible via
+> `GatedWorkflow: false` (audit-log `legacy-parallel.log`).
 
 Mode **autonome** : pas de Q/R utilisateur.
 
@@ -136,7 +149,7 @@ Si `CheckpointMode ∈ {off, record}` → skip ce STEP, continuer.
 **Granularité dev-run** : checkpoint au niveau **dev-run complet** (skip
 arch + dev-back + dev-front + API Gate + auditors d'un coup), pas au
 niveau phase interne. Pour la granularité phase, l'idempotence `Status:
-Done` US-level suffit (cf. `file-ownership.md §6`).
+Done` US-level suffit (cf. `ownership.md §6`, was file-ownership.md §6).
 
 Émissions possibles : `[CHECKPOINT_HASH_MISMATCH]` (US ou mockup modifié),
 `[CHECKPOINT_INPUT_MISSING]` (US supprimée), `[CHECKPOINT_STATE_UNREADABLE]`
@@ -157,7 +170,7 @@ FIX: lancer /us-generate {n} pour générer les US d'abord
 
 Émettre 1 ligne récap :
 ```
-FEAT {n} — {U} US à matérialiser (back + front en parallèle)
+FEAT {n} — {U} US à matérialiser (back → API gate → front, parallélisme intra-phase borné par MaxParallel)
 ```
 
 ---
@@ -358,7 +371,13 @@ Sinon, invoquer agent `arch` (équivalent `/arch-init`). L'agent gère :
 > de `security-reviewer` est **supprimé**. Le défaut
 > `SecurityThreatModelEnabled` est flippé `true → false` dans
 > `config.base.yml`. La STEP est conservée numériquement pour
-> préserver la numérotation aval, mais **aucun agent n'est spawné ici**.
+> préserver la numérotation aval **interne à `/dev-run`** (les STEPs 6.x
+> ci-dessous référencent cet ancrage), mais **aucun agent n'est spawné ici**.
+>
+> **Note d'audit (v7.0.0-alpha, 2026-05-20)** : la numérotation STEP est
+> **propre à chaque commande** (`/sdd-full`, `/dev-run`, `/qa-generate`).
+> Il n'y a pas d'alignement cross-commande. Le STEP 5.5 de `/dev-run`
+> n'a pas de correspondance dans `/sdd-full` (dont les STEPs vont 1→5).
 >
 > **Remplacement** : template humain à instancier par le Tech Lead
 > pré-`/arch-init` — `.claude/templates/threat-model.template.md`
@@ -371,7 +390,36 @@ Sinon, invoquer agent `arch` (équivalent `/arch-init`). L'agent gère :
 > Aucune lecture de `phase_planner.threat_model` — la phase est
 > systématiquement `enabled: false` avec `agent_removed: true` dans le JSON.
 
-Passer directement à STEP 6.
+Passer directement à STEP 5.5.1 puis STEP 6.
+
+### 5.5.1 — Phase plan initialization (standalone guard, v7.0.0 audit P2)
+
+**Bloquant si `$PHASE_PLAN` non défini.** Quand `/dev-run` est invoqué
+directement (hors `/sdd-full`), la variable `$PHASE_PLAN` n'a pas été
+initialisée par l'amont. STEP 6.4 (auditor batch) dépend de ce JSON pour
+décider quels reviewers spawner — sans guard, la branche `if phases.X.enabled`
+faute silencieusement (KeyError ou `undefined`) et le batch dégénère.
+
+```bash
+if [ -z "$PHASE_PLAN" ]; then
+  PHASE_PLAN=$(python .claude/python/sdd_scripts/phase_planner.py \
+    --feat-number {n} \
+    --json)
+  if [ $? -ne 0 ]; then
+    echo "ERROR: /dev-run {n} — phase planner failed"
+    echo "CAUSE: [PHASE_PLAN_INIT_FAILED] phase_planner.py exit $? (FEAT {n})"
+    echo "FIX: vérifier workspace/input/feats/{n}-*.md + Project Config + run /sdd-status {n}"
+    exit 2
+  fi
+fi
+```
+
+**Idempotent** : si `/sdd-full` a déjà calculé `$PHASE_PLAN`, il est
+réutilisé tel quel (pas de re-calcul). Si `/dev-run` standalone, le JSON
+est calculé maintenant et propagé aux STEP 6.4+.
+
+Détail phase_planner : `.claude/python/sdd_scripts/phase_planner.py`
+(Python pur, 0 LLM, ~50 ms).
 
 ### 5.5.4 — State tracking (legacy, conservé)
 
@@ -636,7 +684,7 @@ Sinon, dispatcher **toutes les invocations en parallèle dans un seul
 message**. Attendre la fin de l'ensemble. Pattern identique aux batches
 dev-* (STEP 6.a, 6.c) — toutes les invocations sont indépendantes
 (paths d'écriture disjoints, cf. `agents/*.md §Idempotence` et matrice
-`file-ownership.md §1`).
+`ownership.md §1`, was file-ownership.md §1).
 
 ### 6.4.2 — Lecture des verdicts
 

@@ -54,6 +54,7 @@ et inlinés dans les agents (po, dev-*, qa).
 | `[QA_FAIL_BLOCKING_SDD_FULL]` | `/qa-generate` verdict RED + `QaFailOnSddFull: true` (default v7.0.0) → STOP `/sdd-full` post-STEP 4.5. Symétrise le gate avec `/qa-generate` standalone (avant : bloquant standalone, ignoré dans `/sdd-full`). Bypass : `QaFailOnSddFull: false` (audit-log). | sdd-full STEP 4.5 (v7.0.0 audit §6.9) |
 | `[FEAT_HASH_MISMATCH]` | Hash sha256 de la FEAT parente diffère de celui inscrit dans une US (`Parent FEAT hash: sha256:...`). FEAT modifiée après génération US → `Covers:` potentiellement obsolète. Fix : re-run `/us-generate {n}` (idempotent). | dev-*, validate_readiness, auditors (v7.0.0 audit §6 P1-11) |
 | `[ELICITOR_GAP]` | FEAT contient sections élicitor (FAIL-N, EDGE-N, Red Team) mais ≥ 1 item n'est mappé sur aucune AC d'aucune US. WARN par défaut (`ElicitorGapMode: warn`), `strict` = NO-GO. | po STEP 4 (v7.0.0 audit §6.11 — boucle elicitor) |
+| `[PHASE_PLAN_INIT_FAILED]` | `/dev-run` standalone : `phase_planner.py` exit ≠ 0 (FEAT inexistante / Project Config malformé). Bloquant STEP 5.5.1 — sans `$PHASE_PLAN`, STEP 6.4 (auditor batch) ne peut décider quels reviewers spawner. | dev-run STEP 5.5.1 (v7.0.0 audit P2) |
 | `[PLAN_NOT_FOUND]` | Plan attendu absent | validate_plan.py |
 | `[PLAN_UNREADABLE]` | Plan présent mais I/O error | validate_plan.py |
 | `[PLAN_NO_FRONTMATTER]` | Plan sans bloc YAML `---` ... `---` | validate_plan.py |
@@ -154,35 +155,17 @@ Priorité d'émission : `[QA_TEST_FAILED] > [QA_COVERAGE_GAP]` ;
 | `[LIBNAME_SIGNATURE_CONFLICT]` | DTO/Model partagé, signatures divergentes |
 | `[LOCK_HELD]` | Lock générique cross-language (sdd_lib/file_locks.py) — `workspace/console/.status.lock`, etc. Alias générique de `[LIBNAME_LOCK_HELD]` pour contextes non-LibName |
 
-### 1.9 A11Y (accessibility WCAG 2.2 — depuis v6.3.0)
+### 1.9 A11Y — héritage (retiré v7.0.0)
 
-> **v7.0.0** : agent `accessibility-auditor` **retiré**
-> (`governance-major-auditors-trim`). Les classes ci-dessous sont
-> **conservées comme schéma de mapping** pour la sortie `axe-core` du CI
-> du projet généré (ingest futur via `ingest_a11y_axe.py`). Aucune n'est
-> émise par un agent SDD_Pro après v6.10.5.
+Classes `[A11Y_*]` (11 préfixes, WCAG 2.2) émises par
+`accessibility-auditor` v6.3.0-v6.10. **Agent retiré v7.0.0**
+(`governance-major-auditors-trim`). Remplacé par `axe-core` au CI du
+projet généré.
 
-Historique (v6.3.0-v6.10) : émis par `accessibility-auditor` (Haiku 4.5).
-Chaque classe porte une **sévérité** ordinale `critical > serious > moderate > minor`
-qui pilotait le verdict 🟢/🟡/🔴 contre le seuil `A11yFailOn` du Project Config.
-
-| Préfixe | WCAG | Sévérité | Phase |
-|---|---|---|---|
-| `[A11Y_MISSING_ALT]` | 1.1.1 | critical | accessibility-auditor STEP 3 |
-| `[A11Y_INPUT_NO_LABEL]` | 1.3.1 | critical | accessibility-auditor STEP 3 |
-| `[A11Y_BUTTON_NO_LABEL]` | 2.4.6 | serious | accessibility-auditor STEP 3 |
-| `[A11Y_TABINDEX_POSITIVE]` | 2.4.3 | serious | accessibility-auditor STEP 3 |
-| `[A11Y_HEADING_SKIP]` | 1.3.1 | moderate | accessibility-auditor STEP 3 |
-| `[A11Y_LANG_MISSING]` | 3.1.1 | serious | accessibility-auditor STEP 3 |
-| `[A11Y_FORM_NO_SUBMIT]` | 3.3.2 | moderate | accessibility-auditor STEP 3 |
-| `[A11Y_ROLE_INCOMPLETE]` | 4.1.2 | serious | accessibility-auditor STEP 3 |
-| `[A11Y_TARGET_TOO_SMALL]` | 2.5.5 | moderate | accessibility-auditor STEP 3 |
-| `[A11Y_STATUS_NO_LIVE]` | 4.1.3 | moderate | accessibility-auditor STEP 3 |
-| `[A11Y_SCAN_TOO_LARGE]` | — | (infra) | accessibility-auditor STEP 2 (> 500 fichiers, dépasse budget Haiku) |
-
-**Verdict global** : `🔴 RED` si ∃ issue de sévérité `≥ A11yFailOn`,
-sinon `🟡 WARN` si issues présentes (< seuil), sinon `🟢 GREEN`.
-Substance opérationnelle : `agents/accessibility-auditor.md §4`.
+> **Aucune classe `[A11Y_*]` n'est émise par un agent SDD_Pro après
+> v6.10.5.** Le schéma complet (tableau préfixes × WCAG × sévérité) est
+> archivé dans `@.claude/rules/error-classification-legacy.md §1` pour
+> consommation future par `ingest_a11y_axe.py` (CI projet généré).
 
 ### 1.10 Code Review (cross-fichier, depuis v6.3.1)
 
@@ -264,44 +247,18 @@ existe — évite double-rapport sur les mêmes file+line.
 Chaque threat porte une catégorie STRIDE (`Spoofing`/`Tampering`/
 `Repudiation`/`InfoDisclosure`/`DoS`/`Elevation`) + control recommandé.
 
-### 1.12 Performance (Core Web Vitals + SLO, depuis v6.4.0)
+### 1.12 Performance — héritage (retiré v7.0.0)
 
-> **v7.0.0** : agent `performance-auditor` **retiré**
-> (`governance-major-auditors-trim`). Les classes ci-dessous sont
-> **conservées comme schéma de mapping** pour la sortie Lighthouse CI +
-> wrk/k6 du projet généré (ingest futur via `ingest_perf_lighthouse.py`).
-> Aucune n'est émise par un agent SDD_Pro après v6.10.5.
+Classes `[PERF_*]` (16 préfixes, Core Web Vitals + SLO API) émises par
+`performance-auditor` v6.4.0-v6.10. **Agent retiré v7.0.0**
+(`governance-major-auditors-trim`). Remplacé par Lighthouse CI + wrk/k6
+au CI du projet généré.
 
-Historique (v6.4.0-v6.10) : émis par `performance-auditor` (Sonnet 4.6).
-Aucune classe n'est hard-blocking par défaut — la perf est contextuelle
-(site marketing tolère 3s LCP, banque non). Le seuil est piloté par
-`PerfFailOn` du Project Config. **Exception** : `[PERF_AC_VIOLATION]`
-était hard-blocking quand une AC d'US mentionne explicitement une
-métrique perf.
-
-| Préfixe | Métrique | Seuil défaut | Sévérité | Phase |
-|---|---|---|---|---|
-| `[PERF_LCP_TOO_HIGH]` | LCP frontend | > 2500 ms (WCAG AA) | critical | perf-auditor §5.1 |
-| `[PERF_CLS_TOO_HIGH]` | CLS | > 0.1 | serious | perf-auditor §5.1 |
-| `[PERF_FID_TOO_HIGH]` | FID (legacy) | > 100 ms | serious | perf-auditor §5.1 |
-| `[PERF_INP_TOO_HIGH]` | INP (Chrome 125+) | > 200 ms | serious | perf-auditor §5.1 |
-| `[PERF_TTFB_TOO_HIGH]` | TTFB backend | > 600 ms | serious | perf-auditor §5.2 |
-| `[PERF_API_P95_HIGH]` | API p95 latency | > 300 ms | serious | perf-auditor §5.2 |
-| `[PERF_API_P99_HIGH]` | API p99 latency | > 1000 ms | moderate | perf-auditor §5.2 |
-| `[PERF_DB_QUERY_P95_HIGH]` | DB query p95 | > 100 ms | moderate | perf-auditor §5.2 |
-| `[PERF_BUNDLE_TOO_LARGE]` | JS bundle size | > 250 KB gzipped | serious | perf-auditor §4.1 |
-| `[PERF_BUNDLE_LARGE]` | JS bundle size | 500-1500 KB raw | moderate | perf-auditor §4.1 |
-| `[PERF_RENDER_BLOCKING]` | scripts sync dans `<head>` | — | serious | perf-auditor §4.2 |
-| `[PERF_N_PLUS_ONE_RISK]` | N+1 query (cross-fichier) | — | serious | perf-auditor §4.3 |
-| `[PERF_MEMORY_LEAK_SUBSCRIPTION]` | subscriptions sans cleanup | — | moderate | perf-auditor §4.4 |
-| `[PERF_LONG_SYNC_LOOP]` | loop sync > 1000 itérations main thread | — | moderate | perf-auditor §4.5 |
-| `[PERF_DB_QUERY_NO_INDEX]` | query sur champ non indexé | — | moderate | perf-auditor §4.6 |
-| `[PERF_AC_VIOLATION]` | AC d'US explicite non respectée | — | critical (hard-blocking) | perf-auditor §6.3 |
-
-**Coordination avec code-reviewer** : `[PERF_N_PLUS_ONE_RISK]` étend
-`[REVIEW_ANTI_PATTERN_N_PLUS_ONE]` (§1.10) avec heuristique cross-fichier
-(lazy load dans loop). Si `code-review.json` flag déjà N+1 sur même
-file+line, perf-auditor dé-duplique (cf. agent §coord).
+> **Aucune classe `[PERF_*]` n'est émise par un agent SDD_Pro après
+> v6.10.5.** Le schéma complet (16 préfixes × métrique × seuil × sévérité)
+> est archivé dans `@.claude/rules/error-classification-legacy.md §2`
+> pour consommation future par `ingest_perf_lighthouse.py` (CI projet
+> généré).
 
 ### 1.13 Spec Compliance (AC-by-AC verification, depuis v6.5.2)
 

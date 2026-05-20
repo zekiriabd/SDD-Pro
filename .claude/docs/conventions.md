@@ -126,7 +126,7 @@ Chaque stack backend déclare une section `## 8. Persistence` avec :
 `dev-*` peuvent renommer une section `## BREAKING CHANGES` du
 `CLAUDE.md` projet en `## BREAKING CHANGES — RESOLVED {YYYY-MM-DD}`
 quand le build est vert et que la dérive est résolue (cf.
-`@.claude/rules/file-ownership.md §6.bis`).
+`@.claude/rules/ownership.md §6.bis`).
 
 ## 13. Capabilities core vs on-demand
 
@@ -151,16 +151,16 @@ script et consomme son JSON. Détail : `agents/dev-backend.md STEP 5.bis`.
 |---------------------------------|--------------------------------------------------|
 | `us-granularity.md`             | Découpage FEAT → US (cible 1-3, warning 4-6, hard cap 6 ; INVEST) |
 | `constitution.md`               | Constitution projet + ADRs (qui écrit quoi)      |
-| `file-ownership.md`             | Matrice ownership fichiers partagés + ADR timestamp atomique |
-| `qa-coverage.md`                | Seuil 80% (RED bloquant si en-dessous), schéma normalisé coverage.json |
-| `stack-completeness.md`         | Anti-derive sur libs + §0 runtime LTS / CVE / origine (ex-`library-policy.md`, fusionné v6.1) |
-| `backend-first.md`              | Workflow gated back → API gate → front |
+| `ownership.md`             | Matrice ownership fichiers partagés + ADR timestamp atomique |
+| `quality.md (Partie A)`                | Seuil 80% (RED bloquant si en-dessous), schéma normalisé coverage.json |
+| `library-and-stack.md`         | Anti-derive sur libs + §0 runtime LTS / CVE / origine (ex-`library-policy.md`, fusionné v6.1) |
+| `build-and-loop.md (Partie A)`              | Workflow gated back → API gate → front |
 | `error-classification.md`       | Taxonomie codes `[CLASS]` cross-agent |
 | `source-first.md`               | Discipline MD-avant-code pour fix bugs |
-| `dev-shared.md`                 | Patterns strictement identiques dev-backend/dev-frontend |
+| `build-and-loop.md (Partie B)`                 | Patterns strictement identiques dev-backend/dev-frontend |
 
-> Substance de `stack-completeness.md`, `file-ownership.md §1-§2`,
-> `qa-coverage.md`, `us-granularity.md`, `.claude/rules/constitution.md`
+> Substance de `library-and-stack.md`, `ownership.md §1-§2`,
+> `quality.md (Partie A)`, `us-granularity.md`, `.claude/rules/constitution.md`
 > est **inlinée** dans les agents qui en dépendent (depuis v5.0). Les
 > fichiers complets restent disponibles pour les cas-limites.
 >
@@ -173,7 +173,7 @@ script et consomme son JSON. Détail : `agents/dev-backend.md STEP 5.bis`.
 
 ### 14.1 Notes opérationnelles (détails utiles ex-CLAUDE.md §5)
 
-- **`backend-first.md`** (depuis 2026-05-07) — chargée par `/dev-run`
+- **`build-and-loop.md (Partie A)`** (depuis 2026-05-07) — chargée par `/dev-run`
   et agent `qa` mode `api-tests`. Pilote la séquence back → API gate →
   front (cf. `commands/dev-run.md §6`).
 - **`error-classification.md`** (depuis 2026-05-08) — chargée par
@@ -185,11 +185,11 @@ script et consomme son JSON. Détail : `agents/dev-backend.md STEP 5.bis`.
   dans une source MD (FEAT, US, plan, stack, rule). Patcher la source
   d'abord, le code ensuite. Chargée par `dev-backend`, `dev-frontend`
   (référence sur échec `build_loop`) + Tech Lead humain.
-- **`file-ownership.md §1.bis`** (depuis 2026-05-12) — Front/Back
+- **`ownership.md §1.bis`** (depuis 2026-05-12) — Front/Back
   isolation stricte : `{AppName}/` et `{BackendName}/` au même niveau
   sous `workspace/output/src/`, jamais imbriqués. Hard-gate
   `[FILE_OWNERSHIP_NESTED]` dans `arch`, `dev-backend`, `dev-frontend`.
-- **`dev-shared.md`** — source de vérité unique pour les patterns
+- **`build-and-loop.md (Partie B)`** — source de vérité unique pour les patterns
   strictement identiques `dev-backend`/`dev-frontend` (context budget
   HARD-GATE, LibName lock, anti-derive bullets, QA ownership interdits,
   stack-completeness, BREAKING CHANGES cleanup, reads on-demand).
@@ -206,14 +206,14 @@ script et consomme son JSON. Détail : `agents/dev-backend.md STEP 5.bis`.
 | `readiness.template.md`            | `/feat-validate`         |
 | `risks-assumptions.template.md`    | agent `elicitor`         |
 | `qa-report.template.md`            | agent `qa`               |
-| `api-tests.template.json`          | schéma rapport API Gate (cf. `rules/backend-first.md §1.4`) — produit par `/qa-generate --mode api-tests` |
+| `api-tests.template.json`          | schéma rapport API Gate (cf. `rules/build-and-loop.md (Partie A) §1.4`) — produit par `/qa-generate --mode api-tests` |
 | `claude-md-backend.template.md`    | agent `arch` STEP 12 — gabarit CLAUDE.md projet backend |
 | `claude-md-frontend.template.md`   | agent `arch` STEP 12 — gabarit CLAUDE.md projet frontend |
 | `claude-md-shared-lib.template.md` | agent `arch` STEP 12 — gabarit CLAUDE.md projet lib partagée (si `LibName` défini) |
 | ~~`dashboard-readme.template.html`~~ | **retiré v6.10** — HTML dashboards remplacés par `console.db` lecture par consommateur externe |
 | `adrs-index.template.md`           | agent `dashboard` (INDEX.md ADRs — seul output `dashboard` v6.10) |
 | ~~`qa-dashboard.template.html`~~   | **retiré v6.10** — métriques QA dans `console.db` (tables `qa_*`) |
-| `libs-catalog.schema.json`         | JSON Schema des `.libs.json` (cf. `stack-completeness.md §1.0`) |
+| `libs-catalog.schema.json`         | JSON Schema des `.libs.json` (cf. `library-and-stack.md §1.0`) |
 | `status.schema.json`               | JSON Schema de `workspace/console/status.json` (console gates manuels) |
 | `runbook.template.md` (v6.4.0)     | Tech Lead humain (mise en prod) — procédure d'intervention on-call |
 | `postmortem.template.md` (v6.4.0)  | Tech Lead humain (post-incident, 48h max cf. `source-first.md §5`) |

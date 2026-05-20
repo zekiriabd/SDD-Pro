@@ -89,7 +89,7 @@ po:
     - workspace/output/.sys/.context/constitution.md # v3 — si présent (lecture acteurs/glossaire)
     # v5.0 Inline Rules (dans agents/po.md, plus de Read mandatory) :
     #   - us-granularity.md §1-§4 (5 anti-patterns détaillés)
-    #   - .claude/rules/constitution.md (procédure §3 inline en STEP 8.5)
+    #   - .claude/rules/ownership.md (procédure §3 inline en STEP 8.5)
     # v5.0 Économie : ~16-20k tokens/invocation
   writes:
     - workspace/output/us/{n}-{m}-*.md         # 1 à 6 fichiers par FEAT (cible 1-3)
@@ -121,9 +121,9 @@ arch:
     - workspace/output/.sys/.context/constitution.md     # v3 — si présent
     - workspace/output/.sys/.context/adrs/ADR-*.md       # v3 — index existants (idempotence)
     # v5.0 Inline Rules (dans agents/arch.md, plus de Read mandatory) :
-    #   - .claude/rules/constitution.md (writes par §, ADR atomique)
-    #   - file-ownership.md §1 (matrice owner arch)
-    #   - stack-completeness.md §0 (runtime LTS / CVE / origine, ex-library-policy.md)
+    #   - .claude/rules/ownership.md (writes par §, ADR atomique)
+    #   - ownership.md §1 (matrice owner arch, was file-ownership.md)
+    #   - library-and-stack.md §0 (runtime LTS / CVE / origine, ex-library-policy.md)
     # v6.1 Read mandatory ajouté (depuis 2026-05-08) :
     #   - .claude/rules/error-classification.md
     # v5.0 Économie : ~12-18k tokens/invocation
@@ -180,12 +180,12 @@ dev-backend:
     - { path: .claude/stacks/archi/{ArchiPattern}.md, cache_layer: stable }
     - { path: .claude/stacks/auth/{active}.md, cache_layer: stable }
     # v5.0 Inline Rules (dans agents/dev-backend.md, plus de Read mandatory) :
-    #   - stack-completeness.md
-    #   - file-ownership.md §1-§2
+    #   - library-and-stack.md
+    #   - ownership.md§1-§2
     # v6.1 Read mandatory ajoutés :
     #   - .claude/rules/error-classification.md (depuis 2026-05-08) — taxonomie
     #     8 classes, pilotage build_loop CORRECTIBLE vs BLOCKING
-    #   - .claude/rules/dev-shared.md (depuis 2026-05-08) — SSOT 7 patterns
+    #   - .claude/rules/build-and-loop.md (depuis 2026-05-08) — SSOT 7 patterns
     #     partagés (context budget, path safety, mode detection, LibName lock,
     #     anti-derive, QA ownership, plan construction)
     # v5.0 Reads conditionnels (lazy) :
@@ -237,11 +237,11 @@ dev-frontend:
     - .claude/stacks/ui/{active}.md        # mapping composants DS (§2 + §7)
     - .claude/stacks/auth/{active}.md      # patterns d'injection auth client
     # v5.0 Inline Rules (dans agents/dev-frontend.md, plus de Read mandatory) :
-    #   - stack-completeness.md
-    #   - file-ownership.md §1-§2
+    #   - library-and-stack.md
+    #   - ownership.md§1-§2
     # v6.1 Read mandatory ajoutés :
     #   - .claude/rules/error-classification.md (depuis 2026-05-08)
-    #   - .claude/rules/dev-shared.md (depuis 2026-05-08) — SSOT 7 patterns
+    #   - .claude/rules/build-and-loop.md (depuis 2026-05-08) — SSOT 7 patterns
     #     partagés avec dev-backend (cf. §note dev-backend ci-dessus)
     # v5.0 Reads conditionnels (lazy) :
     #   - workspace/output/.sys/.context/constitution.md  # uniquement si terme ambigu
@@ -354,8 +354,8 @@ qa:
     - workspace/output/src/{LibName}/**/*        # contrats partagés
     - .claude/stacks/qa/{active}.md    # tous QA stacks actifs (sélectif)
     # v5.0 Inline Rules (dans agents/qa.md, plus de Read mandatory) :
-    #   - qa-coverage.md §2-§3
-    #   - stack-completeness.md (scope étendu : tous stacks actifs §2.4)
+    #   - quality.md§2-§3
+    #   - library-and-stack.md (scope étendu : tous stacks actifs §2.4)
     #   - ownership QA (substance inlinée §Ownership)
     # v6.1 Read mandatory ajouté (depuis 2026-05-08) :
     #   - .claude/rules/error-classification.md (taxonomie QA §1.7)
@@ -424,7 +424,7 @@ code-reviewer:
   reads:
     - workspace/input/stack/stack.md             # Project Config (CodeReviewMode, CodeReviewFailOn)
     - .claude/rules/error-classification.md      # taxonomie [REVIEW_*] §1.10 + classes réutilisées §1.3/§1.6
-    - .claude/rules/dev-shared.md                # anti-derive bullets, plan structure, QA ownership
+    - .claude/rules/build-and-loop.md            # Partie B : anti-derive bullets, plan structure, QA ownership (was dev-shared.md, consolidated v7.0.0)
     - workspace/input/feats/{n}-*.md             # FEAT parente (passif, intent métier)
     - workspace/output/us/{n}-*.md               # toutes les US ciblées (passif)
     - workspace/output/src/{BackendName}/CLAUDE.md  # architecture backend
@@ -571,12 +571,18 @@ security-reviewer:
     - workspace/output/db/                        # schema DB hors scope direct (mentionné via constitution §4)
     - workspace/output/qa/feat-{n}/coverage.json  # responsabilité qa
     - workspace/output/qa/feat-{n}/quality.json   # responsabilité qa
-    - workspace/output/qa/feat-{n}/a11y-report.json  # responsabilité accessibility-auditor
+    # a11y-report.json retiré v7.0.0 (agent accessibility-auditor supprimé,
+    # remplacé par axe-core CI). Entrée préservée pour cohérence path-prefix
+    # forbidden_reads — l'agent ne lit toujours pas le dossier /qa/ qui peut
+    # contenir des fichiers axe-core JSON ingérés par futur ingest_a11y_axe.py.
+    - workspace/output/qa/feat-{n}/a11y-report.json  # (legacy v6, agent retiré v7.0.0 — futur ingest axe-core)
   forbidden_writes:
     - workspace/output/src/                       # read-only strict (jamais de patch)
     - workspace/output/us/                        # responsabilité po
     - workspace/output/qa/                        # responsabilité qa
-    - workspace/output/dashboard/                 # responsabilité dashboard
+    # dashboard/ retiré v7.0.0 (agent dashboard supprimé, INDEX ADRs via
+    # sdd_scripts/index_adrs.py). Entrée préservée comme garde-fou.
+    - workspace/output/dashboard/                 # (legacy v6, agent retiré v7.0.0)
     - workspace/output/.sys/.context/             # responsabilité po/arch/elicitor
     - workspace/output/plans/                     # ne planifie pas
     - workspace/output/.sys/.validation/{n}-code-review.*  # responsabilité code-reviewer
@@ -680,7 +686,7 @@ constitutioner:
     - workspace/output/.sys/.context/constitution.md
     - workspace/output/.sys/.context/adrs/ADR-*.md     # idempotence par slug
     - .claude/templates/adr.template.md
-    - .claude/rules/file-ownership.md                  # §3 numérotation atomique
+    - .claude/rules/ownership.md                       # Partie B §3 numérotation atomique ADR (was file-ownership.md, consolidated v7.0.0)
     - .claude/rules/error-classification.md
   writes:
     - workspace/output/.sys/.context/adrs/ADR-{YYYYMMDDTHHmmss}-{slug}.md

@@ -93,7 +93,7 @@ Si aucun ADR : `OK index_adrs — INDEX.md (0 ADRs, empty) refreshed`.
 - Le fichier `INDEX.md` est overwritten à chaque run
 - Peut être ré-invoqué sans risque, en parallèle de tout autre agent
   ou script (l'output ne croise aucune matrice de
-  `file-ownership.md §1`)
+  `ownership.md §1`, Partie A, ex-file-ownership.md)
 
 ## Coût
 

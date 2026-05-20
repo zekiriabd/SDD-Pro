@@ -25,8 +25,11 @@ de superpowers v5.1) :
 
 **Position dans le pipeline** : intégré au batch parallèle STEP 6.4 de
 `/dev-run` (cf. `commands/dev-run.md §6.4.1`), aux côtés de
-`code-reviewer`, `accessibility-auditor`, `security-reviewer --mode scan`.
-Skip conditionnel via `phase_planner.py` selon `SpecComplianceMode`.
+`code-reviewer`, `security-reviewer` (mode `scan` uniquement depuis
+v7.0.0), et `arch-reviewer` (si `ArchReviewMode: full`).
+`accessibility-auditor` retiré v7.0.0 (gov-major-auditors-trim) —
+remplacé par axe-core dans le CI du projet généré. Skip conditionnel
+via `phase_planner.py` selon `SpecComplianceMode`.
 
 **Strictement read-only** sur `workspace/output/src/**` et
 `workspace/output/us/**`. **Ne corrige pas, ne re-Read pas le rapport

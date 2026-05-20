@@ -1,4 +1,12 @@
 [project]
+# v7.0.0 audit M8 (2026-05-20) : the SDD_Pro framework versions
+# (loader.yml `version: 7.0.0-alpha`, CLAUDE.md, CHANGELOG.md) track the
+# DSL surface (agents/commands/rules/stacks/prompts) which evolves on a
+# different cadence than this Python tooling. Keep these versions
+# intentionally decoupled. Framework version = WHAT the framework
+# promises ; this `version` = the Python package that ships hooks +
+# scripts (utility code, no DSL contract). Bumped only when packaging
+# semantics change (deps, entry points, CLI surface).
 name = "sdd-pro-tools"
 version = "0.1.0"
 description = "SDD_Pro framework hooks and scripts (Python port for cross-platform support)"

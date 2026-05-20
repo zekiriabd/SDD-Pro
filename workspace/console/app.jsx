@@ -952,12 +952,22 @@ function UXCarousel({ FeatNode }) {
         </span>
       </div>
       <div className="ux-stage">
+        {/*
+          Security : mockups in workspace/input/ui/ are user-supplied HTML
+          served on the same origin as the console. `allow-same-origin` +
+          `allow-scripts` would let a hostile mockup read window.parent
+          and call internal APIs (e.g. /api/gate-decide). We drop
+          `allow-same-origin` so the iframe runs in an opaque-origin
+          context : scripts execute (hover, etc.) but cannot touch the
+          console's storage or fetch its endpoints. Relative CSS loads
+          (design-system.css) work without it.
+        */}
         <iframe
           key={current.key}
           src={src}
           title={current.title}
           className="ux-frame"
-          sandbox="allow-same-origin allow-popups allow-forms allow-scripts"/>
+          sandbox="allow-scripts allow-popups allow-forms"/>
       </div>
     </div>
   );

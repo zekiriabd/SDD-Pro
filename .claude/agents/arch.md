@@ -90,8 +90,7 @@ CVE détectée OU lib hors §2.2.1 → STOP + ERROR `[STACK_LIBRARY_VULNERABLE]`
 Ajout lib : éditer stack puis relancer `/arch-init` (idempotent). Pas
 d'install ad-hoc.
 
-Commands CVE par registre, runtime LTS, bypass : `@.claude/rules/
-stack-completeness.md §0` (Read on-demand).
+Commands CVE par registre, runtime LTS, bypass : `@.claude/rules/library-and-stack.md §0` (Partie A, Read on-demand, ex-stack-completeness.md).
 
 **INTERDIT** :
 - Lecture FEATs, US, mockups HTML
@@ -218,7 +217,7 @@ Trois entrées en RAM, consommées par STEP 4.5 et STEP 8 :
 ## STEP 2.bis — Hard-gate Front/Back isolation
 
 **Bloquant avant toute exécution d'Init Commands.** Substance complète :
-`@.claude/rules/ownership.md §1.bis` + `dev-shared.md §1.bis`.
+`@.claude/rules/ownership.md §1.bis` + `@.claude/rules/build-and-loop.md §1.bis` (Partie B, ex-dev-shared.md).
 
 Vérifs après lecture du `## Project Config` :
 

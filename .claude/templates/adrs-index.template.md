@@ -24,6 +24,6 @@ Généré le **{GeneratedAt}** · **{ADRCount}** ADR(s).
 
 ## Voir aussi
 
-- `.claude/rules/constitution.md` — règles de création/écriture
-- `.claude/rules/file-ownership.md §3` — numérotation atomique anti-race
+- `.claude/rules/ownership.md` Partie B — règles de création/écriture (ex-constitution.md)
+- `.claude/rules/ownership.md §3` (Partie B) — numérotation atomique anti-race (ex-file-ownership.md §3)
 - `workspace/output/.sys/.context/constitution.md` §6 — index dans la constitution (rebuild par `arch`)

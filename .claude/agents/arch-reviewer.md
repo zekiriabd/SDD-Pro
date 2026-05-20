@@ -41,9 +41,13 @@ lecture sélective via plans + stack §1.3 + ADRs).
 **Anti-pattern strict** : ne **PAS dupliquer** ce que les autres font :
 - `quality_scan.py` → Code Smells déterministes (hex, magic, long methods)
 - `code-reviewer` → anti-patterns techniques (N+1, useEffect deps, sync over async)
-- `security-reviewer` → OWASP Top 10
-- `accessibility-auditor` → WCAG
+- `security-reviewer` → OWASP Top 10 (mode `scan` uniquement depuis v7.0.0)
 - `spec-compliance-reviewer` → AC verification
+
+Auditors retirés v7.0.0 (gov-major-auditors-trim) dont la couverture
+est désormais déléguée au CI du projet généré :
+- ~~`accessibility-auditor`~~ → WCAG via axe-core CI
+- ~~`performance-auditor`~~ → Core Web Vitals + SLO via Lighthouse CI + wrk/k6
 
 Focus arch-reviewer = **couches + pattern + ADRs**, rien d'autre.
 
@@ -387,7 +391,9 @@ Classes typiques :
 1. ❌ JAMAIS écrire de code applicatif (`workspace/output/src/**`)
 2. ❌ JAMAIS éditer ADRs, constitution, stack.md
 3. ❌ JAMAIS dupliquer les checks de `code-reviewer` (anti-patterns techniques),
-   `security-reviewer` (OWASP), `quality_scan.py` (Code Smells), `accessibility-auditor` (WCAG)
+   `security-reviewer` (OWASP), `quality_scan.py` (Code Smells). WCAG est
+   désormais couvert par axe-core dans le CI du projet généré
+   (`accessibility-auditor` retiré v7.0.0)
 4. ❌ JAMAIS lancer un autre agent
 5. ❌ JAMAIS poser de question utilisateur (autonomous)
 6. ✅ Focus exclusif : **pattern + layers + ADRs + glossaire**

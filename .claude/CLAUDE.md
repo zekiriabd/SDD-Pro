@@ -137,9 +137,11 @@ Liste : `@.claude/docs/conventions.md §15`.
 | UI DS (3) | `shadcn` | `vuetify`, `radzen-blazor` ⚠️ |
 | QA (7) | `code-quality` | `dotnet-xunit` ⚠️, `kotlin-junit` ⚠️, `node-vitest` ⚠️, `blazor-bunit` ⚠️, `python-pytest` ⚠️, `angular-jasmine` ⚠️ |
 | Auth (2) | `azure-ad` | `auth-local` |
-| Archi (1) | `mvc` | — |
+| Archi (2) | `mvc` | `ddd` |
 
-> **Quarantaine v7.0.0** — 10 stacks déplacés vers `.claude/stacks/_drafts/` : 6 fullstack (`node-react`, `blazor-server`, `next`, `nuxt`, `angular-universal`, `kotlin-mustache`), 2 mobiles (`react-native`, `maui`), 2 archi (`ddd`, `microservice`). **Non chargés par le framework actif**. Voir `.claude/stacks/_drafts/README.md` pour la procédure de réactivation. ADR `governance-major-stacks-quarantine`.
+> **Quarantaine v7.0.0** — 9 stacks dans `.claude/stacks/_drafts/` : 6 fullstack (`node-react`, `blazor-server`, `next`, `nuxt`, `angular-universal`, `kotlin-mustache`), 2 mobiles (`react-native`, `maui`), 1 archi (`microservice`). **Non chargés par le framework actif**. Voir `.claude/stacks/_drafts/README.md` pour la procédure de réactivation. ADR `governance-major-stacks-quarantine`.
+>
+> **Réactivation 2026-05-20** : `ddd` retiré de quarantaine vers `.claude/stacks/archi/ddd.md` (ADR `governance-restore-ddd-archi-pattern`) — résout la contradiction audit v7.0.0-alpha M5 (workspace CMSPrint utilisait DDD alors que pattern était en quarantaine). Statut `🟡 experimental` (PoC formel pending — cf. `docs/validated-combos.md §3`).
 
 > **Vérité terrain** : 🟢 = stack avec entête `Validation: 🟢 reference` ET inclus dans un combo validé bout-en-bout. 🟡 = entête `Validation: 🟡 experimental`. ⚠️ = stack **sans entête `Validation:`** (7 cas — drift documentaire à corriger en post-freeze, classés 🟡 par défaut conservateur). La source de vérité reste l'entête `Validation:` de chaque `.claude/stacks/{cat}/{id}.md`.
 
@@ -155,7 +157,7 @@ Hors ces 2 combos, la composition n'a pas été validée par un PoC complet `/sd
 
 **Catalogue machine** : chaque stack expose `{id}.libs.json` (versions, libs core/on-demand, triggers). Le `.md` est doc humaine ; §2.4 régénéré via `sync_stack_md.py`.
 
-> Détail combos + capabilities on-demand : `@.claude/docs/architecture.md §4`. Catalogue : `@.claude/rules/stack-completeness.md §1.0`.
+> Détail combos + capabilities on-demand : `@.claude/docs/architecture.md §4`. Catalogue : `@.claude/rules/library-and-stack.md §1.0` (Partie A).
 
 ---
 

@@ -24,7 +24,7 @@
 | **AC-UI-N** | AC spécifique à l'interface utilisateur (Given/When/Then orienté écran). | `agents/dev-frontend.md` | — |
 | **ADR** | *Architecture Decision Record* — fichier atomique `workspace/output/.sys/.context/adrs/ADR-{ts}-{slug}.md` traçant 1 décision structurante. | `rules/constitution.md §4` | `decision-record` |
 | **Mockup** | Maquette HTML statique déposée manuellement par UX Designer sous `workspace/input/ui/{n}-{m}-{Name}.html`. Lecture passive uniquement. | `CLAUDE.md §1` | `wireframe`, `HTML UI` |
-| **Plan technique** | Frontmatter YAML + section `## Files` listant les fichiers à matérialiser pour 1 US. `workspace/output/plans/{n}-{m}-{Name}.{back\|front}.md`. | `rules/dev-shared.md §7` | `tech-plan` |
+| **Plan technique** | Frontmatter YAML + section `## Files` listant les fichiers à matérialiser pour 1 US. `workspace/output/plans/{n}-{m}-{Name}.{back\|front}.md`. | `rules/build-and-loop.md §7` | `tech-plan` |
 | **Covers** | Champ d'une US qui référence les SFD/BR/AC/FD couverts dans la FEAT parente. | `docs/principles/us-granularity.md §5` | — |
 
 ---
@@ -59,7 +59,7 @@
 |---|---|---|---|
 | **Readiness Gate** | Validation déterministe FEAT avant pipeline, `script validate_readiness.py`. Invoqué par `/feat-validate`. | 2.6 | oui (NO-GO → STOP) |
 | **Plan-then-Review Gate** | Pause humaine après `/dev-plan` (avant `/dev-run`). Toujours actif en v7 (`PlanReviewDefault` retiré). | 3.5→4 | oui par défaut |
-| **API Gate** | Tests intégration HTTP après dev-backend, avant dev-frontend (in-memory only, jamais DB réelle). Cf. `rules/backend-first.md`. | 4c | oui (RED bloque frontend) |
+| **API Gate** | Tests intégration HTTP après dev-backend, avant dev-frontend (in-memory only, jamais DB réelle). Cf. `rules/build-and-loop.md`. | 4c | oui (RED bloque frontend) |
 | **Manual Gate** | Pause interactive opt-in via `--manual-gates`. Affichée dans `workspace/console/`. | configurable | opt-in |
 | **Coverage Gate** | Seuil `CoverageMin` du Project Config. Coverage < seuil → 🔴 RED `[QA_COVERAGE_GAP]`. | 5 | oui |
 | **Audit Gate** | Verdict consolidé des auditors post-dev (parallèle dans `/dev-run` STEP 6.4). | 5 | oui sur 🔴 |
@@ -77,7 +77,7 @@ Forme rejetée : `gate` (générique) sans qualificatif → toujours préfixer.
 | **STEP** | Étape interne d'un agent (e.g., dev-backend STEP 5.bis = capability detection). Toujours en majuscules dans la doc. | `agents/*.md` |
 | **Batch** | Groupe d'US traitées en parallèle dans `/dev-run` (`MaxParallel: 3` US fullstack par batch). | `commands/dev-run.md` |
 | **build_loop** | Boucle de correction post-build d'un agent dev-* sur erreurs `[BUILD_CORRECTIBLE]`. Max `BuildLoopMaxIter` itérations (défaut 3). | `rules/error-classification.md §3` |
-| **preflight** | Validation HARD-GATE déterministe en amont de chaque agent dev-* (script `preflight.py`). | `agents/dev-shared.md §1.bis` |
+| **preflight** | Validation HARD-GATE déterministe en amont de chaque agent dev-* (script `preflight.py`). | `rules/build-and-loop.md §1.bis` |
 | **phase_planner** | Meta-orchestrateur déterministe qui décide quels auditors tourner par FEAT (script `phase_planner.py`). | `CLAUDE.md §4` |
 | **run** | 1 exécution d'une commande slash (id `run_id` 12 chars hex). Persisté en `console.db` table `runs`. | `agents/sdd_state.py` |
 | **invocation** | 1 appel d'un sub-agent dans un run. | informel |
@@ -95,7 +95,7 @@ Forme rejetée : `gate` (générique) sans qualificatif → toujours préfixer.
 | **Layered config** | Lecture mergée des 3 couches (project > team > base). Réalisée par `read_layered_config()`. | v6.7.1+ |
 | **Active * Specs** | Sections `## Active Tech/UI/QA/Auth Specs` + `## Active Database` + `## Active Architecture Pattern` de `stack.md`. Sélection des stacks. | per-projet |
 | **Capabilities** | Features opt-in mappées à des libs `onDemand` des `.libs.json` (e.g., `excel`, `pdf`, `redis-cache`). | `## Project Config Capabilities` |
-| **Triggers** | Regex case-insensitive dans `.libs.json` qui matchent les ACs d'une US pour activer une capability. | `stack-completeness.md §1.bis` |
+| **Triggers** | Regex case-insensitive dans `.libs.json` qui matchent les ACs d'une US pour activer une capability. | `library-and-stack.md §1.bis` |
 | **Profile** | Snapshot de `config.team.yml` sous `~/.sdd/profiles/{name}.yml`. Côté Tech Lead. | `/sdd-profile` |
 
 ---
@@ -135,13 +135,13 @@ Forme rejetée : `gate` (générique) sans qualificatif → toujours préfixer.
 |---|---|---|
 | **Anti-derive** | Discipline qui interdit aux agents de générer du code/des fichiers hors du scope explicite de l'US/FEAT. | `docs/conventions.md §1` |
 | **Drift** | Divergence entre 2 sources qui devraient être synchronisées (e.g., `loader.yml` vs agents `.md`). | informel |
-| **Load-bearing** | Mécanisme load-bearing = strictement nécessaire pour la robustesse industrielle ; sa violation casse silencieusement le système. | `rules/file-ownership.md` |
+| **Load-bearing** | Mécanisme load-bearing = strictement nécessaire pour la robustesse industrielle ; sa violation casse silencieusement le système. | `rules/ownership.md` |
 | **Scaffolding** | Bootstrap projet (csproj/package.json/etc.) + entities + structure directory par agent `arch` Phase A/B. | `agents/arch.md` |
 | **SSoT** | *Single Source of Truth* — fichier ou table unique faisant autorité sur un concept. | informel |
 | **Source-first discipline** | Tout bug code = trou dans MD source ; patcher SPEC/US/plan/stack MD AVANT le code. | `docs/principles/source-first.md` |
-| **Backend-first gated workflow** | dev-backend → API Gate → dev-frontend (jamais en parallèle depuis 2026-05-07). | `rules/backend-first.md` |
-| **File ownership** | Matrice qui désigne UN propriétaire unique par fichier pour éviter race conditions parallèles. | `rules/file-ownership.md §1` |
-| **Lib lock** | Verrou atomique par entité pour le projet shared `LibName` (procédure `acquire_libname_lock.py`). | `rules/file-ownership.md §4` |
+| **Backend-first gated workflow** | dev-backend → API Gate → dev-frontend (jamais en parallèle depuis 2026-05-07). | `rules/build-and-loop.md` |
+| **File ownership** | Matrice qui désigne UN propriétaire unique par fichier pour éviter race conditions parallèles. | `rules/ownership.md §1` |
+| **Lib lock** | Verrou atomique par entité pour le projet shared `LibName` (procédure `acquire_libname_lock.py`). | `rules/ownership.md §4` |
 | **Idempotence** | Une commande relancée 2× avec mêmes inputs produit le même résultat sans effet de bord cumulé. | `docs/conventions.md §2` |
 | **Selective read** | Lecture sélective : un agent ne lit que les artefacts strictement nécessaires à son US (1 fichier US, pas la FEAT entière). | `CLAUDE.md §1` |
 | **Strict mode** | Variant Sonnet 4.6 des dev-* qui consomme un plan v2 strict-ready (digest auto-suffisant). | `docs/DESIGN-FROMPLAN-STRICT.md` |

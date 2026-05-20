@@ -117,7 +117,7 @@ Read **uniquement** :
    uniquement sur le fichier tokens (`src/index.css` / `theme.ts` /
    `styles.css` selon stack UI), jamais sur les composants.
 
-**Rules inlinées (v5.0)** : `stack-completeness.md` n'est PLUS lue ici —
+**Rules inlinées (v5.0)** : `library-and-stack.md` (Partie A, ex-stack-completeness.md) n'est PLUS lue ici —
 substance dans **Anti-derive strict** + **Inline Rules** ci-dessous. Read
 détail à la demande uniquement.
 
@@ -239,7 +239,7 @@ Config}` + `ds_components`, `source_html_elements`. Plan ajoute sections
 
 ### 6.2 Sections additionnelles du plan frontend
 
-Compléments à `@dev-shared.md §7.4` (générique) :
+Compléments à `@.claude/rules/build-and-loop.md §7.4` (générique) :
 
 ```markdown
 ---
@@ -252,7 +252,7 @@ html-source: workspace/input/ui/{n}-{m}-{Name}.html  # ou "absent"
 - path: {chemin}
   ds_components: [RadzenButton, RadzenDataGrid]
   source_html_elements: [<table>, <button.btn-primary>]
-  # (autres champs : cf. @dev-shared.md §7.4)
+  # (autres champs : cf. @.claude/rules/build-and-loop.md §7.4)
 
 ## Theme overrides
 - token: --color-primary
@@ -282,13 +282,13 @@ FIX: décommenter un design system (radzen-blazor, shadcn, vuetify)
 
 ### 6.4 Exit + AC coverage + plan write-through (format v2, v6.2)
 
-- Exit silencieux "backend-only US" : `@dev-shared.md §7.3`
-- AC UI coverage : `@dev-shared.md §7.2` (AC-UI au lieu d'AC)
-- Anti-derive plan : `@dev-shared.md §7.5` + spécifique frontend : aucun
+- Exit silencieux "backend-only US" : `@.claude/rules/build-and-loop.md §7.3`
+- AC UI coverage : `@.claude/rules/build-and-loop.md §7.2` (AC-UI au lieu d'AC)
+- Anti-derive plan : `@.claude/rules/build-and-loop.md §7.5` + spécifique frontend : aucun
   composant hors mapping `ui/{stack}.md §2/§7`, aucune couleur/libellé/icône
   absente du HTML
 
-**Format v2 obligatoire en mode `:plan`** (cf. `@dev-shared.md §7.4.bis`) :
+**Format v2 obligatoire en mode `:plan`** (cf. `@.claude/rules/build-and-loop.md §7.4.bis`) :
 
 1. Sections frontend habituelles : `## Files` (avec `ds_components`/
    `source_html_elements`), `## ACs Coverage Summary`, `## Theme overrides`,

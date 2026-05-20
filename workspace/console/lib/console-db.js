@@ -146,6 +146,51 @@ export function rawSql(sql, params = []) {
   return pythonSql(sql, params);
 }
 
+// v7.0.0 P0 C2 fix : mirror console gate decisions into console.db `gates`
+// table for cross-FEAT historical queries. status.json remains the live
+// source of truth ; this is best-effort analytics — failures are logged
+// (returned in result) but never thrown to the HTTP handler.
+//
+// Writes go through the Python CLI (`record_gate_decision.py`) because the
+// Node-side connection is opened read-only (connect_ro / DatabaseSync
+// readOnly:true). Centralizing writes in Python preserves the
+// "Python writes, Node reads" architectural invariant (cf. console-db.js
+// header comment line 11-12) and keeps schema migration logic in one place.
+//
+// Returns { ok: boolean, error?: string } — never throws.
+export function recordGateDecision({
+  featN,
+  gateName,
+  decision,
+  byUser = null,
+  comment = null,
+  decidedAt = null,
+  runId = null,
+}) {
+  const args = [
+    "-m", "sdd_scripts.record_gate_decision",
+    "--feat-n", String(featN),
+    "--gate-name", String(gateName),
+    "--decision", String(decision),
+  ];
+  if (byUser)    args.push("--by-user",    String(byUser));
+  if (comment)   args.push("--comment",    String(comment));
+  if (decidedAt) args.push("--decided-at", String(decidedAt));
+  if (runId)     args.push("--run-id",     String(runId));
+
+  const res = spawnSync(PY_BIN, args, {
+    cwd: PY_ROOT,
+    encoding: "utf8",
+    timeout: 5000,
+    windowsHide: true,
+  });
+  if (res.status === 0) return { ok: true };
+  return {
+    ok: false,
+    error: (res.stderr || res.stdout || `record_gate_decision exited ${res.status}`).trim(),
+  };
+}
+
 export function dbAvailable() {
   if (!existsSync(DB_PATH)) {
     return { ok: false, path: DB_PATH, mode: MODE, error: "DB absente — lancer python -m sdd_scripts.init_console_db" };

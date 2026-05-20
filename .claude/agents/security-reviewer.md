@@ -597,8 +597,9 @@ L'agent est strictement idempotent :
 - Mode `threat-model` et mode `scan` produisent des fichiers distincts
   (pas de conflit même si invoqués séquentiellement sur la même FEAT)
 - Peut être ré-invoqué en parallèle de `code-reviewer`,
-  `accessibility-auditor`, `dashboard` sans conflit
-  (paths distincts dans `workspace/output/.sys/.validation/`)
+  `spec-compliance-reviewer`, `arch-reviewer` sans conflit (paths
+  distincts dans `workspace/output/.sys/.validation/`).
+  `accessibility-auditor` + `dashboard` retirés v7.0.0.
 
 ---
 
@@ -636,11 +637,13 @@ Tech Lead invoque :
   invoque `security-reviewer --mode threat-model` si
   `SecurityThreatModelEnabled: true`. Verdict informational uniquement
   (ne bloque jamais).
-- `/dev-run {n}` nouveau STEP 6.5 (entre code-reviewer 6.4 et dashboard
-  6.6) : invoque `security-reviewer --mode scan` si
-  `SecurityScanEnabled: true`. Verdict 🔴 RED → STOP + rapport.
-- `dashboard` : Glob `workspace/output/.sys/.validation/{n}-{threat-model,security-scan}.json`
-  pour enrichir le README.html (§Security).
+- `/dev-run {n}` STEP 6.4 batch parallèle : invoque
+  `security-reviewer` (sans flag mode — `threat-model` retiré v7.0.0,
+  seul le mode `scan` reste) si `SecurityScanEnabled: true`.
+  Verdict 🔴 RED → STOP + rapport.
+- Consommation rapports : `console.db` (table `qa_security`) +
+  `workspace/output/.sys/.validation/{n}-security-scan.json`. Console
+  Fastify lit la DB pour rendu §Security (`dashboard` retiré v7.0.0).
 
 ---
 

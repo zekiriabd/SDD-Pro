@@ -68,7 +68,7 @@ est ensuite généré en parallèle par Dev-Backend et Dev-Frontend.
 | `constitutioner` | ADRs existants + section §6 constitution.md                        | `workspace/output/.sys/.context/constitution.md` (§1/§4/§6) + `workspace/output/.sys/.context/adrs/INDEX.md` |
 | `dashboard`    | ADRs `.md` (Glob `workspace/output/.sys/.context/adrs/ADR-*.md`) + `adrs-index.template.md` | `workspace/output/.sys/.context/adrs/INDEX.md` *uniquement* (v6.10 BREAKING : HTML retirés, métriques dans `console.db`) |
 | `accessibility-auditor` (v6.3.0) | markup frontend généré (`.razor/.tsx/.vue/.html`) + Project Config (`A11yMode/Threshold/FailOn`) + error-classification.md | `workspace/output/qa/feat-{n}/a11y-report.{md,json}` |
-| `code-reviewer` (v6.3.1) | plan v2 ou fallback convention → code production `src/{BackendName|AppName|LibName}/**` + US passif + Project Config (`CodeReviewMode/FailOn`) + stacks §1.3+§3 actifs + error-classification.md + dev-shared.md | `workspace/output/.sys/.validation/{n}-code-review.{md,json}` |
+| `code-reviewer` (v6.3.1) | plan v2 ou fallback convention → code production `src/{BackendName|AppName|LibName}/**` + US passif + Project Config (`CodeReviewMode/FailOn`) + stacks §1.3+§3 actifs + error-classification.md + build-and-loop.md | `workspace/output/.sys/.validation/{n}-code-review.{md,json}` |
 | `security-reviewer` (v6.3.2) | mode `threat-model` : constitution §3-§4-§7 + FEAT + US + stack auth + Project Config. Mode `scan` : code production + CLAUDE.md projets + stacks §1.3+§3+§2.4 + plan v2 + `{n}-code-review.json` (dé-dup secrets) | `workspace/output/.sys/.validation/{n}-{threat-model,security-scan}.{md,json}` (2 outputs selon mode) |
 | `performance-auditor` (v6.4.0) | code production via plan v2 ou convention + CLAUDE.md projets + stacks §1.3+§3 + package.json + dist/ si présent + `coverage.json` (passif) + `{n}-code-review.json` (dé-dup N+1) + Project Config (`PerfMode/FailOn/Thresholds`) | `workspace/output/qa/feat-{n}/perf-report.{md,json}` + `.lighthouse-raw.json` si dispo |
 
@@ -181,7 +181,7 @@ reportlab (pdf Python).
 - Migrations EF Core forward/rollback
 - Dashboard / observabilité production runtime
 - E2E tests (out-of-process Playwright/Cypress — non couvert)
-- CVE deps scanning runtime (couvert partiellement par `stack-completeness.md §0` post-install par arch)
+- CVE deps scanning runtime (couvert partiellement par `library-and-stack.md §0` post-install par arch)
 - Backend dynamic benchmarking via wrk/k6 (prévu v6.4.0.1 via `perf_bench.py`)
 - ~~Enrichissement `dashboard` pour absorber les 6 nouveaux JSON auditor dans `README.html`~~ **OBSOLÈTE v6.10** : les auditors persistent désormais dans `console.db` (tables `qa_code_review`, `qa_security`, `qa_perf`, `qa_a11y`, `qa_spec_compliance`) ; le rendu graphique est délégué à la console web (`workspace/console/`) ou consommateur externe
 - Script `perf_bench.py` pour benchmark backend dynamique via wrk/k6 (prévu v6.4.0.1)

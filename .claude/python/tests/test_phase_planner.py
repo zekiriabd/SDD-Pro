@@ -206,16 +206,19 @@ class TestDecideA11y:
         assert ph["enabled"] is False
         assert "absent" in ph["skip_reason"] or "vide" in ph["skip_reason"]
 
-    def test_a11y_enabled(self) -> None:
+    def test_a11y_removed_even_when_gates_pass(self) -> None:
+        """v7.0.0 P2 fix : even when all upstream gates pass (full mode +
+        frontend stack + frontend code), the a11y phase MUST be enabled=False
+        because the agent is gone. `agent_removed=True` flags WHY enabled is
+        False on what would have been a green path. estimated_tokens = 0
+        (no spawn, no budget). Replacement = axe-core in CI."""
         ph = _decide_a11y(a11y_mode="full", has_frontend_stack=True, has_frontend_code=True)
-        assert ph["enabled"] is True
-        # v7.0.0 : skip_reason is non-None because the agent was removed —
-        # it documents the removal and the replacement path.
+        assert ph["enabled"] is False
         assert ph["skip_reason"] is not None
         assert "agent removed v7.0.0" in ph["skip_reason"]
         assert ph["agent_removed"] is True
         assert "axe-core" in ph["replacement"]
-        assert ph["estimated_tokens"] == PHASE_COST_ESTIMATE["a11y_audit"]
+        assert ph["estimated_tokens"] == 0
 
 
 class TestDecidePerf:
@@ -224,15 +227,23 @@ class TestDecidePerf:
         assert ph["enabled"] is False
         assert "no AC mentions perf" in ph["skip_reason"]
 
-    def test_perf_manual_with_ac_force_enabled(self) -> None:
-        """Override : AC explicite force l'invocation même en manual."""
+    def test_perf_manual_with_ac_removed(self) -> None:
+        """v7.0.0 P2 fix : even when an AC explicitly mentions perf metrics
+        (LCP/p95/...), the perf phase MUST be enabled=False — the agent is
+        gone. The reason surfaces Lighthouse CI / wrk-k6 as the runtime
+        replacement to honor the AC."""
         ph = _decide_perf(perf_mode="manual", has_perf_ac=True, has_backend_code=True, has_frontend_code=True)
-        assert ph["enabled"] is True
-        assert "forced by explicit perf metric" in ph["skip_reason"]
+        assert ph["enabled"] is False
+        assert ph["agent_removed"] is True
+        assert "Lighthouse" in ph["skip_reason"] or "wrk" in ph["skip_reason"]
 
-    def test_perf_full_enabled(self) -> None:
+    def test_perf_full_removed(self) -> None:
+        """v7.0.0 P2 fix : full mode + code present used to be the green path,
+        but the agent is gone. enabled=False, agent_removed=True."""
         ph = _decide_perf(perf_mode="full", has_perf_ac=False, has_backend_code=True, has_frontend_code=True)
-        assert ph["enabled"] is True
+        assert ph["enabled"] is False
+        assert ph["agent_removed"] is True
+        assert ph["estimated_tokens"] == 0
 
     def test_perf_no_code_disabled(self) -> None:
         ph = _decide_perf(perf_mode="full", has_perf_ac=False, has_backend_code=False, has_frontend_code=False)
@@ -430,11 +441,14 @@ class TestPlanIntegration:
         # Restent actifs : code_review, security_scan, spec_compliance.
         assert result["phases"]["threat_model"]["enabled"] is False
         assert result["phases"]["threat_model"].get("agent_removed") is True
-        assert result["phases"]["a11y_audit"]["enabled"] is True   # a11y phase planifiée (config full) mais agent retiré
+        # v7.0.0 P2 fix : agent_removed implies enabled=False (no spawn happens
+        # regardless of upstream gates). The agent_removed flag explains the
+        # forced disable to consumers reading the plan.
+        assert result["phases"]["a11y_audit"]["enabled"] is False
         assert result["phases"]["a11y_audit"].get("agent_removed") is True
         assert result["phases"]["code_review"]["enabled"] is True
         assert result["phases"]["security_scan"]["enabled"] is True
-        assert result["phases"]["perf_audit"]["enabled"] is True  # perf phase planifiée mais agent retiré
+        assert result["phases"]["perf_audit"]["enabled"] is False
         assert result["phases"]["perf_audit"].get("agent_removed") is True
         assert result["phases"]["spec_compliance"]["enabled"] is True
         # Phases véritablement actionnables (sans agent_removed) = 3
@@ -477,10 +491,13 @@ class TestPlanIntegration:
         expected_saved = sum(PHASE_COST_ESTIMATE.values())
         assert result["summary"]["estimated_tokens_saved"] == expected_saved
 
-    def test_plan_manual_with_perf_ac_forces_perf(
+    def test_plan_manual_with_perf_ac_surfaces_replacement(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """PerfMode=manual + AC mentionne LCP → perf_audit forcé enabled."""
+        """v7.0.0 P2 fix : PerfMode=manual + AC mentionne LCP USED to force
+        perf_audit enabled. Now the agent is removed — phase stays disabled
+        but skip_reason surfaces Lighthouse CI / wrk-k6 so the Tech Lead
+        knows to verify the perf AC via the CI replacement instead."""
         ws = _make_workspace(
             tmp_path,
             stack_md=STACK_ALL_MANUAL,
@@ -492,8 +509,10 @@ class TestPlanIntegration:
 
         result = plan(feat_number=1)
 
-        assert result["phases"]["perf_audit"]["enabled"] is True
-        assert "forced" in result["phases"]["perf_audit"]["skip_reason"]
+        assert result["phases"]["perf_audit"]["enabled"] is False
+        assert result["phases"]["perf_audit"].get("agent_removed") is True
+        skip_reason = result["phases"]["perf_audit"]["skip_reason"]
+        assert "Lighthouse" in skip_reason or "wrk" in skip_reason
         assert result["runtime_state"]["has_perf_ac"] is True
 
     def test_plan_manual_with_security_ac_forces_threat_model(

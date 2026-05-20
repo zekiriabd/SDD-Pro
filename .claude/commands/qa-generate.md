@@ -235,7 +235,10 @@ pour le pipeline qa-generate (le `.md` reste lisible humainement).
 un consommateur externe de la DB (cf. roadmap `workspace/console/`).
 
 Aucun fichier HTML n'est produit ici. STEP no-op conservé pour
-préserver la numérotation des STEPs aval.
+préserver la numérotation des STEPs aval **interne à `/qa-generate`**
+(pas un alignement cross-commande — chaque commande SDD_Pro a sa propre
+numérotation indépendante : `/sdd-full` 1→5, `/dev-run` 1→7, ce
+fichier 1→6.bis).
 
 ---
 
@@ -275,7 +278,7 @@ Le JSON `STATS` contient les blocs `api_gate`, `coverage`, `quality`,
 
 ```
 si stats.api_gate.tests_failed > 0:               → RED
-elif stats.coverage.coverage_passed == false:     → RED  (cf. qa-coverage.md §3.1 hardening v6.1)
+elif stats.coverage.coverage_passed == false:     → RED  (cf. quality.md §A.3.1 hardening v6.1, ex-qa-coverage.md)
 elif stats.quality.errors > 0:                    → YELLOW
 else:                                              → GREEN
 ```
@@ -328,5 +331,8 @@ Voir `/sdd-full` STEP 5 pour la logique d'invocation auto.
   - tests-only mode : ~17-27k tokens (génération tests Sonnet)
   - tests+coverage mode : ~17-27k tokens (coverage parsing gratuit)
   - full mode : ~20-30k tokens (recommandé)
-- **Pas de bloquage** sur tests rouges : la commande exit 1 mais le
-  pipeline `/sdd-full` continue (la review est laissée à l'humain)
+- **Blocage tests rouges sur `/sdd-full`** (depuis v7.0.0, default `QaFailOnSddFull: true`) :
+  - `/qa-generate {n}` standalone : exit 1 sur RED, fail-fast (inchangé)
+  - `/sdd-full {n}` post-STEP 4.5 : STOP + ERROR `[QA_FAIL_BLOCKING_SDD_FULL]` si QA verdict RED
+  - **Bypass** : `QaFailOnSddFull: false` dans `## Project Config` (décision tracée, logged en audit). Avec le bypass, la review est laissée à l'humain et le pipeline continue. Sans bypass, le pipeline s'arrête et l'humain corrige avant de relancer.
+  - Détail rationale + format ERROR : `.claude/rules/error-classification.md` `[QA_FAIL_BLOCKING_SDD_FULL]`.

@@ -62,6 +62,8 @@ PROJECT_CONFIG_KEYS = (
     # v6.5.2 spec-compliance-reviewer
     "SpecComplianceMode",
     "SpecComplianceFailOn",
+    # v7.0.0 P2 #12 — Lean reviewers auto-routing (heuristique FEAT S)
+    "LeanReviewersPreset",
     # Stacks
     "AppName",
     "BackendName",
@@ -467,8 +469,13 @@ def _decide_a11y(
         ph = _phase("a11y_audit", enabled=False,
                     reason="workspace/output/src/{AppName}/ absent ou vide (markup pas généré)")
     else:
-        ph = _phase("a11y_audit", enabled=True,
-                    reason="agent removed v7.0.0 — phase logically planned but no spawn ; use axe-core in CI")
+        # Even when all upstream gates pass, the agent is GONE (v7.0.0
+        # governance-major-auditors-trim). `enabled` MUST be False — there
+        # is no spawn, no token budget, no work product. The `agent_removed`
+        # flag (set below) tells consumers WHY enabled is False on what
+        # would have been a green path.
+        ph = _phase("a11y_audit", enabled=False,
+                    reason="agent removed v7.0.0 — use axe-core in CI of generated project")
     ph["agent_removed"] = True
     ph["replacement"] = "axe-core CI step in the generated project"
     return ph
@@ -564,17 +571,22 @@ def _decide_perf(
             reason="PerfMode=manual + no AC mentions perf metric (lcp/p95/...)",
         )
     elif perf_mode == "manual" and has_perf_ac:
+        # Pre-v7.0.0, an explicit perf AC would force-enable the auditor
+        # even in manual mode. The agent is GONE — surface that the perf
+        # AC must be checked via Lighthouse CI / wrk-k6 instead.
         ph = _phase(
             "perf_audit",
-            enabled=True,
-            reason="forced by explicit perf metric in AC (PerfMode=manual override) ; agent removed v7.0.0",
+            enabled=False,
+            reason="agent removed v7.0.0 — perf AC must be checked via Lighthouse CI / wrk-k6",
         )
     elif not has_backend_code and not has_frontend_code:
         ph = _phase("perf_audit", enabled=False,
                     reason="aucun code production (/dev-run pas exécuté)")
     else:
-        ph = _phase("perf_audit", enabled=True,
-                    reason="agent removed v7.0.0 — phase logically planned but no spawn ; use Lighthouse CI + wrk/k6")
+        # All upstream gates pass but the agent is GONE — same rationale as
+        # _decide_a11y: enabled MUST be False, agent_removed flag explains why.
+        ph = _phase("perf_audit", enabled=False,
+                    reason="agent removed v7.0.0 — use Lighthouse CI + wrk/k6 in CI of generated project")
     ph["agent_removed"] = True
     ph["replacement"] = "Lighthouse CI + wrk/k6 in the generated project"
     return ph

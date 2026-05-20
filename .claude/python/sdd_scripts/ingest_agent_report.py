@@ -46,6 +46,7 @@ from sdd_lib.console_db import (  # noqa: E402
     insert_qa_a11y_batch, insert_qa_code_review_batch,
     insert_qa_security_batch, insert_qa_performance_batch,
     insert_qa_spec_compliance_batch, insert_qa_api_tests,
+    record_auditor_run,
     replace_qa_auditor_for_feat, replace_qa_api_tests_for_feat,
 )
 from sdd_lib.paths import repo_root  # noqa: E402
@@ -140,7 +141,10 @@ def ingest_a11y(report: dict, feat: int) -> int:
     verdict = _verdict_of(report)
     with connect() as conn:
         replace_qa_auditor_for_feat(conn, "qa_a11y", feat)
-        return insert_qa_a11y_batch(conn, feat_n=feat, verdict=verdict, issues=issues)
+        n = insert_qa_a11y_batch(conn, feat_n=feat, verdict=verdict, issues=issues)
+        record_auditor_run(conn, feat_n=feat, auditor="a11y",
+                           findings_count=n, verdict=verdict)
+        return n
 
 
 def ingest_code_review(report: dict, feat: int) -> int:
@@ -148,7 +152,23 @@ def ingest_code_review(report: dict, feat: int) -> int:
     verdict = _verdict_of(report)
     with connect() as conn:
         replace_qa_auditor_for_feat(conn, "qa_code_review", feat)
-        return insert_qa_code_review_batch(conn, feat_n=feat, verdict=verdict, issues=issues)
+        n = insert_qa_code_review_batch(conn, feat_n=feat, verdict=verdict, issues=issues)
+        # v7.0.0 P0 C3 fix : `qa_code_review` mixes code-review + arch findings
+        # (split by [ARCH_*] prefix in sdd_review.fetch_findings). Record both
+        # presence markers so --ensure-scans treats them independently.
+        n_arch = sum(1 for it in issues
+                     if str(it.get("issue_class", "")).strip().startswith(("ARCH_", "[ARCH_")))
+        n_code = n - n_arch
+        record_auditor_run(conn, feat_n=feat, auditor="code-review",
+                           findings_count=n_code, verdict=verdict)
+        if n_arch > 0:
+            # Only record arch marker if at least one [ARCH_*] finding was
+            # produced (i.e. arch-reviewer actually emitted output ingested
+            # via this code path). Pure code-reviewer reports don't get a
+            # phantom arch marker.
+            record_auditor_run(conn, feat_n=feat, auditor="arch",
+                               findings_count=n_arch, verdict=verdict)
+        return n
 
 
 def ingest_security(report: dict, feat: int, mode: str) -> int:
@@ -169,7 +189,15 @@ def ingest_security(report: dict, feat: int, mode: str) -> int:
     verdict = _verdict_of(report)
     with connect() as conn:
         replace_qa_auditor_for_feat(conn, "qa_security", feat, mode=mode)
-        return insert_qa_security_batch(conn, feat_n=feat, mode=mode, verdict=verdict, issues=issues)
+        n = insert_qa_security_batch(conn, feat_n=feat, mode=mode, verdict=verdict, issues=issues)
+        # Only the `scan` mode is consumed by /sdd-review (threat-model is
+        # informational pre-dev). The `security` auditor presence in the
+        # review pipeline = scan mode rows.
+        if mode == "scan":
+            record_auditor_run(conn, feat_n=feat, auditor="security",
+                               findings_count=n, verdict=verdict,
+                               payload={"mode": mode})
+        return n
 
 
 def ingest_performance(report: dict, feat: int) -> int:
@@ -177,7 +205,10 @@ def ingest_performance(report: dict, feat: int) -> int:
     verdict = _verdict_of(report)
     with connect() as conn:
         replace_qa_auditor_for_feat(conn, "qa_performance", feat)
-        return insert_qa_performance_batch(conn, feat_n=feat, verdict=verdict, issues=issues)
+        n = insert_qa_performance_batch(conn, feat_n=feat, verdict=verdict, issues=issues)
+        record_auditor_run(conn, feat_n=feat, auditor="perf",
+                           findings_count=n, verdict=verdict)
+        return n
 
 
 def ingest_spec_compliance(report: dict, feat: int) -> int:
@@ -201,7 +232,14 @@ def ingest_spec_compliance(report: dict, feat: int) -> int:
             })
     with connect() as conn:
         replace_qa_auditor_for_feat(conn, "qa_spec_compliance", feat)
-        return insert_qa_spec_compliance_batch(conn, feat_n=feat, entries=rows)
+        n = insert_qa_spec_compliance_batch(conn, feat_n=feat, entries=rows)
+        # spec-compliance presence is the COUNT of non-verified ACs by
+        # sdd_review's filter, but the marker counts ALL AC rows (the
+        # auditor "ran" regardless of how many ACs landed verified).
+        verdict_top = _verdict_of(report)
+        record_auditor_run(conn, feat_n=feat, auditor="spec",
+                           findings_count=len(rows), verdict=verdict_top)
+        return n
 
 
 def ingest_api_tests(report: dict, feat: int) -> int:

@@ -40,7 +40,7 @@
 │        ├─ 🟢 GREEN → 4d                                         │
 │        └─ 🔴 RED   → STOP, l'humain corrige et relance          │
 │    4d. dev-frontend ALL US (parallèle bornée par MaxParallel)   │
-│  cf. .claude/rules/backend-first.md                             │
+│  cf. .claude/rules/build-and-loop.md                             │
 └─────────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
@@ -113,7 +113,7 @@ PHASE 5   /qa-generate {n} [--mode M]   → workspace/output/qa/feat-{n}/{report
   HTTP automatisés via `WebApplicationFactory<Program>` + DB
   in-memory) entre les deux. Frontend non généré tant que la gate
   n'est pas 🟢 GREEN. Détail :
-  `.claude/rules/backend-first.md`. Anciens default `GatedWorkflow:
+  `.claude/rules/build-and-loop.md`. Anciens default `GatedWorkflow:
   false` (legacy parallèle) disponible pour les projets simples.
 - **Convention URL canonique backend** (depuis 2026-05-07) : tout
   endpoint doit suivre `/api/v{N}/{resource-kebab-case-pluriel}`
@@ -153,7 +153,7 @@ PHASE 5   /qa-generate {n} [--mode M]   → workspace/output/qa/feat-{n}/{report
   des conventions, architecture, workflow est externalisé en
   `.claude/docs/{architecture,workflow,conventions}.md` chargés à la
   demande.
-- **Inline Rules dans dev-* agents** : `stack-completeness.md` n'est
+- **Inline Rules dans dev-* agents** : `library-and-stack.md` n'est
   plus lu en STEP 3/4 ; sa substance opérationnelle est inlinée dans
   les agents `dev-backend` et `dev-frontend`. `constitution.md` et `INDEX.md` ADRs deviennent des
   reads conditionnels.

@@ -129,7 +129,8 @@ Après les 3 lancements, afficher en une seule sortie :
 
   Backend  ▶ CMSPrintBack         (kotlin-spring-boot) → :8080   [bash_id: xxx]
   Frontend ▶ CMSPrintFront        (react)              → :5173   [bash_id: yyy]
-  Console  ▶ workspace/console    (fastify)            → :4000   [bash_id: zzz]
+  Console  ▶ workspace/console    (fastify)            → :5173   [bash_id: zzz]
+            (override via env PORT=4000)
 
 Logs : BashOutput / Monitor sur bash_id.
 Stop : KillShell sur bash_id.

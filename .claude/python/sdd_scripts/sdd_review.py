@@ -30,6 +30,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sqlite3
 import subprocess
 import sys
 from collections import Counter, defaultdict
@@ -137,6 +138,23 @@ def fetch_findings(feat_n: int) -> tuple[list[Finding], list[str]]:
     sources_present: set[str] = set()
 
     with connect() as conn:
+        # v7.0.0 P0 C3 fix : presence is determined by auditor_runs (one row
+        # per invocation, regardless of findings count). Counting rows in the
+        # per-finding tables produced false-positive [REVIEW_SOURCES_MISSING]
+        # on clean scans (0 findings = no row inserted). The findings loops
+        # below still add to sources_present opportunistically — that path
+        # remains correct for any auditor that produced ≥ 1 finding even if
+        # it forgot to call record_auditor_run() (forward-compat).
+        try:
+            for row in conn.execute(
+                "SELECT DISTINCT auditor FROM auditor_runs WHERE feat_n=?", (feat_n,)
+            ):
+                sources_present.add(row[0])
+        except sqlite3.OperationalError:
+            # Table not yet created (DB pre-migration). Fall back to legacy
+            # inference from findings rows only — same behavior as v6.x.
+            pass
+
         conn.row_factory = lambda c, r: {d[0]: r[i] for i, d in enumerate(c.description)}
 
         # qa_quality (deterministic scan)
@@ -577,27 +595,41 @@ ENSURE_SCANS_OPTIONAL = ("arch", "a11y", "perf")
 
 
 def resolve_arch_required() -> bool:
-    """Return True iff ArchReviewMode is `full` in Project Config."""
+    """Return True iff ArchReviewMode is `full` in layered config (base ← team ← project).
+
+    Uses `read_layered_config` to honor team-level policies. A project that
+    downgrades `ArchReviewMode` below the team baseline raises `ConfigError`
+    `[CONFIG_SECURITY_DOWNGRADE]` which is re-raised here (no silent swallow).
+    """
+    from sdd_lib.layered_config import ConfigError, read_layered_config
     try:
-        from sdd_lib.project_config import read_project_config
-        cfg = read_project_config(keys=("ArchReviewMode",))
-        return (cfg.get("ArchReviewMode") or "").strip().lower() == "full"
+        cfg = read_layered_config(keys=("ArchReviewMode",))
+    except ConfigError:
+        raise  # [CONFIG_SECURITY_DOWNGRADE] must surface
     except Exception:
         return False
+    return (cfg.get("ArchReviewMode") or "").strip().lower() == "full"
 
 
 def resolve_fail_on(cli_value: str | None) -> str:
+    """Resolve --fail-on threshold from CLI or layered config (base ← team ← project).
+
+    A project that relaxes `ReviewFailOn` below the team baseline raises
+    `ConfigError` `[CONFIG_SECURITY_DOWNGRADE]` which is re-raised here
+    (no silent swallow). Other I/O errors fall back to default 'serious'.
+    """
     if cli_value:
         return cli_value.strip().lower()
-    # Read from Project Config (best-effort, no failure if absent)
+    from sdd_lib.layered_config import ConfigError, read_layered_config
     try:
-        from sdd_lib.project_config import read_project_config
-        cfg = read_project_config(keys=("ReviewFailOn",))
-        v = (cfg.get("ReviewFailOn") or "").strip().lower()
-        if v in SEVERITY_RANK:
-            return v
+        cfg = read_layered_config(keys=("ReviewFailOn",))
+    except ConfigError:
+        raise  # [CONFIG_SECURITY_DOWNGRADE] must surface
     except Exception:
-        pass
+        return "serious"
+    v = (cfg.get("ReviewFailOn") or "").strip().lower()
+    if v in SEVERITY_RANK:
+        return v
     return "serious"
 
 

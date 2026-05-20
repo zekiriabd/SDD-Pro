@@ -74,7 +74,7 @@ maintenir la cohérence visuelle entre mockups successifs.
 
 Lors du scaffolding, `arch` peut copier `design-system.css` dans
 `workspace/output/src/{AppName}/src/index.css` comme socle de tokens
-shadcn/vuetify/radzen (cf. `.claude/rules/ui-tokens.md §2`).
+shadcn/vuetify/radzen (cf. `.claude/rules/quality.md` Partie B §B.2, ex-ui-tokens.md).
 
 **Non requis** : si vous n'avez pas de palette projet définie, omettre
 les 2 fichiers et utiliser les tokens par défaut du Design System.

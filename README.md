@@ -1,6 +1,6 @@
 # SDD_Pro
 
-Framework FEAT-driven development pour Claude Code — version **v6.10.0**.
+Framework FEAT-driven development pour Claude Code — branche `next` : **v7.0.0-alpha** (cf. [.claude/VERSIONING.md](.claude/VERSIONING.md)). Branche `main` : v6.10.4-LTS (freeze actif jusqu'au 2026-06-18).
 
 Documentation principale : [.claude/CLAUDE.md](.claude/CLAUDE.md)
 

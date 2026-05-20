@@ -1,6 +1,7 @@
-# MCP Server — Exposing SDD_Pro to MCP clients (v6.9 — 100% livré)
+# MCP Server — Exposing SDD_Pro to MCP clients
 
-> **Status** : 🟢 **100% livré v6.9.0** — Sprints MCP-1, MCP-2, MCP-3 complets.
+> **Framework version** : v7.0.0-alpha (branche `next`).
+> **MCP server status** : 🟢 **stable since v6.9.0** (Sprints MCP-1, MCP-2, MCP-3 complets). Aucun BREAKING en v7.0.0 sur l'API MCP — les 14 tools livrés v6.9 sont préservés.
 > **Source** : Audit comparatif Taskmaster (mai 2026) — 37 MCP tools observés.
 > **Cible** : Cursor, Windsurf, Cline, Claude Desktop, n8n/Make, scripts CI.
 > **Zéro modification du cœur** (agents, règles, taxonomie, pipeline).

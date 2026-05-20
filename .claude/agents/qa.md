@@ -146,7 +146,7 @@ Read **uniquement** :
     `gate_passed` §1.3, boucle correction RED→GREEN §2).
 
 **Rules inline (depuis SDD_Pro v5.0 — économie tokens)** : les règles
-`qa-coverage.md` et `stack-completeness.md` ne sont **PLUS lues** en
+`quality.md` (Partie A, ex-qa-coverage.md) et `library-and-stack.md` (Partie A, ex-stack-completeness.md) ne sont **PLUS lues** en
 STEP 3. Substance
 opérationnelle inlinée dans la section **Inline Rules** en bas de ce
 fichier. Si cas-limite (ex. format précis schema coverage.json,

@@ -120,7 +120,7 @@ Read **uniquement** :
    agents.
 
 **Rules inline (depuis SDD_Pro v5.0 — économie tokens) :** la règle
-`stack-completeness.md` n'est **PLUS lue en STEP 3**. Leur substance opérationnelle est inlinée dans la section
+`library-and-stack.md` (Partie A, ex-stack-completeness.md) n'est **PLUS lue en STEP 3**. Sa substance opérationnelle est inlinée dans la section
 **Anti-derive strict** + **Inline Rules** en bas de ce fichier. Si tu
 as besoin du détail (cas-limite), Read `@.claude/rules/{nom}.md` à la
 demande.
@@ -273,11 +273,11 @@ Pas de `ds_components`/`source_html_elements` (spécifique frontend).
 
 ### 5.2 Exit + plan write-through (format v2 strict-ready, depuis v6.2)
 
-- Exit silencieux "frontend-only US" : `@dev-shared.md §7.3`
-- AC coverage : `@dev-shared.md §7.2`
-- Anti-derive plan : `@dev-shared.md §7.5`
+- Exit silencieux "frontend-only US" : `@.claude/rules/build-and-loop.md §7.3`
+- AC coverage : `@.claude/rules/build-and-loop.md §7.2`
+- Anti-derive plan : `@.claude/rules/build-and-loop.md §7.5`
 
-**Format v2 obligatoire en mode `:plan`** (cf. `@dev-shared.md §7.4.bis`) :
+**Format v2 obligatoire en mode `:plan`** (cf. `@.claude/rules/build-and-loop.md §7.4.bis`) :
 
 1. Construire les sections markdown standard : `## Files`, `## ACs Coverage Summary`, `## Notes` (optionnel) — format §7.4.
 2. Construire la section `## Inline Digest` (auto-suffisante, requise en v2) :
@@ -435,7 +435,7 @@ BREAKING CHANGES cleanup, reads on-demand cas-limite) :
 Spécifique dev-backend (résumé) :
 - `[STACK_LIBRARY_MISSING]` sur lib hors §2.4.a/§2.4.b du stack backend
 - `[QA_OWNERSHIP_VIOLATION]` sur écriture matchant patterns test .NET/Node/Python/Kotlin
-- `[LIBNAME_LOCK_HELD]` sur conflit verrou (cf. `dev-shared.md §2`)
+- `[LIBNAME_LOCK_HELD]` sur conflit verrou (cf. `build-and-loop.md §2`, Partie B, ex-dev-shared.md)
 
 **Discipline source-first** (v6.10.5 fix CRIT-4) :
 `@.claude/docs/principles/source-first.md` — Read on-demand uniquement si bug
