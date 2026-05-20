@@ -576,10 +576,13 @@ Le pipeline `/sdd-review` :
 5. Compute verdict 🟢/🟡/🔴 contre `ReviewFailOn`
 6. Persist `validation_reports(report_type='review')` + emit `workspace/output/qa/feat-{n}/review.md`
 
-**Comportement bloquant** :
-- `ReviewFailOnSddFull: true` dans Project Config (défaut `false`) + verdict
-  RED → STOP `/sdd-full` avant STEP 5, exit code propagation.
-- Sinon → continue vers STEP 5, le verdict est inclus dans le récap.
+**Comportement bloquant** (v7.0.0 — codex audit P0 #9) :
+- `ReviewFailOnSddFull: true` dans Project Config (**défaut `true` depuis v7.0.0**,
+  flippé depuis `false` en v6.11.0) + verdict RED → STOP `/sdd-full` avant
+  STEP 5, exit code propagation.
+- Bypass explicite : `ReviewFailOnSddFull: false` dans `## Project Config`
+  de `stack.md` → continue vers STEP 5 même sur RED, le verdict est inclus
+  dans le récap.
 
 **State tracking** : set-phase phase=sdd-review (schema payload cf. STEP 1.quart).
 Status `skip` si `ReviewMode ∈ {off, manual}`.

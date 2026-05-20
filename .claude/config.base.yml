@@ -63,6 +63,19 @@ PerfFailOn: serious
 SpecComplianceMode: full
 SpecComplianceFailOn: serious
 
+# --- /sdd-review consolidated audit (v6.11.0, defaults flipped v7.0.0) ---
+# Rationale (codex audit P0 #9, 2026-05-20) : "Rendre /sdd-review
+# bloquant par défaut sur RED pour les projets sérieux". /sdd-full
+# STEP 4.8 historically continued past a RED verdict (warning only) —
+# this masked real quality issues at release time. v7.0.0 flips to
+# blocking. Bypass : explicit ReviewFailOnSddFull: false in stack.md
+# ## Project Config (project layer wins).
+ReviewMode: full                      # full | scans-only | read-only | manual | off
+ReviewFailOn: serious                 # info | minor | moderate | serious | critical
+ReviewFailOnSddFull: true             # v7.0.0 : false → true (blocking)
+ArchReviewMode: manual                # full | manual | off (Sonnet 4.6 cost-aware)
+ArchReviewFailOn: serious
+
 # --- Plan Cache Strict (v6.2 → v7.0.0 DEPRECATED) ---
 # DEPRECATED in v7.0.0 (cf. ADR governance-major-prompts-trim) :
 #   - dev-backend-strict / dev-frontend-strict variants removed.
