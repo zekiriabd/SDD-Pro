@@ -1,5 +1,11 @@
 # /dev-plan — Génère les plans techniques d'1 FEAT sans coder
 
+> ⚠️ **Commande interne v7.0.0** — invoquée par /sdd-full STEP 3.6.
+> Plans techniques pré-dev — invoqué conditionnellement.
+> Utilisateur final : préférer la commande orchestrante (`/sdd-full` ou `/dev-run`)
+> qui gère pré-conditions, idempotence et état. Conservée comme command pour
+> debug/inspection ciblée et préservation des chaînes d'invocation documentées.
+
 Pour chaque US de la FEAT `{n}`, invoque les agents `dev-backend` et
 `dev-frontend` en **mode Plan Only** : ils lisent l'US (+ mockup HTML
 en lecture texte directe pour le front), planifient inline les

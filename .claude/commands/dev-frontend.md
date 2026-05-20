@@ -1,5 +1,11 @@
 # /dev-frontend — Génère le code client d'UNE US
 
+> ⚠️ **Commande interne v7.0.0** — invoquée par /dev-run STEP 6.c.
+> Génère 1 US frontend — invoqué en batch par /dev-run.
+> Utilisateur final : préférer la commande orchestrante (`/sdd-full` ou `/dev-run`)
+> qui gère pré-conditions, idempotence et état. Conservée comme command pour
+> debug/inspection ciblée et préservation des chaînes d'invocation documentées.
+
 Invoque l'agent `dev-frontend` pour matérialiser l'US
 `workspace/output/us/{n}-{m}-{Name}.md` + le mockup HTML éventuel
 `workspace/input/ui/{n}-{m}-{Name}.html` en code client (Pages, Components,

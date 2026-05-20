@@ -1,5 +1,11 @@
 # /dev-run — Orchestrateur dev (arch+db → back + front en parallèle) pour 1 FEAT
 
+> ⚠️ **Commande interne v7.0.0** — invoquée par /sdd-full STEP 4.
+> Orchestrateur dev (arch+back+API+front) — invoqué par /sdd-full.
+> Utilisateur final : préférer la commande orchestrante (`/sdd-full` ou `/dev-run`)
+> qui gère pré-conditions, idempotence et état. Conservée comme command pour
+> debug/inspection ciblée et préservation des chaînes d'invocation documentées.
+
 > **Dépendance load-bearing au runtime Claude Code** : orchestration
 > parallèle via tool `Agent` (alias `Task`) avec N calls indépendants
 > dans un même message. Contrat externe garanti par Claude Code.

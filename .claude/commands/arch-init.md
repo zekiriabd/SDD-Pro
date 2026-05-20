@@ -1,5 +1,11 @@
 # /arch-init — Bootstrap idempotent (projets vides + scaffolding DB)
 
+> ⚠️ **Commande interne v7.0.0** — invoquée par /dev-run STEP 5.
+> Bootstrap projet idempotent — invoqué automatiquement.
+> Utilisateur final : préférer la commande orchestrante (`/sdd-full` ou `/dev-run`)
+> qui gère pré-conditions, idempotence et état. Conservée comme command pour
+> debug/inspection ciblée et préservation des chaînes d'invocation documentées.
+
 Invoque l'agent `arch` pour préparer l'**ossature complète** du projet
 à partir des stacks actifs :
 

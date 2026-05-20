@@ -1,5 +1,11 @@
 # /us-generate — Découpe une FEAT en User Stories
 
+> ⚠️ **Commande interne v7.0.0** — invoquée par /sdd-full STEP 2.
+> Découpage FEAT → US — invoqué automatiquement.
+> Utilisateur final : préférer la commande orchestrante (`/sdd-full` ou `/dev-run`)
+> qui gère pré-conditions, idempotence et état. Conservée comme command pour
+> debug/inspection ciblée et préservation des chaînes d'invocation documentées.
+
 Invoque l'agent PO pour découper une FEAT fonctionnelle en User
 Stories structurées (cible 1-3, warning 4-6, hard cap 6) dans `workspace/output/`.
 

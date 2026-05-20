@@ -42,24 +42,35 @@ Basename `{n}-{m}-{Name}` rigoureusement identique à travers tous les artefacts
 
 ## 3. Commandes disponibles
 
+**8 user-facing** (v7.0.0 — orchestrent le pipeline complet, gèrent
+pré-conditions et idempotence) :
+
 | Commande | Phase | Rôle |
 |---|---|---|
 | `/feat-generate [Nom]` | 1 | Cadrage FEAT + bootstrap constitution |
-| `/feat-deepen {n} [--quick]` | 1.5 | Élicitation (Pre-mortem, Red Team…) |
-| `/us-generate {n}` | 2 | FEAT → User Stories (agent PO) |
 | `/feat-validate {n} [--json]` | 2.6 | Implementation Readiness Gate |
-| `/arch-init` | 3 | Bootstrap arch (auto via `/dev-run`) |
-| `/dev-plan {n}` | 3.5 | Plans techniques sans coder |
-| `/dev-backend {n}-{m}[:plan]` | 4 | Code serveur d'1 US |
-| `/dev-frontend {n}-{m}[:plan]` | 4 | Code client d'1 US |
-| `/dev-run {n}` | 3→4 | Orchestrateur (arch+back+front gated) |
 | `/sdd-full {n}` | 2→5 | Pipeline complet A→Z |
 | `/qa-generate {n}` | 5 | Tests + coverage + quality scan |
-| `/sdd-review {n}` | audit | Audit consolidé (style Sonar) |
+| `/sdd-review {n} [--ensure-scans] [--fail-on …]` | audit | Audit consolidé (style Sonar, v7.0.0 bloquant RED) |
 | `/sdd-status [{n}]` | diagnostic | État pipeline (read-only) |
 | `/sdd-discover-stack` | onboarding | Scan repo → `stack.md.candidate` |
-| `/sdd-profile {cmd}` | gouvernance | Snapshots team config |
-| `/doc-refresh` | rendu | INDEX.md ADRs |
+| `/sdd-run` | runtime | Lance backend + frontend + console en parallèle |
+
+**9 internes v7.0.0** (invoquées par les commandes orchestrantes
+ci-dessus, conservées comme slash commands pour debug/inspection
+ciblée ; **utilisateur final : préférer une commande orchestrante**) :
+
+| Commande | Invoquée par | Rôle |
+|---|---|---|
+| `/us-generate {n}` | `/sdd-full STEP 2` | FEAT → User Stories (agent PO) |
+| `/arch-init` | `/dev-run STEP 5` | Bootstrap projet + DB scaffolding |
+| `/dev-plan {n}` | `/sdd-full STEP 3.6` | Plans techniques pré-dev |
+| `/dev-run {n}` | `/sdd-full STEP 4` | Orchestrateur dev (arch + back + API + front) |
+| `/dev-backend {n}-{m}` | `/dev-run STEP 6.a` | Code serveur 1 US |
+| `/dev-frontend {n}-{m}` | `/dev-run STEP 6.c` | Code client 1 US |
+| `/doc-refresh` | fin pipeline | INDEX.md ADRs (script `index_adrs.py`) |
+| `/feat-deepen {n}` | manuel | Élicitation 5 techniques (sera fusionné dans `/feat-generate --deepen` post-v7.0.0) |
+| `/sdd-profile {cmd}` | gouvernance | Snapshots config team (script `manage_profile.py`) |
 
 > Flags `/sdd-full` et `/dev-run` : `--force`, `--rebuild-arch`, `--resume`, `--manual-gates`, `--plan`, `--max-parallel N`. Pour la sémantique exhaustive : `@.claude/commands/*.md`.
 

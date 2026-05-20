@@ -1,5 +1,11 @@
 # /dev-backend — Génère le code serveur d'UNE US
 
+> ⚠️ **Commande interne v7.0.0** — invoquée par /dev-run STEP 6.a.
+> Génère 1 US backend — invoqué en batch par /dev-run.
+> Utilisateur final : préférer la commande orchestrante (`/sdd-full` ou `/dev-run`)
+> qui gère pré-conditions, idempotence et état. Conservée comme command pour
+> debug/inspection ciblée et préservation des chaînes d'invocation documentées.
+
 Invoque l'agent `dev-backend` pour matérialiser l'US
 `workspace/output/us/{n}-{m}-{Name}.md` en code serveur (services, endpoints,
 DTOs, entities, mappers, Program.cs, middleware). L'agent planifie

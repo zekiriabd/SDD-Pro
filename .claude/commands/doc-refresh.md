@@ -1,5 +1,11 @@
 # /doc-refresh
 
+> ⚠️ **Commande interne v7.0.0** — invoquée par fin de pipeline (/sdd-full, /dev-run, /qa-generate).
+> Régénère INDEX.md ADRs — script index_adrs.py invoqué automatiquement.
+> Utilisateur final : préférer la commande orchestrante (`/sdd-full` ou `/dev-run`)
+> qui gère pré-conditions, idempotence et état. Conservée comme command pour
+> debug/inspection ciblée et préservation des chaînes d'invocation documentées.
+
 > Régénère l'**INDEX.md des ADRs** depuis l'état du workspace.
 > **Idempotent**. Exécution déterministe via `index_adrs.py` (v7.0.0).
 >

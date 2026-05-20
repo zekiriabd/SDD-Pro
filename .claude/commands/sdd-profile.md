@@ -1,5 +1,11 @@
 # /sdd-profile — Gestion des profiles team config (v6.7.2)
 
+> ⚠️ **Commande interne v7.0.0** — invoquée par manuel (gouvernance team config).
+> Gestion snapshots config — script manage_profile.py.
+> Utilisateur final : préférer la commande orchestrante (`/sdd-full` ou `/dev-run`)
+> qui gère pré-conditions, idempotence et état. Conservée comme command pour
+> debug/inspection ciblée et préservation des chaînes d'invocation documentées.
+
 Wrapper autour de `python .claude/python/sdd_scripts/manage_profile.py`.
 Permet d'exporter/importer/lister les profiles `~/.sdd/profiles/{name}.yml`,
 qui sont des snapshots de `~/.sdd/config.team.yml` (le niveau team du
