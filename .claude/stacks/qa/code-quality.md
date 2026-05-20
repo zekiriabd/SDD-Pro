@@ -64,7 +64,7 @@ Détecte les valeurs hex hardcodées (#RRGGBB ou #RGB) **hors** de
 Concerne : `.css`, `.scss`, `.razor`, `.tsx`, `.jsx`, `.vue`.
 
 Le seul endroit autorisé pour les hex est le fichier theme global
-référencé par `rules/ui-tokens.md` (héritage SDD_Lite philosophie).
+référencé par `rules/quality.md` (héritage SDD_Lite philosophie).
 
 **Sévérité** : `warning`.
 

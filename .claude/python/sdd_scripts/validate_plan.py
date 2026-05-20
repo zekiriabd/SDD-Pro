@@ -44,7 +44,7 @@ Conventions (cf. `.claude/python/README.md`):
 
 Related:
 - `@.claude/docs/DESIGN-FROMPLAN-STRICT.md` (design)
-- `@.claude/rules/dev-shared.md §7` (plan structure spec)
+- `@.claude/rules/build-and-loop.md §7` (plan structure spec)
 - `@.claude/rules/error-classification.md` (PLAN_* codes)
 """
 from __future__ import annotations

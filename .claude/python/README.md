@@ -138,7 +138,7 @@ Deux nouveaux scripts ajoutés en v6.2 pour le chemin From-Plan Strict
 | `sdd_scripts/compute_plan_metadata.py` (~150 LOC, 7 tests) | Helper YAML/JSON pour générer le v2 frontmatter (`plan-schema-version: 2`, `us-hash` SHA-256, `claude-md-hash`, `generated-at` ISO, `capabilities-triggered`, `strict-ready: true`). | `dev-backend` STEP 5.2 (mode `:plan`), `dev-frontend` STEP 6.4 (mode `:plan`) |
 
 Détail design : `@.claude/docs/DESIGN-FROMPLAN-STRICT.md`.
-Détail format plan v2 : `@.claude/rules/dev-shared.md §7.4.bis`.
+Détail format plan v2 : `@.claude/rules/build-and-loop.md §7.4.bis`.
 
 ### Conventions
 

@@ -499,7 +499,7 @@ secret.
 
 ### 4.2 CORS
 
-Le backend doit avoir une policy CORS `DevOpen` (cf. `.claude/rules/cors.md`).
+Le backend doit avoir une policy CORS `DevOpen` (cf. `.claude/rules/library-and-stack.md`).
 
 ### 4.3 Types partagés DTO ↔ Backend
 
@@ -654,7 +654,7 @@ Hash dans nom de fichier → cache navigateur agressif possible.
 - **State global hors Pinia**
 - **Mutation directe de props** dans un composant enfant
 - **Watcher non motivé** sur ref (préférer `computed`)
-- **Hex hardcodé hors `theme.css`** (cf. `rules/ui-tokens.md`)
+- **Hex hardcodé hors `theme.css`** (cf. `rules/quality.md`)
 - **Texte hardcodé** dans templates (toujours `t('key')`)
 - **Lazy loading absent** sur routes
 - **Imports cycliques** entre stores

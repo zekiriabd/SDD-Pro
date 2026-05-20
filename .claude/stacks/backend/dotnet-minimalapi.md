@@ -787,7 +787,7 @@ Parametre de requete optionnel `langue`. Traductions dans
 ---
 
 ## 7. CORS
-Conforme a `.claude/rules/cors.md §2.1`. Policy `Spa` avec origins **explicites**
+Conforme a `.claude/rules/library-and-stack.md §2.1`. Policy `Spa` avec origins **explicites**
 lus depuis la configuration (`Cors:AllowedOrigins`, CSV) ; fallback
 `http://localhost:5173` (port Vite par defaut pour React, ajuster si le stack
 frontend utilise un autre port — Vue 5173, Angular 4200, Next 3000).
@@ -826,8 +826,8 @@ Override via env var `Cors__AllowedOrigins=http://localhost:5173,https://staging
 - Origins hardcodees dans Program.cs (doit venir de config)
 
 Durcissement staging / prod : remplacer le fallback localhost par les origins
-production reelles, jamais de wildcard. Cf. `rules/cors.md §4` (anti-patterns) +
-`rules/cors.md §5` (verification dev-backend STEP build).
+production reelles, jamais de wildcard. Cf. `rules/library-and-stack.md §4` (anti-patterns) +
+`rules/library-and-stack.md §5` (verification dev-backend STEP build).
 
 ---
 
@@ -888,7 +888,7 @@ Cf. `.claude/stacks/frontend/react.md §5` pour le grep côté frontend.
 Skills Claude Code disponibles invoquees via le tool `Skill` AVANT
 generation quand le trigger matche. Ces skills sont **guidance technique** —
 elles n'autorisent JAMAIS l'expansion de scope au-dela de la task / FEAT /
-stack (voir `.claude/rules/stack-completeness.md`). Toute librairie
+stack (voir `.claude/rules/library-and-stack.md`). Toute librairie
 recommandee par une skill mais non listee en §2.4 reste interdite.
 
 | Trigger (detecte dans la task ou les ACs) | Skill | Phase |

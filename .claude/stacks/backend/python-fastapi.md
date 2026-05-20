@@ -683,7 +683,7 @@ temporaire puis merger via diff (avancé, non requis pour MVP).
 
 ## 6. CORS
 
-Conforme à `.claude/rules/cors.md §2.3`. Origins **explicites** lus depuis env
+Conforme à `.claude/rules/library-and-stack.md §2.3`. Origins **explicites** lus depuis env
 (`CORS_ALLOWED_ORIGINS`, CSV) ; fallback `http://localhost:5173` (port Vite par
 défaut pour React, ajuster si le stack frontend utilise un autre port — Vue 5173,
 Angular 4200, Next 3000).
@@ -717,7 +717,7 @@ CORS_ALLOWED_ORIGINS=http://localhost:5173,https://staging.example.com
 - Origins hardcodées dans `main.py` (doit venir d'env / config)
 
 Production : remplacer le fallback localhost par les origins prod réelles, jamais
-de wildcard. Cf. `rules/cors.md §4` (anti-patterns).
+de wildcard. Cf. `rules/library-and-stack.md §4` (anti-patterns).
 
 ---
 
@@ -833,7 +833,7 @@ log.info("User logged in", user_id=42, ip="1.2.3.4")
 
 **Interdits** :
 - Ne jamais ajouter une lib non listée en §2.4 — STOP + ERROR
-  `[STACK_LIBRARY_MISSING]` (cf. `rules/stack-completeness.md`)
+  `[STACK_LIBRARY_MISSING]` (cf. `rules/library-and-stack.md`)
 - Ne jamais utiliser `pip install` ad-hoc — toujours mettre à jour
   §2.4 + §2.2.1 d'abord
 

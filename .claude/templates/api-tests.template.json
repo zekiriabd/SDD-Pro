@@ -1,5 +1,5 @@
 {
-  "$comment": "SDD_Pro API Gate report — produced by /qa-generate --mode api-tests (cf. rules/backend-first.md §1.4). Schema mirror of templates/coverage.template.json shape.",
+  "$comment": "SDD_Pro API Gate report — produced by /qa-generate --mode api-tests (cf. rules/build-and-loop.md §1.3-§1.4). v7.0.0: canonical 'status' field (PASS|WARN|FAIL|SKIPPED|INFRA_BLOCKED) added; 'verdict' (GREEN|YELLOW|RED) retained as legacy alias; readers MUST prefer 'status' for new code.",
   "FEAT": "{n}-{FeatName}",
   "extractedAt": "2026-05-14T10:30:00Z",
   "stack": "qa-dotnet-xunit",
@@ -33,6 +33,7 @@
     "min_per_endpoint": 2,
     "min_per_endpoint_required": 2,
     "gate_passed": true,
+    "status": "PASS",
     "verdict": "GREEN"
   }
 }

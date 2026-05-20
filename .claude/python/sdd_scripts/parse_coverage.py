@@ -3,7 +3,7 @@
 
 Reads native coverage outputs from various stacks and produces
 `workspace/output/qa/feat-{n}/coverage.json` following the schema in
-`rules/qa-coverage.md §2`.
+`rules/quality.md §2`.
 
 Supported formats:
 - Cobertura XML  (`coverage.cobertura.xml`)  — .NET coverlet, Python coverage.py, JS

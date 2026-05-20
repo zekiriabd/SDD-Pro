@@ -16,7 +16,7 @@
 | Terme canonique | Définition | Source | Aliases dépréciés |
 |---|---|---|---|
 | **FEAT** | Spécification fonctionnelle d'une feature, fichier `workspace/input/feats/{n}-{Name}.md`. Porte les sections Functional Needs, Business Rules, Acceptance Criteria, Functional Deliverables, Actors, etc. | `templates/feat.template.md` | `feature`, `spec` |
-| **US** (User Story) | Découpe d'une FEAT en flux utilisateur. `workspace/output/us/{n}-{m}-{Name}.md`. 1-6 par FEAT max (cf. `rules/us-granularity.md`). | `templates/us.template.md` | `story`, `user-story` |
+| **US** (User Story) | Découpe d'une FEAT en flux utilisateur. `workspace/output/us/{n}-{m}-{Name}.md`. 1-6 par FEAT max (cf. `docs/principles/us-granularity.md`). | `templates/us.template.md` | `story`, `user-story` |
 | **SFD-N** | *Specifiable Functional Deliverable* — ID stable d'une ligne `## Functional Needs` dans une FEAT. | `rules/constitution.md §2` | `Need-N`, `FN-N` |
 | **FD-N** | *Functional Deliverable* — ID stable d'une ligne `## Functional Deliverables` dans une FEAT. | idem | `Deliverable-N` |
 | **BR-N** | *Business Rule* — ID stable d'une ligne `## Business Rules` dans une FEAT. | idem | `Rule-N` |
@@ -25,7 +25,7 @@
 | **ADR** | *Architecture Decision Record* — fichier atomique `workspace/output/.sys/.context/adrs/ADR-{ts}-{slug}.md` traçant 1 décision structurante. | `rules/constitution.md §4` | `decision-record` |
 | **Mockup** | Maquette HTML statique déposée manuellement par UX Designer sous `workspace/input/ui/{n}-{m}-{Name}.html`. Lecture passive uniquement. | `CLAUDE.md §1` | `wireframe`, `HTML UI` |
 | **Plan technique** | Frontmatter YAML + section `## Files` listant les fichiers à matérialiser pour 1 US. `workspace/output/plans/{n}-{m}-{Name}.{back\|front}.md`. | `rules/dev-shared.md §7` | `tech-plan` |
-| **Covers** | Champ d'une US qui référence les SFD/BR/AC/FD couverts dans la FEAT parente. | `rules/us-granularity.md §5` | — |
+| **Covers** | Champ d'une US qui référence les SFD/BR/AC/FD couverts dans la FEAT parente. | `docs/principles/us-granularity.md §5` | — |
 
 ---
 
@@ -138,7 +138,7 @@ Forme rejetée : `gate` (générique) sans qualificatif → toujours préfixer.
 | **Load-bearing** | Mécanisme load-bearing = strictement nécessaire pour la robustesse industrielle ; sa violation casse silencieusement le système. | `rules/file-ownership.md` |
 | **Scaffolding** | Bootstrap projet (csproj/package.json/etc.) + entities + structure directory par agent `arch` Phase A/B. | `agents/arch.md` |
 | **SSoT** | *Single Source of Truth* — fichier ou table unique faisant autorité sur un concept. | informel |
-| **Source-first discipline** | Tout bug code = trou dans MD source ; patcher SPEC/US/plan/stack MD AVANT le code. | `rules/source-first.md` |
+| **Source-first discipline** | Tout bug code = trou dans MD source ; patcher SPEC/US/plan/stack MD AVANT le code. | `docs/principles/source-first.md` |
 | **Backend-first gated workflow** | dev-backend → API Gate → dev-frontend (jamais en parallèle depuis 2026-05-07). | `rules/backend-first.md` |
 | **File ownership** | Matrice qui désigne UN propriétaire unique par fichier pour éviter race conditions parallèles. | `rules/file-ownership.md §1` |
 | **Lib lock** | Verrou atomique par entité pour le projet shared `LibName` (procédure `acquire_libname_lock.py`). | `rules/file-ownership.md §4` |

@@ -2,6 +2,7 @@
 
 ID: {n}-{m}-{Name}
 Parent FEAT: {n}-{FeatName}
+Parent FEAT hash: sha256:{feat-hash-8}        # v7.0.0 P1-11 — détecte modification silencieuse de la FEAT
 Status: Draft
 
 <!-- Status valides (v6.8+, optionnel — backward-compat avec Draft/Done) :

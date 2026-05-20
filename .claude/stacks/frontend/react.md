@@ -743,7 +743,7 @@ Hierarchie de styling :
 
 1. **Tokens globaux** (`src/index.css`) — variables CSS shadcn
    (`--background`, `--foreground`, `--primary`, etc.) injectees par
-   `shadcn init`. Surcharge possible via `.claude/rules/ui-tokens.md §3`
+   `shadcn init`. Surcharge possible via `.claude/rules/quality.md §3`
    pour matcher la fidelite design-FEAT.md §8.
 2. **Utility classes Tailwind** sur les composants — preferred path.
    Ex : `className="flex gap-4 px-6 py-4 rounded-lg bg-card"`.

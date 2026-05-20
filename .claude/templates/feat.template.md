@@ -9,6 +9,25 @@ Status: Draft
 ## Objective
 <Un seul résultat mesurable. Observable, pas aspirationnel.>
 
+## Quantified Goal (v7.0.0 — anti-GIGO)
+<KPI mesurable + valeur cible + délai. Exemples :
+"taux conversion +15% sous 6 mois", "p95 latence < 300ms sous charge nominale",
+"taux abandon panier -20% sur cible mobile". Écrire `<à préciser>` si non
+connu — mais le gap doit être explicite, pas absent.>
+- Metric: <à préciser>
+- Target: <à préciser>
+- Deadline: <à préciser>
+
+## Non-Functional Constraints (v7.0.0)
+<Champs structurés non-skippables. Si non applicable, écrire `n/a`
+explicitement — l'absence du champ déclenche un WARN feat-validate.>
+- Expected volume: <ex. 10k requêtes/jour, 500 utilisateurs concurrents, ou n/a>
+- Performance SLA: <ex. p95 < 500ms, ou n/a>
+- Data retention: <ex. logs 90 jours, données utilisateur GDPR, ou n/a>
+- Compliance: <ex. GDPR/RGPD, HIPAA, SOC2, PCI-DSS, ou n/a>
+- Integration: <système d'enregistrement / API externes / SSO, ou n/a>
+- Degraded mode: <comportement si dépendance down, ou n/a>
+
 ## Actors
 - <acteur-1>: <rôle>
 - <acteur-2>: <rôle>

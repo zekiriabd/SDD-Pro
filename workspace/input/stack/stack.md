@@ -14,25 +14,29 @@ PlanReviewDefault: true
 QAMode: full
 CoverageMin: 80
 MaxParallel: 4
-SecurityScanEnabled: false
-# v6.10.5 audit 2026-05-19 — activation chemin From-Plan Strict (Sonnet 4.6)
-# Fallback Opus automatique si plan v1 ou ## Inline Digest manquant via
-# validate_plan.py --strict. Cf. config.base.yml et ADR governance-major-
-# devstar-strict-dry.
+# 2026-05-20 audit CTO — runs sérieux : OWASP scan obligatoire.
+# Avant : false (raison historique : surface CMSPrint considérée low-risk).
+# Maintenant : true (decision audit P0 + ADR governance-security-baseline).
+# Pour bypasser ponctuellement : commenter cette ligne + ADR projet.
+SecurityScanEnabled: true
+# v6.10.5 audit 2026-05-19 — PlanCacheStrict no-op en v7.0.0 (variants strict
+# retirés via governance-major-auditors-trim). Clé tolérée en lecture pour
+# backward-compat, valeur ignorée runtime. Cf. config.base.yml §79-88.
 PlanCacheStrict: true
 
 # v6.10.5 fix CRIT-1 (2026-05-19) — auditors manquants en CMSPrint.
-# Defaults phase_planner.py = "manual" pour code_review et spec_compliance
-# → auditors skippés silencieusement. On les force à "full" côté projet.
-# A11yMode/PerfMode déjà à "full" par défaut planner (cohérent avec
-# a11y-report.md + perf-report.md déjà produits pour les 4 FEATs).
-# SecurityMode reste "manual" (SecurityScanEnabled: false explicite).
+# v7.0.0 : a11y/perf agents RETIRÉS (axe-core/Lighthouse CI projet généré).
+# Defaults v7.0.0 base.yml = "full" pour code_review, security, spec_compliance.
+# A11yMode/PerfMode reflètent l'absence d'agent — défaut "off".
+# SecurityMode flippé "manual" → "full" pour runs sérieux (cohérent avec
+# SecurityScanEnabled: true ci-dessus).
 # ArchReviewMode pris en compte uniquement par /sdd-review (sdd-full.md L560).
 CodeReviewMode: full
+SecurityMode: full
 SpecComplianceMode: full
 ArchReviewMode: full
-A11yMode: full
-PerfMode: full
+A11yMode: "off"
+PerfMode: "off"
 
 ## Active Architecture Pattern
 # 1 seul pattern actif. Scope = backend/* déclaré.
