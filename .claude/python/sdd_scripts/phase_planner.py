@@ -397,6 +397,10 @@ def _decide_a11y(
     has_frontend_stack: bool,
     has_frontend_code: bool,
 ) -> dict[str, object]:
+    # NOTE v7.0.0 : accessibility-auditor agent REMOVED (governance-major-auditors-trim),
+    # but planner phase entry kept for callers reading the plan JSON. The agent
+    # binary is gone so /sdd-full simply skips invocation — see CLAUDE.md §4 for
+    # the axe-core replacement path in the generated project's CI.
     if a11y_mode == "off":
         return _phase("a11y_audit", enabled=False, reason="A11yMode=off")
     if a11y_mode == "manual":
@@ -486,6 +490,10 @@ def _decide_perf(
     has_backend_code: bool,
     has_frontend_code: bool,
 ) -> dict[str, object]:
+    # NOTE v7.0.0 : performance-auditor agent REMOVED (governance-major-auditors-trim),
+    # but planner phase entry kept for callers reading the plan JSON. The agent
+    # binary is gone so /sdd-full simply skips invocation — see CLAUDE.md §4 for
+    # the Lighthouse CI replacement path in the generated project's CI.
     if perf_mode == "off":
         return _phase("perf_audit", enabled=False, reason="PerfMode=off")
     if perf_mode == "manual" and not has_perf_ac:
@@ -495,7 +503,6 @@ def _decide_perf(
             reason="PerfMode=manual + no AC mentions perf metric (lcp/p95/...)",
         )
     if perf_mode == "manual" and has_perf_ac:
-        # Override : AC explicite force l'invocation même en manual
         return _phase(
             "perf_audit",
             enabled=True,

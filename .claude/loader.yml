@@ -397,61 +397,14 @@ dashboard:
   idempotent: true                          # peut être ré-invoqué sans risque
 
 # -------------------------------------------------------------------------
-# Agent: accessibility-auditor (Haiku 4.5) — depuis v6.3.0
-# Phase: 5.5 (post-dev frontend, parallèle possible à qa, avant dashboard)
-# Token footprint estimé: ~2-4 KB par feature (scan déterministe Haiku)
-# Invocation: manuelle en v6.3.0 ("audite l'accessibilité de la FEAT N")
-#             auto-invoke depuis /qa-generate en v6.3.0.1 (à venir)
-# Skip silencieux si projet backend-only OU A11yMode: off
+# Agent: accessibility-auditor — REMOVED v7.0.0
 # -------------------------------------------------------------------------
-accessibility-auditor:
-  reads:
-    - workspace/input/stack/stack.md             # Project Config (A11yMode, A11yThreshold, A11yFailOn)
-    - .claude/rules/error-classification.md      # taxonomie [A11Y_*] §1.9
-    - workspace/input/feats/{n}-*.md             # FEAT parente (passif, contexte)
-    - workspace/output/us/{n}-*.md               # US ciblées (passif, mots-clés a11y)
-    - workspace/output/src/{AppName}/**/*.razor  # markup Blazor
-    - workspace/output/src/{AppName}/**/*.{tsx,jsx}  # markup React
-    - workspace/output/src/{AppName}/**/*.vue    # markup Vue
-    - workspace/output/src/{AppName}/**/*.html   # markup Angular + index.html
-    - workspace/output/src/{AppName}/**/*.component.ts  # templates inline Angular
-    # Optionnel (optimisation faux-positifs) :
-    #   - .claude/stacks/ui/{active}.md §2       # mapping composants DS (ignorer scan)
-    # Budget cible : ≤ 4 KB par invocation (Haiku, déterministe)
-  writes:
-    - workspace/output/qa/feat-{n}/a11y-report.md     # rapport humain
-    - workspace/output/qa/feat-{n}/a11y-report.json   # schéma normalisé
-  forbidden_reads:
-    - .claude/stacks/backend/                    # hors scope a11y
-    - .claude/stacks/auth/                       # hors scope a11y
-    - .claude/stacks/qa/                         # hors scope a11y
-    - workspace/output/src/{BackendName}/        # backend non scanné
-    - workspace/output/.sys/.context/            # constitution/ADRs hors scope
-    - workspace/output/db/                       # schema DB hors scope
-  forbidden_writes:
-    - workspace/output/src/                      # read-only sur le markup généré
-    - workspace/output/qa/feat-*/coverage.json   # responsabilité qa
-    - workspace/output/qa/feat-*/quality.json    # responsabilité qa
-    - workspace/output/qa/feat-*/api-tests.json  # responsabilité qa (API Gate)
-    - workspace/output/qa/feat-*/report.md       # responsabilité qa
-    - workspace/output/dashboard/                # responsabilité dashboard
-    - workspace/output/.sys/                     # hors scope
-  modes:                                          # selon A11yMode dans Project Config
-    - off: "agent jamais invoqué (exit immédiat 'disabled')"
-    - full: "scan complet, verdict 🟢/🟡/🔴 selon A11yFailOn (recommandé, défaut)"
-    - manual: "skip auto-invoke ; Tech Lead lance via demande directe"
-  thresholds:
-    - AA: "WCAG 2.2 niveau AA — défaut, 10 checkpoints scannés"
-    - AAA: "WCAG 2.2 niveau AAA — AA + target size 44px + section headings"
-  fail_on:
-    - critical: "🔴 RED dès 1 issue critical (alt, label input)"
-    - serious: "🔴 RED dès 1 issue serious ou critical (défaut)"
-    - moderate: "🔴 RED dès 1 issue moderate ou pire"
-    - minor: "🔴 RED dès 1 issue (strict)"
-  exit_silent_when:
-    - "no frontend stack active OR workspace/output/src/{AppName}/ absent"
-    - "A11yMode: off"
-  idempotent: true                                # peut être ré-invoqué sans risque
+# Haiku 4.5 agent that did WCAG 2.2 AA deterministic greps (v6.3.0).
+# Retired in v7.0.0 (ADR governance-major-auditors-trim) — replaced by
+# axe-core CI integration in the generated project. The [A11Y_*] error
+# classes in error-classification.md §1.9 are preserved for axe-core's
+# output mapping.
+# -------------------------------------------------------------------------
 
 # -------------------------------------------------------------------------
 # Agent: code-reviewer (Sonnet 4.6) — depuis v6.3.1
@@ -648,83 +601,15 @@ security-reviewer:
   idempotent: true                                # peut être ré-invoqué sans risque
 
 # -------------------------------------------------------------------------
-# Agent: performance-auditor (Sonnet 4.6) — depuis v6.4.0
-# Phase: 7 (post-qa, parallèle à code-reviewer + security-reviewer scan)
-# Token footprint estimé: ~10-18 KB par feature (Sonnet 4.6 + Lighthouse opt-in)
-# Invocation: manuelle en v6.4.0 ("audite la performance de la FEAT N")
-#             auto-invoke depuis /qa-generate en v6.4.0.1 (à venir)
-# Activé par défaut (PerfMode: full). Désactivable via off | manual.
+# Agent: performance-auditor — REMOVED v7.0.0
 # -------------------------------------------------------------------------
-performance-auditor:
-  reads:
-    - workspace/input/stack/stack.md             # Project Config (PerfMode, PerfFailOn, PerfThresholds)
-    - .claude/rules/error-classification.md      # taxonomie [PERF_*] §1.12
-    - workspace/input/feats/{n}-*.md             # FEAT parente (passif)
-    - workspace/output/us/{n}-*.md               # US ciblées (passif, repérer ACs perf explicites)
-    - workspace/output/src/{BackendName}/CLAUDE.md  # architecture backend
-    - workspace/output/src/{AppName}/CLAUDE.md      # architecture frontend
-    - .claude/stacks/backend/{active}.md   # §1.3 + §3 patterns runtime
-    - .claude/stacks/frontend/{active}.md  # §1.3 + §3 patterns bundle/SSR
-    - workspace/output/plans/{n}-*.{back,front}.md  # mode preferred (lecture sélective)
-    - workspace/output/src/{BackendName}/**       # code production (fallback convention)
-    - workspace/output/src/{AppName}/**           # code production
-    - workspace/output/src/{LibName}/**           # lib partagée si présente
-    - workspace/output/src/{AppName}/package.json  # estimer node_modules deps
-    - workspace/output/src/{AppName}/dist/**      # si build effectué, mesurer bundle réel
-    - workspace/output/qa/feat-{n}/coverage.json  # cross-check tests perf vs unitaires (passif)
-    - workspace/output/.sys/.validation/{n}-code-review.json  # dé-dup N+1 avec code-reviewer
-    # Anti-pattern strict : pas de Glob workspace/output/src/**/*
-  writes:
-    - workspace/output/qa/feat-{n}/perf-report.md         # rapport humain
-    - workspace/output/qa/feat-{n}/perf-report.json       # schéma machine
-    - workspace/output/qa/feat-{n}/.lighthouse-raw.json   # raw output Lighthouse CI (si dispo)
-  forbidden_reads:
-    - workspace/output/us/{other-feat}            # autres FEATs
-    - workspace/input/feats/{other}.md            # autres FEATs
-    - .claude/stacks/qa/                          # hors scope
-    - .claude/stacks/auth/                        # hors scope direct
-    - .claude/stacks/ui/                          # hors scope (a11y-auditor)
-    - workspace/output/.sys/.context/             # constitution hors scope direct
-  forbidden_writes:
-    - workspace/output/src/                       # read-only strict
-    - workspace/output/us/                        # responsabilité po
-    - workspace/output/qa/feat-*/coverage.json    # responsabilité qa
-    - workspace/output/qa/feat-*/quality.json     # responsabilité qa
-    - workspace/output/qa/feat-*/a11y-report.*    # responsabilité accessibility-auditor
-    - workspace/output/qa/feat-*/report.md        # responsabilité qa
-    - workspace/output/dashboard/                 # responsabilité dashboard
-    - workspace/output/.sys/.validation/          # responsabilité /feat-validate + code-reviewer + security-reviewer
-    - workspace/output/plans/                     # ne planifie pas
-  modes:                                          # selon PerfMode dans Project Config
-    - off: "agent jamais invoqué (exit immédiat 'disabled')"
-    - full: "scan complet : analyses statiques (toujours) + Lighthouse CI (si dispo) + benchmark backend (v6.4.0.1) — défaut depuis v6.4.3"
-    - manual: "skip auto-invoke sauf si AC mentionne LCP/p95/... ; Tech Lead lance à la demande"
-  fail_on:
-    - critical: "🔴 RED dès 1 issue critical"
-    - serious: "🔴 RED dès 1 issue serious (défaut)"
-    - moderate: "🔴 RED dès 1 issue moderate"
-    - minor: "🔴 RED dès 1 issue (strict)"
-  thresholds_default:                             # PerfThresholds dans Project Config
-    LCP: 2500          # ms (Core Web Vitals AA)
-    CLS: 0.1           # score
-    FID: 100           # ms (legacy)
-    INP: 200           # ms (Chrome 125+)
-    TTFB: 600          # ms backend
-    BundleSize: 250    # KB gzipped
-    ApiP95: 300        # ms
-    ApiP99: 1000       # ms
-    DbQueryP95: 100    # ms
-  hard_blocking_classes:                          # override PerfFailOn
-    - "[PERF_AC_VIOLATION]"                       # AC d'US explicite non respectée
-  coordination:
-    - "Dé-duplique [PERF_N_PLUS_ONE_RISK] vs [REVIEW_ANTI_PATTERN_N_PLUS_ONE] de code-reviewer si code-review.json présent"
-  optional_tools:                                 # détection best-effort (which)
-    - lighthouse: "Lighthouse CI pour Core Web Vitals frontend (npm i -g lighthouse)"
-    - wrk: "HTTP benchmarking backend (v6.4.0.1)"
-    - k6: "Alternative wrk (v6.4.0.1)"
-  exit_silent_when:
-    - "PerfMode: off"
-  idempotent: true                                # peut être ré-invoqué sans risque
+# Sonnet 4.6 agent that did Core Web Vitals + SLO scans (v6.4.0) with
+# optional Lighthouse CI integration. Retired in v7.0.0
+# (ADR governance-major-auditors-trim) — replaced by direct Lighthouse CI
+# integration in the generated project's CI pipeline. The [PERF_*] error
+# classes in error-classification.md §1.12 are preserved for Lighthouse
+# output mapping.
+# -------------------------------------------------------------------------
 
 # -------------------------------------------------------------------------
 # Agent: spec-compliance-reviewer (Sonnet 4.6) — depuis v6.5.2

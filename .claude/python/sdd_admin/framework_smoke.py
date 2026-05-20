@@ -124,9 +124,11 @@ EXPECTED_AGENTS = (
     "elicitor", "qa", "constitutioner",
     # Rendering (1)
     "dashboard",
-    # Auditors v6.3+ (5)
-    "accessibility-auditor", "code-reviewer", "security-reviewer",
-    "performance-auditor", "spec-compliance-reviewer",
+    # Auditors v6.3+ (4 after v7.0.0 trim)
+    # accessibility-auditor + performance-auditor REMOVED v7.0.0
+    # (governance-major-auditors-trim) → axe-core + Lighthouse CI
+    "code-reviewer", "security-reviewer",
+    "spec-compliance-reviewer", "arch-reviewer",
 )
 
 EXPECTED_RULES = (

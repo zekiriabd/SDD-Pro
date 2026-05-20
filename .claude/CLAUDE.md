@@ -67,9 +67,13 @@ Basename `{n}-{m}-{Name}` rigoureusement identique à travers tous les artefacts
 
 **4 cœur** : `po`, `arch` (Sonnet 4.6) ; `dev-backend`, `dev-frontend` (Opus 4.7).
 **Support** : `elicitor`, `constitutioner`, `qa` (Sonnet 4.6) ; `dashboard` (Haiku 4.5).
-**Auditors** (Sonnet 4.6) : `accessibility-auditor` (Haiku), `code-reviewer`, `security-reviewer`, `performance-auditor`, `spec-compliance-reviewer`, `arch-reviewer`.
+**Auditors** (4 après v7.0.0 trim, Sonnet 4.6) : `code-reviewer`, `security-reviewer` (mode `scan` uniquement), `spec-compliance-reviewer`, `arch-reviewer`.
 
-> `dev-backend-strict` / `dev-frontend-strict` (v6.2 opt-in) **retirés en v7.0.0**. Plan v2 + `## Inline Digest` préservés pour review humaine, sans routing alternatif. Cf. `ADR-20260519T153000-governance-major-prompts-trim`.
+> **Retirés en v7.0.0** (cf. `ADR-20260519T120000-governance-major-auditors-trim`) :
+> - `accessibility-auditor` (Haiku 4.5) → remplacé par **axe-core** intégré au CI du projet généré.
+> - `performance-auditor` (Sonnet 4.6) → remplacé par **Lighthouse CI** + benchmark wrk/k6 au CI.
+> - `security-reviewer` mode `threat-model` → remplacé par **template humain** (`templates/threat-model.template.md`, à instancier par le Tech Lead pré-dev).
+> - `dev-backend-strict` / `dev-frontend-strict` → routing strict supprimé (plan v2 + `## Inline Digest` préservés pour review humaine).
 
 > Détail modèles, rôles, phases, isolation reads/writes : `@.claude/docs/architecture.md §2-§3`.
 > Tous autonomes (aucune question utilisateur). Ambiguïté → `STOP + ERROR [CLASS]`.
