@@ -34,18 +34,33 @@ BuildLoopMaxIter: 3
 # inexistant. Tolérée en lecture mais le caller doit skip.
 A11yMode: "off"
 A11yFailOn: serious
-CodeReviewMode: manual
+# --- Auditor modes (v7.0.0 defaults flipped per codex audit 2026-05-20) ---
+# Rationale : audit revealed reviewers were skipped silently when set
+# to "manual" without operator awareness (CRIT-1 v6.10.5). v7.0.0 flips
+# the 3 retained reviewers to "full" by default so projects get full
+# coverage out of the box ; explicit "manual" or "off" in stack.md
+# Project Config still wins (project layer).
+CodeReviewMode: full
 CodeReviewFailOn: critical
-SecurityMode: manual
+SecurityMode: full
 SecurityFailOn: critical
-SecurityThreatModelEnabled: true
+# SecurityThreatModelEnabled v7.0.0 : threat-model mode REMOVED from
+# security-reviewer agent. Key kept for backward-compat in legacy
+# stack.md files but has no runtime effect (replaced by
+# templates/threat-model.template.md as a human deliverable).
+SecurityThreatModelEnabled: false
 SecurityScanEnabled: true
 # PerfMode v7.0.0 : agent performance-auditor RETIRÉ
 # (governance-major-auditors-trim). Remplacé par Lighthouse CI + wrk/k6
 # dans le projet généré. Défaut flippé full → off.
 PerfMode: "off"
 PerfFailOn: serious
-SpecComplianceMode: manual
+# SpecComplianceMode v7.0.0 : flipped manual → full (codex audit P0 #5).
+# Spec compliance is the strongest guarantee that each AC is actually
+# implemented in the generated code ("Do not trust the report" pattern
+# from superpowers v5.1). For production runs, the reviewer must
+# default to running.
+SpecComplianceMode: full
 SpecComplianceFailOn: serious
 
 # --- Plan Cache Strict (v6.2 → v7.0.0 DEPRECATED) ---
@@ -70,7 +85,11 @@ PlanReviewDefault: true
 # --- Checkpoint (v6.6.3) ---
 CheckpointMode: "off"
 
-# --- Token telemetry (v6.5.1) ---
-# Note: env var SDD_TOKEN_USAGE_MODE takes precedence over this key.
-# Setting here just documents the framework default ("off").
-TokenUsageMode: "off"
+# --- Token telemetry (v6.5.1, flipped v7.0.0 per codex audit P0 #4) ---
+# Rationale : codex audit 2026-05-20 found 0 rows in console.db
+# token_usage table → real $/feature cost impossible to audit. v7.0.0
+# flips default off → record so every Agent invocation captures
+# input/output/cache tokens via the PostToolUse.Agent hook. ~0 overhead
+# per call (lightweight DB INSERT). Env var SDD_TOKEN_USAGE_MODE still
+# takes precedence ; set to "off" in Project Config to opt out.
+TokenUsageMode: "record"

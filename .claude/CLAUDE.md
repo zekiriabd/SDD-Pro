@@ -1,7 +1,9 @@
-# SDD_Pro v6.10.4-LTS — FEAT-Driven Development pour Claude Code
+# SDD_Pro v7.0.0-alpha (branche `next`) — FEAT-Driven Development pour Claude Code
 
-> ⛔ **FREEZE actif jusqu'au 2026-06-18** — voir `@.claude/VERSIONING.md §4`.
-> Sur `main` : seuls les bumps PATCH. MAJOR/MINOR vivent sur `next`.
+> ⛔ **FREEZE actif jusqu'au 2026-06-18** sur `main` (v6.10.4-LTS).
+> Sur `next` : v7.0.0-alpha en cours (auditors-trim, prompts-trim,
+> stacks quarantine, migration infra). Cf. `@.claude/VERSIONING.md §4`
+> + `@.claude/CHANGELOG.md` § Unreleased v7.0.0.
 
 > Framework SDD strict : FEAT fonctionnelle → User Stories → Code
 > (back/front en parallèle). Lecture sélective, anti-derive, isolation
