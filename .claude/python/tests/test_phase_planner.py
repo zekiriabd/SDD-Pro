@@ -378,8 +378,11 @@ class TestDecideThreatModel:
         )
         assert ph["enabled"] is False
 
-    def test_manual_with_security_ac_enabled(self) -> None:
-        """has_security_ac override mode manual."""
+    def test_manual_with_security_ac_disabled_v7(self) -> None:
+        """v7.0.0 : threat_model agent retiré (governance-major-auditors-trim).
+        Même avec security_mode=full + has_security_ac=True + stacks actifs,
+        la phase est TOUJOURS enabled=False avec agent_removed=True.
+        Remplacement : template humain templates/threat-model.template.md."""
         stacks = {"backend": "dotnet-minimalapi", "frontend": "react", "ui": None, "auth": None}
         ph = _decide_threat_model(
             security_mode="manual",
@@ -387,7 +390,9 @@ class TestDecideThreatModel:
             has_security_ac=True,
             stacks=stacks,
         )
-        assert ph["enabled"] is True
+        assert ph["enabled"] is False
+        assert ph.get("agent_removed") is True
+        assert "replacement" in ph
 
     def test_no_stacks(self) -> None:
         stacks = {"backend": None, "frontend": None, "ui": None, "auth": None}
@@ -421,14 +426,21 @@ class TestPlanIntegration:
         result = plan(feat_number=1)
 
         assert "error" not in result
-        assert result["phases"]["threat_model"]["enabled"] is True
-        assert result["phases"]["a11y_audit"]["enabled"] is True
+        # v7.0.0 : threat_model, a11y_audit, perf_audit RETIRÉS (agent_removed=True).
+        # Restent actifs : code_review, security_scan, spec_compliance.
+        assert result["phases"]["threat_model"]["enabled"] is False
+        assert result["phases"]["threat_model"].get("agent_removed") is True
+        assert result["phases"]["a11y_audit"]["enabled"] is True   # a11y phase planifiée (config full) mais agent retiré
+        assert result["phases"]["a11y_audit"].get("agent_removed") is True
         assert result["phases"]["code_review"]["enabled"] is True
         assert result["phases"]["security_scan"]["enabled"] is True
-        assert result["phases"]["perf_audit"]["enabled"] is True
+        assert result["phases"]["perf_audit"]["enabled"] is True  # perf phase planifiée mais agent retiré
+        assert result["phases"]["perf_audit"].get("agent_removed") is True
         assert result["phases"]["spec_compliance"]["enabled"] is True
-        assert result["summary"]["phases_enabled"] == 6
-        assert result["summary"]["phases_skipped"] == 0
+        # Phases véritablement actionnables (sans agent_removed) = 3
+        active = [k for k, ph in result["phases"].items()
+                  if ph["enabled"] and not ph.get("agent_removed")]
+        assert len(active) == 3
 
     def test_plan_backend_only_skips_a11y(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         ws = _make_workspace(
@@ -500,7 +512,9 @@ class TestPlanIntegration:
         result = plan(feat_number=1)
 
         assert result["runtime_state"]["has_security_ac"] is True
-        assert result["phases"]["threat_model"]["enabled"] is True
+        # v7.0.0 : threat_model agent retiré — phase reste False même avec AC sécurité
+        assert result["phases"]["threat_model"]["enabled"] is False
+        assert result["phases"]["threat_model"].get("agent_removed") is True
         assert result["phases"]["security_scan"]["enabled"] is True
         # Perf reste skippé car pas d'AC perf
         assert result["phases"]["perf_audit"]["enabled"] is False
@@ -550,7 +564,8 @@ class TestPlanIntegration:
         assert result["runtime_state"]["has_frontend_code"] is False
         assert result["phases"]["code_review"]["enabled"] is False
         assert result["phases"]["security_scan"]["enabled"] is False
-        # threat_model peut tourner sans code (c'est pré-dev)
-        assert result["phases"]["threat_model"]["enabled"] is True
+        # v7.0.0 : threat_model agent retiré — always False with agent_removed
+        assert result["phases"]["threat_model"]["enabled"] is False
+        assert result["phases"]["threat_model"].get("agent_removed") is True
         # a11y skip car pas de frontend code
         assert result["phases"]["a11y_audit"]["enabled"] is False

@@ -21,8 +21,15 @@ Format : [version] — date courte. Sections : `Breaking`, `Added`, `Changed`, `
 ## [Unreleased — v7.0.0-alpha] — 2026-05-20 (branche `next` only, 21 commits)
 
 > **Scope** : implémentation effective des 4 ADRs `governance-major-*` les plus
-> impactants + résolution des P0 du **Codex CTO audit (2026-05-20)**. Le
-> tag v7.0.0 final attend la sortie du freeze (2026-06-19) + revue 2 mainteneurs.
+> impactants + résolution des P0 du **Codex CTO audit (2026-05-20)** +
+> **post-audit CTO interne 2026-05-20 (cette session)** : 20 fixes
+> cross-couches (cost cap, statuts API gate, spec-compliance gate, DAG
+> strict, mutation testing opt-in, CI templates a11y/perf, dé-dup
+> reviewers, feat-hash, Quantified Goal/NFC anti-GIGO, migrations
+> versionnées console.db, sweep complet des 8 stubs backward-compat).
+> Tests : 777/777 vert, smoke 79/79 vert. Le tag v7.0.0 final attend la
+> sortie du freeze (2026-06-19) + revue 2 mainteneurs + 2 runs PoC ROI
+> supplémentaires (variance).
 >
 > **Sur `main` : RIEN ne change** pendant le freeze (politique strict PATCH).
 > Cette entrée documente l'état de la branche `next` au 2026-05-20 pour

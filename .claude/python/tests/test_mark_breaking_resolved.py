@@ -91,6 +91,8 @@ class TestMainPaths(unittest.TestCase):
             self.assertEqual(rc, 0)
 
     def test_coherent_files_marks_resolved(self):
+        """v7.0.0 — was returning 1 (= success in legacy semantics), now returns 0
+        (sdd_lib/exit_codes.py SUCCESS convention). Stdout '[OK]' prefix indicates action."""
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             cm = Path(tmp) / "CLAUDE.md"
             cm.write_text(CLAUDE_MD_WITH_BREAKING, encoding="utf-8")
@@ -99,13 +101,15 @@ class TestMainPaths(unittest.TestCase):
                 "--modified-files", "Pages/Bebes.razor,Components/BebeForm.razor",
                 "--build-command", "dotnet build",
             )
-            self.assertEqual(rc, 1)
+            self.assertEqual(rc, 0)
             after = cm.read_text(encoding="utf-8")
             self.assertIn("BREAKING CHANGES — RESOLVED", after)
             self.assertIn("RESOLU", after)
             self.assertIn("dotnet build", after)
 
-    def test_no_coherence_returns_2(self):
+    def test_no_coherence_returns_0_skip(self):
+        """v7.0.0 — was returning 2 (skip-incoherent), now returns 0 (skip is a
+        valid SUCCESS outcome). File unchanged. Stdout '[SKIP]' prefix indicates."""
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             cm = Path(tmp) / "CLAUDE.md"
             cm.write_text(CLAUDE_MD_WITH_BREAKING, encoding="utf-8")
@@ -114,7 +118,7 @@ class TestMainPaths(unittest.TestCase):
                 "--modified-files", "OtherFile.cs",  # not in section
                 "--build-command", "dotnet build",
             )
-            self.assertEqual(rc, 2)
+            self.assertEqual(rc, 0)
             # File not modified.
             self.assertEqual(cm.read_text(encoding="utf-8"),
                              CLAUDE_MD_WITH_BREAKING)
@@ -129,9 +133,10 @@ class TestMainPaths(unittest.TestCase):
                 "--modified-files", "src/Pages/Bebes.razor",  # full path
                 "--build-command", "dotnet build",
             )
-            self.assertEqual(rc, 1)
+            self.assertEqual(rc, 0)
 
     def test_dry_run_does_not_write(self):
+        """v7.0.0 — was 1, now 0 (SUCCESS — dry-run is informational not error)."""
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             cm = Path(tmp) / "CLAUDE.md"
             original = CLAUDE_MD_WITH_BREAKING
@@ -142,7 +147,7 @@ class TestMainPaths(unittest.TestCase):
                 "--build-command", "dotnet build",
                 "--dry-run",
             )
-            self.assertEqual(rc, 1)
+            self.assertEqual(rc, 0)
             self.assertEqual(cm.read_text(encoding="utf-8"), original)
 
 

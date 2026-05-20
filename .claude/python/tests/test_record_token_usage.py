@@ -162,13 +162,22 @@ class TestMainBehaviour(unittest.TestCase):
                 mock_read.assert_not_called()
 
     def test_unknown_mode_is_noop(self):
+        """v7.0.0 : env unknown value falls through to layered config.
+        With config also returning unknown/off, mode resolves to 'off' and
+        read_hook_input must not be called."""
         from sdd_hooks import record_token_usage as mod
 
         with mock.patch.dict(os.environ, {"SDD_TOKEN_USAGE_MODE": "garbage"}, clear=False):
-            with mock.patch.object(mod, "read_hook_input") as mock_read:
-                rc = mod.main()
-                self.assertEqual(rc, 0)
-                mock_read.assert_not_called()
+            # Force layered config to also return an unknown/off value so the
+            # final resolved mode is 'off' (no DB read attempted).
+            with mock.patch.object(
+                mod, "read_layered_config",
+                return_value={"TokenUsageMode": "off"},
+            ):
+                with mock.patch.object(mod, "read_hook_input") as mock_read:
+                    rc = mod.main()
+                    self.assertEqual(rc, 0)
+                    mock_read.assert_not_called()
 
     def test_record_mode_writes_db_row(self):
         """v6.10: hook now writes to console.db (token_usage table)."""

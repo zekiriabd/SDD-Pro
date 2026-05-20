@@ -4,6 +4,143 @@ Guide concis pour migrer un projet existant entre versions majeures.
 
 ---
 
+## v6.10 → v7.0.0-alpha (consolidation majeure, post-audit CTO 2026-05-20)
+
+**Effort** : 1-2h pour mettre à jour `stack.md ## Project Config` + relancer
+`/feat-validate {n}` sur chaque FEAT pour bénéficier des nouveaux gates.
+**Breaking** : 5 (agents retirés + statuts API gate + comportements).
+
+### Agents retirés (5)
+
+| Agent | Remplacement |
+|---|---|
+| `accessibility-auditor` | axe-core CI step (`.github/workflows/quality.yml` auto-généré si `CiTemplatesGeneration: true`) |
+| `performance-auditor` | Lighthouse CI + wrk/k6 CI step |
+| `dashboard` | `sdd_scripts/index_adrs.py` (0 token) |
+| `dev-backend-strict` | `dev-backend` Opus 4.7 (plan v2 préservé) |
+| `dev-frontend-strict` | `dev-frontend` Opus 4.7 |
+
+### API Gate — statuts normalisés (BREAKING)
+
+`GREEN/YELLOW/RED` → `PASS / WARN / FAIL / SKIPPED / INFRA_BLOCKED`.
+Champ `verdict` legacy conservé en parallèle de `status` canonique
+(cf. `rules/build-and-loop.md §1.3`). Callers v7+ doivent lire `status`.
+
+### Rules consolidées (11 → 5) — stubs supprimés
+
+Migration `Read @.claude/rules/X.md` → nouveau path :
+
+| Ancien stub (supprimé) | Nouveau path |
+|---|---|
+| `backend-first.md` | `build-and-loop.md` Partie A |
+| `dev-shared.md` | `build-and-loop.md` Partie B |
+| `qa-coverage.md` | `quality.md` Partie A |
+| `ui-tokens.md` | `quality.md` Partie B |
+| `file-ownership.md` | `ownership.md` Partie A |
+| `constitution.md` | `ownership.md` Partie B |
+| `stack-completeness.md` | `library-and-stack.md` Partie A |
+| `cors.md` | `library-and-stack.md` Partie B |
+| `source-first.md` | `docs/principles/source-first.md` |
+| `us-granularity.md` | `docs/principles/us-granularity.md` |
+
+### Project Config — nouveaux flags v7.0.0
+
+Ajouter dans `## Project Config` selon besoin (tous ont des défauts sains) :
+
+```yaml
+# Cost caps (P0)
+MaxCostPerRun: 50.00              # USD hard cap par run (strict CI + interactive)
+MaxOpusInflight: 6
+BuildLoopMaxCostUsd: 15.00        # cap retries dev-* par US
+BuildLoopMaxIter: 5
+
+# Telemetry (P0 #4 — flippé off→record)
+TokenUsageMode: record
+
+# Auditors symmetry (P0 #6, #9)
+QaFailOnSddFull: true
+ReviewFailOnSddFull: true
+SpecComplianceRequiredForFeatValidate: true
+
+# Anti-GIGO
+FeatAntiGigoMode: warn            # off | warn | strict
+UsGranularityHardCap: 10          # was 6
+UsGranularityWarnAt: 6
+FeatDeepenThreshold: 3
+FeatDeepenMode: warn
+
+# Opt-in stacks
+MutationTestingMode: "off"        # off | minimal | full
+E2EMode: "off"                    # off | smoke | happy-paths | full
+IntegrationTestMode: memory       # memory | hybrid | containers
+
+# CI / a11y / perf
+CiTemplatesGeneration: true       # arch génère .github/workflows/quality.yml
+```
+
+### Templates — nouveaux champs
+
+`feat.template.md` v7.0.0 ajoute `## Quantified Goal` + `## Non-Functional
+Constraints`. FEATs legacy → WARN non bloquant.
+
+`us.template.md` v7.0.0 ajoute `Parent FEAT hash: sha256:{8}` au
+frontmatter, vérifié par `preflight.py` (détecte FEAT modifiée
+post-`/us-generate`).
+
+### Hooks renforcés en CI
+
+- `preflight_cost_cap` : hard block (était WARN-only en interactif)
+- `protect_framework` : strict CI auto-detect (override `SDD_PROTECT_FRAMEWORK_MODE`)
+- `audit_file_ownership` : WARN visible stderr en CI
+- `preflight_agent_budget` : rejette les 5 agents retirés v7 avec `[AGENT_REMOVED_V7]`
+- `record_token_usage` : lit layered config + alerte si DB inserts échouent
+
+### DAG strict batching (R3)
+
+`/dev-run` STEP 2.bis utilise `validate_us_deps.py --layered-batches`
+(Kahn layered). Garantie hard : aucun US dans un batch ne dépend d'un
+autre US du même batch.
+
+### Bypasses cumulables verrouillés (R1)
+
+`--force --no-plan-on-warn --no-validate` (2+ bypass) exige
+`SDD_ALLOW_FORCE=1` env var. Sinon `[FORCE_CUMUL_REJECTED]`.
+
+### Console.db migration v2
+
+Table `qa_mutation` ajoutée (opt-in mutation testing). Migration
+`0002_add-qa-mutation-table.sql` appliquée automatiquement.
+
+### Atomic write pattern
+
+Nouvelle règle `rules/build-and-loop.md §2.bis` : écritures `{LibName}/`
+& projets shared doivent passer par `sdd_lib.atomic_write.atomic_write_text()`
+(`.sddtmp + os.replace()`). Anti-corruption crash-mid-write.
+
+### Exit codes convention
+
+Nouveau module `sdd_lib/exit_codes.py` : 0=SUCCESS, 1=FAIL_FAST,
+2=CORRECTIBLE, 3=INFRA_BLOCKED. `mark_breaking_resolved.py` migré
+(était exit 1 = succès non-standard — **BREAKING** pour callers shell
+qui distinguaient via exit code, voir docstring du script).
+
+### Migration projet — checklist
+
+1. Vérifier `stack.md ## Project Config` — ajouter flags v7 nécessaires
+2. Lancer `/feat-validate {n}` sur chaque FEAT pour voir les WARN anti-GIGO
+3. Optionnel : `/us-generate {n}` pour ajouter `Parent FEAT hash`
+4. `console.db` schema_version = 2 (automatique)
+5. Re-run `/sdd-full {n}` — bénéficier des nouveaux gates
+6. Si CI : `protect_framework` + `audit_file_ownership` deviennent
+   strict — vérifier qu'aucun agent custom écrit hors matrice
+
+### Rollback
+
+`git checkout v6.10.4-LTS` sur `main` (freeze jusqu'au 2026-06-18,
+rollback safe).
+
+---
+
 ## v6.8.0 → v6.9.0 (MCP server — additif opt-in)
 
 **Effort** : 0. Aucun fichier projet à toucher.

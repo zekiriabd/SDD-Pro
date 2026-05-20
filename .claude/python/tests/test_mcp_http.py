@@ -77,21 +77,41 @@ def _start_server(registry: Registry) -> tuple[ThreadingHTTPServer, int]:
 
 
 def _post_json(port: int, path: str, body: dict[str, Any], headers: dict[str, str] | None = None) -> tuple[int, dict[str, Any] | None]:
-    conn = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
-    try:
-        payload = json.dumps(body)
-        conn.request(
-            "POST",
-            path,
-            body=payload,
-            headers={"Content-Type": "application/json", **(headers or {})},
-        )
-        r = conn.getresponse()
-        data = r.read().decode("utf-8")
-        parsed = json.loads(data) if data and r.status not in (204,) else None
-        return r.status, parsed
-    finally:
-        conn.close()
+    """POST JSON with single retry on Windows socket race.
+
+    v7.0.0 audit dette mineure #21 fix 2026-05-20 — on Windows, when the
+    server closes the connection IMMEDIATELY after sending 401 (no Keep-Alive,
+    rapid teardown), the client can hit ConnectionAbortedError [WinError 10053]
+    "Une connexion établie a été abandonnée par un logiciel de votre ordinateur
+    hôte". This is a transient socket race, not a real failure — retry once
+    with a fresh connection.
+    """
+    payload = json.dumps(body)
+    last_exc: Exception | None = None
+    for attempt in range(2):  # 1 retry max
+        conn = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+        try:
+            conn.request(
+                "POST",
+                path,
+                body=payload,
+                headers={"Content-Type": "application/json", **(headers or {})},
+            )
+            r = conn.getresponse()
+            data = r.read().decode("utf-8")
+            parsed = json.loads(data) if data and r.status not in (204,) else None
+            return r.status, parsed
+        except (ConnectionAbortedError, ConnectionResetError) as e:
+            last_exc = e
+            if attempt == 0:
+                continue  # retry once
+            raise
+        finally:
+            conn.close()
+    # Should never reach here (raise above on 2nd failure), but defensive
+    if last_exc is not None:
+        raise last_exc
+    raise RuntimeError("_post_json : impossible state")
 
 
 def _get(port: int, path: str, headers: dict[str, str] | None = None) -> tuple[int, dict[str, Any] | None]:

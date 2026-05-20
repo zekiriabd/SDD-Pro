@@ -67,8 +67,12 @@ class TestEnsureInitialized(unittest.TestCase):
                     n = conn.execute(
                         "SELECT COUNT(*) FROM schema_version"
                     ).fetchone()[0]
-                    # Only one row per actual version applied
-                    self.assertEqual(n, 1)
+                    # v7.0.0 : 1 row per version applied (currently v1 base +
+                    # v2 migration). Idempotence guarantee : the count must
+                    # NOT grow with repeated ensure_initialized() calls,
+                    # which would indicate duplicate inserts. Expected value
+                    # is SCHEMA_VERSION (= number of applied versions).
+                    self.assertEqual(n, SCHEMA_VERSION)
 
     def test_creates_token_usage_table(self) -> None:
         """Round-trip : insert + read back proves the schema is functional."""
@@ -226,23 +230,26 @@ class TestApplyPendingMigrations(unittest.TestCase):
                     ).fetchone())
 
     def test_db_ahead_of_framework_no_migration_no_crash(self) -> None:
-        """DB at v3 with framework SCHEMA_VERSION=1 → warn, no migration, no crash."""
+        """DB at v99 (simulating future framework) → warn, no migration, no crash.
+
+        v7.0.0 — uses v99 instead of v3 since SCHEMA_VERSION bumped to 3
+        (qa_e2e). The principle (DB > framework = warn-not-crash) unchanged."""
         with TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = _fake_repo(tmp)
             with mock.patch.object(console_db, "repo_root", return_value=root):
-                ensure_initialized()  # init at v1
-                # Manually bump to v3 (simulating another checkout's DB)
+                ensure_initialized()  # init at SCHEMA_VERSION (current)
+                # Manually bump to v99 (simulating another checkout's future DB)
                 with connect() as conn:
                     conn.execute(
                         "INSERT INTO schema_version(version, applied_at) "
-                        "VALUES(3, '2026-05-20T00:00:00.000Z')"
+                        "VALUES(99, '2030-01-01T00:00:00.000Z')"
                     )
 
-            # Re-call ensure_initialized at SCHEMA_VERSION=1 — should warn, not raise
+            # Re-call ensure_initialized — should warn DB ahead, not raise
             with mock.patch.object(console_db, "repo_root", return_value=root):
                 ensure_initialized()  # MUST NOT raise
                 with connect() as conn:
-                    self.assertEqual(current_schema_version(conn), 3)
+                    self.assertEqual(current_schema_version(conn), 99)
 
 
 class TestConcurrentWriters(unittest.TestCase):
