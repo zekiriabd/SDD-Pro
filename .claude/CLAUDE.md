@@ -98,7 +98,17 @@ ciblée ; **utilisateur final : préférer une commande orchestrante**) :
 
 ## 5. Règles
 
-11 règles dans `.claude/rules/` : `backend-first`, `constitution`, `cors`, `dev-shared`, `error-classification`, `file-ownership`, `qa-coverage`, `source-first`, `stack-completeness`, `ui-tokens`, `us-granularity`. Substance des règles critiques inlinée dans les agents (sera dépliée en v7.0.0, cf. `ADR-20260519T153000-governance-major-prompts-trim`).
+**9 règles cross-cutting** dans `.claude/rules/` (v7.0.0, was 11) :
+`backend-first`, `constitution`, `cors`, `dev-shared`, `error-classification`,
+`file-ownership`, `qa-coverage`, `stack-completeness`, `ui-tokens`.
+
+> **Déplacés v7.0.0** vers `.claude/docs/principles/` (principes
+> philosophiques, non cross-cutting) : `source-first` (Tech Lead
+> discipline, pas de mécanique agent), `us-granularity` (règle mono-agent
+> `po`). Stubs préservés dans `rules/` pour les `Read @.claude/rules/X.md`
+> historiques. Consolidation finale 11 → 5 (codex audit Prio 2)
+> reportée post-freeze : nécessite sweep cross-agent risqué dans
+> session fatigue.
 
 Index commenté + détail : `@.claude/docs/conventions.md §14`.
 
@@ -190,5 +200,5 @@ Contrat : `@.claude/WORKING-AGREEMENT.md`.
 - `@.claude/CHANGELOG.md` — historique versions
 - `@.claude/MIGRATION.md` — guide migration
 - `@.claude/WORKING-AGREEMENT.md` — autorisations + limites
-- `@.claude/rules/` — 11 règles opérationnelles
+- `@.claude/rules/` — 9 règles cross-cutting (v7.0.0, 2 principes déplacés en `docs/principles/`)
 - `@.claude/python/README.md` — scripts utilitaires
