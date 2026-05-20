@@ -34,6 +34,13 @@ htmlcov/
 # Console Fastify deps (lourdes, ~27MB, restituables via npm install)
 workspace/console/node_modules/
 
+# v7.0.0 cleanup 2026-05-20 — node_modules orphelins (pas de package.json
+# racine ni dans workspace/output/src/*). Ignore tout node_modules récursif
+# par sécurité (le projet généré dans workspace/output/src/ a son propre
+# node_modules quand frontend Node — toujours ignoré).
+node_modules/
+**/node_modules/
+
 # Console DB (SQLite local — généré par init_console_db.py, contient stats run-locale)
 workspace/output/db/*.db
 workspace/output/db/*.db-shm
