@@ -150,9 +150,15 @@ Priorité d'émission : `[QA_TEST_FAILED] > [QA_COVERAGE_GAP]` ;
 
 ### 1.9 A11Y (accessibility WCAG 2.2 — depuis v6.3.0)
 
-Émis par l'agent `accessibility-auditor` (Haiku 4.5, scan déterministe).
+> **v7.0.0** : agent `accessibility-auditor` **retiré**
+> (`governance-major-auditors-trim`). Les classes ci-dessous sont
+> **conservées comme schéma de mapping** pour la sortie `axe-core` du CI
+> du projet généré (ingest futur via `ingest_a11y_axe.py`). Aucune n'est
+> émise par un agent SDD_Pro après v6.10.5.
+
+Historique (v6.3.0-v6.10) : émis par `accessibility-auditor` (Haiku 4.5).
 Chaque classe porte une **sévérité** ordinale `critical > serious > moderate > minor`
-qui pilote le verdict 🟢/🟡/🔴 contre le seuil `A11yFailOn` du Project Config.
+qui pilotait le verdict 🟢/🟡/🔴 contre le seuil `A11yFailOn` du Project Config.
 
 | Préfixe | WCAG | Sévérité | Phase |
 |---|---|---|---|
@@ -254,11 +260,18 @@ Chaque threat porte une catégorie STRIDE (`Spoofing`/`Tampering`/
 
 ### 1.12 Performance (Core Web Vitals + SLO, depuis v6.4.0)
 
-Émis par l'agent `performance-auditor` (Sonnet 4.6). Aucune classe n'est
-hard-blocking par défaut — la perf est contextuelle (site marketing
-tolère 3s LCP, banque non). Le seuil est piloté par `PerfFailOn` du
-Project Config. **Exception** : `[PERF_AC_VIOLATION]` est hard-blocking
-quand une AC d'US mentionne explicitement une métrique perf.
+> **v7.0.0** : agent `performance-auditor` **retiré**
+> (`governance-major-auditors-trim`). Les classes ci-dessous sont
+> **conservées comme schéma de mapping** pour la sortie Lighthouse CI +
+> wrk/k6 du projet généré (ingest futur via `ingest_perf_lighthouse.py`).
+> Aucune n'est émise par un agent SDD_Pro après v6.10.5.
+
+Historique (v6.4.0-v6.10) : émis par `performance-auditor` (Sonnet 4.6).
+Aucune classe n'est hard-blocking par défaut — la perf est contextuelle
+(site marketing tolère 3s LCP, banque non). Le seuil est piloté par
+`PerfFailOn` du Project Config. **Exception** : `[PERF_AC_VIOLATION]`
+était hard-blocking quand une AC d'US mentionne explicitement une
+métrique perf.
 
 | Préfixe | Métrique | Seuil défaut | Sévérité | Phase |
 |---|---|---|---|---|
@@ -318,129 +331,68 @@ indépendamment.
 
 ---
 
-### 1.14 Discover (stack auto-detection, depuis v6.6.1)
+### 1.14 Tooling & Governance (compact, depuis v7.0.0)
 
-Émis par la commande `/sdd-discover-stack` et ses 2 scripts compagnons
-(`scan_repo.py`, `match_stack_catalog.py`). Cette commande est **hors
-pipeline standard** — elle ne touche pas au moteur, ne lance pas
-build_loop, ne modifie pas les FEATs ni le code. Elle produit
-uniquement `workspace/input/stack/stack.md.candidate`.
+Classes émises par les commandes/scripts **hors pipeline build_loop** —
+mono-shot, déterministes, ne déclenchent pas d'itération. Détail
+opérationnel dans le script source cité. Aucune classe n'est
+hard-blocking par défaut sauf annoté `(bloquant)`.
 
-| Préfixe | Usage | Phase |
-|---|---|---|
-| `[SCAN_NO_MANIFESTS]` | Aucun manifest détecté dans le périmètre (csproj/package.json/...) | scan_repo §scan() |
-| `[SCAN_PARSE_ERROR]` | Manifest présent mais illisible (encoding, JSON corrompu) | scan_repo |
-| `[DISCOVER_SCAN_FAILED]` | scan_repo.py exit non-zéro (erreur fatale I/O) | sdd-discover-stack STEP 3 |
-| `[DISCOVER_NO_MATCH]` | Aucun stack SDD_Pro reconnu (manifests présents mais combo non supporté) | sdd-discover-stack STEP 5.1 |
-| `[DISCOVER_PARTIAL]` | Backend détecté sans frontend (ou inverse) — WARN, pas bloquant | sdd-discover-stack STEP 5 |
-| `[DISCOVER_AMBIGUOUS]` | ≥ 2 candidats même catégorie — Tech Lead doit arbitrer | sdd-discover-stack STEP 5.2 |
-| `[DISCOVER_STACK_EXISTS]` | `stack.md` existe déjà, génération en `.candidate` | sdd-discover-stack STEP 2 (info) |
+**Discover** (`/sdd-discover-stack`, `scan_repo.py`, `match_stack_catalog.py`)
+— produit `stack.md.candidate`, ne touche pas le moteur :
 
-**Hors build_loop** : aucune de ces classes ne déclenche d'itération
-(la commande est mono-shot, déterministe, scriptée).
-
-**Production warnings vs errors** :
-- `[DISCOVER_NO_MATCH]` est **bloquant** (STOP avec message guide)
-- `[DISCOVER_PARTIAL]` et `[DISCOVER_AMBIGUOUS]` sont **informationnels**
-  (commande continue, signale au Tech Lead dans le résumé)
-- `[SCAN_PARSE_ERROR]` est **WARN** (continue avec les autres manifests)
-
----
-
-### 1.15 Checkpoint (input-hash phase resumption, depuis v6.6.2)
-
-Émis par `sdd_lib/checkpoint.py` lorsqu'une commande tente d'utiliser
-le mécanisme `--resume` avec validation hash. Ces classes sont
-**informationnelles** — elles indiquent qu'une phase ne peut pas être
-skippée sur resume et doit ré-exécuter. Aucune n'est bloquante.
-
-| Préfixe | Usage | Phase |
-|---|---|---|
-| `[CHECKPOINT_HASH_MISMATCH]` | input_hash stocké ≠ recalculé → inputs modifiés post-run, invalide le skip | checkpoint.is_phase_resumable §3 |
-| `[CHECKPOINT_INPUT_MISSING]` | Un input_path déclaré n'existe plus (fichier supprimé entre runs) | checkpoint.is_phase_resumable |
-| `[CHECKPOINT_STATE_UNREADABLE]` | state.json absent, corrompu, ou phase absente | checkpoint.is_phase_resumable |
-
-**Comportement par défaut** : sur émission d'une de ces classes, le
-caller (slash command) doit **ré-exécuter la phase**, jamais la skipper.
-La discipline est *fail-safe* : un doute = re-run, pas un skip optimiste.
-
-**Adoption (v6.6.3-5)** : intégré dans `/qa-generate` (v6.6.3),
-`/us-generate` (v6.6.4), `/dev-run` (v6.6.5). Opt-in via
-`CheckpointMode: off | record | resume` (défaut `off`).
-
----
-
-### 1.16 Governance & Tooling (depuis v6.7.x)
-
-Émis par les commandes/scripts de gouvernance v6.7 :
-`/sdd-profile` (manage_profile.py, v6.7.2), `read_layered_config()`
-(layered_config.py, v6.7.1), `validate_inline_rules.py` (drift suspect).
-Ces classes sont **informationnelles** ou **bloquantes selon contexte**.
-
-| Préfixe | Usage | Source |
-|---|---|---|
-| `[CONFIG_SECURITY_DOWNGRADE]` | Project tente de relâcher une policy team (SecurityFailOn, CoverageMin, etc.) — **bloquant** | layered_config._check_security_down |
-| `[PROFILE_EXISTS]` | Tentative d'export d'un profile déjà présent sans `--force` | manage_profile.cmd_export |
-| `[PROFILE_NOT_FOUND]` | Import/show/delete d'un profile inexistant | manage_profile.cmd_{import,show,delete} |
-| `[PROFILE_NO_TEAM_CONFIG]` | Export tenté sans `~/.sdd/config.team.yml` présent | manage_profile.cmd_export |
-| `[DRIFT_SUSPECTED]` | Inline rules dans agent .md non-synchro avec source rules/X.md | validate_inline_rules.py |
-
-**Hors build_loop** : aucune de ces classes ne déclenche d'itération
-(commandes mono-shot, scripts déterministes).
-
-**Bloquant vs informationnel** :
-- `[CONFIG_SECURITY_DOWNGRADE]` : **bloquant** — empêche la lecture du
-  Project Config si project tente d'affaiblir la policy team. Tech Lead
-  doit DURCIR (ou utiliser team value), pas RELÂCHER.
-- `[PROFILE_*]` : exit code 1 ou 2 du script, message ERROR/CAUSE/FIX,
-  commande retourne en erreur (pas un STOP de pipeline).
-- `[DRIFT_SUSPECTED]` : WARN dans CI/audit, non bloquant.
-
----
-
-### 1.18 Architecture Review (depuis v6.11.0)
-
-Émis par l'agent `arch-reviewer` (Sonnet 4.6, read-only). Re-lit le code
-matérialisé et vérifie le respect du pattern d'archi actif (`## Active
-Architecture Pattern` du stack.md : MVC / DDD / microservice), le layer
-mapping §1.3 du stack actif, et la conformité aux ADRs §6 de la
-constitution. Verdict 🟢/🟡/🔴 selon seuil `ArchReviewFailOn` du Project
-Config. Aucune classe hard-blocking par défaut. Persistance : table
-`qa_code_review` existante avec préfixes `[ARCH_*]` (pas de nouvelle table).
-
-| Préfixe | Sévérité | Phase |
-|---|---|---|
-| `[ARCH_PATTERN_VIOLATION]` | serious | arch-reviewer §5.1 (couches MVC/DDD non respectées : DbContext dans UI layer, Aggregate sans Port, etc.) |
-| `[ARCH_LAYER_BYPASS]` | serious | arch-reviewer §5.2 (Controller appelle Repository directement, Page appelle DbContext sans Service) |
-| `[ARCH_ADR_DRIFT]` | moderate | arch-reviewer §5.3 (décision ADR §6 non appliquée dans le code : ex. "pagination cursor-based" décidé mais offset utilisé) |
-| `[ARCH_NAMING_INVALID]` | minor | arch-reviewer §5.4 (naming canonique du pattern non respecté : suffixe `Service`/`Repository`/`UseCase` manquant ou incohérent) |
-| `[ARCH_CONSTITUTION_GAP]` | minor (info) | arch-reviewer §5.5 (entité/concept §2 glossaire non trouvé dans le code) |
-| `[ARCH_NO_TARGETS]` | (bloquant runtime) | arch-reviewer §3 (rien à reviewer — code non encore matérialisé) |
-
-**Coordination avec autres auditeurs** :
-- `[ARCH_LAYER_BYPASS]` étend `[LAYER_VIOLATION]` (§1.3) — arch-reviewer
-  fait l'analyse cross-fichier (Controller → Repository skip) que le
-  build ne catch pas
-- Pas de duplication avec `code-reviewer` (qui ignore pattern d'archi et
-  focus sur anti-patterns techniques)
-
-Substance opérationnelle : `agents/arch-reviewer.md §5`.
-
----
-
-### 1.19 Review Orchestrator (depuis v6.11.0)
-
-Émis par la commande `/sdd-review` et son orchestrateur `sdd_review.py`.
-
-| Préfixe | Usage | Bloquant ? |
+| Préfixe | Sens | Bloquant |
 |---|---|:---:|
-| `[REVIEW_VERDICT_RED]` | Verdict consolidé 🔴 RED après agrégation : ≥ 1 finding `critical`/`blocker` OU ≥ 1 finding ≥ `ReviewFailOn` | OUI (exit 1) |
+| `[SCAN_NO_MANIFESTS]` | Aucun manifest détecté dans le périmètre | WARN |
+| `[SCAN_PARSE_ERROR]` | Manifest présent mais illisible | WARN |
+| `[DISCOVER_SCAN_FAILED]` | Erreur I/O fatale scan_repo | (bloquant) |
+| `[DISCOVER_NO_MATCH]` | Manifests présents mais aucun combo SDD_Pro reconnu | (bloquant) |
+| `[DISCOVER_PARTIAL]` | Backend sans frontend (ou inverse) | info |
+| `[DISCOVER_AMBIGUOUS]` | ≥ 2 candidats même catégorie | info |
+| `[DISCOVER_STACK_EXISTS]` | `stack.md` existe déjà, génération en `.candidate` | info |
+
+**Checkpoint** (`sdd_lib/checkpoint.py`, opt-in via `CheckpointMode`)
+— fail-safe : doute = re-exec, pas skip optimiste. Aucune bloquante :
+
+| Préfixe | Sens |
+|---|---|
+| `[CHECKPOINT_HASH_MISMATCH]` | input_hash recalculé ≠ stocké — phase doit re-exec |
+| `[CHECKPOINT_INPUT_MISSING]` | Fichier d'input déclaré disparu |
+| `[CHECKPOINT_STATE_UNREADABLE]` | state.json absent/corrompu |
+
+**Governance** (`layered_config.py`, `manage_profile.py`, `validate_inline_rules.py`) :
+
+| Préfixe | Sens | Bloquant |
+|---|---|:---:|
+| `[CONFIG_SECURITY_DOWNGRADE]` | Project tente de relâcher une policy team (SecurityFailOn↓, CoverageMin↓) | **OUI** |
+| `[PROFILE_EXISTS]` / `[PROFILE_NOT_FOUND]` / `[PROFILE_NO_TEAM_CONFIG]` | `/sdd-profile` exit 1 ou 2 | command |
+| `[DRIFT_SUSPECTED]` | Inline rule agent .md non-synchro avec `rules/X.md` source | WARN |
+
+**Architecture Review** (agent `arch-reviewer` Sonnet 4.6, read-only ;
+verdict 🟢/🟡/🔴 selon `ArchReviewFailOn` ; persiste dans `qa_code_review`) :
+
+| Préfixe | Sévérité |
+|---|:---:|
+| `[ARCH_PATTERN_VIOLATION]` | serious (MVC/DDD : DbContext dans UI, Aggregate sans Port…) |
+| `[ARCH_LAYER_BYPASS]` | serious (étend `[LAYER_VIOLATION]` cross-fichier) |
+| `[ARCH_ADR_DRIFT]` | moderate (décision ADR §6 non appliquée) |
+| `[ARCH_NAMING_INVALID]` | minor (suffixe `Service`/`Repository`/`UseCase` manquant) |
+| `[ARCH_CONSTITUTION_GAP]` | minor (info) (entité du glossaire absente du code) |
+| `[ARCH_NO_TARGETS]` | (bloquant runtime) |
+
+Substance : `agents/arch-reviewer.md §5`.
+
+**Review Orchestrator** (`/sdd-review`, `sdd_review.py`) :
+
+| Préfixe | Sens | Bloquant |
+|---|---|:---:|
+| `[REVIEW_VERDICT_RED]` | Verdict consolidé RED post-agrégation | OUI (exit 1) |
 | `[REVIEW_DB_UNREACHABLE]` | `console.db` introuvable / non-lisible | OUI (exit 2) |
-| `[REVIEW_SCAN_FAILED]` | `quality_scan.py` re-run a échoué (timeout, exception) | NON (WARN, continue sur DB stale) |
+| `[REVIEW_SCAN_FAILED]` | `quality_scan.py` re-run échoué | WARN (continue sur DB stale) |
 
 ---
 
-### 1.17 Inconnue
+### 1.15 Inconnue
 
 | Préfixe | Usage |
 |---|---|
@@ -481,44 +433,47 @@ FIX: move data access to Services/AuthService.cs, inject via DI
 
 ## 3. Comportement `build_loop` selon classe
 
-| Classe | Itère ? | Action |
-|---|:---:|---|
-| `[BUILD_CORRECTIBLE]` | OUI (max `BuildLoopMaxIter`) | Re-dispatch agent avec stderr |
-| `[BUILD_BLOCKING]` / `[DEP_MISSING]` / `[CIRCULAR_DEP]` | NON | STOP, ERROR au Tech Lead |
-| `[BUILD_LOOP_EXHAUSTED]` | NON (terminal, boucle déjà épuisée) | STOP, ERROR + suggestion fallback Opus ou revoir US/stack |
-| `[LAYER_VIOLATION]` / `[PRESERVES_VIOLATED]` | NON | STOP, repenser plan/US |
-| `[STACK_LIBRARY_MISSING]` / `[STACK_RUNTIME_NOT_LTS]` | NON | STOP, mettre à jour `.libs.json` |
-| `[FILE_OWNERSHIP]` / `[FILE_OWNERSHIP_NESTED]` | NON | STOP, corriger le plan |
-| `[UI_FIDELITY_GAP]` | NON (1 retry après revue plan) | WARN ou STOP selon score |
-| `[INVALID_ARG]` / `[INVALID_MODE]` / `[PROJECT_NOT_INIT]` | NON | STOP, corriger l'invocation ou l'amont (`arch`) |
-| `[BREAKING_CLEANUP_FAILED]` | NON | STOP narrow, vérifier CLAUDE.md projet |
-| `[PLAN_STALE]` / `[PLAN_INVALID]` | NON | STOP, relancer `/dev-plan {n}` |
-| `[US_DEPS_CYCLE]` / `[US_DEPS_MISSING]` | NON | STOP, corriger `## Dependencies` dans les US fautives puis relancer `/dev-run` (idempotent) |
-| `[US_DEPS_ORPHAN]` / `[US_STATUS_*]` | NON | Informational ou narrow, pas d'itération build |
-| `[PLAN_NOT_STRICT_READY]` / `[PLAN_DIGEST_INSUFFICIENT]` | NON | Fallback automatique classic Opus (cf. dev-run STEP 6.a/6.c) |
-| `[A11Y_*]` (10 sous-classes, cf. §1.9) | NON | Rapport seul (`a11y-report.{md,json}`) ; verdict 🟢/🟡/🔴 selon `A11yFailOn` ; aucun build_loop |
-| `[REVIEW_*]` (11 sous-classes, cf. §1.10) | NON | Rapport seul (`{n}-code-review.{md,json}`) ; verdict 🟢/🟡/🔴 selon `CodeReviewFailOn` ; aucun build_loop ; Tech Lead re-dispatche `dev-*` après lecture |
-| `[SEC_*]` (21 sous-classes, cf. §1.11) | NON | Rapport seul (`{n}-{threat-model,security-scan}.{md,json}`) ; mode `scan` : verdict 🟢/🟡/🔴 selon `SecurityFailOn` + 8 classes hard-blocking ; mode `threat-model` : informational uniquement ; Tech Lead arbitre |
-| `[PERF_*]` (16 sous-classes, cf. §1.12) | NON | Rapport seul (`feat-{n}/perf-report.{md,json}`) ; verdict 🟢/🟡/🔴 selon `PerfFailOn` ; aucune classe hard-blocking par défaut sauf `[PERF_AC_VIOLATION]` ; Tech Lead arbitre |
-| `[SPEC_*]` (6 sous-classes, cf. §1.13) | NON | Rapport seul (`{n}-spec-compliance.{md,json}`) ; verdict 🟢/🟡/🔴 selon `SpecComplianceFailOn` ; aucune classe hard-blocking par défaut ; Tech Lead arbitre |
-| `[DISCOVER_*]` / `[SCAN_*]` (7 sous-classes, cf. §1.14) | NON | Mono-shot, hors pipeline. `[DISCOVER_NO_MATCH]` bloquant (STOP), `[DISCOVER_PARTIAL]`/`[DISCOVER_AMBIGUOUS]` informationnels (commande continue) |
-| `[CHECKPOINT_*]` (3 sous-classes, cf. §1.15) | NON | Informationnel. Caller re-exécute la phase (discipline fail-safe : doute = re-run, pas skip optimiste) |
-| `[CONFIG_SECURITY_DOWNGRADE]` (cf. §1.16) | NON | **Bloquant** au moment du `read_layered_config()`. Project must DURCIR (or align team value), not RELAX |
-| `[PROFILE_*]` / `[DRIFT_SUSPECTED]` (cf. §1.16) | NON | Exit code script `manage_profile.py` (1 ou 2) ou WARN audit, mono-shot, hors pipeline |
+Une seule classe déclenche une itération `build_loop` :
+
+| Itère ? | Classe(s) | Action |
+|:---:|---|---|
+| **OUI** (max `BuildLoopMaxIter`) | `[BUILD_CORRECTIBLE]` | Re-dispatch agent avec stderr |
+| NON | tout le reste | STOP, ERROR au Tech Lead — voir tableau §3.1 |
+
+### 3.1 Actions sur STOP (classes ne provoquant pas d'itération)
+
+| Famille | Action |
+|---|---|
+| `[BUILD_BLOCKING]` / `[BUILD_LOOP_EXHAUSTED]` / `[DEP_MISSING]` / `[CIRCULAR_DEP]` | STOP fail-fast. Suggérer Opus fallback OU revoir US/stack sur EXHAUSTED. |
+| `[LAYER_VIOLATION]` / `[PRESERVES_VIOLATED]` / `[ADDS_VIOLATED]` | STOP, repenser plan/US |
+| `[STACK_LIBRARY_*]` / `[STACK_RUNTIME_NOT_LTS]` | STOP, mettre à jour `.libs.json` puis relancer |
+| `[FILE_OWNERSHIP*]` | STOP, corriger le plan ou la matrice ownership |
+| `[INVALID_ARG]` / `[INVALID_MODE]` / `[PROJECT_NOT_INIT]` | STOP, corriger l'invocation ou l'amont (`arch`) |
+| `[BREAKING_CLEANUP_FAILED]` | STOP narrow, vérifier CLAUDE.md projet |
+| `[PLAN_STALE]` / `[PLAN_INVALID]` | STOP, relancer `/dev-plan {n}` |
+| `[US_DEPS_CYCLE]` / `[US_DEPS_MISSING]` | STOP, corriger `## Dependencies` puis relancer (idempotent) |
+| `[UI_FIDELITY_GAP]` | 1 retry après revue plan, sinon WARN ou STOP selon score |
+| `[US_DEPS_ORPHAN]` / `[US_STATUS_*]` / `[CHECKPOINT_*]` / `[DRIFT_SUSPECTED]` | Informational, jamais bloquant |
+| `[CONFIG_SECURITY_DOWNGRADE]` | **Bloquant** au moment du `read_layered_config()` |
+| Auditors : `[REVIEW_*]` / `[SEC_*]` / `[SPEC_*]` / `[ARCH_*]` / `[A11Y_*]` (héritage) / `[PERF_*]` (héritage) | Rapport seul (`{n}-{kind}.{md,json}`) ; verdict 🟢/🟡/🔴 selon `{Kind}FailOn` du Project Config ; aucun build_loop ; hard-blocking selon table de la sous-section (§1.10-§1.13) ; Tech Lead arbitre |
+| `[DISCOVER_*]` / `[SCAN_*]` / `[PROFILE_*]` | Mono-shot, hors pipeline. Bloquant ou info selon classe — cf. §1.14 |
+| `[PLAN_NOT_STRICT_READY]` / `[PLAN_DIGEST_INSUFFICIENT]` (héritage v6.2) | Plus utilisé en v7.0.0 (`dev-*-strict` retirés) — toléré en lecture |
 
 ---
 
 ## 4. Enforcement
 
-- **Agents** (po, arch, dev-backend, dev-frontend, qa, elicitor,
-  dashboard, accessibility-auditor, code-reviewer, security-reviewer,
-  performance-auditor, spec-compliance-reviewer) chargent cette règle en
-  STEP contexte. Voir `@.claude/loader.yml` pour le mapping détaillé
-  agent → STEP.
+- **Agents** retenus en v7.0.0 (po, arch, dev-backend, dev-frontend,
+  qa, elicitor, constitutioner, code-reviewer, security-reviewer,
+  spec-compliance-reviewer, arch-reviewer) chargent cette règle en
+  STEP contexte. Voir `@.claude/loader.yml` pour le mapping détaillé.
+  Retirés v7.0.0 (`accessibility-auditor`, `performance-auditor`,
+  `dashboard`, `dev-*-strict`) — classes héritage conservées pour ingest
+  futur de `axe-core` / Lighthouse CI.
 - **Scripts** (`preflight.py`, `validate_readiness.py`,
   `parse_coverage.py`, `quality_scan.py`, `validate_fidelity.py`,
-  `validate_augment_contract.py`, `audit_file_ownership.py`) émettent
-  des préfixes `[CLASS]`.
+  `validate_augment_contract.py`, `audit_file_ownership.py`,
+  `sdd_review.py`, `report_roi.py`) émettent des préfixes `[CLASS]`.
 - **Hooks** (`PostToolUse`, `SubagentStop`, `Stop`) lisent les classes
   pour décider (continuer / append warning / STOP).
 - Erreur sans préfixe → tolérée (backward-compat) mais traitée
