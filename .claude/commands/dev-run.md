@@ -53,15 +53,8 @@ Arguments :
 
   Stocker `$rebuild_arch ∈ {true, false}` (STEP 4.bis et 5).
 
-- `PlanCacheStrict` (lu depuis `## Project Config` de `stack.md`) —
-  flag opt-in **From-Plan Strict** :
-  - `true` → si plan v2 strict-ready, dev-* tournent en Sonnet 4.6 via
-    `dev-backend-strict` / `dev-frontend-strict`. Gain latence ×3, coût ×5.
-  - `false` (défaut v6.2) → comportement v6.1, dev-* Opus 4.7 classique.
-
-  Stocker `$plan_cache_strict ∈ {true, false}` (STEP 6.0.bis).
-
-  Détail : `@.claude/docs/DESIGN-FROMPLAN-STRICT.md`.
+- ~~`PlanCacheStrict`~~ — **retiré v7.0.0** (les variants `dev-*-strict`
+  ont été supprimés ; clé tolérée mais sans effet runtime).
 
 Si `{n}` absent → demander :
 ```
@@ -397,95 +390,58 @@ Chaque dev-* détecte son plan au démarrage et bascule en mode From Plan.
 FEAT {n} — {U} US : {P_back} plans backend + {P_front} plans frontend détectés (mode From Plan)
 ```
 
-### 6.0.bis Routing strict (v6.2, PlanCacheStrict)
+### 6.0.bis Plan staleness check (v7.0.0 simplified)
 
-**Conditionnel** : exécuté seulement si `$plan_cache_strict == true`.
-Sinon, MARK_STRICT[{us},{family}] = false pour toutes les US, aller à 6.a.
+> **Note v7.0.0** : la phase historique "Routing strict" (v6.2-v6.10) qui
+> évaluait `plan-schema-version: 2 + strict-ready: true` pour router vers
+> `dev-*-strict` (Sonnet 4.6) a été retirée. Les variants strict sont
+> supprimés. La validation déterministe reste utile pour détecter les
+> plans stale/invalides — mais ne route plus vers un agent alternatif.
 
-Pour chaque plan détecté en 6.0, valider strict-readiness via script
-déterministe (0 token LLM) :
+Pour chaque plan détecté en 6.0, vérifier qu'il n'est pas stale via
+`validate_plan.py` (0 token LLM) :
 
 ```bash
 python .claude/python/sdd_scripts/validate_plan.py \
   --plan-path "workspace/output/plans/{n}-{m}-{Name}.{back|front}.md" \
   --us-path "workspace/output/us/{n}-{m}-{Name}.md" \
-  --strict \
   --json
 ```
 
-Pour chaque (US, family ∈ {backend, frontend}) :
+| Exit script | Action |
+|---|---|
+| `0` ou `1` | plan valide (avec ou sans Inline Digest) → continuer 6.a |
+| `2` (stale/invalid) | STOP + ERROR `[PLAN_STALE]` ou `[PLAN_INVALID]` |
 
-| Exit script | Mode résultant | Action 6.a/6.c |
-|---|---|---|
-| `0` (strict-ready) | strict | spawn `dev-{family}-strict` (Sonnet 4.6) |
-| `1` (not strict-ready) | classic | spawn `dev-{family}` (Opus 4.7, fallback) |
-| `2` (stale/invalid) | bloquant | STOP + ERROR `[PLAN_STALE]` ou `[PLAN_INVALID]` |
-
-**Exit 2 bloquant** : aucun spawn lancé. Émettre :
+**Exit 2 bloquant** :
 ```
 🔴 /dev-run {n} — plan stale ou invalide
 Plan : workspace/output/plans/{n}-{m}-{Name}.{back|front}.md
 Cause : [PLAN_STALE | PLAN_INVALID] {détail depuis JSON}
-FIX :
-  1. relancer /dev-plan {n} pour régénérer le plan
-  2. relancer /dev-run {n}
+FIX : relancer /dev-plan {n} pour régénérer le plan, puis /dev-run {n}
 ```
 
-**Observabilité** : event state.jsonl par validation :
-```bash
-python .claude/python/sdd_scripts/sdd_state.py emit-event \
-  --run-id $RUN_ID \
-  --event-type plan_validate \
-  --payload-json '{"us":"{n}-{m}","family":"{back|front}","exit_code":N,"result":"ready|not_strict_ready|invalid"}'
-```
-
-Event résumé après évaluation de tous les plans :
-```bash
-python .claude/python/sdd_scripts/sdd_state.py emit-event \
-  --run-id $RUN_ID \
-  --event-type plan_cache_evaluation \
-  --payload-json '{"us_strict_back":S_back,"us_strict_front":S_front,"us_classic":C,"rate":(S_back+S_front)/(2*U)}'
-```
-
-Émettre 1 ligne récap au chat :
-```
-FEAT {n} — plan cache : {S_back}/{U} back + {S_front}/{U} front strict-ready (rate {%}, routing : {S} strict + {C} classic)
-```
-
-### 6.a Phase Backend — invocations dev-backend bornées (routing strict-aware)
+### 6.a Phase Backend — invocations dev-backend bornées
 
 Pour chaque US `{n}-{m}-{Name}`, invoquer en batches de `$max_parallel`.
-Choix agent selon `MARK_STRICT[{us},backend]` :
 
 ```
 $batches = chunk(US_LIST, size = $max_parallel)
 for batch in $batches:
     invoquer en parallèle :
       pour chaque US dans batch :
-        if MARK_STRICT[{us},backend] == true:
-          Agent(dev-backend-strict, args="{n}-{m}")  # Sonnet 4.6
-        else:
-          Agent(dev-backend, args="{n}-{m}")         # Opus 4.7 (défaut)
+        Agent(dev-backend, args="{n}-{m}")         # Opus 4.7
     attendre fin du batch
 ```
 
 Émettre 1 ligne par batch :
 ```
-FEAT {n} — backend batch {i}/{B} : US {liste-{m}} → {U_batch} invocations ({S_batch} strict + {C_batch} classic)
+FEAT {n} — backend batch {i}/{B} : US {liste-{m}} → {U_batch} invocations
 ```
 
-Chaque agent (strict ou classic) :
+Chaque agent :
 - US backend/fullstack → génère code serveur
 - US frontend pure → exit `skipped (frontend-only US)`
-
-**Fallback auto** : si `dev-backend-strict` retourne ERROR
-`[PLAN_DIGEST_INSUFFICIENT]`, relancer avec `dev-backend` (Opus, From-Plan
-classique) **dans le même batch** (pas d'attente). Logger event :
-```bash
-python .claude/python/sdd_scripts/sdd_state.py emit-event \
-  --run-id $RUN_ID --event-type plan_cache_fallback \
-  --payload-json '{"us":"{n}-{m}","family":"backend","reason":"PLAN_DIGEST_INSUFFICIENT"}'
-```
 
 **Échec US backend** : continue les autres invocations du batch. À la
 fin de 6a si ≥ 1 US backend en échec → émettre :
@@ -553,37 +509,29 @@ Pour débloquer :
      6b re-confirme, 6c démarre)
 ```
 
-### 6.c Phase Frontend — invocations dev-frontend bornées (routing strict-aware)
+### 6.c Phase Frontend — invocations dev-frontend bornées
 
 **Uniquement si 6b a passé en 🟢 ou 🟡.** Pour chaque US, invoquer
-en batches de `$max_parallel`. Le choix de l'agent dépend de
-`MARK_STRICT[{us},frontend]` :
+en batches de `$max_parallel` :
 
 ```
 $batches = chunk(US_LIST, size = $max_parallel)
 for batch in $batches:
     invoquer en parallèle :
       pour chaque US dans batch :
-        if MARK_STRICT[{us},frontend] == true:
-          Agent(dev-frontend-strict, args="{n}-{m}")  # Sonnet 4.6
-        else:
-          Agent(dev-frontend, args="{n}-{m}")         # Opus 4.7 (défaut)
+        Agent(dev-frontend, args="{n}-{m}")         # Opus 4.7
     attendre fin du batch
 ```
 
 Émettre 1 ligne par batch :
 ```
-FEAT {n} — frontend batch {i}/{B} : US {liste-{m}} → {U_batch} invocations ({S_batch} strict + {C_batch} classic)
+FEAT {n} — frontend batch {i}/{B} : US {liste-{m}} → {U_batch} invocations
 ```
 
-Chaque agent (strict ou classic) bénéficie maintenant de la **certitude
-que les endpoints backend honorent leur contrat** (vérifié par 6b). Les
-mismatches `[FRONTEND_BACKEND_CONTRACT_GAP]` ne peuvent plus se
-produire en silence.
-
-**Fallback automatique** : si `dev-frontend-strict` retourne ERROR
-`[PLAN_DIGEST_INSUFFICIENT]`, relancer l'US avec `dev-frontend` (Opus)
-au sein du même batch. Logger event `plan_cache_fallback`.
+Chaque agent bénéficie de la **certitude que les endpoints backend
+honorent leur contrat** (vérifié par 6b). Les mismatches
+`[FRONTEND_BACKEND_CONTRACT_GAP]` ne peuvent plus se produire en
+silence.
 
 **Idempotence (re-run après correction backend, v6.10)** : au début de
 6a, requêter la DB pour le verdict API Gate le plus récent et son
@@ -823,11 +771,10 @@ entièrement (le STOP §6.b prend le relais, les US restent `InProgress`).
 ✅ FEAT {n} — phase dev terminée (gated)
 
 Workflow      : gated back→API gate→front (MaxParallel={$max_parallel})
-Plan Cache    : {S_back}/{U} back + {S_front}/{U} front strict (rate {%}, {F_fb} fallbacks)  # v6.2 ; ligne omise si PlanCacheStrict=false
 Bootstrap + DB : {init | skipped (short-circuit) | invoked} ({N_tables} tables | DB=none)
-Backend       : {Tb_ok}/{U} US ({Tb_skip} skipped, {F_back} échec) · {S_back} strict + {C_back} classic
+Backend       : {Tb_ok}/{U} US ({Tb_skip} skipped, {F_back} échec)
 API Gate      : {Tg_passed}/{Tg_total} tests · {N_endpoints} endpoints couverts → {🟢 GREEN | 🟡 YELLOW | 🔴 RED}
-Frontend      : {Tf_ok}/{U} US ({Tf_skip} skipped, {F_front} échec) · {S_front} strict + {C_front} classic | not run (gate RED)
+Frontend      : {Tf_ok}/{U} US ({Tf_skip} skipped, {F_front} échec) | not run (gate RED)
 ```
 
 Notation `Bootstrap + DB` :

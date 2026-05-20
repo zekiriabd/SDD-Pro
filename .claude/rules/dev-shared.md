@@ -351,68 +351,62 @@ matérialiser. Économie ~20-50 KB/invocation + cache hit accru.
 
 ### 7.6 Validation du plan (script déterministe)
 
-`validate_plan.py` (sdd_scripts/) valide structure + strict-readiness
+`validate_plan.py` (sdd_scripts/) valide structure + détection staleness
 sans coût LLM. Invoqué par :
-- `/dev-plan` STEP 5 (post-génération, marquage `strict-ready`)
-- `/dev-run` STEP 6.0.bis (gate du chemin strict)
+- `/dev-plan` STEP 5 (post-génération, validation cohérence)
+- `/dev-run` STEP 6.0.bis (gate staleness avant matérialisation)
 - `/sdd-status` (diagnostic plan-readiness)
 
 ```bash
 python .claude/python/sdd_scripts/validate_plan.py \
   --plan-path workspace/output/plans/{n}-{m}-*.{back|front}.md \
   --us-path workspace/output/us/{n}-{m}-*.md \
-  --strict \
   --json
 ```
 
 | Exit | Sens | Comportement caller |
 |---|---|---|
-| `0` | **strict-ready** (ou v1 valide sans `--strict`) | OK → utiliser `dev-*-strict` (Sonnet) |
-| `1` | structurellement valide mais **pas strict-ready** (v1 ou manque digest) | Fallback `From-Plan` classique (Opus) |
+| `0` | plan valide avec `## Inline Digest` (plan v2) | OK → matérialiser |
+| `1` | plan valide sans digest (plan v1 legacy) | OK → matérialiser |
 | `2` | **invalide / corrompu / stale** | STOP + ERROR `[PLAN_STALE]` ou `[PLAN_INVALID]` |
+
+> **v7.0.0 change** : exit 0/1 ne route plus vers des agents différents
+> (les variants `dev-*-strict` ont été supprimés). Les deux exit codes
+> mènent au même agent `dev-*` (Opus). Le flag historique `--strict`
+> reste accepté en CLI (no-op) pour backward-compat scripts.
 
 Classes d'erreur retournées (cf. `error-classification.md`) :
 - `PLAN_NOT_FOUND`, `PLAN_UNREADABLE`, `PLAN_NO_FRONTMATTER`
 - `PLAN_MISSING_REQUIRED_FIELD`, `PLAN_FILES_SECTION_MISSING`
 - `PLAN_FILE_ENTRY_INVALID`, `PLAN_AUGMENT_CONTRACT_MISSING`
-- `PLAN_AC_COVERAGE_GAP`, `PLAN_STALE`, `PLAN_NOT_STRICT_READY`
+- `PLAN_AC_COVERAGE_GAP`, `PLAN_STALE`
+- ~~`PLAN_NOT_STRICT_READY`~~ — déprécié (plus de routing strict)
 
-### 7.7 Mode dispatch étendu (depuis v6.2)
+### 7.7 Mode dispatch (simplifié v7.0.0)
 
-Extension de §1.ter.4. Quand `FROM_PLAN_PATH != null`, le caller
-(`/dev-run`) décide entre **From-Plan Strict** et **From-Plan Classique** :
+Extension de §1.ter.4. Quand `FROM_PLAN_PATH != null`, le caller (`/dev-run`)
+lance toujours `dev-*` classique (Opus 4.7). Avant le spawn, gate de
+staleness via `validate_plan.py` (exit 2 → STOP) :
 
 ```
 FROM_PLAN_PATH != null :
-  ├─ validate_plan.py --strict --plan-path $PATH --us-path $US
-  │   ├─ exit 0 → MODE = FROM_PLAN_STRICT
-  │   │           → spawn dev-*-strict (Sonnet 4.6)
-  │   │           → lecture minimale : plan + US uniquement
-  │   ├─ exit 1 → MODE = FROM_PLAN_CLASSIC (fallback)
-  │   │           → spawn dev-* normal (Opus 4.7)
-  │   │           → lecture v6.1 complète (plan + US + stack + CLAUDE.md)
-  │   └─ exit 2 → STOP + ERROR [PLAN_STALE] ou [PLAN_INVALID]
-  │                Tech Lead doit relancer /dev-plan
+  ├─ validate_plan.py --plan-path $PATH --us-path $US
+  │   ├─ exit 0 ou 1 → MODE = FROM_PLAN (classique)
+  │   │                → spawn dev-* (Opus 4.7)
+  │   └─ exit 2      → STOP + ERROR [PLAN_STALE] ou [PLAN_INVALID]
+  │                    Tech Lead doit relancer /dev-plan
 ```
 
-Gating par flag Project Config `PlanCacheStrict: true|false` (défaut
-`false` en v6.2, opt-in). Si `false` → toujours `FROM_PLAN_CLASSIC`.
-`validate_plan.py` reste utile en mode `false` pour détecter plans
-stale/corrompus.
+### 7.8 Invariants From-Plan
 
-### 7.8 Invariants préservés en strict mode
-
-Le mode strict ne dégrade JAMAIS ces propriétés :
+Le mode From-Plan préserve ces propriétés (inchangées v6→v7) :
 
 - ✅ Source-first : plan MD = SSOT exécutable (pas de mémoire opaque)
 - ✅ Idempotence : même plan + même US → même code
 - ✅ Reproductibilité cross-machine : tout est dans le plan
-- ✅ File ownership : `dev-*-strict` hérite des mêmes règles
-- ✅ Anti-derive : strict mode = STOP si plan stale, pas de fallback créatif
+- ✅ File ownership : `dev-*` hérite des mêmes règles
+- ✅ Anti-derive : STOP si plan stale, pas de fallback créatif
 - ✅ Build loop : inchangé (max `BuildLoopMaxIter`)
-- ✅ Capabilities on-demand : `capabilities-triggered` du frontmatter
-  pré-déclare → `dev-*-strict` n'invoque pas `detect_capabilities.py`
-  (gain temps additionnel)
 
 ---
 
