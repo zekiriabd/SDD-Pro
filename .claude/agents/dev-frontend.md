@@ -60,14 +60,14 @@ Aucun Glob/Read manuel ici. Détail : `.claude/python/sdd_scripts/preflight.py`.
 
 ## STEP 0.5 — HARD-GATE context budget
 
-Pattern partagé — appliquer `@.claude/rules/dev-shared.md §1` avec
+Pattern partagé — appliquer `@.claude/rules/build-and-loop.md §1` avec
 `--agent dev-frontend`.
 
 ---
 
 ## STEP 1 — Détection mode From Plan
 
-Pattern partagé — appliquer `@.claude/rules/dev-shared.md §1.ter`
+Pattern partagé — appliquer `@.claude/rules/build-and-loop.md §1.ter`
 ligne `dev-frontend` de la matrice (Glob `*.front.md`).
 
 Variables : `FROM_PLAN_PATH` (string|null), `PLAN_ONLY` (bool, set par STEP 0).
@@ -77,7 +77,7 @@ Mode Normal côté frontend inclut le **fidelity check** post-build (STEP 11).
 
 ## STEP 1.bis — Hard-gate path safety (Front/Back isolation)
 
-Pattern partagé — appliquer `@.claude/rules/dev-shared.md §1.bis`
+Pattern partagé — appliquer `@.claude/rules/build-and-loop.md §1.bis`
 ligne `dev-frontend` de la matrice.
 
 ---
@@ -106,10 +106,10 @@ Read **uniquement** :
 7. **`.claude/rules/error-classification.md`** — taxonomie (BUILD_*, UI_*,
    FRONTEND_BACKEND_CONTRACT_GAP, DERIVE_*). Préfixer `CAUSE:`.
    `[BUILD_BLOCKING]` = fail-fast ; `[BUILD_CORRECTIBLE]` = itère.
-8. **`.claude/rules/dev-shared.md`** — patterns partagés (context budget,
+8. **`.claude/rules/build-and-loop.md`** — patterns partagés (context budget,
    LibName lock, anti-derive, QA ownership, stack-completeness, BREAKING
    CHANGES cleanup, reads on-demand).
-9. **`.claude/rules/ui-tokens.md`** — discipline tokens CSS (v6.10.5 fix
+9. **`.claude/rules/quality.md`** — discipline tokens CSS (v6.10.5 fix
    CRIT-4). Source de vérité unique pour la palette FEAT.md §8 → variables
    CSS (`--primary`, `--background`, etc.). **Anti-pattern `[UI_TOKEN_VIOLATION]`
    bloquant** au STEP build : hex hardcodé `#xxx` ou `bg-[#xxx]` Tailwind
@@ -211,7 +211,7 @@ Mémoriser mapping `couche → répertoire` du stack actif (§1.3 du fichier). P
 
 ## STEP 6 — Planifier inline OU consommer un plan existant
 
-Pattern partagé — appliquer `@.claude/rules/dev-shared.md §7`
+Pattern partagé — appliquer `@.claude/rules/build-and-loop.md §7`
 (dispatch From Plan / Plan Only / Inline ; AC coverage ; exit
 silencieux ; structure du plan ; anti-derive plan).
 
@@ -414,7 +414,7 @@ de la responsabilité humaine.
 ## STEP 11.5 — Cleanup BREAKING CHANGES post-build
 
 **Déclenchement** : build vert au STEP 9 + fidelity check STEP 10+11
-terminé. Pattern partagé — appliquer `@.claude/rules/dev-shared.md §6`
+terminé. Pattern partagé — appliquer `@.claude/rules/build-and-loop.md §6`
 avec `--claude-md "workspace/output/src/{AppName}/CLAUDE.md"`. Exit
 code 1 → loguer en STEP 12.
 
@@ -435,7 +435,7 @@ Aucun autre texte.
 
 ## Anti-derive strict
 
-Substance partagée — `@.claude/rules/dev-shared.md §3` (7 bullets canoniques).
+Substance partagée — `@.claude/rules/build-and-loop.md §3` (7 bullets canoniques).
 Spécifique dev-frontend :
 - Seul le HTML de l'US courante (`workspace/input/ui/{n}-{m}-*.html`)
   est lu — jamais les autres mockups
@@ -449,7 +449,7 @@ Spécifique dev-frontend :
 Patterns partagés avec `dev-backend` (context budget HARD-GATE, LibName
 lock, anti-derive bullets, QA ownership interdits, stack-completeness,
 BREAKING CHANGES cleanup, reads on-demand cas-limite) :
-**`@.claude/rules/dev-shared.md`** — source de vérité unique.
+**`@.claude/rules/build-and-loop.md`** — source de vérité unique.
 
 Spécifique dev-frontend (résumé) :
 - `[STACK_LIBRARY_MISSING]` sur lib hors §2.4 du stack frontend OU
@@ -457,11 +457,11 @@ Spécifique dev-frontend (résumé) :
 - `[UI_FIDELITY_GAP]` sur divergence libellés/composants/hex extraits
   du HTML mockup (script `validate_fidelity.py`)
 - `[UI_TOKEN_VIOLATION]` sur hex hardcodé `#xxx` dans composants
-  (cf. `@.claude/rules/ui-tokens.md §5`, v6.10.5 fix CRIT-4)
+  (cf. `@.claude/rules/quality.md §5`, v6.10.5 fix CRIT-4)
 - `[QA_OWNERSHIP_VIOLATION]` sur écriture matchant patterns test Node/Blazor/Kotlin
 
 **Discipline source-first** (v6.10.5 fix CRIT-4) :
-`@.claude/rules/source-first.md` — Read on-demand uniquement si bug
+`@.claude/docs/principles/source-first.md` — Read on-demand uniquement si bug
 récurrent en build_loop. Avant un fix créatif, questionner : *"quelle
 source MD (US/plan/stack/rule) a manqué ? Patcher cette source AVANT
 le code."* Le code généré est une cible, jamais une source.

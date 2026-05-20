@@ -54,14 +54,14 @@ Read manuel à effectuer ici. Détail script : `.claude/python/sdd_scripts/prefl
 
 ## STEP 0.5 — HARD-GATE context budget
 
-Pattern partagé — appliquer `@.claude/rules/dev-shared.md §1` avec
+Pattern partagé — appliquer `@.claude/rules/build-and-loop.md §1` avec
 `--agent dev-backend`.
 
 ---
 
 ## STEP 1 — Détection mode From Plan
 
-Pattern partagé — appliquer `@.claude/rules/dev-shared.md §1.ter`
+Pattern partagé — appliquer `@.claude/rules/build-and-loop.md §1.ter`
 ligne `dev-backend` de la matrice (Glob `*.back.md`).
 
 Variables résultantes en mémoire pour la suite : `FROM_PLAN_PATH`
@@ -71,7 +71,7 @@ Variables résultantes en mémoire pour la suite : `FROM_PLAN_PATH`
 
 ## STEP 1.bis — Hard-gate path safety (Front/Back isolation)
 
-Pattern partagé — appliquer `@.claude/rules/dev-shared.md §1.bis`
+Pattern partagé — appliquer `@.claude/rules/build-and-loop.md §1.bis`
 ligne `dev-backend` de la matrice.
 
 ---
@@ -112,7 +112,7 @@ Read **uniquement** :
    etc.). À utiliser pour préfixer tout bloc ERROR dans le `CAUSE:`. La
    classe `[BUILD_BLOCKING]` impose un fail-fast (pas d'itération
    `build_loop`). La classe `[BUILD_CORRECTIBLE]` autorise l'itération.
-9. **`.claude/rules/dev-shared.md`** — patterns partagés dev-backend/
+9. **`.claude/rules/build-and-loop.md`** — patterns partagés dev-backend/
    dev-frontend (context budget HARD-GATE, LibName lock, anti-derive
    bullets, QA ownership interdits, stack-completeness, BREAKING
    CHANGES cleanup, reads on-demand cas-limite). Source de vérité
@@ -129,7 +129,7 @@ demande.
 - `workspace/output/.sys/.context/constitution.md` : à Read **uniquement** si l'US
   contient un terme métier ambigu nécessitant désambiguïsation via le
   glossaire (§2). Lecture strictement passive — l'agent ne MODIFIE
-  JAMAIS constitution.md (cf. `@.claude/rules/file-ownership.md §2`).
+  JAMAIS constitution.md (cf. `@.claude/rules/ownership.md §2`).
 - `workspace/output/.sys/.context/adrs/INDEX.md` : à Read **uniquement au STEP 5
   (planning)** si une décision architecturale non triviale est en jeu
   (avant création d'un nouvel ADR). Si INDEX.md absent → fallback Glob
@@ -245,7 +245,7 @@ Mémoriser l'ID du stack et son mapping `couche → répertoire`. Pour `appType=
 
 ## STEP 5 — Planifier inline OU consommer un plan existant
 
-Pattern partagé — appliquer `@.claude/rules/dev-shared.md §7`
+Pattern partagé — appliquer `@.claude/rules/build-and-loop.md §7`
 (dispatch From Plan / Plan Only / Inline ; AC coverage ; exit
 silencieux ; structure du plan ; anti-derive plan).
 
@@ -398,7 +398,7 @@ Aucun refactor opportuniste, aucune nouvelle dépendance hors stack.
 ## STEP 8.5 — Cleanup BREAKING CHANGES post-build
 
 **Déclenchement** : build vert au STEP 8 (exit 0). Pattern partagé —
-appliquer `@.claude/rules/dev-shared.md §6` avec
+appliquer `@.claude/rules/build-and-loop.md §6` avec
 `--claude-md "workspace/output/src/{BackendName}/CLAUDE.md"`. Exit
 code 1 → loguer en STEP 9.
 
@@ -419,7 +419,7 @@ Aucun autre texte.
 
 ## Anti-derive strict
 
-Substance partagée — `@.claude/rules/dev-shared.md §3` (7 bullets canoniques).
+Substance partagée — `@.claude/rules/build-and-loop.md §3` (7 bullets canoniques).
 Spécifique dev-backend : stacks contraints à `backend|auth/*.md` (pas
 de stack frontend/ui).
 
@@ -430,7 +430,7 @@ de stack frontend/ui).
 Patterns partagés avec `dev-frontend` (context budget HARD-GATE, LibName
 lock, anti-derive bullets, QA ownership interdits, stack-completeness,
 BREAKING CHANGES cleanup, reads on-demand cas-limite) :
-**`@.claude/rules/dev-shared.md`** — source de vérité unique.
+**`@.claude/rules/build-and-loop.md`** — source de vérité unique.
 
 Spécifique dev-backend (résumé) :
 - `[STACK_LIBRARY_MISSING]` sur lib hors §2.4.a/§2.4.b du stack backend
@@ -438,7 +438,7 @@ Spécifique dev-backend (résumé) :
 - `[LIBNAME_LOCK_HELD]` sur conflit verrou (cf. `dev-shared.md §2`)
 
 **Discipline source-first** (v6.10.5 fix CRIT-4) :
-`@.claude/rules/source-first.md` — Read on-demand uniquement si bug
+`@.claude/docs/principles/source-first.md` — Read on-demand uniquement si bug
 récurrent en build_loop. Avant un fix créatif, questionner : *"quelle
 source MD (US/plan/stack/rule) a manqué ? Patcher cette source AVANT
 le code."* Le code généré est une cible, jamais une source.

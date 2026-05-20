@@ -139,7 +139,7 @@ Read **uniquement** :
    `[QA_INIT_FAILED]`, `[QA_TEST_INVALID]`, `[QA_OUTPUT_INVALID]`,
    `[QA_PRECONDITION_FAILED]`, `[QA_OWNERSHIP_VIOLATION]`,
    `[API_GATE_RED]`. Ordre de priorité émission documenté §1.7.
-10. **`.claude/rules/backend-first.md`** (v6.10.5 fix CRIT-4) — contrat
+10. **`.claude/rules/build-and-loop.md`** (v6.10.5 fix CRIT-4) — contrat
     API Gate (post-dev backend, pré-dev frontend). Substance opérationnelle
     inlinée plus bas (§API Gate STEP 2.7-2.9), Read le fichier source si
     cas-limite (stratégie fixtures in-memory par stack QA §1.2, critère
@@ -309,7 +309,7 @@ Skip si `QAMode: tests-only`.
 Exécuter `parse_coverage.py` qui consomme les outputs natifs des
 test runners (cobertura XML, lcov.info, coverage.json) et produit le
 schéma normalisé `workspace/output/qa/feat-{n}/coverage.json` (cf.
-`rules/qa-coverage.md §2` pour le format).
+`rules/quality.md §2` pour le format).
 
 ```bash
 python .claude/python/sdd_scripts/parse_coverage.py --feat-number {n}
@@ -329,6 +329,106 @@ Si `coverage_passed = false` → flag `[QA_COVERAGE_GAP]` **bloquant**
 (décision globale RED, depuis v6.1 hardening). Pour autoriser une FEAT
 sous le seuil, baisser `CoverageMin` dans `## Project Config` (la
 décision est tracée en git blame) — JAMAIS contourner via `--force`.
+
+---
+
+## STEP 8.5 — Mutation testing (opt-in, v7.0.0 P0 §6.2)
+
+Skip si `MutationTestingMode: off` (défaut). Lire la config layered :
+
+```bash
+MUTATION_MODE=$(python -c "
+import sys; sys.path.insert(0, '.claude/python')
+from sdd_lib.layered_config import read_layered_config
+print((read_layered_config().get('MutationTestingMode') or 'off').lower())
+")
+MUTATION_SCORE_MIN=$(python -c "..." )  # MutationScoreMin (default 60)
+MUTATION_TIMEOUT=$(python -c "..." )    # MutationTestingTimeoutSec (default 600)
+```
+
+Si `MUTATION_MODE in {minimal, full}` :
+
+1. **Sélection des cibles** (services métier vs CRUD trivial) :
+   - `minimal` : Services/*, UseCases/*, Domain/* (≠ DTO, Controllers, Mappers)
+   - `full` : tout `workspace/output/src/{BackendName|AppName}/` sauf entry points, tests
+
+2. **Invoquer le tool par stack** (cf. `stacks/qa/mutation-testing.md §2`) :
+   - `qa/dotnet-xunit` → `dotnet stryker --threshold-break $MUTATION_SCORE_MIN --timeout-ms $((MUTATION_TIMEOUT*1000))`
+   - `qa/node-vitest` → `npx stryker run --thresholds.break=$MUTATION_SCORE_MIN`
+   - `qa/python-pytest` → `mutmut run --paths-to-mutate src/`
+   - `qa/kotlin-junit` → `./gradlew pitest -DmutationThreshold=$MUTATION_SCORE_MIN`
+
+3. **Verdict canonique (cohérent API Gate v7.0.0)** :
+   - `PASS` si `mutation_score >= MutationScoreMin`
+   - `WARN` si `0.8 * MutationScoreMin <= mutation_score < MutationScoreMin`
+   - `FAIL` si `mutation_score < 0.8 * MutationScoreMin`
+   - `INFRA_BLOCKED` si tool absent OU timeout dépassé
+   - `SKIPPED` si `MutationTestingMode: off` OU aucune cible
+
+4. **Écrire** `workspace/output/qa/feat-{n}/mutation.json` + persister
+   dans `console.db` table `qa_mutation` (migration v8 — cf. P0-7).
+
+5. **Anti-derive** :
+   - ❌ Bloquer le pipeline sur `INFRA_BLOCKED` (le tool peut ne pas être installé) — émettre WARN seulement
+   - ❌ Mesurer mutation score si `coverage_lines_pct < 80%` — meaningless (le score sera artificiellement haut sur le code non couvert)
+   - ✅ Toujours respecter `MutationTestingTimeoutSec` (kill -9 si dépassé)
+
+Exit silencieux par défaut (`MutationTestingMode: off`). Aucun changement
+comportement byte-vs-pre-v7.0.0 sauf opt-in explicite.
+
+---
+
+## STEP 8.bis — Playwright E2E (opt-in, v7.0.0 P1 §6.5)
+
+Skip si `E2EMode: off` (défaut). Lire la config layered :
+
+```bash
+E2E_MODE=$(python -c "
+import sys; sys.path.insert(0, '.claude/python')
+from sdd_lib.layered_config import read_layered_config
+print((read_layered_config().get('E2EMode') or 'off').lower())
+")
+E2E_MIN_PER_US=$(...)  # E2EMinPerUs (default 1)
+E2E_TIMEOUT=$(...)     # E2ETimeoutSec (default 300)
+```
+
+Si `E2E_MODE in {smoke, happy-paths, full}` :
+
+1. **Skip silencieux** si aucun frontend stack actif OU aucune US n'a
+   de UI ACs (FEAT backend-only).
+
+2. **Démarrer backend in-memory + serve build SPA** :
+   - .NET : `dotnet run --project {BackendName}` (test fixture WebApplicationFactory)
+   - SPA : `npm run preview` (Vite) ou `ng serve` selon stack frontend
+   - Attendre readiness via `wait-on http://localhost:{port}` (timeout 60s).
+
+3. **Sélection des tests** :
+   - `smoke` : 1 test global `app loads + login form visible`
+   - `happy-paths` : 1 spec par US (parcours nominal AC-1 ou première AC UI)
+   - `full` : tous AC observables UI + edge cases élicitor (`Pre-mortem` / `Edge Cases`)
+
+4. **Invoquer le tool par stack frontend** (cf. `stacks/qa/playwright.md §2`) :
+   - `react`, `vue`, `angular` → `npx playwright test e2e/feat-{n}/ --timeout=${E2E_TIMEOUT}000`
+   - `blazor-webassembly` → `dotnet test {BackendName}.E2E.csproj --filter "FullyQualifiedName~Feat{n}"`
+
+5. **Verdict canonique (cohérent API Gate v7.0.0)** :
+   - `PASS` si `tests_failed == 0 AND us_covered >= us_total * E2EMinPerUs`
+   - `WARN` si `tests_failed == 0 AND us_covered < us_total` (couverture partielle)
+   - `FAIL` si `tests_failed >= 1`
+   - `INFRA_BLOCKED` si browsers absent (`playwright install`) OU backend unreachable
+   - `SKIPPED` si `E2EMode: off` OU aucune US avec UI ACs
+
+6. **Persistance** : `workspace/output/qa/feat-{n}/e2e.json` + insert
+   `console.db` table `qa_e2e` (schema v3, migration 0003 appliquée auto).
+
+7. **Anti-derive** :
+   - ❌ E2E contre la DB prod — toujours backend in-memory + preview SPA local
+   - ❌ Sleeps fixes (`page.waitForTimeout(3000)`) — utiliser `expect().toBeVisible()` waits
+   - ❌ Tests dépendant de l'ordre — chaque spec isolé
+   - ❌ Capture HAR prod (anonymisation OK pour debug local, jamais commit)
+   - ✅ Cap absolu `E2ETimeoutSec` (kill -9 si dépassé)
+
+Exit silencieux par défaut (`E2EMode: off`) — byte-identical pre-v7.0.0.
 
 ---
 
@@ -461,5 +561,5 @@ en §2.4 d'un stack actif (qa, backend, frontend, ui, auth). Lib absente
 `RED`, Tech Lead re-dispatche dev-*. Schéma `coverage.json` normalisé
 géré par `parse_coverage.py` (STEP 8).
 
-**Read on-demand si cas-limite** : `@.claude/rules/qa-coverage.md`,
-`@.claude/rules/stack-completeness.md`.
+**Read on-demand si cas-limite** : `@.claude/rules/quality.md`,
+`@.claude/rules/library-and-stack.md`.

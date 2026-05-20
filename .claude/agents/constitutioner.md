@@ -34,7 +34,7 @@ Read :
 2. `workspace/output/.sys/.context/constitution.md` — si absent → skip
    silencieux + exit 0.
 3. `.claude/templates/adr.template.md` — template de chaque ADR.
-4. **`.claude/rules/file-ownership.md §3`** — règle numérotation
+4. **`.claude/rules/ownership.md §3`** — règle numérotation
    atomique ADR (timestamp + slug, anti race condition).
 5. **`.claude/rules/error-classification.md`** — taxonomie pour
    préfixer tout ERROR émis.
@@ -68,7 +68,7 @@ Pour chaque ADR à créer (= dimension dont le slug n'a pas matché en STEP 1) :
 1. **Identifiant atomique** : `ADR-{YYYYMMDDTHHmmss}-{slug}.md`
    (timestamp UTC seconde + slug kebab-case). Collision improbable →
    suffixe `-{rand4}`. **Pas** de numérotation incrémentale `ADR-001`
-   (racy avec dev-* en parallèle, cf. `@.claude/rules/file-ownership.md §3`).
+   (racy avec dev-* en parallèle, cf. `@.claude/rules/ownership.md §3`).
 2. Read `.claude/templates/adr.template.md`.
 3. Remplir :
    - **Titre** : phrase courte descriptive (ex. "Backend stack — .NET Minimal API")
@@ -128,7 +128,7 @@ Constitution read-only ou absente après STEP 0 → WARN (pas STOP) :
 
 `workspace/output/.sys/.context/adrs/INDEX.md` est l'index compact lu
 par dev-* en priorité au lieu de Glob tous les ADRs (cf.
-`@.claude/rules/file-ownership.md §1`).
+`@.claude/rules/ownership.md §1`).
 
 Procédure (idempotent, ~1-2 KB en sortie) :
 1. Glob `workspace/output/.sys/.context/adrs/ADR-*.md` (exclure

@@ -101,27 +101,20 @@ ciblée ; **utilisateur final : préférer une commande orchestrante**) :
 **5 règles cross-cutting consolidées v7.0.0** dans `.claude/rules/`
 (codex audit Prio 2 — was 11) :
 
-| Nouvelle règle | Substance |
-|---|---|
-| `build-and-loop.md` | Backend-first gated workflow + Dev-shared patterns (was `backend-first` + `dev-shared`) |
-| `quality.md` | QA Coverage seuil + UI Tokens anti-hex (was `qa-coverage` + `ui-tokens`) |
-| `ownership.md` | File ownership matrix + Constitution & ADRs governance (was `file-ownership` + `constitution`) |
-| `library-and-stack.md` | Stack completeness (libs anti-derive, runtime LTS) + CORS patterns (was `stack-completeness` + `cors`) |
-| `error-classification.md` | Vocabulaire d'erreur unifié `[CLASS]` cross-agent (unchanged) |
+| Règle | Substance | Migration v6 |
+|---|---|---|
+| `build-and-loop.md` | Backend-first gated workflow + Dev-shared patterns | was `backend-first` + `dev-shared` |
+| `quality.md` | QA Coverage seuil + UI Tokens anti-hex | was `qa-coverage` + `ui-tokens` |
+| `ownership.md` | File ownership matrix + Constitution & ADRs governance | was `file-ownership` + `constitution` |
+| `library-and-stack.md` | Stack completeness (libs anti-derive, runtime LTS) + CORS patterns | was `stack-completeness` + `cors` |
+| `error-classification.md` | Vocabulaire d'erreur unifié `[CLASS]` cross-agent | unchanged |
 
-**8 stubs** préservés (backward-compat des `Read @.claude/rules/X.md`
-historiques dans agents) : `backend-first`, `dev-shared`, `qa-coverage`,
-`ui-tokens`, `file-ownership`, `constitution`, `stack-completeness`,
-`cors`. Chaque stub pointe vers la nouvelle règle consolidée.
+**Stubs backward-compat** : ~~conservés v7.0.0-alpha~~ **supprimés v7.0.0** (sweep complet 2026-05-20). Les `Read @.claude/rules/{X}.md` historiques ont été migrés vers les fichiers consolidés ci-dessus dans tous les agents/commands/python/stacks. **0 stub résiduel**.
 
-**2 principes** déplacés vers `.claude/docs/principles/` : `source-first`
-(Tech Lead discipline, non cross-agent), `us-granularity` (mono-agent po).
-Stubs aussi conservés dans `rules/`.
-
-> **Migration utilisateur** : les agents continuent de Read les anciens
-> paths via stubs (zéro régression). Post-v7.0.0 final, sweep des
-> `Read @.claude/rules/X.md` vers les nouveaux paths, puis suppression
-> des stubs en v7.1.
+**2 principes** dans `.claude/docs/principles/` : `source-first`
+(Tech Lead discipline, non cross-agent), `us-granularity` (mono-agent po,
+règle interne à l'agent PO). Tous les Read pointent désormais directement
+vers `docs/principles/{X}.md`.
 
 Index commenté + détail : `@.claude/docs/conventions.md §14`.
 

@@ -139,7 +139,7 @@ Read **uniquement** :
 
 1. `.claude/rules/error-classification.md` — taxonomie `[REVIEW_*]` (§1.11
    v6.3.1) + classes réutilisées `[LAYER_VIOLATION]`, `[FRONTEND_BACKEND_CONTRACT_GAP]`
-2. `.claude/rules/dev-shared.md` — anti-patterns partagés dev-backend/dev-frontend
+2. `.claude/rules/build-and-loop.md` — anti-patterns partagés dev-backend/dev-frontend
    (§3 anti-derive bullets, §7 plan construction, §4 QA ownership)
 3. `workspace/input/feats/{n}-*.md` — FEAT parente (passif)
 4. `workspace/output/us/{n}-*.md` — toutes les US ciblées (passif, comprendre

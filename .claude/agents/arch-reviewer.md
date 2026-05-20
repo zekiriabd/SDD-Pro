@@ -396,15 +396,19 @@ Classes typiques :
 
 ## Coordination cross-agent
 
-| Agent | Focus | Émet |
-|---|---|---|
-| `arch-reviewer` (ici) | Pattern + Layers + ADRs | `[ARCH_*]` → `qa_code_review` |
-| `code-reviewer` | Anti-patterns techniques cross-fichier | `[REVIEW_*]` → `qa_code_review` |
-| `security-reviewer` | OWASP Top 10 | `[SEC_*]` → `qa_security` |
-| `quality_scan.py` (`qa`) | Code Smells déterministes | rules `magic-number`, `long-method`, `commented-code` → `qa_quality` |
-| `accessibility-auditor` | WCAG 2.2 | `[A11Y_*]` → `qa_a11y` |
-| `performance-auditor` | Core Web Vitals + SLO | `[PERF_*]` → `qa_performance` |
-| `spec-compliance-reviewer` | AC verification | `[SPEC_*]` → `qa_spec_compliance` |
+| Agent | Statut v7.0.0 | Focus | Émet |
+|---|---|---|---|
+| `arch-reviewer` (ici) | ✅ actif | Pattern + Layers + ADRs | `[ARCH_*]` → `qa_code_review` |
+| `code-reviewer` | ✅ actif | Anti-patterns techniques cross-fichier | `[REVIEW_*]` → `qa_code_review` |
+| `security-reviewer` (mode `scan`) | ✅ actif | OWASP Top 10 | `[SEC_*]` → `qa_security` |
+| `spec-compliance-reviewer` | ✅ actif | AC verification | `[SPEC_*]` → `qa_spec_compliance` |
+| `quality_scan.py` (`qa`) | ✅ actif (déterministe) | Code Smells | rules `magic-number`, `long-method`, `commented-code` → `qa_quality` |
+| ~~`accessibility-auditor`~~ | ⊘ RETIRÉ v7.0.0 | WCAG 2.2 → axe-core CI | classes `[A11Y_*]` conservées schema-only (`qa_a11y`) |
+| ~~`performance-auditor`~~ | ⊘ RETIRÉ v7.0.0 | Core Web Vitals + SLO → Lighthouse CI | classes `[PERF_*]` conservées schema-only (`qa_performance`) |
+| ~~`security-reviewer --mode threat-model`~~ | ⊘ RETIRÉ v7.0.0 | STRIDE pré-dev → template humain | n/a (informational) |
 
-L'orchestrateur `/sdd-review` agrège ces 7 sources via `sdd_review.py`
+L'orchestrateur `/sdd-review` agrège les sources **actives** (5 sources
+v7.0.0 : arch + code + security-scan + spec + quality) via `sdd_review.py`
 et produit le rapport consolidé `workspace/output/qa/feat-{n}/review.md`.
+Les tables `qa_a11y` / `qa_performance` restent lues si elles contiennent
+des données ingérées par un futur bridge axe-core / Lighthouse CI.

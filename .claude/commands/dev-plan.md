@@ -94,7 +94,7 @@ Chaque agent en mode `:plan` :
   actifs et le CLAUDE.md projet (s'il existe)
 - Construit le plan inline normal (STEPs 5/6 selon agent)
 - **Écrit le plan dans `workspace/output/plans/{n}-{m}-{Name}.{back|front}.md`**
-  au format défini (cf. `@.claude/rules/dev-shared.md §7.4`)
+  au format défini (cf. `@.claude/rules/build-and-loop.md §7.4`)
 - Émet UNE ligne :
   ```
   dev-backend {n}-{m}-{Name}: plan written → workspace/output/plans/{n}-{m}-{Name}.back.md (X fichiers)

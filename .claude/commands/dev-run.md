@@ -178,22 +178,56 @@ python .claude/python/sdd_scripts/validate_us_deps.py --feat {n} --json
 | 4 | `[US_DEPS_MISSING]` | STOP + ERROR, ref vers US inexistante |
 | 1/2/5 | erreur infra | STOP + ERROR |
 
-Sur exit 0, récupérer le topo order :
+Sur exit 0, récupérer **les batches layered Kahn** (v7.0.0 audit P0 R3) :
+
+```bash
+# v7.0.0 strict batching — une ligne par layer, ids US séparés par espaces.
+# Garantie : aucun US dans un layer ne dépend d'un autre US du même layer.
+US_LAYERS=$(python .claude/python/sdd_scripts/validate_us_deps.py --feat {n} --layered-batches)
+```
+
+`US_LAYERS` est consommé en STEP 6.a / 6.c comme suit :
+```bash
+while IFS= read -r layer; do
+    # Chaque layer = US indépendants entre eux → safe parallel
+    # Si layer plus grand que MaxParallel, chunk en sous-batches DE LA MÊME LAYER
+    # (toujours safe car tous indépendants par construction).
+    for sub_batch in chunk("$layer", $max_parallel); do
+        invoke_parallel(sub_batch)   # dev-backend OU dev-frontend selon STEP
+        wait                          # attendre fin du sous-batch
+    done
+done <<< "$US_LAYERS"
+```
+
+**Fallback compat** : si `--layered-batches` non supporté (script ancien),
+fallback sur `--topo` :
 ```bash
 US_LIST=$(python .claude/python/sdd_scripts/validate_us_deps.py --feat {n} --topo)
+# Heuristique : chunk(US_LIST, $max_parallel) — risque de collision intra-batch
+# si dépendance proche (cf. ancien comportement v6.7–v6.10).
 ```
 
 **Backward-compat strict** : pour les US legacy sans `## Dependencies` (ou avec
-`NONE`), le graphe est vide, le topo order est alphabétique stable, et le
-comportement est byte-identique à v6.7. Aucune US v1 n'est cassée.
+`NONE`), le graphe est vide, le layered Kahn renvoie 1 seul layer contenant
+toutes les US (tri alphabétique stable), et le comportement est byte-identique
+à `--topo` v6.7. Aucune US v1 n'est cassée.
 
-**Invariant aval (STEP 6.a, 6.c)** : `US_LIST` est désormais en ordre
-topologique. Les US sans dépendances apparaissent en premier ; au sein d'un
-batch `chunk(US_LIST, $max_parallel)`, les US peuvent toujours dépendre d'US
-des batches PRÉCÉDENTS (déjà terminés via wait), jamais du batch courant.
-*Note* : la stricte garantie "deps jamais dans le même batch" n'est pas
-encore enforced — le topo order minimise les violations mais ne les élimine
-pas pour des graphes denses. Ajustement futur : layered Kahn batching.
+**Invariant aval (STEP 6.a, 6.c) — v7.0.0 strict** : au sein d'un layer, les
+US sont **pairwise indépendantes** (aucune dépendance interne). Donc :
+
+1. Aucune race sur `{LibName}/` ou autre artefact partagé (cf.
+   `ownership.md §4` LibName lock O_EXCL).
+2. Le chunking par `MaxParallel` à l'intérieur d'un layer **préserve** la
+   sécurité (les US d'un sous-batch sont triviallement indépendantes puisque
+   c'est un sous-ensemble d'un layer indépendant).
+3. Inter-layer : layer K attend la fin du layer K-1 avant de démarrer
+   (synchronisation explicite via `wait` shell ou équivalent batched
+   sequencing).
+
+→ La concession historique `dev-run.md` v6.10 (« le topo order minimise les
+violations mais ne les élimine pas pour des graphes denses ») est **résolue**
+en v7.0.0. Le diamant `A→B, A→C, B→D, C→D` est désormais ordonnancé en
+3 layers : `{A}`, `{B, C}`, `{D}` — `D` n'est jamais dans le même batch que `B` ni `C`.
 
 ---
 
@@ -318,46 +352,28 @@ Sinon, invoquer agent `arch` (équivalent `/arch-init`). L'agent gère :
 
 ---
 
-## STEP 5.5 — Threat model pré-dev (security-reviewer mode threat-model, v6.4.2)
+## STEP 5.5 — Threat model pré-dev (RETIRÉ v7.0.0)
 
-**Conditionnel + non bloquant**. Décide via `phase_planner.py` si la
-phase doit tourner ; en cas de positif, invoque l'agent
-`security-reviewer --mode threat-model`. Le résultat est
-**informational** uniquement — ne stoppe **jamais** `/dev-run`.
+> **v7.0.0 (governance-major-auditors-trim)** : le mode `threat-model`
+> de `security-reviewer` est **supprimé**. Le défaut
+> `SecurityThreatModelEnabled` est flippé `true → false` dans
+> `config.base.yml`. La STEP est conservée numériquement pour
+> préserver la numérotation aval, mais **aucun agent n'est spawné ici**.
+>
+> **Remplacement** : template humain à instancier par le Tech Lead
+> pré-`/arch-init` — `.claude/templates/threat-model.template.md`
+> (STRIDE light, ~15-30 min, ~150 LOC structurées : assets / actors /
+> surfaces / threats / controls / residual / ADRs / review).
+>
+> Les classes `[SEC_*]` runtime (post-dev) restent gérées par
+> `security-reviewer --mode scan` (STEP 6.4 du batch auditors).
+>
+> Aucune lecture de `phase_planner.threat_model` — la phase est
+> systématiquement `enabled: false` avec `agent_removed: true` dans le JSON.
 
-### 5.5.1 — Décision via phase_planner
+Passer directement à STEP 6.
 
-```bash
-PHASE_PLAN=$(python .claude/python/sdd_scripts/phase_planner.py \
-  --feat-number {n} --json 2>/dev/null)
-THREAT_MODEL_ENABLED=$(echo "$PHASE_PLAN" | python -c \
-  "import json,sys; d=json.load(sys.stdin); print(d['phases']['threat_model']['enabled'])" 2>/dev/null)
-```
-
-- `THREAT_MODEL_ENABLED == True` → invocation (5.5.2)
-- `THREAT_MODEL_ENABLED == False` → skip silencieux + 1 ligne récap
-  (`FEAT {n} — threat-model skip ({skip_reason du planner})`)
-- Erreur script → log WARNING + skip (best-effort, ne bloque pas)
-
-### 5.5.2 — Invocation
-
-```
-Agent(security-reviewer, args="{n} --mode threat-model")
-```
-
-L'agent produit `workspace/output/.sys/.validation/{n}-threat-model.{md,json}`.
-
-### 5.5.3 — Émission
-
-```
-FEAT {n} — threat-model : {N} threats identifiés ({C} critical, {S} serious, {M} moderate) → cf. {path}
-```
-
-Verdict toujours `informational` → **continue STEP 6** quoi qu'il
-arrive (même sur threats critical visibles, c'est au Tech Lead de
-décider d'arrêter manuellement avant `/dev-run`).
-
-### 5.5.4 — State tracking
+### 5.5.4 — State tracking (legacy, conservé)
 
 ```bash
 python .claude/python/sdd_scripts/sdd_state.py set-phase \
@@ -367,7 +383,7 @@ python .claude/python/sdd_scripts/sdd_state.py set-phase \
 
 ---
 
-## STEP 6 — Workflow gated séquentiel (cf. `.claude/rules/backend-first.md`)
+## STEP 6 — Workflow gated séquentiel (cf. `.claude/rules/build-and-loop.md`)
 
 **Défaut** : back → QA API gate → front, plus de parallélisme back+front.
 
@@ -376,15 +392,19 @@ python .claude/python/sdd_scripts/sdd_state.py set-phase \
         ↓
 6b. QA API Gate (tests d'intégration HTTP, in-memory DB)
         ↓
-   ├── 🟢 GREEN → 6c. dev-frontend ALL US (parallèle bornée)
-   └── 🔴 RED   → STOP + rapport, l'humain corrige et relance /dev-run
+   ├── PASS / WARN / SKIPPED → 6c. dev-frontend ALL US (parallèle bornée)
+   ├── FAIL                  → STOP + rapport, l'humain corrige et relance /dev-run
+   └── INFRA_BLOCKED         → STOP + ERROR [QA_FRAMEWORK_MISSING] (config infra)
 ```
+
+Statuts canoniques API Gate (v7.0.0) : `PASS | WARN | FAIL | SKIPPED | INFRA_BLOCKED`.
+Détail sémantique + critère arithmétique : `.claude/rules/build-and-loop.md §1.3`.
 
 Lire `## Project Config` :
 - `GatedWorkflow` (default `true`) : si `false`, fallback legacy parallèle
   (log `workspace/output/.sys/.audit/legacy-parallel.log`). Déconseillé.
-- `ApiGateRequired` (default `true`) : si `false`, gate produit WARN au
-  lieu de RED (continue malgré tests rouges, déconseillé).
+- `ApiGateRequired` (default `true`) : si `false` ET `GatedWorkflow: false`,
+  status devient `SKIPPED` (gate désactivée).
 
 ### 6.0 Détection automatique du mode From Plan
 
@@ -466,7 +486,7 @@ erreurs (cf. logs dev-backend) puis relancer /dev-run {n}.
 ### 6.b Phase QA API Gate (tests d'intégration HTTP)
 
 Si toutes US backend OK (incl. skipped frontend-only), invoquer
-`/qa-generate {n} --mode api-tests` (cf. `.claude/rules/backend-first.md §1`).
+`/qa-generate {n} --mode api-tests` (cf. `.claude/rules/build-and-loop.md §1`).
 
 Contenu :
 - Tests d'intégration HTTP par endpoint backend (style Postman) avec
@@ -482,19 +502,28 @@ ingéré et supprimé par `qa-generate` STEP 6.bis) :
 
 ```bash
 GATE_JSON=$(python .claude/python/sdd_scripts/query_console_db.py api-gate --feat {n})
-GATE_PASSED=$(echo "$GATE_JSON" | python -c "import json,sys; print(json.load(sys.stdin).get('gate_passed', False))")
+STATUS=$(echo "$GATE_JSON" | python -c "import json,sys; print(json.load(sys.stdin).get('status', 'INFRA_BLOCKED'))")
 TESTS_FAILED=$(echo "$GATE_JSON" | python -c "import json,sys; print(json.load(sys.stdin).get('tests_failed', 0))")
+# legacy fallback si DB pre-v7 sans 'status' :
+# GATE_PASSED=$(echo "$GATE_JSON" | python -c "import json,sys; print(json.load(sys.stdin).get('gate_passed', False))")
 ```
 
-Décision selon `gate_passed` :
+Décision selon `status` (canonique v7.0.0, cf. `build-and-loop.md §1.3`) :
 
-| Verdict gate | Action |
+| `status` | Action |
 |---|---|
-| 🟢 `gate_passed: true`, 0 failed, coverage min OK | continuer 6c |
-| 🟡 `gate_passed: true` mais coverage endpoints partielle | continuer 6c + WARN |
-| 🔴 `gate_passed: false` (≥1 failed OR coverage minimale non atteinte) | STOP, voir bloc ci-dessous |
+| `PASS`           | continuer 6c (vert) |
+| `WARN`           | continuer 6c + propager WARNING au verdict QA global |
+| `SKIPPED`        | continuer 6c silencieusement (aucun endpoint OU gate désactivée) |
+| `FAIL`           | STOP, voir bloc `6.b.STOP` ci-dessous (mismatch contrat back↔front) |
+| `INFRA_BLOCKED`  | STOP + ERROR `[QA_FRAMEWORK_MISSING]` (test runner / fixtures KO — corriger config infra avant retry, **pas** une régression code) |
 
-### 6.b.STOP — Format STOP sur RED
+> Compat : la sortie `gate_passed: true` couvre `PASS`, `WARN`, `SKIPPED`.
+> Les callers legacy peuvent continuer à le lire ; les nouveaux callers
+> doivent préférer `status` pour distinguer "rien à tester" (`SKIPPED`)
+> d'un vrai pass (`PASS`).
+
+### 6.b.STOP — Format STOP sur FAIL
 
 ```
 🔴 /dev-run {n} — API Gate RED ({F_api} test(s) échoué(s) sur {T_api})

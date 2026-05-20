@@ -130,7 +130,7 @@ Modes valides :
 - `tests+coverage` → STEP 6 + STEP 7 + STEP 8 + STEP 9 (skip 4, 5)
 - `full` → tous les STEP
 - `manual` → identique à `full` (legacy compat)
-- `api-tests` (depuis 2026-05-07, cf. `rules/backend-first.md`) →
+- `api-tests` (depuis 2026-05-07, cf. `rules/build-and-loop.md`) →
   génère et exécute UNIQUEMENT les tests d'intégration HTTP
   (style Postman) via `WebApplicationFactory<Program>` + DB
   in-memory + auth handler mocké. Sortie :

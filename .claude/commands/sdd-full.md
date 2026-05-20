@@ -48,15 +48,15 @@ uniquement si readiness ≠ GO ou si `--plan` activé.
 **Activation projet** : `PlanReviewDefault: true` dans `## Project Config`
 de `workspace/input/stack/stack.md` rend `--plan` actif par défaut.
 
-**Chemin From-Plan Strict (v6.2, opt-in)** : `PlanCacheStrict: true` dans
-`## Project Config` active le routing strict — quand un plan v2
-strict-ready existe, `/dev-run` STEP 6.0.bis spawn les forks Sonnet 4.6
-(`dev-backend-strict`, `dev-frontend-strict`) au lieu d'Opus 4.7 (gain
-latence ×3, coût ×5 moins cher). Fallback automatique classic Opus sur
-`[PLAN_DIGEST_INSUFFICIENT]`. Recommandé d'invoquer `/sdd-full {n} --plan`
-pour garantir une phase `/dev-plan` qui produit les plans v2. Détail :
-`@.claude/docs/DESIGN-FROMPLAN-STRICT.md` et `@.claude/MIGRATION.md`
-section "v6.1.x → v6.2.0".
+**Chemin From-Plan Strict (RETIRÉ v7.0.0)** : les variants
+`dev-backend-strict` et `dev-frontend-strict` (Sonnet 4.6, v6.2-v6.10) ont
+été supprimés (`ADR-20260519T120000-governance-major-auditors-trim`). La
+clé `PlanCacheStrict: true` reste **tolérée en lecture** dans
+`## Project Config` mais devient **no-op runtime**. Le plan v2 schema
+(`## Inline Digest`) est **préservé** pour review humaine — il n'oriente
+plus vers un agent alternatif. Tous les plans (v1 et v2) sont matérialisés
+par les agents canoniques Opus 4.7. Invoquer `/sdd-full {n} --plan` si
+revue humaine du plan désirée avant matérialisation.
 
 **Gates manuels (LOT 3, depuis 2026-05-10)** : 4 points d'arrêt
 optionnels où l'humain valide via la console
@@ -116,12 +116,19 @@ est best-effort).
 
 ## STEP 1.tiers — Phase planner (méta-orchestrateur conditionnel, v6.4.1)
 
-Cette commande **n'invoque PAS** elle-même les agents auditor v6.3.x +
-v6.4.0 (a11y, code-review, threat-model, security-scan, perf-audit) —
+Cette commande **n'invoque PAS** elle-même les agents auditor actifs
+(`code-review`, `security-scan`, `spec-compliance`, `arch-review`) —
 ils sont auto-invoqués depuis `/dev-run` / `/qa-generate` selon leur
 mode (cf. agent.md §Intégration pipeline). Mais `/sdd-full` peut
 émettre **dès le démarrage** un récap des phases auditor planifiées,
 utile pour l'observabilité du run et l'estimation tokens.
+
+> **v7.0.0** : les phases `a11y_audit`, `perf_audit`, `threat_model`
+> apparaissent encore dans le JSON `phase_planner` pour backward-compat
+> des consumers, mais portent toutes `enabled: false` + `agent_removed: true`
+> (agents retirés). Affichées dans le récap avec le marqueur `⊘`
+> (skip) + `skip_reason` mentionnant le remplacement (axe-core CI,
+> Lighthouse CI, template humain).
 
 Exécuter via Bash (best-effort, non bloquant) :
 
@@ -442,6 +449,62 @@ Glob `workspace/output/plans/{n}-*-*.{back,front}.md`.
 
 ---
 
+## STEP 3.6.quart — Anti-cumul bypass (v7.0.0, audit P0 R1)
+
+**But** : empêcher les opérateurs de cumuler `--force` + `--no-plan-on-warn`
++ `--no-validate` sans signal explicite. Un seul flag de bypass est
+légitime (cas d'usage assumé) ; **cumuler 2 bypass ou plus** signifie
+court-circuiter tous les filets et exige une preuve d'autorisation
+hors-bande (env var). Cf. R1 du rapport CTO audit 2026-05-20.
+
+### Détection cumul
+
+```bash
+BYPASS_COUNT=0
+[ "$FORCE" = "true" ]            && BYPASS_COUNT=$((BYPASS_COUNT + 1))
+[ "$NO_PLAN_ON_WARN" = "true" ]  && BYPASS_COUNT=$((BYPASS_COUNT + 1))
+[ "$NO_VALIDATE" = "true" ]      && BYPASS_COUNT=$((BYPASS_COUNT + 1))
+```
+
+### Gate
+
+| BYPASS_COUNT | `SDD_ALLOW_FORCE` env | Action |
+|:-:|---|---|
+| 0 ou 1 | n/a | continuer (cas normal ou bypass simple — audit STEP 3.7 trace) |
+| ≥ 2 | non défini OU `0` / `false` | **STOP + ERROR `[FORCE_CUMUL_REJECTED]`** |
+| ≥ 2 | `1` / `true` / `yes` | continuer + audit log enrichi (`cumul=true`) |
+
+### Format ERROR
+
+```
+ERROR: /sdd-full {n} — cumul de bypass refusé
+CAUSE: [FORCE_CUMUL_REJECTED] {BYPASS_COUNT} flags de bypass cumulés
+       (--force + --no-plan-on-warn + --no-validate) sans SDD_ALLOW_FORCE
+FIX: 1. retirer au moins un bypass (préférer corriger la cause amont)
+     2. OU exporter SDD_ALLOW_FORCE=1 et relancer (audit trace enrichie)
+        export SDD_ALLOW_FORCE=1  # bash
+        $env:SDD_ALLOW_FORCE='1'  # powershell
+HINT: ce verrou protège contre l'override silencieux de TOUS les gates
+      amont. Un seul bypass = cas légitime (audit trace simple). Deux ou
+      plus = décision exceptionnelle qui doit être explicitement assumée
+      hors-CLI (env var = trace ops/devops, pas juste shell history).
+```
+
+### Pourquoi env var et pas flag
+
+Un flag CLI supplémentaire (`--really-really-force`) serait copié-collé
+depuis Stack Overflow. Une env var demande un acte conscient (`export`),
+visible dans `env` audit, et reste local au shell — pas dans la commande
+qui apparaît dans les logs CI/scripts. Cf. principe "elevated privilege
+requires elevated friction" (NIST SP 800-160 §3.3.5).
+
+### Skip
+
+- `BYPASS_COUNT == 0` → STEP no-op silencieux, continuer.
+- `BYPASS_COUNT == 1` → continuer ; STEP 3.7 trace l'usage simple.
+
+---
+
 ## STEP 3.7 — Audit log (depuis v5.0, si `--force` utilisé)
 
 **Déclencheur** : si `--force` a été passé sur cette invocation
@@ -517,8 +580,26 @@ Lire `QAMode` dans `## Project Config` (default `manual`).
 | `manual` | skip (l'utilisateur lance `/qa-generate` manuellement) |
 | `full`, `tests-only`, `tests+coverage`, `quality-only` | exécuter `/qa-generate {n}` |
 
-`/qa-generate` n'est jamais bloquant pour `/sdd-full`. GREEN/YELLOW/RED
-sont propagés au récap STEP 5.
+### Gate : bloquant ou non ? (v7.0.0 audit §6.9)
+
+Lire `QaFailOnSddFull` dans `## Project Config` (défaut `true` v7.0.0,
+flippé depuis `false` historique pour fixer l'asymétrie).
+
+| Verdict `/qa-generate` | `QaFailOnSddFull: true` (défaut) | `QaFailOnSddFull: false` (legacy) |
+|---|---|---|
+| `GREEN` | continuer STEP 4.7 | continuer STEP 4.7 |
+| `YELLOW` | continuer STEP 4.7 + WARN récap | continuer STEP 4.7 + WARN récap |
+| `RED` | **STOP** + ERROR `[QA_FAIL_BLOCKING_SDD_FULL]` (exit 1) | continuer STEP 4.7 + WARN récap (bypass audit-log) |
+
+**Format ERROR** :
+```
+ERROR: /sdd-full {n} — QA verdict RED bloquant
+CAUSE: [QA_FAIL_BLOCKING_SDD_FULL] {classes /qa-generate, e.g. QA_TEST_FAILED ou QA_COVERAGE_GAP}
+FIX: corriger les tests/coverage via /dev-run {n} (idempotent), puis re-run /sdd-full {n}
+     OU baisser CoverageMin / QaFailOnSddFull dans Project Config (décision tracée)
+```
+
+GREEN/YELLOW/RED sont également propagés au récap STEP 5.
 
 **State tracking** : set-phase phase=qa-generate (schema payload cf. STEP 1.quart). Status `skip` si `QAMode ∈ {off, manual}`.
 
@@ -589,6 +670,34 @@ Status `skip` si `ReviewMode ∈ {off, manual}`.
 
 Coût marginal : ~30 s (re-scan déterministe) + ~10-18 KB tokens si
 `ArchReviewMode: full` (Sonnet 4.6).
+
+---
+
+## STEP 4.9 — Drift detection inline rules (v7.0.0 audit hardening, 2026-05-20)
+
+**Auto-invoke** `validate_inline_rules.py` (déterministe, 0 token) pour
+détecter le drift entre la substance inlinée dans les prompts agents et
+les fichiers source de `.claude/rules/`. Tourne **systématiquement** en
+fin de pipeline (avant STEP 5 récap) — best-effort non-bloquant : un
+drift détecté émet `[DRIFT_SUSPECTED]` WARN dans le récap, ne fait pas
+échouer le run.
+
+```bash
+python .claude/python/sdd_scripts/validate_inline_rules.py --json \
+  > /tmp/sdd-inline-rules-{RUN_ID}.json 2>/dev/null
+# Exit code informationnel :
+#   0 = aucun drift
+#   1 = drift détecté (WARN dans récap, non bloquant)
+#   2 = erreur infra (script absent / illisible — silently skip)
+```
+
+Lire le JSON et propager le compteur de drifts dans le récap STEP 5
+(`Drift inline rules : {N} suspectés → voir /tmp/...`).
+
+**Pourquoi ici** : avant v7.0.0, ce check était manuel (`/sdd-status` ou
+release check). Le rendre auto-invoké élimine la dette silencieuse — un
+agent dont l'inline diverge de la source MD donne des résultats
+incohérents cross-run.
 
 ---
 

@@ -73,7 +73,7 @@ Read **uniquement** :
   déjà connus du projet — évite les doublons en STEP 8.5)
 
 **Rules inline (depuis SDD_Pro v5.0 — économie tokens)** : les règles
-`us-granularity.md` et `.claude/rules/constitution.md`
+`us-granularity.md` et `.claude/rules/ownership.md`
 ne sont **PLUS lues**. Leur substance opérationnelle est :
 - inlinée dans la section **Inline Rules** en bas de ce fichier
 - déjà reprise verbatim dans STEP 5 (granularité), STEP 7 (anti-patterns)
@@ -85,9 +85,11 @@ Si un cas-limite nécessite le détail : Read `@.claude/rules/{nom}.md`
 
 ## STEP 4 — Lire la FEAT
 
-Read `workspace/input/feats/{n}-{FeatName}.md`. Extraire les 9 sections :
+Read `workspace/input/feats/{n}-{FeatName}.md`. Extraire les 9 sections + 2 nouvelles (v7.0.0) :
 - Context
 - Objective
+- **Quantified Goal** (v7.0.0 — KPI mesurable, peut contenir `<à préciser>`)
+- **Non-Functional Constraints** (v7.0.0 — Volume / Perf / Retention / Compliance / Integration / Degraded mode)
 - Actors
 - Functional Needs (SFD-1, SFD-2, ... — IDs explicitement préfixés dans la FEAT ; lire les IDs tels qu'écrits, jamais ré-indexer par position)
 - Business Rules (BR-1, BR-2, ...)
@@ -95,6 +97,38 @@ Read `workspace/input/feats/{n}-{FeatName}.md`. Extraire les 9 sections :
 - Dependencies
 - Functional Deliverables (FD-1, FD-2, ...)
 - Out of Scope
+
+### Sections d'élicitation post-`/feat-deepen` (v7.0.0 — boucle fermée)
+
+Si la FEAT contient en plus les sections suivantes (produites par
+l'agent `elicitor`), **les lire et les utiliser** comme inputs ACs
+plutôt que les ignorer (correction du "cargo-cult elicitor" — audit §6.11) :
+
+- `## Pre-mortem` (FAIL-N) — chaque échec anticipé devrait avoir au
+  moins 1 AC qui matérialise une mitigation ou un test négatif.
+- `## Red Team` — chaque vecteur d'attaque devrait être couvert par
+  une AC sécurité (auth, validation, rate limit, etc.).
+- `## Edge Cases` (EDGE-N) — chaque edge case devrait apparaître dans
+  les ACs d'une US ou être explicitement listé en `## Out of Scope`.
+- `## Risks` (RISK-N) — informational, conserver le mapping US ↔ RISK
+  dans le frontmatter `Mitigates:` de chaque US concernée.
+- `## Stakeholder Mapping` (STK-N) — informational, peut aider à
+  trancher les conflits d'acteurs (qui décide).
+
+**Procédure consommation** :
+1. Pour chaque FAIL-N / EDGE-N / Red Team item → vérifier qu'une AC
+   existante le couvre. Si non, **suggérer** la création d'une AC
+   dérivée dans la US correspondante (préfixe `AC-{N}: [from FAIL-{X}]`
+   ou `[from EDGE-{X}]` pour traçabilité).
+2. Si aucune US ne couvre un FAIL/EDGE → STOP + WARN `[ELICITOR_GAP]` :
+```
+WARN: agent PO — élicitation non couverte
+CAUSE: FAIL-{N} "{description}" non mappé sur aucune AC d'aucune US générée
+FIX: (a) ajouter AC dans une US existante ; (b) créer une US dédiée ;
+     (c) marquer en `## Out of Scope` de la FEAT et re-run /feat-deepen
+```
+3. WARN non bloquant par défaut (`ElicitorGapMode: warn`), peut être
+   strict via `ElicitorGapMode: strict` (NO-GO).
 
 Si `## Functional Needs` contient des entrées au format technique
 `US-N: As a..., I want..., so that...` → REJETER la FEAT :
@@ -114,26 +148,49 @@ FIX: préfixer chaque bullet par SFD-1:, SFD-2:, … (IDs stables et explicites)
 
 ---
 
-## STEP 5 — Découper en User Stories (cible 1-3, hard cap 6)
+## STEP 5 — Découper en User Stories (cible 1-3, hard cap configurable v7.0.0)
 
-Pour chaque SFD bullet, classifier (cf. `us-granularity.md §2`) :
+Pour chaque SFD bullet, classifier (cf. `docs/principles/us-granularity.md §2`) :
 1. **Action utilisateur distincte** → candidat US
 2. **Comportement dérivé** → AC d'une US existante
 3. **Détail technique** → ne génère pas, sera dans la tâche technique de l'itération 4
 
 Regrouper les candidats US par **flux utilisateur** (même Actor + même
-intention métier). Le résultat cible est 1 à 3 US, toléré jusqu'à 6,
-bloquant au-delà.
+intention métier). Le résultat cible est 1 à 3 US, toléré jusqu'au seuil
+warn, bloquant au-delà du hard cap.
 
-**Comportement selon le nombre `N` d'US générées** (cf.
-`us-granularity.md §1`) :
-- `N ∈ [1..3]` → génération normale
-- `N ∈ [4..6]` → génération + **WARNING émis dans la ligne de
-  succès finale** (non bloquant) :
+### Seuils configurables v7.0.0
+
+Lire `## Project Config` :
+
+```yaml
+UsGranularityHardCap: 10          # default v7.0.0 (was 6 strict v6.x)
+UsGranularityWarnAt: 6            # WARN above this (heritage hard cap)
+```
+
+**Bypass exceptionnel** via flag CLI `--allow-large-feat` propagé par
+`/us-generate {n} --allow-large-feat` :
+- Stocker dans une env var `SDD_ALLOW_LARGE_FEAT=1` (ce run uniquement).
+- Effet : `UsGranularityHardCap` est ignoré (cap effectif = 999).
+- Audit-log dans `workspace/output/.sys/.audit/force-bypass.log` : 1 ligne
+  par usage du bypass.
+
+À utiliser **uniquement** pour FEATs métier légitimement très larges
+(catalog produit ≥ 8 flux distincts, dashboard multi-vue, etc.) ;
+préférer un split FEAT sinon.
+
+### Comportement selon le nombre `N` d'US générées
+
+- `N ∈ [1 .. UsGranularityWarnAt]` (default `[1..6]`) → génération normale
+- `N ∈ [UsGranularityWarnAt+1 .. UsGranularityHardCap]` (default `[7..10]`)
+  → génération + **WARNING émis dans la ligne de succès finale** (non bloquant) :
   ```
-  WARNING: FEAT {n}-{Name} génère {N} US (zone 4-6 — tolérée mais à reconsidérer)
+  WARNING: FEAT {n}-{Name} génère {N} US (zone {warn+1}-{hardcap} — tolérée mais à reconsidérer)
   ```
-- `N > 6` → STOP + ERROR `[GRANULARITY_VIOLATION]` (cf. `us-granularity.md §1`)
+- `N > UsGranularityHardCap` sans `--allow-large-feat`
+  → STOP + ERROR `[GRANULARITY_VIOLATION]`
+- `N > UsGranularityHardCap` avec `--allow-large-feat` (env `SDD_ALLOW_LARGE_FEAT=1`)
+  → génération + **WARNING** + ligne audit-log `force-bypass.log`
 
 Pour chaque US :
 - Titre = verbe d'action utilisateur (ex. `Connexion`, `Inscription`,
@@ -181,10 +238,22 @@ en AC). Pas de question à l'utilisateur.
 
 Pour chaque US (m = 1, 2, ..., max 6) :
 
+**v7.0.0 P1-11** — calculer le hash de la FEAT parente AVANT d'écrire les US :
+```bash
+FEAT_HASH=$(sha256sum workspace/input/feats/{n}-{FeatName}.md | cut -c1-8)
+# Format inscrit : "Parent FEAT hash: sha256:{8 hex chars}"
+```
+
+Ce hash permet aux agents `dev-*` et auditors de détecter si la FEAT
+a été modifiée après génération des US (`Covers:` devient invalide).
+En cas de mismatch détecté en aval → ERROR `[FEAT_HASH_MISMATCH]`,
+Tech Lead doit re-run `/us-generate {n}` (idempotent).
+
 Write `workspace/output/us/{n}-{m}-{Name}.md` à partir de
 `.claude/templates/us.template.md`. Remplir tous les champs :
 - Titre, ID `{n}-{m}-{Name}`
 - Parent FEAT `{n}-{FeatName}`
+- **Parent FEAT hash** : `sha256:{FEAT_HASH}` (8 premiers hex chars, v7.0.0)
 - Status: Draft
 - User Story (Acteur / Action / Valeur)
 - Acceptance Criteria
@@ -344,6 +413,6 @@ La substance des règles est déjà inlinée dans les STEPs 3-8.5 (anti-patterns
 en STEP 7, traçabilité en STEP 6, constitution append en STEP 8.5).
 
 **Read on-demand uniquement si cas-limite** (nominal = 0 Read) :
-- `@.claude/rules/us-granularity.md` — découpage litigieux, > 6 US
-- `@.claude/rules/constitution.md §3` — détail procédure §3 acteurs
-- `@.claude/rules/file-ownership.md §2` — sérialisation constitution
+- `@.claude/docs/principles/us-granularity.md` — découpage litigieux, > 6 US
+- `@.claude/rules/ownership.md §3` — détail procédure §3 acteurs
+- `@.claude/rules/ownership.md §2` — sérialisation constitution

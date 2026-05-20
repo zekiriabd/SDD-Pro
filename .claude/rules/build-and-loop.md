@@ -3,8 +3,10 @@
 > **v7.0.0 merge** : fusionne `backend-first.md` (API Gate in-memory
 > gated workflow back→front) + `dev-shared.md` (patterns dev-backend
 > / dev-frontend identiques : context budget, path safety, mode detect,
-> LibName lock, plan construction). Les 2 originaux restent en place
-> comme stubs pointant vers ce fichier (backward-compat).
+> LibName lock, plan construction). Stubs `backend-first.md` et
+> `dev-shared.md` **supprimés au sweep v7.0.0-alpha 2026-05-20** — tous
+> les Read `@.claude/rules/{backend-first,dev-shared}.md` historiques
+> dans agents/commands/python pointent désormais directement ici.
 
 ## TOC
 
@@ -60,35 +62,70 @@ mismatch = 4xx/5xx silencieux). Mode **non opt-in** depuis 2026-05-07.
 mocké via `TestAuthHandler` (ClaimsPrincipal pré-rempli). **Jamais** d'appel
 Azure AD réel.
 
-### 1.3 Critère de passage
+### 1.3 Statuts normalisés (v7.0.0) et critère de passage
 
+**5 statuts explicites** (canoniques depuis v7.0.0) — remplacent l'ancien
+triplet `GREEN/YELLOW/RED` qui était ambigu sur "rien à tester" vs
+"runtime cassé". Mapping vieux → nouveau garanti par le template api-tests
+(champ `verdict` legacy conservé en parallèle de `status` canonique).
+
+| `status` (canonique) | `verdict` legacy | Sens opérationnel | Action `/dev-run` STEP 6.b |
+|---|---|---|---|
+| **`PASS`**          | `GREEN`  | tous tests OK + `total >= MIN_PER_ENDPOINT × N_endpoints` | continue 6c (dev-frontend) |
+| **`WARN`**          | `YELLOW` | tests OK mais `total < MIN_PER_ENDPOINT × N_endpoints` (couverture endpoints partielle) | continue 6c + WARNING |
+| **`FAIL`**          | `RED`    | ≥ 1 test failed (mismatch contrat back↔front) | STOP + boucle correction §2 |
+| **`SKIPPED`**       | `n/a`    | aucun endpoint à tester (FEAT frontend-pure) OU `ApiGateRequired: false` ET `GatedWorkflow: false` | continue 6c silencieusement |
+| **`INFRA_BLOCKED`** | `n/a`    | test runner absent (`[QA_FRAMEWORK_MISSING]`), fixtures non utilisables (`[QA_INIT_FAILED]`), DB in-memory KO | STOP + ERROR `[QA_FRAMEWORK_MISSING]` (pas une régression code — config infra à corriger) |
+
+**Critère arithmétique de `status`** :
 ```
-gate_passed = (failed == 0) AND (total >= MIN_PER_ENDPOINT × N_endpoints)
+status = "INFRA_BLOCKED"  if test runner unusable OR fixtures init failed
+status = "SKIPPED"        elif N_endpoints == 0 OR (ApiGateRequired=false AND GatedWorkflow=false)
+status = "FAIL"           elif failed >= 1
+status = "PASS"           elif total >= MIN_PER_ENDPOINT × N_endpoints
+status = "WARN"           else   # tests OK mais couverture partielle
 ```
 
-`MIN_PER_ENDPOINT = 2` (1 happy + 1 négatif min).
+`MIN_PER_ENDPOINT = 2` (1 happy + 1 négatif min). Ordre d'évaluation
+**fail-fast** : INFRA_BLOCKED court-circuite tout (la qualité du test
+runner conditionne tout signal en aval).
 
-| Verdict | Action |
-|---|---|
-| 🟢 GREEN | continue vers `dev-frontend` |
-| 🔴 RED | STOP + `workspace/output/qa/feat-{n}/api-tests.{md,json}` |
-| 🟡 YELLOW | continue avec WARNING (couverture endpoints partielle, pas d'échec) |
+**Champ booléen dérivé** (conservé pour callers legacy) :
+```
+gate_passed = (status in {"PASS", "WARN", "SKIPPED"})
+```
+Note : `WARN` reste `gate_passed: true` (continue) mais propage l'avertissement
+au verdict QA global. `INFRA_BLOCKED` n'est **jamais** considéré PASS — c'est
+un gating bloquant distinct d'un FAIL fonctionnel (sémantique : "je n'ai
+pas pu tester", pas "le code est cassé"). Cette distinction évite que
+build_loop itère inutilement sur un environnement de test cassé.
 
 ### 1.4 Rapport
 
-`workspace/output/qa/feat-{n}/api-tests.json` — schéma similaire à
-`coverage.json` : `endpoints[].{verb, route, tests:{total,passed,failed}, cases[]}`
-+ `summary.{endpoints_total, tests_total, gate_passed}`.
+`workspace/output/qa/feat-{n}/api-tests.json` — schéma :
+`endpoints[].{verb, route, tests:{total,passed,failed}, cases[]}`
++ `summary.{endpoints_total, tests_total, tests_passed, tests_failed,
+min_per_endpoint, min_per_endpoint_required, gate_passed, status, verdict}`.
+
+- `status` (canonique v7.0.0) : `PASS | WARN | FAIL | SKIPPED | INFRA_BLOCKED`
+- `verdict` (legacy, conservé) : `GREEN | YELLOW | RED` (mapping §1.3)
+- `gate_passed` (booléen dérivé) : `true` ssi status ∈ {PASS, WARN, SKIPPED}
+
+Les callers v7.0.0+ **doivent lire `status`** (sémantique fine).
+Les callers legacy peuvent lire `verdict` ou `gate_passed`.
 
 ---
 
-## 2. Boucle correction RED → GREEN
+## 2. Boucle correction FAIL → PASS
 
 1. Consulter `api-tests.md` (par endpoint en échec)
 2. Corriger : (a) `/dev-backend {n}-{m}` (idempotent), (b) édit manuel
    backend, ou (c) édit test (QA ownership, dans `*.Tests/Api/`)
 3. Re-tester : `/qa-generate {n} --mode api-tests [--filter {endpoint}]`
-4. GREEN → relancer `/dev-run {n}` (idempotent : skip backend si stable)
+4. `status: PASS` → relancer `/dev-run {n}` (idempotent : skip backend si stable)
+
+> Boucle **non applicable** sur `status: INFRA_BLOCKED` — corriger la
+> config infra (test runner, fixtures, DB in-memory) avant tout retry.
 
 ---
 
@@ -140,7 +177,7 @@ Dossier `Api/` généré uniquement si endpoints HTTP existent.
 
 Patterns opérationnels strictement identiques entre `agents/dev-backend.md`
 et `agents/dev-frontend.md`. Hérités par référence
-(`@.claude/rules/dev-shared.md`) plutôt que dupliqués. Évolution centrée ici.
+(`@.claude/rules/build-and-loop.md`) plutôt que dupliqués. Évolution centrée ici.
 
 **Périmètre** : fragments **vraiment identiques** (exit codes, scripts,
 format ERROR). Fragments asymétriques (paths front/back, preflight,
@@ -185,7 +222,7 @@ FIX: écrire sous workspace/output/src/{AppName|BackendName}/ AU MÊME NIVEAU, j
 **Création répertoire** : si le parent n'existe pas, `mkdir -p`
 implicite — APRÈS validation du pré-check.
 
-Détail règle : `@.claude/rules/file-ownership.md §1.bis`.
+Détail règle : `@.claude/rules/ownership.md §1.bis`.
 
 ---
 
@@ -248,7 +285,73 @@ python .claude/python/sdd_scripts/acquire_libname_lock.py \
 | `2` | stale lock (>30min) écrasé | continuer (recovery automatique) |
 
 Détail matrice ownership et procédure complète :
-`@.claude/rules/file-ownership.md §1, §4`.
+`@.claude/rules/ownership.md §1, §4`.
+
+---
+
+## 2.bis Pattern atomic write — anti-corruption crash mid-write (v7.0.0 R4)
+
+**Bloquant pour tout Write/Edit sous `{LibName}/` ET `{BackendName}/Services|Endpoints|DTOs`
+ET `{AppName}/src/components|src/pages`** — les artefacts partagés entre US
+de la même FEAT.
+
+### Problème mitigé
+
+Sans pattern atomique, un crash mid-write (Ctrl-C, OOM, kill -9, panne
+réseau si write sur FS distant) laisse un fichier **tronqué partiellement**.
+Le prochain agent qui :
+1. Acquiert le LibName lock après recovery stale (§2 ci-dessus, TTL 30min)
+2. Read le fichier corrompu (50 lignes écrites sur 100)
+3. Edit dessus
+
+…va produire un mélange de deux entités, compiler (warning) ou échouer
+obscurément sans signal clair. Post-mortem CMS-Back identifié 2× ce
+pattern en production avant le fix R4.
+
+### Procédure obligatoire dev-* (Python helper)
+
+```python
+from sdd_lib.atomic_write import atomic_write_text
+
+# Au lieu de :
+#   Path(target).write_text(content)        # NON ATOMIQUE
+# Faire :
+atomic_write_text(Path(target), content)    # .sddtmp + os.replace()
+```
+
+L'helper :
+1. Crée le parent dir si absent (`mkdir -p`).
+2. Écrit en `{target}.sddtmp` (suffix dédié, ne collide pas avec `.tmp` user).
+3. `f.flush() + os.fsync()` (best-effort — durabilité kernel-panic).
+4. `os.replace(tmp, target)` — atomique POSIX + Windows ≥ NT.
+5. Cleanup `.sddtmp` automatique si rename échoue.
+
+### Procédure pour les outils Edit Claude Code (non-Python)
+
+Quand l'agent dev-* invoque le tool `Write` ou `Edit` natif Claude Code,
+le runtime fait déjà une écriture atomique côté harness (Write garantit
+file integrity au niveau VFS). **Aucun changement requis côté agent prompt**
+pour ces tools — le pattern Python ci-dessus s'applique uniquement aux
+scripts auxiliaires (`acquire_libname_lock.py` callers, etc.).
+
+### Détection orphan tmps (forensic)
+
+```python
+from sdd_lib.atomic_write import find_orphan_tmps
+for orphan in find_orphan_tmps("workspace/output/src"):
+    log(f"WARN orphan tmp from crash : {orphan}")
+```
+
+Invoqué par `framework_smoke.py` (à câbler v7.1). Aucun cleanup
+automatique — l'orphan est une **trace forensique** indiquant un crash
+non-récupéré. Tech Lead inspecte, archive ou supprime manuellement.
+
+### Anti-patterns rejetés
+
+- ❌ `f.write(content)` direct sur le target
+- ❌ `Path(target).write_text(...)` sans fsync
+- ❌ Suffix custom autre que `.sddtmp` (collision avec `.tmp` user / `.swp` vim)
+- ❌ Catch + swallow de l'exception de rename (laisse `.sddtmp` orphan invisible)
 
 ---
 
@@ -340,7 +443,7 @@ python .claude/python/sdd_scripts/mark_breaking_resolved.py \
 
 > ⚠️ **Sémantique non-standard** : `exit 1` = **succès** (action effectuée), pas une erreur. La seule classe d'erreur est `exit 3`. Ne **JAMAIS** utiliser le pattern bash `cmd || handle_error` sur ce script — utiliser `cmd; rc=$?; case $rc in 0|1|2) ok ;; 3) error ;; esac`. Référencer cette table avant tout caller automatisé (Tech Lead humain : OK à lire stdout).
 
-Détail procédure + cas interdits : `@.claude/rules/file-ownership.md §6.bis`.
+Détail procédure + cas interdits : `@.claude/rules/ownership.md §6.bis`.
 
 ---
 
@@ -551,10 +654,10 @@ Le mode From-Plan préserve ces propriétés (inchangées v6→v7) :
 Les agents dev-* ne lisent PAS systématiquement ces règles (substance
 inlinée). À Read uniquement si ambiguïté irrécupérable :
 
-- `@.claude/rules/stack-completeness.md` (workflow Tech Lead + format
+- `@.claude/rules/library-and-stack.md` (workflow Tech Lead + format
   ERROR HINT)
-- `@.claude/rules/file-ownership.md §1-§2, §4, §6.bis`
-- `@.claude/rules/source-first.md` (si bug récurrent dans build_loop —
+- `@.claude/rules/ownership.md §1-§2, §4, §6.bis`
+- `@.claude/docs/principles/source-first.md` (si bug récurrent dans build_loop —
   questionner quelle source MD a manqué)
 
 ---

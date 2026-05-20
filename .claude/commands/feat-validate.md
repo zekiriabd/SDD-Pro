@@ -129,6 +129,105 @@ mode `deterministic` exclusivement, 0 token.
 
 ---
 
+## STEP 4.5 — Spec-compliance gate (conditionnel post-dev, v7.0.0)
+
+**But** : empêcher de valider une FEAT comme "prête / terminée" tant que
+le code matérialisé n'a pas été indépendamment vérifié contre chaque AC
+par `spec-compliance-reviewer` (pattern "Do not trust the report"
+hérité superpowers v5.1).
+
+### 4.5.1 Détection mode (pre-dev vs post-dev)
+
+Le gate ne tourne qu'**après** matérialisation du code. Détecter via
+présence d'un projet sous `workspace/output/src/` :
+
+```bash
+HAS_CODE=$(find workspace/output/src -maxdepth 3 \
+  \( -name '*.csproj' -o -name 'package.json' -o -name 'pyproject.toml' \
+  -o -name 'build.gradle.kts' -o -name 'angular.json' -o -name 'vite.config.*' \) \
+  2>/dev/null | head -1)
+
+if [ -z "$HAS_CODE" ]; then
+  MODE="pre-dev"   # pas de code → skip silencieusement, continuer STEP 5
+else
+  MODE="post-dev"  # code matérialisé → gate active
+fi
+```
+
+- **`pre-dev`** : émettre 1 ligne info
+  `spec-compliance gate: pre-dev — skipped (no materialized code yet)`,
+  passer STEP 5.
+- **`post-dev`** : continuer 4.5.2.
+
+### 4.5.2 Lire la config layered
+
+```bash
+REQUIRED=$(python -c "
+import sys; sys.path.insert(0, '.claude/python')
+from sdd_lib.layered_config import read_layered_config
+cfg = read_layered_config()
+print(str(cfg.get('SpecComplianceRequiredForFeatValidate', 'true')).lower())
+" 2>/dev/null || echo 'true')
+```
+
+- `REQUIRED=false` (project bypass explicite, tracé git blame) →
+  émettre WARN 1 ligne et passer STEP 5
+  (`spec-compliance gate: bypassed via Project Config`)
+- `REQUIRED=true` (défaut v7.0.0) → continuer 4.5.3.
+
+### 4.5.3 Vérifier la présence d'un rapport spec-compliance récent
+
+```bash
+SPEC_PATH="workspace/output/qa/feat-{n}/spec-compliance.json"
+if [ ! -f "$SPEC_PATH" ]; then
+  cat <<EOF
+ERROR: /feat-validate {n} — spec-compliance absent
+CAUSE: [SPEC_COMPLIANCE_REQUIRED] code matérialisé détecté mais $SPEC_PATH manquant
+FIX: lancer /sdd-review {n} --ensure-scans (spawne spec-compliance-reviewer)
+     OU /qa-generate {n} (pipeline QA complet)
+     OU baisser SpecComplianceRequiredForFeatValidate à false (décision tracée)
+EOF
+  exit 1
+fi
+```
+
+### 4.5.4 Lire le verdict + appliquer le gate
+
+```bash
+VERDICT=$(python -c "
+import json, sys
+d = json.load(open('$SPEC_PATH'))
+print(d.get('summary', {}).get('verdict', 'UNKNOWN').upper())
+" 2>/dev/null || echo 'UNKNOWN')
+```
+
+| `verdict` | Action |
+|---|---|
+| `GREEN`            | continuer STEP 5 (gate passée) |
+| `YELLOW`           | continuer STEP 5 + propager WARN au rapport readiness §4 |
+| `RED`              | **NO-GO** — ERROR `[SPEC_COMPLIANCE_RED]` + exit 1 |
+| `UNKNOWN` / parse fail | **NO-GO** — ERROR `[SPEC_COMPLIANCE_PARSE_ERROR]` + exit 1 |
+
+Format ERROR `[SPEC_COMPLIANCE_RED]` :
+```
+ERROR: /feat-validate {n} — spec-compliance verdict RED
+CAUSE: [SPEC_COMPLIANCE_RED] N ACs non vérifiées dans le code matérialisé
+       (cf. workspace/output/qa/feat-{n}/spec-compliance.md)
+FIX: corriger les ACs flag NOT_VERIFIED via /dev-run {n} (idempotent)
+     puis /sdd-review {n} --ensure-scans
+     puis /feat-validate {n} (idempotent)
+```
+
+### 4.5.5 Anti-bypass
+
+- **Jamais** bypass par `--json` (CI/CD doit transporter le signal exit code).
+- **Bypass** possible par `/sdd-full --force --no-validate` (audit log
+  `force-bypass.log` capture la décision).
+- Pre-dev (`MODE=pre-dev`) **n'est jamais** bloqué (par construction —
+  spec-compliance ne peut pas s'exécuter sans code).
+
+---
+
 ## STEP 5 — Écrire le rapport readiness
 
 Read `.claude/templates/readiness.template.md`.

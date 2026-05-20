@@ -1,10 +1,7 @@
 # Règle — Quality (Coverage + UI Tokens consolidée, v7.0.0)
 
 > **v7.0.0 merge** : fusionne `qa-coverage.md` (QA test coverage seuil 80 %)
-> + `ui-tokens.md` (variables CSS, anti-hex-hardcode). Les 2 originaux
-> restent en place comme stubs pointant vers ce fichier (préservation
-> backward-compat des `Read @.claude/rules/{qa-coverage,ui-tokens}.md`
-> existants dans agents).
+> + `ui-tokens.md` (variables CSS, anti-hex-hardcode). Stubs `qa-coverage.md` et `ui-tokens.md` **supprimés au sweep v7.0.0-alpha 2026-05-20** — tous les Read historiques pointent désormais directement ici.
 
 ## TOC
 

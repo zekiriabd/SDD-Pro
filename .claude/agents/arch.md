@@ -218,7 +218,7 @@ Trois entrées en RAM, consommées par STEP 4.5 et STEP 8 :
 ## STEP 2.bis — Hard-gate Front/Back isolation
 
 **Bloquant avant toute exécution d'Init Commands.** Substance complète :
-`@.claude/rules/file-ownership.md §1.bis` + `dev-shared.md §1.bis`.
+`@.claude/rules/ownership.md §1.bis` + `dev-shared.md §1.bis`.
 
 Vérifs après lecture du `## Project Config` :
 
@@ -353,171 +353,37 @@ Capability listée mais absente du §2.4.b → STOP + ERROR avec FIX
 Étape **idempotente** : Edit (ou create) le fichier config natif,
 injectant `db_config` + `auth_config` (STEP 2.ter).
 
-### 4.5.1 Mapping stack → fichier de configuration
+> **Substance détaillée extraite v7.0.0 trim** : `@.claude/docs/arch/phase-a-config-propagation.md`
+> §4.5.1 (mapping stack→fichier), §4.5.2 (structure canonique), §4.5.3
+> (idempotence), §4.5.4 (anti-derive), §4.5.5 (validation), §4.5.6 (CORS).
+>
+> Substance résumée ci-dessous (5 KB inline pour le cas standard). Lire
+> le sous-doc si cas-limite (multi-DB, multi-auth profil, CORS prod
+> override, etc.).
 
-| Stack backend | Fichier cible | Format |
-|---|---|---|
-| `dotnet-minimalapi`  | `workspace/output/src/{BackendName}/appsettings.json` | JSON |
-| `kotlin-spring-boot` | `workspace/output/src/{BackendName}/src/main/resources/application.yml` | YAML |
-| `node-express`       | `workspace/output/src/{BackendName}/config/default.json` | JSON |
-| `python-fastapi`     | `workspace/output/src/{BackendName}/app/config.py` | Python (pydantic-settings) |
+### Résumé opérationnel (cas standard, ≥ 1 stack backend actif)
 
-Création si absent (`mkdir -p` implicite). Re-run : Edit narrow sur
-sections owned uniquement :
-- DB : `ConnectionStrings.Default`, `Database`, `Db`, `db`, `spring.datasource`, `spring.jpa`
-- Auth `azure-ad` : `AzureAd`, `azure.ad`, `azure`
-- Auth `auth-local` : `Jwt`, `auth.jwt`, `jwt`, classe `JwtSettings`
-- **CORS** (depuis v6.10.4, cf. §4.5.6) : `Cors`, `cors`, `app.cors`, classe `CorsSettings`
+1. **Cible** selon stack backend :
+   - `dotnet-minimalapi` → `appsettings.json` (JSON)
+   - `kotlin-spring-boot` → `src/main/resources/application.yml` (YAML)
+   - `node-express` → `config/default.json` (JSON)
+   - `python-fastapi` → `app/config.py` (Python pydantic-settings)
 
-Autres sections (logging custom, beans custom hors policy CORS) préservées.
-Switch profil auth → supprimer ancien + écrire nouveau (évite double chargement
-= crash Spring/.NET).
+2. **Sections owned** (Edit narrow, autres préservées) :
+   - DB : `ConnectionStrings.Default`, `Database`, `spring.datasource`, `db`
+   - Auth `azure-ad` : `AzureAd`, `azure.ad`, `azure`
+   - Auth `auth-local` : `Jwt`, `auth.jwt`, `jwt`
+   - CORS (depuis v6.10.4) : `Cors`, `cors`, `app.cors` — injection
+     automatique de l'origin frontend dev si `appType=back-front/web`
+     (cf. sous-doc §4.5.6 pour matrice port).
 
-### 4.5.2 Structure canonique par stack
+3. **Switch profil auth** (azure-ad ↔ auth-local) : supprimer ancien +
+   écrire nouveau (évite double chargement = crash Spring/.NET).
 
-Sections requises (DB toujours présente ; auth présente UNIQUEMENT si
-`auth_profile != null` ; profils `azure-ad`/`auth-local` mutuellement
-exclusifs cf. STEP 2.ter.3).
+4. **Validation post-écriture** : syntaxe JSON/YAML/Python.
+   Échec → ERROR `[STACK_MALFORMED]` + STOP avant STEP 5.
 
-| Stack | DB | Auth `azure-ad` | Auth `auth-local` | Détail |
-|---|---|---|---|---|
-| `dotnet-minimalapi` | `ConnectionStrings.Default` + `Database.Type` | `AzureAd.{Instance,TenantId,ClientId,Domain,CallbackPath,ValidAudiences[]}` | `Jwt.{Secret,Issuer,Audience,ExpirationMinutes}` | `dotnet-minimalapi.md §5.1 §8.2` |
-| `kotlin-spring-boot` | `spring.datasource.{url,username,password,driver-class-name}` + `spring.jpa.properties.hibernate.dialect` | `azure.ad.{tenant-id,client-id,domain,audiences,backend-callback-path,frontend-callback-path}` (+ optionnels `frontend-client-id`, `backend-client-id`) | `auth.jwt.{secret,issuer,audience,expiration-minutes}` | `kotlin-spring-boot.md §5.1 §8.2` |
-| `node-express` | `db.{type,host,port,name,user,password}` | `azure.ad.{tenantId,clientId,domain,audiences[],backendCallbackPath,frontendCallbackPath}` | `jwt.{secret,issuer,audience,expirationMinutes}` | `node-express.md §5.1 §8.2` |
-| `python-fastapi` | classe `DBSettings(BaseSettings)` champs `type,host,port,name,user,password` | classe `AzureADSettings` champs `tenant_id,client_id,domain,audiences[],backend_callback_path,frontend_callback_path` | classe `JwtSettings` champs `secret,issuer,audience,expiration_minutes` | `python-fastapi.md §5.1 §8.2` |
-
-**Substitutions** :
-- Valeurs DB depuis `db_config` (STEP 2.ter). Connection strings /
-  URLs JDBC composées selon `DatabaseType` cf. §8.2 du stack.
-- Valeurs auth depuis `auth_config` selon `auth_profile`.
-- `AZ_AUDIENCES` : split virgule + strip quotes/espaces (liste).
-- `azure.ad.frontend-client-id`/`backend-client-id` (Spring) : fallback
-  `auth_config.AZ_CLIENTID` si non fournis.
-- Sections logging/JPA/préservées si fichier déjà présent.
-
-**Templates détaillés** : chaque stack documente le format complet en
-`§5.1` (config natif applicatif) et `§8.2` (composition connection
-string). Arch lit le pattern, génère le fichier, n'invente rien.
-
-### 4.5.3 Idempotence (re-run)
-
-- Fichier cible existe : Read, parser format natif (JSON / YAML /
-  Python AST), Edit narrow sections owned (cf. §4.5.1). Autres préservées.
-- Fichier cible absent : Create avec contenu canonique §4.5.2 (valeurs
-  par défaut framework pour Logging, JPA, etc.).
-- Aucun secret loggé. Hash sha256-8 du fichier noté dans récap STEP 13
-  (optionnel).
-
-### 4.5.4 Anti-derive (intra-step)
-
-- ❌ Lecture `Environment.GetEnvironmentVariable`, `System.getenv`,
-  `process.env`, `os.environ` côté arch — SSOT = stack.md.
-- ❌ Écriture `.env` projet (sauf dotenv-natif explicite — pas en v6.1.3).
-- ❌ Écriture DB/Auth dans autre fichier que cible canonique §4.5.1
-  (pas de duplication dans `Program.cs`, `SecurityConfig.kt`, etc.).
-- ✅ Connection string Phase B (STEP 8) : RAM uniquement, jamais
-  réécrite dans config (Spring/.NET/Node/Python reconstruisent depuis
-  leurs propriétés natives).
-
-### 4.5.5 Validation post-écriture
-
-Vérifier syntaxe :
-- JSON → `Test-Json` (PowerShell) ou `json.loads`
-- YAML → `python -c "import yaml; yaml.safe_load(open(sys.argv[1]))"`
-- Python → `python -c "import ast; ast.parse(open(sys.argv[1]).read())"`
-
-Échec → ERROR `[STACK_MALFORMED]` + STOP avant STEP 5.
-
-### 4.5.6 Propagation CORS origins (depuis v6.10.4)
-
-**But** : injecter automatiquement l'origin du frontend dev dans la config
-backend, en accord avec `.claude/rules/cors.md` (allowlist explicite, jamais
-de wildcard).
-
-**Skip silencieux** si `appType ≠ back-front` OU `frontendKind ≠ web`
-(fullstack/mobile/backend-only → pas de SPA cross-origin à autoriser).
-
-#### Matrice frontend stack → port dev par défaut
-
-| Frontend stack | Port | Origin par défaut |
-|---|---:|---|
-| `frontend/react`              | 5173 | `http://localhost:5173` (Vite) |
-| `frontend/vue`                | 5173 | `http://localhost:5173` (Vite) |
-| `frontend/angular`            | 4200 | `http://localhost:4200` |
-| `frontend/blazor-webassembly` | 5097 | `http://localhost:5097` (varie scaffold) |
-| `mobiles/*`                   | —    | (skip) |
-| `fullstack/*`                 | —    | (skip — même origin que backend) |
-
-**Override** : si `Cors:AllowedOrigins` (ou alias `CorsAllowedOrigins`) est
-explicitement présent dans `## Project Config` de `stack.md`, arch préserve la
-valeur utilisateur (**User-set wins**) sans la modifier.
-
-#### Cible par stack backend
-
-| Backend | Fichier | Clé / forme | Type valeur |
-|---|---|---|---|
-| `dotnet-minimalapi` | `appsettings.Development.json` | `Cors:AllowedOrigins` | string CSV |
-| `kotlin-spring-boot` | `application.yml` | `app.cors.allowed-origins` | string CSV |
-| `node-express` | `config/default.json` | `cors.allowedOrigins` | array |
-| `python-fastapi` | `app/config.py` | classe `CorsSettings.allowed_origins` | `list[str]` (default factory) |
-
-#### Exemples canoniques post-injection
-
-**.NET `appsettings.Development.json`** (DEV uniquement, `appsettings.json` prod-clean) :
-```json
-{ "Cors": { "AllowedOrigins": "http://localhost:5173" } }
-```
-
-**Spring `application.yml`** :
-```yaml
-app:
-  cors:
-    allowed-origins: http://localhost:5173
-```
-
-**Node `config/default.json`** :
-```json
-{ "cors": { "allowedOrigins": ["http://localhost:5173"], "allowCredentials": true } }
-```
-
-**FastAPI `app/config.py`** :
-```python
-from pydantic import Field
-from pydantic_settings import BaseSettings
-
-class CorsSettings(BaseSettings):
-    allowed_origins: list[str] = Field(default_factory=lambda: ["http://localhost:5173"])
-    allow_credentials: bool = True
-    model_config = {"env_prefix": "CORS_"}
-```
-
-#### Algorithme
-
-1. Détection du frontend stack actif depuis `## Active Tech Specs` (parsé STEP 2).
-   Si `frontend/*` absent ou `mobiles/*` ou `fullstack/*` → SKIP silencieux.
-2. Lookup port dev dans la matrice.
-3. Lecture `## Project Config` : si `Cors:AllowedOrigins` présent → User-set wins ;
-   sinon → défaut matrice.
-4. Edit narrow du fichier config backend (§4.5.1) pour injecter la clé.
-   Préserver autres sections (DB, Auth, logging).
-5. Re-run idempotent : valeur identique → no-op.
-
-#### Anti-derive
-
-- ❌ Jamais d'injection `*` / `AllowAnyOrigin()` même au scaffold (cf.
-  `rules/cors.md §4`).
-- ❌ Jamais d'écriture des origins **prod** côté arch — uniquement dev locales.
-  Override prod = responsabilité ops via env var (`Cors__AllowedOrigins`,
-  `CORS_ALLOWED_ORIGINS`, `APP_CORS_ALLOWED_ORIGINS`).
-- ❌ Jamais de scan `launchSettings.json` côté frontend pour deviner un port
-  custom. Si non-standard, Tech Lead pose `Cors:AllowedOrigins` explicitement
-  dans `stack.md`.
-
-#### Validation post-injection
-
-Identique §4.5.5 (syntaxe JSON / YAML / Python), plus :
-- Grep défensif post-write : si la valeur contient `*` ou `AllowAnyOrigin` →
-  ERROR `[STACK_MALFORMED]` + STOP.
+5. **Idempotence** : re-run modifie uniquement si valeur diverge.
 
 ---
 
@@ -586,84 +452,45 @@ fks: N, entities: N }` pour le récap STEP 13.
 
 ## STEP 12 — Écrire un `CLAUDE.md` PAR PROJET
 
-Un `CLAUDE.md` par projet généré (auto-loading natif Claude Code,
-contexte isolé par famille) :
+Un `CLAUDE.md` par projet (auto-loading Claude Code, isolation par
+famille). Bénéfice : -30-40 % tokens + isolation cognitive dev-backend
+/ dev-frontend.
 
-| Fichier produit | Lu par | Contenu |
-|---|---|---|
-| `workspace/output/src/{BackendName}/CLAUDE.md` | dev-backend | architecture backend |
-| `workspace/output/src/{AppName}/CLAUDE.md` | dev-frontend | architecture frontend + UI |
-| `workspace/output/src/{LibName}/CLAUDE.md` (si défini) | dev-* (passif) | contrats partagés (DTOs / Models) |
+> **Substance détaillée extraite v7.0.0 phase 2 trim** :
+> `@.claude/docs/arch/phase-c-claude-md-generation.md` §12.1
+> (frontmatter), §12.2 (templates + procédure ligne par ligne),
+> §12.3 (calcul hash), §12.4 (mode create), §12.5 (purge BREAKING
+> CHANGES RESOLVED + archivage).
 
-Bénéfice : -30-40 % tokens (pas de cross-mapping) + isolation cognitive
-dev-backend / dev-frontend.
+### Résumé opérationnel
 
-### 12.1 Frontmatter commun
+1. **3 cibles** (toujours backend + frontend si stacks actifs, lib si
+   `LibName` défini) :
+   - `{BackendName}/CLAUDE.md` ← template `claude-md-backend.template.md`
+   - `{AppName}/CLAUDE.md` ← template `claude-md-frontend.template.md`
+   - `{LibName}/CLAUDE.md` ← template `claude-md-shared-lib.template.md`
 
-```yaml
----
-generated-by: agent arch
-generated-at: {ISO-8601 UTC}
-stack-md-hash: {sha256-8 de stack.md + stacks actifs filtrés}
-project-type: backend | frontend | shared-lib
-project-name: {BackendName | AppName | LibName}
-active-stacks:
-  - .claude/stacks/backend/dotnet-minimalapi.md   # filtré par famille
-  - .claude/stacks/auth/azure-ad.md
----
-```
+2. **CI template (depuis v7.0.0)** : si `CiTemplatesGeneration: true`
+   (défaut) ET frontend stack actif → écrire `.github/workflows/quality.yml`
+   depuis `ci-quality.github-actions.yml.template`. Idempotent (skip
+   si fichier existe = édit humain).
 
-### 12.2 Gabarits + procédure
+3. **Frontmatter** : `generated-by: arch` + `stack-md-hash: sha256-8` +
+   `project-type` + `active-stacks` filtrés par famille.
 
-Templates dans `.claude/templates/` :
+4. **Procédure** : Read template → substituer tokens (BackendName,
+   AppNamespace, DatabaseType, stack IDs) → condenser §1-§8 des stacks
+   pertinents dans "Architecture/Persistence/Auth/Forbidden" → Write
+   `create` (écrase l'existant).
 
-| Cible | Template | Quand |
-|---|---|---|
-| `{BackendName}/CLAUDE.md` | `claude-md-backend.template.md`   | toujours |
-| `{AppName}/CLAUDE.md`     | `claude-md-frontend.template.md`  | toujours |
-| `{LibName}/CLAUDE.md`     | `claude-md-shared-lib.template.md`| si `LibName` défini |
+5. **Purge BREAKING CHANGES RESOLVED** : avant écrasement, Read l'ancien
+   CLAUDE.md, détecter `## BREAKING CHANGES — RESOLVED {date}` (marqué
+   par dev-*). Conserver si scaffolding Phase B reproduit l'ancien nom
+   (non régression), supprimer sinon. Archivage optionnel dans
+   `.claude-archive/`.
 
-Procédure par projet :
-1. Read template
-2. Substituer `{ISO-8601 UTC}`, `{sha256-8}` (§12.3),
-   `{BackendName|AppName|LibName}`, `{AppNamespace}`, `{DatabaseType}`,
-   `{backend|ui|auth-stack-id}`, `{build command}`, `{driver from §8.1}`
-3. Sections "Architecture / Persistence / Auth / Forbidden" : condenser
-   depuis §1.1, §1.2, §3-4, §5, §8 des stacks (pas de copy intégral)
-4. Section auth supprimée si aucun stack auth actif
-5. Write `create` (§12.4)
-
-### 12.3 Calcul du hash
-
-`stack-md-hash` = sha256-8 de `stack.md` + stacks actifs filtrés par famille :
-- backend → `stack.md` + `backend/*` + `auth/*`
-- frontend → `stack.md` + `frontend/*` + `ui/*` + `auth/*`
-- shared-lib → `stack.md`
-
-Permet aux dev-* de détecter un CLAUDE.md périmé (fallback stacks bruts).
-
-### 12.4 Mode `create` / écrasement
-
-Mode `create` : écrase l'existant. Idempotent. Édits humains entre runs
-perdus — ces fichiers sont **dérivatifs**, pas source humaine.
-
-### 12.5 Purge sections BREAKING CHANGES — RESOLVED
-
-Avant écrasement d'un CLAUDE.md existant :
-1. Read CLAUDE.md actuel
-2. Glob `## BREAKING CHANGES — RESOLVED {date}` (marqué par dev-*
-   STEP 8.5/11.5)
-3. Section RESOLVED :
-   - scaffolding Phase B reproduit l'ancien nom → **conserver** (non régression)
-   - écart absorbé → **supprimer**
-4. `## BREAKING CHANGES` non marquée RESOLVED → régénérer telle quelle
-
-**Archivage optionnel** : section supprimée → écrire
-`workspace/output/src/{Project}/.claude-archive/breaking-changes-{date}.md`
-(répertoire ignoré par dev-* en lecture).
-
-**Rationale** : sans purge, mode `create` réimprime sans marqueurs
-RESOLVED → section ré-apparaît brute chaque `/arch-init`.
+6. **Anti-derive** : ces fichiers sont **dérivatifs** (regenérables
+   depuis stacks + stack.md). Édits humains perdus au re-run.
 
 ---
 
@@ -731,10 +558,10 @@ Sur erreur, bloc ERROR 3 lignes (CAUSE / FIX) et STOP. Aucun autre texte.
 ## Règles applicables
 
 Substance inlinée dans STEPs 1-12.5. Read on-demand si cas-limite :
-- `@.claude/rules/constitution.md` (procédure ADR §4)
-- `@.claude/rules/file-ownership.md` (matrice ownership)
-- `@.claude/rules/stack-completeness.md §0` (runtime LTS, CVE)
-- `@.claude/rules/source-first.md` (discipline MD-before-code, v6.10.5
+- `@.claude/rules/ownership.md` (procédure ADR §4)
+- `@.claude/rules/ownership.md` (matrice ownership)
+- `@.claude/rules/library-and-stack.md §0` (runtime LTS, CVE)
+- `@.claude/docs/principles/source-first.md` (discipline MD-before-code, v6.10.5
   fix CRIT-4) — Read on-demand uniquement si bug récurrent en
   build_loop : *"quelle source MD a manqué pour que cette erreur ne
   soit pas évitée nativement ? Patcher cette source AVANT le code."*

@@ -2,8 +2,9 @@
 
 > **v7.0.0 merge** : fusionne `file-ownership.md` (matrice path → owner
 > + serialization parallèle) + `constitution.md` (constitution projet +
-> ADRs governance + numérotation atomique timestamp). Les 2 originaux
-> restent en place comme stubs pointant vers ce fichier (backward-compat).
+> ADRs governance + numérotation atomique timestamp). Stubs originaux
+> **supprimés au sweep v7.0.0-alpha 2026-05-20** — tous les Read historiques
+> pointent désormais directement ici.
 
 ## TOC
 

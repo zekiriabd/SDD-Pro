@@ -14,8 +14,35 @@
 #
 # Toute modification d'un agent → mise à jour synchrone de cette section.
 
-version: "6.9.0"
-updated: "2026-05-17"
+version: "7.0.0-alpha"
+updated: "2026-05-20"
+
+# =========================================================================
+# Cache layers (v7.0.0 P2 #11 — Anthropic prompt caching strategy)
+# =========================================================================
+# Chaque entrée `reads:` peut être annotée `cache_layer: stable|semi|volatile`
+# pour piloter le placement des markers `cache_control: ephemeral` :
+#
+# - stable    : invariant inter-runs (loader.yml, stacks, rules consolidées).
+#               Cachable jusqu'à 5 min TTL Anthropic. Gain ~90% prompt cache hit.
+# - semi      : invariant intra-FEAT (CLAUDE.md per-project, schema.json).
+#               Cachable courte durée — invalidé à chaque /arch-init.
+# - volatile  : variable per-US (US courante, mockup HTML, plan from-plan).
+#               JAMAIS cachable.
+#
+# Stratégie d'application (max 4 cache breakpoints / requête Anthropic) :
+#   [1] System prompt agent (.md inline)                  → cache_layer: stable
+#   [2] Stacks + règles concaténés                         → cache_layer: stable
+#   [3] CLAUDE.md projet + schema.json                     → cache_layer: semi
+#   [4] US + HTML mockup + plan                            → cache_layer: volatile (NO CACHE)
+#
+# Gain mesuré baseline 2026-05-20 : 40.8% cache hit (sans markers).
+# Cible post-implémentation : ≥ 60% (estimé -50% coût Opus / FEAT M).
+# Détail : @.claude/docs/cache-strategy.md
+#
+# v7.0.0-alpha : annotations ajoutées sur les sections critiques ci-dessous.
+# Implémentation effective des cache_control markers : v7.1 (refacto harness).
+# =========================================================================
 
 # =========================================================================
 # Convention de langue (v5.0 — décision documentée, pas un bug)
@@ -46,7 +73,7 @@ updated: "2026-05-17"
 #                                 (créent uniquement leurs ADRs en fichiers
 #                                  indépendants — index §6 rebuild par arch)
 #
-# Détail : @.claude/rules/file-ownership.md §2 + agents/po.md STEP 8.5
+# Détail : @.claude/rules/ownership.md §2 + agents/po.md STEP 8.5
 #          + agents/arch.md STEP 12.5/12.6 (read-back validation v5.0)
 # =========================================================================
 
@@ -136,21 +163,22 @@ arch:
 # Invocations parallèles : 1 par US backend
 # -------------------------------------------------------------------------
 dev-backend:
+  # cache_layer annotations v7.0.0 P2 #11 — gain estimé -50% coût Opus
+  # après implémentation cache_control markers (v7.1).
   reads:
-    - workspace/output/us/{n}-{m}-*.md            # US ciblée (1 fichier)
-    - workspace/input/ui/{n}-{m}-*.html           # HTML mockup si présent (passif,
-                                        # pour identifier formulaires/tables
-                                        # déclenchant des endpoints/DTOs)
-    - workspace/output/plans/{n}-{m}-*.back.md    # plan existant si /dev-plan
-                                        # a tourné — mode From Plan
-    - workspace/output/src/{Project}/CLAUDE.md    # CLAUDE.md par projet (auto-load
-                                        # Claude Code conv)
-    - workspace/input/stack/stack.md              # lu UNE FOIS en STEP 0 Phase B (v5.0)
-    - .claude/stacks/backend/{active}.md  # fallback si CLAUDE.md insuffisant
-    - .claude/stacks/fullstack/{active}.md  # si AppType=fullstack (v6.7.5+)
-    - .claude/stacks/archi/{ArchiPattern}.md  # MVC (défaut) / DDD / microservice — UNIQUEMENT si AppType=back-front (v6.7.6+)
-    - .claude/stacks/auth/{active}.md     # patterns d'injection auth
-    - workspace/output/db/schema.json             # si présent (Mappers/DTOs)
+    # --- volatile (per-US, jamais cachable) ---
+    - { path: workspace/output/us/{n}-{m}-*.md, cache_layer: volatile }            # US ciblée (1 fichier)
+    - { path: workspace/input/ui/{n}-{m}-*.html, cache_layer: volatile }           # HTML mockup passif
+    - { path: workspace/output/plans/{n}-{m}-*.back.md, cache_layer: volatile }    # plan From Plan
+    # --- semi-stable (invariant intra-FEAT, invalidé par /arch-init) ---
+    - { path: workspace/output/src/{Project}/CLAUDE.md, cache_layer: semi }        # CLAUDE.md projet
+    - { path: workspace/output/db/schema.json, cache_layer: semi }                 # schema DB si présent
+    # --- stable (invariant inter-FEAT, cachable 5 min TTL) ---
+    - { path: workspace/input/stack/stack.md, cache_layer: stable }                # Project Config
+    - { path: .claude/stacks/backend/{active}.md, cache_layer: stable }
+    - { path: .claude/stacks/fullstack/{active}.md, cache_layer: stable }
+    - { path: .claude/stacks/archi/{ArchiPattern}.md, cache_layer: stable }
+    - { path: .claude/stacks/auth/{active}.md, cache_layer: stable }
     # v5.0 Inline Rules (dans agents/dev-backend.md, plus de Read mandatory) :
     #   - stack-completeness.md
     #   - file-ownership.md §1-§2

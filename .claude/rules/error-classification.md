@@ -48,6 +48,12 @@ et inlinés dans les agents (po, dev-*, qa).
 | `[GRANULARITY_VIOLATION]` | > 6 US, anti-pattern détecté | po STEP 5/7 |
 | `[TRACEABILITY_GAP]` | SFD/AC/BR/FD non couvert par une US | po STEP 6 |
 | `[READINESS_NO_GO]` | `/feat-validate` NO-GO sans `--force` | feat-validate |
+| `[FORCE_CUMUL_REJECTED]` | ≥ 2 bypass flags (`--force`, `--no-plan-on-warn`, `--no-validate`) cumulés sans `SDD_ALLOW_FORCE=1` env | sdd-full STEP 3.6.quart (v7.0.0 audit P0 R1) |
+| `[COST_CAP_EXCEEDED]` | Cumulative USD cost ≥ `MaxCostPerRun` (default $50) sur le run en cours. Bloquant CI + interactif (v7.0.0 R1 fix). Bypass : `SDD_DISABLE_COST_CAP=1` one-shot OU `MaxCostPerRun: 0` config. | preflight_cost_cap.py (v7.0.0 P0 §4.3) |
+| `[BUILD_LOOP_COST_EXCEEDED]` | Cumulative USD spent on build_loop iterations for ONE US ≥ `BuildLoopMaxCostUsd` (default $15) avant que `BuildLoopMaxIter` ne soit atteint. STOP fail-fast — distinguer de `[BUILD_LOOP_EXHAUSTED]` (iter limit) car la cause-racine est cost-pathological pas convergence-pathological. Bypass : `BuildLoopMaxCostUsd: 0` config. | dev-* build_loop (v7.0.0 P1 §6) |
+| `[QA_FAIL_BLOCKING_SDD_FULL]` | `/qa-generate` verdict RED + `QaFailOnSddFull: true` (default v7.0.0) → STOP `/sdd-full` post-STEP 4.5. Symétrise le gate avec `/qa-generate` standalone (avant : bloquant standalone, ignoré dans `/sdd-full`). Bypass : `QaFailOnSddFull: false` (audit-log). | sdd-full STEP 4.5 (v7.0.0 audit §6.9) |
+| `[FEAT_HASH_MISMATCH]` | Hash sha256 de la FEAT parente diffère de celui inscrit dans une US (`Parent FEAT hash: sha256:...`). FEAT modifiée après génération US → `Covers:` potentiellement obsolète. Fix : re-run `/us-generate {n}` (idempotent). | dev-*, validate_readiness, auditors (v7.0.0 audit §6 P1-11) |
+| `[ELICITOR_GAP]` | FEAT contient sections élicitor (FAIL-N, EDGE-N, Red Team) mais ≥ 1 item n'est mappé sur aucune AC d'aucune US. WARN par défaut (`ElicitorGapMode: warn`), `strict` = NO-GO. | po STEP 4 (v7.0.0 audit §6.11 — boucle elicitor) |
 | `[PLAN_NOT_FOUND]` | Plan attendu absent | validate_plan.py |
 | `[PLAN_UNREADABLE]` | Plan présent mais I/O error | validate_plan.py |
 | `[PLAN_NO_FRONTMATTER]` | Plan sans bloc YAML `---` ... `---` | validate_plan.py |
@@ -314,6 +320,9 @@ l'addition cumulée d'ACs non vérifiées qui fait basculer le verdict.
 | `[SPEC_AC_AMBIGUOUS]` | minor (info, AC mal formulée) | spec-compliance §6.1 |
 | `[SPEC_AC_UI_PRESENT]` | minor (info, présence cosmétique) | spec-compliance §6.2 |
 | `[SPEC_NO_TARGETS]` | (bloquant runtime) | spec-compliance §5.3 |
+| `[SPEC_COMPLIANCE_REQUIRED]` | **critical** (bloquant) | feat-validate STEP 4.5.3 (v7.0.0 — code matérialisé sans rapport spec-compliance.json) |
+| `[SPEC_COMPLIANCE_RED]` | **critical** (bloquant) | feat-validate STEP 4.5.4 (v7.0.0 — verdict spec-compliance RED) |
+| `[SPEC_COMPLIANCE_PARSE_ERROR]` | **critical** (bloquant) | feat-validate STEP 4.5.4 (spec-compliance.json corrompu/illisible) |
 
 **Biais explicite « bias toward not-verified »** : l'agent émet
 `[SPEC_AC_NOT_VERIFIED]` dès qu'il hésite entre verified et not-verified.
@@ -358,7 +367,7 @@ hard-blocking par défaut sauf annoté `(bloquant)`.
 |---|---|
 | `[CHECKPOINT_HASH_MISMATCH]` | input_hash recalculé ≠ stocké — phase doit re-exec |
 | `[CHECKPOINT_INPUT_MISSING]` | Fichier d'input déclaré disparu |
-| `[CHECKPOINT_STATE_UNREADABLE]` | state.json absent/corrompu |
+| `[CHECKPOINT_STATE_UNREADABLE]` | state.json checkpoint OU schema.json arch (depuis v7.0.0 audit P0 R2) absent ou corrompu (JSON unparsable, clé `tables` manquante…). Émis par `detect_arch_shortcircuit.py` quand schema.json présent mais invalide — empêche le fallback "safe arch" silencieux qui propagait la corruption aux dev-*. |
 
 **Governance** (`layered_config.py`, `manage_profile.py`, `validate_inline_rules.py`) :
 

@@ -13,11 +13,17 @@ Stories structurées (cible 1-3, warning 4-6, hard cap 6) dans `workspace/output
 
 ---
 
-## STEP 1 — Valider l'argument
+## STEP 1 — Valider les arguments
 
-L'argument `{n}` est obligatoire et doit être un entier ≥ 1.
+Arguments :
+- `{n}` (entier ≥ 1, **obligatoire**)
+- `--allow-large-feat` (optionnel, v7.0.0 P2 #13) — bypass conscient du
+  hard cap `UsGranularityHardCap` (default 10). À utiliser pour FEATs
+  métier légitimement très larges (≥ 11 flux distincts). Effet : export
+  `SDD_ALLOW_LARGE_FEAT=1` avant invocation agent `po`, audit-log dans
+  `workspace/output/.sys/.audit/force-bypass.log`. Préférer split FEAT.
 
-Si absent → demander :
+Si `{n}` absent → demander :
 ```
 Quel est le numéro de la FEAT à découper ? (ex. : 1 pour workspace/input/feats/1-Auth.md)
 ```
@@ -28,6 +34,19 @@ ERROR: /us-generate — argument invalide
 CAUSE: "{argument}" n'est pas un entier
 FIX: relancer /us-generate {n} avec n entier (ex. /us-generate 1)
 ```
+
+### Propagation `--allow-large-feat`
+
+```bash
+if [[ "$@" == *--allow-large-feat* ]]; then
+    export SDD_ALLOW_LARGE_FEAT=1
+    mkdir -p workspace/output/.sys/.audit
+    echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) /us-generate {n} --allow-large-feat (bypass UsGranularityHardCap)" \
+      >> workspace/output/.sys/.audit/force-bypass.log
+fi
+```
+
+L'agent `po` (STEP 5) lit cette env var pour passer outre le hard cap.
 
 ---
 

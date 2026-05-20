@@ -2,9 +2,9 @@
 
 > **v7.0.0 merge** : fusionne `stack-completeness.md` (libs anti-derive,
 > §2.4 catalog, runtime LTS, CVE) + `cors.md` (CORS pattern stack-aware).
-> Les 2 originaux restent en place comme stubs pointant vers ce fichier
-> (préservation backward-compat des `Read @.claude/rules/{stack-completeness,
-> cors}.md` existants dans agents).
+> Stubs originaux **supprimés au sweep v7.0.0-alpha 2026-05-20** — tous
+> les Read `@.claude/rules/{stack-completeness,cors}.md` historiques
+> dans agents/commands/python pointent désormais directement ici.
 
 ## TOC
 

@@ -373,4 +373,4 @@ constitution §7 (append-only). Forbidden : modifier les sections
 initiales de la FEAT (Functional Needs/BR/AC/FD), générer US/code,
 lire stacks/UI.
 
-**Read on-demand si cas-limite** : `@.claude/rules/file-ownership.md §2`.
+**Read on-demand si cas-limite** : `@.claude/rules/ownership.md §2`.
