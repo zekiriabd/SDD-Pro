@@ -153,10 +153,11 @@ Radix par capability), `vuetify`.
   `spring-security-oauth2-resource-server`, etc.) vivent dans le
   `.libs.json` du backend/frontend consommateur.
 - `qa/code-quality.md` : règles QA pures (seuils sonar-like).
-- `frontend/blazor-server` : **déplacé en `fullstack/blazor-server.md` (2026-05-13)**
+- `frontend/blazor-server` : **déplacé en `_drafts/fullstack/blazor-server.md` (v7.0.0 quarantine)**
   — le pattern monolithique est incompatible avec l'isolation front/back du
-  scope `back-front` (cf. `file-ownership.md §1.bis`), mais reste valide en
-  scope `fullstack` (single-project UI+API intégrés). Le `.libs.json`
+  scope `back-front` (cf. `ownership.md §1.bis`), et le scope `fullstack`
+  est en quarantine v7.0.0 (non chargé, cf. CLAUDE.md §6). Pour Blazor,
+  utiliser `frontend/blazor-webassembly` + un backend `.NET` séparé. Le `.libs.json`
   compagnon a été régénéré dans `fullstack/`.
 
 ### Dé-duplication QA (post-mortem 2026-05-07)
@@ -326,6 +327,62 @@ L'agent NE DOIT JAMAIS :
 
 ---
 
+## 6.bis Schema/regex sync front↔back (post-mortem 2026-05-21)
+
+**Règle load-bearing** : tout champ de DTO/payload partagé entre
+backend et frontend DOIT avoir le **même contrat** (type, regex,
+contraintes min/max) des deux côtés. Toute désynchro = bug runtime
+silencieux à la première soumission de form.
+
+### 6.bis.1 Type des IDs (post-mortem #1)
+
+| Backend Kotlin/Spring | Frontend TS | Convention SDD_Pro |
+|---|---|---|
+| `val id: Int` (PostgreSQL serial) | `id: string` (RHF + DOM) | Coercer en string AU BOUNDARY fetch via `.map(o => ({ id: String(o.id), ... }))` côté `apiXxx.ts` |
+| `val id: UUID` | `id: string` (UUID hex) | Pas de coercion (déjà string) |
+
+**Anti-pattern** : laisser un `number` traverser jusqu'au form RHF.
+React state + DOM value sont toujours string ; `===` strict échoue
+silencieusement (`5 !== "5"`).
+
+### 6.bis.2 Regex de validation (post-mortem #2)
+
+| Backend `@Pattern` | Frontend Zod | Risque si désynchro |
+|---|---|---|
+| `^[0-9]{13}$` (EAN-13) | `^[0-9]+$` | 400 ProblemDetail au save sur user qui a tapé 5 chiffres |
+| `^[0-9a-f]{8}-[0-9a-f]{4}-...$` (GUID) | `^\d+$` | rejet UI sur GUIDs valides backend |
+| `@Size(max=100)` | `z.string().max(100)` | back rejette texte de 101 char accepté front |
+
+**Convention canonique** : copier le regex exact de `@Pattern` (Jackson/
+Jakarta Validation) côté Zod dans `src/schemas/{Domain}Schema.ts`.
+Ajouter un commentaire `// MIRROR backend EanItemRequest.@Pattern "^[0-9]{13}$"`
+pour traçabilité.
+
+**Alternative future** : générer le client TS depuis l'OpenAPI 3 du
+backend (`springdoc-openapi` → `openapi-typescript`) — élimine le drift
+par construction. Non encore systématisé v7.0.0.
+
+### 6.bis.3 Field naming (camelCase serialization)
+
+Jackson par défaut sérialise les `val nom` Kotlin en `nom`, `val fkAnnonceur`
+en `fkAnnonceur` (préservation du camelCase). Frontend TS DOIT utiliser
+les mêmes clés. Tout renommage de champ DTO en backend exige un grep
+frontend (`grep -rn "field.nom\|field.fkXxx" workspace/output/src/{AppName}/`)
+pour aligner les consommateurs.
+
+**Anti-pattern** : un champ `libelle` côté backend mappé sur `nom`
+côté frontend → Jackson rejette le POST (400 `@NotBlank` sur `nom`
+absent), ET la lecture en mode édition retourne `undefined` (front lit
+`detail.nom` mais payload a `detail.libelle`). Cf. post-mortem FEAT 4.
+
+### 6.bis.4 Pattern de revue
+
+`code-reviewer` détecte ce type de drift via la classe
+`[FRONTEND_BACKEND_CONTRACT_GAP]` (hard-blocking, override
+`CodeReviewFailOn`). Cf. `error-classification.md §1.10`.
+
+---
+
 ## 7. Workflow Tech Lead (ajout d'une lib)
 
 Sur STOP + ERROR `[STACK_LIBRARY_MISSING]` :
@@ -398,7 +455,7 @@ est cassé en runtime.
 |---|:---:|
 | SPA + API séparés (`backend/*` + `frontend/*`) | ✅ OBLIGATOIRE |
 | Mobile + API (`backend/*` + `mobiles/*`) | ✅ OBLIGATOIRE (origins `capacitor://`, `ionic://`, etc.) |
-| Fullstack monolithique (`fullstack/blazor-server`, `next` SSR) | ❌ N/A (même origin) |
+| ~~Fullstack monolithique~~ (`fullstack/*` en quarantine v7.0.0) | ⊘ non supporté en v7.0.0 — utiliser `back-front` |
 | Backend headless (sans SPA) | ❌ N/A |
 
 L'agent `arch` détecte le cas à partir de `## Active Tech Specs` du

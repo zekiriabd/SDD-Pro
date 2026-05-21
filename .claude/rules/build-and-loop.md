@@ -436,12 +436,16 @@ python .claude/python/sdd_scripts/mark_breaking_resolved.py \
 
 | Exit | Sens | Action agent |
 |---|---|---|
-| `0` | section absente ou déjà RESOLVED | skip silencieux |
-| `1` | section marquée RESOLVED avec succès | log en STEP de confirmation |
-| `2` | section présente mais incohérente avec cette US | skip (autre US la résoudra) |
-| `3` | erreur fichier | ERROR `[BREAKING_CLEANUP_FAILED]` |
+| `0` (`SUCCESS`) | opération complétée (marked OU skipped — pipeline continue) | log la valeur de `SDD_MARK_BREAKING_ACTION` si export demandé |
+| `3` (`INFRA_BLOCKED`) | erreur fichier (parse, write, missing) | ERROR `[BREAKING_CLEANUP_FAILED]` |
 
-> ⚠️ **Sémantique non-standard** : `exit 1` = **succès** (action effectuée), pas une erreur. La seule classe d'erreur est `exit 3`. Ne **JAMAIS** utiliser le pattern bash `cmd || handle_error` sur ce script — utiliser `cmd; rc=$?; case $rc in 0|1|2) ok ;; 3) error ;; esac`. Référencer cette table avant tout caller automatisé (Tech Lead humain : OK à lire stdout).
+> ✅ **Standardisé v7.0.0** (cf. docstring du script) — convention
+> `sdd_lib/exit_codes.py` respectée. **Breaking** vs v6.x : marked et
+> skipped retournaient autrefois 1 et 0 ; les deux sont désormais `0`.
+> Discrimination via stdout pattern `[OK]` / `[SKIP]` / `[DRY-RUN]` ou
+> env-export `SDD_MARK_BREAKING_CAPTURE=1` → `SDD_MARK_BREAKING_ACTION=
+> marked|skipped|dryrun`. Pattern bash standard `cmd || handle_error`
+> fonctionne désormais.
 
 Détail procédure + cas interdits : `@.claude/rules/ownership.md §6.bis`.
 

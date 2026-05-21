@@ -1,8 +1,13 @@
 # QA Stack — pytest + coverage.py
 
 > §2.4 (Librairies) régénérée depuis `python-pytest.libs.json` — ne pas éditer manuellement (`python .claude/python/sdd_admin/sync_stack_md.py --stack-id python-pytest`).
->
-> Validation: 🟡 experimental (not yet validated end-to-end in production combo)
+
+Status: Draft
+Validation: 🟡 experimental (not yet validated end-to-end in production combo)
+QA FEAT ID: python-pytest
+Scope: tests unitaires backend Python (FastAPI, Flask, Django)
+
+---
 
 ## 1. Scope
 

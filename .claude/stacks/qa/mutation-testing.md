@@ -1,11 +1,17 @@
 # QA Stack — Mutation Testing (opt-in, v7.0.0)
 
-> **Validation** : 🟡 experimental — schema opt-in, non actif par défaut.
+Status: Draft
+Validation: 🟡 experimental (schema opt-in, non actif par défaut)
+QA FEAT ID: mutation-testing
+Scope: anti auto-confirmation bias (briser le co-écrit IA code+tests)
+
 > **But** : briser l'auto-confirmation bias où la même IA génère code + tests.
 > Mutation testing introduit des mutations syntaxiques (`>` → `<`, `+` → `-`,
 > `true` → `false`, etc.) dans le code production puis re-run la suite : si
 > les tests passent **encore**, c'est qu'ils ne vérifient pas vraiment cette
 > ligne (mutant survivant = test inadéquat).
+
+---
 
 ## 1. Activation
 
@@ -57,19 +63,101 @@ Phase 5 (QA) :
   `console.db` (schema migration v8).
 - `/sdd-review` agrège dans le verdict consolidé (nouvelle source `mutation`).
 
-## 5. Anti-derive
+## 5. Exemples cross-runtime
+
+### 5.1 Stryker.NET (qa/dotnet-xunit)
+
+Configuration `stryker-config.json` à la racine de `{BackendName}.Tests/` :
+
+```json
+{
+  "stryker-config": {
+    "project": "../{BackendName}/{BackendName}.csproj",
+    "test-projects": ["{BackendName}.Tests.csproj"],
+    "mutate": ["**/Services/**/*.cs", "**/UseCases/**/*.cs", "!**/*.g.cs"],
+    "thresholds": { "high": 80, "low": 60, "break": 60 },
+    "reporters": ["json", "progress"],
+    "concurrency": 4
+  }
+}
+```
+
+Commande lancée par `qa.md` STEP 8.5 :
+```bash
+cd workspace/output/src/{BackendName}.Tests
+dotnet stryker --threshold-break $MUTATION_SCORE_MIN \
+               --timeout-ms $((MUTATION_TIMEOUT*1000)) \
+               --output ../qa-mutation
+```
+
+Sortie : `StrykerOutput/{timestamp}/reports/mutation-report.json` → parsé
+vers `workspace/output/qa/feat-{n}/mutation.json`.
+
+### 5.2 StrykerJS (qa/node-vitest)
+
+`stryker.conf.mjs` :
+```javascript
+export default {
+  packageManager: 'npm',
+  testRunner: 'vitest',
+  mutate: ['src/services/**/*.ts', 'src/use-cases/**/*.ts'],
+  thresholds: { high: 80, low: 60, break: 60 },
+  reporters: ['json', 'progress'],
+  vitest: { configFile: 'vitest.config.ts' },
+};
+```
+
+### 5.3 mutmut (qa/python-pytest)
+
+`pyproject.toml` :
+```toml
+[tool.mutmut]
+paths_to_mutate = "src/services/,src/use_cases/"
+runner = "pytest -x"
+tests_dir = "tests/"
+```
+
+### 5.4 Pitest (qa/kotlin-junit)
+
+`build.gradle.kts` :
+```kotlin
+plugins { id("info.solidsoft.pitest") version "1.15.0" }
+pitest {
+    targetClasses.set(listOf("com.example.services.*", "com.example.usecases.*"))
+    mutationThreshold.set(60)
+    timestampedReports.set(false)
+    outputFormats.set(listOf("XML", "HTML"))
+}
+```
+
+## 6. Edge cases & pièges connus
+
+| Piège | Symptôme | Solution |
+|---|---|---|
+| **Mutants équivalents** | Score stagne à ~70 % même avec tests parfaits — certaines mutations produisent un code sémantiquement identique (`x > 0` → `x >= 1` sur entier) | Exclure via `excluded-mutations` config ; ne pas viser 100 % |
+| **Timeout par mutant** | `INFRA_BLOCKED` aléatoire | Augmenter `MutationTestingTimeoutSec` ou réduire scope `mutate:` |
+| **DTO/Models triviaux** | Score bas artificiellement | Mode `minimal` exclut DTO/Models — privilégier ce mode |
+| **Tests d'intégration lents** | Run mutation 10× plus lent que tests unit | Stryker `testRunner: vitest-runner --include 'tests/unit/**'` |
+| **CI vs local divergence** | Score différent CI/local | Pin random seed via tool config (Stryker `randomSeed`, Pitest `randomSeed`) |
+
+## 7. Anti-derive
 
 - ❌ Activer `full` en CI sans cap timeout (peut bloquer 1 h+)
 - ❌ Mesurer mutation score sans baseline humaine (un score 60 % peut être bon
   OU mauvais selon le domaine — calibrer)
 - ❌ Activer sur code généré qui n'a pas atteint coverage 80 % d'abord
   (mutation score sur 20 % de code couvert est trivialement faux)
+- ❌ Mutation testing sur tests générés (auto-confirmation bias) — toujours
+  mesurer contre tests humains complémentaires
+- ❌ Ignorer les mutants équivalents sans audit (ils gonflent le score)
 
-## 6. Statut implémentation
+## 8. Statut implémentation
 
-**v7.0.0** : stack documenté, **infrastructure pas encore câblée** dans
-`qa.md` ni `qa-generate.md`. À implémenter en v7.1 si validation PoC sur
-1 FEAT M démontre la valeur. Tracé via ADR `governance-mutation-testing-poc`.
+**v7.0.0** : ✅ stack câblé. `qa.md` STEP 8.5 invoque le tool si
+`MutationTestingMode != off`, persiste dans `console.db` table
+`qa_mutation` (migration `0002_add-qa-mutation-table.sql`).
+**Opt-in strict** (`off` par défaut) — aucun coût ajouté tant que le
+Tech Lead n'active pas via Project Config.
 
 **Recommandation** : activer `MutationTestingMode: minimal` sur 1 FEAT M
 test en local, mesurer wall-clock + mutation score, comparer aux issues

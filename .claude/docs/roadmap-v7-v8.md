@@ -48,6 +48,17 @@
 | 20 | Mémoire Claude scoped Tech Lead | Cf. discussion ouverte 2026-05-18. Sans casser source-first invariant. Implementation MCP server-side. | 1 semaine |
 | 21 | Console web packagée | Embarquer `workspace/console/` dans framework (template + serveur Node minimal). Actuellement couplage soft. | 3-5 jours |
 | ~~22~~ | ~~Sweep stubs backward-compat~~ | ✅ **DONE v7.0.0-alpha post-audit 2026-05-20** : 8 stubs supprimés + 2 principes relocés à `docs/principles/`. 45+11+7 refs migrées dans agents/commands/python/stacks. Banners des 4 rules consolidées mis à jour. 0 ref orpheline (vérifié grep). |
+| 23 | Refactor 5 gros stacks `.md` > 800 L | `dotnet-minimalapi` (1016), `kotlin-spring-boot` (982), `react` (933), `python-fastapi` (849), `azure-ad` (795). Migrer §2.4 vers `.libs.json` (déjà partiellement fait via `sync_stack_md.py`), §3 conventions vers `docs/stacks/{id}-conventions.md`, garder `.md` à ~400 L (overview + layer mapping + scope). | 5× 1.5h = ~8h |
+
+**Décision M4 audit v7.0.0-alpha (2026-05-21)** : item 23 deferred v7.1.
+Rationale = **risque rupture compat agents** existants qui Read sélectivement
+les §1.3 / §2.4 / §3 via offset/limit. Refactor nécessite (a) audit des
+~80 invocations `Read .claude/stacks/.../X.md` dans `.claude/agents/`,
+(b) test d'intégration sur les 2 combos validés C1/C2, (c) régénération
+`.libs.json` pour chaque stack touché. Faible valeur immédiate vs risque —
+les 5 stacks fonctionnent (`/sdd-full` les utilise sans drift), le cache
+Anthropic absorbe le coût tokens. Trace ADR à créer lors du sprint v7.1
+sous identifiant `governance-major-stacks-refactor`.
 
 ---
 

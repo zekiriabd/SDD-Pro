@@ -173,12 +173,12 @@ MaxCostPerRun: 50.00          # USD ; 0 = disabled
 # to 6 cap protects against accidental --max-parallel 6 burst (~$30 instant)
 # while still allowing 3-US fullstack standard runs. Hard ceiling 12.
 #
-# ⚠ NOT IMPLEMENTED YET (v7.0.0 audit M1, 2026-05-20) — no preflight hook
-# currently reads this value to enforce the ceiling. MaxParallel (line 27)
-# acts as the de-facto cap via batching, but it limits US count not raw
-# Opus invocations. Slated for v7.1 (preflight_inflight_cap.py). Setting
-# this in stack.md or team config has no runtime effect today.
-MaxOpusInflight: 6
+# ⚠ EXPERIMENTAL — NOT IMPLEMENTED (v7.0.0 audit M1, 2026-05-20). Aucun
+# preflight hook ne lit cette valeur. MaxParallel (line 27) sert de cap
+# de facto via batching. Slated v7.1 (preflight_inflight_cap.py).
+# COMMENTÉ pour éviter de l'exposer comme clé "active" dans le layered
+# config — réactiver quand le hook sera câblé.
+# MaxOpusInflight: 6
 
 # --- Build loop cost cap (v7.0.0 P1 §6, 2026-05-20) ---
 # Per-US build loop hard cap : maximum USD spent on retries for ONE US
@@ -188,8 +188,10 @@ MaxOpusInflight: 6
 # US where each iteration adds ~$3-5 of Opus tokens.
 # Default $15 = ~3-5 Opus invocations on a medium US (each ~$3-4 measured).
 # 0 = disabled (legacy behavior, only BuildLoopMaxIter applies).
+# Note: BuildLoopMaxIter canonique défini ligne 29 (valeur 3). NE PAS
+# redéfinir ici — le parser layered_config rejette les doublons via
+# [CONFIG_DUPLICATE_KEY] depuis v7.0.0.
 BuildLoopMaxCostUsd: 15.00
-BuildLoopMaxIter: 5
 
 # --- Integration test depth (v7.0.0 audit §6.1) ---
 # API Gate default uses in-memory DB (EF Core InMemory, H2, SQLite:memory:).
@@ -201,13 +203,14 @@ BuildLoopMaxIter: 5
 # Modes : memory (default, fast) | hybrid (memory + 1 container canary) |
 #         containers (full container, slowest, prod-faithful)
 #
-# ⚠ NOT IMPLEMENTED YET (v7.0.0 audit M1, 2026-05-20) — no agent or rule
-# currently branches on this value. API Gate fixtures (cf. build-and-loop.md
-# Partie A §1.2) are always in-memory regardless. The `hybrid` and
-# `containers` modes require fixture template variants per QA stack
-# (dotnet-xunit, kotlin-junit, etc.) that haven't been written.
-# Slated for v7.1. Setting in stack.md / team config has no runtime effect today.
-IntegrationTestMode: memory
+# ⚠ EXPERIMENTAL — NOT IMPLEMENTED (v7.0.0 audit M1, 2026-05-20). Aucun
+# agent ne branche sur cette valeur. API Gate fixtures (cf. build-and-
+# loop.md Partie A §1.2) sont toujours in-memory. Les modes `hybrid` et
+# `containers` requièrent des fixture templates par stack QA (dotnet-
+# xunit, kotlin-junit, etc.) non écrits. Slated v7.1.
+# COMMENTÉ pour éviter de l'exposer comme clé "active" — réactiver
+# quand les fixture templates seront prêts.
+# IntegrationTestMode: memory
 
 # --- CI generation policy (v7.0.0 audit §6.7) ---
 # When /arch-init scaffolds a frontend project, generate .github/workflows/

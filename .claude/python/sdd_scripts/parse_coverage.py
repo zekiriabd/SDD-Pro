@@ -37,6 +37,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from sdd_lib.console_db import (  # noqa: E402
     connect, ensure_initialized, insert_qa_coverage, replace_qa_coverage_for_feat,
 )
+from sdd_lib.exit_codes import FAIL_FAST, SUCCESS  # noqa: E402
 from sdd_lib.paths import normalize, repo_root  # noqa: E402
 from sdd_lib.stderr import warn  # noqa: E402
 
@@ -279,7 +280,7 @@ def main() -> int:
 
     if not src_dir.is_dir():
         print(f"No source directory: {src_dir}")
-        return 1
+        return FAIL_FAST
 
     # 1. Cobertura XML
     for f in src_dir.rglob("coverage.cobertura.xml"):
@@ -327,7 +328,7 @@ def main() -> int:
             "Looked for: coverage.cobertura.xml, lcov.info, jacocoTestReport.xml, "
             "coverage-summary.json"
         )
-        return 1
+        return FAIL_FAST
 
     total_covered = sum(s["coverage"]["lines"]["covered"] for s in stacks_found)
     total_total = sum(s["coverage"]["lines"]["total"] for s in stacks_found)
@@ -380,7 +381,7 @@ def main() -> int:
     print(f"Stacks: {len(stacks_found)}")
     print(f"FEAT: {feat_label} -> console.db (table qa_coverage)")
 
-    return 0
+    return SUCCESS
 
 
 if __name__ == "__main__":

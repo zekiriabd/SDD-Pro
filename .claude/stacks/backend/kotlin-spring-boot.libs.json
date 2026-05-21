@@ -16,7 +16,7 @@
     "kotlin": "2.3.21",
     "spring-boot": "4.0.6",
     "ktlint": "14.2.0",
-    "flyway": "9.22.3",
+    "flyway": "10.21.0",
     "springdoc": "2.7.0",
     "postgresql": "42.7.10",
     "mssql-jdbc": "12.8.1.jre11",
@@ -38,8 +38,8 @@
     { "module": "org.springframework.boot:spring-boot-starter-oauth2-client",           "rationale": "OAuth2 client flow (utilise par certains scenarios M2M)" },
     { "module": "org.springframework.boot:spring-boot-starter-data-jpa",                "rationale": "ORM Hibernate + Spring Data repositories (PagingAndSortingRepository, JpaRepository)" },
     { "module": "org.springframework.boot:spring-boot-starter-validation",              "rationale": "Bean Validation Jakarta (@Valid, @NotBlank, @Email) sur DTOs entrants" },
-    { "module": "org.flywaydb:flyway-core", "ref": "flyway",                            "rationale": "Moteur migrations versionnees V{n}__*.sql + autoconfig Spring (pas de starter dedie). Pin 9.22.3 (compat Spring Boot 3.5 BOM, Flyway 10+ supprime cleanOnValidationError). Cf. kotlin-spring-boot.md §4.4" },
-    { "module": "org.flywaydb:flyway-database-postgresql", "ref": "flyway",            "rationale": "Module support PostgreSQL Flyway 10+ (externalise depuis flyway-core). Necessaire si DatabaseType=postgres" },
+    { "module": "org.flywaydb:flyway-core", "ref": "flyway",                            "rationale": "Moteur migrations versionnees V{n}__*.sql + autoconfig Spring (pas de starter dedie). Pin 10.21.0 (compat Spring Boot 4 BOM, Flyway 10 externalise les dialects DB en modules separes). Cf. kotlin-spring-boot.md §4.4" },
+    { "module": "org.flywaydb:flyway-database-postgresql", "ref": "flyway",            "rationale": "Module support PostgreSQL Flyway 10+ (externalise depuis flyway-core en 10.x, n'existe PAS en branche 9.x — d'ou la bump). Necessaire si DatabaseType=postgres" },
     { "module": "org.springdoc:springdoc-openapi-starter-webmvc-ui", "ref": "springdoc","rationale": "OpenAPI 3 + Swagger UI auto-generes depuis controllers (path /swagger custom, cf. §5.6)" },
     { "module": "org.springframework:spring-context",                                   "rationale": "DI core (transitive via web, listee explicitement pour clarte)" },
     { "module": "tools.jackson.module:jackson-module-kotlin",                           "rationale": "Serialization Kotlin data classes (sans no-arg constructor)" },
@@ -76,8 +76,19 @@
     { "id": "org.flywaydb.flyway",                 "ref": "flyway",       "rationale": "Tasks Gradle flywayMigrate / flywayInfo / flywayClean (CLI hors runtime)" }
   ],
   "metadata": {
-    "lastUpdated": "2026-05-07",
+    "lastUpdated": "2026-05-21",
     "format": "compact (v2)",
-    "source": "User Working Agreement 2026-05-07 — schema v2 compact migration"
+    "source": "User Working Agreement 2026-05-07 — schema v2 compact migration",
+    "runtimeException": {
+      "platform": "kotlin",
+      "pinnedVersion": "2.3.21",
+      "ltsRecommended": "2.1.x",
+      "status": "STS (short-term support)",
+      "rationale": "Kotlin 2.3.x est requis pour la compatibilité K2 compiler stable + coroutines 1.9 (utilisé par spring-boot-starter-webflux 4.0.6). Kotlin 2.1 LTS ne supporte pas Spring Boot 4.0.x ABI. Migration vers Kotlin 2.5 LTS prévue dès sa disponibilité (estimée 2026-Q4).",
+      "rule": "library-and-stack.md §0 — bypass STS tracé (équivalent ADR runtime-sts-exception, framework-level)",
+      "reviewedBy": "framework maintainers v7.0.0-alpha",
+      "reviewDate": "2026-05-21",
+      "warningEmitted": "[RUNTIME_STS_EXCEPTION] WARN par validate_libs_catalog.py"
+    }
   }
 }

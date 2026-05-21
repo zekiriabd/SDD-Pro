@@ -28,12 +28,8 @@ rapport, le Tech Lead arbitre.
 
 **Token footprint cible** : ~10-20 KB (Sonnet, scan + classification cross-fichier).
 
-> **v7.0.0 change** : le mode `threat-model` pré-dev (STRIDE light) a été
-> retiré (cf. ADR `governance-major-auditors-trim`). Le threat modeling
-> reste utile mais est désormais un livrable humain — instancier
-> `.claude/templates/threat-model.template.md` lors de la phase de
-> conception (post-FEAT, pré-`/arch-init`). Ne plus invoquer cet agent
-> avec `--mode threat-model`.
+> **v7.0.0** : mode `threat-model` retiré → livrable humain via
+> `.claude/templates/threat-model.template.md` (ADR `governance-major-auditors-trim`).
 
 ---
 
@@ -74,10 +70,7 @@ security-reviewer {n}
 
 Si `{n}` manquant/non numérique → STOP + ERROR `[INVALID_ARG]`.
 
-> Le flag historique `--mode {threat-model|scan}` (v6.3.2-v6.10) est
-> **déprécié en v7.0.0**. Si présent dans l'invocation, ignorer
-> silencieusement (équivalent à `--mode scan` qui est désormais le
-> seul mode supporté). Voir front-matter pour la migration `threat-model`.
+> Flag historique `--mode` (v6.x) ignoré silencieusement en v7.0.0.
 
 ### 1.2 Project Config
 
@@ -126,18 +119,46 @@ Absent → STOP + ERROR `[QA_PRECONDITION_FAILED]` : `code production absent, la
 5. `workspace/output/src/{AppName}/CLAUDE.md` si présent
 6. `.claude/stacks/backend/{active}.md` §1.3 layer mapping + §3 + §2.4 libs
 7. `.claude/stacks/frontend/{active}.md` §1.3 + §3
-8. `.claude/stacks/auth/{active}.md` §2-§3 (patterns auth attendus)
+8. `.claude/stacks/auth/{active}.md` **§2-§3 UNIQUEMENT** (patterns auth
+   attendus). NE PAS Read le fichier entier — `azure-ad.md` fait 795 L
+   (~30 KB) ; §2-§3 ≈ 5–8 KB. Utiliser Read avec offset/limit pour
+   isoler les sections.
 9. Code généré : lecture sélective via plan v2 si présent, sinon
    convention (cf. `code-reviewer.md §4`)
 
-**Budget cible** : ≤ 20 KB.
+**⚠️ WARN obligatoire (v7.0.0-alpha 2026-05-21)** — quand le fallback
+convention est activé (aucun `workspace/output/plans/{n}-*.{back,front}.md`
+matché), émettre **avant** le scan OWASP :
+
+```
+⚠️ WARN security-reviewer FEAT {n} — plan v2 absent, fallback convention
+   Cause : aucun plan v2 strict-ready disponible
+   Conséquence : sélection des fichiers par heuristique nom→path. Risque
+                 de **manquer des fichiers** non couverts par la convention
+                 (ex : middleware custom). Faux négatifs OWASP possibles.
+   Fix     : `/dev-plan {n}` puis `/sdd-review --ensure-scans security`
+             pour relancer avec couverture certaine.
+```
+
+Persister `"source_mode": "convention-fallback"` + `"plan_v2_warn": true`
+dans `{n}-security-scan.json`.
+
+**Budget cible** : ≤ 20 KB (validé déterministe par `context_budget.py`).
 
 ---
 
 ## STEP 4 — Scan OWASP Top 10 2021
 
 Pour chaque catégorie, exécuter scans **déterministes** (Grep) +
-**raisonnement Sonnet** sur les matches cross-fichier.
+**raisonnement Sonnet** sur les matches cross-fichier. Le découpage
+opérationnel des 10 catégories OWASP est donné en STEP 5 ci-dessous
+(sous-sections §5.1 à §5.10, une par catégorie A01-A10).
+
+## STEP 5 — Détection par catégorie OWASP (A01-A10)
+
+Sous-sections déterministes : chaque `### 5.x` ci-dessous correspond
+à une catégorie OWASP Top 10 2021, avec patterns Grep + heuristiques
+Sonnet + exclusions canoniques (tests, env vars, dev configs).
 
 ### 5.1 A03 Injection — Secrets hardcoded
 
@@ -603,23 +624,11 @@ L'agent est strictement idempotent :
 
 ---
 
-## Pourquoi Sonnet 4.6 (et pas Haiku ou Opus)
+## Choix modèle
 
-- **Sonnet 4.6** : raisonnement nécessaire sur :
-  - Mode threat-model : extraction d'assets/actors depuis prose libre
-    (constitution, FEAT)
-  - Mode scan : interprétation contextuelle des matches Grep
-    (ex. `process.env.X` = OK, `"my_secret"` = pas OK ; nuance impossible
-    en pur regex)
-  - Coordination avec code-reviewer (dé-duplication)
-- **Pas Opus** : pas de génération de code, juste analyse + classification
-- **Pas Haiku** : trop léger pour le raisonnement STRIDE et la
-  contextualisation OWASP
-
-Coût cible : ~5-8 KB (threat-model) / ~10-20 KB (scan). Pour économiser
-si la table §5 devient lourde, externaliser les patterns simples vers
-`security_scan.py` (script Python déterministe, pattern identique à
-`quality_scan.py`) et garder Sonnet pour le raisonnement cross-fichier.
+Sonnet 4.6 — raisonnement contextuel sur matches Grep (nuance
+`process.env.X` vs literal) + coordination dé-duplication avec
+`code-reviewer`. Coût cible ~10-20 KB / scan.
 
 ---
 

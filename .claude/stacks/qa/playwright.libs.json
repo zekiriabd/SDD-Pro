@@ -1,0 +1,43 @@
+{
+  "$schema": "../../templates/libs-catalog.schema.json",
+  "stackId": "playwright",
+  "category": "qa",
+  "schemaVersion": 1,
+  "buildSystem": "npm",
+  "manifest": {
+    "files": ["workspace/output/src/{AppName}/package.json"]
+  },
+  "versions": {
+    "playwright-test": "1.48.2",
+    "playwright-dotnet": "1.48.0"
+  },
+  "core": [
+    {
+      "module": "@playwright/test",
+      "ref": "playwright-test",
+      "rationale": "Test runner E2E Node-based stacks (react, vue, angular).",
+      "installCommand": "npm install -D @playwright/test && npx playwright install --with-deps",
+      "license": "Apache-2.0"
+    }
+  ],
+  "onDemand": [
+    {
+      "module": "Microsoft.Playwright",
+      "ref": "playwright-dotnet",
+      "capability": "blazor-e2e",
+      "triggers": ["frontend/blazor-webassembly", "blazor.*e2e", "\\.cshtml"],
+      "rationale": "Adapter .NET pour Blazor WASM. Install : dotnet add package + pwsh playwright.ps1 install.",
+      "installCommand": "dotnet add package Microsoft.Playwright && dotnet build && pwsh bin/Debug/net10.0/playwright.ps1 install",
+      "license": "Apache-2.0",
+      "alternative": false
+    }
+  ],
+  "plugins": [],
+  "metadata": {
+    "lastUpdated": "2026-05-20",
+    "format": "compact (v2)",
+    "activation": "Opt-in via Project Config `E2EMode: off | smoke | happy-paths | full`. STEP 8.bis qa-generate (v7.1 cabling).",
+    "installPolicy": "manual",
+    "notes": "Tech Lead lance l'install (pas arch Phase A). Catalogue présent pour empêcher [STACK_LIBRARY_MISSING] quand E2EMode != off."
+  }
+}

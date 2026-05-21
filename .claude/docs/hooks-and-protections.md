@@ -50,7 +50,7 @@ depuis le cwd.
 
 | Champ | Valeur |
 |---|---|
-| Trigger Claude Code | `SubagentStop` matcher `dev-backend\|dev-backend-strict\|dev-frontend\|dev-frontend-strict\|qa\|dashboard\|accessibility-auditor\|code-reviewer\|security-reviewer\|performance-auditor\|spec-compliance-reviewer\|constitutioner` |
+| Trigger Claude Code | `SubagentStop` matcher `dev-backend\|dev-frontend\|qa\|code-reviewer\|security-reviewer\|spec-compliance-reviewer\|arch-reviewer\|constitutioner` (v7.0.0 — retirés : `dev-*-strict`, `dashboard`, `accessibility-auditor`, `performance-auditor`) |
 | Script | [`.claude/python/sdd_hooks/audit_file_ownership.py`](.claude/python/sdd_hooks/audit_file_ownership.py) |
 | LOC | ~150 |
 | Rôle | Vérifie la matrice ownership de `rules/ownership.md §1` (Partie A, ex-file-ownership.md) : un agent dev-backend n'a pas écrit dans `{AppName}/`, un agent QA n'a pas écrit en dehors de `*.Tests/`, etc. Émet `[FILE_OWNERSHIP]` ou `[FILE_OWNERSHIP_NESTED]` si violation. |

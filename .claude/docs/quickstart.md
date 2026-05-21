@@ -3,6 +3,25 @@
 > Document chargé **à la demande** (`Read @.claude/docs/quickstart.md`).
 > Référencé depuis `@.claude/CLAUDE.md §10` (slim entry point).
 
+## 0. Bootstrap automatique (recommandé pour un nouveau projet)
+
+```bash
+python bootstrap.py                # interactive — 5 questions max
+python bootstrap.py --combo c1     # one-shot, combo .NET+React+Azure
+python bootstrap.py --combo c2     # one-shot, combo Kotlin+React+Azure
+python bootstrap.py --dry-run      # preview sans écrire
+```
+
+Le bootstrap génère un `stack.md` cohérent (43 clés Project Config avec
+defaults sûrs), crée la structure `workspace/output/.sys/`, installe les
+dépendances Python, et propose l'install des deps console.
+
+Voir [README.md](../../README.md#-quickstart--nouveau-projet) pour le
+détail des combos validés.
+
+Les sections 1-5 ci-dessous décrivent la **configuration manuelle**
+(brownfield / migration projet existant).
+
 ## 1. Sélectionner le stack
 
 Éditer `workspace/input/stack/stack.md` : activer 1 backend, 1 frontend,

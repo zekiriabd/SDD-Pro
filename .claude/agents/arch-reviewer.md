@@ -120,7 +120,7 @@ ignoré, on review uniquement le layer mapping frontend.
 Read le fichier pattern :
 - `.claude/stacks/archi/mvc.md` (défaut)
 - `.claude/stacks/archi/ddd.md`
-- `.claude/stacks/archi/microservice.md`
+- ~~`.claude/stacks/archi/microservice.md`~~ — **draft v7.0.0** (en `_drafts/archi/`, non chargé) ; sélection rejetée.
 
 Extraire :
 - §2 couches canoniques (Controller, Service, Repository, …)
@@ -152,6 +152,21 @@ Glob les fichiers matérialisés par les US de la FEAT :
 - Extraire `## Files` section → liste de paths
 - Si plans absents : fallback Glob `workspace/output/src/**/*.{cs,kt,ts,tsx,py,vue,razor}`
   (filtrer hors `node_modules/bin/obj/dist/build/.Tests/__tests__`)
+
+**⚠️ WARN obligatoire (v7.0.0-alpha 2026-05-21)** — quand le fallback
+Glob est activé, émettre **avant** la phase de vérification §5 :
+
+```
+⚠️ WARN arch-reviewer FEAT {n} — plan v2 absent, fallback Glob activé
+   Cause : aucun `workspace/output/plans/{n}-*.{back,front}.md` matché
+   Conséquence : analyse de TOUT le code matérialisé (pas seulement les
+                 fichiers de la FEAT). Risque de **faux positifs**
+                 [ARCH_PATTERN_VIOLATION] sur du code legacy hors scope.
+   Fix     : `/dev-plan {n}` pour scoper l'audit aux fichiers de la FEAT.
+```
+
+Persister `"source_mode": "convention-fallback"` + `"plan_v2_warn": true`
+dans `{n}-arch-review.json`.
 
 ---
 

@@ -20,6 +20,21 @@ Les 3 blocs sont rendus **simultanément** sur la même page — l'ordre vertica
 
 Les mutations de la collection EAN (ajout manuel via Bloc B, import CSV via Bloc C, delete unitaire/total) opèrent **en mémoire côté SPA** jusqu'à ce que l'utilisateur clique sur "Sauvegarder et quitter" ou "Suivant" (depuis le sub-menu wizard top bar). Ces 2 actions déclenchent la persistance complète (POST/PUT campagne + DELETE all EAN + bulk insert).
 
+## Quantified Goal
+
+- **Metric** : page Campagne (3 blocs) entièrement éditable en mémoire SPA ; persistance "Sauvegarder et quitter" en une seule transaction backend
+- **Target** : save complet (campagne + DELETE all + bulk insert EAN) < 3s p95 pour 1000 EAN ; import CSV `<à préciser>` lignes < 5s
+- **Deadline** : `<à préciser>`
+
+## Non-Functional Constraints
+
+- **Volume** : campagne ~10 champs ; collection EAN attendue 0-`<à préciser>` items (typique 100-1000, max raisonnable 5000)
+- **Performance** : bulk insert EAN backend ≤ 3s p95 / 1000 items ; rendu grille EAN paginée client-side < 200ms
+- **Retention** : EAN persistés en base PostgreSQL ; pas de soft-delete (DELETE all + bulk insert remplace l'ensemble à chaque save)
+- **Compliance** : `<à préciser>` (data produits, vérifier classification selon politique interne)
+- **Integration** : Frontend SPA + Backend API REST + PostgreSQL ; template CSV statique servi depuis `assets/`
+- **Degraded mode** : si bulk insert échoue → transaction rollback (campagne + EAN), message d'erreur explicite, état SPA préservé pour retry sans re-saisie
+
 ## Actors
 
 - Utilisateur marketing authentifié (Azure AD): saisit la campagne et gère ses EAN sur la page unique

@@ -2,13 +2,45 @@
 
 Framework FEAT-driven development pour Claude Code — branche `next` : **v7.0.0-alpha** (cf. [.claude/VERSIONING.md](.claude/VERSIONING.md)). Branche `main` : v6.10.4-LTS (freeze actif jusqu'au 2026-06-18).
 
+> 🌍 [English README](README.en.md) — quickstart + console essentials (les docs FR restent canoniques).
+
 Documentation principale : [.claude/CLAUDE.md](.claude/CLAUDE.md)
 
 ---
 
-## Démarrage rapide
+## 🚀 Quickstart — nouveau projet
 
-1. Éditer [workspace/input/stack/stack.md](workspace/input/stack/stack.md) (copier depuis `stack.md.example`).
+**Option recommandée : utiliser ce repo comme [GitHub Template](https://docs.github.com/en/repositories/creating-and-managing-repositories/creating-a-template-repository).** Cliquer sur **"Use this template"** → "Create a new repository" → cloner localement → lancer le bootstrap interactif :
+
+```bash
+# macOS / Linux
+python3 bootstrap.py
+
+# Windows (PowerShell)
+.\bootstrap.ps1
+
+# Non-interactive (CI / scripted) — uses validated combo C1
+python bootstrap.py --combo c1 --skip-install
+```
+
+Le bootstrap :
+- Demande le nom du projet + 3-4 questions (stack, DB, auth)
+- Génère `workspace/input/stack/stack.md` (43 clés Project Config, defaults sûrs)
+- Crée la structure `workspace/output/.sys/` complète
+- Installe les dépendances Python (`pip install -e .claude/python[dev]`)
+- Propose l'install des deps console (`npm install` dans `workspace/console/`)
+- Lance un smoke check final
+
+Combos validés bout-en-bout :
+- **C1** : .NET Minimal API + React + shadcn + Azure AD + xUnit (recommended)
+- **C2** : Kotlin Spring Boot + React + shadcn + Azure AD + JUnit
+- `--combo custom` : composition manuelle (4 backends × 4 frontends × 3 UI)
+
+---
+
+## Démarrage rapide (après bootstrap)
+
+1. Éditer les secrets dans [workspace/input/stack/stack.md](workspace/input/stack/stack.md) (DB password, Azure AD client ID, etc.) — fichier gitignored.
 2. Dans Claude Code : `/feat-generate <Nom>` — répondre aux 3-6 questions.
 3. (Optionnel) déposer mockups HTML sous `workspace/input/ui/{n}-{m}-{Name}.html`.
 4. `/sdd-full {n}` — pipeline complet de A à Z.
@@ -25,7 +57,7 @@ Depuis **v6.10**, une console web React + Fastify centralise toute la télémét
 ```bash
 cd workspace/console
 npm install        # première fois uniquement (Fastify + SDK Anthropic)
-npm start          # démarre sur http://127.0.0.1:5173
+npm start          # démarre sur http://127.0.0.1:4000
 ```
 
 Pré-requis : Node.js ≥ 20 et Python ≥ 3.8 sur le PATH (utilisé pour requêter `console.db` via les helpers `sdd_lib`).
@@ -115,7 +147,20 @@ python -m pytest .claude/python/tests/ -q          # collecte pytest complète (
 python -m unittest discover -s .claude/python/tests -p "test_*.py"   # subset compatible stdlib (~530)
 ```
 
-Aucun runtime applicatif imposé sur le code généré — SDD_Pro produit du code dans le stack du projet cible (28 stacks supportés : .NET, Spring Boot, FastAPI, Node Express ; React, Vue, Angular, Blazor ; shadcn, Vuetify, Radzen…).
+Aucun runtime applicatif imposé sur le code généré — SDD_Pro produit du code dans le stack du projet cible.
+
+**Catalogue stacks (v7.0.0-alpha)** — terminologie stricte :
+
+| Statut | Définition | Compte |
+|:---:|---|:---:|
+| 🟢 **validé** | Combo `/sdd-full` testé bout-en-bout sur ≥ 1 FEAT M (3 US, back+front), pipeline complet sans intervention humaine | **2 combos** ([.claude/docs/validated-combos.md](.claude/docs/validated-combos.md)) |
+| 🟢 **reference** | Stack avec entête `Validation: 🟢 reference` ET utilisé dans un combo validé | 7 stacks (composants de C1+C2) |
+| 🟡 **experimental** | Stack avec entête `Validation: 🟡 experimental` — utilisable mais aucun PoC formel bout-en-bout | 17 stacks |
+| ⏸️ **draft (quarantaine)** | Stack dans [`.claude/stacks/_drafts/`](.claude/stacks/_drafts/) — non chargé par le framework actif, procédure de réactivation documentée | 9 stacks |
+
+**Total actif** : 24 stacks répartis : Backend (4), Frontend (4), UI DS (3), QA (9, dont 2 opt-in `mutation-testing` + `playwright`), Auth (2), Archi (2 patterns `mvc`/`ddd`). Détail : [.claude/CLAUDE.md §6](.claude/CLAUDE.md).
+
+> ⚠️ Hors les 2 combos validés `C1`/`C2`, la composition multi-stacks n'a pas été validée par un PoC complet ; le pipeline peut échouer en runtime de manière non triviale. Pour activer une 3ᵉ combo, exécuter d'abord le PoC ROI méthodologie ([.claude/docs/poc-roi-methodology.md](.claude/docs/poc-roi-methodology.md)).
 
 Voir [.claude/python/README.md](.claude/python/README.md) pour les scripts utilitaires.
 

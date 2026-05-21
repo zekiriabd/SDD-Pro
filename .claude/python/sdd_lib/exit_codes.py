@@ -15,19 +15,23 @@ Convention canonique :
 | `2` | CORRECTIBLE — erreur récupérable par retry/edit (build, lint) | retry max BuildLoopMaxIter |
 | `3` | INFRA_BLOCKED — outil/DB/réseau down (pas une régression code) | STOP + ERROR différent |
 
-Cas hors convention (legacy, à migrer en v7.1) :
-  - `mark_breaking_resolved.py` exit 1 = succès (non-standard, documenté
-    dans `rules/build-and-loop.md §6` comme exception irréductible)
+Cas hors convention (legacy granular — préservés pour [CLASS] granularity) :
+  - `mark_breaking_resolved.py` : ✅ MIGRÉ v7.0.0 (0=SUCCESS, 3=INFRA_BLOCKED).
+    Discrimination marked/skipped via stdout [OK]/[SKIP] ou env-export.
   - `validate_us_deps.py` exit 3 = cycle, exit 4 = missing ref, exit 5 =
     infra error (granularité utile pour la classification d'erreur, mais
-    dévie de la convention 0/1/2/3)
-  - `sdd_review.py` exit 3 = sources missing (ensure-scans flag)
+    dévie de la convention 0/1/2/3) — préservé par design.
+  - `set_us_status.py` exit 1-5 granular (US_NOT_FOUND, US_STATUS_INVALID,
+    US_STATUS_TRANSITION_INVALID, US_STATUS_PARSE_ERROR, I/O) — préservé.
+  - `sdd_review.py` exit 2 = invalid --fail-on, exit 3 = sources missing
+    (ensure-scans flag) — préservé.
+  - `phase_planner.py` exit 2 = STACK_MALFORMED granularité — préservé.
 
 Pour les nouveaux scripts : utiliser exclusivement les constantes ci-dessous.
 """
 from __future__ import annotations
 
-# Standard exit codes
+# Standard exit codes (SDD scripts under sdd_scripts/ + sdd_admin/)
 SUCCESS = 0
 FAIL_FAST = 1            # Config invalide, contrat violé, FEAT introuvable, etc.
 CORRECTIBLE = 2          # Build error retry-able, lint warning, validation soft
@@ -38,6 +42,18 @@ OK = SUCCESS
 BLOCKING_ERROR = FAIL_FAST
 RETRY_POSSIBLE = CORRECTIBLE
 ENV_PROBLEM = INFRA_BLOCKED
+
+# === Claude Code hook protocol (sdd_hooks/ uniquement) ===
+# Distinct de la convention SDD scripts ci-dessus — Claude Code définit
+# son propre protocole pour les hooks (PostToolUse, SubagentStop, Stop,
+# UserPromptSubmit, etc.) :
+#   exit 0  → allow (continuer normalement)
+#   exit 2  → deny / block (afficher stderr à l'utilisateur, bloquer
+#             l'action déclenchant le hook). NE PAS confondre avec
+#             SDD CORRECTIBLE — sémantique totalement différente.
+# Les 6 hooks de sdd_hooks/ utilisent EXCLUSIVEMENT ces constantes.
+HOOK_ALLOW = 0
+HOOK_DENY = 2
 
 
 # Inversion guards — utilitaires pour les callers Python qui veulent

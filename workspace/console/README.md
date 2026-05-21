@@ -12,7 +12,7 @@ npm install
 node server.js
 ```
 
-→ http://127.0.0.1:5173
+→ http://127.0.0.1:4000
 
 ## Stack
 
@@ -201,7 +201,7 @@ La prochaine invocation du pipeline repeuple la DB idempotemment.
 
 | Var | Default | Rôle |
 |---|---|---|
-| `PORT`                  | `5173`                           | Port du serveur Fastify |
+| `PORT`                  | `4000` (v7.0.0-alpha, was 5173)  | Port du serveur Fastify (changé pour éviter collision avec Vite frontend) |
 | `SDD_USER_EMAIL`        | `git config` ou `anonymous@local` | Identité du validateur (champ `validatedBy`) |
 | `ANTHROPIC_API_KEY`     | (absent → toggle Vue PO 🔒)       | Clé API Anthropic pour reformulation IA |
 | `SDD_EXPLAIN_MODEL`     | `claude-haiku-4-5-20251001`      | Modèle utilisé pour la reformulation |

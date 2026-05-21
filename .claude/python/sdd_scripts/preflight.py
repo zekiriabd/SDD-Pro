@@ -25,6 +25,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from sdd_lib.exit_codes import FAIL_FAST, SUCCESS  # noqa: E402
 from sdd_lib.paths import normalize, repo_root  # noqa: E402
 
 
@@ -390,7 +391,7 @@ def main() -> int:
     if not m:
         add_err("INVALID_ARG", rf"argument doit matcher ^\d+-\d+(:plan)?$ (recu: {args.arg})")
         print(json.dumps(result, separators=(",", ":")))
-        return 1
+        return FAIL_FAST
     result["n"] = int(m.group(1))
     result["m"] = int(m.group(2))
     result["planOnly"] = bool(m.group(3))
@@ -434,7 +435,7 @@ def main() -> int:
     if not stack_path.is_file():
         add_err("STACK_MISSING", "verifier que workspace/input/stack/stack.md existe")
         print(json.dumps(result, separators=(",", ":")))
-        return 1
+        return FAIL_FAST
 
     # A4 — HTML mockup unique (frontend only)
     if args.family == "frontend":
@@ -457,7 +458,7 @@ def main() -> int:
     except OSError as e:
         add_err("STACK_READ_FAILED", f"lecture stack.md impossible : {e}")
         print(json.dumps(result, separators=(",", ":")))
-        return 1
+        return FAIL_FAST
 
     # B1 — Active Tech Specs / UI Specs / Auth Specs blocks
     tech_block = extract_section(stack_content, r"^##\s+Active\s+Tech\s+Specs")
@@ -667,7 +668,7 @@ def main() -> int:
         )
 
     print(json.dumps(result, separators=(",", ":")))
-    return 0 if result["ok"] else 1
+    return SUCCESS if result["ok"] else FAIL_FAST
 
 
 if __name__ == "__main__":

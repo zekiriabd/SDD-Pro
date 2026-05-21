@@ -1,8 +1,13 @@
 # QA Stack — Angular Jasmine + Karma + istanbul
 
 > §2.4 (Librairies) régénérée depuis `angular-jasmine.libs.json` — ne pas éditer manuellement (`python .claude/python/sdd_admin/sync_stack_md.py --stack-id angular-jasmine`).
->
-> Validation: 🟡 experimental (not yet validated end-to-end in production combo)
+
+Status: Draft
+Validation: 🟡 experimental (not yet validated end-to-end in production combo)
+QA FEAT ID: angular-jasmine
+Scope: tests unitaires frontend Angular
+
+---
 
 ## 1. Scope
 

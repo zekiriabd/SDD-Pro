@@ -18,6 +18,364 @@ Format : [version] — date courte. Sections : `Breaking`, `Added`, `Changed`, `
 
 ---
 
+## [Unreleased — v7.0.0-alpha] — 2026-05-21 (audit follow-up, in-session fixes)
+
+> **Session** : audit interne CTO 2026-05-21 (suite à audit Codex 2026-05-20)
+> — exécution P0 + items P1 sélectionnés + 3 audits user empilés. **5 bugs
+> critiques découverts et corrigés** au passage. **+175 tests** (872 → 1047),
+> **smoke 80/82** (2 WARN informatifs sur pollution console.db héritée +
+> smoke-timing à 504ms après +3 subprocess checks — non régression code).
+> Aucune régression. Tag v7.0.0 final reste bloqué par item P0 #1
+> (2 runs PoC ROI supplémentaires).
+
+### Added — P0 tag v7.0.0 GA prerequisites (2026-05-21)
+
+> 5 items P0 demandés pour tag v7.0.0 GA (≤ 4 semaines). Total : +14 tests
+> (1072 → 1086), +1 smoke check (#18), +9 stacks `Status:` + `Validation:`
+> normalisés, +1 nightly workflow, +1 README/quickstart EN.
+
+#### 1. Validation des headers Status: + Validation: sur 24 stacks
+
+- **9 stacks normalisés** (8 QA + 1 UI) : `Validation:` était dans un
+  blockquote `> Validation: ...` au lieu d'une ligne directe → invisible
+  aux regex `^Validation:` des callers (`phase_planner` etc.). Stacks
+  fixés : `qa/{dotnet-xunit, kotlin-junit, node-vitest, angular-jasmine,
+  blazor-bunit, python-pytest, mutation-testing, playwright}`,
+  `ui/radzen-blazor`. Chaque header complété avec `Status: Draft`,
+  `<Catégorie> FEAT ID:`, `Scope: ...` pour cohérence.
+- **Nouveau** : `sdd_admin/validate_stack_md_headers.py` (200 LOC). Scanne
+  les 24 stacks actifs (exclut `_drafts/`), détecte missing/blockquoted/
+  invalid badge. Modes `--json` et `--strict` (exit 1 sur drift).
+- **Branchements** : `framework_smoke.py` check #18 (auto-exécuté au hook
+  Stop) + `.github/workflows/sdd-framework-ci.yml` (job strict).
+- **Fix encoding** : le script `reconfigure(encoding="utf-8")` au boot
+  pour gérer Windows cp1252 sans `PYTHONIOENCODING` (les badges 🟢🟡🔴
+  cassaient sinon).
+
+#### 2-4. Tests directs sur 3 scripts load-bearing
+
+L'audit initial annonçait "31 scripts sans tests". Vérification précise :
+
+| Script | Tests existants | Coverage avant | Action | Coverage après |
+|---|---:|---:|---|---:|
+| `phase_planner.py` | 40 (test_phase_planner.py) | 80% | KEEP (couverture saine) | 80% |
+| `preflight.py` | 36 (test_preflight_unit.py) | 78% | KEEP | 78% |
+| `sdd_review.py` | 13 (test_sdd_review_dedup.py) | **17%** | **+14 tests** | 29% |
+
+- **`test_sdd_review.py` (14 tests)** : `resolve_fail_on` (CLI/config),
+  `resolve_arch_required`, exit code matrix (0 GREEN/YELLOW, 1 RED, 2
+  invalid args, 3 ensure-scans MISS), `--ensure-scans` gate (v7.0.0
+  CRIT-1 fix), `--json` output, artefact markdown généré. Subprocess-
+  based pour valider le CLI end-to-end.
+- L'audit initial était trompeur — la coverage globale Python est saine
+  (69% sur les 3 scripts). Seul `sdd_review.main()` était sous-testé.
+
+#### 5. Workflow nightly E2E combo C1
+
+- **`.github/workflows/nightly-e2e.yml`** : exécution quotidienne 02:30 UTC
+  + déclenchement manuel. 2 jobs :
+  - **`deterministic`** (toujours) : bootstrap combo C1 sur tmp dir +
+    framework smoke `--strict` + 4 validators stricts + pytest. Catch
+    ~80% des régressions sans appel LLM (gratuit, < 5 min).
+  - **`e2e-full-pipeline`** (gated `secrets.ANTHROPIC_API_KEY != ''`) :
+    `bootstrap.py --combo c1` + `/sdd-full 1` sur FEAT fixture minimale
+    + assertion code généré + upload artifact + telemetry health check.
+    Cap `MaxCostPerRun=5$` forcé pour safety (la fixture coûte ~$2-3).
+- **Fixture** : `.claude/python/tests/fixtures/e2e-combo-c1/1-Minimal.md`
+  (FEAT 1 US backend + 1 US frontend, page d'accueil "Bienvenue"). Plus
+  README de maintenance.
+- **Activation production** : Tech Lead ajoute `ANTHROPIC_API_KEY`
+  secret GitHub → nightly e2e-full-pipeline s'active automatiquement.
+
+#### 6. WARN explicite quand plan v2 absent (4 auditors)
+
+Avant : les 4 auditors (code-reviewer, security-reviewer,
+spec-compliance-reviewer, arch-reviewer) tombaient silencieusement en
+mode fallback convention quand `workspace/output/plans/{n}-*.{back,front}.md`
+était absent. Conséquence : couverture dégradée (heuristique nom→path
+au lieu de plan v2 strict-ready) **sans signal opérateur**.
+
+Après : chaque auditor émet un WARN dédié AVANT toute lecture de code,
+avec format normalisé :
+```
+⚠️ WARN {auditor} FEAT {n} — plan v2 absent, fallback {convention|Glob}
+   Cause       : ...
+   Conséquence : ...
+   Fix         : /dev-plan {n} pour matérialiser un plan v2 strict-ready
+```
++ persistance `"source_mode": "convention-fallback"` et
+`"plan_v2_warn": true` dans le JSON de rapport `{n}-{kind}.json`
+(consommable par `/sdd-review`).
+
+#### 7. README + quickstart EN
+
+- **`README.en.md`** (96 lignes) : mirror EN du quickstart + console
+  + architecture en un paragraphe + clés ressources. Les docs FR
+  restent canoniques.
+- **`docs/quickstart.en.md`** (75 lignes) : sections 0 (bootstrap
+  automatique) + 1-5 (configuration manuelle brownfield).
+- **`README.md`** (FR) : bandeau `🌍 [English README]` en tête pour
+  discoverability.
+
+---
+
+### Roadmap items empilés (non livrés cette session)
+
+**P1 — 1-2 trimestres post-GA** :
+- `npx sdd-pro install` / `pipx install sdd-pro` (CLI installer
+  publié). Préreq : valider traction du GitHub Template (Option C
+  déjà livrée) sur 2-4 semaines.
+- Plugin Claude Code officiel — soumettre au marketplace, modèle
+  Superpowers (skills auto-triggered).
+- `FileLocker` wrapper sur `sdd_state.py` — uniformiser avec
+  `gate_decide` (cross-process lock).
+- Détection intent via hook `UserPromptSubmit` — détecte "je veux
+  faire X" → invite à `/feat-generate`.
+
+**P2 — Vision 12 mois** :
+- Mode "scale-adaptive" : `po` détecte ampleur du projet (count FEATs
+  prévues) et choisit un workflow léger vs lourd.
+- `sdd-builder` agent : créer interactivement un nouveau stack via
+  conversation guidée (modèle `bmad-builder`).
+
+---
+
+### Added — bootstrap installer (Option C : GitHub Template + script)
+
+> Réduction de la friction d'adoption « manual install » → 1 commande.
+> Pas de package npm/PyPI publié (engagement maintenance évité ; valider
+> traction avant). Repo configuré comme GitHub Template + script
+> `bootstrap.py` (zéro dépendance externe). Inspiration : workflow BMAD
+> mais sans la dette d'un binaire CLI à versionner.
+
+- **`bootstrap.py`** à la racine du repo (475 LOC, stdlib uniquement) :
+  - Détecte si le projet est déjà initialisé (`workspace/input/feats/`
+    non vide OU `stack.md` existe) — refuse de l'écraser sans `--force`
+  - 5 prompts interactifs max (AppName, BackendName, combo, DB type)
+  - 2 combos validés présélectionnés (C1 : .NET+React+Azure ;
+    C2 : Kotlin+React+Azure) + mode `custom` interactif
+  - Rendu de `stack.md.template` avec 13 placeholders substitués
+    (AppName, ports, ArchiPattern, backend/frontend/UI/QA stacks,
+    auth profile, DatabaseType + env lines)
+  - Création de `workspace/output/.sys/{audit,context,state,validation}`
+  - `pip install -e .claude/python[dev]` (sauf `--skip-install`)
+  - `npm install` dans `workspace/console/` (lazy, après confirmation)
+  - Smoke check final + next steps actionnables
+  - Force UTF-8 stdout/stderr au boot (fix emojis sur Windows cp1252)
+  - Exit codes standardisés (0 SUCCESS / 1 USER_ABORT / 2 INVALID_INPUT
+    / 3 INFRA_ERROR)
+  - Flags : `--combo {c1,c2,custom}`, `--dry-run`, `--skip-install`,
+    `--force`
+
+- **`bootstrap.ps1`** (wrapper PowerShell Windows-friendly, 70 LOC) :
+  - Localise un Python 3.10+ (`py` → `python3` → `python`)
+  - Force UTF-8 console encoding (cp1252 par défaut casse les emojis)
+  - Forward des flags vers `bootstrap.py` (parité fonctionnelle totale)
+
+- **`workspace/input/stack/stack.md.template`** : skeleton avec 13
+  placeholders (`{{AppName}}`, `{{ArchiPattern}}`, etc.) + defaults
+  sûrs (QAMode tests+coverage, CoverageMin 80, MaxCostPerRun 50,
+  SecurityScanEnabled true, MutationTestingMode off).
+
+- **`test_bootstrap.py`** (25 tests) :
+  - `TestCombos` (5) : présence C1/C2, champs requis, fichiers stacks
+    référencés existent sur disque
+  - `TestValidateAppName` (5) : PascalCase, refus lowercase/spaces/long
+  - `TestRenderStackMd` (13) : substitution placeholders, no-leak final,
+    auth profiles (azure-ad / auth-local / none), DB types (postgres /
+    sqlserver / none)
+  - `TestDetection` (1) : constantes sous REPO_ROOT
+  - `TestCliDryRun` (1) : dry-run ne modifie pas stack.md existant
+
+- **README.md** : section « 🚀 Quickstart — nouveau projet » avec
+  3 modes d'invocation (Python, PowerShell, scripted).
+- **docs/quickstart.md** : section §0 bootstrap automatique en tête,
+  sections 1-5 (config manuelle) repositionnées comme brownfield.
+
+**Effort réel** : 1 jour (vs 4-6 jours pour une option `npx sdd-pro`
+ou `pipx install sdd-pro`). Maintenance : ~30 min par release MAJOR
+(refresh template + tests combo). Décision validation après 2-4
+semaines : si traction observée (forks, stars), investir B (pipx) en
+sprint dédié pour package PyPI.
+
+### Fixed — bugs critiques télémétrie (filé par user 2026-05-21)
+
+- **`connect_ro` ouvrait via URI non-RFC** : `f"file:{db_path.as_posix()}"`
+  produisait `file:G:/...` (Windows) au lieu de `file:///G:/...` (RFC 8089).
+  Fonctionnait sur la plupart des builds Python mais cassait sur certains
+  sandboxés. Plus grave : aucun fallback si WAL `-wal`/`-shm` étaient
+  verrouillés par un writer concurrent (cas Windows fréquent pendant
+  `/sdd-full`) → erreur opaque "unable to open database file" sur
+  `verify_telemetry_health.py` + `report_token_usage.py`. Fix : `Path.as_uri()`
+  pour RFC compliance + retry `?mode=ro&immutable=1` sur `OperationalError`
+  ("unable to open database file"). `immutable=1` bypasse complètement
+  `-wal`/`-shm`, sûr pour lecture-only.
+- **`preflight_cost_cap._compute_run_cost` transformait toute erreur DB en
+  cost=0.0** → le cap `MaxCostPerRun: $50` devenait **silencieusement
+  inopérant** à chaque échec de télémétrie (DB locked, schéma corrompu,
+  permissions FS). Le hook autorisait l'invocation Agent sans contrôle.
+  Fix : distinguer 3 cas de scope :
+    - `"db absent"` (fichier inexistant) → ALLOW legit (fresh checkout)
+    - `"run={id} (no rows yet)"` → ALLOW legit (run frais)
+    - `"db error: ..."` → **NEW** : DENY (`HOOK_DENY=2`) en CI auto-detect,
+      visible ERROR + ALLOW en interactif (operator awareness).
+      Classe d'erreur `[TELEMETRY_UNAVAILABLE]`. Bypass strict via
+      `SDD_DISABLE_COST_CAP=1` uniquement.
+- **`verify_telemetry_health.py` utilisait `sqlite3.connect` direct** au
+  lieu de `connect_ro` → cohérence rompue avec les autres lecteurs + même
+  défaut WAL lock. Fix : route via `connect_ro` (WAL-safe + immutable
+  fallback) + nouveau verdict `UNREADABLE` quand la DB existe mais qu'un
+  premier query révèle la corruption (SQLite n'invalide pas à l'ouverture).
+  Wrapper try/except élargi pour capturer les exceptions levées au premier
+  SELECT (`sqlite_master`) — sinon le script crashait avec stack trace au
+  lieu d'émettre un verdict structuré.
+
+### Fixed — conflit ports console / Vite (filé par user 2026-05-21)
+
+- **`workspace/console/server.js:46`** défaut `PORT = 5173` → collision
+  garantie avec Vite (`react`, `vue`) qui prend aussi 5173 → `/sdd-serve`
+  démarrait instablement, l'un des 2 services rebondissait sur un port
+  libre aléatoire et la doc devenait fausse. Doc déjà cohérente sur 4000
+  (`sdd-serve.md` §6, `MCP-SERVER.md`) mais le code par défaut contredisait.
+  Fix : défaut 4000 (cohérent doc) + commentaire explicatif. Override
+  `PORT=` env var conservé pour compat. Sweep cross-files :
+  `workspace/console/README.md`, `workspace/console/help/presentation.html`,
+  `.claude/commands/sdd-serve.md`, `.claude/commands/sdd-kill-server.md`
+  (8 occurrences fixées).
+
+### Changed — settings.json durci (audit user 2026-05-21)
+
+- **`Bash` bare retiré** de l'allowlist. Cette entrée seule rendait les
+  60+ allowlists granulaires `Bash(dotnet:*)`, `Bash(python:*)`, etc.
+  **purement décoratives** (l'autorisation universelle prenait toujours
+  le pas). Désormais l'allowlist granulaire est seule active — chaque
+  commande Bash doit matcher un pattern explicite.
+- **`WebFetch`, `WebSearch` retirés** du allow versionné. Les agents
+  SDD_Pro sont source-first (lecture locale) ; ces tools sont rarement
+  nécessaires. Ajout possible via `.claude/settings.local.json` (per-dev,
+  gitignored) si besoin ponctuel.
+- **`defaultMode`** : `"acceptEdits"` → `"default"`. Avant : tout Edit /
+  Write était auto-accepté **silencieusement**, y compris pour les
+  outils non-allowlistés. Désormais : seuls Edit / Write / MultiEdit
+  (explicitement allowlistés) passent sans prompt — tout outil hors
+  allow prompte l'utilisateur. Le pipeline SDD continue de fonctionner
+  inchangé (les outils dont il a besoin sont allowlistés). Pour
+  restaurer le comportement legacy plus rapide : poser
+  `defaultMode: "acceptEdits"` dans `settings.local.json`.
+
+### Added — tests télémétrie trust (+13)
+
+- **`test_telemetry_trust.py`** (13 tests) :
+  - `TestConnectRoUriPortability` (4) : `as_uri()` source-inspection,
+    fallback `immutable=1` présent, raises on missing DB, sanity read.
+  - `TestComputeRunCostScopes` (2) : DB absent → scope legit ; DB corrupt
+    → scope `db error:...` (signal au caller).
+  - `TestCostCapHookBehaviourOnDbError` (3) : CI auto-detect → DENY ;
+    interactif → ERROR visible + ALLOW ; bypass `SDD_DISABLE_COST_CAP=1`.
+  - `TestCostCapAbsentDbAllows` (1) : fresh repo sans DB → ALLOW silencieux.
+  - `TestVerifyTelemetryHealth` (3) : verdict ABSENT / CLEAN / **UNREADABLE**
+    (nouveau).
+
+### Fixed — bugs critiques
+
+- **`sdd_lib/run_id.py:37`** importait `find_project_root` qui **n'existait pas
+  dans `paths.py`** (seul `repo_root` est exposé). Conséquence :
+  `preflight_cost_cap.py:40` faisait un import eager → crash silencieux du
+  hook à **chaque** invocation depuis v7.0.0. `record_token_usage.py:213`
+  masquait le même bug avec un `try/except` → toutes les lignes
+  `token_usage.run_id` insérées en prod étaient **NULL**. Le `MaxCostPerRun:
+  $50` annoncé en v7.0.0 **n'a jamais bloqué une seule invocation** depuis
+  la sortie. Fix : `find_project_root` → `repo_root` + upsert idempotent
+  du parent `runs` row dans `record_token_usage.py` (respecter la FK
+  constraint `token_usage.run_id -> runs(run_id)`).
+- **Parser Project Config retournait `dict[str, str]`** — toutes les valeurs
+  bool/int/float arrivaient comme strings ("true", "80", "15.00"). Les
+  callers existants compensaient via leurs propres `_bool_flag` /
+  `_normalize_mode` / `int(raw)` mais un caller négligent aurait écrit
+  `if cfg["SecurityScanEnabled"]:` → toujours truthy. Fix : coercion
+  opt-in `coerce=True` sur `parse_kv_block`, `read_project_config`,
+  `read_layered_config` (backward-compat préservée à 100% pour les
+  ~10 callers existants).
+
+### Added — tests (+162)
+
+- **`test_protect_framework.py`** (13 tests) : warn/strict/off, CI auto-detect,
+  framework paths protégés, payload edge cases.
+- **`test_audit_file_ownership.py`** (17 tests) : matrice ownership in-process
+  + lifecycle sous-process (tmp workspace, cutoff, modes).
+- **`test_preflight_agent_budget.py`** (18 tests) : `REJECTED_AGENTS_V7`,
+  `extract_us_and_feat` regex, lifecycle CI/interactive.
+- **`test_preflight_cost_cap.py`** (13 tests) : pricing table, cap
+  résolution, blocking hard, bypass, scoping par `run_id`.
+- **`test_quality_scan.py`** (38 tests) : TODO/FIXME/debug/hex/long-method/
+  magic-numbers, robustesse encoding.
+- **`test_validate_project_config.py`** (25 tests) : schéma JSON, enum/range/
+  type mismatch, strict-unknown.
+- **`test_coerce_config_types.py`** (38 tests) : `coerce_scalar` bool/int/float,
+  `coerce_config_types` mode preservation + idempotence, `parse_kv_block` +
+  `read_project_config` + `read_layered_config` avec/sans `coerce=True`.
+
+### Added — outillage
+
+- **`templates/project-config.schema.json`** (43 clés documentées) — SSoT JSON
+  Schema pour le merged Project Config (3-layer hierarchy). Couvre 7 modes,
+  7 severities, 3 cost caps, 6 naming/ports, 2 deprecated/no-op (`PlanCacheStrict`,
+  `SecurityThreatModelEnabled`) avec marqueurs explicites dans `_meta`.
+- **`sdd_scripts/validate_project_config.py`** — validator CLI léger
+  (pas de dep `jsonschema` externe). Détecte typos enum (`QAMode: of`),
+  out-of-range (`CoverageMin: 150`), type mismatches (`MaxParallel: "three"`).
+  Mode `--strict-unknown` flag les clés non documentées.
+- **`sdd_lib/project_config.py`** — fonctions `coerce_scalar`,
+  `coerce_config_types`, frozenset `STRING_ENUM_KEYS` (28 clés enum à
+  ne JAMAIS coercer).
+- **`framework_smoke.py`** — 3 nouveaux checks :
+  - #15 `framework-bom-check` (délègue `strip_bom.py --check`)
+  - #16 `telemetry-health` (délègue `verify_telemetry_health.py`)
+  - #17 `project-config-schema` (délègue `validate_project_config.py`)
+  - Smoke passe de 79 à 82 checks ; seuil self-timing relevé 200ms → 400ms
+    (les 3 subprocess ajoutent ~90ms cumul, légitimes).
+- **`.github/workflows/sdd-framework-ci.yml`** — workflow GitHub Actions
+  léger (pytest + smoke `--strict` + 3 strict validators). Optionnel,
+  prêt à activer en commit.
+
+### Changed — refs vaporware purgées des sources actives
+
+- `error-classification.md` §1.9 (a11y), §1.12 (perf) : refs à `ingest_a11y_axe.py`
+  et `ingest_perf_lighthouse.py` (scripts inexistants) → wording neutralisé
+  (« décision out-of-scope du framework — à arbitrer par le projet consommateur »).
+- `error-classification-legacy.md` (3 occurrences) idem.
+- `ownership.md` : `/sdd-rebuild-index` (futur v3.1) → `index_adrs.py` (existe).
+- `dev-shared-preflight.md` : `sdd_admin/sync_inline_rules.py` (inexistant)
+  → `sdd_scripts/validate_inline_rules.py` (existe, déjà branché à smoke).
+- `loader.yml` ligne 547 : commentaire `futur ingest_a11y_axe.py` nettoyé.
+- Refs `DESIGN-FROMPLAN-STRICT.md` repointées vers `ARCHIVE/v7-design-superseded/`
+  (file déjà déplacé, refs cassées dans `architecture.md`, `glossary.md`,
+  `MIGRATION.md`, `python/README.md`, `compute_plan_metadata.py`,
+  `validate_plan.py`).
+
+### Changed — false positives d'orphelins
+
+L'audit initial avait flaggé `record_gate_decision.py` comme orphelin —
+**incorrect** : il est invoqué par `workspace/console/lib/console-db.js:171`
+(API `/api/gate-decide` du serveur console). Le scope du grep initial
+était limité à `.claude/` et ratait les callers Node. **Aucune action** —
+le script reste tel quel.
+
+### Decisions différées — explicites et tracées
+
+- **Cache `cache_control` markers** (P0.3) : déféré v7.1 par décision
+  M4 audit (refacto harness Anthropic, hors scope hotfix P0).
+- **Refactor 5 stacks > 800 LOC** (P1.7) : déféré v7.1 par décision M4 audit
+  (risque rupture compat agents qui Read sélectivement via offset/limit).
+- **Refactor `validate_readiness.main` 423 LOC** (P2.9) : 27 tests dépendent
+  du contrat — refactor exige sprint dédié.
+- **Refactor `console_db.py` 883 LOC / 38 funcs plates** (P2.10) : SSoT
+  télémétrie 24 tables — refactor par feature.
+- **Réduire `dev-run.md` (905 LOC) + `sdd-full.md` (783 LOC)** (P1.4) :
+  casserait les refs internes STEP X.bis/quart.
+
+---
+
 ## [Unreleased — v7.0.0-alpha] — 2026-05-20 (branche `next` only, 21 commits)
 
 > **Scope** : implémentation effective des 4 ADRs `governance-major-*` les plus

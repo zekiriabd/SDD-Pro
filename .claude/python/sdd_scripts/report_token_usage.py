@@ -37,7 +37,7 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sdd_lib.console_db import connect_ro  # noqa: E402  (RO reader — no WAL, no init)
-from sdd_lib.paths import iso_now, repo_root  # noqa: E402
+from sdd_lib.paths import iso_now  # noqa: E402
 from sdd_lib.stderr import warn  # noqa: E402
 
 

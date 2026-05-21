@@ -9,37 +9,27 @@ tools: Read, Write, Glob, Grep, Bash
 
 ## Rôle
 
-Pour une FEAT `{n}` dont les phases `dev-backend` + `API Gate` + `dev-frontend`
-sont terminées (build vert + API Gate 🟢/🟡), produire un **rapport de
-review** ciblé sur ce que le build ne catch pas :
+Pour une FEAT `{n}` post-`dev-backend` + API Gate + `dev-frontend` (build
+vert), produire un rapport de review ciblé sur ce que le build ne catch pas :
 
-1. **Anti-patterns spécifiques au stack** (N+1 queries EF/Prisma/JPA,
-   sync over async, blocking I/O en endpoint async, missing
-   `ConfigureAwait`, etc.)
-2. **Layer violations résiduelles** (DbContext dans UI, business logic
-   dans controllers, repository pattern bypass)
-3. **Contract drift front↔back** (front appelle une route backend
-   inexistante, payload divergent du DTO)
-4. **Smells nécessitant raisonnement cross-fichier** (duplicate code,
-   confusing naming, deep nesting > 3, missing error handling
-   contextuel, long methods que `quality_scan.py` n'attrape pas car
-   borderline)
-5. **Patterns de secrets hardcoded** (compléments à `quality_scan.py`)
+1. **Anti-patterns stack-specific** (N+1 EF/Prisma/JPA, sync-over-async,
+   blocking I/O en endpoint async, missing `ConfigureAwait`)
+2. **Layer violations résiduelles** (DbContext dans UI, business dans
+   controllers, repository bypass)
+3. **Contract drift front↔back** (route backend inexistante, payload
+   divergent du DTO)
+4. **Smells cross-fichier** (duplicate code, confusing naming, deep
+   nesting > 3, missing error handling contextuel) — borderline que
+   `quality_scan.py` ne catch pas
+5. **Secrets hardcoded** (compléments à `quality_scan.py`)
 
-**Position dans le pipeline** : entre `/dev-run` STEP 6.c (frontend
-done) et `/dev-run` STEP 6.5 (dashboard refresh). En v6.3.1 invocation
-**manuelle** ou via flag `--code-review`. Auto-invoke depuis `/dev-run`
-en v6.3.1.1.
+**Strictement read-only** sur `workspace/output/src/**`. Ne corrige pas —
+émet un rapport, Tech Lead arbitre. Position : entre `/dev-run` STEP 6.c
+et 6.5. Auto-invoke en STEP 6.4 batch (v6.3.1.1+).
 
-**Strictement read-only** sur `workspace/output/src/**`. **Ne corrige
-pas** — émet un rapport, le Tech Lead arbitre.
-
-**Token footprint cible** : 8-15 KB par feature de 3-5 US (Sonnet 4.6
-sélectif via plans + diff git si dispo).
-
-**Anti-pattern strict** : ne **PAS dupliquer** ce que `quality_scan.py`
-fait déjà (TODO/FIXME, magic numbers, console.log, simple long methods,
-naming violations triviales). Focus sur le raisonnement cross-fichier.
+**Token footprint cible** : 8-15 KB / feature 3-5 US.
+**Anti-pattern strict** : ne PAS dupliquer `quality_scan.py` (TODO,
+magic numbers, console.log, naming triviaux). Focus cross-fichier.
 
 ---
 
@@ -137,25 +127,15 @@ mais émis quand même.
 
 Read **uniquement** :
 
-1. `.claude/rules/error-classification.md` — taxonomie `[REVIEW_*]` (§1.11
-   v6.3.1) + classes réutilisées `[LAYER_VIOLATION]`, `[FRONTEND_BACKEND_CONTRACT_GAP]`
-2. `.claude/rules/build-and-loop.md` — anti-patterns partagés dev-backend/dev-frontend
-   (§3 anti-derive bullets, §7 plan construction, §4 QA ownership)
-3. `workspace/input/feats/{n}-*.md` — FEAT parente (passif)
-4. `workspace/output/us/{n}-*.md` — toutes les US ciblées (passif, comprendre
-   l'intent métier)
-5. `workspace/output/src/{BackendName}/CLAUDE.md` si présent — architecture backend
-6. `workspace/output/src/{AppName}/CLAUDE.md` si présent — architecture frontend
-
-### 3.bis Stack actifs (chargement sélectif)
-
-Lire `## Active Tech Specs` dans `workspace/input/stack/stack.md` :
-- Stack backend → charger `.claude/stacks/backend/{active}.md` §1.3 (layer mapping)
-  + §3 (conventions) + §2.4 (libs core/on-demand)
-- Stack frontend → charger `.claude/stacks/frontend/{active}.md` §1.3 + §3
-- **Pas de** stack ui/auth/qa en lecture (hors scope review)
-
-Budget : ~3-5 KB de stack par stack (sélectif §1.3 + §3 uniquement).
+1. `.claude/rules/error-classification.md` — taxonomie `[REVIEW_*]` §1.11 +
+   classes réutilisées (`[LAYER_VIOLATION]`, `[FRONTEND_BACKEND_CONTRACT_GAP]`)
+2. `.claude/rules/build-and-loop.md` — anti-patterns dev-backend/dev-frontend
+3. `workspace/input/feats/{n}-*.md` + `workspace/output/us/{n}-*.md` (intent métier)
+4. `workspace/output/src/{BackendName|AppName}/CLAUDE.md` si présents
+5. **Stacks actifs sélectifs** — depuis `## Active Tech Specs` du stack.md :
+   - `.claude/stacks/backend/{active}.md` §1.3 (layer mapping) + §3 + §2.4
+   - `.claude/stacks/frontend/{active}.md` §1.3 + §3
+   - **Pas** ui/auth/qa (hors scope review). Budget ~3-5 KB / stack.
 
 ---
 
@@ -175,6 +155,23 @@ Lire **uniquement** ces fichiers. Avantage : on review ce qui a été
 matérialisé par les dev-* (déterministe, traçable).
 
 ### 4.2 Sinon, fallback via convention
+
+**⚠️ WARN obligatoire (v7.0.0-alpha 2026-05-21)** — quand cette branche
+est prise (plan v2 absent ou plan v1 sans `## Files`), émettre **avant
+toute lecture de code** :
+
+```
+⚠️ WARN code-reviewer FEAT {n} — plan v2 absent, fallback convention activé
+   Cause : aucun `workspace/output/plans/{n}-*.{back,front}.md` matché
+   Conséquence : sélection des fichiers par heuristique nom→path (moins
+                 précise que la `## Files` section du plan v2)
+   Fix     : `/dev-plan {n}` pour matérialiser un plan v2 strict-ready
+             AVANT le code-reviewer (pas de dégradation silencieuse).
+```
+
+Persister dans le rapport `.md` (section « Source mode ») et dans
+`{n}-code-review.json` (`"source_mode": "convention-fallback"` + champ
+`"plan_v2_warn": true`).
 
 Pour chaque US `{n}-{m}-{Name}` :
 - Backend : lire `workspace/output/src/{BackendName}/Services/*{Name}*.{cs,kt,py,ts}`,
@@ -632,21 +629,10 @@ L'agent est strictement idempotent :
 
 ---
 
-## Pourquoi Sonnet 4.6 (et pas Haiku ou Opus)
+## Choix modèle
 
-- **Sonnet 4.6** : besoin de raisonnement cross-fichier (contract drift,
-  duplicate code par similarité, missing error handling contextuel) que
-  Haiku ne fait pas bien
-- **Pas Opus 4.7** : pas de génération de code, juste analyse +
-  classification. Sonnet suffit largement
-- Coût cible : ~8-15 KB tokens / feature de 3-5 US, beaucoup plus
-  économique que de re-lancer `dev-*` Opus pour patcher après que
-  `qa` ait détecté un smell tardif
-
-Si la table §5.1.bis grossit au point que Sonnet sature → externaliser
-les patterns simples vers un script Python `code_smell_scan.py` (pattern
-identique à `quality_scan.py`), garder Sonnet pour les checks cross-fichier
-(contract drift, duplicate code).
+Sonnet 4.6 — raisonnement cross-fichier (contract drift, duplicate code
+par similarité, error handling contextuel). Coût cible 8-15 KB / feature.
 
 ---
 

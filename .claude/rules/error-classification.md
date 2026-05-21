@@ -164,8 +164,10 @@ projet généré.
 
 > **Aucune classe `[A11Y_*]` n'est émise par un agent SDD_Pro après
 > v6.10.5.** Le schéma complet (tableau préfixes × WCAG × sévérité) est
-> archivé dans `@.claude/rules/error-classification-legacy.md §1` pour
-> consommation future par `ingest_a11y_axe.py` (CI projet généré).
+> archivé dans `@.claude/rules/error-classification-legacy.md §1` au cas
+> où un outil d'ingest CI axe-core serait câblé (non planifié à ce jour
+> — décision out-of-scope du framework SDD_Pro, à arbitrer par le projet
+> consommateur).
 
 ### 1.10 Code Review (cross-fichier, depuis v6.3.1)
 
@@ -257,8 +259,9 @@ au CI du projet généré.
 > **Aucune classe `[PERF_*]` n'est émise par un agent SDD_Pro après
 > v6.10.5.** Le schéma complet (16 préfixes × métrique × seuil × sévérité)
 > est archivé dans `@.claude/rules/error-classification-legacy.md §2`
-> pour consommation future par `ingest_perf_lighthouse.py` (CI projet
-> généré).
+> au cas où un outil d'ingest CI Lighthouse serait câblé (non planifié
+> à ce jour — décision out-of-scope du framework SDD_Pro, à arbitrer
+> par le projet consommateur).
 
 ### 1.13 Spec Compliance (AC-by-AC verification, depuis v6.5.2)
 

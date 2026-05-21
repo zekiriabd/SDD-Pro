@@ -25,6 +25,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from sdd_lib.exit_codes import FAIL_FAST, SUCCESS  # noqa: E402
 from sdd_lib.paths import repo_root  # noqa: E402
 from sdd_lib.project_config import section_body  # noqa: E402
 
@@ -654,7 +655,7 @@ def main() -> int:
 
     # Output
     decision = rep.decision
-    exit_code = 1 if rep.errors else 0
+    exit_code = FAIL_FAST if rep.errors else SUCCESS
 
     if args.json:
         result = {

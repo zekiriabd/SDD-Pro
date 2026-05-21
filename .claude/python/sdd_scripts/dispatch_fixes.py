@@ -40,6 +40,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sdd_lib.console_db import connect, ensure_initialized  # noqa: E402
+from sdd_lib.exit_codes import INFRA_BLOCKED, SUCCESS  # noqa: E402
 from sdd_lib.paths import repo_root  # noqa: E402
 
 from sdd_scripts.triage_issues import (  # noqa: E402
@@ -349,7 +350,7 @@ def main() -> int:
         plan = build_plan(args.feat_number, dry_run=args.dry_run)
     except Exception as exc:
         sys.stderr.write(f"ERROR: dispatch_fixes: {exc}\n")
-        return 2
+        return INFRA_BLOCKED
 
     if args.json:
         # Serialize dataclasses to dict
@@ -370,7 +371,8 @@ def main() -> int:
     else:
         print(render_human(plan))
 
-    return 0 if plan.auto_fixable else 1
+    # predicate: 0 if there are auto-fixable findings, 1 if none (not an error code)
+    return SUCCESS if plan.auto_fixable else 1
 
 
 if __name__ == "__main__":

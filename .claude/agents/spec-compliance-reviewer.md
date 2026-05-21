@@ -195,6 +195,21 @@ directement les fichiers qui CENSÉS implémenter l'AC).
 
 ### 5.2 Sinon, fallback via convention
 
+**⚠️ WARN obligatoire (v7.0.0-alpha 2026-05-21)** — émettre **avant**
+toute lecture de code :
+
+```
+⚠️ WARN spec-compliance-reviewer FEAT {n} — plan v2 absent, fallback convention
+   Cause : aucun `workspace/output/plans/{n}-*.{back,front}.md` matché
+   Conséquence : mapping `us→files` (granularité US) au lieu de
+                 `ac_id→files` (granularité AC du plan v2). Risque
+                 accru de `[SPEC_AC_NOT_VERIFIED]` faux positifs.
+   Fix     : `/dev-plan {n}` pour matérialiser un plan v2 strict-ready.
+```
+
+Persister `"source_mode": "convention-fallback"` + `"plan_v2_warn": true`
+dans `{n}-spec-compliance.json`.
+
 Pour chaque US `{n}-{m}-{Name}` :
 - Backend : `workspace/output/src/{BackendName}/Services/*{Name}*`,
   `Endpoints/*{Name}*`, `DTOs/*{Name}*`, `Validators/*{Name}*`

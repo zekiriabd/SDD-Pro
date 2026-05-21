@@ -442,14 +442,181 @@ def main() -> int:
             checks.add("dev-run-deps-gate", "WARN",
                        "dev-run.md missing STEP 2.bis or validate_us_deps.py invocation")
 
-    # 11. Self-timing (anti-régression risque #1 : smoke doit rester rapide au hook Stop)
+    # === Heavy subprocess checks below (#15-#18) ============================
+    # These cumulate ~400ms (4× subprocess Python boot + script run). Acceptable
+    # for the standard smoke (CI, manual call) but break the hook Stop budget
+    # of ≤ 700ms. Skip them when --silent-on-pass is set (= hook Stop context).
+    # They still run on every full smoke invocation, just not on the per-Stop
+    # hot path. The strict CI workflow runs the standalone scripts directly.
+    skip_heavy = args.silent_on_pass
+
+    # 15. v7.0.0-alpha — BOM check on framework .md files (strip_bom.py --check)
+    # Detects UTF-8 BOM that break Claude Code's frontmatter parser before
+    # users discover it the hard way (subagents silently not registered).
+    strip_bom_path = claude_root / "python" / "sdd_admin" / "strip_bom.py"
+    if strip_bom_path.is_file() and not skip_heavy:
+        try:
+            res = subprocess.run(
+                [sys.executable, str(strip_bom_path), "--check"],
+                cwd=claude_root.parent,
+                capture_output=True, text=True, timeout=15,
+            )
+            stdout = (res.stdout or "").strip()
+            # Output pattern: "Scanned N .md files\nwould strip K files:\n..."
+            m_strip = re.search(r"would strip\s+(\d+)\s+files", stdout)
+            n_with_bom = int(m_strip.group(1)) if m_strip else 0
+            if res.returncode == 0 and n_with_bom == 0:
+                checks.add("framework-bom-check", "OK",
+                           "no BOM in framework .md files")
+            elif n_with_bom > 0:
+                checks.add("framework-bom-check", "WARN",
+                           f"{n_with_bom} framework .md file(s) carry UTF-8 BOM — "
+                           f"run `python .claude/python/sdd_admin/strip_bom.py` to fix")
+            else:
+                checks.add("framework-bom-check", "WARN",
+                           f"strip_bom --check exit={res.returncode}")
+        except (OSError, subprocess.TimeoutExpired) as e:
+            checks.add("framework-bom-check", "WARN", f"strip_bom invocation failed: {e}")
+
+    # 16. v7.0.0-alpha — console.db telemetry health (verify_telemetry_health.py).
+    # Detects test-pollution artifacts (NULL run_id, unrealistic token volumes,
+    # `/x` /`/a` test commands) that would distort cost-cap + ROI aggregation.
+    # Only enforces presence of the script ; runs in --fail-on suspect mode
+    # but reports WARN (not FAIL) because an empty DB on a fresh checkout
+    # is legitimate.
+    telemetry_path = claude_root / "python" / "sdd_admin" / "verify_telemetry_health.py"
+    if telemetry_path.is_file() and not skip_heavy:
+        try:
+            res = subprocess.run(
+                [sys.executable, str(telemetry_path), "--json", "--fail-on", "polluted"],
+                cwd=claude_root.parent,
+                capture_output=True, text=True, timeout=15,
+            )
+            try:
+                payload = json.loads(res.stdout) if res.stdout.strip() else {}
+            except json.JSONDecodeError:
+                payload = {}
+            verdict = (payload.get("verdict") or "UNKNOWN").upper()
+            if verdict in ("CLEAN", "ABSENT"):
+                # ABSENT = fresh checkout, no console.db yet → expected
+                detail = ("DB clean" if verdict == "CLEAN"
+                          else "no console.db yet (fresh checkout)")
+                checks.add("telemetry-health", "OK", detail)
+            elif verdict == "SUSPECT":
+                checks.add("telemetry-health", "WARN",
+                           "console.db verdict=SUSPECT — see "
+                           "`python .claude/python/sdd_admin/verify_telemetry_health.py`")
+            elif verdict == "POLLUTED":
+                # WARN (not FAIL) by design : POLLUTED is operational signal
+                # (cost-cap + ROI are operating on stale data) but not a code
+                # regression. For strict CI gating, call verify_telemetry_health.py
+                # directly with `--fail-on polluted` (exits 3=INFRA_BLOCKED).
+                checks.add("telemetry-health", "WARN",
+                           "console.db verdict=POLLUTED (test artifacts) — "
+                           "cost-cap + ROI on stale data. Clean : delete "
+                           "workspace/output/db/console.db (will be recreated)")
+            else:
+                checks.add("telemetry-health", "WARN", f"unknown verdict={verdict}")
+        except (OSError, subprocess.TimeoutExpired) as e:
+            checks.add("telemetry-health", "WARN",
+                       f"verify_telemetry_health invocation failed: {e}")
+
+    # 17. v7.0.0-alpha — Project Config JSON-Schema validation.
+    # Catches typos / wrong enum values / out-of-range scalars / type
+    # mismatches in `## Project Config` of stack.md against
+    # `.claude/templates/project-config.schema.json` (43 keys covered).
+    # WARN (not FAIL) because the validator runs with --strict-unknown
+    # which can flag user-extension keys legitimately added by the project.
+    # For strict CI gating, call directly: `python .claude/python/
+    # sdd_scripts/validate_project_config.py --strict-unknown` (exit 1).
+    pcfg_validator = py_dir / "validate_project_config.py"
+    if pcfg_validator.is_file() and not skip_heavy:
+        try:
+            res = subprocess.run(
+                [sys.executable, str(pcfg_validator), "--json"],
+                cwd=claude_root.parent,
+                capture_output=True, text=True, timeout=10,
+            )
+            try:
+                payload = json.loads(res.stdout) if res.stdout.strip() else {}
+            except json.JSONDecodeError:
+                payload = {}
+            errs = int(payload.get("summary", {}).get("errors", 0))
+            n_keys = int(payload.get("config_keys", 0))
+            if res.returncode == 0 and errs == 0:
+                checks.add("project-config-schema", "OK",
+                           f"Project Config valid ({n_keys} keys)")
+            else:
+                # Show top-2 finding keys for quick diagnosis
+                findings = payload.get("findings", [])[:2]
+                hint = ", ".join(f"{f.get('key', '?')}:{f.get('code', '?')}"
+                                 for f in findings)
+                checks.add("project-config-schema", "WARN",
+                           f"{errs} issue(s) in Project Config ({hint}…) — "
+                           f"`python .claude/python/sdd_scripts/"
+                           f"validate_project_config.py` for full report")
+        except (OSError, subprocess.TimeoutExpired) as e:
+            checks.add("project-config-schema", "WARN",
+                       f"validate_project_config invocation failed: {e}")
+
+    # 18. v7.0.0-alpha — stack .md headers (Status: + Validation:) validation.
+    # The agents read these to surface stack maturity to Tech Lead. Drift to
+    # blockquoted format (`> Validation:`) breaks regex-based readers and
+    # phase_planner cannot emit the "experimental stack used in prod" warning.
+    headers_script = claude_root / "python" / "sdd_admin" / "validate_stack_md_headers.py"
+    if headers_script.is_file() and not skip_heavy:
+        try:
+            # encoding=utf-8 explicit : the script's JSON contains 🟢/🟡/🔴
+            # badges which break stdout decode on Windows cp1252 default.
+            res = subprocess.run(
+                [sys.executable, str(headers_script), "--json"],
+                cwd=claude_root.parent,
+                capture_output=True, text=True, encoding="utf-8",
+                errors="replace", timeout=10,
+            )
+            try:
+                payload = json.loads(res.stdout) if res.stdout.strip() else {}
+            except json.JSONDecodeError:
+                payload = {}
+            s = payload.get("summary", {})
+            problems = (s.get("missing_status", 0)
+                        + s.get("missing_validation", 0)
+                        + s.get("blockquoted_only", 0)
+                        + s.get("invalid_badge", 0))
+            n_stacks = payload.get("stacks_count", 0)
+            if res.returncode == 0 and problems == 0:
+                checks.add("stack-md-headers", "OK",
+                           f"all {n_stacks} stacks have Status:+Validation: headers")
+            else:
+                checks.add("stack-md-headers", "WARN",
+                           f"{problems} stack(s) have header issues — "
+                           f"`python .claude/python/sdd_admin/"
+                           f"validate_stack_md_headers.py` for details")
+        except (OSError, subprocess.TimeoutExpired) as e:
+            checks.add("stack-md-headers", "WARN",
+                       f"validate_stack_md_headers invocation failed: {e}")
+
+    # 11. Self-timing — seuil dépendant du mode :
+    #   - silent-on-pass (hook Stop) : seuil strict 200/400ms (les 4 heavy
+    #     checks sont skippés, seule la portion in-process compte)
+    #   - mode normal (CI/manuel) : seuil large 1000/1500ms (les 4 heavy
+    #     checks subprocess ajoutent ~400-500ms acceptable hors hook Stop)
     elapsed_ms = (time.perf_counter() - t_start) * 1000
-    if elapsed_ms < 200:
-        checks.add("smoke-timing", "OK", f"smoke completed in {elapsed_ms:.0f}ms (< 200ms threshold)")
-    elif elapsed_ms < 500:
-        checks.add("smoke-timing", "WARN", f"smoke took {elapsed_ms:.0f}ms (> 200ms — hook Stop perçu)")
+    if skip_heavy:
+        ok_thr, warn_thr = 200, 400
+        ctx = "hook Stop"
     else:
-        checks.add("smoke-timing", "FAIL", f"smoke took {elapsed_ms:.0f}ms (> 500ms — hook Stop trop lent)")
+        ok_thr, warn_thr = 1000, 1500
+        ctx = "full smoke"
+    if elapsed_ms < ok_thr:
+        checks.add("smoke-timing", "OK",
+                   f"smoke completed in {elapsed_ms:.0f}ms (< {ok_thr}ms threshold, {ctx})")
+    elif elapsed_ms < warn_thr:
+        checks.add("smoke-timing", "WARN",
+                   f"smoke took {elapsed_ms:.0f}ms (> {ok_thr}ms — {ctx} perçu)")
+    else:
+        checks.add("smoke-timing", "FAIL",
+                   f"smoke took {elapsed_ms:.0f}ms (> {warn_thr}ms — {ctx} trop lent)")
 
     ok = checks.count("OK")
     warn = checks.count("WARN")

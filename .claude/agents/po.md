@@ -238,10 +238,44 @@ en AC). Pas de question à l'utilisateur.
 
 Pour chaque US (m = 1, 2, ..., max 6) :
 
-**v7.0.0 P1-11** — calculer le hash de la FEAT parente AVANT d'écrire les US :
+**v7.0.0 P1-11** — calculer le hash RÉEL de la FEAT parente AVANT
+d'écrire les US (jamais un placeholder symbolique) :
+
 ```bash
 FEAT_HASH=$(sha256sum workspace/input/feats/{n}-{FeatName}.md | cut -c1-8)
 # Format inscrit : "Parent FEAT hash: sha256:{8 hex chars}"
+```
+
+**⚠️ ANTI-PATTERN HARD-BLOCKING (post-mortem 2026-05-21)** :
+
+L'agent NE DOIT JAMAIS écrire un placeholder symbolique pour ce hash —
+patterns observés à interdire :
+- `sha256:placeholder`
+- `sha256:RECALC_RUN`
+- `sha256:a3f8c2e1` (hash fictif inventé)
+- `sha256:xxxxxxxx`
+- toute valeur autre qu'un hex réel de 8 caractères calculé via la
+  commande ci-dessus
+
+Si la commande Bash `sha256sum` n'est pas disponible (env Windows pur
+sans Git Bash), utiliser le fallback Python (toujours disponible) :
+```bash
+FEAT_HASH=$(python -c "import hashlib,sys; print(hashlib.sha256(open(sys.argv[1],'rb').read()).hexdigest()[:8])" workspace/input/feats/{n}-{FeatName}.md)
+```
+
+Sur PowerShell pur (sans Bash) :
+```powershell
+$FEAT_HASH = (Get-FileHash "workspace\input\feats\{n}-{FeatName}.md" -Algorithm SHA256).Hash.ToLower().Substring(0,8)
+```
+
+**Validation read-back obligatoire en STEP 9** : après avoir écrit
+toutes les US, l'agent doit re-Read chaque fichier et vérifier que
+la ligne `Parent FEAT hash:` ne contient PAS l'un des placeholders
+ci-dessus. Si placeholder détecté → STOP + ERROR 3-lignes :
+```
+ERROR: agent po — Parent FEAT hash placeholder detected in {us_file}
+CAUSE: [PO_HASH_PLACEHOLDER] valeur fictive "{found}" au lieu du SHA-256 réel
+FIX: calculer FEAT_HASH via sha256sum (ou fallback Python/PS) puis ré-écrire l'US
 ```
 
 Ce hash permet aux agents `dev-*` et auditors de détecter si la FEAT
@@ -267,13 +301,32 @@ existe déjà, l'écraser (régénération idempotente).
 
 ## STEP 8.5 — Étendre la constitution (depuis SDD_Pro v3, durci v3.1.3)
 
-### 8.5.0 Précondition
+### 8.5.0 Précondition + auto-bootstrap (durci 2026-05-21)
 
 Read `workspace/output/.sys/.context/constitution.md` :
-- **Absent** → skip silencieusement (projet bootstrappé avant v3 ou
-  `/feat-generate` non utilisé). Logguer
-  `constitution§3: skipped (constitution.md absent)` au STEP 9.
 - **Présent** → ce STEP devient **OBLIGATOIRE** (pas de skip silencieux).
+- **Absent** → **auto-bootstrap idempotent** (depuis 2026-05-21, no
+  more silent skip — fixe le pattern `[CONST-MISSING]` chronique sur
+  projets où les FEATs sont déposées manuellement sans passer par
+  `/feat-generate`) :
+  1. Read `.claude/templates/constitution.template.md`
+  2. Substituer les placeholders :
+     - `{ProjectName}` ← valeur `AppName` (ou `ProjectName`) du
+       `## Project Config` de `workspace/input/stack/stack.md`,
+       fallback `Unnamed-Project` si absent
+     - `{YYYY-MM-DD}` ← date du jour (UTC)
+  3. Write `workspace/output/.sys/.context/constitution.md` (mkdir -p le parent)
+  4. Logguer `constitution§1: bootstrapped (auto, FEAT {n} déclencheur)`
+  5. Continuer la suite du STEP 8.5 normalement (le fichier est maintenant
+     présent, les acteurs de la FEAT seront ajoutés en §3 via 8.5.1)
+
+> **Pourquoi auto-bootstrap** : `/feat-generate` est l'owner principal du
+> bootstrap (cf. `.claude/rules/ownership.md §B.1`), mais quand l'utilisateur
+> dépose des FEATs directement dans `workspace/input/feats/` sans passer
+> par `/feat-generate`, constitution.md n'est jamais créée et l'agent PO
+> est le 1er agent à pouvoir le faire (il a déjà la FEAT acteurs en mémoire).
+> Cette responsabilité secondaire est idempotente et ne casse pas le
+> contrat owner-principal `/feat-generate`.
 
 Stocker dans une variable `$expected_actors` la liste des acteurs
 extraits de la section `## Actors` de la FEAT parente (slugifiés en

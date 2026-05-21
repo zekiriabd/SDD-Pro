@@ -11,6 +11,7 @@
     ]
   },
   "versions": {
+    "python": "3.12",
     "fastapi": "0.115.5",
     "uvicorn": "0.32.1",
     "pydantic": "2.10.3",

@@ -29,56 +29,19 @@ N'invente, n'étend, n'optimise rien. QA hors scope.
 
 ---
 
-## STEP 0 — HARD-GATE pre-flight (script-driven, v6.1)
+## STEP 0 — 1.bis — Preflight + Context Budget + Mode + Path Safety
 
-Invoquer le script `preflight.py` qui retourne JSON sur stdout :
+Pattern partagé — appliquer `@.claude/rules/dev-shared-preflight.md`
+intégralement (§1 STEP 0 preflight, §2 STEP 0.5 context budget, §3
+STEP 1 mode From Plan, §4 STEP 1.bis path safety). Paramètres
+`dev-frontend` : `--family frontend`, `--agent dev-frontend`, Glob
+mode `*.front.md`, path root `workspace/output/src/{AppName}/`.
+Codes preflight extra : `HTML_AMBIGUOUS`, `UI_DS_NOT_SELECTED` (cf.
+§5 matrice). Mode Normal inclut **fidelity check** post-build (STEP 11).
 
-```bash
-python .claude/python/sdd_scripts/preflight.py --family frontend --arg "{n}-{m}[:plan]"
-```
-
-**Comportement** :
-- Exit 0 + `ok:true` → préconditions A1-A4 + B1-B5 vertes. Variables JSON :
-  `planOnly`, `name`, `htmlPath` (peut être `null`), `appOrBackendName`,
-  `activeStacks.{backend,frontend,uiDs,auth}`. **Procéder à STEP 1**.
-- Exit 1 + `ok:false` → STOP + ERROR 3 lignes pour la **première** entrée
-  de `errors[]` :
-  ```
-  ERROR: dev-frontend {n}-{m} — preflight {code}
-  CAUSE: [{code}] {détail extrait du JSON}
-  FIX: {hint}
-  ```
-
-**Codes** : `INVALID_ARG`, `US_NOT_FOUND`, `US_AMBIGUOUS`, `HTML_AMBIGUOUS`,
-`STACK_MISSING`, `STACK_NOT_SELECTED`, `STACK_MALFORMED`, `STACK_DIGEST_MISSING`,
-`PROJECT_NOT_INIT` (dégradé en `PROJECT_NOT_INIT_WARN` non bloquant en mode `:plan`),
-`UI_DS_NOT_SELECTED` (si `htmlPath != null` sans `ui-*` actif).
-
-Aucun Glob/Read manuel ici. Détail : `.claude/python/sdd_scripts/preflight.py`.
-
----
-
-## STEP 0.5 — HARD-GATE context budget
-
-Pattern partagé — appliquer `@.claude/rules/build-and-loop.md §1` avec
-`--agent dev-frontend`.
-
----
-
-## STEP 1 — Détection mode From Plan
-
-Pattern partagé — appliquer `@.claude/rules/build-and-loop.md §1.ter`
-ligne `dev-frontend` de la matrice (Glob `*.front.md`).
-
-Variables : `FROM_PLAN_PATH` (string|null), `PLAN_ONLY` (bool, set par STEP 0).
-Mode Normal côté frontend inclut le **fidelity check** post-build (STEP 11).
-
----
-
-## STEP 1.bis — Hard-gate path safety (Front/Back isolation)
-
-Pattern partagé — appliquer `@.claude/rules/build-and-loop.md §1.bis`
-ligne `dev-frontend` de la matrice.
+Variables résultantes en mémoire pour la suite : `planOnly`, `name`,
+`htmlPath` (peut être `null`), `appOrBackendName`,
+`activeStacks.{backend,frontend,uiDs,auth}`, `FROM_PLAN_PATH`, `PLAN_ONLY`.
 
 ---
 
@@ -190,9 +153,9 @@ Lire `appType` + `frontendKind` depuis le JSON preflight (v6.7.7+) :
 | `appType` | `frontendKind` | Source du stack à lire | UI Design System |
 |---|---|---|---|
 | `back-front` | `web` | `.claude/stacks/frontend/{stack-id}.md` | obligatoire si mockup HTML présent (`.claude/stacks/ui/{stack-id}.md` de `## Active UI Specs`) |
-| `back-front` | `mobile` | `.claude/stacks/mobiles/{stack-id}.md` (`react-native` ou `maui`) | géré par le stack mobile : NativeWind (RN) ou Resources/Styles (MAUI). `## Active UI Specs` IGNORÉ. |
+| ~~`back-front`~~ | ~~`mobile`~~ | ~~`.claude/stacks/mobiles/{stack-id}.md`~~ | **draft v7.0.0** — `stacks/mobiles/*` sont en `_drafts/` (non chargés). Combo `mobile` non supporté en v7.0.0. |
 | `back-front` | `null` | aucun frontend → exit silencieux (backend-only) | — |
-| `fullstack` | `null` | `.claude/stacks/fullstack/{stack-id}.md` | géré nativement par le stack fullstack (Tailwind pour next/nuxt/angular-universal, Radzen pour blazor-server, CSS custom pour node-react/kotlin-mustache). `## Active UI Specs` IGNORÉ. |
+| ~~`fullstack`~~ | ~~`null`~~ | ~~`.claude/stacks/fullstack/{stack-id}.md`~~ | **draft v7.0.0** — `stacks/fullstack/*` sont en `_drafts/` (non chargés). Combo `fullstack` non supporté en v7.0.0 ; utiliser `back-front`. |
 
 Si aucun stack à lire selon le tableau (et frontendKind ≠ null) → ERROR :
 ```

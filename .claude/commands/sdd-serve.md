@@ -1,4 +1,9 @@
-# /sdd-run — Lance backend + frontend + console en parallèle
+# /sdd-serve — Lance backend + frontend + console en parallèle
+
+> **Renommée v7.0.0** : ex-`/sdd-run` (renommée pour lever l'ambiguïté
+> UX avec `/sdd-full` — orchestrateur pipeline — et `/dev-run` —
+> orchestrateur dev). `/sdd-serve` est un **utilitaire runtime**
+> read-only, jamais un orchestrateur.
 
 Démarre les 3 process runtime du projet généré en arrière-plan :
 
@@ -11,11 +16,11 @@ build.** Chaque process tourne en `run_in_background` ; les logs
 sont accessibles via `BashOutput` / Monitor sur le shell parent.
 
 **Usage :**
-- `/sdd-run` — lance les 3
-- `/sdd-run back` — backend seul
-- `/sdd-run front` — frontend seul
-- `/sdd-run console` — console seule
-- `/sdd-run back front` — combinaison (sous-ensemble)
+- `/sdd-serve` — lance les 3
+- `/sdd-serve back` — backend seul
+- `/sdd-serve front` — frontend seul
+- `/sdd-serve console` — console seule
+- `/sdd-serve back front` — combinaison (sous-ensemble)
 
 ---
 
@@ -34,7 +39,7 @@ Read `## Active Tech Specs` pour identifier :
 
 Si `## Project Config` absent OU `FrontendName`/`BackendName` non lisibles :
 ```
-ERROR: /sdd-run — Project Config incomplet
+ERROR: /sdd-serve — Project Config incomplet
 CAUSE: [STACK_MALFORMED] FrontendName ou BackendName absent de workspace/input/stack/stack.md
 FIX: renseigner FrontendName et BackendName dans ## Project Config
 ```
@@ -76,7 +81,7 @@ Pour chaque cible activée :
 
 1. **Répertoire existe** : Glob du dossier cible. Absent → ERROR :
    ```
-   ERROR: /sdd-run — projet absent
+   ERROR: /sdd-serve — projet absent
    CAUSE: [PROJECT_NOT_INIT] workspace/output/src/{Name}/ introuvable — arch n'a pas tourné
    FIX: lancer /arch-init OU /dev-run {n} pour matérialiser le projet
    ```
@@ -129,8 +134,9 @@ Après les 3 lancements, afficher en une seule sortie :
 
   Backend  ▶ CMSPrintBack         (kotlin-spring-boot) → :8080   [bash_id: xxx]
   Frontend ▶ CMSPrintFront        (react)              → :5173   [bash_id: yyy]
-  Console  ▶ workspace/console    (fastify)            → :5173   [bash_id: zzz]
-            (override via env PORT=4000)
+  Console  ▶ workspace/console    (fastify)            → :4000   [bash_id: zzz]
+            (default v7.0.0-alpha — was 5173 conflicting with Vite ;
+             override via env PORT=)
 
 Logs : BashOutput / Monitor sur bash_id.
 Stop : KillShell sur bash_id.
@@ -162,11 +168,11 @@ du port avec un `(override)`.
 ### 6.1 Aucune cible activée
 
 Si l'argument restreint à un sous-ensemble qui ne matche rien (ex.
-`/sdd-run xyz`) → STOP + ERROR :
+`/sdd-serve xyz`) → STOP + ERROR :
 ```
-ERROR: /sdd-run — cible inconnue
+ERROR: /sdd-serve — cible inconnue
 CAUSE: [INVALID_ARG] argument "{arg}" ne matche pas back|front|console
-FIX: /sdd-run [back] [front] [console] (ou sans argument pour les 3)
+FIX: /sdd-serve [back] [front] [console] (ou sans argument pour les 3)
 ```
 
 ### 6.2 Fullstack mono-projet
@@ -183,7 +189,7 @@ le couple back+front. Adapter le rapport STEP 5 :
 
 ### 6.3 Console seule (sans projets générés)
 
-Cas valide : utiliser `/sdd-run console` pour ouvrir le cockpit sans
+Cas valide : utiliser `/sdd-serve console` pour ouvrir le cockpit sans
 avoir lancé `/dev-run`. STEP 3 ne vérifie que `workspace/console/`.
 
 ### 6.4 Port déjà occupé

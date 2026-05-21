@@ -451,8 +451,9 @@ ADR.
 
 Pour reconstruire l'index §6 manuellement après une session
 `/dev-run` qui aurait produit des ADRs : prochaine invocation `arch`
-(idempotente) re-scanne et reconstruit, OU commande dédiée
-`/sdd-rebuild-index` (futur v3.1).
+(idempotente) re-scanne et reconstruit, OU régénération directe via
+`python .claude/python/sdd_scripts/index_adrs.py` (déterministe,
+0 token).
 
 ---
 

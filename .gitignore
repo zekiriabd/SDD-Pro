@@ -45,6 +45,19 @@ node_modules/
 workspace/output/db/*.db
 workspace/output/db/*.db-shm
 workspace/output/db/*.db-wal
+workspace/console/*.db
+workspace/console/*.db-shm
+workspace/console/*.db-wal
+
+# Runtime transient — scheduler lock (regénéré, ne pas committer)
+.claude/scheduled_tasks.lock
+
+# Scripts dev ad-hoc oubliés à la racine (PO/dev workflow)
+/.tmp_*.py
+
+# Orphan crash forensic traces (atomic_write .sddtmp pattern + .json.tmp)
+**/*.sddtmp
+**/.sys/.validation/*.tmp
 
 # MCPB bundle build artifact (régénérable via python -m sdd_mcp.build_mcpb)
 .claude/python/.mcpb-build/

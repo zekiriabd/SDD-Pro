@@ -20,6 +20,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from sdd_lib.exit_codes import HOOK_DENY  # noqa: E402
 from sdd_lib.hook_input import get_file_path, read_hook_input  # noqa: E402
 from sdd_lib.paths import normalize  # noqa: E402
 from sdd_lib.stderr import warn  # noqa: E402
@@ -79,7 +80,7 @@ def main() -> int:
         warn(f"CAUSE: [FRAMEWORK_PROTECTED] tentative d'edit en mode strict (CI ou explicite)")
         warn(f"FIX: (a) si edit legitime Tech Lead : export SDD_PROTECT_FRAMEWORK_MODE=warn")
         warn(f"     (b) si agent produit modifie le framework : c'est un BUG, ne pas bypass")
-        return 2
+        return HOOK_DENY
 
     # warn mode (default interactive)
     warn(f"WARNING: '{file_path}' est un fichier propriete framework SDD_Pro.")

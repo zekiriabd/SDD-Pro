@@ -33,11 +33,11 @@ Valid transitions:
 
 Same-status (idempotent): exit 0, no-op.
 
-Exit codes:
-    0  Success (status set, or already at target, or --get/--list-statuses)
-    1  US file not found ([US_NOT_FOUND])
-    2  Status value invalid ([US_STATUS_INVALID])
-    3  Transition invalid ([US_STATUS_TRANSITION_INVALID])
+Exit codes (legacy granular convention — preserved by design, see sdd_lib/exit_codes.py docstring §"Cas hors convention"):
+    0  Success (status set, or already at target, or --get/--list-statuses) — = SUCCESS
+    1  US file not found ([US_NOT_FOUND]) — = FAIL_FAST
+    2  Status value invalid ([US_STATUS_INVALID]) — distinct from FAIL_FAST for [CLASS] granularity
+    3  Transition invalid ([US_STATUS_TRANSITION_INVALID]) — distinct from INFRA_BLOCKED for [CLASS] granularity
     4  US parse error — no `Status:` line ([US_STATUS_PARSE_ERROR])
     5  I/O error
 """

@@ -110,107 +110,63 @@ CAUSE: ## Active Tech Specs vide dans workspace/input/stack/stack.md
 FIX: décommenter au moins un stack (backend/frontend/fullstack/mobiles)
 ```
 
-**AppType auto-détection (v6.7.7+)** : depuis la v6.7.7, `AppType` est **auto-déduit** à partir des stacks déclarés dans `## Active Tech Specs`. Le bloc `## Active App Type` reste lu pour rétro-compat mais devient **redondant** (warning émis si présent). Lecture concrète : `preflight.py` retourne `appType` + `frontendKind` + `appTypeSource` dans son JSON.
+**AppType auto-détecté** (v6.7.7+) depuis `## Active Tech Specs` —
+lecture concrète via `preflight.py` JSON (`appType`, `frontendKind`,
+`appTypeSource`). Matrice :
 
-| AppType auto-détecté | Stacks déclarés | frontendKind | Project Config (clés requises) |
+| AppType | Stacks déclarés | frontendKind | Clés Project Config requises |
 |---|---|---|---|
 | `back-front` | `backend/*` + `frontend/*` | `web` | `AppName` + `BackendName` (+ `LibName` si `LibStrategy ≠ none`) |
 | `back-front` | `backend/*` + `mobiles/*` | `mobile` | `AppName` + `BackendName` |
 | `back-front` | `backend/*` seul | `null` | `BackendName` |
-| `fullstack` | `fullstack/*` (exclusif) | `null` | `AppName` uniquement (BackendName/LibName/LibStrategy IGNORÉS — WARNING si déclarés) |
+| `fullstack` | `fullstack/*` exclusif | `null` | `AppName` uniquement |
 
-**Mix interdit** (validé par `preflight.py` STEP 0) : `fullstack/*` + (`backend/*` OU `frontend/*` OU `mobiles/*`) → ERROR `[STACK_COMBO_INVALID]`. `frontend/*` + `mobiles/*` simultanés → ERROR `[STACK_COMBO_INVALID]`.
+Mix interdit (`fullstack` + autres ; `frontend` + `mobiles`) →
+`[STACK_COMBO_INVALID]`. Legacy `AppType: mobile-*` toléré avec
+`[APPTYPE_LEGACY_MOBILE]` WARNING. Pour `fullstack`/`mobile`, lire en
+plus §10-§11 du stack actif (init précis par stack).
 
-**Legacy déprécié (v6.7.5)** : valeurs explicites `AppType: mobile-react-native|mobile-maui` traduites en `back-front` + `frontendKind=mobile` automatiquement, avec WARNING `[APPTYPE_LEGACY_MOBILE]`. À supprimer du stack.md.
+**Architecture Pattern** (`## Active Architecture Pattern`, défaut `MVC` —
+scope `back-front` avec backend uniquement) :
 
-Clé Project Config requise absente → ERROR avec FIX précis (clé manquante).
+| Pattern | Stack à charger STEP 3.6 |
+|---|---|
+| `MVC` (défaut) | `.claude/stacks/archi/mvc.md` 🟢 |
+| `DDD` | `.claude/stacks/archi/ddd.md` 🟡 |
+| ~~`microservice`~~ | `.claude/stacks/_drafts/archi/microservice.md` ⊘ **draft v7.0.0** (non chargé) |
 
-**Note v6.1.3** : `DatabaseType` vit dans `## Active Database` (cf. STEP 2.ter), plus dans `## Project Config`.
+Le pattern pilote (a) le mapping couche → répertoire scaffolding Phase A,
+(b) les libs CORE supplémentaires (DDD+.NET → MediatR ; microservice+Kotlin →
+Resilience4j), (c) l'ADR `ADR-{ts}-archi-pattern-{pattern}.md`.
 
-**Note v6.7.5** : pour `appType=fullstack` ou (`appType=back-front` ET `frontendKind=mobile`), l'agent arch lit en plus la section §10 ("Notes pour l'agent arch") + §11 (file ownership) du stack actif — chaque stack `fullstack/*.md` et `mobiles/*.md` documente son init précisément.
-
-**Note v6.7.6/7.7 (Active Architecture Pattern)** : parser `## Active Architecture Pattern` (syntaxe préférée : bullet `.md`, syntaxe legacy `ArchitecturePattern: MVC` aussi acceptée). Défaut `MVC` si absent. **Scope = back-front avec backend stack déclaré uniquement**. Pour `appType=fullstack` OU absence de backend → IGNORÉ (les fullstack/mobiles ont leur archi intégrée au stack).
-
-| Pattern actif | Fichier de pattern à charger en STEP 3.6 | Status |
-|---|---|---|
-| `MVC` (défaut) | `.claude/stacks/archi/mvc.md` | 🟢 reference |
-| `DDD` | `.claude/stacks/archi/ddd.md` | 🟡 Phase 2 |
-| `microservice` | `.claude/stacks/archi/microservice.md` | 🟡 Phase 2 |
-
-Pattern invalide ou ambigu (plusieurs `archi/*.md` non commentés) → ERROR `[STACK_MALFORMED]` (émise par `preflight.py`).
-
-L'agent arch utilise le pattern (lu en STEP 3.6) pour décider :
-- Le mapping couche → répertoire à scaffolder en Phase A (e.g., MVC : `services/`, `repositories/`, `entities/` ; DDD : `domain/`, `application/`, `infrastructure/`, `presentation/`)
-- Les libs CORE supplémentaires à installer (e.g., DDD + .NET → MediatR ; microservice + Kotlin → Resilience4j)
-- L'ADR à créer (`ADR-{ts}-archi-pattern-{archiPattern}.md`)
+> Note : `DatabaseType` est dans `## Active Database` (STEP 2.ter), pas
+> dans `## Project Config` (v6.1.3+).
 
 ---
 
 ## STEP 2.ter — Parser `## Active Database` + `## Active Auth Specs`
 
-### 2.ter.1 Format
+Parsing tolérant des blocs `## Active Database` (DatabaseType + 5 clés
+`DB_HOST/PORT/NAME/USER/PASSWORD`) et `## Active Auth Specs` (chemin
+`.md` du profil + clés `AZ_*` ou `AUTH_JWT_*`) dans `stack.md`.
 
-Blocs dans `stack.md`, renseignés par le Tech Lead, ligne par ligne :
-
-```markdown
-## Active Database
- - DatabaseType: postgres
- - DB_HOST:127.0.0.1
- - DB_NAME:CMSPrint
- - DB_PASSWORD:***REMOVED***
- - DB_PORT:5432
- - DB_USER:postgres
-
-## Active Auth Specs
- - .claude/stacks/auth/azure-ad.md
- - AZ_AUDIENCES:"<REDACTED>-...","<REDACTED>-..."
- - AZ_BE_CALLBACKPATH:/signin-oidc
- - AZ_CLIENTID:<REDACTED>-...
- - AZ_DOMAIN:demo.com
- - AZ_FE_CALLBACKPATH:/login-callback
- - AZ_TENANTID:<REDACTED>-...
-```
-
-**Parsing tolérant** : `- {path}` `.claude/stacks/` = stack ; `- KEY:VALUE`
-ou `- KEY: VALUE` = paire (stripper espaces/quotes sauf AZ_AUDIENCES
-multi-valeur quoté). Lignes vides + commentaires `<!-- ... -->` ignorés.
-
-### 2.ter.2 Validation `## Active Database`
-
-Backend actif :
-- Bloc manquant → ERROR `[STACK_MALFORMED]` : "bloc ## Active Database manquant"
-- `DatabaseType` absent → idem
-- `DatabaseType ≠ none` et une des 5 clés `DB_HOST/PORT/NAME/USER/PASSWORD` manquante/vide → ERROR `[STACK_MALFORMED]` listant les clés
-
-`DatabaseType` accepté (case-insensitive, lowercase) : `none | postgres |
+**DatabaseType** accepté (case-insensitive) : `none | postgres |
 postgresql | sqlserver | mysql | sqlite | mariadb | oracle`. Alias
-`postgresql → postgres`. Inconnu → ERROR `[STACK_MALFORMED]`.
+`postgresql → postgres`. Inconnu / clé manquante → `[STACK_MALFORMED]`.
 
-### 2.ter.3 Validation `## Active Auth Specs`
+**Profils auth** : `azure-ad.md` (clés `AZ_TENANTID/CLIENTID/DOMAIN/
+AUDIENCES/BE_CALLBACKPATH/FE_CALLBACKPATH`) ou `auth-local.md` (clés
+`AUTH_JWT_SECRET ≥ 32 chars/ISSUER/AUDIENCE/EXPIRATION`). Mutuellement
+exclusifs. Aucun listé → warning silencieux, pas de config auth STEP 4.5.
 
-Profil auth déterminé par le chemin `.md` listé :
-
-| Stack `.md` listé | Profil | Clés requises |
-|---|---|---|
-| `.claude/stacks/auth/azure-ad.md` | `azure-ad` | `AZ_TENANTID`, `AZ_CLIENTID`, `AZ_DOMAIN`, `AZ_AUDIENCES`, `AZ_BE_CALLBACKPATH`, `AZ_FE_CALLBACKPATH` |
-| `.claude/stacks/auth/auth-local.md` | `auth-local` | `AUTH_JWT_SECRET`, `AUTH_JWT_ISSUER`, `AUTH_JWT_AUDIENCE`, `AUTH_JWT_EXPIRATION` |
-
-Clé requise manquante → ERROR `[STACK_MALFORMED]` listant les clés.
-
-**Profil `auth-local`** — validations additionnelles :
-- `AUTH_JWT_SECRET` ≥ 32 chars (HMAC-SHA256). Sinon ERROR : `AUTH_JWT_SECRET trop court ({len} chars, min 32)`.
-- `AUTH_JWT_EXPIRATION` entier positif (minutes). Sinon ERROR.
-
-Aucun stack auth listé → ignorer toute clé `AZ_*`/`AUTH_*` (warning silencieux), pas de config auth en STEP 4.5.
-
-**Profils mutuellement exclusifs** : `azure-ad.md` + `auth-local.md` ensemble → ERROR `[STACK_MALFORMED]` : `profils auth mutuellement exclusifs. FIX: ne lister qu'un seul .claude/stacks/auth/*.md`.
-
-### 2.ter.4 Mémorisation
-
-Trois entrées en RAM, consommées par STEP 4.5 et STEP 8 :
-- `db_config = { "DatabaseType": "postgres", "DB_HOST": "...", "DB_PORT": "...", "DB_NAME": "...", "DB_USER": "...", "DB_PASSWORD": "..." }`
+**Mémorisation RAM** consommée par STEP 4.5 et STEP 8 :
+- `db_config = {DatabaseType, DB_*}`
 - `auth_profile = "azure-ad" | "auth-local" | null`
-- `auth_config` : map `AZ_*` (azure-ad) ou `AUTH_JWT_*` (auth-local), vide sinon
+- `auth_config = map AZ_* | AUTH_JWT_* | {}`
+
+Détail format (lignes ` - KEY:VALUE`, parsing AZ_AUDIENCES multi-valeur
+quoté, validations exhaustives) : **Read on-demand
+`@.claude/stacks/auth/{auth-profile}.md §1-§2`**.
 
 ---
 
@@ -463,33 +419,20 @@ famille). Bénéfice : -30-40 % tokens + isolation cognitive dev-backend
 
 ### Résumé opérationnel
 
-1. **3 cibles** (toujours backend + frontend si stacks actifs, lib si
-   `LibName` défini) :
-   - `{BackendName}/CLAUDE.md` ← template `claude-md-backend.template.md`
-   - `{AppName}/CLAUDE.md` ← template `claude-md-frontend.template.md`
-   - `{LibName}/CLAUDE.md` ← template `claude-md-shared-lib.template.md`
-
-2. **CI template (depuis v7.0.0)** : si `CiTemplatesGeneration: true`
-   (défaut) ET frontend stack actif → écrire `.github/workflows/quality.yml`
-   depuis `ci-quality.github-actions.yml.template`. Idempotent (skip
-   si fichier existe = édit humain).
-
-3. **Frontmatter** : `generated-by: arch` + `stack-md-hash: sha256-8` +
-   `project-type` + `active-stacks` filtrés par famille.
-
-4. **Procédure** : Read template → substituer tokens (BackendName,
-   AppNamespace, DatabaseType, stack IDs) → condenser §1-§8 des stacks
-   pertinents dans "Architecture/Persistence/Auth/Forbidden" → Write
-   `create` (écrase l'existant).
-
-5. **Purge BREAKING CHANGES RESOLVED** : avant écrasement, Read l'ancien
-   CLAUDE.md, détecter `## BREAKING CHANGES — RESOLVED {date}` (marqué
-   par dev-*). Conserver si scaffolding Phase B reproduit l'ancien nom
-   (non régression), supprimer sinon. Archivage optionnel dans
-   `.claude-archive/`.
-
-6. **Anti-derive** : ces fichiers sont **dérivatifs** (regenérables
-   depuis stacks + stack.md). Édits humains perdus au re-run.
+1. **3 cibles** : `{BackendName}/CLAUDE.md`, `{AppName}/CLAUDE.md`, et
+   `{LibName}/CLAUDE.md` si défini — chacun depuis son template
+   `claude-md-{backend|frontend|shared-lib}.template.md`.
+2. **CI template (v7.0.0)** : si `CiTemplatesGeneration: true` (défaut) ET
+   frontend actif → écrire `.github/workflows/quality.yml` depuis
+   `ci-quality.github-actions.yml.template` (idempotent).
+3. **Frontmatter** : `generated-by + stack-md-hash + project-type +
+   active-stacks` filtrés par famille.
+4. **Procédure** : Read template → substituer tokens → condenser §1-§8
+   stacks pertinents → Write `create` (écrase).
+5. **Purge BREAKING CHANGES RESOLVED** : conserver si scaffolding Phase B
+   reproduit l'ancien nom (non régression), supprimer sinon.
+6. **Anti-derive** : fichiers dérivatifs (regenérables) — édits humains
+   perdus au re-run.
 
 ---
 

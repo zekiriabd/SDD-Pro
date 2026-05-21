@@ -31,6 +31,7 @@ from sdd_lib.console_db import (  # noqa: E402
     connect, ensure_initialized, insert_qa_quality_batch, record_auditor_run,
     replace_qa_quality_for_feat,
 )
+from sdd_lib.exit_codes import SUCCESS  # noqa: E402
 from sdd_lib.paths import normalize, repo_root  # noqa: E402
 
 
@@ -229,7 +230,7 @@ def main() -> int:
     if not src_dir.is_dir():
         print(f"Source directory not found: {src_dir}")
         print("Skipping quality scan (no code to analyze).")
-        return 0
+        return SUCCESS
 
     source_files: list[Path] = []
     for ext in SOURCE_EXTENSIONS:
@@ -243,7 +244,7 @@ def main() -> int:
 
     if not source_files:
         print("No source files found to scan.")
-        return 0
+        return SUCCESS
 
     results: dict[str, list] = {"errors": [], "warnings": [], "info": []}
 
@@ -284,7 +285,7 @@ def main() -> int:
     print(f"  Info          : {len(results['info'])}")
     print(f"  Target        : console.db (table qa_quality), feat_n={args.feat_number}")
 
-    return 0
+    return SUCCESS
 
 
 if __name__ == "__main__":

@@ -332,103 +332,34 @@ décision est tracée en git blame) — JAMAIS contourner via `--force`.
 
 ---
 
-## STEP 8.5 — Mutation testing (opt-in, v7.0.0 P0 §6.2)
+## STEP 8.5 — Mutation testing (opt-in, v7.0.0 P0)
 
-Skip si `MutationTestingMode: off` (défaut). Lire la config layered :
+Skip si `MutationTestingMode: off` (défaut). Substance opérationnelle
+(sélection cibles, tool per stack, verdict canonique, anti-derive) :
+**Read on-demand `@.claude/stacks/qa/mutation-testing.md §2-§5`**.
 
-```bash
-MUTATION_MODE=$(python -c "
-import sys; sys.path.insert(0, '.claude/python')
-from sdd_lib.layered_config import read_layered_config
-print((read_layered_config().get('MutationTestingMode') or 'off').lower())
-")
-MUTATION_SCORE_MIN=$(python -c "..." )  # MutationScoreMin (default 60)
-MUTATION_TIMEOUT=$(python -c "..." )    # MutationTestingTimeoutSec (default 600)
-```
+Verdict normalisé v7.0.0 (`PASS/WARN/FAIL/SKIPPED/INFRA_BLOCKED`) selon
+`MutationScoreMin` (défaut 60) avec tolérance 0.8×. Persiste
+`workspace/output/qa/feat-{n}/mutation.json` + console.db `qa_mutation`.
 
-Si `MUTATION_MODE in {minimal, full}` :
-
-1. **Sélection des cibles** (services métier vs CRUD trivial) :
-   - `minimal` : Services/*, UseCases/*, Domain/* (≠ DTO, Controllers, Mappers)
-   - `full` : tout `workspace/output/src/{BackendName|AppName}/` sauf entry points, tests
-
-2. **Invoquer le tool par stack** (cf. `stacks/qa/mutation-testing.md §2`) :
-   - `qa/dotnet-xunit` → `dotnet stryker --threshold-break $MUTATION_SCORE_MIN --timeout-ms $((MUTATION_TIMEOUT*1000))`
-   - `qa/node-vitest` → `npx stryker run --thresholds.break=$MUTATION_SCORE_MIN`
-   - `qa/python-pytest` → `mutmut run --paths-to-mutate src/`
-   - `qa/kotlin-junit` → `./gradlew pitest -DmutationThreshold=$MUTATION_SCORE_MIN`
-
-3. **Verdict canonique (cohérent API Gate v7.0.0)** :
-   - `PASS` si `mutation_score >= MutationScoreMin`
-   - `WARN` si `0.8 * MutationScoreMin <= mutation_score < MutationScoreMin`
-   - `FAIL` si `mutation_score < 0.8 * MutationScoreMin`
-   - `INFRA_BLOCKED` si tool absent OU timeout dépassé
-   - `SKIPPED` si `MutationTestingMode: off` OU aucune cible
-
-4. **Écrire** `workspace/output/qa/feat-{n}/mutation.json` + persister
-   dans `console.db` table `qa_mutation` (migration v8 — cf. P0-7).
-
-5. **Anti-derive** :
-   - ❌ Bloquer le pipeline sur `INFRA_BLOCKED` (le tool peut ne pas être installé) — émettre WARN seulement
-   - ❌ Mesurer mutation score si `coverage_lines_pct < 80%` — meaningless (le score sera artificiellement haut sur le code non couvert)
-   - ✅ Toujours respecter `MutationTestingTimeoutSec` (kill -9 si dépassé)
-
-Exit silencieux par défaut (`MutationTestingMode: off`). Aucun changement
-comportement byte-vs-pre-v7.0.0 sauf opt-in explicite.
+Anti-derive : ne pas bloquer sur `INFRA_BLOCKED` (WARN seulement) ;
+respecter `MutationTestingTimeoutSec` (kill -9). Exit silencieux par
+défaut — byte-identical pre-v7.0.0 sauf opt-in explicite.
 
 ---
 
-## STEP 8.bis — Playwright E2E (opt-in, v7.0.0 P1 §6.5)
+## STEP 8.bis — Playwright E2E (opt-in, v7.0.0 P1)
 
-Skip si `E2EMode: off` (défaut). Lire la config layered :
+Skip si `E2EMode: off` (défaut). Substance opérationnelle (start backend
+in-memory + SPA preview, sélection tests `smoke|happy-paths|full`, tool
+per stack, verdict canonique, anti-derive sleeps/HAR) : **Read on-demand
+`@.claude/stacks/qa/playwright.md §2-§5`**.
 
-```bash
-E2E_MODE=$(python -c "
-import sys; sys.path.insert(0, '.claude/python')
-from sdd_lib.layered_config import read_layered_config
-print((read_layered_config().get('E2EMode') or 'off').lower())
-")
-E2E_MIN_PER_US=$(...)  # E2EMinPerUs (default 1)
-E2E_TIMEOUT=$(...)     # E2ETimeoutSec (default 300)
-```
+Verdict normalisé v7.0.0 (`PASS/WARN/FAIL/SKIPPED/INFRA_BLOCKED`) selon
+`E2EMinPerUs` (défaut 1) et `E2ETimeoutSec` (défaut 300). Persiste
+`workspace/output/qa/feat-{n}/e2e.json` + console.db `qa_e2e`.
 
-Si `E2E_MODE in {smoke, happy-paths, full}` :
-
-1. **Skip silencieux** si aucun frontend stack actif OU aucune US n'a
-   de UI ACs (FEAT backend-only).
-
-2. **Démarrer backend in-memory + serve build SPA** :
-   - .NET : `dotnet run --project {BackendName}` (test fixture WebApplicationFactory)
-   - SPA : `npm run preview` (Vite) ou `ng serve` selon stack frontend
-   - Attendre readiness via `wait-on http://localhost:{port}` (timeout 60s).
-
-3. **Sélection des tests** :
-   - `smoke` : 1 test global `app loads + login form visible`
-   - `happy-paths` : 1 spec par US (parcours nominal AC-1 ou première AC UI)
-   - `full` : tous AC observables UI + edge cases élicitor (`Pre-mortem` / `Edge Cases`)
-
-4. **Invoquer le tool par stack frontend** (cf. `stacks/qa/playwright.md §2`) :
-   - `react`, `vue`, `angular` → `npx playwright test e2e/feat-{n}/ --timeout=${E2E_TIMEOUT}000`
-   - `blazor-webassembly` → `dotnet test {BackendName}.E2E.csproj --filter "FullyQualifiedName~Feat{n}"`
-
-5. **Verdict canonique (cohérent API Gate v7.0.0)** :
-   - `PASS` si `tests_failed == 0 AND us_covered >= us_total * E2EMinPerUs`
-   - `WARN` si `tests_failed == 0 AND us_covered < us_total` (couverture partielle)
-   - `FAIL` si `tests_failed >= 1`
-   - `INFRA_BLOCKED` si browsers absent (`playwright install`) OU backend unreachable
-   - `SKIPPED` si `E2EMode: off` OU aucune US avec UI ACs
-
-6. **Persistance** : `workspace/output/qa/feat-{n}/e2e.json` + insert
-   `console.db` table `qa_e2e` (schema v3, migration 0003 appliquée auto).
-
-7. **Anti-derive** :
-   - ❌ E2E contre la DB prod — toujours backend in-memory + preview SPA local
-   - ❌ Sleeps fixes (`page.waitForTimeout(3000)`) — utiliser `expect().toBeVisible()` waits
-   - ❌ Tests dépendant de l'ordre — chaque spec isolé
-   - ❌ Capture HAR prod (anonymisation OK pour debug local, jamais commit)
-   - ✅ Cap absolu `E2ETimeoutSec` (kill -9 si dépassé)
-
-Exit silencieux par défaut (`E2EMode: off`) — byte-identical pre-v7.0.0.
+Skip silencieux si aucun frontend stack actif OU aucune US avec UI ACs.
 
 ---
 
@@ -530,8 +461,13 @@ Idempotent et non-bloquant. Transition `Review → Done` valide sans `--force`.
 
 - Ne JAMAIS modifier le code de production sous
   `workspace/output/src/{App|Backend|Frontend|*Lib}/**` (read-only strict)
-- Ne JAMAIS générer de tests E2E, performance, accessibility, code
-  review hybride (hors scope SDD_Pro v3.1)
+- **Périmètre QA SDD_Pro v7.0.0** :
+  - ✅ Tests **unitaires** (STEP 5, obligatoire selon `QAMode`)
+  - ✅ Tests **mutation** (STEP 8, opt-in `MutationTestingMode != off`, stack `qa/mutation-testing`)
+  - ✅ Tests **E2E Playwright** (STEP 8.bis, opt-in `E2EMode != off`, stack `qa/playwright`)
+  - ❌ Tests **performance** → délégué au CI du projet généré (Lighthouse CI + wrk/k6, `accessibility-auditor`/`performance-auditor` retirés v7.0.0)
+  - ❌ Tests **accessibility** → délégué au CI (axe-core)
+  - ❌ Code review → agents dédiés `code-reviewer`/`security-reviewer`/`arch-reviewer`/`spec-compliance-reviewer`
 - Ne JAMAIS auto-corriger un test failure (rapporter, ne pas patcher)
 - Ne JAMAIS auto-installer un package non listé dans le QA stack actif
 - Ne JAMAIS modifier les FEATs, US, mockups HTML (read-only)

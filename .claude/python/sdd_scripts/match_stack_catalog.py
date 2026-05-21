@@ -29,7 +29,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from sdd_lib.paths import iso_now, repo_root  # noqa: E402
+from sdd_lib.paths import iso_now  # noqa: E402
 
 try:
     from sdd_scripts.scan_repo import scan as scan_repo_func

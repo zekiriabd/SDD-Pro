@@ -1,8 +1,13 @@
 # QA Stack — Kotlin JUnit 5 + MockK + JaCoCo
 
 > §2.4 (Librairies) régénérée depuis `kotlin-junit.libs.json` — ne pas éditer manuellement (`python .claude/python/sdd_admin/sync_stack_md.py --stack-id kotlin-junit`).
->
-> Validation: 🟢 reference (validated combo CMS — kotlin-spring-boot + react + shadcn + azure-ad, 2026-05-13)
+
+Status: Draft
+Validation: 🟢 reference (validated combo CMS — kotlin-spring-boot + react + shadcn + azure-ad, 2026-05-13)
+QA FEAT ID: kotlin-junit
+Scope: tests unitaires backend Kotlin (Spring Boot, Ktor)
+
+---
 
 ## 1. Scope
 

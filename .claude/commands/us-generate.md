@@ -122,6 +122,38 @@ Erreur silencieuse si state.json absent → WARN, non bloquant.
 
 ---
 
+### STEP 3.ter — Auto-ingest FEAT/US dans console.db (depuis 2026-05-21)
+
+Si l'agent PO a réussi (US écrites), invoquer **systématiquement** le script
+déterministe `ingest_feats_us.py` pour populer correctement les tables
+`feats` et `us` de `workspace/output/db/console.db` (cf. gap framework
+identifié 2026-05-21 — auparavant seules les colonnes skeleton `feat_n` +
+`feat-{n}` étaient remplies par les auditors via `ensure_feat_skeleton()`,
+laissant `name`, `actors_json`, `ac_count`, `sfd_count`, `br_count`,
+`fd_count`, `covers_json`, `status` à null/zéro et brisant l'affichage
+de la console web dashboard).
+
+```bash
+python .claude/python/sdd_scripts/ingest_feats_us.py 2>&1 | tail -1
+```
+
+| Exit | Sens | Action caller |
+|---|---|---|
+| `0` | Ingest OK | continuer (log 1 ligne `[OK] ingested N FEATs + M US`) |
+| `1` | DB introuvable / corrompue | WARN 1 ligne, continuer (non bloquant) |
+
+**Idempotent** : utilise `ON CONFLICT(feat_n|us_id) DO UPDATE` — re-exécution
+sans effet sur les counts (ré-écrit avec mêmes valeurs).
+
+**Coût** : 0 token LLM, ~50 ms, parse markdown déterministe (regex SFD-N /
+BR-N / AC-N / FD-N / `## Actors` / `Covers:`).
+
+**Non bloquant** : un échec de l'ingest n'invalide pas le succès du PO.
+Les US sur disque restent la SSoT ; le DB n'est qu'un cache projeté pour
+la console web.
+
+---
+
 ## STEP 4 — Inventaire des mockups HTML (depuis v4)
 
 Glob `workspace/input/ui/{n}-*.html` pour détecter les mockups déjà déposés.

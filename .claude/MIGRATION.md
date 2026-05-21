@@ -783,7 +783,7 @@ activer ; **0 effort** si tu restes en v6.1 behaviour.
    .claude/CLAUDE.md                         (v6.2.0)
    .claude/CHANGELOG.md                      (entry v6.2.0)
    .claude/MIGRATION.md                      (ce fichier)
-   .claude/docs/DESIGN-FROMPLAN-STRICT.md    (design de référence)
+   .claude/ARCHIVE/v7-design-superseded/DESIGN-FROMPLAN-STRICT.md    (design de référence)
    ```
 
 2. **Activer le chemin strict** dans `workspace/input/stack/stack.md` :

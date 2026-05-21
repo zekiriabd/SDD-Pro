@@ -1,8 +1,13 @@
 # QA Stack — .NET xUnit + Coverlet
 
 > §2.4 (Librairies) régénérée depuis `dotnet-xunit.libs.json` — ne pas éditer manuellement (`python .claude/python/sdd_admin/sync_stack_md.py --stack-id dotnet-xunit`).
->
-> Validation: 🟢 reference (validated combo — dotnet-minimalapi + blazor + radzen + azure-ad)
+
+Status: Draft
+Validation: 🟢 reference (validated combo — dotnet-minimalapi + blazor + radzen + azure-ad)
+QA FEAT ID: dotnet-xunit
+Scope: tests unitaires backend .NET (ASP.NET Core, Minimal API)
+
+---
 
 ## 1. Scope
 

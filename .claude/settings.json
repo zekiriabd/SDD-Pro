@@ -12,9 +12,6 @@
       "Agent",
       "Task",
       "TodoWrite",
-      "WebFetch",
-      "WebSearch",
-      "Bash",
       "Bash(dotnet:*)",
       "Bash(npm:*)",
       "Bash(pnpm:*)",
@@ -117,7 +114,8 @@
       "Bash(format:*)",
       "Bash(mkfs:*)"
     ],
-    "defaultMode": "acceptEdits"
+    "_defaultMode_doc": "v7.0.0-alpha (2026-05-21) : 'acceptEdits' (auto-accept Edit/Write/NotebookEdit silently) → 'default' (prompts on tools not in allow). Edit/Write/MultiEdit are explicitly allowlisted above so the SDD pipeline still flows ; this defaultMode change blocks ONLY tools that slip outside the curated allowlist. To restore the legacy auto-accept behaviour (faster but less safe), set `defaultMode: 'acceptEdits'` in .claude/settings.local.json (per-dev, gitignored).",
+    "defaultMode": "default"
   },
   "hooks": {
     "PreToolUse": [

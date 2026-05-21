@@ -42,6 +42,7 @@ from typing import Any
 
 from sdd_lib.paths import repo_root
 from sdd_lib.project_config import (
+    coerce_config_types,
     normalize_project_aliases,
     parse_kv_block,
     section_body,
@@ -100,8 +101,9 @@ def _parse_yaml_minimal(text: str) -> dict[str, Any]:
     type via downstream parsers).
     """
     out: dict[str, str] = {}
+    seen: dict[str, int] = {}
     line_re = re.compile(r"^\s*([A-Za-z][A-Za-z0-9_]*)\s*:\s*(.+?)\s*(?:#.*)?$")
-    for raw in text.splitlines():
+    for lineno, raw in enumerate(text.splitlines(), start=1):
         line = raw.split("#", 1)[0].rstrip() if "#" in raw and not _is_in_quotes(raw, "#") else raw.rstrip()
         if not line.strip() or line.lstrip().startswith("#"):
             continue
@@ -110,6 +112,13 @@ def _parse_yaml_minimal(text: str) -> dict[str, Any]:
             continue
         key, value = m.group(1), m.group(2).strip()
         value = value.strip('"').strip("'")
+        if key in seen:
+            raise ValueError(
+                f"[CONFIG_DUPLICATE_KEY] '{key}' defined twice "
+                f"(first at line {seen[key]}, again at line {lineno}). "
+                f"Remove one or use layered override (base ← team ← project)."
+            )
+        seen[key] = lineno
         out[key] = value
     return out
 
@@ -295,6 +304,7 @@ def read_layered_config(
     *,
     keys: tuple[str, ...] | None = None,
     include_sources: bool = False,
+    coerce: bool = False,
 ) -> dict[str, Any]:
     """Read 3-level Project Config: base.yml ← team.yml ← project.
 
@@ -303,9 +313,14 @@ def read_layered_config(
         keys: restrict to these keys
         include_sources: if True, return {'config': {...}, 'sources': {...}}
                          else return just the merged config dict
+        coerce: when True (opt-in, v7.0.0-alpha), apply
+            `project_config.coerce_config_types` so int/float/bool keys
+            return native Python types instead of strings. Default False
+            preserves byte-identical v6.x behaviour for legacy callers
+            (phase_planner, parse_coverage, ...) that do their own cast.
 
     Returns:
-        dict[str, str] merged config (or wrapper dict if include_sources).
+        dict[str, Any] merged config (or wrapper dict if include_sources).
         Raises ConfigError on policy violations (security downgrade).
 
     Backward compatibility:
@@ -324,6 +339,9 @@ def read_layered_config(
     if keys is not None:
         effective = {k: v for k, v in effective.items() if k in keys}
         sources = {k: v for k, v in sources.items() if k in keys}
+
+    if coerce:
+        effective = coerce_config_types(effective)
 
     if include_sources:
         return {"config": effective, "sources": sources}

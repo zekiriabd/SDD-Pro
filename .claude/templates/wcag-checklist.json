@@ -4,6 +4,8 @@
   "title": "WCAG 2.2 AA — accessibility-auditor scan patterns",
   "version": "1.0",
   "generated_at": "2026-05-19",
+  "status": "legacy-v7.0.0-no-active-consumer",
+  "status_note": "RETAINED FOR FUTURE INGEST. The accessibility-auditor agent that consumed this template was REMOVED in v7.0.0 (governance-major-auditors-trim). Schema preserved as a reference mapping (WCAG 2.2 AA × severity × CWE) in case an axe-core CI ingest is wired later — see error-classification-legacy.md §1 + §3. No agent loads this file in v7.0.0.",
   "rationale": "Externalized from .claude/agents/accessibility-auditor.md to support the v7.0.0 'compress accessibility-auditor 635 -> ~250 L' refactor (audit 2026-05-19, ROI #9). Agent reads this template at STEP 3 of its scan loop and produces issues with the codes/severities/WCAG refs declared here. Keep the agent prompt orchestration-only; rules data lives here. Forward-compatible: extending this list does not require touching the agent .md.",
   "design_systems": {
     "DS_IMG_TAGS": ["AvatarImage", "RadzenImage", "v-img", "mat-image", "Image"],

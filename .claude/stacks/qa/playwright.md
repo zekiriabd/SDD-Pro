@@ -1,9 +1,15 @@
 # QA Stack — Playwright E2E (opt-in, v7.0.0)
 
-> **Validation** : 🟡 experimental — schema opt-in, non actif par défaut.
+Status: Draft
+Validation: 🟡 experimental (schema opt-in, non actif par défaut)
+QA FEAT ID: playwright
+Scope: tests E2E navigateur multi-browser (combler trou API Gate v7)
+
 > **But** : combler le trou E2E navigateur. L'API Gate v7 ne teste que
 > le contrat HTTP back↔front, jamais le rendu SPA dans un vrai navigateur.
 > Playwright fournit ≥ 1 happy path par US matérialisée.
+
+---
 
 ## 1. Activation
 
@@ -79,24 +85,127 @@ Phase 5 (QA) — STEP 8.bis (nouveau, conditionnel) :
 4. Parser le résultat JSON Playwright → `workspace/output/qa/feat-{n}/e2e.json`
 5. Persist `console.db` table `qa_e2e` (migration v3 à créer)
 
-## 6. Anti-derive
+## 6. Exemples concrets par mode
+
+### 6.1 Mode `smoke` — 1 spec global
+
+`e2e/smoke.spec.ts` (React) :
+```typescript
+import { test, expect } from '@playwright/test';
+
+test('app loads and login form is visible', async ({ page }) => {
+  await page.goto('/');
+  await expect(page).toHaveTitle(/MyApp/);
+  await expect(page.getByLabel('Email')).toBeVisible();
+  await expect(page.getByRole('button', { name: /sign in/i })).toBeVisible();
+});
+```
+
+### 6.2 Mode `happy-paths` — 1 spec par US (AC-1 nominal)
+
+`e2e/feat-1/us-1-2-Login.spec.ts` (couvre AC-1 de l'US 1-2) :
+```typescript
+import { test, expect } from '@playwright/test';
+import { mockAuth } from '../fixtures/auth.fixture';
+
+test('AC-1: login with valid credentials redirects to /dashboard', async ({ page }) => {
+  await mockAuth(page, { user: 'alice@test.com', role: 'admin' });
+  await page.goto('/login');
+  await page.getByLabel('Email').fill('alice@test.com');
+  await page.getByLabel('Password').fill('correct-horse-battery');
+  await page.getByRole('button', { name: /sign in/i }).click();
+  await expect(page).toHaveURL(/\/dashboard/);
+  await expect(page.getByText(/welcome alice/i)).toBeVisible();
+});
+```
+
+### 6.3 Mode `full` — happy + edge cases élicitor
+
+`e2e/feat-1/us-1-2-Login.spec.ts` ajouts (FAIL-N + EDGE-N de la FEAT) :
+```typescript
+test('FAIL-1: invalid password shows error without leaking user existence', async ({ page }) => {
+  await page.goto('/login');
+  await page.getByLabel('Email').fill('alice@test.com');
+  await page.getByLabel('Password').fill('wrong');
+  await page.getByRole('button', { name: /sign in/i }).click();
+  await expect(page.getByRole('alert')).toHaveText(/invalid credentials/i);
+  await expect(page).toHaveURL(/\/login/);  // pas de redirect
+});
+
+test('EDGE-2: rate-limit after 5 failed attempts', async ({ page }) => {
+  for (let i = 0; i < 5; i++) {
+    await page.goto('/login');
+    await page.getByLabel('Email').fill('alice@test.com');
+    await page.getByLabel('Password').fill('wrong');
+    await page.getByRole('button', { name: /sign in/i }).click();
+  }
+  await expect(page.getByRole('alert')).toHaveText(/too many attempts/i);
+});
+```
+
+### 6.4 Fixtures partagées
+
+`e2e/fixtures/auth.fixture.ts` :
+```typescript
+import { Page } from '@playwright/test';
+
+export async function mockAuth(page: Page, opts: { user: string; role: string }) {
+  // Intercepte /api/auth/me pour retourner user + role sans appel réseau
+  await page.route('**/api/auth/me', route =>
+    route.fulfill({ json: { email: opts.user, role: opts.role, exp: 9999999999 } }),
+  );
+  // Inject JWT mocké dans localStorage (lu par le client React)
+  await page.addInitScript(token => {
+    localStorage.setItem('auth_token', token);
+  }, 'mocked.jwt.token');
+}
+```
+
+### 6.5 Mapping AC → spec
+
+| AC (US 1-2-Login) | Spec name | Mode requis |
+|---|---|---|
+| AC-1 (happy path) | `'AC-1: login with valid credentials...'` | `happy-paths`, `full` |
+| AC-2 (admin role redirect) | `'AC-2: admin user sees /admin...'` | `happy-paths`, `full` |
+| FAIL-1 (élicitor) | `'FAIL-1: invalid password...'` | `full` |
+| EDGE-2 (élicitor) | `'EDGE-2: rate-limit...'` | `full` |
+
+Convention : 1 `test()` par AC, nom préfixé `AC-N:` / `FAIL-N:` / `EDGE-N:`
+pour traçabilité automatique vers `spec-compliance-reviewer`.
+
+## 7. Edge cases & pièges connus
+
+| Piège | Symptôme | Solution |
+|---|---|---|
+| **Race condition login + redirect** | Test flaky 5–20 % | `await page.waitForURL(/\/dashboard/)` au lieu d'`expect(page).toHaveURL` |
+| **CI sans display** | Browsers crash en CI Linux | `npx playwright install --with-deps` (installe Xvfb + deps OS) |
+| **Backend in-memory ≠ prod** | E2E pass localement mais 500 en prod | Maintenir 1 spec contre staging (mode `containers` futur) |
+| **JWT mocké invalide après refresh** | Test échoue après ~1h | Set `exp: 9999999999` (futur lointain) dans mock |
+| **Vite preview port collision** | `EADDRINUSE :4173` | `PORT=0` (port aléatoire) + lecture stdout pour URL |
+| **Blazor WASM lent à boot** | `expect.toBeVisible` timeout 5s | Augmenter `timeout: 15000` global pour les specs Blazor |
+
+## 8. Anti-derive
 
 - ❌ E2E contre prod (jamais — toujours in-memory backend + preview SPA local)
 - ❌ Tests dépendant de l'ordre d'exécution
 - ❌ Sleeps fixes (`page.waitForTimeout(3000)`) — utiliser `expect().toBeVisible()` waits
 - ❌ Capture réseau prod (HAR files anonymisés OK pour debug, jamais commit)
+- ❌ Tests authentifiés sans fixture mockAuth (auth réelle = flaky + couplage Azure AD)
+- ❌ Sélecteurs CSS fragiles (`.btn-primary > span > i`) — préférer `getByRole`, `getByLabel`, `getByText`
 
-## 7. Statut implémentation
+## 9. Statut implémentation
 
-**v7.0.0** : stack documenté, **infrastructure pas encore câblée** dans
-`qa.md` ni `qa-generate.md`. Création migration `qa_e2e` table + STEP 8.bis
-reporté en v7.1.
+**v7.0.0** : ✅ stack câblé. `qa.md` STEP 8.bis invoque Playwright si
+`E2EMode != off`, persiste dans `console.db` table `qa_e2e` (migration
+`0003_add-qa-e2e-table.sql`). **Opt-in strict** (`off` par défaut) —
+aucun coût ajouté tant que le Tech Lead n'active pas via Project Config.
+Install Playwright reste **manuel** (Tech Lead), pas `arch` Phase A.
 
 **Recommandation** : activer `E2EMode: smoke` sur 1 FEAT pilote en local,
 mesurer coût marginal. Si < $0.50/FEAT et catches ≥ 1 bug réel → green-light
 pour câblage pipeline.
 
-## 8. Pourquoi pas `qa/cypress`
+## 10. Pourquoi pas `qa/cypress`
 
 Choix Playwright > Cypress (audit 2026-05-20) :
 - Multi-navigateur natif (Chromium + Firefox + WebKit + Edge)

@@ -42,6 +42,7 @@ from typing import Any
 # sdd_lib is sibling package — add parent dir to path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from sdd_lib.console_db import connect, ensure_initialized, insert_gate  # noqa: E402
+from sdd_lib.exit_codes import FAIL_FAST, SUCCESS  # noqa: E402
 from sdd_lib.file_locks import acquire_with_retry, release  # noqa: E402
 from sdd_lib.paths import iso_now  # noqa: E402
 from sdd_lib.stderr import warn  # noqa: E402
@@ -143,7 +144,7 @@ def main() -> int:
     if args.action == "read":
         if not status_file.is_file():
             print('{"decision":"none"}' if args.json else "none")
-            return 0
+            return SUCCESS
         status = read_status(status_file)
         gate = get_gate(status, feat_key, args.phase)
         decision = gate.get("decision", "none") if gate else "none"
@@ -152,9 +153,10 @@ def main() -> int:
             print(json.dumps(payload, separators=(",", ":")))
         else:
             print(decision)
-        return 0
+        return SUCCESS
 
     if args.action == "is-resolved":
+        # is-resolved predicate: returns 0/1 as boolean answer (not error code)
         if not status_file.is_file():
             return 1
         status = read_status(status_file)
@@ -191,7 +193,7 @@ def main() -> int:
                 print("pending")
         finally:
             release_lock(lock_path)
-        return 0
+        return SUCCESS
 
     if args.action == "set":
         acquire_lock(lock_path)
@@ -219,10 +221,10 @@ def main() -> int:
                 print(args.decision)
         finally:
             release_lock(lock_path)
-        return 0
+        return SUCCESS
 
     warn(f"Unknown action: {args.action}")
-    return 1
+    return FAIL_FAST
 
 
 if __name__ == "__main__":

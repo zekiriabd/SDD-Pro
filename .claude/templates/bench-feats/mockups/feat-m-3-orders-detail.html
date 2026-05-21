@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Commande #1042 — Détail</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f8fafc; margin: 0; padding: 24px; color: #0f172a; }
+    .container { max-width: 1000px; margin: 0 auto; }
+    .breadcrumb { font-size: 14px; color: #64748b; margin-bottom: 8px; }
+    .breadcrumb a { color: #2563eb; text-decoration: none; }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+    .header-left { display: flex; align-items: center; gap: 12px; }
+    h1 { font-size: 24px; font-weight: 600; margin: 0; }
+    .badge { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 13px; font-weight: 500; }
+    .badge-draft { background: #fef3c7; color: #92400e; }
+    .badge-confirmed { background: #d1fae5; color: #065f46; }
+    .badge-cancelled { background: #fee2e2; color: #991b1b; }
+    .card { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin-bottom: 16px; }
+    .card-title { font-size: 16px; font-weight: 600; margin: 0 0 16px 0; color: #0f172a; }
+    .meta-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+    .meta-field { display: flex; flex-direction: column; gap: 4px; }
+    .meta-field .label { font-size: 12px; font-weight: 500; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; }
+    .meta-field .value { font-size: 15px; color: #0f172a; }
+    .lines-table { width: 100%; border-collapse: collapse; }
+    .lines-table th { background: #f1f5f9; padding: 10px 12px; text-align: left; font-size: 12px; font-weight: 600; text-transform: uppercase; color: #475569; letter-spacing: 0.05em; border-bottom: 1px solid #e2e8f0; }
+    .lines-table th.amount { text-align: right; }
+    .lines-table td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
+    .lines-table td.amount { text-align: right; font-variant-numeric: tabular-nums; font-weight: 500; }
+    .lines-table tfoot td { background: #f8fafc; font-weight: 600; border-bottom: none; border-top: 2px solid #e2e8f0; }
+    .actions { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 24px; padding: 16px; background: white; border: 1px solid #e2e8f0; border-radius: 8px; }
+    .actions-hint { font-size: 13px; color: #64748b; }
+    .btn { padding: 10px 20px; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; border: 1px solid transparent; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-secondary { background: white; border-color: #cbd5e1; color: #0f172a; }
+    .btn-confirm { background: #10b981; color: white; border-color: #10b981; }
+    .btn-confirm:hover:not(:disabled) { background: #059669; }
+    .btn-cancel { background: #dc2626; color: white; border-color: #dc2626; }
+    .btn-cancel:hover:not(:disabled) { background: #b91c1c; }
+    .cancellation-notice { padding: 12px 16px; background: #fee2e2; border: 1px solid #fecaca; border-radius: 6px; color: #991b1b; font-size: 14px; margin-bottom: 16px; }
+    .cancellation-notice .label { font-weight: 600; display: block; margin-bottom: 4px; }
+    .modal-backdrop { display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.5); align-items: center; justify-content: center; z-index: 50; }
+    .modal { background: white; border-radius: 8px; padding: 24px; max-width: 480px; width: 90%; box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1); }
+    .modal h2 { font-size: 18px; font-weight: 600; margin: 0 0 12px 0; }
+    .modal textarea { width: 100%; min-height: 100px; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; font-family: inherit; resize: vertical; box-sizing: border-box; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 16px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="breadcrumb">
+      <a href="/orders">Commandes</a> &gt; Commande #1042
+    </div>
+    <div class="header">
+      <div class="header-left">
+        <h1>Commande #1042</h1>
+        <span class="badge badge-confirmed">Confirmed</span>
+      </div>
+      <a href="/orders" class="btn btn-secondary">← Retour à la liste</a>
+    </div>
+
+    <!-- Affiché uniquement si status=Cancelled -->
+    <!-- <div class="cancellation-notice">
+      <span class="label">Commande annulée le 2026-05-19 à 16:24</span>
+      Motif : Client a retiré sa commande suite à un changement de besoin métier.
+    </div> -->
+
+    <div class="card">
+      <h2 class="card-title">Informations</h2>
+      <div class="meta-grid">
+        <div class="meta-field">
+          <div class="label">Client</div>
+          <div class="value">ACME Corp</div>
+        </div>
+        <div class="meta-field">
+          <div class="label">Statut</div>
+          <div class="value">Confirmed</div>
+        </div>
+        <div class="meta-field">
+          <div class="label">Créée le</div>
+          <div class="value">2026-05-19 14:32</div>
+        </div>
+        <div class="meta-field">
+          <div class="label">Confirmée le</div>
+          <div class="value">2026-05-19 14:35</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 class="card-title">Lignes (read-only)</h2>
+      <table class="lines-table">
+        <thead>
+          <tr>
+            <th>Produit</th>
+            <th class="amount">Quantité</th>
+            <th class="amount">Prix unitaire</th>
+            <th class="amount">Total ligne</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>SKU-002 — Souris ergonomique</td>
+            <td class="amount">8</td>
+            <td class="amount">45,00 €</td>
+            <td class="amount">360,00 €</td>
+          </tr>
+          <tr>
+            <td>SKU-003 — Clavier mécanique</td>
+            <td class="amount">4</td>
+            <td class="amount">120,00 €</td>
+            <td class="amount">480,00 €</td>
+          </tr>
+          <tr>
+            <td>SKU-004 — Webcam HD</td>
+            <td class="amount">3</td>
+            <td class="amount">89,90 €</td>
+            <td class="amount">269,70 €</td>
+          </tr>
+          <tr>
+            <td>SKU-001 — Câble HDMI 2m</td>
+            <td class="amount">11</td>
+            <td class="amount">12,50 €</td>
+            <td class="amount">137,50 €</td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="3" class="amount">Total commande</td>
+            <td class="amount">1 247,20 €</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <div class="actions">
+      <span class="actions-hint">Une commande confirmée ne peut plus être modifiée. Seule action disponible : annulation.</span>
+      <div>
+        <!-- Affiché si status=Draft -->
+        <!-- <button class="btn btn-confirm">Confirmer la commande</button> -->
+        <!-- Affiché si status=Confirmed -->
+        <button class="btn btn-cancel" onclick="document.getElementById('cancel-modal').style.display='flex'">Annuler la commande</button>
+        <!-- Affiché si status=Cancelled : pas de bouton, voir cancellation-notice ci-dessus -->
+      </div>
+    </div>
+  </div>
+
+  <div id="cancel-modal" class="modal-backdrop" style="display:none">
+    <div class="modal">
+      <h2>Annuler la commande #1042</h2>
+      <p style="color:#64748b; font-size: 14px;">Motif d'annulation (obligatoire, 1-500 caractères) :</p>
+      <textarea placeholder="Ex. Client a retiré sa commande suite à..."></textarea>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="document.getElementById('cancel-modal').style.display='none'">Fermer</button>
+        <button class="btn btn-cancel">Confirmer l'annulation</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

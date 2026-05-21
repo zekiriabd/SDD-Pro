@@ -43,7 +43,7 @@ Conventions (cf. `.claude/python/README.md`):
 - Canonical ERROR format on stderr via sdd_lib.stderr.error_block
 
 Related:
-- `@.claude/docs/DESIGN-FROMPLAN-STRICT.md` (design)
+- `@.claude/ARCHIVE/v7-design-superseded/DESIGN-FROMPLAN-STRICT.md` (design)
 - `@.claude/rules/build-and-loop.md §7` (plan structure spec)
 - `@.claude/rules/error-classification.md` (PLAN_* codes)
 """
@@ -60,7 +60,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from sdd_lib.paths import normalize, repo_root  # noqa: E402
+from sdd_lib.paths import normalize  # noqa: E402
 from sdd_lib.stderr import error_block  # noqa: E402
 
 

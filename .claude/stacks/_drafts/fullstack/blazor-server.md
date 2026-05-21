@@ -1,4 +1,4 @@
-﻿# Tech FEAT: blazor-server (fullstack)
+# Tech FEAT: blazor-server (fullstack)
 
 Status: Draft  
 Validation: 🟡 experimental (combo non valide end-to-end dans SDD_Pro v6 — pattern derive d'un projet legacy Demo 2026-05)  

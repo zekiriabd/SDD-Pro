@@ -36,10 +36,18 @@ def _make_workspace(
     app_name: str = "AppFront",
     backend_name: str = "AppBack",
 ) -> Path:
-    """Construit un workspace minimal SDD_Pro pour tests."""
+    """Construit un workspace minimal SDD_Pro pour tests.
+
+    v7.0.1 fix : `_looks_like_repo_root()` requires `.claude/agents/` +
+    `.claude/commands/` + `workspace/` (strict check). Creating only
+    `.claude/` made tests walk up to the real repo and pollute
+    workspace/output/db/console.db.
+    """
     workspace = tmp_path
-    # Marker pour repo_root() detection (cf. sdd_lib/paths.py)
-    (workspace / ".claude").mkdir(exist_ok=True)
+    # Markers complets pour repo_root() detection (cf. sdd_lib/paths.py
+    # _looks_like_repo_root strict check post-mortem 2026-05-21).
+    (workspace / ".claude" / "agents").mkdir(parents=True, exist_ok=True)
+    (workspace / ".claude" / "commands").mkdir(parents=True, exist_ok=True)
     (workspace / "workspace" / "input" / "stack").mkdir(parents=True, exist_ok=True)
     (workspace / "workspace" / "input" / "stack" / "stack.md").write_text(stack_md, encoding="utf-8")
 

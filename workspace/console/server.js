@@ -43,7 +43,13 @@ const STATE_DIR  = join(WORKSPACE, "output", ".sys", ".state");
 const STATUS_FILE = join(CONSOLE_DIR, "status.json");
 const STACK_FILE  = join(WORKSPACE, "input", "stack", "stack.md");
 
-const PORT = parseInt(process.env.PORT || "5173", 10);
+// Port par défaut : 4000 (cohérent avec docs/commands/sdd-serve.md §6 +
+// docs/MCP-SERVER.md). 5173 (ancien défaut) entre en collision avec Vite
+// (react, vue) qui prend 5173 → /sdd-serve démarrait instablement quand
+// les 2 services se réservaient le même port. Override via env PORT=...
+// reste supporté pour compat scripts existants.
+// Bug filé 2026-05-21 ; fix v7.0.0-alpha (cf. CHANGELOG).
+const PORT = parseInt(process.env.PORT || "4000", 10);
 
 // HTTPS dev — clé/cert auto-signés générés via openssl (cf. .certs/).
 // Si la paire est absente, fallback HTTP (rétro-compat).

@@ -22,6 +22,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from sdd_lib.exit_codes import HOOK_ALLOW, HOOK_DENY  # noqa: E402
 from sdd_lib.hook_input import get_file_path, get_tool_name, read_hook_input  # noqa: E402
 from sdd_lib.paths import normalize, repo_root  # noqa: E402
 from sdd_lib.stderr import error_block  # noqa: E402
@@ -150,7 +151,7 @@ def main() -> int:
                 f"(declare preserves: dans {plan_name}) absent du fichier apres edition",
                 f"re-dispatcher l'agent ou restaurer manuellement '{preserved_id}' dans {file_path}",
             )
-            return 2
+            return HOOK_DENY
 
     for added_id in _parse_id_list(block_text, "adds"):
         if added_id not in content:
@@ -160,9 +161,9 @@ def main() -> int:
                 f"(declare adds: dans {plan_name}) non present apres ecriture",
                 f"re-dispatcher l'agent ou ajouter '{added_id}' manuellement dans {file_path}",
             )
-            return 2
+            return HOOK_DENY
 
-    return 0
+    return HOOK_ALLOW
 
 
 if __name__ == "__main__":

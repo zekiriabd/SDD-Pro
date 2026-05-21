@@ -113,14 +113,14 @@ Forme rejetée : `gate` (générique) sans qualificatif → toujours préfixer.
 | `qa` | Sonnet 4.6 | Tests + coverage + quality scan | 5 |
 | `elicitor` | Sonnet 4.6 | Élicitation FEAT (Pre-mortem, Red Team, etc.) | 1.5 |
 | `constitutioner` | Sonnet 4.6 | Maintien `constitution.md` post-arch | 4 |
-| `dashboard` | Haiku 4.5 | Rendu `INDEX.md` des ADRs | fin pipeline |
-| `accessibility-auditor` | Haiku 4.5 | Scan WCAG 2.2 AA | 5 (post-dev) |
+| ~~`dashboard`~~ | — | **RETIRÉ v7.0.0** — INDEX.md généré par `index_adrs.py` (déterministe) |
+| ~~`accessibility-auditor`~~ | — | **RETIRÉ v7.0.0** — remplacé par `axe-core` au CI projet |
 | `code-reviewer` | Sonnet 4.6 | Review cross-fichier anti-patterns | 5 |
-| `security-reviewer` | Sonnet 4.6 | STRIDE threat-model + scan OWASP Top 10 | 4.5 + 5 |
-| `performance-auditor` | Sonnet 4.6 | Core Web Vitals + SLO p95/p99 | 5 |
+| `security-reviewer` | Sonnet 4.6 | Scan OWASP Top 10 (mode `scan`). Mode `threat-model` retiré v7.0.0 → template humain | 5 |
+| ~~`performance-auditor`~~ | — | **RETIRÉ v7.0.0** — remplacé par Lighthouse CI + wrk/k6 au CI projet |
 | `spec-compliance-reviewer` | Sonnet 4.6 | Vérification AC-par-AC du code livré | 5 |
 | `arch-reviewer` | Sonnet 4.6 | Conformité pattern d'archi (MVC/DDD) | 5 |
-| `dev-backend-strict`, `dev-frontend-strict` | Sonnet 4.6 | From-Plan strict (opt-in v6.2) | 4 |
+| ~~`dev-backend-strict`, `dev-frontend-strict`~~ | — | **RETIRÉ v7.0.0** — variants Sonnet supprimés, `PlanCacheStrict` est DEPRECATED no-op |
 
 **Terminologie cross-agents** :
 - **Auditor** : agent post-dev qui produit un rapport sans modifier le code (accessibility, code, security, performance, spec-compliance, arch).
@@ -144,7 +144,7 @@ Forme rejetée : `gate` (générique) sans qualificatif → toujours préfixer.
 | **Lib lock** | Verrou atomique par entité pour le projet shared `LibName` (procédure `acquire_libname_lock.py`). | `rules/ownership.md §4` |
 | **Idempotence** | Une commande relancée 2× avec mêmes inputs produit le même résultat sans effet de bord cumulé. | `docs/conventions.md §2` |
 | **Selective read** | Lecture sélective : un agent ne lit que les artefacts strictement nécessaires à son US (1 fichier US, pas la FEAT entière). | `CLAUDE.md §1` |
-| **Strict mode** | Variant Sonnet 4.6 des dev-* qui consomme un plan v2 strict-ready (digest auto-suffisant). | `docs/DESIGN-FROMPLAN-STRICT.md` |
+| **Strict mode** | (retiré v7.0.0) Variant Sonnet 4.6 des dev-* qui consommait un plan v2 strict-ready. Tous les plans (v1 et v2) sont désormais matérialisés par les agents canoniques Opus 4.7. | `ARCHIVE/v7-design-superseded/DESIGN-FROMPLAN-STRICT.md` |
 | **Constitution** | Fichier `workspace/output/.sys/.context/constitution.md` partagé entre agents pour cohérence sémantique cross-FEAT (glossaire local, acteurs, ADRs index). | `rules/constitution.md` |
 | **Checkpoint** | Mécanisme de reprise post-crash via hashing input des phases. | v6.6.2+ |
 

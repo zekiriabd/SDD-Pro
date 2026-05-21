@@ -593,12 +593,25 @@ Configuration API — **DEUX patterns mutuellement exclusifs** :
 **Pattern A — Proxy Vite** (recommandé, dev only, pas de CORS dev) :
 ```typescript
 // vite.config.ts
+import basicSsl from "@vitejs/plugin-basic-ssl"  // HTTPS dev (auth Azure AD)
 export default defineConfig({
+  plugins: [react(), basicSsl()],   // ← basicSsl pour matcher Azure AD HTTPS Redirect URI
   server: {
     port: 5173,
+    https: {},                       // active HTTPS via basic-ssl
     proxy: {
-      "/api": {
-        target: "http://localhost:5143",  // ← port backend HTTP du stack actif (LITTÉRAL)
+      // ⚠️ POST-MORTEM 2026-05-21 — Slash final OBLIGATOIRE sur chaque préfixe.
+      // Sans slash, Vite fait du prefix-match → '/api' capture aussi '/apis'
+      // ou '/auth' capture '/authentication/login-callback' (route SPA MSAL).
+      // Le slash final force le match strict des sous-chemins seulement.
+      "/api/":  {
+        target: "https://localhost:5143",  // ← port backend HTTPS du stack actif (LITTÉRAL)
+        changeOrigin: true,
+        secure: false,                     // accepte cert self-signed dev
+      },
+      // Si auth/azure-ad actif : proxy aussi /auth/ vers backend pour /auth/config.
+      "/auth/": {
+        target: "https://localhost:5143",
         changeOrigin: true,
         secure: false,
       },
@@ -634,6 +647,42 @@ FIX: 1. lire le port HTTP depuis workspace/output/src/{BackendName}/Properties/l
      2. mettre target: "http://localhost:{port}" dans vite.config.ts
      3. relancer le dev server Vite
 ```
+
+---
+
+### 5.bis Coercion ID au boundary API (anti-mismatch back↔front)
+
+**Post-mortem 2026-05-21** : un backend Kotlin/Spring expose un DTO
+`AnnonceurLookupResponse(id: Int)` → JSON `{"id": 5}`. Le frontend
+typé `id: string` provoque alors :
+- `Array.some(a => a.id === watchedValue)` → `5 === "5"` strict → **false**
+- shadcn `<Select value={field.value}>` reçoit un number mais form RHF
+  stocke string → re-render boucle inf ou "Valeur indisponible" affichée
+- Zod schema `fkXxx: z.string().regex(/^[guid]/)` rejette tout entier-as-string
+
+**Convention canonique** : **coercer les ID en `string` au boundary
+fetch** (juste après `apiFetch` et avant retour) :
+
+```typescript
+// src/api/annonceursApi.ts
+export async function getAnnonceurs(): Promise<AnnonceurLookupDto[]> {
+  const data = await apiFetch<Array<{ id: number | string; libelle: string }>>(
+    '/api/v1/annonceurs',
+    ...
+  )
+  // ← coerce id au boundary (idempotent si déjà string)
+  return data.map(a => ({ id: String(a.id), libelle: a.libelle }))
+}
+```
+
+**Côté Zod schema** : adapter le regex à la réalité du backend
+(`^\d+$` pour ID entier serial, `^[0-9a-f]{8}-...` pour UUID).
+Pas de regex GUID par défaut sans vérification.
+
+**Anti-pattern** : laisser `id: number` traverser jusqu'au form RHF.
+Le contrat React state + DOM value est **toujours string** ;
+laisser un `number` dedans crée des `===` strict qui échouent
+silencieusement.
 
 ---
 

@@ -52,9 +52,26 @@ lit `IConfiguration` / `application.yml` / `config/default.json` /
   `accessTokenAcceptedVersion` v1=`api://{guid}` vs v2=`{guid}`).
   Exemple : `api://{guid1},{guid1},api://{guid2},{guid2}`.
 - AZ_BE_CALLBACKPATH : retour backend (ex. `/signin-oidc`)
-- AZ_FE_CALLBACKPATH : retour frontend. Recommandé
-  `/authentication/login-callback` (convention Blazor/Microsoft.Identity.Web).
-  Alternative `/login-callback` si projet exclusivement React/Vue/Angular.
+- AZ_FE_CALLBACKPATH : retour frontend. **Canonical pour tous SPAs
+  (React/Vue/Angular/Blazor) : `/authentication/login-callback`**
+  (convention Microsoft.Identity.Web/Blazor — adoptée comme défaut
+  cross-stack par SDD_Pro depuis 2026-05-21 pour éviter le piège
+  AADSTS50011 quand la valeur ne matche pas l'URI enregistrée
+  côté Azure AD App Registration).
+
+  ⚠️ **Anti-pattern post-mortem 2026-05-21** : `/login-callback`
+  (sans préfixe `authentication/`) NE doit PAS être utilisé pour les
+  raisons suivantes :
+  1. Collision **Vite proxy** `/auth` (prefix-match) sur React — le path
+     `/auth/config` (proxy backend) et `/auth-callback` peuvent piéger
+     `/authentication/login-callback` si la règle proxy n'est pas
+     `/auth/` (slash final strict). Path `/authentication/...` évite
+     l'ambiguïté car ne commence pas par `/auth/`.
+  2. Convention **Azure AD App Reg** : les Redirect URIs sont
+     case-sensitive ET exact-match. Un projet qui migre de Blazor
+     (`/authentication/login-callback`) vers React n'a plus à
+     ré-enregistrer l'URI dans Azure AD si la même convention est
+     utilisée — réduit la friction multi-stack.
 
 ### Variables optionnelles
 
@@ -697,9 +714,19 @@ class CorsConfig(
 | `node-express` | `app.use(cors({ origin: [...], credentials: true }))` |
 
 **Alternative dev only — Vite proxy** (évite CORS, redirige `/api` et
-`/auth` vers backend depuis même origin) :
+`/auth/` vers backend depuis même origin) :
 ```ts
-server: { proxy: { "/api": "http://localhost:8080", "/auth": "http://localhost:8080" } }
+server: {
+  proxy: {
+    "/api/":  { target: "https://localhost:44328", changeOrigin: true, secure: false },
+    // ⚠️ POST-MORTEM 2026-05-21 — Slash final OBLIGATOIRE sur '/auth/' :
+    // sans slash, le prefix-match capture aussi '/authentication/login-callback'
+    // (route SPA MSAL callback) → proxy vers backend → 401 Spring Security →
+    // Azure AD redirect échoue silencieusement. Le slash final force le match
+    // strict de '/auth/config' uniquement.
+    "/auth/": { target: "https://localhost:44328", changeOrigin: true, secure: false },
+  }
+}
 ```
 À utiliser **uniquement en dev** ; prod requiert CORS backend ou même-origin.
 

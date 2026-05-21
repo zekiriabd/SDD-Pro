@@ -29,6 +29,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from sdd_lib.exit_codes import HOOK_ALLOW, HOOK_DENY  # noqa: E402
 from sdd_lib.hook_input import (  # noqa: E402
     get_nested,
     get_subagent_type,
@@ -63,21 +64,49 @@ REJECTED_AGENTS_V7: dict[str, str] = {
 
 
 def extract_us_and_feat(haystack: str) -> tuple[int, str]:
-    """Best-effort regex extraction of FEAT number and US id from the prompt."""
+    """Best-effort regex extraction of FEAT number and US id from the prompt.
+
+    v7.0.1 (audit C3) : tightened regex to require an SDD-shaped anchor
+    (FEAT/US prefix, command name, or `{n}-{m}-{Name}` SDD basename) to
+    avoid spurious matches on arbitrary numeric pairs in the prompt
+    (e.g. "42-1234" inside an unrelated identifier or path). The legacy
+    free-form `\\b(\\d{1,3})-(\\d{1,3})\\b` pattern is preserved as a
+    fallback so usability is unchanged in ambiguous contexts.
+    """
     feat_number = 0
     us_id = ""
 
-    m_us = re.search(r"\b(\d{1,3})-(\d{1,3})(?:-[A-Za-z][A-Za-z0-9\-]*)?\b", haystack)
+    # Pass 1 (strict) : SDD-anchored {n}-{m} reference. Either preceded by
+    # a command/keyword, or followed by `-{Name}` capitalised basename.
+    m_us = re.search(
+        r"(?i)(?:"
+        r"(?:FEAT|us|sdd-full|/?dev-run|/?dev-plan|/?dev-backend|/?dev-frontend"
+        r"|/?qa-generate|/?us-generate|/?arch-init|/?feat-validate)"
+        r"\s*[-:]?\s*"
+        r"|\b"  # OR plain word boundary if followed by Capital basename
+        r")(\d{1,3})-(\d{1,3})(?:-[A-Z][A-Za-z0-9\-]*)?\b",
+        haystack,
+    )
     if m_us:
         us_id = f"{m_us.group(1)}-{m_us.group(2)}"
         feat_number = int(m_us.group(1))
-    else:
-        m_feat = re.search(
-            r"(?i)\b(?:FEAT|feat-?|sdd-full|us-generate|dev-run|dev-plan|qa-generate)\s*[-:]?\s*(\d{1,3})\b",
-            haystack,
-        )
-        if m_feat:
-            feat_number = int(m_feat.group(1))
+        return feat_number, us_id
+
+    # Pass 2 (lenient fallback) : any {n}-{m} pair, but require both numbers
+    # ≤ 999 and not adjacent to other digits/letters (avoid mid-identifier matches).
+    m_us2 = re.search(r"(?<![\w-])(\d{1,3})-(\d{1,3})(?![\w-])", haystack)
+    if m_us2:
+        us_id = f"{m_us2.group(1)}-{m_us2.group(2)}"
+        feat_number = int(m_us2.group(1))
+        return feat_number, us_id
+
+    # Pass 3 : FEAT-only reference (no US id)
+    m_feat = re.search(
+        r"(?i)\b(?:FEAT|feat-?|sdd-full|us-generate|dev-run|dev-plan|qa-generate)\s*[-:]?\s*(\d{1,3})\b",
+        haystack,
+    )
+    if m_feat:
+        feat_number = int(m_feat.group(1))
 
     return feat_number, us_id
 
@@ -133,13 +162,13 @@ def main() -> int:
         # In strict mode (CI), block the invocation. In warn mode (interactive),
         # the operator sees the WARN but can proceed.
         if mode == "strict":
-            return 2
-        return 0
+            return HOOK_DENY
+        return HOOK_ALLOW
 
     if subagent not in ALLOWED_AGENTS:
         # Unknown agent — silent skip preserves backward-compat with custom
         # agents not registered in SDD_Pro framework.
-        return 0
+        return HOOK_ALLOW
 
     prompt = get_nested(payload, "tool_input", "prompt", default="") or ""
     descr = get_nested(payload, "tool_input", "description", default="") or ""
@@ -187,13 +216,13 @@ def main() -> int:
                 "(query_console_db.py ou /api/audit) ; reduire reads/ du loader "
                 "OU exporter SDD_BUDGET_MODE=warn"
             )
-            return 2
+            return HOOK_DENY
         warn(
             f"WARN preflight-agent-budget: budget depasse pour '{subagent}' "
             "(mode=warn, non bloquant)"
         )
 
-    return 0
+    return HOOK_ALLOW
 
 
 if __name__ == "__main__":

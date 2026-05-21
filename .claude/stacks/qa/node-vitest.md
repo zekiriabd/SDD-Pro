@@ -1,8 +1,13 @@
 # QA Stack — Vitest + Testing Library + c8
 
 > §2.4 (Librairies) régénérée depuis `node-vitest.libs.json` — ne pas éditer manuellement (`python .claude/python/sdd_admin/sync_stack_md.py --stack-id node-vitest`).
->
-> Validation: 🟢 reference (validated combo CMS — kotlin-spring-boot + react + shadcn + azure-ad, 2026-05-13)
+
+Status: Draft
+Validation: 🟢 reference (validated combo CMS — kotlin-spring-boot + react + shadcn + azure-ad, 2026-05-13)
+QA FEAT ID: node-vitest
+Scope: tests unitaires backend Node.js + frontend React/Vue
+
+---
 
 ## 1. Scope
 

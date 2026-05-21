@@ -9,7 +9,7 @@
 |---|---|---|
 | `fullstack/` (6) | `angular-universal`, `blazor-server`, `kotlin-mustache`, `next`, `node-react`, `nuxt` | Aucun combo `/sdd-full` validé end-to-end. ~3 569 LOC de spec maintenue sans preuve d'exécution. |
 | `mobiles/` (2) | `maui`, `react-native` | Idem — `AppType=mobile-*` jamais exercé bout-en-bout. |
-| `archi/` (2) | `ddd.md`, `microservice.md` | `ddd` est en YAML pseudo-DSL non parseable par les agents (doc flair) ; `microservice` aspirational. Seul `mvc.md` est exécuté en production. |
+| `archi/` (1) | `microservice.md` | `microservice` aspirational, jamais utilisé en runtime. `ddd.md` **réactivé** 2026-05-20 (cf. ADR `governance-restore-ddd-archi-pattern`) car workspace runtime CMSPrint l'utilise déjà — la quarantaine créait une contradiction (pattern actif mais non reconnu par framework). |
 
 ## Conséquences runtime
 
@@ -31,5 +31,6 @@ Procédure (post-freeze v7.0.0, jamais sur `main` pendant freeze) :
 ## Historique
 
 - **2026-05-20** (v7.0.0) : déplacement initial depuis `fullstack/`, `mobiles/`, `archi/` (ADR `governance-major-stacks-quarantine`).
+- **2026-05-20** (v7.0.0-alpha post-audit) : `ddd.md` **retiré de la quarantaine** vers `.claude/stacks/archi/ddd.md` (ADR `governance-restore-ddd-archi-pattern`) — résout la contradiction audit M5 (workspace utilise DDD, framework ne le reconnaissait plus). Statut `🟡 experimental` (pas encore de PoC formel).
 
 > Source de vérité combos validés : `.claude/CLAUDE.md §7 "Combos validés bout-en-bout"`.

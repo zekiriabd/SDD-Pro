@@ -127,17 +127,25 @@ validate_readiness, validate_semantic, validate_fidelity, parse_coverage,
 quality_scan, mark_breaking_resolved, acquire_libname_lock,
 compact_front_plans, sdd_state, gate_decide).
 
-### Scripts From-Plan Strict (v6.2)
+### Scripts From-Plan (v6.2 → v7.0.0)
 
-Deux nouveaux scripts ajoutés en v6.2 pour le chemin From-Plan Strict
-(opt-in via `PlanCacheStrict: true` dans Project Config) :
+Deux scripts pour le chemin From-Plan (validation déterministe avant
+spawn dev-*) :
+
+> **v7.0.0 change** : le mode "strict" (variants `dev-*-strict` Sonnet)
+> a été retiré (governance-major-prompts-trim). Le flag `PlanCacheStrict`
+> est désormais **DEPRECATED no-op** — toléré en lecture pour
+> backward-compat, mais le routing `/dev-run` STEP 6.0.bis spawn toujours
+> `dev-*` Opus 4.7 que `validate_plan.py` retourne 0 (plan v2 avec
+> Inline Digest) ou 1 (plan v1 legacy). Seul exit 2 (stale/invalide)
+> reste bloquant.
 
 | Script | Rôle | Invocateurs |
 |---|---|---|
-| `sdd_scripts/validate_plan.py` (~370 LOC, 21 tests) | Validation structurelle + strict-readiness d'un plan `.back.md` / `.front.md`. Exit 0 (strict-ready), 1 (not strict-ready → fallback classic Opus), 2 (stale/invalide → STOP). | `dev-run` STEP 6.0.bis, `dev-plan` STEP 4.7, `dev-*-strict` STEP 1, `sdd-status` (diagnostic) |
-| `sdd_scripts/compute_plan_metadata.py` (~150 LOC, 7 tests) | Helper YAML/JSON pour générer le v2 frontmatter (`plan-schema-version: 2`, `us-hash` SHA-256, `claude-md-hash`, `generated-at` ISO, `capabilities-triggered`, `strict-ready: true`). | `dev-backend` STEP 5.2 (mode `:plan`), `dev-frontend` STEP 6.4 (mode `:plan`) |
+| `sdd_scripts/validate_plan.py` (~370 LOC, 21 tests) | Validation structurelle + détection staleness (`us-hash` mismatch) d'un plan `.back.md` / `.front.md`. Exit 0 (plan v2 valide), 1 (plan v1 legacy valide), 2 (stale/invalide/corrompu → STOP). Le flag CLI `--strict` est accepté en no-op pour backward-compat. | `dev-run` STEP 6.0.bis (gate staleness), `dev-plan` STEP 5 (post-génération), `sdd-status` (diagnostic) |
+| `sdd_scripts/compute_plan_metadata.py` (~150 LOC, 7 tests) | Helper YAML/JSON pour générer le v2 frontmatter (`plan-schema-version: 2`, `us-hash` SHA-256, `claude-md-hash`, `generated-at` ISO, `capabilities-triggered`). | `dev-backend` STEP 5.2 (mode `:plan`), `dev-frontend` STEP 6.4 (mode `:plan`) |
 
-Détail design : `@.claude/docs/DESIGN-FROMPLAN-STRICT.md`.
+Détail design (archive) : `@.claude/ARCHIVE/v7-design-superseded/DESIGN-FROMPLAN-STRICT.md`.
 Détail format plan v2 : `@.claude/rules/build-and-loop.md §7.4.bis`.
 
 ### Conventions

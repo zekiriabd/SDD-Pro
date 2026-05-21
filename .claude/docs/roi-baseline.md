@@ -5,8 +5,17 @@
 > marquée `<TBD>` doit être remplacée par une **mesure réelle**
 > issue de `console.db` + journal humain.
 >
-> **Statut au 2026-05-19** : aucune mesure. À exécuter avant tag `v7.0.0`
-> (cf. `ADR-20260519T193000-governance-roi-poc §8` critères de release).
+> **Statut au 2026-05-20** : décision audit prise — bench focalisé
+> **FEAT M Kotlin uniquement** pour rc1 (1 cellule mesurée > 6 bâclées).
+> Runbook : `@.claude/docs/benchmarks/runbook-bench-m.md`.
+> Cellules S, L, C1 dotnet : reportées post-rc1.
+>
+> **Cibles critères de release v7.0.0-rc1** (sync §5.2) :
+> - FEAT M wall-clock : framework ≤ humain / 5
+> - FEAT M coût $ : framework ≤ humain / 50
+> - FEAT M coverage : framework ≥ humain - 5 pts
+> - FEAT M AC verified : framework ≥ 90 %
+> - Variance 3 runs : σ ≤ 15 % wall-clock & coût
 
 ---
 

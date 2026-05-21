@@ -10,6 +10,21 @@ L'application possède plusieurs pages fonctionnelles (campagnes, etc.) mais auc
 
 Disposer d'un composant menu global persistant sur le layout principal, accessible uniquement aux utilisateurs authentifiés Azure AD, qui centralise la navigation et les actions transverses.
 
+## Quantified Goal
+
+- **Metric** : présence visuelle du menu sur 100% des routes protégées ; navigation cross-route sans flicker
+- **Target** : rendu menu < 100ms après mount du layout ; persistance d'état (collapsed/expanded) entre routes
+- **Deadline** : `<à préciser>`
+
+## Non-Functional Constraints
+
+- **Volume** : ~`<à préciser>` items menu (ordre de grandeur ≤ 20)
+- **Performance** : rendu sans appel réseau (purement client) ; pas de re-render au changement de route
+- **Retention** : état UI menu en localStorage uniquement, pas de persistance serveur
+- **Compliance** : n/a (UI uniquement)
+- **Integration** : composant du Design System actif ; consommé par MainLayout (cf. FEAT 1 FD-8)
+- **Degraded mode** : menu rendu même si endpoint notifications futur est indisponible (notifications hors scope cette spec)
+
 ## Actors
 
 - Utilisateur authentifié Azure AD: utilise le menu pour naviguer et accéder à son profil

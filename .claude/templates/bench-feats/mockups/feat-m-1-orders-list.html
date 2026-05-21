@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Commandes — Liste</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f8fafc; margin: 0; padding: 24px; color: #0f172a; }
+    .container { max-width: 1200px; margin: 0 auto; }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+    h1 { font-size: 24px; font-weight: 600; margin: 0; }
+    .btn-primary { background: #2563eb; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 500; cursor: pointer; }
+    .filters { display: flex; gap: 12px; margin-bottom: 16px; padding: 16px; background: white; border-radius: 8px; border: 1px solid #e2e8f0; }
+    .filter-field { display: flex; flex-direction: column; gap: 4px; }
+    .filter-field label { font-size: 12px; font-weight: 500; color: #64748b; }
+    .filter-field select, .filter-field input { padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; }
+    table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; border: 1px solid #e2e8f0; }
+    th { background: #f1f5f9; padding: 12px; text-align: left; font-size: 12px; font-weight: 600; text-transform: uppercase; color: #475569; letter-spacing: 0.05em; }
+    td { padding: 12px; border-top: 1px solid #e2e8f0; font-size: 14px; }
+    .badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 12px; font-weight: 500; }
+    .badge-draft { background: #fef3c7; color: #92400e; }
+    .badge-confirmed { background: #d1fae5; color: #065f46; }
+    .badge-cancelled { background: #fee2e2; color: #991b1b; }
+    .row-link { color: #2563eb; text-decoration: none; font-weight: 500; }
+    .pagination { display: flex; justify-content: space-between; align-items: center; margin-top: 16px; padding: 12px; background: white; border-radius: 8px; border: 1px solid #e2e8f0; }
+    .pagination-info { font-size: 14px; color: #64748b; }
+    .pagination-controls { display: flex; gap: 8px; }
+    .btn-page { padding: 6px 12px; border: 1px solid #cbd5e1; background: white; border-radius: 6px; cursor: pointer; font-size: 14px; }
+    .btn-page:disabled { opacity: 0.5; cursor: not-allowed; }
+    .amount { text-align: right; font-variant-numeric: tabular-nums; font-weight: 500; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Commandes</h1>
+      <button class="btn-primary">+ Nouvelle commande</button>
+    </div>
+
+    <div class="filters">
+      <div class="filter-field">
+        <label for="filter-status">Statut</label>
+        <select id="filter-status">
+          <option value="">Tous</option>
+          <option value="Draft">Draft</option>
+          <option value="Confirmed">Confirmed</option>
+          <option value="Cancelled">Cancelled</option>
+        </select>
+      </div>
+      <div class="filter-field">
+        <label for="filter-customer">Client</label>
+        <select id="filter-customer">
+          <option value="">Tous</option>
+          <option value="1">ACME Corp</option>
+          <option value="2">Globex Inc</option>
+          <option value="3">Initech SARL</option>
+        </select>
+      </div>
+      <div class="filter-field">
+        <label for="filter-from">Du</label>
+        <input type="date" id="filter-from">
+      </div>
+      <div class="filter-field">
+        <label for="filter-to">Au</label>
+        <input type="date" id="filter-to">
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Id</th>
+          <th>Client</th>
+          <th>Statut</th>
+          <th class="amount">Total</th>
+          <th>Créé le</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><a href="/orders/1042" class="row-link">#1042</a></td>
+          <td>ACME Corp</td>
+          <td><span class="badge badge-confirmed">Confirmed</span></td>
+          <td class="amount">1 248,00 €</td>
+          <td>2026-05-19 14:32</td>
+          <td><a href="/orders/1042" class="row-link">Voir</a></td>
+        </tr>
+        <tr>
+          <td><a href="/orders/1041" class="row-link">#1041</a></td>
+          <td>Globex Inc</td>
+          <td><span class="badge badge-draft">Draft</span></td>
+          <td class="amount">432,50 €</td>
+          <td>2026-05-19 11:08</td>
+          <td><a href="/orders/1041" class="row-link">Voir</a></td>
+        </tr>
+        <tr>
+          <td><a href="/orders/1040" class="row-link">#1040</a></td>
+          <td>Initech SARL</td>
+          <td><span class="badge badge-cancelled">Cancelled</span></td>
+          <td class="amount">980,00 €</td>
+          <td>2026-05-18 17:45</td>
+          <td><a href="/orders/1040" class="row-link">Voir</a></td>
+        </tr>
+        <tr>
+          <td><a href="/orders/1039" class="row-link">#1039</a></td>
+          <td>ACME Corp</td>
+          <td><span class="badge badge-confirmed">Confirmed</span></td>
+          <td class="amount">2 540,75 €</td>
+          <td>2026-05-18 10:21</td>
+          <td><a href="/orders/1039" class="row-link">Voir</a></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="pagination">
+      <span class="pagination-info">Affichage de 1 à 20 sur 47 commandes</span>
+      <div class="pagination-controls">
+        <button class="btn-page" disabled>Précédent</button>
+        <button class="btn-page">1</button>
+        <button class="btn-page">2</button>
+        <button class="btn-page">3</button>
+        <button class="btn-page">Suivant</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

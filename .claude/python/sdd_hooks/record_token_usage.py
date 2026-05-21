@@ -207,8 +207,37 @@ def _persist_to_db(entry: dict[str, Any]) -> None:
     preflight_cost_cap.py de filtrer par run_id exact au lieu de la
     fenêtre temporelle started_at/ended_at (fragile en concurrence)."""
     ensure_initialized()
-    run_id = (os.environ.get("SDD_RUN_ID") or "").strip() or None
+    # v7.0.1 : always resolve a stable run_id via sdd_lib/run_id helper
+    # (env > workspace marker > generated). Avoids null run_id rows that
+    # broke per-run aggregation in preflight_cost_cap.
+    try:
+        from sdd_lib.run_id import get_or_create_run_id
+        run_id = get_or_create_run_id()
+    except Exception:
+        run_id = (os.environ.get("SDD_RUN_ID") or "").strip() or None
     with connect() as conn:
+        # v7.0.0-alpha P0 fix 2026-05-21 — upsert a parent runs row before
+        # inserting token_usage. Required by FK constraint
+        # token_usage.run_id -> runs(run_id). Previously masked by the
+        # silently-broken `find_project_root` import (ran the except branch,
+        # producing NULL run_id rows which SQLite allowed). With run_id.py
+        # fixed, we always have a valid run_id but no guarantee that the
+        # orchestrator (/sdd-full STEP 1.quart) was the one that created
+        # the runs row — e.g. ad-hoc Agent calls outside /sdd-full. The
+        # upsert is idempotent and inexpensive.
+        if run_id:
+            try:
+                from sdd_lib.console_db import upsert_run
+                upsert_run(
+                    conn,
+                    run_id=run_id,
+                    command=os.environ.get("SDD_RUN_COMMAND") or "hook",
+                    status="running",
+                )
+            except Exception:
+                # Defensive : never break the token record path on a parent
+                # upsert error — fall back to NULL run_id to preserve the row.
+                run_id = None
         insert_token_usage(
             conn,
             agent=entry.get("subagent_type") or entry.get("hook_event") or "unknown",

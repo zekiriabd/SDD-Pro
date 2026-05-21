@@ -83,17 +83,26 @@ IGNORE_PATTERNS: tuple[re.Pattern[str], ...] = (
 
 
 def _parse_cutoff() -> datetime:
-    """Return cutoff datetime: env $SDD_DISPATCH_START_TS or now-5min."""
+    """Return cutoff datetime: env $SDD_DISPATCH_START_TS, marker file, or now-5min.
+
+    v7.0.1 : delegated resolution to sdd_lib/run_id helper which scopes the
+    cutoff to the current run's start (run_id marker mtime) when the env
+    var is not explicitly set. Final fallback remains now-5min for safety.
+    """
     raw = os.environ.get("SDD_DISPATCH_START_TS", "").strip()
-    if raw:
-        # Accept ISO 8601 with optional 'Z' suffix
+    if not raw:
         try:
-            if raw.endswith("Z"):
-                raw = raw[:-1] + "+00:00"
-            return datetime.fromisoformat(raw)
-        except ValueError:
-            pass
-    return datetime.now(timezone.utc) - timedelta(minutes=5)
+            from sdd_lib.run_id import get_or_create_dispatch_start_ts
+            raw = get_or_create_dispatch_start_ts()
+        except Exception:
+            return datetime.now(timezone.utc) - timedelta(minutes=5)
+    # Accept ISO 8601 with optional 'Z' suffix
+    try:
+        if raw.endswith("Z"):
+            raw = raw[:-1] + "+00:00"
+        return datetime.fromisoformat(raw)
+    except ValueError:
+        return datetime.now(timezone.utc) - timedelta(minutes=5)
 
 
 def _iter_modified_files(workspace: Path, cutoff: datetime) -> list[Path]:

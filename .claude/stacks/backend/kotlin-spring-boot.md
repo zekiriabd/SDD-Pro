@@ -955,6 +955,31 @@ de la chaîne Spring Security visible.
 - **`hibernate.ddl-auto: create|update`** en prod (Flyway uniquement)
 - **`hibernate.ddl-auto: validate`** quand Phase B DB scaffolding skippée
   (cf. §4.4.2) — utiliser `none`
+- **`hibernate.ddl-auto: validate`** sur PostgreSQL Database-First avec
+  colonnes `char(N)` (post-mortem 2026-05-21) — Hibernate type-mapper
+  signale `bpchar (Types#CHAR)` vs `char(N) (Types#VARCHAR)` même quand
+  les colonnes existent et matchent par sémantique. **`none` est le
+  défaut sain pour tout projet Database-First** ; n'activer `validate`
+  qu'après un cycle de tests d'intégration qui prouve l'absence de
+  faux-positifs avec le dialect+driver actuel.
+- **`AntPathRequestMatcher`** (Spring Security 7 / Spring Boot 4) —
+  l'API a été retirée dans Spring Security 7 (post-mortem 2026-05-21,
+  `Unresolved reference 'AntPathRequestMatcher'`). Utiliser des **string
+  paths littéraux** dans `requestMatchers(...)` (Spring choisit
+  automatiquement `PathPatternRequestMatcher` derrière) :
+  ```kotlin
+  auth.requestMatchers("/auth/config", "/actuator/health", "/swagger/**")
+      .permitAll()
+  ```
+  Le pattern import + construction explicite `AntPathRequestMatcher("/x")`
+  est interdit.
+- **Séquence `/**` (deux étoiles) dans un commentaire KDoc** —
+  Kotlin supporte les commentaires imbriqués (`/* /* */ */`), donc
+  `/api/v1/**` à l'intérieur d'un KDoc `/** ... */` ouvre un niveau
+  imbriqué jamais fermé → `error: Syntax error: Unclosed comment` à la
+  compilation (post-mortem 2026-05-21). Préférer `/api/v1/[anything]`
+  ou `/api/v1/<wildcard>` dans les KDoc. Code applicatif (hors
+  commentaire) non concerné.
 - **Flyway activé** (`spring.flyway.enabled: true`) sans `flyway-sqlserver`
   module quand DatabaseType=SqlServer (cf. §4.4.1)
 - **`springdoc-openapi` < 2.7.0** quand Spring Security actif (cf. §5.6)

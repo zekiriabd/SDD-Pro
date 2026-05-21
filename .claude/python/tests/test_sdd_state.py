@@ -21,6 +21,7 @@ On crée un fake repo (avec `.claude/` factice) et lance le script avec
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 import subprocess
 import sys
@@ -34,8 +35,19 @@ SCRIPT = REPO_ROOT / ".claude" / "python" / "sdd_scripts" / "sdd_state.py"
 
 
 def _run(args: list[str], cwd: Path) -> subprocess.CompletedProcess:
+    """Run sdd_state.py in subprocess with strict SDD_REPO_ROOT isolation.
+
+    v7.0.1 fix : pass SDD_REPO_ROOT=cwd explicitly to the subprocess. Without
+    this, repo_root() falls back to CWD walk and finds the REAL repo above
+    %TEMP% (Windows : %TEMP% is under C:\\Users\\…\\AppData), polluting the
+    real workspace/output/db/console.db with test data. Combined with the
+    paths.py fix (honor override unconditionally), this gives proper test
+    isolation.
+    """
     cmd = [sys.executable, str(SCRIPT)] + args
-    return subprocess.run(cmd, capture_output=True, text=True, cwd=str(cwd))
+    env = os.environ.copy()
+    env["SDD_REPO_ROOT"] = str(cwd)
+    return subprocess.run(cmd, capture_output=True, text=True, cwd=str(cwd), env=env)
 
 
 def _setup_fake_repo(root: Path) -> None:

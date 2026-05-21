@@ -25,7 +25,17 @@ from sdd_mcp.tools import pipeline  # noqa: E402
 
 
 def _make_fake_repo(root: Path) -> None:
-    (root / ".claude").mkdir(parents=True, exist_ok=True)
+    """Scaffold a tmp dir as a valid SDD_Pro repo root.
+
+    v7.0.1 fix : `_looks_like_repo_root()` in sdd_lib.paths now requires
+    `.claude/agents/` + `.claude/commands/` + `workspace/` (strict check,
+    post-mortem `.claude/.claude/` archive false positive). Creating only
+    `.claude/` made repo_root() fail the strict check and walk up to the
+    real repo → console.db pollution. Tests now create the full layout.
+    """
+    (root / ".claude" / "agents").mkdir(parents=True, exist_ok=True)
+    (root / ".claude" / "commands").mkdir(parents=True, exist_ok=True)
+    (root / "workspace").mkdir(parents=True, exist_ok=True)
 
 
 def _fake_env() -> dict[str, str]:

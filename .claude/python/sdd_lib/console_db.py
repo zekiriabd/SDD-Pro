@@ -93,6 +93,20 @@ def connect_ro(db_path: Path | str | None = None) -> Iterator[sqlite3.Connection
 
     Used by pure readers : ``report_token_usage.py``, ``query_console_db.py``,
     and the Node-side ``/api/audit`` / ``/api/state`` via the same convention.
+
+    v7.0.0-alpha (2026-05-21) — telemetry trust fix :
+      - URI built via ``Path.as_uri()`` instead of ad-hoc ``file:{posix}``
+        for cross-platform compliance (Windows drive letters need 3 slashes :
+        ``file:///G:/path``, not ``file:G:/path``). Both worked on most
+        Python builds but the ad-hoc form is technically malformed per
+        RFC 8089 + breaks on some sandboxed builds.
+      - On ``OperationalError: unable to open database file`` (typical
+        cause : WAL ``-shm``/``-wal`` files held by a concurrent writer on
+        Windows, or RO parent directory), retry with ``immutable=1``
+        which bypasses the journal entirely (safe for read-only inspection,
+        we explicitly forbid writes via PRAGMA query_only ON).
+        Critical for ``preflight_cost_cap`` + ``report_token_usage``
+        running while ``/sdd-full`` keeps the DB locked.
     """
     db_path = Path(db_path) if db_path is not None else default_db_path()
     if not db_path.exists():
@@ -100,8 +114,23 @@ def connect_ro(db_path: Path | str | None = None) -> Iterator[sqlite3.Connection
             f"console.db not found at {db_path} — run /sdd-full or "
             f"init_console_db.py to bootstrap before opening in read-only mode."
         )
-    uri = f"file:{db_path.as_posix()}?mode=ro"
-    conn = sqlite3.connect(uri, uri=True)
+
+    base_uri = db_path.as_uri()  # portable, RFC-compliant (file:///path)
+    uri_ro = f"{base_uri}?mode=ro"
+    try:
+        conn = sqlite3.connect(uri_ro, uri=True)
+    except sqlite3.OperationalError as e:
+        # Fallback : immutable=1 means SQLite never touches -wal/-shm,
+        # which is exactly what we need when the writer holds them.
+        # Safety : immutable=1 implies the DB CANNOT change during this
+        # connection's lifetime — readers that need fresh data after a
+        # writer commit must reconnect, but that's already the case for
+        # WAL-on-Windows lock scenarios.
+        if "unable to open database file" not in str(e).lower():
+            raise
+        uri_immut = f"{base_uri}?mode=ro&immutable=1"
+        conn = sqlite3.connect(uri_immut, uri=True)
+
     conn.row_factory = sqlite3.Row
     try:
         _apply_pragmas_ro(conn)

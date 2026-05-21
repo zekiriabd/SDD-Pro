@@ -10,6 +10,21 @@ L'application n'a aucun mécanisme d'authentification. Elle doit s'intégrer au 
 
 Tout accès fonctionnel de l'application est conditionné à un JWT Azure AD valide, validé côté backend, avec autorisation dérivée des groupes Azure AD.
 
+## Quantified Goal
+
+- **Metric** : 100% des endpoints non publics rejettent les requêtes sans JWT valide ; `/login` flow SSO Microsoft complet
+- **Target** : login SSO end-to-end < 3s p95 ; 0 secret hardcodé dans le code (vérifié par security-reviewer)
+- **Deadline** : `<à préciser>`
+
+## Non-Functional Constraints
+
+- **Volume** : single tenant, ~`<à préciser>` utilisateurs actifs simultanés
+- **Performance** : login redirect end-to-end < 3s p95 ; JWT validation backend < 50ms p99
+- **Retention** : aucune session/token stocké côté backend (stateless JWT) ; cache MSAL côté frontend uniquement
+- **Compliance** : conformité politique Azure AD du tenant ; pas de PII stockée côté app
+- **Integration** : MSAL frontend + spring-security-oauth2-resource-server backend + Azure AD App Registration
+- **Degraded mode** : mode "auth seule" si claim `groups` absent (utilisateur authentifié mais 403 sur endpoints scope-gated, cf. SFD-6 AC-8)
+
 ## Actors
 
 - Utilisateur Azure AD: se connecte avec son compte d'organisation
@@ -96,7 +111,7 @@ Tout accès fonctionnel de l'application est conditionné à un JWT Azure AD val
 - FD-7: Page publique `/login` côté frontend (composant `LoginPage` mappant le mockup `1-1-Connexion.html` vers shadcn) avec bouton "Se connecter avec Microsoft" déclenchant `loginRedirect`
 - FD-9: Page `/authentication/login-callback` côté frontend (composant `LoginCallbackPage`) — route publique, attend que `handleRedirectPromise()` ait été résolu au bootstrap MSAL puis redirige vers `/campagnes`. URI enregistrée côté Azure AD App Registration section "Single-page application".
 - FD-8: Layout principal `MainLayout` (menu global cf. SPEC 2) enveloppant toutes les routes protégées ; `/login` exclue
-- FD-9: Guard de route global (dans `__root.tsx` ou layout parent `_protected`) qui : (1) si user non authentifié et route ≠ `/login` → `Navigate to="/login"`, (2) si user authentifié → rendre `<MainLayout><Outlet/></MainLayout>`
+- FD-13: Guard de route global (dans `__root.tsx` ou layout parent `_protected`) qui : (1) si user non authentifié et route ≠ `/login` → `Navigate to="/login"`, (2) si user authentifié → rendre `<MainLayout><Outlet/></MainLayout>`
 - FD-10: Route `/` index qui redirige : authentifié → `/campagnes`, sinon → `/login`
 - FD-11: Bean Spring `CorsConfigurationSource` (`CorsConfig.kt`) listant les origins autorisés via `APP_CORS_ALLOWED_ORIGINS` (CSV, default `http://localhost:5173,http://localhost:4173`) ; branché via `http.cors {}` dans `SecurityFilterChain`
 - FD-12: `AuthConfigController.kt` (GET `/auth/config`, public via `permitAll(HttpMethod.GET)` dans `SecurityConfig`), lecture des env vars `AZ_TENANTID / AZ_CLIENTID / AZ_AUDIENCES / AZ_FE_CALLBACKPATH` avec strip quotes + strip préfixe MSYS Git Bash dans `AZ_FE_CALLBACKPATH`
@@ -150,7 +165,7 @@ Tout accès fonctionnel de l'application est conditionné à un JWT Azure AD val
 | EDGE-1 | L'utilisateur abandonne le flow Azure AD côté Microsoft (back nav, ferme l'onglet, blocage SSO) | Le SPA revient sur `/login` au prochain accès, sans erreur bloquante. Plus de "popup à fermer" — flow `loginRedirect` plein écran (BR-9). | AC-13 |
 | EDGE-2 | Le backend `/auth/config` est indisponible au chargement du SPA (down, timeout réseau) | Le SPA affiche une page d'erreur "Backend indisponible" sans crash JS ; pas de `PublicClientApplication` instancié | AC-16 |
 | EDGE-3 | Le JWT arrive à expiration pendant une session active (requête envoyée avec token expiré) | Le backend retourne `401 Unauthorized` ; MSAL intercepte et tente un `acquireTokenSilent` (refresh via iframe) ; si échec → redirection vers `/login` | AC-4 ; à valider que le comportement MSAL silent renewal est câblé |
-| EDGE-4 | Un utilisateur authentifié accède directement à une URL protégée `/campagnes/123` sans passer par `/login` (lien direct, favori) | Le guard de route laisse passer si le token est valide ; si token absent ou expiré → redirect vers `/login` (sans mémoriser l'URL cible en v1, BR-10) | AC-1, FD-9 |
+| EDGE-4 | Un utilisateur authentifié accède directement à une URL protégée `/campagnes/123` sans passer par `/login` (lien direct, favori) | Le guard de route laisse passer si le token est valide ; si token absent ou expiré → redirect vers `/login` (sans mémoriser l'URL cible en v1, BR-10) | AC-1, FD-13 |
 | EDGE-5 | Le claim `groups` est absent du JWT (option non activée dans l'App Reg ou groupe > 200 membres déclenchant le Graph overflow) | Le backend place l'utilisateur en mode dégradé (auth seule, pas d'autorisation par groupe) ; `403` sur les endpoints nécessitant un groupe | AC-8, BR-2 ; à ajouter : logguer un WARNING côté backend si claim absent |
 | EDGE-6 | Deux onglets de navigateur ouverts simultanément, le token est révoqué sur Azure AD (ex. admin force sign-out) | Les deux onglets reçoivent `401` à la prochaine requête ; MSAL `acquireTokenSilent` échoue ; l'utilisateur est redirigé vers `/login` | AC-3, AC-4 ; comportement dépendant du TTL du JWT — à valider |
 | EDGE-7 | La valeur de `AZ_FE_CALLBACKPATH` contient un préfixe MSYS Git Bash (`C:/Program Files/Git/login-callback`) au lieu de `/login-callback` | `AuthConfigController.kt` strip le préfixe par regex avant d'émettre la valeur ; la Redirect URI composée côté SPA reste correcte | AC-15, BR-13, FD-12 |

@@ -22,61 +22,22 @@ référence à un framework de test.
 
 ---
 
-## STEP 0 — HARD-GATE pre-flight (script-driven, v6.1)
+## STEP 0 — 1.bis — Preflight + Context Budget + Mode + Path Safety
 
-Invoquer le script `preflight.py` qui retourne JSON sur stdout :
+Pattern partagé — appliquer `@.claude/rules/dev-shared-preflight.md`
+intégralement (§1 STEP 0 preflight, §2 STEP 0.5 context budget, §3
+STEP 1 mode From Plan, §4 STEP 1.bis path safety). Paramètres
+`dev-backend` : `--family backend`, `--agent dev-backend`, Glob
+mode `*.back.md`, path root `workspace/output/src/{BackendName}/`.
+Codes preflight extra : aucun (cf. §5 matrice).
 
-```bash
-python .claude/python/sdd_scripts/preflight.py --family backend --arg "{n}-{m}[:plan]"
-```
-
-**Comportement** :
-- Exit 0 + `ok:true` → toutes les préconditions A1-A3 + B1-B4 sont vertes.
-  Variables disponibles dans le JSON : `planOnly`, `name`, `appOrBackendName`,
-  `activeStacks.{backend,frontend,uiDs,auth}`. **Procéder à STEP 1**.
-- Exit 1 + `ok:false` → STOP + ERROR 3-lignes pour la **première** entrée
-  de `errors[]` (code + hint). Format :
-  ```
-  ERROR: dev-backend {n}-{m} — preflight {code}
-  CAUSE: [{code}] {détail extrait du JSON}
-  FIX: {hint}
-  ```
-
-**Codes d'erreur** : `INVALID_ARG`, `US_NOT_FOUND`, `US_AMBIGUOUS`,
-`STACK_MISSING`, `STACK_NOT_SELECTED`, `STACK_MALFORMED`,
-`STACK_DIGEST_MISSING`, `PROJECT_NOT_INIT` (en mode `:plan`,
-`PROJECT_NOT_INIT` est dégradé en `PROJECT_NOT_INIT_WARN` non bloquant).
-
-Le script remplace les checks A1-A3 + B1-B4 inlinés ; aucun Glob ni
-Read manuel à effectuer ici. Détail script : `.claude/python/sdd_scripts/preflight.py`.
+Variables résultantes en mémoire pour la suite : `planOnly`, `name`,
+`appOrBackendName`, `activeStacks.{backend,frontend,uiDs,auth}`,
+`FROM_PLAN_PATH`, `PLAN_ONLY`.
 
 ---
 
-## STEP 0.5 — HARD-GATE context budget
-
-Pattern partagé — appliquer `@.claude/rules/build-and-loop.md §1` avec
-`--agent dev-backend`.
-
----
-
-## STEP 1 — Détection mode From Plan
-
-Pattern partagé — appliquer `@.claude/rules/build-and-loop.md §1.ter`
-ligne `dev-backend` de la matrice (Glob `*.back.md`).
-
-Variables résultantes en mémoire pour la suite : `FROM_PLAN_PATH`
-(string|null), `PLAN_ONLY` (bool, déjà set par STEP 0).
-
----
-
-## STEP 1.bis — Hard-gate path safety (Front/Back isolation)
-
-Pattern partagé — appliquer `@.claude/rules/build-and-loop.md §1.bis`
-ligne `dev-backend` de la matrice.
-
----
-
-> **STEP 2 absorbé v5.0** dans STEP 0 HARD-GATE Phase A check A2.
+> **STEPs 2 absorbé v5.0** dans STEP 0 HARD-GATE Phase A check A2.
 > Numérotation STEP 3+ conservée (refs internes/externes stables).
 
 ## STEP 3 — Charger le contexte minimal
@@ -216,8 +177,8 @@ Lire `appType`, `frontendKind` ET `archiPattern` depuis le JSON preflight :
 | `appType` | `frontendKind` | Source du stack à lire | Action |
 |---|---|---|---|
 | `back-front` | `web` ou `null` | `.claude/stacks/backend/{stack-id}.md` (un de `## Active Tech Specs`) | comportement nominal ci-dessous |
-| `back-front` | `mobile` | `.claude/stacks/backend/{stack-id}.md` (backend distant) | nominal — le backend distant est un projet `{BackendName}` distinct du projet mobile `{AppName}`. Si `## Active Tech Specs` ne déclare AUCUN `backend/*` → exit silencieux (le mobile n'a pas de backend SDD-managed). |
-| `fullstack` | `null` | `.claude/stacks/fullstack/{stack-id}.md` (un de `## Active Tech Specs`) | lire ce stack ; §11 documente l'ownership backend dans le projet unique (server.js / app/api / server/ selon stack) |
+| `back-front` | `mobile` | `.claude/stacks/backend/{stack-id}.md` (backend distant) | nominal — le backend distant est un projet `{BackendName}` distinct du projet mobile `{AppName}`. Si `## Active Tech Specs` ne déclare AUCUN `backend/*` → exit silencieux (le mobile n'a pas de backend SDD-managed). v7.0.0 : stacks `mobiles/*` sont en `_drafts/` (non chargés). |
+| ~~`fullstack`~~ | `null` | ~~`.claude/stacks/fullstack/{stack-id}.md`~~ | **draft v7.0.0** — `stacks/fullstack/*` sont en `_drafts/` (non chargés). Combo `fullstack` non supporté en v7.0.0 ; utiliser `back-front` avec un backend + un frontend séparés. |
 
 Si aucun stack à lire selon les règles ci-dessus → ERROR :
 ```
@@ -232,7 +193,7 @@ FIX: décommenter un stack adapté (cf. tableau ci-dessus)
 |---|---|---|
 | `MVC` (défaut) | `.claude/stacks/archi/mvc.md` | Source canonique des couches + principes + naming. Le `backend/*.md` n'apporte que les overrides tech-specific (§1.x du fichier) |
 | `DDD` (Phase 2 SDD_Pro 🟡) | `.claude/stacks/archi/ddd.md` | idem |
-| `microservice` (Phase 2 SDD_Pro 🟡) | `.claude/stacks/archi/microservice.md` | idem |
+| ~~`microservice`~~ | ~~`.claude/stacks/archi/microservice.md`~~ | **draft v7.0.0** — en `_drafts/archi/` (non chargé). Sélection rejetée si déclaré actif. |
 
 **Précédence en cas de conflit** :
 1. Idioms tech du `backend/*.md` (§2.5 Naming, §1.4 overrides) priment

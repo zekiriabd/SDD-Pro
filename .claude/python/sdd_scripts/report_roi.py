@@ -48,20 +48,16 @@ if str(_PY_ROOT) not in sys.path:
     sys.path.insert(0, str(_PY_ROOT))
 
 from sdd_lib.console_db import connect_ro  # noqa: E402
+from sdd_lib.pricing import as_tuple, FALLBACK_PRICING  # noqa: E402  # v7.0.1 SSoT
 
-
-# Anthropic pricing 2026 (USD per 1M tokens) — kept in sync with
-# docs/poc-roi-methodology.md. Update on pricing change.
-# Pattern : (input_per_M, output_per_M, cache_creation_per_M, cache_read_per_M)
-PRICING_TABLE: dict[str, tuple[float, float, float, float]] = {
-    "claude-opus-4-7":          (15.00, 75.00, 18.75, 1.50),
-    "claude-opus-4-6":          (15.00, 75.00, 18.75, 1.50),
-    "claude-sonnet-4-6":        (3.00,  15.00, 3.75,  0.30),
-    "claude-sonnet-4-5":        (3.00,  15.00, 3.75,  0.30),
-    "claude-haiku-4-5":         (1.00,  5.00,  1.25,  0.10),
-    "claude-haiku-4-5-20251001": (1.00,  5.00,  1.25,  0.10),
-}
-DEFAULT_PRICING = (3.00, 15.00, 3.75, 0.30)  # Sonnet fallback for unknown models
+# Pricing SSoT moved to sdd_lib/pricing.py (v7.0.1). DEFAULT_PRICING kept
+# here as a tuple-shaped alias for the legacy model_cost() signature.
+DEFAULT_PRICING = (
+    FALLBACK_PRICING["input"],
+    FALLBACK_PRICING["output"],
+    FALLBACK_PRICING["cache_creation"],
+    FALLBACK_PRICING["cache_read"],
+)
 
 
 def parse_iso(s: str | None) -> datetime | None:
@@ -98,10 +94,7 @@ def fmt_duration(ms: int | None) -> str:
 def model_cost(model: str | None, in_t: int, out_t: int,
                cache_c: int, cache_r: int) -> float:
     """Return cost in USD given token counts and the model id."""
-    if model is None:
-        rates = DEFAULT_PRICING
-    else:
-        rates = PRICING_TABLE.get(model, DEFAULT_PRICING)
+    rates = DEFAULT_PRICING if model is None else as_tuple(model)
     in_rate, out_rate, cc_rate, cr_rate = rates
     return (
         in_t * in_rate / 1_000_000

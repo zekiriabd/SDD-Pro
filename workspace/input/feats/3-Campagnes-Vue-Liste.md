@@ -10,6 +10,21 @@ L'application gère des campagnes marketing stockées en base PostgreSQL dans la
 
 Permettre à un utilisateur authentifié de consulter l'ensemble des campagnes existantes dans une grille filtrable, paginable et exportable (toutes ces opérations 100% côté frontend via le composant DataGrid du Design System), avec bascule possible vers la vue timeline et accès à la création d'une nouvelle campagne.
 
+## Quantified Goal
+
+- **Metric** : chargement liste complète + rendu grille < 2s p95 jusqu'à `<à préciser>` lignes (ordre attendu 1k-10k)
+- **Target** : filtrage/tri/pagination 100% client-side (latence < 200ms perçue) ; export CSV/Excel < 5s sur l'ensemble du dataset
+- **Deadline** : `<à préciser>`
+
+## Non-Functional Constraints
+
+- **Volume** : `<à préciser>` lignes campagnes (jusqu'à 10k acceptable côté SPA, au-delà → repenser pagination serveur)
+- **Performance** : 1 unique appel `GET /api/v1/campagnes` ; latence backend SQL < 500ms p95 (4 INNER JOIN sur tables référentielles)
+- **Retention** : n/a (lecture seule, dataset rafraîchi à chaque mount de la route)
+- **Compliance** : `<à préciser>` (data marketing, vérifier classification PII selon politique interne)
+- **Integration** : DataGrid composant Design System actif ; PostgreSQL via JDBC backend
+- **Degraded mode** : si backend timeout/5xx → message d'erreur "Liste indisponible" + bouton retry (pas de cache stale affiché)
+
 ## Actors
 
 - Utilisateur marketing authentifié (Azure AD): consulte, filtre, exporte les campagnes

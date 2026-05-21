@@ -196,6 +196,36 @@ Skip pour les US sans plan écrit (erreur isolée, cf. STEP 4).
 
 ---
 
+## STEP 4.ter — Auto-ingest plans dans console.db (depuis 2026-05-21)
+
+Invoquer **systématiquement** le script déterministe `ingest_plans.py`
+pour populer la table `plans` de `workspace/output/db/console.db`
+(parsing frontmatter v2 + count entrées section `## Files`).
+
+```bash
+python .claude/python/sdd_scripts/ingest_plans.py 2>&1 | tail -1
+```
+
+| Exit | Sens | Action caller |
+|---|---|---|
+| `0` | Ingest OK | continuer (log 1 ligne `[OK] ingested N plans`) |
+| `1` | DB introuvable / corrompue | WARN 1 ligne, continuer (non bloquant) |
+
+**Idempotent** : `ON CONFLICT(plan_id) DO UPDATE` — re-exécution
+sans effet.
+
+**Coût** : 0 token LLM, ~50 ms, parse YAML frontmatter + regex.
+
+**Schéma populé** : `plan_id` (= `{us_id}-{family}`), `us_id`, `family`,
+`file_path`, `schema_version` (1|2), `strict_ready` (0|1), `us_hash`
+(SHA-256 US au moment du plan), `capabilities_json` (liste), `file_count`
+(entrées `- path:` dans `## Files`), `generated_at`.
+
+**Non bloquant** : un échec de l'ingest n'invalide pas la génération
+des plans. Les fichiers `.back.md` / `.front.md` sur disque restent la SSoT.
+
+---
+
 ## STEP 5 — Récap final
 
 Émettre **un seul bloc final** :

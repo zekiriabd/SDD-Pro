@@ -34,17 +34,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from sdd_lib.exit_codes import HOOK_ALLOW, HOOK_DENY  # noqa: E402
 from sdd_lib.hook_input import read_hook_input, get_subagent_type  # noqa: E402
+from sdd_lib.pricing import PRICING, FALLBACK_PRICING  # noqa: E402  # v7.0.1 SSoT
+from sdd_lib.run_id import get_or_create_run_id  # noqa: E402  # v7.0.1 stable scoping
 from sdd_lib.stderr import warn  # noqa: E402
-
-# Pricing per million tokens (must mirror report_roi.py)
-PRICING = {
-    "claude-opus-4-7":    {"input": 15.00, "output": 75.00, "cache_read": 1.50, "cache_creation": 18.75},
-    "claude-sonnet-4-6":  {"input":  3.00, "output": 15.00, "cache_read": 0.30, "cache_creation":  3.75},
-    "claude-haiku-4-5":   {"input":  1.00, "output":  5.00, "cache_read": 0.10, "cache_creation":  1.25},
-}
-# Fallback for unknown models — apply Sonnet pricing (conservative midpoint)
-FALLBACK_PRICING = PRICING["claude-sonnet-4-6"]
 
 
 def _detect_ci() -> bool:
@@ -124,41 +118,51 @@ def _compute_run_cost() -> tuple[float, int, str]:
          /sdd-full state.
 
     Returns (cost_usd, call_count, scope_label).
+
+    Scope label conventions (v7.0.0-alpha telemetry-trust fix) :
+      - "run={id} (no rows yet)" : DB readable, run scope empty → safe ALLOW
+      - "db absent"              : console.db file missing → safe ALLOW
+                                    (fresh checkout / pre-bootstrap)
+      - "db error: {detail}"     : DB exists but unreadable → caller MUST
+                                    treat as untrusted (block in strict CI,
+                                    visible WARN in interactive). Previously
+                                    this state silently returned 0.0 → the
+                                    cap was bypassed every time telemetry
+                                    failed (root cause filed by user
+                                    2026-05-21).
     """
     try:
-        from sdd_lib.console_db import connect_ro
-    except Exception:
-        return 0.0, 0, "console.db unavailable"
+        from sdd_lib.console_db import connect_ro, default_db_path
+    except Exception as e:
+        return 0.0, 0, f"db error: import failed: {e}"
 
-    run_id = os.environ.get("SDD_RUN_ID", "").strip()
+    # Distinguish absent (legit fresh state) from unreadable (suspect).
+    try:
+        if not default_db_path().exists():
+            return 0.0, 0, "db absent"
+    except Exception:
+        # repo_root() failure is itself a problem — surface it.
+        pass
+
+    # v7.0.1 : always resolve a stable run_id (env > marker file > generate).
+    # Avoids the legacy "today window" fallback which collided across parallel runs.
+    run_id = get_or_create_run_id()
     try:
         with connect_ro() as conn:
             cur = conn.cursor()
-            if run_id:
-                # v7.0.0 — exact match on run_id column (no more time window).
-                cur.execute(
-                    "SELECT model, input_tokens, output_tokens, "
-                    "       cache_creation_tokens, cache_read_tokens "
-                    "FROM token_usage WHERE run_id = ?",
-                    (run_id,),
-                )
-                rows = cur.fetchall()
-                if not rows:
-                    return 0.0, 0, f"run={run_id[:8]} (no rows yet)"
-                scope = f"run={run_id[:8]}"
-            else:
-                # Fallback : today UTC window (no run_id context available)
-                from datetime import datetime, timezone
-                today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-                cur.execute(
-                    "SELECT model, input_tokens, output_tokens, "
-                    "       cache_creation_tokens, cache_read_tokens "
-                    "FROM token_usage WHERE ts LIKE ?",
-                    (f"{today}%",),
-                )
-                rows = cur.fetchall()
-                scope = f"today={today}"
+            cur.execute(
+                "SELECT model, input_tokens, output_tokens, "
+                "       cache_creation_tokens, cache_read_tokens "
+                "FROM token_usage WHERE run_id = ?",
+                (run_id,),
+            )
+            rows = cur.fetchall()
+            if not rows:
+                return 0.0, 0, f"run={run_id[:8]} (no rows yet)"
+            scope = f"run={run_id[:8]}"
     except Exception as e:
+        # SCOPE = "db error: ..." signals the caller that 0.0 is NOT a
+        # legitimate "no cost yet" but a "cap unenforceable" condition.
         return 0.0, 0, f"db error: {e}"
 
     total = 0.0
@@ -193,6 +197,32 @@ def main() -> int:
     # operator is unaware.
     _check_telemetry_health()
 
+    # v7.0.0-alpha telemetry-trust fix (2026-05-21) — when _compute_run_cost
+    # signals "db error: ...", we CANNOT trust cost=0.0 as "no cost yet".
+    # Previously this branch was conflated with the legitimate empty state
+    # → the cap silently became inoperative every time telemetry failed
+    # (root cause filed by user 2026-05-21 : DB locked, WAL inaccessible,
+    # corrupted schema, etc.). New semantics :
+    #   - CI (auto strict)              → DENY [TELEMETRY_UNAVAILABLE]
+    #                                     (can't enforce cap, abort the run)
+    #   - Interactive (or SDD_BUDGET_MODE=warn)
+    #                                   → visible ERROR on stderr + ALLOW
+    #                                     (operator awareness, manual decision)
+    # Bypass requires explicit SDD_DISABLE_COST_CAP=1 (no silent fallthrough).
+    if scope.startswith("db error:"):
+        is_ci = _detect_ci()
+        warn("ERROR preflight-cost-cap : telemetry unavailable — cap cannot be enforced")
+        warn(f"CAUSE: [TELEMETRY_UNAVAILABLE] {scope}")
+        if is_ci:
+            warn("FIX (CI strict) : investigate console.db readability "
+                 "(WAL lock, FS permissions) ; bypass one-shot : "
+                 "export SDD_DISABLE_COST_CAP=1")
+            return HOOK_DENY
+        warn("FIX (interactive) : run `python .claude/python/sdd_admin/"
+             "verify_telemetry_health.py` to diagnose ; allowing this "
+             "invocation but cap is OFF for the run")
+        return HOOK_ALLOW
+
     # 80%-100% : WARN (let the operator know early, do not block — head-up only)
     if cap * 0.8 <= cost < cap:
         warn(f"WARN preflight-cost-cap : ${cost:.2f} / ${cap:.2f} "
@@ -213,9 +243,9 @@ def main() -> int:
         warn(f"FIX: (a) attendre la fin du run en cours et relancer ; "
              f"(b) augmenter MaxCostPerRun dans Project Config (decision tracee) ; "
              f"(c) bypass one-shot : export SDD_DISABLE_COST_CAP=1 puis relancer")
-        return 2
+        return HOOK_DENY
 
-    return 0
+    return HOOK_ALLOW
 
 
 if __name__ == "__main__":

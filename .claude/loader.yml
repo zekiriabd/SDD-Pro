@@ -115,8 +115,8 @@ po:
 arch:
   reads:
     - workspace/input/stack/stack.md
-    - .claude/stacks/{cat}/{active}.md   # tous stacks actifs (sélectif — backend, frontend, ui, fullstack, mobiles, auth, qa)
-    - .claude/stacks/archi/{ArchiPattern}.md  # MVC (défaut) / DDD / microservice — UNIQUEMENT si AppType=back-front (v6.7.6+)
+    - .claude/stacks/{cat}/{active}.md   # tous stacks actifs (sélectif — backend, frontend, ui, auth, qa). v7.0.0 : fullstack/* et mobiles/* sont en `_drafts/` (non chargés) — utiliser uniquement backend+frontend.
+    - .claude/stacks/archi/{ArchiPattern}.md  # MVC (défaut) / DDD — UNIQUEMENT si AppType=back-front (v6.7.6+). v7.0.0 : `microservice` est en `_drafts/archi/` (non chargé).
     - .claude/templates/adr.template.md  # v3 — nécessaire pour Phase D
     - workspace/output/.sys/.context/constitution.md     # v3 — si présent
     - workspace/output/.sys/.context/adrs/ADR-*.md       # v3 — index existants (idempotence)
@@ -176,18 +176,26 @@ dev-backend:
     # --- stable (invariant inter-FEAT, cachable 5 min TTL) ---
     - { path: workspace/input/stack/stack.md, cache_layer: stable }                # Project Config
     - { path: .claude/stacks/backend/{active}.md, cache_layer: stable }
-    - { path: .claude/stacks/fullstack/{active}.md, cache_layer: stable }
-    - { path: .claude/stacks/archi/{ArchiPattern}.md, cache_layer: stable }
+    # v7.0.0 : fullstack/* est en `_drafts/` (non chargé). Entrée conservée pour ré-activation future si un stack fullstack est promu.
+    - { path: .claude/stacks/fullstack/{active}.md, cache_layer: stable, status: draft-quarantine }
+    - { path: .claude/stacks/archi/{ArchiPattern}.md, cache_layer: stable }  # MVC | DDD uniquement (microservice en _drafts/)
     - { path: .claude/stacks/auth/{active}.md, cache_layer: stable }
+    - { path: .claude/rules/dev-shared-preflight.md, cache_layer: stable }   # v7.0.0 — STEP 0/0.5/1/1.bis hoist cross-agent
+    - { path: .claude/rules/build-and-loop.md, cache_layer: stable }         # v7.0.0 — SSOT patterns dev-* (ex backend-first + dev-shared)
+    - { path: .claude/rules/error-classification.md, cache_layer: stable }   # v6.1 — taxonomie classes + pilotage build_loop
     # v5.0 Inline Rules (dans agents/dev-backend.md, plus de Read mandatory) :
     #   - library-and-stack.md
     #   - ownership.md§1-§2
     # v6.1 Read mandatory ajoutés :
     #   - .claude/rules/error-classification.md (depuis 2026-05-08) — taxonomie
-    #     8 classes, pilotage build_loop CORRECTIBLE vs BLOCKING
+    #     8 classes, pilotage build_loop CORRECTIBLE vs BLOCKING (listée ci-dessus)
     #   - .claude/rules/build-and-loop.md (depuis 2026-05-08) — SSOT 7 patterns
     #     partagés (context budget, path safety, mode detection, LibName lock,
-    #     anti-derive, QA ownership, plan construction)
+    #     anti-derive, QA ownership, plan construction) (listée ci-dessus)
+    # v7.0.0 Read mandatory ajouté :
+    #   - .claude/rules/dev-shared-preflight.md — substance hoistée des STEP 0/0.5/1/1.bis
+    #     (preflight script-driven, context budget, mode From Plan, path safety
+    #     Front/Back isolation) (listée ci-dessus)
     # v5.0 Reads conditionnels (lazy) :
     #   - workspace/output/.sys/.context/constitution.md  # uniquement si terme ambigu
     #   - workspace/output/.sys/.context/adrs/INDEX.md    # uniquement au STEP 5 avant création ADR
@@ -236,13 +244,18 @@ dev-frontend:
     - .claude/stacks/frontend/{active}.md  # fallback si CLAUDE.md insuffisant
     - .claude/stacks/ui/{active}.md        # mapping composants DS (§2 + §7)
     - .claude/stacks/auth/{active}.md      # patterns d'injection auth client
+    - .claude/rules/dev-shared-preflight.md   # v7.0.0 — STEP 0/0.5/1/1.bis hoist cross-agent
+    - .claude/rules/build-and-loop.md         # v7.0.0 — SSOT patterns dev-* (ex backend-first + dev-shared)
+    - .claude/rules/error-classification.md   # v6.1 — taxonomie classes + pilotage build_loop
     # v5.0 Inline Rules (dans agents/dev-frontend.md, plus de Read mandatory) :
     #   - library-and-stack.md
     #   - ownership.md§1-§2
-    # v6.1 Read mandatory ajoutés :
+    # v6.1 Read mandatory ajoutés (listés ci-dessus avec path complet) :
     #   - .claude/rules/error-classification.md (depuis 2026-05-08)
     #   - .claude/rules/build-and-loop.md (depuis 2026-05-08) — SSOT 7 patterns
     #     partagés avec dev-backend (cf. §note dev-backend ci-dessus)
+    # v7.0.0 Read mandatory ajouté :
+    #   - .claude/rules/dev-shared-preflight.md — substance hoistée des STEP 0/0.5/1/1.bis
     # v5.0 Reads conditionnels (lazy) :
     #   - workspace/output/.sys/.context/constitution.md  # uniquement si terme ambigu
     #   - workspace/output/.sys/.context/adrs/INDEX.md    # uniquement au STEP 6 avant création ADR
@@ -275,30 +288,8 @@ dev-frontend:
       pendant dans le markup (RadzenButton, RadzenDataGrid, etc.)
     - STOP + ERROR sur libellé/structure absent
 
-# -------------------------------------------------------------------------
-# Agents: dev-backend-strict / dev-frontend-strict — RETIRÉS EN v7.0.0
-# -------------------------------------------------------------------------
-# Variants Sonnet 4.6 introduits en v6.2 (opt-in PlanCacheStrict: true)
-# pour consommer des plans v2 strict-ready (digest auto-suffisant).
-# Retirés en v7.0.0 (cf. ADR governance-major-prompts-trim) — la
-# maintenance double (sync dev-* normal ↔ strict) > ROI sur runs réels.
-# Plan v2 schema (## Inline Digest) reste utile pour review humaine
-# mais ne route plus vers un agent alternatif.
-# Pour réintroduire localement : restaurer depuis git history d4330c5.
-# -------------------------------------------------------------------------
-
-# -------------------------------------------------------------------------
-# Agent: validator — RETIRÉ EN v6.0
-# -------------------------------------------------------------------------
-# La validation sémantique (mesurabilité ACs, ambiguïtés, hypothèses) a
-# été retirée pour économie tokens (~1.4M par /sdd-full). La commande
-# /feat-validate est désormais 100% déterministe via Python
-# (validate_readiness.py). La review sémantique est à la charge du
-# PO humain lors de la review de la FEAT.
-#
-# Pour re-introduire localement, restaurer agents/validator.md depuis
-# git history < v6.0 et restaurer la STEP 4 dans commands/feat-validate.md.
-# -------------------------------------------------------------------------
+# (Stubs dev-backend-strict / dev-frontend-strict / validator déplacés
+#  en fin de fichier — cf. section "## Removed agents (backward-compat)".)
 
 # -------------------------------------------------------------------------
 # Agent: elicitor (Sonnet 4.6) — v3, P3
@@ -389,28 +380,8 @@ qa:
     - full: "tous les STEP (recommandé)"
     - manual: "skip auto-invoke par /sdd-full ; user lance /qa-generate manuellement"
 
-# -------------------------------------------------------------------------
-# Agent: dashboard — REMOVED v7.0.0 (governance-major-auditors-trim)
-# -------------------------------------------------------------------------
-# Haiku 4.5 agent that produced INDEX.md of ADRs (sole remaining output
-# after v6.10 BREAKING). Retired in v7.0.0 because the task is 100 %
-# mechanical (glob + parse + render template) and never required LLM
-# reasoning. Replaced by `sdd_scripts/index_adrs.py` (0 token, ~50 ms).
-#
-# Callers historiques migrated to direct Bash invocation :
-#   python -m sdd_scripts.index_adrs
-# See commands/doc-refresh.md for the migration path.
-# -------------------------------------------------------------------------
-
-# -------------------------------------------------------------------------
-# Agent: accessibility-auditor — REMOVED v7.0.0
-# -------------------------------------------------------------------------
-# Haiku 4.5 agent that did WCAG 2.2 AA deterministic greps (v6.3.0).
-# Retired in v7.0.0 (ADR governance-major-auditors-trim) — replaced by
-# axe-core CI integration in the generated project. The [A11Y_*] error
-# classes in error-classification.md §1.9 are preserved for axe-core's
-# output mapping.
-# -------------------------------------------------------------------------
+# (Stubs dashboard / accessibility-auditor déplacés en fin de fichier
+#  — cf. section "## Removed agents (backward-compat)".)
 
 # -------------------------------------------------------------------------
 # Agent: code-reviewer (Sonnet 4.6) — depuis v6.3.1
@@ -484,7 +455,7 @@ arch-reviewer:
   reads:
     - workspace/input/stack/stack.md                # Project Config + Active Architecture Pattern + Active Tech Specs
     - .claude/rules/error-classification.md         # taxonomie [ARCH_*] §1.18
-    - .claude/stacks/archi/{mvc|ddd|microservice}.md  # §2 couches + §3 principes + §4 naming canonique
+    - .claude/stacks/archi/{mvc|ddd}.md             # §2 couches + §3 principes + §4 naming canonique (microservice retiré v7.0.0 — en `_drafts/`)
     - .claude/stacks/backend/{active}.md            # §1.3 layer mapping backend
     - .claude/stacks/frontend/{active}.md           # §1.3 layer mapping frontend
     - workspace/output/.sys/.context/constitution.md  # §2 glossaire + §6 ADRs index
@@ -574,8 +545,9 @@ security-reviewer:
     # a11y-report.json retiré v7.0.0 (agent accessibility-auditor supprimé,
     # remplacé par axe-core CI). Entrée préservée pour cohérence path-prefix
     # forbidden_reads — l'agent ne lit toujours pas le dossier /qa/ qui peut
-    # contenir des fichiers axe-core JSON ingérés par futur ingest_a11y_axe.py.
-    - workspace/output/qa/feat-{n}/a11y-report.json  # (legacy v6, agent retiré v7.0.0 — futur ingest axe-core)
+    # contenir des fichiers axe-core JSON si un éventuel pont d'ingest CI
+    # est câblé par le projet consommateur (out-of-scope SDD_Pro v7.0.0).
+    - workspace/output/qa/feat-{n}/a11y-report.json  # (legacy v6, agent retiré v7.0.0)
   forbidden_writes:
     - workspace/output/src/                       # read-only strict (jamais de patch)
     - workspace/output/us/                        # responsabilité po
@@ -612,16 +584,8 @@ security-reviewer:
     - "mode=scan AND SecurityScanEnabled: false"
   idempotent: true                                # peut être ré-invoqué sans risque
 
-# -------------------------------------------------------------------------
-# Agent: performance-auditor — REMOVED v7.0.0
-# -------------------------------------------------------------------------
-# Sonnet 4.6 agent that did Core Web Vitals + SLO scans (v6.4.0) with
-# optional Lighthouse CI integration. Retired in v7.0.0
-# (ADR governance-major-auditors-trim) — replaced by direct Lighthouse CI
-# integration in the generated project's CI pipeline. The [PERF_*] error
-# classes in error-classification.md §1.12 are preserved for Lighthouse
-# output mapping.
-# -------------------------------------------------------------------------
+# (Stub performance-auditor déplacé en fin de fichier
+#  — cf. section "## Removed agents (backward-compat)".)
 
 # -------------------------------------------------------------------------
 # Agent: spec-compliance-reviewer (Sonnet 4.6) — depuis v6.5.2
@@ -724,3 +688,33 @@ constitutioner:
 # - Sonnet 4.6 (pas Opus) sur génération de tests
 # - Lecture sélective stricte par US (jamais Glob *)
 # - Total Phase 5 : ~17-27k tokens par feature en mode "full"
+
+# =========================================================================
+# ## Removed agents (backward-compat reference, consolidated v7.0.1)
+# =========================================================================
+# Block consolidé qui regroupe les ex-agents retirés et leurs remplacements.
+# Sert deux usages : (1) audit forensique des sorties console.db legacy qui
+# référencent ces noms ; (2) recovery procedure si réintroduction locale.
+#
+# **Aucun de ces agents n'est invocable en v7.0.x.** Toute tentative de spawn
+# via Agent() est rejetée par `sdd_hooks/preflight_agent_budget.py` avec
+# `REJECTED_AGENTS_V7` (HOOK_DENY).
+#
+# | Agent retiré              | Version | ADR / Raison                                     | Remplacement v7.0.0                              |
+# |---------------------------|---------|--------------------------------------------------|--------------------------------------------------|
+# | `validator`               | v6.0    | Coût ~1.4M tokens/run, faux positifs sémantiques | `feat-validate` 100% déterministe (Python)       |
+# | `dev-backend-strict`      | v7.0.0  | Maintenance double > ROI réel                    | `dev-backend` (Opus 4.7) — plan v2 conservé      |
+# | `dev-frontend-strict`     | v7.0.0  | idem                                             | `dev-frontend` (Opus 4.7) — plan v2 conservé     |
+# | `dashboard`               | v7.0.0  | 100% mécanique, jamais raisonnement LLM          | `sdd_scripts/index_adrs.py` (0 token, ~50 ms)    |
+# | `accessibility-auditor`   | v7.0.0  | WCAG mieux couvert par tooling CI                | `axe-core` CI (mapping `[A11Y_*]` cf. legacy.md) |
+# | `performance-auditor`     | v7.0.0  | Core Web Vitals mieux mesurés par browser réel   | `Lighthouse CI` + `wrk/k6` (mapping `[PERF_*]`)  |
+#
+# Recovery (si réintroduction locale strictement nécessaire) :
+#   - dev-*-strict : restaurer depuis git history avant tag v7.0.0
+#     (commit d4330c5) + remettre la branche dans preflight_agent_budget.py
+#   - dashboard / a11y / perf : restaurer agents/{name}.md + retirer l'entrée
+#     correspondante de `REJECTED_AGENTS_V7` (sdd_hooks/preflight_agent_budget.py)
+#
+# Source de vérité côté code : `error-classification-legacy.md §6` pour
+# les références "load-bearing" intentionnelles (whitelists READ-side
+# backward-compat, annotations historiques agents/CHANGELOG, etc.)

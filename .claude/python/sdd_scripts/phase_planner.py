@@ -42,6 +42,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from sdd_lib.exit_codes import FAIL_FAST, SUCCESS  # noqa: E402
 from sdd_lib.paths import normalize, repo_root  # noqa: E402
 from sdd_lib.project_config import read_project_config  # noqa: E402  (legacy fallback)
 from sdd_lib.layered_config import ConfigError, read_layered_config  # noqa: E402  (v6.7.3)
@@ -610,21 +611,22 @@ def main(argv: list[str] | None = None) -> int:
         result = plan(feat_number=args.feat_number)
     except FileNotFoundError as exc:
         sys.stderr.write(f"[NOT_FOUND] {exc}\n")
-        return 1
+        return FAIL_FAST
     except (OSError, UnicodeDecodeError) as exc:
         sys.stderr.write(f"[ERROR] I/O: {exc}\n")
-        return 1
+        return FAIL_FAST
     except ValueError as exc:
         sys.stderr.write(f"[STACK_MALFORMED] {exc}\n")
-        return 2
+        return 2  # legacy exit code preserved — STACK_MALFORMED granularity
 
     if "error" in result:
         sys.stderr.write(f"{result['error']}\n")
         sys.stdout.write(json.dumps(result, indent=2, ensure_ascii=False) + "\n")
-        return 2 if "STACK_MALFORMED" in str(result.get("error", "")) else 1
+        # legacy exit code preserved — STACK_MALFORMED granularity (exit 2)
+        return 2 if "STACK_MALFORMED" in str(result.get("error", "")) else FAIL_FAST
 
     sys.stdout.write(json.dumps(result, indent=2, ensure_ascii=False) + "\n")
-    return 0
+    return SUCCESS
 
 
 if __name__ == "__main__":

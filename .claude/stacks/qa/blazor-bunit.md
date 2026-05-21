@@ -1,8 +1,13 @@
 # QA Stack — Blazor bUnit + xUnit + Coverlet
 
 > §2.4 (Librairies) régénérée depuis `blazor-bunit.libs.json` — ne pas éditer manuellement (`python .claude/python/sdd_admin/sync_stack_md.py --stack-id blazor-bunit`).
->
-> Validation: 🟢 reference (validated combo — dotnet-minimalapi + blazor + radzen + azure-ad)
+
+Status: Draft
+Validation: 🟢 reference (validated combo — dotnet-minimalapi + blazor + radzen + azure-ad)
+QA FEAT ID: blazor-bunit
+Scope: tests unitaires composants Blazor (Server + WebAssembly)
+
+---
 
 ## 1. Scope
 

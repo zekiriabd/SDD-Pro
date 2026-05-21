@@ -678,7 +678,7 @@ if phases.spec_compliance.enabled:
 ```
 
 Si `BATCH == []` (toutes phases skipped) → skip STEP 6.4 entier,
-passer à STEP 6.5 (dashboard).
+passer à STEP 6.5 (Refresh INDEX ADRs via `index_adrs.py`).
 
 Sinon, dispatcher **toutes les invocations en parallèle dans un seul
 message**. Attendre la fin de l'ensemble. Pattern identique aux batches
@@ -708,9 +708,9 @@ verdict_overall = max_severity({verdicts non-skipped})
 
 | Verdict | Action |
 |---|---|
-| 🟢 GREEN | continue STEP 6.5 (dashboard) |
+| 🟢 GREEN | continue STEP 6.5 (Refresh INDEX ADRs) |
 | 🟡 WARN  | continue STEP 6.5 + log WARN dans STEP 7 récap |
-| 🔴 RED   | STOP — afficher 6.4.STOP ci-dessous, ne pas exécuter dashboard |
+| 🔴 RED   | STOP — afficher 6.4.STOP ci-dessous, ne pas exécuter STEP 6.5 |
 
 ### 6.4.STOP — Format STOP sur RED
 
@@ -745,7 +745,7 @@ Bypass (à utiliser en connaissance de cause) :
 ✓ code-reviewer       : {🟢 GREEN | 🟡 WARN} — {C}/{S}/{M}/{m} issues
 ✓ security-scan       : {🟢 GREEN | 🟡 WARN} — {C}/{S}/{M}/{m} issues
 ✓ spec-compliance     : {🟢 GREEN | 🟡 WARN} — {V}/{T} ACs verified
-FEAT {n} — auditor batch {🟢 GREEN | 🟡 WARN} (continue → dashboard)
+FEAT {n} — auditor batch {🟢 GREEN | 🟡 WARN} (continue → STEP 6.5 INDEX ADRs)
 ```
 
 Pour les agents skippés (phase disabled) :
