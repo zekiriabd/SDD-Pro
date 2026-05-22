@@ -238,47 +238,45 @@ en AC). Pas de question à l'utilisateur.
 
 Pour chaque US (m = 1, 2, ..., max 6) :
 
-**v7.0.0 P1-11** — calculer le hash RÉEL de la FEAT parente AVANT
-d'écrire les US (jamais un placeholder symbolique) :
+**v7.0.0 P1-11 (révisé v7.0.0-alpha 2026-05-22)** — l'agent `po` n'a
+**pas** le tool `Bash` (cf. frontmatter `tools: Read, Write, Edit,
+Glob, Grep`) et ne peut donc pas calculer un sha256. Écrire le
+**sentinel littéral** :
 
-```bash
-FEAT_HASH=$(sha256sum workspace/input/feats/{n}-{FeatName}.md | cut -c1-8)
-# Format inscrit : "Parent FEAT hash: sha256:{8 hex chars}"
+```
+Parent FEAT hash: sha256:COMPUTE_REQUIRED
 ```
 
-**⚠️ ANTI-PATTERN HARD-BLOCKING (post-mortem 2026-05-21)** :
+Ce sentinel sera **résolu en post-step déterministe** par la commande
+`/us-generate` (STEP 3.bis, cf. `commands/us-generate.md`) qui calcule
+le hash via Python et patche les 3 fichiers US. 0 token LLM, ~50 ms.
 
-L'agent NE DOIT JAMAIS écrire un placeholder symbolique pour ce hash —
-patterns observés à interdire :
-- `sha256:placeholder`
-- `sha256:RECALC_RUN`
-- `sha256:a3f8c2e1` (hash fictif inventé)
-- `sha256:xxxxxxxx`
-- toute valeur autre qu'un hex réel de 8 caractères calculé via la
-  commande ci-dessus
+> **Note historique** : la version v7.0.0 d'origine prescrivait à `po`
+> de calculer le hash via Bash/Python/PowerShell — prescription
+> impossible (Bash absent des tools). Le post-mortem du run FEAT 2
+> (2026-05-22) a confirmé que l'agent émettait soit `COMPUTE_REQUIRED`,
+> soit un placeholder fictif, et bloquait son propre STEP 9 sur l'erreur
+> `[PO_HASH_PLACEHOLDER]`. La résolution déterministe par la commande
+> élimine ce piège.
 
-Si la commande Bash `sha256sum` n'est pas disponible (env Windows pur
-sans Git Bash), utiliser le fallback Python (toujours disponible) :
-```bash
-FEAT_HASH=$(python -c "import hashlib,sys; print(hashlib.sha256(open(sys.argv[1],'rb').read()).hexdigest()[:8])" workspace/input/feats/{n}-{FeatName}.md)
+**STEP 9 (modifié)** — Read-back sentinel-aware :
+
+```
+Si la ligne `Parent FEAT hash:` contient `sha256:COMPUTE_REQUIRED`
+  → OK, sentinel attendu, la commande /us-generate résoudra (continuer STEP 10).
+Si la ligne contient `sha256:` suivi de 8 hex chars [0-9a-f]
+  → OK, déjà résolu (relance idempotente sur fichier existant).
+Sinon (placeholder fictif type "placeholder", "RECALC_RUN", hex inventé)
+  → STOP + ERROR :
 ```
 
-Sur PowerShell pur (sans Bash) :
-```powershell
-$FEAT_HASH = (Get-FileHash "workspace\input\feats\{n}-{FeatName}.md" -Algorithm SHA256).Hash.ToLower().Substring(0,8)
+```
+ERROR: agent po — Parent FEAT hash placeholder fictif
+CAUSE: [PO_HASH_PLACEHOLDER] valeur "{found}" non conforme (attendu : "COMPUTE_REQUIRED" sentinel OU 8 hex chars)
+FIX: ré-écrire le fichier US avec `Parent FEAT hash: sha256:COMPUTE_REQUIRED` (sentinel littéral)
 ```
 
-**Validation read-back obligatoire en STEP 9** : après avoir écrit
-toutes les US, l'agent doit re-Read chaque fichier et vérifier que
-la ligne `Parent FEAT hash:` ne contient PAS l'un des placeholders
-ci-dessus. Si placeholder détecté → STOP + ERROR 3-lignes :
-```
-ERROR: agent po — Parent FEAT hash placeholder detected in {us_file}
-CAUSE: [PO_HASH_PLACEHOLDER] valeur fictive "{found}" au lieu du SHA-256 réel
-FIX: calculer FEAT_HASH via sha256sum (ou fallback Python/PS) puis ré-écrire l'US
-```
-
-Ce hash permet aux agents `dev-*` et auditors de détecter si la FEAT
+Le hash permet aux agents `dev-*` et auditors de détecter si la FEAT
 a été modifiée après génération des US (`Covers:` devient invalide).
 En cas de mismatch détecté en aval → ERROR `[FEAT_HASH_MISMATCH]`,
 Tech Lead doit re-run `/us-generate {n}` (idempotent).
@@ -446,6 +444,43 @@ Sur erreur (incluant `STEP 8.5 read-back failed`), bloc ERROR 3 lignes
 Sur erreur, émettre le bloc ERROR 3 lignes (CAUSE / FIX) et STOP.
 
 Aucun autre texte. Pas de récap, pas de liste de fichiers.
+
+---
+
+## Chat Output Protocol
+
+> Cet agent applique strictement `@.claude/rules/output-protocol.md`.
+> Substance non dupliquée — la règle est SSoT.
+
+**Label canonique** : `[PO]` (cf. output-protocol.md §3)
+**Plage de progression** : `8-12%` (cf. output-protocol.md §4)
+
+**Granularité cible** : 3 à 6 updates par invocation, format
+`[PO] Action au gérondif... (X%)` ou `[PO] Résultat factuel. (X%)`.
+
+**Interdits stricts** (cf. §5 du protocole) :
+- chemins de fichiers internes (`workspace/...`, `.claude/...`)
+- noms de classes/méthodes/composants générés
+- stdout/stderr de bash, Read/Edit/Glob narration
+- context budget, tokens, preflight checks détaillés
+- diffs, snippets, lignes de code
+
+**Erreurs (LOAD-BEARING)** : tout bloc `ERROR: ... / CAUSE: ... / FIX: ...`
+apparaissant dans les STEPs ci-dessus est un **TEMPLATE pour le fichier
+rapport disque**, JAMAIS un texte à émettre verbatim en chat.
+
+Procédure obligatoire à chaque émission d'erreur :
+1. **Disque** : écrire le bloc 3-lignes complet dans le fichier rapport
+   approprié (`workspace/output/qa/feat-{n}/{kind}.md`,
+   `workspace/output/.sys/.validation/{n}-readiness.md`, etc.) — format
+   préservé pour `build_loop`/hooks/dashboards (cf. `error-classification.md §2`).
+2. **Chat** : émettre UNE SEULE ligne compressée :
+   ```
+   🔴 [{LABEL}/FAIL] {résumé court} — [{CLASS}] {détail 1L} → {rapport.md}. ({X}%)
+   ```
+   Pas de chemin absolu, pas de stack trace, pas de blocs codés multi-lignes.
+
+**Bypass debug** : `SDD_CHAT_VERBOSE=1` → mode legacy verbose (§10).
 
 ---
 

@@ -1,8 +1,8 @@
 # ARCHI_MICROSERVICES
 
-Status: Draft  
-Validation: 🟡 experimental (combo non valide end-to-end dans SDD_Pro v6 — Phase 2 SDD_Pro v6.7.6+)  
-Pattern ID: archi-microservice  
+Status: Draft
+Validation: 🟡 experimental (combo non valide end-to-end dans SDD_Pro v6 — Phase 2 SDD_Pro v6.7.6+)
+Pattern ID: archi-microservice
 Scope: **pattern d'architecture backend** — Microservices (Sam Newman 2015 + Chris Richardson 2018). S'applique aux stacks `backend/*.md` lorsque `ArchiPattern: microservice`. Ne s'applique PAS aux `fullstack/*` (monolithe par définition) ni aux `mobiles/*`.
 
 > **Scope SDD_Pro important** : un microservice = **UN seul backend** géré par SDD_Pro. Ce pattern décrit comment **structurer UN service** pour qu'il soit prêt à vivre dans un écosystème microservices (résilience, observability, contracts, isolation). **Multi-service orchestration** (saga distribuée, service mesh, K8s manifests) est **hors scope** SDD_Pro v6 — relève des Ops/DevOps. Un `/sdd-full` génère **UN service** ; l'écosystème complet est construit en répétant l'opération pour chaque service.

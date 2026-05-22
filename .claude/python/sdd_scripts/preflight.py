@@ -433,7 +433,12 @@ def main() -> int:
     # A3 — stack.md exists
     stack_path = root / "workspace" / "input" / "stack" / "stack.md"
     if not stack_path.is_file():
-        add_err("STACK_MISSING", "verifier que workspace/input/stack/stack.md existe")
+        add_err(
+            "STACK_MISSING",
+            "workspace/input/stack/stack.md absent — projet non initialise. "
+            "FIX: lancer `python bootstrap.py` depuis la racine du repo "
+            "(interactif, ~5 questions, ~30s). Cf. /sdd-bootstrap pour les options.",
+        )
         print(json.dumps(result, separators=(",", ":")))
         return FAIL_FAST
 
@@ -457,6 +462,21 @@ def main() -> int:
         stack_content = stack_path.read_text(encoding="utf-8")
     except OSError as e:
         add_err("STACK_READ_FAILED", f"lecture stack.md impossible : {e}")
+        print(json.dumps(result, separators=(",", ":")))
+        return FAIL_FAST
+
+    # A3.bis — stack.md is the raw template (placeholders not substituted)
+    # Detect `{{Placeholder}}` patterns leftover from templates/stack.md.template.
+    # Symptom of "user copy-pasted the template instead of running bootstrap.py".
+    # Fail fast with an actionable pointer rather than a cryptic downstream error.
+    if "{{" in stack_content and re.search(r"\{\{[A-Za-z][A-Za-z0-9_]*\}\}", stack_content):
+        add_err(
+            "STACK_MALFORMED",
+            "workspace/input/stack/stack.md contient des placeholders `{{...}}` "
+            "non substitues (template brut). "
+            "FIX: lancer `python bootstrap.py` depuis la racine du repo pour "
+            "rendre le template (interactif, ~5 questions). Cf. /sdd-bootstrap.",
+        )
         print(json.dumps(result, separators=(",", ":")))
         return FAIL_FAST
 

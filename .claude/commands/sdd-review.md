@@ -236,3 +236,33 @@ ReviewFailOn:   serious     # info | minor | moderate | serious | critical
 `/sdd-review` est **idempotent** : re-runs lisent l'état actuel de la DB,
 overwrites la ligne `validation_reports` précédente (via
 `replace_validation_reports`).
+
+---
+
+## Chat Output Protocol
+
+> Cette commande applique strictement `@.claude/rules/output-protocol.md`.
+> Substance non dupliquée — la règle est SSoT.
+
+**Labels canoniques émis** : `[REVIEW]`, `[SECURITY]`, `[DONE]`
+(cf. output-protocol.md §3)
+**Plage de progression couverte** : `88-100%` (cf. output-protocol.md §4)
+
+**Granularité cible** : 5-7 updates (agrégation 5 sources : arch +
+code + security-scan + spec + quality, puis verdict consolidé style
+Sonar).
+
+**Interdits stricts** (cf. §5 du protocole) :
+- chemins de fichiers internes (`workspace/...`, `.claude/...`)
+- détail des findings par source (compteurs par sévérité suffisent)
+- stdout/stderr de bash, JSON dumps sdd_review.py
+- snippets de code citées
+
+**Verdict consolidé** : 1 ligne avec emoji style Sonar. Exemple :
+`[REVIEW] Verdict consolidé: 0 critical, 5 serious, 12 moderate — 🟡 WARN. (99%)`.
+En cas de RED bloquant : `🔴 [DONE/FAIL] FEAT {n} — [REVIEW_VERDICT_RED] → workspace/output/qa/feat-{n}/review.md. (99%)`.
+
+**Verdict final** : 1 ligne `[DONE]` (🟢) / `[DONE/WARN]` (🟡) /
+`[DONE/FAIL]` (🔴) (cf. §9.1). Pas de "next steps" après (cf. §9.3).
+
+**Bypass debug** : `SDD_CHAT_VERBOSE=1` → mode legacy verbose (§10).

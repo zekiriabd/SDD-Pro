@@ -2,9 +2,9 @@
 
 > §2.4 (Librairies) régénérée depuis `node-express.libs.json` — ne pas éditer manuellement (`python .claude/python/sdd_admin/sync_stack_md.py --stack-id node-express`).
 
-Status: Draft  
-Validation: 🟡 experimental (not yet validated end-to-end in production combo)  
-Tech FEAT ID: tech-expressapi  
+Status: Draft
+Validation: 🟡 experimental (not yet validated end-to-end in production combo)
+Tech FEAT ID: tech-expressapi
 Scope: backend uniquement (API, logique metier, persistance)
 
 ---
@@ -110,10 +110,10 @@ Chaque task qui crée un nouveau controller / route DOIT enrichir `swaggerConfig
 
 ## 2.1 Identite
 
-Stack ID : back-exp  
-Langage : TypeScript  
-Runtime : Node.js 22+  
-Framework : Express.js  
+Stack ID : back-exp
+Langage : TypeScript
+Runtime : Node.js 22+
+Framework : Express.js
 Namespace racine : `{BackendNamespace}`
 
 ---

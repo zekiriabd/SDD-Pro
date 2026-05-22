@@ -1,8 +1,8 @@
 # Tech FEAT: node-react (fullstack)
 
-Status: Draft  
-Validation: 🟡 experimental (validated combo: workspace/console v0.4.0 — Fastify 5 + React 18 CDN + Babel-standalone, 2026-05-16)  
-Tech FEAT ID: tech-node-react  
+Status: Draft
+Validation: 🟡 experimental (validated combo: workspace/console v0.4.0 — Fastify 5 + React 18 CDN + Babel-standalone, 2026-05-16)
+Tech FEAT ID: tech-node-react
 Scope: **fullstack monolithe** — backend Node.js + frontend React servis depuis le MEME projet (zero-build, JSX transpilé in-browser via Babel Standalone). Pas de séparation `{BackendName}` / `{AppName}` / `{LibName}`. Modèle SSR-adjacent (le serveur sert l'HTML initial + l'API ; React hydrate côté client).
 
 ---

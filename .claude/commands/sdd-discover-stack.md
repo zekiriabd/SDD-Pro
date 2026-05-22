@@ -281,3 +281,30 @@ l'attention du Tech Lead.
 - **Pas de détection des secrets** : `DB_PASSWORD`, `AUTH_JWT_SECRET`,
   etc. doivent être ajoutés manuellement (sécurité — on ne lit pas les
   `appsettings.json` pour ça).
+
+---
+
+## Chat Output Protocol
+
+> Cette commande applique strictement `@.claude/rules/output-protocol.md`.
+> Substance non dupliquée — la règle est SSoT.
+
+**Labels canoniques émis** : `[ANALYSIS]` (cf. output-protocol.md §3)
+**Plage de progression couverte** : `0-100%` (scan onboarding mono-shot)
+
+**Granularité cible** : 3-4 updates (scan manifests, match catalogue,
+écriture `stack.md.candidate`, verdict).
+
+**Interdits stricts** (cf. §5 du protocole) :
+- chemins de fichiers internes (`workspace/...`, `.claude/...`)
+- liste détaillée des manifests parsés (compteur suffit)
+- stdout/stderr de scan_repo.py / match_stack_catalog.py
+- JSON dumps
+
+**Verdict final** : 1 ligne avec compteur stacks détectés + pointeur
+fichier généré. Exemple : `[ANALYSIS] 1 combo backend×frontend×ui
+détecté → workspace/input/stack/stack.md.candidate. (100%)`. En cas
+d'absence de match : `🟡 [ANALYSIS/WARN] Manifests présents mais
+[DISCOVER_NO_MATCH]. (100%)`.
+
+**Bypass debug** : `SDD_CHAT_VERBOSE=1` → mode legacy verbose (§10).

@@ -59,7 +59,7 @@ for _stream in (sys.stdout, sys.stderr):
 
 
 REPO_ROOT = Path(__file__).resolve().parent
-STACK_TEMPLATE = REPO_ROOT / "workspace" / "input" / "stack" / "stack.md.template"
+STACK_TEMPLATE = REPO_ROOT / ".claude" / "templates" / "stack.md.template"
 STACK_TARGET = REPO_ROOT / "workspace" / "input" / "stack" / "stack.md"
 FEATS_DIR = REPO_ROOT / "workspace" / "input" / "feats"
 UI_DIR = REPO_ROOT / "workspace" / "input" / "ui"

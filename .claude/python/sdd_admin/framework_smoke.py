@@ -183,14 +183,18 @@ EXPECTED_ADMIN_SCRIPTS = (
 )
 
 EXPECTED_COMMANDS = (
-    "feat-generate", "feat-deepen", "feat-validate", "us-generate", "arch-init",
-    "dev-plan", "dev-backend", "dev-frontend", "dev-run", "sdd-full",
-    "qa-generate", "sdd-status", "doc-refresh",
+    # User-facing (11) — cf. CLAUDE.md §3
+    "feat-generate", "feat-validate", "sdd-full", "dev-run", "qa-generate",
+    "sdd-review", "sdd-status", "sdd-discover-stack", "sdd-serve",
+    "sdd-kill-server", "sdd-bootstrap",
+    # Internes (8) — debug/inspection
+    "us-generate", "arch-init", "dev-plan", "dev-backend", "dev-frontend",
+    "doc-refresh", "feat-deepen", "sdd-profile",
 )
 
 PRINCIPAL_COMMANDS_FOR_CLAUDE_MD = (
     "feat-generate", "us-generate", "dev-run", "sdd-full",
-    "qa-generate", "sdd-status",
+    "qa-generate", "sdd-status", "sdd-bootstrap",
 )
 
 

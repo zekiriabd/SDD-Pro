@@ -59,6 +59,36 @@ updated: "2026-05-20"
 # =========================================================================
 
 # =========================================================================
+# Cross-agent reads (v7.0.0+)
+# =========================================================================
+# Règles chargées implicitement par TOUS les agents listés ci-dessous via
+# référence `@.claude/rules/{nom}.md` dans leur prompt. Annotation
+# `cache_layer: stable` car invariant inter-runs (cachable 5 min TTL).
+#
+# - .claude/rules/output-protocol.md (v7.0.0)
+#     Référencée par les 11 agents (po, arch, dev-backend, dev-frontend,
+#     qa, elicitor, constitutioner, code-reviewer, security-reviewer,
+#     spec-compliance-reviewer, arch-reviewer) ET les 10 commandes
+#     user-facing (feat-generate, feat-validate, sdd-full, dev-run,
+#     qa-generate, sdd-review, sdd-status, sdd-discover-stack, sdd-serve,
+#     sdd-kill-server). Définit le protocole de sortie chat executive
+#     (1L `[AGENT] résumé (X%)`, anti-verbose, ERROR 3L disque préservé).
+#     Coût ~4-6 KB par invocation (substance dans la règle, agents/
+#     commandes ne portent qu'un mini bloc 20L de paramétrage).
+#
+#     Couches complémentaires (hors prompt agent) :
+#       * Output style `.claude/output-styles/sdd-executive.md` — augmente
+#         le system prompt de Claude (main loop) pour qu'elle suive le
+#         protocole quand elle orchestre une commande SDD. Activable par
+#         `/output-style sdd-executive` (puis revert via `/output-style`).
+#       * Statusline `sdd_admin.statusline` (`.claude/python/sdd_admin/
+#         statusline.py`) — single-line bottom-of-screen view du run
+#         actif (`[AGENT] X% · FEAT N-Name · US m-Name · elapsed`).
+#         Lit `workspace/output/db/console.db` (table `runs` + `events`).
+#         Câblé dans `.claude/settings.json` clé `statusLine`. Désactivable
+#         per-dev via `.claude/settings.local.json` (statusLine: null).
+#
+# =========================================================================
 # Sérialisation des writes sur workspace/output/.sys/.context/constitution.md (v3+)
 # =========================================================================
 # Plusieurs agents écrivent dans constitution.md, mais JAMAIS en parallèle.

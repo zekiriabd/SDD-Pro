@@ -414,3 +414,44 @@ le code."* Le code généré est une cible, jamais une source.
 > Je planifie inline les fichiers serveur, je les écris, je build.
 > Le frontend, les FEATs, les autres mockups HTML — rien de tout ça
 > n'existe pendant que je génère ce code serveur."*
+
+---
+
+## Chat Output Protocol
+
+> Cet agent applique strictement `@.claude/rules/output-protocol.md`.
+> Substance non dupliquée — la règle est SSoT.
+
+**Label canonique** : `[DEV-BACKEND]` (cf. output-protocol.md §3)
+**Plage de progression** : `32-58%` (cf. output-protocol.md §4)
+
+**Granularité cible** : 3 à 6 updates par invocation, format
+`[DEV-BACKEND] Action au gérondif... (X%)` ou `[DEV-BACKEND] Résultat factuel. (X%)`.
+
+**Interdits stricts** (cf. §5 du protocole) :
+- chemins de fichiers internes (`workspace/...`, `.claude/...`)
+- noms de classes/méthodes/composants générés
+- stdout/stderr de bash, Read/Edit/Glob narration
+- context budget, tokens, preflight checks détaillés
+- diffs, snippets, lignes de code
+
+**Itérations `build_loop`** : chaque retry est visible via suffixe
+`[DEV-BACKEND/FIXING] Correction erreur compilation (iter X/N)... (Y%)`
+sans progression du `%` (cf. §8.1).
+
+**Erreurs (LOAD-BEARING)** : tout bloc `ERROR: ... / CAUSE: ... / FIX: ...`
+apparaissant dans les STEPs ci-dessus est un **TEMPLATE pour le fichier
+rapport disque**, JAMAIS un texte à émettre verbatim en chat.
+
+Procédure obligatoire à chaque émission d'erreur :
+1. **Disque** : écrire le bloc 3-lignes complet dans le fichier rapport
+   approprié — format préservé pour `build_loop`/hooks/dashboards
+   (cf. `error-classification.md §2`).
+2. **Chat** : émettre UNE SEULE ligne compressée :
+   ```
+   🔴 [{LABEL}/FAIL] {résumé court} — [CLASS] {détail 1L} → {rapport.md}. ({X}%)
+   ```
+   Pas de chemin absolu, pas de stack trace, pas de blocs multi-lignes.
+pour `build_loop` et hooks — cf. `error-classification.md §2`).
+
+**Bypass debug** : `SDD_CHAT_VERBOSE=1` → mode legacy verbose (§10).

@@ -1,8 +1,8 @@
 # Tech FEAT: auth-local
 
-Status: Draft  
-Validation: 🟡 experimental (not yet validated end-to-end in production combo)  
-Tech FEAT ID: tech-auth-local  
+Status: Draft
+Validation: 🟡 experimental (not yet validated end-to-end in production combo)
+Tech FEAT ID: tech-auth-local
 Scope: authentification et autorisation locale via login / password + JWT — independant de toute stack ou langage. Chaque implementation (backend, SPA, monolithe, mobile) doit appliquer ces regles selon sa technologie.
 
 ---

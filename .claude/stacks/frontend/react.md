@@ -2,9 +2,9 @@
 
 > §2.4 (Librairies) régénérée depuis `react.libs.json` — ne pas éditer manuellement (`python .claude/python/sdd_admin/sync_stack_md.py --stack-id react`).
 
-Status: Draft  
-Validation: 🟢 reference (validated combo CMS — kotlin-spring-boot + react + shadcn + azure-ad, 2026-05-13)  
-Tech FEAT ID: tech-react  
+Status: Draft
+Validation: 🟢 reference (validated combo CMS — kotlin-spring-boot + react + shadcn + azure-ad, 2026-05-13)
+Tech FEAT ID: tech-react
 Scope: frontend uniquement (React SPA)
 
 ---
@@ -719,8 +719,8 @@ Structure :
 
 i18n/
 
-fr.json  
-en.json  
+fr.json
+en.json
 
 Langue :
 
@@ -763,8 +763,8 @@ Structure :
 
 layouts/
 
-MainLayout.tsx  
-AuthLayout.tsx  
+MainLayout.tsx
+AuthLayout.tsx
 
 ---
 

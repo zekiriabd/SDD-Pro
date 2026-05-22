@@ -1,8 +1,8 @@
 # Tech FEAT: auth-azure
 
-Status: Draft  
-Validation: 🟢 reference (validated dans 2 combos — dotnet+blazor+radzen 2026-05 et kotlin+react+shadcn 2026-05-13)  
-Tech FEAT ID: tech-auth-azure  
+Status: Draft
+Validation: 🟢 reference (validated dans 2 combos — dotnet+blazor+radzen 2026-05 et kotlin+react+shadcn 2026-05-13)
+Tech FEAT ID: tech-auth-azure
 Scope: authentification et autorisation Azure AD — independant de toute stack ou langage. Chaque implementation (backend, SPA, monolithe) doit appliquer ces regles selon sa technologie.
 
 ---
@@ -86,8 +86,166 @@ lit `IConfiguration` / `application.yml` / `config/default.json` /
 
 - Toutes valeurs dans `## Active Auth Specs` de `stack.md`, propagées par `arch` STEP 4.5
 - Aucun hardcoding Azure AD dans le code (`.cs`/`.kt`/`.py`/`.ts`)
-- Aucune lecture `Environment.GetEnvironmentVariable`/`System.getenv`/`process.env`/`os.environ`
 - Lecture via mécanismes natifs framework : `IConfiguration["AzureAd:*"]`, `@Value("${azure.ad.*}")`, `config.get("azure.ad")`, `azure_settings.*`
+- **Env var binding runtime AUTORISÉ** (depuis 2026-05-22, audit P0) : arch
+  doit générer dans `Program.cs`/`main.kt`/`main.py`/`server.ts` un bloc
+  de mapping `AZ_*` → clés natives Configuration (cf. §2.bis Pont env-var-runtime).
+  La règle anti-`Environment.GetEnvironmentVariable` v6.x est révoquée :
+  scaffolder les valeurs littérales dans `appsettings.json` crée un risque
+  `[SEC_SECRET_HARDCODED]` même si `workspace/output/` est gitignored
+  (accès poste dev, leak via templates partagés). Pattern correct :
+  `appsettings.json` avec valeurs vides + binding env var runtime.
+
+### §2.bis — Pont env-var → Configuration runtime (load-bearing, depuis 2026-05-22)
+
+**Contexte** : la convention `stack.md` (`AZ_TENANTID`, `DB_PASSWORD`, etc.)
+ne correspond pas au binding natif des frameworks (.NET attend
+`AzureAd__TenantId` double underscore, Spring attend `AZURE_AD_TENANT_ID`,
+Node lit `process.env.AZ_TENANTID` directement, Python idem). Le pont
+runtime est **obligatoire**, généré par arch.
+
+**Pattern .NET** (à inliner dans `Program.cs` AVANT `AddMicrosoftIdentityWebApiAuthentication`) :
+
+```csharp
+// === Pont env-var stack.md → IConfiguration (arch STEP 4.5.7) ===
+static string ReadEnv(string key, string fallback = "") =>
+    (Environment.GetEnvironmentVariable(key) ?? fallback).Trim().Trim('"');
+
+// MSYS Git Bash strip — sur poste dev Windows, valeurs path-like (/login-callback)
+// sont mangled vers C:/Program Files/Git/login-callback ou /Git/login-callback
+// quand le process est launched depuis Bash. Strip défensif au boot.
+static string StripMsysPrefix(string raw)
+{
+    if (string.IsNullOrWhiteSpace(raw)) return string.Empty;
+    var v = raw.Replace('\\', '/');
+    var idx = v.LastIndexOf("/Git/", StringComparison.OrdinalIgnoreCase);
+    if (idx >= 0) v = "/" + v.Substring(idx + "/Git/".Length);
+    if (v.Length > 2 && v[1] == ':')
+    {
+        var lastSlash = v.LastIndexOf('/');
+        v = lastSlash >= 0 ? "/" + v.Substring(lastSlash + 1) : "/" + v;
+    }
+    if (!v.StartsWith('/')) v = "/" + v;
+    return v.Replace("//", "/");
+}
+
+builder.Configuration["AzureAd:TenantId"]            = ReadEnv("AZ_TENANTID");
+builder.Configuration["AzureAd:ClientId"]            = ReadEnv("AZ_CLIENTID");
+builder.Configuration["AzureAd:Domain"]              = ReadEnv("AZ_DOMAIN");
+builder.Configuration["AzureAd:CallbackPath"]        = StripMsysPrefix(ReadEnv("AZ_BE_CALLBACKPATH", "/signin-oidc"));
+builder.Configuration["AzureAd:FrontendCallbackPath"]= StripMsysPrefix(ReadEnv("AZ_FE_CALLBACKPATH", "/authentication/login-callback"));
+
+// AZ_AUDIENCES : CSV de GUIDs (avec guillemets parasites possibles, cf. BR-13)
+var audiences = ReadEnv("AZ_AUDIENCES")
+    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+    .Select(a => a.Trim('"').Trim()).Where(a => !string.IsNullOrEmpty(a)).ToArray();
+for (int i = 0; i < audiences.Length; i++)
+    builder.Configuration[$"AzureAd:ValidAudiences:{i}"] = audiences[i];
+```
+
+**Pattern Spring Boot** : `application.yml` avec env var placeholders
+natifs (`${AZ_TENANTID:}` Spring résout les env vars directement, pas
+besoin de pont code) :
+
+```yaml
+azure:
+  ad:
+    tenant-id: ${AZ_TENANTID:}
+    client-id: ${AZ_CLIENTID:}
+    callback-path: ${AZ_BE_CALLBACKPATH:/signin-oidc}
+```
+
+**Pattern FastAPI Python** : `pydantic-settings` lit nativement env vars :
+
+```python
+class AzureADSettings(BaseSettings):
+    tenant_id: str = Field("", env="AZ_TENANTID")
+    client_id: str = Field("", env="AZ_CLIENTID")
+```
+
+**Pattern Express Node** : `process.env.AZ_TENANTID` direct (12-factor).
+
+### §2.ter — Anti-pattern MSYS Git Bash sur Windows (post-mortem 2026-05-22)
+
+Quand le dev lance le backend via Bash/Git Bash sur Windows, certaines env
+vars dont la valeur **commence par `/`** subissent une **conversion
+POSIX→Windows path** : `/login-callback` devient `C:/Program Files/Git/login-callback`
+ou `/Git/login-callback` selon l'environnement.
+
+Symptôme : MSAL rejette le callback avec `AADSTS50011: The redirect URI
+'https://localhost:5185/Git/login-callback' specified in the request does
+not match`.
+
+**Mitigation** :
+1. La fonction `StripMsysPrefix` du §2.bis nettoie au runtime.
+2. Le dev peut éviter Git Bash et lancer via `cmd.exe` / PowerShell.
+3. Le dev peut définir `MSYS_NO_PATHCONV=1` dans son shell Bash.
+
+**Validation** : `AZ_FE_CALLBACKPATH` doit valoir `/authentication/login-callback`
+(convention universelle SPA — React/Vue/Angular/Blazor) — toute autre
+valeur déclenche AADSTS50011 si non matchée côté Azure AD App Reg.
+
+### §2.quart — Anti-pattern pollution env shell parent (post-mortem 2026-05-22, CMSPrint)
+
+Un shell utilisateur (PowerShell profile, `.bashrc`, variables système
+Windows) peut contenir une valeur héritée d'un ancien projet :
+```
+AZ_FE_CALLBACKPATH=/login-callback     # convention React MSAL.js, INCOMPATIBLE Blazor
+```
+
+Quand `dotnet run` est lancé depuis ce shell, le process backend hérite
+de cette valeur. Le `ReadEnv("AZ_FE_CALLBACKPATH", ...)` ne retombe
+**pas** sur le fallback canonique car la variable est définie (non-vide).
+`/auth/config` retourne alors `/login-callback` au frontend MSAL Blazor,
+qui envoie `https://localhost:5185/login-callback` à Azure AD → AADSTS50011
+(Azure a `/authentication/login-callback` registered, pas `/login-callback`).
+
+**Symptôme distinctif** vs §2.ter MSYS : pas de `/Git/` dans l'URI rejetée,
+la valeur est littéralement celle du shell parent.
+
+**Mitigation systémique (load-bearing — arch STEP 3 doit la matérialiser)** :
+injecter **explicitement** les valeurs canoniques dans
+`Properties/launchSettings.json` du backend pour **neutraliser** tout
+shell pollué :
+
+```json
+{
+  "profiles": {
+    "https": {
+      "commandName": "Project",
+      "applicationUrl": "https://localhost:44328",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "AZ_FE_CALLBACKPATH": "/authentication/login-callback",
+        "AZ_BE_CALLBACKPATH": "/signin-oidc"
+      }
+    }
+  }
+}
+```
+
+Effet : `dotnet run` (et `dotnet watch run`) charge `launchSettings.json`
+**avant** la résolution `Environment.GetEnvironmentVariable`, override
+le shell parent. Le `.env.local` (si présent) ne contient PAS ces clés —
+elles vivent **uniquement** dans `launchSettings.json` (dev) et `.env.production`
+(prod, géré par ops).
+
+**Pour le frontend** (Blazor WASM standalone — pas de `launchSettings.json`
+qui injecte les env vars dans le browser), la valeur est résolue runtime
+via `fetch /auth/config` (le backend est SSoT). Donc fixer côté backend
+suffit pour les 2 process.
+
+**Anti-pattern rejeté** : déclarer `AZ_FE_CALLBACKPATH` dans le profil
+shell utilisateur (`.bashrc`, `$PROFILE` PowerShell, variables système
+Windows). Doit rester **scopé au projet** via `launchSettings.json` ou
+`.env.local`.
+
+**Détection diagnostique** : si `dotnet run` retourne AADSTS50011 sans
+préfixe `/Git/`, exécuter `echo $env:AZ_FE_CALLBACKPATH` (PowerShell)
+ou `echo $AZ_FE_CALLBACKPATH` (Bash). Toute valeur ≠ `/authentication/login-callback`
+indique une pollution shell. Fix immédiat : `launchSettings.json` override
+(cf. ci-dessus). Fix permanent : `Remove-Item Env:AZ_FE_CALLBACKPATH`
+(session) ou retirer la ligne du profil utilisateur.
 
 ### §dual-app — Pattern canonique 2 App Reg
 
@@ -247,14 +405,45 @@ Utilisé par tous les frontends (cf. §dual-app pour distinction FE/BE clientId)
 
 **Pattern .NET (Program.cs)** :
 ```csharp
-// appsettings.json peuplé par arch STEP 4.5 :
+// IConfiguration peuplé par le pont env-var → §2.bis :
 //   "AzureAd": { "Instance", "TenantId", "ClientId", "Domain", "CallbackPath", "ValidAudiences" }
 builder.Services.AddMicrosoftIdentityWebApiAuthentication(builder.Configuration, "AzureAd");
-// Pas d'AddInMemoryCollection, pas d'Environment.GetEnvironmentVariable, pas de Configure<MicrosoftIdentityOptions>("AzureAd", ...)
 ```
 
 **Anti-pattern .NET (pré-2026-05-14)** : `Configure<MicrosoftIdentityOptions>("AzureAd", o => o.ClientId = Environment.GetEnvironmentVariable(...))`
 → named options non lues par le handler `JwtBearer` → `IDW10106: The 'ClientId' option must be provided` au 1er appel endpoint.
+
+#### 5.1.1.bis DI lifetime — `IAuthorizationHandler` doit être Scoped (post-mortem 2026-05-22)
+
+Si l'AuthorizationHandler consomme un service Scoped (typiquement
+`IGroupsClaimReader` qui lit le `HttpContext.User`), il **DOIT** être
+enregistré en `AddScoped`, **JAMAIS** `AddSingleton`. ASP.NET DI valide
+au boot que le graphe n'a pas de capture Scoped-dans-Singleton et plante
+le démarrage sinon :
+
+```
+System.InvalidOperationException: Error while validating the service descriptor
+'ServiceType: IAuthorizationHandler Lifetime: Singleton ImplementationType: GroupAuthorizationHandler':
+Cannot consume scoped service 'IGroupsClaimReader' from singleton 'IAuthorizationHandler'.
+```
+
+Pattern canonique (`Program.cs`) :
+```csharp
+builder.Services.AddScoped<IGroupsClaimReader, GroupsClaimReader>();
+// IAuthorizationHandler doit être Scoped — consomme IGroupsClaimReader (Scoped, lit HttpContext).
+builder.Services.AddScoped<IAuthorizationHandler, GroupAuthorizationHandler>();
+```
+
+**Anti-pattern bloquant** :
+```csharp
+builder.Services.AddSingleton<IAuthorizationHandler, GroupAuthorizationHandler>(); // ❌
+```
+→ Backend ne démarre pas, exit 1 immédiat. Symptôme : `dotnet run` se
+termine avec exit code non-zero avant même de logguer "Now listening".
+
+**Règle générale** : tout `IAuthorizationHandler` custom dans Microsoft.Identity.Web
+est Scoped par défaut. N'utiliser Singleton que si le handler est totalement
+stateless ET ne dépend que de Singleton/Transient services.
 
 #### 5.1.2 Piege Swagger UI whitelist (Spring Boot)
 
@@ -611,6 +800,43 @@ redirectUri: "http://localhost:5173/login-callback"  // hardcode (cassé prod)
 Backend `/auth/config` : `redirectUri` retourné DOIT être un path
 commençant par `/` (jamais URL complète, jamais vide).
 
+#### 5.2.7.3.ter `navigateToLoginRequestUrl: false` OBLIGATOIRE (post-mortem 2026-05-22, CMSPrint)
+
+**Symptôme** : utilisateur se connecte avec succès sur Azure AD, callback
+revient sur `/authentication/login-callback`, MSAL consomme bien le code,
+puis l'utilisateur est **renvoyé sur `/login`** au lieu de la home page —
+en boucle infinie même après auth réussie.
+
+**Cause** : par défaut `navigateToLoginRequestUrl: true` dans MSAL fait
+que MSAL **replay l'URL d'origine** du login (typiquement `/login` lui-même
+puisque c'est là que l'utilisateur a cliqué). La page `LoginCallbackPage`
+n'a jamais l'occasion de tourner — MSAL navigue avant elle.
+
+**Pattern canonique** :
+
+```ts
+const msalConfig: Configuration = {
+  auth: {
+    clientId, authority, redirectUri,
+    postLogoutRedirectUri: window.location.origin,
+    navigateToLoginRequestUrl: false,  // OBLIGATOIRE — la nav post-login est gérée par LoginCallbackPage
+  },
+  cache: { cacheLocation: "sessionStorage", storeAuthStateInCookie: false },
+}
+```
+
+Anti-patterns rejetés :
+- ❌ `navigateToLoginRequestUrl: true` (défaut MSAL) — provoque le loop
+- ❌ Omettre la clé — MSAL utilise `true` par défaut
+- ❌ Compter sur le replay MSAL pour la navigation post-login — fragile,
+  contradictoire avec une `LoginCallbackPage` qui fait `window.location.href`
+
+**Validation grep dev-frontend** :
+```bash
+grep -nE "navigateToLoginRequestUrl" src/auth/msalConfig.ts \
+  | grep "false" || ERROR [MSAL_NAVIGATE_DEFAULT]
+```
+
 #### 5.2.7.4 Route `/login` publique + autonome
 
 Toute SPA avec `auth/azure-ad` actif **DOIT** définir :
@@ -623,18 +849,37 @@ Toute SPA avec `auth/azure-ad` actif **DOIT** définir :
 #### 5.2.7.5 Auth guard global dans `__root.tsx`
 
 ```tsx
-const PUBLIC = new Set(["/login"])
+const PUBLIC = new Set(["/login", "/authentication/login-callback"])
+const HOME_AFTER_LOGIN = "/campagnes"  // ou page d'accueil métier
+
 function RootComponent() {
   const isAuth = useIsAuthenticated()
   const location = useLocation()
   const isPublic = PUBLIC.has(location.pathname)
-  if (!isPublic && !isAuth) return <Navigate to="/login" />
+
+  // 1. Non auth + route protégée → /login
+  if (!isAuth && !isPublic) return <Navigate to="/login" />
+
+  // 2. Déjà auth + sur /login → home (cas MSAL replay / bookmark / back-button
+  //    post-mortem 2026-05-22 : sans cette garde, utilisateur reste bloqué
+  //    sur le bouton "Se connecter" alors que sa session est valide)
+  if (isAuth && location.pathname === "/login") {
+    return <Navigate to={HOME_AFTER_LOGIN} />
+  }
+
+  // 3. Route publique (login, callback) → outlet nu, sans MainLayout
   if (isPublic) return <Outlet />
+
+  // 4. Route protégée + auth → wrap MainLayout
   return <MainLayout><Outlet /></MainLayout>
 }
 ```
 
-Effet : `/login` sans menu, autres routes wrappées `MainLayout`.
+Effet :
+- `/login` sans menu, autres routes wrappées `MainLayout`
+- `/authentication/login-callback` traverse le guard (sinon LoginCallbackPage
+  ne tournerait jamais et `handleRedirectPromise` ne consommerait pas le code)
+- Auto-redirect vers home si utilisateur arrive sur `/login` déjà authentifié
 
 #### 5.2.7.6 Token sessionStorage — clé partagée
 
@@ -671,6 +916,8 @@ par défaut (typiquement 1ère feature post-login).
 - ❌ `MainLayout` enveloppant `/login`
 - ❌ Token Bearer attendu par `httpClient` mais jamais écrit en sessionStorage par `LoginPage`
 - ❌ Pas de route `/` index → "Not Found" runtime
+- ❌ `navigateToLoginRequestUrl: true` (défaut MSAL) ou clé absente — loop /login post-auth (§5.2.7.3.ter)
+- ❌ Guard `__root.tsx` qui n'auto-redirige PAS un utilisateur auth déjà sur `/login` vers la home (§5.2.7.5)
 
 #### 5.2.7.9 CORS — config OBLIGATOIRE backend (dev + prod)
 

@@ -35,9 +35,25 @@ def try_create_exclusive(path: Path, content: str) -> bool:
 
 
 def read_lock(path: Path) -> tuple[str, int] | None:
-    """Read a `lockfile` of form 'AGENT_ID:UNIX_TIMESTAMP'.
+    """Read a `lockfile` and return (agent_id, unix_timestamp_seconds).
 
-    Returns (agent_id, timestamp) or None if file missing/malformed.
+    Supports both lock payload formats coexisting in the SDD_Pro framework :
+
+    1. **2-part** : `AGENT_ID:UNIX_TS_SECONDS` — produced by
+       `acquire_libname_lock.py` (Python only, LibName entity locks).
+    2. **3-part** : `PREFIX:PID:UNIX_TS_MS` — produced by
+       `acquire_with_retry()` and the Node.js console
+       (`workspace/console/.status.lock` cross-language symmetry).
+
+    The two payload zones (`{LibName}/.locks/*.lock` vs
+    `workspace/console/.status.lock`) do not overlap in current callers,
+    but `read_lock()` is defensive : it detects the 3-part format by
+    counting `:` separators and converts ms → seconds so downstream
+    stale detection (`now - ts > threshold_seconds`) works regardless
+    of which writer produced the lock.
+
+    Returns (agent_id_or_prefix, timestamp_seconds) or None if missing
+    /malformed.
     """
     try:
         raw = path.read_text(encoding="ascii", errors="replace").strip()
@@ -45,13 +61,26 @@ def read_lock(path: Path) -> tuple[str, int] | None:
         return None
     if not raw:
         return None
-    parts = raw.split(":", 1)
-    agent = parts[0].strip()
-    try:
-        ts = int(parts[1].strip()) if len(parts) >= 2 else 0
-    except ValueError:
-        ts = 0
-    return (agent, ts)
+    parts_all = raw.split(":")
+    agent = parts_all[0].strip()
+    if len(parts_all) >= 3:
+        # 3-part format: PREFIX:PID:TS_MS — last segment is ms timestamp.
+        try:
+            ts_ms = int(parts_all[-1].strip())
+        except ValueError:
+            return (agent, 0)
+        # Heuristic: a ms timestamp post-2001 is >= 1e12 ; a seconds
+        # timestamp post-2001 is >= 1e9. Convert iff in ms range.
+        ts = ts_ms // 1000 if ts_ms >= 1_000_000_000_000 else ts_ms
+        return (agent, ts)
+    # 2-part format: AGENT:TS_SECONDS.
+    if len(parts_all) >= 2:
+        try:
+            ts = int(parts_all[1].strip())
+        except ValueError:
+            ts = 0
+        return (agent, ts)
+    return (agent, 0)
 
 
 def overwrite_lock(path: Path, content: str) -> None:

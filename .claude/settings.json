@@ -1,4 +1,11 @@
 {
+  "outputStyle": "sdd-executive",
+  "statusLine": {
+    "_doc": "v7.0.0-alpha (2026-05-22) — executive view of the active SDD pipeline run. Reads workspace/output/db/console.db (table runs / events) and emits [AGENT] X% · FEAT N-Name · US m-Name · elapsed. Cheap (single SELECT, < 30 ms, no LLM). Fallback `[SDD] no run` when console.db absent. Disable per-dev via .claude/settings.local.json overriding `statusLine` to null. Detail: .claude/python/sdd_admin/statusline.py docstring.",
+    "type": "command",
+    "command": "python -c \"import os,sys,pathlib; r=os.environ.get('CLAUDE_PROJECT_DIR') or next((str(p) for p in [pathlib.Path.cwd()]+list(pathlib.Path.cwd().parents) if (p/'.claude').is_dir()),'.'); sys.path.insert(0,r+'/.claude/python'); from sdd_admin import statusline; statusline.main()\"",
+    "padding": 0
+  },
   "permissions": {
     "allow": [
       "Read",
@@ -143,15 +150,6 @@
       }
     ],
     "PostToolUse": [
-      {
-        "matcher": "Edit|Write|MultiEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python -c \"import os,sys,pathlib; r=os.environ.get('CLAUDE_PROJECT_DIR') or next((str(p) for p in [pathlib.Path.cwd()]+list(pathlib.Path.cwd().parents) if (p/'.claude').is_dir()),'.'); sys.path.insert(0,r+'/.claude/python'); import _hook; _hook.run('sdd_hooks.validate_augment_contract')\""
-          }
-        ]
-      },
       {
         "matcher": "Agent",
         "hooks": [

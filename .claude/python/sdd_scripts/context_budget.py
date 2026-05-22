@@ -48,30 +48,43 @@ from sdd_lib.layered_config import read_layered_config  # noqa: E402  (v6.7.3)
 from sdd_lib.stderr import warn  # noqa: E402
 
 
-ALLOWED_AGENTS: tuple[str, ...] = (
-    # Core + support
+#: Agents acceptable AS `--agent` CLI choice (current v7.0.0 surface).
+#: Must stay in sync with `sdd_hooks.preflight_agent_budget.ALLOWED_AGENTS`.
+#: Drift = hook would reject Agent spawns that this script accepts on CLI,
+#: producing inconsistent budget signals.
+CURRENT_AGENTS: tuple[str, ...] = (
+    # Core + support (4 + 3)
     "po", "arch", "dev-backend", "dev-frontend",
-    "qa", "elicitor", "constitutioner", "dashboard",
+    "qa", "elicitor", "constitutioner",
     # Auditors retained in v7.0.0 (4)
     "code-reviewer",
     "security-reviewer",
     "spec-compliance-reviewer",
     "arch-reviewer",
-    # Legacy auditors REMOVED v7.0.0 (governance-major-auditors-trim)
-    # but kept in this whitelist for context_budget READ-side compat
-    # with historical context_budget rows in console.db. The
-    # preflight_agent_budget hook actively rejects new invocations.
+)
+
+#: Read-side compat list for historical `console.db` rows produced by
+#: agents retired in v7.0.0 (governance-major-auditors-trim). Used by
+#: `DEFAULT_BUDGETS` lookups and `recompute --backfill` only — NEVER as
+#: argparse choice (a new `--agent dashboard` spawn must be rejected by
+#: the hook, so it must also be rejected here for sanity).
+RETIRED_AGENTS_V7: tuple[str, ...] = (
+    "dashboard",
     "accessibility-auditor",
     "performance-auditor",
 )
+
+#: Legacy alias kept for any external script that imports this name.
+#: Prefer `CURRENT_AGENTS` in new code. v7.1: remove this alias.
+ALLOWED_AGENTS: tuple[str, ...] = CURRENT_AGENTS + RETIRED_AGENTS_V7
 
 # Default byte budgets per agent (mirrors PowerShell defaults)
 DEFAULT_BUDGETS: dict[str, int] = {
     "po":            60_000,
     "elicitor":      70_000,
     "arch":         180_000,
-    "dev-backend":  140_000,
-    "dev-frontend": 160_000,
+    "dev-backend":  220_000,
+    "dev-frontend": 240_000,
     "qa":           280_000,
     "dashboard":    180_000,
     # Auditors — les 5 reviewers cross-fichier scannent le code matérialisé
@@ -97,7 +110,13 @@ EXCLUDE_EXT_RE = re.compile(r"\.(dll|exe|pdb|cache|map|woff|ttf|otf|eot|ico|png|
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="SDD_Pro context budget gate")
-    p.add_argument("--agent", required=True, choices=ALLOWED_AGENTS)
+    # v7.0.0 : CLI accepts only CURRENT_AGENTS (aligned with hook). Retired
+    # agents (RETIRED_AGENTS_V7) keep their DEFAULT_BUDGETS entries for
+    # `recompute --backfill` over historical console.db rows, but new CLI
+    # invocations with `--agent dashboard|accessibility-auditor|
+    # performance-auditor` are rejected with argparse's standard
+    # "invalid choice" — matches the hook's REJECTED_AGENTS_V7 behavior.
+    p.add_argument("--agent", required=True, choices=CURRENT_AGENTS)
     p.add_argument("--feat-number", type=int, default=0)
     p.add_argument("--us-id", default="")
     p.add_argument("--repo-root", default=None)

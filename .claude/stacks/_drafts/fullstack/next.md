@@ -1,8 +1,8 @@
 # Tech FEAT: next (fullstack)
 
-Status: Draft  
-Validation: 🟡 experimental (combo non valide end-to-end dans SDD_Pro v6)  
-Tech FEAT ID: tech-next  
+Status: Draft
+Validation: 🟡 experimental (combo non valide end-to-end dans SDD_Pro v6)
+Tech FEAT ID: tech-next
 Scope: **fullstack monolithe** — application Next.js 15 (App Router) dans UN seul projet `{AppName}/`. UI (React Server Components + Client Components) + API routes + Server Actions + auth vivent dans le meme processus Node.js. Pas de separation `{BackendName}` / `{AppName}` / `{LibName}`. Modele **SSR vrai** : HTML pre-rendu serveur par defaut, hydratation selective cote client.
 
 ---

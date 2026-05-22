@@ -1,8 +1,8 @@
 # Tech FEAT: blazor-server (fullstack)
 
-Status: Draft  
-Validation: 🟡 experimental (combo non valide end-to-end dans SDD_Pro v6 — pattern derive d'un projet legacy Demo 2026-05)  
-Tech FEAT ID: tech-blazor-server  
+Status: Draft
+Validation: 🟡 experimental (combo non valide end-to-end dans SDD_Pro v6 — pattern derive d'un projet legacy Demo 2026-05)
+Tech FEAT ID: tech-blazor-server
 Scope: **fullstack monolithe** — application Blazor Server .NET 10 dans UN seul projet `{AppName}/`. UI + logique metier + acces donnees + auth vivent dans le meme processus ASP.NET Core. Pas de separation `{BackendName}` / `{AppName}` / `{LibName}`. Modele SSR vrai : HTML rendu serveur, UI synchronisee via SignalR (pas de SPA, pas de JS bundler).
 
 ---

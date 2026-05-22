@@ -117,15 +117,15 @@ dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj reference wor
 <!-- CORE_PACKAGES_START -->
 ```bash
 # Auto-genere depuis dotnet-minimalapi.libs.json -- ne pas editer (utiliser sync_stack_md.py).
-dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package Microsoft.EntityFrameworkCore --version 10.0.6
-dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package Microsoft.EntityFrameworkCore.SqlServer --version 10.0.6
-dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package Microsoft.EntityFrameworkCore.Design --version 10.0.6
-dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package Microsoft.EntityFrameworkCore.Tools --version 10.0.6
+dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package Microsoft.EntityFrameworkCore --version 9.0.4
+dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package Microsoft.EntityFrameworkCore.Design --version 9.0.4
+dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package Microsoft.EntityFrameworkCore.Tools --version 9.0.4
+dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package Microsoft.AspNetCore.OpenApi --version 9.0.4
 dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package AutoMapper --version 16.1.1
-dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package Serilog.AspNetCore --version 10.0.0
+dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package Serilog.AspNetCore --version 9.0.0
 dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package Serilog.Sinks.Console --version 6.1.1
-dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package Swashbuckle.AspNetCore --version 10.1.7
-dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package Swashbuckle.AspNetCore.Annotations --version 10.1.7
+dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package Swashbuckle.AspNetCore --version 9.0.4
+dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package Swashbuckle.AspNetCore.Annotations --version 9.0.4
 dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package Asp.Versioning.Http --version 8.1.1
 dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package Asp.Versioning.Mvc.ApiExplorer --version 8.1.1
 dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package Microsoft.OpenApi --version 2.4.1
@@ -215,7 +215,7 @@ dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package MimeK
 
 # capability: auth-local
 dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package BCrypt.Net-Next --version 4.0.3
-dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package Microsoft.AspNetCore.Authentication.JwtBearer --version 10.0.6
+dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package Microsoft.AspNetCore.Authentication.JwtBearer --version 9.0.4
 ```
 <!-- ONDEMAND_PACKAGES_END -->
 
@@ -241,15 +241,15 @@ Codes prioritaires : CS0246, CS0103, CS1061, CS1002, CS1003, CS1513, CS0029, CS0
 
 | Lib | Version | Role |
 |-----|---------|------|
-| Microsoft.EntityFrameworkCore | 10.0.6 |  |
-| Microsoft.EntityFrameworkCore.SqlServer | 10.0.6 |  |
-| Microsoft.EntityFrameworkCore.Design | 10.0.6 |  |
-| Microsoft.EntityFrameworkCore.Tools | 10.0.6 |  |
+| Microsoft.EntityFrameworkCore | 9.0.4 |  |
+| Microsoft.EntityFrameworkCore.Design | 9.0.4 |  |
+| Microsoft.EntityFrameworkCore.Tools | 9.0.4 |  |
+| Microsoft.AspNetCore.OpenApi | 9.0.4 |  |
 | AutoMapper | 16.1.1 |  |
-| Serilog.AspNetCore | 10.0.0 |  |
+| Serilog.AspNetCore | 9.0.0 |  |
 | Serilog.Sinks.Console | 6.1.1 |  |
-| Swashbuckle.AspNetCore | 10.1.7 |  |
-| Swashbuckle.AspNetCore.Annotations | 10.1.7 |  |
+| Swashbuckle.AspNetCore | 9.0.4 |  |
+| Swashbuckle.AspNetCore.Annotations | 9.0.4 |  |
 | Asp.Versioning.Http | 8.1.1 |  |
 | Asp.Versioning.Mvc.ApiExplorer | 8.1.1 |  |
 | Microsoft.OpenApi | 2.4.1 |  |
@@ -278,13 +278,20 @@ Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'U
 | email | MailKit | 4.8.0 | smtp, envoi.*email, envoi.*courriel, send.*email, email.*notification, notification.*par.*email, mail.*confirmation, verifier.*email |
 | email | MimeKit | 4.8.0 | smtp, envoi.*email, envoi.*courriel, send.*email, email.*notification, notification.*par.*email, mail.*confirmation, verifier.*email |
 | auth-local | BCrypt.Net-Next | 4.0.3 | bcrypt, password.*hash, hash.*password, motdepasse.*hash, mot.*passe.*hash, auth-local, password_hash, verify.*password, connexion.*mot.*passe, inscription, register.*user |
-| auth-local | Microsoft.AspNetCore.Authentication.JwtBearer | 10.0.6 | jwt, jsonwebtoken, bearer.*token, auth-local, issue.*token, verify.*token, validate.*token, jwt.*authent, token.*authent, authorize.*attribute, \[Authorize\] |
+| auth-local | Microsoft.AspNetCore.Authentication.JwtBearer | 9.0.4 | jwt, jsonwebtoken, bearer.*token, auth-local, issue.*token, verify.*token, validate.*token, jwt.*authent, token.*authent, authorize.*attribute, \[Authorize\] |
 
 #### 2.4.d DB Drivers (selectionne par arch selon DatabaseType)
 
 | DatabaseType | Module | Version | Scope |
 |---|---|---|---|
-| sqlserver | `Microsoft.EntityFrameworkCore.SqlServer` | 10.0.6 | runtime |
+| sqlserver | `Microsoft.EntityFrameworkCore.SqlServer` | 9.0.4 | runtime |
+| postgres | `Npgsql.EntityFrameworkCore.PostgreSQL` | 9.0.4 | runtime |
+| postgresql | `Npgsql.EntityFrameworkCore.PostgreSQL` | 9.0.4 | runtime |
+| mysql | `Pomelo.EntityFrameworkCore.MySql` | 9.0.0 | runtime |
+| mariadb | `Pomelo.EntityFrameworkCore.MySql` | 9.0.0 | runtime |
+| sqlite | `Microsoft.EntityFrameworkCore.Sqlite` | 9.0.4 | runtime |
+| oracle | `Oracle.EntityFrameworkCore` | 9.23.60 | runtime |
+| mongodb | `MongoDB.EntityFrameworkCore` | 9.0.0 | runtime |
 <!-- LIBS_CATALOG_END -->
 
 ### 2.5 Conventions de nommage
@@ -372,24 +379,79 @@ verifier la signature exacte (anti-pattern `[FRONTEND_BACKEND_CONTRACT_GAP]`).
 
 ## 3. Base de donnees
 
-- **Moteur** : Microsoft SQL Server
-- **Acces** : Entity Framework Core, approche Database-First, scaffolding incremental
-- **Migrations** : `dotnet ef dbcontext scaffold` en mode continuation
-- **DbContext** : `OperationsDbContext` dans `workspace/output/src/{BackendName}/Entities/DBcontext/`
-- **Strategie de scaffolding** : verifier les entites existantes, generer uniquement les tables manquantes, etendre le DbContext avec les nouveaux `DbSet`, conserver les configurations existantes.
-- **Tables initiales** : `point_vente` (liste incrementale).
+- **Moteur** : déterminé par `DatabaseType` dans `## Active Database` de
+  `workspace/input/stack/stack.md` (cf. §3.0 matrice).
+- **Acces** : Entity Framework Core, approche Database-First, scaffolding
+  incremental.
+- **Migrations** : `dotnet ef dbcontext scaffold` en mode continuation.
+- **DbContext** : `OperationsDbContext` dans
+  `workspace/output/src/{BackendName}/Entities/DBcontext/`.
+- **Strategie de scaffolding** : verifier les entites existantes, generer
+  uniquement les tables manquantes, etendre le DbContext avec les
+  nouveaux `DbSet`, conserver les configurations existantes.
 - **Source des valeurs DB** (depuis 2026-05-14) : bloc
-  `## Active Database` de `workspace/input/stack/stack.md` (cles
-  `DatabaseType`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`,
-  `DB_PASSWORD`). Le Tech Lead renseigne ces valeurs ; l'agent `arch`
-  les propage vers `appsettings.json` (sections `ConnectionStrings.Default`
-  et `Database.Type`) lors de Phase A — STEP 4.5. Cf. `agents/arch.md
-  §4.5.2.A`.
+  `## Active Database` de `stack.md` (cles `DatabaseType`, `DB_HOST`,
+  `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`). Le Tech Lead renseigne
+  ces valeurs en env vars. L'agent `arch` Phase A STEP 4.5 :
+  1. Installe **uniquement le driver EF Core matchant `DatabaseType`**
+     (cf. §3.0) — pas les autres.
+  2. Génère le bloc d'assemblage `ConnectionStrings:Default` depuis les
+     env vars `DB_*` dans `Program.cs` (cf. §5.1).
+- La chaine de connexion est assemblée au boot dans `Program.cs` puis
+  lue via `IConfiguration` (`builder.Configuration.GetConnectionString("Default")`).
+  Aucune valeur en dur dans `appsettings.json`, aucun secret commit.
 
-La chaine de connexion est lue **uniquement via `IConfiguration`**
-(`builder.Configuration.GetConnectionString("Default")`). Aucune valeur
-en dur, aucune lecture de `Environment.GetEnvironmentVariable`. Fail-fast
-au demarrage si la cle est absente (cf. §5.1 pattern canonique).
+### 3.0 Matrice DatabaseType → Driver EF Core (sélection arch STEP 4)
+
+**Source canonique** : `dotnet-minimalapi.libs.json` `dbDrivers` (catalogue
+machine, lu par arch). Tableau de référence humain ci-dessous, à jour
+2026-05-22 (post-mortem version mismatch NU1608 → MissingMethodException
+runtime sur Npgsql.EF 9.0.4 + EF Core 10.0.6) :
+
+| `DatabaseType` | Package NuGet à installer | `Use{X}` extension | Version |
+|---|---|---|---:|
+| `sqlserver` | `Microsoft.EntityFrameworkCore.SqlServer` | `UseSqlServer` | 9.0.4 |
+| `postgres` / `postgresql` | `Npgsql.EntityFrameworkCore.PostgreSQL` | `UseNpgsql` | 9.0.4 |
+| `mysql` | `Pomelo.EntityFrameworkCore.MySql` | `UseMySql` | 9.0.0 |
+| `mariadb` | `Pomelo.EntityFrameworkCore.MySql` | `UseMySql` | 9.0.0 |
+| `sqlite` | `Microsoft.EntityFrameworkCore.Sqlite` | `UseSqlite` | 9.0.4 |
+| `oracle` | `Oracle.EntityFrameworkCore` | `UseOracle` | 9.23.60 |
+| `mongodb` | `MongoDB.EntityFrameworkCore` | `UseMongoDB` | 9.0.0 |
+| `none` | (aucun — pas de DbContext scaffold) | — | — |
+
+> **Règle load-bearing v7.0.0** : `Microsoft.EntityFrameworkCore` et
+> `Microsoft.EntityFrameworkCore.Design`/`Tools` sont pinnés **9.0.4**
+> (LCD compatible avec tous les drivers ci-dessus). Tant que
+> `Npgsql.EntityFrameworkCore.PostgreSQL` n'a pas de release stable 10.x,
+> ne PAS bumper EF Core à 10.x — déclenche `NU1608` warning + `MissingMethodException`
+> runtime au premier accès `DbSet`. Cf. post-mortem CMSPrint 2026-05-22.
+
+**Anti-pattern (corrigé 2026-05-22)** :
+- ❌ `core[]` contenait `Microsoft.EntityFrameworkCore.SqlServer` hardcodé,
+  installé même pour `DatabaseType: postgres`. Pollution csproj + risque
+  de drift de driver.
+- ✅ `core[]` ne contient désormais que `Microsoft.EntityFrameworkCore` +
+  `Design` + `Tools`. Le driver spécifique vient de `dbDrivers[DatabaseType]`.
+
+### 3.1 Procédure arch STEP 4 — installation conditionnelle driver
+
+```bash
+# 1. Lire DatabaseType depuis stack.md ## Active Database
+DB_TYPE=$(grep -oE 'DatabaseType:\s*\S+' workspace/input/stack/stack.md | awk '{print tolower($2)}')
+
+# 2. Lookup dans dbDrivers du libs.json
+DRIVER_MODULE=$(jq -r ".dbDrivers.\"$DB_TYPE\".module" .claude/stacks/backend/dotnet-minimalapi.libs.json)
+DRIVER_VERSION_REF=$(jq -r ".dbDrivers.\"$DB_TYPE\".ref" .claude/stacks/backend/dotnet-minimalapi.libs.json)
+DRIVER_VERSION=$(jq -r ".versions.\"$DRIVER_VERSION_REF\"" .claude/stacks/backend/dotnet-minimalapi.libs.json)
+
+# 3. Si DB_TYPE == "none" → SKIP (pas de driver). Sinon installer.
+if [ "$DB_TYPE" != "none" ] && [ -n "$DRIVER_MODULE" ]; then
+  dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj \
+    package "$DRIVER_MODULE" --version "$DRIVER_VERSION"
+fi
+```
+
+**Idempotent** : `dotnet add package` no-op si version déjà présente.
 
 ### 3.1 Commandes de scaffolding EF Core
 
@@ -546,22 +608,48 @@ exploites sont dans `tech-auth-azure.md`.
 
 ---
 
-## 5.1 Connection string — lecture via IConfiguration (depuis 2026-05-14)
+## 5.1 Connection string — env var binding runtime (depuis 2026-05-22)
 
-La chaine de connexion est **lue exclusivement depuis `IConfiguration`**,
-section `ConnectionStrings.Default` peuplée par `arch` Phase A — STEP
-4.5 depuis le bloc `## Active Database` de `stack.md`. Aucune
-construction runtime via `SqlConnectionStringBuilder`, aucune lecture
-de `Environment.GetEnvironmentVariable`.
+> **BREAKING change 2026-05-22** : la règle « aucune lecture
+> `Environment.GetEnvironmentVariable` » v6.x est révoquée pour
+> `appsettings.json`-vs-secrets. Pattern correct = `appsettings.json`
+> avec `ConnectionStrings:Default = ""` (placeholder vide) + binding
+> runtime dans `Program.cs` qui assemble la connection string depuis les
+> env vars `DB_*` déclarées en `## Active Database` de stack.md.
+>
+> Motif : la scaffolding `arch` v6.x écrivait `Password=***REMOVED***` en
+> littéral dans `appsettings.json`, créant un `[SEC_SECRET_HARDCODED]`
+> critique même si `workspace/output/` est gitignored (leak via dev
+> machine, template partagé, screenshot debug).
 
-Pattern canonique (`Program.cs`) :
+La chaine de connexion est **assemblée au boot dans `Program.cs`**
+depuis les env vars `DB_HOST` / `DB_PORT` / `DB_NAME` / `DB_USER` /
+`DB_PASSWORD` qui correspondent exactement aux clés déclarées en
+`## Active Database` de `stack.md`. arch génère le bloc d'assemblage
+au scaffolding ; `appsettings.json` reste vide de secrets.
+
+Pattern canonique (`Program.cs`) — env var binding au boot :
 
 ```csharp
-// Lecture directe depuis IConfiguration (appsettings.json peuplé par arch)
+// === Pont env-var → IConfiguration (arch génère ce bloc au scaffolding) ===
+static string ReadEnv(string key, string fallback = "") =>
+    (Environment.GetEnvironmentVariable(key) ?? fallback).Trim().Trim('"');
+
+var dbHost = ReadEnv("DB_HOST", "127.0.0.1");
+var dbPort = ReadEnv("DB_PORT", "5432");
+var dbName = ReadEnv("DB_NAME");
+var dbUser = ReadEnv("DB_USER", "postgres");
+var dbPwd  = ReadEnv("DB_PASSWORD");
+if (!string.IsNullOrEmpty(dbHost) && !string.IsNullOrEmpty(dbName))
+{
+    builder.Configuration["ConnectionStrings:Default"] =
+        $"Host={dbHost};Port={dbPort};Database={dbName};Username={dbUser};Password={dbPwd}";
+}
+
+// Lecture (le pont ci-dessus a peuplé la clé)
 var connectionString = builder.Configuration.GetConnectionString("Default")
     ?? throw new InvalidOperationException(
-        "ConnectionStrings:Default missing in appsettings.json. " +
-        "Verifier que ## Active Database de stack.md est renseigne et que /arch-init a tourne.");
+        "ConnectionStrings:Default missing. Verifier les env vars DB_* (cf. ## Active Database de stack.md).");
 
 // Selon DatabaseType (lu via builder.Configuration["Database:Type"])
 var dbType = builder.Configuration["Database:Type"]?.ToLowerInvariant() ?? "sqlserver";
@@ -786,6 +874,50 @@ Parametre de requete optionnel `langue`. Traductions dans
 
 ---
 
+## 6.bis Security headers HSTS + X-Frame-Options + X-Content-Type-Options (depuis 2026-05-22)
+
+**Bloc obligatoire dans le scaffold `Program.cs`** — couvre les classes
+`[SEC_HEADERS_MISSING]` (security-reviewer A05/CWE-693). Ajouter entre
+`builder.Services.Add*` et `var app = builder.Build();` :
+
+```csharp
+// --- HSTS hardening (SEC: A05/CWE-693) ---
+builder.Services.AddHsts(options =>
+{
+    options.Preload = true;
+    options.IncludeSubDomains = true;
+    options.MaxAge = TimeSpan.FromDays(365);
+});
+```
+
+Puis dans le pipeline HTTP (juste après `var app = builder.Build();`) :
+
+```csharp
+// --- Security headers middleware (SEC: A05/CWE-693) ---
+app.Use(async (ctx, next) =>
+{
+    ctx.Response.Headers["X-Content-Type-Options"] = "nosniff";
+    ctx.Response.Headers["X-Frame-Options"] = "DENY";
+    ctx.Response.Headers["Referrer-Policy"] = "no-referrer";
+    await next();
+});
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+else
+{
+    app.UseHsts();   // Strict-Transport-Security en prod uniquement (browsers cachent l'header → dev = risque)
+}
+```
+
+**Justification** : sans ces headers, `security-reviewer` flag
+`[SEC_HEADERS_MISSING]` à chaque scaffold. Coût marginal : ~10 lignes
+dans Program.cs, zéro impact runtime. Doit être généré par arch comme
+partie du Program.cs initial.
+
 ## 7. CORS
 Conforme a `.claude/rules/library-and-stack.md §2.1`. Policy `Spa` avec origins **explicites**
 lus depuis la configuration (`Cors:AllowedOrigins`, CSV) ; fallback
@@ -854,6 +986,44 @@ depuis `launchSettings.json` (autorité unique).
 Tout désalignement entre `launchSettings.json` et la config frontend (proxy
 Vite, `VITE_API_BASE_URL`, `Api:BaseAddress`) → 500 / proxy error silencieux.
 Cf. `.claude/stacks/frontend/react.md §5` pour le grep côté frontend.
+
+### 8.1 Injection env vars canoniques dans `launchSettings.json` (arch STEP 3, depuis 2026-05-22)
+
+`launchSettings.json` est chargé par `dotnet run` **avant** la résolution
+`Environment.GetEnvironmentVariable` — ses `environmentVariables`
+**overrident le shell parent**. Cette propriété est load-bearing pour
+neutraliser un shell utilisateur pollué (post-mortem AADSTS50011
+CMSPrint 2026-05-22 : un `AZ_FE_CALLBACKPATH=/login-callback` hérité
+d'un ancien projet React dans le profil PowerShell faisait échouer
+le bootstrap MSAL Blazor).
+
+**Arch STEP 3 (.NET backend)** doit injecter dans **chaque profil** de
+`Properties/launchSettings.json` les env vars dont la valeur canonique
+est **dépendante du stack frontend actif** (et non du shell utilisateur) :
+
+```json
+"environmentVariables": {
+  "ASPNETCORE_ENVIRONMENT": "Development",
+  "AZ_BE_CALLBACKPATH": "/signin-oidc",
+  "AZ_FE_CALLBACKPATH": "/authentication/login-callback"
+}
+```
+
+| Env var | Valeur canonique | Source |
+|---|---|---|
+| `AZ_BE_CALLBACKPATH` | `/signin-oidc` (web flow OIDC backend) | `auth/azure-ad.md §1` |
+| `AZ_FE_CALLBACKPATH` (frontend = Blazor WASM) | `/authentication/login-callback` | `auth/azure-ad.md §2.quart` |
+| `AZ_FE_CALLBACKPATH` (frontend = React/Vue/Angular MSAL.js) | `/authentication/login-callback` (depuis convention universelle SDD_Pro v6.x) | `auth/azure-ad.md §2.ter` |
+
+**Pas dans `appsettings.json`** : ces clés ne sont pas du config "produit"
+(elles sont des valeurs de bootstrap pré-config), elles vivent dans
+l'env. `launchSettings.json` est l'endroit déterministe pour les figer
+dev-side. Production : `.env.production` géré par ops (out of scope arch).
+
+**Pas dans `.env.example`** : `.env.example` documente les env vars
+**utilisateur** (DB connection, secrets Azure AD GUID), pas les valeurs
+canoniques framework. Garder la séparation : `launchSettings.json` =
+valeurs canoniques, `.env.local` = secrets/overrides utilisateur.
 
 ---
 

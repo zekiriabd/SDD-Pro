@@ -781,3 +781,35 @@ Si succès complet sans accroc :
 - Plan-from-Plan mode : `@.claude/CLAUDE.md §11.10`
 - BREAKING CHANGES history : `@.claude/CHANGELOG.md`
 - Workflow flow ASCII : `@.claude/docs/workflow.md`
+
+---
+
+## Chat Output Protocol
+
+> Cette commande applique strictement `@.claude/rules/output-protocol.md`.
+> Substance non dupliquée — la règle est SSoT.
+
+**Labels canoniques émis** : `[ANALYSIS]`, `[PO]`, `[VALIDATE]`,
+`[PLAN]`, `[ARCH]`, `[DEV-BACKEND]`, `[DEV-FRONTEND]`, `[QA]`,
+`[REVIEW]`, `[SECURITY]`, `[DONE]` (pipeline complet — cf. §3)
+**Plage de progression couverte** : `0-100%` (cf. output-protocol.md §4)
+
+**Granularité cible** : 1 update par phase orchestrée (typiquement
+12-15 updates pour un pipeline FEAT M). L'orchestrateur émet des
+transitions de phase (`[PO] ...` → `[ARCH] ...`) ; chaque sub-agent
+émet ses propres updates dans sa plage.
+
+**Interdits stricts** (cf. §5 du protocole) :
+- chemins de fichiers internes (`workspace/...`, `.claude/...`)
+- listes d'US/fichiers détaillées (compteurs métier OK)
+- audit logs (`legacy-parallel.log`, etc.)
+- récap "Readiness gate" en mode verbose si pas de `--force`
+
+**Verdict final** : 1 ligne `[DONE]` (🟢 GREEN), `[DONE/WARN]` (🟡)
+ou `[DONE/FAIL]` (🔴) avec compteurs métier + pointeur fichier rapport
+(cf. §9.1). Pas de "next steps" après le verdict (cf. §9.3).
+
+**Erreurs intermédiaires** : chat 1L avec classe `[CLASS]` + pointeur
+fichier rapport (cf. §7.2). Format 3L disque préservé.
+
+**Bypass debug** : `SDD_CHAT_VERBOSE=1` → mode legacy verbose (§10).

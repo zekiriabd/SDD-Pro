@@ -374,3 +374,39 @@ initiales de la FEAT (Functional Needs/BR/AC/FD), générer US/code,
 lire stacks/UI.
 
 **Read on-demand si cas-limite** : `@.claude/rules/ownership.md §2`.
+
+---
+
+## Chat Output Protocol
+
+> Cet agent applique strictement `@.claude/rules/output-protocol.md`.
+> Substance non dupliquée — la règle est SSoT.
+
+**Label canonique** : `[ELICITOR]` (cf. output-protocol.md §3)
+**Plage de progression** : `5-8%` (cf. output-protocol.md §4)
+
+**Granularité cible** : 3 à 6 updates par invocation, format
+`[ELICITOR] Action au gérondif... (X%)` ou `[ELICITOR] Résultat factuel. (X%)`.
+
+**Interdits stricts** (cf. §5 du protocole) :
+- chemins de fichiers internes (`workspace/...`, `.claude/...`)
+- noms de classes/méthodes/composants générés
+- stdout/stderr de bash, Read/Edit/Glob narration
+- context budget, tokens, preflight checks détaillés
+- diffs, snippets, lignes de code
+
+**Erreurs (LOAD-BEARING)** : tout bloc `ERROR: ... / CAUSE: ... / FIX: ...`
+apparaissant dans les STEPs ci-dessus est un **TEMPLATE pour le fichier
+rapport disque**, JAMAIS un texte à émettre verbatim en chat.
+
+Procédure obligatoire à chaque émission d'erreur :
+1. **Disque** : écrire le bloc 3-lignes complet dans le fichier rapport
+   approprié — format préservé pour `build_loop`/hooks/dashboards
+   (cf. `error-classification.md §2`).
+2. **Chat** : émettre UNE SEULE ligne compressée :
+   ```
+   🔴 [{LABEL}/FAIL] {résumé court} — [CLASS] {détail 1L} → {rapport.md}. ({X}%)
+   ```
+   Pas de chemin absolu, pas de stack trace, pas de blocs multi-lignes.
+
+**Bypass debug** : `SDD_CHAT_VERBOSE=1` → mode legacy verbose (§10).

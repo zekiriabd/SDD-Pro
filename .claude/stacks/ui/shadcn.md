@@ -2,9 +2,9 @@
 
 > §2.4 (Librairies) régénérée depuis `shadcn.libs.json` — ne pas éditer manuellement (`python .claude/python/sdd_admin/sync_stack_md.py --stack-id shadcn`).
 
-Status: Draft  
-Validation: 🟢 reference (validated combo CMS — kotlin-spring-boot + react + shadcn + azure-ad, 2026-05-13)  
-UI FEAT ID: shadcn-ui  
+Status: Draft
+Validation: 🟢 reference (validated combo CMS — kotlin-spring-boot + react + shadcn + azure-ad, 2026-05-13)
+UI FEAT ID: shadcn-ui
 Scope: design system shadcn/ui — composants UI pour applications React (Next.js, SPA, dashboards, applications métier)
 
 ---
@@ -203,19 +203,19 @@ incomplet, relancer `npx shadcn@latest init -d -y` puis
 
 ## 2. Principes fondamentaux
 
-- Composants accessibles basés sur Radix UI  
-- Styling via Tailwind CSS  
-- Code local (pas de dépendance runtime lourde)  
-- Composition via props + children  
-- Dark mode natif (via Tailwind)  
-- Design system flexible et extensible  
+- Composants accessibles basés sur Radix UI
+- Styling via Tailwind CSS
+- Code local (pas de dépendance runtime lourde)
+- Composition via props + children
+- Dark mode natif (via Tailwind)
+- Design system flexible et extensible
 
 Règles IA :
 
-- Toujours privilégier un composant shadcn/ui existant  
-- Ne jamais recréer un composant déjà disponible  
-- Respecter la structure Tailwind + Radix  
-- Composer les composants plutôt que reconstruire  
+- Toujours privilégier un composant shadcn/ui existant
+- Ne jamais recréer un composant déjà disponible
+- Respecter la structure Tailwind + Radix
+- Composer les composants plutôt que reconstruire
 
 ---
 
@@ -289,30 +289,30 @@ metier sous `components/`. Jamais d'edition manuelle de `components/ui/*`.
 
 Fonctionnalités :
 
-- tri (sorting)  
-- pagination  
-- filtrage  
-- sélection  
-- intégration avec TanStack Table  
+- tri (sorting)
+- pagination
+- filtrage
+- sélection
+- intégration avec TanStack Table
 
 Règles :
 
-- utiliser server-side pour gros volumes  
-- ne jamais charger de gros datasets côté client  
-- utiliser hooks + API layer  
+- utiliser server-side pour gros volumes
+- ne jamais charger de gros datasets côté client
+- utiliser hooks + API layer
 
 ---
 
 ### 5.2 Forms
 
-- utiliser Form (react-hook-form recommandé)  
-- validation via Zod ou équivalent  
-- champs contrôlés  
+- utiliser Form (react-hook-form recommandé)
+- validation via Zod ou équivalent
+- champs contrôlés
 
 Interdit :
 
-- validation manuelle dispersée  
-- logique métier dans JSX  
+- validation manuelle dispersée
+- logique métier dans JSX
 
 ---
 
@@ -320,58 +320,58 @@ Interdit :
 
 Basé sur Tailwind CSS :
 
-- container → wrapper  
-- grid / flex → layout  
-- spacing via utility classes  
+- container → wrapper
+- grid / flex → layout
+- spacing via utility classes
 
 Layouts standards :
 
-- Dashboard layout  
-- Auth layout  
-- Full page  
+- Dashboard layout
+- Auth layout
+- Full page
 
 ---
 
 ## 7. Navigation
 
-- Sidebar custom + navigation structurée  
-- DropdownMenu pour actions  
-- Command pour recherche/navigation rapide  
+- Sidebar custom + navigation structurée
+- DropdownMenu pour actions
+- Command pour recherche/navigation rapide
 
 Règles :
 
-- navigation centralisée  
-- pas de duplication  
-- routing via Next.js / React Router  
+- navigation centralisée
+- pas de duplication
+- routing via Next.js / React Router
 
 ---
 
 ## 8. Theming system
 
-- basé sur Tailwind config  
-- support dark/light mode  
-- variables CSS  
+- basé sur Tailwind config
+- support dark/light mode
+- variables CSS
 
 Règles :
 
-- respecter design tokens  
-- éviter styles inline incohérents  
-- limiter overrides  
+- respecter design tokens
+- éviter styles inline incohérents
+- limiter overrides
 
 ---
 
 ## 9. Interactions UI
 
-- Dialog → modales  
-- Toast → notifications  
-- Tooltip → aides  
-- DropdownMenu → actions  
+- Dialog → modales
+- Toast → notifications
+- Tooltip → aides
+- DropdownMenu → actions
 
 Règles :
 
-- aucune modal custom hors Dialog  
-- aucune notification hors Toast  
-- interactions standardisées  
+- aucune modal custom hors Dialog
+- aucune notification hors Toast
+- interactions standardisées
 
 ---
 
@@ -379,22 +379,22 @@ Règles :
 
 Recommandé :
 
-- Zustand / React Context  
+- Zustand / React Context
 
 Règles :
 
-- état global centralisé  
-- pas de logique métier dans UI  
-- éviter duplication état  
+- état global centralisé
+- pas de logique métier dans UI
+- éviter duplication état
 
 ---
 
 ## 11. Accessibilité et UX
 
-- Radix garantit accessibilité  
-- support clavier natif  
-- focus management intégré  
-- ARIA compliant  
+- Radix garantit accessibilité
+- support clavier natif
+- focus management intégré
+- ARIA compliant
 
 ---
 
@@ -402,21 +402,21 @@ Règles :
 
 ### Obligatoire
 
-- utiliser composants shadcn/ui  
-- respecter structure Tailwind  
-- séparation UI / logique métier  
-- composants réutilisables si nécessaire  
+- utiliser composants shadcn/ui
+- respecter structure Tailwind
+- séparation UI / logique métier
+- composants réutilisables si nécessaire
 
 ---
 
 ### Interdit
 
-- recréer composants existants  
-- utiliser HTML brut à la place  
-- CSS non structuré  
-- duplication composants  
-- logique métier dans JSX  
-- mix avec autres UI kits  
+- recréer composants existants
+- utiliser HTML brut à la place
+- CSS non structuré
+- duplication composants
+- logique métier dans JSX
+- mix avec autres UI kits
 
 ---
 
@@ -424,26 +424,26 @@ Règles :
 
 Ce design system doit être interprété comme :
 
-- un système UI modulaire  
-- une base pour génération UI contrôlée  
-- un ensemble de composants composables  
+- un système UI modulaire
+- une base pour génération UI contrôlée
+- un ensemble de composants composables
 
 L’IA doit :
 
-- privilégier shadcn/ui  
-- composer au lieu de recréer  
-- respecter accessibilité Radix  
-- générer du code propre et maintenable  
+- privilégier shadcn/ui
+- composer au lieu de recréer
+- respecter accessibilité Radix
+- générer du code propre et maintenable
 
 ---
 
 ## 14. Hors scope
 
-- autres UI frameworks (MUI, Bootstrap, etc.)  
-- logique backend  
-- auth system  
-- design tokens multi-brand avancés  
-- animations complexes hors scope  
+- autres UI frameworks (MUI, Bootstrap, etc.)
+- logique backend
+- auth system
+- design tokens multi-brand avancés
+- animations complexes hors scope
 
 ---
 

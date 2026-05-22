@@ -105,7 +105,7 @@ if [ ! -f "workspace/output/src/{BackendName}/build.gradle.kts" ]; then
   curl -s https://start.spring.io/starter.zip \
     -d type=gradle-project-kotlin \
     -d language=kotlin \
-    -d bootVersion=3.4.0 \
+    -d bootVersion=4.0.6 \
     -d baseDir={BackendName} \
     -d groupId={BackendNamespace} \
     -d artifactId={BackendName} \
@@ -171,11 +171,11 @@ cd workspace/output/src/{BackendName} && ./gradlew compileKotlin --no-daemon
 
 ```kotlin
 plugins {
-    id("org.springframework.boot") version "3.4.0"
+    id("org.springframework.boot") version "4.0.6"
     id("io.spring.dependency-management") version "1.1.7"
-    kotlin("jvm") version "2.0.21"
-    kotlin("plugin.spring") version "2.0.21"
-    kotlin("plugin.jpa") version "2.0.21"      // no-arg pour @Entity
+    kotlin("jvm") version "2.3.21"
+    kotlin("plugin.spring") version "2.3.21"
+    kotlin("plugin.jpa") version "2.3.21"      // no-arg pour @Entity
     id("org.jlleitschuh.gradle.ktlint") version "12.1.1"
     id("io.gitlab.arturbosch.detekt") version "1.23.7"
 }

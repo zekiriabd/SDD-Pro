@@ -19,6 +19,54 @@
 
 ---
 
+> ## ⚠️ Périmètre de mesure (anti-R2 — honnêteté méthodologique)
+>
+> Ajouté 2026-05-22 après critique CTO : *« la variance artificielle introduite
+> par des UI mocks HTML statiques + backend généré depuis spec figée mesure
+> surtout l'orchestration framework, pas la charge fonctionnelle réelle ».*
+>
+> ### Ce que ce bench mesure
+> - **Orchestration framework** : timing pipeline, gates, parallélisme, déterminisme LLM
+> - **Génération code depuis spec figée** : FEAT M template + 3 mockups HTML statiques + DDL postgres seed
+> - **Coût LLM + wall-clock + verdict auditors + coverage** sur scope spec-fixe
+> - **Variance stochastique LLM** sur input strictement identique
+>
+> ### Ce que ce bench NE mesure PAS (à ne JAMAIS prétendre)
+> - **Adéquation UI/UX réelle** sous usage utilisateur — les mockups sont des
+>   stubs HTML statiques, pas un prototype testé en accessibilité ou usabilité
+> - **Bugs surfaçant post-déploiement** — la review humaine 1h ≠ une revue prod
+>   ni un canary deploy
+> - **Résilience runtime, perf charge, observabilité, sécurité post-pentest**
+> - **Variance "produit"** — edge cases métier non spécifiés, clients réels,
+>   imprévus opérationnels
+> - **Coût total cycle de vie** — déploiement, monitoring, évolutions, debt
+>   accumulée, support, migrations
+>
+> ### Implication pour la publication
+> La phrase publiable est :
+>
+> > *« Sur la génération de code conforme à une spec figée (FEAT M + mockups
+> > HTML), le framework livre en X minutes et $Y vs Z h baseline humaine
+> > codant la même spec sans IA. »*
+>
+> **PAS** :
+>
+> > ~~« Le framework remplace un dev senior pour livrer un produit en prod. »~~
+>
+> Cette nuance évite que R2 (claim ROI surévalué) ne resurgisse dès la
+> première démo client critique. Le scope mesuré est nécessaire mais
+> **insuffisant** pour conclure au remplacement humain end-to-end ; il
+> qualifie le **gain sur la phase code-generation isolée**, qui reste une
+> phase load-bearing d'un cycle produit.
+>
+> ### Action requise au moment de remplir §3 FEAT M
+> Toute cellule chiffrée doit être suffixée du label `[scope: code-gen from
+> fixed spec]` ou regroupée sous un en-tête de tableau le rappelant.
+> Les comparatifs `Ratio humain/framework` ne doivent **jamais** être
+> extrapolés en "gain produit total".
+
+---
+
 ## 1. Méta
 
 | Champ | Valeur |

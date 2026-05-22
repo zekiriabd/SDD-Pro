@@ -245,3 +245,28 @@ echo "Pour redémarrer : /sdd-serve"
 2. **Nettoyage avant `/dev-run`** : si build Gradle bloqué par JVM orphelin
 3. **Libérer 4000 après crash console** : `/sdd-kill-server --port 4000`
 4. **Fin de session dev** : `/sdd-kill-server` pour libérer toutes les ressources
+
+---
+
+## Chat Output Protocol
+
+> Cette commande applique strictement `@.claude/rules/output-protocol.md`.
+> Substance non dupliquée — la règle est SSoT.
+
+**Labels canoniques émis** : `[ANALYSIS]` (label runtime, hors pipeline
+SDD)
+**Plage de progression couverte** : `0-100%` (lifecycle serveurs)
+
+**Granularité cible** : 2-3 updates (scan PIDs ports, kill, verdict).
+Format `[ANALYSIS] Arrêt {service} (PID {N})... (X%)`.
+
+**Interdits stricts** (cf. §5 du protocole) :
+- chemins de fichiers internes (`workspace/...`, `.claude/...`)
+- stdout/stderr de `taskkill` / `kill` / `lsof`
+- liste exhaustive des PIDs (compteur suffit)
+
+**Verdict final** : 1 ligne récap. Exemple :
+`[ANALYSIS] 3 process arrêtés (ports 8080, 5173, 4000). (100%)`.
+Ou : `[ANALYSIS] Aucun process actif. (100%)`.
+
+**Bypass debug** : `SDD_CHAT_VERBOSE=1` → mode legacy verbose (§10).

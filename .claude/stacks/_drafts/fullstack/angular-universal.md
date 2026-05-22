@@ -1,8 +1,8 @@
 # Tech FEAT: angular-universal (fullstack)
 
-Status: Draft  
-Validation: 🟡 experimental (combo non valide end-to-end dans SDD_Pro v6)  
-Tech FEAT ID: tech-angular-universal  
+Status: Draft
+Validation: 🟡 experimental (combo non valide end-to-end dans SDD_Pro v6)
+Tech FEAT ID: tech-angular-universal
 Scope: **fullstack monolithe** — application Angular 19 avec **`@angular/ssr`** (anciennement Angular Universal) dans UN seul projet `{AppName}/`. UI Angular standalone + signals + SSR Express + API routes (server-side `server.ts`) vivent dans le meme processus Node.js. Pas de separation `{BackendName}` / `{AppName}` / `{LibName}`. Modele **SSR vrai** : HTML pre-rendu serveur, hydratation Angular cote client.
 
 > ⚠️ **Naming** : "Angular Universal" est le nom historique (Angular ≤ 16). Depuis Angular 17, le package officiel est `@angular/ssr` integre via `ng add @angular/ssr` — meme concept, API modernisee (Builder esbuild, Standalone bootstrap, Vite dev). Ce stack utilise la version moderne ; le nom du fichier conserve `angular-universal.md` pour la decouvrabilite.

@@ -1,8 +1,8 @@
 # Tech FEAT: nuxt (fullstack)
 
-Status: Draft  
-Validation: 🟡 experimental (combo non valide end-to-end dans SDD_Pro v6)  
-Tech FEAT ID: tech-nuxt  
+Status: Draft
+Validation: 🟡 experimental (combo non valide end-to-end dans SDD_Pro v6)
+Tech FEAT ID: tech-nuxt
 Scope: **fullstack monolithe** — application Nuxt 3 dans UN seul projet `{AppName}/`. UI (Vue 3 SFC server-rendered + client-hydrated) + server routes (Nitro `server/api/`) + middleware + auth vivent dans le meme processus Node.js. Pas de separation `{BackendName}` / `{AppName}` / `{LibName}`. Modele **SSR vrai** : HTML pre-rendu serveur par defaut, hydratation universelle cote client.
 
 ---

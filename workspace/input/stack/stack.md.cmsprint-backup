@@ -1,0 +1,210 @@
+# Project Stack
+#
+# ═══════════════════════════════════════════════════════════════════════════
+# ⚠️ SÉCURITÉ — VARIABLES D'ENVIRONNEMENT (v7.0.0 hardening, 2026-05-21)
+# ═══════════════════════════════════════════════════════════════════════════
+# AUCUN secret ne doit être en clair dans ce fichier. Les sections
+# `## Active Auth Specs`, `## Active Database`, `## Active SMTP Server`
+# déclarent uniquement les NOMS des variables d'environnement à lire
+# au runtime. Les valeurs sont résolues par :
+#   - .NET    : `Environment.GetEnvironmentVariable("DB_PASSWORD")`
+#               ou `builder.Configuration["DB_PASSWORD"]` (lit env auto).
+#   - Spring  : `@Value("${DB_PASSWORD}")` (Spring Boot env binding) +
+#               support `.env` via `spring-dotenv` ou export shell.
+#   - Node    : `process.env.DB_PASSWORD` (charger `.env` via `dotenv`).
+#   - Python  : `os.environ["DB_PASSWORD"]` (charger `.env` via
+#               `python-dotenv`).
+#
+# Pour le dev local : valeurs déjà set côté machine via `setx` (Windows)
+# ou export shell (Unix). Ne JAMAIS committer ce fichier (`.gitignore:23`
+# le bloque). Pour partager le contrat env var, versionner uniquement
+# `.claude/templates/stack.md.template` (placeholders, déplacé 2026-05-22
+# vers le répertoire framework templates pour cohérence avec adr.template.md,
+# feat.template.md, us.template.md, etc.).
+#
+# Convention SDD_Pro v7.0.0 : `KEY: ${KEY}` signifie « agent doit lire
+# la variable d'environnement nommée KEY ». Une valeur en dur dans
+# ces sections est un bug à corriger immédiatement.
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# ═══════════════════════════════════════════════════════════════════════════
+# WORKFLOW OPTIMISÉ TOKENS (audit 2026-05-21) — recommandé pour usage quotidien
+# ═══════════════════════════════════════════════════════════════════════════
+# Au lieu de : /sdd-full {n}
+# Préférer :
+#   1. /feat-validate {n}              # 0 token (script Python)
+#   2. /dev-plan {n}                   # Sonnet — produit plans v2 (Inline Digest)
+#   3. /dev-run {n} --resume           # Opus — skip re-Read stacks (-20-50 KB/US)
+#   4. /qa-generate {n}                # Sonnet — tests only (coverage désactivé)
+#   5. /sdd-review {n}                 # Sonnet × 3 reviewers (arch-reviewer manual)
+#
+# Flags utiles :
+#   --resume          : skip US déjà Done, plans déjà générés
+#   --manual-gates    : Tech Lead arbitre, évite re-runs auto sur RED
+#   --max-parallel 2  : override ponctuel si MaxParallel ci-dessous insuffisant
+#
+# Gain cumulé estimé vs config par défaut : -50 à -65% tokens
+# ═══════════════════════════════════════════════════════════════════════════
+
+## Project Config
+# FrontendName/BackendName = nom des projets ; AppNamespace/BackendNamespace
+# auto-dérivés (= nom de projet, cf. CLAUDE.md §1 + file-ownership.md §1.bis).
+# Pour fullstack : drop le suffixe "Front" (ex. CMSPrintFront → CMSPrint).
+AppName: CMSPrintFront
+FrontendName: CMSPrintFront
+FrontendLocalPort: 5185
+BackendName: CMSPrintBack
+BackendLocalPort: 44328
+LibStrategy: openapi-codegen
+PlanReviewDefault: true
+QAMode: tests-only
+# CoverageMin: 0 — désactivé volontairement (audit 2026-05-21).
+# Tracé : QAMode tests-only ne mesure plus la couverture → CoverageMin sans effet.
+# Re-activer (tests+coverage + CoverageMin: 80) si exigence compliance.
+CoverageMin: 0
+MaxParallel: 2
+# Token optimization (audit 2026-05-21) — caps fail-fast + retries réduits
+MaxCostPerRun: 30
+BuildLoopMaxCostUsd: 10
+BuildLoopMaxIter: 2
+# Sélectivité audits — focus sur verdicts bloquants, ignore minor/moderate
+CodeReviewFailOn: serious
+SecurityFailOn: critical
+SpecComplianceFailOn: critical
+ArchReviewFailOn: serious
+# Granularité US — cible 2-3 US/FEAT pour limiter les invocations Opus dev-*
+# (hard cap framework = 6, mais 4+ déclenche un warning po STEP 5/7)
+UsGranularityTarget: 3
+# 2026-05-20 audit CTO — runs sérieux : OWASP scan obligatoire.
+# Avant : false (raison historique : surface CMSPrint considérée low-risk).
+# Maintenant : true (decision audit P0 + ADR governance-security-baseline).
+# Pour bypasser ponctuellement : commenter cette ligne + ADR projet.
+SecurityScanEnabled: true
+# v6.10.5 audit 2026-05-19 — PlanCacheStrict no-op en v7.0.0 (variants strict
+# retirés via governance-major-auditors-trim). Clé tolérée en lecture pour
+# backward-compat, valeur ignorée runtime. Cf. config.base.yml §79-88.
+PlanCacheStrict: true
+
+# v6.10.5 fix CRIT-1 (2026-05-19) — auditors manquants en CMSPrint.
+# v7.0.0 : a11y/perf agents RETIRÉS (axe-core/Lighthouse CI projet généré).
+# Defaults v7.0.0 base.yml = "full" pour code_review, security, spec_compliance.
+# A11yMode/PerfMode reflètent l'absence d'agent — défaut "off".
+# SecurityMode flippé "manual" → "full" pour runs sérieux (cohérent avec
+# SecurityScanEnabled: true ci-dessus).
+# ArchReviewMode pris en compte uniquement par /sdd-review (sdd-full.md L560).
+CodeReviewMode: full
+SecurityMode: full
+SpecComplianceMode: full
+# ArchReviewMode: manual — n'est pris en compte que par /sdd-review (cf. sdd-full.md L560).
+# Passé "manual" pour optimisation tokens : skip auto dans /sdd-full, run on-demand uniquement.
+ArchReviewMode: manual
+A11yMode: "off"
+PerfMode: "off"
+
+## Active Architecture Pattern
+# 1 seul pattern actif. Scope = backend/* déclaré.
+# - .claude/stacks/archi/ddd.md
+ - .claude/stacks/archi/mvc.md
+# - .claude/stacks/archi/microservice.md
+
+
+## Active Tech Specs
+# AppType auto-détecté depuis les stacks ci-dessous (v6.7.7+) :
+ - .claude/stacks/frontend/react.md
+# - .claude/stacks/frontend/blazor-webassembly.md
+
+ - .claude/stacks/backend/python-fastapi.md
+# - .claude/stacks/backend/dotnet-minimalapi.md
+# - .claude/stacks/backend/kotlin-spring-boot.md
+
+# - .claude/stacks/fullstack/kotlin-spring-boot.md
+# - .claude/stacks/fullstack/blazor-server.md
+# - .claude/stacks/fullstack/next.md
+# - .claude/stacks/fullstack/nuxt.md
+# - .claude/stacks/fullstack/angular-universal.md
+# - .claude/stacks/fullstack/kotlin-mustache.md
+# - .claude/stacks/fullstack/node-react.md
+
+# - .claude/stacks/mobiles/react-native.md
+# - .claude/stacks/mobiles/maui.md
+
+## Active UI Specs
+# Requis uniquement pour back-front + frontend web. Ignoré pour mobile/fullstack.
+ - .claude/stacks/ui/shadcn.md
+# - .claude/stacks/ui/vuetify.md
+# - .claude/stacks/ui/radzen-blazor.md
+
+## Active QA Specs
+# Frameworks de test auto-détectés depuis les stacks runtime déclarés ci-dessus (v6.7.7+) :
+# code-quality.md commenté (audit 2026-05-21) — déjà couvert par quality_scan.py
+# déterministe (0 token). Re-activer si besoin de règles QA Sonnet additionnelles.
+
+# - .claude/stacks/qa/kotlin-junit.md
+# - .claude/stacks/qa/dotnet-xunit.md
+# - .claude/stacks/qa/angular-jasmine.md
+# - .claude/stacks/qa/blazor-bunit.md
+ - .claude/stacks/qa/python-pytest.md
+ - .claude/stacks/qa/node-vitest.md
+ - .claude/stacks/qa/code-quality.md
+
+
+## Active Auth Specs
+# 1 seul profil auth actif (azure-ad et auth-local mutuellement exclusifs).
+#
+# ⚠️ Valeurs résolues runtime via env vars (cf. en-tête fichier).
+# AUCUNE valeur en clair ici. Si une valeur apparaît au lieu de `${KEY}`,
+# c'est un bug à corriger immédiatement.
+#
+# --- Option 1 : auth-local (JWT signé par le backend, désactivé ici) ---
+# Env vars attendues côté machine dev :
+#   AUTH_JWT_AUDIENCE, AUTH_JWT_EXPIRATION, AUTH_JWT_ISSUER, AUTH_JWT_SECRET
+# - .claude/stacks/auth/auth-local.md
+# - AUTH_JWT_AUDIENCE: ${AUTH_JWT_AUDIENCE}
+# - AUTH_JWT_EXPIRATION: ${AUTH_JWT_EXPIRATION}
+# - AUTH_JWT_ISSUER: ${AUTH_JWT_ISSUER}
+# - AUTH_JWT_SECRET: ${AUTH_JWT_SECRET}
+
+# --- Option 2 : azure-ad (actif) ---
+# Env vars attendues côté machine dev (set via `setx` Windows ou export Unix) :
+#   AZ_TENANTID, AZ_CLIENTID, AZ_DOMAIN, AZ_AUDIENCES,
+#   AZ_BE_CALLBACKPATH, AZ_FE_CALLBACKPATH
+# L'agent arch / dev-backend / dev-frontend doit lire ces vars depuis
+# l'environnement (Environment.GetEnvironmentVariable / @Value / process.env).
+ - .claude/stacks/auth/azure-ad.md
+ - AZ_TENANTID: ${AZ_TENANTID}
+ - AZ_CLIENTID: ${AZ_CLIENTID}
+ - AZ_DOMAIN: ${AZ_DOMAIN}
+ - AZ_AUDIENCES: ${AZ_AUDIENCES}
+ - AZ_BE_CALLBACKPATH: ${AZ_BE_CALLBACKPATH}
+ - AZ_FE_CALLBACKPATH: ${AZ_FE_CALLBACKPATH}
+
+## Active Database
+# DatabaseType ∈ {none, SqlServer, PostgreSql, MySql, Sqlite, MariaDb, Oracle, MongoDb}
+#
+# ⚠️ Connection string construite runtime depuis env vars (cf. en-tête fichier).
+# Env vars attendues côté machine dev :
+#   DB_HOST, DB_NAME, DB_PASSWORD, DB_PORT, DB_USER
+# L'agent arch (Phase B, introspection DB READ-ONLY) construit la conn
+# string à partir de ces vars. JAMAIS de password en dur ici.
+ - DatabaseType: postgres
+ - DB_HOST: ${DB_HOST}
+ - DB_NAME: ${DB_NAME}
+ - DB_PASSWORD: ${DB_PASSWORD}
+ - DB_PORT: ${DB_PORT}
+ - DB_USER: ${DB_USER}
+
+## Active SMTP Server
+# Optionnel. Activé si une AC d'US mentionne email/notification/contact.
+#
+# ⚠️ Valeurs résolues runtime via env vars (cf. en-tête fichier).
+# Env vars attendues côté machine dev (à set manuellement, non listées
+# dans la photo dev — déclarer via `setx` ou ajouter au .env du projet) :
+#   SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD,
+#   SMTP_FROM, SMTP_FROM_NAME, SMTP_USE_STARTTLS
+ - SMTP_HOST: ${SMTP_HOST}
+ - SMTP_PORT: ${SMTP_PORT}
+ - SMTP_USER: ${SMTP_USER}
+ - SMTP_PASSWORD: ${SMTP_PASSWORD}
+ - SMTP_FROM: ${SMTP_FROM}
+ - SMTP_FROM_NAME: ${SMTP_FROM_NAME}
+ - SMTP_USE_STARTTLS: ${SMTP_USE_STARTTLS}

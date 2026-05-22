@@ -227,6 +227,26 @@ La review « bugs trouvés en 1 h » sur le code humain doit être faite par un
 auteur **différent** du framework et **différent** du dev senior baseline.
 Sinon biais de confirmation.
 
+### 7.4 Périmètre de mesure (anti-R2) — ajouté 2026-05-22
+
+Toute mesure produite par cette méthodologie a un **scope étroit volontaire** :
+génération de code depuis une **spec figée** + mockups HTML statiques.
+
+**Hors scope explicite** :
+- Adéquation UI/UX réelle sous usage utilisateur (mockups = stubs HTML)
+- Bugs surfaçant post-déploiement / canary deploy
+- Perf en charge, résilience runtime, observabilité
+- Edge cases métier non spec, variance "produit" sous clients réels
+- Coût cycle de vie complet (déploiement, monitoring, evolutions, debt)
+
+**Implication** : les ratios humain/framework publiés dans `roi-baseline.md`
+doivent **toujours** être suffixés `[scope: code-gen from fixed spec]`. Toute
+extrapolation en "gain produit total" est interdite — c'est précisément le
+piège que le risque R2 (claim ROI surévalué) cherche à éviter.
+
+Détail complet et phrases autorisées/interdites : callout "Périmètre de
+mesure (anti-R2)" en tête de `@.claude/docs/roi-baseline.md`.
+
 ---
 
 ## 8. Critères de release v7.0.0

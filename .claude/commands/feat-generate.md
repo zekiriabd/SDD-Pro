@@ -7,6 +7,39 @@ via 2 séries de questions courtes. Le numéro `{n}` est auto-détecté.
 
 ---
 
+## STEP 0 — Preflight projet initialisé (greenfield gate)
+
+Avant toute interaction avec l'utilisateur, vérifier que le projet est
+bootstrappé. Évite que `/feat-generate` produise une FEAT orpheline
+(sans `stack.md` aval cassé sur `/sdd-full`).
+
+1. **Test existence** : `workspace/input/stack/stack.md` existe et fait
+   ≥ 100 octets.
+2. **Test template rendu** : Read le fichier, vérifier qu'il ne contient
+   pas de placeholder `{{Placeholder}}` (regex `\{\{[A-Za-z][A-Za-z0-9_]*\}\}`).
+
+Si l'un des tests échoue → STOP avec message actionnable (pas d'ERROR
+technique, c'est un onboarding utilisateur) :
+
+```
+🟡 [FEAT-GENERATE] Projet non initialise — bootstrap requis.
+
+workspace/input/stack/stack.md {absent | contient des placeholders non substitues}.
+
+Avant de creer une FEAT, lance depuis un terminal :
+    python bootstrap.py
+
+(interactif, ~5 questions, ~30s — choisit le combo stack, AppName, DB, auth)
+
+Apres bootstrap, relance : /feat-generate {Nom}
+Details et options : /sdd-bootstrap
+```
+
+Cette commande **ne lance jamais** `bootstrap.py` (interactif, requiert
+le terminal utilisateur — pas du sub-agent Claude).
+
+---
+
 ## STEP 1 — Nom de la feature
 
 Si l'utilisateur a fourni un nom : l'utiliser.
@@ -210,3 +243,28 @@ Aucune autre ligne. STOP.
 - **Ne jamais inventer** de contenu non mentionné par le PO (anti-derive).
 - **Hors scope** : générer du code, créer des tâches techniques, lire le stack, lire les maquettes UI.
   Cette commande produit uniquement `workspace/input/feats/{n}-{Name}.md`.
+
+---
+
+## Chat Output Protocol
+
+> Cette commande applique strictement `@.claude/rules/output-protocol.md`.
+> Substance non dupliquée — la règle est SSoT.
+
+**Labels canoniques émis** : `[ANALYSIS]` (cf. output-protocol.md §3)
+**Plage de progression couverte** : `0-12%` (cf. output-protocol.md §4)
+
+**Granularité cible** : 3-5 updates (cadrage initial, questions Q/R,
+écriture FEAT, bootstrap constitution). Format
+`[ANALYSIS] Action au gérondif... (X%)` ou résultat factuel 1L.
+
+**Interdits stricts** (cf. §5 du protocole) :
+- chemins de fichiers internes (`workspace/...`, `.claude/...`)
+- tool call narration, stdout/stderr bash
+- détail des sections FEAT générées (compteurs SFD/BR/AC suffisent)
+- context budget, tokens
+
+**Verdict final** : 1 ligne `[ANALYSIS] FEAT {n}-{Name} créée
+(N SFD, M BR, P AC). (12%)`. Pas de "next steps" après (cf. §9.3).
+
+**Bypass debug** : `SDD_CHAT_VERBOSE=1` → mode legacy verbose (§10).

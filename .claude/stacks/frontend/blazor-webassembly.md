@@ -312,10 +312,20 @@ conflit avec `Refit.ApiResponse<T>`).
 **Fichiers supplementaires injectes par STEP 3c et STEP 3d** (pas dans le template de base) :
 - `wwwroot/index.html` augmente avec
   `<script src="_content/Microsoft.Authentication.WebAssembly.Msal/AuthenticationService.js"></script>`
-  AVANT `<script src="_framework/blazor.webassembly#[.{fingerprint}].js"></script>`. Sans cette
+  AVANT `<script src="_framework/blazor.webassembly.js"></script>`. Sans cette
   ligne, runtime exception `Could not find 'AuthenticationService.init'` au premier rendu d'un
   composant `[Authorize]`. Identifiant `preserves:` pour les augments ulterieurs :
   `AuthenticationService.js`.
+- ⚠️ **Syntaxe fingerprint INTERDITE en standalone** (post-mortem 2026-05-22 CMSPrint) :
+  ne JAMAIS écrire `_framework/blazor.webassembly#[.{fingerprint}].js`. La substitution du
+  placeholder `#[.{fingerprint}]` est faite par `MapStaticAssets()` côté **serveur** (Blazor
+  Web App / hosted), pas par Blazor WASM **standalone**. En standalone, le placeholder est
+  servi littéralement au navigateur → `404 _framework/blazor.webassembly#[.{fingerprint}].js`
+  + `<link rel=preload> has an invalid href value`. Voir §3.5.
+- ⚠️ **`<link rel="preload" id="webassembly" />` SANS `href`** : ne PAS conserver le placeholder
+  vide injecté par certains templates `dotnet new blazorwasm`. Soit le supprimer (recommandé —
+  le runtime Blazor WASM standalone n'en a pas besoin), soit fournir un `href` valide. Sinon
+  warning navigateur `<link rel=preload> has an invalid 'href' value` au démarrage.
 - `wwwroot/appsettings.json` cree avec `Api:BaseAddress` pointant sur l'URL HTTPS du Backend
   (par defaut `https://localhost:7238/`, alignee sur le profil HTTPS du
   `launchSettings.json` du Backend dotnet-minimalapi). A surcharger par feature si l'URL
@@ -442,7 +452,21 @@ Pour que les handlers MSAL injectent `NavigationManager`, ajouter
 ```
 
 L'ordre est imperatif (MSAL avant Blazor WASM). Details auth dans
-`tech-auth-azure.md`.
+`auth/azure-ad.md §5`.
+
+**Syntaxe `_framework/blazor.webassembly.js` (sans fingerprint)** est la
+forme correcte pour **Blazor WASM standalone**. La forme alternative
+`_framework/blazor.webassembly#[.{fingerprint}].js` est exclusive au
+**Blazor Web App** (server-rendered) qui utilise `app.MapStaticAssets()`
+pour substituer le placeholder. En standalone, `MapStaticAssets` n'est
+pas dans le pipeline → le placeholder est servi tel quel → 404 runtime.
+
+**Anti-pattern `<link rel="preload" id="webassembly" />`** : certains
+templates `dotnet new blazorwasm` (.NET 10) injectent ce slot vide en
+attente d'un `href` rempli par le build. En standalone, le slot reste
+vide → warning navigateur `<link rel=preload> has an invalid 'href'
+value`. **Supprimer la ligne** au scaffolding (le runtime Blazor WASM
+charge `dotnet.wasm` par lui-même sans ce hint preload).
 
 ### 3.5.1 `AuthorizationMessageHandler` — URLs autorisees obligatoires (post-mortem 2026-05-03)
 
@@ -490,6 +514,54 @@ sont mises en cache par le navigateur (IndexedDB + cache HTTP) :
 
 Caveat runtime uniquement, aucune implication sur le code genere.
 
+### 3.7 Scoped CSS — isolation par composant (load-bearing, post-mortem 2026-05-22)
+
+Le mécanisme Blazor « CSS isolé » injecte un **attribut hash unique
+`[b-xxxxxxxxxx]` par composant `.razor`** et préfixe automatiquement
+chaque selecteur du `.razor.css` adjacent avec ce hash. Conséquence
+**load-bearing** :
+
+- Un composant `Foo.razor` ne style **que** son propre markup via
+  `Foo.razor.css` adjacent. Le hash `b-xxx` injecté dans le HTML rendu
+  ne s'étend **PAS** aux composants enfants `<Bar />` consommés.
+- Un `Page.razor.css` ne style **PAS** un composant enfant `<Component />`
+  consommé dans `Page.razor` — les classes du composant enfant ont un
+  hash différent.
+
+**Règle obligatoire** : les classes CSS consommées par un composant
+`Foo.razor` (markup HTML verbatim, classes mockup `.brand`/`.submenu`/
+`.btn`/etc.) DOIVENT être déclarées dans `Foo.razor.css` **adjacent**
+(même répertoire, même basename). Pas dans le `.razor.css` d'une
+page parent, pas dans `wwwroot/css/theme.css` (sauf tokens `:root`).
+
+**Exceptions au scope** :
+- `wwwroot/css/theme.css` — global, non scoped : OK pour tokens
+  `:root { --pink: ...; }` et règles `body` / `html`.
+- `::deep selector { ... }` dans un `.razor.css` — traverse la frontière
+  scoped pour atteindre les enfants (utile pour forcer `width: 100%`
+  sur les wrappers `.rz-textbox`/`.rz-dropdown` Radzen).
+- `MainLayout.razor.css` style le contenu de `MainLayout.razor`
+  uniquement ; le `@Body` rendu hérite des règles `body`/tokens
+  globaux mais pas des classes scopées du Layout.
+
+**Anti-pattern rejeté** : déclarer dans `Pages/Foo.razor.css` les
+classes consommées par `<BarComponent />` enfant
+(`.bar-title`, `.bar-field`, …). Résultat runtime : CSS **jamais
+appliqué**, composant non stylé, l'agent dev-frontend croit avoir
+livré le mockup → écart de fidélité silencieux.
+
+**Vérification dev-frontend** : à la fin du STEP build, pour chaque
+classe non-token consommée dans `Components/Foo.razor`, vérifier
+qu'elle existe dans `Components/Foo.razor.css` adjacent (pas dans
+le CSS d'une page parent). Si écart → réécrire / créer le
+`.razor.css` adjacent du composant.
+
+**Coordination avec radzen-blazor §7.0** : la règle « containers HTML
+verbatim » impose des classes mockup (`.submenu`, `.brand`, `.btn`,
+`.stepper`, …) ; cette règle §3.7 impose **où** déclarer le CSS de
+ces classes — toujours dans le `.razor.css` adjacent au composant
+qui possède le markup.
+
 ---
 
 ## 4. Integration back → front
@@ -519,8 +591,8 @@ Caveat runtime uniquement, aucune implication sur le code genere.
 - Traductions codees en dur dans les composants → utiliser `.resx` via `IStringLocalizer`
 - `AddRefitClient<T>()` sans factory explicite (voir §3.1)
 - `using Refit;` global dans un contrat exposant `ApiResponse<T>` (voir §3.2)
+- Déclarer dans `Pages/Foo.razor.css` les classes consommées par un `<BarComponent />` enfant — scope hash différent, CSS jamais appliqué (voir §3.7). Les classes d'un composant DOIVENT vivre dans son `.razor.css` adjacent.
 - `HttpClient` instancie a la main dans un composant
 - `wwwroot/index.html` sans `AuthenticationService.js` avant `blazor.webassembly.js` (voir §3.5)
 - Valeurs Azure AD (`TenantId`, `ClientId`, `Authority`, `Audience`) en dur dans le code
 - `TODO`, `FIXME`, code commente, placeholders (`TBD`, `changeme`, `foo`, `bar`)
-

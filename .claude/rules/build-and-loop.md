@@ -280,9 +280,10 @@ python .claude/python/sdd_scripts/acquire_libname_lock.py \
 
 | Exit | Sens | Action agent |
 |---|---|---|
-| `0` | ACQUIRED | écrire le fichier puis release du lock |
+| `0` | ACQUIRED (création ou re-entrant même agent) ou RELEASED | écrire le fichier puis release du lock |
 | `1` | LOCK_HELD par autre agent | STOP + ERROR `[LIBNAME_LOCK_HELD]` |
-| `2` | stale lock (>30min) écrasé | continuer (recovery automatique) |
+| `2` | stale lock (>30min) écrasé OU lock corrompu/illisible écrasé | continuer (recovery automatique) |
+| `3` | erreur fichier (`--lib-path` invalide, permission denied, release sur lock d'un autre agent) | STOP + ERROR `[INFRA_BLOCKED]` (pas un conflit lock — corriger l'arg ou la perm) |
 
 Détail matrice ownership et procédure complète :
 `@.claude/rules/ownership.md §1, §4`.

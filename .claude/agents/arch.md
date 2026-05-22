@@ -332,13 +332,58 @@ injectant `db_config` + `auth_config` (STEP 2.ter).
      automatique de l'origin frontend dev si `appType=back-front/web`
      (cf. sous-doc §4.5.6 pour matrice port).
 
-3. **Switch profil auth** (azure-ad ↔ auth-local) : supprimer ancien +
+3. **🔴 Pattern obligatoire env-var binding (depuis 2026-05-22, audit P0)** :
+   les sections DB/Auth de `appsettings.json` / `application.yml` /
+   `config/default.json` / `app/config.py` doivent contenir **uniquement
+   des placeholders vides** (`""`, `[]`). Aucune valeur résolue littéralement
+   depuis les env vars stack.md (sinon `[SEC_SECRET_HARDCODED]`).
+   Le binding runtime AZ_* / DB_* → clés natives Configuration est généré
+   dans `Program.cs` / `main.kt` / `main.py` / `server.ts` (cf.
+   `stacks/auth/azure-ad.md §2.bis` et `stacks/backend/dotnet-minimalapi.md §5.1`).
+   Inclure systématiquement le helper `StripMsysPrefix` pour
+   `AZ_BE_CALLBACKPATH` / `AZ_FE_CALLBACKPATH` (post-mortem MSYS Git
+   Bash 2026-05-22).
+
+4. **Switch profil auth** (azure-ad ↔ auth-local) : supprimer ancien +
    écrire nouveau (évite double chargement = crash Spring/.NET).
 
-4. **Validation post-écriture** : syntaxe JSON/YAML/Python.
-   Échec → ERROR `[STACK_MALFORMED]` + STOP avant STEP 5.
+5. **Validation post-écriture** :
+   - syntaxe JSON/YAML/Python OK
+   - **§4.5.bis Anti-leak check** : grep `appsettings.json` post-écriture
+     pour absence de patterns `Password=[^"]+[^"]`, `TenantId=\"[a-f0-9-]{36}\"`,
+     `ClientId=\"[a-f0-9-]{36}\"` (valeurs réelles GUID/password). Si
+     pattern détecté → ERROR `[ARCH_SECRET_LEAK]` + revert.
+   Échec → ERROR `[STACK_MALFORMED]` ou `[ARCH_SECRET_LEAK]` + STOP avant STEP 5.
 
-5. **Idempotence** : re-run modifie uniquement si valeur diverge.
+6. **§4.5.ter Validation env vars canoniques** (depuis 2026-05-22) :
+   - `AZ_FE_CALLBACKPATH` doit valoir `/authentication/login-callback`
+     (convention universelle SPA — cf. `stacks/auth/azure-ad.md §2`).
+     Toute autre valeur → WARN `[AUTH_CALLBACK_NON_CANONICAL]` au scaffolding
+     (Tech Lead arbitre — si choix volontaire, ajouter ADR).
+   - `AZ_BE_CALLBACKPATH` doit valoir `/signin-oidc` (convention
+     Microsoft.Identity.Web). Idem WARN si divergent.
+
+7. **§4.5.quart Propagation `FrontendLocalPort` / `BackendLocalPort` (load-bearing, depuis 2026-05-22)** :
+   après création des `.csproj`, lire `FrontendLocalPort` et `BackendLocalPort`
+   du `## Project Config` et écrire `Properties/launchSettings.json` avec
+   `applicationUrl` correct :
+   ```json
+   {
+     "profiles": {
+       "https": { "applicationUrl": "https://localhost:{Port}", "commandName": "Project", "dotnetRunMessages": true,
+                  "environmentVariables": { "ASPNETCORE_ENVIRONMENT": "Development" } },
+       "http":  { "applicationUrl": "http://localhost:{Port}",  "commandName": "Project" }
+     }
+   }
+   ```
+   Anti-pattern bloquant (post-mortem 2026-05-22) : laisser les ports par
+   défaut du template `dotnet new` (5226/5014/7149/7157) au lieu des ports
+   déclarés. La SPA appelle `https://localhost:44328/auth/config` (cf.
+   `wwwroot/appsettings.json Api:BaseAddress`) → si le backend écoute sur
+   5226 par défaut, `TypeError: Failed to fetch` côté browser, "Backend
+   indisponible" affiché.
+
+8. **Idempotence** : re-run modifie uniquement si valeur diverge.
 
 ---
 
@@ -477,6 +522,43 @@ arch: bootstrap + DB + CLAUDE.md par projet terminé
 ```
 
 Sur erreur, bloc ERROR 3 lignes (CAUSE / FIX) et STOP. Aucun autre texte.
+
+---
+
+## Chat Output Protocol
+
+> Cet agent applique strictement `@.claude/rules/output-protocol.md`.
+> Substance non dupliquée — la règle est SSoT.
+
+**Label canonique** : `[ARCH]` (cf. output-protocol.md §3)
+**Plage de progression** : `22-32%` (cf. output-protocol.md §4)
+
+**Granularité cible** : 3 à 6 updates par invocation, format
+`[ARCH] Action au gérondif... (X%)` ou `[ARCH] Résultat factuel. (X%)`.
+
+**Interdits stricts** (cf. §5 du protocole) :
+- chemins de fichiers internes (`workspace/...`, `.claude/...`)
+- noms de classes/méthodes/composants générés
+- stdout/stderr de bash, Read/Edit/Glob narration
+- context budget, tokens, preflight checks détaillés
+- diffs, snippets, lignes de code
+
+**Erreurs (LOAD-BEARING)** : tout bloc `ERROR: ... / CAUSE: ... / FIX: ...`
+apparaissant dans les STEPs ci-dessus est un **TEMPLATE pour le fichier
+rapport disque**, JAMAIS un texte à émettre verbatim en chat.
+
+Procédure obligatoire à chaque émission d'erreur :
+1. **Disque** : écrire le bloc 3-lignes complet dans le fichier rapport
+   approprié — format préservé pour `build_loop`/hooks/dashboards
+   (cf. `error-classification.md §2`).
+2. **Chat** : émettre UNE SEULE ligne compressée :
+   ```
+   🔴 [{LABEL}/FAIL] {résumé court} — [CLASS] {détail 1L} → {rapport.md}. ({X}%)
+   ```
+   Pas de chemin absolu, pas de stack trace, pas de blocs multi-lignes.
+pour `build_loop` et hooks — cf. `error-classification.md §2`).
+
+**Bypass debug** : `SDD_CHAT_VERBOSE=1` → mode legacy verbose (§10).
 
 ---
 

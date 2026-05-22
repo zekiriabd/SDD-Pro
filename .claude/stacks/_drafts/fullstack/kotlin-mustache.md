@@ -1,8 +1,8 @@
 # Tech FEAT: kotlin-mustache (fullstack)
 
-Status: Draft  
-Validation: 🟡 experimental (combo non valide end-to-end dans SDD_Pro v6)  
-Tech FEAT ID: tech-kotlin-mustache  
+Status: Draft
+Validation: 🟡 experimental (combo non valide end-to-end dans SDD_Pro v6)
+Tech FEAT ID: tech-kotlin-mustache
 Scope: **fullstack monolithe** — application Spring Boot 3.x (Kotlin) avec **templates Mustache** rendus serveur dans UN seul projet `{AppName}/`. UI HTML server-rendered + Controllers + Services + Spring Data JPA + Spring Security vivent dans le meme JAR. Pas de separation `{BackendName}` / `{AppName}` / `{LibName}`. Modele **SSR classique JVM** : HTML genere serveur (FreeMarker-like via Mustache), interactivite optionnelle via HTMX ou Alpine.js (capabilities) — pas de JS bundler, pas de SPA.
 
 ---

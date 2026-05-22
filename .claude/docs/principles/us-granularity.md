@@ -122,4 +122,3 @@ ERROR: FEAT {n}-{Name} traceability gap
 CAUSE: {SFD-3, BR-2} non couverts par les US générées
 FIX: ajouter ces éléments au Covers d'une US existante OU créer une US dédiée
 ```
-

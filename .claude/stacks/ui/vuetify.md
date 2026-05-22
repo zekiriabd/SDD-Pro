@@ -2,9 +2,9 @@
 
 > §2.4 (Librairies) régénérée depuis `vuetify.libs.json` — ne pas éditer manuellement (`python .claude/python/sdd_admin/sync_stack_md.py --stack-id vuetify`).
 
-Status: Draft  
-Validation: 🟡 experimental (not yet validated end-to-end in production combo)  
-UI FEAT ID: vuetify  
+Status: Draft
+Validation: 🟡 experimental (not yet validated end-to-end in production combo)
+UI FEAT ID: vuetify
 Scope: design system Vuetify — composants UI pour applications Vue 3 (SPA, dashboards, applications métier)
 
 ---

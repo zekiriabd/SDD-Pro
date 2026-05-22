@@ -214,3 +214,31 @@ voit l'erreur via `BashOutput`. Pas de retry automatique.
   stack (`bootRun`, `npm run dev`, `dotnet watch run`).
 - **Pas d'impact sur le pipeline SDD.** N'invoque ni `arch`, ni
   `dev-*`, ni `qa`. Strictement utilitaire runtime.
+
+---
+
+## Chat Output Protocol
+
+> Cette commande applique strictement `@.claude/rules/output-protocol.md`.
+> Substance non dupliquée — la règle est SSoT.
+
+**Labels canoniques émis** : `[ANALYSIS]` (label runtime, hors pipeline
+SDD — pas de phase métier dédiée)
+**Plage de progression couverte** : `0-100%` (lifecycle serveurs)
+
+**Granularité cible** : 3-4 updates (start backend, start frontend,
+start console, verdict tous OK). Format
+`[ANALYSIS] {service} démarré (port {N}). (X%)`.
+
+**Interdits stricts** (cf. §5 du protocole) :
+- chemins de fichiers internes (`workspace/...`, `.claude/...`)
+- stdout/stderr des process backend/front/console
+- détails npm install / dotnet restore
+- logs de hot-reload
+
+**Verdict final** : 1 ligne récap ports. Exemple :
+`[ANALYSIS] Backend :8080, Front :5173, Console :4000 — tous démarrés. (100%)`.
+
+**Erreurs** : 1L par service qui échoue, classe `[CLASS]` + port en conflit.
+
+**Bypass debug** : `SDD_CHAT_VERBOSE=1` → mode legacy verbose (§10).

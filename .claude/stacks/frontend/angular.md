@@ -2,9 +2,9 @@
 
 > §2.4 (Librairies) régénérée depuis `angular.libs.json` — ne pas éditer manuellement (`python .claude/python/sdd_admin/sync_stack_md.py --stack-id angular`).
 
-Status: Draft  
-Validation: 🟡 experimental (not yet validated end-to-end in production combo)  
-Tech FEAT ID: tech-angular  
+Status: Draft
+Validation: 🟡 experimental (not yet validated end-to-end in production combo)
+Tech FEAT ID: tech-angular
 Scope: frontend uniquement (Angular SPA)
 
 ---
@@ -350,10 +350,10 @@ Structure :
 
 store/
 
-actions/  
-reducers/  
-effects/  
-selectors/  
+actions/
+reducers/
+effects/
+selectors/
 
 Aucun state global hors NgRx.
 
@@ -423,8 +423,8 @@ Structure :
 
 store/
 
-auth/  
-app/  
+auth/
+app/
 
 Aucun state global hors NgRx.
 
@@ -440,8 +440,8 @@ Structure :
 
 i18n/
 
-fr.json  
-en.json  
+fr.json
+en.json
 
 Langue :
 
@@ -475,8 +475,8 @@ Structure :
 
 layouts/
 
-main-layout/  
-auth-layout/  
+main-layout/
+auth-layout/
 
 ---
 
@@ -556,32 +556,32 @@ src/
 
 {AppName}/
 
-pages/  
-components/  
-layouts/  
-services/  
-api/  
-interceptors/  
-guards/  
-store/  
-models/  
-pipes/  
-directives/  
-auth/  
-utils/  
-i18n/  
-assets/  
+pages/
+components/
+layouts/
+services/
+api/
+interceptors/
+guards/
+store/
+models/
+pipes/
+directives/
+auth/
+utils/
+i18n/
+assets/
 
-app/  
+app/
 
-app.module.ts  
-app-routing.module.ts  
+app.module.ts
+app-routing.module.ts
 
-main.ts  
+main.ts
 
-package.json  
-angular.json  
-tsconfig.json  
+package.json
+angular.json
+tsconfig.json
 
 ---
 

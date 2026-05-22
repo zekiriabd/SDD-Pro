@@ -903,3 +903,39 @@ Cas API Gate RED → format §6.b.STOP (seul rapport affiché).
   les stacks backend hors patterns d'injection auth.
 - **Pas de pré-step DB séparé** : le scaffolding Database-First est
   intégré à l'agent `arch` depuis SDD_Pro v2.1.
+
+---
+
+## Chat Output Protocol
+
+> Cette commande applique strictement `@.claude/rules/output-protocol.md`.
+> Substance non dupliquée — la règle est SSoT.
+
+**Labels canoniques émis** : `[PLAN]`, `[ARCH]`, `[DEV-BACKEND]`,
+`[QA]` (API Gate), `[DEV-FRONTEND]`, `[REVIEW]`, `[SECURITY]`,
+`[DONE]` (cf. output-protocol.md §3)
+**Plage de progression couverte** : `15-78%` (sans review/QA finale,
+cf. output-protocol.md §4)
+
+**Granularité cible** : 1 update par phase orchestrée (typiquement
+8-10 updates : plan → arch → backend ALL US → API Gate → frontend
+ALL US → verdict). Chaque sub-agent émet ses updates dans sa plage.
+
+**Interdits stricts** (cf. §5 du protocole) :
+- chemins de fichiers internes (`workspace/...`, `.claude/...`)
+- listes d'US par batch (compteur par batch suffit, ex. `2/3 US livrées`)
+- détail des invocations parallèles dev-backend + dev-frontend
+- stdout/stderr de bash, JSON dumps phase_planner.py
+
+**API Gate** : 1 ligne dédiée transitionnelle entre dev-backend ALL US
+et dev-frontend ALL US, avec statut canonique
+PASS/WARN/FAIL/SKIPPED/INFRA_BLOCKED (cf. `build-and-loop.md §1.3`).
+Exemple : `[QA] API Gate: 16/16 endpoints couverts, status PASS. (66%)`.
+
+**Verdict final** : 1 ligne `[DONE]` (🟢) / `[DONE/WARN]` (🟡) /
+`[DONE/FAIL]` (🔴) (cf. §9.1). Pas de "next steps" après (cf. §9.3).
+
+**Erreurs intermédiaires** : chat 1L avec classe `[CLASS]` + pointeur
+fichier rapport (cf. §7.2). Format 3L disque préservé.
+
+**Bypass debug** : `SDD_CHAT_VERBOSE=1` → mode legacy verbose (§10).

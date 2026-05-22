@@ -336,3 +336,28 @@ Voir `/sdd-full` STEP 5 pour la logique d'invocation auto.
   - `/sdd-full {n}` post-STEP 4.5 : STOP + ERROR `[QA_FAIL_BLOCKING_SDD_FULL]` si QA verdict RED
   - **Bypass** : `QaFailOnSddFull: false` dans `## Project Config` (décision tracée, logged en audit). Avec le bypass, la review est laissée à l'humain et le pipeline continue. Sans bypass, le pipeline s'arrête et l'humain corrige avant de relancer.
   - Détail rationale + format ERROR : `.claude/rules/error-classification.md` `[QA_FAIL_BLOCKING_SDD_FULL]`.
+
+---
+
+## Chat Output Protocol
+
+> Cette commande applique strictement `@.claude/rules/output-protocol.md`.
+> Substance non dupliquée — la règle est SSoT.
+
+**Labels canoniques émis** : `[QA]` (cf. output-protocol.md §3)
+**Plage de progression couverte** : `78-88%` (cf. output-protocol.md §4)
+
+**Granularité cible** : 3-5 updates (bootstrap test project si absent,
+génération tests, run + coverage, quality scan, verdict).
+
+**Interdits stricts** (cf. §5 du protocole) :
+- chemins de fichiers internes (`workspace/...`, `.claude/...`)
+- listes de tests générés, assertion dumps, xunit/jest verbose logs
+- stdout/stderr de bash, SQL queries
+
+**Verdict final** : 1 ligne avec emoji + compteurs métier. Exemple :
+`[QA] 47/47 tests passés, coverage 82% ≥ 80%, verdict 🟢. (88%)`.
+En cas de RED : `🔴 [QA/FAIL] {feat} — [QA_TEST_FAILED] 3 tests échec →
+workspace/output/qa/feat-{n}/report.md. (84%)`.
+
+**Bypass debug** : `SDD_CHAT_VERBOSE=1` → mode legacy verbose (§10).

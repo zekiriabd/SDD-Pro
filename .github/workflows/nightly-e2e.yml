@@ -54,8 +54,8 @@ jobs:
           tmpdir=$(mktemp -d)
           cp -r .claude "$tmpdir/"
           cp bootstrap.py "$tmpdir/"
+          # stack.md.template lives in .claude/templates/ since 2026-05-22 (déjà copié via .claude recursive ci-dessus)
           mkdir -p "$tmpdir/workspace/input/stack"
-          cp workspace/input/stack/stack.md.template "$tmpdir/workspace/input/stack/"
           mkdir -p "$tmpdir/workspace/input/feats" "$tmpdir/workspace/input/ui"
           cd "$tmpdir"
           # Provide answers : AppName=NightlyCi, backend=default, db=PostgreSql, proceed=y
@@ -126,9 +126,8 @@ jobs:
           mkdir -p e2e-tmp
           cp -r .claude e2e-tmp/
           cp bootstrap.py e2e-tmp/
+          # stack.md.template lives in .claude/templates/ since 2026-05-22 (déjà copié via .claude recursive ci-dessus)
           mkdir -p e2e-tmp/workspace/input/{stack,feats,ui}
-          cp workspace/input/stack/stack.md.template \
-             e2e-tmp/workspace/input/stack/
           cp .claude/python/tests/fixtures/e2e-combo-c1/1-Minimal.md \
              e2e-tmp/workspace/input/feats/
           cd e2e-tmp

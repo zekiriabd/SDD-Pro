@@ -8,11 +8,17 @@
     "files": ["workspace/output/src/{BackendName}/{BackendName}.csproj"]
   },
   "versions": {
-    "ef-core": "10.0.6",
+    "ef-core": "9.0.4",
+    "ef-core-sqlserver": "9.0.4",
+    "ef-core-sqlite": "9.0.4",
+    "npgsql-ef": "9.0.4",
+    "pomelo-mysql": "9.0.0",
+    "oracle-ef": "9.23.60",
+    "mongodb-ef": "9.0.0",
     "automapper": "16.1.1",
-    "serilog-aspnetcore": "10.0.0",
+    "serilog-aspnetcore": "9.0.0",
     "serilog-sinks-console": "6.1.1",
-    "swashbuckle": "10.1.7",
+    "swashbuckle": "9.0.4",
     "asp-versioning": "8.1.1",
     "microsoft-openapi": "2.4.1",
     "microsoft-identity-web": "4.9.0",
@@ -21,6 +27,7 @@
     "polly": "8.5.1",
     "http-resilience": "9.0.0",
     "caching-memory": "9.0.0",
+    "asp-openapi": "9.0.4",
     "epplus": "7.5.3",
     "closedxml": "0.104.2",
     "questpdf": "2024.12.3",
@@ -32,16 +39,63 @@
     "mailkit": "4.8.0",
     "mimekit": "4.8.0",
     "bcrypt-net": "4.0.3",
-    "jwt-bearer": "10.0.6"
+    "jwt-bearer": "9.0.4"
   },
   "dbDrivers": {
-    "sqlserver": { "module": "Microsoft.EntityFrameworkCore.SqlServer", "ref": "ef-core" }
+    "sqlserver": {
+      "module": "Microsoft.EntityFrameworkCore.SqlServer",
+      "ref": "ef-core-sqlserver",
+      "providerName": "Microsoft.EntityFrameworkCore.SqlServer",
+      "useExtension": "UseSqlServer"
+    },
+    "postgres": {
+      "module": "Npgsql.EntityFrameworkCore.PostgreSQL",
+      "ref": "npgsql-ef",
+      "providerName": "Npgsql.EntityFrameworkCore.PostgreSQL",
+      "useExtension": "UseNpgsql"
+    },
+    "postgresql": {
+      "module": "Npgsql.EntityFrameworkCore.PostgreSQL",
+      "ref": "npgsql-ef",
+      "providerName": "Npgsql.EntityFrameworkCore.PostgreSQL",
+      "useExtension": "UseNpgsql"
+    },
+    "mysql": {
+      "module": "Pomelo.EntityFrameworkCore.MySql",
+      "ref": "pomelo-mysql",
+      "providerName": "Pomelo.EntityFrameworkCore.MySql",
+      "useExtension": "UseMySql"
+    },
+    "mariadb": {
+      "module": "Pomelo.EntityFrameworkCore.MySql",
+      "ref": "pomelo-mysql",
+      "providerName": "Pomelo.EntityFrameworkCore.MySql",
+      "useExtension": "UseMySql"
+    },
+    "sqlite": {
+      "module": "Microsoft.EntityFrameworkCore.Sqlite",
+      "ref": "ef-core-sqlite",
+      "providerName": "Microsoft.EntityFrameworkCore.Sqlite",
+      "useExtension": "UseSqlite"
+    },
+    "oracle": {
+      "module": "Oracle.EntityFrameworkCore",
+      "ref": "oracle-ef",
+      "providerName": "Oracle.EntityFrameworkCore",
+      "useExtension": "UseOracle"
+    },
+    "mongodb": {
+      "module": "MongoDB.EntityFrameworkCore",
+      "ref": "mongodb-ef",
+      "providerName": "MongoDB.EntityFrameworkCore",
+      "useExtension": "UseMongoDB"
+    }
   },
   "core": [
     { "module": "Microsoft.EntityFrameworkCore", "ref": "ef-core" },
-    { "module": "Microsoft.EntityFrameworkCore.SqlServer", "ref": "ef-core" },
     { "module": "Microsoft.EntityFrameworkCore.Design", "ref": "ef-core" },
     { "module": "Microsoft.EntityFrameworkCore.Tools", "ref": "ef-core" },
+    { "module": "Microsoft.AspNetCore.OpenApi", "ref": "asp-openapi" },
     { "module": "AutoMapper", "ref": "automapper" },
     { "module": "Serilog.AspNetCore", "ref": "serilog-aspnetcore" },
     { "module": "Serilog.Sinks.Console", "ref": "serilog-sinks-console" },
@@ -73,5 +127,9 @@
     { "module": "Microsoft.AspNetCore.Authentication.JwtBearer", "ref": "jwt-bearer", "capability": "auth-local", "triggers": ["\\bjwt\\b", "jsonwebtoken", "bearer.*token", "auth-local", "issue.*token", "verify.*token", "validate.*token", "jwt.*authent", "token.*authent", "authorize.*attribute", "\\[Authorize\\]"] }
   ],
   "plugins": [],
-  "metadata": { "lastUpdated": "2026-05-07", "format": "compact (v2)" }
+  "metadata": {
+    "lastUpdated": "2026-05-22",
+    "format": "compact (v2)",
+    "changeLog": "2026-05-22 — fix: removed hardcoded EF.SqlServer from core[] (was installed for ALL projects regardless of DatabaseType). Expanded dbDrivers from 1 → 7 entries (sqlserver, postgres, mysql, mariadb, sqlite, oracle, mongodb). Pinned ef-core 10.0.6 → 9.0.4 (LCD across all drivers since Npgsql.EF 10.x is preview only). Post-mortem CMSPrint 2026-05-22: NU1608 EF 10.0.6 vs Npgsql.EF 9.0.4 became runtime MissingMethodException on first DbSet access."
+  }
 }

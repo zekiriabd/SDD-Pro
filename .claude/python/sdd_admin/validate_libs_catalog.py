@@ -195,15 +195,36 @@ def validate_catalog(file: Path, root: Path) -> tuple[dict[str, Any], list[dict]
                     "Message": f"dbDrivers.{name} ref='{d_ref}' not declared",
                 })
 
+    # v7.0.0 audit P0 §6.2 — Empty `core` is a configuration smell unless
+    # the stack explicitly opts out of arch auto-install via
+    # `metadata.manualInstall: true`. Catches accidentally-empty catalogs
+    # (would produce a project with zero installed libs at arch Phase A)
+    # while accepting intentional manual-install stacks like
+    # `qa/mutation-testing` (multi-runtime, target picked at qa STEP 8.5).
+    core_libs = cat.get("core") or []
+    metadata = cat.get("metadata") or {}
+    manual_install = isinstance(metadata, dict) and metadata.get("manualInstall") is True
+    if not core_libs and not manual_install:
+        warnings.append({
+            "File": rel,
+            "Code": "EMPTY_CORE",
+            "Message": (
+                "core=[] without metadata.manualInstall=true — arch Phase A "
+                "will install NO library for this stack. If intentional, add "
+                "metadata.manualInstall=true + manualInstallRationale to the catalog."
+            ),
+        })
+
     summary = {
         "File":        rel,
         "StackId":     cat.get("stackId"),
         "Category":    cat.get("category"),
         "BuildSystem": cat.get("buildSystem"),
         "Versions":    len(versions_keys),
-        "Core":        len(cat.get("core") or []),
+        "Core":        len(core_libs),
         "OnDemand":    len(cat.get("onDemand") or []),
         "Plugins":     len(cat.get("plugins") or []),
+        "ManualInstall": manual_install,
     }
     return summary, errors, warnings
 

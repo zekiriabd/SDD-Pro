@@ -64,7 +64,7 @@ Les mutations de la collection EAN (ajout manuel via Bloc B, import CSV via Bloc
 - SFD-17: Restaurer l'état "dernier Save connu" via "Retour/Annuler" sans déclencher de persistance backend
 - SFD-18: Prévenir la perte de données : alerter l'utilisateur avant fermeture/refresh/navigation si la collection EAN ou les Infos contiennent des modifications non sauvegardées (drapeau `isDirty` + `beforeunload` + router guard)
 - SFD-19: Empêcher l'insertion d'un libellé EAN contenant des caractères dangereux (`<`, `>`, `"`, `'`, `&`, `\0`) — protection XSS au stockage (le rendu utilise l'escaping JSX natif)
-- SFD-20: Garantir des performances acceptables sur DELETE/INSERT scope `fk_campagne` via un index DB composé `(fk_campagne, ean)` sur la table `ean`
+- SFD-20: Garantir des performances acceptables sur DELETE/INSERT scope `fk_compagne` via un index DB composé `(fk_compagne, ean)` sur la table `ean`
 - SFD-21: Afficher une FAQ inline (accordion repliable) "Comment préparer la liste de produits à importer ?" sous la zone d'import CSV, contenu statique côté SPA (pas d'API)
 
 ## Business Rules
@@ -98,7 +98,15 @@ Les mutations de la collection EAN (ajout manuel via Bloc B, import CSV via Bloc
   - `GET /api/v1/campagnes/{campagneId}` → pré-remplit Infos générales (combos pré-sélectionnés sur `Fk_annonceur`/`Fk_marque` matchés par `id`, nom, description, dates)
   - `GET /api/v1/campagnes/{campagneId}/eans` → initialise la collection EAN en mémoire avec le résultat
   Si un FK référence un id absent des listes (annonceur/marque supprimé), afficher "Valeur indisponible" et bloquer le Save jusqu'à correction.
-- BR-17: **Sub-menu wizard partagé — composition stricte mockup `_shared-4-Menu-Campagne.html`** — la page Campagne s'affiche **dans le shell d'un wizard 4-steps** dont le top bar contient (de gauche à droite) :
+- BR-17: **Sub-menu wizard partagé — layout dédié `CampagneWizardLayout` (LOAD-BEARING, clarifié 2026-05-22)** — les pages du wizard de création/édition campagne (`/campagnes/creation`, `/campagnes/edit`, `/campagnes/edit/perimetre`, `/campagnes/edit/contenus`, `/campagnes/edit/recapitulatif`) **n'utilisent PAS `MainLayout`** (la sidebar globale Campagnes/MediaPlanning/Médiathèque de FEAT 2). Elles utilisent un layout dédié `CampagneWizardLayout` qui :
+  - **Aucune sidebar globale** (focus utilisateur sur le wizard, pas distraction par navigation horizontale)
+  - **Aucun LanguageSelector / UserAvatarMenu** dans le header (composants FEAT 2 retirés du shell wizard)
+  - **Brand minimaliste** (logo + libellé app) qui redirige vers `/campagnes` au clic
+  - **Le `<WizardTopBar>` est rendu par la page** (pas par le layout) car il consomme `ActiveStepIndex` + `IsValid` + handlers `OnNext`/`OnBack`/`OnSaveAndQuit` du formulaire de la page
+
+  > **Choix architectural** : la décision « quel layout utiliser » est portée par la **FEAT** (spécification fonctionnelle), pas par le stack technique. La FEAT 4 dit explicitement « wizard avec son propre menu », donc l'agent dev-frontend DOIT créer un layout dédié et l'appliquer via `@layout CampagneWizardLayout`. Anti-pattern bloquant (post-mortem 2026-05-22) : utiliser le `MainLayout` par défaut → la sidebar globale FEAT 2 reste visible derrière le wizard → contradiction avec le mockup `_shared-4-Menu-Campagne.html` qui montre un top bar plat sans sidebar.
+
+  Composition du top bar contient (de gauche à droite) :
   1. **Bouton "Sauvegarder et quitter"** (colonne gauche, icône disquette + libellé verbatim mockup ligne 169).
   2. **Stepper 4 steps** (colonne centre, libellés verbatim mockup lignes 173-191) :
      - **Step 1 — Informations générales** : page de FEAT 4 (cette spec), step actif par défaut au mount, 3 blocs Infos+CSV+EAN. **Libellé exact = `Informations générales` (PAS `Campagne`)** — verbatim mockup ligne 175.
@@ -126,7 +134,7 @@ Les mutations de la collection EAN (ajout manuel via Bloc B, import CSV via Bloc
   - `window.beforeunload` retournant `event.preventDefault()` + `event.returnValue = ""` → dialog natif navigateur
   - Guard router frontend (`useBlocker` TanStack/RR v6.4+) → dialog modal applicatif "Modifications non sauvegardées — êtes-vous sûr de quitter ?" (actions : Quitter sans sauver / Annuler / Sauvegarder et quitter)
   Reset `isDirty` à false après chaque Save (BR-22/23) ou Retour/Annuler (BR-24).
-- BR-27: **Index DB composé `(fk_campagne, ean)` sur table `ean`** — `CREATE INDEX idx_ean_campagne_ean ON ean(fk_campagne, ean);` à matérialiser dans la migration DB scaffoldée par arch (à vérifier dans `workspace/output/db/schema.{json,md}` et compléter via migration explicite si manquant).
+- BR-27: **Index DB composé `(fk_compagne, ean)` sur table `ean`** — `CREATE INDEX idx_ean_campagne_ean ON ean(fk_compagne, ean);` à matérialiser dans la migration DB scaffoldée par arch (à vérifier dans `workspace/output/db/schema.{json,md}` et compléter via migration explicite si manquant). **NOTE typo historique préservée (RISK-7)** : la table s'appelle `compagne` (pas `campagne`) et la colonne FK s'appelle `fk_compagne` (pas `fk_campagne`). NE PAS « corriger » l'orthographe — l'alias se fait au niveau ORM (`[Table("compagne")]` + entité `Compagne.cs`), pas au niveau DB. Toute migration SQL DOIT utiliser `fk_compagne` littéral, sinon `column "fk_campagne" does not exist`.
 - BR-28: **Pagination + tri frontend de la grille EAN** — la grille EAN est paginée **client-side** (le backend retourne la collection complète via `GET /api/v1/campagnes/{campagneId}/eans` sans pagination ; le composant grid SPA paginate localement). Lignes par page configurables : 5 (défaut) / 10 / 25 / 50. Tri par colonne EAN et Libellé (asc/desc). Affichage du compteur "X-Y de Z" et navigation paginée (prev/next + numéros). **Pas de pagination backend** (out of scope).
 - BR-29: **FAQ inline "Comment préparer la liste de produits à importer ?"** — composant accordion repliable sous la dropzone d'import. Contenu statique côté SPA (texte ou markdown bundle, pas d'appel API). Au clic, déplie/replie. Contient des règles de format CSV (séparateur, encodage, header, exemples).
 
@@ -155,7 +163,7 @@ Les mutations de la collection EAN (ajout manuel via Bloc B, import CSV via Bloc
 - AC-21: Le bouton "Retour" / "Annuler" restaure l'état dernier-Save-connu sans persister (BR-24). En édition : reload depuis backend. En création antérieure au 1er Save : reset state mémoire.
 - AC-22: Une tentative de fermeture/refresh/navigation alors que `isDirty == true` déclenche un dialog confirm (natif `beforeunload` ou modal applicatif selon nav). Si l'utilisateur annule, il reste sur la page avec la collection EAN intacte. Si l'utilisateur confirme, modifs non sauvegardées perdues (sauf option "Sauvegarder et quitter" intégrée au modal in-SPA). Après tout Save (BR-22/23) ou Retour (BR-24), `isDirty == false` et le warning ne se déclenche plus.
 - AC-23: Une tentative d'ajout EAN (manuel OU CSV) avec libellé contenant `<`, `>`, `"`, `'`, `&`, `\0` est rejetée au Save par le backend (400 ProblemDetails avec détail du champ). Côté frontend, tout libellé EAN est rendu via escaping JSX (`{ean.libelle}`), jamais `dangerouslySetInnerHTML`. Vérifiable par test : libellé `<script>alert(1)</script>` ne provoque aucune exécution JS au rendu.
-- AC-24: La table `ean` du schéma DB porte un index composé `idx_ean_campagne_ean` sur `(fk_campagne, ean)`. Vérifiable via `EXPLAIN ANALYZE DELETE FROM ean WHERE fk_campagne = ?` qui utilise l'index (pas de Seq Scan).
+- AC-24: La table `ean` du schéma DB porte un index composé `idx_ean_campagne_ean` sur `(fk_compagne, ean)`. Vérifiable via `EXPLAIN ANALYZE DELETE FROM ean WHERE fk_compagne = ?` qui utilise l'index (pas de Seq Scan).
 - AC-25: La grille EAN paginée côté frontend affiche 5 lignes par défaut, avec selector "Lignes par page" (5/10/25/50) et navigation paginée (prev/next + numéros de page). Tri cliquable sur colonnes EAN et Libellé (asc/desc). La pagination/tri opère sur la collection en mémoire complète, **aucun appel backend** déclenché par changement de page ou tri.
 - AC-26: Une FAQ accordion "Comment préparer la liste de produits à importer ?" (BR-29) est présente sous la dropzone d'import CSV, repliable au clic, contenu statique inline (pas d'API).
 - AC-27: **3 blocs montés simultanément (cf. BR-14bis)** — au runtime de `/campagnes/creation` ET `/campagnes/edit`, la page `CampagneInfosPage.tsx` doit afficher dans l'ordre vertical du mockup : (1) Bloc A `<CampagneInfosForm>` (US 4-1), (2) Bloc C `<EanImportBlock>` (US 4-3), (3) Bloc B `<EanManager>` (US 4-2 — ajout manuel + grille paginée). Une page qui n'affiche que le Bloc A est un bug **bloquant** : vérifier que les augment-contracts des plans US 4-2 et 4-3 ciblent bien `CampagneInfosPage.tsx` (PAS `CampagneFormPage.tsx`).
@@ -170,7 +178,7 @@ Les mutations de la collection EAN (ajout manuel via Bloc B, import CSV via Bloc
 - Backend `POST /api/v1/campagnes` (201 + Location), `PUT /api/v1/campagnes/{id}` (200), `GET /api/v1/campagnes/{id}` (200)
 - Backend EAN (`GET /api/v1/campagnes/{campagneId}/eans` collection complète sans pagination ; `DELETE /api/v1/campagnes/{campagneId}/eans` 204 ; `POST .../eans/bulk` 201)
 - Fichier statique `assets/ean-template.csv` livré dans les assets publiés du frontend
-- Base PostgreSQL contenant `campagne`, `annonceur`, `marque`, `ean` (index composé `(fk_campagne, ean)` requis cf. BR-27)
+- Base PostgreSQL contenant `campagne`, `annonceur`, `marque`, `ean` (index composé `(fk_compagne, ean)` requis cf. BR-27)
 - Composant SPA partagé `_shared-4-Menu-Campagne.html` (wizard top bar avec 4 onglets + bouton "Sauvegarder et quitter")
 - Composant SPA grille paginée avec tri client-side (TanStack Table ou équivalent stack frontend)
 - Composant SPA popup d'alerte rouge clair, dismissable
@@ -197,7 +205,7 @@ Les mutations de la collection EAN (ajout manuel via Bloc B, import CSV via Bloc
 - FD-17: Service SPA `csvImportService` parsant + validant ligne-par-ligne le CSV, retournant `{validRows, rejectedRows: [{lineNumber, reason}]}`
 - FD-18: Guards SPA `isDirty` + `window.beforeunload` + `useBlocker` router + dialog modal applicatif "Modifications non sauvegardées"
 - FD-19: Validation JSR-303 backend sur DTO `EanInputDto` (`@Pattern` reject `<>"'&\0`) renvoyant 400 ProblemDetails
-- FD-20: Migration DB scaffoldée pour index composé `idx_ean_campagne_ean ON ean(fk_campagne, ean)` (Flyway/Liquibase ou SQL natif, idempotent)
+- FD-20: Migration DB scaffoldée pour index composé `idx_ean_campagne_ean ON ean(fk_compagne, ean)` (Flyway/Liquibase ou SQL natif, idempotent)
 - FD-21: Composant FAQ accordion statique sous la dropzone CSV (contenu inline, repliable)
 
 ## Out of Scope
@@ -262,7 +270,7 @@ Les mutations de la collection EAN (ajout manuel via Bloc B, import CSV via Bloc
 - Product Owner (décide format CSV, règles validation EAN, arbitrage strictness vs adoption)
 - Équipe Frontend (page Campagne 3 blocs, grille paginée, popup, drapeau isDirty, FAQ accordion, composant wizard partagé)
 - Équipe Backend (endpoints campagne + EAN bulk, validation JSR-303 anti-XSS)
-- Data team (perf DELETE+bulk insert, index composé `(fk_campagne, ean)`, monitoring queries)
+- Data team (perf DELETE+bulk insert, index composé `(fk_compagne, ean)`, monitoring queries)
 - Sécurité (sanitization libellé XSS, politique escape rendu)
 - Utilisateurs marketing (UX page, taux de rejet CSV réel)
 
@@ -324,7 +332,7 @@ Trois causes d'échec probables identifiées par le PO :
 | Façon de saboter | Défense |
 |---|---|
 | Aucun warning sur close/refresh avec données non sauvegardées | **BR-26** intégré : `beforeunload` + `useBlocker` + dialog confirm si `isDirty == true` |
-| Pas d'index DB sur `(fk_campagne, ean)` → bulk insert full scan | **BR-27** intégré : `CREATE INDEX idx_ean_campagne_ean ON ean(fk_campagne, ean);` (user a confirmé "c'est fait", à vérifier dans schema scaffold) |
+| Pas d'index DB sur `(fk_compagne, ean)` → bulk insert full scan | **BR-27** intégré : `CREATE INDEX idx_ean_campagne_ean ON ean(fk_compagne, ean);` (user a confirmé "c'est fait", à vérifier dans schema scaffold) |
 | Page ne sauvegarde rien jusqu'à fermeture utilisateur | **BR-22/23** intégrés : Suivant + Sauvegarder-et-quitter déclenchent persistance complète. In-memory uniquement INTRA-page (pas de Save automatique). |
 
 ## Items intégrés post-élicitation

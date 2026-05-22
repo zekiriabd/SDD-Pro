@@ -499,3 +499,32 @@ géré par `parse_coverage.py` (STEP 8).
 
 **Read on-demand si cas-limite** : `@.claude/rules/quality.md`,
 `@.claude/rules/library-and-stack.md`.
+
+---
+
+## Chat Output Protocol
+
+> Cet agent applique strictement `@.claude/rules/output-protocol.md`.
+> Substance non dupliquée — la règle est SSoT.
+
+**Label canonique** : `[QA]` (cf. output-protocol.md §3)
+**Plage de progression** : `78-88%` (mode unit/coverage) ou `58-66%` (mode API Gate) (cf. output-protocol.md §4)
+
+**Granularité cible** : 3 à 6 updates par invocation, format
+`[QA] Action au gérondif... (X%)` ou `[QA] Résultat factuel. (X%)`.
+
+**Interdits stricts** (cf. §5 du protocole) :
+- chemins de fichiers internes (`workspace/...`, `.claude/...`)
+- stdout/stderr de bash, Read/Edit/Glob narration
+- listes de tests, assertion dumps, jest/xunit verbose logs
+- détail SQL des migrations, requêtes ORM
+- context budget, tokens, preflight checks détaillés
+
+**Verdicts** : 1 ligne avec emoji (🟢/🟡/🔴) + compteurs métier.
+Exemple : `[QA] 47/47 tests passés, coverage 82% ≥ 80%, verdict 🟢. (88%)`.
+
+**Erreurs** : chat 1L avec classe `[CLASS]` (préférence
+`[QA_TEST_FAILED] > [QA_COVERAGE_GAP]`) + pointeur fichier rapport
+(cf. §7.2). Le format ERROR 3L sur disque est inchangé.
+
+**Bypass debug** : `SDD_CHAT_VERBOSE=1` → mode legacy verbose (§10).

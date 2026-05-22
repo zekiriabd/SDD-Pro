@@ -11,6 +11,20 @@
 > **Combo cible** : C2 — `kotlin-spring-boot × react × shadcn ×
 > kotlin-junit + node-vitest × azure-ad × postgres × ddd`.
 
+> ## ⚠️ Périmètre de mesure (à lire AVANT d'exécuter)
+>
+> Ce bench mesure la **génération de code depuis spec figée + mockups HTML
+> statiques**. Il NE mesure PAS l'adéquation UI/UX réelle, les bugs
+> post-déploiement, la perf en charge, ni le cycle de vie produit complet.
+>
+> Toute valeur reportée dans `roi-baseline.md` §3 FEAT M doit être suffixée
+> du label `[scope: code-gen from fixed spec]`. Les ratios humain/framework
+> ne doivent **jamais** être extrapolés en "gain produit total" (sinon
+> risque R2 — claim ROI surévalué — resurgit à la première démo critique).
+>
+> Détail complet : `@.claude/docs/roi-baseline.md` callout "Périmètre de
+> mesure (anti-R2)".
+
 ---
 
 ## J1 matin (2 h) — Préparation FEAT et mockups
@@ -314,7 +328,12 @@ Remplir **uniquement** la cellule FEAT M C2 :
 ```markdown
 ## 3. FEAT M — Moyen
 
-### 3.1 Baseline humaine
+> **Scope mesuré** : `[code-gen from fixed spec]` — FEAT M template + 3
+> mockups HTML statiques + DDL postgres seed. NE PAS extrapoler ces
+> ratios en "gain produit total" (cf. callout "Périmètre de mesure
+> (anti-R2)" en tête de ce fichier).
+
+### 3.1 Baseline humaine `[code-gen from fixed spec]`
 | Métrique | Valeur |
 |---|---:|
 | Heures-homme | X.X h |
@@ -324,7 +343,7 @@ Remplir **uniquement** la cellule FEAT M C2 :
 | Quality issues (serious+) | X |
 | Bugs review (1 h indep) | N (critical: M) |
 
-### 3.2 Framework (3 runs, combo C2 Kotlin/React)
+### 3.2 Framework (3 runs, combo C2 Kotlin/React) `[code-gen from fixed spec]`
 | Run | Wall-clock | Tokens input | Tokens output | Tokens cache | Coût $ |
 |---|---:|---:|---:|---:|---:|
 | Run 1 | XX min | XXX | XXX | XXX | $XX |
@@ -333,7 +352,7 @@ Remplir **uniquement** la cellule FEAT M C2 :
 | **Médiane** | XX min | XXX | XXX | XXX | $XX |
 | **Variance** | X.X % | X.X % | X.X % | X.X % | X.X % |
 
-### 3.3 Verdict comparatif
+### 3.3 Verdict comparatif `[code-gen from fixed spec]`
 | Métrique | Humain | Framework (médiane) | Ratio | Verdict |
 |---|---:|---:|---:|---|
 | Wall-clock | X.X h | X.X h | XX× | 🟢/🟡/🔴 |
@@ -343,7 +362,11 @@ Remplir **uniquement** la cellule FEAT M C2 :
 | Quality issues | X | X | XX× | 🟢/🟡/🔴 |
 | Bugs review | X | X | +/- N | 🟢/🟡/🔴 |
 
-**Verdict global FEAT M Kotlin** : 🟢 / 🟡 / 🔴
+**Verdict global FEAT M Kotlin** `[scope: code-gen from fixed spec]` : 🟢 / 🟡 / 🔴
+
+> Rappel publication : phrase autorisée *« sur la génération de code conforme
+> à une spec figée, framework ≤ humain / N »*. Phrase **interdite** : ~~« le
+> framework remplace un dev senior pour livrer un produit en prod »~~.
 
 > Cellules FEAT S et FEAT L : non mesurées (décision audit 2026-05-20 —
 > 1 cellule mesurée > 6 cellules bâclées). À benchmarker en v7.1+.
@@ -400,22 +423,33 @@ n'est pas prêt pour la communication "ROI mesuré".
 
 ## Résultat attendu publication finale
 
-Une **release note rc1** d'une page contenant :
+Une **release note rc1** d'une page contenant (formulation calibrée
+anti-R2) :
 
 > *« SDD_Pro v7.0.0-rc1 — FEAT-Driven Development pour Claude Code,
-> stack Kotlin Spring Boot + React + shadcn (production-ready).
+> validé sur combo C2 Kotlin Spring Boot + React + shadcn pour la
+> génération de code depuis spec figée.
 >
-> ROI mesuré sur FEAT M (workflow métier, 3 US, 10 AC) :
-> - Wall-clock médian : YY min (vs X h humain → ratio NN×)
+> ROI mesuré sur FEAT M `[scope: code-gen from fixed spec]`
+> (workflow métier, 3 US, 10 AC, mockups HTML + DDL postgres seed) :
+> - Wall-clock médian : YY min (vs X h dev senior codant la même spec
+>   sans IA → ratio NN×)
 > - Coût médian : $X.XX (vs $YYY humain → ratio MM×)
 > - AC verified : ZZ % du premier coup (sans correction Tech Lead)
 > - Variance 3 runs : ±N % (σ wall-clock)
 >
-> Stack .NET disponible sans bench (extrapolation conservatrice).
-> Autres stacks (Vue/Angular/Blazor) marqués `experimental`,
-> non garantis production. Voir docs/validated-combos.md. »*
+> **Hors scope mesuré** : adéquation UI/UX réelle, bugs post-déploiement,
+> perf en charge, cycle de vie produit. Le bench qualifie le gain sur la
+> phase code-generation isolée, qui reste load-bearing dans un cycle
+> produit mais ne remplace pas un dev senior end-to-end.
+>
+> Stack .NET disponible (combo C1) sans bench mesuré — extrapolation
+> conservatrice à confirmer en v7.1. Autres stacks (Vue/Angular/Blazor/
+> FastAPI/Express) marqués `experimental`, non validés bout-en-bout. Voir
+> `docs/validated-combos.md`. »*
 
-**C'est ça l'argument produit.** Tout le reste de l'audit attend cette phrase.
+**C'est ça l'argument produit honnête.** Tout le reste de l'audit attend
+cette phrase calibrée.
 
 ---
 

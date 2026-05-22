@@ -4,7 +4,11 @@
   "category": "qa",
   "schemaVersion": 1,
   "buildSystem": "dotnet",
-  "$comment": "v7.0.0 audit P0 §6.2 — opt-in mutation testing stack (default MutationTestingMode: off). NOTE buildSystem='dotnet' est nominal — ce catalogue est en réalité multi-runtime, le tool effectif est sélectionné par qa.md STEP 8.5 selon le stack backend actif (Stryker.NET / Stryker.js / mutmut / Pitest). Not installed by arch — Tech Lead invokes tool manually (cf. stacks/qa/mutation-testing.md §2 installation).",
+  "$comment": "v7.0.0 audit P0 §6.2 — opt-in mutation testing stack (default MutationTestingMode: off). NOTE buildSystem='dotnet' est nominal — ce catalogue est en réalité multi-runtime, le tool effectif est sélectionné par qa.md STEP 8.5 selon le stack backend actif (Stryker.NET / Stryker.js / mutmut / Pitest). Not installed by arch — Tech Lead invokes tool manually (cf. stacks/qa/mutation-testing.md §2 installation). core=[] est INTENTIONNEL et tracé via metadata.manualInstall=true (cf. validate_libs_catalog.py qui WARN sur core=[] sauf si ce flag est posé).",
+  "metadata": {
+    "manualInstall": true,
+    "manualInstallRationale": "Multi-runtime stack (Stryker.NET/.js/Vitest, mutmut, Pitest). Le runtime cible n'est connu qu'à l'instant où qa.md STEP 8.5 inspecte le stack backend actif. arch Phase A ne peut pas pré-installer sans surinstaller des outils inutiles. Cf. stacks/qa/mutation-testing.md §2."
+  },
   "manifest": {
     "files": [
       "workspace/output/src/{BackendName}.Tests/{BackendName}.Tests.csproj",

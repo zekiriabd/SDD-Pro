@@ -37,12 +37,13 @@ supprimer ligne ET régénérer les US. `Covers` réfèrent par valeur.
 
 ---
 
-## 3. Commandes (10 user-facing + 8 internes [debug])
+## 3. Commandes (11 user-facing + 8 internes [debug])
 
 **User-facing** (orchestrantes, gèrent pré-conditions et idempotence) :
 
 | Commande | Phase | Rôle |
 |---|---|---|
+| `/sdd-bootstrap` | 0 | Init projet greenfield (génère stack.md + workspace/) |
 | `/feat-generate [Nom]` | 1 | Cadrage FEAT + bootstrap constitution |
 | `/feat-validate {n} [--json]` | 2.6 | Implementation Readiness Gate |
 | `/sdd-full {n}` | 2→5 | Pipeline complet A→Z |
@@ -50,7 +51,7 @@ supprimer ligne ET régénérer les US. `Covers` réfèrent par valeur.
 | `/qa-generate {n}` | 5 | Tests + coverage + quality scan |
 | `/sdd-review {n}` | audit | Audit consolidé (style Sonar, bloquant RED) |
 | `/sdd-status [{n}]` | diagnostic | État pipeline (read-only) |
-| `/sdd-discover-stack` | onboarding | Scan repo → `stack.md.candidate` |
+| `/sdd-discover-stack` | onboarding | Scan repo brownfield → `stack.md.candidate` |
 | `/sdd-serve` | runtime | Backend + front + console parallèle (ex-`/sdd-run`) |
 | `/sdd-kill-server` | runtime | Arrête backend + front + console (pendant de `/sdd-serve`) |
 
@@ -80,9 +81,14 @@ ces commandes sont stables mais réservées au troubleshooting ciblé) :
 
 ## 5. Règles & Templates
 
-`.claude/rules/` (7 fichiers, 5 actives + 2 annexes) :
+`.claude/rules/` (8 fichiers, 6 actives + 2 annexes) :
 - **5 règles consolidées v7.0.0** : `build-and-loop`, `quality`,
   `ownership`, `library-and-stack`, `error-classification`
+- **1 protocole chat** : `output-protocol.md` (executive chat output —
+  1L par update `[AGENT] résumé (X%)`, suppression logs/tool-calls,
+  ERROR 3L disque préservé) — complété par output-style
+  `.claude/output-styles/sdd-executive.md` (Claude main loop) et
+  statusline `sdd_admin.statusline` (vue permanente bas-écran)
 - **1 hoist cross-agent** : `dev-shared-preflight.md` (STEP 0-1.bis
   partagés dev-backend / dev-frontend)
 - **1 stub héritage** : `error-classification-legacy.md` (préfixes
@@ -120,10 +126,11 @@ ces commandes sont stables mais réservées au troubleshooting ciblé) :
 
 ## 7. Conventions strictes
 
-Anti-derive, format ERROR 3 lignes, idempotence, lecture sélective,
-parallélisme borné (`MaxParallel: 3`), plan inline, CLAUDE.md par projet,
-capabilities core vs on-demand, chat output minimal, gates manuels opt-in.
-Détail : `@.claude/docs/conventions.md §1-§13`.
+Anti-derive, format ERROR 3 lignes (sur disque), idempotence, lecture
+sélective, parallélisme borné (`MaxParallel: 3`), plan inline, CLAUDE.md
+par projet, capabilities core vs on-demand, **chat output executive**
+(1L `[AGENT] résumé (X%)` — cf. `@.claude/rules/output-protocol.md`),
+gates manuels opt-in. Détail : `@.claude/docs/conventions.md §1-§13`.
 
 ---
 
@@ -136,8 +143,12 @@ déterministiquement v7.0.0 (ADR `governance-major-config-ssot`).
 
 ## 9. Démarrage rapide
 
-1. Éditer `workspace/input/stack/stack.md` (`## Project Config`,
-   `## Active Database`, `## Active Auth Specs`).
+0. **(Greenfield seulement)** `python bootstrap.py` depuis la racine du
+   repo — génère `workspace/input/stack/stack.md` + squelette workspace
+   (interactif, ~5 questions). Brownfield : `/sdd-discover-stack` à la
+   place. Détails : `/sdd-bootstrap`.
+1. Éditer `workspace/input/stack/stack.md` pour ajuster (secrets DB,
+   tenant Azure AD, ports si besoin).
 2. `/feat-generate Auth` — répondre aux 3-6 questions.
 3. (Optionnel) déposer mockups HTML dans `workspace/input/ui/`.
 4. `/sdd-full 1` — pipeline complet.

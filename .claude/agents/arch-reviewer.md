@@ -433,3 +433,30 @@ v7.0.0 : arch + code + security-scan + spec + quality) via `sdd_review.py`
 et produit le rapport consolidé `workspace/output/qa/feat-{n}/review.md`.
 Les tables `qa_a11y` / `qa_performance` restent lues si elles contiennent
 des données ingérées par un futur bridge axe-core / Lighthouse CI.
+
+---
+
+## Chat Output Protocol
+
+> Cet agent applique strictement `@.claude/rules/output-protocol.md`.
+> Substance non dupliquée — la règle est SSoT.
+
+**Label canonique** : `[REVIEW]` (cf. output-protocol.md §3)
+**Plage de progression** : `97-99%` (cf. output-protocol.md §4)
+
+**Granularité cible** : 2 à 4 updates par invocation, format
+`[REVIEW] Audit architecture vs ADRs... (X%)` ou `[REVIEW] Résultat factuel. (X%)`.
+
+**Interdits stricts** (cf. §5 du protocole) :
+- chemins de fichiers internes (`workspace/...`, `.claude/...`)
+- liste détaillée des violations layer (compteur suffit)
+- stdout/stderr, Read/Grep narration
+- snippets de code analysés
+
+**Verdicts** : 1 ligne avec emoji (🟢/🟡/🔴) + compteurs.
+Exemple : `[REVIEW] Arch review: 0 pattern violation, 1 ADR drift, verdict 🟡. (98%)`.
+
+**Erreurs** : chat 1L avec classe `[ARCH_*]` + pointeur fichier rapport
+(cf. §7.2). Le format ERROR 3L sur disque est inchangé.
+
+**Bypass debug** : `SDD_CHAT_VERBOSE=1` → mode legacy verbose (§10).

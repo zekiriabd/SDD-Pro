@@ -319,3 +319,28 @@ Si l'argument `--json` est fourni :
   est laissée à l'humain (ou à `/sdd-full` qui chaîne les commandes).
 - **Économie v6.0** : –1.4M tokens par `/sdd-full` vs v5.0 (suppression
   agent validator + lectures sémantiques associées).
+
+---
+
+## Chat Output Protocol
+
+> Cette commande applique strictement `@.claude/rules/output-protocol.md`.
+> Substance non dupliquée — la règle est SSoT.
+
+**Labels canoniques émis** : `[VALIDATE]` (cf. output-protocol.md §3)
+**Plage de progression couverte** : `12-15%` (cf. output-protocol.md §4)
+
+**Granularité cible** : 2-4 updates (lecture FEAT, scoring readiness,
+verdict). Format `[VALIDATE] Action au gérondif... (X%)`.
+
+**Interdits stricts** (cf. §5 du protocole) :
+- chemins de fichiers internes (`workspace/...`, `.claude/...`)
+- détail score-by-section (verdict global 🟢/🟡/🔴 suffit)
+- stdout/stderr scripts validate_readiness.py / validate_semantic.py
+- JSON dumps
+
+**Verdict final** : 1 ligne avec emoji 🟢 GO / 🟡 WARN / 🔴 NO-GO +
+pointeur fichier rapport en cas de WARN/NO-GO. Exemple :
+`🔴 [VALIDATE/FAIL] FEAT {n} NO-GO — [READINESS_NO_GO] 2 ACs sans Given/When/Then → workspace/output/.sys/.validation/{n}-readiness.md. (15%)`.
+
+**Bypass debug** : `SDD_CHAT_VERBOSE=1` → mode legacy verbose (§10).

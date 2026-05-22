@@ -2,9 +2,9 @@
 
 > §2.4 (Librairies) regeneree depuis `maui.libs.json` — ne pas editer manuellement (`python .claude/python/sdd_admin/sync_stack_md.py --stack-id maui`).
 
-Status: Draft  
-Validation: 🟡 experimental (combo non valide end-to-end dans SDD_Pro v6)  
-Tech FEAT ID: tech-maui  
+Status: Draft
+Validation: 🟡 experimental (combo non valide end-to-end dans SDD_Pro v6)
+Tech FEAT ID: tech-maui
 Scope: **mobile cross-platform** — application **.NET MAUI 9** (Multi-platform App UI) dans UN seul projet `{AppName}/`. Single codebase C# / XAML qui cible iOS + Android (+ macOS Catalyst + Windows en option). UI MAUI + MVVM + acces APIs natives + auth vivent dans le meme `.csproj`. Pas de separation `{BackendName}` / `{LibName}`.
 
 > **Backend separe** : ce stack est PUREMENT client mobile. Il consomme une API backend distincte declaree en `## Active Tech Specs` (ex. `backend/dotnet-minimalapi.md`, `backend/node-express.md`). Pour un app purement client → Microsoft Graph / Azure Mobile Apps / BaaS via env vars.

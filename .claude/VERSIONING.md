@@ -236,4 +236,4 @@ documenter ce qui a déclenché cette politique.
 
 - `@.claude/CHANGELOG.md` — historique versions (à compléter rétroactivement pour combler le gap v6.9 → v6.10.4)
 - `@.claude/MIGRATION.md` — guide migration entre versions majeures
-- `@.claude/rules/constitution.md §4` — format ADR (la gouvernance MAJOR/MINOR adopte le même format)
+- `@.claude/rules/ownership.md` Partie B §4 — format ADR (la gouvernance MAJOR/MINOR adopte le même format ; fusionné depuis `constitution.md` au merge v7.0.0)

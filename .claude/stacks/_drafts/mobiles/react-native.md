@@ -2,9 +2,9 @@
 
 > §2.4 (Librairies) regeneree depuis `react-native.libs.json` — ne pas editer manuellement (`python .claude/python/sdd_admin/sync_stack_md.py --stack-id react-native`).
 
-Status: Draft  
-Validation: 🟡 experimental (combo non valide end-to-end dans SDD_Pro v6)  
-Tech FEAT ID: tech-react-native  
+Status: Draft
+Validation: 🟡 experimental (combo non valide end-to-end dans SDD_Pro v6)
+Tech FEAT ID: tech-react-native
 Scope: **mobile cross-platform** — application React Native via **Expo SDK 52** dans UN seul projet `{AppName}/`. UI React Native + state + navigation + acces APIs natives + auth vivent dans le meme projet TypeScript. Pas de separation `{BackendName}` / `{LibName}`. Cible iOS + Android (+ Web optionnel via Expo Web).
 
 > **Backend separe** : ce stack est PUREMENT client mobile. Il consomme une API backend distincte declaree en `## Active Tech Specs` (ex. `backend/node-express.md`, `backend/dotnet-minimalapi.md`). Pour un app monolithe sans backend distinct → utiliser un Backend-as-a-Service (Supabase, Firebase, Appwrite) configure via env vars.

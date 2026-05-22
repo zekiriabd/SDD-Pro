@@ -18,6 +18,25 @@ Format : [version] — date courte. Sections : `Breaking`, `Added`, `Changed`, `
 
 ---
 
+## [Unreleased — v7.0.0-alpha] — 2026-05-22 (templates SSoT consolidation)
+
+### Changed — Stack template déplacé vers framework templates dir
+
+- **`workspace/input/stack/stack.md.template`** → **`.claude/templates/stack.md.template`**.
+  Cohérence avec les autres templates framework (adr, feat, us, constitution,
+  readiness, postmortem, ci-quality, etc.) tous regroupés dans
+  `.claude/templates/`. `workspace/input/` reste réservé aux **inputs
+  utilisateur** (stack.md résolu, feats/, ui/), pas aux templates framework.
+- Callers patchés :
+  - `bootstrap.py:62` — `STACK_TEMPLATE` pointe vers `.claude/templates/stack.md.template`
+  - `.github/workflows/nightly-e2e.yml` — étapes E2E utilisent le template
+    via le `cp -r .claude` recursive (cp explicite supprimé, redondant)
+  - `workspace/input/stack/stack.md` (header note) — pointer mis à jour
+- Aucun agent ou commande ne référençait directement le path templatisé
+  (tous utilisaient le résolu `workspace/input/stack/stack.md`).
+
+---
+
 ## [Unreleased — v7.0.0-alpha] — 2026-05-21 (audit follow-up, in-session fixes)
 
 > **Session** : audit interne CTO 2026-05-21 (suite à audit Codex 2026-05-20)

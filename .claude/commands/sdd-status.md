@@ -146,3 +146,28 @@ Pipeline complet. Inspecter workspace/output/src/ pour le code généré.
 - **Pas de coût agent** — uniquement Glob et formatage.
 - **Pas de référence aux tâches techniques** — la phase TASKS n'existe
   plus en v2 (les agents dev planifient inline depuis l'US).
+
+---
+
+## Chat Output Protocol
+
+> Cette commande applique strictement `@.claude/rules/output-protocol.md`.
+> Substance non dupliquée — la règle est SSoT.
+
+**Labels canoniques émis** : `[ANALYSIS]` (label diagnostic read-only)
+**Plage de progression couverte** : `0-100%` (snapshot, pas progression
+réelle — affichage tree ASCII compact en 1 passe)
+
+**Granularité cible** : sortie déterministe 1 passe. Pas de chunking
+multi-update. Format final = tree ASCII compact lisible (cf. règles
+existantes de la commande) sans préfixe `[ANALYSIS]` (sortie tabulaire
+considérée comme "rendu" plutôt que "log de progression").
+
+**Interdits stricts** (cf. §5 du protocole) :
+- pas d'invocation d'agent ni de tool log
+- pas de stdout/stderr de bash autre que le tree final
+- pas de "Reading…", "Globbing…" avant le rendu
+
+**Erreurs** : si Glob échoue → 1 ligne `🔴 [ANALYSIS/FAIL] {résumé}.`.
+
+**Bypass debug** : `SDD_CHAT_VERBOSE=1` → mode legacy verbose (§10).

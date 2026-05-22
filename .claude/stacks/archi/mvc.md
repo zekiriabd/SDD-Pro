@@ -1,8 +1,8 @@
 # ARCHI_MVC
 
-Status: Reference  
-Validation: 🟢 reference (utilisé en defaut implicite pour les 4 backends SDD_Pro depuis l'origine — extrait en archi/ canonique 2026-05-16)  
-Pattern ID: archi-mvc  
+Status: Reference
+Validation: 🟢 reference (utilisé en defaut implicite pour les 4 backends SDD_Pro depuis l'origine — extrait en archi/ canonique 2026-05-16)
+Pattern ID: archi-mvc
 Scope: **pattern d'architecture backend** — Model-View-Controller layered. S'applique aux stacks `backend/*.md` lorsque `ArchiPattern: MVC` (défaut implicite si `## Active Architecture Pattern` absent). Ne s'applique PAS aux `fullstack/*` ni aux `mobiles/*` qui ont leur propre architecture documentée par stack.
 
 ---

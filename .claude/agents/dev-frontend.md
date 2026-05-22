@@ -107,13 +107,27 @@ Comparer le `stack-md-hash` de la frontmatter avec le sha256 actuel de
 
 `Read HTML_PATH` → contenu ajouté comme **texte** (HTML = texte structuré, pas vision).
 
-**Prééminence en cas de divergence** :
+**Prééminence en cas de divergence** (révisée 2026-05-22) :
 - **HTML > stack §2/§7** sur visuel (libellés, ordre, structure zones,
-  classes CSS, couleurs)
-- **Stack UI §2/§7 > HTML** sur sémantique (mapping vers primitives DS).
-  HTML brut = **structure source** ; markup final = composants DS natifs
-  (RadzenDataGrid, Button shadcn, v-data-table) jamais primitives HTML
-  brutes (sauf wrappers layout autorisés).
+  classes CSS, couleurs) ET sur **layout/containers**.
+- **§7.0 du stack UI actif est SOUVERAINE** sur la décision « HTML
+  natif vs composant DS ». Lecture obligatoire AVANT toute traduction
+  élément par élément. Règle canonique :
+  - **Containers de layout/positionnement** (`<nav>`, `<header>`,
+    `<aside>`, `<main>`, `<footer>`, `<section>`, `<div>` portant
+    `display:flex`/`grid`/`position`, `padding`, `gap`, `border`,
+    `box-shadow`, `background`) → **HTML verbatim** + CSS du mockup
+    porté dans `.razor.css` adjacent. **JAMAIS** mappés vers
+    `RadzenLayout`/`RadzenSidebar`/`RadzenHeader`/`RadzenMenu`.
+  - **Éléments de contenu fonctionnel** (formulaires riches, grilles
+    de données, dialogs, dropdowns data-driven, validation) →
+    composant DS natif (`RadzenDataGrid`, `RadzenDropDown`,
+    `RadzenTextBox`, `DialogService`, …).
+  - **Éléments visuels simples** (boutons icône cosmétiques, SVG
+    inline du mockup, liens nav, sélecteurs custom du mockup) →
+    HTML verbatim + CSS mockup, **PAS** de wrapping Radzen.
+- **Tables §7.bis du stack UI = référence rapide pour le contenu
+  uniquement**, subordonnées à §7.0 (containers exclus).
 - **US > tout** sur workflow (validation, navigation, affichage conditionnel)
 
 ### 4.2 Configuration auth consommée par le code généré
@@ -180,25 +194,65 @@ silencieux ; structure du plan ; anti-derive plan).
 
 ### 6.1 Analyse du HTML mockup (spécifique frontend)
 
+> ⚠️ **Lire d'abord §7.0 du stack UI actif** (règle souveraine
+> 2026-05-22 : containers HTML verbatim, contenu DS). Les points 1-2
+> ci-dessous sont **subordonnés** à §7.0 du stack UI.
+
 À partir de US + HTML mockup (si présent) + stacks frontend/UI actifs :
 
-1. **Zones layout** (header, sidebar, main, footer, cards) → layout DS.
-2. **Éléments interactifs/structurels** → composant DS via stack §7 :
-   - `<table>` → `RadzenDataGrid` / `<v-data-table>` / `<Table>` shadcn
-   - `<button>` → `RadzenButton` / `<v-btn>` / `<Button>`
-   - `<input type="text">` → `RadzenTextBox` / `<v-text-field>` / `<Input>`
-   - `<select>` → `RadzenDropDown` / `<v-select>` / `<Select>`
-   - `<form>` → `RadzenTemplateForm` / `<v-form>` / form natif shadcn
-   - `<a>` navigation → `RadzenLink` / `<router-link>` / `<NavigationMenuItem>`
+1. **Containers de layout / positionnement** (`<nav>`, `<header>`,
+   `<aside>`, `<main>`, `<footer>`, `<section>`, `<div>` portant
+   `display:flex`/`grid`/`position`, `padding`, `gap`, `border`,
+   `box-shadow`, `background`) → **HTML verbatim** + CSS mockup
+   porté dans `.razor.css` adjacent (ou `.module.css` / SFC `<style
+   scoped>` selon stack). **JAMAIS** remplacés par `RadzenLayout`/
+   `RadzenSidebar`/`RadzenHeader`/`RadzenMenu` / `<v-app-bar>` /
+   layout shadcn équivalent. Les classes mockup
+   (`.brand`, `.menu`, `.submenu`, `.stepper`, `.step`, `.country`,
+   `.right`, `.icon-btn`, …) sont **préservées** comme vocabulaire
+   CSS du composant.
+2. **Éléments de contenu fonctionnel** (à l'intérieur des containers)
+   → composant DS via stack §7 (test d'arbitrage §7.0.3 du stack UI) :
+   - `<table>` riche (tri/filtre/pagination) → `RadzenDataGrid` /
+     `<v-data-table>` / `<Table>` shadcn
+   - `<input type="text">` (form contrôlé, validation) → `RadzenTextBox`
+     / `<v-text-field>` / `<Input>`
+   - `<select>` data-driven → `RadzenDropDown` / `<v-select>` / `<Select>`
+   - `<form>` (validation) → `RadzenTemplateForm` / `<v-form>` / form shadcn
    - `<dialog>`/modal → `DialogService` (Radzen) / `<v-dialog>` / `<Dialog>`
-3. **Libellés** verbatim — IDENTIQUES dans markup généré.
-4. **Couleurs** `style="..."` ou `<style>` → overrides theme global.
-5. **Icônes** (inline, `.fa-*`, `.mdi-*`, `.lucide-*`, `<svg>`) → pack DS actif.
-6. **Assets non-icône** (logo, illustration) → placeholders `<img data-ui-asset="{role}" ...>`.
+   - `<button>` action **complexe** (submit form, dialog trigger,
+     binding state) → `RadzenButton` / `<v-btn>` / `<Button>`
+3. **Éléments visuels simples** (boutons d'icône cosmétiques avec
+   SVG inline du mockup, liens nav, toolbar buttons, sélecteurs custom
+   stylés par le mockup) → **HTML verbatim** (`<button>`, `<a>`)
+   + classes mockup. **PAS** de wrapping Radzen/Vuetify/shadcn —
+   le styling vient du CSS verbatim.
+4. **Libellés** verbatim — IDENTIQUES dans markup généré.
+5. **Couleurs** `style="..."` ou `<style>` → overrides theme global
+   + tokens CSS mockup préservés dans `.razor.css` / `theme.css`.
+6. **Icônes** (inline, `.fa-*`, `.mdi-*`, `.lucide-*`, `<svg>`) → SVG
+   verbatim du mockup conservé (pas de `RadzenIcon` wrapper sur SVG
+   inline existant — double rendering).
+7. **Assets non-icône** (logo, illustration) → placeholders
+   `<img data-ui-asset="{role}" ...>`.
+8. **Scoped CSS — co-location obligatoire (Blazor uniquement)** : pour
+   chaque composant `Foo.razor` qui consomme des classes non-token
+   (`.submenu`, `.brand`, `.btn`, `.field`, `.section-title`, …), un
+   fichier `Foo.razor.css` **adjacent** (même répertoire, même basename)
+   doit être planifié et porter ces classes. **JAMAIS** déclarer les
+   classes d'un composant dans le `.razor.css` d'une page parent qui
+   le consomme — scope hash différent, CSS jamais appliqué au runtime
+   (cf. `stacks/frontend/blazor-webassembly.md §3.7`).
 
 Fields plan frontend : `layer ∈ {Page | Component | Layout | Style |
 Config}` + `ds_components`, `source_html_elements`. Plan ajoute sections
 `## Theme overrides` et `## UI Assets pending`.
+
+**Vérification STEP build (Blazor)** : pour chaque `Components/Foo.razor`
+généré, grep classes consommées (`class="\.\.\."`) et vérifier présence
+dans `Components/Foo.razor.css` adjacent (hors tokens `:root` qui vivent
+dans `wwwroot/css/theme.css`). Écart → créer/compléter le `.razor.css`
+adjacent avant déclarer l'US livrée.
 
 ### 6.2 Sections additionnelles du plan frontend
 
@@ -441,3 +495,47 @@ le code."* Le code généré est une cible, jamais une source.
 > tous les libellés et composants attendus sont présents. Le backend,
 > la FEAT, les autres US — rien de tout ça n'existe pendant que je
 > génère ce code client."*
+
+---
+
+## Chat Output Protocol
+
+> Cet agent applique strictement `@.claude/rules/output-protocol.md`.
+> Substance non dupliquée — la règle est SSoT.
+
+**Label canonique** : `[DEV-FRONTEND]` (cf. output-protocol.md §3)
+**Plage de progression** : `66-78%` (cf. output-protocol.md §4)
+
+**Granularité cible** : 3 à 6 updates par invocation, format
+`[DEV-FRONTEND] Action au gérondif... (X%)` ou `[DEV-FRONTEND] Résultat factuel. (X%)`.
+
+**Interdits stricts** (cf. §5 du protocole) :
+- chemins de fichiers internes (`workspace/...`, `.claude/...`)
+- noms de classes/méthodes/composants générés
+- stdout/stderr de bash, Read/Edit/Glob narration
+- context budget, tokens, preflight checks détaillés
+- diffs, snippets, lignes de code
+
+**Itérations `build_loop`** : chaque retry visible via suffixe
+`[DEV-FRONTEND/FIXING] Correction erreur build (iter X/N)... (Y%)`
+sans progression du `%` (cf. §8.1).
+
+**Fidelity check** : 1 ligne post-build de type
+`[DEV-FRONTEND] Fidélité HTML→UI: 18/18 libellés présents. (Y%)`.
+
+**Erreurs (LOAD-BEARING)** : tout bloc `ERROR: ... / CAUSE: ... / FIX: ...`
+apparaissant dans les STEPs ci-dessus est un **TEMPLATE pour le fichier
+rapport disque**, JAMAIS un texte à émettre verbatim en chat.
+
+Procédure obligatoire à chaque émission d'erreur :
+1. **Disque** : écrire le bloc 3-lignes complet dans le fichier rapport
+   approprié — format préservé pour `build_loop`/hooks/dashboards
+   (cf. `error-classification.md §2`).
+2. **Chat** : émettre UNE SEULE ligne compressée :
+   ```
+   🔴 [{LABEL}/FAIL] {résumé court} — [CLASS] {détail 1L} → {rapport.md}. ({X}%)
+   ```
+   Pas de chemin absolu, pas de stack trace, pas de blocs multi-lignes.
+pour `build_loop` et hooks — cf. `error-classification.md §2`).
+
+**Bypass debug** : `SDD_CHAT_VERBOSE=1` → mode legacy verbose (§10).
