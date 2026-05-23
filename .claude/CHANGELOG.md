@@ -18,6 +18,145 @@ Format : [version] — date courte. Sections : `Breaking`, `Added`, `Changed`, `
 
 ---
 
+## [v7.0.0] — 2026-05-23 (industrial publication — 10 audit blockers closed)
+
+> **Promotion v7.0.0-alpha → v7.0.0 GA.** Session d'audit CTO 2026-05-22→23
+> (fresh audit on sources, ignoring prior audit reports). **10 blockers
+> fermés** (3 critiques + 7 moyens) couvrant catalog drift, onboarding
+> greenfield cassé, output protocol non-enforced runtime, cross-platform
+> us-generate, lock exit codes, lock payload formats, ALLOWED_AGENTS
+> drift, smoke commands list incomplet, mutation-testing core=0,
+> mark_breaking exit ambigu (déjà fixé, audit-confirmé).
+>
+> **Validation runtime** : `framework_smoke.py --strict` 🟢 ~30 checks
+> verts (787 ms), pytest ~1080 tests verts (1 fail MCP `us_ops` pré-
+> existant, hors scope core pipeline, tracé en known issue),
+> `bootstrap.py --dry-run --combo c1` 🟢 flow greenfield validé.
+
+### Fixed — Audit blockers (10)
+
+#### #1 [CRITIQUE] Stack `kotlin-spring-boot` 🟢 reference — versions cohérentes
+- `.libs.json` épingle `kotlin: 2.3.21` + `spring-boot: 4.0.6` (versions
+  réelles au 2026-05). `.md` snippets §3 (curl init `bootVersion=`) +
+  §4 (`build.gradle.kts` plugins) re-alignés sur ces versions
+  (auparavant `bootVersion=3.4.0` + `kotlin("jvm") version "2.0.21"` —
+  drift entre catalog machine et snippets prose). Combo "validé bout-
+  en-bout CMS" désormais réellement buildable.
+
+#### #2 [CRITIQUE] Onboarding greenfield — `bootstrap.py` discoverable + auto-detection
+- `preflight.py` STEP A3 hint actionnable pointant vers `python bootstrap.py`
+  (au lieu de `STACK_MISSING` cryptique). Nouveau STEP A3.bis détecte
+  `{{Placeholder}}` non substitué dans `stack.md` (template brut copy-pasté
+  sans rendu) → `STACK_MALFORMED` clair avec FIX = `python bootstrap.py`.
+- **Nouvelle commande** `/sdd-bootstrap` (user-facing, Phase 0) — wrapper
+  documentaire pour `bootstrap.py` (interactif Python, ne peut pas tourner
+  dans sub-agent). Détecte état projet (greenfield/partial/initialisé/
+  template brut) et émet l'instruction terminal correspondante.
+- `/feat-generate` STEP 0 gate : refuse de générer une FEAT orpheline
+  si `stack.md` absent ou contient des placeholders, redirige vers
+  `python bootstrap.py`.
+- `CLAUDE.md §9` Step 0 explicite "(Greenfield only) python bootstrap.py".
+
+#### #3 [CRITIQUE] Output protocol enforced runtime
+- `.claude/settings.json` : ajout `"outputStyle": "sdd-executive"` à la
+  racine. Active `.claude/output-styles/sdd-executive.md` sur le Claude
+  main loop (auparavant la promesse "1L par update" v7.0.0 était prompt-
+  side uniquement chez les sub-agents — Claude orchestrateur narrait
+  encore les Read/Edit/Bash). La règle `rules/output-protocol.md` est
+  désormais appliquée par le harness sur toutes les surfaces texte.
+
+#### #4 [MOYEN] `/us-generate` cross-platform — single Python invocation
+- Remplace les variantes bash `sed -i` (GNU, absent natif Windows sans
+  Git Bash) et PowerShell `Set-Content -Encoding utf8` (écrit UTF-8
+  BOM sur Windows PowerShell 5.1, corrompant le frontmatter US) par
+  un Python one-liner via `python -c "..."` qui écrit `encoding='utf-8'`
+  sans BOM + `newline=''` préservant LF original + idempotent (re-exec
+  sur US déjà patchées = no-op). Aucune dépendance externe (sed/pwsh/Git
+  Bash).
+
+#### #5 [MOYEN] `acquire_libname_lock.py` exit 3 documenté côté caller
+- `rules/build-and-loop.md §2` table complétée :
+  exit `3` = erreur fichier (lib-path invalide, permission denied,
+  release sur lock d'un autre agent) → STOP + ERROR `[INFRA_BLOCKED]`
+  distinct de `[LIBNAME_LOCK_HELD]` (exit 1). Évite faux positifs
+  où un caller dev-* interprétait exit 3 comme lock conflict.
+
+#### #6 [MOYEN] `sdd_lib/file_locks.py::read_lock()` durci dual-format
+- Détecte les 2 formats de payload coexistant dans le framework :
+  `AGENT:TS_SECONDS` (2-parts, produit par `acquire_libname_lock.py`)
+  ET `PREFIX:PID:TS_MS` (3-parts, produit par `acquire_with_retry` +
+  Node console). Conversion ms→s automatique sur 3-parts (heuristique
+  `ts >= 1e12`). Garantit que la détection de stale lock fonctionne
+  quel que soit le writer (Python/Node). Smoke validé : `('py', 1748000000)`
+  ↔ `('dev-backend-1-2', 1748000000)`.
+
+#### #7 [MOYEN] `context_budget.py` — `CURRENT_AGENTS` séparé de `RETIRED_AGENTS_V7`
+- Split du whitelist monolithique `ALLOWED_AGENTS` (14 agents mixés) en
+  2 listes sémantiques : `CURRENT_AGENTS` (11 — actifs v7.0.0, alignés
+  avec `sdd_hooks.preflight_agent_budget.ALLOWED_AGENTS`) et
+  `RETIRED_AGENTS_V7` (3 — `dashboard`, `accessibility-auditor`,
+  `performance-auditor`, conservés pour read-side compat sur historique
+  console.db). `argparse choices=` utilise `CURRENT_AGENTS` → CLI
+  rejette désormais les agents retirés (consistent avec le hook).
+  Alias `ALLOWED_AGENTS` conservé v7.0→v7.1 pour callers externes.
+
+#### #8 [MOYEN] `framework_smoke.py` EXPECTED_COMMANDS complet (19)
+- Tableau monté de 13 → 19 commandes. Ajouts : `sdd-review`,
+  `sdd-discover-stack`, `sdd-serve`, `sdd-kill-server`, `sdd-profile`,
+  `sdd-bootstrap`. Structuré en 2 blocs commentés (11 user-facing + 8
+  internes) miroir de CLAUDE.md §3. Suppression accidentelle d'une de
+  ces commandes déclenchera désormais le smoke fail.
+- `PRINCIPAL_COMMANDS_FOR_CLAUDE_MD` ajoute `sdd-bootstrap` (entry point
+  greenfield).
+
+#### #9 [MOYEN] `qa/mutation-testing` core=0 — intent tracé
+- Ajout `metadata.manualInstall: true` + `manualInstallRationale`
+  (catalog est multi-runtime, target picked at runtime par qa STEP 8.5
+  selon stack backend actif — arch ne peut pas pré-installer sans sur-
+  installer). `validate_libs_catalog.py` émet désormais WARN
+  `[EMPTY_CORE]` sur tout catalog `core=[]` SAUF si `manualInstall=true`
+  est posé → catch accidentels, tolère intentionnels. Summary sortie
+  expose `ManualInstall: bool`.
+
+#### #10 [MOYEN] `mark_breaking_resolved.py` exit 0 ambigu — déjà fixé (audit-confirmé)
+- Audit vérifié zero caller actif `.claude/` utilise `&&`/`||` sur le
+  code retour. Migration v7.0.0 (0=SUCCESS marked/skipped/dryrun,
+  3=INFRA_BLOCKED) documentée dans `sdd_lib/exit_codes.py §19` et la
+  docstring du script. Discrimination via stdout `[OK]/[SKIP]/[DRY-RUN]`
+  ou env-export `SDD_MARK_BREAKING_ACTION`. 7 tests existants couvrent
+  l'invariant. Aucun code change requis.
+
+### Added — Nouvelles surfaces
+
+- **`/sdd-bootstrap`** : 11e commande user-facing, Phase 0. Wrapper
+  documentaire pour `python bootstrap.py` (interactif). Détection état
+  projet (greenfield/partial/initialisé/template brut) + instruction
+  terminal contextuelle.
+- **`output-styles/sdd-executive.md`** : enforced via `settings.json`
+  (cf. #3). Frontmatter `name: SDD Executive`, slug `sdd-executive`.
+- **`validate_libs_catalog.py`** : WARN `[EMPTY_CORE]` (cf. #9).
+- **`file_locks.py::read_lock()`** : support 3-part format avec ms→s
+  conversion (cf. #6).
+
+### Changed — Documentation
+
+- **CLAUDE.md §3** : `10 user-facing + 8 internes` → `11 user-facing + 8
+  internes`. Ajout ligne `/sdd-bootstrap` Phase 0. Re-libellé
+  `/sdd-discover-stack` "brownfield" pour distinguer du greenfield.
+- **CLAUDE.md §9** : Step 0 explicite "(Greenfield seulement) python
+  bootstrap.py" + pointer `/sdd-bootstrap` pour les options.
+- **`rules/build-and-loop.md §2`** : tableau exit codes
+  `acquire_libname_lock.py` complété (cf. #5).
+- **`stacks/backend/kotlin-spring-boot.md`** §3 (curl init) + §4
+  (build.gradle.kts plugins) : versions Kotlin/Spring Boot re-alignées
+  sur `.libs.json` (cf. #1).
+
+### Removed — N/A
+
+(aucun retrait dans cette release — promotion clean alpha→GA)
+
+---
+
 ## [Unreleased — v7.0.0-alpha] — 2026-05-22 (templates SSoT consolidation)
 
 ### Changed — Stack template déplacé vers framework templates dir
