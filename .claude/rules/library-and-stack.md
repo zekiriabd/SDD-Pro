@@ -153,12 +153,11 @@ Radix par capability), `vuetify`.
   `spring-security-oauth2-resource-server`, etc.) vivent dans le
   `.libs.json` du backend/frontend consommateur.
 - `qa/code-quality.md` : règles QA pures (seuils sonar-like).
-- `frontend/blazor-server` : **déplacé en `_drafts/fullstack/blazor-server.md` (v7.0.0 quarantine)**
-  — le pattern monolithique est incompatible avec l'isolation front/back du
-  scope `back-front` (cf. `ownership.md §1.bis`), et le scope `fullstack`
-  est en quarantine v7.0.0 (non chargé, cf. CLAUDE.md §6). Pour Blazor,
-  utiliser `frontend/blazor-webassembly` + un backend `.NET` séparé. Le `.libs.json`
-  compagnon a été régénéré dans `fullstack/`.
+- `fullstack/blazor-server` : 🟡 expérimental (chargeable mais jamais validé
+  bout-en-bout). Le pattern monolithique est incompatible avec l'isolation
+  front/back du scope `back-front` (cf. `ownership.md §1.bis`) ; à n'utiliser
+  qu'avec `AppType=fullstack` explicite. Pour stabilité maximale en Blazor,
+  préférer `frontend/blazor-webassembly` + un backend `.NET` séparé.
 
 ### Dé-duplication QA (post-mortem 2026-05-07)
 
@@ -630,7 +629,7 @@ ERROR: dev-backend {n}-{m} — CORS non configuré
 CAUSE: [SECURITY_CORS_MISSING] backend SPA-facing sans config CORS — toute requête front échouera
 FIX: ajouter Program.cs/CorsConfig.kt/main.py selon stack §2.{1..4}
      configurer CORS_ALLOWED_ORIGINS env var (csv des origins SPA dev + prod)
-HINT: cf. .claude/rules/cors.md §2 pour le pattern stack-aware
+HINT: cf. .claude/rules/library-and-stack.md (Partie B §2) pour le pattern stack-aware
 ```
 
 ---
@@ -646,17 +645,17 @@ implicite couvert par cette règle :
 > `Access-Control-Allow-Origin: X` et `Access-Control-Allow-Credentials: true`,
 > et la requête principale aboutit.
 
-À matérialiser dans la phase QA API Gate (cf. `backend-first.md §1.1`).
+À matérialiser dans la phase QA API Gate (cf. `build-and-loop.md` Partie A §1.1).
 
 ---
 
 ## 7. Lien avec autres règles
 
-- `backend-first.md` : la QA API Gate doit inclure ≥ 1 test CORS
+- `build-and-loop.md` (Partie A) : la QA API Gate doit inclure ≥ 1 test CORS
   preflight (OPTIONS avec Origin) par endpoint exposé à la SPA.
-- `source-first.md §1` : tout bug CORS en runtime → patch ce
-  `rules/cors.md` (si gap) AVANT le fix code.
-- `stack-completeness.md` : la lib CORS (Microsoft.AspNetCore.Cors,
+- `docs/principles/source-first.md §1` : tout bug CORS en runtime → patch
+  cette règle (Partie B, si gap) AVANT le fix code.
+- Partie A §2.4 ci-dessus : la lib CORS (Microsoft.AspNetCore.Cors,
   spring-security-config, fastapi[all], cors npm) est CORE de tout
   backend SPA-facing.
 

@@ -17,12 +17,12 @@
 |---|---|---|---|
 | **FEAT** | Spécification fonctionnelle d'une feature, fichier `workspace/input/feats/{n}-{Name}.md`. Porte les sections Functional Needs, Business Rules, Acceptance Criteria, Functional Deliverables, Actors, etc. | `templates/feat.template.md` | `feature`, `spec` |
 | **US** (User Story) | Découpe d'une FEAT en flux utilisateur. `workspace/output/us/{n}-{m}-{Name}.md`. 1-6 par FEAT max (cf. `docs/principles/us-granularity.md`). | `templates/us.template.md` | `story`, `user-story` |
-| **SFD-N** | *Specifiable Functional Deliverable* — ID stable d'une ligne `## Functional Needs` dans une FEAT. | `rules/constitution.md §2` | `Need-N`, `FN-N` |
+| **SFD-N** | *Specifiable Functional Deliverable* — ID stable d'une ligne `## Functional Needs` dans une FEAT. | `rules/ownership.md (Partie B §2)` | `Need-N`, `FN-N` |
 | **FD-N** | *Functional Deliverable* — ID stable d'une ligne `## Functional Deliverables` dans une FEAT. | idem | `Deliverable-N` |
 | **BR-N** | *Business Rule* — ID stable d'une ligne `## Business Rules` dans une FEAT. | idem | `Rule-N` |
 | **AC-N** | *Acceptance Criterion* — ID stable d'une ligne `## Acceptance Criteria` dans une FEAT ou une US. | idem | `Criterion-N`, `Test-N` |
 | **AC-UI-N** | AC spécifique à l'interface utilisateur (Given/When/Then orienté écran). | `agents/dev-frontend.md` | — |
-| **ADR** | *Architecture Decision Record* — fichier atomique `workspace/output/.sys/.context/adrs/ADR-{ts}-{slug}.md` traçant 1 décision structurante. | `rules/constitution.md §4` | `decision-record` |
+| **ADR** | *Architecture Decision Record* — fichier atomique `workspace/output/.sys/.context/adrs/ADR-{ts}-{slug}.md` traçant 1 décision structurante. | `rules/ownership.md (Partie B §4)` | `decision-record` |
 | **Mockup** | Maquette HTML statique déposée manuellement par UX Designer sous `workspace/input/ui/{n}-{m}-{Name}.html`. Lecture passive uniquement. | `CLAUDE.md §1` | `wireframe`, `HTML UI` |
 | **Plan technique** | Frontmatter YAML + section `## Files` listant les fichiers à matérialiser pour 1 US. `workspace/output/plans/{n}-{m}-{Name}.{back\|front}.md`. | `rules/build-and-loop.md §7` | `tech-plan` |
 | **Covers** | Champ d'une US qui référence les SFD/BR/AC/FD couverts dans la FEAT parente. | `docs/principles/us-granularity.md §5` | — |
@@ -145,7 +145,7 @@ Forme rejetée : `gate` (générique) sans qualificatif → toujours préfixer.
 | **Idempotence** | Une commande relancée 2× avec mêmes inputs produit le même résultat sans effet de bord cumulé. | `docs/conventions.md §2` |
 | **Selective read** | Lecture sélective : un agent ne lit que les artefacts strictement nécessaires à son US (1 fichier US, pas la FEAT entière). | `CLAUDE.md §1` |
 | **Strict mode** | (retiré v7.0.0) Variant Sonnet 4.6 des dev-* qui consommait un plan v2 strict-ready. Tous les plans (v1 et v2) sont désormais matérialisés par les agents canoniques Opus 4.7. | `ARCHIVE/v7-design-superseded/DESIGN-FROMPLAN-STRICT.md` |
-| **Constitution** | Fichier `workspace/output/.sys/.context/constitution.md` partagé entre agents pour cohérence sémantique cross-FEAT (glossaire local, acteurs, ADRs index). | `rules/constitution.md` |
+| **Constitution** | Fichier `workspace/output/.sys/.context/constitution.md` partagé entre agents pour cohérence sémantique cross-FEAT (glossaire local, acteurs, ADRs index). | `rules/ownership.md (Partie B)` |
 | **Checkpoint** | Mécanisme de reprise post-crash via hashing input des phases. | v6.6.2+ |
 
 ---
@@ -304,7 +304,7 @@ Liste des termes à éliminer en v7.0.0 — préférer la forme canonique de la 
 - `@.claude/docs/conventions.md` — anti-derive, idempotence, parallélisme
 - `@.claude/docs/version-notes.md` — notes par version (archive §10.*)
 - `@.claude/rules/` — 9 règles opérationnelles
-- `@.claude/VERSIONING.md` — politique SemVer + freeze
+- `@.claude/docs/VERSIONING.md` — politique SemVer + freeze
 - `ADR-20260519T120000-governance-major-auditors-trim.md`
 - `ADR-20260519T133000-governance-major-config-ssot.md`
 - `ADR-20260519T143000-governance-major-flags-trim.md`

@@ -160,7 +160,7 @@ script et consomme son JSON. Détail : `agents/dev-backend.md STEP 5.bis`.
 | `build-and-loop.md (Partie B)`                 | Patterns strictement identiques dev-backend/dev-frontend |
 
 > Substance de `library-and-stack.md`, `ownership.md §1-§2`,
-> `quality.md (Partie A)`, `us-granularity.md`, `.claude/rules/constitution.md`
+> `quality.md (Partie A)`, `us-granularity.md`, `ownership.md (Partie B)`
 > est **inlinée** dans les agents qui en dépendent (depuis v5.0). Les
 > fichiers complets restent disponibles pour les cas-limites.
 >
@@ -211,7 +211,7 @@ script et consomme son JSON. Détail : `agents/dev-backend.md STEP 5.bis`.
 | `claude-md-frontend.template.md`   | agent `arch` STEP 12 — gabarit CLAUDE.md projet frontend |
 | `claude-md-shared-lib.template.md` | agent `arch` STEP 12 — gabarit CLAUDE.md projet lib partagée (si `LibName` défini) |
 | ~~`dashboard-readme.template.html`~~ | **retiré v6.10** — HTML dashboards remplacés par `console.db` lecture par consommateur externe |
-| `adrs-index.template.md`           | agent `dashboard` (INDEX.md ADRs — seul output `dashboard` v6.10) |
+| `adrs-index.template.md`           | script `sdd_scripts/index_adrs.py` (INDEX.md ADRs — remplace agent `dashboard` retiré v7.0.0) |
 | ~~`qa-dashboard.template.html`~~   | **retiré v6.10** — métriques QA dans `console.db` (tables `qa_*`) |
 | `libs-catalog.schema.json`         | JSON Schema des `.libs.json` (cf. `library-and-stack.md §1.0`) |
 | `status.schema.json`               | JSON Schema de `workspace/console/status.json` (console gates manuels) |

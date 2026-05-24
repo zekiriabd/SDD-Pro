@@ -66,9 +66,10 @@ updated: "2026-05-20"
 # `cache_layer: stable` car invariant inter-runs (cachable 5 min TTL).
 #
 # - .claude/rules/output-protocol.md (v7.0.0)
-#     Référencée par les 11 agents (po, arch, dev-backend, dev-frontend,
+#     Référencée par les 12 agents (po, arch, dev-backend, dev-frontend,
 #     qa, elicitor, constitutioner, code-reviewer, security-reviewer,
-#     spec-compliance-reviewer, arch-reviewer) ET les 10 commandes
+#     spec-compliance-reviewer, arch-reviewer, adversarial-reviewer) ET
+#     les 10 commandes
 #     user-facing (feat-generate, feat-validate, sdd-full, dev-run,
 #     qa-generate, sdd-review, sdd-status, sdd-discover-stack, sdd-serve,
 #     sdd-kill-server). Définit le protocole de sortie chat executive
@@ -77,10 +78,6 @@ updated: "2026-05-20"
 #     commandes ne portent qu'un mini bloc 20L de paramétrage).
 #
 #     Couches complémentaires (hors prompt agent) :
-#       * Output style `.claude/output-styles/sdd-executive.md` — augmente
-#         le system prompt de Claude (main loop) pour qu'elle suive le
-#         protocole quand elle orchestre une commande SDD. Activable par
-#         `/output-style sdd-executive` (puis revert via `/output-style`).
 #       * Statusline `sdd_admin.statusline` (`.claude/python/sdd_admin/
 #         statusline.py`) — single-line bottom-of-screen view du run
 #         actif (`[AGENT] X% · FEAT N-Name · US m-Name · elapsed`).
@@ -145,8 +142,8 @@ po:
 arch:
   reads:
     - workspace/input/stack/stack.md
-    - .claude/stacks/{cat}/{active}.md   # tous stacks actifs (sélectif — backend, frontend, ui, auth, qa). v7.0.0 : fullstack/* et mobiles/* sont en `_drafts/` (non chargés) — utiliser uniquement backend+frontend.
-    - .claude/stacks/archi/{ArchiPattern}.md  # MVC (défaut) / DDD — UNIQUEMENT si AppType=back-front (v6.7.6+). v7.0.0 : `microservice` est en `_drafts/archi/` (non chargé).
+    - .claude/stacks/{cat}/{active}.md   # tous stacks actifs (sélectif — backend, frontend, ui, auth, qa, fullstack, mobiles). fullstack/* et mobiles/* chargeables mais 🟡 expérimentaux (jamais validés bout-en-bout).
+    - .claude/stacks/archi/{ArchiPattern}.md  # MVC (défaut) / DDD / microservice (🟡 expérimental) — UNIQUEMENT si AppType=back-front (v6.7.6+).
     - .claude/templates/adr.template.md  # v3 — nécessaire pour Phase D
     - workspace/output/.sys/.context/constitution.md     # v3 — si présent
     - workspace/output/.sys/.context/adrs/ADR-*.md       # v3 — index existants (idempotence)
@@ -206,9 +203,9 @@ dev-backend:
     # --- stable (invariant inter-FEAT, cachable 5 min TTL) ---
     - { path: workspace/input/stack/stack.md, cache_layer: stable }                # Project Config
     - { path: .claude/stacks/backend/{active}.md, cache_layer: stable }
-    # v7.0.0 : fullstack/* est en `_drafts/` (non chargé). Entrée conservée pour ré-activation future si un stack fullstack est promu.
-    - { path: .claude/stacks/fullstack/{active}.md, cache_layer: stable, status: draft-quarantine }
-    - { path: .claude/stacks/archi/{ArchiPattern}.md, cache_layer: stable }  # MVC | DDD uniquement (microservice en _drafts/)
+    # fullstack/* chargeable mais 🟡 expérimental (aucun combo validé bout-en-bout) — n'utiliser que si AppType=fullstack.
+    - { path: .claude/stacks/fullstack/{active}.md, cache_layer: stable, status: experimental }
+    - { path: .claude/stacks/archi/{ArchiPattern}.md, cache_layer: stable }  # MVC | DDD | microservice (🟡 expérimental pour microservice)
     - { path: .claude/stacks/auth/{active}.md, cache_layer: stable }
     - { path: .claude/rules/dev-shared-preflight.md, cache_layer: stable }   # v7.0.0 — STEP 0/0.5/1/1.bis hoist cross-agent
     - { path: .claude/rules/build-and-loop.md, cache_layer: stable }         # v7.0.0 — SSOT patterns dev-* (ex backend-first + dev-shared)
@@ -455,7 +452,7 @@ code-reviewer:
     - workspace/output/src/                       # read-only strict (rapport seul, jamais patch)
     - workspace/output/us/                        # responsabilité po
     - workspace/output/qa/                        # responsabilité qa
-    - workspace/output/dashboard/                 # responsabilité dashboard
+    - workspace/output/dashboard/                 # legacy v6 (agent dashboard retiré v7.0.0)
     - workspace/output/.sys/.context/             # responsabilité po/arch/elicitor
     - workspace/output/plans/                     # le reviewer ne planifie pas
   modes:                                          # selon CodeReviewMode dans Project Config
@@ -485,7 +482,7 @@ arch-reviewer:
   reads:
     - workspace/input/stack/stack.md                # Project Config + Active Architecture Pattern + Active Tech Specs
     - .claude/rules/error-classification.md         # taxonomie [ARCH_*] §1.18
-    - .claude/stacks/archi/{mvc|ddd}.md             # §2 couches + §3 principes + §4 naming canonique (microservice retiré v7.0.0 — en `_drafts/`)
+    - .claude/stacks/archi/{mvc|ddd|microservice}.md  # §2 couches + §3 principes + §4 naming canonique (microservice 🟡 expérimental)
     - .claude/stacks/backend/{active}.md            # §1.3 layer mapping backend
     - .claude/stacks/frontend/{active}.md           # §1.3 layer mapping frontend
     - workspace/output/.sys/.context/constitution.md  # §2 glossaire + §6 ADRs index
@@ -525,6 +522,63 @@ arch-reviewer:
     - "ArchReviewMode: manual (sauf demande explicite)"
   db_target:                                        # réutilise table existante (pas de schema change)
     - "qa_code_review (issue_class LIKE 'ARCH_%')"  # via ingest_agent_report --type arch-review
+  idempotent: true
+
+# -------------------------------------------------------------------------
+# Agent: adversarial-reviewer (Sonnet 4.6) — depuis v7.2.0 (R1 BMAD)
+# Phase: 99% (post-agrégation `/sdd-review`, opt-in `--adversarial`)
+# Token footprint estimé: ~8-15 KB par FEAT
+# Invocation: spawn par /sdd-review --adversarial (manuel) OU auto si
+#             AdversarialReviewMode=full dans Project Config
+# Rôle: avocat du diable — 5-10 attaques que les autres reviewers
+#       n'auraient pas vues. Verdict informational (jamais bloquant).
+# -------------------------------------------------------------------------
+adversarial-reviewer:
+  reads:
+    - workspace/input/stack/stack.md                              # Project Config (AdversarialReviewMode, Min/Max)
+    - .claude/rules/error-classification.md                       # taxonomie [ADV_*] §1.16
+    - workspace/input/feats/{n}-*.md                              # FEAT (Functional Needs, Business Rules, ACs, §7 Risks)
+    - workspace/output/us/{n}-*.md                                # US (ACs)
+    - workspace/output/plans/{n}-*.{back,front}.md                # cartographie fichiers — sélection ≤ 5 chemins critiques
+    - workspace/output/qa/feat-{n}/review.md                      # verdict consolidé (précondition stricte)
+    - workspace/output/.sys/.validation/{n}-code-review.md        # résumé findings (header uniquement, anti-dup §2.5)
+    - workspace/output/.sys/.validation/{n}-security-scan.md      # idem
+    - workspace/output/.sys/.validation/{n}-spec-compliance.md    # idem
+    - workspace/output/.sys/.validation/{n}-arch-review.md        # idem (si ArchReviewMode=full)
+    - workspace/output/src/{BackendName}/**                       # ≤ 3 fichiers ciblés via §2.3, jamais Glob récursif
+    - workspace/output/src/{AppName}/**                           # idem
+    - workspace/output/src/{LibName}/**                           # idem si présent
+    # Anti-pattern strict : pas de Glob récursif workspace/output/src/** — lecture sélective via plan
+  writes:
+    - workspace/output/qa/feat-{n}/adversarial.md                 # rapport humain (canal séparé Tech Lead)
+    - workspace/output/qa/feat-{n}/adversarial.json               # schéma machine (consommé par ingest_agent_report)
+  forbidden_reads:
+    - workspace/output/us/{other-feat}                            # autres FEATs
+    - workspace/input/feats/{other}.md                            # autres FEATs
+    - workspace/output/.sys/.context/                             # hors scope direct
+    - .claude/stacks/qa/                                          # hors scope
+  forbidden_writes:
+    - workspace/output/src/                                       # read-only strict
+    - workspace/output/us/                                        # responsabilité po
+    - workspace/output/.sys/.context/                             # responsabilité po/arch/elicitor/constitutioner
+    - workspace/output/plans/                                     # ne planifie pas
+    - workspace/input/                                            # read-only
+    - workspace/output/.sys/.validation/                          # responsabilité auditors classiques
+  config_flags:                                                   # dans Project Config
+    - AdversarialReviewMode: "off | full | manual (défaut: manual)"
+    - AdversarialMinAttacks: "entier ≥ 1 (défaut: 5)"
+    - AdversarialMaxAttacks: "entier ≥ AdversarialMinAttacks (défaut: 10)"
+  modes:
+    - off: "skip total (exit silencieux)"
+    - manual: "invocation explicite uniquement via /sdd-review --adversarial (défaut)"
+    - full: "auto-invoke par /sdd-review post-agrégation (sans nécessiter --adversarial)"
+  fail_on: []                                                     # verdict TOUJOURS informational — jamais de bascule 🟢/🟡/🔴
+  hard_blocking_classes: []                                       # aucune classe hard-blocking par design
+  exit_silent_when:
+    - "AdversarialReviewMode: off"
+    - "AdversarialReviewMode: manual ET /sdd-review invoqué sans --adversarial"
+  db_target:
+    - "validation_reports (report_type='adversarial', verdict='informational', payload_json={attacks:[...]})"
   idempotent: true
 
 # -------------------------------------------------------------------------
@@ -653,7 +707,7 @@ spec-compliance-reviewer:
     - workspace/output/src/                       # read-only strict (jamais de patch)
     - workspace/output/us/                        # responsabilité po
     - workspace/output/qa/                        # responsabilité qa
-    - workspace/output/dashboard/                 # responsabilité dashboard
+    - workspace/output/dashboard/                 # legacy v6 (agent dashboard retiré v7.0.0)
     - workspace/output/.sys/.context/             # responsabilité po/arch/elicitor
     - workspace/output/plans/                     # ne planifie pas
     - workspace/output/.sys/.validation/{n}-code-review.*  # responsabilité code-reviewer

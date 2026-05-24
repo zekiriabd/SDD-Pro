@@ -43,7 +43,7 @@ non déterministes.
 | `workspace/output/src/{Project}/CLAUDE.md` (par projet) | `arch` (création/régénération) ; `dev-*` (marquage RESOLVED §6.bis) | Create + Edit hash exclusif (arch) ; Edit narrow (dev-*) | 4-5 |
 | `workspace/output/.sys/.context/constitution.md` | **séquentiel** : `/feat-generate` → `po` (§3) → `arch` (§4, §6) → `elicitor` (§7) | Append-only par section | 1, 2, 4, 1.5 |
 | `workspace/output/.sys/.context/adrs/ADR-*.md` | **multi-writers** | Numérotation atomique timestamp (§3) | 4, 5 |
-| `workspace/output/.sys/.context/adrs/INDEX.md` | `dashboard` (depuis 2026-05-08) ; `arch` continue à pouvoir l'écrire | Create overwrite (idempotent) | fin pipeline / arch STEP 12.7 |
+| `workspace/output/.sys/.context/adrs/INDEX.md` | `sdd_scripts/index_adrs.py` (depuis v7.0.0, ex-agent `dashboard` retiré) ; `arch` continue à pouvoir l'écrire | Create overwrite (idempotent) | fin pipeline / arch STEP 12.7 |
 | `workspace/output/us/{n}-{m}-*.md` | `po` | Create exclusif (1 fichier = 1 US) | 2 |
 | `workspace/input/ui/{n}-{m}-*.html` | UX Designer humain | Read-only stricte côté agents | 2.5 |
 | `workspace/output/plans/{n}-{m}-*.{back\|front}.md` | `dev-backend` (`.back`) / `dev-frontend` (`.front`) | Create exclusif (mode `:plan`) | 2.7 |
@@ -348,7 +348,7 @@ fichiers ADR eux-mêmes).
 **Pourquoi ?** `/dev-run` lance dev-backend + dev-frontend en
 parallèle sur N US (jusqu'à 2×N invocations). Si chacun éditait §6,
 on aurait des race conditions garanties sur le même fichier. La
-règle `.claude/rules/file-ownership.md` formalise cette sérialisation.
+matrice ci-dessus (Partie A §1) formalise cette sérialisation.
 
 **Tout autre agent ou phase** = read-only strict (lecture passive
 pour glossaire, acteurs, ADRs existants).

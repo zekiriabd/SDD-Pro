@@ -7,11 +7,11 @@
 > persistés sur disque (rapports `workspace/output/qa/...`,
 > `workspace/output/.sys/.audit/...`) pour debug/audit.
 >
-> **Load-bearing** : règle universelle chargée par les 11 agents
+> **Load-bearing** : règle universelle chargée par les 12 agents
 > (`po`, `arch`, `dev-backend`, `dev-frontend`, `qa`, `elicitor`,
 > `constitutioner`, `code-reviewer`, `security-reviewer`,
-> `spec-compliance-reviewer`, `arch-reviewer`) et les 10 commandes
-> user-facing.
+> `spec-compliance-reviewer`, `arch-reviewer`, `adversarial-reviewer`)
+> et les 10 commandes user-facing.
 
 ## TOC
 
@@ -410,9 +410,9 @@ Aucune autre variable n'altère ce protocole.
 
 ### 11.1 Qui doit appliquer ce protocole
 
-- **11 agents** : `po`, `arch`, `dev-backend`, `dev-frontend`, `qa`,
+- **12 agents** : `po`, `arch`, `dev-backend`, `dev-frontend`, `qa`,
   `elicitor`, `constitutioner`, `code-reviewer`, `security-reviewer`,
-  `spec-compliance-reviewer`, `arch-reviewer`
+  `spec-compliance-reviewer`, `arch-reviewer`, `adversarial-reviewer`
 - **10 commandes user-facing** : `/feat-generate`, `/feat-validate`,
   `/sdd-full`, `/dev-run`, `/qa-generate`, `/sdd-review`,
   `/sdd-status`, `/sdd-discover-stack`, `/sdd-serve`,
