@@ -7,6 +7,13 @@ Ce document est l'index des conventions opératoires du framework. Le
 détail complet de chaque règle vit dans `.claude/rules/` ; ce fichier
 en est la **TOC commentée**.
 
+> **Voir aussi** (audit mineur #9 v7.0.0-alpha 2026-06-05 — cross-ref) :
+> `@.claude/docs/glossary.md` pour la **taxonomie canonique** (agents,
+> rôles, termes métier SDD_Pro). Ce fichier-ci décrit les **règles
+> d'exécution** ; le glossaire décrit le **vocabulaire** sur lequel elles
+> reposent. Si un terme apparaît ici sans définition explicite, le
+> glossaire en est la source.
+
 ## 1. Anti-derive (universel)
 
 Aucun agent n'invente :

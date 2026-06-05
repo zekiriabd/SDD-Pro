@@ -273,6 +273,6 @@ Pour que v7.0.0 puisse être taguée (post-2026-06-19), le PoC doit avoir :
 - `@.claude/python/sdd_scripts/report_token_usage.py` — agrégation tokens existante
 - `@.claude/python/sdd_scripts/parse_coverage.py` — agrégation coverage
 - `@.claude/python/sdd_scripts/query_console_db.py` — read queries SQL
-- `@.claude/CHANGELOG.md` lignes 489, 530, 600, 850 — promesses ROI non mesurées historiquement
+- `@.claude/docs/CHANGELOG.md` lignes 489, 530, 600, 850 — promesses ROI non mesurées historiquement
 - `workspace/output/.sys/.context/adrs/ADR-20260519T193000-governance-roi-poc.md` — décision + plan
 - `docs/roi-baseline.md` — résultats publiés (à créer post-exécution PoC)

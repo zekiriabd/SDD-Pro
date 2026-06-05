@@ -2,7 +2,7 @@
 
 > §2.4 (Librairies) régénérée depuis `angular-jasmine.libs.json` — ne pas éditer manuellement (`python .claude/python/sdd_admin/sync_stack_md.py --stack-id angular-jasmine`).
 
-Status: Draft
+Status: Experimental
 Validation: 🟡 experimental (not yet validated end-to-end in production combo)
 QA FEAT ID: angular-jasmine
 Scope: tests unitaires frontend Angular
@@ -35,7 +35,7 @@ Cette stack documente leur usage standard, sans migration vers Jest.
 <!-- LIBS_CATALOG_START -->
 ### 2.4 Librairies
 
-> Source de verite : `.claude/stacks/qa/angular-jasmine.libs.json`. Ne pas editer cette section manuellement -- utiliser `python .claude/python/sdd_admin/sync_stack_md.py --stack-id angular-jasmine`.
+> Source de verite : `.claude/stacks/qa/angular-jasmine.libs.json`. Ne pas editer cette section manuellement -- utiliser `.claude/python/sdd_admin/sync_stack_md.py --stack-id angular-jasmine`.
 
 #### 2.4.a Librairies CORE (installees par arch en section 2.2.1, toujours)
 

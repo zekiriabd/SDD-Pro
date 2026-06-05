@@ -10,6 +10,7 @@ Idempotent — uses INSERT OR REPLACE on (feat_n) and (us_id) primary keys.
 
 from __future__ import annotations
 
+import functools
 import json
 import re
 import sqlite3
@@ -21,6 +22,21 @@ ROOT = Path(__file__).resolve().parents[3]
 DB_PATH = ROOT / "workspace" / "output" / "db" / "console.db"
 FEATS_DIR = ROOT / "workspace" / "input" / "feats"
 US_DIR = ROOT / "workspace" / "output" / "us"
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from sdd_lib.markdown_io import section_body_stripped  # noqa: E402
+from sdd_lib.exit_codes import FAIL_FAST, SUCCESS  # noqa: E402
+
+
+@functools.lru_cache(maxsize=8)
+def _count_ids_pattern(prefix: str) -> re.Pattern[str]:
+    """Compile-once regex for counting `{prefix}-N` IDs (SFD/BR/AC/FD).
+
+    Audit mineur #2 v7.0.0-alpha 2026-06-05 — was rebuilt inside count_ids
+    on every call (rare hot path but easy fix).
+    """
+    return re.compile(rf"^\s*[-*]?\s*{re.escape(prefix)}-\d+", re.MULTILINE)
 
 
 def now_iso() -> str:
@@ -37,15 +53,15 @@ def parse_feat(path: Path) -> dict:
     feat_n = int(m.group(1))
     feat_name = m.group(2)
 
-    # Section bodies
+    # v7.0.0-alpha (audit CRIT-3) : section extraction delegated to
+    # sdd_lib.markdown_io (SSoT). Inner closure removed.
     def section(name: str) -> str:
-        pat = re.compile(rf"^## {re.escape(name)}\s*\n(.*?)(?=^## |\Z)", re.DOTALL | re.MULTILINE)
-        mm = pat.search(text)
-        return mm.group(1).strip() if mm else ""
+        return section_body_stripped(text, name) or ""
 
-    # Counts by counting ID prefixes
+    # Counts by counting ID prefixes (regex precompiled per prefix — audit
+    # mineur #2 v7.0.0-alpha 2026-06-05, was recompiled on every call).
     def count_ids(prefix: str, body: str) -> int:
-        return len(re.findall(rf"^\s*[-*]?\s*{prefix}-\d+", body, re.MULTILINE))
+        return len(_count_ids_pattern(prefix).findall(body))
 
     sfd_body = section("Functional Needs")
     br_body = section("Business Rules")
@@ -111,8 +127,7 @@ def parse_us(path: Path) -> dict:
 def main() -> int:
     if not DB_PATH.exists():
         print(f"DB not found: {DB_PATH}", file=sys.stderr)
-        return 1
-
+        return FAIL_FAST
     conn = sqlite3.connect(str(DB_PATH))
     cur = conn.cursor()
     ts = now_iso()
@@ -164,8 +179,6 @@ def main() -> int:
 
     conn.commit()
     print(f"[OK] ingested {n_feats} FEATs + {n_us} US into {DB_PATH.relative_to(ROOT)}")
-    return 0
-
-
+    return SUCCESS
 if __name__ == "__main__":
     raise SystemExit(main())

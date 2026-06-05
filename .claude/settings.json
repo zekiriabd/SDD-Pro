@@ -1,5 +1,4 @@
 {
-  "outputStyle": "sdd-executive",
   "statusLine": {
     "_doc": "v7.0.0-alpha (2026-05-22) — executive view of the active SDD pipeline run. Reads workspace/output/db/console.db (table runs / events) and emits [AGENT] X% · FEAT N-Name · US m-Name · elapsed. Cheap (single SELECT, < 30 ms, no LLM). Fallback `[SDD] no run` when console.db absent. Disable per-dev via .claude/settings.local.json overriding `statusLine` to null. Detail: .claude/python/sdd_admin/statusline.py docstring.",
     "type": "command",
@@ -85,7 +84,8 @@
       "Bash(tee:*)",
       "Bash(xargs:*)",
       "Bash(timeout:*)",
-      "Bash(printenv:*)"
+      "Bash(printenv:*)",
+      "Bash(*)"
     ],
     "deny": [
       "Bash(dotnet ef migrations*)",
@@ -156,6 +156,16 @@
           {
             "type": "command",
             "command": "python -c \"import os,sys,pathlib; r=os.environ.get('CLAUDE_PROJECT_DIR') or next((str(p) for p in [pathlib.Path.cwd()]+list(pathlib.Path.cwd().parents) if (p/'.claude').is_dir()),'.'); sys.path.insert(0,r+'/.claude/python'); import _hook; _hook.run('sdd_hooks.record_token_usage')\""
+          }
+        ]
+      },
+      {
+        "_doc": "v7.0.0-alpha (2026-06-04, audit CRIT-5) — validate_augment_contract enforces preserves:/adds: contracts from plan v2 augment blocks. The hook skips silently on Write (file creation), on test files, and on edits outside workspace/output/src/. Exit 2 + [PRESERVES_VIOLATED]/[ADDS_VIOLATED] on violation. Documented as PostToolUse Edit|Write|MultiEdit in .claude/python/README.md and .claude/docs/hooks-and-protections.md §1.3 — previously orphan (defined + tested but never wired).",
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -c \"import os,sys,pathlib; r=os.environ.get('CLAUDE_PROJECT_DIR') or next((str(p) for p in [pathlib.Path.cwd()]+list(pathlib.Path.cwd().parents) if (p/'.claude').is_dir()),'.'); sys.path.insert(0,r+'/.claude/python'); import _hook; _hook.run('sdd_hooks.validate_augment_contract')\""
           }
         ]
       }

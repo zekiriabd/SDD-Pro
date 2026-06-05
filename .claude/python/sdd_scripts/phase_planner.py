@@ -44,7 +44,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sdd_lib.exit_codes import FAIL_FAST, SUCCESS  # noqa: E402
 from sdd_lib.paths import normalize, repo_root  # noqa: E402
-from sdd_lib.project_config import read_project_config  # noqa: E402  (legacy fallback)
+from sdd_lib.project_config import read_project_config, read_stack_md_text  # noqa: E402  (legacy fallback)
 from sdd_lib.layered_config import ConfigError, read_layered_config  # noqa: E402  (v6.7.3)
 
 
@@ -140,13 +140,12 @@ def _count_us_files(root: Path, feat_number: int) -> int:
 
 
 def _active_stacks(root: Path) -> dict[str, str | None]:
-    """Détecte les stacks actifs depuis ## Active Tech Specs + UI + Auth de stack.md."""
-    stack_md = root / "workspace" / "input" / "stack" / "stack.md"
-    if not stack_md.is_file():
-        return {"backend": None, "frontend": None, "ui": None, "auth": None, "fullstack": None, "mobiles": None}
-    try:
-        text = stack_md.read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError):
+    """Détecte les stacks actifs depuis ## Active Tech Specs + UI + Auth de stack.md.
+
+    v7.0.0-alpha (audit CRIT-2) : I/O cached on (path, mtime_ns).
+    """
+    text = read_stack_md_text(root)
+    if text is None:
         return {"backend": None, "frontend": None, "ui": None, "auth": None, "fullstack": None, "mobiles": None}
 
     # v6.7.5 — categories etendues: + fullstack + mobiles
@@ -396,87 +395,23 @@ def plan(feat_number: int) -> dict[str, object]:
     }
 
 
-def _decide_threat_model(
-    *,
-    security_mode: str,
-    threat_model_enabled: bool,
-    has_security_ac: bool,
-    stacks: dict[str, str | None],
-) -> dict[str, object]:
-    # NOTE v7.0.0 : security-reviewer --mode threat-model REMOVED
-    # (governance-major-auditors-trim). The phase entry is preserved in
-    # the planner JSON for backward-compat with consumers reading the plan ;
-    # an `agent_removed: True` field flags the deletion so new consumers can
-    # short-circuit and use templates/threat-model.template.md (humain) instead.
-    # /dev-run STEP 5.5 already skips the spawn (this commit).
-    if security_mode == "off":
-        ph = _phase("threat_model", enabled=False, reason="SecurityMode=off")
-    elif not threat_model_enabled:
-        ph = _phase(
-            "threat_model",
-            enabled=False,
-            reason="SecurityThreatModelEnabled=false (default v7.0.0 — agent removed)",
-        )
-    elif security_mode == "manual" and not has_security_ac:
-        ph = _phase(
-            "threat_model",
-            enabled=False,
-            reason="SecurityMode=manual + no AC mentions security",
-        )
-    elif (
-        stacks.get("backend") is None
-        and stacks.get("frontend") is None
-        and stacks.get("fullstack") is None
-        and stacks.get("mobiles") is None
-    ):
-        ph = _phase(
-            "threat_model",
-            enabled=False,
-            reason="no backend/frontend/fullstack/mobiles stack active",
-        )
-    else:
-        # Even when all gates pass, the agent is GONE — phase is logically
-        # planned (consumers see the slot) but never spawned.
-        ph = _phase(
-            "threat_model",
-            enabled=False,
-            reason="agent removed v7.0.0 — fill templates/threat-model.template.md manually",
-        )
+def _decide_threat_model(**_kwargs: object) -> dict[str, object]:
+    # v7.0.0-alpha (audit MAJ-6) — agent retiré. Remplacement :
+    # `templates/threat-model.template.md` (humain, STRIDE light, ~15-30 min).
+    ph = _phase("threat_model", enabled=False,
+                reason="agent removed v7.0.0 — fill templates/threat-model.template.md manually")
     ph["agent_removed"] = True
     ph["replacement"] = "templates/threat-model.template.md (humain, STRIDE light, ~15-30 min)"
     return ph
 
 
-def _decide_a11y(
-    *,
-    a11y_mode: str,
-    has_frontend_stack: bool,
-    has_frontend_code: bool,
-) -> dict[str, object]:
-    # NOTE v7.0.0 : accessibility-auditor agent REMOVED (governance-major-auditors-trim).
-    # The phase entry is preserved in the planner JSON for backward-compat with
-    # consumers reading the plan ; an `agent_removed: True` field flags the
-    # deletion so new consumers can short-circuit and use axe-core in CI
-    # instead. /sdd-full STEP 6.4 already skips the spawn (commit 5902d50).
-    if a11y_mode == "off":
-        ph = _phase("a11y_audit", enabled=False, reason="A11yMode=off")
-    elif a11y_mode == "manual":
-        ph = _phase("a11y_audit", enabled=False,
-                    reason="A11yMode=manual (Tech Lead invoque à la demande)")
-    elif not has_frontend_stack:
-        ph = _phase("a11y_audit", enabled=False,
-                    reason="no frontend stack active (backend-only project)")
-    elif not has_frontend_code:
-        ph = _phase("a11y_audit", enabled=False,
-                    reason="workspace/output/src/{AppName}/ absent ou vide (markup pas généré)")
-    else:
-        # Even when all upstream gates pass, the agent is GONE (v7.0.0
-        # governance-major-auditors-trim). `enabled` MUST be False — there
-        # is no spawn, no token budget, no work product. The `agent_removed`
-        # flag (set below) tells consumers WHY enabled is False on what
-        # would have been a green path.
-        ph = _phase("a11y_audit", enabled=False,
-                    reason="agent removed v7.0.0 — use axe-core in CI of generated project")
+def _decide_a11y(**_kwargs: object) -> dict[str, object]:
+    # v7.0.0-alpha (audit MAJ-6) — agent retiré. Toutes les branches précédentes
+    # convergent vers `enabled=False, agent_removed=True`. Stub minimal pour
+    # consumers legacy qui parsent la phase. Remplacement : axe-core dans le
+    # CI du projet généré (`templates/ci-quality.github-actions.yml.template`).
+    ph = _phase("a11y_audit", enabled=False,
+                reason="agent removed v7.0.0 — use axe-core in CI of generated project")
     ph["agent_removed"] = True
     ph["replacement"] = "axe-core CI step in the generated project"
     return ph
@@ -553,41 +488,11 @@ def _decide_spec_compliance(
     return _phase("spec_compliance", enabled=True, reason=None)
 
 
-def _decide_perf(
-    *,
-    perf_mode: str,
-    has_perf_ac: bool,
-    has_backend_code: bool,
-    has_frontend_code: bool,
-) -> dict[str, object]:
-    # NOTE v7.0.0 : performance-auditor agent REMOVED (governance-major-auditors-trim).
-    # Same pattern as _decide_a11y — phase entry preserved, agent_removed flag
-    # surfaced for new consumers. Replacement = Lighthouse CI + wrk/k6.
-    if perf_mode == "off":
-        ph = _phase("perf_audit", enabled=False, reason="PerfMode=off")
-    elif perf_mode == "manual" and not has_perf_ac:
-        ph = _phase(
-            "perf_audit",
-            enabled=False,
-            reason="PerfMode=manual + no AC mentions perf metric (lcp/p95/...)",
-        )
-    elif perf_mode == "manual" and has_perf_ac:
-        # Pre-v7.0.0, an explicit perf AC would force-enable the auditor
-        # even in manual mode. The agent is GONE — surface that the perf
-        # AC must be checked via Lighthouse CI / wrk-k6 instead.
-        ph = _phase(
-            "perf_audit",
-            enabled=False,
-            reason="agent removed v7.0.0 — perf AC must be checked via Lighthouse CI / wrk-k6",
-        )
-    elif not has_backend_code and not has_frontend_code:
-        ph = _phase("perf_audit", enabled=False,
-                    reason="aucun code production (/dev-run pas exécuté)")
-    else:
-        # All upstream gates pass but the agent is GONE — same rationale as
-        # _decide_a11y: enabled MUST be False, agent_removed flag explains why.
-        ph = _phase("perf_audit", enabled=False,
-                    reason="agent removed v7.0.0 — use Lighthouse CI + wrk/k6 in CI of generated project")
+def _decide_perf(**_kwargs: object) -> dict[str, object]:
+    # v7.0.0-alpha (audit MAJ-6) — agent retiré. Remplacement : Lighthouse CI
+    # + wrk/k6 dans le CI du projet généré.
+    ph = _phase("perf_audit", enabled=False,
+                reason="agent removed v7.0.0 — use Lighthouse CI + wrk/k6 in CI of generated project")
     ph["agent_removed"] = True
     ph["replacement"] = "Lighthouse CI + wrk/k6 in the generated project"
     return ph

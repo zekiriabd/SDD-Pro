@@ -127,17 +127,20 @@ reportlab (pdf Python).
 - `frontend/blazor-webassembly.md`, `frontend/react.md`,
   `frontend/vue.md`, `frontend/angular.md`
 
-**Fullstack** ⊘ **draft v7.0.0** (en `_drafts/fullstack/`, non chargés — single-project SSR exclusif d'un combo `backend × frontend`). Combo `fullstack` non supporté en v7.0.0 ; utiliser `back-front` :
-- ~~`fullstack/node-react.md`~~ — Fastify 5 + React 18 CDN (modèle workspace/console)
-- ~~`fullstack/blazor-server.md`~~ — Blazor Server .NET 10 + SignalR + Razor
-- ~~`fullstack/next.md`~~ — Next.js 15 + App Router + RSC + Tailwind v4
-- ~~`fullstack/nuxt.md`~~ — Nuxt 3 + Nitro + Vuetify + Pinia
-- ~~`fullstack/angular-universal.md`~~ — Angular 19 + @angular/ssr
-- ~~`fullstack/kotlin-mustache.md`~~ — Spring Boot + Kotlin + Mustache + HTMX/Alpine.js
+**Fullstack** 🟡 expérimental — chargeables mais aucun combo `fullstack`
+validé bout-en-bout. Single-project SSR (exclusif d'un combo `backend × frontend`).
+Pour stabilité maximale, préférer `back-front` :
+- `fullstack/node-react.md` — Fastify 5 + React 18 CDN (modèle workspace/console)
+- `fullstack/blazor-server.md` — Blazor Server .NET 10 + SignalR + Razor
+- `fullstack/next.md` — Next.js 15 + App Router + RSC + Tailwind v4
+- `fullstack/nuxt.md` — Nuxt 3 + Nitro + Vuetify + Pinia
+- `fullstack/angular-universal.md` — Angular 19 + @angular/ssr
+- `fullstack/kotlin-mustache.md` — Spring Boot + Kotlin + Mustache + HTMX/Alpine.js
 
-**Mobiles** ⊘ **draft v7.0.0** (en `_drafts/mobiles/`, non chargés — mobile cross-platform avec backend distant séparé). Combo `mobile` non supporté en v7.0.0 :
-- ~~`mobiles/react-native.md`~~ — Expo SDK 52 + RN 0.76 + Expo Router + NativeWind + Zustand
-- ~~`mobiles/maui.md`~~ — .NET MAUI 9 + CommunityToolkit.Mvvm + CommunityToolkit.Maui + sqlite-net-pcl + Refit
+**Mobiles** 🟡 expérimental — chargeables mais aucun combo `mobile`
+validé bout-en-bout. Mobile cross-platform avec backend distant séparé :
+- `mobiles/react-native.md` — Expo SDK 52 + RN 0.76 + Expo Router + NativeWind + Zustand
+- `mobiles/maui.md` — .NET MAUI 9 + CommunityToolkit.Mvvm + CommunityToolkit.Maui + sqlite-net-pcl + Refit
 
 **UI Design System** (1 actif requis quand mockup HTML présent) :
 - `ui/radzen-blazor.md`, `ui/shadcn.md`, `ui/vuetify.md`
@@ -170,10 +173,10 @@ reportlab (pdf Python).
 - Phase 3 (ARCH + DB) — bootstrap idempotent + scaffolding Database-First + ADRs
 - Phase 4 (CODE) — Dev-Backend + Dev-Frontend, plan inline, build loop max 3
 - Phase 5 (QA + Quality) — tests unitaires + coverage + quality scan sonar-like
-- Phase 5.5 (Accessibility, v6.3.0) — scan WCAG 2.2 AA déterministe via `accessibility-auditor` (Haiku), verdict 🟢/🟡/🔴 selon `A11yFailOn`
+- Phase 5.5 (Accessibility, v6.3.0 → retirée v7.0.0) — `accessibility-auditor` (Haiku) supprimé via ADR `governance-major-auditors-trim`. Remplacement v7.2.0 : ingest CI déterministe `sdd_scripts/ingest_axe.py` (axe-core JSON → `qa_a11y`), verdict 🟢/🟡/🔴 selon `A11yFailOn`. Cf. `rules/error-classification-legacy.md §1`.
 - Phase 6.4 (Code Review, v6.3.1) — review cross-fichier post-dev via `code-reviewer` (Sonnet) — anti-patterns stack, layer violations, contract drift, smells. Hard-blocking sur `[REVIEW_SECRETS_HARDCODED]` + `[FRONTEND_BACKEND_CONTRACT_GAP]`.
 - Phase 3.5 + 6.5 (Security Review, v6.3.2) — `security-reviewer` (Sonnet) 2 modes : pré-dev threat model STRIDE (informational) + post-dev scan OWASP Top 10 (verdict 🟢/🟡/🔴, 8 classes hard-blocking).
-- Phase 7 (Performance Audit, v6.4.0) — `performance-auditor` (Sonnet, opt-in `PerfMode: full`) : analyses statiques + dynamiques (Lighthouse CI). Core Web Vitals (LCP/CLS/INP), SLO API p95/p99, bundle, N+1 cross-fichier, memory leak, DB query index. 16 classes `[PERF_*]`. Hard-blocking sur `[PERF_AC_VIOLATION]` uniquement.
+- Phase 7 (Performance Audit, v6.4.0 → retirée v7.0.0) — `performance-auditor` (Sonnet) supprimé via ADR `governance-major-auditors-trim`. Remplacement v7.2.0 : ingest CI déterministe `sdd_scripts/ingest_lighthouse.py` (Lighthouse JSON → `qa_performance`), verdict selon `PerfFailOn`. SLO API backend (wrk/k6) prévu v7.3+. Cf. `rules/error-classification-legacy.md §2`.
 - Templates ops (v6.4.0) — `templates/{runbook,postmortem,slo-sli}.template.md` à instancier par le Tech Lead lors de la mise en prod du projet généré.
 - Phase planner (v6.4.1) — script Python déterministe `phase_planner.py` qui décide quelles phases auditor sont enabled/skipped selon Project Config + stacks actifs + état runtime + mentions perf/sec dans ACs. Invoqué par `/sdd-full` STEP 1.tiers (récap unifié au démarrage, non bloquant). Détection automatique override pour ACs explicites (`LCP < 2s` force perf-audit même en mode manual).
 - Auto-invoke chain (v6.4.2) — branchement effectif des 5 agents auditor dans le pipeline. `/dev-run` STEP 5.5 (threat-model post-arch) + STEP 6.4 (3 agents en parallèle pré-dashboard : code-review + a11y + security-scan). `/qa-generate` STEP 6.4 (perf-audit post-coverage). Verdict 🔴 RED de code-reviewer/a11y/security-scan → STOP avec rapport et procédure de déblocage.

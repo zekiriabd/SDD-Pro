@@ -114,6 +114,29 @@ Pipeline complet de A à Z (phases 2 → 5).
 - `/dev-run 1` — exécution seule (phases 3-4)
 - `/qa-generate 1` — tests + coverage + quality (phase 5)
 
+### Variante POC / prototype rapide
+
+```
+/sdd-poc 1
+```
+
+Pipeline **minimaliste** pour POC, démo, ou exemple — saute
+`/us-generate`, `/feat-validate`, `/dev-plan`, **l'API Gate**,
+`/qa-generate` et `/sdd-review`. Génère 1 pseudo-US qui agrège toute la
+FEAT, puis enchaîne `arch` → `dev-backend` → `dev-frontend` sans gate
+entre les deux.
+
+⚠️ **Ne pas déployer en prod** : aucun test, aucun review, aucune
+vérification contrat back↔front. Pour passer en mode strict après un
+POC :
+
+```
+/us-generate 1 --replace-pseudo   # remplace la pseudo-US par 1-N vraies US
+/sdd-full 1                       # pipeline standard (idempotent)
+```
+
+Détails : `@.claude/commands/sdd-poc.md`.
+
 ## 6. Vérifier l'état
 
 ```
@@ -124,6 +147,6 @@ Pipeline complet de A à Z (phases 2 → 5).
 ## Référence complète
 
 - Commandes : `@.claude/CLAUDE.md §3`
-- Working Agreement : `@.claude/WORKING-AGREEMENT.md`
+- Working Agreement : `@.claude/docs/WORKING-AGREEMENT.md`
 - Conventions strictes : `@.claude/docs/conventions.md`
 - Architecture détaillée : `@.claude/docs/architecture.md`

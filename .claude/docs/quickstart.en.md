@@ -63,6 +63,19 @@ In Claude Code: `/feat-generate <Name>`. The agent asks 3-6 elicitation question
 
 *(Optional)* drop static HTML mockups under `workspace/input/ui/{n}-{m}-{Name}.html` — they are consumed passively by `dev-frontend` to map to design system components (cf. `.claude/stacks/ui/*.md` §2 + §7).
 
+### Shared design-system assets (UX convention)
+
+`workspace/input/ui/` may also host **two special files** outside the `{n}-{m}-*.html` convention:
+
+- `design-system.html` — reference palette, primitives, component states
+- `design-system.css` — shared CSS variables / tokens / utilities
+
+These are loaded by the other mockups via `<link rel="stylesheet">` but **not read by `dev-frontend`** (which only globs `{n}-{m}-*.html` basenames). They exist for the **human UX designer** to maintain visual consistency across successive mockups.
+
+During scaffolding, `arch` may copy `design-system.css` into `workspace/output/src/{AppName}/src/index.css` as a token baseline for shadcn/vuetify/radzen (cf. `.claude/rules/quality.md` Part B §B.2).
+
+**Not required**: if you have no project palette, omit both files and use the Design System's default tokens.
+
 ## 4. Run the full pipeline
 
 ```

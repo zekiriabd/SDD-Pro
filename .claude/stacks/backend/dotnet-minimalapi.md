@@ -2,7 +2,7 @@
 
 > §2.4 (Librairies) régénérée depuis `dotnet-minimalapi.libs.json` — ne pas éditer manuellement (`python .claude/python/sdd_admin/sync_stack_md.py --stack-id dotnet-minimalapi`).
 
-Status: Draft
+Status: Stable
 Validation: 🟢 reference (validated combo — dotnet-minimalapi + blazor + radzen + azure-ad + dotnet-xunit + blazor-bunit)
 Tech FEAT ID: tech-minimalapi
 Scope: backend uniquement (API, logique metier, persistance)

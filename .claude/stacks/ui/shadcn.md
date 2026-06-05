@@ -2,7 +2,7 @@
 
 > §2.4 (Librairies) régénérée depuis `shadcn.libs.json` — ne pas éditer manuellement (`python .claude/python/sdd_admin/sync_stack_md.py --stack-id shadcn`).
 
-Status: Draft
+Status: Stable
 Validation: 🟢 reference (validated combo CMS — kotlin-spring-boot + react + shadcn + azure-ad, 2026-05-13)
 UI FEAT ID: shadcn-ui
 Scope: design system shadcn/ui — composants UI pour applications React (Next.js, SPA, dashboards, applications métier)

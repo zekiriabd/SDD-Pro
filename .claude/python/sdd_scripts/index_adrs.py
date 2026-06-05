@@ -35,6 +35,7 @@ if str(_PY_ROOT) not in sys.path:
     sys.path.insert(0, str(_PY_ROOT))
 
 from sdd_lib.paths import repo_root  # noqa: E402
+from sdd_lib.exit_codes import CORRECTIBLE, FAIL_FAST, SUCCESS  # noqa: E402
 
 
 DEFAULT_TEMPLATE = (
@@ -68,8 +69,11 @@ def parse_adr(path: Path) -> dict[str, str]:
     text = ""
     try:
         text = path.read_text(encoding="utf-8")
-    except OSError:
-        pass
+    except OSError as e:
+        # Audit mineur #3 v7.0.0-alpha 2026-06-05 : log instead of silent swallow.
+        # Downstream still works (empty `text` → "Accepted" default + filename title),
+        # but a stderr trace helps when a real I/O bug occurs in the wild.
+        sys.stderr.write(f"WARN index_adrs: cannot read {path}: {e}\n")
 
     title_match = _H1_RE.search(text)
     title = title_match.group(1).strip() if title_match else m.group(2)
@@ -149,8 +153,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"ERROR: index_adrs — template missing", file=sys.stderr)
         print(f"CAUSE: [NOT_FOUND] {args.template}", file=sys.stderr)
         print(f"FIX: ensure .claude/templates/adrs-index.template.md exists", file=sys.stderr)
-        return 1
-
+        return FAIL_FAST
     template = args.template.read_text(encoding="utf-8")
 
     adrs: list[dict[str, str]] = []
@@ -163,8 +166,7 @@ def main(argv: list[str] | None = None) -> int:
     if not ok:
         print(f"ERROR: index_adrs — atomic write self-check failed", file=sys.stderr)
         print(f"CAUSE: [QA_OUTPUT_INVALID] {output}.tmp content mismatch", file=sys.stderr)
-        return 2
-
+        return CORRECTIBLE
     if args.json:
         print(json.dumps({
             "output": str(output),
@@ -177,8 +179,6 @@ def main(argv: list[str] | None = None) -> int:
             msg += ", empty"
         msg += ") refreshed"
         print(f"OK index_adrs — {msg}")
-    return 0
-
-
+    return SUCCESS
 if __name__ == "__main__":
     raise SystemExit(main())

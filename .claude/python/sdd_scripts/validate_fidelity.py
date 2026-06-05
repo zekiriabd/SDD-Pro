@@ -43,6 +43,7 @@ _US_ID_RE = re.compile(r"^\d+-\d+$")
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from sdd_lib.console_db import connect, ensure_initialized, insert_validation_report  # noqa: E402
 from sdd_lib.stderr import warn  # noqa: E402
+from sdd_lib.exit_codes import CORRECTIBLE  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:
@@ -116,13 +117,11 @@ def main() -> int:
     html_path = Path(args.html_path)
     if not html_path.is_file():
         warn(f"FAIL: HTML mockup not found: {args.html_path}")
-        return 2
-
+        return CORRECTIBLE
     generated_dir = Path(args.generated_dir)
     if not generated_dir.is_dir():
         warn(f"FAIL: Generated dir not found: {args.generated_dir}")
-        return 2
-
+        return CORRECTIBLE
     html = read_file(html_path)
 
     # ===== STEP 10: hex tokens =====
@@ -262,7 +261,7 @@ def main() -> int:
                     f"FAIL: invalid --us-id '{args.us_id}' "
                     "(expected pattern {n}-{m} with digits)"
                 )
-                return 2
+                return CORRECTIBLE
             # Persist to console.db (table validation_reports) — replaces fidelity-{n}-{m}.json
             feat_n = int(args.us_id.split("-")[0])
             ensure_initialized()

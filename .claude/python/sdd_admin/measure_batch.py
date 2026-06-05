@@ -23,6 +23,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from sdd_lib.stderr import warn  # noqa: E402
+from sdd_lib.exit_codes import FAIL_FAST, SUCCESS  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:
@@ -39,9 +40,7 @@ def safe_int(v: Any) -> int:
     try:
         return int(v) if v is not None else 0
     except (TypeError, ValueError):
-        return 0
-
-
+        return SUCCESS
 def main() -> int:
     args = parse_args()
 
@@ -51,8 +50,7 @@ def main() -> int:
 
     if not project_dir.is_dir():
         warn(f"Project dir not found: {project_dir}")
-        return 1
-
+        return FAIL_FAST
     files = sorted(project_dir.glob("*.jsonl"))
     if args.session_id:
         files = [f for f in files if f.stem == args.session_id]
@@ -61,13 +59,12 @@ def main() -> int:
             since_dt = datetime.fromisoformat(args.since)
         except ValueError:
             warn(f"Invalid --since format: {args.since}")
-            return 1
+            return FAIL_FAST
         files = [f for f in files if datetime.fromtimestamp(f.stat().st_mtime) >= since_dt]
 
     if not files:
         print("No session files matched.")
-        return 0
-
+        return SUCCESS
     print(f"Processing {len(files)} session file(s)...")
 
     rows: list[dict[str, Any]] = []
@@ -106,8 +103,7 @@ def main() -> int:
 
     if not rows:
         print("No assistant messages with usage found.")
-        return 0
-
+        return SUCCESS
     # Aggregation par session + skill
     by_cmd: dict[tuple[str, str], list[dict]] = {}
     for r in rows:
@@ -217,8 +213,6 @@ def main() -> int:
                 writer.writerow(r)
         print(f"\nCSV written to: {args.out_file}")
 
-    return 0
-
-
+    return SUCCESS
 if __name__ == "__main__":
     sys.exit(main())

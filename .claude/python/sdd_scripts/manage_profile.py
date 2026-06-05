@@ -23,6 +23,8 @@ Exit codes:
 """
 from __future__ import annotations
 
+from sdd_lib.exit_codes import CORRECTIBLE, FAIL_FAST, SUCCESS  # noqa: E402
+
 import argparse
 import os
 import re
@@ -66,8 +68,7 @@ def cmd_export(name: str, *, force: bool = False) -> int:
             f"CAUSE: [PROFILE_NO_TEAM_CONFIG] {src} not found\n"
             f"FIX: create ~/.sdd/config.team.yml first (or set $SDD_TEAM_CONFIG)\n"
         )
-        return 1
-
+        return FAIL_FAST
     dst_dir = profiles_dir()
     dst_dir.mkdir(parents=True, exist_ok=True)
     dst = dst_dir / f"{name}.yml"
@@ -77,12 +78,10 @@ def cmd_export(name: str, *, force: bool = False) -> int:
             f"CAUSE: [PROFILE_EXISTS] {dst}\n"
             f"FIX: use --force to overwrite, or pick another name\n"
         )
-        return 2
+        return CORRECTIBLE
     shutil.copy2(src, dst)
     sys.stdout.write(f"✓ profile '{name}' exported → {dst}\n")
-    return 0
-
-
+    return SUCCESS
 def cmd_import(name: str, *, force: bool = False) -> int:
     validate_profile_name(name)
     src = profiles_dir() / f"{name}.yml"
@@ -92,8 +91,7 @@ def cmd_import(name: str, *, force: bool = False) -> int:
             f"CAUSE: [PROFILE_NOT_FOUND] {src}\n"
             f"FIX: check available profiles via 'manage_profile.py list'\n"
         )
-        return 1
-
+        return FAIL_FAST
     dst = team_config_path()
     if dst.exists() and not force:
         # Backup before overwrite
@@ -107,9 +105,7 @@ def cmd_import(name: str, *, force: bool = False) -> int:
     sys.stdout.write(
         "  Note: re-run /sdd-full or any SDD command to apply the new layered config.\n"
     )
-    return 0
-
-
+    return SUCCESS
 def cmd_list() -> int:
     pd = profiles_dir()
     active = team_config_path()
@@ -128,9 +124,7 @@ def cmd_list() -> int:
         sys.stdout.write(f"\nActive team config: {active}\n")
     else:
         sys.stdout.write(f"\nNo active team config (looked at {active})\n")
-    return 0
-
-
+    return SUCCESS
 def cmd_delete(name: str) -> int:
     validate_profile_name(name)
     path = profiles_dir() / f"{name}.yml"
@@ -140,12 +134,10 @@ def cmd_delete(name: str) -> int:
             f"CAUSE: [PROFILE_NOT_FOUND] {path}\n"
             f"FIX: check available profiles via 'manage_profile.py list'\n"
         )
-        return 1
+        return FAIL_FAST
     path.unlink()
     sys.stdout.write(f"✓ profile '{name}' deleted\n")
-    return 0
-
-
+    return SUCCESS
 def cmd_show(name: str) -> int:
     validate_profile_name(name)
     path = profiles_dir() / f"{name}.yml"
@@ -155,14 +147,12 @@ def cmd_show(name: str) -> int:
             f"CAUSE: [PROFILE_NOT_FOUND] {path}\n"
             f"FIX: check available profiles via 'manage_profile.py list'\n"
         )
-        return 1
+        return FAIL_FAST
     sys.stdout.write(path.read_text(encoding="utf-8"))
     if not sys.stdout.isatty():
-        return 0
+        return SUCCESS
     sys.stdout.write("\n")
-    return 0
-
-
+    return SUCCESS
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="manage_profile",
@@ -204,12 +194,10 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_show(args.name)
     except ValueError as e:
         sys.stderr.write(f"ERROR: {e}\n")
-        return 2
+        return CORRECTIBLE
     except OSError as e:
         sys.stderr.write(f"ERROR: I/O failure: {e}\n")
-        return 1
-    return 2
-
-
+        return FAIL_FAST
+    return CORRECTIBLE
 if __name__ == "__main__":
     sys.exit(main())

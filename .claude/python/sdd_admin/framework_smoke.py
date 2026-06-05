@@ -35,6 +35,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sdd_lib.paths import repo_root  # noqa: E402
+from sdd_lib.exit_codes import FAIL_FAST, SUCCESS  # noqa: E402
 
 
 CACHE_TTL_SECONDS = 300
@@ -116,19 +117,21 @@ def _write_cache(claude_root: Path, status: str) -> None:
         pass
 
 
+# v7.0.0-alpha (audit MAJ-10, 2026-06-04) — these 2 hardcoded lists are
+# the only "drift hotspot" in framework_smoke.py. Refactoring them into
+# a generated catalog (auto-discovery via Glob) was considered but
+# rejected: framework_smoke is a sanity-checker — auto-discovery would
+# make the test useless (it would always pass because it'd find whatever
+# happens to exist). The hardcoded list IS the contract.
 EXPECTED_AGENTS = (
     # Cœur (4)
     "po", "arch", "dev-backend", "dev-frontend",
-    # Variants strict v6.2 — REMOVED v7.0.0 (governance-major-prompts-trim)
     # Support (3)
     "elicitor", "qa", "constitutioner",
-    # Rendering (1) — REMOVED v7.0.0 (governance-major-auditors-trim)
-    # → replaced by sdd_scripts/index_adrs.py (0 token, deterministic)
-    # Auditors v6.3+ (4 after v7.0.0 trim)
-    # accessibility-auditor + performance-auditor REMOVED v7.0.0
-    # → axe-core + Lighthouse CI
+    # Auditors v6.3+ (5 in v7.0.0 — accessibility/perf removed, adversarial added in v7.2.0)
     "code-reviewer", "security-reviewer",
     "spec-compliance-reviewer", "arch-reviewer",
+    "adversarial-reviewer",
 )
 
 EXPECTED_RULES = (
@@ -231,8 +234,7 @@ def main() -> int:
     # et qu'on est en mode hook (silent-on-pass), on saute tout le smoke.
     # Coût typique : 20-50ms (stat() récursifs uniquement).
     if args.silent_on_pass and _try_fast_path(claude_root):
-        return 0
-
+        return SUCCESS
     checks = Checks()
 
     # 1. Agents
@@ -365,11 +367,10 @@ def main() -> int:
         from sdd_admin.validate_libs_catalog import validate_catalog  # noqa: E402
 
         stacks_dir = claude_root / "stacks"
-        # Skip _drafts/ subtree — those are quarantined stacks
-        # (fullstack/mobiles/ddd/microservice) not part of the active surface.
+        # All stacks under .claude/stacks/ are validated (v7.0.0+ rollback of
+        # _drafts/ quarantine — every category subdirectory is active).
         catalogs = (
-            sorted(p for p in stacks_dir.rglob("*.libs.json")
-                   if "_drafts" not in p.parts)
+            sorted(stacks_dir.rglob("*.libs.json"))
             if stacks_dir.is_dir() else []
         )
         cat_errors = 0
@@ -384,6 +385,28 @@ def main() -> int:
                        f"{cat_errors} schema error(s) in stacks/**/*.libs.json — run validate_libs_catalog.py")
     except ImportError:
         checks.add("libs-catalogs-schema", "WARN", "validate_libs_catalog module not importable")
+
+    # 11. v7.0.0-alpha (audit CRIT-7) — exit codes consistency.
+    # Verify that no script outside the documented granular exceptions
+    # still uses hardcoded `return [0-3]` (drift gate for the
+    # sdd_lib/exit_codes.py convention).
+    try:
+        from sdd_admin.migrate_exit_codes import main as _mig_main  # noqa: E402
+        rc = _mig_main(["--check"])
+        if rc == SUCCESS:
+            checks.add(
+                "exit-codes-consistency", "OK",
+                "no hardcoded `return [0-3]` outside documented granular exceptions",
+            )
+        else:
+            checks.add(
+                "exit-codes-consistency", "FAIL",
+                "hardcoded `return [0-3]` re-introduced — "
+                "run `python -m sdd_admin.migrate_exit_codes` to fix",
+            )
+    except ImportError:
+        checks.add("exit-codes-consistency", "WARN",
+                   "migrate_exit_codes module not importable")
 
     # 10. Console lock cross-langage symétrique (anti-régression risque #2)
     node_lock = root / "workspace" / "console" / "lib" / "atomic-write.js"
@@ -629,8 +652,7 @@ def main() -> int:
     # Silent-on-pass: no output if everything OK (suitable for Stop hook)
     if args.silent_on_pass and fail == 0 and warn == 0:
         _write_cache(claude_root, "ok")
-        return 0
-
+        return SUCCESS
     if args.json:
         result = {
             "scanned_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -661,10 +683,8 @@ def main() -> int:
 
     if (args.strict and fail > 0) or fail > 0:
         _write_cache(claude_root, "fail")
-        return 1
+        return FAIL_FAST
     _write_cache(claude_root, "ok")
-    return 0
-
-
+    return SUCCESS
 if __name__ == "__main__":
     sys.exit(main())

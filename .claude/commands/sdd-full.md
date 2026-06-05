@@ -84,6 +84,38 @@ Si non numérique → ERROR `[INVALID_ARG]`.
 
 ---
 
+## STEP 1.bis — HARD-GATE anti-cumul bypass (v7.0.0-alpha, audit CRIT-10)
+
+**Bloquant AVANT tout coût LLM.** Pré-CRIT-10, cette gate vivait à
+STEP 3.6.quart — après que STEP 3.5 / STEP 3.6 ait déjà déclenché la
+génération de plans techniques (jusqu'à ~30-60 KB tokens Opus 4.7 par
+plan × N US). Si `BYPASS_COUNT >= 2` sans `SDD_ALLOW_FORCE=1`, ces
+plans étaient générés pour rien. Désormais le check primaire est ici,
+juste après le parsing des flags, **avant toute autre phase**.
+
+Exécuter le script déterministe (0 token LLM, ~50 ms) :
+
+```bash
+python .claude/python/sdd_scripts/preflight_force_cumul.py \
+  $( [ "$FORCE" = "true" ]            && echo --force ) \
+  $( [ "$NO_PLAN_ON_WARN" = "true" ]  && echo --no-plan-on-warn ) \
+  $( [ "$NO_VALIDATE" = "true" ]      && echo --no-validate )
+```
+
+| Exit | Action |
+|:-:|---|
+| 0 | continuer STEP 1.quart (cas normal, bypass simple, ou cumul autorisé via `SDD_ALLOW_FORCE`) |
+| 1 | **STOP** + ERROR `[FORCE_CUMUL_REJECTED]` déjà émis par le script sur stderr |
+
+Le script reproduit fidèlement la logique documentée historiquement à
+STEP 3.6.quart (mêmes seuils, même env var, même format ERROR). STEP
+3.6.quart est conservé en mode **defense-in-depth** (cf. ci-dessous)
+pour les invocations qui contourneraient ce STEP 1.bis (chaînage
+inline par un assistant Claude qui spawne directement les sous-commandes
+sans repasser par la CLI).
+
+---
+
 ## STEP 1.quart — Initialiser l'état du run (Phase 0 observability, v6.1)
 
 Cette commande émet désormais un **state.json par run** et un **event log
@@ -114,60 +146,37 @@ est best-effort).
 
 ---
 
-## STEP 1.tiers — Phase planner (méta-orchestrateur conditionnel, v6.4.1)
+## STEP 1.tiers — Phase planner (délégué à /dev-run §5.5.1 depuis v7.0.0-alpha)
 
-Cette commande **n'invoque PAS** elle-même les agents auditor actifs
-(`code-review`, `security-scan`, `spec-compliance`, `arch-review`) —
-ils sont auto-invoqués depuis `/dev-run` / `/qa-generate` selon leur
-mode (cf. agent.md §Intégration pipeline). Mais `/sdd-full` peut
-émettre **dès le démarrage** un récap des phases auditor planifiées,
-utile pour l'observabilité du run et l'estimation tokens.
+> **v7.0.0-alpha (audit CRIT-4 — 2026-06-04)** : le calcul eager de
+> `$PHASE_PLAN` est désormais **délégué à `/dev-run §5.5.1`** (qui le
+> calcule de toute façon en mode idempotent — guard standalone). La
+> double invocation `phase_planner.py` était redondante. Ce STEP émet
+> uniquement un récap léger en fin de pipeline (au STEP 5), à partir du
+> JSON que `/dev-run` aura déjà persisté dans `state.json.phases.planning`.
 
 > **v7.0.0** : les phases `a11y_audit`, `perf_audit`, `threat_model`
 > apparaissent encore dans le JSON `phase_planner` pour backward-compat
 > des consumers, mais portent toutes `enabled: false` + `agent_removed: true`
-> (agents retirés). Affichées dans le récap avec le marqueur `⊘`
+> (agents retirés). Affichées dans le récap final avec le marqueur `⊘`
 > (skip) + `skip_reason` mentionnant le remplacement (axe-core CI,
 > Lighthouse CI, template humain).
 
-Exécuter via Bash (best-effort, non bloquant) :
+**Rationale** : éviter de re-calculer `$PHASE_PLAN` ici a deux bénéfices :
+1. Évite la double exécution de `phase_planner.py` (`/sdd-full` STEP 1.tiers
+   PUIS `/dev-run` STEP 5.5.1).
+2. Évite le passage cross-process de `$PHASE_PLAN` (env vars, JSON args)
+   qui n'a jamais été vraiment fiable cross-platform (cf. post-mortem
+   `[ENV_PROPAGATION_FAILED]` dans `error-classification.md §1.1`).
 
-```bash
-PHASE_PLAN=$(python .claude/python/sdd_scripts/phase_planner.py \
-  --feat-number {n} --json 2>/dev/null)
-```
+Le récap "auditor phases planifiées" est désormais émis par le STEP 5
+final (récap consolidé), où il a accès au state.json complet incluant
+le payload `planning` calculé par `/dev-run`. Bénéfice secondaire : le
+récap reflète l'état RÉEL d'exécution (pass/warn/fail des auditors) et
+pas une projection ex-ante.
 
-Parser le JSON et émettre 1 ligne récap :
-
-```
-FEAT {n} — auditor phases planifiées : {N_enabled}/{N_total} ({tokens_est} KB est., {tokens_saved} KB évités via skip conditionnel)
-  ✓ {phase_name} ({tokens} KB)         # pour chaque phase enabled
-  ⊘ {phase_name} : {skip_reason}       # pour chaque phase skipped
-```
-
-Si le script échoue (Python absent, parse error) → WARNING 1 ligne et
-continuer **sans plan** (les agents auditor tournent quand même selon
-leur mode Project Config — le planner est un raccourci, pas une gate).
-
-**Critique** : ce STEP n'**affecte pas** le pipeline. Les décisions
-runtime restent prises par les agents eux-mêmes via leur STEP 1.2
-(lecture Project Config). Le planner sert à :
-
-1. **Émettre un récap unifié** au démarrage (UX Tech Lead)
-2. **Détecter des incohérences précoces** (ex. CodeReviewMode=full
-   mais aucun code généré encore — early warning)
-3. **Faciliter le debugging** (Tech Lead voit pourquoi telle phase
-   n'a pas tourné via `skip_reason` lisible)
-
-State tracking :
-
-```bash
-python .claude/python/sdd_scripts/sdd_state.py set-phase \
-  --run-id $RUN_ID --phase planning --status pass \
-  --payload-json "$PHASE_PLAN"
-```
-
-(Non bloquant — emit-event si pertinent, sinon skip silencieux.)
+(Aucune action runtime ici — ce STEP est conservé comme placeholder
+documentaire pour préserver la numérotation des STEPs existants.)
 
 ---
 
@@ -457,46 +466,39 @@ légitime (cas d'usage assumé) ; **cumuler 2 bypass ou plus** signifie
 court-circuiter tous les filets et exige une preuve d'autorisation
 hors-bande (env var). Cf. R1 du rapport CTO audit 2026-05-20.
 
-### Détection cumul
+### Defense-in-depth (v7.0.0-alpha, audit CRIT-10)
+
+> **Check primaire** : `STEP 1.bis` exécute `preflight_force_cumul.py`
+> juste après le parsing des flags. Ce STEP 3.6.quart est conservé comme
+> **filet de sécurité** pour les invocations qui auraient contourné
+> STEP 1.bis (chaînage inline par un assistant Claude qui spawne les
+> sous-commandes sans repasser par CLI parsing).
+
+Si STEP 1.bis a tourné → ce STEP est **no-op idempotent** (les mêmes
+flags produisent le même verdict). Si STEP 1.bis a été sauté (rare —
+voir scenarios ci-dessus) → re-exécuter la même vérification :
 
 ```bash
-BYPASS_COUNT=0
-[ "$FORCE" = "true" ]            && BYPASS_COUNT=$((BYPASS_COUNT + 1))
-[ "$NO_PLAN_ON_WARN" = "true" ]  && BYPASS_COUNT=$((BYPASS_COUNT + 1))
-[ "$NO_VALIDATE" = "true" ]      && BYPASS_COUNT=$((BYPASS_COUNT + 1))
+python .claude/python/sdd_scripts/preflight_force_cumul.py \
+  $( [ "$FORCE" = "true" ]            && echo --force ) \
+  $( [ "$NO_PLAN_ON_WARN" = "true" ]  && echo --no-plan-on-warn ) \
+  $( [ "$NO_VALIDATE" = "true" ]      && echo --no-validate )
 ```
 
-### Gate
+Exit 1 → STOP + ERROR `[FORCE_CUMUL_REJECTED]` (script émet le bloc
+3-lignes sur stderr).
 
-| BYPASS_COUNT | `SDD_ALLOW_FORCE` env | Action |
-|:-:|---|---|
-| 0 ou 1 | n/a | continuer (cas normal ou bypass simple — audit STEP 3.7 trace) |
-| ≥ 2 | non défini OU `0` / `false` | **STOP + ERROR `[FORCE_CUMUL_REJECTED]`** |
-| ≥ 2 | `1` / `true` / `yes` | continuer + audit log enrichi (`cumul=true`) |
+### Convention env var (documentation conservée)
 
-### Format ERROR
+`SDD_ALLOW_FORCE` truthy = `1` / `true` / `yes` (case-insensitive).
+Toute autre valeur (incluant `0` / `false` / absent) compte comme
+non-autorisé.
 
-```
-ERROR: /sdd-full {n} — cumul de bypass refusé
-CAUSE: [FORCE_CUMUL_REJECTED] {BYPASS_COUNT} flags de bypass cumulés
-       (--force + --no-plan-on-warn + --no-validate) sans SDD_ALLOW_FORCE
-FIX: 1. retirer au moins un bypass (préférer corriger la cause amont)
-     2. OU exporter SDD_ALLOW_FORCE=1 et relancer (audit trace enrichie)
-        export SDD_ALLOW_FORCE=1  # bash
-        $env:SDD_ALLOW_FORCE='1'  # powershell
-HINT: ce verrou protège contre l'override silencieux de TOUS les gates
-      amont. Un seul bypass = cas légitime (audit trace simple). Deux ou
-      plus = décision exceptionnelle qui doit être explicitement assumée
-      hors-CLI (env var = trace ops/devops, pas juste shell history).
-```
-
-### Pourquoi env var et pas flag
-
-Un flag CLI supplémentaire (`--really-really-force`) serait copié-collé
-depuis Stack Overflow. Une env var demande un acte conscient (`export`),
-visible dans `env` audit, et reste local au shell — pas dans la commande
-qui apparaît dans les logs CI/scripts. Cf. principe "elevated privilege
-requires elevated friction" (NIST SP 800-160 §3.3.5).
+**Pourquoi env var et pas flag CLI** : un flag (`--really-really-force`)
+serait copié-collé depuis Stack Overflow. Une env var demande un acte
+conscient (`export`), visible dans `env` audit, et reste local au shell —
+pas dans la commande qui apparaît dans les logs CI/scripts. Cf. principe
+"elevated privilege requires elevated friction" (NIST SP 800-160 §3.3.5).
 
 ### Skip
 
@@ -647,11 +649,20 @@ Lire `ReviewMode` dans `## Project Config` (default `full` depuis v6.11.0
 | `off` | skip silencieusement |
 | `manual` | skip (l'utilisateur lance `/sdd-review {n}` manuellement) |
 | `read-only` | `/sdd-review {n} --skip-scans` (lecture DB seule, pas de re-scan) |
-| `full` (défaut) | `/sdd-review {n}` complet (re-scan quality + agrégation + arch-reviewer si `ArchReviewMode=full`) |
+| `full` (défaut) | `/sdd-review {n}` complet (re-scan quality + agrégation) |
+
+> **v7.0.0-alpha (audit CRIT-4)** : `arch-reviewer` n'est **plus**
+> spawné par `/sdd-review §3.0` quand l'invocation arrive depuis
+> `/sdd-full §4.8` — il a déjà tourné en parallèle dans
+> `/dev-run §6.4` (cf. `commands/dev-run.md §6.4.1`). `/sdd-review`
+> reste en charge du **fallback standalone** (invocation directe
+> `/sdd-review {n}` sans `/dev-run` préalable). Économie ~10-15K
+> tokens + ~20s sur un pipeline `/sdd-full` complet.
 
 Le pipeline `/sdd-review` :
 1. Re-run [`quality_scan.py`](.claude/python/sdd_scripts/quality_scan.py) (refresh `qa_quality`)
-2. Spawn `arch-reviewer` agent si `ArchReviewMode: full` (Pattern + Layers + ADRs → `qa_code_review` avec `[ARCH_*]`)
+2. ~~Spawn `arch-reviewer` agent~~ — désormais owned by `/dev-run §6.4`
+   (fallback uniquement si invocation standalone, cf. `commands/sdd-review.md §3.0`)
 3. Read DB (qa_quality + qa_code_review + qa_security + qa_a11y + qa_performance + qa_spec_compliance)
 4. Triage par owner (backend / frontend / shared / unknown) via [`triage_issues.py`](.claude/python/sdd_scripts/triage_issues.py)
 5. Compute verdict 🟢/🟡/🔴 contre `ReviewFailOn`
@@ -779,7 +790,7 @@ Si succès complet sans accroc :
 
 ### Référence détaillée
 - Plan-from-Plan mode : `@.claude/CLAUDE.md §11.10`
-- BREAKING CHANGES history : `@.claude/CHANGELOG.md`
+- BREAKING CHANGES history : `@.claude/docs/CHANGELOG.md`
 - Workflow flow ASCII : `@.claude/docs/workflow.md`
 
 ---
@@ -790,8 +801,9 @@ Si succès complet sans accroc :
 > Substance non dupliquée — la règle est SSoT.
 
 **Labels canoniques émis** : `[ANALYSIS]`, `[PO]`, `[VALIDATE]`,
-`[PLAN]`, `[ARCH]`, `[DEV-BACKEND]`, `[DEV-FRONTEND]`, `[QA]`,
-`[REVIEW]`, `[SECURITY]`, `[DONE]` (pipeline complet — cf. §3)
+`[PLAN]`, `[ARCH]`, `[CONSTITUTION]`, `[DEV-BACKEND]`, `[DEV-FRONTEND]`,
+`[QA]`, `[CODE-REVIEW]`, `[SPEC-REVIEW]`, `[ARCH-REVIEW]`, `[ADV-REVIEW]`,
+`[SECURITY]`, `[DONE]` (pipeline complet — cf. §3)
 **Plage de progression couverte** : `0-100%` (cf. output-protocol.md §4)
 
 **Granularité cible** : 1 update par phase orchestrée (typiquement

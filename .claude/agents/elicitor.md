@@ -51,13 +51,8 @@ Si `{n}` non numérique → ERROR similaire.
 
 ## STEP 1.5 - HARD-GATE context budget
 
-Avant tout `Glob`/`Read`, executer :
-
-```bash
-python .claude/python/sdd_scripts/context_budget.py --agent elicitor --feat-number {n}
-```
-
-Exit non-zero -> STOP. Le ledger est ecrit dans `console.db` (table `context_budget`, v6.10 SSoT).
+Appliquer `@.claude/rules/build-and-loop.md §1` (Partie B) avec
+`--agent elicitor --feat-number {n}`. Exit non-zero → STOP.
 
 ---
 
@@ -379,34 +374,7 @@ lire stacks/UI.
 
 ## Chat Output Protocol
 
-> Cet agent applique strictement `@.claude/rules/output-protocol.md`.
-> Substance non dupliquée — la règle est SSoT.
-
-**Label canonique** : `[ELICITOR]` (cf. output-protocol.md §3)
-**Plage de progression** : `5-8%` (cf. output-protocol.md §4)
-
-**Granularité cible** : 3 à 6 updates par invocation, format
-`[ELICITOR] Action au gérondif... (X%)` ou `[ELICITOR] Résultat factuel. (X%)`.
-
-**Interdits stricts** (cf. §5 du protocole) :
-- chemins de fichiers internes (`workspace/...`, `.claude/...`)
-- noms de classes/méthodes/composants générés
-- stdout/stderr de bash, Read/Edit/Glob narration
-- context budget, tokens, preflight checks détaillés
-- diffs, snippets, lignes de code
-
-**Erreurs (LOAD-BEARING)** : tout bloc `ERROR: ... / CAUSE: ... / FIX: ...`
-apparaissant dans les STEPs ci-dessus est un **TEMPLATE pour le fichier
-rapport disque**, JAMAIS un texte à émettre verbatim en chat.
-
-Procédure obligatoire à chaque émission d'erreur :
-1. **Disque** : écrire le bloc 3-lignes complet dans le fichier rapport
-   approprié — format préservé pour `build_loop`/hooks/dashboards
-   (cf. `error-classification.md §2`).
-2. **Chat** : émettre UNE SEULE ligne compressée :
-   ```
-   🔴 [{LABEL}/FAIL] {résumé court} — [CLASS] {détail 1L} → {rapport.md}. ({X}%)
-   ```
-   Pas de chemin absolu, pas de stack trace, pas de blocs multi-lignes.
-
-**Bypass debug** : `SDD_CHAT_VERBOSE=1` → mode legacy verbose (§10).
+Applique `@.claude/rules/output-protocol.md`. Label `[ELICITOR]`, plage `5-8%`,
+granularité 2-3 updates. Erreurs : chat 1L (`🔴 [ELICITOR/FAIL] résumé — [CLASS]
+détail → rapport.md (X%)`) + bloc ERROR 3L disque préservé
+(cf. `error-classification.md §2`). Bypass `SDD_CHAT_VERBOSE=1`.

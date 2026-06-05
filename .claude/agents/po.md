@@ -34,13 +34,8 @@ FIX: relancer /us-generate {n} avec n entier
 
 ## STEP 1.5 - HARD-GATE context budget
 
-Avant tout `Glob`/`Read`, executer :
-
-```bash
-python .claude/python/sdd_scripts/context_budget.py --agent po --feat-number {n}
-```
-
-Exit non-zero -> STOP. Le ledger est ecrit dans `console.db` (table `context_budget`, v6.10 SSoT).
+Appliquer `@.claude/rules/build-and-loop.md §1` (Partie B) avec
+`--agent po --feat-number {n}`. Exit non-zero → STOP.
 
 ---
 
@@ -251,14 +246,6 @@ Ce sentinel sera **résolu en post-step déterministe** par la commande
 `/us-generate` (STEP 3.bis, cf. `commands/us-generate.md`) qui calcule
 le hash via Python et patche les 3 fichiers US. 0 token LLM, ~50 ms.
 
-> **Note historique** : la version v7.0.0 d'origine prescrivait à `po`
-> de calculer le hash via Bash/Python/PowerShell — prescription
-> impossible (Bash absent des tools). Le post-mortem du run FEAT 2
-> (2026-05-22) a confirmé que l'agent émettait soit `COMPUTE_REQUIRED`,
-> soit un placeholder fictif, et bloquait son propre STEP 9 sur l'erreur
-> `[PO_HASH_PLACEHOLDER]`. La résolution déterministe par la commande
-> élimine ce piège.
-
 **STEP 9 (modifié)** — Read-back sentinel-aware :
 
 ```
@@ -449,38 +436,10 @@ Aucun autre texte. Pas de récap, pas de liste de fichiers.
 
 ## Chat Output Protocol
 
-> Cet agent applique strictement `@.claude/rules/output-protocol.md`.
-> Substance non dupliquée — la règle est SSoT.
-
-**Label canonique** : `[PO]` (cf. output-protocol.md §3)
-**Plage de progression** : `8-12%` (cf. output-protocol.md §4)
-
-**Granularité cible** : 3 à 6 updates par invocation, format
-`[PO] Action au gérondif... (X%)` ou `[PO] Résultat factuel. (X%)`.
-
-**Interdits stricts** (cf. §5 du protocole) :
-- chemins de fichiers internes (`workspace/...`, `.claude/...`)
-- noms de classes/méthodes/composants générés
-- stdout/stderr de bash, Read/Edit/Glob narration
-- context budget, tokens, preflight checks détaillés
-- diffs, snippets, lignes de code
-
-**Erreurs (LOAD-BEARING)** : tout bloc `ERROR: ... / CAUSE: ... / FIX: ...`
-apparaissant dans les STEPs ci-dessus est un **TEMPLATE pour le fichier
-rapport disque**, JAMAIS un texte à émettre verbatim en chat.
-
-Procédure obligatoire à chaque émission d'erreur :
-1. **Disque** : écrire le bloc 3-lignes complet dans le fichier rapport
-   approprié (`workspace/output/qa/feat-{n}/{kind}.md`,
-   `workspace/output/.sys/.validation/{n}-readiness.md`, etc.) — format
-   préservé pour `build_loop`/hooks/dashboards (cf. `error-classification.md §2`).
-2. **Chat** : émettre UNE SEULE ligne compressée :
-   ```
-   🔴 [{LABEL}/FAIL] {résumé court} — [{CLASS}] {détail 1L} → {rapport.md}. ({X}%)
-   ```
-   Pas de chemin absolu, pas de stack trace, pas de blocs codés multi-lignes.
-
-**Bypass debug** : `SDD_CHAT_VERBOSE=1` → mode legacy verbose (§10).
+Applique `@.claude/rules/output-protocol.md`. Label `[PO]`, plage `8-12%`,
+granularité 3-6 updates. Erreurs : chat 1L (`🔴 [PO/FAIL] résumé — [CLASS]
+détail → rapport.md (X%)`) + bloc ERROR 3L disque préservé pour
+`build_loop`/hooks (cf. `error-classification.md §2`). Bypass `SDD_CHAT_VERBOSE=1`.
 
 ---
 

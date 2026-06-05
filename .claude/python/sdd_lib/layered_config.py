@@ -45,6 +45,7 @@ from sdd_lib.project_config import (
     coerce_config_types,
     normalize_project_aliases,
     parse_kv_block,
+    read_stack_md_text,
     section_body,
     stack_md_path,
 )
@@ -153,12 +154,9 @@ def _read_project_section(root: Path) -> dict[str, str]:
     (A11yMode, A11yFailOn, CodeReviewMode, ...). Legacy flat keys in
     `## Project Config` take precedence over the block (backward compat).
     """
-    path = stack_md_path(root)
-    if not path.is_file():
-        return {}
-    try:
-        text = path.read_text(encoding="utf-8")
-    except OSError:
+    # v7.0.0-alpha (audit CRIT-2) : cached I/O via read_stack_md_text.
+    text = read_stack_md_text(root)
+    if text is None:
         return {}
     block = section_body(text, "Project Config")
     project_kv: dict[str, str] = {}

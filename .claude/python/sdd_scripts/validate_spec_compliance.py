@@ -37,6 +37,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from sdd_lib.paths import repo_root  # noqa: E402
 from sdd_lib.project_config import read_project_config  # noqa: E402  (legacy fallback)
 from sdd_lib.layered_config import read_layered_config  # noqa: E402  (v6.7.3)
+from sdd_lib.exit_codes import CORRECTIBLE  # noqa: E402
 
 
 VALID_VERDICTS = {"🟢 GREEN", "🟡 WARN", "🔴 RED"}
@@ -328,7 +329,7 @@ def main(argv: list[str] | None = None) -> int:
             path = args.report_path
             if not path.is_file():
                 sys.stderr.write(f"[QA_PRECONDITION_FAILED] {path} introuvable\n")
-                return 2
+                return CORRECTIBLE
             try:
                 report = json.loads(path.read_text(encoding="utf-8"))
             except json.JSONDecodeError as e:
@@ -337,22 +338,20 @@ def main(argv: list[str] | None = None) -> int:
                     f"CAUSE: [QA_OUTPUT_INVALID] JSON corrompu: {e.msg} (ligne {e.lineno})\n"
                     f"FIX: régénérer le rapport\n"
                 )
-                return 2
+                return CORRECTIBLE
     except FileNotFoundError as e:
         sys.stderr.write(f"{e}\n")
-        return 2
+        return CORRECTIBLE
     except ValidationError as e:
         sys.stderr.write(f"ERROR: {e.error}\nCAUSE: {e.cause}\nFIX: {e.fix}\n")
-        return 2
-
+        return CORRECTIBLE
     exit_code, info = validate_report(report, fail_on=fail_on)
 
     if exit_code == 2:
         sys.stderr.write(info.get("error_block", "[QA_OUTPUT_INVALID] unknown\n"))
         if args.json:
             sys.stdout.write(json.dumps(info, ensure_ascii=False) + "\n")
-        return 2
-
+        return CORRECTIBLE
     if args.json:
         sys.stdout.write(
             json.dumps(

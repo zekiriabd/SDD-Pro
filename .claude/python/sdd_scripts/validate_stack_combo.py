@@ -56,97 +56,53 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from sdd_lib.combos import (  # noqa: E402
+    get_component_level,
+    get_component_levels,
+    get_level_priority,
+    get_validated_combos,
+)
 from sdd_lib.paths import repo_root  # noqa: E402
-from sdd_lib.project_config import section_body, stack_md_path  # noqa: E402
+from sdd_lib.project_config import read_stack_md_text, section_body, stack_md_path  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
-# Catalogue canonique des combos validés (SSOT — sync avec docs/validated-combos.md §1)
+# v7.0.0-alpha (audit CRIT-6, 2026-06-04) — catalogue + levels désormais SSoT
+# dans `.claude/templates/combos.json` (cf. sdd_lib/combos.py loader).
+# Les helpers ci-dessous reconstruisent les structures attendues par le code
+# aval, qui était écrit pour des dicts module-level. Cache mtime-keyed via
+# functools.lru_cache dans sdd_lib.combos — re-read automatique sur édition.
 # ---------------------------------------------------------------------------
 
-VALIDATED_COMBOS: list[dict[str, object]] = [
-    {
-        "id": "C1",
-        "label": "stack-microsoft + react",
-        "backend": "dotnet-minimalapi",
-        "frontend": "react",
-        "ui": "shadcn",
-        "qa": {"dotnet-xunit"},
-        "auth": "azure-ad",
-        "db": "postgres",  # SqlServer aussi documenté mais PoC formel sur postgres
-        "archi": "mvc",
-        "validated_at": "2026-05-07",
-    },
-    {
-        "id": "C2",
-        "label": "stack-kotlin + react (workspace CMSPrint)",
-        "backend": "kotlin-spring-boot",
-        "frontend": "react",
-        "ui": "shadcn",
-        "qa": {"kotlin-junit", "node-vitest"},
-        "auth": "azure-ad",
-        "db": "postgres",
-        "archi": "ddd",  # workspace réel mais archi pattern lui-même reste 🟡
-        "validated_at": "2026-05-11",
-    },
-]
 
-# ---------------------------------------------------------------------------
-# Statuts par composant (sync avec docs/validated-combos.md §2)
-# ---------------------------------------------------------------------------
+def _validated_combos() -> list[dict[str, object]]:
+    """Adapter : combos.json → format attendu par `_match_combo` (qa as set)."""
+    out: list[dict[str, object]] = []
+    for raw in get_validated_combos():
+        combo = dict(raw)
+        combo["qa"] = set(raw.get("qa", []))  # JSON arrays → Python set
+        # Backward-compat alias for the field renamed in JSON.
+        if "validatedAt" in combo and "validated_at" not in combo:
+            combo["validated_at"] = combo["validatedAt"]
+        out.append(combo)
+    return out
 
-COMPONENT_LEVELS: dict[str, dict[str, str]] = {
-    "backend": {
-        "dotnet-minimalapi": "validated",
-        "kotlin-spring-boot": "validated",
-        "python-fastapi": "experimental",
-        "node-express": "experimental",
-    },
-    "frontend": {
-        "react": "validated",
-        "blazor-webassembly": "experimental",
-        "vue": "experimental",
-        "angular": "experimental",
-    },
-    "ui": {
-        "shadcn": "validated",
-        "vuetify": "experimental",
-        "radzen-blazor": "experimental",
-    },
-    "qa": {
-        "dotnet-xunit": "validated",
-        "kotlin-junit": "validated",
-        "node-vitest": "validated",
-        "code-quality": "validated",
-        "python-pytest": "experimental",
-        "angular-jasmine": "experimental",
-        "blazor-bunit": "experimental",
-        "mutation-testing": "experimental",
-        "playwright": "experimental",
-    },
-    "auth": {
-        "azure-ad": "validated",
-        "auth-local": "experimental",
-    },
-    "db": {
-        "postgres": "validated",
-        "postgresql": "validated",
-        "sqlserver": "experimental",
-        "mysql": "untested",
-        "mariadb": "untested",
-        "sqlite": "untested",
-        "oracle": "untested",
-        "mongodb": "untested",
-        "none": "validated",
-    },
-    "archi": {
-        "mvc": "validated",
-        "ddd": "experimental",
-        "microservice": "untested",
-    },
-}
 
-LEVEL_PRIORITY = {"validated": 0, "experimental": 1, "untested": 2, "missing": 3}
+def _component_levels_dict() -> dict[str, dict[str, str]]:
+    """Adapter : combos.json::componentLevels → 2D dict (per legacy callers)."""
+    return get_component_levels()
+
+
+def _level_priority() -> dict[str, int]:
+    return get_level_priority()
+
+
+# Module-level constants reconstructed on first import — preserves the
+# behavioural contract for any external caller doing
+# `from validate_stack_combo import VALIDATED_COMBOS, COMPONENT_LEVELS, LEVEL_PRIORITY`.
+VALIDATED_COMBOS: list[dict[str, object]] = _validated_combos()
+COMPONENT_LEVELS: dict[str, dict[str, str]] = _component_levels_dict()
+LEVEL_PRIORITY: dict[str, int] = _level_priority()
 
 # ---------------------------------------------------------------------------
 # Parsing helpers
@@ -184,9 +140,8 @@ def _parse_archi_pattern(text: str) -> str | None:
 
 
 def _component_level(category: str, stack_id: str | None) -> str:
-    if stack_id is None:
-        return "missing"
-    return COMPONENT_LEVELS.get(category, {}).get(stack_id, "untested")
+    # v7.0.0-alpha (audit CRIT-6) : delegate to combos.json SSoT.
+    return get_component_level(category, stack_id)
 
 
 def _match_combo(components: dict) -> dict | None:
@@ -267,16 +222,16 @@ def validate(root: Path | None = None) -> dict:
             "bypass_active": False,
         }
 
-    try:
-        text = path.read_text(encoding="utf-8", errors="replace")
-    except OSError as exc:
+    # v7.0.0-alpha (audit CRIT-2) : cached mtime-keyed read.
+    text = read_stack_md_text(root)
+    if text is None:
         return {
             "signature": None,
             "matched_combo": None,
             "status": "io_error",
             "exit_code": 4,
             "components": {},
-            "warnings": [f"stack.md unreadable: {exc}"],
+            "warnings": [f"stack.md unreadable at {path}"],
             "bypass_active": False,
         }
 

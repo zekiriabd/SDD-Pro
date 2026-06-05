@@ -2,7 +2,7 @@
 
 > §2.4 (Librairies) régénérée depuis `node-vitest.libs.json` — ne pas éditer manuellement (`python .claude/python/sdd_admin/sync_stack_md.py --stack-id node-vitest`).
 
-Status: Draft
+Status: Stable
 Validation: 🟢 reference (validated combo CMS — kotlin-spring-boot + react + shadcn + azure-ad, 2026-05-13)
 QA FEAT ID: node-vitest
 Scope: tests unitaires backend Node.js + frontend React/Vue
@@ -38,7 +38,7 @@ natif via `ng test`).
 <!-- LIBS_CATALOG_START -->
 ### 2.4 Librairies
 
-> Source de verite : `.claude/stacks/qa/node-vitest.libs.json`. Ne pas editer cette section manuellement -- utiliser `python .claude/python/sdd_admin/sync_stack_md.py --stack-id node-vitest`.
+> Source de verite : `.claude/stacks/qa/node-vitest.libs.json`. Ne pas editer cette section manuellement -- utiliser `.claude/python/sdd_admin/sync_stack_md.py --stack-id node-vitest`.
 
 #### 2.4.a Librairies CORE (installees par arch en section 2.2.1, toujours)
 

@@ -70,6 +70,7 @@ from sdd_lib.hook_input import (  # noqa: E402
     read_hook_input,
 )
 from sdd_lib.paths import iso_now_ms, repo_root  # noqa: E402
+from sdd_lib.exit_codes import HOOK_ALLOW  # noqa: E402
 
 # layered_config is optional — telemetry must never break on import errors.
 try:
@@ -276,10 +277,9 @@ def main() -> int:
     try:
         payload = read_hook_input()
     except Exception:
-        return 0
+        return HOOK_ALLOW
     if not payload:
-        return 0
-
+        return HOOK_ALLOW
     root = repo_root()
     audit_dir = root / "workspace" / "output" / ".sys" / ".audit"
 
@@ -319,11 +319,8 @@ def main() -> int:
         # v7.0.0 audit fix : log failure to a fail counter file ; preflight hook
         # reads it and emits a visible WARN when telemetry is going dark.
         _record_telemetry_failure(audit_dir, exc)
-        return 0
-
-    return 0
-
-
+        return HOOK_ALLOW
+    return HOOK_ALLOW
 def _record_telemetry_failure(audit_dir: Path, exc: Exception) -> None:
     """Append failure to .audit/token-telemetry-failures.log + maintain counter.
 

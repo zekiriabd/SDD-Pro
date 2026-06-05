@@ -27,6 +27,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sdd_lib.paths import repo_root  # noqa: E402
+from sdd_lib.exit_codes import SUCCESS  # noqa: E402
 
 DEFAULT_MAX_BYTES = 1 * 1024 * 1024   # 1 MiB
 DEFAULT_MAX_LINES = 5000
@@ -93,8 +94,7 @@ def main() -> int:
     audit_dir = repo_root() / "workspace" / "output" / ".sys" / ".audit"
     if not audit_dir.is_dir():
         print(f"audit dir absent ({audit_dir}) — nothing to rotate")
-        return 0
-
+        return SUCCESS
     any_action = False
     for pattern in AUDIT_LOG_PATTERNS:
         path = audit_dir / pattern
@@ -116,8 +116,6 @@ def main() -> int:
 
     if not any_action:
         print("no rotation needed (logs under thresholds, no old rotations to prune)")
-    return 0
-
-
+    return SUCCESS
 if __name__ == "__main__":
     sys.exit(main())

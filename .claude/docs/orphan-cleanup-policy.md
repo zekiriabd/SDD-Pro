@@ -9,7 +9,7 @@
 
 ## 1. Le problème (mesuré 2026-05-19)
 
-`/sdd-clear` a été retiré en v6.1 (cf. `@.claude/CHANGELOG.md` ligne 1208) :
+`/sdd-clear` a été retiré en v6.1 (cf. `@.claude/docs/CHANGELOG.md` ligne 1208) :
 *"purge en masse non récupérable jugée risquée"*. Décision correcte
 (mass purge dangereux) mais **sans remplacement ciblé**.
 
@@ -218,7 +218,7 @@ au niveau projet entier. Mode opt-in via Project Config
 
 ## 9. Pointers
 
-- [`@.claude/CHANGELOG.md`](.claude/CHANGELOG.md) ligne 1208 — décision de retrait `/sdd-clear` v6.1
+- [`@.claude/docs/CHANGELOG.md`](.claude/docs/CHANGELOG.md) ligne 1208 — décision de retrait `/sdd-clear` v6.1
 - [`@.claude/CLAUDE.md §3`](.claude/CLAUDE.md) — table des commandes (futur emplacement `/cleanup-orphans` post-v7)
 - `workspace/output/.sys/.context/adrs/ADR-20260519T183000-governance-orphan-cleanup-tool.md` — décision + plan v7.0.0
 - [`@.claude/python/sdd_scripts/detect_capabilities.py`](.claude/python/sdd_scripts/detect_capabilities.py) — base pour §6 (détection capabilities orphelines)

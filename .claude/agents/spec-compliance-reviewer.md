@@ -61,14 +61,8 @@ existants (`*-code-review.{md,json}`, etc.) — la review est indépendante.
 
 ## STEP 0.5 — HARD-GATE context budget
 
-Avant tout `Read` hors preflight, exécuter :
-
-```bash
-python .claude/python/sdd_scripts/context_budget.py --agent spec-compliance-reviewer --feat-number {n}
-```
-
-Exit non-zero → STOP. Le ledger est écrit dans
-`console.db` (table `context_budget`, v6.10 SSoT).
+Appliquer `@.claude/rules/build-and-loop.md §1` (Partie B) avec
+`--agent spec-compliance-reviewer --feat-number {n}`. Exit non-zero → STOP.
 
 ---
 
@@ -455,51 +449,25 @@ via `SELECT … FROM qa_spec_compliance WHERE feat_n = {n}`.
 
 ## Chat Output Protocol
 
-> Cet agent applique strictement `@.claude/rules/output-protocol.md`.
-> Substance non dupliquée — la règle est SSoT.
-
-**Label canonique** : `[REVIEW]` (cf. output-protocol.md §3)
-**Plage de progression** : `88-94%` (cf. output-protocol.md §4)
-
-**Granularité cible** : 3 à 6 updates par invocation, format
-`[REVIEW] Action au gérondif... (X%)` ou `[REVIEW] Résultat factuel. (X%)`.
-
-**Interdits stricts** (cf. §5 du protocole) :
-- chemins de fichiers internes (`workspace/...`, `.claude/...`)
-- noms de classes/méthodes/composants générés
-- stdout/stderr de bash, Read/Edit/Glob narration
-- context budget, tokens, preflight checks détaillés
-- diffs, snippets, lignes de code
-
-**Erreurs (LOAD-BEARING)** : tout bloc `ERROR: ... / CAUSE: ... / FIX: ...`
-apparaissant dans les STEPs ci-dessus est un **TEMPLATE pour le fichier
-rapport disque**, JAMAIS un texte à émettre verbatim en chat.
-
-Procédure obligatoire à chaque émission d'erreur :
-1. **Disque** : écrire le bloc 3-lignes complet dans le fichier rapport
-   approprié — format préservé pour `build_loop`/hooks/dashboards
-   (cf. `error-classification.md §2`).
-2. **Chat** : émettre UNE SEULE ligne compressée :
-   ```
-   🔴 [{LABEL}/FAIL] {résumé court} — [CLASS] {détail 1L} → {rapport.md}. ({X}%)
-   ```
-   Pas de chemin absolu, pas de stack trace, pas de blocs multi-lignes.
-pour `build_loop` et hooks — cf. `error-classification.md §2`).
-
-**Bypass debug** : `SDD_CHAT_VERBOSE=1` → mode legacy verbose (§10).
+Applique `@.claude/rules/output-protocol.md`. Label `[SPEC-REVIEW]` (v7.0.0-alpha
+audit M11 fix — dé-collision ex-`[REVIEW]`), plage `88-94%`, granularité 2-3
+updates. Verdict 1L avec emoji + ratio ACs verified/total. Erreurs : chat 1L
+(`🔴 [SPEC-REVIEW/FAIL] résumé — [SPEC_*] détail → rapport.md (X%)`) + bloc ERROR
+3L disque préservé (cf. `error-classification.md §2`). Bypass `SDD_CHAT_VERBOSE=1`.
 
 ---
 
 ## Anti-derive strict
 
+**Universels** : `@.claude/rules/build-and-loop.md §3.bis` (autonomous, ambiguïté → STOP, no-spawn).
+
+**Domain-specific spec-compliance** :
 1. Ne JAMAIS modifier le code de prod (read-only strict)
 2. Ne JAMAIS lire un rapport d'un autre agent (review indépendante)
 3. Ne JAMAIS marquer un AC `verified` sans pointer `file:line`
 4. Ne JAMAIS « inférer » qu'une AC est couverte parce que le file
    existe — il faut une evidence concrète (signal + contexte)
-5. Si ambiguité irrécupérable → STOP + ERROR 3 lignes
-6. Pas de question utilisateur (autonomous)
-7. Pas de fallback créatif sur AC non trouvée — `not_verified` est une
+5. Pas de fallback créatif sur AC non trouvée — `not_verified` est une
    conclusion valable
 
 ## Idempotence

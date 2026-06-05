@@ -40,6 +40,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sdd_lib.console_db import connect, ensure_initialized, insert_gate  # noqa: E402
 from sdd_lib.paths import iso_now_ms  # noqa: E402
+from sdd_lib.exit_codes import INFRA_BLOCKED, SUCCESS  # noqa: E402
 
 
 # Canonical gate names recognized by the historical analytics.
@@ -96,10 +97,7 @@ def main() -> int:
         # Best-effort : caller (Node) decides whether to surface this as
         # a warning. status.json already holds the user-visible decision.
         print(f"ERROR: console.db gate insert failed: {e}", file=sys.stderr)
-        return 3
-
-    return 0
-
-
+        return INFRA_BLOCKED
+    return SUCCESS
 if __name__ == "__main__":
     sys.exit(main())

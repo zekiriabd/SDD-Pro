@@ -2,7 +2,7 @@
 
 > Archive des **sous-sections §10.bis → §10.novies** de l'ancien `CLAUDE.md`
 > (slim 2026-05-19, cf. ADR-20260519T153000-governance-major-prompts-trim).
-> Les entrées détaillées par version vivent dans `@.claude/CHANGELOG.md` ;
+> Les entrées détaillées par version vivent dans `@.claude/docs/CHANGELOG.md` ;
 > ce fichier conserve les notes opérationnelles courtes-format de chaque
 > sprint pour l'onboarding et le diagnostic.
 
@@ -118,33 +118,6 @@ alphabétique = comportement v6.7 byte-identique.
 
 ---
 
-## v6.9.0 — MCP server (opt-in)
-
-Serveur MCP qui expose **14 tools SDD_Pro** à des clients non-Claude-Code
-(Cursor, Windsurf, Cline, Claude Desktop, n8n, scripts CI). Aucun impact
-sur le moteur. Stdlib pure, ~1000 LOC sous `.claude/python/sdd_mcp/`.
-
-**7 tools déterministes** (read-only ou narrow edit) : `sdd_status`,
-`validate_readiness`, `feat_validate`, `set_us_status`, `validate_us_deps`,
-`compute_us_complexity`, `migrate_us_v1_to_v2`.
-
-**7 tools LLM-driven** (subprocess `claude` CLI) : `claude_check`,
-`feat_generate`, `us_generate`, `sdd_full` (async), `get_sdd_full_status`,
-`cancel_sdd_full`, `list_sdd_full_jobs`.
-
-**Transports** : stdio (défaut), HTTP opt-in (`--transport http --port 8765`),
-MCPB bundle pour Claude Desktop.
-
-**98 tests pytest dédiés** (offline grâce à `SDD_MCP_FAKE_CLAUDE=1`).
-
-**Manifest client** : `.claude/mcp.json`. Protocole MCP `2024-11-05`.
-
-Pour Claude Code : RIEN ne change — slash commands continuent nativement.
-
-Détail design : `@.claude/docs/MCP-SERVER.md`.
-
----
-
 ## v6.10.0 — Console DB SQLite (BREAKING)
 
 **Refactor majeur** : tous les `.json` / `.jsonl` / `.log` de télémétrie
@@ -197,7 +170,7 @@ ultérieurement pour lire `console.db` dynamiquement.
 
 ## Pointers
 
-- `@.claude/CHANGELOG.md` — historique versions complet
-- `@.claude/VERSIONING.md` — politique SemVer + freeze window active
-- `@.claude/MIGRATION.md` — guide migration entre versions majeures
+- `@.claude/docs/CHANGELOG.md` — historique versions complet
+- `@.claude/docs/VERSIONING.md` — politique SemVer + freeze window active
+- `@.claude/docs/MIGRATION.md` — guide migration entre versions majeures
 - `workspace/output/.sys/.context/adrs/ADR-2026*` — 4 ADRs governance v7.0.0 proposées (auditors-trim, config-ssot, flags-trim, prompts-trim)

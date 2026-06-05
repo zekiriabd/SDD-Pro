@@ -18,6 +18,7 @@ Migrated from .claude/scripts/preflight.ps1 (2026-05-13).
 from __future__ import annotations
 
 import argparse
+import functools
 import json
 import re
 import sys
@@ -26,7 +27,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sdd_lib.exit_codes import FAIL_FAST, SUCCESS  # noqa: E402
+from sdd_lib.markdown_io import section_body  # noqa: E402
 from sdd_lib.paths import normalize, repo_root  # noqa: E402
+from sdd_lib.project_config import read_stack_md_text  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:
@@ -37,6 +40,16 @@ def parse_args() -> argparse.Namespace:
     return p.parse_args()
 
 
+@functools.lru_cache(maxsize=16)
+def _stack_id_pattern(category: str) -> re.Pattern[str]:
+    """Cache per-category compiled regex (audit mineur #2 v7.0.0-alpha 2026-06-05).
+
+    Was rebuilt on every get_active_ids call ; now compiled once per category.
+    LRU cache bounded to 16 entries (more than enough — only ~8 categories exist).
+    """
+    return re.compile(rf"\.claude/stacks/{re.escape(category)}/([\w-]+)\.md")
+
+
 def get_active_ids(block: str, category: str) -> list[str]:
     """Extract stack ids referenced under `## Active …` block for a given category.
 
@@ -44,7 +57,7 @@ def get_active_ids(block: str, category: str) -> list[str]:
     `# - .claude/stacks/archi/ddd.md`.
     """
     ids: list[str] = []
-    pattern = re.compile(rf"\.claude/stacks/{re.escape(category)}/([\w-]+)\.md")
+    pattern = _stack_id_pattern(category)
     for line in block.splitlines():
         # Skip commented lines (leading `#`, ignoring whitespace)
         stripped = line.lstrip()
@@ -56,10 +69,16 @@ def get_active_ids(block: str, category: str) -> list[str]:
     return ids
 
 
-def extract_section(text: str, header_regex: str) -> str:
-    """Extract content between `## Header` and next `## ` (or end of doc)."""
-    m = re.search(header_regex + r"\s*\r?\n(.*?)(?=^##\s|\Z)", text, re.MULTILINE | re.DOTALL)
-    return m.group(1) if m else ""
+def extract_section(text: str, heading: str) -> str:
+    """Extract content between `## {heading}` and next `## ` (or EOF).
+
+    v7.0.0-alpha (audit CRIT-3) : thin adapter over `sdd_lib.markdown_io.section_body`
+    that returns ``""`` instead of ``None`` when the section is absent
+    (preserves call-site expectations using ``block.strip()`` truth tests).
+    Heading is now a plain string (regex-escaped internally) — the legacy
+    signature accepting raw regex was unused outside this module.
+    """
+    return section_body(text, heading) or ""
 
 
 # v6.7.5 — Active App Type detection (legacy explicit values)
@@ -78,7 +97,7 @@ def get_explicit_app_type(stack_content: str) -> str | None:
     backward-compat reconciliation with auto-detection (v6.7.7+).
     Invalid value → None (errored upstream by reconcile).
     """
-    block = extract_section(stack_content, r"^##\s+Active\s+App\s+Type")
+    block = extract_section(stack_content, "Active App Type")
     if not block.strip():
         return None
     m = re.search(r"(?m)^\s*AppType\s*:\s*([\w-]+)", block)
@@ -176,7 +195,7 @@ def get_archi_pattern(stack_content: str) -> tuple[str, bool]:
     Scope (v6.7.6+): applique UNIQUEMENT au back-front avec backend/* déclaré.
     Pour fullstack/ et mobiles/, ignoré (les stacks intègrent leur archi).
     """
-    block = extract_section(stack_content, r"^##\s+Active\s+Architecture\s+Pattern")
+    block = extract_section(stack_content, "Active Architecture Pattern")
     if not block.strip():
         return "MVC", False
 
@@ -240,7 +259,7 @@ def _is_experimental_stack(root: Path, category: str, stack_id: str) -> str | No
 def _active_archi_id(stack_content: str) -> str | None:
     """Extract the archi stack id (mvc|ddd|microservice) from the
     `## Active Architecture Pattern` block, if exactly one is set."""
-    block = extract_section(stack_content, r"^##\s+Active\s+Architecture\s+Pattern")
+    block = extract_section(stack_content, "Active Architecture Pattern")
     if not block or not block.strip():
         return None
     archi_files = get_active_ids(block, "archi")
@@ -457,11 +476,10 @@ def main() -> int:
         elif len(html_files) == 1:
             result["htmlPath"] = normalize(html_files[0])
 
-    # Read stack.md once
-    try:
-        stack_content = stack_path.read_text(encoding="utf-8")
-    except OSError as e:
-        add_err("STACK_READ_FAILED", f"lecture stack.md impossible : {e}")
+    # Read stack.md once (cached on (path, mtime_ns) — audit CRIT-2)
+    stack_content = read_stack_md_text(root)
+    if stack_content is None:
+        add_err("STACK_READ_FAILED", "lecture stack.md impossible")
         print(json.dumps(result, separators=(",", ":")))
         return FAIL_FAST
 
@@ -481,9 +499,9 @@ def main() -> int:
         return FAIL_FAST
 
     # B1 — Active Tech Specs / UI Specs / Auth Specs blocks
-    tech_block = extract_section(stack_content, r"^##\s+Active\s+Tech\s+Specs")
-    ui_block = extract_section(stack_content, r"^##\s+Active\s+UI\s+Specs")
-    auth_block = extract_section(stack_content, r"^##\s+Active\s+Auth\s+Specs")
+    tech_block = extract_section(stack_content, "Active Tech Specs")
+    ui_block = extract_section(stack_content, "Active UI Specs")
+    auth_block = extract_section(stack_content, "Active Auth Specs")
 
     be_ids = get_active_ids(tech_block, "backend")
     fe_ids = get_active_ids(tech_block, "frontend")
@@ -629,7 +647,7 @@ def main() -> int:
 
     # B2 — Project Config field (BackendName or AppName)
     # v6.7.5+ : pour AppType=fullstack, les 2 families partagent AppName (projet unique).
-    pc_block = extract_section(stack_content, r"^##\s+Project\s+Config")
+    pc_block = extract_section(stack_content, "Project Config")
     if app_type == "fullstack":
         key_name = "AppName"
     elif app_type in ("mobile-react-native", "mobile-maui") and args.family == "frontend":

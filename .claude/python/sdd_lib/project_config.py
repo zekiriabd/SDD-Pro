@@ -14,6 +14,7 @@ already do their own `_bool_flag` / `int(raw)` style cast). New code
 from __future__ import annotations
 
 import re
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -21,6 +22,9 @@ from sdd_lib.paths import repo_root
 
 _KV_RE = re.compile(r"^[-*]?\s*([A-Za-z][A-Za-z0-9_]*)\s*:\s*(.+?)\s*$")
 _ACTIVE_STACK_RE = re.compile(r"^\s*-\s*(\.claude/stacks/[^\s]+\.md)\s*$")
+# `_SECTION_RE_TMPL` kept for backward-compat with external callers (none
+# in tree as of v7.0.0-alpha) — section parsing is now in
+# `sdd_lib.markdown_io.section_body` (audit CRIT-3, SSoT consolidation).
 _SECTION_RE_TMPL = r"^##\s+{heading}\s*\n(.*?)(?=^##\s+|\Z)"
 
 # ---------------------------------------------------------------------------
@@ -112,14 +116,77 @@ def stack_md_path(root: Path | None = None) -> Path:
     return (root or repo_root()) / "workspace" / "input" / "stack" / "stack.md"
 
 
+# ---------------------------------------------------------------------------
+# mtime-keyed read cache (v7.0.0-alpha, audit CRIT-2)
+# ---------------------------------------------------------------------------
+# `stack.md` is the SSoT consumed by ~10 scripts on every /sdd-full run
+# (preflight, validate_*, phase_planner, dev-*, qa). Without caching, a run
+# with N=5 US triggers ≥ 20 reads + regex reparse of the same ~5-10 KB file.
+# The cache is keyed on (resolved_path_str, mtime_ns) so any edit to
+# stack.md invalidates the entry automatically (next call sees a new key).
+# Bounded to maxsize=4 to cover the common cases (default root, occasional
+# alt root from tests, optional team/profile overlays).
+
+
+@lru_cache(maxsize=4)
+def _read_text_cached(path_str: str, mtime_ns: int) -> str:
+    """Cached file read keyed on (resolved path, mtime_ns).
+
+    Do NOT call directly — go through `read_stack_md_text()` which
+    performs the existence + stat lookup that produces the cache key.
+    Raises OSError if the file vanished between stat and read (rare race
+    condition handled by the caller).
+    """
+    del mtime_ns  # part of the key only — discriminates cached entries
+    return Path(path_str).read_text(encoding="utf-8")
+
+
+def read_stack_md_text(root: Path | None = None) -> str | None:
+    """Read `stack.md` with mtime-based caching, or None if absent.
+
+    Used by `read_project_config`, `get_active_stack_paths`, and
+    `layered_config._read_project_section`. Single source of I/O for the
+    Project Config / Active Stacks lookups.
+
+    Returns None when the file does not exist or is unreadable. The cache
+    auto-invalidates when the file mtime changes (Tech Lead edit, sync_stack_md,
+    git checkout).
+    """
+    path = stack_md_path(root)
+    try:
+        stat = path.stat()
+    except OSError:
+        return None
+    try:
+        return _read_text_cached(str(path.resolve()), stat.st_mtime_ns)
+    except OSError:
+        # File vanished between stat() and read() — treat as absent.
+        return None
+
+
+def clear_stack_md_cache() -> None:
+    """Drop the cached stack.md content.
+
+    Useful for long-running processes (tests) that need to force a
+    reread without relying on mtime change. No-op safe when the cache
+    is empty.
+    """
+    _read_text_cached.cache_clear()
+
+
 def section_body(text: str, heading: str) -> str | None:
     """Extract body between `## {heading}` and next H2 (or EOF).
 
     Heading is regex-escaped; whitespace tolerant.
+
+    v7.0.0-alpha (audit CRIT-3) : delegates to `sdd_lib.markdown_io.section_body`
+    (SSoT for markdown section parsing). Kept as a re-export to preserve
+    the public API used by ~10 callers.
     """
-    pattern = _SECTION_RE_TMPL.format(heading=re.escape(heading).replace(r"\ ", r"\s+"))
-    m = re.search(pattern, text, re.MULTILINE | re.DOTALL)
-    return m.group(1) if m else None
+    # Imported locally to avoid a circular import at module load time
+    # (markdown_io is leaf, project_config is mid-tier).
+    from sdd_lib.markdown_io import section_body as _ssot_section_body
+    return _ssot_section_body(text, heading)
 
 
 def parse_kv_block(
@@ -131,6 +198,13 @@ def parse_kv_block(
     """Parse `Key: value` lines from a markdown block.
 
     Strips outer quotes. If `keys` is provided, only those keys are returned.
+
+    YAML-style inline comments are stripped (audit mineur 2026-06-05 fix —
+    previously `PlanReviewDefault: false  # mode café` was parsed as the
+    literal string `"false  # mode café"` triggering TYPE_MISMATCH in
+    validate_project_config.py). A `#` is treated as the start of a comment
+    only when **not inside quotes** ; quoted values like `"secret#1"` are
+    preserved intact.
 
     Args:
         block: raw markdown text of the section.
@@ -145,7 +219,17 @@ def parse_kv_block(
         m = _KV_RE.match(line)
         if not m:
             continue
-        key, value = m.group(1), m.group(2).strip().strip('"').strip("'")
+        key = m.group(1)
+        raw_value = m.group(2)
+        # Strip inline `#` comment unless `#` appears inside quotes.
+        # Heuristic: if `#` is preceded by an unbalanced quote, keep as-is.
+        if "#" in raw_value:
+            # Count quotes before each `#` to decide if it's inside a string.
+            hash_idx = raw_value.find("#")
+            prefix = raw_value[:hash_idx]
+            if prefix.count('"') % 2 == 0 and prefix.count("'") % 2 == 0:
+                raw_value = prefix
+        value = raw_value.strip().strip('"').strip("'")
         if keys is not None and key not in keys:
             continue
         if value:
@@ -170,13 +254,12 @@ def read_project_config(
 
     v7.0.0-alpha : `coerce=True` returns native types (int / float / bool)
     for non-enum keys. Default False = legacy behaviour (strings).
+
+    v7.0.0-alpha (audit CRIT-2) : I/O cached on `(path, mtime_ns)` via
+    `read_stack_md_text()`. Parsing still runs per call (cheap regex).
     """
-    path = stack_md_path(root)
-    if not path.is_file():
-        return {}
-    try:
-        text = path.read_text(encoding="utf-8")
-    except OSError:
+    text = read_stack_md_text(root)
+    if text is None:
         return {}
     block = section_body(text, "Project Config")
     if block is None:
@@ -215,13 +298,12 @@ def normalize_project_aliases(raw: dict[str, str]) -> dict[str, str]:
 
 
 def get_active_stack_paths(root: Path | None = None) -> list[str]:
-    """List `.claude/stacks/...` paths referenced under `## Active ...` sections."""
-    path = stack_md_path(root)
-    if not path.is_file():
-        return []
-    try:
-        text = path.read_text(encoding="utf-8")
-    except OSError:
+    """List `.claude/stacks/...` paths referenced under `## Active ...` sections.
+
+    v7.0.0-alpha (audit CRIT-2) : I/O cached via `read_stack_md_text()`.
+    """
+    text = read_stack_md_text(root)
+    if text is None:
         return []
     paths: list[str] = []
     for line in text.splitlines():

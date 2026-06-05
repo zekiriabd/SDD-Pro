@@ -52,13 +52,8 @@ FIX: relancer /qa-generate {n} avec n entier
 
 ## STEP 1.5 - HARD-GATE context budget
 
-Avant tout `Glob`/`Read` de code source, executer :
-
-```bash
-python .claude/python/sdd_scripts/context_budget.py --agent qa --feat-number {n}
-```
-
-Exit non-zero -> STOP. Le ledger est ecrit dans `console.db` (table `context_budget`, v6.10 SSoT).
+Appliquer `@.claude/rules/build-and-loop.md §1` (Partie B) avec
+`--agent qa --feat-number {n}`. Exit non-zero → STOP.
 
 ---
 
@@ -459,6 +454,9 @@ Idempotent et non-bloquant. Transition `Review → Done` valide sans `--force`.
 
 ## Anti-derive strict
 
+**Universels** : `@.claude/rules/build-and-loop.md §3.bis` (autonomous, ambiguïté → STOP, no-spawn).
+
+**Domain-specific QA** :
 - Ne JAMAIS modifier le code de production sous
   `workspace/output/src/{App|Backend|Frontend|*Lib}/**` (read-only strict)
 - **Périmètre QA SDD_Pro v7.0.0** :
@@ -473,8 +471,6 @@ Idempotent et non-bloquant. Transition `Review → Done` valide sans `--force`.
 - Ne JAMAIS modifier les FEATs, US, mockups HTML (read-only)
 - Ne JAMAIS modifier `workspace/output/.sys/.context/constitution.md` ni les ADRs
   (read-only)
-- Ne JAMAIS poser de question utilisateur (autonomous)
-- En cas d'ambiguïté → STOP + ERROR (pas de devinette)
 
 ---
 
@@ -504,27 +500,8 @@ géré par `parse_coverage.py` (STEP 8).
 
 ## Chat Output Protocol
 
-> Cet agent applique strictement `@.claude/rules/output-protocol.md`.
-> Substance non dupliquée — la règle est SSoT.
-
-**Label canonique** : `[QA]` (cf. output-protocol.md §3)
-**Plage de progression** : `78-88%` (mode unit/coverage) ou `58-66%` (mode API Gate) (cf. output-protocol.md §4)
-
-**Granularité cible** : 3 à 6 updates par invocation, format
-`[QA] Action au gérondif... (X%)` ou `[QA] Résultat factuel. (X%)`.
-
-**Interdits stricts** (cf. §5 du protocole) :
-- chemins de fichiers internes (`workspace/...`, `.claude/...`)
-- stdout/stderr de bash, Read/Edit/Glob narration
-- listes de tests, assertion dumps, jest/xunit verbose logs
-- détail SQL des migrations, requêtes ORM
-- context budget, tokens, preflight checks détaillés
-
-**Verdicts** : 1 ligne avec emoji (🟢/🟡/🔴) + compteurs métier.
-Exemple : `[QA] 47/47 tests passés, coverage 82% ≥ 80%, verdict 🟢. (88%)`.
-
-**Erreurs** : chat 1L avec classe `[CLASS]` (préférence
-`[QA_TEST_FAILED] > [QA_COVERAGE_GAP]`) + pointeur fichier rapport
-(cf. §7.2). Le format ERROR 3L sur disque est inchangé.
-
-**Bypass debug** : `SDD_CHAT_VERBOSE=1` → mode legacy verbose (§10).
+Applique `@.claude/rules/output-protocol.md`. Label `[QA]`, plage `58-66%` (mode API
+Gate) ou `78-88%` (mode unit/coverage), granularité 3-6. Verdict 1L avec emoji
+(`[QA] 47/47 tests, coverage 82%, 🟢 (88%)`). Erreurs : chat 1L avec préférence
+`[QA_TEST_FAILED] > [QA_COVERAGE_GAP]` + pointeur rapport (§7.2) ; bloc ERROR 3L
+disque préservé. Bypass `SDD_CHAT_VERBOSE=1`.

@@ -45,6 +45,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sdd_lib.paths import iso_now  # noqa: E402
 from sdd_lib.stderr import error_block  # noqa: E402
+from sdd_lib.exit_codes import CORRECTIBLE, FAIL_FAST, SUCCESS  # noqa: E402
 
 
 def sha256_of_file(path: Path) -> str:
@@ -78,8 +79,7 @@ def main() -> int:
             cause=f"[PLAN_NOT_FOUND] US file introuvable: {us_path}",
             fix="lancer /us-generate {n} avant /dev-plan",
         )
-        return 1
-
+        return FAIL_FAST
     try:
         us_hash = sha256_of_file(us_path)
     except OSError as e:
@@ -88,8 +88,7 @@ def main() -> int:
             cause=f"[PLAN_UNREADABLE] lecture US impossible: {e}",
             fix="verifier les droits FS et l'encodage UTF-8",
         )
-        return 1
-
+        return FAIL_FAST
     claude_md_hash: str | None = None
     if claude_md_path is not None:
         if not claude_md_path.is_file():
@@ -98,7 +97,7 @@ def main() -> int:
                 cause=f"[PLAN_NOT_FOUND] CLAUDE.md projet introuvable: {claude_md_path}",
                 fix="lancer /arch-init avant /dev-plan (CLAUDE.md genere par arch Phase C)",
             )
-            return 2
+            return CORRECTIBLE
         try:
             claude_md_hash = sha256_of_file(claude_md_path)
         except OSError as e:
@@ -107,8 +106,7 @@ def main() -> int:
                 cause=f"[PLAN_UNREADABLE] lecture CLAUDE.md impossible: {e}",
                 fix="verifier les droits FS et l'encodage UTF-8",
             )
-            return 2
-
+            return CORRECTIBLE
     caps = [c.strip() for c in args.capabilities.split(",") if c.strip()]
     timestamp = iso_now()
 
@@ -122,8 +120,7 @@ def main() -> int:
             "strict_ready": True,
         }
         print(json.dumps(payload, separators=(",", ":")))
-        return 0
-
+        return SUCCESS
     # YAML fragment: lines ready to inject in frontmatter (no `---` delimiters)
     lines: list[str] = [
         "plan-schema-version: 2",
@@ -137,8 +134,6 @@ def main() -> int:
     lines.append("strict-ready: true")
 
     print("\n".join(lines))
-    return 0
-
-
+    return SUCCESS
 if __name__ == "__main__":
     sys.exit(main())

@@ -168,14 +168,16 @@ selon §3). Cible : 5 combos validés à v7.1.0.
 **Inconvénient** : coût significatif (10-15 jours-homme) sans utilisateur
 demandeur identifié.
 
-### 5.3 Option C — *« Quarantaine élargie »*
+### 5.3 Option C — *« Quarantaine élargie »* (historique, rollback v7.x)
 
-**Réduire la surface** : déplacer tous les stacks 🔴 / 🟡 jamais utilisés
-en `.claude/stacks/_drafts/` (déjà fait pour fullstack/mobile/DDD/microservice
-en v7.0.0 — étendre à `python-fastapi`, `node-express`, `vue`, `angular`,
-`blazor-webassembly`, `vuetify`, `radzen-blazor`, `auth-local`).
+**Position historique v7.0.0** : déplacer tous les stacks 🔴 / 🟡 jamais
+utilisés vers `.claude/stacks/_drafts/`. Cette quarantaine a été **rollback
+en v7.x** (cf. ADR `governance-stacks-quarantine-rollback`) : tous les
+stacks sont désormais chargeables sous `.claude/stacks/{cat}/`. Le statut
+🟢/🟡 reste signalé par le frontmatter `Validation:` de chaque stack.
 
-**Avantage** : framework v7.0.0 = 2 combos officiels, 0 ambiguïté.
+**Avantage de la nouvelle approche** : surface unique, statut explicite
+par stack, plus de mécanisme de filtrage spécial dans les scripts Python.
 
 **Inconvénient** : retour en arrière sur le travail v6.x sur ces stacks.
 
@@ -215,7 +217,7 @@ Pour information / mitigation préventive si vous tentez un combo 🟡/🔴 :
 - `@.claude/docs/poc-roi-methodology.md` — méthodologie de validation combo
 - `@.claude/docs/roi-baseline.md` — résultats PoCs (à remplir)
 - `@.claude/python/sdd_scripts/validate_stack_combo.py` — script §4.2
-- `@.claude/stacks/_drafts/README.md` — procédure réactivation stack quarantine
+- ADR `governance-stacks-quarantine-rollback` — décision rollback v7.x
 
 ---
 

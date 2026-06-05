@@ -19,12 +19,41 @@ Migrated from .claude/scripts/detect-capabilities.ps1 (2026-05-13).
 """
 from __future__ import annotations
 
+from sdd_lib.exit_codes import SUCCESS  # noqa: E402
+
 import argparse
 import json
 import re
 import sys
 from datetime import datetime, timezone
+from functools import lru_cache
 from pathlib import Path
+
+
+# v7.0.0-alpha (audit MAJ-11, 2026-06-04) — regex compilation cache +
+# word-boundary wrapping. Before MAJ-11, every trigger was re.search'd
+# uncompiled (re-parsed per call) and matched `re.IGNORECASE` literally
+# — `excel` matched `excellent UX`. The cache + \b wrap fixes both.
+
+@lru_cache(maxsize=256)
+def _compile_trigger(pattern: str) -> re.Pattern[str] | None:
+    """Return a compiled trigger or None on invalid regex.
+
+    Wraps the user pattern with `\\b...\\b` boundaries IFF the pattern
+    looks like a simple alphanumeric word (no metachars). Patterns
+    containing regex metachars are compiled as-is — the catalog author
+    has already crafted their own boundaries.
+    """
+    if not pattern:
+        return None
+    try:
+        # Heuristic: bare alphanumeric token → wrap with \b for word match.
+        # Token = letters/digits/dashes only, no regex metachars.
+        if re.fullmatch(r"[A-Za-z0-9_-]+", pattern):
+            return re.compile(rf"\b{re.escape(pattern)}\b", re.IGNORECASE)
+        return re.compile(pattern, re.IGNORECASE)
+    except re.error:
+        return None
 
 
 def parse_args() -> argparse.Namespace:
@@ -137,13 +166,16 @@ def main() -> int:
         matched_triggers: list[str] = []
 
         if not is_forced:
+            # v7.0.0-alpha (audit MAJ-11) : compiled cache + word-boundary
+            # wrap for bare-word patterns ; eliminates `excel` matching
+            # `excellent UX`. Cf. _compile_trigger above.
             for trigger in cap["triggers"]:  # type: ignore[union-attr]
-                try:
-                    if trigger and re.search(trigger, haystack, re.IGNORECASE):
-                        is_auto = True
-                        matched_triggers.append(trigger)
-                except re.error:
+                compiled = _compile_trigger(str(trigger or ""))
+                if compiled is None:
                     continue
+                if compiled.search(haystack):
+                    is_auto = True
+                    matched_triggers.append(trigger)
 
         lib_to_use = override_map.get(name_lc, cap["lib"])
         lib_already_present = (
@@ -186,8 +218,6 @@ def main() -> int:
     }
 
     print(json.dumps({"summary": summary, "capabilities": results}, indent=2))
-    return 0
-
-
+    return SUCCESS
 if __name__ == "__main__":
     sys.exit(main())

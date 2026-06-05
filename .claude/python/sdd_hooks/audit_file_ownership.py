@@ -27,6 +27,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from sdd_lib.hook_input import get_subagent_type, read_hook_input  # noqa: E402
 from sdd_lib.paths import normalize, repo_root  # noqa: E402
 from sdd_lib.stderr import warn  # noqa: E402
+from sdd_lib.exit_codes import HOOK_ALLOW  # noqa: E402
 
 
 # Matrix extracted from file-ownership.md §1 (must stay in sync)
@@ -81,6 +82,15 @@ IGNORE_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"\.tmp$"),
 )
 
+# Pre-compiled ownership patterns (M7 fix v7.0.0-alpha 2026-06-05).
+# Previously these were re.compile()d inside main() on every SubagentStop —
+# 76 patterns × ~6-10 invocations per /sdd-full = wasted CPU on hot path.
+# Module-level cache : compiled once at import, reused across invocations.
+_COMPILED_OWNERSHIP: dict[str, list[re.Pattern[str]]] = {
+    agent: [re.compile(p) for p in patterns]
+    for agent, patterns in OWNERSHIP_MATRIX.items()
+}
+
 
 def _parse_cutoff() -> datetime:
     """Return cutoff datetime: env $SDD_DISPATCH_START_TS, marker file, or now-5min.
@@ -123,21 +133,18 @@ def _iter_modified_files(workspace: Path, cutoff: datetime) -> list[Path]:
 def main() -> int:
     payload = read_hook_input()
     subagent = get_subagent_type(payload)
-    if not subagent or subagent not in OWNERSHIP_MATRIX:
-        return 0
-
-    allowed = [re.compile(p) for p in OWNERSHIP_MATRIX[subagent]]
+    if not subagent or subagent not in _COMPILED_OWNERSHIP:
+        return HOOK_ALLOW
+    allowed = _COMPILED_OWNERSHIP[subagent]  # M7 : reuse precompiled patterns
 
     root = repo_root()
     workspace = root / "workspace"
     if not workspace.is_dir():
-        return 0
-
+        return HOOK_ALLOW
     cutoff = _parse_cutoff()
     modified = _iter_modified_files(workspace, cutoff)
     if not modified:
-        return 0
-
+        return HOOK_ALLOW
     violations: list[str] = []
     for f in modified:
         try:
@@ -152,8 +159,7 @@ def main() -> int:
             violations.append(rel)
 
     if not violations:
-        return 0
-
+        return HOOK_ALLOW
     audit_dir = root / "workspace" / "output" / ".sys" / ".audit"
     audit_dir.mkdir(parents=True, exist_ok=True)
     log_file = audit_dir / "ownership-violations.log"
@@ -197,8 +203,6 @@ def main() -> int:
             warn(f"FIX: (a) corriger le prompt agent ou la matrice ownership.md")
             warn(f"     (b) bypass interactif : export SDD_AUDIT_OWNERSHIP_MODE=warn")
 
-    return 0
-
-
+    return HOOK_ALLOW
 if __name__ == "__main__":
     sys.exit(main())

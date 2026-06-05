@@ -31,7 +31,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sdd_lib.paths import repo_root  # noqa: E402
-from sdd_lib.project_config import section_body as _section_body  # noqa: E402
+from sdd_lib.project_config import (  # noqa: E402
+    read_stack_md_text as _read_stack_md_text,
+    section_body as _section_body,
+)
+from sdd_lib.exit_codes import SUCCESS  # noqa: E402
 
 
 VAGUE_CONSERVATIVE = [
@@ -153,7 +157,7 @@ def read_safe(path: Path) -> str:
 
 def line_number(text: str, index: int) -> int:
     if index < 0:
-        return 0
+        return SUCCESS
     return text.count("\n", 0, index) + 1
 
 
@@ -221,8 +225,7 @@ def main() -> int:
             print("## 2. Validations semantiques (deterministes)")
             print()
             print(f"**Skip** : FEAT introuvable (workspace/input/feats/{args.feat_number}-*.md)")
-        return 0
-
+        return SUCCESS
     feat_content = read_safe(feat_file)
     us_content = ""
     if us_dir.is_dir():
@@ -330,8 +333,9 @@ def main() -> int:
 
     if routes_in_spec:
         backend_name: str | None = None
-        if stack_path.is_file():
-            stack_raw = read_safe(stack_path)
+        # v7.0.0-alpha (audit CRIT-2) : cached mtime-keyed read.
+        stack_raw = _read_stack_md_text(root)
+        if stack_raw:
             m = re.search(r"(?im)^\s*BackendName\s*:\s*(\S+)", stack_raw)
             if m:
                 backend_name = m.group(1).strip()
@@ -427,8 +431,6 @@ def main() -> int:
             "Pour escalation petit modele sur WARN, voir SemanticValidationMode dans stack.md._"
         )
 
-    return 0
-
-
+    return SUCCESS
 if __name__ == "__main__":
     sys.exit(main())

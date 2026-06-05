@@ -199,51 +199,25 @@ Sur erreur, bloc ERROR 3 lignes (CAUSE / FIX, préfixe `[CLASS]` cf.
 
 ## Chat Output Protocol
 
-> Cet agent applique strictement `@.claude/rules/output-protocol.md`.
-> Substance non dupliquée — la règle est SSoT.
-
-**Label canonique** : `[ARCH]` (cf. output-protocol.md §3)
-**Plage de progression** : `22-32%` (cf. output-protocol.md §4)
-
-**Granularité cible** : 3 à 6 updates par invocation, format
-`[ARCH] Action au gérondif... (X%)` ou `[ARCH] Résultat factuel. (X%)`.
-
-**Interdits stricts** (cf. §5 du protocole) :
-- chemins de fichiers internes (`workspace/...`, `.claude/...`)
-- noms de classes/méthodes/composants générés
-- stdout/stderr de bash, Read/Edit/Glob narration
-- context budget, tokens, preflight checks détaillés
-- diffs, snippets, lignes de code
-
-**Erreurs (LOAD-BEARING)** : tout bloc `ERROR: ... / CAUSE: ... / FIX: ...`
-apparaissant dans les STEPs ci-dessus est un **TEMPLATE pour le fichier
-rapport disque**, JAMAIS un texte à émettre verbatim en chat.
-
-Procédure obligatoire à chaque émission d'erreur :
-1. **Disque** : écrire le bloc 3-lignes complet dans le fichier rapport
-   approprié — format préservé pour `build_loop`/hooks/dashboards
-   (cf. `error-classification.md §2`).
-2. **Chat** : émettre UNE SEULE ligne compressée :
-   ```
-   🔴 [{LABEL}/FAIL] {résumé court} — [CLASS] {détail 1L} → {rapport.md}. ({X}%)
-   ```
-   Pas de chemin absolu, pas de stack trace, pas de blocs multi-lignes.
-pour `build_loop` et hooks — cf. `error-classification.md §2`).
-
-**Bypass debug** : `SDD_CHAT_VERBOSE=1` → mode legacy verbose (§10).
+Applique `@.claude/rules/output-protocol.md`. Label `[CONSTITUTION]` (v7.0.0-alpha
+audit M12 fix — dé-collision ex-`[ARCH]`, phase B finalize post-arch), plage
+`32-36%`, granularité 2-3 updates (ADRs créés, INDEX régénéré, validation
+read-back). Erreurs : chat 1L + bloc ERROR 3L disque préservé
+(cf. `error-classification.md §2`). Bypass `SDD_CHAT_VERBOSE=1`.
 
 ---
 
 ## Anti-derive strict
 
+**Universels** : `@.claude/rules/build-and-loop.md §3.bis` (autonomous, ambiguïté → STOP, no-spawn).
+
+**Domain-specific constitutioner** :
 - Ne JAMAIS lire les FEATs, US, mockups HTML (hors scope)
 - Ne JAMAIS écrire de code applicatif (réservé dev-*)
 - Ne JAMAIS modifier `workspace/input/` (read-only)
 - Ne JAMAIS inventer un ADR pour une dimension non active dans le stack
 - Ne JAMAIS modifier les ADRs existants (append-only sur §6, create-only sur fichiers ADR)
 - Ne JAMAIS réécrire constitution.md intégralement (Edit ligne par ligne uniquement)
-- Ne JAMAIS poser de question à l'utilisateur (autonomous)
-- Si ambiguïté irrécupérable → STOP + ERROR
 
 ---
 

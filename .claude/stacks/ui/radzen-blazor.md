@@ -2,7 +2,7 @@
 
 > §2.4 (Librairies) régénérée depuis `radzen-blazor.libs.json` — ne pas éditer manuellement (`python .claude/python/sdd_admin/sync_stack_md.py --stack-id radzen-blazor`).
 
-Status: Draft
+Status: Stable
 Validation: 🟢 reference (validated combo — dotnet-minimalapi + blazor + radzen + azure-ad)
 UI FEAT ID: radzen-blazor
 Scope: design system Radzen — composants Blazor (Server + WebAssembly)
@@ -17,7 +17,6 @@ Scope: design system Radzen — composants Blazor (Server + WebAssembly)
 
 ---
 
-Status: Draft
 UI FEAT ID: radzen-blazor
 Scope: design system Radzen.Blazor — composants UI pour applications Blazor Server et Blazor WebAssembly
 

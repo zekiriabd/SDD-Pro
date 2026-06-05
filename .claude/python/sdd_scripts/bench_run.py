@@ -46,6 +46,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sdd_lib.paths import repo_root  # noqa: E402
+from sdd_lib.exit_codes import FAIL_FAST, INFRA_BLOCKED, SUCCESS  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Pricing table (USD per million tokens, v7.0.0 / 2026-05-20)
@@ -354,16 +355,14 @@ def main() -> int:
         print(f"[OK] snapshot-before saved: {path.relative_to(repo_root())}")
         if not state.get("db_present"):
             print("[WARN] console.db missing - TokenUsageMode likely 'off' ; bench will lack token data")
-            return 1
-        return 0
-
+            return FAIL_FAST
+        return SUCCESS
     # snapshot-after path
     before_path = _snapshot_path(args.bench_id)
     if not before_path.is_file():
         print(f"[FAIL] snapshot-before not found: {before_path}", file=sys.stderr)
         print("       Run with --snapshot-before first.", file=sys.stderr)
-        return 3
-
+        return INFRA_BLOCKED
     try:
         before = json.loads(before_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
@@ -387,8 +386,6 @@ def main() -> int:
     print(f"     total_cost_usd  : {report['summary']['total_cost_usd']}")
     print(f"     invocations     : {report['summary']['total_invocations']}")
     print(f"     auditor outputs : {report['summary']['auditor_artifacts_present']}")
-    return 0
-
-
+    return SUCCESS
 if __name__ == "__main__":
     sys.exit(main())

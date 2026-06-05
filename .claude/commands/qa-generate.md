@@ -209,36 +209,12 @@ pour le pipeline qa-generate (le `.md` reste lisible humainement).
 
 ---
 
-## STEP 6.4 — Performance audit (RETIRÉ v7.0.0)
-
-> **v7.0.0 (governance-major-auditors-trim)** : l'agent `performance-auditor`
-> (Sonnet 4.6, v6.4.0-v6.10) est **supprimé**. Le défaut `PerfMode` est
-> flippé `full → off` dans `config.base.yml`. La phase est conservée
-> dans `phase_planner.py` pour backward-compat des consumers JSON, mais
-> aucun spawn n'est tenté ici — passer directement à STEP 7.
->
-> **Remplacement** : Lighthouse CI + wrk/k6 dans le CI du projet généré
-> (cf. templates `runbook.template.md` et `slo-sli.template.md`).
->
-> Les tables `qa_performance` de `console.db` et les classes `[PERF_*]`
-> de `error-classification.md §1.12` restent en place pour intégration
-> future avec les sorties Lighthouse CI.
-
----
-
-## STEP 6.5 — Refresh dashboard QA (RETIRÉ en v6.10)
-
-**Retiré** depuis v6.10. Les métriques QA vivent maintenant dans
-`workspace/output/db/console.db` (tables `qa_coverage`, `qa_quality`,
-`qa_api_tests`, `qa_a11y`, `qa_code_review`, `qa_security`,
-`qa_performance`, `qa_spec_compliance`). Le rendu HTML est délégué à
-un consommateur externe de la DB (cf. roadmap `workspace/console/`).
-
-Aucun fichier HTML n'est produit ici. STEP no-op conservé pour
-préserver la numérotation des STEPs aval **interne à `/qa-generate`**
-(pas un alignement cross-commande — chaque commande SDD_Pro a sa propre
-numérotation indépendante : `/sdd-full` 1→5, `/dev-run` 1→7, ce
-fichier 1→6.bis).
+> **v7.0.0-alpha (audit MAJ-5, 2026-06-04)** : STEPs 6.4 (Performance
+> audit) et 6.5 (Refresh dashboard QA) — supprimés en v7.0.0 / v6.10 —
+> ont été retirés (31 L de code mort déclaratif). Pour l'historique :
+> performance-auditor remplacé par Lighthouse CI + wrk/k6 ; dashboard
+> HTML remplacé par `console.db` + `workspace/console/`. Cf. CHANGELOG
+> et `error-classification-legacy.md §2`.
 
 ---
 

@@ -10,14 +10,26 @@
 
 ## TOC
 
-- **Partie A — Backend-First Gated Workflow** : `dev-backend ALL US →
-  QA API Gate (in-memory) → dev-frontend ALL US`, cas testés, fixtures
-  in-memory, critère de passage 🟢/🟡/🔴, boucle correction RED→GREEN.
-- **Partie B — Dev-shared patterns** : context budget HARD-GATE,
-  path safety front/back isolation, mode detection (Normal / Plan Only /
-  From Plan), LibName lock procédure, anti-derive bullets, QA-ownership
-  forbidden patterns, stack-completeness check, BREAKING CHANGES cleanup,
-  plan construction v1/v2.
+- **Partie A — Backend-First Gated Workflow** (§1–§5)
+  - §1 Phase QA API Gate (cas testés, fixtures in-memory, statuts PASS/WARN/FAIL/SKIPPED/INFRA_BLOCKED)
+  - §2 Boucle correction FAIL → PASS
+  - §3 Configuration (GatedWorkflow, ApiGateRequired, ApiGateMinPerEndpoint)
+  - §4 Localisation des tests
+  - §5 Anti-patterns
+- **Partie B — Dev-shared patterns cross-agent** (§1–§9)
+  - §1 Context budget HARD-GATE (STEP 0.5)
+  - §1.bis Path safety Front/Back isolation (STEP 1.bis)
+  - §1.ter Mode detection From Plan (STEP 1)
+  - §2 LibName lock procédure
+  - §2.bis Atomic write — anti-corruption crash mid-write
+  - §3 Anti-derive bullets dev-*
+  - §3.bis Anti-derive universels cross-agent
+  - §4 QA-ownership forbidden patterns
+  - §5 Stack-completeness
+  - §6 BREAKING CHANGES cleanup post-build
+  - §7 Plan construction v1/v2 + dispatch From Plan
+  - §8 Read on-demand
+  - §9 Enforcement
 
 ---
 
@@ -187,16 +199,29 @@ mapping HTML→DS) restent inlinés dans chaque agent.
 
 ## 1. Pattern context budget (HARD-GATE STEP 0.5)
 
-Avant tout `Read` hors preflight, exécuter :
+**SSoT pour les 11 agents** (`po`, `arch`, `dev-backend`, `dev-frontend`,
+`qa`, `elicitor`, `code-reviewer`, `security-reviewer`,
+`spec-compliance-reviewer`, `arch-reviewer`, `adversarial-reviewer`).
+`constitutioner` hérite du budget de `arch` (Phase B). Avant tout `Read`
+hors preflight, exécuter :
 
 ```bash
 python .claude/python/sdd_scripts/context_budget.py \
-  --agent {dev-backend|dev-frontend} \
-  --feat-number {n} --us-id {n}-{m}
+  --agent {agent-id} \
+  [--feat-number {n}] [--us-id {n}-{m}]
 ```
 
+| Agent | Flags requis |
+|---|---|
+| `arch` | `--agent arch` (pas de `--feat-number` — niveau projet) |
+| `dev-backend`, `dev-frontend` | `--agent {dev-*} --feat-number {n} --us-id {n}-{m}` |
+| `po`, `qa`, `elicitor`, *-reviewer | `--agent {agent-id} --feat-number {n}` |
+
 Exit non-zero → STOP. Le ledger est écrit dans
-`console.db` (table `context_budget`, v6.10 SSoT).
+`console.db` (table `context_budget`, v6.10 SSoT). Hoist v7.0.0-alpha
+(audit CRIT-9, 2026-06-04) — chacun des 9 agents non-dev se contentait
+de dupliquer cette substance (~9 L × 9 = ~80 L). Désormais ils
+référencent ce §1 directement avec leur `--agent` en dur.
 
 ---
 
@@ -356,7 +381,27 @@ non-récupéré. Tech Lead inspecte, archive ou supprime manuellement.
 
 ---
 
-## 3. Anti-derive bullets communs
+## 3.bis Anti-derive universels (cross-agent, v7.0.0-alpha audit MAJ-1)
+
+Bullets génériques applicables à **TOUS les 12 agents** (dev-*, support, auditors).
+Référencés via `@.claude/rules/build-and-loop.md §3.bis` ; chaque agent y ajoute
+ses propres bullets **domain-specific** (DB read-only pour arch, périmètre QA
+pour qa, no-duplicate-quality-scan pour code-reviewer, etc.).
+
+1. **Autonomous** : ne JAMAIS poser de question à l'utilisateur en cours
+   d'exécution. L'agent décide ou STOP, pas de dialogue.
+2. **Ambiguïté → STOP** : sur ambiguïté irrécupérable → STOP + ERROR 3
+   lignes (ERROR / CAUSE / FIX avec préfixe `[CLASS]` cf.
+   `error-classification.md §2`). Pas de devinette, pas de fallback créatif.
+3. **No-spawn** : ne JAMAIS appeler / spawn un autre agent depuis ce
+   prompt. Les invocations cross-agent vivent dans les commandes
+   orchestrantes (`/sdd-full`, `/dev-run`, `/sdd-review`), pas dans
+   les agents-feuilles. Exception : `constitutioner` qui est lui-même
+   spawné par `arch` Phase B.
+
+---
+
+## 3. Anti-derive bullets dev-* (backend / frontend)
 
 Interdictions strictes partagées dev-backend / dev-frontend (conservées
 dans leur "Anti-derive strict" pour lisibilité ; **source de vérité ici**) :

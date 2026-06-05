@@ -10,6 +10,13 @@
 >
 > **Statut** : proposition. À valider par décision tracée via ADR
 > `governance-scope-reduction-v7-ga` avant exécution.
+>
+> ⚠️ **Mise à jour v7.x — quarantine `_drafts/` rollback** : la section §2.3
+> ci-dessous référence le dossier `.claude/stacks/_drafts/` qui a été
+> supprimé (cf. ADR `governance-stacks-quarantine-rollback`). Les 9 stacks
+> autrefois quarantine sont désormais chargeables sous `.claude/stacks/{archi,fullstack,mobiles}/`
+> mais marqués 🟡 expérimental dans leur frontmatter `Validation:`. La
+> proposition §2 reste valide ; seul l'emplacement physique des stacks change.
 
 ---
 
@@ -54,11 +61,17 @@ sans garantie de fonctionnement bout-en-bout :
 | Auth | `auth-local` |
 | Archi | `ddd` |
 
-### 2.3 Stacks « Quarantine — non chargés » (🔴 dans `_drafts/`)
+### 2.3 Stacks « Quarantine » (🟡 expérimental depuis rollback v7.x)
 
-Inchangé par cette proposition (cf. `.claude/stacks/_drafts/README.md`) :
+Depuis le rollback v7.x (ADR `governance-stacks-quarantine-rollback`),
+ces 9 stacks ne sont plus en quarantine physique (`_drafts/` supprimé)
+mais marqués 🟡 expérimental dans leur frontmatter `Validation:` sous
+`.claude/stacks/{archi,fullstack,mobiles}/` :
 
-- 6 fullstack, 2 mobiles, 1 archi (`microservice`)
+- 6 fullstack (`angular-universal`, `blazor-server`, `kotlin-mustache`,
+  `next`, `node-react`, `nuxt`)
+- 2 mobiles (`maui`, `react-native`)
+- 1 archi (`microservice`)
 
 ---
 

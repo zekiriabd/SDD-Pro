@@ -1,6 +1,6 @@
 # QA Stack — Playwright E2E (opt-in, v7.0.0)
 
-Status: Draft
+Status: Experimental
 Validation: 🟡 experimental (schema opt-in, non actif par défaut)
 QA FEAT ID: playwright
 Scope: tests E2E navigateur multi-browser (combler trou API Gate v7)

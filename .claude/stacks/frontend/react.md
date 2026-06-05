@@ -2,7 +2,7 @@
 
 > §2.4 (Librairies) régénérée depuis `react.libs.json` — ne pas éditer manuellement (`python .claude/python/sdd_admin/sync_stack_md.py --stack-id react`).
 
-Status: Draft
+Status: Stable
 Validation: 🟢 reference (validated combo CMS — kotlin-spring-boot + react + shadcn + azure-ad, 2026-05-13)
 Tech FEAT ID: tech-react
 Scope: frontend uniquement (React SPA)
@@ -205,9 +205,7 @@ npx shadcn@latest add button card input label textarea select checkbox switch \
   lucide-react@0.468.0 \
   @tanstack/react-query@5.62.7 \
   @tanstack/react-query-devtools@5.62.7 \
-  @tanstack/react-router@1.95.0 \
-  @tanstack/router-plugin@1.95.0 \
-  @tanstack/router-devtools@1.95.0 \
+  react-router-dom@7.15.0 \
   react-hook-form@7.54.1 \
   zod@3.24.1 \
   @hookform/resolvers@3.10.0 \
@@ -233,13 +231,19 @@ npm run build  # doit passer sans erreur de resolution d'import
 (cd workspace/output/src/{AppName} && pnpm add i18next-http-backend@3.0.1)
 
 # capability: auth-azure-ad
-(cd workspace/output/src/{AppName} && pnpm add @azure/msal-browser@3.27.0 @azure/msal-react@2.2.0)
+(cd workspace/output/src/{AppName} && pnpm add @azure/msal-browser@5.10.1 @azure/msal-react@5.4.1)
 
 # capability: data-grid
 (cd workspace/output/src/{AppName} && pnpm add @tanstack/react-table@8.20.5)
 
 # capability: csv-client
 (cd workspace/output/src/{AppName} && pnpm add papaparse@5.4.1 @types/papaparse@5.3.15)
+
+# capability: router-tanstack
+(cd workspace/output/src/{AppName} && pnpm add @tanstack/react-router@1.166.0 @tanstack/router-plugin@1.166.0)
+
+# capability: dev-https
+(cd workspace/output/src/{AppName} && pnpm add @vitejs/plugin-basic-ssl@2.0.0)
 ```
 <!-- ONDEMAND_PACKAGES_END -->
 
@@ -275,7 +279,7 @@ Codes prioritaires :
 <!-- LIBS_CATALOG_START -->
 ### 2.4 Librairies
 
-> Source de verite : `.claude/stacks/frontend/react.libs.json`. Ne pas editer cette section manuellement -- utiliser `python .claude/python/sdd_admin/sync_stack_md.py --stack-id react`.
+> Source de verite : `.claude/stacks/frontend/react.libs.json`. Ne pas editer cette section manuellement -- utiliser `.claude/python/sdd_admin/sync_stack_md.py --stack-id react`.
 
 #### 2.4.a Librairies CORE (installees par arch en section 2.2.1, toujours)
 
@@ -296,9 +300,7 @@ Codes prioritaires :
 | lucide-react | 0.468.0 |  |
 | @tanstack/react-query | 5.62.7 |  |
 | @tanstack/react-query-devtools | 5.62.7 |  |
-| @tanstack/react-router | 1.95.0 |  |
-| @tanstack/router-plugin | 1.95.0 |  |
-| @tanstack/router-devtools | 1.95.0 |  |
+| react-router-dom | 7.15.0 |  |
 | react-hook-form | 7.54.1 |  |
 | zod | 3.24.1 |  |
 | @hookform/resolvers | 3.10.0 |  |
@@ -316,11 +318,14 @@ Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'U
 | Capability | Lib | Version | Triggers |
 |---|---|---|---|
 | i18n-http-loading | i18next-http-backend | 3.0.1 | traductions.*serveur, i18n.*lazy, load.*translations.*remote |
-| auth-azure-ad | @azure/msal-browser | 3.27.0 | azure ad, msal, single sign-on, sso, oauth2.*spa, @azure/msal |
-| auth-azure-ad | @azure/msal-react | 2.2.0 | azure ad, msal, single sign-on, sso, oauth2.*spa, @azure/msal |
+| auth-azure-ad | @azure/msal-browser | 5.10.1 | azure ad, msal, single sign-on, sso, oauth2.*spa, @azure/msal |
+| auth-azure-ad | @azure/msal-react | 5.4.1 | azure ad, msal, single sign-on, sso, oauth2.*spa, @azure/msal |
 | data-grid | @tanstack/react-table | 8.20.5 | datagrid, data grid, tanstack.*table, react-table, tableau.*colonnes, grille.*filtre |
 | csv-client | papaparse | 5.4.1 | csv.*client, export.*csv.*frontend, papaparse, blob.*csv, csv.*download.*navigateur |
 | csv-client | @types/papaparse | 5.3.15 | csv.*client, export.*csv.*frontend, papaparse, blob.*csv, csv.*download.*navigateur |
+| router-tanstack | @tanstack/react-router | 1.166.0 | tanstack.*router, @tanstack/react-router, file-based.*routing, routes/__root, routeTree.gen |
+| router-tanstack | @tanstack/router-plugin | 1.166.0 | tanstack.*router, @tanstack/react-router, file-based.*routing, routes/__root, routeTree.gen |
+| dev-https | @vitejs/plugin-basic-ssl | 2.0.0 | https.*dev, basic-ssl, https.*localhost, azure ad.*spa, msal.*redirect.*localhost, vite.*https |
 <!-- LIBS_CATALOG_END -->
 
 ## 3. Conventions d'usage

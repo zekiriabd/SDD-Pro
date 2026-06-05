@@ -1,6 +1,6 @@
 # Tech FEAT: auth-azure
 
-Status: Draft
+Status: Stable
 Validation: 🟢 reference (validated dans 2 combos — dotnet+blazor+radzen 2026-05 et kotlin+react+shadcn 2026-05-13)
 Tech FEAT ID: tech-auth-azure
 Scope: authentification et autorisation Azure AD — independant de toute stack ou langage. Chaque implementation (backend, SPA, monolithe) doit appliquer ces regles selon sa technologie.

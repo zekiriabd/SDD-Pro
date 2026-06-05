@@ -50,6 +50,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sdd_lib.console_db import connect_ro  # noqa: E402
 from sdd_lib.paths import iso_now_ms, repo_root  # noqa: E402
+from sdd_lib.exit_codes import FAIL_FAST  # noqa: E402
 
 # Pricing table (mirror report_roi.py + preflight_cost_cap.py — keep in sync)
 PRICING = {
@@ -233,8 +234,7 @@ def main() -> int:
     runs = collect_runs(args.feat, args.n_runs)
     if not runs:
         print(f"ERROR : aucun run /sdd-full trouvé pour FEAT {args.feat}", file=sys.stderr)
-        return 1
-
+        return FAIL_FAST
     summary = compute_variance(runs, args.threshold_pct)
 
     if args.json:

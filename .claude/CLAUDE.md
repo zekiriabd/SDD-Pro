@@ -1,8 +1,8 @@
 # SDD_Pro v7.0.0-alpha (branche `next`) — FEAT-Driven Development pour Claude Code
 
 > ⛔ **FREEZE 2026-06-18** sur `main` (v6.10.4-LTS). Sur `next` : v7.0.0-alpha
-> (auditors-trim, prompts-trim, stacks quarantine). Cf. `@.claude/VERSIONING.md`
-> + `@.claude/CHANGELOG.md`.
+> (auditors-trim, prompts-trim, stacks quarantine). Cf. `@.claude/docs/VERSIONING.md`
+> + `@.claude/docs/CHANGELOG.md`.
 
 > Framework SDD strict : FEAT → User Stories → Code (back/front parallèle).
 > Lecture sélective, anti-derive, isolation par US et famille.
@@ -37,7 +37,7 @@ supprimer ligne ET régénérer les US. `Covers` réfèrent par valeur.
 
 ---
 
-## 3. Commandes (11 user-facing + 8 internes [debug])
+## 3. Commandes (12 user-facing + 8 internes [debug])
 
 **User-facing** (orchestrantes, gèrent pré-conditions et idempotence) :
 
@@ -46,7 +46,8 @@ supprimer ligne ET régénérer les US. `Covers` réfèrent par valeur.
 | `/sdd-bootstrap` | 0 | Init projet greenfield (génère stack.md + workspace/) |
 | `/feat-generate [Nom]` | 1 | Cadrage FEAT + bootstrap constitution |
 | `/feat-validate {n} [--json]` | 2.6 | Implementation Readiness Gate |
-| `/sdd-full {n}` | 2→5 | Pipeline complet A→Z |
+| `/sdd-full {n}` | 2→5 | Pipeline complet A→Z (strict, prod-ready) |
+| `/sdd-poc {n}` | 1→4 | **Pipeline minimaliste POC** (skip US/QA/review/API-gate — FEAT→arch→back→front) |
 | `/dev-run {n}` | 4 | Orchestrateur dev (arch+DB → back → API gate → front) |
 | `/qa-generate {n}` | 5 | Tests + coverage + quality scan |
 | `/sdd-review {n}` | audit | Audit consolidé (style Sonar, bloquant RED) |
@@ -55,52 +56,41 @@ supprimer ligne ET régénérer les US. `Covers` réfèrent par valeur.
 | `/sdd-serve` | runtime | Backend + front + console parallèle (ex-`/sdd-run`) |
 | `/sdd-kill-server` | runtime | Arrête backend + front + console (pendant de `/sdd-serve`) |
 
-**Internes** (8, debug/inspection — préférer une commande orchestrante,
-ces commandes sont stables mais réservées au troubleshooting ciblé) :
-`/us-generate`, `/arch-init`, `/dev-plan`, `/dev-backend`, `/dev-frontend`,
-`/doc-refresh`, `/feat-deepen`, `/sdd-profile`.
-
-> Flags `/sdd-full` et `/dev-run` : `--force`, `--rebuild-arch`, `--resume`,
-> `--manual-gates`, `--plan`, `--max-parallel N`. Détail : `@.claude/commands/*.md`.
+**Internes** (8, debug — préférer un orchestrateur) : `/us-generate`,
+`/arch-init`, `/dev-plan`, `/dev-backend`, `/dev-frontend`, `/doc-refresh`,
+`/feat-deepen`, `/sdd-profile`. Flags `/sdd-full` et `/dev-run` : `--force`,
+`--rebuild-arch`, `--resume`, `--manual-gates`, `--plan`, `--max-parallel N`.
+Détail : `@.claude/commands/*.md`.
 
 ---
 
-## 4. Agents (11)
+## 4. Agents (12)
 
 **Cœur** : `po`, `arch` (Sonnet 4.6) ; `dev-backend`, `dev-frontend` (Opus 4.7).
 **Support** : `elicitor`, `constitutioner`, `qa` (Sonnet 4.6).
-**Auditors** : `code-reviewer`, `security-reviewer` (mode `scan`),
-`spec-compliance-reviewer`, `arch-reviewer` (Sonnet 4.6).
-
-> Retirés v7.0.0 : `accessibility-auditor` (→ axe-core CI), `performance-auditor`
-> (→ Lighthouse CI + wrk/k6), `dashboard` (→ `index_adrs.py`), variants
-> `*-strict`. Méta-orchestrateur : `phase_planner.py`. Détail :
-> `@.claude/docs/architecture.md §2-§3`.
+**Auditors** : `code-reviewer`, `security-reviewer` (scan), `spec-compliance-reviewer`,
+`arch-reviewer`, `adversarial-reviewer` (opt-in, informational). Méta-orchestrateur
+déterministe : `phase_planner.py`. Retirés v7.0.0 (`a11y`/`perf`/`dashboard`/`*-strict`) :
+cf. `@.claude/docs/architecture.md §2-§3`.
 
 ---
 
 ## 5. Règles & Templates
 
 `.claude/rules/` (8 fichiers, 6 actives + 2 annexes) :
-- **5 règles consolidées v7.0.0** : `build-and-loop`, `quality`,
-  `ownership`, `library-and-stack`, `error-classification`
-- **1 protocole chat** : `output-protocol.md` (executive chat output —
-  1L par update `[AGENT] résumé (X%)`, suppression logs/tool-calls,
-  ERROR 3L disque préservé) — complété par output-style
-  `.claude/output-styles/sdd-executive.md` (Claude main loop) et
-  statusline `sdd_admin.statusline` (vue permanente bas-écran)
-- **1 hoist cross-agent** : `dev-shared-preflight.md` (STEP 0-1.bis
-  partagés dev-backend / dev-frontend)
-- **1 stub héritage** : `error-classification-legacy.md` (préfixes
-  `[A11Y_*]`/`[PERF_*]` archivés pour ingest CI futur — axe-core,
-  Lighthouse)
+- **5 règles consolidées** : `build-and-loop`, `quality`, `ownership`,
+  `library-and-stack`, `error-classification`
+- **1 protocole chat** : `output-protocol.md` (1L `[AGENT] résumé (X%)`)
+  + statusline `sdd_admin.statusline`
+- **1 hoist** : `dev-shared-preflight.md` (STEP 0-1.bis dev-backend/frontend)
+- **1 annexe** : `error-classification-legacy.md` (`[A11Y_*]`/`[PERF_*]` ingest CI)
 
-**2 principes** dans `.claude/docs/principles/` : `source-first`,
-`us-granularity`. Templates : `@.claude/docs/conventions.md §14-§15`.
+**2 principes** : `.claude/docs/principles/{source-first,us-granularity}.md`.
+Templates : `@.claude/docs/conventions.md §14-§15`.
 
 ---
 
-## 6. Stacks (24 actifs + 9 drafts)
+## 6. Stacks (34 actifs)
 
 | Catégorie | 🟢 reference | 🟡 experimental |
 |---|---|---|
@@ -109,62 +99,43 @@ ces commandes sont stables mais réservées au troubleshooting ciblé) :
 | UI DS (3) | `shadcn` | `vuetify`, `radzen-blazor` |
 | QA (9) | `code-quality`, `dotnet-xunit`, `kotlin-junit` | `node-vitest`, `blazor-bunit`, `python-pytest`, `angular-jasmine`, `mutation-testing` (opt-in), `playwright` (opt-in) |
 | Auth (2) | `azure-ad` | `auth-local` |
-| Archi (2) | `mvc` | `ddd` |
+| Archi (3) | `mvc` | `ddd`, `microservice` |
+| Fullstack (6) | — | `angular-universal`, `blazor-server`, `kotlin-mustache`, `next`, `node-react`, `nuxt` |
+| Mobiles (3) | — | `kotlin-android`, `maui`, `react-native` |
 
-**9 drafts** dans `.claude/stacks/_drafts/` (6 fullstack, 2 mobiles, 1 archi
-`microservice` — non chargés). **Combos validés bout-en-bout : 2** sur ~120
-(`dotnet-minimalapi×react×shadcn×dotnet-xunit×azure-ad`,
-`kotlin-spring-boot×react×shadcn×kotlin-junit×azure-ad`).
-
-> Source de vérité = entête `Validation:` de chaque stack. AppType
-> auto-détecté depuis `## Active Tech Specs`. Catalogue machine
-> `{id}.libs.json` régénéré via `sync_stack_md.py`. Détail combos,
-> capabilities, drafts : `@.claude/docs/architecture.md §4` +
-> `@.claude/docs/validated-combos.md`.
+**Combos validés bout-en-bout : 2** sur ~120 (`dotnet-minimalapi×react×shadcn×dotnet-xunit×azure-ad`,
+`kotlin-spring-boot×react×shadcn×kotlin-junit×azure-ad`). 🟡 chargeables mais non validés
+end-to-end (risque runtime). Source de vérité = entête `Validation:` ; catalogue machine
+`{id}.libs.json` régénéré via `sync_stack_md.py`. Détail : `@.claude/docs/{architecture,validated-combos}.md`.
 
 ---
 
 ## 7. Conventions strictes
 
-Anti-derive, format ERROR 3 lignes (sur disque), idempotence, lecture
-sélective, parallélisme borné (`MaxParallel: 3`), plan inline, CLAUDE.md
-par projet, capabilities core vs on-demand, **chat output executive**
-(1L `[AGENT] résumé (X%)` — cf. `@.claude/rules/output-protocol.md`),
-gates manuels opt-in. Détail : `@.claude/docs/conventions.md §1-§13`.
-
----
+Anti-derive, ERROR 3L disque, idempotence, lecture sélective, parallélisme borné
+(`MaxParallel: 3`), plan inline, capabilities core vs on-demand, chat executive 1L
+(`@.claude/rules/output-protocol.md`), gates manuels opt-in. Détail : `@.claude/docs/conventions.md §1-§13`.
 
 ## 8. Loader manifest
 
-`@.claude/loader.yml` = miroir consolidé reads/writes par agent. Régénéré
-déterministiquement v7.0.0 (ADR `governance-major-config-ssot`).
+`@.claude/loader.yml` = miroir reads/writes par agent (SSoT, ADR `governance-major-config-ssot`).
 
 ---
 
 ## 9. Démarrage rapide
 
-0. **(Greenfield seulement)** `python bootstrap.py` depuis la racine du
-   repo — génère `workspace/input/stack/stack.md` + squelette workspace
-   (interactif, ~5 questions). Brownfield : `/sdd-discover-stack` à la
-   place. Détails : `/sdd-bootstrap`.
-1. Éditer `workspace/input/stack/stack.md` pour ajuster (secrets DB,
-   tenant Azure AD, ports si besoin).
-2. `/feat-generate Auth` — répondre aux 3-6 questions.
-3. (Optionnel) déposer mockups HTML dans `workspace/input/ui/`.
-4. `/sdd-full 1` — pipeline complet.
-5. `/sdd-status [{n}]` — vérifier.
-
-Variantes : `@.claude/docs/quickstart.md`.
+0. Greenfield : `python bootstrap.py [--combo c1|c2] [--dry-run]` (ou `/sdd-bootstrap` — détail `python bootstrap.py --help`). Brownfield : `/sdd-discover-stack`.
+1. Éditer `workspace/input/stack/stack.md` (secrets DB, tenant Azure AD, ports).
+2. `/feat-generate Auth` (3-6 questions). Optionnel : mockups HTML dans `workspace/input/ui/`.
+3. `/sdd-full 1` → `/sdd-status [{n}]`. Variantes : `@.claude/docs/quickstart.md`.
 
 ---
 
 ## 10. Pour aller plus loin
 
-- `@.claude/docs/` — architecture, workflow, conventions, quickstart,
-  version-notes, MCP-SERVER, validated-combos, roadmap-v7-v8,
-  orphan-cleanup-policy (ADR `governance-orphan-cleanup-tool`),
-  principles/
-- `@.claude/rules/` — 5 règles cross-cutting + 1 hoist preflight + 1 stub héritage
-- `@.claude/VERSIONING.md`, `@.claude/CHANGELOG.md`, `@.claude/MIGRATION.md`,
-  `@.claude/WORKING-AGREEMENT.md` (pleine autorisation SDD_Pro, 3 limites),
-  `@.claude/python/README.md`
+- **Architecture & workflow** : `@.claude/docs/{architecture,workflow,conventions,quickstart}.md`
+- **Onboarding** : `@.claude/docs/{glossary,hooks-and-protections,config-precedence}.md`
+- **Gouvernance** : `@.claude/docs/{VERSIONING,CHANGELOG,MIGRATION,WORKING-AGREEMENT}.md`
+- **ROI & roadmap** : `@.claude/docs/{poc-roi-methodology,roi-baseline,roadmap-v7-v8,scope-reduction-v7-ga,version-notes,cache-strategy,validated-combos,orphan-cleanup-policy}.md`
+- **Règles** : `@.claude/rules/` (5 consolidées + 1 hoist + 1 protocole + 1 annexe)
+- **Python** : `@.claude/python/README.md`

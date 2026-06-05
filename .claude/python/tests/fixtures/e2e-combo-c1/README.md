@@ -1,9 +1,13 @@
 # E2E fixture — combo C1
 
-This directory contains the minimal FEAT used by the nightly E2E job
-(`.github/workflows/nightly-e2e.yml`) to validate the full `/sdd-full`
-pipeline on combo C1 (.NET Minimal API + React + shadcn + dotnet-xunit
-+ Azure AD).
+This directory contains a minimal FEAT used to manually validate the full
+`/sdd-full` pipeline on combo C1 (.NET Minimal API + React + shadcn +
+dotnet-xunit + Azure AD).
+
+> ⚠️ **Note historique** : auparavant invoqué automatiquement par le
+> workflow GitHub Actions `nightly-e2e.yml` (supprimé — ce repo est sur
+> Azure DevOps, pas GitHub). La fixture reste utilisable en standalone
+> par un Tech Lead pour reproduire un comportement.
 
 ## Why a fixture
 

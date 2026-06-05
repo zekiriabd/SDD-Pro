@@ -26,6 +26,7 @@ le path, calcul du verdict 🟢/🟡/🔴 contre `ReviewFailOn`, persistance dan
 /sdd-review {n} --ensure-scans        # v7.0.0 : exit 3 si une source QA obligatoire manque
 /sdd-review {n} --fail-on critical    # override seuil (info|minor|moderate|serious|critical)
 /sdd-review {n} --json                # sortie JSON pour CI/tooling
+/sdd-review {n} --adversarial         # v7.2.0 R1 : avocat du diable post-agrégation (informational, jamais bloquant)
 ```
 
 `--ensure-scans` (v7.0.0, codex audit follow-up) : exige que toutes les
@@ -91,17 +92,38 @@ Si `ReviewMode: read-only` → forcer `--skip-scans` (pas de re-run quality_scan
 
 Si `ArchReviewMode: full` → spawn agent `arch-reviewer` au STEP 3.5 ci-dessous.
 
+Si `AdversarialReviewMode: full` OU flag CLI `--adversarial` → spawn agent
+`adversarial-reviewer` au STEP 6 (post-agrégation, opt-in, jamais bloquant).
+
 ---
 
-## STEP 3.0 — Spawn `arch-reviewer` (conditionnel, si `ArchReviewMode: full`)
+## STEP 3.0 — `arch-reviewer` (fallback standalone uniquement)
 
-Si `ArchReviewMode: full` → spawner l'agent `arch-reviewer` via tool Agent
-**AVANT** l'orchestrateur Python (l'agent écrit dans `qa_code_review` table,
-puis `sdd_review.py` STEP 3.2 lit cette table et inclut les `[ARCH_*]`).
+> **v7.0.0-alpha (audit CRIT-4 — 2026-06-04)** : `arch-reviewer` est
+> désormais spawné **upstream** par `/dev-run §6.4` dans le batch
+> parallèle aux côtés de `code-reviewer`/`security-reviewer`/`spec-compliance-reviewer`.
+> Quand `/sdd-review {n}` est invoqué **post-`/dev-run`** (typique via
+> `/sdd-full §4.8`), les findings `[ARCH_*]` sont déjà présents dans
+> `qa_code_review` table — `sdd_review.py` STEP 3.2 les agrège sans
+> re-spawn. Gain : élimine 1 invocation agent séquentielle (~10-15K
+> tokens Sonnet 4.6).
+
+**Fallback standalone** (`/sdd-review {n}` invoqué directement, hors
+`/sdd-full`) : si `ArchReviewMode: full` ET aucune entrée `[ARCH_*]`
+trouvée pour la FEAT `{n}` dans `qa_code_review` (signal que dev-run
+n'a pas tourné dans la session courante), spawner l'agent en
+fallback :
 
 ```
 Agent: arch-reviewer
   prompt: "Audit FEAT {n} — Pattern + Layers + ADRs (cf. agents/arch-reviewer.md). FailOn={ArchReviewFailOn}"
+```
+
+Vérification rapide avant spawn (lecture déterministe DB) :
+```bash
+python .claude/python/sdd_scripts/query_console_db.py arch-review-present --feat {n}
+# exit 0 = entrées présentes → SKIP fallback (déjà fait par dev-run)
+# exit 1 = aucune entrée → spawn fallback ci-dessus
 ```
 
 Sur skip (`ArchReviewMode in (manual, off)`) → continuer STEP 3 directement,
@@ -176,6 +198,34 @@ FIX: lire workspace/output/qa/feat-{n}/review.md §"Findings déclenchants" puis
 
 ---
 
+## STEP 4.5 — Spawn `adversarial-reviewer` (opt-in, post-agrégation)
+
+Si `--adversarial` (CLI) OU `AdversarialReviewMode: full` (config),
+**et uniquement après** que le rapport consolidé
+[`workspace/output/qa/feat-{n}/review.md`](workspace/output/qa/feat-)
+est écrit (l'agent en a besoin comme précondition) :
+
+```
+Agent: adversarial-reviewer
+  prompt: "Audit FEAT {n} — avocat du diable post-/sdd-review (cf. agents/adversarial-reviewer.md)."
+```
+
+- L'agent produit `workspace/output/qa/feat-{n}/adversarial.{md,json}`
+  puis appelle `ingest_agent_report --type adversarial` qui insère dans
+  `validation_reports(report_type='adversarial', verdict='informational')`.
+- **Verdict consolidé inchangé** : les `[ADV_*]` ne sont PAS agrégés
+  dans `validation_reports(report_type='review')` ni dans l'exit code.
+  C'est un canal séparé consultable via :
+  ```bash
+  python .claude/python/sdd_scripts/query_console_db.py adversarial --feat {n}
+  ```
+- Échec adversarial-reviewer (timeout, erreur infra) → WARN dans le
+  récap final, ne bloque jamais (par design).
+- Skip légitime si `AdversarialReviewMode: off` OU absence du flag —
+  message court `adversarial-reviewer feat-{n}: skipped`.
+
+---
+
 ## STEP 5 — Suite manuelle (Phase B/C à venir)
 
 Tant que Phase B (auto-fix dispatcher) et Phase C (arch review +
@@ -194,14 +244,20 @@ auto-invoke `/sdd-full`) ne sont pas livrées, le Tech Lead arbitre :
 
 ```yaml
 # Defaults conservateurs
-ReviewMode:     full        # full | scans-only | read-only
-ReviewFailOn:   serious     # info | minor | moderate | serious | critical
+ReviewMode:                 full        # full | scans-only | read-only
+ReviewFailOn:               serious     # info | minor | moderate | serious | critical
+AdversarialReviewMode:      manual      # off | manual | full (v7.2.0 R1)
+AdversarialMinAttacks:      5
+AdversarialMaxAttacks:      10
 ```
 
 | Clé | Défaut | Effet |
 |---|---|---|
 | `ReviewMode` | `full` | `full` = re-scan + read DB ; `scans-only` = re-scan + skip DB read ; `read-only` = pas de re-scan |
 | `ReviewFailOn` | `serious` | Seuil de bascule 🟡 → 🔴. `critical` = très permissif, `info` = très strict |
+| `AdversarialReviewMode` | `manual` | `off` = jamais ; `manual` = uniquement si `--adversarial` ; `full` = auto-invoke à chaque `/sdd-review` |
+| `AdversarialMinAttacks` | `5` | Plancher cible (warn `coverage_warning: true` si moins) |
+| `AdversarialMaxAttacks` | `10` | Plafond strict (verdict toujours informational) |
 
 ---
 
@@ -244,7 +300,8 @@ overwrites la ligne `validation_reports` précédente (via
 > Cette commande applique strictement `@.claude/rules/output-protocol.md`.
 > Substance non dupliquée — la règle est SSoT.
 
-**Labels canoniques émis** : `[REVIEW]`, `[SECURITY]`, `[DONE]`
+**Labels canoniques émis** : `[CODE-REVIEW]`, `[SPEC-REVIEW]`,
+`[ARCH-REVIEW]`, `[ADV-REVIEW]` (opt-in), `[SECURITY]`, `[DONE]`
 (cf. output-protocol.md §3)
 **Plage de progression couverte** : `88-100%` (cf. output-protocol.md §4)
 
@@ -259,7 +316,7 @@ Sonar).
 - snippets de code citées
 
 **Verdict consolidé** : 1 ligne avec emoji style Sonar. Exemple :
-`[REVIEW] Verdict consolidé: 0 critical, 5 serious, 12 moderate — 🟡 WARN. (99%)`.
+`[CODE-REVIEW] Verdict consolidé: 0 critical, 5 serious, 12 moderate — 🟡 WARN. (99%)`.
 En cas de RED bloquant : `🔴 [DONE/FAIL] FEAT {n} — [REVIEW_VERDICT_RED] → workspace/output/qa/feat-{n}/review.md. (99%)`.
 
 **Verdict final** : 1 ligne `[DONE]` (🟢) / `[DONE/WARN]` (🟡) /

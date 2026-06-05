@@ -2,7 +2,7 @@
 
 > §2.4 (Librairies) régénérée depuis `angular.libs.json` — ne pas éditer manuellement (`python .claude/python/sdd_admin/sync_stack_md.py --stack-id angular`).
 
-Status: Draft
+Status: Experimental
 Validation: 🟡 experimental (not yet validated end-to-end in production combo)
 Tech FEAT ID: tech-angular
 Scope: frontend uniquement (Angular SPA)
@@ -206,7 +206,7 @@ Codes prioritaires :
 <!-- LIBS_CATALOG_START -->
 ### 2.4 Librairies
 
-> Source de verite : `.claude/stacks/frontend/angular.libs.json`. Ne pas editer cette section manuellement -- utiliser `python .claude/python/sdd_admin/sync_stack_md.py --stack-id angular`.
+> Source de verite : `.claude/stacks/frontend/angular.libs.json`. Ne pas editer cette section manuellement -- utiliser `.claude/python/sdd_admin/sync_stack_md.py --stack-id angular`.
 
 #### 2.4.a Librairies CORE (installees par arch en section 2.2.1, toujours)
 
@@ -248,7 +248,7 @@ Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'U
 | auth-azure-ad | @azure/msal-angular | 3.1.0 | azure.ad, msal, tech-auth-azure |
 | auth-azure-ad | @azure/msal-browser | 3.27.0 | azure.ad, msal, tech-auth-azure |
 | date-utils | dayjs | 1.11.13 | dates.*format, duree, intervalle.*temps |
-| uuid-gen | uuid | 11.0.5 | \buuid\b, guid.*genere, id.*aleatoire |
+| uuid-gen | uuid | 11.0.5 | uuid, guid.*genere, id.*aleatoire |
 | css-classes | clsx | 2.1.1 | clsx, classes.*conditionnel |
 <!-- LIBS_CATALOG_END -->
 

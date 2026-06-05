@@ -33,6 +33,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sdd_lib.console_db import connect_ro  # noqa: E402  (RO reader — no WAL, no init)
+from sdd_lib.exit_codes import CORRECTIBLE, FAIL_FAST, SUCCESS  # noqa: E402
 
 
 def _dict_row(row: sqlite3.Row | None) -> dict | None:
@@ -217,6 +218,33 @@ def query_feat_stats(feat: int) -> dict:
     }
 
 
+def query_arch_review_present(feat: int) -> dict:
+    """Predicate query : are there `[ARCH_*]` findings persisted for this FEAT ?
+
+    v7.0.0-alpha (audit CRIT-4) : used by `/sdd-review §3.0` to decide
+    whether to spawn `arch-reviewer` as a standalone fallback. When the
+    invocation arrives downstream of `/dev-run §6.4`, the agent has
+    already run and findings exist — fallback is skipped.
+
+    Predicate semantics : main() returns exit 0 when ≥ 1 ``[ARCH_*]`` row
+    exists in `qa_code_review` for this FEAT, exit 1 otherwise. The JSON
+    payload (always emitted on stdout) carries the count for debugging.
+    """
+    with connect_ro() as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) FROM qa_code_review "
+            "WHERE feat_n = ? AND issue_class LIKE 'ARCH_%'",
+            (feat,),
+        ).fetchone()
+    count = int(row[0]) if row else 0
+    return {
+        "present":   count > 0,
+        "feat":      feat,
+        "count":     count,
+        "_exit_code": 0 if count > 0 else 1,
+    }
+
+
 def query_review(feat: int) -> dict:
     """Read latest /sdd-review run for FEAT (table validation_reports, type='review')."""
     with connect_ro() as conn:
@@ -250,17 +278,23 @@ def query_review(feat: int) -> dict:
 
 
 DISPATCH = {
-    "api-gate":   query_api_gate,
-    "coverage":   query_coverage,
-    "quality":    query_quality,
-    "perf":       query_perf,
-    "a11y":       query_a11y,
-    "spec":       query_spec,
-    "security":   query_security,
-    "review":     query_review,
-    "run-latest": query_run_latest,
-    "feat-stats": query_feat_stats,
+    "api-gate":              query_api_gate,
+    "coverage":              query_coverage,
+    "quality":               query_quality,
+    "perf":                  query_perf,
+    "a11y":                  query_a11y,
+    "spec":                  query_spec,
+    "security":              query_security,
+    "review":                query_review,
+    "arch-review-present":   query_arch_review_present,  # v7.0.0-alpha audit CRIT-4
+    "run-latest":            query_run_latest,
+    "feat-stats":            query_feat_stats,
 }
+
+# Predicate-style subcommands : main() propagates `_exit_code` from the
+# payload so callers can use the script as a shell predicate (exit 0 = yes,
+# exit 1 = no), in addition to consuming the JSON on stdout.
+_PREDICATE_SUBCOMMANDS = {"arch-review-present"}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -281,15 +315,14 @@ def main(argv: list[str] | None = None) -> int:
         result = DISPATCH[args.subcommand](args.feat)
     except FileNotFoundError as exc:
         sys.stderr.write(f"ERROR: query_console_db: {exc}\n")
-        return 2
+        return CORRECTIBLE
     except Exception as exc:
         sys.stderr.write(f"ERROR: query_console_db: {exc}\n")
-        return 1
-
+        return FAIL_FAST
     sys.stdout.write(json.dumps(result, indent=2, ensure_ascii=False, default=str))
     sys.stdout.write("\n")
-    return 0
-
-
+    if args.subcommand in _PREDICATE_SUBCOMMANDS:
+        return int(result.get("_exit_code", 0))
+    return SUCCESS
 if __name__ == "__main__":
     sys.exit(main())

@@ -43,6 +43,8 @@ Phase → label/progress mapping aligned with rules/output-protocol.md §3-§4.
 """
 from __future__ import annotations
 
+from sdd_lib.exit_codes import SUCCESS  # noqa: E402
+
 import argparse
 import os
 import pathlib
@@ -308,16 +310,14 @@ def main() -> int:
         emit("[SDD] no run", no_emoji=args.no_emoji)
         if args.debug:
             print("statusline: console.db not found", file=sys.stderr)
-        return 0
-
+        return SUCCESS
     try:
         conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=0.5)
     except sqlite3.Error as exc:
         emit("[SDD] db unreachable", no_emoji=args.no_emoji)
         if args.debug:
             print(f"statusline: sqlite3 connect failed: {exc}", file=sys.stderr)
-        return 0
-
+        return SUCCESS
     try:
         active = query_active_run(conn)
         if active:
@@ -333,8 +333,6 @@ def main() -> int:
     finally:
         conn.close()
 
-    return 0
-
-
+    return SUCCESS
 if __name__ == "__main__":
     sys.exit(main())

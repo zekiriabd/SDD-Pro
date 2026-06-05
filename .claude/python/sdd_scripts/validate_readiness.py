@@ -27,7 +27,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sdd_lib.exit_codes import FAIL_FAST, SUCCESS  # noqa: E402
 from sdd_lib.paths import repo_root  # noqa: E402
-from sdd_lib.project_config import section_body  # noqa: E402
+from sdd_lib.project_config import read_stack_md_text, section_body  # noqa: E402
 
 
 VALID_DB_TYPES = (
@@ -137,14 +137,14 @@ def get_covered_ids(content: str, prefix: str) -> set[str]:
 def count_bullets(content: str, heading: str, id_prefix: str) -> int:
     body = section_body(content, heading)
     if body is None:
-        return 0
+        return SUCCESS
     return len(re.findall(rf"(?m)^\s*-\s+{id_prefix}-\d+\s*:", body))
 
 
 def count_oos_bullets(content: str) -> int:
     body = section_body(content, "Out of Scope")
     if body is None:
-        return 0
+        return SUCCESS
     return len(re.findall(r"(?m)^\s*-\s+\S", body))
 
 
@@ -391,7 +391,8 @@ def main() -> int:
             "Creer workspace/input/stack/stack.md avec sections Active Tech Specs / Project Config",
         )
     else:
-        stack_content = read_text_safe(stack_path)
+        # v7.0.0-alpha (audit CRIT-2) : cached mtime-keyed read.
+        stack_content = read_stack_md_text(root) or ""
         active_tech_body = section_body(stack_content, "Active Tech Specs") or ""
         has_backend = bool(re.search(r"\bbackend/[^.\s]+\.md\b", active_tech_body))
         has_frontend = bool(re.search(r"\bfrontend/[^.\s]+\.md\b", active_tech_body))

@@ -102,6 +102,14 @@ def _check_telemetry_health() -> None:
         pass
 
 
+# Module-level cache (process-local) for cost queries.
+# Mitigates per-Agent-spawn SQL hit (audit finding C3 v7.0.0-alpha 2026-06-04).
+# TTL 30s : cap precision is $50 default with O(0.01$) telemetry resolution,
+# 30s window is fine grained enough vs Agent spawn cadence (~5-30s).
+_COST_CACHE: dict[str, tuple[float, float, int, str]] = {}  # run_id -> (ts, cost, count, scope)
+_COST_CACHE_TTL_SEC = 30.0
+
+
 def _compute_run_cost() -> tuple[float, int, str]:
     """Aggregate USD spent so far in the current run.
 
@@ -116,6 +124,14 @@ def _compute_run_cost() -> tuple[float, int, str]:
       3. fallback B : no $SDD_RUN_ID at all → all rows from today (UTC date
          prefix). Coarse, but safe : Tech Lead in interactive without
          /sdd-full state.
+
+    Caching (v7.0.0-alpha audit C3 fix 2026-06-04) : in-process 30s TTL on
+    (cost, count, scope) keyed by run_id. PreToolUse.Agent fires before
+    every Agent spawn (8-12× per /sdd-full) — without cache, each fire opens
+    SQLite + queries token_usage. With index `idx_token_usage_run` the query
+    itself is O(log n), but connection overhead + serialization ~5-15ms each
+    accumulates. Cache invalidation = TTL expiry (next Agent spawn after 30s
+    re-queries). Sufficient for cap enforcement at $0.01 precision.
 
     Returns (cost_usd, call_count, scope_label).
 
@@ -147,6 +163,16 @@ def _compute_run_cost() -> tuple[float, int, str]:
     # v7.0.1 : always resolve a stable run_id (env > marker file > generate).
     # Avoids the legacy "today window" fallback which collided across parallel runs.
     run_id = get_or_create_run_id()
+
+    # Cache check (C3 fix) : skip SQLite if same run_id within TTL.
+    import time
+    now = time.monotonic()
+    cached = _COST_CACHE.get(run_id)
+    if cached is not None:
+        cached_ts, cached_cost, cached_count, cached_scope = cached
+        if (now - cached_ts) < _COST_CACHE_TTL_SEC:
+            return cached_cost, cached_count, cached_scope
+
     try:
         with connect_ro() as conn:
             cur = conn.cursor()
@@ -173,6 +199,8 @@ def _compute_run_cost() -> tuple[float, int, str]:
         total += (cc or 0) * p["cache_creation"] / 1_000_000
         total += (cr or 0) * p["cache_read"] / 1_000_000
 
+    # Cache write (C3 fix) — TTL expiry on next read past 30s.
+    _COST_CACHE[run_id] = (now, total, len(rows), scope)
     return total, len(rows), scope
 
 
@@ -183,11 +211,10 @@ def main() -> int:
 
     payload = read_hook_input()
     if not payload:
-        return 0
+        return HOOK_ALLOW
     subagent = get_subagent_type(payload)
     if not subagent:
-        return 0
-
+        return HOOK_ALLOW
     cost, calls, scope = _compute_run_cost()
     pct = (cost / cap * 100) if cap > 0 else 0
 
@@ -227,8 +254,7 @@ def main() -> int:
     if cap * 0.8 <= cost < cap:
         warn(f"WARN preflight-cost-cap : ${cost:.2f} / ${cap:.2f} "
              f"({pct:.0f}% du cap) — {calls} calls scope={scope}")
-        return 0
-
+        return HOOK_ALLOW
     # >= 100% : HARD BLOCK in ALL contexts (v7.0.0 audit P0 R1 fix 2026-05-20).
     # Previous behavior `return 2 if is_ci else 0` made the cap purely
     # informational in interactive sessions — Tech Lead lancant /sdd-full

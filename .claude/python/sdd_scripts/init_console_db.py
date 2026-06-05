@@ -41,6 +41,7 @@ from sdd_lib.console_db import (  # noqa: E402
     default_db_path,
     load_schema_sql,
 )
+from sdd_lib.exit_codes import FAIL_FAST, SUCCESS  # noqa: E402
 
 
 def _utc_now_iso() -> str:
@@ -142,8 +143,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"ERROR: init_console_db failed", file=sys.stderr)
             print(f"CAUSE: {exc}", file=sys.stderr)
             print("FIX: see traceback above; --force-recreate is destructive", file=sys.stderr)
-        return 1
-
+        return FAIL_FAST
     if args.json:
         print(json.dumps(result, indent=2))
     else:
@@ -160,8 +160,6 @@ def main(argv: list[str] | None = None) -> int:
         if "warning" in result:
             print(f"WARN: {result['warning']}")
 
-    return 0
-
-
+    return SUCCESS
 if __name__ == "__main__":
     sys.exit(main())

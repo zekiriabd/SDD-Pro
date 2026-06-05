@@ -2,7 +2,7 @@
 
 > §2.4 (Librairies) régénérée depuis `kotlin-junit.libs.json` — ne pas éditer manuellement (`python .claude/python/sdd_admin/sync_stack_md.py --stack-id kotlin-junit`).
 
-Status: Draft
+Status: Stable
 Validation: 🟢 reference (validated combo CMS — kotlin-spring-boot + react + shadcn + azure-ad, 2026-05-13)
 QA FEAT ID: kotlin-junit
 Scope: tests unitaires backend Kotlin (Spring Boot, Ktor)
@@ -37,7 +37,7 @@ S'applique aux projets `workspace/output/src/{BackendName}/` typés Kotlin.
 <!-- LIBS_CATALOG_START -->
 ### 2.4 Librairies
 
-> Source de verite : `.claude/stacks/qa/kotlin-junit.libs.json`. Ne pas editer cette section manuellement -- utiliser `python .claude/python/sdd_admin/sync_stack_md.py --stack-id kotlin-junit`.
+> Source de verite : `.claude/stacks/qa/kotlin-junit.libs.json`. Ne pas editer cette section manuellement -- utiliser `.claude/python/sdd_admin/sync_stack_md.py --stack-id kotlin-junit`.
 
 #### 2.4.a Librairies CORE (installees par arch en section 2.2.1, toujours)
 

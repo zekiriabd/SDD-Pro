@@ -194,68 +194,43 @@ class TestHelpers:
 
 
 class TestDecideA11y:
-    def test_a11y_off_disabled(self) -> None:
-        ph = _decide_a11y(a11y_mode="off", has_frontend_stack=True, has_frontend_code=True)
-        assert ph["enabled"] is False
-        assert "off" in ph["skip_reason"]
+    """v7.0.0-alpha (audit MAJ-6) — agent retiré, fonction réduite à un stub.
+    Toutes les branches granulaires de l'ancien code sont écrasées : peu importe
+    les flags d'entrée, le verdict est uniformément enabled=False, agent_removed=True.
+    """
 
-    def test_a11y_manual_disabled(self) -> None:
-        ph = _decide_a11y(a11y_mode="manual", has_frontend_stack=True, has_frontend_code=True)
-        assert ph["enabled"] is False
-        assert "manual" in ph["skip_reason"]
-
-    def test_a11y_no_frontend_stack(self) -> None:
-        ph = _decide_a11y(a11y_mode="full", has_frontend_stack=False, has_frontend_code=False)
-        assert ph["enabled"] is False
-        assert "backend-only" in ph["skip_reason"]
-
-    def test_a11y_no_frontend_code(self) -> None:
-        ph = _decide_a11y(a11y_mode="full", has_frontend_stack=True, has_frontend_code=False)
-        assert ph["enabled"] is False
-        assert "absent" in ph["skip_reason"] or "vide" in ph["skip_reason"]
-
-    def test_a11y_removed_even_when_gates_pass(self) -> None:
-        """v7.0.0 P2 fix : even when all upstream gates pass (full mode +
-        frontend stack + frontend code), the a11y phase MUST be enabled=False
-        because the agent is gone. `agent_removed=True` flags WHY enabled is
-        False on what would have been a green path. estimated_tokens = 0
-        (no spawn, no budget). Replacement = axe-core in CI."""
-        ph = _decide_a11y(a11y_mode="full", has_frontend_stack=True, has_frontend_code=True)
-        assert ph["enabled"] is False
-        assert ph["skip_reason"] is not None
-        assert "agent removed v7.0.0" in ph["skip_reason"]
-        assert ph["agent_removed"] is True
-        assert "axe-core" in ph["replacement"]
-        assert ph["estimated_tokens"] == 0
+    def test_a11y_stub_always_disabled(self) -> None:
+        for kwargs in (
+            {},  # no kwargs (stub accepts anything)
+            {"a11y_mode": "off"},
+            {"a11y_mode": "manual"},
+            {"a11y_mode": "full", "has_frontend_stack": True, "has_frontend_code": True},
+            {"a11y_mode": "full", "has_frontend_stack": False, "has_frontend_code": False},
+        ):
+            ph = _decide_a11y(**kwargs)
+            assert ph["enabled"] is False
+            assert ph["agent_removed"] is True
+            assert "agent removed v7.0.0" in ph["skip_reason"]
+            assert "axe-core" in ph["replacement"]
+            assert ph["estimated_tokens"] == 0
 
 
 class TestDecidePerf:
-    def test_perf_manual_no_ac_disabled(self) -> None:
-        ph = _decide_perf(perf_mode="manual", has_perf_ac=False, has_backend_code=True, has_frontend_code=True)
-        assert ph["enabled"] is False
-        assert "no AC mentions perf" in ph["skip_reason"]
+    """v7.0.0-alpha (audit MAJ-6) — agent retiré, stub. Cf. TestDecideA11y."""
 
-    def test_perf_manual_with_ac_removed(self) -> None:
-        """v7.0.0 P2 fix : even when an AC explicitly mentions perf metrics
-        (LCP/p95/...), the perf phase MUST be enabled=False — the agent is
-        gone. The reason surfaces Lighthouse CI / wrk-k6 as the runtime
-        replacement to honor the AC."""
-        ph = _decide_perf(perf_mode="manual", has_perf_ac=True, has_backend_code=True, has_frontend_code=True)
-        assert ph["enabled"] is False
-        assert ph["agent_removed"] is True
-        assert "Lighthouse" in ph["skip_reason"] or "wrk" in ph["skip_reason"]
-
-    def test_perf_full_removed(self) -> None:
-        """v7.0.0 P2 fix : full mode + code present used to be the green path,
-        but the agent is gone. enabled=False, agent_removed=True."""
-        ph = _decide_perf(perf_mode="full", has_perf_ac=False, has_backend_code=True, has_frontend_code=True)
-        assert ph["enabled"] is False
-        assert ph["agent_removed"] is True
-        assert ph["estimated_tokens"] == 0
-
-    def test_perf_no_code_disabled(self) -> None:
-        ph = _decide_perf(perf_mode="full", has_perf_ac=False, has_backend_code=False, has_frontend_code=False)
-        assert ph["enabled"] is False
+    def test_perf_stub_always_disabled(self) -> None:
+        for kwargs in (
+            {},
+            {"perf_mode": "off"},
+            {"perf_mode": "manual", "has_perf_ac": False},
+            {"perf_mode": "manual", "has_perf_ac": True, "has_backend_code": True, "has_frontend_code": True},
+            {"perf_mode": "full", "has_perf_ac": False, "has_backend_code": True, "has_frontend_code": True},
+        ):
+            ph = _decide_perf(**kwargs)
+            assert ph["enabled"] is False
+            assert ph["agent_removed"] is True
+            assert "Lighthouse" in ph["skip_reason"] or "wrk" in ph["skip_reason"]
+            assert ph["estimated_tokens"] == 0
 
 
 class TestDecideSecurityScan:
@@ -465,6 +440,7 @@ class TestPlanIntegration:
         assert len(active) == 3
 
     def test_plan_backend_only_skips_a11y(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        # v7.0.0-alpha (audit MAJ-6) — a11y agent retiré, raison uniforme.
         ws = _make_workspace(
             tmp_path,
             stack_md=STACK_BACKEND_ONLY,
@@ -476,7 +452,7 @@ class TestPlanIntegration:
         result = plan(feat_number=1)
 
         assert result["phases"]["a11y_audit"]["enabled"] is False
-        assert "backend-only" in result["phases"]["a11y_audit"]["skip_reason"]
+        assert result["phases"]["a11y_audit"]["agent_removed"] is True
 
     def test_plan_all_manual_no_ac_skips_optional(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch

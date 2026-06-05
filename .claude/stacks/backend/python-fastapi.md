@@ -230,7 +230,7 @@ Erreurs ruff/mypy :
 <!-- LIBS_CATALOG_START -->
 ### 2.4 Librairies
 
-> Source de verite : `.claude/stacks/backend/python-fastapi.libs.json`. Ne pas editer cette section manuellement -- utiliser `python .claude/python/sdd_admin/sync_stack_md.py --stack-id python-fastapi`.
+> Source de verite : `.claude/stacks/backend/python-fastapi.libs.json`. Ne pas editer cette section manuellement -- utiliser `.claude/python/sdd_admin/sync_stack_md.py --stack-id python-fastapi`.
 
 #### 2.4.a Librairies CORE (installees par arch en section 2.2.1, toujours)
 
@@ -261,9 +261,9 @@ Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'U
 | Capability | Lib | Version | Triggers |
 |---|---|---|---|
 | auth-local | passlib[bcrypt] | 1.7.4 | auth-local, hash.*password, bcrypt |
-| jwt | python-jose[cryptography] | 3.3.0 | \bjwt\b, jose, auth-local, auth-azure-ad |
-| excel | openpyxl | 3.1.5 | \bexcel\b, \.xlsx\b, export.*excel, import.*excel, tableur |
-| pdf | reportlab | 4.2.5 | \bpdf\b, \.pdf\b, export.*pdf, generer.*pdf, imprim |
+| jwt | python-jose[cryptography] | 3.3.0 | jwt, jose, auth-local, auth-azure-ad |
+| excel | openpyxl | 3.1.5 | excel, \.xlsx, export.*excel, import.*excel, tableur |
+| pdf | reportlab | 4.2.5 | pdf, \.pdf, export.*pdf, generer.*pdf, imprim |
 
 #### 2.4.d DB Drivers (selectionne par arch selon DatabaseType)
 

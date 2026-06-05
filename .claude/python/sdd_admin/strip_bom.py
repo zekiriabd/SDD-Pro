@@ -16,7 +16,13 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
+
+# Ensure sdd_lib is importable when script invoked directly (no PYTHONPATH).
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from sdd_lib.exit_codes import SUCCESS  # noqa: E402
 
 BOM = b"\xef\xbb\xbf"
 
@@ -65,8 +71,6 @@ def main() -> int:
     for p in fixed:
         print(f"  {p.as_posix()}")
 
-    return 0
-
-
+    return SUCCESS
 if __name__ == "__main__":
     raise SystemExit(main())

@@ -1,0 +1,631 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Demo — Rapport du jour</title>
+<link rel="stylesheet" href="design-system.css">
+<style>
+  .app{flex:1;display:flex;flex-direction:column;background:var(--nj-cream);overflow:hidden}
+
+  /* ---- Top bar ---- */
+  .topbar{height:var(--nj-topbar-h);flex-shrink:0;display:flex;align-items:center;gap:12px;padding:0 16px;background:var(--nj-surface);border-bottom:1px solid var(--nj-line-soft)}
+  .topbar__back{width:38px;height:38px;border-radius:999px;background:var(--nj-coral-50);color:var(--nj-coral-700);border:0;display:grid;place-items:center;cursor:pointer;text-decoration:none}
+  .topbar__title{flex:1;font-size:15px;font-weight:800;color:var(--nj-ink-900);letter-spacing:-0.015em;min-width:0}
+  .topbar__avatar{width:38px;height:38px;border-radius:999px;overflow:hidden;flex-shrink:0;box-shadow:inset 0 0 0 2px #fff, 0 2px 6px rgba(40,20,10,0.10)}
+  .topbar__avatar img{width:100%;height:100%;object-fit:cover;display:block}
+
+  /* ---- Stepper ---- */
+  .stepper{flex-shrink:0;padding:14px 16px 8px;background:var(--nj-surface);border-bottom:1px solid var(--nj-line-soft)}
+  .stepper__track{display:flex;align-items:center;gap:6px;margin-bottom:10px}
+  .stepper__node{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;position:relative;cursor:pointer}
+  .stepper__dot{width:30px;height:30px;border-radius:999px;background:var(--nj-line-soft);color:var(--nj-ink-400);display:grid;place-items:center;font-size:13px;font-weight:700;border:2px solid transparent;transition:all var(--nj-dur) var(--nj-ease)}
+  .stepper__node.is-done .stepper__dot{background:var(--nj-sage-500);color:#fff}
+  .stepper__node.is-current .stepper__dot{background:var(--nj-coral-500);color:#fff;box-shadow:0 0 0 4px var(--nj-coral-100)}
+  .stepper__label{font-size:10.5px;font-weight:600;color:var(--nj-ink-400);letter-spacing:0.01em;text-align:center;line-height:1.1}
+  .stepper__node.is-current .stepper__label{color:var(--nj-coral-700)}
+  .stepper__node.is-done .stepper__label{color:var(--nj-sage-700)}
+  .stepper__line{position:absolute;top:15px;left:calc(50% + 18px);right:calc(-50% + 18px);height:2px;background:var(--nj-line);z-index:-1}
+  .stepper__node.is-done .stepper__line{background:var(--nj-sage-300)}
+  .stepper__node:last-child .stepper__line{display:none}
+  .stepper__progress{height:3px;background:var(--nj-line-soft);border-radius:999px;overflow:hidden}
+  .stepper__progress span{display:block;height:100%;background:linear-gradient(90deg,var(--nj-coral-500),var(--nj-coral-400));border-radius:999px;transition:width var(--nj-dur) var(--nj-ease)}
+
+  /* ---- Body ---- */
+  .body{flex:1;overflow-y:auto;padding:20px 16px 12px;display:flex;flex-direction:column;gap:16px}
+  .body>*{flex-shrink:0}
+
+  .step{display:none;flex-direction:column;gap:14px}
+  .step.is-active{display:flex;animation:slideIn .35s var(--nj-ease)}
+  @keyframes slideIn{from{opacity:0;transform:translateX(12px)}to{opacity:1;transform:translateX(0)}}
+
+  .step__head h2{margin:0;font-size:22px;font-weight:800;color:var(--nj-ink-900);letter-spacing:-0.02em;display:flex;align-items:center;gap:10px}
+  .step__head h2 .step-num{
+    width:32px;height:32px;border-radius:10px;background:var(--nj-coral-500);color:#fff;
+    display:grid;place-items:center;font-size:14px;font-weight:800;
+    box-shadow:var(--nj-shadow-brand);
+  }
+  .step__head p{margin:6px 0 0 0;font-size:12.5px;color:var(--nj-ink-500);line-height:1.5}
+
+  /* ---- Selectable grid ---- */
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+  .cell{
+    position:relative;display:flex;flex-direction:column;align-items:center;
+    gap:7px;padding:14px 8px 12px;
+    background:var(--nj-surface);border:1.5px solid var(--nj-line);border-radius:14px;
+    cursor:pointer;font-family:inherit;text-align:center;
+    transition:transform var(--nj-dur-fast) var(--nj-ease), border-color var(--nj-dur-fast) var(--nj-ease), background var(--nj-dur-fast) var(--nj-ease);
+  }
+  .cell:active{transform:scale(0.97)}
+  .cell__icon{
+    width:40px;height:40px;border-radius:12px;
+    background:var(--nj-cream);color:var(--nj-coral-700);
+    display:grid;place-items:center;flex-shrink:0;font-size:22px;line-height:1;
+  }
+  .cell__icon svg{display:block}
+  .cell__label{font-size:12.5px;font-weight:600;color:var(--nj-ink-900);letter-spacing:-0.005em;line-height:1.2}
+  .cell__check{
+    position:absolute;top:7px;right:7px;width:18px;height:18px;border-radius:999px;
+    background:transparent;border:1.5px solid var(--nj-line);
+    display:grid;place-items:center;color:transparent;
+    transition:all var(--nj-dur-fast) var(--nj-ease);
+  }
+  .cell.is-on{background:var(--nj-coral-50);border-color:var(--nj-coral-500)}
+  .cell.is-on .cell__icon{background:var(--nj-coral-100);color:var(--nj-coral-700)}
+  .cell.is-on .cell__check{background:var(--nj-coral-500);border-color:var(--nj-coral-500);color:#fff}
+
+  /* "No issue" full-width cell */
+  .cell--full{grid-column:1/-1;flex-direction:row;justify-content:flex-start;gap:12px;padding:13px 14px;text-align:left}
+  .cell--full .cell__icon{background:var(--nj-sage-50);color:var(--nj-sage-700)}
+  .cell--full.is-on{background:var(--nj-sage-50);border-color:var(--nj-sage-500)}
+  .cell--full.is-on .cell__icon{background:var(--nj-sage-100);color:var(--nj-sage-700)}
+  .cell--full.is-on .cell__check{background:var(--nj-sage-500);border-color:var(--nj-sage-500);color:#fff}
+  .cell--full .cell__label{font-size:14px;font-weight:700}
+  .cell--full .cell__label small{display:block;font-size:11px;font-weight:500;color:var(--nj-ink-500);margin-top:2px}
+
+  /* Mood cells: bigger emoji */
+  .cell--mood .cell__icon{background:transparent;font-size:32px;width:auto;height:auto}
+
+  /* Custom add input */
+  .add-row{
+    display:flex;gap:8px;align-items:center;
+    background:var(--nj-surface);border:1.5px dashed var(--nj-coral-300);
+    border-radius:13px;padding:0 12px;
+  }
+  .add-row input{
+    flex:1;border:0;outline:0;background:transparent;
+    height:42px;font-family:inherit;font-size:13.5px;color:var(--nj-ink-900);
+  }
+  .add-row button{
+    background:var(--nj-coral-500);color:#fff;border:0;border-radius:9px;
+    padding:7px 12px;font-family:inherit;font-weight:700;font-size:12px;cursor:pointer
+  }
+
+  /* Section sub-label */
+  .sub-label{
+    display:flex;align-items:center;gap:8px;
+    font-family:var(--nj-font-mono);font-size:10.5px;font-weight:500;
+    color:var(--nj-coral-700);text-transform:uppercase;letter-spacing:.1em;
+    margin-top:8px;
+  }
+  .sub-label::before{content:'';width:14px;height:2px;background:var(--nj-coral-400);border-radius:999px}
+
+  /* ---- Footer ---- */
+  .footer{flex-shrink:0;display:flex;gap:10px;padding:12px 16px 14px;background:var(--nj-surface);border-top:1px solid var(--nj-line-soft)}
+  .btn{height:48px;border-radius:13px;border:0;font-family:inherit;font-weight:700;font-size:14px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;transition:transform var(--nj-dur-fast) var(--nj-ease)}
+  .btn:active{transform:scale(0.98)}
+  .btn-ghost{background:var(--nj-coral-50);color:var(--nj-coral-700);flex:0 0 auto;padding:0 18px}
+  .btn-primary{background:var(--nj-coral-500);color:#fff;flex:1;box-shadow:var(--nj-shadow-brand)}
+  .btn-primary--save{background:linear-gradient(135deg,var(--nj-sage-500),oklch(0.62 0.085 168))}
+
+  .home-indicator{height:8px;display:flex;justify-content:center;align-items:flex-start;flex-shrink:0;background:var(--nj-surface)}
+  .home-indicator::after{content:'';width:134px;height:5px;background:var(--nj-ink-900);border-radius:999px;opacity:.92}
+</style>
+</head>
+<body>
+<div class="nj-stage">
+  <div class="nj-phone">
+    <div class="nj-phone__notch"></div>
+    <div class="nj-phone__screen">
+      <div class="nj-statusbar"><span>9:41</span><span class="nj-statusbar__icons">
+        <svg width="17" height="11" viewBox="0 0 17 11" fill="currentColor"><rect x="0" y="7" width="3" height="4" rx="0.5"></rect><rect x="4.5" y="5" width="3" height="6" rx="0.5"></rect><rect x="9" y="3" width="3" height="8" rx="0.5"></rect><rect x="13.5" y="0" width="3" height="11" rx="0.5"></rect></svg>
+        <svg width="15" height="11" viewBox="0 0 15 11" fill="currentColor"><path d="M7.5 0C4.6 0 1.9 1 0 2.7l1.4 1.5C2.9 2.8 5.1 1.9 7.5 1.9s4.6.9 6.1 2.3L15 2.7C13.1 1 10.4 0 7.5 0zm0 3.7c-2 0-3.7.7-5.1 1.9l1.4 1.4c1-.9 2.3-1.4 3.7-1.4s2.7.5 3.7 1.4L12.6 5.6C11.2 4.4 9.5 3.7 7.5 3.7zm0 3.7c-1.1 0-2 .4-2.7 1l2.7 2.6 2.7-2.6c-.7-.6-1.6-1-2.7-1z"></path></svg>
+        <svg width="25" height="11" viewBox="0 0 25 11" fill="none"><rect x="0.5" y="0.5" width="21" height="10" rx="2.5" stroke="currentColor" opacity="0.5"></rect><rect x="2" y="2" width="18" height="7" rx="1.5" fill="currentColor"></rect><rect x="22.5" y="3.5" width="1.5" height="4" rx="0.5" fill="currentColor" opacity="0.5"></rect></svg>
+      </span></div>
+
+      <div class="app" data-screen-label="07 Rapport du jour">
+
+        <!-- Top bar -->
+        <div class="topbar">
+          <a class="topbar__back" href="09-fiche-enfant.html" aria-label="Retour">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          </a>
+          <div class="topbar__title">Lina Bouchet</div>
+          <div class="topbar__avatar"><img src="assets/baby-lina.png" alt="Lina"></div>
+        </div>
+
+        <!-- Stepper -->
+        <div class="stepper">
+          <div class="stepper__track" id="stepperTrack">
+            <div class="stepper__node is-current" data-step="1">
+              <div class="stepper__dot">1</div>
+              <div class="stepper__label">Santé</div>
+              <div class="stepper__line"></div>
+            </div>
+            <div class="stepper__node" data-step="2">
+              <div class="stepper__dot">2</div>
+              <div class="stepper__label">Nourriture</div>
+              <div class="stepper__line"></div>
+            </div>
+            <div class="stepper__node" data-step="3">
+              <div class="stepper__dot">3</div>
+              <div class="stepper__label">Activité</div>
+              <div class="stepper__line"></div>
+            </div>
+            <div class="stepper__node" data-step="4">
+              <div class="stepper__dot">4</div>
+              <div class="stepper__label">Humeur</div>
+            </div>
+          </div>
+          <div class="stepper__progress"><span id="stepperBar" style="width:25%"></span></div>
+        </div>
+
+        <!-- BODY -->
+        <div class="body">
+
+          <!-- ============ STEP 1 — SANTÉ ============ -->
+          <section class="step is-active" data-step="1">
+
+            <div class="grid">
+              <button class="cell" data-toggle>
+                <div class="cell__icon">
+                  <!-- thermometer -->
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"></path></svg>
+                </div>
+                <div class="cell__label">Fièvre</div>
+                <div class="cell__check"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+              </button>
+              <button class="cell" data-toggle>
+                <div class="cell__icon">
+                  <!-- cloud / cough -->
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19a4.5 4.5 0 1 0 0-9h-1.8A7 7 0 1 0 4 15.25"></path><path d="M14 19h.01M11 22h.01M8 19h.01"></path></svg>
+                </div>
+                <div class="cell__label">Toux</div>
+                <div class="cell__check"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+              </button>
+              <button class="cell" data-toggle>
+                <div class="cell__icon">
+                  <!-- droplet (rhume) -->
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"></path></svg>
+                </div>
+                <div class="cell__label">Rhume / Nez qui coule</div>
+                <div class="cell__check"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+              </button>
+              <button class="cell" data-toggle>
+                <div class="cell__icon">
+                  <!-- belly (frown circle) -->
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M16 16s-1.5-2-4-2-4 2-4 2"></path><line x1="9" y1="9" x2="9.01" y2="9"></line><line x1="15" y1="9" x2="15.01" y2="9"></line></svg>
+                </div>
+                <div class="cell__label">Mal au ventre</div>
+                <div class="cell__check"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+              </button>
+              <button class="cell is-on" data-toggle>
+                <div class="cell__icon">
+                  <!-- bandage -->
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3l-7 7a2 2 0 0 0 0 2.83l7 7a2 2 0 0 0 2.83 0l7-7a2 2 0 0 0 0-2.83l-7-7a2 2 0 0 0-2.83 0z"></path><path d="M9 12h.01M12 9h.01M12 12h.01M12 15h.01M15 12h.01"></path></svg>
+                </div>
+                <div class="cell__label">Petite blessure</div>
+                <div class="cell__check"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+              </button>
+              <button class="cell" data-toggle>
+                <div class="cell__icon">
+                  <!-- tooth -->
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5.5C9 2 5 3 4 6c-.6 2 0 5 .5 7 .3 1 .8 5 2 7 1 1.5 2.5.5 3-1 .5-1.5.5-3 1-4 .5-1 1.5-1 2 0 .5 1 .5 2.5 1 4 .5 1.5 2 2.5 3 1 1.2-2 1.7-6 2-7 .5-2 1.1-5 .5-7-1-3-5-4-8-.5z"></path></svg>
+                </div>
+                <div class="cell__label">Poussée dentaire</div>
+                <div class="cell__check"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+              </button>
+              <button class="cell" data-toggle>
+                <div class="cell__icon">
+                  <!-- spots -->
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="6" cy="7" r="1.6"></circle><circle cx="14" cy="6" r="1.6"></circle><circle cx="18" cy="13" r="1.6"></circle><circle cx="9" cy="13" r="1.6"></circle><circle cx="15" cy="18" r="1.6"></circle><circle cx="6" cy="18" r="1.6"></circle></svg>
+                </div>
+                <div class="cell__label">Boutons / Rougeurs</div>
+                <div class="cell__check"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+              </button>
+              <button class="cell" data-toggle>
+                <div class="cell__icon">
+                  <!-- vomit -->
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="10" r="7"></circle><line x1="9" y1="9" x2="9.01" y2="9"></line><line x1="15" y1="9" x2="15.01" y2="9"></line><path d="M8 14h8"></path><path d="M12 17v4"></path></svg>
+                </div>
+                <div class="cell__label">Vomissement</div>
+                <div class="cell__check"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+              </button>
+              <button class="cell" data-toggle>
+                <div class="cell__icon">
+                  <!-- water drop diarrhea -->
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"></path><path d="M8 17h8"></path></svg>
+                </div>
+                <div class="cell__label">Diarrhée</div>
+                <div class="cell__check"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+              </button>
+              <button class="cell" data-toggle>
+                <div class="cell__icon">
+                  <!-- ear -->
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8.5a6.5 6.5 0 1 1 13 0c0 6-6 6-6 10a3.5 3.5 0 1 1-7 0"></path><path d="M15 8.5a2.5 2.5 0 0 0-5 0v1a2 2 0 0 1-2 2"></path></svg>
+                </div>
+                <div class="cell__label">Mal aux oreilles</div>
+                <div class="cell__check"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+              </button>
+            </div>
+          </section>
+
+          <!-- ============ STEP 2 — NOURRITURE ============ -->
+          <section class="step" data-step="2">
+
+            <div class="grid">
+              <button class="cell is-on" data-toggle>
+                <div class="cell__icon">
+                  <!-- bottle -->
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2h8"></path><path d="M9 4v4l-2 4v9a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-9l-2-4V4"></path><line x1="7" y1="14" x2="17" y2="14"></line></svg>
+                </div>
+                <div class="cell__label">Biberon de lait</div>
+                <div class="cell__check"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+              </button>
+              <button class="cell is-on" data-toggle>
+                <div class="cell__icon">
+                  <!-- water glass -->
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h10l-1 18a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2L7 3z"></path><path d="M7 8h10"></path></svg>
+                </div>
+                <div class="cell__label">A bien bu de l'eau</div>
+                <div class="cell__check"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+              </button>
+            </div>
+            <div class="grid">
+              <button class="cell is-on" data-toggle>
+                <div class="cell__icon">
+                  <!-- carrot -->
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21l9-9"></path><path d="M12 12a8 8 0 0 1 9-9c0 5-4 9-9 9z"></path><path d="M9 15l-3 3M6 18l-2-1"></path></svg>
+                </div>
+                <div class="cell__label">Légumes</div>
+                <div class="cell__check"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+              </button>
+              <button class="cell is-on" data-toggle>
+                <div class="cell__icon">
+                  <!-- apple -->
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6c-2-3-5-3-7-1-3 3-1 9 1 12 1 1 3 2 6 2s5-1 6-2c2-3 4-9 1-12-2-2-5-2-7 1z"></path><path d="M12 6c0-2 1-4 3-4"></path></svg>
+                </div>
+                <div class="cell__label">Fruits</div>
+                <div class="cell__check"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+              </button>
+            </div>
+            <div class="grid">
+              <button class="cell" data-toggle>
+                <div class="cell__icon">
+                  <!-- drumstick -->
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M15.5 3a5.5 5.5 0 0 0-5.5 5.5v3l-3.5 3.5a2.5 2.5 0 1 0 3.5 3.5l3.5-3.5h3a5.5 5.5 0 0 0 0-11z"></path><path d="M5 19l-2 2"></path></svg>
+                </div>
+                <div class="cell__label">Viande</div>
+                <div class="cell__check"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+              </button>
+              <button class="cell" data-toggle>
+                <div class="cell__icon">
+                  <!-- fish -->
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12c2-4 6-6 10-6s8 2 10 6c-2 4-6 6-10 6s-8-2-10-6z"></path><circle cx="16" cy="11" r="1"></circle><path d="M22 12c-1 1-2 2-4 2"></path></svg>
+                </div>
+                <div class="cell__label">Poisson</div>
+                <div class="cell__check"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+              </button>
+              <button class="cell" data-toggle>
+                <div class="cell__icon">
+                  <!-- egg -->
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c-4 0-7-3-7-7 0-5 3-13 7-13s7 8 7 13c0 4-3 7-7 7z"></path></svg>
+                </div>
+                <div class="cell__label">Œuf</div>
+                <div class="cell__check"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+              </button>
+              <button class="cell is-on" data-toggle>
+                <div class="cell__icon">
+                  <!-- yogurt cup -->
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8h12l-1 13a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1L6 8z"></path><path d="M5 5h14v3H5z"></path></svg>
+                </div>
+                <div class="cell__label">Yaourt / Fromage</div>
+                <div class="cell__check"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+              </button>
+            </div>
+            <div class="grid">
+              <button class="cell" data-toggle>
+                <div class="cell__icon">
+                  <!-- bowl pasta -->
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11h18a8 8 0 0 1-8 8h-2a8 8 0 0 1-8-8z"></path><path d="M9 8c0-1 1-2 0-3M13 8c0-1 1-2 0-3M17 8c0-1 1-2 0-3"></path></svg>
+                </div>
+                <div class="cell__label">Pâtes / Riz</div>
+                <div class="cell__check"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+              </button>
+              <button class="cell" data-toggle>
+                <div class="cell__icon">
+                  <!-- bread -->
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11c0-3 2-5 5-5h6c3 0 5 2 5 5l-1 8a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z"></path><path d="M8 14h.01M12 13h.01M16 14h.01"></path></svg>
+                </div>
+                <div class="cell__label">Pain</div>
+                <div class="cell__check"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+              </button>
+              <button class="cell" data-toggle>
+                <div class="cell__icon">
+                  <!-- cookie -->
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="8.5" cy="10" r="1"></circle><circle cx="14" cy="13" r="1"></circle><circle cx="11" cy="16" r="1"></circle></svg>
+                </div>
+                <div class="cell__label">Gâteau / Biscuit</div>
+                <div class="cell__check"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+              </button>
+              <button class="cell" data-toggle>
+                <div class="cell__icon">
+                  <!-- candy -->
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><path d="M7 12l-4-3v6zM17 12l4-3v6z"></path></svg>
+                </div>
+                <div class="cell__label">Bonbon</div>
+                <div class="cell__check"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+              </button>
+            </div>
+
+            <div class="add-row">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--nj-coral-600)" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              <input type="text" placeholder="Ajouter un autre aliment…">
+              <button>Ajouter</button>
+            </div>
+          </section>
+
+          <!-- ============ STEP 3 — ACTIVITÉ ============ -->
+          <section class="step" data-step="3">
+            <div class="grid">
+              <button class="cell is-on" data-toggle>
+                <div class="cell__icon">
+                  <!-- walking -->
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="13" cy="4" r="2"></circle><path d="M14 18l-2-6 4-3-3-3-5 3v5"></path><path d="M10 22l1-7 4-1"></path></svg>
+                </div>
+                <div class="cell__label">Promenade</div>
+                <div class="cell__check"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+              </button>
+              <button class="cell" data-toggle>
+                <div class="cell__icon">
+                  <!-- tree -->
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2c-3 0-5 2-5 5 0 1.5.6 2.8 1.5 3.7-2 .8-3.5 2.8-3.5 5.3 0 3 2.5 5 5.5 5h3c3 0 5.5-2 5.5-5 0-2.5-1.5-4.5-3.5-5.3.9-.9 1.5-2.2 1.5-3.7 0-3-2-5-5-5z"></path><line x1="12" y1="21" x2="12" y2="13"></line></svg>
+                </div>
+                <div class="cell__label">Parc / Jardin</div>
+                <div class="cell__check"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+              </button>
+              <button class="cell" data-toggle>
+                <div class="cell__icon">
+                  <!-- slide / playground -->
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21l8-9 5 5 5-6"></path><path d="M3 21h18"></path><circle cx="11" cy="6" r="2"></circle></svg>
+                </div>
+                <div class="cell__label">Toboggan</div>
+                <div class="cell__check"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+              </button>
+              <button class="cell" data-toggle>
+                <div class="cell__icon">
+                  <!-- bicycle/stroller -->
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="17" r="3"></circle><circle cx="18" cy="17" r="3"></circle><path d="M6 17l3-8h6l3 8M9 9V6h6"></path></svg>
+                </div>
+                <div class="cell__label">Poussette / Sortie</div>
+                <div class="cell__check"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+              </button>
+            </div>
+            <div class="grid">
+              <button class="cell is-on" data-toggle>
+                <div class="cell__icon">
+                  <!-- blocks -->
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="13" width="8" height="8" rx="1"></rect><rect x="13" y="13" width="8" height="8" rx="1"></rect><rect x="8" y="3" width="8" height="8" rx="1"></rect></svg>
+                </div>
+                <div class="cell__label">Cubes / Construction</div>
+                <div class="cell__check"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+              </button>
+              <button class="cell" data-toggle>
+                <div class="cell__icon">
+                  <!-- group play -->
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="3"></circle><circle cx="17" cy="9" r="2.5"></circle><path d="M3 20v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"></path><path d="M15 14a3 3 0 0 1 3 3v3"></path></svg>
+                </div>
+                <div class="cell__label">Jeux collectifs</div>
+                <div class="cell__check"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+              </button>
+              <button class="cell" data-toggle>
+                <div class="cell__icon">
+                  <!-- teddy bear -->
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="11" r="6"></circle><circle cx="7" cy="7" r="2"></circle><circle cx="17" cy="7" r="2"></circle><circle cx="10" cy="11" r=".7"></circle><circle cx="14" cy="11" r=".7"></circle><path d="M10 14c1 1 3 1 4 0"></path><path d="M9 18v3M15 18v3"></path></svg>
+                </div>
+                <div class="cell__label">Peluches / Doudou</div>
+                <div class="cell__check"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+              </button>
+              <button class="cell" data-toggle>
+                <div class="cell__icon">
+                  <!-- puzzle -->
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12a3 3 0 0 1-3 3v3a2 2 0 0 1-2 2h-3a2 2 0 0 1-2-2v-3a3 3 0 0 1-3-3v-3a2 2 0 0 1 2-2h3a3 3 0 0 1 3-3 3 3 0 0 1 3 3h3a2 2 0 0 1 2 2v3z"></path></svg>
+                </div>
+                <div class="cell__label">Puzzle</div>
+                <div class="cell__check"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+              </button>
+            </div>
+            <div class="grid">
+              <button class="cell is-on" data-toggle>
+                <div class="cell__icon">
+                  <!-- pencil/draw -->
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19l7-7 3 3-7 7-3-3z"></path><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path><path d="M2 2l7.586 7.586"></path><circle cx="11" cy="11" r="2"></circle></svg>
+                </div>
+                <div class="cell__label">Dessin / Coloriage</div>
+                <div class="cell__check"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+              </button>
+              <button class="cell" data-toggle>
+                <div class="cell__icon">
+                  <!-- play dough / blob -->
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 14c0-4 3-7 7-7s7 3 7 7c0 3-2 6-7 6s-7-3-7-6z"></path><circle cx="10" cy="12" r=".7"></circle><circle cx="14" cy="13" r=".7"></circle></svg>
+                </div>
+                <div class="cell__label">Pâte à modeler</div>
+                <div class="cell__check"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+              </button>
+              <button class="cell" data-toggle>
+                <div class="cell__icon">
+                  <!-- book -->
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
+                </div>
+                <div class="cell__label">Lecture / Histoire</div>
+                <div class="cell__check"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+              </button>
+              <button class="cell" data-toggle>
+                <div class="cell__icon">
+                  <!-- music note -->
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+                </div>
+                <div class="cell__label">Chansons / Musique</div>
+                <div class="cell__check"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+              </button>
+            </div>
+            <div class="grid">
+              <button class="cell is-on" data-toggle>
+                <div class="cell__icon">
+                  <!-- moon -->
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+                </div>
+                <div class="cell__label">Sieste</div>
+                <div class="cell__check"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+              </button>
+              <button class="cell" data-toggle>
+                <div class="cell__icon">
+                  <!-- bath -->
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6V4a2 2 0 0 1 4 0v2"></path><path d="M2 12h20v4a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4z"></path><path d="M2 12V8a2 2 0 0 1 2-2h2"></path></svg>
+                </div>
+                <div class="cell__label">Bain</div>
+                <div class="cell__check"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+              </button>
+            </div>
+          </section>
+
+          <!-- ============ STEP 4 — HUMEUR ============ -->
+          <section class="step" data-step="4">
+            <div class="grid">
+              <button class="cell cell--mood is-on" data-toggle>
+                <div class="cell__icon">😊</div>
+                <div class="cell__label">Joyeux(se)</div>
+                <div class="cell__check"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+              </button>
+              <button class="cell cell--mood is-on" data-toggle>
+                <div class="cell__icon">😌</div>
+                <div class="cell__label">Calme</div>
+                <div class="cell__check"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+              </button>
+              <button class="cell cell--mood" data-toggle>
+                <div class="cell__icon">🤗</div>
+                <div class="cell__label">Câlin(e)</div>
+                <div class="cell__check"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+              </button>
+              <button class="cell cell--mood" data-toggle>
+                <div class="cell__icon">🤔</div>
+                <div class="cell__label">Curieux(se)</div>
+                <div class="cell__check"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+              </button>
+            </div>
+            <div class="grid">
+              <button class="cell cell--mood" data-toggle>
+                <div class="cell__icon">😣</div>
+                <div class="cell__label">Grognon</div>
+                <div class="cell__check"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+              </button>
+              <button class="cell cell--mood" data-toggle>
+                <div class="cell__icon">😢</div>
+                <div class="cell__label">A pleuré</div>
+                <div class="cell__check"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+              </button>
+              <button class="cell cell--mood" data-toggle>
+                <div class="cell__icon">😴</div>
+                <div class="cell__label">Fatigué(e)</div>
+                <div class="cell__check"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+              </button>
+              <button class="cell cell--mood" data-toggle>
+                <div class="cell__icon">😠</div>
+                <div class="cell__label">Agité(e)</div>
+                <div class="cell__check"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+              </button>
+            </div>
+            <div class="grid">
+              <button class="cell" data-toggle>
+                <div class="cell__icon">
+                  <!-- speech -->
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                </div>
+                <div class="cell__label">A beaucoup parlé</div>
+                <div class="cell__check"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+              </button>
+              <button class="cell is-on" data-toggle>
+                <div class="cell__icon">
+                  <!-- laugh -->
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M7 14s2 3 5 3 5-3 5-3"></path><line x1="9" y1="9" x2="9.01" y2="9"></line><line x1="15" y1="9" x2="15.01" y2="9"></line></svg>
+                </div>
+                <div class="cell__label">A beaucoup ri</div>
+                <div class="cell__check"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+              </button>
+            </div>
+          </section>
+
+        </div>
+
+        <!-- Footer nav -->
+        <div class="footer">
+          <button class="btn btn-primary" id="btnNext">
+            Suivant
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </button>
+        </div>
+
+        <div class="home-indicator"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const TOTAL = 4;
+  let current = 1;
+
+  const stepCount = document.getElementById('stepCount');
+  const bar = document.getElementById('stepperBar');
+  const btnNext = document.getElementById('btnNext');
+  const nodes = document.querySelectorAll('.stepper__node');
+  const steps = document.querySelectorAll('.step');
+  const body = document.querySelector('.body');
+
+  function render(){
+    if (stepCount) stepCount.textContent = `ÉTAPE ${current}/${TOTAL}`;
+    bar.style.width = (current / TOTAL * 100) + '%';
+    nodes.forEach(n => {
+      const s = +n.dataset.step;
+      n.classList.toggle('is-current', s === current);
+      n.classList.toggle('is-done', s < current);
+    });
+    steps.forEach(s => s.classList.toggle('is-active', +s.dataset.step === current));
+    if (current === TOTAL) {
+      btnNext.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Enregistrer`;
+    } else {
+      btnNext.innerHTML = `Suivant <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>`;
+    }
+    if (body) body.scrollTop = 0;
+  }
+
+  btnNext.addEventListener('click', () => {
+    if (current < TOTAL) { current++; render(); }
+    else {
+      btnNext.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Rapport enregistré`;
+      btnNext.disabled = true;
+    }
+  });
+  nodes.forEach(n => n.addEventListener('click', () => {
+    current = +n.dataset.step; render();
+  }));
+
+  // toggle cells
+  document.querySelectorAll('[data-toggle]').forEach(cell => {
+    cell.addEventListener('click', () => cell.classList.toggle('is-on'));
+  });
+})();
+</script>
+</body>
+</html>

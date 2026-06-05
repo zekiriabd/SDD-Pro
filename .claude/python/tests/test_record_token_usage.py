@@ -212,7 +212,7 @@ class TestMainBehaviour(unittest.TestCase):
                     # Patch repo_root in BOTH modules so default_db_path() resolves
                     # to the temp directory.
                     with mock.patch.object(mod, "repo_root", return_value=tmp_root), \
-                         mock.patch.object(console_db, "repo_root", return_value=tmp_root):
+                         mock.patch.object(console_db.core, "repo_root", return_value=tmp_root):
                         rc = mod.main()
                         self.assertEqual(rc, 0)
 
@@ -255,7 +255,7 @@ class TestMainBehaviour(unittest.TestCase):
                     tmp_root = Path(tmp)
                     (tmp_root / ".claude").mkdir()
                     with mock.patch.object(mod, "repo_root", return_value=tmp_root), \
-                         mock.patch.object(console_db, "repo_root", return_value=tmp_root):
+                         mock.patch.object(console_db.core, "repo_root", return_value=tmp_root):
                         rc = mod.main()
                         self.assertEqual(rc, 0)
 

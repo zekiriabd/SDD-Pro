@@ -163,21 +163,13 @@ Les autres classes (`[QA_TEST_FAILED]`) peuvent toujours flagger.
 
 ## A.5 Classes d'erreur QA
 
-| Préfixe | Quand l'utiliser |
-|---|---|
-| `[QA_TEST_FAILED]` | Au moins un test échoue → décision `RED` |
-| `[QA_COVERAGE_GAP]` | `coverage_lines_pct < CoverageMin` → décision `RED` (bloquant, depuis v6.1 hardening) |
-| `[QA_FRAMEWORK_MISSING]` | Test runner CLI absent OU `## Active QA Specs` vide |
-| `[QA_INIT_FAILED]` | Bootstrap test project échoue |
-| `[QA_TEST_INVALID]` | Forbidden patterns détectés (sleep, DB réelle, état partagé) |
-| `[QA_OUTPUT_INVALID]` | `coverage.json` ou `quality.json` non-parseable au self-verify |
-| `[QA_PRECONDITION_FAILED]` | FEAT/US/code production absents |
-| `[QA_OWNERSHIP_VIOLATION]` | dev-* tente d'écrire un test OU agent QA tente d'éditer du code production |
-
-**Ordre de priorité** (une seule classe primaire émise dans la décision globale) :
-```
-[QA_TEST_FAILED] > [QA_COVERAGE_GAP]
-```
+> **SSoT** : la taxonomie complète des 8 classes `[QA_*]` + l'ordre de
+> priorité d'émission vit dans `@.claude/rules/error-classification.md §1.7`
+> (audit MAJ-8, 2026-06-04 — dé-duplication entre les 2 rules pour
+> éliminer le risque de drift sémantique). Cette section §A.5 conserve
+> uniquement le **focus QA-spécifique** : les 2 classes que `qa` émet en
+> propre (`[QA_TEST_FAILED]`, `[QA_COVERAGE_GAP]`) avec leur format ERROR
+> illustré ci-dessous (§A.6).
 
 ## A.6 Format ERROR — exemples
 

@@ -365,61 +365,44 @@ Sinon, invoquer agent `arch` (équivalent `/arch-init`). L'agent gère :
 
 ---
 
-## STEP 5.5 — Threat model pré-dev (RETIRÉ v7.0.0)
+## STEP 5.5 — Phase plan initialization (SSoT depuis v7.0.0-alpha audit CRIT-4)
 
-> **v7.0.0 (governance-major-auditors-trim)** : le mode `threat-model`
-> de `security-reviewer` est **supprimé**. Le défaut
-> `SecurityThreatModelEnabled` est flippé `true → false` dans
-> `config.base.yml`. La STEP est conservée numériquement pour
-> préserver la numérotation aval **interne à `/dev-run`** (les STEPs 6.x
-> ci-dessous référencent cet ancrage), mais **aucun agent n'est spawné ici**.
->
-> **Note d'audit (v7.0.0-alpha, 2026-05-20)** : la numérotation STEP est
-> **propre à chaque commande** (`/sdd-full`, `/dev-run`, `/qa-generate`).
-> Il n'y a pas d'alignement cross-commande. Le STEP 5.5 de `/dev-run`
-> n'a pas de correspondance dans `/sdd-full` (dont les STEPs vont 1→5).
->
-> **Remplacement** : template humain à instancier par le Tech Lead
-> pré-`/arch-init` — `.claude/templates/threat-model.template.md`
-> (STRIDE light, ~15-30 min, ~150 LOC structurées : assets / actors /
-> surfaces / threats / controls / residual / ADRs / review).
->
-> Les classes `[SEC_*]` runtime (post-dev) restent gérées par
-> `security-reviewer --mode scan` (STEP 6.4 du batch auditors).
->
-> Aucune lecture de `phase_planner.threat_model` — la phase est
-> systématiquement `enabled: false` avec `agent_removed: true` dans le JSON.
+> **v7.0.0-alpha (audit MAJ-5, 2026-06-04)** : l'ancien sous-STEP 5.5
+> "Threat model pré-dev" est retiré (27 L de stub déclaratif sans
+> action runtime). L'agent `security-reviewer --mode threat-model`
+> est supprimé depuis v7.0.0 ; remplacement : template humain
+> `.claude/templates/threat-model.template.md` (STRIDE light, à
+> instancier pré-`/arch-init`). Les classes `[SEC_*]` runtime
+> restent gérées par `security-reviewer --mode scan` (STEP 6.4).
+> Le STEP 5.5.1 ci-dessous devient le STEP 5.5 canonique.
 
-Passer directement à STEP 5.5.1 puis STEP 6.
+**Owner unique du calcul `$PHASE_PLAN`.** STEP 6.4 (auditor batch)
+dépend de ce JSON pour décider quels reviewers spawner — sans guard,
+la branche `if phases.X.enabled` faute silencieusement (KeyError ou
+`undefined`) et le batch dégénère.
 
-### 5.5.1 — Phase plan initialization (standalone guard, v7.0.0 audit P2)
-
-**Bloquant si `$PHASE_PLAN` non défini.** Quand `/dev-run` est invoqué
-directement (hors `/sdd-full`), la variable `$PHASE_PLAN` n'a pas été
-initialisée par l'amont. STEP 6.4 (auditor batch) dépend de ce JSON pour
-décider quels reviewers spawner — sans guard, la branche `if phases.X.enabled`
-faute silencieusement (KeyError ou `undefined`) et le batch dégénère.
+> **v7.0.0-alpha (audit CRIT-4 — 2026-06-04)** : `/sdd-full §1.tiers`
+> ne calcule plus `$PHASE_PLAN` en amont (l'eager-compute + passage
+> cross-process via env vars était redondant et fragile, cf.
+> `[ENV_PROPAGATION_FAILED]`). Ce STEP est désormais l'**unique** site
+> de calcul, qu'il soit invoqué via `/sdd-full` ou en standalone.
 
 ```bash
-if [ -z "$PHASE_PLAN" ]; then
-  PHASE_PLAN=$(python .claude/python/sdd_scripts/phase_planner.py \
-    --feat-number {n} \
-    --json)
-  if [ $? -ne 0 ]; then
-    echo "ERROR: /dev-run {n} — phase planner failed"
-    echo "CAUSE: [PHASE_PLAN_INIT_FAILED] phase_planner.py exit $? (FEAT {n})"
-    echo "FIX: vérifier workspace/input/feats/{n}-*.md + Project Config + run /sdd-status {n}"
-    exit 2
-  fi
+PHASE_PLAN=$(python .claude/python/sdd_scripts/phase_planner.py \
+  --feat-number {n} \
+  --json)
+if [ $? -ne 0 ]; then
+  echo "ERROR: /dev-run {n} — phase planner failed"
+  echo "CAUSE: [PHASE_PLAN_INIT_FAILED] phase_planner.py exit $? (FEAT {n})"
+  echo "FIX: vérifier workspace/input/feats/{n}-*.md + Project Config + run /sdd-status {n}"
+  exit 2
 fi
 ```
 
-**Idempotent** : si `/sdd-full` a déjà calculé `$PHASE_PLAN`, il est
-réutilisé tel quel (pas de re-calcul). Si `/dev-run` standalone, le JSON
-est calculé maintenant et propagé aux STEP 6.4+.
-
 Détail phase_planner : `.claude/python/sdd_scripts/phase_planner.py`
-(Python pur, 0 LLM, ~50 ms).
+(Python pur, 0 LLM, ~50 ms). Le JSON résultat est persisté dans
+`state.json.phases.planning.payload` (via `sdd_state.py set-phase`)
+pour consommation par le récap final de `/sdd-full §5`.
 
 ### 5.5.4 — State tracking (legacy, conservé)
 
@@ -432,6 +415,17 @@ python .claude/python/sdd_scripts/sdd_state.py set-phase \
 ---
 
 ## STEP 6 — Workflow gated séquentiel (cf. `.claude/rules/build-and-loop.md`)
+
+> **v7.0.0-alpha (audit MAJ-4, 2026-06-04)** — dette technique documentée.
+> Ce STEP fait ~213L de pseudo-code Bash (chunking, `wait`, queries DB,
+> fallback gate_passed). Un refactor vers `python sdd_scripts/run_dev_phase.py
+> --feat {n}` est recommandé pour réduire le prompt à ~30L narratives, mais
+> exige une session E2E complète (vraie FEAT, vraie console.db, vrai stack)
+> pour valider la non-régression. **Hors-scope CRIT-12 sweep** — à conduire
+> en branche dédiée avec un projet de référence intégré au CI. Le pseudo-code
+> ci-dessous reste **load-bearing** : il est lu par Claude pour orchestrer
+> les 3 phases (dev-backend × N → API gate → dev-frontend × N) avec gate
+> STOP-on-RED, batching parallèle, et fallback gate_passed.
 
 **Défaut** : back → QA API gate → front, plus de parallélisme back+front.
 
@@ -644,13 +638,23 @@ backend fragile.
 
 ---
 
-## STEP 6.4 — Auditor batch parallèle (code-review + security-scan + spec-compliance, v7.0.0)
+## STEP 6.4 — Auditor batch parallèle (4 auditors, v7.0.0)
 
-**Conditionnel** : invoque les 3 agents auditor **EN PARALLÈLE** (un
-seul message Agent multi-tool-use) pour les phases enabled selon
-`phase_planner.py` (cf. STEP 5.5.1 — réutiliser `$PHASE_PLAN`).
-Lecture mode + verdicts post-exécution. Le verdict consolidé pilote
-le passage à STEP 6.5 ou STOP.
+**Conditionnel** : invoque jusqu'à **4 agents auditor EN PARALLÈLE**
+(un seul message Agent multi-tool-use) pour les phases enabled selon
+`phase_planner.py` (cf. STEP 5.5.1 — réutiliser `$PHASE_PLAN`) **et**
+selon `ArchReviewMode` du Project Config. Lecture mode + verdicts
+post-exécution. Le verdict consolidé pilote le passage à STEP 6.5
+ou STOP.
+
+> **v7.0.0-alpha (audit CRIT-4 — 2026-06-04)** : `arch-reviewer` est
+> désormais inclus dans CE batch parallèle quand `ArchReviewMode: full`,
+> au lieu d'être spawné séparément en aval par `/sdd-review §3.0`.
+> Gain : 1 batch parallèle de 4 agents au lieu de 3 parallèles + 1
+> séquentiel post-dev-run. Économie ~10-15K tokens (arch-reviewer
+> Sonnet 4.6) + ~20s sur le wall-clock total. `/sdd-review` devient
+> aggregation pure quand invoqué post-`/dev-run` (lit `qa_code_review`
+> table où `arch-reviewer` a écrit ses `[ARCH_*]`).
 
 > **Anti-régression `framework_smoke.py`** : les invocations parallèles
 > ci-dessous utilisent le tool `Agent` (alias `Task`) avec multiples
@@ -666,6 +670,14 @@ le passage à STEP 6.5 ou STOP.
 ### 6.4.1 — Construction du batch
 
 ```python
+# v7.0.0-alpha (audit CRIT-4) : lire ArchReviewMode directement depuis
+# Project Config — phase_planner.py ne l'expose pas (volontaire — la
+# décision est binaire, pas de heuristique skip-conditional comme pour
+# code-review / security / spec).
+arch_review_mode = read_layered_config(keys=("ArchReviewMode",)).get(
+    "ArchReviewMode", "manual"
+)
+
 BATCH = []  # liste d'invocations à dispatcher en parallèle
 if phases.code_review.enabled:
     BATCH.append(Agent("code-reviewer", args="{n}"))
@@ -673,31 +685,39 @@ if phases.security_scan.enabled:
     BATCH.append(Agent("security-reviewer", args="{n}"))   # --mode scan supprimé v7.0.0
 if phases.spec_compliance.enabled:
     BATCH.append(Agent("spec-compliance-reviewer", args="{n}"))
+if arch_review_mode == "full":
+    BATCH.append(Agent("arch-reviewer", args="{n}"))       # v7.0.0-alpha audit CRIT-4
 # v7.0.0 : phases.a11y_audit ignored — agent removed.
 # Replacement : axe-core in the generated project's CI step.
 ```
 
-Si `BATCH == []` (toutes phases skipped) → skip STEP 6.4 entier,
-passer à STEP 6.5 (Refresh INDEX ADRs via `index_adrs.py`).
+Si `BATCH == []` (toutes phases skipped + ArchReviewMode ≠ full) →
+skip STEP 6.4 entier, passer à STEP 6.5 (Refresh INDEX ADRs via
+`index_adrs.py`).
 
 Sinon, dispatcher **toutes les invocations en parallèle dans un seul
 message**. Attendre la fin de l'ensemble. Pattern identique aux batches
 dev-* (STEP 6.a, 6.c) — toutes les invocations sont indépendantes
 (paths d'écriture disjoints, cf. `agents/*.md §Idempotence` et matrice
-`ownership.md §1`, was file-ownership.md §1).
+`ownership.md §1`).
 
 ### 6.4.2 — Lecture des verdicts
 
-Après réception des 3 (ou moins) agents, lire les rapports JSON :
+Après réception des 4 (ou moins) agents, lire les rapports JSON :
 
 | Agent | Verdict path | Champ |
 |---|---|---|
 | code-reviewer | `workspace/output/.sys/.validation/{n}-code-review.json` | `summary.verdict` |
 | security-reviewer | `workspace/output/.sys/.validation/{n}-security-scan.json` | `summary.verdict` |
 | spec-compliance-reviewer | `workspace/output/.sys/.validation/{n}-spec-compliance.json` | `summary.verdict` |
+| arch-reviewer (v7.0.0-alpha CRIT-4) | `workspace/output/.sys/.validation/{n}-arch-review.json` | `summary.verdict` |
 
 Si un fichier attendu est absent (agent a STOP en erreur runtime) →
 agent considéré comme `🔴 RED` avec cause `[AUDITOR_RUNTIME_ERROR]`.
+Exception `arch-reviewer` : échec runtime (timeout, infra) → **WARN**
+seulement (cf. règle historique sdd-review §3.0 — l'audit architecture
+n'est jamais hard-blocking par design, `ArchReviewFailOn: serious` par
+défaut).
 
 ### 6.4.3 — Verdict consolidé
 
@@ -721,11 +741,13 @@ Verdicts :
   - code-reviewer       : {🟢|🟡|🔴} (blocking: {class si applicable})
   - security-scan       : {🟢|🟡|🔴}
   - spec-compliance     : {🟢|🟡|🔴}
+  - arch-reviewer       : {🟢|🟡|⚪ skipped} (jamais hard-blocking, cf. §6.4.2)
 
 Rapports :
   - workspace/output/.sys/.validation/{n}-code-review.md
   - workspace/output/.sys/.validation/{n}-security-scan.md
   - workspace/output/.sys/.validation/{n}-spec-compliance.md
+  - workspace/output/.sys/.validation/{n}-arch-review.md (si ArchReviewMode=full)
 
 Pour débloquer :
   1. Lire les rapports en 🔴 RED (issues critical/serious + suggestions FIX)
@@ -745,12 +767,13 @@ Bypass (à utiliser en connaissance de cause) :
 ✓ code-reviewer       : {🟢 GREEN | 🟡 WARN} — {C}/{S}/{M}/{m} issues
 ✓ security-scan       : {🟢 GREEN | 🟡 WARN} — {C}/{S}/{M}/{m} issues
 ✓ spec-compliance     : {🟢 GREEN | 🟡 WARN} — {V}/{T} ACs verified
+✓ arch-reviewer       : {🟢 GREEN | 🟡 WARN} — {P} pattern violations  (si ArchReviewMode=full)
 FEAT {n} — auditor batch {🟢 GREEN | 🟡 WARN} (continue → STEP 6.5 INDEX ADRs)
 ```
 
-Pour les agents skippés (phase disabled) :
+Pour les agents skippés (phase disabled OU ArchReviewMode ≠ full) :
 ```
-⊘ {agent_name} : skipped ({skip_reason du phase_planner})
+⊘ {agent_name} : skipped ({skip_reason du phase_planner | ArchReviewMode={mode}})
 ```
 
 ### 6.4.5 — State tracking
@@ -758,7 +781,7 @@ Pour les agents skippés (phase disabled) :
 ```bash
 python .claude/python/sdd_scripts/sdd_state.py set-phase \
   --run-id $RUN_ID --phase auditor_batch --status {pass|warn|fail} \
-  --payload-json '{"code_review":"{verdict}","security_scan":"{verdict}","spec_compliance":"{verdict}"}'
+  --payload-json '{"code_review":"{verdict}","security_scan":"{verdict}","spec_compliance":"{verdict}","arch_review":"{verdict|skipped}"}'
 ```
 
 ### 6.4.6 — Anti-derive
@@ -911,9 +934,9 @@ Cas API Gate RED → format §6.b.STOP (seul rapport affiché).
 > Cette commande applique strictement `@.claude/rules/output-protocol.md`.
 > Substance non dupliquée — la règle est SSoT.
 
-**Labels canoniques émis** : `[PLAN]`, `[ARCH]`, `[DEV-BACKEND]`,
-`[QA]` (API Gate), `[DEV-FRONTEND]`, `[REVIEW]`, `[SECURITY]`,
-`[DONE]` (cf. output-protocol.md §3)
+**Labels canoniques émis** : `[PLAN]`, `[ARCH]`, `[CONSTITUTION]`,
+`[DEV-BACKEND]`, `[QA]` (API Gate), `[DEV-FRONTEND]`, `[CODE-REVIEW]`,
+`[SPEC-REVIEW]`, `[ARCH-REVIEW]`, `[SECURITY]`, `[DONE]` (cf. output-protocol.md §3)
 **Plage de progression couverte** : `15-78%` (sans review/QA finale,
 cf. output-protocol.md §4)
 

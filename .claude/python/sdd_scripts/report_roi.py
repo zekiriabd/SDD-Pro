@@ -49,6 +49,7 @@ if str(_PY_ROOT) not in sys.path:
 
 from sdd_lib.console_db import connect_ro  # noqa: E402
 from sdd_lib.pricing import as_tuple, FALLBACK_PRICING  # noqa: E402  # v7.0.1 SSoT
+from sdd_lib.exit_codes import CORRECTIBLE, FAIL_FAST, SUCCESS  # noqa: E402
 
 # Pricing SSoT moved to sdd_lib/pricing.py (v7.0.1). DEFAULT_PRICING kept
 # here as a tuple-shaped alias for the legacy model_cost() signature.
@@ -427,8 +428,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"CAUSE: [NOT_FOUND] {exc}", file=sys.stderr)
         print("FIX: run /sdd-full at least once to bootstrap, OR run "
               "init_console_db.py", file=sys.stderr)
-        return 1
-
+        return FAIL_FAST
     with ro_ctx as conn:
         if args.feat is not None:
             payloads = [collect_feat_data(conn, args.feat)]
@@ -436,7 +436,7 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"ERROR: report_roi — FEAT {args.feat} unknown "
                       f"(no runs and no coverage row)", file=sys.stderr)
                 print(f"CAUSE: [FEAT_NOT_FOUND] feat_n={args.feat}", file=sys.stderr)
-                return 2
+                return CORRECTIBLE
         else:
             feat_ns = list_feats(conn)
             payloads = [collect_feat_data(conn, n) for n in feat_ns]
@@ -445,8 +445,6 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps({"feats": payloads}, separators=(",", ":"), default=str))
     else:
         print(render_markdown(payloads))
-    return 0
-
-
+    return SUCCESS
 if __name__ == "__main__":
     raise SystemExit(main())

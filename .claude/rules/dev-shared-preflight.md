@@ -8,27 +8,14 @@
 > et ne spécifient que les paramètres asymétriques (family, codes
 > family-specific). Source de vérité unique pour évolutions futures.
 
-> ⚠️ **Sync risk — duplication partielle conservée (audit v7.0.0 finding E)** :
-> pour préserver l'autonomie v5.0 d'invocation (l'agent dev-* doit pouvoir
-> exécuter STEP 0-1.bis sans Read mandatory secondaire), une **copie
-> compacte** des STEP 0/0.5/1/1.bis reste **inlinée** dans
-> `agents/dev-backend.md` et `agents/dev-frontend.md`. Toute évolution
-> de §1-§4 ci-dessous DOIT être propagée manuellement aux deux fichiers
-> agent. Process :
->
-> 1. Éditer ici d'abord (SSoT documentaire).
-> 2. Re-générer la version compacte dans les deux agents (paragraphe
->    "STEP 0 — pre-flight" / "STEP 1 — détection mode" / "STEP 1.bis —
->    path safety"), en supprimant les détails de matrice (§5) — laisser
->    le @-ref vers ce fichier pour le reste.
-> 3. Diff de cohérence : `python .claude/python/sdd_scripts/validate_inline_rules.py
->    [--json] [--strict]`. Scanne tous les agents avec une section
->    `## Inline Rules`, détecte les rules modifiées après leur agent
->    référent (mtime-based), émet `[DRIFT_SUSPECTED]` quand le diff
->    diverge. À câbler en CI via `--strict` (exit 1 si drift).
->
-> Class d'erreur `[DRIFT_SUSPECTED]` (cf. `error-classification.md §1.14`)
-> est émise par `validate_inline_rules.py` quand le diff diverge.
+> **v7.0.0-alpha (audit CRIT-8, 2026-06-04)** : le warning « Sync risk
+> — duplication partielle conservée » historiquement présent ici a été
+> supprimé. Vérification factuelle : `dev-backend.md:25-37` et
+> `dev-frontend.md:32-44` font 9–13 lignes chacun et ne contiennent
+> que l'@-ref + les paramètres asymétriques (cf. §5 matrice). Aucune
+> copie compacte de §1–§4 inlinée. `validate_inline_rules.py` (toujours
+> wired en CI via `framework_smoke.py`) reste utile comme garde-fou
+> si une future section `## Inline Rules` est ré-introduite.
 
 ## TOC
 

@@ -2,7 +2,7 @@
 
 > §2.4 (Librairies) régénérée depuis `node-express.libs.json` — ne pas éditer manuellement (`python .claude/python/sdd_admin/sync_stack_md.py --stack-id node-express`).
 
-Status: Draft
+Status: Experimental
 Validation: 🟡 experimental (not yet validated end-to-end in production combo)
 Tech FEAT ID: tech-expressapi
 Scope: backend uniquement (API, logique metier, persistance)
@@ -121,7 +121,7 @@ Namespace racine : `{BackendNamespace}`
 <!-- LIBS_CATALOG_START -->
 ### 2.4 Librairies
 
-> Source de verite : `.claude/stacks/backend/node-express.libs.json`. Ne pas editer cette section manuellement -- utiliser `python .claude/python/sdd_admin/sync_stack_md.py --stack-id node-express`.
+> Source de verite : `.claude/stacks/backend/node-express.libs.json`. Ne pas editer cette section manuellement -- utiliser `.claude/python/sdd_admin/sync_stack_md.py --stack-id node-express`.
 
 #### 2.4.a Librairies CORE (installees par arch en section 2.2.1, toujours)
 
@@ -138,7 +138,7 @@ Namespace racine : `{BackendNamespace}`
 | swagger-ui-express | 5.0.1 |  |
 | helmet | 8.0.0 |  |
 | cors | 2.8.5 |  |
-| config | 3.3.12 | Lecture `config/default.json` peuplé par arch (DB + Azure AD), depuis 2026-05-14 |
+| dotenv | 16.4.7 |  |
 | compression | 1.7.5 |  |
 | express-rate-limit | 7.4.1 |  |
 | typescript | 5.6.3 |  |
@@ -158,17 +158,17 @@ Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'U
 
 | Capability | Lib | Version | Triggers |
 |---|---|---|---|
-| uuid-gen | uuid | 11.0.5 | \buuid\b, guid.*genere, id.*aleatoire |
-| uuid-gen | @types/uuid | 10.0.0 | \buuid\b, guid.*genere, id.*aleatoire |
+| uuid-gen | uuid | 11.0.5 | uuid, guid.*genere, id.*aleatoire |
+| uuid-gen | @types/uuid | 10.0.0 | uuid, guid.*genere, id.*aleatoire |
 | date-utils | dayjs | 1.11.13 | dates.*format, duree, intervalle.*temps |
 | auth-local | bcryptjs | 2.4.3 | auth-local, hash.*password, bcrypt |
 | auth-local | @types/bcryptjs | 2.4.6 | auth-local, hash.*password, bcrypt |
-| jwt | jsonwebtoken | 9.0.2 | \bjwt\b, auth-local, auth-azure-ad |
-| jwt | @types/jsonwebtoken | 9.0.7 | \bjwt\b, auth-local, auth-azure-ad |
-| http-client | axios | 1.7.9 | \baxios\b, appel.*api.*externe, service.*externe, third.party |
-| http-client | axios-retry | 4.5.0 | \baxios\b, retry.*http, resilience |
-| excel | exceljs | 4.4.0 | \bexcel\b, \.xlsx\b, export.*excel, import.*excel, tableur |
-| pdf | pdfkit | 0.15.2 | \bpdf\b, \.pdf\b, export.*pdf, generer.*pdf |
+| jwt | jsonwebtoken | 9.0.2 | jwt, auth-local, auth-azure-ad |
+| jwt | @types/jsonwebtoken | 9.0.7 | jwt, auth-local, auth-azure-ad |
+| http-client | axios | 1.7.9 | axios, appel.*api.*externe, service.*externe, third.party |
+| http-client | axios-retry | 4.5.0 | axios, retry.*http, resilience |
+| excel | exceljs | 4.4.0 | excel, \.xlsx, export.*excel, import.*excel, tableur |
+| pdf | pdfkit | 0.15.2 | pdf, \.pdf, export.*pdf, generer.*pdf |
 | file-upload | multer | 1.4.5-lts.1 | upload.*fichier, multipart, form-data |
 | file-upload | @types/multer | 1.4.12 | upload.*fichier, multipart, form-data |
 | object-mapping | class-transformer | 0.5.1 | class-transformer, auto.*mapping, dto.*mapping |
@@ -216,7 +216,7 @@ npm init -y
   swagger-ui-express@5.0.1 \
   helmet@8.0.0 \
   cors@2.8.5 \
-  config@3.3.12 \
+  dotenv@16.4.7 \
   compression@1.7.5 \
   express-rate-limit@7.4.1 \
   typescript@5.6.3 \

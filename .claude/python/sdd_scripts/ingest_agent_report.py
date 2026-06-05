@@ -15,6 +15,8 @@ Supported report types:
     - performance    → qa_performance         (workspace/output/qa/feat-{n}/perf-report.json)
     - spec-compliance→ qa_spec_compliance     (workspace/output/.sys/.validation/{n}-spec-compliance.json)
     - api-tests      → qa_api_tests (+ qa_api_endpoints)  (workspace/output/qa/feat-{n}/api-tests.json)
+    - adversarial    → validation_reports(report_type='adversarial')
+                       (workspace/output/qa/feat-{n}/adversarial.json) — v7.2.0 R1 BMAD
 
 Usage:
     python -m sdd_scripts.ingest_agent_report --type a11y --feat 1
@@ -46,17 +48,19 @@ from sdd_lib.console_db import (  # noqa: E402
     insert_qa_a11y_batch, insert_qa_code_review_batch,
     insert_qa_security_batch, insert_qa_performance_batch,
     insert_qa_spec_compliance_batch, insert_qa_api_tests,
+    insert_validation_report, replace_validation_reports,
     record_auditor_run,
     replace_qa_auditor_for_feat, replace_qa_api_tests_for_feat,
 )
 from sdd_lib.paths import repo_root  # noqa: E402
 from sdd_lib.stderr import warn  # noqa: E402
+from sdd_lib.exit_codes import FAIL_FAST, INFRA_BLOCKED, SUCCESS  # noqa: E402
 
 
 REPORT_TYPES = (
     "a11y", "code-review", "security-scan", "threat-model",
     "performance", "spec-compliance", "api-tests",
-    "arch-review",
+    "arch-review", "adversarial",
 )
 
 
@@ -73,6 +77,7 @@ def default_path(report_type: str, feat: int, root: Path) -> Path:
         "spec-compliance": val / f"{feat}-spec-compliance.json",
         "api-tests":       qa / "api-tests.json",
         "arch-review":     val / f"{feat}-arch-review.json",
+        "adversarial":     qa / "adversarial.json",
     }
     return mapping[report_type]
 
@@ -242,6 +247,50 @@ def ingest_spec_compliance(report: dict, feat: int) -> int:
         return n
 
 
+def ingest_adversarial(report: dict, feat: int) -> int:
+    """v7.2.0 R1 BMAD — persist adversarial-reviewer output into validation_reports.
+
+    The agent produces 5-10 attacks with verdict='informational' (never
+    blocking). Stored in validation_reports(report_type='adversarial')
+    so the consolidated /sdd-review verdict is unaffected; the Tech
+    Lead consults the canal separately.
+
+    Idempotent : a re-run wipes the prior row for the same FEAT
+    (delete + insert) so re-invocations of /sdd-review --adversarial
+    don't accumulate stale telemetry.
+    """
+    attacks = report.get("attacks") or []
+    if not isinstance(attacks, list):
+        attacks = []
+    summary = report.get("summary") or {}
+    attacks_total = (summary.get("attacks_total")
+                     if isinstance(summary.get("attacks_total"), int)
+                     else len(attacks))
+    coverage_warning = bool(summary.get("coverage_warning", False))
+    # Verdict is constant by design — surface any deviation as a warning
+    # rather than silently coerce (helps spot agent prompt drift).
+    raw_verdict = report.get("verdict", "informational")
+    if raw_verdict != "informational":
+        warn(f"WARN: adversarial report verdict={raw_verdict!r} (expected 'informational') — coerced")
+    with connect() as conn:
+        replace_validation_reports(conn, feat_n=feat, report_type="adversarial")
+        insert_validation_report(
+            conn,
+            feat_n=feat,
+            report_type="adversarial",
+            verdict="informational",
+            score=attacks_total,
+            summary=(f"{attacks_total} attacks (coverage_warning="
+                     f"{str(coverage_warning).lower()})"),
+            payload={
+                "attacks": attacks,
+                "summary": summary,
+            },
+            file_path=str(default_path("adversarial", feat, repo_root())),
+        )
+    return attacks_total
+
+
 def ingest_api_tests(report: dict, feat: int) -> int:
     summary = report.get("summary") or {}
     endpoints = report.get("endpoints") or []
@@ -284,8 +333,7 @@ def main(argv: list[str] | None = None) -> int:
             f"CAUSE: [QA_PRECONDITION_FAILED] {path}\n"
             f"FIX: ensure the agent {args.type} wrote its JSON before ingest\n"
         )
-        return 1
-
+        return FAIL_FAST
     ensure_initialized()
     try:
         report = _load_json(path)
@@ -298,8 +346,7 @@ def main(argv: list[str] | None = None) -> int:
             f"CAUSE: [QA_OUTPUT_INVALID] root is not an object in {path}\n"
             "FIX: regenerate the report\n"
         )
-        return 3
-
+        return INFRA_BLOCKED
     try:
         if args.type == "a11y":
             n = ingest_a11y(report, args.feat)
@@ -319,17 +366,18 @@ def main(argv: list[str] | None = None) -> int:
             # arch-reviewer writes into qa_code_review with ARCH_* issue_class
             # (reuses existing table, distinguishable via WHERE issue_class LIKE 'ARCH_%')
             n = ingest_code_review(report, args.feat)
+        elif args.type == "adversarial":
+            n = ingest_adversarial(report, args.feat)
         else:
             sys.stderr.write(f"ERROR: unsupported type {args.type}\n")
-            return 3
+            return INFRA_BLOCKED
     except Exception as exc:
         sys.stderr.write(
             "ERROR: ingest_agent_report: DB insert failed\n"
             f"CAUSE: [QA_OUTPUT_INVALID] {exc}\n"
             "FIX: inspect the JSON schema vs DB expected fields\n"
         )
-        return 3
-
+        return INFRA_BLOCKED
     if not args.keep_json:
         try:
             path.unlink()
@@ -338,8 +386,6 @@ def main(argv: list[str] | None = None) -> int:
 
     print(f"OK ingest_agent_report: type={args.type} feat={args.feat} rows={n} "
           f"({'kept' if args.keep_json else 'deleted'}: {path})")
-    return 0
-
-
+    return SUCCESS
 if __name__ == "__main__":
     sys.exit(main())

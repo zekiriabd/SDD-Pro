@@ -208,6 +208,6 @@ ADR `governance-protection-{slug}` + 2 approbations.
 - [`.claude/python/sdd_hooks/`](.claude/python/sdd_hooks/) — 5 hooks Python
 - [`.claude/python/sdd_admin/framework_smoke.py`](.claude/python/sdd_admin/framework_smoke.py) — smoke check Stop hook
 - [`.claude/python/_hook.py`](.claude/python/_hook.py) — wrapper d'invocation
-- [`.claude/MIGRATION.md`](.claude/MIGRATION.md) — guide migration entre versions majeures
-- [`.claude/VERSIONING.md`](.claude/VERSIONING.md) — politique SemVer + freeze
+- [`.claude/docs/MIGRATION.md`](.claude/docs/MIGRATION.md) — guide migration entre versions majeures
+- [`.claude/docs/VERSIONING.md`](.claude/docs/VERSIONING.md) — politique SemVer + freeze
 - `workspace/output/.sys/.context/adrs/ADR-20260519T173000-governance-protection-tracing.md` — ADR ex-post de la migration v6.5+

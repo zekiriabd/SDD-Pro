@@ -59,7 +59,7 @@ class TestLoadLedger(unittest.TestCase):
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_root = Path(tmp)
             (tmp_root / ".claude").mkdir()
-            with mock.patch.object(console_db, "repo_root", return_value=tmp_root):
+            with mock.patch.object(console_db.core, "repo_root", return_value=tmp_root):
                 self.assertEqual(_load_ledger(), [])
 
     def test_loads_db_rows(self):
@@ -72,7 +72,7 @@ class TestLoadLedger(unittest.TestCase):
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_root = Path(tmp)
             (tmp_root / ".claude").mkdir()
-            with mock.patch.object(console_db, "repo_root", return_value=tmp_root):
+            with mock.patch.object(console_db.core, "repo_root", return_value=tmp_root):
                 ensure_initialized()
                 with connect() as conn:
                     insert_token_usage(
@@ -205,7 +205,7 @@ class TestCli(unittest.TestCase):
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_root = Path(tmp)
             (tmp_root / ".claude").mkdir()
-            with mock.patch.object(console_db, "repo_root", return_value=tmp_root):
+            with mock.patch.object(console_db.core, "repo_root", return_value=tmp_root):
                 ensure_initialized()
                 with connect() as conn:
                     insert_token_usage(
@@ -235,7 +235,7 @@ class TestCli(unittest.TestCase):
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_root = Path(tmp)
             (tmp_root / ".claude").mkdir()
-            with mock.patch.object(console_db, "repo_root", return_value=tmp_root):
+            with mock.patch.object(console_db.core, "repo_root", return_value=tmp_root):
                 ensure_initialized()
                 with connect() as conn:
                     insert_token_usage(

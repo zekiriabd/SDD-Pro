@@ -51,7 +51,7 @@ class TestEnsureInitialized(unittest.TestCase):
     def test_fresh_init_creates_schema_at_current_version(self) -> None:
         with TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = _fake_repo(tmp)
-            with mock.patch.object(console_db, "repo_root", return_value=root):
+            with mock.patch.object(console_db.core, "repo_root", return_value=root):
                 ensure_initialized()
                 with connect() as conn:
                     self.assertEqual(current_schema_version(conn), SCHEMA_VERSION)
@@ -59,7 +59,7 @@ class TestEnsureInitialized(unittest.TestCase):
     def test_idempotent_no_duplicate_rows(self) -> None:
         with TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = _fake_repo(tmp)
-            with mock.patch.object(console_db, "repo_root", return_value=root):
+            with mock.patch.object(console_db.core, "repo_root", return_value=root):
                 ensure_initialized()
                 ensure_initialized()
                 ensure_initialized()
@@ -78,7 +78,7 @@ class TestEnsureInitialized(unittest.TestCase):
         """Round-trip : insert + read back proves the schema is functional."""
         with TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = _fake_repo(tmp)
-            with mock.patch.object(console_db, "repo_root", return_value=root):
+            with mock.patch.object(console_db.core, "repo_root", return_value=root):
                 ensure_initialized()
                 with connect() as conn:
                     insert_token_usage(
@@ -102,7 +102,7 @@ class TestEnsureInitialized(unittest.TestCase):
     def test_wal_journal_mode(self) -> None:
         with TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = _fake_repo(tmp)
-            with mock.patch.object(console_db, "repo_root", return_value=root):
+            with mock.patch.object(console_db.core, "repo_root", return_value=root):
                 ensure_initialized()
                 with connect() as conn:
                     mode = conn.execute("PRAGMA journal_mode").fetchone()[0]
@@ -113,7 +113,7 @@ class TestConnectRo(unittest.TestCase):
     def test_raises_when_db_absent(self) -> None:
         with TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = _fake_repo(tmp)
-            with mock.patch.object(console_db, "repo_root", return_value=root):
+            with mock.patch.object(console_db.core, "repo_root", return_value=root):
                 with self.assertRaises(FileNotFoundError):
                     with connect_ro():
                         pass
@@ -121,7 +121,7 @@ class TestConnectRo(unittest.TestCase):
     def test_succeeds_after_init(self) -> None:
         with TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = _fake_repo(tmp)
-            with mock.patch.object(console_db, "repo_root", return_value=root):
+            with mock.patch.object(console_db.core, "repo_root", return_value=root):
                 ensure_initialized()
                 with connect_ro() as conn:
                     v = current_schema_version(conn)
@@ -138,7 +138,7 @@ class TestApplyPendingMigrations(unittest.TestCase):
     def test_noop_when_at_current_version(self) -> None:
         with TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = _fake_repo(tmp)
-            with mock.patch.object(console_db, "repo_root", return_value=root):
+            with mock.patch.object(console_db.core, "repo_root", return_value=root):
                 ensure_initialized()
                 with connect() as conn:
                     applied = apply_pending_migrations(conn)
@@ -158,9 +158,9 @@ class TestApplyPendingMigrations(unittest.TestCase):
                 "CREATE TABLE test_v3 (id INTEGER PRIMARY KEY);", encoding="utf-8"
             )
 
-            with mock.patch.object(console_db, "repo_root", return_value=root), \
-                 mock.patch.object(console_db, "MIGRATIONS_DIR", migrations_tmp), \
-                 mock.patch.object(console_db, "SCHEMA_VERSION", 3):
+            with mock.patch.object(console_db.core, "repo_root", return_value=root), \
+                 mock.patch.object(console_db.core, "MIGRATIONS_DIR", migrations_tmp), \
+                 mock.patch.object(console_db.core, "SCHEMA_VERSION", 3):
                 ensure_initialized()  # fresh init at v1 first
                 # ensure_initialized() with SCHEMA_VERSION=3 on a fresh DB
                 # loads the v1 schema then applies v2 + v3 migrations.
@@ -195,9 +195,9 @@ class TestApplyPendingMigrations(unittest.TestCase):
                 "CREATE TABLE valid (id INTEGER);", encoding="utf-8"
             )
 
-            with mock.patch.object(console_db, "repo_root", return_value=root), \
-                 mock.patch.object(console_db, "MIGRATIONS_DIR", migrations_tmp), \
-                 mock.patch.object(console_db, "SCHEMA_VERSION", 2):
+            with mock.patch.object(console_db.core, "repo_root", return_value=root), \
+                 mock.patch.object(console_db.core, "MIGRATIONS_DIR", migrations_tmp), \
+                 mock.patch.object(console_db.core, "SCHEMA_VERSION", 2):
                 ensure_initialized()
                 with connect() as conn:
                     self.assertEqual(current_schema_version(conn), 2)
@@ -218,9 +218,9 @@ class TestApplyPendingMigrations(unittest.TestCase):
                 "CREATE TABLE future (id INTEGER);", encoding="utf-8"
             )
 
-            with mock.patch.object(console_db, "repo_root", return_value=root), \
-                 mock.patch.object(console_db, "MIGRATIONS_DIR", migrations_tmp), \
-                 mock.patch.object(console_db, "SCHEMA_VERSION", 2):
+            with mock.patch.object(console_db.core, "repo_root", return_value=root), \
+                 mock.patch.object(console_db.core, "MIGRATIONS_DIR", migrations_tmp), \
+                 mock.patch.object(console_db.core, "SCHEMA_VERSION", 2):
                 ensure_initialized()
                 with connect() as conn:
                     self.assertEqual(current_schema_version(conn), 2)
@@ -236,7 +236,7 @@ class TestApplyPendingMigrations(unittest.TestCase):
         (qa_e2e). The principle (DB > framework = warn-not-crash) unchanged."""
         with TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = _fake_repo(tmp)
-            with mock.patch.object(console_db, "repo_root", return_value=root):
+            with mock.patch.object(console_db.core, "repo_root", return_value=root):
                 ensure_initialized()  # init at SCHEMA_VERSION (current)
                 # Manually bump to v99 (simulating another checkout's future DB)
                 with connect() as conn:
@@ -246,7 +246,7 @@ class TestApplyPendingMigrations(unittest.TestCase):
                     )
 
             # Re-call ensure_initialized — should warn DB ahead, not raise
-            with mock.patch.object(console_db, "repo_root", return_value=root):
+            with mock.patch.object(console_db.core, "repo_root", return_value=root):
                 ensure_initialized()  # MUST NOT raise
                 with connect() as conn:
                     self.assertEqual(current_schema_version(conn), 99)
@@ -258,7 +258,7 @@ class TestConcurrentWriters(unittest.TestCase):
     def test_threaded_inserts_all_persisted(self) -> None:
         with TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = _fake_repo(tmp)
-            with mock.patch.object(console_db, "repo_root", return_value=root):
+            with mock.patch.object(console_db.core, "repo_root", return_value=root):
                 ensure_initialized()
 
                 errors: list[Exception] = []

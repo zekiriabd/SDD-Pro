@@ -45,17 +45,20 @@ RAM, phase B uniquement.
 `application.yml` / `config/default.json` / `app/config.py`, jamais
 d'env vars. `stack.md` reste source humaine, propagée par STEP 4.5.
 
+> **Convention numérotation STEPs (v7.0.0-alpha audit MIN-1, 2026-06-04)** :
+> les suffixes `.bis`, `.ter`, `.quart` désignent des **prolongements**
+> (extensions ordonnées) du STEP parent, **pas** une renumérotation. Ordre
+> d'exécution = ordre d'écriture dans le fichier (STEP 0.5 → 1 → 2 →
+> 2.ter → 2.bis → 3 → 3.6 → 3.5 → …). Ce léger « désordre » apparent est
+> volontaire : les sous-STEPs ont été ajoutés en cours d'évolution sans
+> casser les références externes existantes (`@.claude/commands/.../STEP X.bis`).
+> Refactor en numérotation contiguë = follow-up dédié (impact ~30 cross-refs).
 ---
 
 ## STEP 0.5 - HARD-GATE context budget
 
-Avant tout `Read`, executer :
-
-```bash
-python .claude/python/sdd_scripts/context_budget.py --agent arch
-```
-
-Exit non-zero -> STOP. Ledger : `console.db` table `context_budget` (v6.10 SSoT).
+Appliquer `@.claude/rules/build-and-loop.md §1` (Partie B) avec
+`--agent arch` (pas de `--feat-number` — niveau projet). Exit non-zero → STOP.
 
 ---
 
@@ -133,7 +136,7 @@ scope `back-front` avec backend uniquement) :
 |---|---|
 | `MVC` (défaut) | `.claude/stacks/archi/mvc.md` 🟢 |
 | `DDD` | `.claude/stacks/archi/ddd.md` 🟡 |
-| ~~`microservice`~~ | `.claude/stacks/_drafts/archi/microservice.md` ⊘ **draft v7.0.0** (non chargé) |
+| `microservice` | `.claude/stacks/archi/microservice.md` 🟡 (chargeable, jamais validé bout-en-bout) |
 
 Le pattern pilote (a) le mapping couche → répertoire scaffolding Phase A,
 (b) les libs CORE supplémentaires (DDD+.NET → MediatR ; microservice+Kotlin →
@@ -527,43 +530,18 @@ Sur erreur, bloc ERROR 3 lignes (CAUSE / FIX) et STOP. Aucun autre texte.
 
 ## Chat Output Protocol
 
-> Cet agent applique strictement `@.claude/rules/output-protocol.md`.
-> Substance non dupliquée — la règle est SSoT.
-
-**Label canonique** : `[ARCH]` (cf. output-protocol.md §3)
-**Plage de progression** : `22-32%` (cf. output-protocol.md §4)
-
-**Granularité cible** : 3 à 6 updates par invocation, format
-`[ARCH] Action au gérondif... (X%)` ou `[ARCH] Résultat factuel. (X%)`.
-
-**Interdits stricts** (cf. §5 du protocole) :
-- chemins de fichiers internes (`workspace/...`, `.claude/...`)
-- noms de classes/méthodes/composants générés
-- stdout/stderr de bash, Read/Edit/Glob narration
-- context budget, tokens, preflight checks détaillés
-- diffs, snippets, lignes de code
-
-**Erreurs (LOAD-BEARING)** : tout bloc `ERROR: ... / CAUSE: ... / FIX: ...`
-apparaissant dans les STEPs ci-dessus est un **TEMPLATE pour le fichier
-rapport disque**, JAMAIS un texte à émettre verbatim en chat.
-
-Procédure obligatoire à chaque émission d'erreur :
-1. **Disque** : écrire le bloc 3-lignes complet dans le fichier rapport
-   approprié — format préservé pour `build_loop`/hooks/dashboards
-   (cf. `error-classification.md §2`).
-2. **Chat** : émettre UNE SEULE ligne compressée :
-   ```
-   🔴 [{LABEL}/FAIL] {résumé court} — [CLASS] {détail 1L} → {rapport.md}. ({X}%)
-   ```
-   Pas de chemin absolu, pas de stack trace, pas de blocs multi-lignes.
-pour `build_loop` et hooks — cf. `error-classification.md §2`).
-
-**Bypass debug** : `SDD_CHAT_VERBOSE=1` → mode legacy verbose (§10).
+Applique `@.claude/rules/output-protocol.md`. Label `[ARCH]`, plage `22-32%`,
+granularité 3-6 updates. Erreurs : chat 1L (`🔴 [ARCH/FAIL] résumé — [CLASS]
+détail → rapport.md (X%)`) + bloc ERROR 3L disque préservé pour
+`build_loop`/hooks (cf. `error-classification.md §2`). Bypass `SDD_CHAT_VERBOSE=1`.
 
 ---
 
 ## Anti-derive strict
 
+**Universels** : `@.claude/rules/build-and-loop.md §3.bis` (autonomous, ambiguïté → STOP, no-spawn).
+
+**Domain-specific arch** :
 - Jamais lire FEATs, US, mockups HTML
 - Jamais générer code applicatif (Page, Component, Endpoint, Service,
   DTO, Mapper) — scope dev-*
@@ -575,7 +553,6 @@ pour `build_loop` et hooks — cf. `error-classification.md §2`).
   TRUNCATE/EXECUTE`
 - Jamais écrire la connection string dans un fichier du repo
 - Jamais supprimer manuellement entité scaffoldée (`--force` incrémental)
-- Jamais poser de question (autonomous)
 
 ---
 

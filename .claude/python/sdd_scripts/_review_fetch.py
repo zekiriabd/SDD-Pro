@@ -4,6 +4,12 @@ Extracted from sdd_review.py to keep the orchestrator <300L. Public API
 (Finding, _normalize_path, deduplicate_findings, fetch_findings,
 run_quality_scan, SEVERITY_*) is re-exported from sdd_review.py for
 backward-compat with tests (test_sdd_review_dedup.py).
+
+v7.0.0-alpha (audit MAJ-15, 2026-06-04) — the `_` prefix on this file
+and `_review_report.py` is **intentional** (PEP 8 module-private
+convention). Renaming to a `sdd_lib/review/` sub-package would be
+cosmetic: zero behavior gain, ~10 caller updates, ~30min of test
+realignment. Decision : keep as-is.
 """
 from __future__ import annotations
 

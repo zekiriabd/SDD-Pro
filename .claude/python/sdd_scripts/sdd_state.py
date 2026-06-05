@@ -45,6 +45,7 @@ from sdd_lib.console_db import (  # noqa: E402
 )
 from sdd_lib.paths import iso_now_ms as iso_now, repo_root  # noqa: E402
 from sdd_lib.stderr import warn  # noqa: E402
+from sdd_lib.exit_codes import FAIL_FAST, SUCCESS  # noqa: E402
 
 
 VALID_PHASE_STATUSES = {
@@ -142,7 +143,7 @@ def _row_to_dict(row, phases: list[Any] | None = None) -> dict[str, Any]:
 def action_new_run(args: argparse.Namespace) -> int:
     if args.feat_number <= 0:
         warn("new-run requires --feat-number > 0")
-        return 1
+        return FAIL_FAST
     run_id = uuid.uuid4().hex[:12]
     tags = [t.strip() for t in args.tags.split(",") if t.strip()] if args.tags else []
     command = args.command or "unknown"
@@ -163,9 +164,7 @@ def action_new_run(args: argparse.Namespace) -> int:
             payload={"cmd": command, "tags": tags},
         )
     print(run_id)
-    return 0
-
-
+    return SUCCESS
 def action_set_phase(args: argparse.Namespace) -> int:
     ensure_initialized()
     now = iso_now()
@@ -174,7 +173,7 @@ def action_set_phase(args: argparse.Namespace) -> int:
         row = get_run(conn, args.run_id)
         if row is None:
             warn(f"Unknown runId: {args.run_id}")
-            return 1
+            return FAIL_FAST
         feat_n = row["feat_n"]
 
         if args.status == "start":
@@ -220,9 +219,7 @@ def action_set_phase(args: argparse.Namespace) -> int:
             conn, event_type=event_type, ts=now, run_id=args.run_id,
             feat_n=feat_n, phase=args.phase, payload=evt_payload,
         )
-    return 0
-
-
+    return SUCCESS
 def action_end_run(args: argparse.Namespace) -> int:
     ensure_initialized()
     now = iso_now()
@@ -230,8 +227,7 @@ def action_end_run(args: argparse.Namespace) -> int:
         row = get_run(conn, args.run_id)
         if row is None:
             warn(f"Unknown runId: {args.run_id}")
-            return 1
-
+            return FAIL_FAST
         feat_n = row["feat_n"]
         try:
             started = datetime.fromisoformat(row["started_at"].replace("Z", "+00:00"))
@@ -249,36 +245,30 @@ def action_end_run(args: argparse.Namespace) -> int:
             feat_n=feat_n, payload={"status": args.status, "durationMs": dur_ms},
         )
     print(f"run {args.run_id} ended status={args.status} durationMs={dur_ms}")
-    return 0
-
-
+    return SUCCESS
 def action_get_run(args: argparse.Namespace) -> int:
     ensure_initialized()
     with connect() as conn:
         rows = list_runs(conn, feat_n=args.feat_number, limit=10_000)
     if not rows:
-        return 1
+        return FAIL_FAST
     if args.latest:
         print(rows[0]["run_id"])
     else:
         for r in rows:
             print(r["run_id"])
-    return 0
-
-
+    return SUCCESS
 def action_show_run(args: argparse.Namespace) -> int:
     ensure_initialized()
     with connect() as conn:
         row = get_run(conn, args.run_id)
         if row is None:
             warn(f"Unknown runId: {args.run_id}")
-            return 1
+            return FAIL_FAST
         phases = get_run_phases(conn, args.run_id)
     state = _row_to_dict(row, phases)
     print(json.dumps(state, indent=2, ensure_ascii=False))
-    return 0
-
-
+    return SUCCESS
 def action_list_runs(args: argparse.Namespace) -> int:
     ensure_initialized()
     with connect() as conn:
@@ -289,8 +279,7 @@ def action_list_runs(args: argparse.Namespace) -> int:
         )
     if not rows:
         print("(no runs)")
-        return 0
-
+        return SUCCESS
     runs = [{
         "runId":     r["run_id"],
         "FEAT":      r["feat_n"] or "",
@@ -307,9 +296,7 @@ def action_list_runs(args: argparse.Namespace) -> int:
     print("-" * len(header))
     for r in runs:
         print("  ".join(f"{str(r[c]):<{widths[c]}}" for c in cols))
-    return 0
-
-
+    return SUCCESS
 def action_emit_event(args: argparse.Namespace) -> int:
     ensure_initialized()
     payload = parse_payload(args.payload_json)
@@ -320,9 +307,7 @@ def action_emit_event(args: argparse.Namespace) -> int:
             conn, event_type=args.event_type, ts=iso_now(),
             run_id=args.run_id, feat_n=feat_n, payload=payload,
         )
-    return 0
-
-
+    return SUCCESS
 DISPATCH = {
     "new-run":    action_new_run,
     "set-phase":  action_set_phase,

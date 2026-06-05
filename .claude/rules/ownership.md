@@ -52,8 +52,12 @@ non déterministes.
 | `workspace/console/status.json` | console web + `/sdd-full` (via `gate_decide.py`) | **Atomic write + lock partagé** `.status.lock` (O_EXCL, TTL 10s, retry 5×) | LOT 2-3 |
 | `workspace/console/.status.lock` | console web OU `/sdd-full` (un seul à la fois) | Création atomique O_EXCL, supprimé après write | LOT 2-3 |
 | `workspace/console/{server.js,app.jsx,index.html,…}` | dev humain (Tech Lead) | Edit manuel — aucun agent SDD ne touche | hors pipeline |
-| ~~`workspace/output/dashboard/README.html`~~ | **retiré v6.10** | métriques dans `console.db` (24 tables) ; rendu graphique par console web | — |
-| ~~`workspace/output/qa/feat-{n}/dashboard.html`~~ | **retiré v6.10** | métriques QA dans `console.db` (tables `qa_*`) ; endpoints `/api/feat/:n` | — |
+
+> v7.0.0-alpha (audit MIN-5, 2026-06-04) — les 2 lignes historiques sur
+> `dashboard/README.html` + `qa/feat-{n}/dashboard.html` (retirés v6.10)
+> ont été supprimées du tableau (l'historique vit dans CHANGELOG). Le
+> rendu graphique des métriques `console.db` est désormais owned par
+> `workspace/console/` (console web).
 
 ---
 

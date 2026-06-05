@@ -1,0 +1,661 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Demo — Fiche enfant</title>
+<link rel="stylesheet" href="design-system.css">
+<style>
+  .app{flex:1;display:flex;flex-direction:column;background:var(--nj-cream);overflow:hidden}
+
+  /* ---- Top bar ---- */
+  .topbar{
+    height:var(--nj-topbar-h);flex-shrink:0;
+    display:flex;align-items:center;gap:10px;padding:0 14px;
+    background:var(--nj-surface);border-bottom:1px solid var(--nj-line-soft);
+  }
+  .topbar__back{width:38px;height:38px;border-radius:999px;background:var(--nj-coral-50);color:var(--nj-coral-700);border:0;display:grid;place-items:center;cursor:pointer;text-decoration:none}
+  .topbar__title{flex:1;min-width:0;line-height:1.15;padding-left:2px}
+  .topbar__title b{display:block;font-size:15px;font-weight:800;color:var(--nj-ink-900);letter-spacing:-0.015em}
+  .topbar__title span{display:block;font-size:10.5px;color:var(--nj-ink-500);font-family:var(--nj-font-mono);letter-spacing:.06em;text-transform:uppercase;margin-top:1px}
+  .topbar__avatar{width:38px;height:38px;border-radius:999px;overflow:hidden;flex-shrink:0;box-shadow:inset 0 0 0 2px #fff, 0 2px 6px rgba(40,20,10,0.10)}
+  .topbar__avatar img{width:100%;height:100%;object-fit:cover;display:block}
+  .topbar__edit{display:inline-flex;align-items:center;gap:5px;background:var(--nj-coral-500);color:#fff;border:0;padding:8px 12px;border-radius:999px;cursor:pointer;font-family:inherit;font-size:11.5px;font-weight:700;text-decoration:none;box-shadow:0 2px 6px rgba(217,119,87,0.35);flex-shrink:0}
+  .topbar__edit svg{flex-shrink:0}
+
+  /* ---- Identity hero ---- */
+  .hero{
+    flex-shrink:0;padding:18px 16px 14px;
+    background:
+      radial-gradient(120% 90% at 30% 0%, oklch(0.94 0.04 30) 0%, transparent 60%),
+      linear-gradient(180deg, var(--nj-coral-50) 0%, var(--nj-cream) 100%);
+    text-align:center;
+  }
+  .hero__avatar{
+    width:96px;height:96px;border-radius:999px;overflow:hidden;
+    margin:0 auto 10px;position:relative;
+    box-shadow:0 6px 22px rgba(40,20,10,0.18), inset 0 0 0 4px #fff, 0 0 0 6px rgba(255,255,255,0.55);
+  }
+  .hero__avatar img{width:100%;height:100%;object-fit:cover;display:block}
+  .hero__name{font-size:22px;font-weight:800;color:var(--nj-ink-900);letter-spacing:-0.02em;line-height:1.1}
+  .hero__meta{
+    margin-top:6px;font-size:12.5px;color:var(--nj-ink-500);
+    display:flex;justify-content:center;flex-wrap:wrap;gap:5px 10px;
+  }
+  .hero__meta strong{color:var(--nj-ink-700);font-weight:600}
+
+  /* ---- Tabs ---- */
+  .tabs{
+    flex-shrink:0;background:var(--nj-surface);
+    border-bottom:1px solid var(--nj-line-soft);
+    padding:0 6px;display:flex;position:relative;z-index:2;
+  }
+  .tab{
+    flex:1;padding:13px 4px 11px;background:transparent;border:0;cursor:pointer;
+    font-family:inherit;font-size:12.5px;font-weight:600;color:var(--nj-ink-500);
+    display:flex;flex-direction:column;align-items:center;gap:5px;position:relative;
+  }
+  .tab.is-active{color:var(--nj-coral-700)}
+  .tab.is-active::after{
+    content:'';position:absolute;left:14%;right:14%;bottom:-1px;height:3px;
+    background:var(--nj-coral-500);border-radius:3px 3px 0 0;
+  }
+  .tab__label{display:inline-flex;align-items:center;gap:5px}
+  .tab__count{
+    min-width:16px;height:16px;padding:0 5px;
+    background:var(--nj-coral-500);color:#fff;border-radius:999px;
+    font-size:9.5px;font-weight:700;
+    display:inline-grid;place-items:center;font-family:var(--nj-font-mono);
+  }
+
+  /* ---- Panes ---- */
+  .panes{flex:1;overflow-y:auto;background:var(--nj-cream);position:relative}
+  .pane{display:none;padding:16px 14px 24px;flex-direction:column;gap:12px;animation:fadeIn .28s var(--nj-ease)}
+  .pane.is-active{display:flex}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+  .section-label{
+    font-family:var(--nj-font-mono);font-size:10.5px;font-weight:500;
+    color:var(--nj-ink-400);text-transform:uppercase;letter-spacing:.12em;
+    padding:6px 4px 2px;display:flex;align-items:center;gap:8px;
+  }
+  .section-label::before{content:'';width:14px;height:2px;background:var(--nj-coral-300);border-radius:999px;flex-shrink:0}
+  .section-label__edit{margin-left:auto;display:inline-flex;align-items:center;gap:5px;background:var(--nj-coral-500);color:#fff;border:0;padding:6px 11px;border-radius:999px;cursor:pointer;font-family:inherit;font-size:11px;font-weight:700;text-decoration:none;letter-spacing:.02em;text-transform:none;box-shadow:0 2px 6px rgba(217,119,87,0.32)}
+  .section-label__edit svg{flex-shrink:0}
+
+  /* Card */
+  .card{
+    background:var(--nj-surface);border:1px solid var(--nj-line-soft);
+    border-radius:18px;padding:14px;display:flex;flex-direction:column;gap:10px;
+    box-shadow:var(--nj-shadow-xs);
+  }
+  .card__head{display:flex;align-items:center;gap:10px}
+  .card__head__icon{width:36px;height:36px;border-radius:12px;display:grid;place-items:center;flex-shrink:0}
+  .ic-coral{background:var(--nj-coral-50);color:var(--nj-coral-700)}
+  .ic-sage{background:var(--nj-sage-50);color:var(--nj-sage-700)}
+  .ic-butter{background:var(--nj-butter-100);color:oklch(0.50 0.10 80)}
+  .ic-sky{background:oklch(0.94 0.04 240);color:oklch(0.48 0.13 250)}
+  .card__title{flex:1;font-size:14.5px;font-weight:700;color:var(--nj-ink-900);letter-spacing:-0.01em}
+  .card__edit{
+    display:inline-flex;align-items:center;gap:5px;
+    background:var(--nj-cream);color:var(--nj-coral-700);border:0;
+    padding:6px 11px;border-radius:999px;cursor:pointer;
+    font-size:11.5px;font-weight:700;font-family:inherit;text-decoration:none;
+  }
+
+  .info-list{display:flex;flex-direction:column;margin-top:2px}
+  .info-row{display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px dashed var(--nj-line-soft)}
+  .info-row:last-child{border-bottom:0}
+  .info-row__k{flex:0 0 110px;font-size:11px;color:var(--nj-ink-400);text-transform:uppercase;letter-spacing:.05em;font-weight:600;padding-top:2px}
+  .info-row__v{flex:1;font-size:13.5px;color:var(--nj-ink-900);font-weight:500;line-height:1.4;min-width:0;word-wrap:break-word}
+  .info-row__v small{color:var(--nj-ink-500);font-weight:500;font-size:12px}
+  .info-row__v a{color:var(--nj-coral-700);text-decoration:none;font-weight:600}
+  .info-row__v .mono{font-family:var(--nj-font-mono);font-size:12.5px;letter-spacing:.04em}
+
+  .parent-actions{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+  .parent-actions a{
+    display:inline-flex;align-items:center;gap:6px;
+    background:var(--nj-coral-50);color:var(--nj-coral-700);
+    padding:6px 11px;border-radius:999px;
+    font-size:11.5px;font-weight:600;text-decoration:none;
+  }
+
+  /* ===== TAB 2 — Rapport du jour ===== */
+  .report-card{background:transparent;border:0;border-radius:0;padding:0;box-shadow:none;display:flex;flex-direction:column;gap:12px;position:relative;overflow:visible}
+  .report-card::before{display:none}
+  .report-card__head{display:flex;align-items:center;gap:10px}
+  .report-card__date{
+    flex:1;font-family:var(--nj-font-mono);font-size:10.5px;color:var(--nj-ink-500);
+    letter-spacing:.08em;text-transform:uppercase;
+  }
+  .report-card__date b{display:block;color:var(--nj-ink-900);font-size:13.5px;font-weight:700;letter-spacing:-0.005em;margin-top:2px;text-transform:none;font-family:var(--nj-font);}
+  .report-card__status{
+    display:inline-flex;align-items:center;gap:5px;
+    background:var(--nj-coral-50);color:var(--nj-coral-700);
+    padding:4px 10px;border-radius:999px;font-size:11px;font-weight:700;
+  }
+  .report-card__status::before{content:'';width:6px;height:6px;border-radius:999px;background:currentColor}
+
+  .report-meta{display:flex;flex-wrap:wrap;gap:6px;padding:0 2px}
+  .report-pill{
+    display:inline-flex;align-items:center;gap:5px;
+    background:var(--nj-surface);border:1px solid var(--nj-line-soft);
+    padding:6px 10px;border-radius:999px;
+    font-size:11px;font-weight:600;color:var(--nj-ink-700);
+  }
+  .report-pill svg{color:var(--nj-coral-600);flex-shrink:0}
+  .report-pill b{font-family:var(--nj-font-mono);color:var(--nj-ink-900);font-weight:700}
+
+  .report-card__textarea{
+    width:100%;min-height:520px;
+    border:1.5px solid var(--nj-line);border-radius:16px;
+    background:var(--nj-surface);
+    padding:16px;font-family:inherit;font-size:14px;line-height:1.6;
+    color:var(--nj-ink-900);outline:0;resize:vertical;
+    box-shadow:var(--nj-shadow-xs);
+  }
+  .report-card__textarea:focus{border-color:var(--nj-coral-400);box-shadow:0 0 0 4px var(--nj-coral-100)}
+
+  .report-actions{display:flex;gap:8px}
+  .btn-edit-choice{
+    flex:0 0 auto;background:var(--nj-coral-50);color:var(--nj-coral-700);
+    border:0;padding:0 16px;height:46px;border-radius:13px;
+    font-family:inherit;font-weight:700;font-size:13.5px;cursor:pointer;
+    display:inline-flex;align-items:center;gap:8px;text-decoration:none;
+  }
+  .btn-send{
+    flex:1;background:var(--nj-coral-500);color:#fff;
+    border:0;height:46px;border-radius:13px;
+    font-family:inherit;font-weight:700;font-size:13.5px;cursor:pointer;
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;
+    box-shadow:var(--nj-shadow-brand);
+  }
+
+  /* ===== TAB 3 — RDV ===== */
+  .rdv-toolbar{
+    display:flex;gap:8px;align-items:center;justify-content:space-between;
+    padding:0 2px;
+  }
+  .rdv-toolbar a.manage{
+    display:inline-flex;align-items:center;gap:6px;
+    background:var(--nj-cream);color:var(--nj-coral-700);
+    padding:7px 12px;border-radius:999px;
+    font-size:11.5px;font-weight:700;text-decoration:none;
+  }
+
+  .event{
+    display:flex;align-items:center;gap:12px;padding:12px;
+    background:var(--nj-surface);border:1px solid var(--nj-line-soft);
+    border-left:3px solid var(--nj-coral-500);border-radius:13px;
+    box-shadow:var(--nj-shadow-xs);text-decoration:none;color:inherit;
+    cursor:pointer;
+  }
+  .event--sage{border-left-color:var(--nj-sage-500)}
+  .event--butter{border-left-color:oklch(0.74 0.14 78)}
+  .event--past{opacity:.65}
+  .event__date{
+    flex:0 0 50px;text-align:center;font-family:var(--nj-font-mono);
+    background:var(--nj-coral-50);color:var(--nj-coral-700);
+    padding:7px 4px;border-radius:11px;
+  }
+  .event__date .m{font-size:9.5px;text-transform:uppercase;letter-spacing:.07em;font-weight:600;opacity:.8}
+  .event__date .d{font-size:18px;font-weight:800;letter-spacing:-0.02em;line-height:1;margin-top:1px}
+  .event--sage .event__date{background:var(--nj-sage-50);color:var(--nj-sage-700)}
+  .event--butter .event__date{background:var(--nj-butter-100);color:oklch(0.50 0.10 80)}
+  .event__body{flex:1;min-width:0}
+  .event__body b{display:block;font-size:13.5px;font-weight:700;color:var(--nj-ink-900);letter-spacing:-0.005em}
+  .event__body span{display:block;font-size:11.5px;color:var(--nj-ink-500);margin-top:2px;line-height:1.4}
+  .event__time{
+    font-family:var(--nj-font-mono);font-size:11.5px;color:var(--nj-ink-700);font-weight:700;
+    background:var(--nj-cream);padding:5px 8px;border-radius:8px;flex-shrink:0;
+  }
+  .event__chev{color:var(--nj-ink-300);flex-shrink:0;margin-left:-4px}
+
+  .fab{
+    position:absolute;right:16px;bottom:18px;
+    width:54px;height:54px;border-radius:999px;
+    background:var(--nj-coral-500);color:#fff;border:0;
+    display:grid;place-items:center;cursor:pointer;text-decoration:none;
+    box-shadow:0 8px 24px rgba(217,119,87,0.45), 0 2px 6px rgba(40,20,10,0.18);
+    z-index:5;
+  }
+
+  /* ===== TAB 4 — Clôture du contrat (notifications) ===== */
+  .notif{border-radius:16px;padding:14px 15px;border:1px solid}
+  .notif--warn{background:oklch(0.96 0.035 80);border-color:oklch(0.86 0.07 80)}
+  .notif--info{background:oklch(0.96 0.025 245);border-color:oklch(0.86 0.05 245)}
+  .notif__head{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+  .notif__ic{flex-shrink:0;width:32px;height:32px;border-radius:10px;display:grid;place-items:center}
+  .notif--warn .notif__ic{background:oklch(0.90 0.09 80);color:oklch(0.46 0.11 65)}
+  .notif--info .notif__ic{background:oklch(0.89 0.06 245);color:oklch(0.45 0.13 250)}
+  .notif__title{font-size:13.5px;font-weight:800;letter-spacing:-0.01em}
+  .notif--warn .notif__title{color:oklch(0.40 0.09 60)}
+  .notif--info .notif__title{color:oklch(0.38 0.10 250)}
+  .notif__list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+  .notif__list li{
+    position:relative;padding-left:16px;
+    font-size:12.5px;line-height:1.5;color:var(--nj-ink-700);
+  }
+  .notif__list li::before{content:'';position:absolute;left:2px;top:7px;width:5px;height:5px;border-radius:999px}
+  .notif--warn .notif__list li::before{background:oklch(0.62 0.13 70)}
+  .notif--info .notif__list li::before{background:oklch(0.55 0.13 250)}
+  .notif__list li b{color:var(--nj-ink-900);font-weight:700}
+
+
+  /* Confirmation modal */
+  .confirm{position:absolute;inset:0;z-index:40;display:none}
+  .confirm.is-open{display:block}
+  .confirm__scrim{position:absolute;inset:0;background:oklch(0.30 0.04 30 / 0.45);backdrop-filter:blur(3px);animation:fadeIn .2s ease}
+  .confirm__sheet{
+    position:absolute;left:16px;right:16px;top:50%;transform:translateY(-50%);
+    background:var(--nj-surface);border-radius:22px;padding:24px 20px 18px;
+    box-shadow:var(--nj-shadow-lg);text-align:center;
+    animation:popIn .26s var(--nj-ease);
+  }
+  @keyframes popIn{from{opacity:0;transform:translateY(-50%) scale(.94)}to{opacity:1;transform:translateY(-50%) scale(1)}}
+  .confirm__ic{width:56px;height:56px;border-radius:999px;margin:0 auto 14px;display:grid;place-items:center;background:oklch(0.95 0.04 30);color:var(--nj-danger)}
+  .confirm__title{font-size:18px;font-weight:800;color:var(--nj-ink-900);letter-spacing:-0.015em;margin-bottom:8px}
+  .confirm__text{font-size:13px;line-height:1.55;color:var(--nj-ink-600,var(--nj-ink-500));margin-bottom:20px}
+  .confirm__text b{color:var(--nj-ink-900);font-weight:700}
+  .confirm__actions{display:flex;gap:10px}
+  .confirm__btn{flex:1;height:48px;border-radius:13px;border:0;cursor:pointer;font-family:inherit;font-weight:700;font-size:14px}
+  .confirm__btn--ghost{background:var(--nj-cream);color:var(--nj-ink-700)}
+  .confirm__btn--danger{background:var(--nj-danger);color:#fff;box-shadow:0 6px 16px oklch(0.62 0.20 25 / 0.32)}
+
+  /* Toast */
+  .toast{
+    position:absolute;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);
+    display:inline-flex;align-items:center;gap:9px;z-index:50;
+    background:var(--nj-sage-700);color:#fff;padding:13px 18px;border-radius:14px;
+    font-size:13px;font-weight:700;box-shadow:0 10px 28px rgba(40,20,10,0.28);
+    opacity:0;pointer-events:none;transition:opacity .3s,transform .3s;white-space:nowrap;
+  }
+  .toast.is-show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  .home-indicator{height:8px;display:flex;justify-content:center;align-items:flex-start;flex-shrink:0;background:var(--nj-surface)}
+  .home-indicator::after{content:'';width:134px;height:5px;background:var(--nj-ink-900);border-radius:999px;opacity:.92}
+</style>
+</head>
+<body>
+<div class="nj-stage">
+  <div class="nj-phone">
+    <div class="nj-phone__notch"></div>
+    <div class="nj-phone__screen">
+      <div class="nj-statusbar"><span>9:41</span><span class="nj-statusbar__icons">
+        <svg width="17" height="11" viewBox="0 0 17 11" fill="currentColor"><rect x="0" y="7" width="3" height="4" rx="0.5"></rect><rect x="4.5" y="5" width="3" height="6" rx="0.5"></rect><rect x="9" y="3" width="3" height="8" rx="0.5"></rect><rect x="13.5" y="0" width="3" height="11" rx="0.5"></rect></svg>
+        <svg width="15" height="11" viewBox="0 0 15 11" fill="currentColor"><path d="M7.5 0C4.6 0 1.9 1 0 2.7l1.4 1.5C2.9 2.8 5.1 1.9 7.5 1.9s4.6.9 6.1 2.3L15 2.7C13.1 1 10.4 0 7.5 0zm0 3.7c-2 0-3.7.7-5.1 1.9l1.4 1.4c1-.9 2.3-1.4 3.7-1.4s2.7.5 3.7 1.4L12.6 5.6C11.2 4.4 9.5 3.7 7.5 3.7zm0 3.7c-1.1 0-2 .4-2.7 1l2.7 2.6 2.7-2.6c-.7-.6-1.6-1-2.7-1z"></path></svg>
+        <svg width="25" height="11" viewBox="0 0 25 11" fill="none"><rect x="0.5" y="0.5" width="21" height="10" rx="2.5" stroke="currentColor" opacity="0.5"></rect><rect x="2" y="2" width="18" height="7" rx="1.5" fill="currentColor"></rect><rect x="22.5" y="3.5" width="1.5" height="4" rx="0.5" fill="currentColor" opacity="0.5"></rect></svg>
+      </span></div>
+
+      <div class="app" data-screen-label="11 Fiche enfant">
+
+        <!-- Top bar -->
+        <div class="topbar">
+          <a class="topbar__back" href="02-liste-bebes.html" aria-label="Retour">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          </a>
+          <div class="topbar__title">
+            <b>Lina Bouchet</b>
+          </div>
+          <a class="topbar__edit" href="08-souscrire-contrat.html?mode=edit" title="Modifier le contrat" style="display:none">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+            Modifier
+          </a>
+          <div class="topbar__avatar"><img src="assets/baby-lina.png" alt="Lina"></div>
+        </div>
+
+        <!-- Tabs -->
+        <nav class="tabs">
+          <button class="tab is-active" data-tab="info">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+            <span>Informations</span>
+          </button>
+          <button class="tab" data-tab="report">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6"></path><path d="M9 13h6M9 17h4"></path></svg>
+            <span>Rapport du jour</span>
+          </button>
+          <button class="tab" data-tab="rdv">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+            <span class="tab__label">RDV <span class="tab__count">2</span></span>
+          </button>
+          <button class="tab" data-tab="cloture">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+            <span>Clôture</span>
+          </button>
+        </nav>
+
+        <!-- PANES -->
+        <div class="panes">
+
+          <!-- ============== TAB 1 — INFORMATIONS ============== -->
+          <section class="pane is-active" data-pane="info">
+
+            <!-- ENFANT -->
+            <div class="section-label">
+              Identité enfant
+              <a class="section-label__edit" href="08-souscrire-contrat.html?mode=edit" title="Modifier le contrat">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                Modifier
+              </a>
+            </div>
+            <div class="card">
+              <div class="card__head">
+                <div class="card__head__icon ic-coral">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M8 14s1.5 2 4 2 4-2 4-2"></path><line x1="9" y1="9" x2="9.01" y2="9"></line><line x1="15" y1="9" x2="15.01" y2="9"></line></svg>
+                </div>
+                <div class="card__title">Informations bébé</div>
+              </div>
+              <div class="info-list">
+                <div class="info-row"><div class="info-row__k">Prénom</div><div class="info-row__v">Lina</div></div>
+                <div class="info-row"><div class="info-row__k">Nom</div><div class="info-row__v">Bouchet</div></div>
+                <div class="info-row"><div class="info-row__k">Naissance</div><div class="info-row__v">12 mars 2024 <small>· 14 mois</small></div></div>
+                <div class="info-row"><div class="info-row__k">Allergies</div><div class="info-row__v">Aucune connue</div></div>
+                <div class="info-row"><div class="info-row__k">Doudou</div><div class="info-row__v">Lapin beige "Pompon"</div></div>
+                <div class="info-row"><div class="info-row__k">Lieu d'accueil</div><div class="info-row__v">8 avenue de la République<br>75011 Paris</div></div>
+              </div>
+            </div>
+
+            <!-- PARENTS — Mère -->
+            <div class="section-label">Parents</div>
+            <div class="card">
+              <div class="card__head">
+                <div class="card__head__icon ic-sage">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                </div>
+                <div class="card__title">Mère — Sophie Bouchet</div>
+              </div>
+              <div class="info-list">
+                <div class="info-row"><div class="info-row__k">Téléphone</div><div class="info-row__v"><a href="tel:0612345678">06 12 34 56 78</a></div></div>
+                <div class="info-row"><div class="info-row__k">Tél. pro.</div><div class="info-row__v"><a href="tel:0144556677">01 44 55 66 77</a></div></div>
+                <div class="info-row"><div class="info-row__k">Email</div><div class="info-row__v">sophie.bouchet@gmail.com</div></div>
+                <div class="info-row"><div class="info-row__k">Adresse</div><div class="info-row__v">12 rue des Lilas<br>75011 Paris</div></div>
+              </div>
+              <div class="parent-actions">
+                <a href="tel:0612345678"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg> Appeler</a>
+                <a href="sms:0612345678"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg> SMS</a>
+                <a href="mailto:sophie.bouchet@gmail.com"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg> Email</a>
+              </div>
+            </div>
+
+            <!-- PARENTS — Père -->
+            <div class="card">
+              <div class="card__head">
+                <div class="card__head__icon ic-sage">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                </div>
+                <div class="card__title">Père — Marc Bouchet</div>
+              </div>
+              <div class="info-list">
+                <div class="info-row"><div class="info-row__k">Téléphone</div><div class="info-row__v"><a href="tel:0698765432">06 98 76 54 32</a></div></div>
+                <div class="info-row"><div class="info-row__k">Email</div><div class="info-row__v">marc.bouchet@gmail.com</div></div>
+              </div>
+              <div class="parent-actions">
+                <a href="tel:0698765432"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg> Appeler</a>
+                <a href="sms:0698765432"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg> SMS</a>
+              </div>
+            </div>
+
+            <!-- CONTRAT -->
+            <div class="section-label">Contrat</div>
+            <div class="card">
+              <div class="card__head">
+                <div class="card__head__icon ic-butter">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6"></path><path d="M9 13h6M9 17h4"></path></svg>
+                </div>
+                <div class="card__title">Détails du contrat</div>
+              </div>
+              <div class="info-list">
+                <div class="info-row"><div class="info-row__k">Début</div><div class="info-row__v">01 juin 2025</div></div>
+                <div class="info-row"><div class="info-row__k">Période d'essai</div><div class="info-row__v">60 jours <small>· jusqu'au 31 juillet 2025</small></div></div>
+                <div class="info-row"><div class="info-row__k">Familiarisation</div><div class="info-row__v">3 demi-journées d'adaptation entre le 27 et le 30 mai</div></div>
+                <div class="info-row"><div class="info-row__k">Jour de repos</div><div class="info-row__v">Dimanche</div></div>
+                <div class="info-row"><div class="info-row__k">Pajemploi</div><div class="info-row__v"><span class="mono">7 12345 67890 12</span></div></div>
+              </div>
+            </div>
+
+            <!-- SALAIRE -->
+            <div class="section-label">Salaire</div>
+            <div class="card">
+              <div class="card__head">
+                <div class="card__head__icon ic-coral">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                </div>
+                <div class="card__title">Rémunération</div>
+              </div>
+              <div class="info-list">
+                <div class="info-row"><div class="info-row__k">Heures / sem.</div><div class="info-row__v">45h <small>· au-delà : majoré 25%</small></div></div>
+                <div class="info-row"><div class="info-row__k">Brut</div><div class="info-row__v"><span class="mono">4,50 €</span> / h <small>· majoré : 5,63 €</small></div></div>
+                <div class="info-row"><div class="info-row__k">Net</div><div class="info-row__v"><span class="mono">3,51 €</span> / h <small>· majoré : 4,39 €</small></div></div>
+                <div class="info-row"><div class="info-row__k">Mensuel net</div><div class="info-row__v"><strong style="color:var(--nj-coral-700)">≈ 685,95 €</strong></div></div>
+              </div>
+            </div>
+
+            <!-- HORAIRES -->
+            <div class="section-label">Horaires hebdomadaires</div>
+            <div class="card">
+              <div class="card__head">
+                <div class="card__head__icon ic-sky">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                </div>
+                <div class="card__title">Planning type</div>
+              </div>
+              <div class="info-list">
+                <div class="info-row"><div class="info-row__k">Lun.</div><div class="info-row__v"><span class="mono">08:00 — 18:30</span></div></div>
+                <div class="info-row"><div class="info-row__k">Mar.</div><div class="info-row__v"><span class="mono">08:00 — 18:30</span></div></div>
+                <div class="info-row"><div class="info-row__k">Mer.</div><div class="info-row__v"><span class="mono">09:00 — 17:00</span></div></div>
+                <div class="info-row"><div class="info-row__k">Jeu.</div><div class="info-row__v"><span class="mono">08:00 — 18:30</span></div></div>
+                <div class="info-row"><div class="info-row__k">Ven.</div><div class="info-row__v"><span class="mono">08:00 — 18:00</span></div></div>
+                <div class="info-row"><div class="info-row__k">Sam. — Dim.</div><div class="info-row__v"><small>Repos</small></div></div>
+              </div>
+            </div>
+
+          </section>
+
+          <!-- ============== TAB 2 — RAPPORT DU JOUR ============== -->
+          <section class="pane" data-pane="report">
+
+            <div class="section-label">
+              Rapport du jour
+              <a class="section-label__edit" href="07-rapport-du-jour.html" title="Modifier les choix">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                Modifier
+              </a>
+            </div>
+
+            <div class="report-card">
+              <textarea class="report-card__textarea" placeholder="Le texte du rapport est généré automatiquement à partir de vos choix dans 'Rapport du jour'…">Bonjour Sophie et Marc,
+
+Lina a passé une belle journée. Elle est arrivée à 08:42 toute souriante.
+
+🩺 Santé : tout va bien, juste une petite égratignure au genou en jouant — soignée avec une compresse, rien d'inquiétant.
+
+🍽 Côté repas : elle a bu son biberon, bien mangé ses légumes et ses fruits, et apprécié un yaourt à midi. Elle a aussi très bien bu de l'eau tout au long de la journée.
+
+🎨 Côté activités : promenade au parc en milieu de matinée, beaucoup de cubes, de la lecture et un peu de dessin.
+
+🙂 Humeur : joyeuse, calme et beaucoup de rires aujourd'hui pendant la lecture du livre des animaux.
+
+À demain !
+Demo User</textarea>
+
+              <div class="report-actions">
+                <button class="btn-send" style="flex:1">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                  Envoyer aux parents
+                </button>
+              </div>
+            </div>
+
+          </section>
+
+          <!-- ============== TAB 3 — RDV ============== -->
+          <section class="pane" data-pane="rdv">
+
+            <div class="section-label">
+              Rendez-vous
+              <a class="section-label__edit" href="10-planning-enfant.html" title="Gérer les rendez-vous">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                Modifier
+              </a>
+            </div>
+
+            <a class="event" href="10-planning-enfant.html">
+              <div class="event__date"><div class="m">MAI</div><div class="d">13</div></div>
+              <div class="event__body">
+                <b>Rendez-vous pédiatre</b>
+                <span>Maman vient chercher Lina · départ anticipé</span>
+              </div>
+              <div class="event__time">15:30</div>
+              <svg class="event__chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </a>
+
+            <a class="event event--butter" href="10-planning-enfant.html">
+              <div class="event__date"><div class="m">MAI</div><div class="d">14</div></div>
+              <div class="event__body">
+                <b>Arrivée tardive</b>
+                <span>Papa en télétravail · arrivée vers 10:00</span>
+              </div>
+              <div class="event__time">10:00</div>
+              <svg class="event__chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </a>
+
+            <a class="event event--sage" href="10-planning-enfant.html">
+              <div class="event__date"><div class="m">MAI</div><div class="d">16</div></div>
+              <div class="event__body">
+                <b>Sortie au parc</b>
+                <span>Avec les autres enfants · autorisation signée</span>
+              </div>
+              <div class="event__time">14:00</div>
+              <svg class="event__chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </a>
+
+            <a class="event" href="10-planning-enfant.html">
+              <div class="event__date"><div class="m">MAI</div><div class="d">23</div></div>
+              <div class="event__body">
+                <b>Vaccin 12 mois (rappel)</b>
+                <span>Cabinet Dr. Lambert · à confirmer avec maman</span>
+              </div>
+              <div class="event__time">09:00</div>
+              <svg class="event__chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </a>
+
+            <div class="section-label" style="margin-top:6px">Passé</div>
+
+            <a class="event event--butter event--past" href="10-planning-enfant.html">
+              <div class="event__date"><div class="m">MAI</div><div class="d">06</div></div>
+              <div class="event__body">
+                <b>Arrivée tardive</b>
+                <span>Maman en réunion · arrivée 09:45</span>
+              </div>
+              <div class="event__time">09:45</div>
+              <svg class="event__chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </a>
+
+            <a class="fab" href="10-planning-enfant.html" aria-label="Ajouter un RDV">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            </a>
+
+          </section>
+
+          <!-- ============== TAB 4 — CLÔTURE DU CONTRAT ============== -->
+          <section class="pane" data-pane="cloture">
+
+            <!-- Notification jaune : à vérifier auprès des parents -->
+            <div class="notif notif--warn">
+              <div class="notif__head">
+                <span class="notif__ic">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                </span>
+                <span class="notif__title">Avant de clôturer, vérifiez auprès des parents</span>
+              </div>
+              <ul class="notif__list">
+                <li><b>Documents remis</b> — certificat de travail, attestation France Travail, dernière fiche de paie, solde de tout compte.</li>
+                <li><b>Paiements</b> — dernier salaire, congés payés, indemnité de rupture et régularisation (si applicable).</li>
+                <li><b>Informations</b> — date de fin de contrat, préavis respecté ou indemnisé, coordonnées des parties.</li>
+              </ul>
+            </div>
+
+            <!-- Notification bleue : archivage -->
+            <div class="notif notif--info">
+              <div class="notif__head">
+                <span class="notif__ic">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                </span>
+                <span class="notif__title">Après la clôture</span>
+              </div>
+              <ul class="notif__list">
+                <li>Lina <b>n'apparaîtra plus</b> dans la liste des enfants gardés.</li>
+                <li>Toutes ses données restent consultables dans les <b>Archives</b>.</li>
+              </ul>
+            </div>
+
+     
+
+            <a class="fab" id="cloture-fab" style="background:var(--nj-danger);box-shadow:0 8px 24px oklch(0.62 0.20 25 / 0.45), 0 2px 6px rgba(40,20,10,0.18)" href="#" aria-label="Clôturer le contrat">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </a>
+
+          </section>
+
+        </div>
+
+        <!-- Modal de confirmation de clôture -->
+        <div class="confirm" id="confirm-cloture" aria-hidden="true">
+          <div class="confirm__scrim" data-cancel></div>
+          <div class="confirm__sheet" role="dialog" aria-modal="true">
+            <div class="confirm__ic">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+            </div>
+            <div class="confirm__title">Clôturer le contrat de Lina ?</div>
+            <div class="confirm__text">Cette action met fin au contrat. Lina sera déplacée dans les <b>Archives</b> et n'apparaîtra plus dans la liste des enfants gardés. Cette opération est définitive.</div>
+            <div class="confirm__actions">
+              <button class="confirm__btn confirm__btn--ghost" data-cancel>Annuler</button>
+              <button class="confirm__btn confirm__btn--danger" id="confirm-yes">Oui, clôturer</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Toast succès -->
+        <div class="toast" id="toast-cloture">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          Contrat clôturé et archivé
+        </div>
+
+        <div class="home-indicator"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const tabs = document.querySelectorAll('.tab');
+  const panes = document.querySelectorAll('.pane');
+  const panesEl = document.querySelector('.panes');
+  tabs.forEach(t => t.addEventListener('click', () => {
+    const k = t.dataset.tab;
+    tabs.forEach(x => x.classList.toggle('is-active', x === t));
+    panes.forEach(p => p.classList.toggle('is-active', p.dataset.pane === k));
+    if (panesEl) panesEl.scrollTop = 0;
+  }));
+
+  // ===== Clôture du contrat =====
+  (function(){
+    const btn = document.getElementById('btn-cloturer');
+    const fab = document.getElementById('cloture-fab');
+    const confirm = document.getElementById('confirm-cloture');
+    const toast = document.getElementById('toast-cloture');
+
+    function openConfirm(e){ if(e) e.preventDefault(); confirm.classList.add('is-open'); confirm.setAttribute('aria-hidden','false'); }
+    function closeConfirm(){ confirm.classList.remove('is-open'); confirm.setAttribute('aria-hidden','true'); }
+    btn.addEventListener('click', openConfirm);
+    fab.addEventListener('click', openConfirm);
+    confirm.querySelectorAll('[data-cancel]').forEach(el => el.addEventListener('click', closeConfirm));
+    document.getElementById('confirm-yes').addEventListener('click', () => {
+      closeConfirm();
+      toast.classList.add('is-show');
+      setTimeout(() => toast.classList.remove('is-show'), 3200);
+    });
+  })();
+</script>
+</body>
+</html>

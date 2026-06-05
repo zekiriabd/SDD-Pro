@@ -96,7 +96,7 @@ class TestConnectRoUriPortability(unittest.TestCase):
 
         Inspection at the source level — guards against accidental reversion.
         """
-        src = (_PY_ROOT / "sdd_lib" / "console_db.py").read_text(encoding="utf-8")
+        src = (_PY_ROOT / "sdd_lib" / "console_db" / "core.py").read_text(encoding="utf-8")
         self.assertIn("db_path.as_uri()", src,
                       "connect_ro must use Path.as_uri() (RFC 8089)")
         self.assertNotIn('f"file:{db_path.as_posix()}', src,
@@ -104,7 +104,7 @@ class TestConnectRoUriPortability(unittest.TestCase):
 
     def test_connect_ro_immutable_fallback_path_present(self):
         """immutable=1 fallback must be present in the code path."""
-        src = (_PY_ROOT / "sdd_lib" / "console_db.py").read_text(encoding="utf-8")
+        src = (_PY_ROOT / "sdd_lib" / "console_db" / "core.py").read_text(encoding="utf-8")
         self.assertIn("immutable=1", src,
                       "connect_ro needs immutable fallback on WAL lock")
         self.assertIn("OperationalError", src)

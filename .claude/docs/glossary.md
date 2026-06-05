@@ -247,19 +247,7 @@ Format canonique : `[CATEGORY_SUBCATEGORY]` (UPPER_SNAKE_CASE).
 
 ---
 
-## 14. MCP server (v6.9)
-
-| Terme canonique | Définition |
-|---|---|
-| **MCP** | *Model Context Protocol* — protocole JSON-RPC 2.0 d'Anthropic exposant des tools à des clients tiers. |
-| **Tool MCP** | Action invokable via JSON-RPC (14 tools en v6.9 : 7 déterministes, 7 LLM-driven). |
-| **Transport** | Mode de connexion : stdio (défaut), HTTP (`--transport http`), MCPB bundle. |
-| **MCPB** | *MCP Bundle* — zip pré-empaqueté pour Claude Desktop (`build_mcpb.py`). |
-| **Async job** | Tool MCP de longue durée (e.g., `sdd_full`) qui retourne un `job_id` et persiste son état sous `workspace/output/.sys/.mcp-jobs/`. |
-
----
-
-## 15. Roles
+## 14. Roles
 
 | Rôle canonique | Définition |
 |---|---|

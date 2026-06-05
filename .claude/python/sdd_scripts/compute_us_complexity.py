@@ -48,6 +48,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from sdd_lib.paths import repo_root  # noqa: E402
 from sdd_lib.stderr import error_block  # noqa: E402
+from sdd_lib.exit_codes import FAIL_FAST, SUCCESS  # noqa: E402
 
 
 COMPLEXITY_KEYWORDS: frozenset[str] = frozenset({
@@ -229,8 +230,7 @@ def main() -> int:
             f"[US_NOT_FOUND] no unique match for workspace/output/us/{args.us}-*.md",
             "verify --us format ({n}-{m}) and that /us-generate has run",
         )
-        return 1
-
+        return FAIL_FAST
     try:
         content = us_path.read_text(encoding="utf-8")
     except OSError as e:
@@ -293,8 +293,6 @@ def main() -> int:
             print(f"[OK] Metadata block updated in {us_path.name}")
         elif args.apply:
             print(f"[SKIP] Metadata block not updated (cf. advisory)")
-    return 0
-
-
+    return SUCCESS
 if __name__ == "__main__":
     sys.exit(main())

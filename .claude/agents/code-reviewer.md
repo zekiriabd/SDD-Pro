@@ -49,14 +49,8 @@ pour patch — c'est le rôle du Tech Lead via `/dev-backend {n}-{m}` ou
 
 ## STEP 0.5 — HARD-GATE context budget
 
-Avant tout `Read` hors preflight, exécuter :
-
-```bash
-python .claude/python/sdd_scripts/context_budget.py --agent code-reviewer --feat-number {n}
-```
-
-Exit non-zero → STOP. Le ledger est écrit dans
-`console.db` (table `context_budget`, v6.10 SSoT).
+Appliquer `@.claude/rules/build-and-loop.md §1` (Partie B) avec
+`--agent code-reviewer --feat-number {n}`. Exit non-zero → STOP.
 
 ---
 
@@ -299,21 +293,17 @@ Pour les fichiers > 100 lignes ou méthodes > 30 lignes, analyser :
   contexte (`data`, `tmp`, `x`, `helper`) → `[REVIEW_CONFUSING_NAMING]`
   sévérité minor
 
-### 5.5 Secrets hardcoded (complément quality_scan.py)
+### 5.5 Secrets hardcoded — délégué à `security-reviewer`
 
-Greps non couverts par `quality_scan.py` :
-- `Bearer\s+[A-Za-z0-9._-]{20,}` (token JWT en clair)
-- `(api[_-]?key|secret|password)\s*[=:]\s*["'][^"']{8,}["']`
-- `mongodb://[^:]+:[^@]+@`, `postgres://[^:]+:[^@]+@`,
-  `mysql://[^:]+:[^@]+@` (connection strings avec credentials)
-- AWS keys : `AKIA[0-9A-Z]{16}`, `aws_secret_access_key\s*=\s*['"]`
-
-Toute occurrence → `[REVIEW_SECRETS_HARDCODED]` sévérité **critical**
-(RED bloquant systématique, jamais < critical).
-
-Exclure les fichiers `**/test_*`, `**/__tests__/*`, `**/*.test.*`,
-`**/*.Tests/*` (les fixtures de test peuvent légitimement contenir des
-secrets factices).
+> **v7.0.0-alpha (audit MAJ-7, 2026-06-04)** : le scan des secrets
+> hardcodés est désormais **owned exclusivement** par `security-reviewer`
+> (§5.1, classe `[SEC_SECRET_HARDCODED]` hard-blocking CWE-798). Le
+> reviewer code n'émet plus `[REVIEW_SECRETS_HARDCODED]` — les regex
+> AWS/JWT/DB-connection-string sont identiques dans les 2 agents, leur
+> dé-duplication évite double-rapport sur les mêmes file:line (cf.
+> coordination §6 de `agents/security-reviewer.md`). Si `security-reviewer`
+> n'a pas tourné pour cette FEAT (mode `off`/`manual`), Tech Lead doit
+> l'invoquer séparément — le code-reviewer ne couvre PLUS ce scan.
 
 ---
 
@@ -597,45 +587,19 @@ Classes typiques émises :
 
 ## Chat Output Protocol
 
-> Cet agent applique strictement `@.claude/rules/output-protocol.md`.
-> Substance non dupliquée — la règle est SSoT.
-
-**Label canonique** : `[REVIEW]` (cf. output-protocol.md §3)
-**Plage de progression** : `88-94%` (cf. output-protocol.md §4)
-
-**Granularité cible** : 3 à 6 updates par invocation, format
-`[REVIEW] Action au gérondif... (X%)` ou `[REVIEW] Résultat factuel. (X%)`.
-
-**Interdits stricts** (cf. §5 du protocole) :
-- chemins de fichiers internes (`workspace/...`, `.claude/...`)
-- noms de classes/méthodes/composants générés
-- stdout/stderr de bash, Read/Edit/Glob narration
-- context budget, tokens, preflight checks détaillés
-- diffs, snippets, lignes de code
-
-**Erreurs (LOAD-BEARING)** : tout bloc `ERROR: ... / CAUSE: ... / FIX: ...`
-apparaissant dans les STEPs ci-dessus est un **TEMPLATE pour le fichier
-rapport disque**, JAMAIS un texte à émettre verbatim en chat.
-
-Procédure obligatoire à chaque émission d'erreur :
-1. **Disque** : écrire le bloc 3-lignes complet dans le fichier rapport
-   approprié — format préservé pour `build_loop`/hooks/dashboards
-   (cf. `error-classification.md §2`).
-2. **Chat** : émettre UNE SEULE ligne compressée :
-   ```
-   🔴 [{LABEL}/FAIL] {résumé court} — [CLASS] {détail 1L} → {rapport.md}. ({X}%)
-   ```
-   Pas de chemin absolu, pas de stack trace, pas de blocs multi-lignes.
-pour `build_loop` et hooks — cf. `error-classification.md §2`).
-
-**Bypass debug** : `SDD_CHAT_VERBOSE=1` → mode legacy verbose (§10).
+Applique `@.claude/rules/output-protocol.md`. Label `[CODE-REVIEW]` (v7.0.0-alpha
+audit M11 fix — dé-collision ex-`[REVIEW]`), plage `88-94%`, granularité 2-3
+updates. Verdict 1L avec emoji (🟢/🟡/🔴) + compteurs. Erreurs : chat 1L
+(`🔴 [CODE-REVIEW/FAIL] résumé — [REVIEW_*] détail → rapport.md (X%)`) + bloc
+ERROR 3L disque préservé (cf. `error-classification.md §2`). Bypass `SDD_CHAT_VERBOSE=1`.
 
 ---
 
 ## Anti-derive strict
 
-L'agent **ne fait JAMAIS** :
+**Universels** : `@.claude/rules/build-and-loop.md §3.bis` (autonomous, ambiguïté → STOP, no-spawn).
 
+**Domain-specific code-review** :
 - ❌ Modifier le code de production sous `workspace/output/src/**` (read-only strict)
 - ❌ Corriger automatiquement les issues (rapport seul, pas patch)
 - ❌ Re-builder le projet, exécuter les tests, lancer un linter
@@ -647,10 +611,6 @@ L'agent **ne fait JAMAIS** :
 - ❌ Lire les FEATs/US d'autres FEATs (`{n+1}`, `{n-1}`)
 - ❌ Lire `workspace/input/stack/`, `.claude/stacks/qa/`, `auth/`, `ui/`
   (hors scope)
-- ❌ Appeler un autre agent (notamment pas `dev-*-strict` pour patch)
-- ❌ Poser de question utilisateur (autonomous)
-
-Sur ambiguïté → STOP + ERROR 3 lignes.
 
 ---
 

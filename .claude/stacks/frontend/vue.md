@@ -212,7 +212,7 @@ Erreurs spécifiques Vue :
 <!-- LIBS_CATALOG_START -->
 ### 2.4 Librairies
 
-> Source de verite : `.claude/stacks/frontend/vue.libs.json`. Ne pas editer cette section manuellement -- utiliser `python .claude/python/sdd_admin/sync_stack_md.py --stack-id vue`.
+> Source de verite : `.claude/stacks/frontend/vue.libs.json`. Ne pas editer cette section manuellement -- utiliser `.claude/python/sdd_admin/sync_stack_md.py --stack-id vue`.
 
 #### 2.4.a Librairies CORE (installees par arch en section 2.2.1, toujours)
 
@@ -247,9 +247,9 @@ Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'U
 |---|---|---|---|
 | auth-azure-ad | @azure/msal-browser | 3.27.0 | azure.ad, msal, tech-auth-azure |
 | date-utils | date-fns | 4.1.0 | dates.*format, duree, intervalle.*temps |
-| excel-client | xlsx | 0.18.5 | \bexcel\b, \.xlsx\b, import.*excel, export.*excel |
-| pdf-client | jspdf | 2.5.2 | \bpdf\b, \.pdf\b, export.*pdf, imprim |
-| pdf-client | jspdf-autotable | 3.8.4 | \bpdf\b, \.pdf\b, export.*pdf, imprim |
+| excel-client | xlsx | 0.18.5 | excel, \.xlsx, import.*excel, export.*excel |
+| pdf-client | jspdf | 2.5.2 | pdf, \.pdf, export.*pdf, imprim |
+| pdf-client | jspdf-autotable | 3.8.4 | pdf, \.pdf, export.*pdf, imprim |
 <!-- LIBS_CATALOG_END -->
 
 ### 2.5 Conventions de nommage

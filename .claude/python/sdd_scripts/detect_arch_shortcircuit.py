@@ -37,6 +37,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from sdd_lib.paths import normalize, repo_root  # noqa: E402
 from sdd_lib.project_config import read_project_config  # noqa: E402  (legacy fallback)
 from sdd_lib.layered_config import read_layered_config  # noqa: E402  (v6.7.3)
+from sdd_lib.exit_codes import CORRECTIBLE, FAIL_FAST, SUCCESS  # noqa: E402
 
 
 PROJECT_CONFIG_KEYS = ("AppName", "BackendName", "LibName", "DatabaseType")
@@ -174,19 +175,16 @@ def main() -> int:
         sys.stderr.write(f"ERROR: detect_arch_shortcircuit — I/O failure\n")
         sys.stderr.write(f"CAUSE: [PERMISSION] {e}\n")
         sys.stderr.write(f"FIX: vérifier droits lecture workspace/input/stack/stack.md\n")
-        return 1
+        return FAIL_FAST
     except Exception as e:
         sys.stderr.write(f"ERROR: detect_arch_shortcircuit — failure\n")
         sys.stderr.write(f"CAUSE: [UNKNOWN] {e.__class__.__name__}: {e}\n")
         sys.stderr.write(f"FIX: relancer ; si récurrent, ouvrir une issue\n")
-        return 2
-
+        return CORRECTIBLE
     if args.feat_number is not None:
         verdict["featNumber"] = args.feat_number
 
     sys.stdout.write(json.dumps(verdict, indent=2, ensure_ascii=False) + "\n")
-    return 0
-
-
+    return SUCCESS
 if __name__ == "__main__":
     sys.exit(main())

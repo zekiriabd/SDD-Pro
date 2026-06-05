@@ -26,6 +26,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sdd_lib.paths import repo_root  # noqa: E402
 from sdd_lib.stderr import warn  # noqa: E402
+from sdd_lib.exit_codes import FAIL_FAST, SUCCESS  # noqa: E402
 
 
 SUBSTANCE_RE = re.compile(r"substance de\s*`([a-zA-Z0-9_-]+)\.md")
@@ -56,11 +57,10 @@ def main() -> int:
 
     if not agents_dir.is_dir():
         warn(f"Agents dir not found: {agents_dir}")
-        return 1
+        return FAIL_FAST
     if not rules_dir.is_dir():
         warn(f"Rules dir not found: {rules_dir}")
-        return 1
-
+        return FAIL_FAST
     agents = sorted(agents_dir.glob("*.md"))
     rules = sorted(rules_dir.glob("*.md"))
     rules_by_name = {r.stem: r for r in rules}
@@ -166,9 +166,7 @@ def main() -> int:
         print(f"Resume : OK={counts['ok']}  DRIFT={counts['drift_suspected']}  MISSING={counts['missing_rule']}")
 
     if args.strict and any(f["status"] != "OK" for f in findings):
-        return 1
-    return 0
-
-
+        return FAIL_FAST
+    return SUCCESS
 if __name__ == "__main__":
     sys.exit(main())

@@ -335,3 +335,160 @@ def test_ingest_db_insert_failure_returns_3(monkeypatch, fake_repo, capsys):
     assert rc == 3
     err = capsys.readouterr().err
     assert "DB insert failed" in err
+
+
+# ---------- adversarial (v7.2.0 R1) ----------
+
+
+def test_default_path_adversarial(tmp_path):
+    p = iar.default_path("adversarial", 4, tmp_path)
+    assert p.name == "adversarial.json"
+    assert "feat-4" in str(p)
+
+
+def _make_adversarial(attacks: list[dict] | None = None,
+                     coverage_warning: bool = False,
+                     verdict: str = "informational") -> dict:
+    attacks = attacks or []
+    by_angle: dict[str, int] = {}
+    for a in attacks:
+        angle = a.get("angle") or "edge_case"
+        by_angle[angle] = by_angle.get(angle, 0) + 1
+    return {
+        "feat": 1,
+        "extractedAt": "2026-05-24T12:00:00Z",
+        "verdict": verdict,
+        "min_attacks": 5,
+        "max_attacks": 10,
+        "summary": {
+            "attacks_total": len(attacks),
+            "by_angle": by_angle,
+            "coverage_warning": coverage_warning,
+        },
+        "attacks": attacks,
+    }
+
+
+def test_ingest_adversarial_inserts_validation_report(monkeypatch, fake_repo):
+    body = _make_adversarial(attacks=[
+        {"id": "ADV-1", "issue_class": "ADV_EDGE_CASE",   "angle": "edge_case",
+         "file": "x.cs", "line": 12, "scenario": "empty input", "mitigation": "validate"},
+        {"id": "ADV-2", "issue_class": "ADV_FAILURE_MODE", "angle": "failure_mode",
+         "file": "y.cs", "line": 34, "scenario": "DB down", "mitigation": "circuit breaker"},
+    ])
+    path = _write_report(fake_repo, "adversarial", 1, body)
+    rc = _run(monkeypatch, ["--type", "adversarial", "--feat", "1"])
+    assert rc == 0
+    # JSON deleted by default
+    assert not path.exists()
+
+    with _db(fake_repo) as conn:
+        rows = list(conn.execute(
+            "SELECT report_type, verdict, score, summary, payload_json, file_path "
+            "FROM validation_reports WHERE feat_n=1 AND report_type='adversarial'"
+        ))
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["report_type"] == "adversarial"
+    assert row["verdict"] == "informational"
+    assert row["score"] == 2
+    assert "2 attacks" in row["summary"]
+    payload = json.loads(row["payload_json"])
+    assert len(payload["attacks"]) == 2
+    assert payload["attacks"][0]["issue_class"] == "ADV_EDGE_CASE"
+    assert payload["summary"]["by_angle"]["edge_case"] == 1
+    assert payload["summary"]["by_angle"]["failure_mode"] == 1
+    assert payload["summary"]["coverage_warning"] is False
+
+
+def test_ingest_adversarial_empty_attacks_still_records_row(monkeypatch, fake_repo):
+    """A FEAT may legitimately produce 0 adversarial findings — the row
+    must still exist so callers can distinguish 'ran with 0 attacks' from
+    'never ran'."""
+    body = _make_adversarial(attacks=[], coverage_warning=True)
+    _write_report(fake_repo, "adversarial", 2, body)
+    rc = _run(monkeypatch, ["--type", "adversarial", "--feat", "2"])
+    assert rc == 0
+    with _db(fake_repo) as conn:
+        row = conn.execute(
+            "SELECT score, summary FROM validation_reports "
+            "WHERE feat_n=2 AND report_type='adversarial'"
+        ).fetchone()
+    assert row["score"] == 0
+    assert "coverage_warning=true" in row["summary"]
+
+
+def test_ingest_adversarial_idempotent_re_run_replaces(monkeypatch, fake_repo):
+    """Re-running ingest wipes the prior validation_reports row for the
+    same (feat, report_type='adversarial') — telemetry stays current."""
+    _write_report(fake_repo, "adversarial", 3, _make_adversarial(attacks=[
+        {"id": "ADV-1", "issue_class": "ADV_EDGE_CASE", "angle": "edge_case"},
+        {"id": "ADV-2", "issue_class": "ADV_EDGE_CASE", "angle": "edge_case"},
+        {"id": "ADV-3", "issue_class": "ADV_EDGE_CASE", "angle": "edge_case"},
+    ]))
+    _run(monkeypatch, ["--type", "adversarial", "--feat", "3"])
+    # Second run with fewer attacks
+    _write_report(fake_repo, "adversarial", 3, _make_adversarial(attacks=[
+        {"id": "ADV-1", "issue_class": "ADV_FAILURE_MODE", "angle": "failure_mode"},
+    ]))
+    _run(monkeypatch, ["--type", "adversarial", "--feat", "3"])
+    with _db(fake_repo) as conn:
+        rows = list(conn.execute(
+            "SELECT score FROM validation_reports "
+            "WHERE feat_n=3 AND report_type='adversarial'"
+        ))
+    assert len(rows) == 1
+    assert rows[0]["score"] == 1   # second run overwrote
+
+
+def test_ingest_adversarial_non_informational_verdict_coerced(
+        monkeypatch, fake_repo, capsys):
+    """Agent prompt drift safeguard : if the JSON declares a non-
+    informational verdict, ingest coerces to 'informational' and emits a
+    WARN on stderr (visible to Tech Lead but non-bloquant)."""
+    body = _make_adversarial(attacks=[], verdict="red")
+    _write_report(fake_repo, "adversarial", 4, body)
+    rc = _run(monkeypatch, ["--type", "adversarial", "--feat", "4"])
+    assert rc == 0
+    err = capsys.readouterr().err
+    assert "verdict='red'" in err or "verdict=\"red\"" in err
+    with _db(fake_repo) as conn:
+        row = conn.execute(
+            "SELECT verdict FROM validation_reports "
+            "WHERE feat_n=4 AND report_type='adversarial'"
+        ).fetchone()
+    assert row["verdict"] == "informational"
+
+
+def test_ingest_adversarial_keep_json_flag(monkeypatch, fake_repo):
+    """`--keep-json` retains the source JSON (debugging)."""
+    path = _write_report(fake_repo, "adversarial", 5,
+                         _make_adversarial(attacks=[]))
+    rc = _run(monkeypatch, ["--type", "adversarial", "--feat", "5",
+                            "--keep-json"])
+    assert rc == 0
+    assert path.exists()
+
+
+def test_ingest_adversarial_not_in_qa_tables(monkeypatch, fake_repo):
+    """The adversarial canal is intentionally SEPARATE from qa_* tables —
+    /sdd-review consolidated verdict must remain unaffected."""
+    _write_report(fake_repo, "adversarial", 6, _make_adversarial(attacks=[
+        {"id": "ADV-1", "issue_class": "ADV_FAILURE_MODE", "angle": "failure_mode"},
+    ]))
+    _run(monkeypatch, ["--type", "adversarial", "--feat", "6"])
+    with _db(fake_repo) as conn:
+        # No rows in qa_a11y / qa_code_review / qa_security / qa_performance /
+        # qa_spec_compliance for this FEAT (only validation_reports).
+        for tbl in ("qa_a11y", "qa_code_review", "qa_security",
+                    "qa_performance", "qa_spec_compliance"):
+            row = conn.execute(
+                f"SELECT COUNT(*) AS n FROM {tbl} WHERE feat_n=6"
+            ).fetchone()
+            assert row["n"] == 0, f"{tbl} unexpectedly contains rows for feat 6"
+        # And exactly one row in validation_reports
+        n = conn.execute(
+            "SELECT COUNT(*) AS n FROM validation_reports "
+            "WHERE feat_n=6 AND report_type='adversarial'"
+        ).fetchone()["n"]
+        assert n == 1

@@ -142,16 +142,13 @@ def _resolve_mode() -> str:
 def main() -> int:
     mode = _resolve_mode()
     if mode == "off":
-        return 0
-
+        return HOOK_ALLOW
     payload = read_hook_input()
     if not payload:
-        return 0
-
+        return HOOK_ALLOW
     subagent = get_subagent_type(payload)
     if not subagent:
-        return 0
-
+        return HOOK_ALLOW
     # v7.0.0 — explicitly reject removed agents (strict in CI, WARN otherwise).
     if subagent in REJECTED_AGENTS_V7:
         replacement = REJECTED_AGENTS_V7[subagent]
@@ -178,14 +175,16 @@ def main() -> int:
     script_path = Path(__file__).resolve().parent.parent / "sdd_scripts" / "context_budget.py"
     if not script_path.is_file():
         warn(f"WARN preflight-agent-budget: context_budget.py introuvable ({script_path})")
-        return 0
-
+        return HOOK_ALLOW
     cmd: list[str] = [sys.executable, str(script_path), "--agent", subagent]
     if feat_number > 0:
         cmd += ["--feat-number", str(feat_number)]
     if us_id:
         cmd += ["--us-id", us_id]
 
+    # Timeout 10s (audit M6 fix v7.0.0-alpha 2026-06-04) — context_budget.py
+    # should complete in <1s typically. 10s ceiling guards against pathological
+    # cases (DB lock, huge reads/, glob explosion) blocking Agent spawn opaquely.
     try:
         result = subprocess.run(
             cmd,
@@ -193,11 +192,15 @@ def main() -> int:
             stderr=subprocess.PIPE,
             text=True,
             check=False,
+            timeout=10,
         )
+    except subprocess.TimeoutExpired:
+        warn(f"WARN preflight-agent-budget: context_budget.py timed out (>10s)")
+        warn(f"     Fail-OPEN to avoid blocking Agent spawn. Investigate reads/ patterns in loader.yml.")
+        return HOOK_ALLOW
     except OSError as e:
         warn(f"WARN preflight-agent-budget: subprocess failed: {e}")
-        return 0
-
+        return HOOK_ALLOW
     # Forward all output to stderr (visible to Claude/user)
     for line in (result.stdout or "").splitlines():
         warn(line)

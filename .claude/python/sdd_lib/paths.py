@@ -64,7 +64,7 @@ def repo_root() -> Path:
       2. Walk up from CWD looking for a directory matching the strict check
       3. Walk up from this file's location (CWD-independent fallback —
          fixes scripts called from outside the repo tree, ex. background
-         agents, MCP server, ad-hoc REPL from /tmp)
+         agents, ad-hoc REPL from /tmp)
       4. Final fallback : CWD (preserves legacy behaviour if every other
          strategy fails — caller will get a clear FileNotFoundError later)
     """

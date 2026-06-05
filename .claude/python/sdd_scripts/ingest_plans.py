@@ -23,6 +23,11 @@ ROOT = Path(__file__).resolve().parents[3]
 DB_PATH = ROOT / "workspace" / "output" / "db" / "console.db"
 PLANS_DIR = ROOT / "workspace" / "output" / "plans"
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from sdd_lib.markdown_io import parse_frontmatter as _parse_frontmatter_pair  # noqa: E402
+from sdd_lib.exit_codes import FAIL_FAST, SUCCESS  # noqa: E402
+
 
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
@@ -30,21 +35,13 @@ def now_iso() -> str:
 
 def parse_frontmatter(text: str) -> dict:
     """Return YAML-ish frontmatter as a flat dict (string values).
-    Handles simple key:value lines; ignores nested structures.
+
+    v7.0.0-alpha (audit CRIT-3) : delegates to `sdd_lib.markdown_io.parse_frontmatter`
+    (SSoT). Returns the dict only (drops the body tuple element) to
+    preserve the v6.x return type expected by callers in this module.
     """
-    m = re.match(r"^---\s*\n(.*?)^---\s*\n", text, re.DOTALL | re.MULTILINE)
-    if not m:
-        return {}
-    out = {}
-    for line in m.group(1).splitlines():
-        line = line.strip()
-        if not line or line.startswith("#"):
-            continue
-        if ":" not in line:
-            continue
-        k, _, v = line.partition(":")
-        out[k.strip()] = v.strip().strip("'\"")
-    return out
+    result = _parse_frontmatter_pair(text)
+    return result[0] if result is not None else {}
 
 
 def parse_plan(path: Path) -> dict | None:
@@ -93,11 +90,10 @@ def parse_plan(path: Path) -> dict | None:
 def main() -> int:
     if not DB_PATH.exists():
         print(f"DB not found: {DB_PATH}", file=sys.stderr)
-        return 1
+        return FAIL_FAST
     if not PLANS_DIR.exists():
         print(f"[OK] no plans dir — nothing to ingest")
-        return 0
-
+        return SUCCESS
     conn = sqlite3.connect(str(DB_PATH))
     cur = conn.cursor()
     ts = now_iso()
@@ -127,8 +123,6 @@ def main() -> int:
 
     conn.commit()
     print(f"[OK] ingested {n_ingested} plans into {DB_PATH.relative_to(ROOT)}")
-    return 0
-
-
+    return SUCCESS
 if __name__ == "__main__":
     raise SystemExit(main())

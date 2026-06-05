@@ -1,0 +1,310 @@
+<html lang="fr"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Demo — Rendez-vous (édition)</title>
+<link rel="stylesheet" href="design-system.css">
+<style>
+  .app{flex:1;display:flex;flex-direction:column;background:var(--nj-cream);overflow:hidden}
+
+  /* ---- Top bar (aligné sur 10-1-Spec-Rapport-Du-Jour.html) ---- */
+  .topbar{
+    height:var(--nj-topbar-h);flex-shrink:0;display:flex;align-items:center;gap:12px;
+    padding:0 16px;background:var(--nj-surface);border-bottom:1px solid var(--nj-line-soft);
+  }
+  .topbar__back{
+    width:38px;height:38px;border-radius:999px;background:var(--nj-coral-50);
+    color:var(--nj-coral-700);border:0;display:grid;place-items:center;cursor:pointer;text-decoration:none;
+  }
+  .topbar__title{flex:1;min-width:0;line-height:1.15}
+  .topbar__title b{display:block;font-size:15px;font-weight:800;color:var(--nj-ink-900);letter-spacing:-0.015em}
+  .topbar__title span{
+    display:block;font-size:11px;color:var(--nj-ink-500);
+    font-family:var(--nj-font-mono);letter-spacing:.06em;margin-top:2px;text-transform:uppercase;
+  }
+  .topbar__avatar{
+    width:38px;height:38px;border-radius:999px;overflow:hidden;flex-shrink:0;
+    box-shadow:inset 0 0 0 2px #fff, 0 2px 6px rgba(40,20,10,0.10);
+  }
+  .topbar__avatar img{width:100%;height:100%;object-fit:cover;display:block}
+
+  /* ---- Body / form ---- */
+  .body{
+    flex:1;overflow-y:auto;padding:18px 16px 12px;
+    display:flex;flex-direction:column;gap:14px;
+  }
+
+  .form-mode{
+    display:flex;align-items:center;gap:10px;
+    padding:8px 12px;border-radius:999px;align-self:flex-start;
+    background:var(--nj-blush-50);color:var(--nj-blush-700);
+    font-family:var(--nj-font-mono);font-size:10.5px;font-weight:600;
+    letter-spacing:.08em;text-transform:uppercase;
+  }
+  .form-mode i{width:6px;height:6px;border-radius:999px;background:var(--nj-blush-500);display:block}
+
+  .field{
+    display:flex;flex-direction:column;gap:7px;
+    background:var(--nj-surface);border:1px solid var(--nj-line-soft);
+    border-radius:14px;padding:13px 14px;
+    box-shadow:var(--nj-shadow-xs);
+  }
+  .field__label{
+    font-family:var(--nj-font-mono);font-size:10.5px;font-weight:600;
+    color:var(--nj-ink-500);text-transform:uppercase;letter-spacing:.1em;
+    display:flex;align-items:center;gap:7px;
+  }
+  .field__label svg{color:var(--nj-coral-600);flex-shrink:0}
+  .field__hint{
+    font-size:11.5px;color:var(--nj-ink-400);margin-top:-2px;
+  }
+
+  .field input,
+  .field textarea{
+    width:100%;border:0;outline:0;background:transparent;font-family:inherit;
+    font-size:15px;color:var(--nj-ink-900);font-weight:600;letter-spacing:-0.005em;
+    padding:0;
+  }
+  .field input::placeholder,
+  .field textarea::placeholder{color:var(--nj-ink-300);font-weight:500}
+  .field textarea{resize:none;min-height:96px;line-height:1.45;font-weight:500}
+
+  .field input[type="date"],
+  .field input[type="time"]{
+    font-family:var(--nj-font-mono);font-weight:700;letter-spacing:.02em;font-size:15.5px;
+  }
+
+  /* Row to align date + time on a single line */
+  .row-2{display:grid;grid-template-columns:1.4fr 1fr;gap:10px}
+
+  .char-count{
+    font-family:var(--nj-font-mono);font-size:10.5px;color:var(--nj-ink-400);
+    text-align:right;letter-spacing:.04em;
+  }
+
+  /* ---- Preview card (récap) ---- */
+  .preview{
+    display:flex;align-items:center;gap:12px;padding:12px;
+    background:var(--nj-surface);border:1px solid var(--nj-line-soft);
+    border-left:3px solid var(--nj-blush-500);border-radius:13px;
+    box-shadow:var(--nj-shadow-xs);
+  }
+  .preview__date{
+    flex:0 0 50px;text-align:center;font-family:var(--nj-font-mono);
+    background:var(--nj-blush-50);color:var(--nj-blush-700);
+    padding:7px 4px;border-radius:11px;
+  }
+  .preview__date .m{font-size:9.5px;text-transform:uppercase;letter-spacing:.07em;font-weight:600;opacity:.85}
+  .preview__date .d{font-size:18px;font-weight:800;letter-spacing:-0.02em;line-height:1;margin-top:1px}
+  .preview__body{flex:1;min-width:0}
+  .preview__body b{display:block;font-size:13.5px;font-weight:700;color:var(--nj-ink-900);letter-spacing:-0.005em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .preview__body span{display:block;font-size:11.5px;color:var(--nj-ink-500);margin-top:2px;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .preview__time{
+    font-family:var(--nj-font-mono);font-size:11.5px;color:var(--nj-ink-700);font-weight:700;
+    background:var(--nj-cream);padding:5px 8px;border-radius:8px;flex-shrink:0;
+  }
+
+  /* ---- Footer ---- */
+  .footer{
+    flex-shrink:0;display:flex;gap:10px;padding:12px 16px 14px;
+    background:var(--nj-surface);border-top:1px solid var(--nj-line-soft);
+  }
+  .btn{
+    height:48px;border-radius:13px;border:0;font-family:inherit;
+    font-weight:700;font-size:14px;cursor:pointer;
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;
+    transition:transform var(--nj-dur-fast) var(--nj-ease);
+    text-decoration:none;
+  }
+  .btn:active{transform:scale(0.98)}
+  .btn-ghost{background:var(--nj-coral-50);color:var(--nj-coral-700);flex:0 0 auto;padding:0 18px}
+  .btn-primary{background:var(--nj-coral-500);color:#fff;flex:1;box-shadow:var(--nj-shadow-brand)}
+  .btn-primary:disabled{opacity:.55;cursor:not-allowed;box-shadow:none}
+
+  .home-indicator{height:8px;display:flex;justify-content:center;align-items:flex-start;flex-shrink:0;background:var(--nj-surface)}
+  .home-indicator::after{content:'';width:134px;height:5px;background:var(--nj-ink-900);border-radius:999px;opacity:.92}
+</style>
+</head>
+<body>
+<div class="nj-stage">
+  <div class="nj-phone">
+    <div class="nj-phone__notch"></div>
+    <div class="nj-phone__screen">
+      <div class="nj-statusbar"><span>9:41</span><span class="nj-statusbar__icons">
+        <svg width="17" height="11" viewBox="0 0 17 11" fill="currentColor"><rect x="0" y="7" width="3" height="4" rx="0.5"></rect><rect x="4.5" y="5" width="3" height="6" rx="0.5"></rect><rect x="9" y="3" width="3" height="8" rx="0.5"></rect><rect x="13.5" y="0" width="3" height="11" rx="0.5"></rect></svg>
+        <svg width="15" height="11" viewBox="0 0 15 11" fill="currentColor"><path d="M7.5 0C4.6 0 1.9 1 0 2.7l1.4 1.5C2.9 2.8 5.1 1.9 7.5 1.9s4.6.9 6.1 2.3L15 2.7C13.1 1 10.4 0 7.5 0zm0 3.7c-2 0-3.7.7-5.1 1.9l1.4 1.4c1-.9 2.3-1.4 3.7-1.4s2.7.5 3.7 1.4L12.6 5.6C11.2 4.4 9.5 3.7 7.5 3.7zm0 3.7c-1.1 0-2 .4-2.7 1l2.7 2.6 2.7-2.6c-.7-.6-1.6-1-2.7-1z"></path></svg>
+        <svg width="25" height="11" viewBox="0 0 25 11" fill="none"><rect x="0.5" y="0.5" width="21" height="10" rx="2.5" stroke="currentColor" opacity="0.5"></rect><rect x="2" y="2" width="18" height="7" rx="1.5" fill="currentColor"></rect><rect x="22.5" y="3.5" width="1.5" height="4" rx="0.5" fill="currentColor" opacity="0.5"></rect></svg>
+      </span></div>
+
+      <div class="app" data-screen-label="14 RDV bébé · édition">
+
+        <!-- ============ Top bar (identique à 10-1-Spec-Rapport-Du-Jour.html) ============ -->
+        <div class="topbar">
+          <a class="topbar__back" href="9-1-Spec-Bebe-Detaile.html" aria-label="Retour vers la fiche bébé">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="15 18 9 12 15 6"></polyline>
+            </svg>
+          </a>
+          <div class="topbar__title">
+            <b>Lina Bouchet</b>
+            <span>RDV · Modifier</span>
+          </div>
+          <div class="topbar__avatar"><img src="assets/baby-lina.png" alt="Lina"></div>
+        </div>
+
+        <!-- ============ Body / form ============ -->
+        <form class="body" id="rdvForm" novalidate="">
+
+          <div class="form-mode" aria-live="polite">
+            <i></i> Modifier le rendez-vous
+          </div>
+
+          <!-- Date + Heure (ligne unique) -->
+          <div class="row-2">
+            <div class="field">
+              <label class="field__label" for="rdvDate">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                  <line x1="16" y1="2" x2="16" y2="6"></line>
+                  <line x1="8" y1="2" x2="8" y2="6"></line>
+                  <line x1="3" y1="10" x2="21" y2="10"></line>
+                </svg>
+                Jour
+              </label>
+              <input type="date" id="rdvDate" name="date" value="2026-05-27" min="2026-05-27" required="">
+            </div>
+            <div class="field">
+              <label class="field__label" for="rdvTime">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <polyline points="12 6 12 12 16 14"></polyline>
+                </svg>
+                Heure
+              </label>
+              <input type="time" id="rdvTime" name="heureRdv" value="13:00" step="300" required="">
+            </div>
+          </div>
+
+          <!-- Titre -->
+          <div class="field">
+            <label class="field__label" for="rdvTitre">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 6h16M4 12h10M4 18h16"></path>
+              </svg>
+              Titre
+            </label>
+            <input type="text" id="rdvTitre" name="titre" maxlength="100" placeholder="ex. Rdv de vaccination" value="Rdv de vaccination">
+            <div class="char-count"><span id="titreCount">18</span> / 100</div>
+          </div>
+
+          <!-- Message -->
+          <div class="field">
+            <label class="field__label" for="rdvMessage">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+              </svg>
+              Message
+            </label>
+            <textarea id="rdvMessage" name="message" maxlength="500" placeholder="ex. Je dois préparer Amatallah pour le rdv de vaccination">Je dois préparer Amatallah pour le rdv de vaccination</textarea>
+            <div class="char-count"><span id="messageCount">53</span> / 500</div>
+          </div>
+
+          <!-- Aperçu (récap de la card finale) -->
+          
+
+        </form>
+
+        <!-- ============ Footer ============ -->
+        <div class="footer">
+          <a class="btn btn-ghost" href="9-1-Spec-Bebe-Detaile.html" aria-label="Retour sans enregistrer">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="15 18 9 12 15 6"></polyline>
+            </svg>
+            Retour
+          </a>
+          <button class="btn btn-primary" type="submit" form="rdvForm" id="btnSave">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            Enregistrer
+          </button>
+        </div>
+
+        <div class="home-indicator"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const MOIS_FR = ['JAN','FEV','MAR','AVR','MAI','JUI','JUL','AOU','SEP','OCT','NOV','DEC'];
+
+  const $date    = document.getElementById('rdvDate');
+  const $time    = document.getElementById('rdvTime');
+  const $titre   = document.getElementById('rdvTitre');
+  const $message = document.getElementById('rdvMessage');
+
+  const $prevMonth   = document.getElementById('prevMonth');
+  const $prevDay     = document.getElementById('prevDay');
+  const $prevTitre   = document.getElementById('prevTitre');
+  const $prevMessage = document.getElementById('prevMessage');
+  const $prevTime    = document.getElementById('prevTime');
+  const $titreCount  = document.getElementById('titreCount');
+  const $messageCount= document.getElementById('messageCount');
+  const $btnSave     = document.getElementById('btnSave');
+  const $form        = document.getElementById('rdvForm');
+
+  function render(){
+    // Date pastille
+    if ($date.value) {
+      const [y,m,d] = $date.value.split('-').map(Number);
+      $prevMonth.textContent = MOIS_FR[(m-1) % 12];
+      $prevDay.textContent   = String(d).padStart(2,'0');
+    } else {
+      $prevMonth.textContent = '—';
+      $prevDay.textContent   = '—';
+    }
+    // Heure
+    $prevTime.textContent = $time.value || '--:--';
+
+    // Titre / Message (règle BR-8 fiche 13 : omettre <b> si titre vide,
+    // omettre <span> si message vide, dash global si tout est vide)
+    const titre = $titre.value.trim();
+    const msg   = $message.value.trim();
+
+    $prevTitre.style.display   = titre ? '' : 'none';
+    $prevMessage.style.display = msg   ? '' : 'none';
+    $prevTitre.textContent     = titre || '';
+    $prevMessage.textContent   = msg   || '';
+
+    if (!titre && !msg) {
+      $prevTitre.style.display = '';
+      $prevTitre.textContent   = '—';
+    }
+
+    $titreCount.textContent   = $titre.value.length;
+    $messageCount.textContent = $message.value.length;
+
+    // Bouton Enregistrer désactivé si date/heure manquantes ou tout vide
+    const ok = !!$date.value && !!$time.value && (titre.length>0 || msg.length>0);
+    $btnSave.disabled = !ok;
+  }
+
+  ['input','change'].forEach(evt => {
+    [$date,$time,$titre,$message].forEach(el => el.addEventListener(evt, render));
+  });
+
+  $form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    // Mockup : on simule l'enregistrement puis on redirige vers la fiche bébé.
+    $btnSave.disabled = true;
+    $btnSave.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Enregistré';
+    setTimeout(() => { window.location.href = '9-1-Spec-Bebe-Detaile.html'; }, 350);
+  });
+
+  render();
+})();
+</script>
+
+
+</body></html>

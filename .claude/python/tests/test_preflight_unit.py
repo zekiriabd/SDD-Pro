@@ -99,14 +99,16 @@ def test_get_active_ids_skips_commented_lines():
 
 
 def test_extract_section_returns_block():
+    # v7.0.0-alpha (audit CRIT-3) : extract_section now takes a plain
+    # heading string (regex-escaped internally by sdd_lib.markdown_io).
     text = "## A\nbody A\n\n## B\nbody B\n"
-    out = preflight.extract_section(text, r"^##\s+A")
+    out = preflight.extract_section(text, "A")
     assert "body A" in out
     assert "body B" not in out
 
 
 def test_extract_section_returns_empty_when_missing():
-    assert preflight.extract_section("only text", r"^##\s+X") == ""
+    assert preflight.extract_section("only text", "X") == ""
 
 
 def test_detect_app_type_auto_backend_frontend():

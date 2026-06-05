@@ -1,0 +1,258 @@
+/* ==========================================================================
+   Demo — Design System
+   Mobile-first tokens for the Demo childcare app.
+   Import this file in every screen mockup to stay consistent.
+   ========================================================================== */
+
+/* ---- Fonts ---- */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap');
+
+:root {
+  /* ============================================================
+     Design System v2 — Blush · Lavande · Ciel · Mint
+     Migration depuis v1 (coral/sage/butter) — alias maintenus.
+     ============================================================ */
+
+  /* ---- Brand · Blush (rose pétale) — remplace coral ---- */
+  --nj-coral-50:  oklch(0.985 0.012 8);
+  --nj-coral-100: oklch(0.960 0.030 8);
+  --nj-coral-200: oklch(0.920 0.055 8);
+  --nj-coral-300: oklch(0.870 0.080 5);
+  --nj-coral-400: oklch(0.810 0.105 3);
+  --nj-coral-500: oklch(0.760 0.120 2);   /* primary */
+  --nj-coral-600: oklch(0.690 0.135 2);   /* hover */
+  --nj-coral-700: oklch(0.580 0.130 5);
+  --nj-coral-900: oklch(0.350 0.080 8);
+  --nj-blush-50:  var(--nj-coral-50);
+  --nj-blush-100: var(--nj-coral-100);
+  --nj-blush-300: var(--nj-coral-300);
+  --nj-blush-500: var(--nj-coral-500);
+  --nj-blush-600: var(--nj-coral-600);
+  --nj-blush-700: var(--nj-coral-700);
+
+  /* ---- Secondary · Lavande — remplace sage ---- */
+  --nj-sage-50:   oklch(0.965 0.018 295);
+  --nj-sage-100:  oklch(0.935 0.035 295);
+  --nj-sage-300:  oklch(0.840 0.075 295);
+  --nj-sage-500:  oklch(0.720 0.100 290);
+  --nj-sage-700:  oklch(0.540 0.105 290);
+  --nj-lavender-50:  var(--nj-sage-50);
+  --nj-lavender-100: var(--nj-sage-100);
+  --nj-lavender-300: var(--nj-sage-300);
+  --nj-lavender-500: var(--nj-sage-500);
+  --nj-lavender-700: var(--nj-sage-700);
+  --nj-lavender-900: oklch(0.320 0.090 295);
+
+  /* ---- Tertiary · Ciel (nouveau) ---- */
+  --nj-sky-50:   oklch(0.970 0.020 230);
+  --nj-sky-100:  oklch(0.940 0.040 230);
+  --nj-sky-300:  oklch(0.860 0.075 230);
+  --nj-sky-500:  oklch(0.760 0.090 232);
+  --nj-sky-700:  oklch(0.560 0.105 233);
+
+  /* ---- Accent · Mint — remplace butter ---- */
+  --nj-butter-100: oklch(0.955 0.035 165);
+  --nj-butter-300: oklch(0.880 0.075 165);
+  --nj-butter-500: oklch(0.770 0.095 165);
+  --nj-mint-100: var(--nj-butter-100);
+  --nj-mint-300: var(--nj-butter-300);
+  --nj-mint-500: var(--nj-butter-500);
+
+  /* ---- Neutres — lait rosé, ink légèrement bleuté ---- */
+  --nj-cream:     oklch(0.990 0.005 320);   /* page background — lait rosé */
+  --nj-surface:   #ffffff;                  /* cards / surfaces */
+  --nj-line:      oklch(0.935 0.012 310);
+  --nj-line-soft: oklch(0.965 0.008 310);
+  --nj-ink-900:   oklch(0.230 0.030 295);   /* primary text */
+  --nj-ink-700:   oklch(0.400 0.025 295);
+  --nj-ink-500:   oklch(0.580 0.020 295);   /* secondary text */
+  --nj-ink-400:   oklch(0.700 0.015 295);   /* muted */
+  --nj-ink-300:   oklch(0.820 0.012 295);   /* placeholder */
+
+  /* ---- Statuts ---- */
+  --nj-success:   oklch(0.720 0.130 160);
+  --nj-warning:   oklch(0.820 0.130 78);
+  --nj-danger:    oklch(0.680 0.170 18);
+  --nj-info:      oklch(0.740 0.110 230);
+
+  /* ---- Dégradés signature ---- */
+  --nj-gradient-soft: linear-gradient(135deg,
+    oklch(0.945 0.045 8) 0%, oklch(0.935 0.055 320) 45%, oklch(0.935 0.060 235) 100%);
+  --nj-gradient-vivid: linear-gradient(135deg,
+    oklch(0.790 0.130 5) 0%, oklch(0.770 0.110 320) 50%, oklch(0.780 0.095 232) 100%);
+  --nj-gradient-mesh:
+    radial-gradient(1100px 700px at 8% 0%,   oklch(0.93 0.07 5   / 0.85), transparent 55%),
+    radial-gradient(900px 700px  at 100% 30%, oklch(0.92 0.08 232 / 0.85), transparent 55%),
+    radial-gradient(900px 800px  at 50% 110%, oklch(0.93 0.07 295 / 0.75), transparent 60%),
+    var(--nj-cream);
+
+  /* ---- Type (inchangé) ---- */
+  --nj-font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --nj-font-mono: 'DM Mono', ui-monospace, Menlo, monospace;
+
+  /* mobile type scale — base 16px viewport */
+  --nj-text-xs:   12px;
+  --nj-text-sm:   13px;
+  --nj-text-base: 15px;
+  --nj-text-md:   16px;
+  --nj-text-lg:   18px;
+  --nj-text-xl:   22px;
+  --nj-text-2xl:  26px;
+  --nj-text-3xl:  32px;
+
+  --nj-leading-tight: 1.2;
+  --nj-leading-snug:  1.35;
+  --nj-leading-norm:  1.5;
+
+  /* ---- Spacing (inchangé) ---- */
+  --nj-space-1: 4px;
+  --nj-space-2: 8px;
+  --nj-space-3: 12px;
+  --nj-space-4: 16px;
+  --nj-space-5: 20px;
+  --nj-space-6: 24px;
+  --nj-space-7: 32px;
+  --nj-space-8: 40px;
+  --nj-space-9: 56px;
+
+  /* ---- Radius — un cran plus rond ---- */
+  --nj-radius-sm:  10px;
+  --nj-radius-md:  16px;
+  --nj-radius-lg:  22px;
+  --nj-radius-xl:  28px;
+  --nj-radius-2xl: 36px;
+  --nj-radius-pill: 999px;
+
+  /* ---- Elevation — ombres teintées lavande ---- */
+  --nj-shadow-xs: 0 1px 2px oklch(0.58 0.08 295 / 0.06);
+  --nj-shadow-sm: 0 2px 6px oklch(0.58 0.08 295 / 0.08), 0 1px 2px oklch(0.58 0.08 295 / 0.05);
+  --nj-shadow-md: 0 10px 26px oklch(0.58 0.08 295 / 0.12), 0 2px 6px oklch(0.58 0.08 295 / 0.06);
+  --nj-shadow-lg: 0 24px 50px oklch(0.55 0.10 295 / 0.18), 0 6px 14px oklch(0.55 0.10 295 / 0.08);
+  --nj-shadow-brand: 0 14px 32px oklch(0.760 0.120 2 / 0.32);
+
+  /* ---- Glass (frosted) ---- */
+  --nj-glass-bg:        oklch(1 0 0 / 0.55);
+  --nj-glass-bg-strong: oklch(1 0 0 / 0.78);
+  --nj-glass-border:    oklch(1 0 0 / 0.72);
+  --nj-glass-blur:      blur(22px) saturate(140%);
+
+  /* ---- Layout (inchangé) ---- */
+  --nj-phone-w: 390px;       /* iPhone 14-class viewport */
+  --nj-phone-h: 844px;
+  --nj-tabbar-h: 76px;
+  --nj-topbar-h: 56px;
+  --nj-drawer-w: 296px;
+
+  /* ---- Motion (inchangé) ---- */
+  --nj-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --nj-dur-fast: 160ms;
+  --nj-dur:      260ms;
+  --nj-dur-slow: 420ms;
+}
+
+/* ==========================================================================
+   Helper class · Glass (frosted)
+   À utiliser sur héros / onboarding / modales success uniquement.
+   NE PAS appliquer sur listes denses (illisible).
+   ========================================================================== */
+.nj-glass {
+  background: var(--nj-glass-bg);
+  backdrop-filter: var(--nj-glass-blur);
+  -webkit-backdrop-filter: var(--nj-glass-blur);
+  border: 1px solid var(--nj-glass-border);
+  border-radius: var(--nj-radius-xl);
+  box-shadow: var(--nj-shadow-md);
+}
+.nj-glass--strong { background: var(--nj-glass-bg-strong); }
+
+/* ==========================================================================
+   Chip variants v2 (en plus des existantes)
+   ========================================================================== */
+.nj-chip--lavender { background: var(--nj-lavender-50); color: var(--nj-lavender-700); }
+.nj-chip--sky      { background: var(--nj-sky-50);      color: var(--nj-sky-700); }
+.nj-chip--mint     { background: var(--nj-mint-100);    color: oklch(0.42 0.10 165); }
+
+/* ==========================================================================
+   Global resets used by all Demo mockups
+   ========================================================================== */
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--nj-font-sans);
+  color: var(--nj-ink-900);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button { font-family: inherit; }
+
+/* ==========================================================================
+   Phone frame — neutral bezel used for mobile mockup presentation
+   ========================================================================== */
+.nj-stage {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 32px 16px;
+  background: var(--nj-gradient-mesh);
+}
+
+.nj-phone {
+  position: relative;
+  width: var(--nj-phone-w);
+  height: var(--nj-phone-h);
+  background: var(--nj-surface);
+  border-radius: 52px;
+  box-shadow:
+    0 0 0 12px #1b1410,
+    0 0 0 13px #2a201a,
+    0 50px 80px -20px rgba(40, 20, 10, 0.35);
+  overflow: hidden;
+}
+
+.nj-phone__screen {
+  position: absolute;
+  inset: 12px;
+  border-radius: 40px;
+  overflow: hidden;
+  background: var(--nj-cream);
+  display: flex;
+  flex-direction: column;
+}
+
+.nj-phone__notch {
+  position: absolute;
+  top: 22px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 118px;
+  height: 32px;
+  background: #1b1410;
+  border-radius: 999px;
+  z-index: 30;
+}
+
+/* iOS-style status bar baked into screen */
+.nj-statusbar {
+  height: 44px;
+  padding: 0 24px 0 28px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--nj-ink-900);
+  letter-spacing: 0.02em;
+  padding-bottom: 6px;
+  flex-shrink: 0;
+}
+
+.nj-statusbar__icons {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}

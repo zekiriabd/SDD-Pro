@@ -26,6 +26,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sdd_lib.paths import normalize, repo_root  # noqa: E402
 from sdd_lib.stderr import warn  # noqa: E402
+from sdd_lib.exit_codes import FAIL_FAST  # noqa: E402
 
 
 BUILD_SYSTEMS = (
@@ -234,11 +235,19 @@ def main() -> int:
     root = Path(args.repo_root).resolve() if args.repo_root else repo_root()
     stacks_dir = root / ".claude" / "stacks"
 
-    # Skip _drafts/ subtree — quarantined stacks (fullstack/mobiles/ddd/
-    # microservice) not part of the active validated surface.
+    # All stacks under .claude/stacks/ are validated (v7.0.0+ rollback of
+    # _drafts/ quarantine — every category subdirectory is now active).
+    #
+    # v7.0.0-alpha (audit MAJ-12, 2026-06-04) — `auth/*.md` intentionally
+    # has NO `.libs.json` companion. Auth is a cross-language *protocol*
+    # (Azure AD OIDC, local JWT, etc.) ; the concrete consumer libraries
+    # (`Microsoft.Identity.Web`, `spring-security-oauth2-resource-server`,
+    # `@azure/msal-browser`) live in the BACKEND/FRONTEND `.libs.json` of
+    # the project consuming the auth protocol. Validation of backend↔auth
+    # compatibility happens at `arch` STEP 4.5.6 via `## Active Auth Specs`
+    # cross-check, not via schema validation. Cf. `library-and-stack.md §1.0`.
     catalogs = (
-        sorted(p for p in stacks_dir.rglob("*.libs.json")
-               if "_drafts" not in p.parts)
+        sorted(stacks_dir.rglob("*.libs.json"))
         if stacks_dir.is_dir() else []
     )
     all_errors: list[dict[str, Any]] = []
@@ -280,7 +289,7 @@ def main() -> int:
             for e in all_errors:
                 warn(f"  ERROR {e['File']:<30} {e['Code']:<20} {e['Message']}")
             warn("\nFAIL")
-            return 1
+            return FAIL_FAST
         print("OK")
 
     return 1 if all_errors else 0

@@ -24,7 +24,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from sdd_lib.markdown_io import extract_frontmatter_raw as extract_frontmatter  # noqa: E402
 from sdd_lib.paths import normalize, repo_root  # noqa: E402
+from sdd_lib.exit_codes import SUCCESS  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:
@@ -36,9 +38,10 @@ def parse_args() -> argparse.Namespace:
     return p.parse_args()
 
 
-def extract_frontmatter(text: str) -> str:
-    m = re.match(r"(?s)^---\r?\n(.*?)\r?\n---\r?\n", text)
-    return m.group(0) if m else ""
+# `extract_frontmatter` imported above from sdd_lib.markdown_io (audit CRIT-3 SSoT).
+# Note : `extract_section` below KEEPS the heading line in its output and
+# applies truncation — semantics differ from `markdown_io.section_body` which
+# returns only the body. Kept local intentionally (bespoke compaction use case).
 
 
 def extract_title(text: str) -> str:
@@ -117,8 +120,7 @@ def main() -> int:
 
     if not plans_dir.is_dir():
         print(f"[SKIP] Plans dir not found: {plans_dir}")
-        return 0
-
+        return SUCCESS
     archive_dir.mkdir(parents=True, exist_ok=True)
 
     files = sorted(plans_dir.glob("*.front.md"))
@@ -194,8 +196,6 @@ def main() -> int:
     else:
         print("(no plans matched)")
 
-    return 0
-
-
+    return SUCCESS
 if __name__ == "__main__":
     sys.exit(main())

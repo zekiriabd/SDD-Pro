@@ -155,19 +155,24 @@ Priorité d'émission : `[QA_TEST_FAILED] > [QA_COVERAGE_GAP]` ;
 | `[LIBNAME_SIGNATURE_CONFLICT]` | DTO/Model partagé, signatures divergentes |
 | `[LOCK_HELD]` | Lock générique cross-language (sdd_lib/file_locks.py) — `workspace/console/.status.lock`, etc. Alias générique de `[LIBNAME_LOCK_HELD]` pour contextes non-LibName |
 
-### 1.9 A11Y — héritage (retiré v7.0.0)
+### 1.9 A11Y — agent retiré v7.0.0, classes réactivées via ingest CI v7.2.0
 
-Classes `[A11Y_*]` (11 préfixes, WCAG 2.2) émises par
-`accessibility-auditor` v6.3.0-v6.10. **Agent retiré v7.0.0**
-(`governance-major-auditors-trim`). Remplacé par `axe-core` au CI du
-projet généré.
+Classes `[A11Y_*]` (11 préfixes canoniques, WCAG 2.2 + fallback
+`A11Y_RULE_*` pour les règles axe-core non mappées). Émises par
+`accessibility-auditor` (LLM) v6.3.0-v6.10, **agent retiré v7.0.0**
+(`governance-major-auditors-trim`).
 
-> **Aucune classe `[A11Y_*]` n'est émise par un agent SDD_Pro après
-> v6.10.5.** Le schéma complet (tableau préfixes × WCAG × sévérité) est
-> archivé dans `@.claude/rules/error-classification-legacy.md §1` au cas
-> où un outil d'ingest CI axe-core serait câblé (non planifié à ce jour
-> — décision out-of-scope du framework SDD_Pro, à arbitrer par le projet
-> consommateur).
+**Réactivation v7.2.0 (Option B — ingest déterministe)** :
+`sdd_scripts/ingest_axe.py` consomme le JSON produit par axe-core CLI
+au CI du projet généré (`.github/workflows/quality.yml`), mappe chaque
+violation vers un préfixe `[A11Y_*]` via `AXE_RULE_MAP`, calcule le
+verdict 🟢/🟡/🔴 contre `--threshold` (défaut `serious`), et persiste
+dans `qa_a11y` + `auditor_runs(auditor='a11y')`. **Pas de coût LLM**.
+
+Le schéma complet (tableau préfixes × WCAG × sévérité) reste dans
+`@.claude/rules/error-classification-legacy.md §1` (source de vérité).
+Lecture par `/sdd-review` via `_review_fetch.py` inchangée
+(`SELECT ... FROM qa_a11y ...`).
 
 ### 1.10 Code Review (cross-fichier, depuis v6.3.1)
 
@@ -249,19 +254,27 @@ existe — évite double-rapport sur les mêmes file+line.
 Chaque threat porte une catégorie STRIDE (`Spoofing`/`Tampering`/
 `Repudiation`/`InfoDisclosure`/`DoS`/`Elevation`) + control recommandé.
 
-### 1.12 Performance — héritage (retiré v7.0.0)
+### 1.12 Performance — agent retiré v7.0.0, classes réactivées via ingest CI v7.2.0
 
 Classes `[PERF_*]` (16 préfixes, Core Web Vitals + SLO API) émises par
-`performance-auditor` v6.4.0-v6.10. **Agent retiré v7.0.0**
-(`governance-major-auditors-trim`). Remplacé par Lighthouse CI + wrk/k6
-au CI du projet généré.
+`performance-auditor` (LLM) v6.4.0-v6.10, **agent retiré v7.0.0**
+(`governance-major-auditors-trim`).
 
-> **Aucune classe `[PERF_*]` n'est émise par un agent SDD_Pro après
-> v6.10.5.** Le schéma complet (16 préfixes × métrique × seuil × sévérité)
-> est archivé dans `@.claude/rules/error-classification-legacy.md §2`
-> au cas où un outil d'ingest CI Lighthouse serait câblé (non planifié
-> à ce jour — décision out-of-scope du framework SDD_Pro, à arbitrer
-> par le projet consommateur).
+**Réactivation v7.2.0 (Option B — ingest déterministe)** :
+`sdd_scripts/ingest_lighthouse.py` consomme la sortie de Lighthouse
+CI (`.lighthouseci/lhr-*.json`) au CI du projet généré, sélectionne
+la run médiane (recommandation lhci), compare les Core Web Vitals
+(LCP, CLS, INP/TBT, TTFB) + total payload + render-blocking aux
+seuils (`--lcp-ms`/`--cls`/`--inp-ms`/`--ttfb-ms`/`--bundle-kb`,
+défauts depuis legacy §2), émet les `[PERF_*]` matchants et persiste
+dans `qa_performance` + `auditor_runs(auditor='perf')`. **Pas de
+coût LLM**. Préfixes SLO API backend (`[PERF_TTFB_*]`, `[PERF_API_P95_*]`,
+`[PERF_DB_QUERY_*]`) restent disponibles pour un ingest wrk/k6 futur
+(out-of-scope v7.2.0, schéma `qa_performance.metric` déjà en place).
+
+Le schéma complet (16 préfixes × métrique × seuil × sévérité) reste
+dans `@.claude/rules/error-classification-legacy.md §2` (source de
+vérité). Lecture par `/sdd-review` inchangée.
 
 ### 1.13 Spec Compliance (AC-by-AC verification, depuis v6.5.2)
 
@@ -361,7 +374,34 @@ Substance : `agents/arch-reviewer.md §5`.
 
 ---
 
-### 1.15 Inconnue
+### 1.15 Adversarial Review (avocat du diable, depuis v7.2.0 R1)
+
+Émises par l'agent `adversarial-reviewer` (Sonnet 4.6) invoqué par
+`/sdd-review --adversarial` (opt-in). **Aucune classe n'est bloquante
+par design** — verdict global toujours `informational`. Ces préfixes
+existent pour qu'une attaque soit traçable (file:line) et que le Tech
+Lead puisse extraire celles qui valent une US de remédiation.
+
+| Préfixe | Angle | Question type |
+|---|---|---|
+| `[ADV_EDGE_CASE]` | edge_case | Empty/max/unicode/NaN/dates passé-futur/collision IDs |
+| `[ADV_FRAGILE_ASSUMPTION]` | fragile_assumption | Ordering implicite, idempotence non vérifiée, lock optimiste absent, TZ mismatch |
+| `[ADV_HIDDEN_TECH_DEBT]` | hidden_tech_debt | Catch-swallow, fallback silencieux, magic cross-FEAT, prerelease pin, dead code |
+| `[ADV_FAILURE_MODE]` | failure_mode | DB unavailable, partial write, OOM payload, désérialisation bombe, retry storm |
+| `[ADV_UX_CONFUSION]` | ux_confusion | Message ambigu, action irréversible sans confirm, loading invisible, log PII leak |
+| `[ADV_PRECONDITION_FAILED]` | (infra) | `/sdd-review` n'a pas été exécuté avant `--adversarial` (review.md absent) |
+
+**Anti-duplication** : par règle §2.5 de l'agent, toute attaque qui
+chevauche un finding déjà émis par `code-reviewer` / `security-reviewer`
+(scan) / `spec-compliance-reviewer` / `arch-reviewer` / `quality_scan.py`
+(même file:line ou classe équivalente) est droppée — l'angle adversarial
+est strictement complémentaire, jamais redondant.
+
+**Persistance** : `validation_reports(report_type='adversarial', verdict='informational', payload_json={attacks: […]})` via `ingest_agent_report --type adversarial`. **Pas dans `qa_*` tables** (canal séparé du verdict consolidé `/sdd-review`).
+
+---
+
+### 1.16 Inconnue
 
 | Préfixe | Usage |
 |---|---|
@@ -422,7 +462,7 @@ Une seule classe déclenche une itération `build_loop` :
 | `[PLAN_STALE]` / `[PLAN_INVALID]` | STOP, relancer `/dev-plan {n}` |
 | `[US_DEPS_CYCLE]` / `[US_DEPS_MISSING]` | STOP, corriger `## Dependencies` puis relancer (idempotent) |
 | `[UI_FIDELITY_GAP]` | 1 retry après revue plan, sinon WARN ou STOP selon score |
-| `[US_DEPS_ORPHAN]` / `[US_STATUS_*]` / `[CHECKPOINT_*]` / `[DRIFT_SUSPECTED]` | Informational, jamais bloquant |
+| `[US_DEPS_ORPHAN]` / `[US_STATUS_*]` / `[CHECKPOINT_*]` / `[DRIFT_SUSPECTED]` / `[ADV_*]` (v7.2.0) | Informational, jamais bloquant |
 | `[CONFIG_SECURITY_DOWNGRADE]` | **Bloquant** au moment du `read_layered_config()` |
 | Auditors : `[REVIEW_*]` / `[SEC_*]` / `[SPEC_*]` / `[ARCH_*]` / `[A11Y_*]` (héritage) / `[PERF_*]` (héritage) | Rapport seul (`{n}-{kind}.{md,json}`) ; verdict 🟢/🟡/🔴 selon `{Kind}FailOn` du Project Config ; aucun build_loop ; hard-blocking selon table de la sous-section (§1.10-§1.13) ; Tech Lead arbitre |
 | `[DISCOVER_*]` / `[SCAN_*]` / `[PROFILE_*]` | Mono-shot, hors pipeline. Bloquant ou info selon classe — cf. §1.14 |
@@ -432,10 +472,11 @@ Une seule classe déclenche une itération `build_loop` :
 
 ## 4. Enforcement
 
-- **Agents** retenus en v7.0.0 (po, arch, dev-backend, dev-frontend,
+- **Agents** retenus en v7.0.0+ (po, arch, dev-backend, dev-frontend,
   qa, elicitor, constitutioner, code-reviewer, security-reviewer,
-  spec-compliance-reviewer, arch-reviewer) chargent cette règle en
-  STEP contexte. Voir `@.claude/loader.yml` pour le mapping détaillé.
+  spec-compliance-reviewer, arch-reviewer, **adversarial-reviewer**
+  (R1 v7.2.0)) chargent cette règle en STEP contexte. Voir
+  `@.claude/loader.yml` pour le mapping détaillé.
   Retirés v7.0.0 (`accessibility-auditor`, `performance-auditor`,
   `dashboard`, `dev-*-strict`) — classes héritage conservées pour ingest
   futur de `axe-core` / Lighthouse CI.

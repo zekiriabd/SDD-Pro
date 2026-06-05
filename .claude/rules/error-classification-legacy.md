@@ -1,23 +1,36 @@
-# Error Classification — Legacy classes (v6.x heritage, v7.0.0+ no-op)
+# Error Classification — Legacy classes (v6.x heritage, réactivées CI v7.2.0)
+
+> **Rôle de ce fichier** (audit mineur #8 v7.0.0-alpha 2026-06-05 — clarification) :
+>
+> - **SSoT** (lecture par scripts d'ingest CI) pour les préfixes `[A11Y_*]`
+>   et `[PERF_*]` — taxonomie exhaustive + mapping sévérité OWASP/WCAG.
+> - **Archive** (lecture humaine) de l'historique v6.3-v6.10 où ces préfixes
+>   étaient émis par des agents LLM (`accessibility-auditor`, `performance-auditor`).
+>
+> Ces deux rôles **cohabitent sans contradiction** : le schéma de mapping
+> conservé en archive **est aussi** la SSoT consommée par les ingests CI v7.2.0.
+> Si un ingest CI futur a besoin d'un nouveau préfixe, l'ajouter ici (pas dans
+> `error-classification.md` qui couvre seulement les classes émises par les
+> agents/scripts en vie).
 
 > Annexe extraite de `error-classification.md` lors de l'audit
-> v7.0.0-alpha (2026-05-20, critique Mineure : *« classes héritage
-> conservées comme schéma de mapping futur — code mort déclaratif »*).
+> v7.0.0-alpha (2026-05-20).
 >
-> Ces classes ne sont **plus émises** par aucun agent SDD_Pro après
-> v6.10.5 (retraits `accessibility-auditor` et `performance-auditor` via
-> `governance-major-auditors-trim`). Elles sont **préservées comme
-> schéma cible** au cas où un outil d'ingest CI consommerait les sorties
-> `axe-core` (frontend a11y) ou `Lighthouse CI` (Core Web Vitals).
+> **MAJ v7.2.0 (R7 — réactivation Option B)** : ces classes sont
+> désormais émises par les **scripts d'ingest CI** déterministes
+> `sdd_scripts/ingest_axe.py` (axe-core → qa_a11y) et
+> `sdd_scripts/ingest_lighthouse.py` (Lighthouse → qa_performance) —
+> pas par un agent LLM. Le verdict 🟢/🟡/🔴 est calculé par les
+> scripts contre le seuil `--threshold` (défaut `serious`).
 >
-> Aucun script d'ingest n'est aujourd'hui planifié dans le framework
-> SDD_Pro — la décision de câbler un tel pont relève du projet
-> consommateur (CI templates générés). Voir `docs/scope-reduction-v7-ga.md`
-> pour le périmètre actuel.
+> Les classes ne sont **plus émises par un agent SDD_Pro** depuis le
+> retrait v7.0.0 de `accessibility-auditor` / `performance-auditor`
+> (`governance-major-auditors-trim`). L'ingest CI est strictement
+> additif (scripts + workflow GitHub Actions), sans coût LLM.
 >
-> Le caller v7.0.0+ ne doit **pas s'attendre** à voir ces classes dans
-> les rapports actuels. Tout traitement runtime de ces préfixes doit
-> être considéré comme un no-op (warning OK, blocking non).
+> Voir `docs/scope-reduction-v7-ga.md` pour le périmètre actuel et
+> `templates/ci-quality.github-actions.yml.template` pour le pipeline
+> CI cible auto-généré par `arch` quand `CiTemplatesGeneration: true`.
 
 ---
 
@@ -104,18 +117,26 @@ projet consommateur).
 
 ---
 
-## 3. Migration path (si pont d'ingest CI est câblé un jour)
+## 3. Migration path — pont d'ingest CI (réalisé v7.2.0)
 
-Si un projet consommateur décide de câbler un pont
-axe-core/Lighthouse → console.db :
+Pont câblé v7.2.0 (`R7 Option B`) — scripts déterministes, pas d'agent LLM :
 
-1. Importer ces classes de ce fichier-ci, **PAS** les redéfinir
-2. Conserver le mapping sévérité (compatibilité Project Config)
-3. Persister dans `console.db` tables `qa_a11y` / `qa_perf` (schéma
-   déjà présent depuis v6.3.0/6.4.0)
-4. Ne **pas** restaurer ces sections dans `error-classification.md`
-   tant que les agents ne sont pas réactivés (les classes sont émises
-   par scripts d'ingest CI, pas par agents Sonnet/Haiku)
+| Source CI | Script ingest | Table cible | Classes émises |
+|---|---|---|---|
+| `@axe-core/cli` JSON (`axe-report.json`) | `sdd_scripts/ingest_axe.py` | `qa_a11y` | 10 canoniques `[A11Y_MISSING_ALT]`, `[A11Y_INPUT_NO_LABEL]`, … + fallback `[A11Y_RULE_<RULE_ID>]` |
+| Lighthouse CI (`.lighthouseci/lhr-*.json`) | `sdd_scripts/ingest_lighthouse.py` | `qa_performance` | 7 actives `[PERF_LCP_TOO_HIGH]`, `[PERF_CLS_TOO_HIGH]`, `[PERF_INP_TOO_HIGH]`, `[PERF_TTFB_TOO_HIGH]`, `[PERF_BUNDLE_TOO_LARGE]`, `[PERF_BUNDLE_LARGE]`, `[PERF_RENDER_BLOCKING]` |
+| wrk/k6 SLO API (futur) | (à câbler v7.3+) | `qa_performance` | `[PERF_API_P95_HIGH]`, `[PERF_DB_QUERY_*]`, … |
+
+Garanties tenues :
+1. Classes importées depuis ce fichier (source de vérité — pas de
+   redéfinition)
+2. Mapping sévérité préservé (compatible Project Config legacy)
+3. Tables `qa_a11y` / `qa_performance` (schéma v6.3.0/6.4.0 inchangé)
+4. Sections §1.9 et §1.12 du fichier principal mises à jour pour
+   noter la réactivation côté ingest (texte court — la taxonomie
+   exhaustive reste ici)
+5. `record_auditor_run(auditor='a11y'|'perf')` posé en marqueur pour
+   que `/sdd-review --ensure-scans` détecte la présence côté CI
 
 ---
 
@@ -139,57 +160,30 @@ opérationnelle quotidienne.
 
 ## 5. Pointers
 
-- `@.claude/rules/error-classification.md` — fichier principal (sans
-  §1.9/§1.12 depuis 2026-05-20)
+- `@.claude/rules/error-classification.md §1.9, §1.12` — fichier
+  principal (stubs MAJ v7.2.0 pour pointer vers ingest CI)
 - `@.claude/docs/AUDIT-FRAMEWORK-v7.md §1.3` — critique audit motivant
   la séparation
 - ADR `governance-major-auditors-trim` (2026-05-19) — retrait initial
   des agents
-- Tables `qa_a11y` et `qa_perf` dans `console.db` (schéma préservé pour
-  ingest futur)
+- `sdd_scripts/ingest_axe.py` + `sdd_scripts/ingest_lighthouse.py`
+  — ingest CI déterministe (v7.2.0)
+- `templates/ci-quality.github-actions.yml.template` — workflow
+  GitHub Actions auto-généré par arch quand `CiTemplatesGeneration: true`
+- Tables `qa_a11y` et `qa_performance` dans `console.db` (schéma
+  v6.3.0/6.4.0 inchangé)
 
 ---
 
-## 6. Références "fantômes" intentionnellement conservées (H4 audit 2026-05-20)
+## 6. Références "fantômes" — moved to `docs/AUDIT-FRAMEWORK-v7.md`
 
-Un audit ciblé v7.0.0-alpha a relevé **28 fichiers** mentionnant les
-agents retirés (`accessibility-auditor`, `performance-auditor`,
-`dashboard`, `dev-backend-strict`, `dev-frontend-strict`). Vérification
-sémantique : **0 référence à nettoyer**. Toutes sont l'une des classes
-ci-dessous, **intentionnellement load-bearing ou historiques**.
+> v7.0.0-alpha (audit MIN-3, 2026-06-04) — la section "28 fichiers
+> fantômes" (~60 L de méta-audit sur les annotations historiques des
+> agents retirés v7.0.0) a été retirée de cette rule de production.
+> Le contenu d'origine documentait l'heuristique anti-faux-positifs
+> pour audits futurs (3 critères : marqueur explicite de retrait,
+> argparse choices/whitelist, document historique). Désormais
+> consultable via `git log` ou archivé dans `docs/AUDIT-FRAMEWORK-v7.md`.
+> Une rule opérationnelle n'est pas l'endroit pour un post-mortem
+> d'audit.
 
-### 6.1 Load-bearing backward-compat (NE PAS RETIRER)
-
-| Fichier | Pourquoi conservé |
-|---|---|
-| `python/sdd_hooks/preflight_agent_budget.py::REJECTED_AGENTS_V7` | dict de **rejection active** — bloque les spawns d'agents retirés avec message d'erreur explicite + pointer vers le replacement (axe-core CI, Lighthouse CI, `index_adrs.py`) |
-| `python/sdd_scripts/context_budget.py::ALLOWED_AGENTS` | whitelist `argparse choices=` — accepte les noms legacy pour parsing de lignes historiques de `console.db` table `context_budget` |
-| `python/sdd_scripts/context_budget.py::DEFAULT_BUDGETS` | budgets pour lecture rétro de lignes legacy (mêmes raisons) |
-| `python/sdd_scripts/phase_planner.py::_decide_a11y / _decide_perf / _decide_threat_model` | phase entries marquées `agent_removed: True` + `enabled: False` toujours, avec champ `replacement:` pointant vers le nouvel outil — consumers parsent le plan JSON et savent qu'il n'y a pas de spawn |
-
-### 6.2 Annotations historiques (lecture humaine — pas de code drift)
-
-| Fichier | Format de l'annotation |
-|---|---|
-| `agents/code-reviewer.md`, `agents/security-reviewer.md`, `agents/arch-reviewer.md`, `agents/spec-compliance-reviewer.md` | `~~accessibility-auditor~~ retiré v7.0.0` dans sections "Coordination" ou tableaux comparatifs |
-| `CHANGELOG.md`, `MIGRATION.md`, `docs/version-notes.md` | trace historique des retraits (rétention permanente) |
-| `python/sdd_admin/framework_smoke.py` | commentaire `# accessibility-auditor + performance-auditor REMOVED v7.0.0` |
-| `error-classification-legacy.md` (ce fichier) | schéma `[A11Y_*]` / `[PERF_*]` figé pour ingest CI futur |
-
-### 6.3 Heuristique pour audits futurs
-
-Avant de signaler une référence comme "drift à corriger" :
-1. Le contexte porte-t-il un marqueur explicite de retrait
-   (`~~`, `agent_removed: True`, `REJECTED_AGENTS_V7`, `RETIRÉ v7.0.0`,
-   "removed v7.0.0") ?
-2. La référence est-elle dans un `argparse choices=` ou une whitelist
-   READ-side compat ?
-3. La référence est-elle dans un document historique (CHANGELOG,
-   MIGRATION, version-notes, ADR) ?
-
-Si oui à l'un des 3 → **OK, ne pas signaler**. C'est de la documentation
-ou du backward-compat actif, pas du drift.
-
-> **Décision (2026-05-20)** : retraits v7.0.0 sont sémantiquement
-> propres ; aucune action H4 nécessaire. Cette section sert de garde
-> contre les faux positifs d'audits futurs.

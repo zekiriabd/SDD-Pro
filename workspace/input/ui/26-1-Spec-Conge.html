@@ -1,0 +1,445 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Demo — Congés</title>
+<link rel="stylesheet" href="design-system.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0">
+<style>
+  body { background: var(--nj-gradient-mesh); min-height: 100vh; display: grid; place-items: center; padding: 36px 16px; }
+  .app { flex: 1; display: flex; flex-direction: column; min-height: 0; background: var(--nj-cream); position: relative; }
+
+  /* top bar */
+  .topbar { height: var(--nj-topbar-h); flex-shrink: 0; display: flex; align-items: center; gap: 12px; padding: 0 16px; background: var(--nj-surface); border-bottom: 1px solid var(--nj-line-soft); }
+  .topbar__back { width: 38px; height: 38px; border-radius: 999px; background: var(--nj-ink-900); color: #fff; border: 0; display: grid; place-items: center; cursor: pointer; text-decoration: none; }
+  .topbar__title { flex: 1; font-size: 18px; font-weight: 800; color: var(--nj-ink-900); letter-spacing: -0.02em; }
+
+  .body { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 16px 0 28px; display: flex; flex-direction: column; gap: 18px; }
+  .pad { padding: 0 18px; }
+
+  /* intro banner */
+  .intro { margin: 0 18px; background: linear-gradient(135deg, var(--nj-lilac-100, oklch(0.93 0.04 295)), var(--nj-sky-50)); border-radius: var(--nj-radius-lg); padding: 14px 16px; display: flex; gap: 11px; align-items: flex-start; }
+  .intro__ic { flex-shrink: 0; width: 34px; height: 34px; border-radius: 11px; background: var(--nj-surface); color: var(--nj-coral-600); display: grid; place-items: center; box-shadow: var(--nj-shadow-xs); }
+  .intro__tx { font-size: 12.5px; line-height: 1.5; color: var(--nj-ink-700); }
+  .intro__tx b { color: var(--nj-ink-900); font-weight: 700; }
+
+  /* section header */
+  .sec-h { display: flex; align-items: baseline; justify-content: space-between; }
+  .sec-h h3 { font-size: 16px; font-weight: 800; letter-spacing: -0.01em; color: var(--nj-ink-900); margin: 0; }
+  .sec-h .hint { font-size: 11.5px; color: var(--nj-ink-400); display: inline-flex; align-items: center; gap: 4px; }
+
+  /* ---- months (scroll vertical) ---- */
+  .carousel { display: flex; flex-direction: column; gap: 14px; padding: 4px 18px 8px; }
+  .mcard { background: var(--nj-surface); border: 1px solid var(--nj-line-soft); border-radius: var(--nj-radius-xl); padding: 18px 18px 20px; box-shadow: var(--nj-shadow-sm); }
+  .mcard__head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }
+  .mcard__title { font-size: 15px; font-weight: 800; color: var(--nj-ink-900); letter-spacing: -0.01em; }
+  .mcard__title span { color: var(--nj-ink-400); font-weight: 600; }
+  .mcard__count { font-size: 11px; font-weight: 700; color: var(--nj-coral-700); background: var(--nj-coral-50); padding: 3px 9px; border-radius: 999px; }
+  .wk { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; margin-bottom: 5px; }
+  .wk span { text-align: center; font-size: 9px; font-family: var(--nj-font-mono); text-transform: uppercase; letter-spacing: 0.04em; color: var(--nj-ink-300); }
+  .grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+  .d { aspect-ratio: 1; display: grid; place-items: center; font-size: 13px; font-weight: 600; color: var(--nj-ink-700); border-radius: 9px; position: relative; }
+  .d .dn { position: relative; z-index: 2; }
+  .d--abs { cursor: pointer; }
+  .d--muted { color: transparent; pointer-events: none; }
+  .d--we { color: var(--nj-ink-900); font-weight: 700; }
+  .d--we .dn { color: var(--nj-ink-900); }
+  .d--we::before { content: ''; position: absolute; inset: 12%; border-radius: 999px; background: var(--nj-line-soft); z-index: 1; }
+  .d--today { box-shadow: inset 0 0 0 1.5px var(--nj-ink-900); font-weight: 800; color: var(--nj-ink-900); }
+  .d--abs { color: #fff; font-weight: 700; }
+  .d--abs.s { border-radius: 8px 3px 3px 8px; }
+  .d--abs.e { border-radius: 3px 8px 8px 3px; }
+  .d--abs.m { border-radius: 3px; }
+  .d--abs.se { border-radius: 8px; }
+  .d--ferie { color: oklch(0.50 0.14 240); font-weight: 800; }
+  .d--ferie::before { content: ''; position: absolute; inset: 12%; border-radius: 999px; box-shadow: inset 0 0 0 1.6px oklch(0.58 0.14 240); background: oklch(0.95 0.03 240); z-index: 1; }
+
+  /* legend */
+  .legend { display: flex; flex-wrap: wrap; gap: 7px 12px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--nj-ink-600, var(--nj-ink-500)); }
+  .legend i { width: 11px; height: 11px; border-radius: 4px; flex-shrink: 0; }
+
+  .tap-hint { font-size: 11.5px; color: var(--nj-ink-400); display: flex; align-items: center; gap: 6px; }
+  .tap-hint .material-symbols-outlined { font-size: 15px; }
+
+  /* FAB */
+  .fab { position: absolute; right: 18px; bottom: 22px; width: 58px; height: 58px; border-radius: 999px; background: var(--nj-coral-500); color: #fff; border: 0; display: grid; place-items: center; box-shadow: 0 12px 28px oklch(0.715 0.135 35 / 0.42); cursor: pointer; z-index: 20; transition: transform var(--nj-dur-fast); }
+  .fab:active { transform: scale(0.96); }
+
+  /* ---- bottom sheet ---- */
+  .sheet-wrap { position: absolute; inset: 0; z-index: 40; display: none; }
+  .sheet-wrap.is-open { display: block; }
+  .sheet-scrim { position: absolute; inset: 0; background: oklch(0.30 0.04 295 / 0.42); backdrop-filter: blur(3px); animation: fade var(--nj-dur-fast) ease; }
+  @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+  .sheet { position: absolute; left: 0; right: 0; bottom: 0; max-height: 92%; background: var(--nj-cream); border-radius: var(--nj-radius-2xl) var(--nj-radius-2xl) 0 0; box-shadow: var(--nj-shadow-lg); display: flex; flex-direction: column; animation: rise var(--nj-dur) var(--nj-ease); }
+  @keyframes rise { from { transform: translateY(100%); } to { transform: none; } }
+  .sheet__grab { width: 40px; height: 5px; border-radius: 999px; background: var(--nj-line); margin: 10px auto 2px; flex-shrink: 0; }
+  .sheet__head { display: flex; align-items: center; gap: 10px; padding: 8px 18px 12px; flex-shrink: 0; }
+  .sheet__head h2 { flex: 1; font-size: 18px; font-weight: 800; color: var(--nj-ink-900); letter-spacing: -0.02em; margin: 0; }
+  .sheet__close { width: 34px; height: 34px; border-radius: 999px; border: 0; background: var(--nj-surface); color: var(--nj-ink-500); display: grid; place-items: center; cursor: pointer; box-shadow: var(--nj-shadow-xs); }
+  .sheet__body { padding: 4px 18px 8px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
+
+  .field__label { font-size: 12px; font-weight: 700; color: var(--nj-ink-700); margin-bottom: 8px; display: block; }
+  .field__hint { font-size: 11px; color: var(--nj-ink-400); margin-top: 6px; font-style: italic; }
+
+  /* duration segmented */
+  .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; background: var(--nj-surface); border: 1px solid var(--nj-line); border-radius: 999px; }
+  .seg button { border: 0; cursor: pointer; padding: 11px; border-radius: 999px; font-family: inherit; font-size: 13.5px; font-weight: 700; color: var(--nj-ink-500); background: transparent; transition: background var(--nj-dur-fast), color var(--nj-dur-fast), box-shadow var(--nj-dur-fast); }
+  .seg button.is-active { background: var(--nj-ink-900); color: #fff; box-shadow: var(--nj-shadow-sm); }
+
+  /* type grid */
+  .type-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .type-opt { display: flex; align-items: center; gap: 9px; padding: 11px 12px; border-radius: 13px; border: 1.5px solid var(--nj-line); background: var(--nj-surface); cursor: pointer; font-family: inherit; font-size: 12.5px; font-weight: 600; color: var(--nj-ink-700); text-align: left; transition: border-color var(--nj-dur-fast), background var(--nj-dur-fast); }
+  .type-opt i { width: 13px; height: 13px; border-radius: 5px; flex-shrink: 0; }
+  .type-opt.is-active { border-color: var(--nj-ink-900); background: var(--nj-cream); box-shadow: inset 0 0 0 1px var(--nj-ink-900); }
+
+  textarea.input, input.input { width: 100%; box-sizing: border-box; border: 1.5px solid var(--nj-line); border-radius: 13px; background: var(--nj-surface); padding: 13px 14px; font-family: inherit; font-size: 14px; color: var(--nj-ink-900); }
+  textarea.input { resize: none; min-height: 64px; line-height: 1.5; }
+  textarea.input::placeholder { color: var(--nj-ink-400); }
+  .input:focus { outline: none; border-color: var(--nj-coral-400); box-shadow: 0 0 0 4px oklch(0.93 0.05 8 / 0.7); }
+
+  .dates { display: flex; flex-direction: column; gap: 12px; }
+  .date-row { display: flex; align-items: center; gap: 12px; }
+  .date-row > label { width: 52px; font-size: 13px; font-weight: 700; color: var(--nj-ink-700); flex-shrink: 0; }
+  .date-row input[type=date] { flex: 1; }
+
+  .sheet__foot { display: flex; gap: 10px; padding: 12px 18px calc(18px + env(safe-area-inset-bottom)); flex-shrink: 0; border-top: 1px solid var(--nj-line-soft); background: var(--nj-cream); }
+  .btn-ghost { flex: 1; height: 50px; border-radius: 14px; border: 1px solid var(--nj-line); background: var(--nj-surface); color: var(--nj-ink-700); font-family: inherit; font-weight: 700; font-size: 14.5px; cursor: pointer; }
+  .btn-solid { flex: 1.6; height: 50px; border-radius: 14px; border: 0; background: var(--nj-coral-500); color: #fff; font-family: inherit; font-weight: 700; font-size: 14.5px; cursor: pointer; box-shadow: var(--nj-shadow-brand); display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+  .btn-solid:disabled { background: var(--nj-ink-300); box-shadow: none; cursor: not-allowed; }
+
+  /* type single-select dropdown */
+  .dd { width: 100%; display: flex; align-items: center; gap: 10px; padding: 14px; border: 1.5px solid var(--nj-line); border-radius: 13px; background: var(--nj-surface); font-family: inherit; font-size: 14px; font-weight: 600; color: var(--nj-ink-900); cursor: pointer; }
+  .dd__cur { flex: 1; display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .dd i, .dd__opt i { width: 14px; height: 14px; border-radius: 5px; flex-shrink: 0; }
+  .dd__chev { color: var(--nj-ink-400); flex-shrink: 0; transition: transform var(--nj-dur-fast); }
+  .dd.is-open .dd__chev { transform: rotate(180deg); }
+  .dd__list { margin-top: 8px; border: 1px solid var(--nj-line); border-radius: 13px; background: var(--nj-surface); overflow: hidden; box-shadow: var(--nj-shadow-sm); display: none; }
+  .dd__list.is-open { display: block; }
+  .dd__opt { display: flex; align-items: center; gap: 10px; padding: 13px 14px; cursor: pointer; font-family: inherit; font-size: 14px; font-weight: 600; color: var(--nj-ink-700); border-bottom: 1px solid var(--nj-line-soft); width: 100%; background: none; text-align: left; }
+  .dd__opt:last-child { border-bottom: 0; }
+  .dd__opt:hover { background: var(--nj-coral-50); }
+  .dd__opt.is-active { color: var(--nj-ink-900); background: var(--nj-cream); }
+  .dd__opt .ck { margin-left: auto; color: var(--nj-coral-600); display: none; }
+  .dd__opt.is-active .ck { display: inline-flex; }
+
+  .btn-primary { width: 100%; height: 52px; border-radius: 999px; background: linear-gradient(95deg, oklch(0.80 0.11 5), oklch(0.78 0.09 285)); color: #fff; border: 0; font-family: inherit; font-weight: 700; font-size: 15px; cursor: pointer; box-shadow: 0 10px 24px oklch(0.78 0.10 320 / 0.38); display: inline-flex; align-items: center; justify-content: center; gap: 8px; letter-spacing: 0.01em; }
+  .btn-primary:active { transform: scale(0.99); }
+
+  .home-indicator { height: 20px; flex-shrink: 0; display: grid; place-items: center; background: var(--nj-cream); }
+  .home-indicator::after { content: ''; width: 130px; height: 5px; border-radius: 999px; background: var(--nj-ink-900); opacity: 0.22; }
+</style>
+</head>
+<body>
+
+<div class="nj-phone">
+  <div class="nj-phone__notch"></div>
+  <div class="nj-phone__screen">
+    <div class="nj-statusbar">
+      <span>9:41</span>
+      <span class="nj-statusbar__icons">
+        <svg width="17" height="11" viewBox="0 0 17 11" fill="currentColor"><rect x="0" y="7" width="3" height="4" rx="0.5"/><rect x="4.5" y="5" width="3" height="6" rx="0.5"/><rect x="9" y="3" width="3" height="8" rx="0.5"/><rect x="13.5" y="0" width="3" height="11" rx="0.5"/></svg>
+        <svg width="15" height="11" viewBox="0 0 15 11" fill="currentColor"><path d="M7.5 0C4.6 0 1.9 1 0 2.7l1.4 1.5C2.9 2.8 5.1 1.9 7.5 1.9s4.6.9 6.1 2.3L15 2.7C13.1 1 10.4 0 7.5 0z"/></svg>
+        <svg width="25" height="11" viewBox="0 0 25 11" fill="none"><rect x="0.5" y="0.5" width="21" height="10" rx="2.5" stroke="currentColor" opacity="0.5"/><rect x="2" y="2" width="18" height="7" rx="1.5" fill="currentColor"/><rect x="22.5" y="3.5" width="1.5" height="4" rx="0.5" fill="currentColor" opacity="0.5"/></svg>
+      </span>
+    </div>
+
+    <div class="app" data-screen-label="06 Congés">
+      <div class="topbar">
+        <a class="topbar__back" href="01-menu-principal.html" aria-label="Fermer">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </a>
+        <div class="topbar__title">Congés</div>
+      </div>
+
+      <div class="body">
+        <div class="pad legend" id="legend" style="margin-top:6px"></div>
+
+        <div class="carousel" id="carousel"></div>
+      </div>
+
+      <button class="fab" id="fab" aria-label="Ajouter une absence">
+        <span class="material-symbols-outlined" style="font-size:26px">add</span>
+      </button>
+
+      <!-- ============ BOTTOM SHEET ============ -->
+      <div class="sheet-wrap" id="sheet">
+        <div class="sheet-scrim" data-close></div>
+        <div class="sheet" role="dialog" aria-modal="true">
+          <div class="sheet__grab"></div>
+          <div class="sheet__head">
+            <h2>Ajouter une absence</h2>
+            <button class="sheet__close" data-close aria-label="Fermer"><span class="material-symbols-outlined" style="font-size:20px">close</span></button>
+          </div>
+          <div class="sheet__body">
+            <div>
+              <label class="field__label">Type d'absence</label>
+              <button class="dd" id="dd-btn" type="button">
+                <span class="dd__cur"><i id="dd-dot"></i><span id="dd-label">Congés payé</span></span>
+                <svg class="dd__chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+              </button>
+              <div class="dd__list" id="dd-list"></div>
+            </div>
+
+            <div class="dates">
+              <div class="date-row">
+                <label for="d-start">Début</label>
+                <input class="input" type="date" id="d-start">
+              </div>
+              <div class="date-row" id="end-row">
+                <label for="d-end">Fin</label>
+                <input class="input" type="date" id="d-end">
+              </div>
+            </div>
+
+            <div>
+              <textarea class="input" id="cmt" placeholder="Commentaire"></textarea>
+            </div>
+          </div>
+          <div class="sheet__foot">
+            <button class="btn-primary" id="validate">Enregistrer</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ DÉTAIL ABSENCE (tap calendrier) ============ -->
+      <div class="sheet-wrap" id="detail">
+        <div class="sheet-scrim" data-dclose></div>
+        <div class="sheet" role="dialog" aria-modal="true" style="max-height:none">
+          <div class="sheet__grab"></div>
+          <div class="sheet__body" style="padding-bottom:4px">
+            <div style="display:flex;align-items:center;gap:12px">
+              <span id="det-swatch" style="width:14px;height:36px;border-radius:7px;flex-shrink:0"></span>
+              <div style="flex:1;min-width:0">
+                <div id="det-title" style="font-size:17px;font-weight:800;color:var(--nj-ink-900);letter-spacing:-0.01em"></div>
+                <div id="det-range" style="font-size:13px;color:var(--nj-ink-500);margin-top:2px"></div>
+              </div>
+              <span id="det-days" style="text-align:center;flex-shrink:0"></span>
+            </div>
+            <div id="det-cmt" style="font-size:13px;color:var(--nj-ink-600,var(--nj-ink-500));line-height:1.5;font-style:italic"></div>
+          </div>
+          <div class="sheet__foot">
+            <button class="btn-ghost" data-dclose>Fermer</button>
+            <button class="btn-ghost" id="det-del" style="flex:1.4;color:var(--nj-danger);border-color:oklch(0.85 0.08 25)"><span class="material-symbols-outlined" style="font-size:18px;vertical-align:-3px">delete</span> Supprimer</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="home-indicator"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ---- leave types (couleurs distinctes, même famille oklch) ----
+  const TYPES = {
+    paye:      { label: 'Congés payé',        color: 'oklch(0.69 0.16 352)', ink: '#fff' },
+    sans:      { label: 'Congés sans solde',  color: 'oklch(0.70 0.05 250)', ink: '#fff' },
+    maladie:   { label: 'Arrêt maladie',      color: 'oklch(0.60 0.20 28)',  ink: '#fff' },
+    formation: { label: 'Formation',          color: 'oklch(0.58 0.17 300)', ink: '#fff' },
+    enfant:    { label: 'Enfant malade',      color: 'oklch(0.74 0.15 62)',  ink: 'oklch(0.36 0.08 62)' },
+    maternite: { label: 'Congés maternité',   color: 'oklch(0.68 0.12 195)', ink: '#fff' },
+    familial:  { label: 'Évènement familial', color: 'oklch(0.68 0.15 150)', ink: '#fff' },
+    education: { label: 'Éducation parental',  color: 'oklch(0.66 0.14 235)', ink: '#fff' },
+    autres:    { label: 'Autres',             color: 'oklch(0.66 0.02 280)', ink: '#fff' }
+  };
+
+  // ---- jours fériés (bleu) ----
+  const FERIE_COLOR = 'oklch(0.58 0.14 240)';
+  const FERIES = new Set([
+    '2025-01-01','2025-04-21','2025-05-01','2025-05-08','2025-05-29','2025-06-09','2025-07-14','2025-08-15','2025-11-01','2025-11-11','2025-12-25',
+    '2026-01-01','2026-04-06','2026-05-01','2026-05-08','2026-05-14','2026-05-25','2026-07-14','2026-08-15','2026-11-01','2026-11-11','2026-12-25',
+    '2027-01-01','2027-03-29','2027-05-01','2027-05-08','2027-05-06','2027-07-14','2027-08-15','2027-11-01','2027-11-11','2027-12-25'
+  ]);
+  const MONTHS_FR = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+  const MONTHS_AB = ['Jan','Fév','Mar','Avr','Mai','Juin','Juil','Août','Sep','Oct','Nov','Déc'];
+  const WK = ['L','M','M','J','V','S','D'];
+  const TODAY = new Date(2026, 4, 31); // 31 mai 2026
+
+  const iso = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const parse = s => { const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); };
+  const fmtLong = d => d.getDate() + ' ' + MONTHS_AB[d.getMonth()].toLowerCase() + ' ' + d.getFullYear();
+  const daysBetween = (a,b) => Math.round((parse(b) - parse(a)) / 86400000) + 1;
+
+  let absences = [
+    { type: 'paye',      start: '2026-05-15', end: '2026-05-18', comment: 'Pont de l\'Ascension' },
+    { type: 'formation', start: '2026-06-09', end: '2026-06-10', comment: 'Formation premiers secours' },
+    { type: 'maladie',   start: '2026-07-11', end: '2026-07-23', comment: '' },
+    { type: 'familial',  start: '2026-08-03', end: '2026-08-07', comment: 'Mariage' }
+  ];
+
+  // months to render: 6 months back from today .. 13 forward
+  function buildMonths() {
+    const list = [];
+    const base = new Date(TODAY.getFullYear(), TODAY.getMonth(), 1);
+    for (let i = -2; i <= 13; i++) list.push(new Date(base.getFullYear(), base.getMonth() + i, 1));
+    return list;
+  }
+
+  function absForDay(d) {
+    const s = iso(d);
+    return absences.find(a => s >= a.start && s <= a.end);
+  }
+
+  const carousel = document.getElementById('carousel');
+
+  function renderCalendar() {
+    const months = buildMonths();
+    carousel.innerHTML = months.map(m => {
+      const y = m.getFullYear(), mo = m.getMonth();
+      const first = new Date(y, mo, 1);
+      const startWd = (first.getDay() + 6) % 7; // lundi = 0
+      const nbDays = new Date(y, mo+1, 0).getDate();
+      let cells = '';
+      for (let i = 0; i < startWd; i++) cells += '<div class="d d--muted">0</div>';
+      let monthCount = 0;
+      for (let day = 1; day <= nbDays; day++) {
+        const dt = new Date(y, mo, day);
+        const wd = (dt.getDay() + 6) % 7;
+        const a = absForDay(dt);
+        let cls = 'd', style = '';
+        if (dt.getFullYear() === TODAY.getFullYear() && dt.getMonth() === TODAY.getMonth() && dt.getDate() === TODAY.getDate()) cls += ' d--today';
+        if (a) {
+          monthCount++;
+          const t = TYPES[a.type];
+          const isS = iso(dt) === a.start, isE = iso(dt) === a.end;
+          cls += ' d--abs ' + (isS && isE ? 'se' : isS ? 's' : isE ? 'e' : 'm');
+          style = `style="background:${t.color};color:${t.ink}" data-absidx="${absences.indexOf(a)}"`;
+        } else if (FERIES.has(iso(dt))) {
+          cls += ' d--ferie';
+        }
+        if (wd >= 5) cls += ' d--we';
+        cells += `<div class="${cls}" ${style}><span class="dn">${day}</span></div>`;
+      }
+      const badge = monthCount ? `<span class="mcard__count">${monthCount} j</span>` : '';
+      return `<div class="mcard" data-mkey="${y}-${mo}">
+        <div class="mcard__head">
+          <span class="mcard__title">${MONTHS_FR[mo]} <span>${y}</span></span>
+          ${badge}
+        </div>
+        <div class="wk">${WK.map(w => `<span>${w}</span>`).join('')}</div>
+        <div class="grid">${cells}</div>
+      </div>`;
+    }).join('');
+  }
+
+  function renderLegend() {
+    const present = [...new Set(absences.map(a => a.type))];
+    let html = present.map(k => `<span><i style="background:${TYPES[k].color}"></i>${TYPES[k].label}</span>`).join('');
+    html += `<span><i style="background:transparent;box-shadow:inset 0 0 0 2px ${FERIE_COLOR}"></i>Jour férié</span>`;
+    document.getElementById('legend').innerHTML = html;
+  }
+
+  function renderList() {}
+
+  function renderAll() { renderCalendar(); renderLegend(); renderList(); bindAbsenceTaps(); }
+  renderAll();
+
+  // ---- tap une absence dans le calendrier → détail / suppression ----
+  const detail = document.getElementById('detail');
+  let detIdx = null;
+  function bindAbsenceTaps() {
+    carousel.querySelectorAll('[data-absidx]').forEach(el => {
+      el.addEventListener('click', () => openDetail(+el.dataset.absidx));
+    });
+  }
+  function openDetail(idx) {
+    const a = absences[idx]; if (!a) return;
+    detIdx = idx;
+    const t = TYPES[a.type], n = daysBetween(a.start, a.end);
+    const s = parse(a.start), e = parse(a.end);
+    document.getElementById('det-swatch').style.background = t.color;
+    document.getElementById('det-title').textContent = t.label;
+    document.getElementById('det-range').textContent = n === 1 ? fmtLong(s) : `du ${s.getDate()} ${MONTHS_AB[s.getMonth()].toLowerCase()} au ${fmtLong(e)}`;
+    document.getElementById('det-days').innerHTML = `<b style="font-size:20px;font-weight:800;color:var(--nj-ink-900);display:block;line-height:1">${n}</b><span style="font-size:9.5px;text-transform:uppercase;letter-spacing:0.05em;color:var(--nj-ink-400);font-weight:600">${n>1?'jours':'jour'}</span>`;
+    document.getElementById('det-cmt').textContent = a.comment ? '“' + a.comment + '”' : '';
+    detail.classList.add('is-open');
+  }
+  function closeDetail() { detail.classList.remove('is-open'); detIdx = null; }
+  detail.querySelectorAll('[data-dclose]').forEach(el => el.addEventListener('click', closeDetail));
+  document.getElementById('det-del').addEventListener('click', () => {
+    if (detIdx !== null) { absences.splice(detIdx, 1); closeDetail(); renderAll(); }
+  });
+
+  // scroll to today's month on load (vertical)
+  requestAnimationFrame(() => {
+    const body = document.querySelector('.body');
+    const target = carousel.querySelector(`[data-mkey="${TODAY.getFullYear()}-${TODAY.getMonth()}"]`);
+    if (target && body) body.scrollTop = target.offsetTop - 80;
+  });
+
+  // ---- bottom sheet ----
+  const sheet = document.getElementById('sheet');
+  const fab = document.getElementById('fab');
+  const typeGrid = null;
+  const dStart = document.getElementById('d-start');
+  const dEnd = document.getElementById('d-end');
+  const endRow = document.getElementById('end-row');
+  const cmt = document.getElementById('cmt');
+  let selType = 'paye';
+
+  // build single-select dropdown
+  const ddBtn = document.getElementById('dd-btn');
+  const ddList = document.getElementById('dd-list');
+  const ddDot = document.getElementById('dd-dot');
+  const ddLabel = document.getElementById('dd-label');
+  ddList.innerHTML = Object.entries(TYPES).map(([k,t]) =>
+    `<button type="button" class="dd__opt${k==='paye'?' is-active':''}" data-type="${k}"><i style="background:${t.color}"></i>${t.label}<span class="ck material-symbols-outlined" style="font-size:18px">check</span></button>`).join('');
+  function setType(k) {
+    selType = k;
+    ddDot.style.background = TYPES[k].color;
+    ddLabel.textContent = TYPES[k].label;
+    ddList.querySelectorAll('.dd__opt').forEach(o => o.classList.toggle('is-active', o.dataset.type === k));
+  }
+  setType('paye');
+  ddBtn.addEventListener('click', () => {
+    const open = ddList.classList.toggle('is-open');
+    ddBtn.classList.toggle('is-open', open);
+  });
+  ddList.addEventListener('click', e => {
+    const o = e.target.closest('.dd__opt'); if (!o) return;
+    setType(o.dataset.type);
+    ddList.classList.remove('is-open'); ddBtn.classList.remove('is-open');
+  });
+
+  document.getElementById('seg') && document.getElementById('seg').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    document.querySelectorAll('#seg button').forEach(x => x.classList.remove('is-active'));
+    b.classList.add('is-active');
+    const one = b.dataset.dur === 'one';
+    endRow.style.display = one ? 'none' : '';
+  });
+
+  function openSheet() {
+    setType('paye'); cmt.value = '';
+    ddList.classList.remove('is-open'); ddBtn.classList.remove('is-open');
+    endRow.style.display = '';
+    dStart.value = iso(TODAY);
+    const t1 = new Date(TODAY); t1.setDate(t1.getDate()+1); dEnd.value = iso(t1);
+    sheet.classList.add('is-open');
+  }
+  function closeSheet() { sheet.classList.remove('is-open'); }
+  fab.addEventListener('click', openSheet);
+  sheet.querySelectorAll('[data-close]').forEach(el => el.addEventListener('click', closeSheet));
+
+  document.getElementById('validate').addEventListener('click', () => {
+    let start = dStart.value;
+    if (!start) return;
+    let end = dEnd.value || start;
+    if (end < start) { const t = end; end = start; start = t; }
+    absences.push({ type: selType, start, end, comment: cmt.value.trim() });
+    renderAll();
+    closeSheet();
+    // scroll to the month of the new absence (vertical)
+    const sd = parse(start);
+    requestAnimationFrame(() => {
+      const body = document.querySelector('.body');
+      const target = carousel.querySelector(`[data-mkey="${sd.getFullYear()}-${sd.getMonth()}"]`);
+      if (target && body) body.scrollTo({ top: target.offsetTop - 80, behavior: 'smooth' });
+    });
+  });
+</script>
+
+</body>
+</html>

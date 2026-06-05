@@ -28,6 +28,7 @@ from typing import Literal
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sdd_lib.project_config import read_project_config  # noqa: E402
+from sdd_lib.exit_codes import FAIL_FAST, SUCCESS  # noqa: E402
 
 Owner = Literal["backend", "frontend", "shared", "unknown"]
 
@@ -128,21 +129,17 @@ def _cli_single(path: str) -> int:
         "backend_name": names.backend_name,
         "lib_name": names.lib_name,
     }}, indent=2))
-    return 0
-
-
+    return SUCCESS
 def _cli_batch(input_path: str) -> int:
     names = load_project_names()
     issues = json.loads(Path(input_path).read_text(encoding="utf-8"))
     if not isinstance(issues, list):
         print("ERROR: input must be a JSON array of issue objects", file=sys.stderr)
-        return 1
+        return FAIL_FAST
     buckets = classify_batch(issues, names)
     summary = summarize_buckets(buckets)
     print(json.dumps({"summary": summary, "buckets": buckets}, indent=2))
-    return 0
-
-
+    return SUCCESS
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     g = p.add_mutually_exclusive_group(required=True)

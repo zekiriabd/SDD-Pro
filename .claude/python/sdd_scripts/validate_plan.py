@@ -60,6 +60,10 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from sdd_lib.markdown_io import (  # noqa: E402
+    parse_frontmatter,
+    section_body_stripped as extract_section_body,
+)
 from sdd_lib.paths import normalize  # noqa: E402
 from sdd_lib.stderr import error_block  # noqa: E402
 
@@ -136,11 +140,8 @@ class PlanReport:
         self.warnings.append({"code": code, "hint": hint})
 
 
-_FRONTMATTER_RE = re.compile(
-    r"^---\s*\r?\n(.*?)\r?\n---\s*\r?\n",
-    re.DOTALL,
-)
-_FRONTMATTER_KV_RE = re.compile(r"^\s*([a-zA-Z][a-zA-Z0-9_\-]*)\s*:\s*(.*?)\s*$")
+# Frontmatter / section parsing now delegated to sdd_lib.markdown_io
+# (v7.0.0-alpha, audit CRIT-3 — SSoT consolidation).
 _FILE_ENTRY_PATH_RE = re.compile(r"^-\s*path\s*:\s*(.+?)\s*$", re.MULTILINE)
 _FILE_ENTRY_FIELD_RE = re.compile(r"^\s+([a-zA-Z_]+)\s*:\s*(.+?)\s*$")
 _LIST_INLINE_RE = re.compile(r"^\s*\[\s*(.*?)\s*\]\s*$")
@@ -163,31 +164,6 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--json", action="store_true", help="Emit structured JSON output on stdout")
     p.add_argument("--workspace-root", default=None, help="Override repo root (testing)")
     return p.parse_args()
-
-
-def parse_frontmatter(text: str) -> tuple[dict[str, str], str] | None:
-    """Return (frontmatter_dict, body_after_frontmatter) or None if absent."""
-    m = _FRONTMATTER_RE.match(text)
-    if not m:
-        return None
-    block = m.group(1)
-    body = text[m.end():]
-    frontmatter: dict[str, str] = {}
-    for line in block.splitlines():
-        if not line.strip() or line.lstrip().startswith("#"):
-            continue
-        m2 = _FRONTMATTER_KV_RE.match(line)
-        if not m2:
-            continue
-        frontmatter[m2.group(1)] = m2.group(2).strip().strip('"').strip("'")
-    return frontmatter, body
-
-
-def extract_section_body(body: str, heading: str) -> str | None:
-    """Extract content between `## {heading}` and next H2 (or EOF). Case-sensitive."""
-    pattern = rf"^##\s+{re.escape(heading)}\s*\r?\n(.*?)(?=^##\s+|\Z)"
-    m = re.search(pattern, body, re.MULTILINE | re.DOTALL)
-    return m.group(1).strip() if m else None
 
 
 def parse_inline_list(raw: str) -> list[str]:

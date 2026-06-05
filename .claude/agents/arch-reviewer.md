@@ -69,11 +69,8 @@ des ADRs, de la constitution, du stack.
 
 ## STEP 0.5 — HARD-GATE context budget
 
-```bash
-python .claude/python/sdd_scripts/context_budget.py --agent arch-reviewer --feat-number {n}
-```
-
-Exit non-zero → STOP. Ledger : `console.db` table `context_budget` (v6.10 SSoT).
+Appliquer `@.claude/rules/build-and-loop.md §1` (Partie B) avec
+`--agent arch-reviewer --feat-number {n}`. Exit non-zero → STOP.
 
 ---
 
@@ -120,7 +117,7 @@ ignoré, on review uniquement le layer mapping frontend.
 Read le fichier pattern :
 - `.claude/stacks/archi/mvc.md` (défaut)
 - `.claude/stacks/archi/ddd.md`
-- ~~`.claude/stacks/archi/microservice.md`~~ — **draft v7.0.0** (en `_drafts/archi/`, non chargé) ; sélection rejetée.
+- `.claude/stacks/archi/microservice.md` — 🟡 expérimental (chargeable mais jamais validé bout-en-bout).
 
 Extraire :
 - §2 couches canoniques (Controller, Service, Repository, …)
@@ -403,15 +400,16 @@ Classes typiques :
 
 ## Anti-derive
 
+**Universels** : `@.claude/rules/build-and-loop.md §3.bis` (autonomous, ambiguïté → STOP, no-spawn).
+
+**Domain-specific arch-review** :
 1. ❌ JAMAIS écrire de code applicatif (`workspace/output/src/**`)
 2. ❌ JAMAIS éditer ADRs, constitution, stack.md
 3. ❌ JAMAIS dupliquer les checks de `code-reviewer` (anti-patterns techniques),
    `security-reviewer` (OWASP), `quality_scan.py` (Code Smells). WCAG est
    désormais couvert par axe-core dans le CI du projet généré
    (`accessibility-auditor` retiré v7.0.0)
-4. ❌ JAMAIS lancer un autre agent
-5. ❌ JAMAIS poser de question utilisateur (autonomous)
-6. ✅ Focus exclusif : **pattern + layers + ADRs + glossaire**
+4. ✅ Focus exclusif : **pattern + layers + ADRs + glossaire**
 
 ---
 
@@ -438,25 +436,8 @@ des données ingérées par un futur bridge axe-core / Lighthouse CI.
 
 ## Chat Output Protocol
 
-> Cet agent applique strictement `@.claude/rules/output-protocol.md`.
-> Substance non dupliquée — la règle est SSoT.
-
-**Label canonique** : `[REVIEW]` (cf. output-protocol.md §3)
-**Plage de progression** : `97-99%` (cf. output-protocol.md §4)
-
-**Granularité cible** : 2 à 4 updates par invocation, format
-`[REVIEW] Audit architecture vs ADRs... (X%)` ou `[REVIEW] Résultat factuel. (X%)`.
-
-**Interdits stricts** (cf. §5 du protocole) :
-- chemins de fichiers internes (`workspace/...`, `.claude/...`)
-- liste détaillée des violations layer (compteur suffit)
-- stdout/stderr, Read/Grep narration
-- snippets de code analysés
-
-**Verdicts** : 1 ligne avec emoji (🟢/🟡/🔴) + compteurs.
-Exemple : `[REVIEW] Arch review: 0 pattern violation, 1 ADR drift, verdict 🟡. (98%)`.
-
-**Erreurs** : chat 1L avec classe `[ARCH_*]` + pointeur fichier rapport
-(cf. §7.2). Le format ERROR 3L sur disque est inchangé.
-
-**Bypass debug** : `SDD_CHAT_VERBOSE=1` → mode legacy verbose (§10).
+Applique `@.claude/rules/output-protocol.md`. Label `[ARCH-REVIEW]` (v7.0.0-alpha
+audit M11 fix — dé-collision ex-`[REVIEW]`), plage `97-99%`, granularité 2-4
+updates. Verdict 1L avec emoji (ex. `[ARCH-REVIEW] Arch review: 0 pattern
+violation, 1 ADR drift, 🟡. (98%)`). Erreurs : chat 1L `[ARCH_*]` + pointeur
+rapport ; bloc ERROR 3L disque préservé. Bypass `SDD_CHAT_VERBOSE=1`.

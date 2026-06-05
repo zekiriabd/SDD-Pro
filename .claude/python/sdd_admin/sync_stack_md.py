@@ -26,6 +26,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sdd_lib.paths import repo_root  # noqa: E402
 from sdd_lib.stderr import warn  # noqa: E402
+from sdd_lib.exit_codes import FAIL_FAST, SUCCESS  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:
@@ -345,19 +346,16 @@ def main() -> int:
         break
     if catalog_path is None:
         warn(f"Catalog not found for stackId={args.stack_id}")
-        return 1
-
+        return FAIL_FAST
     md_path = catalog_path.parent / f"{args.stack_id}.md"
     if not md_path.is_file():
         warn(f"Companion .md not found: {md_path}")
-        return 1
-
+        return FAIL_FAST
     try:
         cat = json.loads(catalog_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as e:
         warn(f"Failed to read catalog: {e}")
-        return 1
-
+        return FAIL_FAST
     generated_table = build_libs_table(cat, args.stack_id)
 
     core_lines = format_core_package_lines(cat.get("core") or [], cat)
@@ -394,8 +392,7 @@ def main() -> int:
                 "Insert <!-- LIBS_CATALOG_START --> / <!-- LIBS_CATALOG_END --> markers manually.",
                 file=sys.stderr,
             )
-            return 1
-
+            return FAIL_FAST
     core_injected = False
     if "<!-- CORE_PACKAGES_START -->" in md:
         md = replace_marked_section(
@@ -437,8 +434,6 @@ def main() -> int:
             f"zones=[{', '.join(zones)}]"
         )
 
-    return 0
-
-
+    return SUCCESS
 if __name__ == "__main__":
     sys.exit(main())

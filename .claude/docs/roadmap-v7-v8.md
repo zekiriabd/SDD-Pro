@@ -23,6 +23,13 @@
 
 **Verdict v7.0.0 tag** : **7/8 P0 done** → tag bloqué uniquement par l'item 1 (2 runs supplémentaires PoC ROI).
 
+> **Clarification v7.0.0-alpha vs v7.0.0** (audit mineur #12 v7.0.0-alpha
+> 2026-06-05) : le repo actuel est sur la branche `next`, état
+> `v7.0.0-alpha` (audit blockers fermés mais ROI variance pas mesurée sur
+> 3 runs). **`v7.0.0` n'a jamais été tagué sur `main`** — `main` reste à
+> `v6.10.4-LTS` (freeze 2026-06-18). Le tag `v7.0.0` final sortira post-PoC
+> ROI complète. Cf. `@.claude/docs/VERSIONING.md` (SSoT) pour la politique.
+
 ### P1 — v7.1 post-freeze (9 items)
 
 | # | Item | État | Détail |
@@ -45,9 +52,11 @@
 |---|---|---|---|
 | 18 | Combos validés ≥ 5 | PoC : `dotnet+react+azure`, `kotlin+react+azure`, `dotnet+vue+azure`, `python+react+local`, `kotlin+vue+local`. Méthodo `docs/poc-roi-methodology.md`. | 5× 0.5 jour-homme = 2.5 jours |
 | 19 | Cross-model validation QA | Opus review Sonnet (vraie indépendance épistémique). Nécessite refonte loader + retry budget. | 1-2 semaines |
-| 20 | Mémoire Claude scoped Tech Lead | Cf. discussion ouverte 2026-05-18. Sans casser source-first invariant. Implementation MCP server-side. | 1 semaine |
+| 20 | Mémoire Claude scoped Tech Lead | Cf. discussion ouverte 2026-05-18. Sans casser source-first invariant. Implementation server-side. | 1 semaine |
 | 21 | Console web packagée | Embarquer `workspace/console/` dans framework (template + serveur Node minimal). Actuellement couplage soft. | 3-5 jours |
 | ~~22~~ | ~~Sweep stubs backward-compat~~ | ✅ **DONE v7.0.0-alpha post-audit 2026-05-20** : 8 stubs supprimés + 2 principes relocés à `docs/principles/`. 45+11+7 refs migrées dans agents/commands/python/stacks. Banners des 4 rules consolidées mis à jour. 0 ref orpheline (vérifié grep). |
+| ~~R7~~ | ~~Réactivation a11y/perf via ingest CI déterministe~~ | ✅ **DONE v7.2.0 (2026-05-24)** : Option B livrée. `sdd_scripts/ingest_axe.py` (axe-core JSON → `qa_a11y`, 53 assertions) + `sdd_scripts/ingest_lighthouse.py` (Lighthouse → `qa_performance`). Template CI `templates/ci-quality.github-actions.yml.template` instrumenté (steps Python + dérivation FEAT depuis branche). `error-classification.md §1.9/§1.12` MAJ. Pas de coût LLM. `/sdd-review` lit déjà `qa_a11y`/`qa_performance` (aggrégation inchangée). |
+| ~~R1~~ | ~~Adversarial review mode (BMAD pattern)~~ | ✅ **DONE v7.2.0 (2026-05-24)** : agent `adversarial-reviewer` (Sonnet 4.6, 240L, joue l'avocat du diable) + flag `/sdd-review --adversarial` + classe `[ADV_*]` (§1.15 — 5 angles : edge_case, fragile_assumption, hidden_tech_debt, failure_mode, ux_confusion). Verdict **purement informational** (jamais bloquant — pas mixé dans verdict consolidé). Persistance dans `validation_reports(report_type='adversarial')` via `ingest_agent_report --type adversarial` (7 nouveaux tests unit). Anti-duplication §2.5 stricte : drop des findings déjà émis par autres reviewers. 12ᵉ agent au framework. |
 | 23 | Refactor 5 gros stacks `.md` > 800 L | `dotnet-minimalapi` (1016), `kotlin-spring-boot` (982), `react` (933), `python-fastapi` (849), `azure-ad` (795). Migrer §2.4 vers `.libs.json` (déjà partiellement fait via `sync_stack_md.py`), §3 conventions vers `docs/stacks/{id}-conventions.md`, garder `.md` à ~400 L (overview + layer mapping + scope). | 5× 1.5h = ~8h |
 
 **Décision M4 audit v7.0.0-alpha (2026-05-21)** : item 23 deferred v7.1.

@@ -23,8 +23,9 @@ Usage :
   python validate_stack_md_headers.py --strict   # exit 1 if any MISS
 
 Scope :
-  - .claude/stacks/{backend,frontend,ui,qa,auth,archi}/*.md (active)
-  - .claude/stacks/_drafts/* is excluded (not loaded at runtime)
+  - .claude/stacks/{backend,frontend,ui,qa,auth,archi,fullstack,mobiles}/*.md
+  - All stacks under .claude/stacks/ are considered active since v7.0.0+
+    rollback of the _drafts/ quarantine mechanism.
 """
 from __future__ import annotations
 
@@ -52,20 +53,32 @@ from sdd_lib.paths import repo_root  # noqa: E402
 
 # Validation badges allowed in v7.0.0 — drift detector for typos
 VALID_BADGES = ("🟢", "🟡", "🔴")
+
+# v7.0.0-alpha (audit MIN-10, 2026-06-04) — `Validation:` header has 3
+# coexisting syntaxes observed in the wild :
+#   (a) `Validation: 🟢 reference (note)`         — TOP-LEVEL, canonical, this validator enforces
+#   (b) `validation: experimental` (YAML META)    — lowercase, indented, accepted by preflight.py
+#   (c) `> Validation: ...` (blockquote)          — rejected by this validator
+# A future v7.1 cleanup could unify to a single format ; for v7.0.0 we
+# tolerate (b) in legacy stacks to avoid mass-migration risk.
 STATUS_RE = re.compile(r"^Status\s*:\s*(\S+)", re.M)
 VALIDATION_RE = re.compile(r"^Validation\s*:\s*(\S+)", re.M)
 BLOCKQUOTED_VALIDATION_RE = re.compile(r"^\s*>\s*Validation\s*:", re.M)
 
 
 def find_stack_files(repo: Path) -> list[Path]:
-    """Return all active stack .md files (excluding _drafts/)."""
+    """Return all active stack .md files under .claude/stacks/.
+
+    Excludes the top-level README.md (not a stack file). All category
+    subdirectories are considered active since the v7.0.0+ rollback of
+    the _drafts/ quarantine mechanism.
+    """
     stacks_dir = repo / ".claude" / "stacks"
     if not stacks_dir.is_dir():
         return []
     out: list[Path] = []
     for p in sorted(stacks_dir.glob("**/*.md")):
-        rel = p.relative_to(stacks_dir).parts
-        if rel and rel[0] == "_drafts":
+        if p.parent == stacks_dir:
             continue
         out.append(p)
     return out

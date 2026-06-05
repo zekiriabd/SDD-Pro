@@ -29,12 +29,27 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from sdd_lib.combos import get_component_level  # noqa: E402
 from sdd_lib.paths import iso_now  # noqa: E402
+from sdd_lib.exit_codes import CORRECTIBLE, SUCCESS  # noqa: E402
 
 try:
     from sdd_scripts.scan_repo import scan as scan_repo_func
 except ImportError:
     scan_repo_func = None  # type: ignore[assignment]
+
+
+# v7.0.0-alpha (audit CRIT-6, 2026-06-04) — validation level no longer
+# hardcoded per entry below (was `"validation": "🟢"` on every stack, a
+# drift source vs the SSoT in `.claude/templates/combos.json`). The
+# `validation` field of each output candidate is now derived at runtime
+# via `sdd_lib.combos.get_component_level(category, stack_id)`.
+_LEVEL_TO_EMOJI: dict[str, str] = {
+    "validated":    "🟢",
+    "experimental": "🟡",
+    "untested":     "🔴",
+    "missing":      "⊘",
+}
 
 
 # Stack matching rules. Each entry maps a stack id to required + bonus indicators.
@@ -44,7 +59,6 @@ STACK_RULES: dict[str, dict[str, Any]] = {
     # --- Backend stacks ---
     "dotnet-minimalapi": {
         "category": "backend",
-        "validation": "🟢",
         "required": {
             "languages": ["dotnet"],
             "frameworks": ["aspnetcore-minimal"],
@@ -55,7 +69,6 @@ STACK_RULES: dict[str, dict[str, Any]] = {
     },
     "kotlin-spring-boot": {
         "category": "backend",
-        "validation": "🟢",
         "required": {
             "languages": ["kotlin"],
             "frameworks": ["spring-boot"],
@@ -66,7 +79,6 @@ STACK_RULES: dict[str, dict[str, Any]] = {
     },
     "python-fastapi": {
         "category": "backend",
-        "validation": "🟢",
         "required": {
             "languages": ["python"],
             "frameworks": ["fastapi"],
@@ -75,7 +87,6 @@ STACK_RULES: dict[str, dict[str, Any]] = {
     },
     "node-express": {
         "category": "backend",
-        "validation": "🟢",
         "required": {
             "languages": ["javascript"],
             "frameworks": ["express"],
@@ -88,7 +99,6 @@ STACK_RULES: dict[str, dict[str, Any]] = {
     # --- Frontend stacks ---
     "react": {
         "category": "frontend",
-        "validation": "🟢",
         "required": {
             "frameworks": ["react"],
         },
@@ -99,7 +109,6 @@ STACK_RULES: dict[str, dict[str, Any]] = {
     },
     "vue": {
         "category": "frontend",
-        "validation": "🟢",
         "required": {
             "frameworks": ["vue"],
         },
@@ -109,7 +118,6 @@ STACK_RULES: dict[str, dict[str, Any]] = {
     },
     "angular": {
         "category": "frontend",
-        "validation": "🟢",
         "required": {
             "frameworks": ["angular"],
         },
@@ -119,7 +127,6 @@ STACK_RULES: dict[str, dict[str, Any]] = {
     },
     "blazor-webassembly": {
         "category": "frontend",
-        "validation": "🟢",
         "required": {
             "frameworks": ["blazor-webassembly"],
         },
@@ -131,7 +138,6 @@ STACK_RULES: dict[str, dict[str, Any]] = {
     # --- UI design systems ---
     "shadcn": {
         "category": "ui",
-        "validation": "🟢",
         "required": {
             "ui_indicators": ["shadcn"],
         },
@@ -141,7 +147,6 @@ STACK_RULES: dict[str, dict[str, Any]] = {
     },
     "vuetify": {
         "category": "ui",
-        "validation": "🟢",
         "required": {
             "ui_indicators": ["vuetify"],
         },
@@ -149,7 +154,6 @@ STACK_RULES: dict[str, dict[str, Any]] = {
     },
     "radzen-blazor": {
         "category": "ui",
-        "validation": "🟢",
         "required": {
             "ui_indicators": ["radzen-blazor"],
         },
@@ -221,12 +225,14 @@ def _score_stack(rules: dict[str, Any], scan_report: dict[str, Any]) -> dict[str
         bonus_pct = (bonus_hit / bonus_total) if bonus_total > 0 else 0
         score = round(req_pct * 70 + bonus_pct * 30)
 
+    # v7.0.0-alpha (audit CRIT-6) : validation derived at runtime from
+    # combos.json SSoT instead of duplicated per-entry. `category` field
+    # is forwarded so the `match()` loop can resolve the level.
     return {
-        "score": score,
-        "required_met": required_met,
+        "score":             score,
+        "required_met":      required_met,
         "required_evidence": required_evidence,
-        "bonus_evidence": bonus_evidence,
-        "validation": rules.get("validation"),
+        "bonus_evidence":    bonus_evidence,
     }
 
 
@@ -249,13 +255,16 @@ def match(scan_report: dict[str, Any]) -> dict[str, Any]:
         if not score_info["required_met"]:
             continue  # skip stacks whose required indicators aren't all present
         category = rules["category"]
+        # v7.0.0-alpha (audit CRIT-6) : look up level from combos.json SSoT.
+        level = get_component_level(category, stack_id)
         candidates.setdefault(category, []).append({
-            "stack_id": stack_id,
-            "score": score_info["score"],
-            "confidence": _confidence_label(score_info["score"]),
-            "validation": score_info["validation"],
+            "stack_id":          stack_id,
+            "score":             score_info["score"],
+            "confidence":        _confidence_label(score_info["score"]),
+            "validation":        _LEVEL_TO_EMOJI.get(level, "⊘"),
+            "validation_level":  level,  # raw string (validated|experimental|untested|missing)
             "required_evidence": score_info["required_evidence"],
-            "bonus_evidence": score_info["bonus_evidence"],
+            "bonus_evidence":    score_info["bonus_evidence"],
         })
 
     # Sort by score desc
@@ -336,11 +345,11 @@ def main(argv: list[str] | None = None) -> int:
             scan_report = json.loads(args.scan_report.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as e:
             sys.stderr.write(f"ERROR loading scan report: {e}\n")
-            return 2
+            return CORRECTIBLE
     else:
         if scan_repo_func is None:
             sys.stderr.write("ERROR: scan_repo module not importable\n")
-            return 2
+            return CORRECTIBLE
         scan_report = scan_repo_func(args.scope)
 
     result = match(scan_report)
@@ -350,8 +359,6 @@ def main(argv: list[str] | None = None) -> int:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(text, encoding="utf-8")
 
-    return 0
-
-
+    return SUCCESS
 if __name__ == "__main__":
     sys.exit(main())

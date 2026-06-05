@@ -163,7 +163,7 @@ cd workspace/output/src/{BackendName} && ./gradlew compileKotlin --no-daemon
 
 # capability: sqlserver-flyway
 # Gradle : ajouter les modules en implementation(...) dans build.gradle.kts
-#   implementation("org.flywaydb:flyway-sqlserver:12.5.0")
+#   implementation("org.flywaydb:flyway-sqlserver:10.21.0")
 ```
 <!-- ONDEMAND_PACKAGES_END -->
 
@@ -208,7 +208,7 @@ Codes prioritaires Kotlin :
 <!-- LIBS_CATALOG_START -->
 ### 2.4 Librairies
 
-> Source de verite : `.claude/stacks/backend/kotlin-spring-boot.libs.json`. Ne pas editer cette section manuellement -- utiliser `python .claude/python/sdd_admin/sync_stack_md.py --stack-id kotlin-spring-boot`.
+> Source de verite : `.claude/stacks/backend/kotlin-spring-boot.libs.json`. Ne pas editer cette section manuellement -- utiliser `.claude/python/sdd_admin/sync_stack_md.py --stack-id kotlin-spring-boot`.
 
 #### 2.4.a Librairies CORE (installees par arch en section 2.2.1, toujours)
 
@@ -222,8 +222,8 @@ Codes prioritaires Kotlin :
 | spring-boot-starter-oauth2-client |  | OAuth2 client flow (utilise par certains scenarios M2M) |
 | spring-boot-starter-data-jpa |  | ORM Hibernate + Spring Data repositories (PagingAndSortingRepository, JpaRepository) |
 | spring-boot-starter-validation |  | Bean Validation Jakarta (@Valid, @NotBlank, @Email) sur DTOs entrants |
-| spring-boot-starter-flyway |  | Auto-config Flyway (lance migrations DB au startup) |
-| flyway-core | 12.5.0 | Moteur migrations versionnees V{n}__*.sql (cf. kotlin-spring-boot.md §4.4) |
+| flyway-core | 10.21.0 | Moteur migrations versionnees V{n}__*.sql + autoconfig Spring (pas de starter dedie). Pin 10.21.0 (compat Spring Boot 4 BOM, Flyway 10 externalise les dialects DB en modules separes). Cf. kotlin-spring-boot.md §4.4 |
+| flyway-database-postgresql | 10.21.0 | Module support PostgreSQL Flyway 10+ (externalise depuis flyway-core en 10.x, n'existe PAS en branche 9.x — d'ou la bump). Necessaire si DatabaseType=postgres |
 | springdoc-openapi-starter-webmvc-ui | 2.7.0 | OpenAPI 3 + Swagger UI auto-generes depuis controllers (path /swagger custom, cf. §5.6) |
 | spring-context |  | DI core (transitive via web, listee explicitement pour clarte) |
 | jackson-module-kotlin |  | Serialization Kotlin data classes (sans no-arg constructor) |
@@ -243,8 +243,8 @@ Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'U
 
 | Capability | Lib | Version | Triggers |
 |---|---|---|---|
-| redis-cache | spring-boot-starter-data-redis |  | \bredis\b, cache distribu, distributed cache, session partag |
-| sqlserver-flyway | flyway-sqlserver | 12.5.0 | sqlserver, mssql |
+| redis-cache | spring-boot-starter-data-redis |  | redis, cache distribu, distributed cache, session partag |
+| sqlserver-flyway | flyway-sqlserver | 10.21.0 | sqlserver, mssql |
 
 #### 2.4.c Plugins build-system
 
@@ -255,7 +255,7 @@ Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'U
 | org.jetbrains.kotlin.plugin.jpa | 2.3.21 | Genere no-arg constructor pour @Entity (exigence Hibernate) |
 | org.springframework.boot | 4.0.6 | Gere bootRun, bootJar, dependency-management BOM |
 | org.jlleitschuh.gradle.ktlint | 14.2.0 | Lint + auto-format Kotlin (tasks ktlintCheck / ktlintFormat) |
-| org.flywaydb.flyway | 12.5.0 | Tasks Gradle flywayMigrate / flywayInfo / flywayClean (CLI hors runtime) |
+| org.flywaydb.flyway | 10.21.0 | Tasks Gradle flywayMigrate / flywayInfo / flywayClean (CLI hors runtime) |
 
 #### 2.4.d DB Drivers (selectionne par arch selon DatabaseType)
 

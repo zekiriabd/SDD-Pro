@@ -118,7 +118,7 @@ class TestCollectFeatData(unittest.TestCase):
     def test_empty_feat_no_runs_no_coverage(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = _fake_repo(tmp)
-            with mock.patch.object(console_db, "repo_root", return_value=root):
+            with mock.patch.object(console_db.core, "repo_root", return_value=root):
                 ensure_initialized()
                 with connect() as conn:
                     data = collect_feat_data(conn, 99)
@@ -130,7 +130,7 @@ class TestCollectFeatData(unittest.TestCase):
     def test_single_run_with_tokens(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = _fake_repo(tmp)
-            with mock.patch.object(console_db, "repo_root", return_value=root):
+            with mock.patch.object(console_db.core, "repo_root", return_value=root):
                 ensure_initialized()
                 with connect() as conn:
                     _seed_run(conn, 1,
@@ -169,7 +169,7 @@ class TestCollectFeatData(unittest.TestCase):
     def test_rework_detection(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = _fake_repo(tmp)
-            with mock.patch.object(console_db, "repo_root", return_value=root):
+            with mock.patch.object(console_db.core, "repo_root", return_value=root):
                 ensure_initialized()
                 with connect() as conn:
                     _seed_run(conn, 1,
@@ -195,7 +195,7 @@ class TestCollectFeatData(unittest.TestCase):
     def test_phase_timing_aggregation(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = _fake_repo(tmp)
-            with mock.patch.object(console_db, "repo_root", return_value=root):
+            with mock.patch.object(console_db.core, "repo_root", return_value=root):
                 ensure_initialized()
                 with connect() as conn:
                     _seed_run(conn, 7,
@@ -233,7 +233,7 @@ class TestCollectFeatData(unittest.TestCase):
     def test_coverage_aggregation(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = _fake_repo(tmp)
-            with mock.patch.object(console_db, "repo_root", return_value=root):
+            with mock.patch.object(console_db.core, "repo_root", return_value=root):
                 ensure_initialized()
                 with connect() as conn:
                     _seed_coverage(conn, 1, pct=82.5, total=47,
@@ -313,7 +313,7 @@ class TestCli(unittest.TestCase):
     def test_main_all_empty_db_returns_ok(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = _fake_repo(tmp)
-            with mock.patch.object(console_db, "repo_root", return_value=root):
+            with mock.patch.object(console_db.core, "repo_root", return_value=root):
                 ensure_initialized()
                 old_stdout = sys.stdout
                 sys.stdout = StringIO()
@@ -326,7 +326,7 @@ class TestCli(unittest.TestCase):
     def test_main_feat_unknown_returns_2(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = _fake_repo(tmp)
-            with mock.patch.object(console_db, "repo_root", return_value=root):
+            with mock.patch.object(console_db.core, "repo_root", return_value=root):
                 ensure_initialized()
                 old_err = sys.stderr
                 sys.stderr = StringIO()
@@ -339,7 +339,7 @@ class TestCli(unittest.TestCase):
     def test_main_json_output(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = _fake_repo(tmp)
-            with mock.patch.object(console_db, "repo_root", return_value=root):
+            with mock.patch.object(console_db.core, "repo_root", return_value=root):
                 ensure_initialized()
                 with connect() as conn:
                     _seed_run(conn, 1,

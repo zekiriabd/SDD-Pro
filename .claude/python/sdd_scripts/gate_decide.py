@@ -158,11 +158,11 @@ def main() -> int:
     if args.action == "is-resolved":
         # is-resolved predicate: returns 0/1 as boolean answer (not error code)
         if not status_file.is_file():
-            return 1
+            return FAIL_FAST
         status = read_status(status_file)
         gate = get_gate(status, feat_key, args.phase)
         if not gate:
-            return 1
+            return FAIL_FAST
         return 0 if gate.get("decision") in ("validated", "skipped") else 1
 
     if args.action == "pose-pending":

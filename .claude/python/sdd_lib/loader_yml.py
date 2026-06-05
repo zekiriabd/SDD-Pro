@@ -1,6 +1,16 @@
 """Parse `.claude/loader.yml` to extract reads/writes per agent.
 
 Hand-rolled YAML parser limited to the loader.yml structure (avoids PyYAML dep).
+
+> v7.0.0-alpha (audit MIN-8, 2026-06-04) — a second hand-rolled YAML
+> mini-parser exists at `sdd_lib/layered_config._parse_yaml_minimal`
+> (for `## Project Config` blocks). The two could be merged into a
+> shared `sdd_lib/yaml_minimal.py` but the structures are different
+> enough (loader.yml = nested per-agent lists with inline-flow dicts ;
+> project_config = flat scalar key:value) that the merge would add
+> complexity without behavior gain. Decision : keep both ; if a third
+> YAML site is ever added, extract then.
+
 Format expected:
 
     agent_name:

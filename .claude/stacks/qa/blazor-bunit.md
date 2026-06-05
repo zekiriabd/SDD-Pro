@@ -2,7 +2,7 @@
 
 > §2.4 (Librairies) régénérée depuis `blazor-bunit.libs.json` — ne pas éditer manuellement (`python .claude/python/sdd_admin/sync_stack_md.py --stack-id blazor-bunit`).
 
-Status: Draft
+Status: Stable
 Validation: 🟢 reference (validated combo — dotnet-minimalapi + blazor + radzen + azure-ad)
 QA FEAT ID: blazor-bunit
 Scope: tests unitaires composants Blazor (Server + WebAssembly)
@@ -36,7 +36,7 @@ classique au sein du même projet de test.
 <!-- LIBS_CATALOG_START -->
 ### 2.4 Librairies
 
-> Source de verite : `.claude/stacks/qa/blazor-bunit.libs.json`. Ne pas editer cette section manuellement -- utiliser `python .claude/python/sdd_admin/sync_stack_md.py --stack-id blazor-bunit`.
+> Source de verite : `.claude/stacks/qa/blazor-bunit.libs.json`. Ne pas editer cette section manuellement -- utiliser `.claude/python/sdd_admin/sync_stack_md.py --stack-id blazor-bunit`.
 
 #### 2.4.a Librairies CORE (installees par arch en section 2.2.1, toujours)
 
@@ -55,7 +55,7 @@ Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'U
 
 | Capability | Lib | Version | Triggers |
 |---|---|---|---|
-| mocking-alt | Moq (alt) | 4.20.72 | \bmoq\b |
+| mocking-alt | Moq (alt) | 4.20.72 | moq |
 | fluent-assertions | FluentAssertions | 7.0.0 | fluentassertions, should\(\) |
 <!-- LIBS_CATALOG_END -->
 

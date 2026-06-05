@@ -13,6 +13,8 @@ Migrated from .claude/scripts/init-status-json.ps1 (2026-05-13).
 """
 from __future__ import annotations
 
+from sdd_lib.exit_codes import SUCCESS  # noqa: E402
+
 import argparse
 import json
 import sys
@@ -33,8 +35,7 @@ def main() -> int:
 
     if path.is_file() and not args.force:
         print(f"[skip] {args.path} existe deja (idempotent). Utiliser --force pour ecraser.")
-        return 0
-
+        return SUCCESS
     path.parent.mkdir(parents=True, exist_ok=True)
 
     skeleton = {
@@ -51,8 +52,6 @@ def main() -> int:
         newline="\n",
     )
     print(f"[ok] {args.path} bootstrap (squelette vide)")
-    return 0
-
-
+    return SUCCESS
 if __name__ == "__main__":
     sys.exit(main())

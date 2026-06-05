@@ -41,6 +41,32 @@ TEST_PATTERNS: tuple[str, ...] = (
 )
 
 
+# Plan cache (M5 fix v7.0.0-alpha 2026-06-05) — PostToolUse Edit fires very
+# often (~30-100×/run). Previously each fire re-read every plan file in
+# `workspace/output/plans/*.md` from disk + ran regex finditer. With 5-10
+# plans of 30-80 KB, that's ~5-15 MB I/O per Edit on the hot path.
+# Cache invalidation = file mtime change (any plan edit busts entry).
+_PLAN_CACHE: dict[str, tuple[float, str]] = {}  # path -> (mtime_ns, text)
+
+
+def _read_plan_cached(plan_path: Path) -> str:
+    """Read plan text with mtime-keyed cache. Returns '' on error."""
+    try:
+        st = plan_path.stat()
+    except OSError:
+        return ""
+    key = str(plan_path)
+    cached = _PLAN_CACHE.get(key)
+    if cached is not None and cached[0] == st.st_mtime_ns:
+        return cached[1]
+    try:
+        text = plan_path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return ""
+    _PLAN_CACHE[key] = (st.st_mtime_ns, text)
+    return text
+
+
 def _path_in_plan(plan_text: str, file_path: str, file_name: str) -> bool:
     return file_path in plan_text or file_name in plan_text
 
@@ -89,17 +115,14 @@ def main() -> int:
     payload = read_hook_input()
     file_path = get_file_path(payload)
     if not file_path:
-        return 0
-
+        return HOOK_ALLOW
     norm = normalize(file_path)
     if "workspace/output/src/" not in norm:
-        return 0
-
+        return HOOK_ALLOW
     tool_name = get_tool_name(payload)
     if tool_name == "Write":
         # preserves:/adds: only applies to augmentation Edits, not file creation
-        return 0
-
+        return HOOK_ALLOW
     if any(pat in norm for pat in TEST_PATTERNS):
         return 0  # QA ownership, no contract
 
@@ -108,25 +131,22 @@ def main() -> int:
     if not target.is_absolute():
         target = root / target
     if not target.is_file():
-        return 0
+        return HOOK_ALLOW
     try:
         content = target.read_text(encoding="utf-8", errors="replace")
     except OSError:
-        return 0
+        return HOOK_ALLOW
     if not content.strip():
-        return 0
-
+        return HOOK_ALLOW
     plans_dir = root / "workspace" / "output" / "plans"
     if not plans_dir.is_dir():
-        return 0
-
+        return HOOK_ALLOW
     file_name = target.name
     matching_plan: Path | None = None
     plan_text: str = ""
     for plan in sorted(plans_dir.glob("*.md")):
-        try:
-            text = plan.read_text(encoding="utf-8", errors="replace")
-        except OSError:
+        text = _read_plan_cached(plan)  # M5 : mtime-keyed cache
+        if not text:
             continue
         if _path_in_plan(text, file_path, file_name) or _path_in_plan(text, norm, file_name):
             matching_plan = plan
@@ -139,8 +159,7 @@ def main() -> int:
     block_text = _find_block_for_file(plan_text, norm, file_name)
     if block_text is None:
         # File mentioned in plan but not as a primary entry — no contract
-        return 0
-
+        return HOOK_ALLOW
     plan_name = matching_plan.name
 
     for preserved_id in _parse_id_list(block_text, "preserves"):

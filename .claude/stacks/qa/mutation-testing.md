@@ -1,6 +1,6 @@
 # QA Stack — Mutation Testing (opt-in, v7.0.0)
 
-Status: Draft
+Status: Experimental
 Validation: 🟡 experimental (schema opt-in, non actif par défaut)
 QA FEAT ID: mutation-testing
 Scope: anti auto-confirmation bias (briser le co-écrit IA code+tests)

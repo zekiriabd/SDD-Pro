@@ -48,13 +48,8 @@ constitution ni des US (read-only strict).
 
 ## STEP 0.5 — HARD-GATE context budget
 
-Avant tout `Read` hors preflight, exécuter :
-
-```bash
-python .claude/python/sdd_scripts/context_budget.py --agent security-reviewer --feat-number {n}
-```
-
-Exit non-zero → STOP. Ledger : `console.db` table `context_budget` (v6.10 SSoT).
+Appliquer `@.claude/rules/build-and-loop.md §1` (Partie B) avec
+`--agent security-reviewer --feat-number {n}`. Exit non-zero → STOP.
 
 ---
 
@@ -593,45 +588,18 @@ ce sont les findings du rapport (verdict 🟢/🟡/🔴, pas STOP de l'agent).
 
 ## Chat Output Protocol
 
-> Cet agent applique strictement `@.claude/rules/output-protocol.md`.
-> Substance non dupliquée — la règle est SSoT.
-
-**Label canonique** : `[SECURITY]` (cf. output-protocol.md §3)
-**Plage de progression** : `94-97%` (cf. output-protocol.md §4)
-
-**Granularité cible** : 3 à 6 updates par invocation, format
-`[SECURITY] Action au gérondif... (X%)` ou `[SECURITY] Résultat factuel. (X%)`.
-
-**Interdits stricts** (cf. §5 du protocole) :
-- chemins de fichiers internes (`workspace/...`, `.claude/...`)
-- noms de classes/méthodes/composants générés
-- stdout/stderr de bash, Read/Edit/Glob narration
-- context budget, tokens, preflight checks détaillés
-- diffs, snippets, lignes de code
-
-**Erreurs (LOAD-BEARING)** : tout bloc `ERROR: ... / CAUSE: ... / FIX: ...`
-apparaissant dans les STEPs ci-dessus est un **TEMPLATE pour le fichier
-rapport disque**, JAMAIS un texte à émettre verbatim en chat.
-
-Procédure obligatoire à chaque émission d'erreur :
-1. **Disque** : écrire le bloc 3-lignes complet dans le fichier rapport
-   approprié — format préservé pour `build_loop`/hooks/dashboards
-   (cf. `error-classification.md §2`).
-2. **Chat** : émettre UNE SEULE ligne compressée :
-   ```
-   🔴 [{LABEL}/FAIL] {résumé court} — [CLASS] {détail 1L} → {rapport.md}. ({X}%)
-   ```
-   Pas de chemin absolu, pas de stack trace, pas de blocs multi-lignes.
-pour `build_loop` et hooks — cf. `error-classification.md §2`).
-
-**Bypass debug** : `SDD_CHAT_VERBOSE=1` → mode legacy verbose (§10).
+Applique `@.claude/rules/output-protocol.md`. Label `[SECURITY]`, plage `94-97%`,
+granularité 2-3 updates. Verdict 1L avec emoji + compteurs OWASP. Erreurs : chat 1L
+(`🔴 [SECURITY/FAIL] résumé — [SEC_*] détail → rapport.md (X%)`) + bloc ERROR 3L
+disque préservé (cf. `error-classification.md §2`). Bypass `SDD_CHAT_VERBOSE=1`.
 
 ---
 
 ## Anti-derive strict
 
-L'agent **ne fait JAMAIS** :
+**Universels** : `@.claude/rules/build-and-loop.md §3.bis` (autonomous, ambiguïté → STOP, no-spawn).
 
+**Domain-specific security-review** :
 - ❌ Modifier le code de production sous `workspace/output/src/**` (read-only strict)
 - ❌ Corriger automatiquement les findings (rapport seul)
 - ❌ Re-builder, exécuter les tests, lancer un linter
@@ -640,12 +608,8 @@ L'agent **ne fait JAMAIS** :
   émettre `[UNKNOWN]` et logger ; étendre la table dans commit séparé
   via discipline `source-first.md`)
 - ❌ Lire les FEATs/US d'autres FEATs
-- ❌ Appeler un autre agent
-- ❌ Poser de question utilisateur (autonomous)
 - ❌ Mode `scan` sans code production présent (STOP en STEP 2.2)
 - ❌ Mode `threat-model` sans constitution.md (STOP en STEP 2.1)
-
-Sur ambiguïté → STOP + ERROR 3 lignes.
 
 ---
 

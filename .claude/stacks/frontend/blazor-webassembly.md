@@ -2,7 +2,7 @@
 
 > §2.4 (Librairies) régénérée depuis `blazor-webassembly.libs.json` — ne pas éditer manuellement (`python .claude/python/sdd_admin/sync_stack_md.py --stack-id blazor-webassembly`).
 
-Status: Draft
+Status: Stable
 Validation: 🟢 reference (validated combo — dotnet-minimalapi + blazor + radzen + azure-ad)
 Tech FEAT ID: tech-blazor
 Scope: frontend uniquement (Blazor WebAssembly)
@@ -257,7 +257,6 @@ dotnet add workspace/output/src/{AppName}/{AppName}.csproj package Blazored.Sess
 dotnet add workspace/output/src/{AppName}/{AppName}.csproj package Blazored.Toast --version 4.2.1
 dotnet add workspace/output/src/{AppName}/{AppName}.csproj package Blazored.Modal --version 7.3.1
 dotnet add workspace/output/src/{AppName}/{AppName}.csproj package FluentValidation --version 11.11.0
-dotnet add workspace/output/src/{AppName}/{AppName}.csproj package Microsoft.AspNetCore.Components.DataAnnotations.Validation --version 3.2.0-rc1
 dotnet add workspace/output/src/{AppName}/{AppName}.csproj package Microsoft.Extensions.Localization --version 10.0.6
 ```
 <!-- CORE_PACKAGES_END -->
@@ -360,7 +359,7 @@ Codes prioritaires : CS0246, CS0103, CS1061, CS1002, CS1003, CS1513, CS0029, CS0
 <!-- LIBS_CATALOG_START -->
 ### 2.4 Librairies
 
-> Source de verite : `.claude/stacks/frontend/blazor-webassembly.libs.json`. Ne pas editer cette section manuellement -- utiliser `python .claude/python/sdd_admin/sync_stack_md.py --stack-id blazor-webassembly`.
+> Source de verite : `.claude/stacks/frontend/blazor-webassembly.libs.json`. Ne pas editer cette section manuellement -- utiliser `.claude/python/sdd_admin/sync_stack_md.py --stack-id blazor-webassembly`.
 
 #### 2.4.a Librairies CORE (installees par arch en section 2.2.1, toujours)
 
@@ -381,7 +380,6 @@ Codes prioritaires : CS0246, CS0103, CS1061, CS1002, CS1003, CS1513, CS0029, CS0
 | Blazored.Toast | 4.2.1 |  |
 | Blazored.Modal | 7.3.1 |  |
 | FluentValidation | 11.11.0 |  |
-| Microsoft.AspNetCore.Components.DataAnnotations.Validation | 3.2.0-rc1 |  |
 | Microsoft.Extensions.Localization | 10.0.6 |  |
 
 ### 2.4.b Librairies ON-DEMAND (installees si l'US declenche)
@@ -390,7 +388,7 @@ Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'U
 
 | Capability | Lib | Version | Triggers |
 |---|---|---|---|
-| excel-client | ClosedXML | 0.104.2 | \bexcel\b, \.xlsx\b, upload.*excel, parse.*excel |
+| excel-client | ClosedXML | 0.104.2 | excel, \.xlsx, upload.*excel, parse.*excel |
 <!-- LIBS_CATALOG_END -->
 
 ### 2.5 Conventions de nommage

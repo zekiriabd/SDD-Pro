@@ -2,7 +2,7 @@
 
 > §2.4 (Librairies) régénérée depuis `python-pytest.libs.json` — ne pas éditer manuellement (`python .claude/python/sdd_admin/sync_stack_md.py --stack-id python-pytest`).
 
-Status: Draft
+Status: Experimental
 Validation: 🟡 experimental (not yet validated end-to-end in production combo)
 QA FEAT ID: python-pytest
 Scope: tests unitaires backend Python (FastAPI, Flask, Django)
@@ -34,7 +34,7 @@ S'applique aux projets `workspace/output/src/{BackendName}/` typés Python.
 <!-- LIBS_CATALOG_START -->
 ### 2.4 Librairies
 
-> Source de verite : `.claude/stacks/qa/python-pytest.libs.json`. Ne pas editer cette section manuellement -- utiliser `python .claude/python/sdd_admin/sync_stack_md.py --stack-id python-pytest`.
+> Source de verite : `.claude/stacks/qa/python-pytest.libs.json`. Ne pas editer cette section manuellement -- utiliser `.claude/python/sdd_admin/sync_stack_md.py --stack-id python-pytest`.
 
 #### 2.4.a Librairies CORE (installees par arch en section 2.2.1, toujours)
 

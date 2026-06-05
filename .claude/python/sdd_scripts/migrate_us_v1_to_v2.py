@@ -31,6 +31,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from sdd_lib.paths import repo_root  # noqa: E402
 from sdd_lib.stderr import error_block, warn  # noqa: E402
+from sdd_lib.exit_codes import FAIL_FAST  # noqa: E402
 
 
 US_ID_RE = re.compile(r"^\d+-\d+$")
@@ -155,7 +156,7 @@ def main() -> int:
                 "[US_NOT_FOUND] workspace/output/us/ empty or absent",
                 "run /us-generate {n} first",
             )
-            return 1
+            return FAIL_FAST
     else:
         path = resolve_us_path(args.us)
         if path is None:
@@ -164,7 +165,7 @@ def main() -> int:
                 f"[US_NOT_FOUND] no unique match for workspace/output/us/{args.us}-*.md",
                 "verify --us format ({n}-{m})",
             )
-            return 1
+            return FAIL_FAST
         targets = [path]
 
     results = [process_one(p, dry_run=args.dry_run) for p in targets]

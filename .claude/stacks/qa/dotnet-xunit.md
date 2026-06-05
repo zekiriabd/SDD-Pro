@@ -2,7 +2,7 @@
 
 > §2.4 (Librairies) régénérée depuis `dotnet-xunit.libs.json` — ne pas éditer manuellement (`python .claude/python/sdd_admin/sync_stack_md.py --stack-id dotnet-xunit`).
 
-Status: Draft
+Status: Stable
 Validation: 🟢 reference (validated combo — dotnet-minimalapi + blazor + radzen + azure-ad)
 QA FEAT ID: dotnet-xunit
 Scope: tests unitaires backend .NET (ASP.NET Core, Minimal API)
@@ -34,7 +34,7 @@ Pour les projets Blazor frontend, utiliser `qa/blazor-bunit.md`.
 <!-- LIBS_CATALOG_START -->
 ### 2.4 Librairies
 
-> Source de verite : `.claude/stacks/qa/dotnet-xunit.libs.json`. Ne pas editer cette section manuellement -- utiliser `python .claude/python/sdd_admin/sync_stack_md.py --stack-id dotnet-xunit`.
+> Source de verite : `.claude/stacks/qa/dotnet-xunit.libs.json`. Ne pas editer cette section manuellement -- utiliser `.claude/python/sdd_admin/sync_stack_md.py --stack-id dotnet-xunit`.
 
 #### 2.4.a Librairies CORE (installees par arch en section 2.2.1, toujours)
 
@@ -52,7 +52,7 @@ Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'U
 
 | Capability | Lib | Version | Triggers |
 |---|---|---|---|
-| mocking-alt | Moq (alt) | 4.20.72 | \bmoq\b |
+| mocking-alt | Moq (alt) | 4.20.72 | moq |
 | fluent-assertions | FluentAssertions | 7.0.0 | fluentassertions, should\(\) |
 | api-tests | Microsoft.AspNetCore.Mvc.Testing | 10.0.6 | api.*test, WebApplicationFactory, integration.*http, qa.*api-tests |
 | api-tests | Microsoft.EntityFrameworkCore.InMemory | 10.0.6 | api.*test, in-?memory.*db, integration.*http, qa.*api-tests |

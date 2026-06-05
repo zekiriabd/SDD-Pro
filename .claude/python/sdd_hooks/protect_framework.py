@@ -20,7 +20,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from sdd_lib.exit_codes import HOOK_DENY  # noqa: E402
+from sdd_lib.exit_codes import HOOK_ALLOW, HOOK_DENY  # noqa: E402
 from sdd_lib.hook_input import get_file_path, read_hook_input  # noqa: E402
 from sdd_lib.paths import normalize  # noqa: E402
 from sdd_lib.stderr import warn  # noqa: E402
@@ -35,8 +35,8 @@ FRAMEWORK_OWNED: tuple[str, ...] = (
     ".claude/python/",
     ".claude/loader.yml",
     ".claude/CLAUDE.md",
-    ".claude/MIGRATION.md",
-    ".claude/CHANGELOG.md",
+    ".claude/docs/MIGRATION.md",
+    ".claude/docs/CHANGELOG.md",
 )
 
 
@@ -61,20 +61,17 @@ def _resolve_mode() -> str:
     return "strict" if _detect_ci() else "warn"
 
 
-def main() -> int:
+def _main_inner() -> int:
     mode = _resolve_mode()
     if mode == "off":
-        return 0
-
+        return HOOK_ALLOW
     payload = read_hook_input()
     file_path = get_file_path(payload)
     if not file_path:
-        return 0
-
+        return HOOK_ALLOW
     norm = normalize(file_path)
     if not any(p in norm for p in FRAMEWORK_OWNED):
-        return 0
-
+        return HOOK_ALLOW
     if mode == "strict":
         warn(f"ERROR: protect-framework — '{file_path}' est propriete framework SDD_Pro")
         warn(f"CAUSE: [FRAMEWORK_PROTECTED] tentative d'edit en mode strict (CI ou explicite)")
@@ -88,12 +85,27 @@ def main() -> int:
     warn("         Maintenance framework autorisee deliberement (Tech Lead).")
 
     if ".claude/CLAUDE.md" in norm:
-        warn("         Rappel: synchroniser .claude/CHANGELOG.md et docs/ si changement architectural.")
+        warn("         Rappel: synchroniser .claude/docs/CHANGELOG.md et docs/ si changement architectural.")
     if ".claude/loader.yml" in norm:
         warn("         Rappel: loader.yml doit refleter les reads/writes reels des agents.")
 
-    return 0
+    return HOOK_ALLOW
 
 
+def main() -> int:
+    """Outer wrapper — fail-OPEN on any internal exception (audit C4 fix
+    v7.0.0-alpha 2026-06-04). Without this guard, an exception in
+    `normalize()` (e.g. ValueError on UNC paths, broken symlinks, paths
+    outside the repo tree) would propagate up and BLOCK the entire
+    Edit|Write|MultiEdit chain until Claude Code restart. Fail-open
+    preserves user's ability to Edit, with a visible WARN so the issue
+    gets noticed and fixed."""
+    try:
+        return _main_inner()
+    except Exception as e:
+        warn(f"WARN protect-framework: internal error suppressed ({type(e).__name__}: {e})")
+        warn(f"     Hook fail-OPEN to avoid blocking Edit|Write globally.")
+        warn(f"     If this repeats, capture stderr + report at .claude/python/sdd_hooks/protect_framework.py")
+        return HOOK_ALLOW
 if __name__ == "__main__":
     sys.exit(main())

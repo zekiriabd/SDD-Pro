@@ -1,6 +1,6 @@
 # Tech FEAT: blazor-server (fullstack)
 
-Status: Draft
+Status: Experimental
 Validation: 🟡 experimental (combo non valide end-to-end dans SDD_Pro v6 — pattern derive d'un projet legacy Demo 2026-05)
 Tech FEAT ID: tech-blazor-server
 Scope: **fullstack monolithe** — application Blazor Server .NET 10 dans UN seul projet `{AppName}/`. UI + logique metier + acces donnees + auth vivent dans le meme processus ASP.NET Core. Pas de separation `{BackendName}` / `{AppName}` / `{LibName}`. Modele SSR vrai : HTML rendu serveur, UI synchronisee via SignalR (pas de SPA, pas de JS bundler).
@@ -177,7 +177,6 @@ dotnet add workspace/output/src/{AppName}/{AppName}.csproj package Microsoft.Ent
 dotnet add workspace/output/src/{AppName}/{AppName}.csproj package Microsoft.EntityFrameworkCore.Design --version 10.0.6
 dotnet add workspace/output/src/{AppName}/{AppName}.csproj package Microsoft.EntityFrameworkCore.Tools --version 10.0.6
 dotnet add workspace/output/src/{AppName}/{AppName}.csproj package AutoMapper --version 16.1.1
-dotnet add workspace/output/src/{AppName}/{AppName}.csproj package Radzen.Blazor --version 10.2.3
 dotnet add workspace/output/src/{AppName}/{AppName}.csproj package Serilog.AspNetCore --version 10.0.0
 dotnet add workspace/output/src/{AppName}/{AppName}.csproj package Serilog.Sinks.Console --version 6.1.1
 
@@ -253,27 +252,23 @@ Codes prioritaires : CS0246, CS0103, CS1061, CS1002, CS1003, CS1513, CS0029, CS0
 <!-- LIBS_CATALOG_START -->
 ### 2.4 Librairies
 
-> Source de verite (future) : `.claude/stacks/fullstack/blazor-server.libs.json`. Ce tableau est edite manuellement tant que le catalogue JSON n'est pas genere — a regenerer via `sync_stack_md.py` une fois `blazor-server.libs.json` cree.
+> Source de verite : `.claude/stacks/fullstack/blazor-server.libs.json`. Ne pas editer cette section manuellement -- utiliser `.claude/python/sdd_admin/sync_stack_md.py --stack-id blazor-server`.
 
-Appliquer `.claude/rules/library-and-stack.md` (Partie A — derniere version stable LTS, .NET 10 LTS).
+#### 2.4.a Librairies CORE (installees par arch en section 2.2.1, toujours)
 
-#### 2.4.a Librairies CORE (installees par arch en §2.2.1, toujours)
-
-| Nom | Version | Role |
+| Lib | Version | Role |
 |-----|---------|------|
-| Microsoft.AspNetCore.Components.Web | 10.0.6 | Runtime Blazor Server |
 | Microsoft.EntityFrameworkCore | 10.0.6 | ORM principal |
-| Microsoft.EntityFrameworkCore.SqlServer | 10.0.6 | Provider SQL Server (defaut) |
-| Microsoft.EntityFrameworkCore.Design | 10.0.6 | Conception / scaffolding |
-| Microsoft.EntityFrameworkCore.Tools | 10.0.6 | Outils `dotnet ef` |
+| Microsoft.EntityFrameworkCore.SqlServer | 10.0.6 | Provider defaut (override via dbDrivers selon DatabaseType) |
+| Microsoft.EntityFrameworkCore.Design | 10.0.6 |  |
+| Microsoft.EntityFrameworkCore.Tools | 10.0.6 |  |
 | AutoMapper | 16.1.1 | Mapping Entity → Model |
-| Radzen.Blazor | 10.2.3 | Composants UI Material (UI Design System par defaut) |
-| Serilog.AspNetCore | 10.0.0 | Logging structure |
-| Serilog.Sinks.Console | 6.1.1 | Sink console |
-| Microsoft.Identity.Web | floating | Auth Azure AD (NON PINNE — CVE cycle frequent, cf. §2.2.1 STEP 3) |
-| Microsoft.Identity.Web.UI | floating | UI auth Azure AD (NON PINNE) |
+| Serilog.AspNetCore | 10.0.0 | Logger structure |
+| Serilog.Sinks.Console | 6.1.1 |  |
+| Microsoft.Identity.Web | floating | Auth Azure AD — NON PINNE (CVE cycle, dotnet add sans --version) |
+| Microsoft.Identity.Web.UI | floating | UI auth Azure AD — NON PINNE |
 
-#### 2.4.b Librairies ON-DEMAND (installees si l'US declenche)
+### 2.4.b Librairies ON-DEMAND (installees si l'US declenche)
 
 Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'US + ACs.
 
@@ -282,14 +277,20 @@ Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'U
 | db-postgres | Npgsql.EntityFrameworkCore.PostgreSQL | 9.0.4 | DatabaseType.*PostgreSql, postgres |
 | db-mysql | Pomelo.EntityFrameworkCore.MySql | 9.0.0 | DatabaseType.*MySql, mysql, mariadb |
 | db-sqlite | Microsoft.EntityFrameworkCore.Sqlite | 10.0.6 | DatabaseType.*Sqlite |
-| excel | ClosedXML | 0.104.1 | \bexcel\b, \.xlsx\b, export.*excel |
-| pdf | QuestPDF | 2024.12.3 | \bpdf\b, \.pdf\b, export.*pdf, generer.*pdf |
+| excel | ClosedXML | 0.104.1 | excel, \.xlsx, export.*excel |
+| pdf | QuestPDF | 2024.12.3 | pdf, \.pdf, export.*pdf, generer.*pdf |
 | http-client | Microsoft.Extensions.Http.Polly | 9.0.1 | appel.*api.*externe, service.*externe |
 | smtp | MailKit | 4.9.0 | email, smtp, envoi.*mail, notification.*mail |
 | smtp | MimeKit | 4.9.0 | email, smtp |
-| file-upload | (built-in IFormFile) | — | upload.*fichier, multipart |
 
-Les dependances Azure AD sont decrites dans `.claude/stacks/auth/azure-ad.md`.
+#### 2.4.d DB Drivers (selectionne par arch selon DatabaseType)
+
+| DatabaseType | Module | Version | Scope |
+|---|---|---|---|
+| sqlserver | `Microsoft.EntityFrameworkCore.SqlServer` | 10.0.6 | runtime |
+| postgres | `Npgsql.EntityFrameworkCore.PostgreSQL` | 9.0.4 | runtime |
+| mysql | `Pomelo.EntityFrameworkCore.MySql` | 9.0.0 | runtime |
+| sqlite | `Microsoft.EntityFrameworkCore.Sqlite` | 10.0.6 | runtime |
 <!-- LIBS_CATALOG_END -->
 
 ### 2.5 Conventions de nommage
@@ -450,12 +451,12 @@ dotnet ef dbcontext scaffold "$CONN" \
   - `InvalidCastException: Unable to cast object of type 'System.String' to type 'System.Guid'` → propriete `Guid?` sur colonne `VARCHAR`.
 - Pour une table de reference (ex. `reference_lookup` avec une cle numerique `numero_label INT` + une colonne d'affichage `valeur_label VARCHAR`), la **cle de jointure** est la colonne numerique, la **colonne d'affichage** est la varchar. La FK dans la table metier pointe vers la cle numerique. Le LINQ JOIN DOIT cibler la cle numerique (`on pv.FkRef equals rl.NumeroLabel`) et NON la colonne d'affichage (`on pv.FkRef equals rl.ValeurLabel`). La colonne d'affichage ne sert qu'au `select` final de projection.
 
-**Pattern UI pour les listes de reference (Blazor Server + Radzen)** :
+**Pattern UI pour les listes de reference (Blazor Server)** :
 
 - Les DTOs d'option d'un dropdown portent `Id` au type natif de la cle (int si FK vers table de reference), et `Label` en `string` pour l'affichage.
 - Les `Filter` / `Model` de formulaire portent les FKs au meme type natif (int / int?), JAMAIS en string.
-- RadzenDropDown : `ValueProperty="Id"`, `TextProperty="Label"` ; le `@bind-Value` cible une propriete du Filter / Model au bon type.
-- Une liste d'options extraite d'une colonne free-text (ex. pays en varchar non normalise) utilise un service dedie `GetXxxAsync(): Task<IReadOnlyList<string>>` (DISTINCT + ORDER BY cote DB) et un dropdown avec `TValue="string"` sans `ValueProperty`.
+- Pattern HTML natif : `<select @bind="Filter.FkRef"><option value="">--</option>@foreach (var o in Options) { <option value="@o.Id">@o.Label</option> }</select>`. Le `@bind` cible une propriete du Filter / Model au type natif (int / int?).
+- Une liste d'options extraite d'une colonne free-text (ex. pays en varchar non normalise) utilise un service dedie `GetXxxAsync(): Task<IReadOnlyList<string>>` (DISTINCT + ORDER BY cote DB) et un `<select>` qui binde directement la `string`.
 
 **Pattern DbContext obligatoire (Blazor Server)** :
 
@@ -502,7 +503,7 @@ La chaine de connexion est construite au runtime a partir de ces variables. Aucu
 - CSS global ciblant les classes d'une Page → toujours isole via `.razor.css`
 - Valeurs Azure AD (`TenantId`, `ClientId`, `Authority`, `Domain`) en dur dans le code
 - `NavigationManager.NavigateTo(...)` dans `OnInitialized` / `OnInitializedAsync` / `OnParametersSet` / `OnParametersSetAsync` → leve `NavigationException` en Blazor Server .NET 8+. Utiliser `OnAfterRender(firstRender)` ou un event handler.
-- **`<a href="...">` pour la navigation interne Blazor** → INTERDIT. Cause un rechargement complet de la page (SPA cassee, perte de l'etat SignalR). Utiliser `<NavLink href="...">` (natif Blazor, ajoute la classe CSS `active` automatiquement) ou `<RadzenLink Path="...">` (design system Radzen). Exception unique : les liens externes (https://...) peuvent utiliser `<a href target="_blank">`.
+- **`<a href="...">` pour la navigation interne Blazor** → INTERDIT. Cause un rechargement complet de la page (SPA cassee, perte de l'etat SignalR). Utiliser `<NavLink href="...">` (natif Blazor, ajoute la classe CSS `active` automatiquement). Exception unique : les liens externes (https://...) peuvent utiliser `<a href target="_blank">`.
 - **Nommage non conforme** : generer un fichier avec un suffixe non liste dans §2.5 (`Dto`, `InputDto`, `OutputDto`, `Result`, `Response`, `Request`, `LiaisonReadDto`, `OutputLiteDto`) → INTERDIT dans le contexte Blazor Server monolithe. Tout ecart = erreur de generation.
 - **SOLID violation** : generer un Service qui retourne des Entities au lieu de Models (violation S + D), une Page qui contient de la logique metier (violation S), un constructeur qui instancie ses dependances avec `new` au lieu de DI (violation D) → INTERDIT.
 - Requete EF Core projetant `select new XxxRecord(a, b, c, ...)` (record positionnel) suivie d'un `OrderBy(r => r.Prop)` ou d'un `CountAsync()` → casse la traduction SQL. Projeter vers un type anonyme dans la requete, materialiser en record cote client apres `ToListAsync()`.
@@ -577,7 +578,7 @@ TOUS les composants injectent `IStringLocalizer<Resource>` → **jamais** `IStri
 @using {AppNamespace}.Resources
 @inject IStringLocalizer<Resource> L
 
-<RadzenButton Text="@L["PointVente.Action.Create"]" />
+<button type="button" class="btn-primary">@L["PointVente.Action.Create"]</button>
 ```
 
 Ou en code-behind :
@@ -621,7 +622,6 @@ using Serilog;
 using {AppNamespace}.Auth;
 using {AppNamespace}.Data.DBcontext;
 using {AppNamespace}.Middleware;
-using Radzen;
 
 Log.Logger = new LoggerConfiguration().WriteTo.Console().CreateBootstrapLogger();
 
@@ -653,7 +653,6 @@ try
     builder.Services.AddRazorPages();
     builder.Services.AddServerSideBlazor();
     builder.Services.AddAutoMapper(cfg => cfg.AddMaps(typeof(Program).Assembly));
-    builder.Services.AddRadzenComponents();
 
     // Localisation : UNE SEULE ressource partagee Resource.
     builder.Services.AddLocalization(options => options.ResourcesPath = "Resources");
@@ -825,18 +824,36 @@ public sealed class XxxService : IXxxService
 
 <PageTitle>@L["Xxx.List.Title"]</PageTitle>
 
-<RadzenDataGrid TItem="XxxListItemDto"
-                Data="@PageResult?.Items"
-                Count="@(PageResult?.TotalCount ?? 0)"
-                IsLoading="@IsLoading"
-                AllowPaging="true"
-                PageSize="@Filter.PageSize"
-                LoadData="@OnLoadData">
-    <Columns>
-        <RadzenDataGridColumn TItem="XxxListItemDto" Property="Id" Title="@L["Xxx.Id"]" />
-        <!-- autres colonnes -->
-    </Columns>
-</RadzenDataGrid>
+@if (IsLoading)
+{
+    <p class="text-sm text-muted-foreground">@L["Common.Loading"]</p>
+}
+else if (PageResult is not null)
+{
+    <table class="w-full text-left border-collapse">
+        <thead class="bg-muted">
+            <tr>
+                <th class="px-3 py-2">@L["Xxx.Id"]</th>
+                <!-- autres colonnes -->
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var item in PageResult.Items)
+            {
+                <tr class="border-t border-border hover:bg-muted/50">
+                    <td class="px-3 py-2">@item.Id</td>
+                    <!-- autres cellules -->
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <nav class="mt-4 flex items-center gap-2" aria-label="@L["Common.Pagination"]">
+        <button type="button" class="btn-secondary" @onclick="() => OnPageChangeAsync(Filter.Page - 1)" disabled="@(Filter.Page <= 1)">@L["Common.Previous"]</button>
+        <span class="text-sm">@Filter.Page / @TotalPages</span>
+        <button type="button" class="btn-secondary" @onclick="() => OnPageChangeAsync(Filter.Page + 1)" disabled="@(Filter.Page >= TotalPages)">@L["Common.Next"]</button>
+    </nav>
+}
 ```
 
 **`Pages/Xxx/XxxList.razor.cs`** (code-behind, delegue aux services, ZERO logique metier, ZERO LINQ, ZERO DbContext) :
@@ -846,7 +863,6 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Localization;
 using {AppNamespace}.Models;
 using {AppNamespace}.Services.Interfaces;
-using Radzen;
 
 namespace {AppNamespace}.Pages.Xxx;
 
@@ -859,24 +875,29 @@ public class XxxListBase : ComponentBase
     protected XxxListPage? PageResult { get; set; }
     protected bool IsLoading { get; set; }
 
+    protected int TotalPages =>
+        PageResult is null || Filter.PageSize <= 0
+            ? 1
+            : (int)Math.Ceiling((double)PageResult.TotalCount / Filter.PageSize);
+
     // Chaque reference list obtient son propre DbContext via factory → Task.WhenAll OK.
     protected override async Task OnInitializedAsync()
     {
         await Task.WhenAll(LoadRef1Async(), LoadRef2Async());
+        await ReloadAsync();
     }
 
-    protected async Task OnLoadData(LoadDataArgs args)
+    protected async Task OnPageChangeAsync(int newPage)
+    {
+        if (newPage < 1) newPage = 1;
+        if (newPage > TotalPages) newPage = TotalPages;
+        Filter.Page = newPage;
+        await ReloadAsync();
+    }
+
+    protected async Task ReloadAsync()
     {
         IsLoading = true;
-        Filter.Page = args.Skip.HasValue && Filter.PageSize > 0
-            ? (args.Skip.Value / Filter.PageSize) + 1
-            : 1;
-        if (args.Sorts?.Any() == true)
-        {
-            var s = args.Sorts.First();
-            Filter.SortColumn = s.Property;
-            Filter.SortDescending = s.SortOrder == SortOrder.Descending;
-        }
         PageResult = await XxxService.GetListAsync(Filter);
         IsLoading = false;
     }
@@ -1004,7 +1025,7 @@ Ce stack est optimise pour :
 - ❌ Besoin d'un mode offline / PWA → `frontend/react.md` + `backend/dotnet-minimalapi.md`
 - ❌ Besoin de SEO indexable sur des pages publiques dynamiques — Blazor Server SSR rend mais necessite tuning particulier (prerendering, fallback statique)
 - ❌ Multi-tenant SaaS multi-region a latence critique — SignalR exige une affinite serveur (sticky sessions)
-- ❌ Stack non-Microsoft prevue (deploiement Linux sans Docker) — Blazor Server tourne sur Linux mais l'ecosysteme `Microsoft.Identity.Web` + Radzen est .NET-centric
+- ❌ Stack non-Microsoft prevue (deploiement Linux sans Docker) — Blazor Server tourne sur Linux mais l'ecosysteme `Microsoft.Identity.Web` reste .NET-centric
 
 ---
 
@@ -1012,7 +1033,7 @@ Ce stack est optimise pour :
 
 | Combo | Status | Source |
 |---|---|---|
-| `fullstack-blazor-server` + `auth-azure-ad` + `qa-bunit` + `SqlServer` + Radzen UI | 🟡 experimental | derive d'un projet legacy Demo 2026-05 (hors SDD_Pro v6) |
+| `fullstack-blazor-server` + `auth-azure-ad` + `qa-bunit` + `SqlServer` | 🟡 experimental | derive d'un projet legacy Demo 2026-05 (hors SDD_Pro v6) |
 | `fullstack-blazor-server` + `auth-local` + `qa-bunit` + `Sqlite` | 🟡 experimental | jamais valide end-to-end |
 | `fullstack-blazor-server` + `auth-azure-ad` + `qa-bunit` + `PostgreSql` | 🟡 experimental | viable (Npgsql EF Core OK) mais hors scope reference |
 
@@ -1032,8 +1053,7 @@ A l'init du projet (Phase A) :
    - Section `AzureAd` depuis `## Active Auth Specs` (TenantId, ClientId, Authority, Domain) si auth-azure-ad active
    - Section `Authorization:Groups` avec placeholders vides (rempli par Tech Lead post-init)
    - **JAMAIS** ecrire les secrets en clair dans `appsettings.json` versionne — utiliser `appsettings.Development.json` (gitignore) ou User Secrets `dotnet user-secrets`
-5. **Active UI Specs** : si la liste est vide → Radzen.Blazor force par defaut (cf. §2.4.a). Si liste contient `shadcn` ou `vuetify` → WARNING (le stack Blazor Server ne consomme ni l'un ni l'autre — composants React/Vue). Si liste contient `radzen-blazor.md` → OK.
-6. **`LibStrategy: openapi-codegen`** ou tout autre LibStrategy → WARNING (pas de package separe, pas de DTO partage en monolithe Blazor)
+5. **`LibStrategy: openapi-codegen`** ou tout autre LibStrategy → WARNING (pas de package separe, pas de DTO partage en monolithe Blazor)
 
 Phase B (DB scaffolding) : invoquee uniquement si `DatabaseType ≠ none`. Commandes §4.1 selon `DatabaseType`. `--no-onconfiguring` + `--force` obligatoires.
 

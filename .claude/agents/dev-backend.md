@@ -37,9 +37,6 @@ Variables résultantes en mémoire pour la suite : `planOnly`, `name`,
 
 ---
 
-> **STEPs 2 absorbé v5.0** dans STEP 0 HARD-GATE Phase A check A2.
-> Numérotation STEP 3+ conservée (refs internes/externes stables).
-
 ## STEP 3 — Charger le contexte minimal
 
 Read **uniquement** :
@@ -177,8 +174,8 @@ Lire `appType`, `frontendKind` ET `archiPattern` depuis le JSON preflight :
 | `appType` | `frontendKind` | Source du stack à lire | Action |
 |---|---|---|---|
 | `back-front` | `web` ou `null` | `.claude/stacks/backend/{stack-id}.md` (un de `## Active Tech Specs`) | comportement nominal ci-dessous |
-| `back-front` | `mobile` | `.claude/stacks/backend/{stack-id}.md` (backend distant) | nominal — le backend distant est un projet `{BackendName}` distinct du projet mobile `{AppName}`. Si `## Active Tech Specs` ne déclare AUCUN `backend/*` → exit silencieux (le mobile n'a pas de backend SDD-managed). v7.0.0 : stacks `mobiles/*` sont en `_drafts/` (non chargés). |
-| ~~`fullstack`~~ | `null` | ~~`.claude/stacks/fullstack/{stack-id}.md`~~ | **draft v7.0.0** — `stacks/fullstack/*` sont en `_drafts/` (non chargés). Combo `fullstack` non supporté en v7.0.0 ; utiliser `back-front` avec un backend + un frontend séparés. |
+| `back-front` | `mobile` | `.claude/stacks/backend/{stack-id}.md` (backend distant) | nominal — le backend distant est un projet `{BackendName}` distinct du projet mobile `{AppName}`. Si `## Active Tech Specs` ne déclare AUCUN `backend/*` → exit silencieux (le mobile n'a pas de backend SDD-managed). Stacks `mobiles/*` chargeables mais 🟡 expérimentaux (jamais validés bout-en-bout). |
+| `fullstack` | `null` | `.claude/stacks/fullstack/{stack-id}.md` | 🟡 expérimental — stacks `fullstack/*` chargeables mais aucun combo validé bout-en-bout. Pour stabilité maximale, préférer `back-front` avec backend + frontend séparés. |
 
 Si aucun stack à lire selon les règles ci-dessus → ERROR :
 ```
@@ -187,13 +184,13 @@ CAUSE: appType={appType}, frontendKind={frontendKind} mais aucun stack {category
 FIX: décommenter un stack adapté (cf. tableau ci-dessus)
 ```
 
-**Lecture additionnelle pattern d'architecture** (v6.7.6+) — UNIQUEMENT pour `appType=back-front` (les fullstack/mobiles ont leur archi intégrée) :
+**Lecture additionnelle pattern d'architecture** (v6.7.6+) — UNIQUEMENT pour `appType=back-front` (les fullstack/mobile ont leur archi intégrée dans le stack lui-même) :
 
 | `archiPattern` | Fichier additionnel à charger en STEP 3.bis | Précédence |
 |---|---|---|
 | `MVC` (défaut) | `.claude/stacks/archi/mvc.md` | Source canonique des couches + principes + naming. Le `backend/*.md` n'apporte que les overrides tech-specific (§1.x du fichier) |
 | `DDD` (Phase 2 SDD_Pro 🟡) | `.claude/stacks/archi/ddd.md` | idem |
-| ~~`microservice`~~ | ~~`.claude/stacks/archi/microservice.md`~~ | **draft v7.0.0** — en `_drafts/archi/` (non chargé). Sélection rejetée si déclaré actif. |
+| `microservice` | `.claude/stacks/archi/microservice.md` | 🟡 expérimental — chargeable mais jamais validé en runtime SDD_Pro. |
 
 **Précédence en cas de conflit** :
 1. Idioms tech du `backend/*.md` (§2.5 Naming, §1.4 overrides) priment
@@ -419,39 +416,8 @@ le code."* Le code généré est une cible, jamais une source.
 
 ## Chat Output Protocol
 
-> Cet agent applique strictement `@.claude/rules/output-protocol.md`.
-> Substance non dupliquée — la règle est SSoT.
-
-**Label canonique** : `[DEV-BACKEND]` (cf. output-protocol.md §3)
-**Plage de progression** : `32-58%` (cf. output-protocol.md §4)
-
-**Granularité cible** : 3 à 6 updates par invocation, format
-`[DEV-BACKEND] Action au gérondif... (X%)` ou `[DEV-BACKEND] Résultat factuel. (X%)`.
-
-**Interdits stricts** (cf. §5 du protocole) :
-- chemins de fichiers internes (`workspace/...`, `.claude/...`)
-- noms de classes/méthodes/composants générés
-- stdout/stderr de bash, Read/Edit/Glob narration
-- context budget, tokens, preflight checks détaillés
-- diffs, snippets, lignes de code
-
-**Itérations `build_loop`** : chaque retry est visible via suffixe
-`[DEV-BACKEND/FIXING] Correction erreur compilation (iter X/N)... (Y%)`
-sans progression du `%` (cf. §8.1).
-
-**Erreurs (LOAD-BEARING)** : tout bloc `ERROR: ... / CAUSE: ... / FIX: ...`
-apparaissant dans les STEPs ci-dessus est un **TEMPLATE pour le fichier
-rapport disque**, JAMAIS un texte à émettre verbatim en chat.
-
-Procédure obligatoire à chaque émission d'erreur :
-1. **Disque** : écrire le bloc 3-lignes complet dans le fichier rapport
-   approprié — format préservé pour `build_loop`/hooks/dashboards
-   (cf. `error-classification.md §2`).
-2. **Chat** : émettre UNE SEULE ligne compressée :
-   ```
-   🔴 [{LABEL}/FAIL] {résumé court} — [CLASS] {détail 1L} → {rapport.md}. ({X}%)
-   ```
-   Pas de chemin absolu, pas de stack trace, pas de blocs multi-lignes.
-pour `build_loop` et hooks — cf. `error-classification.md §2`).
-
-**Bypass debug** : `SDD_CHAT_VERBOSE=1` → mode legacy verbose (§10).
+Applique `@.claude/rules/output-protocol.md`. Label `[DEV-BACKEND]`, plage `32-58%`,
+granularité 3-6 updates. Retry build_loop visible via `[DEV-BACKEND/FIXING] (iter X/N)`
+(% gelé, cf. §8.1). Erreurs : chat 1L (`🔴 [DEV-BACKEND/FAIL] résumé — [CLASS] détail
+→ rapport.md (X%)`) + bloc ERROR 3L disque préservé pour `build_loop`/hooks
+(cf. `error-classification.md §2`). Bypass `SDD_CHAT_VERBOSE=1`.
