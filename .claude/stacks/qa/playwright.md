@@ -2,6 +2,7 @@
 
 Status: Experimental
 Validation: 🟡 experimental (schema opt-in, non actif par défaut)
+Support: ⚠ Non supporté commercialement (audit C3, 2026-06-06) — exclu du SLA produit. Voir CLAUDE.md §6 et docs/validated-combos.md.
 QA FEAT ID: playwright
 Scope: tests E2E navigateur multi-browser (combler trou API Gate v7)
 

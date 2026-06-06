@@ -1,5 +1,5 @@
 ---
-id: ADR-20260605T1632-runtime-sts-prerelease-exceptions
+id: ADR-20260605T163200-runtime-sts-prerelease-exceptions
 title: Pre-release pins on Next.js, Nuxt, and MAUI stacks — STS exception
 status: Accepted
 date: 2026-06-05
@@ -42,7 +42,7 @@ Chaque `.libs.json` concerné ajoute dans Project Config (champ libre `runtime-e
   "lib": "next-auth",
   "reason": "v4 LTS deprecated upstream — no V5 GA yet, no mature alternative for App Router",
   "review-by": "2026-09-30",
-  "adr": "ADR-20260605T1632-runtime-sts-prerelease-exceptions"
+  "adr": "ADR-20260605T163200-runtime-sts-prerelease-exceptions"
 }
 ```
 

@@ -107,10 +107,21 @@ Templates : `@.claude/docs/conventions.md §14-§15`.
 | Fullstack (6) | — | `angular-universal`, `blazor-server`, `kotlin-mustache`, `next`, `nuxt` | `node-react` 🟡 POC-only (console interne — non destiné prod externe) |
 | Mobiles (3) | `kotlin-android` | `maui` (Windows desktop runtime), `react-native` (Expo Web runtime) | — |
 
-**Tiers de validation** :
-- 🟢 **validated** (2 combos C1/C2) = `/sdd-full` complet automatisé bout-en-bout sans intervention humaine
-- 🟢 **bench-validated runtime** (11 stacks supp.) = code généré compile + démarre + sert les ACs ; pipeline `/sdd-full` partiellement bypassé (scaffolding manuel mainteneur). Détail bench : `workspace/output/qa/bench/BENCH-GLOBAL-REPORT.md`. Gaps tracés : `docs/benchmarks/known-gaps.md`
-- 🟡 **experimental** = spec stack OK + `.libs.json` valide, jamais exécuté
+**Tiers de validation** (clarifié audit C2 — 2026-06-06) :
+
+| Tier | Couleur | Stacks | Garantie | Support |
+|---|---|---:|---|---|
+| **validated** | 🟢 ref | 2 combos (C1, C2) | `/sdd-full` bout-en-bout 100 % automatisé, sans intervention humaine | **Supporté production**. SLO 95 % runs PASS sur FEATs S/M. |
+| **bench-validated runtime** | 🟢 bench | 11 stacks supp. | Code généré **compile + démarre + sert les ACs**, mais une partie du scaffolding `/sdd-full` a été faite manuellement par le mainteneur. Détail : `workspace/output/qa/bench/BENCH-GLOBAL-REPORT.md`. Gaps : `docs/benchmarks/known-gaps.md` | **Supporté best-effort**. Pas de garantie idempotence `/sdd-full`. |
+| **experimental** | 🟡 exp | 8 stacks | Spec stack OK + `.libs.json` valide, **jamais exécuté end-to-end**. Code généré peut compiler — ou pas. | **⚠ Non supporté commercialement.** À considérer comme « community preview ». |
+| **POC-only** | 🟡 poc | 1 stack (`node-react`) | Usage interne console SDD uniquement. Pas de TS natif, pas de bundler, pas de pipeline Playwright. | **Hors périmètre produit.** Ne sera pas commercialisé. |
+
+> **⚠ Engagement commercial v7.0.0** : seuls les tiers `validated` et
+> `bench-validated runtime` (13 stacks total) sont éligibles à un
+> contrat de support payant. Les tiers `experimental` et `POC-only`
+> sont **explicitement exclus de tout SLA** et marqués comme tels
+> dans le hook `preflight_stack_combo` (exit 2 = bloquant sauf
+> `SDD_ALLOW_UNTESTED_COMBO=1`, audit-loggué).
 
 **23 combinaisons bench runtime validées** (2026-06-05) : 16 cross-origin REST (4 backends × 4 SPA) + 6 monolithes fullstack + 1 MAUI Windows desktop + 1 RN Expo Web ; + 1 mobile scaffold seul (Kotlin Android, SDK absent).
 

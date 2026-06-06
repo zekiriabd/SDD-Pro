@@ -49,6 +49,10 @@ _ITEM_RE = re.compile(r"^\s{4}-\s*(.+?)\s*(?:#.*)?$")
 _DICT_PATH_RE = re.compile(
     r"\bpath\s*:\s*['\"]?(.+?)['\"]?\s*(?:,\s*[a-z_]+\s*:|\}\s*$)"
 )
+# Extract `cache_layer: <value>` from inline-flow dict (audit C1, 2026-06-06).
+_DICT_CACHE_LAYER_RE = re.compile(
+    r"\bcache_layer\s*:\s*['\"]?([a-z_-]+)['\"]?"
+)
 
 
 def loader_path(root: Path | None = None) -> Path:
@@ -112,3 +116,84 @@ def parse_agent_section(
                     items.append(raw)
 
     return items
+
+
+# ---------------------------------------------------------------------------
+# Cache annotations extractor (audit C1, 2026-06-06)
+# ---------------------------------------------------------------------------
+# Returns the (path, cache_layer) tuples for an agent's `reads:` section.
+# v7.0.0 only stores annotations in loader.yml ; v7.1 will consume them to
+# place `cache_control: ephemeral` markers on Anthropic API calls. This
+# helper is the stable contract between the two versions.
+
+#: Canonical cache layers (output-protocol cache_layer column).
+CACHE_LAYERS = ("stable", "semi", "volatile")
+
+#: Default layer when annotation is missing — treated as "volatile" so we
+#: never accidentally cache a per-US file.
+DEFAULT_CACHE_LAYER = "volatile"
+
+
+def parse_agent_cache_annotations(
+    agent_name: str,
+    section: str = "reads",
+    root: Path | None = None,
+) -> list[dict[str, str]]:
+    """Return [{path, cache_layer}, ...] for an agent's reads section.
+
+    Scalar form entries (no annotation) default to `cache_layer=volatile`.
+    Inline-flow dict entries honor whatever `cache_layer:` value is set.
+    Unknown layer values are normalized to `volatile` (defensive).
+
+    Used by `sdd_admin/cache_manifest.py --agent {id}` to emit a JSON
+    manifest consumed by the harness in v7.1 to wire `cache_control`
+    markers on Anthropic API requests.
+    """
+    path = loader_path(root)
+    if not path.is_file():
+        return []
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return []
+
+    out: list[dict[str, str]] = []
+    in_agent = False
+    in_section = False
+
+    for line in text.splitlines():
+        agent_match = _AGENT_RE.match(line)
+        if agent_match:
+            in_agent = agent_match.group(1) == agent_name
+            in_section = False
+            continue
+        if not in_agent:
+            continue
+        section_match = _SECTION_RE.match(line)
+        if section_match:
+            in_section = section_match.group(1) == section
+            continue
+        if not in_section:
+            continue
+        item_match = _ITEM_RE.match(line)
+        if not item_match:
+            continue
+        raw = item_match.group(1).strip()
+        layer = DEFAULT_CACHE_LAYER
+        if raw.startswith("{"):
+            dict_match = _DICT_PATH_RE.search(raw)
+            if dict_match is None:
+                continue
+            path_str = dict_match.group(1).strip()
+            layer_match = _DICT_CACHE_LAYER_RE.search(raw)
+            if layer_match:
+                cand = layer_match.group(1).lower()
+                layer = cand if cand in CACHE_LAYERS else DEFAULT_CACHE_LAYER
+        else:
+            path_str = raw
+        path_str = path_str.strip('"').strip("'").strip()
+        if not path_str or path_str.startswith("#"):
+            continue
+        out.append({"path": path_str, "cache_layer": layer})
+
+    return out

@@ -296,6 +296,58 @@ def build_idle_line(last: dict | None) -> str:
     return " · ".join(p for p in parts if p)
 
 
+#: TTL cache for statusline output (audit m6, 2026-06-06).
+#: The harness may invoke statusline on every keystroke ; with a typing
+#: speed of 5-10 char/sec each invocation triggers ~5 SQLite opens/sec
+#: which is wasteful on Windows (file open syscalls are 10-50× slower
+#: than POSIX). 750ms TTL gives perceived freshness while cutting ~80 %
+#: of I/O on a typing-heavy session.
+_STATUSLINE_TTL_MS = 750
+
+
+def _cache_path() -> pathlib.Path | None:
+    """Resolve the statusline cache file path or None on failure."""
+    root = os.environ.get("CLAUDE_PROJECT_DIR")
+    if not root:
+        for parent in [pathlib.Path.cwd()] + list(pathlib.Path.cwd().parents):
+            if (parent / ".claude").is_dir():
+                root = str(parent)
+                break
+    if not root:
+        return None
+    return pathlib.Path(root) / "workspace" / "output" / ".sys" / ".cache" / "statusline.txt"
+
+
+def _try_serve_from_cache(no_emoji: bool) -> bool:
+    """Emit last cached output if mtime is within TTL ; return True if served."""
+    cache = _cache_path()
+    if cache is None or not cache.exists():
+        return False
+    try:
+        age_ms = (time.time() - cache.stat().st_mtime) * 1000.0
+        if age_ms > _STATUSLINE_TTL_MS:
+            return False
+        text = cache.read_text(encoding="utf-8").rstrip("\n")
+        if not text:
+            return False
+        emit(text, no_emoji=no_emoji)
+        return True
+    except OSError:
+        return False
+
+
+def _write_cache(line: str) -> None:
+    """Persist line to cache (best-effort, never raises)."""
+    cache = _cache_path()
+    if cache is None:
+        return
+    try:
+        cache.parent.mkdir(parents=True, exist_ok=True)
+        cache.write_text(line + "\n", encoding="utf-8")
+    except OSError:
+        pass
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(prog="sdd_admin.statusline")
     parser.add_argument("--db", help="Override console.db path")
@@ -303,18 +355,29 @@ def main() -> int:
                         help="ASCII output (no emoji)")
     parser.add_argument("--debug", action="store_true",
                         help="Print debug info to stderr")
+    parser.add_argument("--no-cache", action="store_true",
+                        help="Skip TTL cache (debug)")
     args = parser.parse_args()
+
+    # TTL cache short-circuit (audit m6) — skip SQLite open entirely on
+    # rapid successive invocations.
+    if not args.no_cache and _try_serve_from_cache(args.no_emoji):
+        return SUCCESS
 
     db_path = resolve_db_path(args.db)
     if db_path is None:
-        emit("[SDD] no run", no_emoji=args.no_emoji)
+        line = "[SDD] no run"
+        emit(line, no_emoji=args.no_emoji)
+        _write_cache(line)
         if args.debug:
             print("statusline: console.db not found", file=sys.stderr)
         return SUCCESS
     try:
         conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=0.5)
     except sqlite3.Error as exc:
-        emit("[SDD] db unreachable", no_emoji=args.no_emoji)
+        line = "[SDD] db unreachable"
+        emit(line, no_emoji=args.no_emoji)
+        _write_cache(line)
         if args.debug:
             print(f"statusline: sqlite3 connect failed: {exc}", file=sys.stderr)
         return SUCCESS
@@ -322,12 +385,16 @@ def main() -> int:
         active = query_active_run(conn)
         if active:
             us_id = query_running_us(conn, active["run_id"])
-            emit(build_active_line(active, us_id), no_emoji=args.no_emoji)
+            line = build_active_line(active, us_id)
         else:
             last = query_last_finished_run(conn)
-            emit(build_idle_line(last), no_emoji=args.no_emoji)
+            line = build_idle_line(last)
+        emit(line, no_emoji=args.no_emoji)
+        _write_cache(line)
     except sqlite3.Error as exc:
-        emit("[SDD] db error", no_emoji=args.no_emoji)
+        line = "[SDD] db error"
+        emit(line, no_emoji=args.no_emoji)
+        _write_cache(line)
         if args.debug:
             print(f"statusline: query failed: {exc}", file=sys.stderr)
     finally:

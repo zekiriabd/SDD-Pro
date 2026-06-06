@@ -361,13 +361,27 @@ BuildLoopMaxIter: 5    # défaut 3, range 1-10
 - `1` = pas de retry (build one-shot strict)
 - `10` = max permissif (cas stacks complexes avec cascades DI)
 
+**Circuit-breaker coût (audit M4, 2026-06-06)** : avant la dernière
+itération (`iter == BuildLoopMaxIter`), si le cumul USD du build_loop
+en cours sur cette US dépasse `BuildLoopMaxCostUsd * 0.5` (par défaut
+$7.50), **downgrade automatique** : la dernière tentative tourne sur
+Sonnet 4.6 (≈5× moins cher qu'Opus 4.7) plutôt que sur Opus. Sentinel
+fichier `workspace/output/.sys/.state/dev-build-downgrade-{n}-{m}.flag`
+écrit par `dev-backend` ; lu par l'orchestrateur (`/dev-run` STEP 6.b)
+qui re-spawn `dev-backend` avec `--fallback-model sonnet`. Justification
+post-mortem : les erreurs `[BUILD_CORRECTIBLE]` qui survivent à 2 retries
+Opus sont rarement résolues par un 3e retry Opus identique — un changement
+de modèle apporte une perspective nouvelle pour le même prix qu'un retry
+Sonnet seul. Bypass : `BuildLoopAdaptiveFallback: false` dans Project Config.
+
 Si le build échoue après `BuildLoopMaxIter` itérations → ERROR :
 ```
 ERROR: agent dev-backend — build échec après {N} itérations
 CAUSE: [BUILD_LOOP_EXHAUSTED] {message d'erreur condensé}
 FIX: revoir l'US workspace/output/us/{n}-{m}-*.md ou le stack backend actif ;
      OU augmenter BuildLoopMaxIter dans Project Config si cascades
-     d'erreurs légitimes
+     d'erreurs légitimes ;
+     OU désactiver le fallback adaptatif (BuildLoopAdaptiveFallback: false)
 ```
 
 Aucun refactor opportuniste, aucune nouvelle dépendance hors stack.

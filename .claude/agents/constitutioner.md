@@ -65,10 +65,18 @@ si déjà présent) :
 
 Pour chaque ADR à créer (= dimension dont le slug n'a pas matché en STEP 1) :
 
-1. **Identifiant atomique** : `ADR-{YYYYMMDDTHHmmss}-{slug}.md`
-   (timestamp UTC seconde + slug kebab-case). Collision improbable →
-   suffixe `-{rand4}`. **Pas** de numérotation incrémentale `ADR-001`
-   (racy avec dev-* en parallèle, cf. `@.claude/rules/ownership.md §3`).
+1. **Identifiant atomique** : `ADR-{YYYYMMDDTHHmmss}-{rand4}-{slug}.md`
+   (timestamp UTC seconde + rand4 hex + slug kebab-case). **OBLIGATOIRE
+   v7.0.0-alpha audit M2 2026-06-06** : invoquer le minter Python
+   déterministe (jamais composer le nom à la main, jamais
+   `date -u +%Y%m%dT%H%M%S` direct — anti-collision garantie) :
+   ```bash
+   python -c "from sdd_lib.adr_id import mint_adr_filename; print(mint_adr_filename('{slug}'))"
+   ```
+   Le minter (`.claude/python/sdd_lib/adr_id.py`) garantit l'unicité
+   cross-agent (16 bits entropie rand4, p > 99.998 %). **Pas** de
+   numérotation incrémentale `ADR-001` (racy avec dev-* en parallèle,
+   cf. `@.claude/rules/ownership.md §3`).
 2. Read `.claude/templates/adr.template.md`.
 3. Remplir :
    - **Titre** : phrase courte descriptive (ex. "Backend stack — .NET Minimal API")
@@ -84,8 +92,11 @@ Pour chaque ADR à créer (= dimension dont le slug n'a pas matché en STEP 1) :
      (## Active Tech Specs)` si imposé, sinon lister les alternatives
      écartées
    - **Liens** : pointer vers `.claude/stacks/{cat}/{stack}.md`
-4. Write `workspace/output/.sys/.context/adrs/ADR-{YYYYMMDDTHHmmss}-{slug}.md`
-   (mode `create`). Idempotence : même slug existant → skip silencieux.
+4. Write `workspace/output/.sys/.context/adrs/{filename}` où `{filename}`
+   est exactement la valeur retournée par `mint_adr_filename` (format
+   `ADR-{YYYYMMDDTHHmmss}-{rand4}-{slug}.md`). Mode `create`.
+   Idempotence : si un fichier matchant `ADR-*-{slug}.md` existe déjà
+   (même slug, timestamp/rand4 différents) → skip silencieux.
 
 ---
 

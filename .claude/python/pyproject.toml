@@ -84,3 +84,40 @@ testpaths = ["tests"]
 python_files = "test_*.py"
 addopts = "-ra -q"
 cache_dir = ".cache/pytest"
+
+# ---------------------------------------------------------------------------
+# Coverage (audit M6, 2026-06-06) — the framework imposes CoverageMin to
+# user projects but had no coverage target on its own Python tooling.
+# Threshold deliberately set CONSERVATIVELY (60 %) to be raised over time
+# as legacy modules grow tests. Bump in steps : 60 → 70 → 80 (parity with
+# the default CoverageMin imposed to user projects).
+#
+# Run locally :
+#   cd .claude/python && python -m pytest --cov=sdd_lib --cov=sdd_scripts \
+#       --cov=sdd_hooks --cov=sdd_admin --cov-report=term-missing
+#
+# CI invocation : .github/workflows/framework-ci.yml (audit m5, 2026-06-06)
+# ---------------------------------------------------------------------------
+[tool.coverage.run]
+source = ["sdd_lib", "sdd_scripts", "sdd_hooks", "sdd_admin"]
+branch = true
+omit = [
+    "*/__pycache__/*",
+    "*/migrations/*",
+    "*/tests/*",
+    "*/.cache/*",
+    "sitecustomize.py",
+]
+
+[tool.coverage.report]
+fail_under = 60
+precision = 2
+show_missing = true
+skip_covered = false
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "\\.\\.\\.",
+]

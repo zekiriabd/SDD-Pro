@@ -28,8 +28,55 @@ import json
 import os
 import re
 import sys
+from datetime import datetime, timezone
+from pathlib import Path
 
 from sdd_lib.exit_codes import HOOK_ALLOW, HOOK_DENY  # noqa: E402
+
+
+def _resolve_project_root() -> Path | None:
+    """Resolve project root via CLAUDE_PROJECT_DIR or `.claude/` walk-up.
+
+    Returns None if no project root can be located — caller skips logging.
+    """
+    env_root = os.environ.get("CLAUDE_PROJECT_DIR")
+    if env_root:
+        candidate = Path(env_root)
+        if (candidate / ".claude").is_dir():
+            return candidate
+    cwd = Path.cwd()
+    for parent in [cwd] + list(cwd.parents):
+        if (parent / ".claude").is_dir():
+            return parent
+    return None
+
+
+def _audit_log(match: str, cmd: str, bypass_set: bool) -> None:
+    """Persist a JSONL audit line for env-bypass denials.
+
+    Non-blocking: any I/O failure here must NOT change the deny decision.
+    Path is anchored to CLAUDE_PROJECT_DIR (fallback : walk-up looking for
+    `.claude/`) under workspace/output/.sys/.audit/env-bypass.jsonl.
+    """
+    try:
+        root = _resolve_project_root()
+        if root is None:
+            return  # no project — skip silently (e.g. pytest in isolated tmpdir)
+        audit_dir = root / "workspace" / "output" / ".sys" / ".audit"
+        audit_dir.mkdir(parents=True, exist_ok=True)
+        line = {
+            "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+            "event": "env_bypass_blocked",
+            "matched_pattern": match,
+            "command_excerpt": cmd[:240],
+            "bypass_flag_inherited": bypass_set,
+            "decision": "DENY",
+        }
+        with (audit_dir / "env-bypass.jsonl").open("a", encoding="utf-8") as f:
+            f.write(json.dumps(line, ensure_ascii=False) + "\n")
+    except Exception:
+        # Audit must not break security. Swallow.
+        pass
 
 
 # Protected envvar name patterns (case-insensitive substring match on var name).
@@ -105,7 +152,8 @@ def main() -> int:
     # Allow only if the parent-process bypass flag was set BEFORE this command
     # tries to set an envvar — and the command itself is NOT trying to set
     # one of the protected names (which would re-enable a bypass mid-session).
-    if os.environ.get("SDD_ALLOW_ENV_BYPASS", "").lower() in ("1", "true", "yes"):
+    bypass_set = os.environ.get("SDD_ALLOW_ENV_BYPASS", "").lower() in ("1", "true", "yes")
+    if bypass_set:
         # Even with the bypass flag set, refuse to let the command itself set
         # one of the protected vars — defense-in-depth.
         sys.stderr.write(
@@ -114,12 +162,16 @@ def main() -> int:
             f"matched: {match}\n"
         )
 
+    # Persistent audit (C5 audit 2026-06-06 hardening — JSONL ledger for forensics).
+    _audit_log(match, cmd, bypass_set)
+
     sys.stderr.write(
         "ERROR: Bash command attempts to set a protected SDD_* envvar mid-session.\n"
         f"CAUSE: [ENV_BYPASS_BLOCKED] matched pattern: {match}\n"
         "FIX: protected envvars (SDD_ALLOW_*, SDD_DISABLE_*) must be set in the\n"
         "     parent shell BEFORE starting Claude Code. Setting them mid-session\n"
         "     would bypass cost-cap / acceptance-gate / security guardrails.\n"
+        "AUDIT: persisted to workspace/output/.sys/.audit/env-bypass.jsonl\n"
     )
     return HOOK_DENY
 

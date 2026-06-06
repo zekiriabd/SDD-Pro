@@ -10,9 +10,19 @@ module has zero dependencies; consumers should import from here.
 
 Rates (USD per million tokens) sourced from Anthropic API pricing page
 (https://www.anthropic.com/pricing), reviewed 2026-05-21.
+
+Freshness contract (audit m4, 2026-06-06)
+-----------------------------------------
+The `PRICING_LAST_REVIEWED` constant below MUST be updated each time
+the pricing table is reviewed/edited. `framework_smoke.py` invokes
+`check_pricing_freshness()` which compares this date against
+`PricingFreshnessMaxAgeDays` (config.base.yml, default 90 days) and
+emits a WARN or STOP per `PricingFreshnessMode` (off/warn/strict).
 """
 
 from __future__ import annotations
+
+import datetime as _dt
 
 # ---------------------------------------------------------------------------
 # Canonical pricing table (USD per million tokens)
@@ -47,3 +57,26 @@ def as_tuple(model_id: str) -> tuple[float, float, float, float]:
     """
     p = get_pricing(model_id)
     return (p["input"], p["output"], p["cache_creation"], p["cache_read"])
+
+
+# ---------------------------------------------------------------------------
+# Freshness check (audit m4, 2026-06-06)
+# ---------------------------------------------------------------------------
+#: ISO date of the last manual review against https://www.anthropic.com/pricing
+#: BUMP THIS each time you edit the PRICING table — `framework_smoke.py`
+#: checks staleness against `PricingFreshnessMaxAgeDays` (config.base.yml).
+PRICING_LAST_REVIEWED = "2026-05-21"
+
+
+def check_pricing_freshness(max_age_days: int = 90, today: _dt.date | None = None
+                            ) -> tuple[bool, int, str]:
+    """Return (is_fresh, age_days, last_reviewed_iso).
+
+    is_fresh : True ssi (today - PRICING_LAST_REVIEWED) <= max_age_days.
+    Caller (framework_smoke.py) decides off/warn/strict per
+    `PricingFreshnessMode` in layered config.
+    """
+    reviewed = _dt.date.fromisoformat(PRICING_LAST_REVIEWED)
+    ref = today or _dt.date.today()
+    age = (ref - reviewed).days
+    return (age <= max_age_days, age, PRICING_LAST_REVIEWED)

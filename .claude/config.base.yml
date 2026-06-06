@@ -193,6 +193,18 @@ MaxCostPerRun: 50.00          # USD ; 0 = disabled
 # [CONFIG_DUPLICATE_KEY] depuis v7.0.0.
 BuildLoopMaxCostUsd: 15.00
 
+# --- Build loop adaptive fallback (v7.0.0-alpha audit M4, 2026-06-06) ---
+# Quand un build_loop dev-backend / dev-frontend a déjà consommé
+# BuildLoopMaxCostUsd * 0.5 ET qu'il reste UNE seule itération autorisée,
+# le runtime peut downgrade Opus 4.7 → Sonnet 4.6 pour la dernière tentative.
+# Justification : 2 retries Opus identiques convergent rarement sur la 3ᵉ ;
+# un changement de modèle apporte une perspective différente pour ~5× moins
+# cher. Sentinel file utilisé par /dev-run pour re-spawn avec --fallback-model.
+#
+# true  : downgrade automatique au-delà du seuil 50 % cost cap (défaut)
+# false : comportement legacy (toujours Opus jusqu'à BuildLoopMaxIter)
+BuildLoopAdaptiveFallback: true
+
 # --- Integration test depth (v7.0.0 audit §6.1) ---
 # API Gate default uses in-memory DB (EF Core InMemory, H2, SQLite:memory:).
 # This is fast but semantically DIFFERENT from production (no FK strict
@@ -241,3 +253,26 @@ UsGranularityWarnAt: 6      # WARN above this (was historical hard cap)
 # v7.0.0 reverts to threshold 3 AND makes it WARN-blocking in strict mode.
 FeatDeepenThreshold: 3       # complexity score (0-5) above which deepen is recommended
 FeatDeepenMode: warn         # off | warn (default) | strict (NO-GO if not run)
+
+# --- Inline rules drift detection (v7.0.0-alpha audit m10, 2026-06-06) ---
+# validate_inline_rules.py compare mtime des agents/*.md inlinant une rule
+# vs mtime du rule fichier source. Si rule modifiée APRÈS agent → drift
+# suspecté ([DRIFT_SUSPECTED]). Historiquement WARN-only ; cet audit M10
+# rend le comportement configurable :
+#   - off    : skip total (legacy v6.x)
+#   - warn   : émet le rapport mais exit 0 (défaut — non-bloquant)
+#   - strict : exit 1 si ≥ 1 drift détecté (bloque framework-ci.yml)
+# Le script invoque encore --strict en CLI explicit (ex. framework_smoke.py
+# strict mode) ; cette clé pilote le comportement DEFAULT sans argument.
+InlineRulesDriftMode: warn
+
+# --- Pricing freshness check (v7.0.0-alpha audit m4, 2026-06-06) ---
+# sdd_lib/pricing.py contient la table USD/M tokens par modèle. Anthropic
+# révise sa grille tarifaire ~tous les 2-4 mois. Pour éviter une dérive
+# silencieuse coût-réel vs coût-affiché, framework_smoke.py vérifie la
+# date du dernier "reviewed YYYY-MM-DD" dans le docstring pricing.py.
+#   - off    : skip check
+#   - warn   : émet WARN si > MaxAgeDays (défaut — non-bloquant)
+#   - strict : exit 1 si stale (CI release-gate)
+PricingFreshnessMode: warn
+PricingFreshnessMaxAgeDays: 90  # ~quarterly review cadence

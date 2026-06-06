@@ -2379,7 +2379,7 @@ Closes le gap "script existed but never wired" (validated-combos.md §4.3).
 4. `pydantic-core` no-wheel Python 3.14 (FastAPI bench)
 5. bUnit `.Change()` vs `@bind:event="oninput"` mismatch (Blazor tests)
 
-### Added — ADR `ADR-20260605T1500-bench-stack-versions-deviation.md` (audit C6)
+### Added — ADR `ADR-20260605T150000-bench-stack-versions-deviation.md` (audit C6)
 
 ADR consolidé pour les 12 déviations stack-vs-runtime du bench. Documente Spring 4→3, Kotlin 2.3→2.0, React 19→18, Tailwind v4→v3, MAUI net8→net9, Pydantic 2.10→2.13, etc.
 

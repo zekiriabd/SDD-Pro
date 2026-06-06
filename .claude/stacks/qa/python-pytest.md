@@ -4,6 +4,7 @@
 
 Status: Experimental
 Validation: 🟡 experimental (not yet validated end-to-end in production combo)
+Support: ⚠ Non supporté commercialement (audit C3, 2026-06-06) — exclu du SLA produit. Voir CLAUDE.md §6 et docs/validated-combos.md.
 QA FEAT ID: python-pytest
 Scope: tests unitaires backend Python (FastAPI, Flask, Django)
 

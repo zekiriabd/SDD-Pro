@@ -2,6 +2,7 @@
 
 Status: Experimental
 Validation: 🟡 experimental (not yet validated end-to-end in production combo)
+Support: ⚠ Non supporté commercialement (audit C3, 2026-06-06) — exclu du SLA produit. Voir CLAUDE.md §6 et docs/validated-combos.md.
 Tech FEAT ID: tech-auth-local
 Scope: authentification et autorisation locale via login / password + JWT — independant de toute stack ou langage. Chaque implementation (backend, SPA, monolithe, mobile) doit appliquer ces regles selon sa technologie.
 

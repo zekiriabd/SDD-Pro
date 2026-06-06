@@ -395,6 +395,12 @@ Exécuter `Build` du stack frontend (§2.2).
 **Limite** : `BuildLoopMaxIter` dans `## Project Config` (défaut `3`, range
 1-10 ; cf. `agents/dev-backend.md STEP 8`). Même paramètre BE/FE.
 
+**Circuit-breaker coût (audit M4, 2026-06-06)** : symétrique avec dev-backend
+STEP 8. Sur dépassement `BuildLoopMaxCostUsd * 0.5`, downgrade Opus → Sonnet
+pour la dernière itération via sentinel
+`workspace/output/.sys/.state/dev-build-downgrade-{n}-{m}.flag`.
+Bypass : `BuildLoopAdaptiveFallback: false`.
+
 Si build échoue après `BuildLoopMaxIter` itérations → ERROR :
 ```
 ERROR: agent dev-frontend — build échec après {N} itérations

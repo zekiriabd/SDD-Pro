@@ -2,6 +2,7 @@
 
 Status: Experimental
 Validation: 🟡 experimental (réactivé 2026-05-20, PoC formel pending — cf. `docs/validated-combos.md §3`)
+Support: ⚠ Non supporté commercialement (audit C3, 2026-06-06) — exclu du SLA produit. Voir CLAUDE.md §6 et docs/validated-combos.md.
 Pattern ID: archi-ddd
 Scope: **pattern d'architecture backend** — Domain-Driven Design layered (Domain → Application → Infrastructure → Interface). S'applique aux stacks `backend/*.md` lorsque `ArchiPattern: DDD`. Ne s'applique PAS aux `fullstack/*` ni aux `mobiles/*`.
 

@@ -2,6 +2,7 @@
 
 Status: POC-only
 Validation: 🟡 POC-only — **utilisé exclusivement par workspace/console SDD interne** (v0.4.0 — Fastify 5 + React 18 CDN + Babel-standalone, 2026-05-16). **NON destiné à un usage production externe** (décision CTO 2026-06-05 audit P3) : pas de bundler, pas de TS natif, pas de pipeline build/lint/Playwright standard. Pour Node/React prod commercial, utiliser combo `backend/node-express` + `frontend/react` (back-front séparés avec Vite + TS strict).
+Support: ⚠ Hors périmètre produit (audit C3/m2/m9, 2026-06-06) — usage interne console SDD uniquement, jamais commercialisé. Toute génération `/sdd-full` ciblant ce stack est bloquée par `preflight_stack_combo` (sauf `SDD_ALLOW_UNTESTED_COMBO=1`).
 Tech FEAT ID: tech-node-react
 Scope: **fullstack monolithe** — backend Node.js + frontend React servis depuis le MEME projet (zero-build, JSX transpilé in-browser via Babel Standalone). Pas de séparation `{BackendName}` / `{AppName}` / `{LibName}`. Modèle SSR-adjacent (le serveur sert l'HTML initial + l'API ; React hydrate côté client).
 

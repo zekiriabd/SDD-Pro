@@ -44,10 +44,59 @@ jobs:
       - name: Framework smoke test
         run: python .claude/python/sdd_admin/framework_smoke.py
 
-      - name: pytest (full suite)
+      - name: pytest + coverage (audit M6, threshold 60% via pyproject)
         run: |
           cd .claude/python
-          python -m pytest tests/ -q --tb=short
+          python -m pytest tests/ -q --tb=short \
+            --cov=sdd_lib --cov=sdd_scripts --cov=sdd_hooks --cov=sdd_admin \
+            --cov-report=term-missing --cov-report=xml:coverage.xml
+
+      - name: Upload coverage artifact (audit M6)
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-py${{ matrix.python-version }}
+          path: .claude/python/coverage.xml
+          if-no-files-found: warn
+
+      - name: Inline rules drift check (audit m10, strict in CI)
+        run: python .claude/python/sdd_scripts/validate_inline_rules.py --strict
+
+      - name: Templates linter (audit m3, strict in CI)
+        run: python .claude/python/sdd_admin/validate_templates.py --strict
+
+      - name: ADR filename format (audit M2, HHmmss[-rand4])
+        shell: bash
+        run: |
+          set -e
+          # Spec : ADR-{YYYYMMDDTHHmmss}(-{rand4})?-{slug}.md
+          pattern='^ADR-[0-9]{8}T[0-9]{6}(-[a-z0-9]{4})?-[a-z0-9-]+\.md$'
+          bad=0
+          for f in .claude/docs/adrs/ADR-*.md workspace/output/.sys/.context/adrs/ADR-*.md ; do
+            [ -e "$f" ] || continue
+            base=$(basename "$f")
+            if ! echo "$base" | grep -qE "$pattern" ; then
+              echo "❌ ADR filename non conforme : $base"
+              bad=$((bad+1))
+            fi
+          done
+          if [ $bad -gt 0 ] ; then
+            echo "FAIL : $bad ADR filename(s) hors spec ownership.md §3."
+            exit 1
+          fi
+          echo "OK : tous les ADR filenames respectent la spec."
+
+      - name: Pricing freshness check (audit m4)
+        run: |
+          python -c "
+          import sys
+          sys.path.insert(0, '.claude/python')
+          from sdd_lib import pricing
+          fresh, age, last = pricing.check_pricing_freshness(max_age_days=90)
+          print(f'pricing.py reviewed {last} ({age}d ago) — fresh={fresh}')
+          if not fresh:
+              print('::warning::pricing.py stale > 90d (audit m4). Review https://www.anthropic.com/pricing and bump PRICING_LAST_REVIEWED.')
+          "
 
       - name: Validate libs catalogs schema
         run: python .claude/python/sdd_admin/validate_libs_catalog.py
