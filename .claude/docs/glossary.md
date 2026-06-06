@@ -250,7 +250,7 @@ Format canonique : `[CATEGORY_SUBCATEGORY]` (UPPER_SNAKE_CASE).
 
 ---
 
-## 14. Roles
+## 15. Roles
 
 | Rôle canonique | Définition |
 |---|---|

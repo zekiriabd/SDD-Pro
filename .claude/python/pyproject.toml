@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 # v7.0.0 audit M8 (2026-05-20) : the SDD_Pro framework versions
 # (loader.yml `version: 7.0.0-alpha`, CLAUDE.md, CHANGELOG.md) track the
@@ -9,8 +13,27 @@
 # semantics change (deps, entry points, CLI surface).
 name = "sdd-pro-tools"
 version = "0.1.0"
-description = "SDD_Pro framework hooks and scripts (Python port for cross-platform support)"
+description = "SDD_Pro framework hooks and scripts (Python port for cross-platform support, no LLM)"
+readme = "README.md"
 requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [
+    { name = "SDD_Pro maintainers" },
+]
+keywords = ["sdd", "spec-driven-development", "claude-code", "agentic", "scaffolding"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Code Generators",
+    "Topic :: Software Development :: Quality Assurance",
+]
 dependencies = []
 
 [project.optional-dependencies]
@@ -18,6 +41,43 @@ dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
 ]
+# Distribution (Top-10 #7 starter, 2026-06-06) :
+# - Build : `python -m build` (requires `pip install build`)
+# - Test PyPI publish : `python -m twine upload --repository testpypi dist/*`
+# - Prod PyPI publish : `python -m twine upload dist/*`
+build = [
+    "build>=1.0",
+    "twine>=4.0",
+]
+
+[project.urls]
+# À configurer quand le repo est public + page de doc construite.
+# Homepage = "https://github.com/<org>/sdd-pro"
+# Documentation = "https://sdd-pro.dev"
+# Repository = "https://github.com/<org>/sdd-pro"
+# Issues = "https://github.com/<org>/sdd-pro/issues"
+# Changelog = "https://github.com/<org>/sdd-pro/blob/main/.claude/docs/CHANGELOG.md"
+
+# Entry points pour CLI installé via pipx (Top-10 #7 cible v7.1).
+# Aujourd'hui, les scripts sont invoqués via `python .claude/python/sdd_scripts/X.py`.
+# Demain (post-distribution PyPI) : `pipx run sdd-pro <command>` ou `sdd-pro <cmd>`.
+[project.scripts]
+# v7.0.0-alpha entry points — décommentés progressivement à mesure que les
+# scripts ont une CLI stable. Frozen post-1re release PyPI (modification
+# = breaking change CLI). Le `sdd-smoke` est le 1er commit ouvert pour
+# permettre `pipx install sdd-pro && sdd-smoke` testable end-to-end.
+sdd-smoke = "sdd_admin.framework_smoke:main"
+# sdd-bootstrap = "sdd_admin.framework_smoke:main"
+# sdd-context-budget = "sdd_scripts.context_budget:main"
+
+[tool.setuptools]
+packages = ["sdd_lib", "sdd_lib.console_db", "sdd_lib.migrations",
+            "sdd_scripts", "sdd_hooks", "sdd_admin"]
+include-package-data = true
+
+[tool.setuptools.package-data]
+"sdd_lib" = ["console_db_schema.sql", "migrations/*.sql"]
+sdd_scripts = ["*.yaml", "*.yml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

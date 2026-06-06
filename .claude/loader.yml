@@ -15,7 +15,7 @@
 # Toute modification d'un agent → mise à jour synchrone de cette section.
 
 version: "7.0.0-alpha"
-updated: "2026-05-20"
+updated: "2026-06-06"
 
 # =========================================================================
 # Cache layers (v7.0.0 P2 #11 — Anthropic prompt caching strategy)

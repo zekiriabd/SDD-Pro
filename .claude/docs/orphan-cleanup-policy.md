@@ -1,5 +1,11 @@
 # SDD_Pro — Politique de gestion des orphelins
 
+> ✅ **Status v7.0.0-alpha (2026-06-05)** — les scripts `audit_orphans.py`
+> et `cleanup_orphans.py` sont **implémentés et testés** (11 tests pytest
+> sous [`tests/test_audit_cleanup_orphans.py`](../python/tests/test_audit_cleanup_orphans.py)).
+> Categories détectées : `us_orphans`, `plan_orphans`, `qa_orphans`,
+> `direct_orphans` (FEAT supprimée → dérivés résiduels).
+
 > **Source de vérité unique** pour la détection et le nettoyage ciblé
 > des artefacts orphelins issus de renommages/suppressions de US ou FEAT.
 > Cf. `ADR-20260519T183000-governance-orphan-cleanup-tool` pour la
@@ -91,12 +97,12 @@ ne matche plus aucune AC active (US présentes). Cf. `detect_capabilities.py`.
 
 ## 4. Mode d'opération du tool (v7.0.0)
 
-Deux scripts complémentaires sous `.claude/python/sdd_scripts/` :
+Deux scripts complémentaires sous `.claude/python/sdd_admin/` (mainteneur-invoqués manuellement, déplacés depuis `sdd_scripts/` audit 2026-06-06 M3 — usage pattern manuel hors pipeline runtime) :
 
 ### 4.1 `audit_orphans.py` — détection read-only
 
 ```bash
-python .claude/python/sdd_scripts/audit_orphans.py [--feat N] [--json]
+python .claude/python/sdd_admin/audit_orphans.py [--feat N] [--json]
 ```
 
 - Scan `workspace/input/feats/` (source) + `workspace/output/{us,plans,src}/`
@@ -109,7 +115,7 @@ python .claude/python/sdd_scripts/audit_orphans.py [--feat N] [--json]
 ### 4.2 `cleanup_orphans.py` — suppression ciblée
 
 ```bash
-python .claude/python/sdd_scripts/cleanup_orphans.py [--feat N] [--dry-run] [--yes]
+python .claude/python/sdd_admin/cleanup_orphans.py [--feat N] [--dry-run] [--yes]
 ```
 
 - Lit le rapport de `audit_orphans.py`
@@ -194,7 +200,7 @@ au niveau projet entier. Mode opt-in via Project Config
 
 1. Avant la première utilisation, lancer :
    ```
-   python .claude/python/sdd_scripts/audit_orphans.py --feat all
+   python .claude/python/sdd_admin/audit_orphans.py --feat all
    ```
    Le rapport peut être conséquent si le repo a accumulé des orphelins
    depuis v6.1.
@@ -216,10 +222,29 @@ au niveau projet entier. Mode opt-in via Project Config
 
 ---
 
+## 8.bis. Scripts Python à faible empreinte référence (audit 2026-06-05)
+
+L'audit v7.0.0-alpha a identifié 5 scripts avec ≤ 1 référence interne :
+
+| Script | Refs | Justification (PAS orphan) |
+|---|---|---|
+| `bench_run.py` | 0 internes | Outil **bench manuel** (docs/benchmarks/runbook-bench-m.md) — invocation directe par Tech Lead, pas via agents. À conserver. |
+| `record_gate_decision.py` | 0 internes | Consommé par **console web Node** (`workspace/console/server.js` + `lib/console-db.js`) — invocation cross-runtime. À conserver. |
+| `compute_us_complexity.py` | 1 | Validé par `framework_smoke.py` (historisé). Utilisé indirectement via tests. À conserver. |
+| `dispatch_fixes.py` | 1 | Importé par `_review_report.py` + tests. À conserver. |
+| `preflight_force_cumul.py` | 1 | Référencé par `sdd-full.md` (STEP 1.bis) + tests. À conserver. |
+
+**Décision** : **aucun retrait** v7.0.0. Tous les scripts ont une raison
+d'être documentable. La règle : "0 référence" ne signifie pas "orphan"
+quand l'invocation est manuelle (bench), cross-runtime (console Node),
+ou auditée par framework_smoke.
+
+---
+
 ## 9. Pointers
 
-- [`@.claude/docs/CHANGELOG.md`](.claude/docs/CHANGELOG.md) ligne 1208 — décision de retrait `/sdd-clear` v6.1
-- [`@.claude/CLAUDE.md §3`](.claude/CLAUDE.md) — table des commandes (futur emplacement `/cleanup-orphans` post-v7)
+- [`@.claude/docs/CHANGELOG.md`](./CHANGELOG.md) ligne 1208 — décision de retrait `/sdd-clear` v6.1
+- [`@.claude/CLAUDE.md §3`](../CLAUDE.md) — table des commandes (futur emplacement `/cleanup-orphans` post-v7)
 - `workspace/output/.sys/.context/adrs/ADR-20260519T183000-governance-orphan-cleanup-tool.md` — décision + plan v7.0.0
 - [`@.claude/python/sdd_scripts/detect_capabilities.py`](.claude/python/sdd_scripts/detect_capabilities.py) — base pour §6 (détection capabilities orphelines)
 - [`@.claude/python/sdd_scripts/scan_repo.py`](.claude/python/sdd_scripts/scan_repo.py) — pattern de scan existant à réutiliser

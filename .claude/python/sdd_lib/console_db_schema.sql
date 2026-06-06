@@ -194,6 +194,7 @@ CREATE TABLE IF NOT EXISTS qa_api_tests (
     feat_n            INTEGER NOT NULL,
     extracted_at      TEXT    NOT NULL,
     gate_passed       INTEGER NOT NULL,
+    -- status column added in migration 0005 (canonical PASS|WARN|FAIL|SKIPPED|INFRA_BLOCKED, audit P3)
     endpoints_total   INTEGER DEFAULT 0,
     tests_total       INTEGER DEFAULT 0,
     tests_passed      INTEGER DEFAULT 0,
@@ -333,15 +334,68 @@ CREATE TABLE IF NOT EXISTS validation_reports (
     FOREIGN KEY (feat_n) REFERENCES feats(feat_n)
 );
 
-CREATE TABLE IF NOT EXISTS breaking_changes (
+-- breaking_changes : retiré 2026-06-06 audit m11 (zéro consommateur côté code,
+-- la résolution BREAKING CHANGES vit dans CLAUDE.md disque via
+-- mark_breaking_resolved.py — pas dans console.db). Si recâblage futur :
+-- ré-introduire ici + côté mark_breaking_resolved.py + invocation côté
+-- dev-* STEP 8/11.5.
+
+-- ============================================================
+-- qa_mutation : storage pour mutation testing opt-in (Stryker etc.)
+-- Aligné avec migration 0002 — présent ici pour init schema neuf.
+-- Consommateur ingest : à câbler v7.1+ (cf. stacks/qa/mutation-testing.md).
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS qa_mutation (
     id                  INTEGER PRIMARY KEY AUTOINCREMENT,
-    project_claude_md   TEXT    NOT NULL,
-    detected_at         TEXT    NOT NULL,
-    resolved_at         TEXT,
-    status              TEXT    NOT NULL,   -- active|resolved
-    summary             TEXT,
-    payload_json        TEXT
+    feat_n              INTEGER NOT NULL,
+    extracted_at        TEXT    NOT NULL,
+    stack               TEXT,
+    tool                TEXT,
+    tool_version        TEXT,
+    mutants_total       INTEGER NOT NULL DEFAULT 0,
+    mutants_killed      INTEGER NOT NULL DEFAULT 0,
+    mutants_survived    INTEGER NOT NULL DEFAULT 0,
+    mutants_timeout     INTEGER NOT NULL DEFAULT 0,
+    mutants_no_coverage INTEGER NOT NULL DEFAULT 0,
+    mutation_score_pct  REAL,
+    score_min_pct       INTEGER,
+    status              TEXT    NOT NULL,
+    duration_ms         INTEGER,
+    report_path         TEXT
 );
+
+CREATE INDEX IF NOT EXISTS idx_qa_mutation_feat_n ON qa_mutation(feat_n);
+CREATE INDEX IF NOT EXISTS idx_qa_mutation_extracted_at ON qa_mutation(extracted_at);
+
+-- ============================================================
+-- qa_e2e : storage pour Playwright E2E opt-in
+-- Aligné avec migration 0003 — présent ici pour init schema neuf.
+-- Consommateur ingest : à câbler v7.1+ (cf. stacks/qa/playwright.md).
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS qa_e2e (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    feat_n              INTEGER NOT NULL,
+    extracted_at        TEXT    NOT NULL,
+    stack               TEXT,
+    tool                TEXT,
+    tool_version        TEXT,
+    browser             TEXT,
+    tests_total         INTEGER NOT NULL DEFAULT 0,
+    tests_passed        INTEGER NOT NULL DEFAULT 0,
+    tests_failed        INTEGER NOT NULL DEFAULT 0,
+    tests_skipped       INTEGER NOT NULL DEFAULT 0,
+    us_total            INTEGER NOT NULL DEFAULT 0,
+    us_covered          INTEGER NOT NULL DEFAULT 0,
+    min_per_us          INTEGER,
+    status              TEXT    NOT NULL,
+    duration_ms         INTEGER,
+    report_path         TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_qa_e2e_feat_n ON qa_e2e(feat_n);
+CREATE INDEX IF NOT EXISTS idx_qa_e2e_extracted_at ON qa_e2e(extracted_at);
 
 -- ============================================================
 -- INDEX
