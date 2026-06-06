@@ -57,8 +57,9 @@ est ensuite généré en parallèle par Dev-Backend et Dev-Frontend.
 > Lighthouse CI + wrk/k6 ; `dashboard` → `index_adrs.py` + console web ;
 > `dev-*-strict` (forks Sonnet v6.2) supprimés — flag `PlanCacheStrict`
 > est désormais DEPRECATED no-op. Le routing `/dev-run` STEP 6.0.bis
-> spawn `dev-*` Opus 4.7 que le plan soit v1 ou v2. Design archivé sous
-> `@.claude/archive/v7-design-superseded/DESIGN-FROMPLAN-STRICT.md`.
+> spawn `dev-*` Opus 4.7 que le plan soit v1 ou v2. Design historique
+> consultable via `git log -- docs/DESIGN-FROMPLAN-STRICT.md` (fichier
+> retiré au sweep v7.0.0-alpha 2026-05-20).
 
 ## 3. Agents — lectures et écritures
 

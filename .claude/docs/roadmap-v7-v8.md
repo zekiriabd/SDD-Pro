@@ -50,6 +50,9 @@
 
 | # | Item | Plan v8 | Effort estimé |
 |---|---|---|---|
+| ~~24~~ | ~~`audit_orphans.py` + `cleanup_orphans.py`~~ | ✅ **DONE v7.0.0-alpha (2026-06-05)** : scripts livrés sous `sdd_scripts/`, 11 tests pytest verts, doc `orphan-cleanup-policy.md` mise à jour, périmètre PROTÉGÉ enforcement, backup `.trash/{ts}/` avec recovery 7j, telemetry `console.db.events`. | — |
+| 25 | `app.jsx` refactor (2056 L monolithe → 5-8 composants) + ≥1 Playwright fumée console + setup React modules (drop Babel client-side). | 🟡 **PARTIEL v7.0.0-alpha (2026-06-05)** : test smoke `tests/structure.smoke.test.js` ajouté (valide 33 composants + 6 endpoints, intégré CI). Garde le mode "no build step" pour l'instant. Reste roadmap v7.2 : décision bundler (esbuild minimal) puis split réel en `app-shell.jsx`/`app-charts.jsx`/`app-dashboard.jsx`/`app-features.jsx` + Playwright. | 4-6 jours restants |
+| 26 | `dev-run.md` / `sdd-full.md` : remplacer le pseudo-code orchestrateur par un script Python testable. | 🟡 **PARTIEL v7.0.0-alpha (2026-06-05)** : `sdd_scripts/sdd_full_planner.py` livré (planner déterministe — produit un PLAN JSON exécutable avec phases + status `pending/skip/blocked`, 10 tests pytest verts). Reste roadmap v7.2 : remplacer le pseudo-code dans `sdd-full.md` par invocation `python sdd_full_planner.py --json` puis `jq` les phases ; refactor symétrique `dev-run.md`. ADR `governance-major-orchestrator-python` toujours à créer. | 4-6 jours restants |
 | 18 | Combos validés ≥ 5 | PoC : `dotnet+react+azure`, `kotlin+react+azure`, `dotnet+vue+azure`, `python+react+local`, `kotlin+vue+local`. Méthodo `docs/poc-roi-methodology.md`. | 5× 0.5 jour-homme = 2.5 jours |
 | 19 | Cross-model validation QA | Opus review Sonnet (vraie indépendance épistémique). Nécessite refonte loader + retry budget. | 1-2 semaines |
 | 20 | Mémoire Claude scoped Tech Lead | Cf. discussion ouverte 2026-05-18. Sans casser source-first invariant. Implementation server-side. | 1 semaine |
@@ -96,19 +99,32 @@ Ordre suggéré (par dépendances) :
 | E2E coverage AC | ≥ 80 % AC UI | qa_e2e aggregate |
 | Variance 3 runs FEAT M | ≤ 15 % | report_roi.py |
 | Stubs backward-compat | 0 (tous supprimés) | grep `Read @.claude/rules/X.md` legacy = 0 |
-| User-facing commands | 8 réelles (pas 17) | CLAUDE.md §3 cohérent avec usage réel |
+| User-facing commands | 12 user-facing + 8 internes (CLAUDE.md §3) | déjà acté v7.0.0-alpha |
 
 ---
 
-## 4. Marketing "8 user-facing + 9 internes"
+## 4. Marketing « 12 user-facing + 8 internes » (acté v7.0.0-alpha)
 
-Audit CTO §6.15 a flag cette communication comme "aspirationnelle". Action :
+Le découpage final v7.0.0-alpha est `12 user-facing + 8 internes [debug]`
+(cf. CLAUDE.md §3). Les internes sont déjà signalés `[debug]` dans la
+table. Évolutions futures envisagées :
 
-- **v7.1** : préciser dans CLAUDE.md §3 que les 9 "internes" sont en
-  réalité **invocables debug** (pas user-facing primaires) — distinguer
-  visuellement (badge `[debug]`) dans la table.
-- **v8.0** : réviser le découpage — privilégier la simplicité (3 vraies
-  user-facing : `/feat-generate`, `/sdd-full`, `/sdd-status`) + 14 internes.
+- **v7.1** : audit usage réel (telemetry `token_usage`) — promouvoir
+  toute commande interne dépassant un seuil d'invocations en user-facing.
+- **v8.0** : réviser si l'usage révèle des commandes orphelines
+  effectivement non-utilisées — décision data-driven, pas a priori.
+
+---
+
+## 4.bis. Décisions abandonnées en v7.0.0
+
+| Décision | Statut | Raison | Reversibilité |
+|---|---|---|---|
+| **MCP integration** (`mcp.json`, `docs/MCP-SERVER.md`) | ❌ Abandonné v7.0.0 | Pas de consommateur production identifié, intégration jamais validée bout-en-bout. Coût maintenance > valeur démontrée. | Restauration v8+ possible si demande utilisateur (ADR `governance-major-mcp-reintroduction` requis). Récupération code : `git checkout main -- .claude/mcp.json .claude/docs/MCP-SERVER.md` (v6.10.4-LTS). |
+| **`accessibility-auditor` (agent LLM)** | ❌ Retiré v7.0.0 | Coût LLM élevé pour bénéfice marginal (axe-core CI fait le même check en 0 token). | Remplacé par `ingest_axe.py` (Option B, v7.2.0). |
+| **`performance-auditor` (agent LLM)** | ❌ Retiré v7.0.0 | Idem accessibility — Lighthouse CI fait le même check déterministe. | Remplacé par `ingest_lighthouse.py` (Option B, v7.2.0). |
+| **`dashboard` (agent LLM)** | ❌ Retiré v7.0.0 | Génération HTML statique remplacée par console web React (`workspace/console/`). | console web restaurée v7.0.0-alpha (2026-06-05). |
+| **`dev-*-strict` (variants Sonnet 4.6)** | ❌ Retirés v7.0.0 | Plans v2 + Inline Digest pas livrés bénéfice token attendu vs complexité. | Clé `PlanCacheStrict` tolérée no-op pour backward-compat. |
 
 ---
 

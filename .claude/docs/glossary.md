@@ -33,7 +33,7 @@
 
 | Terme canonique | Définition | Source | Aliases |
 |---|---|---|---|
-| **AppName** | Nom du projet frontend (ou fullstack). Littéral, case-sensitive. | `stack.md ## Project Config` | `FrontendName` (v6.10.2 alias) → v7 keep one |
+| **AppName** | Nom du projet frontend (ou fullstack). Littéral, case-sensitive. Token canonique du framework. | `stack.md ## Project Config` | `FrontendName` (alias actif, normalisé par `sdd_lib.project_config.normalize_project_aliases()` — cf. `ownership.md §1.bis`) |
 | **BackendName** | Nom du projet backend. | idem | — |
 | **LibName** | Nom du projet shared lib (DTOs cross-langage, opt-in via `LibStrategy: shared`). | idem | — |
 | **AppNamespace** | Auto-dérivé de `AppName` depuis v6.10.2 (plus explicite). | auto | retiré en v7 |
@@ -268,7 +268,7 @@ Liste des termes à éliminer en v7.0.0 — préférer la forme canonique de la 
 | Forme à éliminer | Remplacement canonique | Source ADR |
 |---|---|---|
 | `derive` (substantif) | **drift** | vocab-consolidation |
-| `FrontendName` | **AppName** (alias retiré) | config-ssot |
+| `FrontendName` (raw) | **AppName** (token canonique) — `FrontendName` reste accepté comme alias et normalisé par `sdd_lib.project_config.normalize_project_aliases()` ; à privilégier dans `stack.md` pour distinguer du backend (cf. `ownership.md §1.bis`) | config-ssot |
 | `reviewer`, `scanner` (générique) | **auditor** | vocab-consolidation |
 | `verdict` vs `status` vs `result` | **verdict** (qa/auditors), **Status:** (US frontmatter) | vocab-consolidation |
 | `phase` vs `step` (minuscule) | **Phase** (macro pipeline), **STEP** (intra-agent) | vocab-consolidation |

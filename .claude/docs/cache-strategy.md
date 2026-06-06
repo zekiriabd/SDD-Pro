@@ -1,5 +1,10 @@
 # SDD_Pro — Prompt Caching Strategy (v7.0.0 P0-8)
 
+> **STATUS: planned v7.1** — doc aspirationnelle. Stratégie cible décrite ci-dessous,
+> implémentation prévue v7.1 (cf. `roadmap-v7-v8.md` item « Cache markers »). À ce
+> jour, aucun marker `cache_control` n'est posé dans les prompts agents — seul le
+> caching automatique Claude Code (5 min TTL) est actif.
+
 ## 1. Baseline mesurée (2026-05-20)
 
 Source : `workspace/output/qa/roi-report-2026-05-20-FEAT2-postfix.json`.

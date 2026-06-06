@@ -655,7 +655,7 @@ backend fragile.
 
 **Conditionnel** : invoque jusqu'à **4 agents auditor EN PARALLÈLE**
 (un seul message Agent multi-tool-use) pour les phases enabled selon
-`phase_planner.py` (cf. STEP 5.5.1 — réutiliser `$PHASE_PLAN`) **et**
+`phase_planner.py` (cf. STEP 5.5 — réutiliser `$PHASE_PLAN`) **et**
 selon `ArchReviewMode` du Project Config. Lecture mode + verdicts
 post-exécution. Le verdict consolidé pilote le passage à STEP 6.5
 ou STOP.

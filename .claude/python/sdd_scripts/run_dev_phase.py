@@ -49,16 +49,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sdd_lib.exit_codes import SUCCESS, INFRA_BLOCKED, FAIL_FAST, CORRECTIBLE  # noqa: E402
+from sdd_lib.paths import project_root_for_hook as _resolve_project_root
 
 # Default MaxParallel value (1-12 range, default 3) — named so the literal `3`
 # doesn't get flagged as a hardcoded exit code by migrate_exit_codes.py.
 DEFAULT_MAX_PARALLEL = 3
-
-
-def _resolve_project_root() -> Path:
-    # Audit 2026-06-06 CR-3 — see sdd_lib.paths.project_root_for_hook.
-    from sdd_lib.paths import project_root_for_hook
-    return project_root_for_hook()
 
 
 # ── US listing + batching ──────────────────────────────────────────────

@@ -55,9 +55,7 @@
       "Bash(head:*)",
       "Bash(tail:*)",
       "Bash(echo:*)",
-      "Bash(env)",
-      "Bash(env:*)",
-      "Bash(curl:*)",
+      "Bash(curl --version)",
       "Bash(git:*)",
       "Bash(cd:*)",
       "Bash(test:*)",
@@ -84,10 +82,45 @@
       "Bash(tee:*)",
       "Bash(xargs:*)",
       "Bash(timeout:*)",
-      "Bash(printenv:*)",
-      "Bash(*)"
+      "Bash(date)",
+      "Bash(date:*)",
+      "Bash(sleep:*)",
+      "Bash(tree:*)",
+      "Bash(du:*)",
+      "Bash(df:*)",
+      "Bash(which:*)",
+      "Bash(whereis:*)",
+      "Bash(chmod:*)",
+      "Bash(kill:*)",
+      "Bash(taskkill:*)",
+      "Bash(ps:*)",
+      "Bash(netstat:*)",
+      "Bash(ss:*)",
+      "Bash(java:*)",
+      "Bash(gradle:*)",
+      "Bash(mvn:*)",
+      "Bash(./gradlew:*)",
+      "Bash(./mvnw:*)",
+      "Bash(gradlew:*)",
+      "Bash(mvnw:*)",
+      "Bash(cargo:*)",
+      "Bash(rustc:*)",
+      "Bash(go:*)",
+      "Bash(make:*)",
+      "Bash(cmake:*)",
+      "Bash(powershell:*)",
+      "Bash(pwsh:*)",
+      "Bash(cmd:*)"
     ],
+    "_allow_bash_doc": "v7.0.0-alpha security hardening 2026-06-06 — `Bash(*)` catch-all retiré (fail-open). Toute invocation Bash hors allowlist explicite déclenche un prompt utilisateur (defaultMode=default). Pour ajouter une commande légitime : éditer cette liste OU settings.local.json (per-dev, gitignored). Deny rules ci-dessous restent en place comme filet de défense additionnel.",
     "deny": [
+      "Bash(env)",
+      "Bash(env:*)",
+      "Bash(printenv:*)",
+      "Bash(curl http*)",
+      "Bash(curl -*)",
+      "Bash(curl ftp*)",
+      "Bash(wget:*)",
       "Bash(dotnet ef migrations*)",
       "Bash(dotnet ef database update*)",
       "Bash(dotnet ef database drop*)",
@@ -119,13 +152,33 @@
       "Bash(rmdir /s*)",
       "Bash(del /f /s /q *)",
       "Bash(format:*)",
-      "Bash(mkfs:*)"
+      "Bash(mkfs:*)",
+      "Bash(export SDD_ALLOW_*)",
+      "Bash(export SDD_DISABLE_*)",
+      "Bash(SDD_ALLOW_*=*)",
+      "Bash(SDD_DISABLE_*=*)",
+      "Bash(*SDD_ALLOW_*=1*)",
+      "Bash(*SDD_DISABLE_COST_CAP*)",
+      "Bash($env:SDD_ALLOW_*=*)",
+      "Bash(setx SDD_ALLOW_*)",
+      "Bash(setx SDD_DISABLE_*)"
     ],
+    "_deny_bypass_doc": "v7.0.0-alpha (audit 2026-06-05) — defense-in-depth contre les bypass envvar SDD_ALLOW_* / SDD_DISABLE_*. Les hooks Python lisaient déjà ces variables et les audit-loggaient, mais rien n'empêchait un agent (ou un Bash exécutif) de les exporter en cours de session. Ces deny rules bloquent les patterns d'export les plus courants (POSIX export, inline VAR=val, PowerShell $env:, Windows setx). Bypass volontaire Tech Lead : éditer settings.local.json (gitignored) et retirer la deny pour la session.",
     "_defaultMode_doc": "v7.0.0-alpha (2026-05-21) : 'acceptEdits' (auto-accept Edit/Write/NotebookEdit silently) → 'default' (prompts on tools not in allow). Edit/Write/MultiEdit are explicitly allowlisted above so the SDD pipeline still flows ; this defaultMode change blocks ONLY tools that slip outside the curated allowlist. To restore the legacy auto-accept behaviour (faster but less safe), set `defaultMode: 'acceptEdits'` in .claude/settings.local.json (per-dev, gitignored).",
     "defaultMode": "default"
   },
   "hooks": {
     "PreToolUse": [
+      {
+        "_doc": "v7.0.0-alpha (audit P0-security 2026-06-05) — block_env_bypass closes the gap left by case-sensitive Bash deny patterns. Receives the Bash command on stdin, refuses any case-insensitive attempt to SET a SDD_ALLOW_* or SDD_DISABLE_* envvar mid-session (export, NAME=val inline, $env:, setx, Set-Variable). Companion to the `_deny_bypass_doc` patterns in permissions.deny.",
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -c \"import os,sys,pathlib; r=os.environ.get('CLAUDE_PROJECT_DIR') or next((str(p) for p in [pathlib.Path.cwd()]+list(pathlib.Path.cwd().parents) if (p/'.claude').is_dir()),'.'); sys.path.insert(0,r+'/.claude/python'); import _hook; _hook.run('sdd_hooks.block_env_bypass')\""
+          }
+        ]
+      },
       {
         "matcher": "Edit|Write|MultiEdit",
         "hooks": [
@@ -147,6 +200,16 @@
             "command": "python -c \"import os,sys,pathlib; r=os.environ.get('CLAUDE_PROJECT_DIR') or next((str(p) for p in [pathlib.Path.cwd()]+list(pathlib.Path.cwd().parents) if (p/'.claude').is_dir()),'.'); sys.path.insert(0,r+'/.claude/python'); import _hook; _hook.run('sdd_hooks.preflight_cost_cap')\""
           }
         ]
+      },
+      {
+        "_doc": "v7.0.0-alpha (audit C5, 2026-06-05) — validate_stack_combo before /sdd-full, /sdd-poc, /dev-run skills. Closes the gap 'script existed but never wired'. Non-blocking on experimental combos (exit 1 → WARN only). Blocks on untested (exit 2) and invalid (exit 3) unless SDD_ALLOW_UNTESTED_COMBO=1.",
+        "matcher": "Skill",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -c \"import os,sys,pathlib; r=os.environ.get('CLAUDE_PROJECT_DIR') or next((str(p) for p in [pathlib.Path.cwd()]+list(pathlib.Path.cwd().parents) if (p/'.claude').is_dir()),'.'); sys.path.insert(0,r+'/.claude/python'); import _hook; _hook.run('sdd_hooks.preflight_stack_combo')\""
+          }
+        ]
       }
     ],
     "PostToolUse": [
@@ -156,6 +219,16 @@
           {
             "type": "command",
             "command": "python -c \"import os,sys,pathlib; r=os.environ.get('CLAUDE_PROJECT_DIR') or next((str(p) for p in [pathlib.Path.cwd()]+list(pathlib.Path.cwd().parents) if (p/'.claude').is_dir()),'.'); sys.path.insert(0,r+'/.claude/python'); import _hook; _hook.run('sdd_hooks.record_token_usage')\""
+          }
+        ]
+      },
+      {
+        "_doc": "v7.0.0-alpha (audit P2, 2026-06-05) — validate_stack_consistency enforces 1 backend XOR 1 fullstack OR 1 mobile, et 1 frontend SPA max. Filtre interne aux édits de workspace/input/stack/stack.md, exit 2 + [STACK_MULTI_INCOHERENT] sur violation. Bypass via SDD_ALLOW_MULTISTACK=1 (bench/debug).",
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -c \"import os,sys,pathlib; r=os.environ.get('CLAUDE_PROJECT_DIR') or next((str(p) for p in [pathlib.Path.cwd()]+list(pathlib.Path.cwd().parents) if (p/'.claude').is_dir()),'.'); sys.path.insert(0,r+'/.claude/python'); import _hook; _hook.run('sdd_hooks.validate_stack_consistency')\""
           }
         ]
       },
@@ -172,7 +245,7 @@
     ],
     "SubagentStop": [
       {
-        "matcher": "dev-backend|dev-frontend|qa|code-reviewer|security-reviewer|spec-compliance-reviewer|arch-reviewer|constitutioner",
+        "matcher": "arch|po|elicitor|dev-backend|dev-frontend|qa|code-reviewer|security-reviewer|spec-compliance-reviewer|arch-reviewer|adversarial-reviewer|constitutioner",
         "hooks": [
           {
             "type": "command",
@@ -181,6 +254,30 @@
           {
             "type": "command",
             "command": "python -c \"import os,sys,pathlib; r=os.environ.get('CLAUDE_PROJECT_DIR') or next((str(p) for p in [pathlib.Path.cwd()]+list(pathlib.Path.cwd().parents) if (p/'.claude').is_dir()),'.'); sys.path.insert(0,r+'/.claude/python'); import _hook; _hook.run('sdd_hooks.record_token_usage')\""
+          }
+        ]
+      },
+      {
+        "_doc": "v7.0.0-alpha (audit P0-workflow 2026-06-05) — resolve_po_hash_sentinel auto-resolves `Parent FEAT hash: sha256:COMPUTE_REQUIRED` in US files whenever the `po` agent stops, regardless of invocation path. Previously the sentinel was resolved ONLY by /us-generate STEP 3.0; standalone `Agent: po` invocations left the sentinel in place, causing all downstream agents to emit [FEAT_HASH_MISMATCH]. The hook is non-blocking (defense-in-depth safety net).",
+        "matcher": "po",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -c \"import os,sys,pathlib; r=os.environ.get('CLAUDE_PROJECT_DIR') or next((str(p) for p in [pathlib.Path.cwd()]+list(pathlib.Path.cwd().parents) if (p/'.claude').is_dir()),'.'); sys.path.insert(0,r+'/.claude/python'); import _hook; _hook.run('sdd_hooks.resolve_po_hash_sentinel')\""
+          },
+          {
+            "type": "command",
+            "command": "python -c \"import os,sys,pathlib; r=os.environ.get('CLAUDE_PROJECT_DIR') or next((str(p) for p in [pathlib.Path.cwd()]+list(pathlib.Path.cwd().parents) if (p/'.claude').is_dir()),'.'); sys.path.insert(0,r+'/.claude/python'); import _hook; _hook.run('sdd_hooks.record_token_usage')\""
+          }
+        ]
+      },
+      {
+        "_doc": "v7.0.0-alpha (audit P5, 2026-06-05) — Acceptance Gate enforcement après agent qa. Run npm test/lint/build pour chaque projet sous workspace/output/src/. Lit AcceptanceGate=strict|warn|off depuis Project Config stack.md. Bypass : SDD_ALLOW_ACCEPTANCE_BYPASS=1.",
+        "matcher": "qa",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -c \"import os,sys,pathlib; r=os.environ.get('CLAUDE_PROJECT_DIR') or next((str(p) for p in [pathlib.Path.cwd()]+list(pathlib.Path.cwd().parents) if (p/'.claude').is_dir()),'.'); sys.path.insert(0,r+'/.claude/python'); import _hook; _hook.run('sdd_hooks.validate_acceptance_gate')\""
           }
         ]
       }

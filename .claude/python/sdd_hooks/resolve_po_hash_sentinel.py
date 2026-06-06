@@ -43,12 +43,7 @@ import sys
 from pathlib import Path
 
 from sdd_lib.exit_codes import HOOK_ALLOW  # noqa: E402
-
-
-def _resolve_project_root() -> Path:
-    # Audit 2026-06-06 CR-3 — see sdd_lib.paths.project_root_for_hook.
-    from sdd_lib.paths import project_root_for_hook
-    return project_root_for_hook()
+from sdd_lib.paths import project_root_for_hook as _resolve_project_root
 
 
 def main() -> int:

@@ -93,7 +93,7 @@ Templates : `@.claude/docs/conventions.md §14-§15`.
 ## 6. Stacks (34 actifs — source de vérité = entête `Validation:` du `.md`)
 
 > **v7.0.0-alpha bench 2026-06-05** (recount 2026-06-06) :
-> **25 🟢 (15 reference + 10 bench-validated runtime) + 8 🟡 experimental + 1 🟡 POC-only = 34 total**.
+> **25 🟢 (14 reference + 11 bench-validated runtime) + 8 🟡 experimental + 1 🟡 POC-only = 34 total**.
 > Validation automatique : `framework_smoke.py --check-stacks-count`.
 
 | Catégorie | 🟢 reference | 🟢 bench-validated runtime (2026-06-05) | 🟡 experimental |
@@ -109,7 +109,7 @@ Templates : `@.claude/docs/conventions.md §14-§15`.
 
 **Tiers de validation** :
 - 🟢 **validated** (2 combos C1/C2) = `/sdd-full` complet automatisé bout-en-bout sans intervention humaine
-- 🟢 **bench-validated runtime** (10 stacks supp.) = code généré compile + démarre + sert les ACs ; pipeline `/sdd-full` partiellement bypassé (scaffolding manuel mainteneur). Détail bench : `workspace/output/qa/bench/BENCH-GLOBAL-REPORT.md`. Gaps tracés : `docs/benchmarks/known-gaps.md`
+- 🟢 **bench-validated runtime** (11 stacks supp.) = code généré compile + démarre + sert les ACs ; pipeline `/sdd-full` partiellement bypassé (scaffolding manuel mainteneur). Détail bench : `workspace/output/qa/bench/BENCH-GLOBAL-REPORT.md`. Gaps tracés : `docs/benchmarks/known-gaps.md`
 - 🟡 **experimental** = spec stack OK + `.libs.json` valide, jamais exécuté
 
 **23 combinaisons bench runtime validées** (2026-06-05) : 16 cross-origin REST (4 backends × 4 SPA) + 6 monolithes fullstack + 1 MAUI Windows desktop + 1 RN Expo Web ; + 1 mobile scaffold seul (Kotlin Android, SDK absent).

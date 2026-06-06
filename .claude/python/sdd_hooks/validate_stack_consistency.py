@@ -25,6 +25,7 @@ to multi-stack incoherent via bootstrap/console/manual edit".
 from __future__ import annotations
 
 from sdd_lib.exit_codes import HOOK_ALLOW, HOOK_DENY  # noqa: E402
+from sdd_lib.paths import project_root_for_hook as _resolve_project_root
 
 import json
 import os
@@ -58,12 +59,6 @@ def _is_stack_md(path: str | None) -> bool:
     if not path:
         return False
     return path.endswith("/workspace/input/stack/stack.md")
-
-
-def _resolve_project_root() -> Path:
-    # Audit 2026-06-06 CR-3 — see sdd_lib.paths.project_root_for_hook.
-    from sdd_lib.paths import project_root_for_hook
-    return project_root_for_hook()
 
 
 def _parse_active_stacks(stack_md: Path) -> dict[str, list[str]]:

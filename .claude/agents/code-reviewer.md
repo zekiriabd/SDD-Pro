@@ -41,9 +41,9 @@ Cet agent **ne produit que** ces 2 outputs :
 2. `workspace/output/.sys/.validation/{n}-code-review.json` — schéma machine
 
 **INTERDIT** : aucun autre Write. Aucun Edit. Aucune correction
-proactive. Aucun appel à un autre agent (notamment pas à `dev-*-strict`
-pour patch — c'est le rôle du Tech Lead via `/dev-backend {n}-{m}` ou
-`/dev-frontend {n}-{m}` après lecture du rapport).
+proactive. Aucun appel à un autre agent — le patch est du ressort
+du Tech Lead via `/dev-backend {n}-{m}` ou `/dev-frontend {n}-{m}`
+après lecture du rapport.
 
 ---
 
@@ -374,13 +374,20 @@ verdict = "🟢 GREEN" si gate_passed ET total_issues == 0
 
 ### 7.3 Hard-blocking systématique
 
-Indépendamment de `CodeReviewFailOn`, ces classes **forcent toujours**
-🔴 RED (sécurité / fonctionnalité brisée) :
+Indépendamment de `CodeReviewFailOn`, cette classe **force toujours**
+🔴 RED (fonctionnalité brisée) :
 
-- `[REVIEW_SECRETS_HARDCODED]`
-- `[FRONTEND_BACKEND_CONTRACT_GAP]`
+- `[FRONTEND_BACKEND_CONTRACT_GAP]` (front appelle endpoint backend manquant)
 
-Documenter dans le rapport : `"blocking_class": "[REVIEW_SECRETS_HARDCODED]"` (override).
+> **v7.0.0-alpha audit P0-doc 2026-06-05** — `[REVIEW_SECRETS_HARDCODED]`
+> a été retiré de ce hard-blocking : son scan est désormais owned
+> exclusivement par `security-reviewer` (cf. §5.5 et `error-classification.md §1.10`
+> note de coordination). Si le reviewer code rencontre un secret évident,
+> il l'émet **uniquement à titre informationnel** dans `issues.minor`
+> avec un pointeur vers le rapport security. Le hard-block effectif vient
+> de `[SEC_SECRET_HARDCODED]` (security-reviewer §5.1, CWE-798).
+
+Documenter dans le rapport : `"blocking_class": "[FRONTEND_BACKEND_CONTRACT_GAP]"` quand applicable.
 
 ---
 
@@ -415,7 +422,7 @@ Localisation : `workspace/output/.sys/.validation/{n}-code-review.json`
     "total_issues": 13,
     "gate_passed": false,
     "verdict": "🔴 RED",
-    "blocking_class": "[REVIEW_SECRETS_HARDCODED]"
+    "blocking_class": "[FRONTEND_BACKEND_CONTRACT_GAP]"
   }
 }
 ```
@@ -587,11 +594,7 @@ Classes typiques émises :
 
 ## Chat Output Protocol
 
-Applique `@.claude/rules/output-protocol.md`. Label `[CODE-REVIEW]` (v7.0.0-alpha
-audit M11 fix — dé-collision ex-`[REVIEW]`), plage `88-94%`, granularité 2-3
-updates. Verdict 1L avec emoji (🟢/🟡/🔴) + compteurs. Erreurs : chat 1L
-(`🔴 [CODE-REVIEW/FAIL] résumé — [REVIEW_*] détail → rapport.md (X%)`) + bloc
-ERROR 3L disque préservé (cf. `error-classification.md §2`). Bypass `SDD_CHAT_VERBOSE=1`.
+Applique `@.claude/rules/output-protocol.md` (label `[CODE-REVIEW]`, plage `88-91%`).
 
 ---
 

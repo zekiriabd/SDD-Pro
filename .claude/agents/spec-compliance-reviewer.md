@@ -25,11 +25,9 @@ de superpowers v5.1) :
 
 **Position dans le pipeline** : intégré au batch parallèle STEP 6.4 de
 `/dev-run` (cf. `commands/dev-run.md §6.4.1`), aux côtés de
-`code-reviewer`, `security-reviewer` (mode `scan` uniquement depuis
-v7.0.0), et `arch-reviewer` (si `ArchReviewMode: full`).
-`accessibility-auditor` retiré v7.0.0 (gov-major-auditors-trim) —
-remplacé par axe-core dans le CI du projet généré. Skip conditionnel
-via `phase_planner.py` selon `SpecComplianceMode`.
+`code-reviewer`, `security-reviewer` (mode `scan`), et `arch-reviewer`
+(si `ArchReviewMode: full`). Skip conditionnel via `phase_planner.py`
+selon `SpecComplianceMode`.
 
 **Strictement read-only** sur `workspace/output/src/**` et
 `workspace/output/us/**`. **Ne corrige pas, ne re-Read pas le rapport
@@ -173,8 +171,14 @@ Pour chaque AC, classifier en :
 
 ## STEP 5 — Sélection du code à inspecter
 
-**Ne JAMAIS** faire `Glob workspace/output/src/**/*` (anti-pattern,
-explosion de budget).
+**HARD-RULE (security audit 2026-06-06)** : **Ne JAMAIS** faire `Glob workspace/output/src/**/*`
+ni aucun glob non-borné sous `workspace/output/src/`. Incident mesuré
+(audit cost-time 2026-06-06) : un run a consommé **11.8M tokens / $35** sur
+1 FEAT en glob non-borné — 200× au-dessus du budget de 1M. Si à un moment
+quelconque tu es tenté de glob largement pour "voir tout le code", **STOP
+immédiatement et ERROR [SPEC_NO_TARGETS]** : l'absence de plan v2 ou de
+convention matché signifie que la FEAT n'a pas été matérialisée correctement,
+pas qu'il faut élargir le scope.
 
 Stratégie ordonnée (premier match wins) :
 
@@ -214,7 +218,13 @@ Mapping fallback : `us → [files]` (granularité US, pas AC).
 
 ### 5.3 Borne et garde-fou
 
-- Si `count(files_to_inspect) > 60` → log WARNING et tronquer à 60.
+- Si `count(files_to_inspect) > 30` → log WARNING et tronquer à 30
+  (security audit 2026-06-06 : était 60 — encore trop large pour rester
+  dans le budget context_budget par défaut).
+- **Per-file size cap** : tout fichier > 50 KB est tronqué aux 200 premières
+  lignes pour les bornes AC visibles + 100 lignes contextuelles. Si l'AC
+  porte sur du code en dehors de cette fenêtre, émettre `[SPEC_AC_NOT_VERIFIED]`
+  avec raison "file too large to scope sufficiently — refactor needed".
 - Si `count(files_to_inspect) == 0` → STOP + ERROR :
   ```
   ERROR: agent spec-compliance-reviewer — aucun fichier à inspecter
@@ -449,11 +459,7 @@ via `SELECT … FROM qa_spec_compliance WHERE feat_n = {n}`.
 
 ## Chat Output Protocol
 
-Applique `@.claude/rules/output-protocol.md`. Label `[SPEC-REVIEW]` (v7.0.0-alpha
-audit M11 fix — dé-collision ex-`[REVIEW]`), plage `88-94%`, granularité 2-3
-updates. Verdict 1L avec emoji + ratio ACs verified/total. Erreurs : chat 1L
-(`🔴 [SPEC-REVIEW/FAIL] résumé — [SPEC_*] détail → rapport.md (X%)`) + bloc ERROR
-3L disque préservé (cf. `error-classification.md §2`). Bypass `SDD_CHAT_VERBOSE=1`.
+Applique `@.claude/rules/output-protocol.md` (label `[SPEC-REVIEW]`, plage `91-94%`).
 
 ---
 

@@ -148,7 +148,7 @@ défaut **avec un commentaire `# TODO`** pour signaler au Tech Lead :
 | `BackendNamespace` | détection csharp namespace | défaut = `BackendName` |
 | `LibStrategy` | toujours `openapi-codegen` par défaut | `openapi-codegen` |
 | `QAMode` | toujours `manual` par défaut sécuritaire | `manual` |
-| `CoverageMin` | défaut `80` | `80` |
+| `CoverageMin` | **obligatoire** (pas de défaut framework — décision explicite à inscrire dans Project Config, cf. `quality.md §A.2`) | `80` (recommandation pour candidate) |
 | `MaxParallel` | défaut `3` | `3` |
 | `PlanReviewDefault` | défaut `true` | `true` |
 
@@ -182,7 +182,7 @@ BackendNamespace: <BackendName>
 LibStrategy: openapi-codegen
 PlanReviewDefault: true
 QAMode: manual                    # passer à "full" quand prêt
-CoverageMin: 80
+CoverageMin: 80                   # obligatoire — voir quality.md §A.2 ; 0 = désactivé (décision tracée)
 MaxParallel: 3
 
 # Auditors v6.3+ — uncomment pour activer

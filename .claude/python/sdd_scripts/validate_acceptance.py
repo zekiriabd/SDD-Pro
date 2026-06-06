@@ -36,6 +36,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sdd_lib.atomic_write import atomic_write_text  # noqa: E402
 from sdd_lib.exit_codes import SUCCESS, INFRA_BLOCKED  # noqa: E402
+from sdd_lib.paths import project_root_for_hook as _resolve_project_root
 
 PROJECT_TYPE_MARKERS = {
     "node": ["package.json"],
@@ -46,12 +47,6 @@ PROJECT_TYPE_MARKERS = {
 
 DEFAULT_TIMEOUT = 120  # seconds per check (security audit 2026-06-06 — was 300s, trop long pour CI)
 DEFAULT_MAX_PROJECTS = 8  # safety cap : scan > 8 projets = symptôme de mauvais scoping
-
-
-def _resolve_project_root() -> Path:
-    # Audit 2026-06-06 CR-3 — see sdd_lib.paths.project_root_for_hook.
-    from sdd_lib.paths import project_root_for_hook
-    return project_root_for_hook()
 
 
 def _read_acceptance_config(root: Path) -> dict[str, str]:

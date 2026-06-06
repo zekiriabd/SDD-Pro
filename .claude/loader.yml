@@ -194,19 +194,19 @@ dev-backend:
   # après implémentation cache_control markers (v7.1).
   reads:
     # --- volatile (per-US, jamais cachable) ---
-    - { path: workspace/output/us/{n}-{m}-*.md, cache_layer: volatile }            # US ciblée (1 fichier)
-    - { path: workspace/input/ui/{n}-{m}-*.html, cache_layer: volatile }           # HTML mockup passif
-    - { path: workspace/output/plans/{n}-{m}-*.back.md, cache_layer: volatile }    # plan From Plan
+    - { path: "workspace/output/us/{n}-{m}-*.md", cache_layer: volatile }            # US ciblée (1 fichier)
+    - { path: "workspace/input/ui/{n}-{m}-*.html", cache_layer: volatile }           # HTML mockup passif
+    - { path: "workspace/output/plans/{n}-{m}-*.back.md", cache_layer: volatile }    # plan From Plan
     # --- semi-stable (invariant intra-FEAT, invalidé par /arch-init) ---
-    - { path: workspace/output/src/{Project}/CLAUDE.md, cache_layer: semi }        # CLAUDE.md projet
+    - { path: "workspace/output/src/{Project}/CLAUDE.md", cache_layer: semi }        # CLAUDE.md projet
     - { path: workspace/output/db/schema.json, cache_layer: semi }                 # schema DB si présent
     # --- stable (invariant inter-FEAT, cachable 5 min TTL) ---
     - { path: workspace/input/stack/stack.md, cache_layer: stable }                # Project Config
-    - { path: .claude/stacks/backend/{active}.md, cache_layer: stable }
+    - { path: ".claude/stacks/backend/{active}.md", cache_layer: stable }
     # fullstack/* chargeable mais 🟡 expérimental (aucun combo validé bout-en-bout) — n'utiliser que si AppType=fullstack.
-    - { path: .claude/stacks/fullstack/{active}.md, cache_layer: stable, status: experimental }
-    - { path: .claude/stacks/archi/{ArchiPattern}.md, cache_layer: stable }  # MVC | DDD | microservice (🟡 expérimental pour microservice)
-    - { path: .claude/stacks/auth/{active}.md, cache_layer: stable }
+    - { path: ".claude/stacks/fullstack/{active}.md", cache_layer: stable, status: experimental }
+    - { path: ".claude/stacks/archi/{ArchiPattern}.md", cache_layer: stable }  # MVC | DDD | microservice (🟡 expérimental pour microservice)
+    - { path: ".claude/stacks/auth/{active}.md", cache_layer: stable }
     - { path: .claude/rules/dev-shared-preflight.md, cache_layer: stable }   # v7.0.0 — STEP 0/0.5/1/1.bis hoist cross-agent
     - { path: .claude/rules/build-and-loop.md, cache_layer: stable }         # v7.0.0 — SSOT patterns dev-* (ex backend-first + dev-shared)
     - { path: .claude/rules/error-classification.md, cache_layer: stable }   # v6.1 — taxonomie classes + pilotage build_loop
@@ -465,7 +465,14 @@ code-reviewer:
     - moderate: "🔴 RED dès 1 issue moderate ou pire"
     - minor: "🔴 RED dès 1 issue (strict)"
   hard_blocking_classes:                          # override CodeReviewFailOn → toujours 🔴 RED
-    - "[REVIEW_SECRETS_HARDCODED]"                # sécurité critique
+    # NOTE v7.0.0-alpha (audit P2 2026-06-06) — [REVIEW_SECRETS_HARDCODED] retiré :
+    # ownership exclusif délégué à security-reviewer ([SEC_SECRET_HARDCODED], CWE-798)
+    # cf. error-classification.md §1.10. code-reviewer peut encore émettre la classe
+    # en `issues.minor` à titre informationnel (pointeur vers security-reviewer),
+    # mais elle n'est plus hard-blocking ici pour éviter le double-rapport sur les
+    # mêmes file:line. La dé-dup cross-source (REVIEW_SECRETS_HARDCODED ↔
+    # SEC_SECRET_HARDCODED) reste assurée par sdd_review.deduplicate_findings()
+    # via CANONICAL_CLASS (cf. _review_fetch.py §6.10).
     - "[FRONTEND_BACKEND_CONTRACT_GAP]"           # feature ne marchera pas en prod
   exit_silent_when:
     - "CodeReviewMode: off"

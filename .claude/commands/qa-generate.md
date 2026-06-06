@@ -266,7 +266,7 @@ qa-generate {n}-{FeatName} → {GREEN | YELLOW | RED}
 
 Mode           : {mode}
 Tests          : {passed}/{total} passants ({skipped} skipped, {failed} échec(s))
-Coverage       : {pct}% (seuil {CoverageMin}%) → {pass | gap}
+Coverage       : {pct}% (seuil {CoverageMin}% — obligatoire) → {pass | gap}
 Quality scan   : {errors} errors / {warnings} warnings / {info} info
 Linter         : {linter_warnings} warnings
 

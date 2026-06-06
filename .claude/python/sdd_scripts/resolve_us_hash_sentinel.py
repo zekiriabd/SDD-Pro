@@ -36,14 +36,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sdd_lib.exit_codes import SUCCESS, INFRA_BLOCKED, CORRECTIBLE  # noqa: E402
+from sdd_lib.paths import project_root_for_hook as _resolve_project_root
 
 SENTINEL = "sha256:COMPUTE_REQUIRED"
-
-
-def _resolve_project_root() -> Path:
-    # Audit 2026-06-06 CR-3 — see sdd_lib.paths.project_root_for_hook.
-    from sdd_lib.paths import project_root_for_hook
-    return project_root_for_hook()
 
 
 def _find_feat_file(root: Path, feat_number: int) -> Path | None:
