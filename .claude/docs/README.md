@@ -1,148 +1,126 @@
-# 📚 SDD_Pro Documentation
+# 📚 Documentation SDD_Pro
 
-> **Spec-Driven Development for Claude Code** — a multi-agent framework that turns functional specifications into production-ready code through 12 specialized AI agents, deterministic Python orchestration, and 5 quality reviewers.
+> **Spec-Driven Development pour Claude Code** — un framework multi-agent qui transforme des spécifications fonctionnelles en code prêt-à-livrer, via 12 agents IA spécialisés, une orchestration Python déterministe, et 5 reviewers qualité.
 
-This is the documentation hub. Every doc has a purpose and a target audience. Pick your path below.
+C'est le hub de documentation. Chaque doc a un objectif et une audience cible. Choisis ton parcours ci-dessous.
 
----
-
-## 🚀 I want to start using SDD_Pro
-
-| Step | Goal | Doc |
-|---|---|---|
-| **1** | Understand what SDD_Pro is in 5 min | [getting-started.md](getting-started.md) |
-| **2** | Get a working project in 30 min | [cookbook.md](cookbook.md) |
-| **3** | Learn the vocabulary | [glossary.md](glossary.md) |
-| **4** | Configure a brownfield repo | [quickstart.md](quickstart.md) |
-| **5** | Pick a stack combo | [validated-combos.md](validated-combos.md) |
+> 🇫🇷 **Documentation FR canonique**. Versions EN disponibles via le sélecteur de langue (en haut à droite). Si une page EN n'existe pas, fallback automatique sur le FR.
 
 ---
 
-## 📖 I want to understand the framework deeply
+## 🚀 Je veux commencer à utiliser SDD_Pro
 
-| Topic | Audience | Doc |
+| Étape | Objectif | Doc |
 |---|---|---|
-| Pipeline visualization (mermaid) | Architect / Tech Lead | [workflow.md](workflow.md) |
-| Component model (agents, rules, hooks) | Architect / Tech Lead | [architecture.md](architecture.md) |
-| Why these design choices | All | [principles/source-first.md](principles/source-first.md) |
-| User story granularity rules | PO / Tech Lead | [principles/us-granularity.md](principles/us-granularity.md) |
+| **1** | Comprendre SDD_Pro en 5 minutes | [getting-started.md](getting-started.md) |
+| **2** | Obtenir un projet fonctionnel en 30 minutes | [cookbook.md](cookbook.md) |
+| **3** | Apprendre le vocabulaire | [glossary.md](glossary.md) |
+| **4** | Configurer un repo brownfield | [quickstart.md](quickstart.md) |
+| **5** | Choisir une combo de stacks | [validated-combos.md](validated-combos.md) |
+
+---
+
+## 📖 Je veux comprendre le framework en profondeur
+
+| Sujet | Audience | Doc |
+|---|---|---|
+| Visualisation du pipeline (mermaid) | Architecte / Tech Lead | [workflow.md](workflow.md) |
+| Modèle de composants (agents, rules, hooks) | Architecte / Tech Lead | [architecture.md](architecture.md) |
+| Pourquoi ces choix de conception | Tous | [principles/source-first.md](principles/source-first.md) |
+| Règles de granularité des User Stories | PO / Tech Lead | [principles/us-granularity.md](principles/us-granularity.md) |
 | Anti-derive + idempotence + plans | Tech Lead | [conventions.md](conventions.md) |
 
 ---
 
-## 🔧 I need reference (cards)
+## 🔧 J'ai besoin d'une référence (fiches)
 
-| Reference | Purpose | Doc |
+| Référence | Objet | Doc |
 |---|---|---|
-| **12 agents** | Role / Model / Inputs / Outputs / Verdicts | [agents-reference.md](agents-reference.md) |
-| **20 commands** | Args / Flags / Agents / Outputs | [commands-reference.md](commands-reference.md) |
-| **Project Config (43 keys)** | Layered config + defaults + ranges | [configuration-reference.md](configuration-reference.md) |
-| **Error classes** | Taxonomy (167 prefixes `[CLASS]`) | [../rules/error-classification.md](../rules/error-classification.md) |
-| **Hooks + protections** | 11 Claude Code hooks wired | [hooks-and-protections.md](hooks-and-protections.md) |
+| **12 agents** | Rôle / Modèle / Entrées / Sorties / Verdicts | [agents-reference.md](agents-reference.md) |
+| **20 commandes** | Args / Flags / Agents / Sorties | [commands-reference.md](commands-reference.md) |
+| **Project Config (43 clés)** | Config layered + defaults + plages | [configuration-reference.md](configuration-reference.md) |
+| **Classes d'erreur** | Taxonomie (167 préfixes `[CLASS]`) | [../rules/error-classification.md](../rules/error-classification.md) |
+| **Hooks + protections** | 11 hooks Claude Code câblés | [hooks-and-protections.md](hooks-and-protections.md) |
 
 ---
 
-## 🛟 I have an error / question
+## 🛟 J'ai une erreur / question
 
 | Situation | Doc |
 |---|---|
-| Common errors + recovery | [troubleshooting.md](troubleshooting.md) |
-| Config precedence (base ← team ← project) | [config-precedence.md](config-precedence.md) |
-| Cleanup orphan files | [orphan-cleanup-policy.md](orphan-cleanup-policy.md) |
-| Stack version mismatch | [validated-combos.md](validated-combos.md) |
+| Erreurs courantes + récupération | [troubleshooting.md](troubleshooting.md) |
+| Précédence de config (base ← team ← project) | [config-precedence.md](config-precedence.md) |
+| Nettoyer les fichiers orphelins | [orphan-cleanup-policy.md](orphan-cleanup-policy.md) |
+| Décalage de version de stack | [validated-combos.md](validated-combos.md) |
 
 ---
 
-## 🤝 I want to contribute
+## 🤝 Je veux contribuer
 
 | Contribution | Doc |
 |---|---|
-| Code / docs / fixes | [../../CONTRIBUTING.md](../../CONTRIBUTING.md) |
-| Working agreement | [WORKING-AGREEMENT.md](WORKING-AGREEMENT.md) |
-| Versioning policy | [VERSIONING.md](VERSIONING.md) |
-| Add a new stack | [../stacks/README.md](../stacks/README.md) |
+| Code / docs / corrections | [../../CONTRIBUTING.md](../../CONTRIBUTING.md) |
+| Accord de travail (working agreement) | [WORKING-AGREEMENT.md](WORKING-AGREEMENT.md) |
+| Politique de versioning | [VERSIONING.md](VERSIONING.md) |
+| Ajouter un nouveau stack | [../stacks/README.md](../stacks/README.md) |
 
 ---
 
-## 📜 I'm reading history / changelogs
+## 📜 Je consulte l'historique / changelogs
 
-| Doc | Content |
+| Doc | Contenu |
 |---|---|
-| [CHANGELOG.md](CHANGELOG.md) | Version-by-version release notes |
-| [MIGRATION.md](MIGRATION.md) | v6 → v7 upgrade guides |
+| [CHANGELOG.md](CHANGELOG.md) | Notes de version (par release) |
+| [MIGRATION.md](MIGRATION.md) | Guides de mise à niveau v6 → v7 |
 | [adrs/](adrs/) | Architecture Decision Records |
-| [roadmap-v7-v8.md](roadmap-v7-v8.md) | What's coming next |
+| [roadmap-v7-v8.md](roadmap-v7-v8.md) | Ce qui arrive après |
 
 ---
 
 ## 📊 ROI & benchmarks
 
-| Doc | Purpose |
+| Doc | Objet |
 |---|---|
-| [poc-roi-methodology.md](poc-roi-methodology.md) | How to validate a new stack |
-| [benchmarks/](benchmarks/) | Run reports + known gaps |
-| [cache-strategy.md](cache-strategy.md) | Prompt caching plan (v7.1 target) |
+| [poc-roi-methodology.md](poc-roi-methodology.md) | Comment valider un nouveau stack |
+| [benchmarks/](benchmarks/) | Rapports de runs + gaps connus |
+| [cache-strategy.md](cache-strategy.md) | Plan de cache prompts (cible v7.1) |
 
 ---
 
-## 🏛 Subsystems
+## 🏛 Sous-systèmes
 
-| Subsystem | Doc |
+| Sous-système | Doc |
 |---|---|
-| **Arch phases** (A/B/C deep dive) | [arch/phase-a-config-propagation.md](arch/phase-a-config-propagation.md), [arch/phase-b-db-scaffolding.md](arch/phase-b-db-scaffolding.md), [arch/phase-c-claude-md-generation.md](arch/phase-c-claude-md-generation.md) |
-| **Python codebase** | [../python/README.md](../python/README.md) |
-| **Stacks catalog** | [../stacks/README.md](../stacks/README.md) |
-| **Rules** (5 consolidated + 3 annexes) | [../rules/](../rules/) |
+| **Phases arch** (A/B/C deep dive) | [arch/phase-a-config-propagation.md](arch/phase-a-config-propagation.md), [arch/phase-b-db-scaffolding.md](arch/phase-b-db-scaffolding.md), [arch/phase-c-claude-md-generation.md](arch/phase-c-claude-md-generation.md) |
+| **Codebase Python** | [../python/README.md](../python/README.md) |
+| **Catalogue stacks** | [../stacks/README.md](../stacks/README.md) |
+| **Règles** (5 consolidées + 3 annexes) | [../rules/](../rules/) |
 
 ---
 
-## 🗺 Documentation map
+## ❓ Toujours perdu ?
 
-```
-.claude/docs/
-├── README.md                  ← you are here
-│
-├── getting-started.md         ← START HERE if you're new
-├── cookbook.md                ← 30-min recipe to a working project
-├── quickstart.md              ← brownfield / detailed setup
-├── glossary.md                ← canonical vocabulary
-│
-├── architecture.md            ← agents, rules, hooks model
-├── workflow.md                ← pipeline phases (FEAT → US → Code)
-├── conventions.md             ← anti-derive, idempotence, plans
-├── configuration-reference.md ← all 43 Project Config keys
-│
-├── agents-reference.md        ← 12 agent reference cards
-├── commands-reference.md      ← 20 command reference cards
-├── troubleshooting.md         ← common errors + FAQ
-│
-├── principles/                ← design principles (source-first, US granularity)
-├── arch/                      ← arch agent deep dives (A/B/C)
-├── adrs/                      ← Architecture Decision Records
-├── benchmarks/                ← run reports, known gaps
-│
-├── CHANGELOG.md               ← release notes
-├── MIGRATION.md               ← v6 → v7 upgrade
-├── VERSIONING.md              ← SemVer policy
-├── WORKING-AGREEMENT.md       ← contribution norms
-│
-├── hooks-and-protections.md   ← 11 Claude Code hooks reference
-├── config-precedence.md       ← base ← team ← project layering
-├── orphan-cleanup-policy.md   ← workspace cleanup
-├── poc-roi-methodology.md     ← validating new stacks
-├── cache-strategy.md          ← prompt caching plan (v7.1)
-├── validated-combos.md        ← 2 GREEN combos + roadmap
-└── roadmap-v7-v8.md           ← what's next
-```
+- **Nouveau contributeur ?** Lis `getting-started.md` + `cookbook.md` (1h au total).
+- **Onboarding repo brownfield ?** Lance `/sdd-discover-stack`, puis lis `quickstart.md`.
+- **Pipeline qui plante ?** Ouvre `troubleshooting.md` et grep ta classe d'erreur `[XXX]`.
+- **Ajouter un stack ?** Lis d'abord `poc-roi-methodology.md` (le critère de validation est réel).
+- **Lire un rapport d'audit ?** Voir `architecture.md §3` (qui écrit quoi).
+
+> 💡 **Astuce** : l'entry-point `.claude/CLAUDE.md` (150 lignes) est un index slim — chaque section y pointe vers les docs détaillées que tu vois ici. Si tu ne lis que 2 fichiers, choisis `CLAUDE.md` + cette page.
 
 ---
 
-## ❓ Still lost?
+## 🌐 Statut des traductions
 
-- **New contributor?** Read `getting-started.md` + `cookbook.md` (1 hour total).
-- **Onboarding a brownfield repo?** Run `/sdd-discover-stack`, then `quickstart.md`.
-- **Debugging a failing pipeline?** Open `troubleshooting.md` and grep your error class `[XXX]`.
-- **Adding a stack?** Read `poc-roi-methodology.md` first to understand the validation bar.
-- **Reviewing an audit report?** Check `architecture.md §3` for who-writes-what.
+| Page | FR | EN |
+|---|:---:|:---:|
+| README (cette page) | ✅ canonique | ✅ |
+| Getting Started | ✅ canonique | ✅ |
+| Agents Reference | ✅ canonique | ✅ (contenu technique anglo-friendly) |
+| Commands Reference | ✅ canonique | ✅ (contenu technique anglo-friendly) |
+| Configuration Reference | ✅ canonique | 🟡 fallback FR |
+| Troubleshooting | ✅ canonique | 🟡 fallback FR |
+| Architecture | ✅ canonique | 🟡 fallback FR |
+| Autres pages | ✅ canonique | 🟡 fallback FR |
 
-> 💡 **Tip** : the entry point `.claude/CLAUDE.md` (150 lines) is a slim index — every section there links into the docs you see here. If you only ever read 2 files, make them `CLAUDE.md` + this one.
+> Quand une page EN manque, le sélecteur de langue retombe gracieusement sur la version FR (via `fallback_to_default: true` dans `mkdocs.yml`). Contributions EN bienvenues — ajouter `page.en.md` à côté de `page.md`.

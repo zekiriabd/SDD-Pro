@@ -59,7 +59,7 @@ nav:
 # ─── Theme — Material Design ─────────────────────────────────────────────────
 theme:
   name: material
-  language: fr   # primary language (FR docs canonical, EN secondary)
+  language: fr   # primary language (FR docs canonical) ; EN via i18n plugin
   logo: assets/logo.svg     # optional — place at .claude/docs/assets/logo.svg
   favicon: assets/favicon.ico
 
@@ -117,6 +117,59 @@ theme:
 
 # ─── Plugins ─────────────────────────────────────────────────────────────────
 plugins:
+  # i18n FIRST — defines languages before search uses them
+  - i18n:
+      docs_structure: suffix       # page.md (FR default) + page.en.md (EN)
+      reconfigure_material: true   # auto-add language switcher to topbar
+      reconfigure_search: true     # search adapts per language
+      fallback_to_default: true    # if EN page missing, fall back to FR
+      languages:
+        - locale: fr
+          default: true
+          name: Français
+          build: true
+        - locale: en
+          name: English
+          build: true
+          site_name: SDD_Pro — Spec-Driven Development for Claude Code
+          nav_translations:
+            Home: Home
+            Getting Started: Getting Started
+            Reference: Reference
+            Architecture: Architecture
+            Operations: Operations
+            Governance: Governance
+            Subsystems: Subsystems
+            Tutorial (30 min): Tutorial (30 min)
+            Cookbook (10 min recipes): Cookbook (10 min recipes)
+            Quickstart (brownfield): Quickstart (brownfield)
+            Glossary: Glossary
+            Agents (12 cards): Agents (12 cards)
+            Commands (20 cards): Commands (20 cards)
+            Configuration (43 keys): Configuration (43 keys)
+            Hooks & Protections: Hooks & Protections
+            Component model: Component model
+            Pipeline workflow: Pipeline workflow
+            Conventions: Conventions
+            Source-first principle: Source-first principle
+            US granularity: US granularity
+            Troubleshooting + FAQ: Troubleshooting + FAQ
+            Config precedence: Config precedence
+            Orphan cleanup: Orphan cleanup
+            Cache strategy: Cache strategy
+            Validated combos: Validated combos
+            Versioning: Versioning
+            Working Agreement: Working Agreement
+            Changelog: Changelog
+            Migration v6→v7: Migration v6→v7
+            Roadmap v7→v8: Roadmap v7→v8
+            PoC ROI methodology: PoC ROI methodology
+            Arch — Phase A (config propagation): Arch — Phase A (config propagation)
+            Arch — Phase B (DB scaffolding): Arch — Phase B (DB scaffolding)
+            Arch — Phase C (CLAUDE.md generation): Arch — Phase C (CLAUDE.md generation)
+            Benchmarks index: Benchmarks index
+            Known gaps: Known gaps
+
   - search:
       lang:
         - fr
