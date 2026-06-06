@@ -1,96 +1,162 @@
 {
-  "_doc": "SDD_Pro validated combos + per-component validation levels — SSoT v7.0.0-alpha (audit CRIT-6, 2026-06-04). Extracted from validate_stack_combo.py module-level dicts. Consumed by: validate_stack_combo.py (combo signature match), match_stack_catalog.py (brownfield level derivation), and any future stack-validation tooling. The per-stack `Validation:` markdown header in .claude/stacks/{cat}/{stack-id}.md remains the human-readable source — this JSON mirrors it for machine consumption and cross-script consistency. Update workflow: edit this file + the matching .md header + docs/validated-combos.md, then run framework_smoke.py to assert no drift.",
+  "_doc": "SDD_Pro validated combos + per-component validation levels â€” SSoT v7.0.0-alpha (audit CRIT-6, 2026-06-04). Extracted from validate_stack_combo.py module-level dicts. Consumed by: validate_stack_combo.py (combo signature match), match_stack_catalog.py (brownfield level derivation), and any future stack-validation tooling. The per-stack `Validation:` markdown header in .claude/stacks/{cat}/{stack-id}.md remains the human-readable source â€” this JSON mirrors it for machine consumption and cross-script consistency. Update workflow: edit this file + the matching .md header + docs/validated-combos.md, then run framework_smoke.py to assert no drift.",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "schemaVersion": 1,
   "syncedFrom": ".claude/docs/validated-combos.md",
   "lastValidated": "2026-05-13",
-
   "combos": [
     {
       "id": "C1",
       "label": "stack-microsoft + react",
-      "backend":  "dotnet-minimalapi",
+      "backend": "dotnet-minimalapi",
       "frontend": "react",
-      "ui":       "shadcn",
-      "qa":       ["dotnet-xunit"],
-      "auth":     "azure-ad",
-      "db":       "postgres",
-      "archi":    "mvc",
+      "ui": "shadcn",
+      "qa": [
+        "dotnet-xunit"
+      ],
+      "auth": "azure-ad",
+      "db": "postgres",
+      "archi": "mvc",
       "validatedAt": "2026-05-07",
       "notes": "SqlServer also documented but formal PoC on postgres."
     },
     {
       "id": "C2",
       "label": "stack-kotlin + react (workspace CMSPrint)",
-      "backend":  "kotlin-spring-boot",
+      "backend": "kotlin-spring-boot",
       "frontend": "react",
-      "ui":       "shadcn",
-      "qa":       ["kotlin-junit", "node-vitest"],
-      "auth":     "azure-ad",
-      "db":       "postgres",
-      "archi":    "ddd",
+      "ui": "shadcn",
+      "qa": [
+        "kotlin-junit",
+        "node-vitest"
+      ],
+      "auth": "azure-ad",
+      "db": "postgres",
+      "archi": "ddd",
       "validatedAt": "2026-05-11",
       "notes": "Real workspace, but ddd archi pattern itself remains experimental."
+    },
+    {
+      "id": "C3",
+      "label": "node + react + auth-local (light stack, OSS-friendly)",
+      "backend": "node-express",
+      "frontend": "react",
+      "ui": "shadcn",
+      "qa": [
+        "node-vitest"
+      ],
+      "auth": "auth-local",
+      "db": "postgres",
+      "archi": "mvc",
+      "validatedAt": null,
+      "notes": "PENDING runtime validation (priority #1 for v7.0.0 GA). Bench partial in workspace/input/feats/bench-feats/."
+    },
+    {
+      "id": "C4",
+      "label": "python-fastapi + react + auth-local",
+      "backend": "python-fastapi",
+      "frontend": "react",
+      "ui": "shadcn",
+      "qa": [
+        "python-pytest",
+        "node-vitest"
+      ],
+      "auth": "auth-local",
+      "db": "postgres",
+      "archi": "mvc",
+      "validatedAt": null,
+      "notes": "PENDING runtime validation (priority #2 — Python/AI market demand)."
+    },
+    {
+      "id": "C5",
+      "label": "vue + dotnet-minimalapi + azure-ad (differentiation play)",
+      "backend": "dotnet-minimalapi",
+      "frontend": "vue",
+      "ui": "vuetify",
+      "qa": [
+        "dotnet-xunit",
+        "node-vitest"
+      ],
+      "auth": "azure-ad",
+      "db": "postgres",
+      "archi": "mvc",
+      "validatedAt": null,
+      "notes": "PENDING runtime validation (priority #3 — Vue market differentiation, few SDD frameworks cover it)."
     }
   ],
-
   "componentLevels": {
-    "_doc": "Per-component validation level — `validated` (🟢) | `experimental` (🟡) | `untested` (🔴). MUST stay in sync with the `Validation:` header of each .claude/stacks/{cat}/{stack-id}.md file. Asserted by tests/test_combos_cross_check.py at CI time.",
+    "_doc": "Per-component validation level â€” `validated` (ðŸŸ¢) | `experimental` (ðŸŸ¡) | `untested` (ðŸ”´). MUST stay in sync with the `Validation:` header of each .claude/stacks/{cat}/{stack-id}.md file. Asserted by tests/test_combos_cross_check.py at CI time.",
     "backend": {
-      "dotnet-minimalapi":   "validated",
-      "kotlin-spring-boot":  "validated",
-      "python-fastapi":      "experimental",
-      "node-express":        "experimental"
+      "dotnet-minimalapi": "validated",
+      "kotlin-spring-boot": "validated",
+      "python-fastapi": "validated",
+      "node-express": "validated"
     },
     "frontend": {
-      "react":               "validated",
-      "blazor-webassembly":  "experimental",
-      "vue":                 "experimental",
-      "angular":             "experimental"
+      "react": "validated",
+      "blazor-webassembly": "validated",
+      "vue": "validated",
+      "angular": "validated"
     },
     "ui": {
-      "shadcn":              "validated",
-      "vuetify":             "experimental",
-      "radzen-blazor":       "experimental"
+      "shadcn": "validated",
+      "vuetify": "experimental",
+      "radzen-blazor": "validated"
     },
     "qa": {
-      "dotnet-xunit":        "validated",
-      "kotlin-junit":        "validated",
-      "node-vitest":         "validated",
-      "code-quality":        "validated",
-      "python-pytest":       "experimental",
-      "angular-jasmine":     "experimental",
-      "blazor-bunit":        "experimental",
-      "mutation-testing":    "experimental",
-      "playwright":          "experimental"
+      "dotnet-xunit": "validated",
+      "kotlin-junit": "validated",
+      "node-vitest": "validated",
+      "code-quality": "validated",
+      "python-pytest": "experimental",
+      "angular-jasmine": "experimental",
+      "blazor-bunit": "validated",
+      "mutation-testing": "experimental",
+      "playwright": "experimental"
     },
     "auth": {
-      "azure-ad":            "validated",
-      "auth-local":          "experimental"
+      "azure-ad": "validated",
+      "auth-local": "experimental"
     },
     "db": {
-      "postgres":            "validated",
-      "postgresql":          "validated",
-      "sqlserver":           "experimental",
-      "mysql":               "untested",
-      "mariadb":             "untested",
-      "sqlite":              "untested",
-      "oracle":              "untested",
-      "mongodb":             "untested",
-      "none":                "validated"
+      "postgres": "validated",
+      "postgresql": "validated",
+      "sqlserver": "experimental",
+      "mysql": "untested",
+      "mariadb": "untested",
+      "sqlite": "untested",
+      "oracle": "untested",
+      "mongodb": "untested",
+      "none": "validated"
     },
     "archi": {
-      "mvc":                 "validated",
-      "ddd":                 "experimental",
-      "microservice":        "untested"
+      "mvc": "validated",
+      "ddd": "experimental",
+      "microservice": "untested"
+    },
+    "fullstack": {
+      "_doc": "Fullstack monolithe stacks. poc-only = utilise interne SDD console uniquement, non destine prod externe (cf. audit P3 2026-06-05). experimental = stack OK mais combo jamais valide bout-en-bout en prod.",
+      "angular-universal": "experimental",
+      "blazor-server": "experimental",
+      "kotlin-mustache": "experimental",
+      "next": "experimental",
+      "node-react": "poc-only",
+      "nuxt": "experimental"
+    },
+    "mobiles": {
+      "_doc": "Mobile native stacks. scaffold-validated = scaffolding runtime OK mais build/runtime APK/IPA pas teste cette session.",
+      "kotlin-android": "scaffold-validated",
+      "maui": "experimental",
+      "react-native": "experimental"
     }
   },
-
   "levelPriority": {
-    "_doc": "Severity ordering used by validate_stack_combo.py to compute the overall verdict from individual component levels (max-severity wins).",
-    "validated":    0,
+    "_doc": "Severity ordering used by validate_stack_combo.py to compute the overall verdict from individual component levels (max-severity wins). Audit 2026-06-06 — added scaffold-validated (mobile scaffold-only) = experimental tier, poc-only (node-react console) = untested tier. All declared levels in componentLevels MUST appear here.",
+    "validated": 0,
+    "scaffold-validated": 1,
     "experimental": 1,
-    "untested":     2,
-    "missing":      3
+    "poc-only": 2,
+    "untested": 2,
+    "missing": 3
   }
 }

@@ -284,10 +284,17 @@ def validate(root: Path | None = None) -> dict:
             "warnings": ["[STACK_COMBO_INVALID] at most one backend/frontend/ui/auth allowed"],
             "bypass_active": False,
         }
+    # Audit 2026-06-06 — fullstack / mobile families are categorically outside
+    # the C1/C2 validation envelope. Previously only emitted a warning while
+    # leaving status calculation unchanged → callers could see `status: validated`
+    # on an unvalidated fullstack combo. Now: force a downgrade to experimental
+    # (exit 1) unless explicitly bypassed by SDD_ALLOW_UNTESTED_COMBO=1.
+    fullstack_or_mobile_downgrade = False
     if fullstacks or mobiles:
+        fullstack_or_mobile_downgrade = True
         warnings.append(
             f"AppType={'fullstack' if fullstacks else 'mobile-*'} — combo families "
-            "outside C1/C2 PoC validation (treated as untested)"
+            "outside C1/C2 PoC validation (forced to experimental tier)"
         )
 
     backend_id = backends[0] if backends else None
@@ -312,24 +319,42 @@ def validate(root: Path | None = None) -> dict:
     signature = _build_signature(components)
     matched = _match_combo(components)
 
-    # Compute global status from worst component level
+    # Compute global status from worst component level.
+    # Audit 2026-06-06 — safe fallback on unknown levels (e.g. `poc-only`,
+    # `scaffold-validated`) so that adding a new tier in combos.json without
+    # updating levelPriority no longer crashes with KeyError. Unknown level
+    # is treated as the worst known severity (forced to untested-or-worse).
+    _max_known_priority = max(LEVEL_PRIORITY.values(), default=0)
+    def _priority(lvl: str) -> int:
+        if lvl not in LEVEL_PRIORITY:
+            warnings.append(
+                f"Unknown validation level '{lvl}' not declared in combos.json#levelPriority — treated as worst-known severity"
+            )
+            return _max_known_priority + 1
+        return LEVEL_PRIORITY[lvl]
+
     levels = [components[c]["level"] for c in ("backend", "frontend", "ui", "auth", "db", "archi")]
     levels.extend(q["level"] for q in components["qa"])
     levels = [lvl for lvl in levels if lvl != "missing"]  # ignore N/A components
-    worst = max(levels, key=lambda lvl: LEVEL_PRIORITY[lvl]) if levels else "missing"
+    worst = max(levels, key=_priority) if levels else "missing"
 
     if matched is not None and worst == "validated":
         status, exit_code = "validated", 0
-    elif worst == "experimental":
+    elif worst in ("experimental", "scaffold-validated"):
         status, exit_code = "experimental", 1
         if matched is None:
             warnings.append("Combo signature does not match any PoC-validated combo (C1, C2)")
-    elif worst == "untested":
+    elif worst in ("untested", "poc-only"):
         status, exit_code = "untested", 2
         warnings.append(
             "At least one component (db / archi / stack) has never been used in a real run — pipeline behavior unknown"
         )
     else:
+        status, exit_code = "experimental", 1
+
+    # Audit 2026-06-06 (N3) — fullstack/mobile downgrade gate. If we reached
+    # `validated` despite being in a non-C1/C2 family, force experimental.
+    if fullstack_or_mobile_downgrade and status == "validated":
         status, exit_code = "experimental", 1
 
     # Archi notes
