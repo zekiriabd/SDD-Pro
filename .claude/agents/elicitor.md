@@ -374,7 +374,4 @@ lire stacks/UI.
 
 ## Chat Output Protocol
 
-Applique `@.claude/rules/output-protocol.md`. Label `[ELICITOR]`, plage `5-8%`,
-granularité 2-3 updates. Erreurs : chat 1L (`🔴 [ELICITOR/FAIL] résumé — [CLASS]
-détail → rapport.md (X%)`) + bloc ERROR 3L disque préservé
-(cf. `error-classification.md §2`). Bypass `SDD_CHAT_VERBOSE=1`.
+Applique `@.claude/rules/output-protocol.md` (label `[ELICITOR]`, plage `5-8%`).

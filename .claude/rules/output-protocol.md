@@ -166,9 +166,11 @@ Régression possible uniquement sur `[…/FIXING]` (retry, le % du retry
 | API Gate (in-memory) | `[QA]` (gate API) | 58-66 |
 | Frontend (ALL US) | `[DEV-FRONTEND]` | 66-78 |
 | QA (tests + coverage) | `[QA]` | 78-88 |
-| Code + spec review | `[CODE-REVIEW]` / `[SPEC-REVIEW]` | 88-94 |
-| Security review | `[SECURITY]` | 94-97 |
-| Arch review + adversarial | `[ARCH-REVIEW]` / `[ADV-REVIEW]` | 97-99 |
+| Code review | `[CODE-REVIEW]` | 88-91 |
+| Spec compliance | `[SPEC-REVIEW]` | 91-94 |
+| Security review | `[SECURITY]` | 94-96 |
+| Arch review | `[ARCH-REVIEW]` | 96-98 |
+| Adversarial review (opt-in) | `[ADV-REVIEW]` | 98-99 (cf. audit P0-doc 2026-06-05 — ne pas chevaucher `[DONE]` 100%) |
 | Verdict final | `[DONE]` | 100 |
 
 Invocation isolée (ex. `/dev-backend 1-1` hors `/sdd-full`) : 0%→100% sur scope local.

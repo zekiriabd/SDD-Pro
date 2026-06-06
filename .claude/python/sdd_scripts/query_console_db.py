@@ -41,15 +41,31 @@ def _dict_row(row: sqlite3.Row | None) -> dict | None:
 
 
 def query_api_gate(feat: int) -> dict:
+    """Return the most recent API Gate row for `feat`.
+
+    v7.0.0-alpha audit P3 (2026-06-06) — exposes both `status` (canonical
+    PASS|WARN|FAIL|SKIPPED|INFRA_BLOCKED, cf. build-and-loop.md §1.3) and
+    `gate_passed` (legacy boolean). Callers should prefer `status` when
+    available so that SKIPPED is distinguishable from PASS.
+
+    On pre-v5 DBs where the column did not yet exist, the `status` field is
+    derived from the boolean+counters for forward compatibility.
+    """
     with connect_ro() as conn:
+        # Detect column presence to stay tolerant of pre-migration DBs opened
+        # for read-only inspection (no auto-migration on RO connections).
+        cols = {r[1] for r in conn.execute("PRAGMA table_info(qa_api_tests)")}
+        has_status = "status" in cols
+        select = (
+            "SELECT gate_passed, status, tests_total, tests_passed, "
+            "tests_failed, endpoints_total, extracted_at"
+            if has_status else
+            "SELECT gate_passed, tests_total, tests_passed, tests_failed, "
+            "endpoints_total, extracted_at"
+        )
         row = conn.execute(
-            """
-            SELECT gate_passed, tests_total, tests_passed, tests_failed,
-                   endpoints_total, extracted_at
-              FROM qa_api_tests
-             WHERE feat_n = ?
-             ORDER BY id DESC LIMIT 1
-            """,
+            f"{select} FROM qa_api_tests WHERE feat_n = ? "
+            "ORDER BY id DESC LIMIT 1",
             (feat,),
         ).fetchone()
     if row is None:
@@ -57,6 +73,16 @@ def query_api_gate(feat: int) -> dict:
     d = dict(row)
     d["present"] = True
     d["gate_passed"] = bool(d["gate_passed"])
+    if not has_status or not d.get("status"):
+        # Derive canonical status for legacy rows / pre-migration DBs.
+        if (d.get("tests_failed") or 0) >= 1:
+            d["status"] = "FAIL"
+        elif d["gate_passed"] and (d.get("tests_total") or 0) == 0:
+            d["status"] = "SKIPPED"
+        elif d["gate_passed"]:
+            d["status"] = "PASS"
+        else:
+            d["status"] = "FAIL"
     return d
 
 

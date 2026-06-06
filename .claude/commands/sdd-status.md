@@ -35,8 +35,8 @@ STOP.
 ce que les scripts font déjà avec moins de bugs).
 
 ```bash
-# État global (arch + DB + CLAUDE.md projets)
-python .claude/python/sdd_scripts/sdd_state.py status [--feat {n}]
+# État global (runs + phases + last_run agrégés depuis console.db)
+python .claude/python/sdd_scripts/sdd_state.py status [--feat-number {n}]
 
 # Métriques QA persistées dans console.db (tables qa_coverage / qa_quality / qa_api_tests / …)
 python .claude/python/sdd_scripts/query_console_db.py feat-stats --feat {n}

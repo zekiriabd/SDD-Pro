@@ -1,10 +1,7 @@
 # /arch-init — Bootstrap idempotent (projets vides + scaffolding DB)
 
-> ⚠️ **Commande interne v7.0.0** — invoquée par /dev-run STEP 5.
-> Bootstrap projet idempotent — invoqué automatiquement.
-> Utilisateur final : préférer la commande orchestrante (`/sdd-full` ou `/dev-run`)
-> qui gère pré-conditions, idempotence et état. Conservée comme command pour
-> debug/inspection ciblée et préservation des chaînes d'invocation documentées.
+> ⚠️ **Commande interne v7.0.0** — invoquée par `/dev-run` STEP 5.
+> Utilisateur final : préférer `/sdd-full` ou `/dev-run` (gèrent pré-conditions, idempotence, état).
 
 Invoque l'agent `arch` pour préparer l'**ossature complète** du projet
 à partir des stacks actifs :
@@ -75,6 +72,54 @@ gère :
   Database-First (entities + DbContext)
 
 Attendre la fin de l'agent. Relayer sa sortie telle quelle.
+
+---
+
+## STEP 3.5 — Spawn `constitutioner` si sentinel posé (no-spawn fix, v7.0.0-alpha audit P0-workflow 2026-06-05)
+
+> **v7.0.0-alpha (audit P0-workflow 2026-06-05)** — déplacé depuis
+> `agents/arch.md` STEP 12.5 qui violait
+> `@.claude/rules/build-and-loop.md §3.bis` (no-spawn cross-agent).
+> Le spawn vit désormais ici, côté commande orchestrante, où il est
+> autorisé. L'agent `arch` se contente de poser un sentinel disque
+> que ce STEP lit.
+
+Lire le sentinel `workspace/output/.sys/.state/arch-ready-for-constitutioner.flag`.
+
+| Cas | Action |
+|---|---|
+| Sentinel absent | skip silencieusement (arch n'a pas eu besoin de Phase D, ex: projet pré-SDD_Pro v3 sans `constitution.md`) |
+| Sentinel présent + parseable | spawn `Agent: constitutioner` (cf. ci-dessous) |
+| Sentinel présent + corrompu | WARN 1 ligne, skip (non-bloquant — la commande continue) |
+
+### Invocation `constitutioner`
+
+```
+Agent: constitutioner
+```
+
+Le sous-agent gère :
+- Création ADRs (numérotation atomique timestamp, idempotente) par
+  dimension active (backend, frontend, UI, auth, database)
+- Update `workspace/output/.sys/.context/constitution.md` : §4 stack
+  retenu (Edit ligne), §6 index ADRs (append), §1 date
+- Régénération `workspace/output/.sys/.context/adrs/INDEX.md`
+- Validation read-back v5.0 (anti Edit silencieux)
+
+### Cleanup sentinel
+
+Après que `constitutioner` ait terminé (succès OU échec), supprimer le
+sentinel (idempotence du prochain run) :
+
+```bash
+rm -f workspace/output/.sys/.state/arch-ready-for-constitutioner.flag
+```
+
+**Sortie attendue** :
+`constitutioner: {K} ADRs ({existants}+{nouveaux}), §4/§6/INDEX.md OK`.
+
+Sur ERROR `constitutioner` → propager + STOP (l'INDEX ADRs serait
+incohérent en aval).
 
 ---
 

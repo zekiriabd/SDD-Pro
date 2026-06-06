@@ -184,7 +184,7 @@ python -m sdd_scripts.ingest_agent_report --type adversarial --feat {n}
 ## STEP 6 — Output succès (chat 1 ligne)
 
 ```
-[ADV-REVIEW] Adversarial review feat-{n}: {N} attaques (informational). (99%)
+[ADV-REVIEW] Adversarial review feat-{n}: {N} attaques (informational). (98%)
 ```
 
 Pointer (1 ligne) :
@@ -231,8 +231,6 @@ d'un finding déjà couvert par les autres sources.
 
 ## Chat Output Protocol
 
-Applique `@.claude/rules/output-protocol.md`. Label `[ADV-REVIEW]` (v7.0.0-alpha
-audit M11 fix — dé-collision ex-`[REVIEW]`), plage `99-100%`. Granularité 2-3
-updates max — format `[ADV-REVIEW] Adversarial: {N} attaques. (99%)`. Verdict
-final 1 ligne (`informational`). Pas de chemin file en chat, pas de snippets.
+Applique `@.claude/rules/output-protocol.md` (label `[ADV-REVIEW]`, plage `98-99%`).
+Granularité 2-3 updates max ; verdict final 1L `informational` ; pas de file path en chat.
 Bypass `SDD_CHAT_VERBOSE=1`.

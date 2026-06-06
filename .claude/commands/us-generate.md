@@ -1,10 +1,7 @@
 # /us-generate — Découpe une FEAT en User Stories
 
-> ⚠️ **Commande interne v7.0.0** — invoquée par /sdd-full STEP 2.
-> Découpage FEAT → US — invoqué automatiquement.
-> Utilisateur final : préférer la commande orchestrante (`/sdd-full` ou `/dev-run`)
-> qui gère pré-conditions, idempotence et état. Conservée comme command pour
-> debug/inspection ciblée et préservation des chaînes d'invocation documentées.
+> ⚠️ **Commande interne v7.0.0** — invoquée par `/sdd-full` STEP 2.
+> Utilisateur final : préférer `/sdd-full` ou `/dev-run` (gèrent pré-conditions, idempotence, état).
 
 Invoque l'agent PO pour découper une FEAT fonctionnelle en User
 Stories structurées (cible 1-3, warning 4-6, hard cap 6) dans `workspace/output/`.
@@ -104,7 +101,7 @@ des fichiers US dans `workspace/output/`.
 Attendre la fin de l'agent. Relayer sa sortie telle quelle (ligne de succès
 ou bloc ERROR 3 lignes).
 
-### STEP 3.0 — Résoudre le sentinel `Parent FEAT hash` (v7.0.0-alpha, 2026-05-22)
+### STEP 3.0 — Résoudre le sentinel `Parent FEAT hash` (v7.0.0-alpha, 2026-05-22 ; refactor 2026-06-05)
 
 Si l'agent `po` a réussi (US écrites), patcher les sentinels
 `sha256:COMPUTE_REQUIRED` en hash sha256 réel **avant** STEP 3.bis.
@@ -114,46 +111,39 @@ Read, Write, Edit, Glob, Grep`) et ne peut pas calculer le hash
 lui-même. Il écrit le sentinel littéral, et cette commande le résout
 en post-step déterministe (0 token LLM, ~50 ms).
 
-**Invocation cross-platform unique** (v7.0.0 — remplace les variantes bash `sed -i`
-et PowerShell `Set-Content -Encoding utf8` qui produisaient un UTF-8 BOM sur
-Windows PowerShell 5.1, corrompant le frontmatter US) :
+> **v7.0.0-alpha audit P0-workflow 2026-06-05** — historiquement
+> l'inline `python -c "..."` vivait ici. Refactor : extrait vers
+> `sdd_scripts/resolve_us_hash_sentinel.py` (SSoT) + posé comme
+> SubagentStop hook matcher=`po` (defense-in-depth). Le hook ferme
+> le gap où `po` était invoqué standalone (hors `/us-generate`) et
+> laissait le sentinel non résolu → tous les downstream émettaient
+> `[FEAT_HASH_MISMATCH]`. Ce STEP reste le chemin nominal ; le hook
+> est un filet de sécurité (idempotent — no-op si déjà résolu).
+
+**Invocation** (déterministe, 0 token LLM, ~50 ms, cross-platform) :
 
 ```bash
-python -c "
-import hashlib, pathlib, sys
-feat = pathlib.Path('workspace/input/feats/{n}-{FeatName}.md')
-if not feat.is_file():
-    sys.exit('FEAT file missing: ' + str(feat))
-h = hashlib.sha256(feat.read_bytes()).hexdigest()[:8]
-patched = 0
-for p in sorted(pathlib.Path('workspace/output/us').glob('{n}-*.md')):
-    txt = p.read_text(encoding='utf-8')
-    if 'sha256:COMPUTE_REQUIRED' in txt:
-        new = txt.replace('sha256:COMPUTE_REQUIRED', 'sha256:' + h)
-        # write_text without BOM (Python default) + LF line endings preserved
-        p.write_text(new, encoding='utf-8', newline='')
-        patched += 1
-print(f'patched {patched} US file(s) with FEAT hash sha256:{h}')
-"
+python .claude/python/sdd_scripts/resolve_us_hash_sentinel.py --feat-number {n}
 ```
 
-**Garanties** :
+**Garanties** (préservées vs implémentation inline) :
 - Aucune dépendance externe (`sed`/`pwsh`/Git Bash) — Python stdlib seulement
 - UTF-8 sans BOM (compatible parser frontmatter YAML cross-OS)
-- Line endings préservés (newline='' → conserve LF original, n'introduit pas CRLF)
-- Idempotent : re-exécution sur US déjà patchées → `patched = 0`
+- Line endings préservés (`newline=''` → conserve LF original, pas de CRLF Windows)
+- Idempotent : re-exécution sur US déjà patchées → 0 patch
 
-**Validation** : grep `sha256:COMPUTE_REQUIRED` sur les fichiers US
-après patch — doit retourner 0 match. Si ≥ 1 → ERROR :
+| Exit | Sens | Action caller |
+|---|---|---|
+| `0` | succès (N US patchées OU rien à faire) | continuer STEP 3.bis |
+| `2` | sentinel persiste après patch (corruption FS) | STOP + ERROR `[PO_HASH_PLACEHOLDER]` |
+| `3` | erreur infra (FEAT file missing, FS perms) | STOP + ERROR `[INFRA_BLOCKED]` |
+
+**Format ERROR (exit 2)** :
 ```
 ERROR: /us-generate {n} — sentinel hash non résolu
 CAUSE: [PO_HASH_PLACEHOLDER] sha256:COMPUTE_REQUIRED persiste dans {N} fichier(s) US après patch
-FIX: vérifier que python OU pwsh sont disponibles, relancer /us-generate {n} (idempotent)
+FIX: vérifier permissions FS sur workspace/output/us/, relancer /us-generate {n} (idempotent)
 ```
-
-**Idempotence** : re-exécuter cette commande sur des US déjà patchées
-(hash réel présent) → `grep` ne match plus, `sed` est no-op. Aucun
-double-patch.
 
 ### STEP 3.bis — Checkpoint record (v6.6.4, opt-in)
 

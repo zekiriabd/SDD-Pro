@@ -297,13 +297,36 @@ def ingest_api_tests(report: dict, feat: int) -> int:
     # Support both schema variants ('passed'/'failed' or 'tests_passed'/'tests_failed')
     tests_passed = int(summary.get("tests_passed", summary.get("passed", 0)) or 0)
     tests_failed = int(summary.get("tests_failed", summary.get("failed", 0)) or 0)
+    tests_total = int(summary.get("tests_total", 0))
+    endpoints_total = int(summary.get("endpoints_total", len(endpoints)))
+    gate_passed = bool(summary.get("gate_passed", False))
+    # v7.0.0-alpha audit P3 — read canonical `status` if the agent provided it
+    # (PASS | WARN | FAIL | SKIPPED | INFRA_BLOCKED, cf. build-and-loop.md §1.3).
+    # When absent, derive from arithmetic per the same rule so the column is
+    # never NULL on writes from current callers.
+    status = (summary.get("status") or report.get("status") or "").strip().upper()
+    if status not in {"PASS", "WARN", "FAIL", "SKIPPED", "INFRA_BLOCKED"}:
+        # Best-effort derivation per build-and-loop §1.3 ordering :
+        #   INFRA_BLOCKED is never inferred (must be emitted explicitly), so we
+        #   fall back to FAIL on infra-like signals.
+        min_per_endpoint = int(summary.get("min_per_endpoint",
+                                summary.get("min_per_endpoint_required", 2)) or 2)
+        if endpoints_total == 0 or tests_total == 0:
+            status = "SKIPPED" if gate_passed else "FAIL"
+        elif tests_failed >= 1:
+            status = "FAIL"
+        elif tests_total >= min_per_endpoint * endpoints_total:
+            status = "PASS"
+        else:
+            status = "WARN"
     with connect() as conn:
         replace_qa_api_tests_for_feat(conn, feat)
         insert_qa_api_tests(
             conn, feat_n=feat,
-            gate_passed=bool(summary.get("gate_passed", False)),
-            endpoints_total=int(summary.get("endpoints_total", len(endpoints))),
-            tests_total=int(summary.get("tests_total", 0)),
+            gate_passed=gate_passed,
+            status=status,
+            endpoints_total=endpoints_total,
+            tests_total=tests_total,
             tests_passed=tests_passed,
             tests_failed=tests_failed,
             endpoints=endpoints,

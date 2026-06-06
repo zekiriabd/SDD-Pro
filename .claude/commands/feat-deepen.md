@@ -1,10 +1,7 @@
 # /feat-deepen — Élicitation structurée d'une FEAT
 
-> ⚠️ **Commande interne v7.0.0** — invoquée par manuel ou via /feat-generate --deepen.
-> Élicitation 5 techniques — sera fusionné dans /feat-generate post-v7.0.0.
-> Utilisateur final : préférer la commande orchestrante (`/sdd-full` ou `/dev-run`)
-> qui gère pré-conditions, idempotence et état. Conservée comme command pour
-> debug/inspection ciblée et préservation des chaînes d'invocation documentées.
+> ⚠️ **Commande interne v7.0.0** — invocation manuelle ou via `/feat-generate --deepen`.
+> Sera fusionné dans `/feat-generate` post-v7.0.0. Préférer `/sdd-full` ou `/dev-run` en usage normal.
 
 Enrichit une FEAT fonctionnelle existante via 5 techniques d'élicitation
 avancée (Pre-mortem, First Principles, Red Team, Stakeholder Mapping,

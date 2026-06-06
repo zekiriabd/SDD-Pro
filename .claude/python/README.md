@@ -145,7 +145,7 @@ spawn dev-*) :
 | `sdd_scripts/validate_plan.py` (~370 LOC, 21 tests) | Validation structurelle + détection staleness (`us-hash` mismatch) d'un plan `.back.md` / `.front.md`. Exit 0 (plan v2 valide), 1 (plan v1 legacy valide), 2 (stale/invalide/corrompu → STOP). Le flag CLI `--strict` est accepté en no-op pour backward-compat. | `dev-run` STEP 6.0.bis (gate staleness), `dev-plan` STEP 5 (post-génération), `sdd-status` (diagnostic) |
 | `sdd_scripts/compute_plan_metadata.py` (~150 LOC, 7 tests) | Helper YAML/JSON pour générer le v2 frontmatter (`plan-schema-version: 2`, `us-hash` SHA-256, `claude-md-hash`, `generated-at` ISO, `capabilities-triggered`). | `dev-backend` STEP 5.2 (mode `:plan`), `dev-frontend` STEP 6.4 (mode `:plan`) |
 
-Détail design (archive) : `@.claude/ARCHIVE/v7-design-superseded/DESIGN-FROMPLAN-STRICT.md`.
+Détail design (archive) : `@.claude/archive/v7-design-superseded/DESIGN-FROMPLAN-STRICT.md`.
 Détail format plan v2 : `@.claude/rules/build-and-loop.md §7.4.bis`.
 
 ### Conventions

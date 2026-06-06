@@ -7,13 +7,13 @@ Validation: 🟢 reference (validated combo — dotnet-minimalapi + blazor + rad
 UI FEAT ID: radzen-blazor
 Scope: design system Radzen — composants Blazor (Server + WebAssembly)
 
-> MCP server disponible : le projet peut declarer un serveur MCP Radzen
-> permettant d’acceder a la documentation officielle des composants.
-> Si disponible, l’agent DOIT l’utiliser pour recuperer :
-> - les proprietes exactes
-> - les evenements
-> - les types attendus
-> Sinon, ce document devient la reference principale.
+> Référence canonique : ce fichier `.md` + le catalogue machine
+> `.libs.json` compagnon. La documentation officielle Radzen
+> (https://blazor.radzen.com/) reste consultable manuellement par le
+> Tech Lead pour récupérer propriétés / événements / types exacts d'un
+> composant. **Pas de fetch automatique** par l'agent (v7.0.0 — l'ancien
+> mécanisme MCP server Radzen a été retiré avec le sweep MCP du sweep
+> dead-code C1, cf. `docs/CHANGELOG.md §[Unreleased]`).
 
 ---
 

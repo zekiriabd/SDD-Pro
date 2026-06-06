@@ -199,7 +199,7 @@ Override le plus fort, audit-loggué dans
 lit calques #2-#5 + l'état runtime du workspace et produit un plan
 d'exécution (`enabled/skipped/why` par phase auditor).
 
-Invoqué par `/sdd-full` STEP 1.tiers (non bloquant, récap unifié).
+Invoqué par `/sdd-full` STEP 1.quart (non bloquant, récap unifié ; renommé depuis 1.tiers lors de l'audit P0-workflow 2026-06-05).
 
 ---
 

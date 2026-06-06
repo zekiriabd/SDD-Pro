@@ -16,6 +16,11 @@
 - **Version SDD_Pro** : v3
 - **Créé le** : {YYYY-MM-DD}
 - **Dernière mise à jour** : {YYYY-MM-DD}
+<!-- "Dernière mise à jour" : la date la plus récente parmi tous les
+     éditeurs autorisés (po, arch, constitutioner, elicitor — cf.
+     ownership.md §2). Le dernier writer wins ; pas de sémantique
+     "dernière mise à jour de la section X" — c'est un timestamp global. -->
+
 
 ---
 

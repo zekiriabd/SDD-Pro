@@ -87,165 +87,80 @@ lit `IConfiguration` / `application.yml` / `config/default.json` /
 - Toutes valeurs dans `## Active Auth Specs` de `stack.md`, propagées par `arch` STEP 4.5
 - Aucun hardcoding Azure AD dans le code (`.cs`/`.kt`/`.py`/`.ts`)
 - Lecture via mécanismes natifs framework : `IConfiguration["AzureAd:*"]`, `@Value("${azure.ad.*}")`, `config.get("azure.ad")`, `azure_settings.*`
-- **Env var binding runtime AUTORISÉ** (depuis 2026-05-22, audit P0) : arch
-  doit générer dans `Program.cs`/`main.kt`/`main.py`/`server.ts` un bloc
-  de mapping `AZ_*` → clés natives Configuration (cf. §2.bis Pont env-var-runtime).
-  La règle anti-`Environment.GetEnvironmentVariable` v6.x est révoquée :
-  scaffolder les valeurs littérales dans `appsettings.json` crée un risque
-  `[SEC_SECRET_HARDCODED]` même si `workspace/output/` est gitignored
-  (accès poste dev, leak via templates partagés). Pattern correct :
-  `appsettings.json` avec valeurs vides + binding env var runtime.
+- **Env var binding runtime INTERDIT pour les clés SDD** (audit
+  2026-06-06, Pattern B canonique) : `stack.md` est la SSoT locale
+  gitignoree, puis `arch` propage les valeurs vers la config native du
+  framework. Le code applicatif ne lit jamais directement `AZ_*`,
+  `DB_*`, `AUTH_*` ou `SMTP_*` via `Environment.GetEnvironmentVariable`,
+  `System.getenv`, `process.env`, `os.environ` ou `@Value("${AZ_*}")`.
+  Toute derive = `[SEC_ENV_VAR_FORBIDDEN]`.
+- Les secrets ne doivent pas etre commites : `workspace/output/` reste
+  ignore, les fichiers locaux generes restent dans le poste dev, et la
+  rotation prod passe par l'outillage ops/secret manager hors repo.
 
-### §2.bis — Pont env-var → Configuration runtime (load-bearing, depuis 2026-05-22)
+### §2.bis — Propagation stack.md → Configuration native (load-bearing, depuis 2026-06-06)
 
 **Contexte** : la convention `stack.md` (`AZ_TENANTID`, `DB_PASSWORD`, etc.)
-ne correspond pas au binding natif des frameworks (.NET attend
-`AzureAd__TenantId` double underscore, Spring attend `AZURE_AD_TENANT_ID`,
-Node lit `process.env.AZ_TENANTID` directement, Python idem). Le pont
-runtime est **obligatoire**, généré par arch.
+est lisible par les agents SDD. L'agent `arch` Phase A STEP 4.5 est le
+seul pont autorise : il lit `workspace/input/stack/stack.md`, valide les
+clés, puis ecrit la section native attendue par le framework. Le runtime
+applicatif consomme uniquement cette config native.
 
-**Pattern .NET** (à inliner dans `Program.cs` AVANT `AddMicrosoftIdentityWebApiAuthentication`) :
+**Pattern .NET** (`Program.cs`) :
 
 ```csharp
-// === Pont env-var stack.md → IConfiguration (arch STEP 4.5.7) ===
-static string ReadEnv(string key, string fallback = "") =>
-    (Environment.GetEnvironmentVariable(key) ?? fallback).Trim().Trim('"');
-
-// MSYS Git Bash strip — sur poste dev Windows, valeurs path-like (/login-callback)
-// sont mangled vers C:/Program Files/Git/login-callback ou /Git/login-callback
-// quand le process est launched depuis Bash. Strip défensif au boot.
-static string StripMsysPrefix(string raw)
-{
-    if (string.IsNullOrWhiteSpace(raw)) return string.Empty;
-    var v = raw.Replace('\\', '/');
-    var idx = v.LastIndexOf("/Git/", StringComparison.OrdinalIgnoreCase);
-    if (idx >= 0) v = "/" + v.Substring(idx + "/Git/".Length);
-    if (v.Length > 2 && v[1] == ':')
-    {
-        var lastSlash = v.LastIndexOf('/');
-        v = lastSlash >= 0 ? "/" + v.Substring(lastSlash + 1) : "/" + v;
-    }
-    if (!v.StartsWith('/')) v = "/" + v;
-    return v.Replace("//", "/");
-}
-
-builder.Configuration["AzureAd:TenantId"]            = ReadEnv("AZ_TENANTID");
-builder.Configuration["AzureAd:ClientId"]            = ReadEnv("AZ_CLIENTID");
-builder.Configuration["AzureAd:Domain"]              = ReadEnv("AZ_DOMAIN");
-builder.Configuration["AzureAd:CallbackPath"]        = StripMsysPrefix(ReadEnv("AZ_BE_CALLBACKPATH", "/signin-oidc"));
-builder.Configuration["AzureAd:FrontendCallbackPath"]= StripMsysPrefix(ReadEnv("AZ_FE_CALLBACKPATH", "/authentication/login-callback"));
-
-// AZ_AUDIENCES : CSV de GUIDs (avec guillemets parasites possibles, cf. BR-13)
-var audiences = ReadEnv("AZ_AUDIENCES")
-    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-    .Select(a => a.Trim('"').Trim()).Where(a => !string.IsNullOrEmpty(a)).ToArray();
-for (int i = 0; i < audiences.Length; i++)
-    builder.Configuration[$"AzureAd:ValidAudiences:{i}"] = audiences[i];
+// appsettings.json est peuple par arch depuis stack.md.
+builder.Services.AddMicrosoftIdentityWebApiAuthentication(
+    builder.Configuration,
+    "AzureAd");
 ```
 
-**Pattern Spring Boot** : `application.yml` avec env var placeholders
-natifs (`${AZ_TENANTID:}` Spring résout les env vars directement, pas
-besoin de pont code) :
+**Pattern Spring Boot** : `application.yml` avec valeurs materialisees par
+`arch`, puis binding natif :
 
 ```yaml
 azure:
   ad:
-    tenant-id: ${AZ_TENANTID:}
-    client-id: ${AZ_CLIENTID:}
-    callback-path: ${AZ_BE_CALLBACKPATH:/signin-oidc}
+    tenant-id: "{AZ_TENANTID}"
+    client-id: "{AZ_BE_CLIENTID}"
+    frontend-client-id: "{AZ_FE_CLIENTID}"
+    callback-path: "/signin-oidc"
 ```
 
-**Pattern FastAPI Python** : `pydantic-settings` lit nativement env vars :
+**Pattern FastAPI Python** : `app/config.py` genere par `arch`, lu par
+l'application comme module de config :
 
 ```python
-class AzureADSettings(BaseSettings):
-    tenant_id: str = Field("", env="AZ_TENANTID")
-    client_id: str = Field("", env="AZ_CLIENTID")
+class AzureADSettings:
+    tenant_id = "{AZ_TENANTID}"
+    client_id = "{AZ_BE_CLIENTID}"
+
+azure_settings = AzureADSettings()
 ```
 
-**Pattern Express Node** : `process.env.AZ_TENANTID` direct (12-factor).
+**Pattern Express Node** : `config/default.json` genere par `arch`, lu via
+`config.get("azure.ad")`.
 
-### §2.ter — Anti-pattern MSYS Git Bash sur Windows (post-mortem 2026-05-22)
+### §2.ter — Legacy post-mortems env shell (clos par Pattern B)
 
-Quand le dev lance le backend via Bash/Git Bash sur Windows, certaines env
-vars dont la valeur **commence par `/`** subissent une **conversion
-POSIX→Windows path** : `/login-callback` devient `C:/Program Files/Git/login-callback`
-ou `/Git/login-callback` selon l'environnement.
+Les incidents MSYS Git Bash / pollution du shell parent de 2026-05-22
+restent utiles comme contexte historique : une valeur de callback path
+heritee du shell pouvait produire `AADSTS50011` (`/Git/login-callback` ou
+`/login-callback`). Depuis le Pattern B 2026-06-06, ces incidents ne sont
+plus traites par lecture runtime d'env vars.
 
-Symptôme : MSAL rejette le callback avec `AADSTS50011: The redirect URI
-'https://localhost:5185/Git/login-callback' specified in the request does
-not match`.
+**Regle actuelle** :
+- `AZ_FE_CALLBACKPATH` et `AZ_BE_CALLBACKPATH` vivent dans
+  `workspace/input/stack/stack.md`.
+- `arch` les propage dans la config native du framework
+  (`appsettings.json`, `application.yml`, `config/default.json`,
+  `app/config.py`).
+- Le code applicatif lit la config native. Toute lecture shell directe de
+  `AZ_*` = `[SEC_ENV_VAR_FORBIDDEN]`.
 
-**Mitigation** :
-1. La fonction `StripMsysPrefix` du §2.bis nettoie au runtime.
-2. Le dev peut éviter Git Bash et lancer via `cmd.exe` / PowerShell.
-3. Le dev peut définir `MSYS_NO_PATHCONV=1` dans son shell Bash.
-
-**Validation** : `AZ_FE_CALLBACKPATH` doit valoir `/authentication/login-callback`
-(convention universelle SPA — React/Vue/Angular/Blazor) — toute autre
-valeur déclenche AADSTS50011 si non matchée côté Azure AD App Reg.
-
-### §2.quart — Anti-pattern pollution env shell parent (post-mortem 2026-05-22, CMSPrint)
-
-Un shell utilisateur (PowerShell profile, `.bashrc`, variables système
-Windows) peut contenir une valeur héritée d'un ancien projet :
-```
-AZ_FE_CALLBACKPATH=/login-callback     # convention React MSAL.js, INCOMPATIBLE Blazor
-```
-
-Quand `dotnet run` est lancé depuis ce shell, le process backend hérite
-de cette valeur. Le `ReadEnv("AZ_FE_CALLBACKPATH", ...)` ne retombe
-**pas** sur le fallback canonique car la variable est définie (non-vide).
-`/auth/config` retourne alors `/login-callback` au frontend MSAL Blazor,
-qui envoie `https://localhost:5185/login-callback` à Azure AD → AADSTS50011
-(Azure a `/authentication/login-callback` registered, pas `/login-callback`).
-
-**Symptôme distinctif** vs §2.ter MSYS : pas de `/Git/` dans l'URI rejetée,
-la valeur est littéralement celle du shell parent.
-
-**Mitigation systémique (load-bearing — arch STEP 3 doit la matérialiser)** :
-injecter **explicitement** les valeurs canoniques dans
-`Properties/launchSettings.json` du backend pour **neutraliser** tout
-shell pollué :
-
-```json
-{
-  "profiles": {
-    "https": {
-      "commandName": "Project",
-      "applicationUrl": "https://localhost:44328",
-      "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development",
-        "AZ_FE_CALLBACKPATH": "/authentication/login-callback",
-        "AZ_BE_CALLBACKPATH": "/signin-oidc"
-      }
-    }
-  }
-}
-```
-
-Effet : `dotnet run` (et `dotnet watch run`) charge `launchSettings.json`
-**avant** la résolution `Environment.GetEnvironmentVariable`, override
-le shell parent. Le `.env.local` (si présent) ne contient PAS ces clés —
-elles vivent **uniquement** dans `launchSettings.json` (dev) et `.env.production`
-(prod, géré par ops).
-
-**Pour le frontend** (Blazor WASM standalone — pas de `launchSettings.json`
-qui injecte les env vars dans le browser), la valeur est résolue runtime
-via `fetch /auth/config` (le backend est SSoT). Donc fixer côté backend
-suffit pour les 2 process.
-
-**Anti-pattern rejeté** : déclarer `AZ_FE_CALLBACKPATH` dans le profil
-shell utilisateur (`.bashrc`, `$PROFILE` PowerShell, variables système
-Windows). Doit rester **scopé au projet** via `launchSettings.json` ou
-`.env.local`.
-
-**Détection diagnostique** : si `dotnet run` retourne AADSTS50011 sans
-préfixe `/Git/`, exécuter `echo $env:AZ_FE_CALLBACKPATH` (PowerShell)
-ou `echo $AZ_FE_CALLBACKPATH` (Bash). Toute valeur ≠ `/authentication/login-callback`
-indique une pollution shell. Fix immédiat : `launchSettings.json` override
-(cf. ci-dessus). Fix permanent : `Remove-Item Env:AZ_FE_CALLBACKPATH`
-(session) ou retirer la ligne du profil utilisateur.
+**Validation** : `AZ_FE_CALLBACKPATH` doit valoir
+`/authentication/login-callback` (convention SPA universelle) sauf ADR
+explicite et App Registration Azure mise a jour.
 
 ### §dual-app — Pattern canonique 2 App Reg
 
@@ -321,15 +236,13 @@ backend. Backend N'EST PAS source de vérité pour le path de callback :
 
 ```ts
 // src/auth/msalConfig.ts — pattern correct
-const FE_CALLBACK_PATH =
-  (import.meta.env.VITE_AZ_FE_CALLBACKPATH as string | undefined)?.trim()
-  || "/login-callback"
+const FE_CALLBACK_PATH = "/authentication/login-callback"
 
 const msalConfiguration: Configuration = {
   auth: {
     clientId: cfg.clientId,
     authority: cfg.authority,
-    redirectUri: window.location.origin + FE_CALLBACK_PATH, // ← front-owned
+    redirectUri: window.location.origin + FE_CALLBACK_PATH, // ← front-owned, path canonique stack.md
     // PAS : window.location.origin + cfg.redirectUri (backend)
   },
 }
@@ -344,7 +257,7 @@ MSAL intercepte `#code=...` via `handleRedirectPromise()`).
 ```
 ERROR: dev-frontend {n}-{m} — redirectUri pris du backend
 CAUSE: [SECURITY_CALLBACK_FROM_BACKEND] cfg.redirectUri lu depuis /auth/config (path mangling shell, mauvaise SOC)
-FIX: hardcoder FE_CALLBACK_PATH front (ou VITE_AZ_FE_CALLBACKPATH), retirer redirectUri du DTO backend, créer route /login-callback publique
+FIX: utiliser FE_CALLBACK_PATH front canonique, retirer redirectUri du DTO backend, créer route /authentication/login-callback publique
 ```
 
 **Grep checklist (STEP build)** :
@@ -1021,8 +934,10 @@ keytool -genkeypair -alias backend -keyalg RSA -keysize 2048 \
 
 `keystore.p12` → `.gitignore` (jamais committer).
 
-**Variables** : `VITE_API_BASE_URL=https://localhost:44328` (front
-`.env.local`) ; `APP_CORS_ALLOWED_ORIGINS=https://localhost:5185` (backend).
+**Config dev** : l'URL API publique du frontend et
+`APP_CORS_ALLOWED_ORIGINS=https://localhost:5185` sont declarees dans
+`stack.md`, puis propagees par `arch` vers la config native du frontend
+et du backend.
 
 **Acceptation cert auto-signé** : user visite **une fois**
 `https://localhost:5185/` puis `https://localhost:44328/auth/config` →

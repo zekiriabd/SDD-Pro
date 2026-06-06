@@ -21,6 +21,7 @@ if str(_PY_ROOT) not in sys.path:
 
 from sdd_scripts.quality_scan import (  # noqa: E402
     DEBUG_PATTERNS,
+    FORBIDDEN_SDD_ENV_PATTERNS,
     MAGIC_NUMBER_SKIP,
     is_excluded,
     line_at,
@@ -181,6 +182,62 @@ class TestScanFileDebugOutput(unittest.TestCase):
         self.assertIn("js-debug", seen_tags)
         self.assertIn("cs-debug", seen_tags)
         self.assertIn("py-debug", seen_tags)
+
+
+class TestScanFileForbiddenSddEnv(unittest.TestCase):
+    """Detect Pattern B violations: SDD config read directly from env vars."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.tmp = Path(self._tmp.name)
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _scan(self, content: str, rel: str) -> dict:
+        f = self.tmp / Path(rel).name
+        f.write_text(content, encoding="utf-8")
+        results = {"errors": [], "warnings": [], "info": []}
+        scan_file(f, rel, results)
+        return results
+
+    def test_patterns_registered(self):
+        self.assertGreaterEqual(len(FORBIDDEN_SDD_ENV_PATTERNS), 6)
+
+    def test_detects_dotnet_sdd_env_read(self):
+        r = self._scan(
+            'var password = Environment.GetEnvironmentVariable("DB_PASSWORD");',
+            "workspace/output/src/Backend/Program.cs",
+        )
+        self.assertTrue(any(e["category"] == "forbidden-sdd-env" for e in r["errors"]))
+
+    def test_detects_node_sdd_env_read(self):
+        r = self._scan(
+            "const secret = process.env.AUTH_JWT_SECRET;",
+            "workspace/output/src/App/server.ts",
+        )
+        self.assertTrue(any(e["tag"] == "node-sdd-env-read" for e in r["errors"]))
+
+    def test_detects_python_sdd_env_read(self):
+        r = self._scan(
+            'tenant = os.environ.get("AZ_TENANTID")',
+            "workspace/output/src/Api/app/config.py",
+        )
+        self.assertTrue(any(e["tag"] == "py-sdd-env-read" for e in r["errors"]))
+
+    def test_detects_spring_direct_env_placeholder(self):
+        r = self._scan(
+            '@Value("${DB_PASSWORD:}") lateinit var password: String',
+            "workspace/output/src/Backend/AuthConfig.kt",
+        )
+        self.assertTrue(any(e["tag"] == "spring-sdd-env-placeholder" for e in r["errors"]))
+
+    def test_allows_runtime_profile_env(self):
+        r = self._scan(
+            "if (process.env.NODE_ENV !== 'production') console.warn('dev');",
+            "workspace/output/src/App/server.ts",
+        )
+        self.assertFalse(any(e["category"] == "forbidden-sdd-env" for e in r["errors"]))
 
 
 class TestScanFileHexHardcoded(unittest.TestCase):

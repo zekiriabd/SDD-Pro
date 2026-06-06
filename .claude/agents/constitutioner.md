@@ -2,7 +2,7 @@
 name: constitutioner
 description: Agent Constitutioner — gère les ADRs (création atomique par timestamp) et met à jour workspace/output/.sys/.context/constitution.md (§4 stack technique, §6 ADRs index, §1 date). Invoqué par arch en fin de Phase B (après scaffolding DB). Skip silencieusement si constitution.md absent. Aucune écriture de code applicatif, aucune lecture des FEATs/US/HTML.
 model: claude-sonnet-4-6
-tools: Read, Write, Edit, Glob, Grep, Bash
+tools: Read, Write, Edit, Glob, Grep
 ---
 
 # Agent Constitutioner — ADRs + Constitution
@@ -199,11 +199,7 @@ Sur erreur, bloc ERROR 3 lignes (CAUSE / FIX, préfixe `[CLASS]` cf.
 
 ## Chat Output Protocol
 
-Applique `@.claude/rules/output-protocol.md`. Label `[CONSTITUTION]` (v7.0.0-alpha
-audit M12 fix — dé-collision ex-`[ARCH]`, phase B finalize post-arch), plage
-`32-36%`, granularité 2-3 updates (ADRs créés, INDEX régénéré, validation
-read-back). Erreurs : chat 1L + bloc ERROR 3L disque préservé
-(cf. `error-classification.md §2`). Bypass `SDD_CHAT_VERBOSE=1`.
+Applique `@.claude/rules/output-protocol.md` (label `[CONSTITUTION]`, plage `32-36%`).
 
 ---
 

@@ -23,7 +23,7 @@ from typing import Any, Iterator
 
 from sdd_lib.paths import iso_now_ms, repo_root
 
-SCHEMA_VERSION = 4  # v7.0.0 : v2 +qa_mutation, v3 +qa_e2e, v4 +auditor_runs (C3 fix)
+SCHEMA_VERSION = 5  # v7.0.0 : v2 +qa_mutation, v3 +qa_e2e, v4 +auditor_runs (C3 fix), v5 +qa_api_tests.status (audit P3)
 # BASE_SCHEMA_VERSION is the version represented by ``console_db_schema.sql``
 # itself (the "v1" full snapshot). When ``SCHEMA_VERSION`` exceeds it, the
 # difference is bridged by forward migrations under ``migrations/``.
@@ -50,10 +50,19 @@ def default_db_path() -> Path:
 DEFAULT_DB_PATH = default_db_path()
 
 
+# Security audit 2026-06-06 — `database is locked` observed under parallel
+# preflight hooks (≥2 agents spawned simultanément). busy_timeout 5s ne suffit
+# pas quand plusieurs writers font INSERT en cascade. Bump à 30s + retry
+# explicite avec backoff sur OperationalError pour les rares cas restants.
+_BUSY_TIMEOUT_MS = 30000  # 30s — laisse SQLite WAL absorber la contention
+_CONNECT_MAX_RETRY = 3
+_CONNECT_RETRY_BACKOFF = (0.25, 0.5, 1.0)  # seconds
+
+
 def _apply_pragmas(conn: sqlite3.Connection) -> None:
     conn.execute("PRAGMA journal_mode = WAL")
     conn.execute("PRAGMA synchronous = NORMAL")
-    conn.execute("PRAGMA busy_timeout = 5000")
+    conn.execute(f"PRAGMA busy_timeout = {_BUSY_TIMEOUT_MS}")
     conn.execute("PRAGMA foreign_keys = ON")
 
 
@@ -62,25 +71,51 @@ def _apply_pragmas_ro(conn: sqlite3.Connection) -> None:
     the journal mode), but still set query_only as a defense-in-depth and a
     timeout to coexist with writers in WAL mode."""
     conn.execute("PRAGMA query_only = ON")
-    conn.execute("PRAGMA busy_timeout = 5000")
+    conn.execute(f"PRAGMA busy_timeout = {_BUSY_TIMEOUT_MS}")
 
 
 @contextmanager
 def connect(db_path: Path | str | None = None) -> Iterator[sqlite3.Connection]:
-    """Open a connection with pragmas applied, commit on success, rollback on exception."""
+    """Open a connection with pragmas applied, commit on success, rollback on exception.
+
+    Retries up to 3× with exponential backoff on `database is locked`. Final
+    failure raises the underlying OperationalError so callers can decide
+    (skip telemetry vs abort run).
+    """
+    import time
     db_path = Path(db_path) if db_path is not None else default_db_path()
     db_path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(db_path))
-    conn.row_factory = sqlite3.Row
-    try:
-        _apply_pragmas(conn)
-        yield conn
-        conn.commit()
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+    for attempt in range(_CONNECT_MAX_RETRY):
+        conn = sqlite3.connect(str(db_path))
+        conn.row_factory = sqlite3.Row
+        try:
+            _apply_pragmas(conn)
+            yield conn
+            conn.commit()
+            return  # finally still runs → conn.close()
+        except sqlite3.OperationalError as e:
+            try:
+                conn.rollback()
+            except sqlite3.Error:
+                pass
+            if "database is locked" not in str(e).lower():
+                raise
+            if attempt >= _CONNECT_MAX_RETRY - 1:
+                raise
+            # Retry : close current conn (finally) puis sleep avant nouvelle tentative
+        except Exception:
+            try:
+                conn.rollback()
+            except sqlite3.Error:
+                pass
+            raise
+        finally:
+            try:
+                conn.close()
+            except sqlite3.Error:
+                pass
+        # On arrive ici uniquement après OperationalError "locked" et retry restant
+        time.sleep(_CONNECT_RETRY_BACKOFF[attempt])
 
 
 @contextmanager

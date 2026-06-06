@@ -1,10 +1,7 @@
 # /dev-plan — Génère les plans techniques d'1 FEAT sans coder
 
-> ⚠️ **Commande interne v7.0.0** — invoquée par /sdd-full STEP 3.6.
-> Plans techniques pré-dev — invoqué conditionnellement.
-> Utilisateur final : préférer la commande orchestrante (`/sdd-full` ou `/dev-run`)
-> qui gère pré-conditions, idempotence et état. Conservée comme command pour
-> debug/inspection ciblée et préservation des chaînes d'invocation documentées.
+> ⚠️ **Commande interne v7.0.0** — invoquée par `/sdd-full` STEP 3.6 (conditionnel).
+> Utilisateur final : préférer `/sdd-full` ou `/dev-run` (gèrent pré-conditions, idempotence, état).
 
 Pour chaque US de la FEAT `{n}`, invoque les agents `dev-backend` et
 `dev-frontend` en **mode Plan Only** : ils lisent l'US (+ mockup HTML
@@ -131,46 +128,54 @@ Si l'US n'a pas de contrepartie pour la famille → exit silent
 
 ---
 
-## STEP 4.7 — Validation strict-readiness des plans (depuis v6.2)
+## STEP 4.7 — Validation post-génération des plans (refactor v7.0.0-alpha audit P0-workflow 2026-06-05)
+
+> **v7.0.0-alpha audit P0-workflow 2026-06-05** — historiquement appelé
+> « strict-readiness ». Les variants d'agents `dev-*-strict` ont été
+> retirés en v7.0.0 (`governance-major-strict-trim`), il n'y a donc
+> plus de routing strict/classic. Le flag `--strict` de `validate_plan.py`
+> reste accepté en CLI (no-op) pour backward-compat scripts, mais ce
+> STEP ne décide plus de routing — uniquement validation structurelle
+> (frontmatter v2, us-hash, AC coverage) pour détecter les plans stale
+> avant matérialisation côté `/dev-run`.
 
 Pour chaque plan généré (back et front), invoquer `validate_plan.py`
-en mode strict pour confirmer la conformité v2 (frontmatter
-`plan-schema-version: 2`, `us-hash` cohérent, section `## Inline Digest`
-non vide, AC coverage complète) :
+pour confirmer la conformité (frontmatter `plan-schema-version: 2`
+recommandé, `us-hash` cohérent avec l'US source, section `## Inline Digest`
+présente, AC coverage complète) :
 
 ```bash
 python .claude/python/sdd_scripts/validate_plan.py \
   --plan-path "workspace/output/plans/{n}-{m}-{Name}.{back|front}.md" \
   --us-path "workspace/output/us/{n}-{m}-{Name}.md" \
-  --strict \
   --json
 ```
 
-| Exit | Comportement |
-|---|---|
-| `0` | Plan strict-ready → log compteur `$S_strict++` |
-| `1` | Plan v1/incomplet → log compteur `$S_classic++` + WARN 1L |
-| `2` | Plan stale/corrompu → ERROR + nettoyer le plan (sera regénéré au re-run) |
+| Exit | Sens | Comportement |
+|---|---|---|
+| `0` | Plan v2 valide avec `## Inline Digest` | log compteur `$S_v2++` |
+| `1` | Plan v1 legacy (pas de `## Inline Digest`) | log compteur `$S_v1++` + WARN 1L (utilisable, mais incomplet) |
+| `2` | Plan stale (us-hash mismatch) OU corrompu | ERROR + nettoyer le plan (sera regénéré au re-run) |
 
 **Émettre un event state.jsonl** par plan validé (si `$RUN_ID` disponible) :
 ```bash
 python .claude/python/sdd_scripts/sdd_state.py emit-event \
   --run-id $RUN_ID --event-type plan_validate_postgen \
-  --payload-json '{"us":"{n}-{m}","family":"{back|front}","exit":N,"result":"ready|not_strict_ready|invalid"}'
+  --payload-json '{"us":"{n}-{m}","family":"{back|front}","exit":N,"result":"v2|v1|invalid"}'
 ```
 
-**Non bloquant** : un plan exit 1 reste utilisable en mode From-Plan
-classique (Opus). Exit 2 nettoie le plan pour éviter qu'un re-run
-ultérieur ne le consomme à tort.
+**Non bloquant** : un plan exit 1 reste utilisable par `dev-*` (Opus)
+en mode From-Plan classique. Exit 2 nettoie le plan pour éviter qu'un
+re-run ultérieur ne le consomme à tort.
 
 Si tous les plans sont exit 0 → émettre 1 ligne récap :
 ```
-FEAT {n} — plans v2 strict-ready : {S_strict_back}/{P_back} back + {S_strict_front}/{P_front} front
+FEAT {n} — plans v2 valides : {S_v2_back}/{P_back} back + {S_v2_front}/{P_front} front
 ```
 
 Si au moins un exit 1 → émettre WARNING 1 ligne :
 ```
-🟡 FEAT {n} — {N_not_ready} plan(s) v1 ou incomplet(s) (PlanCacheStrict aura fallback classic Opus sur ces US)
+🟡 FEAT {n} — {N_v1} plan(s) v1 legacy (utilisables par dev-* Opus, sans Inline Digest)
 ```
 
 ---

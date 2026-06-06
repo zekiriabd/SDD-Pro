@@ -187,7 +187,8 @@ Le code importe `from app.config import jwt_settings` et utilise
 
 **Securite critique** : `AUTH_JWT_SECRET` est une **cle de signature
 serveur** ; elle ne doit JAMAIS apparaitre dans :
-- un fichier `.env` frontend (`VITE_*`, `REACT_APP_*`, `NG_*`)
+- un fichier de config frontend public (`VITE_*`, `REACT_APP_*`, `NG_*`
+  ou equivalent compile-time) contenant une cle `AUTH_JWT_*`
 - un fichier `appsettings.json` cote Blazor WASM (lu cote client)
 - un bundle JS livre au navigateur
 - une reponse d'endpoint `/auth/config` ou similaire
@@ -202,8 +203,9 @@ Le frontend (SPA) :
   du `exp` via `jwt-decode` autorisee pour pre-refresh)
 
 Le frontend n'a donc **aucun besoin** des cles `AUTH_JWT_*`. La seule
-URL backend est `VITE_API_BASE_URL` (ou equivalent), declaree dans
-`.env` frontend (cf. stack frontend actif §5).
+configuration publique attendue est l'URL backend (`VITE_API_BASE_URL`
+ou equivalent), produite selon le stack frontend actif §5 et jamais
+confondue avec les secrets `stack.md`.
 
 ---
 

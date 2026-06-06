@@ -27,6 +27,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from sdd_lib.paths import repo_root  # noqa: E402
 from sdd_lib.stderr import warn  # noqa: E402
 from sdd_lib.exit_codes import FAIL_FAST, SUCCESS  # noqa: E402
+from sdd_lib.atomic_write import atomic_write_text  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:
@@ -418,7 +419,7 @@ def main() -> int:
         print(f"[Zone 3: ONDEMAND_PACKAGES] (markers present: {ondemand_injected})")
         print(ondemand_block)
     else:
-        md_path.write_text(md, encoding="utf-8", newline="")
+        atomic_write_text(md_path, md, newline="")
         core_n = len(cat.get("core") or [])
         ondemand_n = len(cat.get("onDemand") or [])
         plugins_n = len(cat.get("plugins") or [])

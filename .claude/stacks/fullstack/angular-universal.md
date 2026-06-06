@@ -1,7 +1,7 @@
 # Tech FEAT: angular-universal (fullstack)
 
 Status: Experimental
-Validation: 🟡 experimental (combo non valide end-to-end dans SDD_Pro v6)
+Validation: 🟢 bench-validated runtime (2026-06-05 — CalcABCAngUniv :44379, Angular 19 SSR Express engine + signals + standalone strict, build browser 100KB + server 568KB en 2.121s, HTML SSR contient "Calc/Angular Universal/Calculate" AVANT JS (preuve runtime SSR), AC-1/2/3 🟢, interactivité 100% client après hydration. Fix bench : `--ssr` rejeté par `ng serve` → retirer flag, auto-détection via angular.json. Pipeline `/sdd-full` complet pas encore validé end-to-end — scaffolding manuel mainteneur, cf. `docs/benchmarks/known-gaps.md`)
 Tech FEAT ID: tech-angular-universal
 Scope: **fullstack monolithe** — application Angular 19 avec **`@angular/ssr`** (anciennement Angular Universal) dans UN seul projet `{AppName}/`. UI Angular standalone + signals + SSR Express + API routes (server-side `server.ts`) vivent dans le meme processus Node.js. Pas de separation `{BackendName}` / `{AppName}` / `{LibName}`. Modele **SSR vrai** : HTML pre-rendu serveur, hydratation Angular cote client.
 
@@ -209,6 +209,7 @@ mkdir -p \
   src/assets/i18n \
   server/services \
   server/repositories \
+  server/config \
   server/schemas \
   server/middleware
 
@@ -364,7 +365,7 @@ Le serveur Express bootstrappe par `@angular/ssr` expose :
 
 - **File-based JSON** (default si `DatabaseType: none`) : pattern `node-react.md §6.2` (atomic write + lock dans `server/repositories/`)
 - **Prisma** (capability `prisma`) : pattern identique a `.claude/stacks/backend/node-express.md §8.3`
-- **DATABASE_URL** stockee en env runtime serveur (`process.env.DATABASE_URL`), lue UNIQUEMENT dans `server/` — JAMAIS importee dans `src/app/`
+- **DATABASE_URL** stockee dans une config serveur generee par `arch` depuis `## Active Database`, lue UNIQUEMENT dans `server/` — JAMAIS importee dans `src/app/` ni lue via `process.env.DATABASE_URL`
 
 ---
 
@@ -421,10 +422,10 @@ Ce stack est optimise pour :
 
 1. **Detecter** `## Active Tech Specs` = `fullstack/angular-universal.md` → **ignorer** `BackendName` et `LibName`
 2. **Creer** UN seul projet via `ng new --ssr` (cf. §2.2.1)
-3. **Injecter** les secrets dans `.env` (gitignore) :
-   - `DATABASE_URL` (si Prisma)
-   - `AUTH_JWT_SECRET`
-   - `AZURE_AD_CLIENT_ID`, `AZURE_AD_TENANT_ID` (si auth-azure-ad)
+3. **Composer** `server/config/app-config.ts` depuis `## Active Database` + `## Active Auth Specs` :
+   - `databaseUrl` (si Prisma)
+   - `authJwtSecret`
+   - `azureAd.clientId`, `azureAd.tenantId` (si auth-azure-ad)
 4. **`## Active UI Specs`** :
    - Angular Material (defaut implicite) → OK
    - `shadcn` ou `vuetify` → WARNING bloquant (composants React/Vue, incompatibles Angular)
@@ -456,7 +457,7 @@ Ce stack est optimise pour :
 | `workspace/output/src/{AppName}/src/app/schemas/**` | `dev-backend` (Zod, partages client + serveur) |
 | `workspace/output/src/{AppName}/angular.json` | `arch` exclusif |
 | `workspace/output/src/{AppName}/prisma/**` | `arch` (create) + `dev-backend` (consommation) |
-| `workspace/output/src/{AppName}/.env` | `arch` (create exclusif — secrets) |
+| `workspace/output/src/{AppName}/server/config/app-config.ts` | `arch` (create exclusif — secrets/config SDD) |
 
 **Cas frontiere `server.ts`** : augmente par dev-backend (routes API). Utiliser lock LibName-equivalent cf. `dev-shared.md §2` quand plusieurs US ajoutent des routes en parallele.
 

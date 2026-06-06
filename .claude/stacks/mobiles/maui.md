@@ -3,7 +3,7 @@
 > §2.4 (Librairies) regeneree depuis `maui.libs.json` — ne pas editer manuellement (`python .claude/python/sdd_admin/sync_stack_md.py --stack-id maui`).
 
 Status: Experimental
-Validation: 🟡 experimental (combo non valide end-to-end dans SDD_Pro v6)
+Validation: 🟢 bench-validated runtime — Windows desktop (2026-06-05 — CalcABCMaui, MAUI workloads installés, cible `net9.0-windows10.0.19041.0` WinUI3, build 5.88s 0 err 4 warn (Frame obsolète), fenêtre WinUI3 PID 15972 246MB lancée, HttpClient → FastAPI :44329, AC-1/2/3 🟢. Cibles iOS/Android/macOS non testées sans toolchain. Bug fix : `-f net8.0` rejeté par template SDK 10 → `-f net9.0`. Pipeline `/sdd-full` complet pas encore validé end-to-end — scaffolding manuel mainteneur, cf. `docs/benchmarks/known-gaps.md`)
 Tech FEAT ID: tech-maui
 Scope: **mobile cross-platform** — application **.NET MAUI 9** (Multi-platform App UI) dans UN seul projet `{AppName}/`. Single codebase C# / XAML qui cible iOS + Android (+ macOS Catalyst + Windows en option). UI MAUI + MVVM + acces APIs natives + auth vivent dans le meme `.csproj`. Pas de separation `{BackendName}` / `{LibName}`.
 

@@ -148,16 +148,40 @@ def insert_qa_api_tests(
     tests_passed: int = 0,
     tests_failed: int = 0,
     endpoints: list[dict[str, Any]] | None = None,
+    status: str | None = None,
 ) -> int:
+    """Insert an API Gate run for `feat_n`.
+
+    v7.0.0-alpha audit P3 (2026-06-06) — `status` is the canonical 5-valued
+    verdict (PASS | WARN | FAIL | SKIPPED | INFRA_BLOCKED) defined in
+    `build-and-loop.md §1.3`. When the caller doesn't provide it (legacy code
+    paths), it is best-effort derived from `gate_passed` + `tests_failed` +
+    `tests_total` so the column is never NULL on writes from current callers.
+
+    `gate_passed` is preserved for backward-compat readers (cf. query_api_gate)
+    and computed as `status ∈ {PASS, WARN, SKIPPED}`.
+    """
     ensure_feat_row(conn, feat_n=feat_n)
+    if status is None:
+        # Legacy callers : derive from boolean. Subset of the canonical mapping.
+        if tests_failed >= 1:
+            status = "FAIL"
+        elif gate_passed and tests_total == 0:
+            status = "SKIPPED"
+        elif gate_passed:
+            status = "PASS"
+        else:
+            status = "FAIL"
+    else:
+        status = status.strip().upper()
     cur = conn.execute(
         """
-        INSERT INTO qa_api_tests(feat_n, extracted_at, gate_passed,
+        INSERT INTO qa_api_tests(feat_n, extracted_at, gate_passed, status,
             endpoints_total, tests_total, tests_passed, tests_failed)
-        VALUES(?, ?, ?, ?, ?, ?, ?)
+        VALUES(?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (feat_n, extracted_at or iso_now_ms(), 1 if gate_passed else 0,
-         endpoints_total, tests_total, tests_passed, tests_failed),
+         status, endpoints_total, tests_total, tests_passed, tests_failed),
     )
     api_test_id = cur.lastrowid
     if endpoints:

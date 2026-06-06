@@ -29,7 +29,7 @@ Exit codes:
 Conventions: Python 3.10+ stdlib only, deterministic (0 token LLM).
 
 Related:
-- `@.claude/ARCHIVE/v7-design-superseded/DESIGN-FROMPLAN-STRICT.md` (design)
+- `@.claude/archive/v7-design-superseded/DESIGN-FROMPLAN-STRICT.md` (design)
 - `@.claude/rules/build-and-loop.md §7.4.bis` (v2 plan format)
 - `validate_plan.py` (counterpart : verifies us-hash matches at consume time)
 """

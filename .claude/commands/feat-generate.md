@@ -189,6 +189,15 @@ Vérifier l'existence de `workspace/output/.sys/.context/constitution.md`.
 
 ### 7.5.1 Si la constitution n'existe PAS (premier `/feat-generate` du projet)
 
+> **v7.0.0-alpha audit P0-doc 2026-06-05** — STEP 7.5.1 doit créer le
+> répertoire parent `workspace/output/.sys/.context/` AVANT d'écrire,
+> sinon le `Write` natif Claude Code échoue sur env greenfield où
+> `/sdd-bootstrap` aurait créé `workspace/` mais pas `.sys/.context/`.
+
+0. **mkdir parent** (idempotent, cross-platform) :
+   ```bash
+   python -c "from pathlib import Path; Path('workspace/output/.sys/.context').mkdir(parents=True, exist_ok=True)"
+   ```
 1. Read `.claude/templates/constitution.template.md`.
 2. Lire `workspace/input/stack/stack.md` (si présent) pour récupérer
    `AppName` du `## Project Config`. Si absent → utiliser le nom du

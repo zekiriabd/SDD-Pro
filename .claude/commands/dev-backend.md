@@ -1,10 +1,7 @@
 # /dev-backend — Génère le code serveur d'UNE US
 
-> ⚠️ **Commande interne v7.0.0** — invoquée par /dev-run STEP 6.a.
-> Génère 1 US backend — invoqué en batch par /dev-run.
-> Utilisateur final : préférer la commande orchestrante (`/sdd-full` ou `/dev-run`)
-> qui gère pré-conditions, idempotence et état. Conservée comme command pour
-> debug/inspection ciblée et préservation des chaînes d'invocation documentées.
+> ⚠️ **Commande interne v7.0.0** — invoquée par `/dev-run` STEP 6.a (batch 1 US).
+> Utilisateur final : préférer `/sdd-full` ou `/dev-run` (gèrent pré-conditions, idempotence, état).
 
 Invoque l'agent `dev-backend` pour matérialiser l'US
 `workspace/output/us/{n}-{m}-{Name}.md` en code serveur (services, endpoints,
@@ -41,23 +38,7 @@ FIX: relancer /dev-backend {n}-{m} (ex. /dev-backend 1-3)
 
 ---
 
-## STEP 2 — (délégué à l'agent v5.0)
-
-> Les vérifications **US existe**, **stack backend actif**, **CLAUDE.md
-> projet présent**, **project_file présent** sont absorbées par le
-> **STEP 0 HARD-GATE** de l'agent `dev-backend` (Phase A + Phase B).
-> Pas de duplication ici. La commande se contente de valider l'argument
-> (STEP 1) puis d'invoquer l'agent (STEP 4).
-
----
-
-## STEP 3 — (délégué à l'agent v5.0)
-
-> Voir STEP 2 ci-dessus. Validation stack backend = HARD-GATE B1.
-
----
-
-## STEP 4 — Invoquer l'agent dev-backend
+## STEP 2 — Invoquer l'agent dev-backend
 
 Lancer l'agent `dev-backend` (défini dans `.claude/agents/dev-backend.md`)
 avec l'argument `{n}-{m}`. L'agent gère :
@@ -72,7 +53,7 @@ Attendre la fin de l'agent. Relayer sa sortie telle quelle.
 
 ---
 
-## STEP 5 — Confirmation finale
+## STEP 3 — Confirmation finale
 
 Si l'agent réussit avec génération, ajouter UNE SEULE ligne :
 ```

@@ -3,7 +3,7 @@
 > §2.4 (Librairies) regeneree depuis `react-native.libs.json` — ne pas editer manuellement (`python .claude/python/sdd_admin/sync_stack_md.py --stack-id react-native`).
 
 Status: Experimental
-Validation: 🟡 experimental (combo non valide end-to-end dans SDD_Pro v6)
+Validation: 🟢 bench-validated runtime — Expo Web (2026-06-05 — CalcABCRN :44399, `create-expo-app` SDK 56 + RN 0.81 + Expo Router, `expo start --web` Metro 13s cold, HTTP 200 / 45KB, `<TextInput>` × 3 + `<Pressable>` Calculate compilés en HTML/CSS via RN-Web, POST → FastAPI :44329 cross-origin 🟢. Cibles iOS/Android natives non testées sans device. Bug fix : :44399 absent de l'allowlist FastAPI → ajouter aux 14 origins. Pipeline `/sdd-full` complet pas encore validé end-to-end — scaffolding manuel mainteneur, cf. `docs/benchmarks/known-gaps.md`)
 Tech FEAT ID: tech-react-native
 Scope: **mobile cross-platform** — application React Native via **Expo SDK 52** dans UN seul projet `{AppName}/`. UI React Native + state + navigation + acces APIs natives + auth vivent dans le meme projet TypeScript. Pas de separation `{BackendName}` / `{LibName}`. Cible iOS + Android (+ Web optionnel via Expo Web).
 

@@ -3,7 +3,7 @@
 > §2.4 (Librairies) régénérée depuis `node-express.libs.json` — ne pas éditer manuellement (`python .claude/python/sdd_admin/sync_stack_md.py --stack-id node-express`).
 
 Status: Experimental
-Validation: 🟡 experimental (not yet validated end-to-end in production combo)
+Validation: 🟢 bench-validated runtime (2026-06-05 — CalcABCBackNode :44329, Express 4 + TypeScript strict (`noUncheckedIndexedAccess`) + ESM `"type":"module"` + Pino + Zod inline + Swagger §1.6 obligatoire + helmet/cors/compression/rate-limit, ~320 LOC code applicatif, **POST 5+5 latence 47ms (2e plus rapide du bench)**, `/api-docs` Swagger UI + OpenAPI 3.0.3, 400 ProblemDetail Zod, 16/16 curl cross-origin 4 SPA OK, AC-1/2/3/4 🟢. Pipeline `/sdd-full` complet pas encore validé end-to-end — scaffolding manuel mainteneur, cf. `docs/benchmarks/known-gaps.md`)
 Tech FEAT ID: tech-expressapi
 Scope: backend uniquement (API, logique metier, persistance)
 

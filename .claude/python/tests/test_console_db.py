@@ -292,5 +292,27 @@ class TestConcurrentWriters(unittest.TestCase):
                     self.assertEqual(n, 8)
 
 
+class TestConnectRetryConfig(unittest.TestCase):
+    """Security audit 2026-06-06 (LOT 8.5) : `database is locked` retry config
+    introduit dans console_db/core.py — vérifier que les constantes sont
+    correctement définies + busy_timeout bumpé à 30s."""
+
+    def test_busy_timeout_increased_to_30s(self) -> None:
+        from sdd_lib.console_db import core
+        self.assertEqual(core._BUSY_TIMEOUT_MS, 30000,
+                         "busy_timeout doit être 30s (audit 2026-06-06, was 5s)")
+
+    def test_retry_constants_defined(self) -> None:
+        from sdd_lib.console_db import core
+        self.assertEqual(core._CONNECT_MAX_RETRY, 3,
+                         "3 retries on database-locked errors")
+        self.assertEqual(len(core._CONNECT_RETRY_BACKOFF), core._CONNECT_MAX_RETRY,
+                         "backoff sequence must match retry count")
+        backoff = core._CONNECT_RETRY_BACKOFF
+        for i in range(1, len(backoff)):
+            self.assertGreater(backoff[i], backoff[i-1],
+                               f"backoff[{i}] must be > backoff[{i-1}] (exponential)")
+
+
 if __name__ == "__main__":
     unittest.main()

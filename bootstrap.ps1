@@ -38,12 +38,19 @@
 
 [CmdletBinding()]
 param(
-    [ValidateSet('c1', 'c2', 'custom')]
+    # Audit P0-doc 2026-06-05 — synced with bootstrap.py CLI (c1..c5 + custom)
+    [ValidateSet('c1', 'c2', 'c3', 'c4', 'c5', 'custom')]
     [string]$Combo,
 
     [switch]$DryRun,
     [switch]$SkipInstall,
-    [switch]$Force
+    [switch]$Force,
+    [switch]$AutoInit,
+
+    # Optional env vars for CI scripted mode (mirror bootstrap.py SDD_* env)
+    [string]$AppName,
+    [string]$BackendName,
+    [string]$FrontendName
 )
 
 $ErrorActionPreference = 'Stop'
@@ -92,12 +99,19 @@ if (-not $Python) {
     exit 3
 }
 
-# Forward CLI flags
+# Forward CLI flags + env vars (audit P0-doc 2026-06-05 — synced with bootstrap.py)
 $Args = @($BootstrapPy)
 if ($Combo)       { $Args += @('--combo', $Combo) }
 if ($DryRun)      { $Args += '--dry-run' }
 if ($SkipInstall) { $Args += '--skip-install' }
 if ($Force)       { $Args += '--force' }
+if ($AutoInit)    { $Args += '--auto-init' }
+
+# CI / scripted mode : propagate SDD_* env vars expected by bootstrap.py
+if ($AppName)      { $env:SDD_APP_NAME = $AppName }
+if ($BackendName)  { $env:SDD_BACKEND_NAME = $BackendName }
+if ($FrontendName) { $env:SDD_FRONTEND_NAME = $FrontendName }
+if ($Combo -and -not $env:SDD_COMBO) { $env:SDD_COMBO = $Combo }
 
 # Run with cwd = ScriptDir so bootstrap.py's REPO_ROOT detection works
 Push-Location $ScriptDir

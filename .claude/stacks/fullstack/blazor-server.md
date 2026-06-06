@@ -1,7 +1,7 @@
 # Tech FEAT: blazor-server (fullstack)
 
 Status: Experimental
-Validation: 🟡 experimental (combo non valide end-to-end dans SDD_Pro v6 — pattern derive d'un projet legacy Demo 2026-05)
+Validation: 🟢 bench-validated runtime (2026-06-05 — CalcABCFullStack :44339, Blazor Web App SSR + `@rendermode InteractiveServer`, SignalR streaming, build .NET 8 vert 0 err 0 warn, GET / 200 5324 bytes 109ms, AC-1/2/3 🟢. Pipeline `/sdd-full` complet pas encore validé end-to-end — scaffolding manuel mainteneur, cf. `docs/benchmarks/known-gaps.md`)
 Tech FEAT ID: tech-blazor-server
 Scope: **fullstack monolithe** — application Blazor Server .NET 10 dans UN seul projet `{AppName}/`. UI + logique metier + acces donnees + auth vivent dans le meme processus ASP.NET Core. Pas de separation `{BackendName}` / `{AppName}` / `{LibName}`. Modele SSR vrai : HTML rendu serveur, UI synchronisee via SignalR (pas de SPA, pas de JS bundler).
 
@@ -353,7 +353,9 @@ Les Components reutilisables vivent sous `Components/` (fichier unique `.razor` 
 
 Lire `DatabaseType` dans `workspace/input/stack/stack.md ## Project Config` et executer
 la commande correspondante. **Toutes les valeurs de connexion proviennent
-exclusivement des variables d'environnement — jamais en dur.**
+du bloc `## Active Database` de `stack.md`, puis sont materialisees par
+`arch` dans `appsettings.json` / `ConnectionStrings:Default` — jamais via
+env vars runtime dans le code applicatif.**
 
 Resoudre les placeholders `{AppName}`, `{AppNamespace}` depuis
 `## Project Config` avant d'executer.
@@ -634,7 +636,7 @@ try
 
     AzureAdConfigBinder.BindFromEnvironment(builder.Configuration);
 
-    var connectionString = BuildConnectionString();
+    var connectionString = BuildConnectionString(builder.Configuration);
 
     // Blazor Server: AddDbContextFactory, jamais AddDbContext. Voir §4.
     builder.Services.AddDbContextFactory<AppDbContext>(options =>
@@ -699,21 +701,18 @@ finally
     Log.CloseAndFlush();
 }
 
-static string RequireEnv(string name)
+static string BuildConnectionString(IConfiguration configuration)
 {
-    var v = Environment.GetEnvironmentVariable(name);
-    if (string.IsNullOrWhiteSpace(v))
-        throw new InvalidOperationException($"Missing required environment variable: {name}");
-    return v;
-}
+    var configured = configuration.GetConnectionString("Default");
+    if (!string.IsNullOrWhiteSpace(configured))
+        return configured;
 
-static string BuildConnectionString()
-{
-    var dbName = RequireEnv("DB_NAME");
-    var dbUser = RequireEnv("DB_USER");
-    var dbPassword = RequireEnv("DB_PASSWORD");
-    var dbHost = RequireEnv("DB_HOST");
-    var dbPort = RequireEnv("DB_PORT");
+    var db = configuration.GetSection("Db");
+    var dbName = db["Name"] ?? throw new InvalidOperationException("Db:Name missing in appsettings.json");
+    var dbUser = db["User"] ?? throw new InvalidOperationException("Db:User missing in appsettings.json");
+    var dbPassword = db["Password"] ?? throw new InvalidOperationException("Db:Password missing in appsettings.json");
+    var dbHost = db["Host"] ?? throw new InvalidOperationException("Db:Host missing in appsettings.json");
+    var dbPort = db["Port"] ?? throw new InvalidOperationException("Db:Port missing in appsettings.json");
     return $"Server={dbHost},{dbPort};Database={dbName};User Id={dbUser};Password={dbPassword};TrustServerCertificate=True;";
 }
 
@@ -967,7 +966,8 @@ public class XxxListBase : ComponentBase
 ### 8.6 Template `appsettings.json`
 
 Placeholders vides obligatoires pour `Authorization:Groups`. Aucun GUID de
-production. La section `AzureAd` reste ABSENTE (alimentee via env vars, §2).
+production. La section `AzureAd` est peuplee par `arch` depuis
+`## Active Auth Specs` de `stack.md` (cf. `auth/azure-ad.md §2.bis`).
 
 ```json
 {

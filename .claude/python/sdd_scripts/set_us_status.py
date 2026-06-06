@@ -51,6 +51,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from sdd_lib.paths import repo_root  # noqa: E402
 from sdd_lib.stderr import error_block, warn  # noqa: E402
+from sdd_lib.atomic_write import atomic_write_text  # noqa: E402
 
 
 VALID_STATUSES: tuple[str, ...] = (
@@ -152,10 +153,8 @@ def is_transition_allowed(current: str, target: str, *, force: bool) -> tuple[bo
 
 
 def write_status_atomic(path: Path, new_content: str) -> None:
-    """Atomic write via .tmp + replace."""
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(new_content, encoding="utf-8", newline="\n")
-    tmp.replace(path)
+    """Atomic write via sdd_lib.atomic_write_text (cf. build-and-loop.md §2.bis)."""
+    atomic_write_text(path, new_content, newline="\n")
 
 
 def main() -> int:

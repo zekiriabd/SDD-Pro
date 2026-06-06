@@ -1,7 +1,7 @@
 # Tech FEAT: next (fullstack)
 
 Status: Experimental
-Validation: 🟡 experimental (combo non valide end-to-end dans SDD_Pro v6)
+Validation: 🟢 bench-validated runtime (2026-06-05 — CalcABCNextJS :44359, Next 15 App Router + Server Components + Server Actions `'use server'`, Zod inline + RHF côté client, startup 2.6s, GET / 200 13363 bytes (compile JIT 3.2s 1ère req), AC-1/2/3 🟢. Pipeline `/sdd-full` complet pas encore validé end-to-end — scaffolding manuel mainteneur, cf. `docs/benchmarks/known-gaps.md`)
 Tech FEAT ID: tech-next
 Scope: **fullstack monolithe** — application Next.js 15 (App Router) dans UN seul projet `{AppName}/`. UI (React Server Components + Client Components) + API routes + Server Actions + auth vivent dans le meme processus Node.js. Pas de separation `{BackendName}` / `{AppName}` / `{LibName}`. Modele **SSR vrai** : HTML pre-rendu serveur par defaut, hydratation selective cote client.
 
@@ -223,13 +223,20 @@ mkdir -p \
   data \
   messages
 
-# STEP 5 — Bootstrap config par defaut (lue par arch depuis stack.md)
-cat > .env.local.example <<'ENV'
-# Cf. config/default.json dans workspace/input/stack/stack.md
-DATABASE_URL="(injectee par arch)"
-NEXTAUTH_SECRET="(injectee par arch)"
-NEXTAUTH_URL="http://localhost:3000"
-ENV
+# STEP 5 — Bootstrap config serveur par defaut (rempli par arch depuis stack.md)
+cat > lib/server/config.ts <<'TS'
+import 'server-only';
+
+export const serverConfig = {
+  databaseUrl: "",
+  nextAuthSecret: "",
+  nextAuthUrl: "http://localhost:3000",
+  azureAd: {
+    tenantId: "",
+    clientId: "",
+  },
+} as const;
+TS
 
 fi
 ```
@@ -349,14 +356,14 @@ Versioning par segment App Router : `app/api/v1/{domain}/route.ts`. **Obligatoir
 **Securite** :
 - CSP `unsafe-inline` sans nonce
 - Cookies sans `httpOnly` + `secure` + `sameSite`
-- Hardcoded secrets (utiliser `.env.local` + `process.env` cote serveur uniquement)
+- Hardcoded secrets hors config serveur generee par `arch` depuis `stack.md`
 - Validation manuelle a la place de Zod
 - Path traversal non protege (resolve + scope check) dans les Route Handlers qui prennent un `path`
 
 **Bundle** :
 - Import d'une lib serveur dans un Client Component (alourdit le bundle JS)
 - Pas de `'use server'` sur une fonction async destinee a etre appelee depuis le client
-- Engager `.next/`, `node_modules/`, `.env.local` dans git
+- Engager `.next/`, `node_modules/` ou un fichier de config locale contenant des secrets dans git
 
 ---
 
@@ -364,7 +371,7 @@ Versioning par segment App Router : `app/api/v1/{domain}/route.ts`. **Obligatoir
 
 - **File-based JSON** (default si `DatabaseType: none`) : pattern identique a `node-react.md §6.2` (atomic write + lock)
 - **Prisma** (capability `prisma`) : pattern identique a `.claude/stacks/backend/node-express.md §8.3` (commandes scaffolding `prisma db pull`)
-- **Connection string** : composee par arch depuis `## Active Database` et injectee dans `.env.local` (sous gitignore). Lecture cote code via `process.env.DATABASE_URL` (serveur uniquement, jamais cote client)
+- **Connection string** : composee par arch depuis `## Active Database` et injectee dans `lib/server/config.ts` (server-only). Lecture cote code via `serverConfig.databaseUrl`, jamais via `process.env.DATABASE_URL`.
 
 ---
 
@@ -426,11 +433,11 @@ Ce stack est optimise pour :
 
 1. **Detecter** `## Active Tech Specs` = `fullstack/next.md` → **ignorer** `BackendName` et `LibName` (WARNING `[STACK_MALFORMED]` si declares)
 2. **Creer** UN seul projet `workspace/output/src/{AppName}/` via `create-next-app` (cf. §2.2.1)
-3. **Composer** `.env.local` (gitignore) depuis `## Active Database` + `## Active Auth Specs` :
-   - `DATABASE_URL` (si Prisma) — format selon `DatabaseType`
-   - `NEXTAUTH_SECRET` (depuis `AUTH_JWT_SECRET`)
-   - `NEXTAUTH_URL` (depuis `## Project Config`)
-   - `AZURE_AD_CLIENT_ID`, `AZURE_AD_TENANT_ID` (si auth-azure-ad)
+3. **Composer** `lib/server/config.ts` depuis `## Active Database` + `## Active Auth Specs` :
+   - `databaseUrl` (si Prisma) — format selon `DatabaseType`
+   - `nextAuthSecret` (depuis `AUTH_JWT_SECRET`)
+   - `nextAuthUrl` (depuis `## Project Config`)
+   - `azureAd.clientId`, `azureAd.tenantId` (si auth-azure-ad)
 4. **`## Active UI Specs`** : seul `shadcn` est compatible (composants React 19 RSC-ready). `vuetify` ou `radzen-blazor` → WARNING bloquant `[STACK_INCOMPAT]`
 5. **Phase B (DB scaffolding)** : invoquee si `DatabaseType ≠ none` ET capability `prisma` matchee — meme procedure que `node-express.md §8.3` (`prisma db pull`)
 6. **Phase C (ADRs)** : creer `ADR-{ts}-stack-fullstack-next.md` documentant App Router + RSC + Server Actions
@@ -466,7 +473,7 @@ Ce stack est optimise pour :
 | `workspace/output/src/{AppName}/app/globals.css` | `dev-frontend` |
 | `workspace/output/src/{AppName}/prisma/**` | `arch` (create) + `dev-backend` (consommation) |
 | `workspace/output/src/{AppName}/package.json` | `arch` (create) + `dev-backend` (augment deps) |
-| `workspace/output/src/{AppName}/.env.local` | `arch` (create exclusif — secrets) |
+| `workspace/output/src/{AppName}/lib/server/config.ts` | `arch` (create exclusif — secrets/config SDD) |
 
 ---
 

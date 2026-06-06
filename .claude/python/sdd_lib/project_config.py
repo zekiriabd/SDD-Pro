@@ -286,8 +286,25 @@ def normalize_project_aliases(raw: dict[str, str]) -> dict[str, str]:
         BackendNamespace  ← BackendName
 
     Precedence : explicit AppName beats FrontendName when both present.
+
+    v7.0.0-alpha audit P0-doc 2026-06-05 : warn on stderr when both
+    `AppName` AND `FrontendName` are set with diverging values — the
+    canonical resolution silently uses `AppName`, but the Tech Lead
+    likely intended the same value (drift means one of the two is stale
+    after a rename). Non-blocking; the Tech Lead arbitrates by editing
+    `stack.md`.
     """
+    import sys as _sys
+
     out = dict(raw)
+    app = out.get("AppName")
+    fe = out.get("FrontendName")
+    if app and fe and app != fe:
+        _sys.stderr.write(
+            f"[project-config] WARN: AppName ('{app}') and FrontendName ('{fe}') diverge "
+            f"in stack.md ## Project Config. Canonical token is AppName — FrontendName ignored.\n"
+            f"FIX: drop FrontendName (or align it to AppName) to silence this warning.\n"
+        )
     if "AppName" not in out and "FrontendName" in out:
         out["AppName"] = out["FrontendName"]
     if "AppNamespace" not in out and "AppName" in out:

@@ -3,6 +3,28 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
+<!-- Content-Security-Policy — audit P0-security 2026-06-05.
+     - default-src 'self'  : everything must originate from the console itself.
+     - script-src 'self' 'unsafe-inline' : Babel runtime compiles app.jsx
+       at load time and emits inline <script> via document.write/eval; we
+       allow inline scripts but NOT external src= from any CDN.
+     - style-src + font-src allow Google Fonts (Inter, JetBrains Mono) since
+       the console relies on them for typography. Switch to local woff2 in a
+       follow-up if external fonts also become unacceptable.
+     - object-src 'none' + base-uri 'self' + frame-ancestors 'self' : block
+       common XSS escalation paths. -->
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'self';
+               script-src 'self' 'unsafe-inline' 'unsafe-eval';
+               style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+               font-src 'self' https://fonts.gstatic.com;
+               img-src 'self' data:;
+               connect-src 'self';
+               frame-src 'self';
+               frame-ancestors 'self';
+               base-uri 'self';
+               object-src 'none';
+               form-action 'self'"/>
 <title>SDD Console — Cockpit de validation</title>
 <link rel="icon" type="image/svg+xml" href="/logo-light.svg" media="(prefers-color-scheme: light)"/>
 <link rel="icon" type="image/svg+xml" href="/logo-dark.svg" media="(prefers-color-scheme: dark)"/>
@@ -19,10 +41,17 @@
   </div>
 </div>
 
-<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin="anonymous"></script>
-<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin="anonymous"></script>
-<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/marked@14.1.4/marked.min.js" crossorigin="anonymous"></script>
+<!-- Vendored locally from workspace/console/node_modules (cf. server.js
+     /vendor/:name route). Audit P0-security 2026-06-05: previously loaded
+     from unpkg.com / cdn.jsdelivr.net without Subresource Integrity, which
+     made compromise-of-CDN equivalent to RCE in the Tech Lead's browser.
+     Run `npm install` in workspace/console/ to install the pinned versions
+     (see package.json). -->
+<script src="/vendor/react.development.js"></script>
+<script src="/vendor/react-dom.development.js"></script>
+<script src="/vendor/babel.min.js"></script>
+<script src="/vendor/marked.min.js"></script>
+<script src="/vendor/purify.min.js"></script>
 
 <script src="data-loader.js"></script>
 <script type="text/babel" src="app.jsx"></script>

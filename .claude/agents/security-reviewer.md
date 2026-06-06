@@ -155,6 +155,16 @@ Sous-sections déterministes : chaque `### 5.x` ci-dessous correspond
 à une catégorie OWASP Top 10 2021, avec patterns Grep + heuristiques
 Sonnet + exclusions canoniques (tests, env vars, dev configs).
 
+> **SSoT machine (v7.0.0-alpha 2026-06-05)** : la taxonomie + patterns
+> regex est aussi capturée en `@.claude/python/security_patterns.yaml`
+> (22 classes [SEC_*] + sévérité + hard-blocking + regex/lang). Le YAML
+> est cross-checké contre §1.11 d'error-classification.md par
+> `tests/test_security_patterns.py`. **v7.0.0 : prose ci-dessous reste
+> la SSoT runtime** (lue par cet agent à chaque invocation). **v7.1+** :
+> migration prévue où l'agent lira le YAML pour réduire son footprint
+> de ~200 lignes (cf. ADR `governance-security-patterns-yaml-migration`
+> à créer si décidé).
+
 ### 5.1 A03 Injection — Secrets hardcoded
 
 Patterns Grep (compléments à `code-reviewer.md §5.5`) :
@@ -391,13 +401,40 @@ Exclusions : endpoints `/health`, `/metrics`, `/swagger`, `/openapi.json`,
 | Deserialization unsafe | ❌ | ✅ |
 | SSRF | ❌ | ✅ |
 
-**Coordination** :
-- Si `code-reviewer` a déjà émis `[REVIEW_SECRETS_HARDCODED]` sur un
-  fichier+ligne donné, le security-reviewer **dé-duplique** (ne ré-émet
-  pas le même match). Détection : Read `workspace/output/.sys/.validation/{n}-code-review.json`
-  si présent et exclure les items déjà listés.
-- L'inverse n'est pas vrai (code-reviewer ne lit pas le security
-  report — il tourne avant).
+**Coordination dé-dup (v7.0.0-alpha audit P1 — 2026-06-06)** :
+
+1. **Dé-dup authoritative post-hoc** — c'est `sdd_review.py::compute_report`
+   qui assure la dé-dup au moment de l'agrégation, via
+   `deduplicate_findings()` + table `CANONICAL_CLASS` (cf.
+   `sdd_scripts/_review_fetch.py §6.10 + R3`). Les classes
+   `[REVIEW_SECRETS_HARDCODED]` et `[SEC_SECRET_HARDCODED]` sont
+   mappées sur la même clé canonique `SECRET_HARDCODED` ; le finding
+   au plus haut severity est conservé, les autres droppés. **C'est ce
+   mécanisme qui empêche le double-rapport sur les mêmes file:line
+   dans le verdict consolidé `/sdd-review`**.
+
+2. **Dé-dup pré-emit best-effort** — quand security-reviewer tourne
+   APRÈS code-reviewer dans le même run (cas séquentiel rare), il
+   PEUT lire `workspace/output/.sys/.validation/{n}-code-review.json`
+   s'il existe et exclure les items déjà listés (Read tool). C'est un
+   bonus qui réduit le bruit du rapport intermédiaire mais n'est pas
+   load-bearing. **Quand les agents tournent en parallèle dans
+   `/dev-run` STEP 6.4 (cas usuel), le fichier code-review.json
+   n'existe pas encore au moment où security-reviewer démarre** —
+   skip silencieux du pré-emit, la dé-dup post-hoc (1) prend le
+   relais. Aucune erreur, aucun warning : pattern attendu.
+
+3. **Code-reviewer ne lit jamais le rapport security** (inverse non
+   couvert) — c'est OK car la dé-dup post-hoc traite les deux sens.
+
+> **Conséquence v7.0.0-alpha audit P0-doc 2026-06-05** :
+> `[REVIEW_SECRETS_HARDCODED]` est désormais owned **exclusivement**
+> par security-reviewer (`[SEC_SECRET_HARDCODED]` hard-blocking
+> CWE-798). Si code-reviewer rencontre incidemment un secret évident,
+> il l'émet en `issues.minor` informationnel avec pointeur vers
+> security-reviewer. La dé-dup post-hoc reste utile pour les bases
+> console.db legacy (pre-2026-06-05) qui contiennent encore les deux
+> classes pour les mêmes file:line.
 
 ---
 
@@ -535,13 +572,9 @@ via `SELECT … FROM qa_security WHERE feat_n = {n}`.
 
 ## STEP 10 — Output succès
 
-Mode `threat-model` :
-```
-security-reviewer feat-{n} mode=threat-model — {N} threats identifiés ({C} critical, {S} serious, {M} moderate)
-
-Rapport  : workspace/output/.sys/.validation/{n}-threat-model.md
-Schéma   : workspace/output/.sys/.validation/{n}-threat-model.json
-```
+> **v7.0.0** : mode `threat-model` retiré (remplacé par `templates/threat-model.template.md`
+> humain). Cet agent n'émet plus que le mode `scan`. L'ingest bridge accepte
+> encore `threat-model` en lecture pour anciens runs (§STEP 9.5).
 
 Mode `scan` :
 ```
@@ -588,10 +621,7 @@ ce sont les findings du rapport (verdict 🟢/🟡/🔴, pas STOP de l'agent).
 
 ## Chat Output Protocol
 
-Applique `@.claude/rules/output-protocol.md`. Label `[SECURITY]`, plage `94-97%`,
-granularité 2-3 updates. Verdict 1L avec emoji + compteurs OWASP. Erreurs : chat 1L
-(`🔴 [SECURITY/FAIL] résumé — [SEC_*] détail → rapport.md (X%)`) + bloc ERROR 3L
-disque préservé (cf. `error-classification.md §2`). Bypass `SDD_CHAT_VERBOSE=1`.
+Applique `@.claude/rules/output-protocol.md` (label `[SECURITY]`, plage `94-96%`).
 
 ---
 

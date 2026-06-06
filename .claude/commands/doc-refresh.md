@@ -1,25 +1,10 @@
 # /doc-refresh
 
-> ⚠️ **Commande interne v7.0.0** — invoquée par fin de pipeline (/sdd-full, /dev-run, /qa-generate).
-> Régénère INDEX.md ADRs — script index_adrs.py invoqué automatiquement.
-> Utilisateur final : préférer la commande orchestrante (`/sdd-full` ou `/dev-run`)
-> qui gère pré-conditions, idempotence et état. Conservée comme command pour
-> debug/inspection ciblée et préservation des chaînes d'invocation documentées.
-
-> Régénère l'**INDEX.md des ADRs** depuis l'état du workspace.
-> **Idempotent**. Exécution déterministe via `index_adrs.py` (v7.0.0).
->
-> **v7.0.0 BREAKING** : l'agent `dashboard` (Haiku 4.5) a été **retiré**.
-> Sa seule responsabilité restante (générer `INDEX.md` des ADRs) est
-> 100 % mécanique (glob + parse frontmatter + render template) et ne
-> justifiait pas une invocation LLM. Le script Python
-> `sdd_scripts/index_adrs.py` le remplace : 0 token, ~50 ms.
->
-> **v6.10 BREAKING (préservé)** : les rendus HTML
-> (`dashboard/README.html`, `qa/feat-{n}/dashboard.html`) restent retirés.
-> Les métriques vivent dans `workspace/output/db/console.db` (SQLite
-> SSoT, 24 tables) et le rendu graphique est délégué à la console web
-> (`workspace/console/`) ou à tout consommateur externe.
+> ⚠️ **Commande interne v7.0.0** — invoquée auto en fin de pipeline
+> (`/sdd-full`, `/dev-run`, `/qa-generate`, `arch` Phase D). Régénère
+> `INDEX.md` des ADRs via `sdd_scripts/index_adrs.py` (0 token, ~50 ms,
+> idempotent). Préférer un orchestrateur en usage normal ; cette
+> commande sert au debug/inspection ciblée.
 
 ## Usage
 
@@ -38,11 +23,8 @@ l'index.
 
 ## Quand l'utiliser
 
-- **Manuel** : après une édition manuelle d'un ADR pour rafraîchir l'index
-- **Auto** : invoqué en fin de `/sdd-full`, `/dev-run`, `/qa-generate`
-  (cf. wirings dans ces commandes — désormais via Bash, plus via Agent)
-- **Auto** : invoqué en fin d'`arch` Phase D (création d'ADRs) pour
-  reconstruire l'INDEX.md
+- **Manuel** : après édition manuelle d'un ADR pour rafraîchir l'index.
+- **Auto** : fin de `/sdd-full`, `/dev-run`, `/qa-generate`, `arch` Phase D.
 
 ## STEP 1 — Exécuter le script
 
@@ -97,14 +79,4 @@ Si aucun ADR : `OK index_adrs — INDEX.md (0 ADRs, empty) refreshed`.
 
 ## Coût
 
-- **0 token LLM** (était Haiku 4.5 ~3k tokens en v6.10)
-- Latence : ~50 ms
-- Aucun appel à un autre agent, aucun build, aucun test
-
-## Migration depuis l'agent `dashboard`
-
-Les callers historiques (`/sdd-full`, `/dev-run`, `/qa-generate`,
-`agents/arch.md` Phase D) qui invoquaient `Agent(dashboard, ...)`
-doivent désormais lancer le script via Bash. Substance équivalente,
-verdict idempotent identique, sortie chat identique au préfixe près
-(`OK index_adrs —` vs `✅ dashboard —`).
+- **0 token LLM** ; latence ~50 ms ; aucun appel agent/build/test.

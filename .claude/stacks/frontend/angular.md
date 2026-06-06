@@ -3,7 +3,7 @@
 > §2.4 (Librairies) régénérée depuis `angular.libs.json` — ne pas éditer manuellement (`python .claude/python/sdd_admin/sync_stack_md.py --stack-id angular`).
 
 Status: Experimental
-Validation: 🟡 experimental (not yet validated end-to-end in production combo)
+Validation: 🟢 bench-validated runtime (2026-06-05 — CalcABCAngular :4200, Angular 18 standalone + signals, 14839 LOC (ng new template), 4/4 curl cross-origin sur Kotlin/.NET/Node/Python backends OK, AC-1/2/3 🟢. Bug fix critique : `<input type=number>` + `[(ngModel)]` envoie number → état `signal<string>` cassé → bouton bloqué. Convention `signal<number\|null>(null)` inscrite dans `library-and-stack.md §7.2`. Pipeline `/sdd-full` complet pas encore validé end-to-end — scaffolding manuel mainteneur, cf. `docs/benchmarks/known-gaps.md`)
 Tech FEAT ID: tech-angular
 Scope: frontend uniquement (Angular SPA)
 

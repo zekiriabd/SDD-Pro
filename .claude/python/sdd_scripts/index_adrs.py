@@ -36,6 +36,7 @@ if str(_PY_ROOT) not in sys.path:
 
 from sdd_lib.paths import repo_root  # noqa: E402
 from sdd_lib.exit_codes import CORRECTIBLE, FAIL_FAST, SUCCESS  # noqa: E402
+from sdd_lib.atomic_write import atomic_write_text  # noqa: E402
 
 
 DEFAULT_TEMPLATE = (
@@ -119,13 +120,21 @@ def render(template: str, adrs: list[dict[str, str]], project_name: str) -> str:
 
 
 def write_atomic(path: Path, content: str) -> bool:
-    """Write `content` atomically via .tmp + read-back self-check."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(content, encoding="utf-8")
-    if tmp.read_text(encoding="utf-8") != content:
+    """Write `content` atomically via sdd_lib.atomic_write_text + read-back self-check.
+
+    Delegates the atomic write semantics (`.sddtmp` + fsync + os.replace) to
+    `sdd_lib.atomic_write.atomic_write_text` (cf. build-and-loop.md §2.bis).
+    Read-back self-check preserved post-write to satisfy exit code 2 contract.
+    """
+    try:
+        atomic_write_text(path, content)
+    except OSError:
         return False
-    tmp.replace(path)
+    try:
+        if path.read_text(encoding="utf-8") != content:
+            return False
+    except OSError:
+        return False
     return True
 
 

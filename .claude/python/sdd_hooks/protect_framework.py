@@ -37,6 +37,13 @@ FRAMEWORK_OWNED: tuple[str, ...] = (
     ".claude/CLAUDE.md",
     ".claude/docs/MIGRATION.md",
     ".claude/docs/CHANGELOG.md",
+    # Security audit 2026-06-06 : settings.json + settings.local.json étaient
+    # omis du FRAMEWORK_OWNED. Un agent Edit pouvait s'auto-promouvoir en
+    # ajoutant `Bash(*)` à permissions.allow — privilege escalation triviale.
+    # Désormais inclus : édition manuelle nécessaire (jamais via agent).
+    ".claude/settings.json",
+    ".claude/settings.local.json",
+    ".claude/config.base.yml",
 )
 
 

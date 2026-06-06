@@ -1,10 +1,7 @@
 # /dev-frontend — Génère le code client d'UNE US
 
-> ⚠️ **Commande interne v7.0.0** — invoquée par /dev-run STEP 6.c.
-> Génère 1 US frontend — invoqué en batch par /dev-run.
-> Utilisateur final : préférer la commande orchestrante (`/sdd-full` ou `/dev-run`)
-> qui gère pré-conditions, idempotence et état. Conservée comme command pour
-> debug/inspection ciblée et préservation des chaînes d'invocation documentées.
+> ⚠️ **Commande interne v7.0.0** — invoquée par `/dev-run` STEP 6.c (batch 1 US).
+> Utilisateur final : préférer `/sdd-full` ou `/dev-run` (gèrent pré-conditions, idempotence, état).
 
 Invoque l'agent `dev-frontend` pour matérialiser l'US
 `workspace/output/us/{n}-{m}-{Name}.md` + le mockup HTML éventuel
@@ -42,31 +39,7 @@ FIX: relancer /dev-frontend {n}-{m} (ex. /dev-frontend 1-2)
 
 ---
 
-## STEP 2 — (délégué à l'agent v5.0)
-
-> Les vérifications **US existe**, **mockup HTML cohérent (0 ou 1)**,
-> **stack frontend actif**, **stack UI si HTML présent**, **CLAUDE.md
-> projet présent**, **project_file présent** sont absorbées par le
-> **STEP 0 HARD-GATE** de l'agent `dev-frontend` (Phase A + Phase B).
-> Pas de duplication ici. La commande se contente de valider l'argument
-> (STEP 1) puis d'invoquer l'agent (STEP 5).
-
----
-
-## STEP 3 — (délégué à l'agent v5.0)
-
-> Voir STEP 2 ci-dessus. Vérification mockup HTML = HARD-GATE A4.
-
----
-
-## STEP 4 — (délégué à l'agent v5.0)
-
-> Voir STEP 2 ci-dessus. Vérification stacks frontend + UI = HARD-GATE
-> B1 + B5.
-
----
-
-## STEP 5 — Invoquer l'agent dev-frontend
+## STEP 2 — Invoquer l'agent dev-frontend
 
 Lancer l'agent `dev-frontend` (défini dans `.claude/agents/dev-frontend.md`)
 avec l'argument `{n}-{m}`. L'agent gère :
@@ -85,7 +58,7 @@ Attendre la fin de l'agent. Relayer sa sortie telle quelle.
 
 ---
 
-## STEP 6 — Confirmation finale
+## STEP 3 — Confirmation finale
 
 Si l'agent réussit avec génération, ajouter UNE SEULE ligne :
 ```

@@ -167,7 +167,7 @@ dans `{n}-arch-review.json`.
 
 ---
 
-## STEP 3 — Vérifications
+## STEP 5 — Vérifications
 
 Si aucun fichier code à reviewer → STOP + ERROR :
 ```
@@ -436,8 +436,4 @@ des données ingérées par un futur bridge axe-core / Lighthouse CI.
 
 ## Chat Output Protocol
 
-Applique `@.claude/rules/output-protocol.md`. Label `[ARCH-REVIEW]` (v7.0.0-alpha
-audit M11 fix — dé-collision ex-`[REVIEW]`), plage `97-99%`, granularité 2-4
-updates. Verdict 1L avec emoji (ex. `[ARCH-REVIEW] Arch review: 0 pattern
-violation, 1 ADR drift, 🟡. (98%)`). Erreurs : chat 1L `[ARCH_*]` + pointeur
-rapport ; bloc ERROR 3L disque préservé. Bypass `SDD_CHAT_VERBOSE=1`.
+Applique `@.claude/rules/output-protocol.md` (label `[ARCH-REVIEW]`, plage `96-98%`).

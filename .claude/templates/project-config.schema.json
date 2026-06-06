@@ -4,6 +4,7 @@
   "title": "SDD_Pro Project Config",
   "description": "JSON Schema (draft 2020-12) for the merged Project Config (3-layer hierarchy: .claude/config.base.yml + ~/.sdd/config.team.yml + workspace/input/stack/stack.md ## Project Config). Generated from v7.0.0-alpha keys; mirrors config.base.yml. Authoritative for validate_layered_config.py (to be wired). Source of truth for ALL Project Config keys consumed by SDD_Pro agents and scripts.",
   "type": "object",
+  "_additionalProperties_note": "Audit P0-doc 2026-06-05 — kept `true` intentionally to tolerate forward-compat keys added by Tech Lead extensions / future versions. A strict schema would reject benign keys like `_doc` or `_legacy` and break audit-log inspection of historical configs. The exhaustive whitelist for SDD_Pro framework keys lives in `properties` below; `validate_project_config.py` separately warns on unknown keys (soft check). For strict mode, run with `--strict` flag (validates `additionalProperties: false` semantics dynamically).",
   "additionalProperties": true,
   "_meta": {
     "version": "v7.0.0-alpha",

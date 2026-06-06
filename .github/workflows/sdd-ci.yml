@@ -1,0 +1,168 @@
+# SDD_Pro — Framework CI
+#
+# Validates the framework on every push/PR. Does NOT run /sdd-full
+# (that requires LLM credits + ~$15-30/run). Static-only checks:
+#   1. Framework smoke (zero hardcoded exit codes, schema, etc.)
+#   2. pytest (1067 tests in <30s)
+#   3. Bootstrap auto-init dry-run on all combos
+#   4. libs-catalog schema validation
+#   5. Lint (ruff)
+#
+# See .claude/docs/cookbook.md for getting started.
+
+name: SDD_Pro CI
+
+on:
+  push:
+    branches: [main, next]
+  pull_request:
+    branches: [main, next]
+  workflow_dispatch:
+
+jobs:
+  framework-validation:
+    name: Framework smoke + tests + lint
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.12", "3.13"]
+      fail-fast: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install SDD_Pro Python tools
+        run: pip install -e .claude/python[dev]
+
+      - name: Framework smoke test
+        run: python .claude/python/sdd_admin/framework_smoke.py
+
+      - name: pytest (full suite)
+        run: |
+          cd .claude/python
+          python -m pytest tests/ -q --tb=short
+
+      - name: Validate libs catalogs schema
+        run: python .claude/python/sdd_admin/validate_libs_catalog.py
+
+      - name: Validate stack md headers (Validation: 🟢|🟡)
+        run: python .claude/python/sdd_admin/validate_stack_md_headers.py
+
+      - name: Validate stack combos (C1..C5)
+        run: |
+          python .claude/python/sdd_scripts/validate_stack_combo.py --combo c1
+          python .claude/python/sdd_scripts/validate_stack_combo.py --combo c2
+          python .claude/python/sdd_scripts/validate_stack_combo.py --combo c3 || echo "C3 experimental (non-blocking)"
+          python .claude/python/sdd_scripts/validate_stack_combo.py --combo c4 || echo "C4 experimental (non-blocking)"
+          python .claude/python/sdd_scripts/validate_stack_combo.py --combo c5 || echo "C5 experimental (non-blocking)"
+
+      - name: Bootstrap auto-init dry-run — combo C1
+        env:
+          SDD_APP_NAME: CIApp
+          SDD_COMBO: c1
+          SDD_DB_TYPE: PostgreSql
+        run: python bootstrap.py --auto-init --dry-run --skip-install
+
+      - name: Bootstrap auto-init dry-run — combo C2
+        env:
+          SDD_APP_NAME: CIApp
+          SDD_COMBO: c2
+          SDD_DB_TYPE: PostgreSql
+        run: python bootstrap.py --auto-init --dry-run --skip-install
+
+      - name: Bootstrap auto-init dry-run — combo C3 (with SDD_ALLOW_UNTESTED_COMBO)
+        env:
+          SDD_APP_NAME: CIApp
+          SDD_COMBO: c3
+          SDD_DB_TYPE: PostgreSql
+          SDD_ALLOW_UNTESTED_COMBO: "1"
+        run: python bootstrap.py --auto-init --dry-run --skip-install
+
+      - name: Bootstrap auto-init dry-run — combo C4 (with SDD_ALLOW_UNTESTED_COMBO)
+        env:
+          SDD_APP_NAME: CIApp
+          SDD_COMBO: c4
+          SDD_DB_TYPE: PostgreSql
+          SDD_ALLOW_UNTESTED_COMBO: "1"
+        run: python bootstrap.py --auto-init --dry-run --skip-install
+
+      - name: Bootstrap auto-init dry-run — combo C5 (with SDD_ALLOW_UNTESTED_COMBO)
+        env:
+          SDD_APP_NAME: CIApp
+          SDD_COMBO: c5
+          SDD_DB_TYPE: PostgreSql
+          SDD_ALLOW_UNTESTED_COMBO: "1"
+        run: python bootstrap.py --auto-init --dry-run --skip-install
+
+      - name: Lint Python (ruff)
+        continue-on-error: true   # ruff not yet configured in pyproject; soft for v7.0.0
+        run: |
+          pip install ruff
+          ruff check .claude/python/ || true
+
+  console-build:
+    name: Console web build smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22.5+ (node:sqlite native)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: workspace/console/package-lock.json
+
+      - name: Install console deps
+        working-directory: workspace/console
+        run: npm ci --no-audit --no-fund
+
+      - name: Server.js + lib/*.js syntax check
+        working-directory: workspace/console
+        run: |
+          node --check server.js
+          node --check lib/atomic-write.js
+          node --check lib/console-db.js
+          node --check lib/explain.js
+          node --check lib/markdown-filter.js
+
+      - name: App.jsx syntax check via @babel/standalone
+        working-directory: workspace/console
+        run: |
+          node -e "
+            const fs = require('node:fs');
+            const babel = require('@babel/standalone');
+            const src = fs.readFileSync('app.jsx', 'utf8');
+            try {
+              babel.transform(src, { presets: ['react'], filename: 'app.jsx' });
+              console.log('OK app.jsx transforms (' + src.length + ' bytes)');
+            } catch (e) {
+              console.error('FAIL app.jsx transform:', e.message);
+              process.exit(1);
+            }
+          "
+
+      - name: App.jsx structure smoke (components + endpoints)
+        working-directory: workspace/console
+        run: node tests/structure.smoke.test.js
+
+      - name: npm test (consolidated)
+        working-directory: workspace/console
+        run: npm test
+
+      - name: Server boot smoke (start, ping /api/tree, stop)
+        working-directory: workspace/console
+        run: |
+          node server.js &
+          SERVER_PID=$!
+          sleep 3
+          curl -fsS -k -m 5 https://127.0.0.1:4000/api/health || curl -fsS -m 5 http://127.0.0.1:4000/api/health
+          kill $SERVER_PID 2>/dev/null || true

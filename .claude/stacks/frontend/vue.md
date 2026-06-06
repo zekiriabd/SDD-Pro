@@ -3,7 +3,7 @@
 > §2.4 (Librairies) régénérée depuis `vue.libs.json` — ne pas éditer manuellement (`python .claude/python/sdd_admin/sync_stack_md.py --stack-id vue`).
 
 Status: Stable
-Validation: 🟡 experimental (spec stable, not yet validated end-to-end in production combo)
+Validation: 🟢 bench-validated runtime (2026-06-05 — CalcABCVue :5180, Vue 3.5.35 + Vite 5 + TS strict + Composition API, 1568 LOC, 4/4 curl cross-origin sur Kotlin/.NET/Node/Python backends OK, AC-1/2/3 🟢. Bug fix critique : `<input type=number>` + `v-model` coerce DOM string → number → état `ref<string>` cassé silencieusement → bouton bloqué. Convention `ref<number\|null>(null)` + `v-model.number` modifier inscrite dans `library-and-stack.md §7.2`. Pipeline `/sdd-full` complet pas encore validé end-to-end — scaffolding manuel mainteneur, cf. `docs/benchmarks/known-gaps.md`)
 Tech FEAT ID: tech-vue
 Scope: frontend uniquement (Vue 3 SPA + TypeScript)
 

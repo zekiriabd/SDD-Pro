@@ -115,18 +115,42 @@ def _parse_cutoff() -> datetime:
         return datetime.now(timezone.utc) - timedelta(minutes=5)
 
 
+# Directories to skip during the workspace walk. These are either
+# vendor-managed (node_modules), build artifacts (dist/build/bin/obj/target),
+# venvs, caches, or VCS metadata. Including them in the walk wasted seconds
+# per SubagentStop on real projects with 50k+ files in node_modules.
+# Audit P0-doc 2026-06-05.
+_AUDIT_SKIP_DIRS: frozenset[str] = frozenset({
+    "node_modules", "dist", "build", "bin", "obj", "out", "target",
+    ".venv", "venv", ".tox", "__pycache__", ".pytest_cache", ".mypy_cache",
+    ".ruff_cache", ".gradle", ".angular", ".next", ".nuxt", ".svelte-kit",
+    ".vite", ".turbo", "coverage", ".nyc_output",
+    ".git", ".hg", ".svn",
+    ".idea", ".vscode",
+})
+
+
 def _iter_modified_files(workspace: Path, cutoff: datetime) -> list[Path]:
-    """Walk workspace/ and yield files modified after cutoff."""
+    """Walk workspace/ and yield files modified after cutoff.
+
+    Uses `os.walk(topdown=True)` with in-place dirs pruning to skip vendor
+    directories (node_modules, .venv, build artifacts, VCS metadata). On a
+    real project with 50k+ files under node_modules, this changes the
+    SubagentStop latency from seconds to ~100ms.
+    """
+    import os
     cutoff_ts = cutoff.timestamp()
     out: list[Path] = []
-    for path in workspace.rglob("*"):
-        try:
-            if not path.is_file():
+    for dirpath, dirnames, filenames in os.walk(workspace, topdown=True):
+        # Prune: mutate dirnames in-place to skip vendor/build dirs.
+        dirnames[:] = [d for d in dirnames if d not in _AUDIT_SKIP_DIRS]
+        for name in filenames:
+            full = Path(dirpath) / name
+            try:
+                if full.stat().st_mtime > cutoff_ts:
+                    out.append(full)
+            except OSError:
                 continue
-            if path.stat().st_mtime > cutoff_ts:
-                out.append(path)
-        except OSError:
-            continue
     return out
 
 

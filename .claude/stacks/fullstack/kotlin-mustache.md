@@ -1,7 +1,7 @@
 # Tech FEAT: kotlin-mustache (fullstack)
 
 Status: Experimental
-Validation: 🟡 experimental (combo non valide end-to-end dans SDD_Pro v6)
+Validation: 🟢 bench-validated runtime (2026-06-05 — CalcABCMustache :44349, Spring Boot 3.3.5 + JMustache, monolithe SSR classique form POST reload, 159 LOC le plus compact du bench, AC-1/2/3 🟢. Bug fix appliqué : JMustache rejette `null` keys → populer Model avec strings vides + flags `hasX` booléens. Pattern documenté `library-and-stack.md §7.3`. Pipeline `/sdd-full` complet pas encore validé end-to-end — scaffolding manuel mainteneur, cf. `docs/benchmarks/known-gaps.md`)
 Tech FEAT ID: tech-kotlin-mustache
 Scope: **fullstack monolithe** — application Spring Boot 3.x (Kotlin) avec **templates Mustache** rendus serveur dans UN seul projet `{AppName}/`. UI HTML server-rendered + Controllers + Services + Spring Data JPA + Spring Security vivent dans le meme JAR. Pas de separation `{BackendName}` / `{AppName}` / `{LibName}`. Modele **SSR classique JVM** : HTML genere serveur (FreeMarker-like via Mustache), interactivite optionnelle via HTMX ou Alpine.js (capabilities) — pas de JS bundler, pas de SPA.
 
@@ -419,8 +419,8 @@ Patterns OBLIGATOIRES — verifies par dev-* STEP 5.0. Toute violation = ERROR.
 **Securite** :
 - CSRF desactive (`csrf().disable()`) en prod sans justification
 - `permitAll()` global sans whitelist precise
-- Connection string DB en dur dans `application.yml` versionne (utiliser `${ENV_VAR}` ou Spring Cloud Config)
-- Secret JWT / API key en dur (utiliser `application.yml` + env vars + `@Value("${...}")`)
+- Connection string DB en dur hors section `spring.datasource` peuplee par `arch` depuis `stack.md`
+- Secret JWT / API key en dur hors section native `application.yml` peuplee par `arch` depuis `stack.md`
 - Log de mots de passe / tokens / body request complet
 
 **JPA / ORM** :
@@ -446,7 +446,7 @@ Patterns OBLIGATOIRES — verifies par dev-* STEP 5.0. Toute violation = ERROR.
 
 - **Mode JPA** (defaut quand `DatabaseType ≠ none`) : Spring Data JPA + Hibernate Database-First. Pattern identique a `.claude/stacks/backend/kotlin-spring-boot.md §8.3`
 - **Driver** selon `DatabaseType` (cf. §2.4.b on-demand)
-- **DataSource config** : `spring.datasource.url` / `username` / `password` dans `application.yml` peuple par arch depuis `## Active Database`. **JAMAIS** en dur, toujours via `${DB_HOST}` etc.
+- **DataSource config** : `spring.datasource.url` / `username` / `password` dans `application.yml` peuple par arch depuis `## Active Database`. **JAMAIS** via `${DB_HOST}` / env var runtime dans le code applicatif.
 
 > File-based JSON store n'a pas vraiment de sens dans cet ecosysteme JVM — preferer SQLite (capability `db-sqlite`) qui reste un fichier mais offre le confort SQL + JPA.
 
@@ -506,7 +506,7 @@ Ce stack est optimise pour :
 
 1. **Detecter** `## Active Tech Specs` = `fullstack/kotlin-mustache.md` → **ignorer** `BackendName` et `LibName` (WARNING `[STACK_MALFORMED]` si declares)
 2. **Creer** UN seul projet via Spring Initializr CLI (cf. §2.2.1)
-3. **Composer** `application.yml` depuis `## Active Database` + `## Active Auth Specs` + `## Active SMTP Server` (si declare). Utiliser substitution `${DB_HOST}` et exporter env vars au runtime.
+3. **Composer** `application.yml` depuis `## Active Database` + `## Active Auth Specs` + `## Active SMTP Server` (si declare). Materialiser les valeurs dans les sections natives Spring (`spring.datasource`, `auth.jwt`, `azure.ad`, `mail`), sans substitution `${DB_*}` ni export env runtime.
 4. **`## Active UI Specs`** : aucun design system n'est applicable (pas de React/Vue/Blazor). Si declare → WARNING bloquant `[STACK_INCOMPAT]`. CSS custom dans `static/css/` + composants Mustache.
 5. **Capabilites recommandees** : `htmx` + `alpine` pour interactivite minimaliste. Si l'US contient "filtre dynamique", "modal", "pagination ajax" → trigger `htmx` automatiquement.
 6. **Phase B (DB scaffolding)** : selon `DatabaseType` — pattern Database-First identique a `kotlin-spring-boot.md §8.3` (jpa-entity-generator OU hibernate-tools)
@@ -534,7 +534,7 @@ Ce stack est optimise pour :
 | `workspace/output/src/{AppName}/src/main/resources/application.yml` | `arch` (create) + `dev-backend` (augment sections) |
 | `workspace/output/src/{AppName}/src/main/resources/db/migration/**` | `arch` (Phase B scaffolding) + `dev-backend` (migrations Flyway si capability) |
 | `workspace/output/src/{AppName}/build.gradle.kts` | `arch` (create) + `dev-backend` (augment dependencies on-demand) |
-| `workspace/output/src/{AppName}/.env` (si utilise) | `arch` (create exclusif — secrets) |
+| `workspace/output/src/{AppName}/src/main/resources/application.yml` | `arch` (create exclusif config initiale) + `dev-backend` (augment sections non secretes) |
 
 **Cas frontiere — modeles passes aux templates** : un Controller MVC dans `dev-backend` cree un Model (DTO data class Kotlin) puis appelle `model.addAttribute("users", users)` + return `"users/list"`. Le template `templates/users/list.mustache` cote `dev-frontend` consomme `{{#users}}{{name}}{{/users}}`. **Contrat partage** : nom de la cle (`"users"`) + structure du Model. Toute modification d'un cote DOIT etre synchronisee de l'autre — equivalent du "frontend-backend contract" mais intra-projet.
 

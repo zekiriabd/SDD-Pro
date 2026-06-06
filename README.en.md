@@ -1,6 +1,6 @@
 # SDD_Pro
 
-FEAT-driven development framework for Claude Code — `next` branch: **v7.0.0-alpha** (see [.claude/VERSIONING.md](.claude/VERSIONING.md)). `main` branch: v6.10.4-LTS (freeze active until 2026-06-18).
+FEAT-driven development framework for Claude Code — `next` branch: **v7.0.0-alpha** (see [.claude/docs/VERSIONING.md](.claude/docs/VERSIONING.md)). `main` branch: v6.10.4-LTS (freeze active until 2026-06-18).
 
 > 🇫🇷 [Version française](README.md) — French docs are the canonical source ; this English page mirrors the Quickstart + Console essentials.
 
@@ -111,6 +111,6 @@ SDD_Pro orchestrates **11 Claude Code agents** (PO, arch, dev-backend, dev-front
 - [.claude/docs/quickstart.en.md](.claude/docs/quickstart.en.md) — full quickstart (EN, this English mirror)
 - [.claude/docs/architecture.md](.claude/docs/architecture.md) — architecture (FR)
 - [.claude/docs/validated-combos.md](.claude/docs/validated-combos.md) — validated stack combinations
-- [.claude/VERSIONING.md](.claude/VERSIONING.md) — versioning policy
-- [.claude/CHANGELOG.md](.claude/CHANGELOG.md) — release notes
-- [.claude/MIGRATION.md](.claude/MIGRATION.md) — migration guides
+- [.claude/docs/VERSIONING.md](.claude/docs/VERSIONING.md) — versioning policy
+- [.claude/docs/CHANGELOG.md](.claude/docs/CHANGELOG.md) — release notes
+- [.claude/docs/MIGRATION.md](.claude/docs/MIGRATION.md) — migration guides

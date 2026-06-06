@@ -3,7 +3,7 @@
 > §2.4 (Librairies) régénérée depuis `python-fastapi.libs.json` — ne pas éditer manuellement (`python .claude/python/sdd_admin/sync_stack_md.py --stack-id python-fastapi`).
 
 Status: Stable
-Validation: 🟡 experimental (spec stable, not yet validated end-to-end in production combo)
+Validation: 🟢 bench-validated runtime (2026-06-05 — CalcABCBackPy :44329, FastAPI + Pydantic inline + Uvicorn ASGI + structlog + CORSMiddleware, **97 LOC le plus court des 4 backends REST**, **POST 5+5 latence 33ms — le plus rapide du bench**, `/docs` Swagger UI + OpenAPI 3.1 auto-généré, 422 validation Pydantic riche, 16/16 curl cross-origin 4 SPA OK, AC-1/2/3/4 🟢. Substitution backend transparente sur :44329 (4e tour de swap après Kotlin/.NET/Node). Bug fix : `pydantic-core 2.10.3` no-wheel Py3.14 → `pydantic>=2.11`. Pipeline `/sdd-full` complet pas encore validé end-to-end — scaffolding manuel mainteneur, cf. `docs/benchmarks/known-gaps.md`)
 Tech FEAT ID: tech-fastapi
 Scope: backend uniquement (API REST async, logique métier, persistance)
 

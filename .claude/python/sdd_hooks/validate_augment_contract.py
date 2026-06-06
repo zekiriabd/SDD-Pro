@@ -124,7 +124,7 @@ def main() -> int:
         # preserves:/adds: only applies to augmentation Edits, not file creation
         return HOOK_ALLOW
     if any(pat in norm for pat in TEST_PATTERNS):
-        return 0  # QA ownership, no contract
+        return HOOK_ALLOW  # QA ownership, no contract (normalized 2026-06-06)
 
     root = repo_root()
     target = Path(file_path)
@@ -154,7 +154,7 @@ def main() -> int:
             break
 
     if matching_plan is None:
-        return 0  # no plan = inline mode, nothing to enforce
+        return HOOK_ALLOW  # no plan = inline mode, nothing to enforce (normalized 2026-06-06)
 
     block_text = _find_block_for_file(plan_text, norm, file_name)
     if block_text is None:

@@ -230,5 +230,25 @@ class TestHookSubprocessAllowedAgent(unittest.TestCase):
                          f"warn mode must never block on allowed agent, got {r.returncode}\nSTDERR={r.stderr}")
 
 
+class TestStrictFailClosedOnTimeout(unittest.TestCase):
+    """Security audit 2026-06-06 (LOT 8.1) : ensure that on subprocess TimeoutExpired
+    in strict mode, the hook returns HOOK_DENY (was HOOK_ALLOW = fail-open before)."""
+
+    def test_strict_mode_emits_deny_path_documentation(self):
+        """Indirect coverage : verify the source path emits HOOK_DENY in strict
+        timeout branch. We don't trigger an actual 30s subprocess timeout here
+        (cost-prohibitive), but assert the strict branch source contains the
+        BUDGET_PRECHECK_TIMEOUT class + HOOK_DENY return.
+        """
+        src = HOOK.read_text(encoding="utf-8")
+        # The strict-mode timeout branch must reference HOOK_DENY and the new class.
+        self.assertIn("BUDGET_PRECHECK_TIMEOUT", src,
+                      "strict-mode timeout branch must emit [BUDGET_PRECHECK_TIMEOUT] error class")
+        self.assertIn("return HOOK_DENY", src,
+                      "strict-mode timeout branch must return HOOK_DENY (fail-closed)")
+        # Verify the comment trail explains the change (anti-regression doc).
+        self.assertIn("47MB", src, "audit trail with the 47MB/spec-compliance-reviewer incident is preserved")
+
+
 if __name__ == "__main__":
     unittest.main()

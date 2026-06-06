@@ -1,4 +1,4 @@
-﻿{
+{
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://sdd-pro.local/schemas/status.schema.json",
   "title": "SDD_Pro — Console human validation status",

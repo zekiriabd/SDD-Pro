@@ -223,7 +223,7 @@ def _persist_to_db(entry: dict[str, Any]) -> None:
         # silently-broken `find_project_root` import (ran the except branch,
         # producing NULL run_id rows which SQLite allowed). With run_id.py
         # fixed, we always have a valid run_id but no guarantee that the
-        # orchestrator (/sdd-full STEP 1.quart) was the one that created
+        # orchestrator (/sdd-full STEP 1.ter) was the one that created
         # the runs row — e.g. ad-hoc Agent calls outside /sdd-full. The
         # upsert is idempotent and inexpensive.
         if run_id:
@@ -272,7 +272,7 @@ def _debug_dump_payload(payload: dict[str, Any], audit_dir: Path) -> None:
 def main() -> int:
     mode = _resolve_mode()
     if mode not in {"record", "debug"}:
-        return 0  # off -> silent skip, no-op vs v6.4.2
+        return HOOK_ALLOW  # off → silent skip (normalized 2026-06-06)
 
     try:
         payload = read_hook_input()

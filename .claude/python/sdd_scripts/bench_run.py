@@ -47,6 +47,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sdd_lib.paths import repo_root  # noqa: E402
 from sdd_lib.exit_codes import FAIL_FAST, INFRA_BLOCKED, SUCCESS  # noqa: E402
+from sdd_lib.atomic_write import atomic_write_text  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Pricing table (USD per million tokens, v7.0.0 / 2026-05-20)
@@ -94,6 +95,37 @@ def _table_exists(con: sqlite3.Connection, table: str) -> bool:
     return cur.fetchone() is not None
 
 
+# Whitelist of all identifiers (column + table names) that may be interpolated
+# into f-string SQL in this module. Defense-in-depth: even though `cols` comes
+# from `PRAGMA table_info(token_usage)` (DB-driven, not user input), explicit
+# whitelisting makes any future code modification fail-fast on unknown idents.
+# Audit P0-doc 2026-06-05.
+_SAFE_SQL_IDENTS: frozenset[str] = frozenset({
+    # token_usage columns
+    "model", "model_name",
+    "input_tokens", "tokens_input",
+    "output_tokens", "tokens_output",
+    "cache_read_input_tokens", "cache_read_tokens",
+    # qa_* tables
+    "qa_coverage", "qa_quality", "qa_api_gate", "qa_code_review",
+    "qa_security", "qa_spec_compliance", "qa_arch_review", "qa_a11y", "qa_performance",
+    # other tables
+    "context_budget", "token_usage",
+})
+
+
+def _safe_ident(name: str) -> str:
+    """Return `name` if it's in the whitelist, else raise ValueError.
+
+    Use whenever interpolating an identifier into f-string SQL. Prevents
+    even hypothetical SQL injection via a future code path that lets user
+    input reach this site.
+    """
+    if name not in _SAFE_SQL_IDENTS:
+        raise ValueError(f"unsafe SQL identifier: {name!r} (not in whitelist)")
+    return name
+
+
 def _query_token_usage(con: sqlite3.Connection) -> dict:
     """Aggregate token_usage table : counts per model + total."""
     if not _table_exists(con, "token_usage"):
@@ -112,6 +144,13 @@ def _query_token_usage(con: sqlite3.Connection) -> dict:
 
     if model_col is None:
         return {"rows": 0, "by_model": {}, "total_rows": 0, "note": "schema mismatch"}
+
+    # Belt + braces: ensure every identifier we interpolate is in the whitelist
+    model_col = _safe_ident(model_col)
+    input_col = _safe_ident(input_col)
+    output_col = _safe_ident(output_col)
+    if cache_col is not None:
+        cache_col = _safe_ident(cache_col)
 
     cache_select = f", COALESCE(SUM({cache_col}), 0)" if cache_col else ", 0"
     sql = (
@@ -148,7 +187,8 @@ def _query_qa_tables(con: sqlite3.Connection) -> dict:
     out = {}
     for t in qa_tables:
         if _table_exists(con, t):
-            (count,) = con.execute(f"SELECT COUNT(*) FROM {t}").fetchone()
+            safe_t = _safe_ident(t)  # belt + braces (t is already hardcoded above)
+            (count,) = con.execute(f"SELECT COUNT(*) FROM {safe_t}").fetchone()
             out[t] = count
     return out
 
@@ -351,7 +391,7 @@ def main() -> int:
     if args.snapshot_before:
         state = _capture_state(args.bench_id)
         path = _snapshot_path(args.bench_id)
-        path.write_text(json.dumps(state, indent=2, ensure_ascii=False, default=str), encoding="utf-8")
+        atomic_write_text(path, json.dumps(state, indent=2, ensure_ascii=False, default=str))
         print(f"[OK] snapshot-before saved: {path.relative_to(repo_root())}")
         if not state.get("db_present"):
             print("[WARN] console.db missing - TokenUsageMode likely 'off' ; bench will lack token data")
@@ -374,12 +414,12 @@ def main() -> int:
 
     # Persist after-snapshot too (for forensic re-runs)
     after_path = _bench_dir() / f"{args.bench_id}.after.json"
-    after_path.write_text(json.dumps(after, indent=2, ensure_ascii=False, default=str), encoding="utf-8")
+    atomic_write_text(after_path, json.dumps(after, indent=2, ensure_ascii=False, default=str))
 
     # Write report
     out_path = args.output or (_bench_dir().parent / "reports" / f"{args.bench_id}.json")
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(json.dumps(report, indent=2, ensure_ascii=False, default=str), encoding="utf-8")
+    atomic_write_text(out_path, json.dumps(report, indent=2, ensure_ascii=False, default=str))
 
     print(f"[OK] report saved: {out_path.relative_to(repo_root())}")
     print(f"     wallclock_min   : {report['summary']['wallclock_min']}")

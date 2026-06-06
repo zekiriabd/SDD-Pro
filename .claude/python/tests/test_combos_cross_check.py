@@ -101,20 +101,15 @@ class TestStackMdCrossCheck(unittest.TestCase):
       (a) have a matching `.claude/stacks/{cat}/{stack_id}.md` file ;
       (b) declare the same validation level in its `Validation:` header.
 
-    **Known pre-existing drift** (recorded 2026-06-04, CRIT-6 extraction) :
-    3 stacks have `Validation: 🟢 reference` in their `.md` header but
-    `experimental` in the legacy Python `COMPONENT_LEVELS` dict that was
-    extracted into `combos.json`. The audit explicitly excluded modifying
-    stack content from CRIT-6 scope, so the drift is **documented here**
-    rather than silently corrected — a follow-up TODO must arbitrate.
+    **Drift résolu 2026-06-06 (security audit)** : les 3 drifts hérités
+    (blazor-webassembly, radzen-blazor, blazor-bunit) + 4 drifts bench-validated
+    (python-fastapi, node-express, vue, angular) sont désormais alignés en
+    combos.json sur la réalité 🟢 des .md headers. `_KNOWN_DRIFT` est vide —
+    toute future divergence est une régression à corriger, pas à accepter.
     """
 
     # stack_id -> (combos.json level, .md header level)
-    _KNOWN_DRIFT: dict[str, tuple[str, str]] = {
-        "blazor-webassembly":  ("experimental", "validated"),
-        "radzen-blazor":       ("experimental", "validated"),
-        "blazor-bunit":        ("experimental", "validated"),
-    }
+    _KNOWN_DRIFT: dict[str, tuple[str, str]] = {}
 
     def test_componentlevels_match_md_headers(self):
         levels = get_component_levels()

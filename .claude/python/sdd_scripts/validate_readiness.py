@@ -394,16 +394,38 @@ def main() -> int:
         # v7.0.0-alpha (audit CRIT-2) : cached mtime-keyed read.
         stack_content = read_stack_md_text(root) or ""
         active_tech_body = section_body(stack_content, "Active Tech Specs") or ""
-        has_backend = bool(re.search(r"\bbackend/[^.\s]+\.md\b", active_tech_body))
-        has_frontend = bool(re.search(r"\bfrontend/[^.\s]+\.md\b", active_tech_body))
-        if not has_backend and not has_frontend:
+        # SSoT 2026-06-06 R3 : utiliser stack_validator au lieu de regex locale.
+        # Construire dict catégorisé depuis Active Tech Specs (lignes - .claude/stacks/X/Y.md)
+        stacks_dict: dict[str, str | None] = {
+            "backend": None, "frontend": None, "ui": None, "auth": None,
+            "fullstack": None, "mobiles": None,
+        }
+        for m in re.finditer(r"^\s*-\s*\.claude/stacks/(\w+)/([\w-]+)\.md", active_tech_body, re.MULTILINE):
+            cat, stack_id = m.group(1), m.group(2)
+            if cat in stacks_dict and stacks_dict[cat] is None:
+                stacks_dict[cat] = stack_id
+
+        try:
+            from sdd_lib.stack_validator import validate_active_stacks_coherence
+            coherence_err = validate_active_stacks_coherence(stacks_dict)
+        except ImportError:
+            coherence_err = None  # degradation gracieuse
+
+        if coherence_err:
             rep.add_err(
-                "STACK-EMPTY",
-                "Aucun stack backend ni frontend actif dans Active Tech Specs",
-                "Activer au moins un stack (backend/* ou frontend/*) dans workspace/input/stack/stack.md",
+                "STACK-INCOHERENT",
+                f"{coherence_err['code']}: {coherence_err['message']}",
+                "Corriger workspace/input/stack/stack.md (un seul AppType actif : fullstack OU back+front OU mobile).",
             )
         else:
-            rep.add_pass("STACK-ACTIVE", f"Stacks actifs : backend={has_backend}, frontend={has_frontend}")
+            has_backend = stacks_dict["backend"] is not None
+            has_frontend = stacks_dict["frontend"] is not None
+            has_fullstack = stacks_dict["fullstack"] is not None
+            has_mobiles = stacks_dict["mobiles"] is not None
+            rep.add_pass(
+                "STACK-ACTIVE",
+                f"Stacks actifs : backend={has_backend}, frontend={has_frontend}, fullstack={has_fullstack}, mobiles={has_mobiles}",
+            )
 
         pc_body = section_body(stack_content, "Project Config") or ""
         # v6.10.2: accept either AppName (legacy) or FrontendName (preferred)

@@ -760,7 +760,7 @@ activer ; **0 effort** si tu restes en v6.1 behaviour.
    .claude/CLAUDE.md                         (v6.2.0)
    .claude/CHANGELOG.md                      (entry v6.2.0)
    .claude/MIGRATION.md                      (ce fichier)
-   .claude/ARCHIVE/v7-design-superseded/DESIGN-FROMPLAN-STRICT.md    (design de référence)
+   .claude/archive/v7-design-superseded/DESIGN-FROMPLAN-STRICT.md    (design de référence)
    ```
 
 2. **Activer le chemin strict** dans `workspace/input/stack/stack.md` :
@@ -933,7 +933,7 @@ Si tu trouves la review sémantique LLM nécessaire :
 
 ## Versions antérieures (v3.x → v4.x, v4.x → v5.x)
 
-Voir [`.claude/ARCHIVE/MIGRATION-legacy.md`](ARCHIVE/MIGRATION-legacy.md) pour
+Voir [`.claude/archive/MIGRATION-legacy.md`](../archive/MIGRATION-legacy.md) pour
 les procédures de migration v3→v4 (HTML direct) et v4→v5 (Inline Rules
 + tokens-lean). Archivé le 2026-05-13.
 

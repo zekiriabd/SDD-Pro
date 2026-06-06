@@ -38,7 +38,7 @@ active-stacks:
 - Connection string pattern: {builder canonique du langage, cf §8.2}
 - **Clé canonique de lecture (LITTÉRAL — anti-derive load-bearing)** :
   - .NET : `builder.Configuration.GetConnectionString("Default")` — argument **EXACTEMENT** `"Default"` (jamais `"{AppName}Db"`, `"{BackendName}Db"`, `"{ProjectName}Db"`, `"DemoDb"`, ou tout autre token dérivé)
-  - Node : `process.env.DATABASE_URL` (single key) OU section `db` du config natif (`config.get('db.connection')`)
+  - Node : section `db` du config natif (`config.get('db.connection')` / `config.get('db.url')`)
   - Python : section `db_settings` (pydantic-settings)
   - Java/Kotlin : `spring.datasource.url` (Spring) — pas d'alias custom
   - Toute clé non canonique → ERROR `[DERIVE_VIOLATION]` au build (post-mortem 2026-05-14 — cf. stack §5.1.0)

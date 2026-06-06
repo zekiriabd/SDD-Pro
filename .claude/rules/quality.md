@@ -379,3 +379,77 @@ avec des hex différents → violation §B.5.
 - Stacks UI : `stacks/ui/shadcn.md §3`, `vuetify.md §3`,
   `radzen-blazor.md §3` inlinent la syntaxe spécifique. Cette partie
   est la spec cross-stack.
+
+---
+
+# Partie C — Acceptance Gate obligatoire (v7.0.0-alpha audit P5 — 2026-06-05)
+
+## C.1 Principe
+
+Tout projet généré (`workspace/output/src/{AppName|BackendName}`) **DOIT** respecter une **acceptance gate** finale avant tag "FEAT delivered". Cette gate est :
+
+- **Bloquante** : si un check échoue, le verdict global passe 🔴 RED et la FEAT n'est pas validée.
+- **Belt + braces** : (a) règle documentée ci-dessous (lecture humaine, prompt agents) + (b) hook enforcement (`SubagentStop` matcher `qa`) automatique.
+
+## C.2 Checks obligatoires par type de projet
+
+### Pour TOUT projet (4 checks minimum)
+
+| Check | Commande (Node) | Commande (.NET) | Commande (Kotlin) | Commande (Python) |
+|---|---|---|---|---|
+| `test` | `npm test` | `dotnet test` | `./gradlew test` | `pytest` |
+| `lint` | `npm run lint` | `dotnet format --verify-no-changes` | `./gradlew ktlintCheck` | `ruff check` |
+| `build` | `npm run build` | `dotnet build --nologo` | `./gradlew build` | `python -m build` ou `python -c "import app.main"` |
+| `coverage ≥ threshold` | `npm run test:coverage` | `dotnet test /p:CollectCoverage=true` | `./gradlew jacocoTestReport` | `pytest --cov` |
+
+### Pour projet UI (front SPA ou fullstack rendant du HTML)
+
+**+2 checks** obligatoires :
+
+| Check | Description |
+|---|---|
+| `smoke browser` | démarrage `npm run dev` + `curl http://localhost:{port}/ → 200 size>500` (preuve UI servie) |
+| `E2E Playwright ≥ 1` par FEAT UI | au moins 1 spec `*.spec.ts` qui simule un utilisateur réel (click Calculate, vérifier C affiché) |
+
+## C.3 Configuration `## Project Config` (stack.md)
+
+```yaml
+AcceptanceGate: strict        # strict (default v7.0.0) | warn | off
+AcceptanceGate.RequireE2E: true   # E2E Playwright obligatoire pour UI
+AcceptanceGate.SmokeTimeout: 10   # secondes pour curl smoke
+AcceptanceGate.MinCoverage: 80    # même seuil que CoverageMin (alias)
+```
+
+## C.4 Verdict + ERROR format
+
+```
+🔴 RED AcceptanceGate
+CAUSE: [ACCEPTANCE_GATE_FAILED] {projet} échec sur {check}
+  - npm test : {N failed tests} OR exit ≠ 0
+  - npm run lint : {N errors} OR script absent
+  - npm run build : exit ≠ 0
+  - smoke browser : http {code} OR timeout
+  - E2E Playwright : {N specs OR 0} (RequireE2E=true)
+FIX: corriger le check fail listé, OU baisser AcceptanceGate strict→warn dans Project Config (décision tracée)
+```
+
+## C.5 Hook enforcement (`SubagentStop` matcher `qa`)
+
+Le script `.claude/python/sdd_hooks/validate_acceptance_gate.py` (créé audit P5) tourne automatiquement après l'agent `qa`. Lit `stack.md` Project Config, parcourt tous les projets sous `workspace/output/src/*`, applique les checks par type détecté (`package.json` → Node, `*.csproj` → .NET, `build.gradle.kts` → Kotlin, `pyproject.toml` ou `requirements.txt` → Python).
+
+Bypass : `SDD_ALLOW_ACCEPTANCE_BYPASS=1` (debug uniquement, audit-loggué).
+
+## C.6 Anti-patterns rejetés
+
+- ❌ `package.json` sans script `test` ni `lint` (le projet doit déclarer ses gates même si vides)
+- ❌ Tests qui passent mais 0 assertions (couvert par `--coverage`)
+- ❌ Lint avec règles désactivées massivement (audit `.eslintignore` / `pyproject.toml` lint config)
+- ❌ E2E Playwright bidons (mock 100%, aucun click réel) — règle `RequireE2E.AssertsRealUserPath`
+- ❌ Build green mais runtime fail (smoke browser couvre)
+
+## C.7 Lien avec autres règles
+
+- `quality.md §A` (coverage seuil) : déjà couvert, AcceptanceGate inclut `coverage_passed`
+- `build-and-loop.md §A` (API Gate) : couvre déjà les tests d'intégration HTTP runtime, **AcceptanceGate inclut API Gate** sur back+front projects
+- `library-and-stack.md §7` (5 pièges runtime documentés) : à vérifier en lint OU en review humaine (pas auto)
+

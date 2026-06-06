@@ -28,6 +28,8 @@
 #   workspace/input/stack/stack.md
 #   appsettings.Development.json (or any generated appsettings*.json with secrets)
 #   config/local.json / application-local.yml
+#   plus every generated project must copy :
+#   .claude/templates/generated-project.gitignore.template → {ProjectName}/.gitignore
 # ═══════════════════════════════════════════════════════════════════════════
 
 ## Project Config

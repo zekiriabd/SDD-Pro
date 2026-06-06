@@ -214,6 +214,19 @@ def _bool_flag(value: str | None, default: bool = True) -> bool:
     return value.strip().lower() in ("true", "1", "yes", "on")
 
 
+def _validate_stack_coherence(stacks: dict[str, str | None]) -> str | None:
+    """Validation cohérence stack.md (security audit 2026-06-06, SSoT v2 2026-06-06 R3).
+
+    Délègue à `sdd_lib.stack_validator.validate_active_stacks_coherence` pour
+    rester aligné avec sdd_full_planner.py + validate_readiness.py.
+    """
+    from sdd_lib.stack_validator import validate_active_stacks_coherence
+    err = validate_active_stacks_coherence(stacks)
+    if err is None:
+        return None
+    return f"[{err['code']}] {err['message']}"
+
+
 def plan(feat_number: int) -> dict[str, object]:
     """Construit le plan d'exécution des phases auditor pour la FEAT N."""
     root = repo_root()
@@ -259,6 +272,17 @@ def plan(feat_number: int) -> dict[str, object]:
 
     # 2. Stacks actifs
     stacks = _active_stacks(root)
+
+    # 2.bis Validation cohérence stack.md (security audit 2026-06-06)
+    # Détecte les combinaisons impossibles ou stack.md vide.
+    coherence_error = _validate_stack_coherence(stacks)
+    if coherence_error:
+        return {
+            "feat_number": feat_number,
+            "error": coherence_error,
+            "phases": {},
+            "stacks_detected": stacks,
+        }
 
     # 3. État runtime (présence code généré)
     has_frontend_code = _project_has_frontend_code(root, app_name)

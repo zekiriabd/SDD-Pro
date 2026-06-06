@@ -1,7 +1,7 @@
 # Tech FEAT: node-react (fullstack)
 
-Status: Experimental
-Validation: 🟡 experimental (validated combo: workspace/console v0.4.0 — Fastify 5 + React 18 CDN + Babel-standalone, 2026-05-16)
+Status: POC-only
+Validation: 🟡 POC-only — **utilisé exclusivement par workspace/console SDD interne** (v0.4.0 — Fastify 5 + React 18 CDN + Babel-standalone, 2026-05-16). **NON destiné à un usage production externe** (décision CTO 2026-06-05 audit P3) : pas de bundler, pas de TS natif, pas de pipeline build/lint/Playwright standard. Pour Node/React prod commercial, utiliser combo `backend/node-express` + `frontend/react` (back-front séparés avec Vite + TS strict).
 Tech FEAT ID: tech-node-react
 Scope: **fullstack monolithe** — backend Node.js + frontend React servis depuis le MEME projet (zero-build, JSX transpilé in-browser via Babel Standalone). Pas de séparation `{BackendName}` / `{AppName}` / `{LibName}`. Modèle SSR-adjacent (le serveur sert l'HTML initial + l'API ; React hydrate côté client).
 
@@ -530,7 +530,7 @@ export async function withLockedWrite(file, mutator) { /* lock + rename atomique
 Quand `DatabaseType ≠ none`, l'agent `arch` Phase B :
 
 1. **Installe** `prisma` (devDep) + `@prisma/client` (dep) depuis `.libs.json.dbDrivers[$dbtype]` au STEP 4.1
-2. **Crée** `prisma/schema.prisma` avec le datasource correspondant au `DatabaseType` (provider + url binding env `DATABASE_URL`)
+2. **Crée** `prisma/schema.prisma` avec le datasource correspondant au `DatabaseType` (provider + url Prisma `DATABASE_URL`, alimente par `arch` depuis la config native)
 3. **Introspecte** la base existante via `npx prisma db pull` (génère le bloc `model` pour chaque table)
 4. **Génère** le client TypeScript-flavored via `npx prisma generate` (sortie `node_modules/.prisma/client/`)
 5. **Écrit** `lib/db.js` — singleton Prisma client (cf. §6.2.2)
@@ -538,7 +538,7 @@ Quand `DatabaseType ≠ none`, l'agent `arch` Phase B :
 
 #### 6.2.1 Variables d'environnement
 
-`DATABASE_URL` est construit par `config/custom-environment-variables.json` à partir des 5 clés `DB_HOST` / `DB_PORT` / `DB_NAME` / `DB_USER` / `DB_PASSWORD` du bloc `## Active Database`. Format par provider :
+`DATABASE_URL` est construit par `arch` à partir des 5 clés `DB_HOST` / `DB_PORT` / `DB_NAME` / `DB_USER` / `DB_PASSWORD` du bloc `## Active Database`, puis stocke dans `config/default.json` sous `db.url`. Format par provider :
 
 | Provider | DATABASE_URL pattern |
 |---|---|
@@ -547,18 +547,23 @@ Quand `DatabaseType ≠ none`, l'agent `arch` Phase B :
 | `mysql` | `mysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}` |
 | `sqlite` | `file:./{DB_NAME}.db` |
 
-Le code applicatif **n'utilise pas directement** `DATABASE_URL` — il importe `lib/db.js` qui résout depuis `process.env.DATABASE_URL` (lu par Prisma client au boot, conforme à la convention Prisma).
+Le code applicatif **n'utilise pas directement** `DATABASE_URL` — il importe `lib/db.js`. Ce module lit `config.get("db.url")`, passe l'URL a `PrismaClient({ datasources: { db: { url } } })`, puis expose le singleton Prisma. Aucune lecture directe `process.env.DB_*` / `process.env.DATABASE_URL`.
 
 #### 6.2.2 Singleton client (`lib/db.js`)
 
 ```js
 // lib/db.js — Prisma client singleton (lazy + cached pour HMR / --watch)
 import { PrismaClient } from '@prisma/client';
+import config from 'config';
 
 const globalForPrisma = globalThis;
+const databaseUrl = config.get('db.url');
 export const prisma =
   globalForPrisma.__nounouPrisma ||
-  new PrismaClient({ log: ['warn', 'error'] });
+  new PrismaClient({
+    datasources: { db: { url: databaseUrl } },
+    log: ['warn', 'error'],
+  });
 
 if (process.env.NODE_ENV !== 'production') {
   globalForPrisma.__nounouPrisma = prisma;
@@ -701,7 +706,7 @@ Phase B (DB scaffolding) :
 - Si `DatabaseType: none` → skip silencieux (mode file-based JSON, cf. §6.1).
 - Si `DatabaseType ∈ {sqlserver, postgres, postgresql, mysql, mariadb, sqlite}` → **force-install la capability `prisma`** (ajoute `prisma` + `@prisma/client` depuis §2.4.b même si `Capabilities:` ne la liste pas), puis exécute la séquence §6.2 :
   1. `npx prisma init --datasource-provider {provider}` (où `{provider}` = `sqlserver` | `postgresql` | `mysql` | `sqlite`)
-  2. Écrit le `DATABASE_URL` dans `config/custom-environment-variables.json` (binding env → `db.url`) — cf. §6.2.1 mapping pattern
+  2. Écrit `db.url` dans `config/default.json` depuis `stack.md` — cf. §6.2.1 mapping pattern
   3. `npx prisma db pull` pour introspecter la base existante
   4. `npx prisma generate` pour produire le client
   5. Crée `lib/db.js` (singleton client, cf. §6.2.2) si absent — sinon préservé (idempotent)

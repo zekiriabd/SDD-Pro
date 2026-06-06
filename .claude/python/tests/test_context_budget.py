@@ -26,6 +26,8 @@ SCRIPT = REPO_ROOT / ".claude" / "python" / "sdd_scripts" / "context_budget.py"
 # Import direct pour unit tests des pure functions
 sys.path.insert(0, str(REPO_ROOT / ".claude" / "python"))
 from sdd_scripts.context_budget import (  # noqa: E402
+    CURRENT_AGENTS,
+    DEFAULT_BUDGETS,
     is_unbounded_glob,
     is_excluded,
     resolve_pattern,
@@ -278,6 +280,21 @@ class TestIntegration(unittest.TestCase):
         record = json.loads(out_file.read_text(encoding="utf-8").strip().splitlines()[-1])
         codes = [e["code"] for e in record["errors"]]
         self.assertIn("BUDGET_EXCEEDED", codes)
+
+
+class TestDefaultBudgetsCoverage(unittest.TestCase):
+    """Non-regression : tout agent listé dans CURRENT_AGENTS DOIT avoir un
+    budget dans DEFAULT_BUDGETS — sinon KeyError au runtime (security audit
+    2026-06-06 sur constitutioner manquant).
+    """
+
+    def test_every_current_agent_has_default_budget(self) -> None:
+        missing = [a for a in CURRENT_AGENTS if a not in DEFAULT_BUDGETS]
+        self.assertEqual(
+            missing, [],
+            f"Agents in CURRENT_AGENTS but missing from DEFAULT_BUDGETS: {missing}. "
+            "Add entries to DEFAULT_BUDGETS to prevent runtime KeyError."
+        )
 
 
 if __name__ == "__main__":

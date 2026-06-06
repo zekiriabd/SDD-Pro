@@ -43,7 +43,7 @@ Conventions (cf. `.claude/python/README.md`):
 - Canonical ERROR format on stderr via sdd_lib.stderr.error_block
 
 Related:
-- `@.claude/ARCHIVE/v7-design-superseded/DESIGN-FROMPLAN-STRICT.md` (design)
+- `@.claude/archive/v7-design-superseded/DESIGN-FROMPLAN-STRICT.md` (design)
 - `@.claude/rules/build-and-loop.md §7` (plan structure spec)
 - `@.claude/rules/error-classification.md` (PLAN_* codes)
 """

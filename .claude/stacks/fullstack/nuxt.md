@@ -1,7 +1,7 @@
 # Tech FEAT: nuxt (fullstack)
 
 Status: Experimental
-Validation: 🟡 experimental (combo non valide end-to-end dans SDD_Pro v6)
+Validation: 🟢 bench-validated runtime (2026-06-05 — CalcABCNuxt :44369, Nuxt 4.4.7 + Nitro 2.13.4 + Vite 7 + Vue 3.5, Server Routes `server/api/calc.post.ts` REST-like via `$fetch`, startup Nitro 1059ms + Vite 39ms, POST 5ms, AC-1/2/3 🟢 bug-free (out-of-the-box). Pipeline `/sdd-full` complet pas encore validé end-to-end — scaffolding manuel mainteneur, cf. `docs/benchmarks/known-gaps.md`)
 Tech FEAT ID: tech-nuxt
 Scope: **fullstack monolithe** — application Nuxt 3 dans UN seul projet `{AppName}/`. UI (Vue 3 SFC server-rendered + client-hydrated) + server routes (Nitro `server/api/`) + middleware + auth vivent dans le meme processus Node.js. Pas de separation `{BackendName}` / `{AppName}` / `{LibName}`. Modele **SSR vrai** : HTML pre-rendu serveur par defaut, hydratation universelle cote client.
 
@@ -121,7 +121,7 @@ Un seul projet sous `workspace/output/src/{AppName}/`. **Convention single-proje
 - Auto-import : `ref`, `computed`, `watch`, `useFetch`, composants, composables disponibles sans `import`
 
 **Securite** :
-- **`runtimeConfig`** dans `nuxt.config.ts` pour separer **public** (expose au client) vs **private** (server only). Les secrets vivent dans `runtimeConfig.{key}` (lus via `process.env.NUXT_{KEY}`), JAMAIS dans `runtimeConfig.public.{key}`.
+- **`runtimeConfig`** dans `nuxt.config.ts` pour separer **public** (expose au client) vs **private** (server only). Les secrets vivent dans `runtimeConfig.{key}` peuple par `arch` depuis `stack.md`, JAMAIS dans `runtimeConfig.public.{key}` ni dans `process.env.NUXT_*` lu par le code applicatif.
 - **CSP** via `nuxt-security` module (capability `security-headers`)
 - **Cookies auth** : `httpOnly` + `secure` (prod) + `sameSite: 'lax'` (gere par `@sidebase/nuxt-auth`)
 
@@ -210,6 +210,7 @@ mkdir -p \
   server/api \
   server/routes \
   server/middleware \
+  server/config \
   server/services \
   server/repositories \
   server/utils \
@@ -218,11 +219,17 @@ mkdir -p \
   locales \
   data
 
-# STEP 6 — Bootstrap .env.example
-cat > .env.example <<'ENV'
-NUXT_AUTH_SECRET="(injectee par arch depuis AUTH_JWT_SECRET)"
-NUXT_DATABASE_URL="(composee par arch depuis ## Active Database)"
-ENV
+# STEP 6 — Bootstrap runtimeConfig prive (rempli par arch depuis stack.md)
+cat > server/config/app-config.ts <<'TS'
+export const appConfig = {
+  authSecret: "",
+  databaseUrl: "",
+  azureAd: {
+    tenantId: "",
+    clientId: "",
+  },
+} as const;
+TS
 
 fi
 ```
@@ -332,14 +339,14 @@ Pas de Swagger par defaut — capability `public-api` ajoute `nuxt-openapi-docs-
 - Imports relatifs profonds — utiliser alias `~/components/...` (auto-configure Nuxt)
 
 **Securite** :
-- Hardcoded secrets — utiliser `.env` + `runtimeConfig`
+- Hardcoded secrets hors `runtimeConfig` prive peuple par `arch` depuis `stack.md`
 - Path traversal non protege
 - CORS `*` (mais inutile en Nuxt fullstack, meme origine)
 - Cookies sans flags secure/httpOnly/sameSite
 
 **Bundle** :
 - Import lib serveur (Prisma, fs, …) dans `composables/` ou `components/` → casse le build Vite cote client
-- Engager `.output/`, `.nuxt/`, `node_modules/`, `.env` dans git
+- Engager `.output/`, `.nuxt/`, `node_modules/` ou un fichier de config locale contenant des secrets dans git
 
 ---
 
@@ -347,7 +354,7 @@ Pas de Swagger par defaut — capability `public-api` ajoute `nuxt-openapi-docs-
 
 - **File-based JSON** (default si `DatabaseType: none`) : utiliser `useStorage('data')` Nitro KV ou pattern atomic write de `node-react.md §6.2`
 - **Prisma** (capability `prisma`) : pattern identique a `.claude/stacks/backend/node-express.md §8.3`
-- **DATABASE_URL** lue depuis `runtimeConfig.databaseUrl` (injectee depuis env `NUXT_DATABASE_URL` par convention)
+- **DATABASE_URL** lue depuis `runtimeConfig.databaseUrl` (valeur materialisee par `arch` depuis `## Active Database`, pas depuis `process.env.NUXT_DATABASE_URL`)
 
 ---
 
@@ -403,10 +410,10 @@ Ce stack est optimise pour :
 
 1. **Detecter** `## Active Tech Specs` = `fullstack/nuxt.md` → **ignorer** `BackendName` et `LibName`
 2. **Creer** UN seul projet via `nuxi init` (cf. §2.2.1)
-3. **Composer** `.env` depuis `## Active Database` + `## Active Auth Specs` :
-   - `NUXT_DATABASE_URL` (si Prisma)
-   - `NUXT_AUTH_SECRET` (depuis `AUTH_JWT_SECRET`)
-   - `NUXT_AZURE_TENANT_ID`, `NUXT_AZURE_CLIENT_ID` (si auth-azure-ad)
+3. **Composer** `server/config/app-config.ts` + `runtimeConfig` depuis `## Active Database` + `## Active Auth Specs` :
+   - `databaseUrl` (si Prisma)
+   - `authSecret` (depuis `AUTH_JWT_SECRET`)
+   - `azureAd.tenantId`, `azureAd.clientId` (si auth-azure-ad)
 4. **`## Active UI Specs`** : `vuetify` (defaut), `nuxt-ui` (alternative via capability). `shadcn` → WARNING (composants React, incompatibles Vue). `radzen-blazor` → WARNING bloquant
 5. **Phase B (DB scaffolding)** : meme procedure que `node-express.md §8.3`
 6. **Phase C (ADRs)** : creer `ADR-{ts}-stack-fullstack-nuxt.md` documentant Nuxt 3 + Nitro + Vuetify
@@ -436,7 +443,7 @@ Ce stack est optimise pour :
 | `workspace/output/src/{AppName}/shared/schemas/**` | `dev-backend` (Zod, partages) |
 | `workspace/output/src/{AppName}/nuxt.config.ts` | `arch` (create) + `dev-backend` (augment modules) + `dev-frontend` (augment css/components.dirs) |
 | `workspace/output/src/{AppName}/prisma/**` | `arch` (create) + `dev-backend` (consommation) |
-| `workspace/output/src/{AppName}/.env` | `arch` (create exclusif — secrets) |
+| `workspace/output/src/{AppName}/server/config/app-config.ts` | `arch` (create exclusif — secrets/config SDD) |
 
 **Cas frontiere `nuxt.config.ts`** : touche par les 2 agents (modules cote backend, css/components cote frontend). Utiliser **lock** equivalent LibName cf. `dev-shared.md §2`, ou serialiser dans le pipeline.
 

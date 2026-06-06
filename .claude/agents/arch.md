@@ -344,6 +344,10 @@ injectant `db_config` + `auth_config` (STEP 2.ter).
    applicatif → `[SEC_ENV_VAR_FORBIDDEN]` (cf. `error-classification.md §1.11`).
    `appsettings.json` / `application.yml` / `config/default.json` générés
    doivent figurer dans `.gitignore` du projet généré.
+   Copier `@.claude/templates/generated-project.gitignore.template` vers
+   `workspace/output/src/{ProjectName}/.gitignore` a la creation de chaque
+   projet (backend, frontend, fullstack, mobile) puis adapter seulement si le
+   stack documente une exception explicite.
 
 4. **Switch profil auth** (azure-ad ↔ auth-local) : supprimer ancien +
    écrire nouveau (évite double chargement = crash Spring/.NET).
