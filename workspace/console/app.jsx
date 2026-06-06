@@ -63,12 +63,10 @@ const Icon = {
   book:     () => <svg className="i" viewBox="0 0 16 16"><path d="M3 2.5h6c1 0 1.5.5 1.5 1.5v10c0-1-1-1.5-1.5-1.5H3z"/><path d="M13 2.5H9c-1 0-1.5.5-1.5 1.5v10c0-1 .5-1.5 1.5-1.5h4z"/></svg>,
 };
 
-// Pages de documentation embarquées dans le SPA (depuis v6.10 — plus d'ouverture dans un onglet).
-// Servies via /api/help/:id (server.js) puis rendues inline via iframe srcdoc.
-const DOC_PAGES = [
-  { id: "fonctionnelle", title: "Fonctionnelle", subtitle: "Vue d ensemble du framework SDD_Pro" },
-  { id: "technique",     title: "Technique",     subtitle: "Architecture, agents, pipeline (v6.0)" },
-];
+// Documentation framework retirée de la console 2026-06-06 :
+// la console ne sert plus QUE les stats projets. La doc SDD_Pro elle-même
+// vit dans le site MkDocs Material (build local via `mkdocs serve`).
+// Cf. mkdocs.yml + .claude/docs/README.md.
 
 // ───────── STATUS HELPERS ─────────
 const STATUS_LABELS = {
@@ -120,7 +118,6 @@ function TopBar({ page, setPage, theme, toggleTheme }) {
           onClick={() => setPage("workspace")}>
           Features
         </button>
-        <DocMenu page={page} setPage={setPage}/>
       </nav>
       <div className="tb-actions" style={{alignItems: 'center', marginLeft: 'auto'}}>
         <button
@@ -214,82 +211,8 @@ function ProjectSwitcher({ projects, currentProjectId, setCurrentProjectId, fall
   );
 }
 
-// ───────── DOC MENU (v6.10 — documentation embarquée inline) ─────────
-function DocMenu({ page, setPage }) {
-  const [open, setOpen] = useState(false);
-  useEffect(() => {
-    if (!open) return;
-    const onClick = (e) => {
-      if (!e.target.closest(".doc-dropdown") && !e.target.closest(".doc-trigger")) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", onClick);
-    return () => document.removeEventListener("mousedown", onClick);
-  }, [open]);
-
-  const onDocPage = page === "doc-fonctionnelle" || page === "doc-technique";
-
-  return (
-    <div style={{position: 'relative'}}>
-      <button
-        className={`nav-tab doc-trigger ${onDocPage ? "active" : ""}`}
-        aria-expanded={open}
-        onClick={() => setOpen(!open)}>
-        Documentation <span style={{fontSize: 10, marginLeft: 4}}>▾</span>
-      </button>
-      {open && (
-        <div className="doc-dropdown" style={{
-          position: 'absolute', top: '100%', left: 0, marginTop: 6,
-          background: 'var(--panel)', border: '1px solid var(--line)',
-          borderRadius: 8, boxShadow: 'var(--shadow-md)',
-          minWidth: 280, zIndex: 100, overflow: 'hidden'
-        }}>
-          {DOC_PAGES.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => { setPage("doc-" + p.id); setOpen(false); }}
-              style={{
-                display: 'block', width: '100%', textAlign: 'left',
-                padding: '12px 14px', border: 0, background: 'transparent',
-                borderBottom: '1px solid var(--line-2)', cursor: 'pointer',
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.background = 'var(--panel-2)'}
-              onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
-              <div style={{fontSize: 13, fontWeight: 500, color: 'var(--ink)'}}>{p.title}</div>
-              <div style={{fontSize: 11.5, color: 'var(--ink-3)', marginTop: 2}}>{p.subtitle}</div>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ───────── DOC PAGE (HTML inliné, style natif du site, theme-aware) ─────────
-function DocPage({ docId }) {
-  const [body, setBody] = useState(null);
-  const [error, setError] = useState(null);
-  useEffect(() => {
-    let cancelled = false;
-    setBody(null); setError(null);
-    fetch("/api/help/" + docId)
-      .then((res) => res.ok ? res.json() : Promise.reject(new Error("HTTP " + res.status)))
-      .then((payload) => { if (!cancelled) setBody(payload.body || ""); })
-      .catch((err) => { if (!cancelled) setError(err.message); });
-    return () => { cancelled = true; };
-  }, [docId]);
-
-  if (error) return <div className="doc-content"><div style={{color: "var(--danger)"}}>Erreur : {error}</div></div>;
-  if (body === null) return <div className="doc-content"><div style={{color: "var(--ink-3)"}}>Chargement de la documentation…</div></div>;
-  // Sanitize HTML reçu de /api/help/* avant injection (security audit 2026-06-06).
-  const safeBody = (typeof DOMPurify !== "undefined") ? DOMPurify.sanitize(body) : body;
-  return (
-    <article className="doc-content">
-      <div dangerouslySetInnerHTML={{ __html: safeBody }}/>
-    </article>
-  );
-}
+// DocMenu + DocPage retirés 2026-06-06 — console = stats projets uniquement.
+// Doc framework SDD_Pro → site MkDocs Material (cf. mkdocs.yml).
 
 function HelpModal({ page, onClose }) {
   // Echap pour fermer
@@ -2071,10 +1994,6 @@ function App() {
         theme={theme} toggleTheme={toggleTheme}/>
       {page === "dashboard" ? (
         <DashboardPage projectName={project?.name}/>
-      ) : page === "doc-fonctionnelle" ? (
-        <DocPage docId="fonctionnelle"/>
-      ) : page === "doc-technique" ? (
-        <DocPage docId="technique"/>
       ) : (
         <>
           <FeaturesHeader tree={filteredTree} onRefresh={refresh}/>

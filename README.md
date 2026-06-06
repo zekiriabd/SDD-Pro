@@ -1,6 +1,6 @@
 # SDD_Pro
 
-Framework FEAT-driven development pour Claude Code — branche `next` : **v7.0.0-alpha** (cf. [.claude/VERSIONING.md](.claude/VERSIONING.md)). Branche `main` : v6.10.4-LTS (freeze actif jusqu'au 2026-06-18).
+Framework FEAT-driven development pour Claude Code — branche `next` : **v7.0.0-alpha** (cf. [.claude/docs/VERSIONING.md](.claude/docs/VERSIONING.md)). Branche `main` : v6.10.4-LTS (freeze actif jusqu'au 2026-06-18).
 
 > 🌍 [English README](README.en.md) — quickstart + console essentials (les docs FR restent canoniques).
 
@@ -31,10 +31,37 @@ Le bootstrap :
 - Propose l'install des deps console (`npm install` dans `workspace/console/`)
 - Lance un smoke check final
 
-Combos validés bout-en-bout :
-- **C1** : .NET Minimal API + React + shadcn + Azure AD + xUnit (recommended)
-- **C2** : Kotlin Spring Boot + React + shadcn + Azure AD + JUnit
+Combos disponibles :
+- **C1** 🟢 : .NET Minimal API + React + shadcn + Azure AD + xUnit (recommended)
+- **C2** 🟢 : Kotlin Spring Boot + React + shadcn + Azure AD + JUnit
+- **C3** 🟡 : Node Express + React + shadcn + auth-local (pending runtime validation v7.0.0 GA)
+- **C4** 🟡 : Python FastAPI + React + shadcn + auth-local (pending v7.0.0 GA)
+- **C5** 🟡 : .NET Minimal API + Vue + Vuetify + Azure AD (pending v7.0.0 GA)
 - `--combo custom` : composition manuelle (4 backends × 4 frontends × 3 UI)
+
+CI mode (no prompts) :
+```bash
+SDD_APP_NAME=MyApp SDD_COMBO=c1 python bootstrap.py --auto-init
+```
+
+---
+
+## 🆚 Pourquoi SDD_Pro vs BMAD / Spec-Kit / AgentOS ?
+
+| Critère | SDD_Pro | BMAD | Spec-Kit | AgentOS |
+|---|:---:|:---:|:---:|:---:|
+| Multi-agents spécialisés | **12** | ~6 | 1 | 4 |
+| Reviewers post-code (angles distincts) | **5** (code, security, spec, arch, adversarial) | 1 | 0 | 1 |
+| Anti-derive strict (ownership + STOP) | ✅ | partial | ❌ | partial |
+| Catalogues machines (`.libs.json` + CVE + LTS) | ✅ | ❌ | ❌ | ❌ |
+| Error classification cross-agent (167 préfixes `[CLASS]`) | ✅ | ❌ | ❌ | ❌ |
+| Telemetry SQLite (cost cap, audit trail) | ✅ | ❌ | ❌ | partial |
+| Idempotence / resume (checkpoint mode) | ✅ | ❌ | ❌ | partial |
+| Determinisme (scripts 0-coût LLM) | **48 scripts** | ❌ | ❌ | partial |
+
+**Créneau différenciant** : SDD_Pro **industrialise la qualité** (5 reviewers, telemetry,
+anti-derive strict). C'est l'équivalent **Sonar + Snyk + ADR governance** appliqué au
+pipeline LLM. Voir [cookbook 10 min](.claude/docs/cookbook.md) pour démarrer.
 
 ---
 
@@ -62,13 +89,16 @@ npm start          # démarre sur http://127.0.0.1:4000
 
 Pré-requis : Node.js ≥ 20 et Python ≥ 3.8 sur le PATH (utilisé pour requêter `console.db` via les helpers `sdd_lib`).
 
-### Trois pages principales
+### Deux pages principales
 
 | Page | URL | Fonction |
 |---|---|---|
 | **Dashboard** *(défaut)* | `/` | KPI cards (FEATs, Tests API, Sécurité, Quality), grille statuts par FEAT, audit qualité style SonarQube (Vulnerabilities / Code Smells / Coverage avec ratings A→E), 4 charts modernes (coverage bars, quality stack, API gate, security donut), sparklines, theme dark/light persisté. |
 | **Features** *(ex-SDD Jira)* | `/` puis onglet Features | 3 vues : **Vue PO** (FEAT → US), **Vue technique** (FEAT → US → plans back/front), **Vue UX** (carrousel des mockups HTML par FEAT). Header avec bouton **Rafraîchir** qui re-scanne le FS (les nouveaux fichiers `.md`/`.html` apparaissent dynamiquement). |
-| **Documentation** | dropdown topbar | Pages **Fonctionnelle** et **Technique** servies en inline (HTML body extrait, restylé avec le thème natif du site — plus d'iframe). |
+
+> ℹ️ **Doc framework retirée de la console 2026-06-06** — la console reste DÉDIÉE
+> aux stats des projets matérialisés. La documentation SDD_Pro elle-même vit
+> dans le site **MkDocs Material** (voir section [📖 Documentation site](#-documentation-site) ci-dessous).
 
 ### Highlights
 
@@ -77,7 +107,6 @@ Pré-requis : Node.js ≥ 20 et Python ≥ 3.8 sur le PATH (utilisé pour requê
 - 🛡 **Section Audit qualité (style SonarQube)** : 1 ligne par FEAT avec ratings A→E (Vulnerabilities, Code Smells, Coverage). Cartes affichées **uniquement** si les données existent en DB (pas de placeholder).
 - 🔍 **Drill-down expandable** : un clic sur une ligne FEAT déplie 3 tables (vulnerabilities critique/serious, code smells, coverage gaps) avec file:line, OWASP/CWE, règles, severities colorées.
 - 🖼 **Vue UX carrousel** : mockups HTML servis via route statique `/ui/*` (CSS relatif `design-system.css` chargé naturellement, **pas de duplication**). Thumbs cliquables + flèches `‹ ›` + iframe sandboxé.
-- 📚 **Documentation inline** : pages Fonctionnelle / Technique rendues directement dans le body (HTML extrait + restylé avec le thème natif du site, plus de fichiers ouverts dans un onglet).
 - ⏳ **Loading spinner** : SVG natif animé (rotation gradient + 3 dots pulse, theme-aware).
 - 🛡 **Gates manuels** : les phases `afterUS / afterReadiness / afterPlan / afterCode` posées par `/sdd-full --manual-gates` sont résolues depuis la console (POST `/api/gate-decide`), atomic write protégé par lock cross-language Python ↔ Node.
 - 🤖 **Reformulation IA** (LOT 4, opt-in) : bouton « Reformuler avec IA » sur les FEAT/US/Plans, utilise l'Anthropic SDK pour produire une version PO-friendly.
@@ -94,14 +123,11 @@ Pré-requis : Node.js ≥ 20 et Python ≥ 3.8 sur le PATH (utilisé pour requê
 | `GET /api/audit` | Aggrégat tokens / contexte par agent |
 | `GET /api/state` | Dernier run + 30 derniers events |
 | `GET /api/gates?feat=N` | Historique gates pour 1 FEAT |
-| `GET /api/help/:id` | Body extrait + nettoyé d'une page de documentation |
 | `GET /api/file?path=…` | Lecture brute d'un fichier MD du workspace |
 | `POST /api/validate` | Enregistre la décision PO/Tech Lead sur une US/Task |
 | `POST /api/gate-decide` | Résout un gate `afterUS/afterReadiness/...` |
 | `GET /api/events` | Server-Sent Events (broadcast modifs FS + gates) |
 | `GET /ui/*` | Sert directement `workspace/input/ui/` (mockups HTML avec leur CSS relatif `design-system.css`) |
-
-Détails techniques : [.claude/docs/MCP-SERVER.md](.claude/docs/MCP-SERVER.md) (pour l'exposition MCP côté Python).
 
 ---
 
@@ -117,29 +143,47 @@ Détails techniques : [.claude/docs/MCP-SERVER.md](.claude/docs/MCP-SERVER.md) (
 
 ### Pour les contributeurs framework
 
-- [.claude/CHANGELOG.md](.claude/CHANGELOG.md) — historique versions (focus v6.10 : SQLite source-of-truth)
-- [.claude/MIGRATION.md](.claude/MIGRATION.md) — guides de mise à niveau
-- [.claude/WORKING-AGREEMENT.md](.claude/WORKING-AGREEMENT.md) — contrat d'autonomie agents
-- [.claude/docs/AUDIT-FRAMEWORK.md](.claude/docs/AUDIT-FRAMEWORK.md) — audit complet v6.1.1
-- [.claude/docs/DESIGN-FROMPLAN-STRICT.md](.claude/docs/DESIGN-FROMPLAN-STRICT.md) — pattern strict v6.2
-- [.claude/docs/MCP-SERVER.md](.claude/docs/MCP-SERVER.md) — serveur MCP (14 tools exposés à Cursor/Windsurf/Claude Desktop)
+- [.claude/docs/CHANGELOG.md](.claude/docs/CHANGELOG.md) — historique versions (focus v7.0.0-alpha)
+- [.claude/docs/MIGRATION.md](.claude/docs/MIGRATION.md) — guides de mise à niveau (v6.10 → v7.0.0)
+- [.claude/docs/AUDIT-FRAMEWORK-v7.md](.claude/docs/AUDIT-FRAMEWORK-v7.md) — audit complet v7.0.0-alpha
 - [.claude/loader.yml](.claude/loader.yml) — manifest reads/writes par agent
-- [.claude/rules/](.claude/rules/) — 9 règles opérationnelles (`backend-first`, `constitution`, `error-classification`, `file-ownership`, `qa-coverage`, `source-first`, `stack-completeness`, `us-granularity`, `cors`, `dev-shared`, `ui-tokens`)
+- [.claude/rules/](.claude/rules/) — 8 règles opérationnelles consolidées v7.0.0 (`build-and-loop`, `library-and-stack`, `ownership`, `quality`, `error-classification` + `output-protocol`, `dev-shared-preflight`, `error-classification-legacy`)
 
-### Documentation dans la console (inline)
+## 📖 Documentation site (MkDocs Material)
 
-Une fois la console lancée, le dropdown **Documentation** de la topbar donne accès à deux pages :
+La documentation complète du framework vit dans un **site statique MkDocs Material** (Python). Lancer en local :
 
-- **Fonctionnelle** — vue d'ensemble du framework (cible : PO / Product Manager / non-tech)
-- **Technique** — architecture, agents, pipeline (cible : Tech Lead / dev / architecte)
+```bash
+# Installer les deps docs (1ère fois uniquement)
+pip install -r requirements-docs.txt
 
-Ces pages vivent dans [workspace/console/help/](workspace/console/help/) et sont servies inline (le contenu HTML est extrait et restylé avec le thème natif du site).
+# Serveur live-reload local
+mkdocs serve
+# → http://localhost:8000
+
+# Build statique (produit site/, HTML pur)
+mkdocs build
+```
+
+Le site comprend :
+
+- 🚀 **Getting Started** (tutoriel 30 min) + **Cookbook** (recettes 10 min)
+- 🤖 **Agents reference** (12 cartes : role / model / IO / verdicts)
+- 💻 **Commands reference** (20 cartes : args / flags / decision tree)
+- ⚙️ **Configuration reference** (43 clés Project Config + policies non-bypass)
+- 🏗 **Architecture** (composants + workflow + 4 diagrammes mermaid)
+- 🛟 **Troubleshooting + FAQ** (22 erreurs `[CLASS]` + 8 FAQ)
+- 🤝 **Contributing** + Working Agreement + Versioning + ADRs
+
+> 💡 **Azure DevOps private project** : pas de publication GitHub Pages. Le dossier `site/` produit par `mkdocs build` peut être déployé manuellement (Azure Static Web Apps, file share, intranet). Cf. `mkdocs.yml` config.
+
+Hub navigation : [.claude/docs/README.md](.claude/docs/README.md) — explorer la doc sans MkDocs (Markdown brut sur GitHub/IDE).
 
 ---
 
 ## Stack technique
 
-Framework écrit en **Python** (stdlib pure pour le moteur, pytest pour les tests — suite > 500 tests couvrant `sdd_lib/`, `sdd_scripts/`, `sdd_mcp/`, `sdd_hooks/`). **Console web** : Node.js 20+ (Fastify 5 + React 18 via CDN, pas de build step). **SQLite** (WAL mode) pour la télémétrie centralisée (`workspace/output/db/console.db`, 24 tables, 36 index).
+Framework écrit en **Python** (stdlib pure pour le moteur, pytest pour les tests — suite > 1000 tests couvrant `sdd_lib/`, `sdd_scripts/`, `sdd_hooks/`, `sdd_admin/`). **Console web** : Node.js 22.5+ (Fastify 5 + React 18 via CDN, pas de build step). **SQLite** (WAL mode) pour la télémétrie centralisée (`workspace/output/db/console.db`).
 
 Compte vérifiable localement :
 ```bash
@@ -149,16 +193,18 @@ python -m unittest discover -s .claude/python/tests -p "test_*.py"   # subset co
 
 Aucun runtime applicatif imposé sur le code généré — SDD_Pro produit du code dans le stack du projet cible.
 
-**Catalogue stacks (v7.0.0-alpha)** — terminologie stricte :
+**Catalogue stacks (v7.0.0-alpha)** — terminologie stricte (source de vérité = entête `Validation:` du fichier `.md`) :
 
-| Statut | Définition | Compte |
+| Statut | Définition | Compte réel |
 |:---:|---|:---:|
 | 🟢 **validé** | Combo `/sdd-full` testé bout-en-bout sur ≥ 1 FEAT M (3 US, back+front), pipeline complet sans intervention humaine | **2 combos** ([.claude/docs/validated-combos.md](.claude/docs/validated-combos.md)) |
-| 🟢 **reference** | Stack avec entête `Validation: 🟢 reference` ET utilisé dans un combo validé | 7 stacks (composants de C1+C2) |
-| 🟡 **experimental** | Stack avec entête `Validation: 🟡 experimental` — utilisable mais aucun PoC formel bout-en-bout | 17 stacks |
-| ⏸️ **draft (quarantaine)** | Stack dans [`.claude/stacks/_drafts/`](.claude/stacks/_drafts/) — non chargé par le framework actif, procédure de réactivation documentée | 9 stacks |
+| 🟢 **reference** | Stack avec entête `Validation: 🟢 reference` (composant d'un combo validé OU pattern de référence) | **14 stacks** |
+| 🟡 **experimental** | Stack avec entête `Validation: 🟡 experimental` — chargeable mais sans PoC formel bout-en-bout | **19 stacks** |
+| 🟡 **POC-only** | Stack `Validation: 🟡 POC-only` — usage interne SDD_Pro uniquement, non destiné prod externe (ex: `fullstack/node-react` pour la console) | **1 stack** |
 
-**Total actif** : 24 stacks répartis : Backend (4), Frontend (4), UI DS (3), QA (9, dont 2 opt-in `mutation-testing` + `playwright`), Auth (2), Archi (2 patterns `mvc`/`ddd`). Détail : [.claude/CLAUDE.md §6](.claude/CLAUDE.md).
+**Total actif : 34 stacks** répartis : Backend (4), Frontend (4), UI DS (3), QA (9 dont 2 opt-in `mutation-testing` + `playwright`), Auth (2), Archi (3 patterns `mvc`/`ddd`/`microservice`), Fullstack (6 expérimentaux), Mobiles (3 expérimentaux). Détail : [.claude/CLAUDE.md §6](.claude/CLAUDE.md).
+
+> ℹ️ **v7.0.0-alpha audit P0-doc 2026-06-05** : la ligne "⏸️ draft (quarantaine)" et le dossier `_drafts/` ont été retirés (rollback `governance-stacks-quarantine-rollback` du 2026-05-24 ; cf. CHANGELOG). Aucun stack n'est en quarantaine — les stacks expérimentaux restent chargeables avec l'avertissement runtime.
 
 > ⚠️ Hors les 2 combos validés `C1`/`C2`, la composition multi-stacks n'a pas été validée par un PoC complet ; le pipeline peut échouer en runtime de manière non triviale. Pour activer une 3ᵉ combo, exécuter d'abord le PoC ROI méthodologie ([.claude/docs/poc-roi-methodology.md](.claude/docs/poc-roi-methodology.md)).
 

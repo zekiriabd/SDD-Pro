@@ -9,6 +9,10 @@
 **/*.pyc
 **/*.pyo
 
+# MkDocs build output (statique, généré par `mkdocs build`)
+# Build local + déploiement manuel sur Azure / intranet, jamais committé.
+/site/
+
 # Workspace généré par le pipeline SDD (artefacts non-versionnés)
 workspace/output/
 workspace/console/status.json
@@ -21,6 +25,11 @@ workspace/console/.status.lock
 # SMTP_PASSWORD etc. en clair pour le dev local. Ne JAMAIS committer.
 # Versionner stack.md.example (placeholders) à la place.
 workspace/input/stack/stack.md
+
+# HTTPS dev cert/key auto-signés (security audit 2026-06-06 — keypair privé
+# ne JAMAIS commiter, même en dev). Régénérer via `npm run gen-cert` ou
+# fallback HTTP automatique si absent (cf. server.js:57).
+workspace/console/.certs/
 
 # Layered config team-level (peut contenir des secrets/policy org)
 .sdd/

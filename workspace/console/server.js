@@ -702,43 +702,17 @@ fastify.get("/api/gates", async (req) => {
 });
 
 // ─────────────────────────────────────────────
-// GET /api/help/:id — contenu HTML d une page d aide embarquée dans le SPA
-// (au lieu d ouvrir le fichier dans un onglet, on injecte dans un iframe srcdoc)
+// Endpoint /api/help/:id RETIRÉ 2026-06-06
 // ─────────────────────────────────────────────
-const HELP_FILES = {
-  "fonctionnelle": join(CONSOLE_DIR, "help", "presentation.html"),
-  "technique":     join(CONSOLE_DIR, "help", "presentation-technique.html"),
-};
-
-// Extrait le contenu utile d une page HTML : body innerHTML, sans <style>/<script>
-// ni attributs `style=` ou `class=` issus du theme original (on re-stylise via .doc-content).
-function extractBody(raw) {
-  // 1) body innerHTML uniquement
-  const m = raw.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-  let body = m ? m[1] : raw;
-  // 2) supprime <script>, <style>, <link> embarqués
-  body = body
-    .replace(/<script[\s\S]*?<\/script>/gi, "")
-    .replace(/<style[\s\S]*?<\/style>/gi, "")
-    .replace(/<link[^>]*>/gi, "");
-  // 3) supprime les attributs style="..." inline (utilisent var(--primary)/--text de la page original)
-  body = body.replace(/\sstyle="[^"]*"/gi, "");
-  // 4) supprime les class= sauf quelques utilitaires sémantiques. Conserve les classes
-  //    "alt" / "kpi-*" / "hero-*" etc. ne servent à rien sans leur CSS — strip toutes les classes.
-  body = body.replace(/\sclass="[^"]*"/gi, "");
-  // 5) trim
-  return body.trim();
-}
-
-fastify.get("/api/help/:id", async (req, reply) => {
-  const file = HELP_FILES[req.params.id];
-  if (!file || !existsSync(file)) {
-    return reply.code(404).send({ error: "page d'aide inconnue" });
-  }
-  const raw = await readFile(file, "utf8");
-  reply.header("Cache-Control", "private, max-age=60");
-  return { id: req.params.id, html: raw, body: extractBody(raw) };
-});
+// La console ne sert plus la documentation du framework SDD_Pro lui-même
+// (séparation des responsabilités) — la doc vit dans le site MkDocs
+// Material (cf. mkdocs.yml au root + .claude/docs/README.md). Lancer :
+//
+//   pip install -r requirements-docs.txt
+//   mkdocs serve   # → http://localhost:8000
+//
+// La console reste DÉDIÉE aux stats des projets matérialisés (FEATs, US,
+// coverage, security, runs, tokens) lues depuis console.db.
 
 fastify.get("/api/health", async () => ({
   ok: true,
