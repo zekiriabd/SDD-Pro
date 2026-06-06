@@ -3,6 +3,136 @@
 > Document de référence chargé **à la demande** (`Read @.claude/docs/architecture.md`).
 > Pas en system prompt.
 
+## 0. Big picture (mermaid)
+
+### 0.1 Composants du framework
+
+```mermaid
+graph TB
+    subgraph Human["👤 Inputs humains"]
+        FEAT[FEAT specs<br/>workspace/input/feats/]
+        UI[HTML mockups<br/>workspace/input/ui/]
+        STACK[stack.md<br/>Project Config]
+    end
+
+    subgraph Agents["🤖 12 agents IA"]
+        direction TB
+        CORE[Core 4<br/>po + arch<br/>+ dev-backend + dev-frontend]
+        SUPPORT[Support 3<br/>elicitor + constitutioner + qa]
+        AUDITORS[Auditors 5<br/>code + security + spec<br/>+ arch + adversarial]
+    end
+
+    subgraph Determ["⚙️ Python deterministic"]
+        SCRIPTS[48 scripts<br/>parse / validate / orchestrate]
+        HOOKS[11 Claude Code hooks<br/>preflight + audit + record]
+        DB[(console.db<br/>SQLite WAL)]
+    end
+
+    subgraph Output["📦 Outputs"]
+        US[User Stories<br/>workspace/output/us/]
+        CODE[Code généré<br/>workspace/output/src/]
+        REVIEW[Reports<br/>workspace/output/qa/]
+        ADRS[ADRs<br/>workspace/output/.sys/.context/adrs/]
+    end
+
+    FEAT --> Agents
+    UI --> Agents
+    STACK --> Agents
+    Agents --> US
+    Agents --> CODE
+    Agents --> REVIEW
+    Agents --> ADRS
+    Agents <-->|orchestrated by| Determ
+    Determ <--> DB
+
+    style Human fill:#e1f5ff
+    style Agents fill:#fff9c4
+    style Determ fill:#e8f5e9
+    style Output fill:#f3e5f5
+```
+
+### 0.2 Pipeline phase flow (1 FEAT, end-to-end)
+
+```mermaid
+sequenceDiagram
+    actor TL as Tech Lead
+    participant CC as Claude Code
+    participant PO as agent po
+    participant Val as feat-validate
+    participant Arch as agent arch
+    participant DevB as dev-backend × N
+    participant Gate as QA API Gate
+    participant DevF as dev-frontend × N
+    participant QA as agent qa
+    participant Aud as 4 auditors batch
+    participant Rev as /sdd-review
+    participant DB as console.db
+
+    TL->>CC: /sdd-full 1
+    CC->>PO: spawn (Phase 2)
+    PO->>DB: persist US + token_usage
+    CC->>Val: invoke (deterministic Python)
+    Val-->>CC: GO/WARN/NO-GO
+    CC->>Arch: spawn if GO
+    Arch->>DB: persist schema + ADRs
+    CC->>DevB: spawn × N US (parallel, MaxParallel)
+    DevB->>DB: persist tokens + run state
+    CC->>Gate: in-memory tests
+    Gate-->>CC: PASS / WARN / FAIL / SKIPPED / INFRA_BLOCKED
+    CC->>DevF: spawn × N US (if PASS/WARN/SKIPPED)
+    DevF->>DB: persist tokens
+    CC->>QA: tests + coverage + quality
+    QA->>DB: persist verdict
+    CC->>Aud: batch parallel (4 auditors)
+    Aud->>DB: persist findings
+    CC->>Rev: consolidate
+    Rev-->>TL: 🟢/🟡/🔴 verdict
+```
+
+### 0.3 Concurrency model (dev-* in parallel)
+
+```mermaid
+graph LR
+    subgraph Backend["🔧 Phase 4a: dev-backend ALL US"]
+        direction TB
+        BB1[US 1-1 → src/Backend/]
+        BB2[US 1-2 → src/Backend/]
+        BB3[US 1-3 → src/Backend/]
+        BBLib[Shared/Lib/<br/>via LibName lock O_EXCL]
+    end
+
+    subgraph Gate["🛡️ Phase 4b: API Gate"]
+        APIG[in-memory tests<br/>fixtures InMemory<br/>5 statuses canonical]
+    end
+
+    subgraph Frontend["🎨 Phase 4c: dev-frontend ALL US"]
+        direction TB
+        FF1[US 1-1 → src/App/]
+        FF2[US 1-2 → src/App/]
+        FF3[US 1-3 → src/App/]
+        FFShared[theme.css<br/>shared per project]
+    end
+
+    BB1 --> BBLib
+    BB2 --> BBLib
+    BB3 --> BBLib
+    Backend --> Gate
+    Gate -->|PASS/WARN| Frontend
+    Gate -->|FAIL| STOP1[STOP — fix back contract]
+
+    style Backend fill:#fff9c4
+    style Gate fill:#e1f5ff
+    style Frontend fill:#fff9c4
+    style STOP1 fill:#ffcdd2
+```
+
+**Concurrence garanties** :
+- LibName lock (`O_EXCL` atomic + stale recovery TOCTOU-safe) sérialise les écritures sur `src/Lib*/`
+- `atomic_write` (POSIX `os.replace` + Windows retry 5×50ms) garantit l'intégrité fichier
+- ADR filename (`mint_adr_filename` avec `secrets.token_hex(2)` systématique) évite collisions parallèles
+- API Gate sépare strictement back → front (workflow gated)
+- `MaxParallel` limite le concurrent (défaut 3, range 1-12)
+
 ## 1. Vision
 
 Le PO humain rédige une FEAT fonctionnelle. L'UX Designer (humain) dépose

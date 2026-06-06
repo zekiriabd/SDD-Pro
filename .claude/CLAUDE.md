@@ -94,7 +94,7 @@ Templates : `@.claude/docs/conventions.md §14-§15`.
 
 > **v7.0.0-alpha bench 2026-06-05** (recount 2026-06-06) :
 > **25 🟢 (14 reference + 11 bench-validated runtime) + 8 🟡 experimental + 1 🟡 POC-only = 34 total**.
-> Validation automatique : `framework_smoke.py --check-stacks-count`.
+> Validation automatique : `python .claude/python/sdd_admin/framework_smoke.py` (la vérif `stacks-count` est intégrée au smoke).
 
 | Catégorie | 🟢 reference | 🟢 bench-validated runtime (2026-06-05) | 🟡 experimental |
 |---|---|---|---|

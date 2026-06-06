@@ -3,7 +3,46 @@
 > Document chargé **à la demande** (`Read @.claude/docs/workflow.md`).
 > Pas en system prompt.
 
-## 1. Vue d'ensemble — 4 phases (5 avec QA)
+## 1. Vue d'ensemble visuelle
+
+```mermaid
+flowchart TD
+    A[Human: /feat-generate Auth] --> B[FEAT .md spec written]
+    B -.optional.-> C[/feat-deepen — elicitor enriches]
+    C --> D[/us-generate — agent PO]
+    B --> D
+    D --> E[US files generated 1-3, max 6]
+    E --> F{/feat-validate readiness gate}
+    F -->|NO-GO| X1[STOP — fix FEAT/US]
+    F -->|GO/WARN| G[/dev-plan optional — plans review]
+    F -->|GO/WARN| H
+    G --> H[/arch-init — bootstrap + DB scaffold]
+    H --> I[dev-backend × N US in parallel]
+    I --> J{QA API Gate in-memory}
+    J -->|RED| X2[STOP — fix backend contract]
+    J -->|PASS/WARN| K[dev-frontend × N US in parallel]
+    K --> L[/qa-generate — tests + coverage + quality]
+    L --> M[Auditors batch: code + security + spec + arch]
+    M --> N[/sdd-review — consolidate verdicts]
+    N -->|RED| X3[STOP — fix critical issues]
+    N -->|GREEN/WARN| Z[FEAT delivered]
+
+    style A fill:#e1f5ff,stroke:#0288d1
+    style Z fill:#c8e6c9,stroke:#388e3c
+    style X1 fill:#ffcdd2,stroke:#c62828
+    style X2 fill:#ffcdd2,stroke:#c62828
+    style X3 fill:#ffcdd2,stroke:#c62828
+    style I fill:#fff9c4,stroke:#fbc02d
+    style K fill:#fff9c4,stroke:#fbc02d
+```
+
+**Légende** :
+- 🟦 cadre bleu = entrée humaine
+- 🟨 cadre jaune = invocations agent **parallèles** (jusqu'à `MaxParallel`)
+- 🟥 cadre rouge = points d'arrêt durs (`[CLASS]` ERROR 3L)
+- 🟩 cadre vert = sortie OK (FEAT livrée, code prêt à livrer)
+
+## 1.bis Vue d'ensemble — 4 phases (5 avec QA)
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
