@@ -43,12 +43,11 @@ const STATE_DIR  = join(WORKSPACE, "output", ".sys", ".state");
 const STATUS_FILE = join(CONSOLE_DIR, "status.json");
 const STACK_FILE  = join(WORKSPACE, "input", "stack", "stack.md");
 
-// Port par défaut : 4000 (cohérent avec docs/commands/sdd-serve.md §6 +
-// docs/MCP-SERVER.md). 5173 (ancien défaut) entre en collision avec Vite
-// (react, vue) qui prend 5173 → /sdd-serve démarrait instablement quand
-// les 2 services se réservaient le même port. Override via env PORT=...
-// reste supporté pour compat scripts existants.
-// Bug filé 2026-05-21 ; fix v7.0.0-alpha (cf. CHANGELOG).
+// Port par défaut : 4000 (cohérent avec docs/commands/sdd-serve.md §6).
+// 5173 (ancien défaut) entre en collision avec Vite (react, vue) qui prend
+// 5173 → /sdd-serve démarrait instablement quand les 2 services se
+// réservaient le même port. Override via env PORT=... reste supporté pour
+// compat scripts existants. Bug filé 2026-05-21 ; fix v7.0.0-alpha (cf. CHANGELOG).
 const PORT = parseInt(process.env.PORT || "4000", 10);
 
 // HTTPS dev — clé/cert auto-signés générés via openssl (cf. .certs/).
@@ -57,7 +56,28 @@ const CERT_KEY  = join(CONSOLE_DIR, ".certs", "dev-key.pem");
 const CERT_CERT = join(CONSOLE_DIR, ".certs", "dev-cert.pem");
 const HTTPS_ENABLED = existsSync(CERT_KEY) && existsSync(CERT_CERT);
 
-const fastifyOptions = { logger: { level: "info" } };
+// Audit P0-doc 2026-06-05 :
+//  - bodyLimit: 100 KiB ceiling on POST payloads (default Fastify is 1 MiB).
+//    The console accepts gate decisions + validation toggles — none should
+//    legitimately exceed a few KB. Smaller ceiling = smaller DoS surface.
+//  - logger redacts ANTHROPIC_API_KEY-shaped strings before they hit disk.
+const fastifyOptions = {
+  bodyLimit: 100 * 1024,
+  logger: {
+    level: "info",
+    redact: {
+      paths: [
+        "headers.authorization",
+        "headers['x-api-key']",
+        "headers['anthropic-api-key']",
+        "req.headers.authorization",
+        'req.headers["x-api-key"]',
+      ],
+      remove: false,
+      censor: "[REDACTED]",
+    },
+  },
+};
 if (HTTPS_ENABLED) {
   fastifyOptions.https = {
     key:  readFileSync(CERT_KEY),
@@ -65,6 +85,90 @@ if (HTTPS_ENABLED) {
   };
 }
 const fastify = Fastify(fastifyOptions);
+
+// Audit 2026-06-06 — defense-in-depth against CSRF / DNS rebinding /
+// curl-from-evil-site. Previous version used `startsWith()` on Host/Origin
+// which accepts `localhost.evil.com` and `127.0.0.1.evil.com` (CWE-1289).
+// Replaced by strict URL parsing + hostname exact match + Sec-Fetch-Site
+// gate + per-process CSRF nonce on mutating verbs.
+const _ALLOWED_HOSTNAMES = new Set(["127.0.0.1", "localhost", "[::1]", "::1"]);
+const MUTATING_VERBS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
+// CSRF nonce: random, per-process, rotated each restart. The browser fetches
+// it via GET /api/csrf (same-origin only, returned from this same process)
+// and echoes it as `X-CSRF-Token` on every mutating call. A curl from evil.com
+// cannot read the nonce (cross-origin GET is blocked by Origin check below)
+// so even a successful DNS rebinding cannot forge a valid mutation.
+import { randomBytes } from "node:crypto";
+const CSRF_NONCE = randomBytes(32).toString("hex");
+
+function _isLocalhostUrl(rawUrl) {
+  if (!rawUrl) return false;
+  let url;
+  try { url = new URL(rawUrl); } catch { return false; }
+  // Normalize IPv6 form: URL.hostname returns "::1" without brackets.
+  const hostname = url.hostname.toLowerCase();
+  return _ALLOWED_HOSTNAMES.has(hostname) || _ALLOWED_HOSTNAMES.has(`[${hostname}]`);
+}
+
+function _isLocalhostHostHeader(hostHeader) {
+  if (!hostHeader) return false;
+  // Parse via URL to handle `host:port` + IPv6 `[::1]:4000` uniformly.
+  let parsed;
+  try { parsed = new URL(`http://${hostHeader}`); } catch { return false; }
+  const hostname = parsed.hostname.toLowerCase();
+  return _ALLOWED_HOSTNAMES.has(hostname) || _ALLOWED_HOSTNAMES.has(`[${hostname}]`);
+}
+
+fastify.addHook("onRequest", async (req, reply) => {
+  // 1. Host header — STRICT parse, exact hostname match (no startsWith).
+  if (!_isLocalhostHostHeader(req.headers.host)) {
+    return reply.code(403).send({ error: "console must be reached via localhost / 127.0.0.1" });
+  }
+
+  const method = req.method || "GET";
+
+  // 2. Origin header — when present, must parse as localhost URL.
+  //    A GET with Origin set means a cross-origin browser request (CORS preflight
+  //    or fetch); we never expect that on a same-origin console.
+  if (req.headers.origin && !_isLocalhostUrl(req.headers.origin)) {
+    return reply.code(403).send({ error: "cross-origin request refused" });
+  }
+
+  // 3. Referer — when present on a mutating call, must also be localhost.
+  //    Catches the case where a malicious page omits Origin but sends Referer.
+  if (MUTATING_VERBS.has(method) && req.headers.referer && !_isLocalhostUrl(req.headers.referer)) {
+    return reply.code(403).send({ error: "cross-origin referer refused" });
+  }
+
+  // 4. Mutating verbs MUST carry Sec-Fetch-Site=same-origin (set natively by
+  //    modern browsers, unforgeable from cross-origin JS). Reject `cross-site`
+  //    and `none` (top-level nav). `same-origin` and `same-site` are accepted.
+  //    Curl/fetch from Node won't set this header → fall through to CSRF check.
+  if (MUTATING_VERBS.has(method)) {
+    const sfs = (req.headers["sec-fetch-site"] || "").toLowerCase();
+    if (sfs && sfs !== "same-origin" && sfs !== "same-site") {
+      return reply.code(403).send({ error: "cross-site mutation refused" });
+    }
+    // 5. CSRF nonce — mandatory on mutating verbs unless the request comes
+    //    from a localhost CLI (no Sec-Fetch-Site, no Origin = trusted local).
+    //    The double check (Sec-Fetch above OR CSRF here) means a browser-driven
+    //    attack on a misconfigured DNS-rebound host still fails the nonce check.
+    const hasBrowserContext = sfs || req.headers.origin;
+    if (hasBrowserContext) {
+      const token = req.headers["x-csrf-token"];
+      if (token !== CSRF_NONCE) {
+        return reply.code(403).send({ error: "missing or invalid X-CSRF-Token" });
+      }
+    }
+  }
+});
+
+// CSRF nonce endpoint — same-origin only (the onRequest hook already enforces
+// localhost Host + Origin). The browser fetches this once at boot, then echoes
+// the nonce as X-CSRF-Token on each mutating call. Returned as JSON so the
+// React/JSX bootstrap can store it in a module-scoped variable.
+fastify.get("/api/csrf", async (_req, _reply) => ({ csrfToken: CSRF_NONCE }));
 
 await fastify.register(fastifyStatic, {
   root: CONSOLE_DIR,
@@ -74,10 +178,59 @@ await fastify.register(fastifyStatic, {
 
 // Sert workspace/input/ui/ tel quel pour que les mockups HTML chargent leur CSS
 // relatif (design-system.css, etc.) sans duplication. Cf. UXCarousel côté React.
+// Security audit 2026-06-06 : ajouter CSP sandbox + headers défensifs côté serveur
+// (en plus du sandbox iframe côté React app.jsx:955). Une URL directe /ui/foo.html
+// dans une nouvelle fenêtre n'était PAS protégée. CSP sandbox neutralise scripts/forms.
 await fastify.register(fastifyStatic, {
   root: UI_DIR,
   prefix: "/ui/",
   decorateReply: false,
+  setHeaders: (res, path) => {
+    if (path.toLowerCase().endsWith(".html")) {
+      res.setHeader(
+        "Content-Security-Policy",
+        "sandbox allow-same-origin; default-src 'none'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:;"
+      );
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      res.setHeader("X-Frame-Options", "SAMEORIGIN");
+      res.setHeader("Referrer-Policy", "no-referrer");
+    }
+  },
+});
+
+// Vendor static route — serves React / ReactDOM / Babel / marked from local
+// node_modules instead of unpkg.com / cdn.jsdelivr.net. Audit P0-security
+// 2026-06-05 : the previous CDN-based loading had no Subresource Integrity
+// (SRI), so a compromised CDN would result in remote code execution in the
+// Tech Lead's browser. Bundling locally removes the external attack surface
+// entirely. Versions are pinned in package.json — upgrade via npm + commit.
+const NODE_MODULES = join(CONSOLE_DIR, "node_modules");
+const VENDOR_FILES = {
+  "react.development.js":     join("react", "umd", "react.development.js"),
+  "react-dom.development.js": join("react-dom", "umd", "react-dom.development.js"),
+  "babel.min.js":             join("@babel", "standalone", "babel.min.js"),
+  "marked.min.js":            join("marked", "marked.min.js"),
+  // Security audit 2026-06-06 : sanitize HTML produit par marked avant injection
+  // via dangerouslySetInnerHTML (XSS surface si contenu LLM hostile).
+  "purify.min.js":            join("dompurify", "dist", "purify.min.js"),
+};
+fastify.get("/vendor/:name", async (req, reply) => {
+  const name = req.params.name;
+  const rel = VENDOR_FILES[name];
+  if (!rel) return reply.code(404).send({ error: "unknown vendor file" });
+  const abs = join(NODE_MODULES, rel);
+  if (!existsSync(abs)) {
+    return reply.code(503).send({
+      error: "vendor file missing — run `npm install` in workspace/console/",
+      hint: `expected at: ${abs}`,
+    });
+  }
+  // Read once per request; the OS page cache handles repeats efficiently.
+  const content = await readFile(abs);
+  reply
+    .header("Content-Type", "application/javascript; charset=utf-8")
+    .header("Cache-Control", "public, max-age=3600")
+    .send(content);
 });
 
 // ─────────────────────────────────────────────
@@ -354,17 +507,79 @@ fastify.get("/api/tree", async () => {
   };
 });
 
+// Whitelist of allowed subdirectories under workspace/ for /api/file reads.
+// Anything outside this set is REFUSED, even if it lives under workspace/.
+// Rationale (audit P0-security 2026-06-05) : the previous implementation only
+// checked that the resolved path was inside workspace/, which exposed
+// `workspace/input/stack/stack.md` — a file containing DB_PASSWORD,
+// AUTH_JWT_SECRET, AZ_TENANTID and other secrets. Any browser extension or
+// localhost-bound page could exfiltrate via GET /api/file?path=...
+const ALLOWED_API_FILE_PREFIXES = [
+  // FEAT / US / Plans markdown — public to the console UI
+  join("input",  "feats")  + sep,
+  join("output", "us")     + sep,
+  join("output", "plans")  + sep,
+  // QA reports + readiness gates — read-only, no secrets
+  join("output", "qa")     + sep,
+  join("output", ".sys", ".validation") + sep,
+  // Constitution + ADRs — no secrets
+  join("output", ".sys", ".context")    + sep,
+  // UI mockups (already served by /ui/* static route, but allowed here too)
+  join("input",  "ui")     + sep,
+];
+
+// Filename suffixes allowed by /api/file. Refuses .env, .key, .pem, etc.
+const ALLOWED_API_FILE_SUFFIXES = [".md", ".json", ".html", ".txt"];
+
+// Explicit denylist (belt + braces, even if the prefix logic regresses).
+const DENIED_API_FILE_BASENAMES = new Set([
+  "stack.md",          // workspace/input/stack/stack.md — secrets
+  "stack.md.candidate",
+  ".env", ".env.local", ".env.production",
+  "credentials.json", "secrets.json",
+]);
+
 fastify.get("/api/file", async (req, reply) => {
   const path = req.query.path;
   if (typeof path !== "string" || !path) {
     return reply.code(400).send({ error: "missing path" });
   }
-  // Securite : restreindre au repertoire workspace/
-  const abs = resolve(ROOT, path);
+  // Reject absolute paths and NUL bytes outright (defense-in-depth).
+  if (path.includes("\0") || /^([a-zA-Z]:|\/|\\)/.test(path)) {
+    return reply.code(403).send({ error: "path must be relative to workspace/" });
+  }
+
+  const abs = resolve(WORKSPACE, path);
   const wsRel = relative(WORKSPACE, abs);
   if (wsRel.startsWith("..") || wsRel.includes(`..${sep}`)) {
     return reply.code(403).send({ error: "path hors workspace/" });
   }
+
+  // Whitelist subdirectory check.
+  const wsRelNorm = wsRel.split("/").join(sep); // normalize forward slashes
+  if (!ALLOWED_API_FILE_PREFIXES.some((p) => wsRelNorm.startsWith(p))) {
+    return reply.code(403).send({
+      error: "path outside the whitelisted subdirectories",
+      allowed: ALLOWED_API_FILE_PREFIXES.map((p) => p.replace(/\\/g, "/")),
+    });
+  }
+
+  // Suffix check.
+  const lower = wsRelNorm.toLowerCase();
+  if (!ALLOWED_API_FILE_SUFFIXES.some((s) => lower.endsWith(s))) {
+    return reply.code(403).send({
+      error: "file extension not allowed",
+      allowed: ALLOWED_API_FILE_SUFFIXES,
+    });
+  }
+
+  // Explicit basename denylist (catches stack.md even if the prefix logic
+  // somehow allows input/stack/).
+  const base = wsRelNorm.split(sep).pop().toLowerCase();
+  if (DENIED_API_FILE_BASENAMES.has(base)) {
+    return reply.code(403).send({ error: "file explicitly denied (contains secrets or sensitive data)" });
+  }
+
   if (!existsSync(abs)) return reply.code(404).send({ error: "not found" });
   const raw = await readFile(abs, "utf8");
   const st  = await stat(abs);
@@ -529,9 +744,18 @@ fastify.get("/api/health", async () => ({
   ok: true,
   console: "sdd-console",
   // Console-app version (Fastify server package — workspace/console/package.json).
-  // Decoupled from the SDD_Pro framework version on purpose (audit M8) :
-  // the console iterates on UI cadence ; the framework on DSL cadence.
-  version: "0.4.0",
+  // Lue dynamiquement pour éviter drift (security audit 2026-06-06 : était hardcodée
+  // "0.4.0" tandis que package.json disait "0.5.0"). Decoupled from the SDD_Pro
+  // framework version on purpose (audit M8) : the console iterates on UI cadence ;
+  // the framework on DSL cadence.
+  version: (() => {
+    try {
+      const pkgPath = join(CONSOLE_DIR, "package.json");
+      if (!existsSync(pkgPath)) return "unknown";
+      const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
+      return pkg.version || "unknown";
+    } catch { return "unknown"; }
+  })(),
   // Framework version read from .claude/loader.yml line `version: "..."`.
   // Allows the UI to display "alpha / beta / GA" in a banner without
   // hard-coding it in the console source.
@@ -550,19 +774,56 @@ fastify.get("/api/health", async () => ({
 }));
 
 // ─────────────────────────────────────────────
-// GET /api/explain — reformulation IA PO-friendly (LOT 4)
+// POST /api/explain — reformulation IA PO-friendly (LOT 4)
+// Security audit 2026-06-06 (R2) : GET → POST car endpoint a effets de bord
+// (appel Anthropic payant + envoi contenu fichier). POST garantit que les
+// pre-flight CORS et l'Origin check (onRequest) s'appliquent strictement,
+// que rien n'est mis en cache navigateur, et que les bots/preview HTML
+// ne déclenchent pas accidentellement le payload.
 // ─────────────────────────────────────────────
-fastify.get("/api/explain", async (req, reply) => {
-  const path = req.query.path;
-  const force = req.query.force === "1" || req.query.force === "true";
+fastify.post("/api/explain", async (req, reply) => {
+  // /api/explain envoie fileContent à Anthropic. Whitelist alignée sur /api/file
+  // empêche l'exfiltration de stack.md, .env, secrets.json vers l'API LLM.
+  const body = req.body || {};
+  const path = body.path;
+  const force = body.force === true || body.force === "1" || body.force === 1;
   if (typeof path !== "string" || !path) {
     return reply.code(400).send({ error: "missing path" });
   }
-  const abs = resolve(ROOT, path);
+  // Reject absolute paths and NUL bytes outright (defense-in-depth, idem /api/file).
+  if (path.includes("\0") || /^([a-zA-Z]:|\/|\\)/.test(path)) {
+    return reply.code(403).send({ error: "path must be relative to workspace/" });
+  }
+  // Resolve under WORKSPACE (was ROOT — too wide) and check containment.
+  const abs = resolve(WORKSPACE, path);
   const wsRel = relative(WORKSPACE, abs);
   if (wsRel.startsWith("..") || wsRel.includes(`..${sep}`)) {
     return reply.code(403).send({ error: "path hors workspace/" });
   }
+  // Whitelist subdirectory check (réutilisation pattern /api/file).
+  const wsRelNorm = wsRel.split("/").join(sep);
+  if (!ALLOWED_API_FILE_PREFIXES.some((p) => wsRelNorm.startsWith(p))) {
+    return reply.code(403).send({
+      error: "path outside the whitelisted subdirectories (explain refuse l'exfiltration vers Anthropic API)",
+      allowed: ALLOWED_API_FILE_PREFIXES.map((p) => p.replace(/\\/g, "/")),
+    });
+  }
+  // Suffix check.
+  const lower = wsRelNorm.toLowerCase();
+  if (!ALLOWED_API_FILE_SUFFIXES.some((s) => lower.endsWith(s))) {
+    return reply.code(403).send({
+      error: "file extension not allowed for explain",
+      allowed: ALLOWED_API_FILE_SUFFIXES,
+    });
+  }
+  // Explicit basename denylist (belt + braces).
+  const base = wsRelNorm.split(sep).pop().toLowerCase();
+  if (DENIED_API_FILE_BASENAMES.has(base)) {
+    return reply.code(403).send({ error: "file explicitly denied (secrets / sensitive data — refuse d'envoyer à Anthropic)" });
+  }
+  // Note : Origin check appliqué automatiquement par le hook onRequest sur POST
+  // (cf. server.js début). Pas besoin de re-checker manuellement comme c'était
+  // le cas pour l'ancien GET.
   if (!existsSync(abs)) return reply.code(404).send({ error: "not found" });
 
   const avail = explainIsAvailable();
