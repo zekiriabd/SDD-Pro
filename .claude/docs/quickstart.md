@@ -106,13 +106,18 @@ les 2 fichiers et utiliser les tokens par défaut du Design System.
 
 Pipeline complet de A à Z (phases 2 → 5).
 
-### Variantes plus granulaires
+### Autres commandes user-facing (cf. CLAUDE.md §3)
 
-- `/us-generate 1` — US uniquement (phase 2)
-- `/feat-validate 1` — readiness gate (phase 2.6)
-- `/dev-plan 1` — plans techniques sans coder (phase 2.7)
-- `/dev-run 1` — exécution seule (phases 3-4)
-- `/qa-generate 1` — tests + coverage + quality (phase 5)
+- `/feat-validate 1` — Implementation Readiness Gate (déterministe)
+- `/sdd-review 1` — audit consolidé style Sonar (bloquant RED)
+- `/sdd-status [1]` — diagnostic pipeline (read-only)
+- `/sdd-serve` / `/sdd-kill-server` — démarre/arrête backend+front+console
+- `/sdd-discover-stack` — onboarding brownfield (scan repo → `stack.md.candidate`)
+
+> **Commandes internes (debug)** : `/us-generate`, `/arch-init`, `/dev-plan`,
+> `/dev-run`, `/dev-backend`, `/dev-frontend`, `/qa-generate`, `/doc-refresh`,
+> `/feat-deepen`, `/sdd-profile`. Préférer un orchestrateur (`/sdd-full`,
+> `/dev-run`, `/sdd-poc`) — les internes peuvent court-circuiter des gates.
 
 ### Variante POC / prototype rapide
 
@@ -128,12 +133,9 @@ entre les deux.
 
 ⚠️ **Ne pas déployer en prod** : aucun test, aucun review, aucune
 vérification contrat back↔front. Pour passer en mode strict après un
-POC :
-
-```
-/us-generate 1 --replace-pseudo   # remplace la pseudo-US par 1-N vraies US
-/sdd-full 1                       # pipeline standard (idempotent)
-```
+POC : éditer manuellement `workspace/output/us/1-1-*.md` (la pseudo-US
+agrégée) pour la découper en vraies US, puis relancer `/sdd-full 1`
+(idempotent).
 
 Détails : `@.claude/commands/sdd-poc.md`.
 

@@ -148,14 +148,14 @@ python bench_run.py --feat 1 --label "framework-v7.0.0" \
     --baseline-human-hours 12.5 --baseline-human-cost-per-hour 150
 ```
 
-Lit `console.db` + applique pricing + produit `docs/roi-baseline.md`
+Lit `console.db` + applique pricing + produit `workspace/output/qa/bench/BENCH-GLOBAL-REPORT.md`
 table comparative auto-générée.
 
 ---
 
 ## 5. Métriques publiées (table comparative)
 
-Format normé pour `docs/roi-baseline.md` :
+Format normé pour `workspace/output/qa/bench/BENCH-GLOBAL-REPORT.md` :
 
 ```markdown
 ## FEAT M — Comparaison humain vs framework v7.0.0
@@ -182,7 +182,7 @@ Format normé pour `docs/roi-baseline.md` :
 - `workspace/input/feats/roi-poc/feat-{S|M|L}.md` — specs figées, hash SHA-256 dans `roi-poc/MANIFEST.json`
 - `workspace/input/stack/roi-poc-stack.md` — stack figé
 - `workspace/input/feats/roi-poc/baseline-human-log.md` — log baseline humaine
-- `docs/roi-baseline.md` — résultats publiés (régénéré par `bench_run.py`)
+- `workspace/output/qa/bench/BENCH-GLOBAL-REPORT.md` — résultats publiés (régénéré par `bench_run.py`)
 
 ### 6.2 Reproductible par tout Tech Lead
 
@@ -199,7 +199,7 @@ Doit produire la table §5 à ±5 % (variance LLM acceptée).
 ### 6.3 Re-mesure semestrielle
 
 À chaque release MAJOR (v8.0, v9.0…), re-run les 3 FEATs → vérifier
-absence de régression. Publier dans `docs/roi-baseline.md` avec un
+absence de régression. Publier dans `workspace/output/qa/bench/BENCH-GLOBAL-REPORT.md` avec un
 historique par version.
 
 ---
@@ -212,7 +212,7 @@ historique par version.
 - **Refactoring** : SDD_Pro ne fait pas de refactoring (génère depuis spec). Un humain refactor 10× plus vite.
 - **Debug runtime** : framework ne sait pas debug post-prod. Humain seul peut.
 
-Inclure explicitement ces cas dans le rapport `roi-baseline.md` section
+Inclure explicitement ces cas dans le rapport `BENCH-GLOBAL-REPORT.md` section
 « Cas où SDD_Pro N'EST PAS le bon outil ». Ne pas les cacher.
 
 ### 7.2 Variance LLM
@@ -239,13 +239,13 @@ génération de code depuis une **spec figée** + mockups HTML statiques.
 - Edge cases métier non spec, variance "produit" sous clients réels
 - Coût cycle de vie complet (déploiement, monitoring, evolutions, debt)
 
-**Implication** : les ratios humain/framework publiés dans `roi-baseline.md`
+**Implication** : les ratios humain/framework publiés dans `BENCH-GLOBAL-REPORT.md`
 doivent **toujours** être suffixés `[scope: code-gen from fixed spec]`. Toute
 extrapolation en "gain produit total" est interdite — c'est précisément le
 piège que le risque R2 (claim ROI surévalué) cherche à éviter.
 
 Détail complet et phrases autorisées/interdites : callout "Périmètre de
-mesure (anti-R2)" en tête de `@.claude/docs/roi-baseline.md`.
+mesure (anti-R2)" en tête de `@.claude/workspace/output/qa/bench/BENCH-GLOBAL-REPORT.md`.
 
 ---
 
@@ -275,4 +275,4 @@ Pour que v7.0.0 puisse être taguée (post-2026-06-19), le PoC doit avoir :
 - `@.claude/python/sdd_scripts/query_console_db.py` — read queries SQL
 - `@.claude/docs/CHANGELOG.md` lignes 489, 530, 600, 850 — promesses ROI non mesurées historiquement
 - `workspace/output/.sys/.context/adrs/ADR-20260519T193000-governance-roi-poc.md` — décision + plan
-- `docs/roi-baseline.md` — résultats publiés (à créer post-exécution PoC)
+- `workspace/output/qa/bench/BENCH-GLOBAL-REPORT.md` — résultats publiés (à créer post-exécution PoC)

@@ -6,9 +6,11 @@
 ## 1. Vision
 
 Le PO humain rédige une FEAT fonctionnelle. L'UX Designer (humain) dépose
-des **mockups HTML statiques** dans `workspace/input/ui/`. Une chaîne de **4
-agents** spécialisés (PO, Arch, Dev-Backend, Dev-Frontend) transforme
-l'ensemble en :
+des **mockups HTML statiques** dans `workspace/input/ui/`. Une chaîne de
+**12 agents** spécialisés (4 cœur : PO, Arch, Dev-Backend, Dev-Frontend ;
+3 support : Elicitor, Constitutioner, QA ; 5 auditors : Code-Reviewer,
+Security-Reviewer, Spec-Compliance-Reviewer, Arch-Reviewer, Adversarial-Reviewer)
+transforme l'ensemble en :
 
 1. **User Stories structurées** (1 à 6 par FEAT, cible 1-3) — agent PO
 2. **Bootstrap solution + projets vides + (si DB) schéma + entities
@@ -56,7 +58,7 @@ est ensuite généré en parallèle par Dev-Backend et Dev-Frontend.
 > `dev-*-strict` (forks Sonnet v6.2) supprimés — flag `PlanCacheStrict`
 > est désormais DEPRECATED no-op. Le routing `/dev-run` STEP 6.0.bis
 > spawn `dev-*` Opus 4.7 que le plan soit v1 ou v2. Design archivé sous
-> `@.claude/ARCHIVE/v7-design-superseded/DESIGN-FROMPLAN-STRICT.md`.
+> `@.claude/archive/v7-design-superseded/DESIGN-FROMPLAN-STRICT.md`.
 
 ## 3. Agents — lectures et écritures
 
@@ -178,7 +180,7 @@ validé bout-en-bout. Mobile cross-platform avec backend distant séparé :
 - Phase 3.5 + 6.5 (Security Review, v6.3.2) — `security-reviewer` (Sonnet) 2 modes : pré-dev threat model STRIDE (informational) + post-dev scan OWASP Top 10 (verdict 🟢/🟡/🔴, 8 classes hard-blocking).
 - Phase 7 (Performance Audit, v6.4.0 → retirée v7.0.0) — `performance-auditor` (Sonnet) supprimé via ADR `governance-major-auditors-trim`. Remplacement v7.2.0 : ingest CI déterministe `sdd_scripts/ingest_lighthouse.py` (Lighthouse JSON → `qa_performance`), verdict selon `PerfFailOn`. SLO API backend (wrk/k6) prévu v7.3+. Cf. `rules/error-classification-legacy.md §2`.
 - Templates ops (v6.4.0) — `templates/{runbook,postmortem,slo-sli}.template.md` à instancier par le Tech Lead lors de la mise en prod du projet généré.
-- Phase planner (v6.4.1) — script Python déterministe `phase_planner.py` qui décide quelles phases auditor sont enabled/skipped selon Project Config + stacks actifs + état runtime + mentions perf/sec dans ACs. Invoqué par `/sdd-full` STEP 1.tiers (récap unifié au démarrage, non bloquant). Détection automatique override pour ACs explicites (`LCP < 2s` force perf-audit même en mode manual).
+- Phase planner (v6.4.1) — script Python déterministe `phase_planner.py` qui décide quelles phases auditor sont enabled/skipped selon Project Config + stacks actifs + état runtime + mentions perf/sec dans ACs. Invoqué par `/sdd-full` STEP 1.quart (récap unifié au démarrage, non bloquant ; renommé depuis 1.tiers lors de l'audit P0-workflow 2026-06-05). Détection automatique override pour ACs explicites (`LCP < 2s` force perf-audit même en mode manual).
 - Auto-invoke chain (v6.4.2) — branchement effectif des 5 agents auditor dans le pipeline. `/dev-run` STEP 5.5 (threat-model post-arch) + STEP 6.4 (3 agents en parallèle pré-dashboard : code-review + a11y + security-scan). `/qa-generate` STEP 6.4 (perf-audit post-coverage). Verdict 🔴 RED de code-reviewer/a11y/security-scan → STOP avec rapport et procédure de déblocage.
 
 ❌ **Hors scope** :

@@ -102,7 +102,10 @@ Forme rejetée : `gate` (générique) sans qualificatif → toujours préfixer.
 
 ## 7. Agents (taxonomie)
 
-> 15 agents en v6.10.4. Tous **autonomes** (jamais de question utilisateur).
+> **12 agents** en v7.0.0-alpha (sweep 2026-05-20 : `accessibility-auditor`,
+> `performance-auditor`, `dashboard`, `dev-backend-strict`, `dev-frontend-strict`
+> retirés ; `adversarial-reviewer` ajouté). Tous **autonomes** (jamais de
+> question utilisateur) sauf `elicitor` (dérogation `/feat-deepen`).
 
 | Agent | Modèle | Rôle | Phase |
 |---|---|---|---|
@@ -144,7 +147,7 @@ Forme rejetée : `gate` (générique) sans qualificatif → toujours préfixer.
 | **Lib lock** | Verrou atomique par entité pour le projet shared `LibName` (procédure `acquire_libname_lock.py`). | `rules/ownership.md §4` |
 | **Idempotence** | Une commande relancée 2× avec mêmes inputs produit le même résultat sans effet de bord cumulé. | `docs/conventions.md §2` |
 | **Selective read** | Lecture sélective : un agent ne lit que les artefacts strictement nécessaires à son US (1 fichier US, pas la FEAT entière). | `CLAUDE.md §1` |
-| **Strict mode** | (retiré v7.0.0) Variant Sonnet 4.6 des dev-* qui consommait un plan v2 strict-ready. Tous les plans (v1 et v2) sont désormais matérialisés par les agents canoniques Opus 4.7. | `ARCHIVE/v7-design-superseded/DESIGN-FROMPLAN-STRICT.md` |
+| **Strict mode** | (retiré v7.0.0) Variant Sonnet 4.6 des dev-* qui consommait un plan v2 strict-ready. Tous les plans (v1 et v2) sont désormais matérialisés par les agents canoniques Opus 4.7. | `archive/v7-design-superseded/DESIGN-FROMPLAN-STRICT.md` |
 | **Constitution** | Fichier `workspace/output/.sys/.context/constitution.md` partagé entre agents pour cohérence sémantique cross-FEAT (glossaire local, acteurs, ADRs index). | `rules/ownership.md (Partie B)` |
 | **Checkpoint** | Mécanisme de reprise post-crash via hashing input des phases. | v6.6.2+ |
 
@@ -290,7 +293,7 @@ Liste des termes à éliminer en v7.0.0 — préférer la forme canonique de la 
 - `@.claude/docs/architecture.md` — vision agents/stacks
 - `@.claude/docs/workflow.md` — détail phases
 - `@.claude/docs/conventions.md` — anti-derive, idempotence, parallélisme
-- `@.claude/docs/version-notes.md` — notes par version (archive §10.*)
+- `@.claude/docs/CHANGELOG.md` — notes par version (consolidé 2026-06-06)
 - `@.claude/rules/` — 9 règles opérationnelles
 - `@.claude/docs/VERSIONING.md` — politique SemVer + freeze
 - `ADR-20260519T120000-governance-major-auditors-trim.md`

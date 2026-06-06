@@ -1,10 +1,9 @@
 # /dev-run — Orchestrateur dev (arch+db → back → API gate → front) pour 1 FEAT
 
-> ⚠️ **Commande interne v7.0.0** — invoquée par /sdd-full STEP 4.
-> Orchestrateur dev (arch+back+API+front) — invoqué par /sdd-full.
-> Utilisateur final : préférer la commande orchestrante (`/sdd-full` ou `/dev-run`)
-> qui gère pré-conditions, idempotence et état. Conservée comme command pour
-> debug/inspection ciblée et préservation des chaînes d'invocation documentées.
+> **Commande user-facing** (cf. CLAUDE.md §3 — 12 user-facing). Phase 4 :
+> orchestre arch+DB → dev-backend ALL US → QA API Gate → dev-frontend ALL US.
+> Invoquée aussi par `/sdd-full` STEP 4. Pour un pipeline complet A→Z, préférer
+> `/sdd-full` qui gère également Phase 2 (US) et Phase 5 (QA + reviews).
 
 > **Dépendance load-bearing au runtime Claude Code** : orchestration
 > parallèle via tool `Agent` (alias `Task`) avec N calls indépendants
@@ -381,11 +380,10 @@ dépend de ce JSON pour décider quels reviewers spawner — sans guard,
 la branche `if phases.X.enabled` faute silencieusement (KeyError ou
 `undefined`) et le batch dégénère.
 
-> **v7.0.0-alpha (audit CRIT-4 — 2026-06-04)** : `/sdd-full §1.tiers`
-> ne calcule plus `$PHASE_PLAN` en amont (l'eager-compute + passage
-> cross-process via env vars était redondant et fragile, cf.
-> `[ENV_PROPAGATION_FAILED]`). Ce STEP est désormais l'**unique** site
-> de calcul, qu'il soit invoqué via `/sdd-full` ou en standalone.
+> **v7.0.0-alpha** : `/sdd-full` ne calcule plus `$PHASE_PLAN` en amont
+> (eager-compute redondant + passage cross-process fragile, cf.
+> `[ENV_PROPAGATION_FAILED]`). Ce STEP est l'**unique** site de calcul,
+> qu'il soit invoqué via `/sdd-full` ou en standalone.
 
 ```bash
 PHASE_PLAN=$(python .claude/python/sdd_scripts/phase_planner.py \
@@ -404,28 +402,35 @@ Détail phase_planner : `.claude/python/sdd_scripts/phase_planner.py`
 `state.json.phases.planning.payload` (via `sdd_state.py set-phase`)
 pour consommation par le récap final de `/sdd-full §5`.
 
-### 5.5.4 — State tracking (legacy, conservé)
-
-```bash
-python .claude/python/sdd_scripts/sdd_state.py set-phase \
-  --run-id $RUN_ID --phase threat_model --status pass \
-  --payload-json '{"threats_count":N,"verdict":"informational"}'
-```
-
----
-
 ## STEP 6 — Workflow gated séquentiel (cf. `.claude/rules/build-and-loop.md`)
 
-> **v7.0.0-alpha (audit MAJ-4, 2026-06-04)** — dette technique documentée.
-> Ce STEP fait ~213L de pseudo-code Bash (chunking, `wait`, queries DB,
-> fallback gate_passed). Un refactor vers `python sdd_scripts/run_dev_phase.py
-> --feat {n}` est recommandé pour réduire le prompt à ~30L narratives, mais
-> exige une session E2E complète (vraie FEAT, vraie console.db, vrai stack)
-> pour valider la non-régression. **Hors-scope CRIT-12 sweep** — à conduire
-> en branche dédiée avec un projet de référence intégré au CI. Le pseudo-code
-> ci-dessous reste **load-bearing** : il est lu par Claude pour orchestrer
-> les 3 phases (dev-backend × N → API gate → dev-frontend × N) avec gate
-> STOP-on-RED, batching parallèle, et fallback gate_passed.
+> **v7.0.0-alpha (audit MAJ-4 → P0-doc 2026-06-05)** — extraction partielle
+> de la logique déterministe vers `sdd_scripts/run_dev_phase.py` :
+>
+> - **`plan` subcommand** : chunking US, MaxParallel resolve, From-Plan detection
+> - **`gate-decision` subcommand** : API Gate verdict parsing + continuation decision
+>
+> Coût LLM 0 (sortie JSON déterministe), unit-testé (`tests/test_run_dev_phase.py`,
+> 28 tests). Le pseudo-bash ci-dessous reste pour les parties qui ne peuvent
+> PAS être en Python : les invocations `Agent(dev-backend|dev-frontend)` sont
+> des tool-calls Claude qui doivent vivre dans le prompt.
+>
+> Pattern d'usage simplifié :
+> ```bash
+> # Avant la phase backend : récupérer le plan d'exécution
+> python .claude/python/sdd_scripts/run_dev_phase.py plan --feat-number {n}
+> # → JSON : {"batches": [...], "from_plan_mode": bool, ...}
+> # Le LLM lit ce JSON et spawn chaque batch séquentiellement.
+>
+> # Après l'API gate : décider si on continue vers frontend
+> python .claude/python/sdd_scripts/run_dev_phase.py gate-decision --feat-number {n}
+> # → JSON : {"status": "PASS|WARN|FAIL|SKIPPED|INFRA_BLOCKED",
+> #           "should_continue_frontend": bool, "reason": "..."}
+> ```
+>
+> Note : un refactor complet (élimination du pseudo-bash) reste hors-scope
+> CRIT-12 — il exigerait un projet de référence intégré au CI pour valider la
+> non-régression sur les spawns LLM.
 
 **Défaut** : back → QA API gate → front, plus de parallélisme back+front.
 
@@ -610,21 +615,29 @@ honorent leur contrat** (vérifié par 6b). Les mismatches
 `[FRONTEND_BACKEND_CONTRACT_GAP]` ne peuvent plus se produire en
 silence.
 
-**Idempotence (re-run après correction backend, v6.10)** : au début de
-6a, requêter la DB pour le verdict API Gate le plus récent et son
-`extracted_at`. Comparer avec le mtime des fichiers backend. Si le
-verdict DB est postérieur **et** `gate_passed: true`, skip 6a + 6b et
-passer directement à 6c.
+**Idempotence (re-run après correction backend, v6.10 ; v7.0.0-alpha audit P3 — status canonique)** :
+au début de 6a, requêter la DB pour le verdict API Gate le plus récent et son
+`extracted_at`. Comparer avec le mtime des fichiers backend. Si le verdict DB
+est postérieur **et** `status ∈ {PASS, WARN}`, skip 6a + 6b et passer
+directement à 6c. **`SKIPPED` ne déclenche pas le skip-idempotence** —
+"aucun endpoint testé" n'est pas une preuve que le backend est stable, donc
+on re-traverse 6.a/6.b par sécurité (au pire ils restent SKIPPED).
 
 ```bash
 GATE=$(python .claude/python/sdd_scripts/query_console_db.py api-gate --feat {n})
-GATE_PASSED=$(echo "$GATE" | python -c "import json,sys; print(json.load(sys.stdin).get('gate_passed', False))")
+GATE_STATUS=$(echo "$GATE" | python -c "import json,sys; print(json.load(sys.stdin).get('status', ''))")
 GATE_TS=$(echo "$GATE" | python -c "import json,sys; print(json.load(sys.stdin).get('extracted_at', ''))")
+# Legacy fallback (DB sans colonne `status` pre-v5) — derive uniquement si vide :
+if [ -z "$GATE_STATUS" ]; then
+  GATE_PASSED=$(echo "$GATE" | python -c "import json,sys; print(json.load(sys.stdin).get('gate_passed', False))")
+  if [ "$GATE_PASSED" = "True" ]; then GATE_STATUS="PASS"; else GATE_STATUS="FAIL"; fi
+fi
 ```
 
+Skip 6a+6b si `GATE_STATUS in {PASS, WARN}` ET `GATE_TS > mtime(backend_files)`.
 Émettre :
 ```
-FEAT {n} — backend stable (console.db qa_api_tests GREEN @ {GATE_TS}), skip 6a+6b → 6c frontend
+FEAT {n} — backend stable (console.db qa_api_tests {GATE_STATUS} @ {GATE_TS}), skip 6a+6b → 6c frontend
 ```
 
 ### Mode legacy parallèle (`GatedWorkflow: false`)
@@ -670,10 +683,21 @@ ou STOP.
 ### 6.4.1 — Construction du batch
 
 ```python
-# v7.0.0-alpha (audit CRIT-4) : lire ArchReviewMode directement depuis
-# Project Config — phase_planner.py ne l'expose pas (volontaire — la
-# décision est binaire, pas de heuristique skip-conditional comme pour
-# code-review / security / spec).
+# Audit 2026-06-06 (CR-6) — hard-fail if phase_planner.py did not produce a
+# usable `phases` object. Previous code silently treated missing keys as
+# `enabled=False`, which caused 3 of the 4 reviewers (code/security/spec)
+# to skip without signal whenever phase_planner.py returned malformed JSON.
+if not phases or not all(
+    hasattr(phases, k) for k in ("code_review", "security_scan", "spec_compliance")
+):
+    STOP + ERROR(
+        "ERROR: /dev-run STEP 6.4.1 — phase plan missing required keys",
+        "CAUSE: [PHASE_PLAN_INIT_FAILED] phases object unusable — phase_planner.py output incomplete",
+        "FIX: rerun `python .claude/python/sdd_scripts/phase_planner.py --feat {n}` and inspect output",
+    )
+
+# Read ArchReviewMode directly from Project Config — phase_planner.py
+# does not expose it (binary decision, no skip-conditional heuristic).
 arch_review_mode = read_layered_config(keys=("ArchReviewMode",)).get(
     "ArchReviewMode", "manual"
 )
@@ -686,9 +710,7 @@ if phases.security_scan.enabled:
 if phases.spec_compliance.enabled:
     BATCH.append(Agent("spec-compliance-reviewer", args="{n}"))
 if arch_review_mode == "full":
-    BATCH.append(Agent("arch-reviewer", args="{n}"))       # v7.0.0-alpha audit CRIT-4
-# v7.0.0 : phases.a11y_audit ignored — agent removed.
-# Replacement : axe-core in the generated project's CI step.
+    BATCH.append(Agent("arch-reviewer", args="{n}"))
 ```
 
 Si `BATCH == []` (toutes phases skipped + ArchReviewMode ≠ full) →
@@ -800,24 +822,15 @@ python .claude/python/sdd_scripts/sdd_state.py set-phase \
 
 ---
 
-## STEP 6.5 — Refresh INDEX ADRs (auto, depuis 2026-05-08 ; déterministe en v7.0.0)
+## STEP 6.5 — Refresh INDEX ADRs (déterministe)
 
-> **v7.0.0** : agent `dashboard` retiré (cf. STEP 4.7 de `/sdd-full`
-> pour la migration). Remplacé par script Python `index_adrs.py`.
-
-Exécuter **systématiquement** après le gated workflow pour régénérer :
+Exécuter **systématiquement** après le gated workflow pour régénérer
+`workspace/output/.sys/.context/adrs/INDEX.md` (dev-* ont peut-être créé
+des ADRs phase 5 que `arch` n'a pas indexés) :
 
 ```bash
 python .claude/python/sdd_scripts/index_adrs.py
 ```
-
-Sortie : `workspace/output/.sys/.context/adrs/INDEX.md` (utile : `dev-*`
-ont peut-être créé des ADRs phase 5 que `arch` n'a pas indexés).
-
-> **v6.10 BREAKING (préservé)** : les rendus HTML
-> (`dashboard/README.html`, `qa/feat-{n}/dashboard.html`) restent
-> retirés. Les métriques vivent dans `console.db` ; le rendu graphique
-> est délégué à la console web.
 
 Coût : **0 token**, latence < 100 ms. Non bloquant : sur exit ≠ 0,
 émettre WARNING + continuer vers STEP 6.6 puis STEP 7.

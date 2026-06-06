@@ -173,7 +173,7 @@ EXPECTED_PY_SCRIPTS = (
     "detect_capabilities.py", "validate_inline_rules.py",
     "validate_fidelity.py", "mark_breaking_resolved.py", "acquire_libname_lock.py",
     "context_budget.py", "gate_decide.py", "sdd_state.py",
-    "compact_front_plans.py", "preflight.py", "validate_semantic.py",
+    "preflight.py", "validate_semantic.py",
     "detect_arch_shortcircuit.py",
     # v6.8 — US schema v2 toolkit
     "set_us_status.py", "compute_us_complexity.py",
@@ -311,6 +311,7 @@ def main() -> int:
             result = subprocess.run(
                 [sys.executable, str(drift_script), "--json"],
                 capture_output=True, text=True, check=False,
+                timeout=60,
             )
             drift = json.loads(result.stdout) if result.stdout.strip() else {}
             summary = drift.get("summary", {})

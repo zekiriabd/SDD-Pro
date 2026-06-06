@@ -28,8 +28,8 @@
 > (`governance-major-auditors-trim`). L'ingest CI est strictement
 > additif (scripts + workflow GitHub Actions), sans coût LLM.
 >
-> Voir `docs/scope-reduction-v7-ga.md` pour le périmètre actuel et
-> `templates/ci-quality.github-actions.yml.template` pour le pipeline
+> Voir `docs/CHANGELOG.md` (entrée v7.0.0-alpha) pour le périmètre actuel
+> et `templates/ci-quality.github-actions.yml.template` pour le pipeline
 > CI cible auto-généré par `arch` quand `CiTemplatesGeneration: true`.
 
 ---
@@ -162,10 +162,8 @@ opérationnelle quotidienne.
 
 - `@.claude/rules/error-classification.md §1.9, §1.12` — fichier
   principal (stubs MAJ v7.2.0 pour pointer vers ingest CI)
-- `@.claude/docs/AUDIT-FRAMEWORK-v7.md §1.3` — critique audit motivant
-  la séparation
 - ADR `governance-major-auditors-trim` (2026-05-19) — retrait initial
-  des agents
+  des agents (cf. `docs/adrs/ADR-20260519T120000-governance-major-auditors-trim.md`)
 - `sdd_scripts/ingest_axe.py` + `sdd_scripts/ingest_lighthouse.py`
   — ingest CI déterministe (v7.2.0)
 - `templates/ci-quality.github-actions.yml.template` — workflow
@@ -175,15 +173,8 @@ opérationnelle quotidienne.
 
 ---
 
-## 6. Références "fantômes" — moved to `docs/AUDIT-FRAMEWORK-v7.md`
+## 6. Références "fantômes" — supprimées 2026-06-06
 
-> v7.0.0-alpha (audit MIN-3, 2026-06-04) — la section "28 fichiers
-> fantômes" (~60 L de méta-audit sur les annotations historiques des
-> agents retirés v7.0.0) a été retirée de cette rule de production.
-> Le contenu d'origine documentait l'heuristique anti-faux-positifs
-> pour audits futurs (3 critères : marqueur explicite de retrait,
-> argparse choices/whitelist, document historique). Désormais
-> consultable via `git log` ou archivé dans `docs/AUDIT-FRAMEWORK-v7.md`.
-> Une rule opérationnelle n'est pas l'endroit pour un post-mortem
-> d'audit.
+> Le méta-audit historique sur les annotations d'agents retirés v7.0.0
+> a été retiré de cette rule de production. Consultable via `git log`.
 

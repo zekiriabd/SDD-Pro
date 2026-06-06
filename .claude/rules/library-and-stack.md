@@ -448,7 +448,7 @@ est cassé en runtime.
 
 ---
 
-## 1. Quand cette règle s'applique
+## B.1 Quand cette règle s'applique
 
 | Cas | CORS requis ? |
 |---|:---:|
@@ -481,9 +481,9 @@ Détail algorithme : `agents/arch.md §4.5.6`.
 
 ---
 
-## 2. Pattern correct par stack backend
+## B.2 Pattern correct par stack backend
 
-### 2.1 .NET (dotnet-minimalapi)
+### B.2.1 .NET (dotnet-minimalapi)
 
 `Program.cs` :
 ```csharp
@@ -503,7 +503,7 @@ app.UseCors("Spa");
 
 `appsettings.json` / env `Cors__AllowedOrigins=http://localhost:5173,http://localhost:4173`.
 
-### 2.2 Spring Boot (kotlin-spring-boot)
+### B.2.2 Spring Boot (kotlin-spring-boot)
 
 Bean dédié `CorsConfig.kt` :
 ```kotlin
@@ -531,7 +531,7 @@ Activer dans `SecurityConfig.kt` :
 http.cors { } // utilise le bean ci-dessus
 ```
 
-### 2.3 FastAPI (python-fastapi)
+### B.2.3 FastAPI (python-fastapi)
 
 `main.py` :
 ```python
@@ -549,7 +549,7 @@ app.add_middleware(
 )
 ```
 
-### 2.4 Node Express (node-express)
+### B.2.4 Node Express (node-express)
 
 `server.ts` :
 ```typescript
@@ -566,7 +566,7 @@ app.use(cors({
 
 ---
 
-## 3. Alternative dev — Vite proxy (sans CORS backend)
+## B.3 Alternative dev — Vite proxy (sans CORS backend)
 
 Si le projet veut éviter la config CORS backend en dev (mais doit
 quand même la faire en prod), Vite peut proxifier l'API :
@@ -588,7 +588,7 @@ même si proxy actif en dev — sinon dérive prod garantie.
 
 ---
 
-## 4. Anti-patterns rejetés
+## B.4 Anti-patterns rejetés
 
 | Anti-pattern | Pourquoi rejeté |
 |---|---|
@@ -601,7 +601,7 @@ même si proxy actif en dev — sinon dérive prod garantie.
 
 ---
 
-## 5. Vérification dev-backend / arch
+## B.5 Vérification dev-backend / arch
 
 ### Pattern à grep en STEP build
 
@@ -634,7 +634,7 @@ HINT: cf. .claude/rules/library-and-stack.md (Partie B §2) pour le pattern stac
 
 ---
 
-## 6. Test d'acceptation
+## B.6 Test d'acceptation
 
 Toute FEAT impliquant un appel SPA→backend doit avoir au moins 1 AC
 implicite couvert par cette règle :
@@ -649,19 +649,95 @@ implicite couvert par cette règle :
 
 ---
 
-## 7. Lien avec autres règles
+## B.7 Pièges runtime documentés (post-mortem bench 2026-06-05)
+
+Bugs détectés lors du bench multi-stack et qui n'apparaissent que **runtime**. Tout
+backend/front SPA-facing DOIT contrôler ces 5 cas :
+
+### B.7.1 CORS `localhost` ≠ `127.0.0.1` (post-mortem bench FEAT 2)
+
+**Symptôme** : UI affiche `Impossible de joindre l'API` malgré curl OK depuis CLI.
+
+**Cause** : navigateur ouvert sur `http://127.0.0.1:5186` envoie `Origin: http://127.0.0.1:5186`.
+Backend allowlist contient `http://localhost:5186` uniquement → preflight `OPTIONS` 403
+"Invalid CORS request" → fetch jette `TypeError: Failed to fetch`.
+
+**Convention obligatoire** : allowlist **multi-host explicite** :
+```
+http://localhost:{port}     # DNS resolves to 127.0.0.1
+http://127.0.0.1:{port}     # IP littéral
+```
+Pour chaque port frontend, déclarer **les deux variantes**. Pattern appliqué dans 4 backends
+bench (Kotlin/.NET/Node/Python) avec 14 origins (7 ports × {host, IP}).
+
+### B.7.2 `<input type=number>` coerce → state framework cassé (post-mortem FEATs 4-5)
+
+**Symptôme** : bouton Calculate reste `disabled` côté Vue 3 + Angular 18 malgré valeurs valides.
+
+**Cause** : `<input type=number>` + binding bidirectionnel (Vue `v-model`, Angular `[(ngModel)]`)
+**coerce automatiquement DOM string en `number`** côté framework. Si state est typé
+`ref<string>` / `signal<string>`, runtime reçoit `number`, et appel `.trim()` jette
+`TypeError: a().trim is not a function` silencieusement intercepté par computed → bouton bloqué.
+
+**Convention obligatoire** :
+- Vue : `ref<number | null>(null)` + `v-model.number` modifier
+- Angular : `signal<number | null>(null)` + adapter validation
+- React : **non concerné** — `useState<string>` reçoit DOM string brute via `e.target.value`
+- Blazor : `@bind` avec `int?` natif type-safe, **non concerné**
+
+### B.7.3 JMustache rejette `null` keys strict (post-mortem FEAT 8)
+
+**Symptôme** : Spring Boot + `spring-boot-starter-mustache` retourne 500 sur `GET /` avec
+`MustacheException$Context: No key, method or field with name 'X'`.
+
+**Cause** : JMustache (com.samskivert) en mode strict refuse les keys avec valeur `null`
+dans `Model.addAttribute("x", null)`.
+
+**Convention obligatoire** : populer `Model` avec **strings vides** (`""`) au lieu de `null`
++ flags booléens dérivés `hasX`/`hasError` pour les sections conditionnelles
+`{{#hasX}}…{{/hasX}}` (pas `{{#x}}…{{/x}}` qui plante).
+
+### B.7.4 `pydantic-core` no-wheel sur Python récent (post-mortem FEAT 13)
+
+**Symptôme** : `pip install pydantic==2.10.3` fail avec `failed-wheel-build-for-install
+pydantic-core` sur Python 3.14.x.
+
+**Cause** : `pydantic-core 2.10.3` n'a pas de wheel pré-compilé pour Python 3.14
+(sorti après pydantic 2.10). Build from source → fail.
+
+**Convention obligatoire** : pin `pydantic>=2.11` dans `requirements.txt` / `pyproject.toml`
+quand Python ≥ 3.13. Pour Python 3.12 LTS stack-pin OK avec 2.10.x. Vérifier
+[PyPI wheels](https://pypi.org/project/pydantic-core/#files) compat avant pin strict.
+
+### B.7.5 bUnit `.Change()` ≠ `@bind:event="oninput"` (post-mortem FEAT 3 tests)
+
+**Symptôme** : bUnit teste Blazor WASM avec `cut.Find("input").Change("5")` →
+`Bunit.MissingEventHandlerException : element does not have event handler 'onchange',
+has 'oninput'`.
+
+**Cause** : `.Change()` déclenche un événement `onchange`, mais le composant utilise
+`@bind:event="oninput"` (binding immediate). Mismatch event handler → exception bUnit.
+
+**Convention obligatoire** :
+- Avec `@bind:event="oninput"` (binding immediate) → tests bUnit avec `.Input("value")`
+- Avec `@bind` simple (binding onchange) → tests avec `.Change("value")`
+- API bUnit v2 : `BunitContext` + `Render<T>()` (au lieu de `TestContext` + `RenderComponent<T>()` v1 obsolètes)
+
+---
+
+## B.9 Lien avec autres règles
 
 - `build-and-loop.md` (Partie A) : la QA API Gate doit inclure ≥ 1 test CORS
   preflight (OPTIONS avec Origin) par endpoint exposé à la SPA.
-- `docs/principles/source-first.md §1` : tout bug CORS en runtime → patch
-  cette règle (Partie B, si gap) AVANT le fix code.
+- `docs/principles/source-first.md §1` : tout bug CORS/coercion/null-strict en runtime
+  → patch cette règle (Partie B, §B.7) AVANT le fix code.
 - Partie A §2.4 ci-dessus : la lib CORS (Microsoft.AspNetCore.Cors,
   spring-security-config, fastapi[all], cors npm) est CORE de tout
   backend SPA-facing.
 
 ---
 
-## 8. Source historique
+## B.10 Source historique
 
 Convention extraite du post-mortem CMS-Back 2026-05-11 (cf.
 `source-first.md §1`) où CORS oublié sur Spring Boot avait causé

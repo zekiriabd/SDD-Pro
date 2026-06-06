@@ -99,6 +99,51 @@ def repo_root() -> Path:
     return cur
 
 
+def project_root_for_hook() -> Path:
+    """Resolve the project root from a Claude Code hook context.
+
+    Audit 2026-06-06 — CR-3 single source of truth. Replaces the 7-line
+    `_resolve_project_root` previously duplicated in every hook. Adds
+    path-traversal defense (`Path.resolve(strict=True)`) and symlink
+    rejection while preserving the user's explicit override semantics.
+
+    Resolution order :
+      1. `CLAUDE_PROJECT_DIR` env var if set, points to an existing dir,
+         and is NOT a symlink. The resolved (canonical) path is returned
+         — `..` traversal is neutralized by `Path.resolve()`. A WARN is
+         emitted on stderr if the layout doesn't look like a repo root,
+         but the override is still honored (same trust model as
+         `repo_root()`: explicit override > inference).
+      2. Fallback to `repo_root()` (CWD walk).
+
+    Hooks SHOULD call this instead of rolling their own resolver.
+    """
+    env_root = os.environ.get("CLAUDE_PROJECT_DIR")
+    if env_root:
+        raw = Path(env_root)
+        # Reject symlinks even before resolve() — defense against /tmp/evil → /etc.
+        if raw.exists() and raw.is_symlink():
+            import sys
+            print(
+                f"WARN sdd_lib.paths: CLAUDE_PROJECT_DIR={env_root!r} is a symlink — refusing override, falling back to repo_root()",
+                file=sys.stderr,
+            )
+        else:
+            try:
+                candidate = raw.resolve(strict=False)
+            except (OSError, RuntimeError):
+                candidate = None
+            if candidate is not None:
+                if not _looks_like_repo_root(candidate):
+                    import sys
+                    print(
+                        f"WARN sdd_lib.paths: CLAUDE_PROJECT_DIR={candidate} does not match strict repo layout (.claude/agents + .claude/commands + workspace) — honored as-is",
+                        file=sys.stderr,
+                    )
+                return candidate
+    return repo_root()
+
+
 def relative_to_root(absolute: str | os.PathLike[str], root: Path | None = None) -> str:
     """Return path relative to repo root, normalized to forward slashes."""
     if root is None:

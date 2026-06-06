@@ -14,18 +14,78 @@
 
 ## 1. Quick reference — combos validés bout-en-bout
 
+### 1.1 Tiers de validation (v7.0.0-alpha)
+
+| Tier | Critère | Garanties |
+|:--:|---|---|
+| 🟢 **validated** | `/sdd-full {n}` complet (FEAT → US → arch → dev → QA → auditors) bout-en-bout sans intervention humaine non documentée sur ≥ 1 FEAT M | Pipeline entièrement automatisé, gates bloquantes appliquées, audit-trail console.db complet |
+| 🟢 **bench-validated runtime** | Code généré (patterns + libs) compile + démarre + sert les ACs ; preuves runtime (curl, build vert, page rendue) | Stack patterns conformes, contrat HTTP source-first respecté ; **pipeline `/sdd-full` partiellement bypassé** (scaffolding manuel mainteneur sur agents non câblés, cf. `docs/benchmarks/known-gaps.md`) |
+| 🟡 **experimental** | Spec stack OK + `.libs.json` valide, jamais exécuté | Conformité unitaire ≠ garantie runtime |
+| 🟡 **POC-only** | Validé uniquement pour usage interne (console SDD), pas prod externe | Volontairement limité |
+
+### 1.2 Combos « validated » (full pipeline) — 2
+
 | ID | Backend | Frontend | UI DS | QA | Auth | DB | Status | Dernière PoC |
 |:---:|---|---|---|---|---|---|:---:|---|
 | **C1** | `dotnet-minimalapi` | `react` | `shadcn` | `dotnet-xunit` | `azure-ad` | PostgreSQL | 🟢 validated | 2026-05-07 |
 | **C2** | `kotlin-spring-boot` | `react` | `shadcn` | `kotlin-junit` + `node-vitest` | `azure-ad` | PostgreSQL | 🟢 validated | 2026-05-11 (workspace CMSPrint) |
 
-**Garanties C1/C2** : `/sdd-full {n}` complet (FEAT → US → arch → dev → QA →
-auditors) a tourné bout-en-bout sans intervention humaine non documentée
-sur ≥ 1 FEAT M (3 US, back+front).
+### 1.3 Combos « bench-validated runtime » — bench 2026-06-05 (23 combinaisons)
 
-**Hors C1/C2 : aucune garantie.** Le pipeline peut échouer en runtime de
-manière non triviale (scaffolding DB, mapping HTML→DS, capabilities
-on-demand, conventions stack-specific).
+Bench session 2026-06-05T10:13Z → 12:03Z (~4h cumulé), poste Windows mainteneur. Rapport
+consolidé : [`workspace/output/qa/bench/BENCH-GLOBAL-REPORT.md`](../../workspace/output/qa/bench/BENCH-GLOBAL-REPORT.md).
+
+#### 1.3.a Cross-origin REST (16 combinaisons : 4 backends × 4 SPA fronts)
+
+| Backend | React :5186 | Blazor WASM :5004 | Vue :5180 | Angular :4200 |
+|---|:--:|:--:|:--:|:--:|
+| Kotlin Spring Boot 3.3.5 (`:44329` stop) | 🟢 | 🟢 | 🟢 | 🟢 |
+| .NET 10 Minimal API (`:44329` subst.) | 🟢 | 🟢 | 🟢 | 🟢 |
+| Node Express + TS + Zod (`:44329` subst.) | 🟢 | 🟢 | 🟢 | 🟢 |
+| **Python FastAPI + Pydantic (`:44329` actif)** | 🟢 | 🟢 | 🟢 | 🟢 |
+
+**Preuve source-first** : 4 substitutions backend transparentes sur le même port :44329 sans modifier aucun fichier front. Contrat HTTP unique `POST /api/calc {a,b}→{c}` respecté à l'identique par les 4 stacks.
+
+**Latences POST 5+5** : FastAPI 33ms (🏆) < Node 47ms < Kotlin 162ms < .NET cold JIT 237ms.
+
+#### 1.3.b Monolithes fullstack (6 combinaisons)
+
+| FEAT | Stack | Port | Pattern | LOC | Verdict |
+|:--:|---|---|---|--:|:--:|
+| 7 | Blazor Server SignalR .NET 8 | :44339 | WebSocket streaming HTML diff | 601 | 🟢 |
+| 8 | Kotlin Spring + Mustache SSR | :44349 | HTML 100% server-rendered + form POST | **159** | 🟢 |
+| 9 | Next.js 15 + Server Actions | :44359 | Server Components + RPC sérialisé | 2017 | 🟢 |
+| 10 | Nuxt 4 + Nitro Server Routes | :44369 | File-based REST-like | 11690 | 🟢 |
+| 11 | Angular Universal 19 SSR Express | :44379 | SSR initial + hydration client | 16438 | 🟢 |
+| 14 | Node-React zero-build Fastify+Babel CDN | :44389 | Zero bundler, transpile in-browser | 1524 | 🟢 |
+
+#### 1.3.c Mobiles natifs (3 stacks)
+
+| FEAT | Stack | Cible runtime | Verdict |
+|:--:|---|---|:--:|
+| 12 | Kotlin Android Compose + Retrofit | scaffold seul (ANDROID_HOME absent) | 🟡 scaffold |
+| 15 | MAUI 9 Windows desktop WinUI3 | runtime build + window 246MB | 🟢 |
+| 16 | React Native Expo Web | runtime web :44399 + cross-origin → FastAPI | 🟢 |
+
+#### 1.3.d 5 bugs runtime fixés en bench, inscrits SSoT dans `library-and-stack.md §7`
+
+1. **CORS `localhost` ≠ `127.0.0.1`** — preflight 403 silencieux → allowlist multi-host {localhost, 127.0.0.1} × N ports
+2. **`<input type=number>` coerce → state framework cassé** Vue/Angular — `ref<number\|null>` + `.number` modifier
+3. **JMustache rejette `null` keys strict** — populer Model avec strings vides + flags `hasX` booléens
+4. **`pydantic-core 2.10` no-wheel Py3.14** — pin `pydantic>=2.11`
+5. **bUnit `.Change()` ≠ `@bind:event="oninput"`** — utiliser `.Input("value")` avec immediate binding
+
+### 1.4 Combos « pending » full-pipeline post-v7.0.0 GA
+
+| ID | Backend | Frontend | UI DS | QA | Auth | DB | Bench runtime ? | Pending |
+|:---:|---|---|---|---|---|---|:---:|:---:|
+| **C3** | `node-express` | `react` | `shadcn` | `node-vitest` | `auth-local` | PostgreSQL | 🟢 | `/sdd-full` complet |
+| **C4** | `python-fastapi` | `react` | `shadcn` | `python-pytest` + `node-vitest` | `auth-local` | PostgreSQL | 🟢 | `/sdd-full` complet |
+| **C5** | `dotnet-minimalapi` | `vue` | `vuetify` | `dotnet-xunit` + `node-vitest` | `azure-ad` | PostgreSQL | 🟢 (subst.) | `/sdd-full` complet |
+
+**Distinction-clé** : bench runtime ≠ full-pipeline. Le bench prouve que les **stack patterns** sont conformes (code généré tourne). La promotion 🟢 validated demande de prouver que **les agents SDD_Pro orchestrent automatiquement** sans scaffolding manuel — chantier tracé dans `docs/benchmarks/known-gaps.md`.
+
+**Hors C1-C5 et hors bench 2026-06-05 : aucune garantie.** Le pipeline peut échouer en runtime de manière non triviale (scaffolding DB, mapping HTML→DS, capabilities on-demand, conventions stack-specific).
 
 ---
 
@@ -50,16 +110,18 @@ on-demand, conventions stack-specific).
 
 ## 3. Combos prioritaires post-v7.0.0 GA
 
-Plan de validation (3 PoCs additionnels pour atteindre 5 combos validés) :
+Plan de validation. **Réordonné 2026-06-05** (CHANGELOG `governance-c3-bis-fullstack-node-react`) : Node monté en priorité 3 (combo cible commerciale crédible vs BMad/AgentOS sur écosystème JS).
 
-| ID | Hypothèse | Backend | Frontend | UI DS | QA | Auth | DB | Effort estimé |
-|:---:|---|---|---|---|---|---|---|---|
-| **C3** | Stack microsoft pur | `dotnet-minimalapi` | `blazor-webassembly` | `radzen-blazor` | `dotnet-xunit` + `blazor-bunit` | `azure-ad` | SqlServer | 2-3 j |
-| **C4** | Stack JS pur | `node-express` | `vue` | `vuetify` | `node-vitest` | `auth-local` | PostgreSQL | 3-4 j |
-| **C5** | Stack Python | `python-fastapi` | `angular` | (custom Material 3) | `python-pytest` + `angular-jasmine` | `azure-ad` | PostgreSQL | 4-5 j |
+| ID | Hypothèse | Backend | Frontend | UI DS | QA | Auth | DB | Effort | Statut |
+|:---:|---|---|---|---|---|---|---|---|---|
+| ~~C3-bis~~ | ~~Fullstack Node monolithe~~ | ~~`fullstack/node-react`~~ | — | — | — | — | — | — | ❌ **RETIRÉ** (audit P3 2026-06-05) : `node-react` marqué `poc-only` (console SDD interne uniquement, pas prod externe). Pour Node prod : voir C-Node-prod ci-dessous. |
+| **C-Node-prod** | **Node back-front séparés (cible prod)** | `backend/node-express` (Fastify/Express + TS + Zod + Pino) | `frontend/react` (Vite + TS strict + Tailwind) | `shadcn` | `node-vitest` + `playwright` | `auth-local` | PostgreSQL via Prisma | 3-5 j | 🟡 **bench validé runtime** 2026-06-05 (CalcABCBackNode + CalcABC React, 5+3 tests passed). À promouvoir 🟢 après PoC FEAT M réelle. |
+| **C4** | Stack microsoft pur (ex-C3) | `dotnet-minimalapi` | `blazor-webassembly` | `radzen-blazor` | `dotnet-xunit` + `blazor-bunit` | `azure-ad` | SqlServer | 2-3 j | non démarré |
+| **C5** | Stack JS séparé back-front | `node-express` | `vue` | `vuetify` | `node-vitest` | `auth-local` | PostgreSQL | 3-4 j | non démarré |
+| **C6** | Stack Python | `python-fastapi` | `angular` | (custom Material 3) | `python-pytest` + `angular-jasmine` | `azure-ad` | PostgreSQL | 4-5 j | non démarré |
 
 **Méthodologie** : suivre `docs/poc-roi-methodology.md` — bench S/M/L,
-mesurer wall-clock + coût + coverage, publier dans `roi-baseline.md`.
+mesurer wall-clock + coût + coverage, publier dans `workspace/output/qa/bench/BENCH-GLOBAL-REPORT.md`.
 
 **Critères d'acceptation combo** :
 - ≥ 1 FEAT M (3 US, back+front, AC traçables) bout-en-bout sans bypass
@@ -160,8 +222,8 @@ empiriquement.
 
 ### 5.2 Option B — *« Multi-stack PoC matrix CI »*
 
-**Investir** : ressources pour valider C3-C5 (effort 2-5 jours chacun
-selon §3). Cible : 5 combos validés à v7.1.0.
+**Investir** : ressources pour valider C3-bis puis C4-C6 (effort 2-5 jours chacun
+selon §3). Cible : 5 combos validés à v7.1.0 (C3-bis prioritaire).
 
 **Avantage** : promesse multi-stack tenue.
 
@@ -206,7 +268,8 @@ Pour information / mitigation préventive si vous tentez un combo 🟡/🔴 :
 |:---:|---|---|---|---|
 | C1 | v6.0.0 | 2026-05-07 | SDD-Pro maintainer | Stack initial du framework |
 | C2 | v6.10.4-LTS | 2026-05-11 | SDD-Pro maintainer | Workspace CMSPrint (4 FEATs, 10 US, schema PostgreSQL) |
-| C3-C5 | `<TBD>` | `<TBD>` | `<TBD>` | Planifiés post-v7.0.0 GA (cf. §3) |
+| C3-bis | en cours | 2026-06-05 (décidé) | SDD-Pro maintainer | PoC partiel Demo + console SDD v0.4.0. Cible v7.1 (cf. §3) |
+| C4-C6 | `<TBD>` | `<TBD>` | `<TBD>` | Planifiés post-C3-bis validé (cf. §3) |
 
 ---
 
@@ -215,7 +278,6 @@ Pour information / mitigation préventive si vous tentez un combo 🟡/🔴 :
 - `@.claude/CLAUDE.md §7` — table stacks (statut `Validation:` par stack)
 - `@.claude/docs/architecture.md §4` — détail des stacks supportés
 - `@.claude/docs/poc-roi-methodology.md` — méthodologie de validation combo
-- `@.claude/docs/roi-baseline.md` — résultats PoCs (à remplir)
 - `@.claude/python/sdd_scripts/validate_stack_combo.py` — script §4.2
 - ADR `governance-stacks-quarantine-rollback` — décision rollback v7.x
 
