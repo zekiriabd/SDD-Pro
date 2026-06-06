@@ -145,7 +145,6 @@ Pré-requis : Node.js ≥ 20 et Python ≥ 3.8 sur le PATH (utilisé pour requê
 
 - [.claude/docs/CHANGELOG.md](.claude/docs/CHANGELOG.md) — historique versions (focus v7.0.0-alpha)
 - [.claude/docs/MIGRATION.md](.claude/docs/MIGRATION.md) — guides de mise à niveau (v6.10 → v7.0.0)
-- [.claude/docs/AUDIT-FRAMEWORK-v7.md](.claude/docs/AUDIT-FRAMEWORK-v7.md) — audit complet v7.0.0-alpha
 - [.claude/loader.yml](.claude/loader.yml) — manifest reads/writes par agent
 - [.claude/rules/](.claude/rules/) — 8 règles opérationnelles consolidées v7.0.0 (`build-and-loop`, `library-and-stack`, `ownership`, `quality`, `error-classification` + `output-protocol`, `dev-shared-preflight`, `error-classification-legacy`)
 
