@@ -90,6 +90,19 @@ def parse_args() -> argparse.Namespace:
     s_emit.add_argument("--event-type", required=True)
     s_emit.add_argument("--payload-json", default="")
 
+    # status — état global ou par FEAT (utilisé par /sdd-status command)
+    s_status = sub.add_parser("status",
+        help="Global state summary (or per-FEAT if --feat-number passed)")
+    s_status.add_argument("--feat-number", type=int, default=0,
+        help="Restrict status to FEAT N (0 = global summary)")
+
+    # resume-target — détermine le STEP de reprise d'un run partiel
+    # (audit 2026-06-06 D5 — vrai routing --resume, pas juste récupération ID)
+    s_resume = sub.add_parser("resume-target",
+        help="Compute next STEP to execute for a run, based on phases status")
+    s_resume.add_argument("--run-id", required=True,
+        help="Existing run_id (typically from `get-run --latest`)")
+
     return p.parse_args()
 
 
@@ -308,14 +321,119 @@ def action_emit_event(args: argparse.Namespace) -> int:
             run_id=args.run_id, feat_n=feat_n, payload=payload,
         )
     return SUCCESS
+def action_status(args: argparse.Namespace) -> int:
+    """Global or per-FEAT state summary — JSON output (used by /sdd-status command).
+
+    Without --feat-number: aggregates total runs, FEATs touched, last run, phase distribution.
+    With --feat-number N : returns runs/phases/last-status for that FEAT only.
+    """
+    ensure_initialized()
+    with connect() as conn:
+        if args.feat_number > 0:
+            runs = list_runs(conn, feat_n=args.feat_number, limit=50)
+        else:
+            runs = list_runs(conn, feat_n=None, limit=50)
+
+    runs_list = [dict(r) for r in runs]
+    feats_touched = sorted({r["feat_n"] for r in runs_list if r.get("feat_n")})
+    by_status: dict[str, int] = {}
+    for r in runs_list:
+        s = r.get("status") or "unknown"
+        by_status[s] = by_status.get(s, 0) + 1
+
+    last_run = runs_list[0] if runs_list else None
+
+    out = {
+        "scope": "feat" if args.feat_number > 0 else "global",
+        "feat_number": args.feat_number if args.feat_number > 0 else None,
+        "runs_total": len(runs_list),
+        "feats_touched": feats_touched,
+        "runs_by_status": by_status,
+        "last_run": {
+            "runId":     last_run["run_id"] if last_run else None,
+            "feat":      last_run.get("feat_n") if last_run else None,
+            "command":   last_run.get("command") if last_run else None,
+            "status":    last_run.get("status") if last_run else None,
+            "phase":     last_run.get("current_phase") if last_run else None,
+            "startedAt": last_run.get("started_at") if last_run else None,
+            "endedAt":   last_run.get("ended_at") if last_run else None,
+        } if last_run else None,
+    }
+    print(json.dumps(out, indent=2, ensure_ascii=False))
+    return SUCCESS
+
+
+#: Ordered list of phases in the /sdd-full pipeline (audit 2026-06-06 D5).
+#: Maps a logical phase to the STEP label the orchestrating command should
+#: jump to. The order matters : the first phase whose status is NOT in
+#: {pass, warn, skip} is the resume target.
+_PIPELINE_PHASES_ORDER: tuple[tuple[str, str], ...] = (
+    ("us_generate",  "STEP_2"),    # /us-generate
+    ("readiness",    "STEP_2.6"),  # /feat-validate
+    ("plan",         "STEP_2.7"),  # /dev-plan (optional)
+    ("arch",         "STEP_3.5"),  # /arch-init (Phase A+B)
+    ("dev_run",      "STEP_4"),    # /dev-run (back + API gate + front)
+    ("qa",           "STEP_5"),    # /qa-generate
+    ("sdd_review",   "STEP_5.5"),  # /sdd-review
+)
+
+_RESUME_DONE_STATUSES = {"pass", "warn", "success", "skip"}
+
+
+def action_resume_target(args: argparse.Namespace) -> int:
+    """Compute the next STEP to execute given a partial run state.
+
+    Audit 2026-06-06 D5 — Pre-fix, `--resume` only re-read $RUN_ID via
+    get-run --latest, but the orchestrating command (sdd-full.md) had no
+    mechanism to actually SKIP past completed phases : all STEPs ran
+    again (idempotent thanks to each agent's own gating, but wasteful in
+    LLM cost — a $30 run that crashed at STEP 5 would re-cost ~$25).
+
+    The pipeline phases order is fixed by `_PIPELINE_PHASES_ORDER`. We
+    iterate, finding the first phase whose status is NOT done. That
+    phase's STEP label is the resume target.
+
+    Output : single STEP label on stdout (e.g. `STEP_4`).
+    Exit 0 always (resume target is a hint, not a hard fact).
+    Edge cases :
+      - Run unknown OR no phases recorded → emit `STEP_2` (start at us-generate)
+      - All phases done → emit `STEP_END` (nothing to resume — clean run)
+    """
+    ensure_initialized()
+    with connect() as conn:
+        run_row = get_run(conn, args.run_id)
+        if run_row is None:
+            print("STEP_2")  # unknown run — fresh start
+            return SUCCESS
+        phase_rows = get_run_phases(conn, args.run_id)
+
+    # Build {phase: status} map. Missing phases stay un-keyed → treated
+    # as NOT done.
+    by_phase: dict[str, str] = {
+        ph["phase"]: (ph["status"] or "").lower() for ph in phase_rows
+    }
+
+    for phase_key, step_label in _PIPELINE_PHASES_ORDER:
+        status = by_phase.get(phase_key, "")
+        if status not in _RESUME_DONE_STATUSES:
+            print(step_label)
+            return SUCCESS
+
+    # All phases done — clean run, nothing to resume
+    print("STEP_END")
+    return SUCCESS
+
+
 DISPATCH = {
-    "new-run":    action_new_run,
-    "set-phase":  action_set_phase,
-    "end-run":    action_end_run,
-    "get-run":    action_get_run,
-    "show-run":   action_show_run,
-    "list-runs":  action_list_runs,
-    "emit-event": action_emit_event,
+    "new-run":      action_new_run,
+    "set-phase":    action_set_phase,
+    "end-run":      action_end_run,
+    "get-run":      action_get_run,
+    "show-run":     action_show_run,
+    "list-runs":    action_list_runs,
+    "emit-event":   action_emit_event,
+    "status":       action_status,
+    "resume-target": action_resume_target,
 }
 
 

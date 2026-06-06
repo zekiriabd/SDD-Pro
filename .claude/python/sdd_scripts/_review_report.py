@@ -120,6 +120,26 @@ def compute_report(
     # from declarative to enforced.
     hard_blocked = [f for f in findings if _is_hard_blocking(f)]
 
+    # Audit 2026-06-06 D4 — aggregate-volume escalation YELLOW → RED.
+    # Rationale : the legacy verdict logic stayed YELLOW regardless of HOW
+    # MANY sub-threshold findings accumulated. 30 `moderate` findings (under
+    # `serious` threshold) → YELLOW, pipeline continues without alerting the
+    # operator. New thresholds tuned conservatively to avoid false positives
+    # on healthy codebases while catching pathological accumulation :
+    #   - 5+ `serious` findings (sub-threshold) → RED
+    #   - 15+ `moderate` findings → RED
+    #   - 30+ total findings (any severity except `minor`) → RED
+    # The `minor`/`info` severities don't count individually toward escalation
+    # (they're often style-only). Project-level override via Project Config
+    # `ReviewAggregateMode` (planned v7.2 — for now constants are inline).
+    aggregate_red = False
+    n_serious  = counts_by_severity.get("serious", 0)
+    n_moderate = counts_by_severity.get("moderate", 0)
+    n_nonminor = sum(counts_by_severity.get(s, 0)
+                     for s in ("blocker", "critical", "serious", "moderate"))
+    if n_serious >= 5 or n_moderate >= 15 or n_nonminor >= 30:
+        aggregate_red = True
+
     if hard_blocked:
         verdict = "red"
         # Treat hard-blocked findings as "triggering" so they appear in the
@@ -130,6 +150,8 @@ def compute_report(
     elif any(f.severity in ("critical", "blocker") for f in findings):
         verdict = "red"
     elif triggering:
+        verdict = "red"
+    elif aggregate_red:
         verdict = "red"
     elif findings:
         verdict = "yellow"

@@ -39,10 +39,42 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sdd_lib.file_locks import (  # noqa: E402
-    overwrite_lock,
+    overwrite_lock,  # legacy, kept for backward-compat but no longer used (D8)
     read_lock,
     try_create_exclusive,
 )
+
+
+def _stale_recover_via_excl(lock_file: Path, payload: str) -> bool:
+    """TOCTOU-safe stale lock recovery (audit 2026-06-06 D8).
+
+    Two agents A and B may detect the same stale lock at T0. Both call this
+    function around T1. Algorithm :
+
+      1. Each agent unlink()s the existing lock (best-effort, ignore missing).
+      2. Each agent attempts `try_create_exclusive(lock_file, payload)`.
+      3. POSIX/Windows guarantee that exactly ONE create succeeds when the
+         file does not exist — the other gets EEXIST.
+
+    Returns True if THIS agent won the recovery race (and now holds the
+    lock), False if another agent claimed it first.
+
+    Pre-D8 implementation used `overwrite_lock` (`path.write_text`) which is
+    last-write-wins : both A and B "succeeded" but only B's payload remained,
+    while A also believed it held the lock → 2 concurrent entity writes
+    downstream.
+    """
+    try:
+        lock_file.unlink()
+    except FileNotFoundError:
+        pass  # Already gone — another agent unlinked it ; no-op for us.
+    except OSError:
+        # Permission denied or similar — let try_create_exclusive race anyway.
+        pass
+    try:
+        return try_create_exclusive(lock_file, payload)
+    except OSError:
+        return False
 
 
 def parse_args() -> argparse.Namespace:
@@ -120,14 +152,29 @@ def main() -> int:
     # Lock file already existed — inspect ownership + age
     existing = read_lock(lock_file)
     if not existing:
-        # Corrupt or unreadable; treat as stale and override
-        overwrite_lock(lock_file, payload)
+        # Corrupt or unreadable; treat as stale and override via
+        # unlink + O_EXCL recreate to avoid TOCTOU race with another
+        # agent that may concurrently detect the same stale lock
+        # (audit 2026-06-06 D8 — formerly used overwrite_lock which is
+        # `path.write_text` non-atomic ; 2 agents could both write,
+        # last-write-wins, both believe they hold the lock).
+        if _stale_recover_via_excl(lock_file, payload):
+            return emit({
+                "status": "ACQUIRED-STALE-OVERRIDE",
+                "entity": args.entity,
+                "agent": args.agent_id,
+                "message": "Existing lock unreadable, overridden via O_EXCL recreate",
+            }, 2)
+        # Lost the recovery race — another agent claimed it. Treat as LOCK-HELD.
         return emit({
-            "status": "ACQUIRED-STALE-OVERRIDE",
+            "status": "LOCK-HELD",
             "entity": args.entity,
             "agent": args.agent_id,
-            "message": "Existing lock unreadable, overridden",
-        }, 2)
+            "held_by": "unknown (lock was corrupt, another agent recovered first)",
+            "held_for_seconds": 0,
+            "error_class": "[LIBNAME_LOCK_HELD]",
+            "message": "Stale recovery race lost (another agent claimed first)",
+        }, 1)
 
     owner, ts = existing
     age = now - ts if ts else 0
@@ -141,17 +188,35 @@ def main() -> int:
         }, 0)
 
     if age > args.stale_threshold_seconds:
-        overwrite_lock(lock_file, payload)
+        # D8 fix : same TOCTOU-safe stale recovery as the corrupt-lock branch.
+        # Pre-D8 `overwrite_lock` could see 2 concurrent agents both succeed
+        # in write_text, both believing they hold the lock → 2 concurrent
+        # entity file writes downstream.
+        if _stale_recover_via_excl(lock_file, payload):
+            return emit({
+                "status": "ACQUIRED-STALE-OVERRIDE",
+                "entity": args.entity,
+                "agent": args.agent_id,
+                "previous_owner": owner,
+                "previous_age_seconds": age,
+                "message": (
+                    f"Stale lock (age {age} s > {args.stale_threshold_seconds} s) "
+                    f"overridden via O_EXCL recreate"
+                ),
+            }, 2)
+        # Lost the recovery race — another agent claimed it.
         return emit({
-            "status": "ACQUIRED-STALE-OVERRIDE",
+            "status": "LOCK-HELD",
             "entity": args.entity,
             "agent": args.agent_id,
-            "previous_owner": owner,
-            "previous_age_seconds": age,
+            "held_by": "unknown (stale recovery race lost)",
+            "held_for_seconds": age,
+            "error_class": "[LIBNAME_LOCK_HELD]",
             "message": (
-                f"Stale lock (age {age} s > {args.stale_threshold_seconds} s) overridden"
+                f"Stale lock recovery race lost (age {age} s ; another "
+                f"agent claimed first via O_EXCL)"
             ),
-        }, 2)
+        }, 1)
 
     return emit({
         "status": "LOCK-HELD",

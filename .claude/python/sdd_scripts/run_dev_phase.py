@@ -196,6 +196,78 @@ def _cmd_gate_decision(args) -> int:
     return SUCCESS
 
 
+def _cmd_batch(args) -> int:
+    """Emit the Nth batch of US to spawn (audit 2026-06-06 D9).
+
+    Forces MaxParallel enforcement at the tool-call level. The LLM
+    orchestrating /dev-run STEP 6.a / 6.c invokes this script with
+    `--layer 0`, spawns the returned US in parallel, WAITS for all
+    SubagentStops, then invokes with `--layer 1`, etc.
+
+    Each call is ONE Bash tool-call (atomic with Claude Code's serialization
+    semantics), so the LLM cannot fire-and-forget all batches at once :
+    it must explicitly Bash-call the script between each batch.
+
+    Output JSON contract :
+        {
+            "feat_number": 1,
+            "layer": 0,                          # the layer requested
+            "total_layers": 3,                   # total batches available
+            "is_last_layer": false,              # true if layer == total-1
+            "us_ids": ["1-1", "1-2"],            # US to spawn THIS batch
+            "next_layer_command": "python ... --layer 1",  # exact CLI for next
+            "wait_instruction": "Spawn all us_ids in parallel via Agent tool. WAIT for all SubagentStops before invoking next_layer_command."
+        }
+    """
+    root = _resolve_project_root()
+    us_list = list_us_for_feat(root, args.feat_number)
+    if not us_list:
+        sys.stderr.write(f"ERROR: no US files found under workspace/output/us/ for FEAT {args.feat_number}\n")
+        return CORRECTIBLE
+    mp = read_max_parallel(root, args.max_parallel)
+    batches = chunk_us_list(us_list, mp)
+    total = len(batches)
+
+    if args.layer < 0 or args.layer >= total:
+        sys.stderr.write(
+            f"ERROR: layer {args.layer} out of range [0, {total - 1}]\n"
+            f"CAUSE: [INVALID_ARG] FEAT {args.feat_number} has {total} batch(es) "
+            f"with MaxParallel={mp}\n"
+            f"FIX: invoke without --layer to see total layers, OR pass 0 <= N < {total}\n"
+        )
+        return CORRECTIBLE
+
+    is_last = args.layer == total - 1
+    batch_us = batches[args.layer]
+    next_cmd = (
+        None if is_last
+        else f"python .claude/python/sdd_scripts/run_dev_phase.py batch "
+             f"--feat-number {args.feat_number} --layer {args.layer + 1}"
+             + (f" --max-parallel {args.max_parallel}" if args.max_parallel else "")
+    )
+    family_hint = (
+        "dev-backend (phase 6.a) OR dev-frontend (phase 6.c) — see prompt context"
+    )
+    out = {
+        "feat_number": args.feat_number,
+        "layer": args.layer,
+        "total_layers": total,
+        "is_last_layer": is_last,
+        "max_parallel": mp,
+        "us_ids": batch_us,
+        "batch_size": len(batch_us),
+        "next_layer_command": next_cmd,
+        "family_hint": family_hint,
+        "wait_instruction": (
+            f"Spawn the {len(batch_us)} us_ids in ONE message via parallel Agent "
+            f"tool calls. WAIT for all SubagentStops before invoking the "
+            + ("API Gate (STEP 6.b)" if is_last else "next layer.")
+        ),
+    }
+    print(json.dumps(out, indent=2, ensure_ascii=False))
+    return SUCCESS
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Deterministic helpers for /dev-run STEP 6.")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -209,6 +281,18 @@ def main() -> int:
     p_gate = sub.add_parser("gate-decision", help="Read API gate verdict + decide continuation")
     p_gate.add_argument("--feat-number", type=int, required=True)
     p_gate.set_defaults(func=_cmd_gate_decision)
+
+    p_batch = sub.add_parser(
+        "batch",
+        help="Emit the Nth batch of US to spawn (forces MaxParallel "
+             "enforcement at CLI level — see D9 fix audit 2026-06-06)"
+    )
+    p_batch.add_argument("--feat-number", type=int, required=True)
+    p_batch.add_argument("--layer", type=int, required=True,
+                         help="0-indexed batch layer to emit")
+    p_batch.add_argument("--max-parallel", type=int, default=None,
+                         help="Override MaxParallel (1-12)")
+    p_batch.set_defaults(func=_cmd_batch)
 
     args = parser.parse_args()
     return args.func(args)

@@ -386,21 +386,40 @@ la branche `if phases.X.enabled` faute silencieusement (KeyError ou
 > qu'il soit invoqué via `/sdd-full` ou en standalone.
 
 ```bash
-PHASE_PLAN=$(python .claude/python/sdd_scripts/phase_planner.py \
+# Audit 2026-06-06 D1 — persist phase plan to disk to survive Claude Code
+# subshell death between tool-calls. Pre-D1, $PHASE_PLAN was bash-only,
+# dead at the next Bash invocation; STEP 6.4 had to silently re-launch
+# phase_planner.py without explicit documentation.
+mkdir -p workspace/output/.sys/.state
+python .claude/python/sdd_scripts/phase_planner.py \
   --feat-number {n} \
-  --json)
+  --json > workspace/output/.sys/.state/phase-plan-{n}.json
 if [ $? -ne 0 ]; then
   echo "ERROR: /dev-run {n} — phase planner failed"
   echo "CAUSE: [PHASE_PLAN_INIT_FAILED] phase_planner.py exit $? (FEAT {n})"
   echo "FIX: vérifier workspace/input/feats/{n}-*.md + Project Config + run /sdd-status {n}"
   exit 2
 fi
+# Re-read into shell var for the current subshell (legacy convenience).
+# In STEP 6.4 below, callers MUST re-read from disk path
+# `workspace/output/.sys/.state/phase-plan-{n}.json` since the bash
+# variable does not survive across Claude Code tool-call boundaries.
+PHASE_PLAN=$(cat workspace/output/.sys/.state/phase-plan-{n}.json)
 ```
 
 Détail phase_planner : `.claude/python/sdd_scripts/phase_planner.py`
-(Python pur, 0 LLM, ~50 ms). Le JSON résultat est persisté dans
-`state.json.phases.planning.payload` (via `sdd_state.py set-phase`)
-pour consommation par le récap final de `/sdd-full §5`.
+(Python pur, 0 LLM, ~50 ms). Le JSON résultat est :
+1. **Persisté sur disque** dans `workspace/output/.sys/.state/phase-plan-{n}.json`
+   (D1 fix — survit aux subshells)
+2. Aussi écrit dans `state.json.phases.planning.payload` (via
+   `sdd_state.py set-phase`) pour consommation par le récap final de
+   `/sdd-full §5`.
+
+**Lecture en STEP 6.4** (cross-tool-call) :
+```bash
+PHASE_PLAN=$(cat workspace/output/.sys/.state/phase-plan-{n}.json)
+# parse via jq or python -c "import json; phases=json.loads(...)"
+```
 
 ## STEP 6 — Workflow gated séquentiel (cf. `.claude/rules/build-and-loop.md`)
 
@@ -683,6 +702,21 @@ ou STOP.
 ### 6.4.1 — Construction du batch
 
 ```python
+# Audit 2026-06-06 D1 — RE-READ phase plan from disk (not from bash var).
+# The shell var $PHASE_PLAN set in STEP 5.5 does NOT survive across Claude
+# Code tool-call boundaries (each Bash invocation = independent subshell).
+# The plan was persisted to a state file in STEP 5.5 ; read it back here.
+import json, pathlib
+plan_path = pathlib.Path(f"workspace/output/.sys/.state/phase-plan-{n}.json")
+if not plan_path.is_file():
+    STOP + ERROR(
+        "ERROR: /dev-run STEP 6.4.1 — phase plan state file missing",
+        "CAUSE: [PHASE_PLAN_INIT_FAILED] expected file not found",
+        f"FIX: re-run STEP 5.5 OR `python .claude/python/sdd_scripts/phase_planner.py --feat {n} --json > {plan_path}`",
+    )
+phase_plan = json.loads(plan_path.read_text(encoding="utf-8"))
+phases = phase_plan.get("phases", {})
+
 # Audit 2026-06-06 (CR-6 + RUPT-4) — hard-fail if phase_planner.py did not
 # produce a usable `phases` object. Previous code silently treated missing
 # keys as `enabled=False`, which caused 3 of the 4 reviewers (code/security/

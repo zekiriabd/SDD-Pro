@@ -338,7 +338,32 @@ def main() -> int:
     total_skipped = sum(s["tests"]["skipped"] for s in stacks_found)
 
     global_pct = _round2(total_covered, total_total)
-    passed = global_pct >= coverage_min
+
+    # Audit 2026-06-06 D6 — per-stack threshold enforcement.
+    # The LOC-weighted global_pct dilutes per-stack signal : back 50%/10k LOC
+    # + front 95%/100 LOC → global ≈ 50.4% → 🔴 RED on the global, while front
+    # is excellent. The reverse is also possible : back 95%/10k LOC + front
+    # 40%/100 LOC → global ≈ 94.5% → 🟢 GREEN, hiding a poor front coverage.
+    #
+    # Strict policy : `passed` requires BOTH the LOC-weighted global AND every
+    # individual stack to meet the threshold. This catches the per-stack
+    # regression that the LOC-weighted average otherwise masks. Per-stack
+    # coverage_passed remains attached to each `qa_coverage` row (single
+    # source of truth for downstream consumers).
+    per_stack_passes: list[bool] = []
+    for s in stacks_found:
+        stack_lines = s.get("coverage", {}).get("lines", {})
+        stack_total = int(stack_lines.get("total", 0) or 0)
+        if stack_total == 0:
+            # Empty stack (no LOC measured) — treat as N/A, do not penalize.
+            per_stack_passes.append(True)
+            continue
+        stack_pct = float(stack_lines.get("percent") or 0.0)
+        per_stack_passes.append(stack_pct >= coverage_min)
+
+    all_stacks_pass = all(per_stack_passes)
+    global_pass = global_pct >= coverage_min
+    passed = global_pass and all_stacks_pass
 
     feat_label = f"{args.feat_number}-{feat_name}" if feat_name else str(args.feat_number)
     extracted_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -377,7 +402,14 @@ def main() -> int:
                 files=s.get("files") or [],
             )
 
-    print(f"Coverage parsed: {global_pct}% (min: {coverage_min}%) passed={passed}")
+    print(f"Coverage parsed: global={global_pct}% (min: {coverage_min}%) "
+          f"passed={passed} (global_pass={global_pass}, all_stacks_pass={all_stacks_pass})")
+    if not all_stacks_pass:
+        for s, ok in zip(stacks_found, per_stack_passes):
+            if not ok:
+                stack_pct = float(s.get("coverage", {}).get("lines", {}).get("percent") or 0.0)
+                print(f"  ⚠ stack '{s.get('stack', '?')}' below threshold : "
+                      f"{stack_pct}% < {coverage_min}%")
     print(f"Stacks: {len(stacks_found)}")
     print(f"FEAT: {feat_label} -> console.db (table qa_coverage)")
 

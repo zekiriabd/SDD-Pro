@@ -24,16 +24,26 @@ Exit codes:
   0 = ALLOW   (verdict=pass / warn / skipped / bypass, OR report missing — see below)
   2 = DENY    (verdict=fail in strict mode)
 
-Report missing behaviour
-────────────────────────
-If `acceptance.json` is absent, this hook returns 0 (ALLOW) with a stderr
-warning. Rationale: the qa agent may have legitimately skipped this STEP
-(e.g. mode=off, no projects yet, or the agent's prompt did not invoke the
-script). Refusing to ALLOW in that case would make adoption painful and
-would not protect against the real attack model: the user running qa
-must trust that the agent invoked the script when relevant.
+Report missing behaviour (audit 2026-06-06 D7 — strict mode in CI)
+─────────────────────────────────────────────────────────────────
+If `acceptance.json` is absent, behaviour now depends on context:
 
-Bypass : SDD_ALLOW_ACCEPTANCE_BYPASS=1 env var (audit-logged in script).
+  - CI (auto-detected via $CI / $GITHUB_ACTIONS / $GITLAB_CI / ...)
+    → DENY with `[ACCEPTANCE_REPORT_MISSING]` so the build fails loud.
+    Rationale: in CI, the absence of acceptance.json signals either a
+    misconfigured pipeline (qa agent did NOT invoke the script) or a
+    silent skip — both are bugs that must surface before merge.
+
+  - Interactive (Tech Lead running /sdd-full locally)
+    → ALLOW with stderr WARN. Rationale: legitimate workflows include
+    intentional skip (mode=off, no projects yet) and adoption ramp.
+    The Tech Lead sees the WARN and decides.
+
+  - Bypass for both contexts: SDD_ALLOW_ACCEPTANCE_BYPASS=1.
+
+Before this audit fix, the missing-report case ALWAYS returned ALLOW,
+including in CI — silent failure mode. The change aligns with the
+existing pattern in preflight_cost_cap.py (telemetry-unavailable case).
 """
 from __future__ import annotations
 
@@ -46,6 +56,24 @@ from sdd_lib.exit_codes import HOOK_ALLOW, HOOK_DENY  # noqa: E402
 from sdd_lib.paths import project_root_for_hook as _resolve_project_root
 
 
+def _detect_ci() -> bool:
+    """Detect CI environment (audit 2026-06-06 D7).
+
+    Mirrors the pattern in `preflight_cost_cap.py:_detect_ci` so that the
+    two hooks share the same notion of "strict mode = CI". Any of these
+    env vars being non-empty/non-zero signals CI.
+    """
+    ci_signals = (
+        "CI", "GITHUB_ACTIONS", "GITLAB_CI", "CIRCLECI",
+        "JENKINS_URL", "BUILDKITE", "TRAVIS", "TF_BUILD",
+        "BITBUCKET_BUILD_NUMBER",
+    )
+    return any(
+        (os.environ.get(v, "").strip().lower() not in ("", "0", "false", "no"))
+        for v in ci_signals
+    )
+
+
 def main() -> int:
     if os.environ.get("SDD_ALLOW_ACCEPTANCE_BYPASS", "").lower() in ("1", "true", "yes"):
         sys.stderr.write("[acceptance-gate] SDD_ALLOW_ACCEPTANCE_BYPASS=1 — bypass\n")
@@ -55,10 +83,26 @@ def main() -> int:
     report_path = root / "workspace" / "output" / ".sys" / ".acceptance" / "acceptance.json"
 
     if not report_path.is_file():
-        # Agent qa did not produce a report this run — non-blocking (see module docstring).
+        # Audit 2026-06-06 D7 — strict mode in CI, soft mode interactive.
+        # The pre-D7 behaviour was ALWAYS ALLOW, which made the gate purely
+        # decorative whenever the qa agent skipped the validate_acceptance.py
+        # call (intentionally or by bug). Now CI fails loud, interactive
+        # warns and continues. Bypass for both via SDD_ALLOW_ACCEPTANCE_BYPASS.
+        is_ci = _detect_ci()
+        if is_ci:
+            sys.stderr.write(
+                "[acceptance-gate] DENY: no acceptance.json report (CI strict)\n"
+                "CAUSE: [ACCEPTANCE_REPORT_MISSING] qa agent did not invoke "
+                "validate_acceptance.py — gate cannot verify pass/fail\n"
+                "FIX: ensure agent qa runs `python .claude/python/sdd_scripts/"
+                "validate_acceptance.py` before SubagentStop, OR set env var "
+                "SDD_ALLOW_ACCEPTANCE_BYPASS=1 to skip gate (audit-logged)\n"
+            )
+            return HOOK_DENY
         sys.stderr.write(
-            "[acceptance-gate] WARN: no acceptance.json report — "
-            "qa agent should invoke `python .claude/python/sdd_scripts/validate_acceptance.py`\n"
+            "[acceptance-gate] WARN: no acceptance.json report (interactive)\n"
+            "qa agent should invoke `python .claude/python/sdd_scripts/validate_acceptance.py` "
+            "— allowing this SubagentStop because not in CI\n"
         )
         return HOOK_ALLOW
 

@@ -70,8 +70,15 @@ optionnels où l'humain valide via la console
 | `afterCode`      | après `/dev-run`            | `gates.{n}.afterCode`      | Équipe (back/front) |
 
 Activation par `## Project Config` (`ManualGates: true`) ou flag CLI
-(`--manual-gates`). Voir STEP 1.bis et la procédure GATE générique en
-STEP 1.ter.
+(`--manual-gates`). Voir STEP 1.gates et la procédure GATE générique en
+STEP 1.gate-proc.
+
+> **v7.0.0-alpha (audit P0-workflow 2026-06-05)** — la numérotation
+> historique avait deux STEP `1.bis` distincts (anti-cumul + résolution
+> des gates manuels) et `1.ter`/`1.tiers`/`1.quart` dans le désordre.
+> Renumérotation : `1.bis` reste l'anti-cumul (hard-gate), `1.ter` =
+> init state.json, `1.quart` = phase planner placeholder, `1.gates` =
+> résolution `$ManualGates`, `1.gate-proc` = définition procédure GATE.
 
 ---
 
@@ -104,7 +111,7 @@ python .claude/python/sdd_scripts/preflight_force_cumul.py \
 
 | Exit | Action |
 |:-:|---|
-| 0 | continuer STEP 1.quart (cas normal, bypass simple, ou cumul autorisé via `SDD_ALLOW_FORCE`) |
+| 0 | continuer STEP 1.ter (cas normal, bypass simple, ou cumul autorisé via `SDD_ALLOW_FORCE`) |
 | 1 | **STOP** + ERROR `[FORCE_CUMUL_REJECTED]` déjà émis par le script sur stderr |
 
 Le script reproduit fidèlement la logique documentée historiquement à
@@ -116,7 +123,7 @@ sans repasser par la CLI).
 
 ---
 
-## STEP 1.quart — Initialiser l'état du run (Phase 0 observability, v6.1)
+## STEP 1.ter — Initialiser l'état du run (Phase 0 observability, v6.1)
 
 Cette commande émet désormais un **state.json par run** et un **event log
 JSONL** dans `workspace/output/.sys/.state/`, pour observabilité et reprise.
@@ -134,49 +141,46 @@ RUN_ID=$(python .claude/python/sdd_scripts/sdd_state.py new-run \
   --feat-number {n} --command "/sdd-full" --tags "$TAGS")
 ```
 
-Si `--resume` actif → utiliser plutôt :
+Si `--resume` actif → reprendre le dernier run + détecter la phase d'arrêt
+pour skipper les STEPs déjà passés (audit 2026-06-06 D5 — vrai routing
+post-resume, pas juste récupération d'ID).
+
 ```bash
 RUN_ID=$(python .claude/python/sdd_scripts/sdd_state.py get-run --feat-number {n} --latest)
+
+# Inspecter les phases du run précédent pour déterminer le point de reprise.
+# Le show-run retourne un JSON avec phases.{us_generate,arch,dev_run,qa,sdd_review}.status
+# parmi {pending,running,pass,warn,fail,skip}. La prochaine phase à exécuter
+# est la première qui n'est PAS dans {pass, warn, skip}.
+RESUME_STATE=$(python .claude/python/sdd_scripts/sdd_state.py show-run --run-id "$RUN_ID" 2>/dev/null)
+
+# Calcul du STEP de reprise (déterministe, pas LLM). Convention :
+#   us_generate=pass   -> skip STEP 2 (us-generate)
+#   us_generate+arch=pass -> skip jusqu'au STEP 4.5 (dev-run)
+#   us_generate+arch+dev_run=pass -> skip jusqu'au STEP 5 (qa)
+#   us_generate+arch+dev_run+qa=pass -> skip jusqu'au STEP 5.5 (sdd-review)
+# Calculé par sdd_state.py resume-target (audit D5 fix) :
+RESUME_TARGET=$(python .claude/python/sdd_scripts/sdd_state.py resume-target \
+  --run-id "$RUN_ID" 2>/dev/null || echo "STEP_2")
+echo "RESUME: skipping to $RESUME_TARGET"
 ```
+
+**Convention de routing post-resume** : chaque STEP majeur (2, 3, 4, 4.5,
+5, 5.5) débute par une garde :
+```
+if [ "$RESUME_TARGET" != "" ] && [ "$RESUME_TARGET" > "STEP_X" ]; then
+    echo "[RESUME] skipping STEP X (already done in run $RUN_ID)"
+    continue   # passer au STEP suivant
+fi
+```
+Ce garde rend `--resume` vraiment opérationnel (sinon le pipeline relance
+tout, idempotent mais coûteux LLM). Cf. `sdd_state.py resume-target`
+qui implémente la table de décision.
 
 Stocker `$RUN_ID` pour les appels `set-phase` ultérieurs (STEPs 3, 3.5,
 4, 4.5, 4.7). Si la primitive échoue (script absent, FS lecture seule),
 émettre un WARNING 1 ligne et continuer (non bloquant — l'observabilité
 est best-effort).
-
----
-
-## STEP 1.tiers — Phase planner (délégué à /dev-run §5.5.1 depuis v7.0.0-alpha)
-
-> **v7.0.0-alpha (audit CRIT-4 — 2026-06-04)** : le calcul eager de
-> `$PHASE_PLAN` est désormais **délégué à `/dev-run §5.5.1`** (qui le
-> calcule de toute façon en mode idempotent — guard standalone). La
-> double invocation `phase_planner.py` était redondante. Ce STEP émet
-> uniquement un récap léger en fin de pipeline (au STEP 5), à partir du
-> JSON que `/dev-run` aura déjà persisté dans `state.json.phases.planning`.
-
-> **v7.0.0** : les phases `a11y_audit`, `perf_audit`, `threat_model`
-> apparaissent encore dans le JSON `phase_planner` pour backward-compat
-> des consumers, mais portent toutes `enabled: false` + `agent_removed: true`
-> (agents retirés). Affichées dans le récap final avec le marqueur `⊘`
-> (skip) + `skip_reason` mentionnant le remplacement (axe-core CI,
-> Lighthouse CI, template humain).
-
-**Rationale** : éviter de re-calculer `$PHASE_PLAN` ici a deux bénéfices :
-1. Évite la double exécution de `phase_planner.py` (`/sdd-full` STEP 1.tiers
-   PUIS `/dev-run` STEP 5.5.1).
-2. Évite le passage cross-process de `$PHASE_PLAN` (env vars, JSON args)
-   qui n'a jamais été vraiment fiable cross-platform (cf. post-mortem
-   `[ENV_PROPAGATION_FAILED]` dans `error-classification.md §1.1`).
-
-Le récap "auditor phases planifiées" est désormais émis par le STEP 5
-final (récap consolidé), où il a accès au state.json complet incluant
-le payload `planning` calculé par `/dev-run`. Bénéfice secondaire : le
-récap reflète l'état RÉEL d'exécution (pass/warn/fail des auditors) et
-pas une projection ex-ante.
-
-(Aucune action runtime ici — ce STEP est conservé comme placeholder
-documentaire pour préserver la numérotation des STEPs existants.)
 
 ---
 
@@ -207,7 +211,7 @@ Les STEPs aval référencent ce tableau via "**State tracking** : set-phase phas
 
 ---
 
-## STEP 1.bis — Résoudre `$ManualGates` (LOT 3)
+## STEP 1.gates — Résoudre `$ManualGates` (LOT 3)
 
 Calculer la liste des gates actifs `$ManualGates` (Set ⊆ {us, readiness, plan, code}) :
 
@@ -225,7 +229,7 @@ Calculer la liste des gates actifs `$ManualGates` (Set ⊆ {us, readiness, plan,
 
 ---
 
-## STEP 1.ter — Procédure GATE générique (LOT 3)
+## STEP 1.gate-proc — Procédure GATE générique (LOT 3)
 
 Cette procédure est invoquée par chaque STEP de gate (3.bis, 3.5.bis,
 3.6.bis, 4.bis). Elle est paramétrée par `(n, phase, label-from, label-to)`.
@@ -309,15 +313,15 @@ Exécuter intégralement `/us-generate {n}`.
 | Succès | continuer STEP 3.bis |
 | ERROR | propager + STOP |
 
-**State tracking** : set-phase phase=us-generate (schema payload cf. STEP 1.quart).
+**State tracking** : set-phase phase=us-generate (schema payload cf. STEP 1.ter).
 
 ---
 
 ## STEP 3.bis — Gate manuel `afterUS` (LOT 3, conditionnel)
 
-**Déclencheur** : `us ∈ $ManualGates` (cf. STEP 1.bis).
+**Déclencheur** : `us ∈ $ManualGates` (cf. STEP 1.gates).
 
-Invoquer la procédure GATE (STEP 1.ter) avec :
+Invoquer la procédure GATE (STEP 1.gate-proc) avec :
 - `phase = afterUS`
 - `label-from = "PO"`
 - `label-to = "Validation readiness"`
@@ -335,7 +339,7 @@ Sinon, exécuter `/feat-validate {n}`. Stocker `$readiness_decision ∈
 {GO, WARN, NO-GO}`.
 
 **Si `readiness ∈ $ManualGates`** (LOT 3), invoquer la procédure GATE
-(STEP 1.ter) avec `phase = afterReadiness`, `label-from = "Readiness"`,
+(STEP 1.gate-proc) avec `phase = afterReadiness`, `label-from = "Readiness"`,
 `label-to = "Plans techniques"` **avant** d'appliquer le tableau de
 décision ci-dessous. Si le gate impose un STOP, l'utilisateur reprend
 via `/sdd-full {n} --resume` après validation.
@@ -369,7 +373,7 @@ Pour débloquer (au choix) :
     → continue sans plan-review
 ```
 
-**State tracking** : set-phase phase=FEAT-validate (schema payload cf. STEP 1.quart).
+**State tracking** : set-phase phase=FEAT-validate (schema payload cf. STEP 1.ter).
 
 ---
 
@@ -421,7 +425,7 @@ Glob `workspace/output/plans/{n}-*-*.{back,front}.md`.
 **Branchement** :
 
 - **Si `plan ∈ $ManualGates`** (LOT 3) → invoquer la procédure GATE
-  (STEP 1.ter) avec `phase = afterPlan`, `label-from = "Plans"`,
+  (STEP 1.gate-proc) avec `phase = afterPlan`, `label-from = "Plans"`,
   `label-to = "Développement"`. Le bandeau de la console
   ([workspace/console/](workspace/console/)) sert d'interface de
   validation. Le checkpoint chat ci-dessous est **bypassé**.
@@ -458,25 +462,11 @@ Glob `workspace/output/plans/{n}-*-*.{back,front}.md`.
 
 ---
 
-## STEP 3.6.quart — Anti-cumul bypass (v7.0.0, audit P0 R1)
+## STEP 3.6.quart — Anti-cumul bypass (defense-in-depth)
 
-**But** : empêcher les opérateurs de cumuler `--force` + `--no-plan-on-warn`
-+ `--no-validate` sans signal explicite. Un seul flag de bypass est
-légitime (cas d'usage assumé) ; **cumuler 2 bypass ou plus** signifie
-court-circuiter tous les filets et exige une preuve d'autorisation
-hors-bande (env var). Cf. R1 du rapport CTO audit 2026-05-20.
-
-### Defense-in-depth (v7.0.0-alpha, audit CRIT-10)
-
-> **Check primaire** : `STEP 1.bis` exécute `preflight_force_cumul.py`
-> juste après le parsing des flags. Ce STEP 3.6.quart est conservé comme
-> **filet de sécurité** pour les invocations qui auraient contourné
-> STEP 1.bis (chaînage inline par un assistant Claude qui spawne les
-> sous-commandes sans repasser par CLI parsing).
-
-Si STEP 1.bis a tourné → ce STEP est **no-op idempotent** (les mêmes
-flags produisent le même verdict). Si STEP 1.bis a été sauté (rare —
-voir scenarios ci-dessus) → re-exécuter la même vérification :
+> **No-op idempotent** si STEP 1.bis a tourné (cas normal). Conservé comme
+> filet de sécurité pour invocations chaînées qui sauteraient le CLI parsing.
+> Logique + convention env var `SDD_ALLOW_FORCE` : cf. STEP 1.bis.
 
 ```bash
 python .claude/python/sdd_scripts/preflight_force_cumul.py \
@@ -485,25 +475,7 @@ python .claude/python/sdd_scripts/preflight_force_cumul.py \
   $( [ "$NO_VALIDATE" = "true" ]      && echo --no-validate )
 ```
 
-Exit 1 → STOP + ERROR `[FORCE_CUMUL_REJECTED]` (script émet le bloc
-3-lignes sur stderr).
-
-### Convention env var (documentation conservée)
-
-`SDD_ALLOW_FORCE` truthy = `1` / `true` / `yes` (case-insensitive).
-Toute autre valeur (incluant `0` / `false` / absent) compte comme
-non-autorisé.
-
-**Pourquoi env var et pas flag CLI** : un flag (`--really-really-force`)
-serait copié-collé depuis Stack Overflow. Une env var demande un acte
-conscient (`export`), visible dans `env` audit, et reste local au shell —
-pas dans la commande qui apparaît dans les logs CI/scripts. Cf. principe
-"elevated privilege requires elevated friction" (NIST SP 800-160 §3.3.5).
-
-### Skip
-
-- `BYPASS_COUNT == 0` → STEP no-op silencieux, continuer.
-- `BYPASS_COUNT == 1` → continuer ; STEP 3.7 trace l'usage simple.
+Exit 1 → STOP + ERROR `[FORCE_CUMUL_REJECTED]`.
 
 ---
 
@@ -554,21 +526,49 @@ son STEP 4.bis si arch est requis.
 | ERROR arch | propager + STOP |
 | Échecs partiels phase 4 | listés par `/dev-run`, → STEP 4.bis |
 
-**State tracking** : set-phase phase=dev-run (schema payload cf. STEP 1.quart). Si arch a tourné, ajouter aussi set-phase phase=arch en amont.
+**State tracking** : set-phase phase=dev-run (schema payload cf. STEP 1.ter). Si arch a tourné, ajouter aussi set-phase phase=arch en amont.
 
 ---
 
 ## STEP 4.bis — Gate manuel `afterCode` (LOT 3, conditionnel)
 
-**Déclencheur** : `code ∈ $ManualGates` (cf. STEP 1.bis).
+**Déclencheur** : `code ∈ $ManualGates` (cf. STEP 1.gates).
 
-Invoquer la procédure GATE (STEP 1.ter) avec :
+Invoquer la procédure GATE (STEP 1.gate-proc) avec :
 - `phase = afterCode`
 - `label-from = "Dev"`
 - `label-to = "QA"`
 
 Permet à l'équipe de revoir le code généré (`workspace/output/src/`)
 avant le scan QA. Si gate non actif → skip directement vers STEP 4.5.
+
+---
+
+## STEP 4.45 — Refresh INDEX ADRs (déplacé depuis 4.7 — audit P0-workflow 2026-06-05)
+
+> **v7.0.0-alpha (audit P0-workflow 2026-06-05)** — historiquement ce
+> STEP était numéroté 4.7 (après QA gate). Conséquence : si STEP 4.5
+> aboutissait à un STOP `[QA_FAIL_BLOCKING_SDD_FULL]`, l'INDEX ADRs
+> n'était **jamais** rafraîchi — donc les ADRs créés en phase 4 (par
+> `arch` / `dev-*`) restaient orphelins dans `INDEX.md`. Drift
+> documentaire à chaque pipeline RED. Déplacé en 4.45 (avant la QA
+> gate) pour exécution inconditionnelle. Ne dépend d'aucun résultat
+> QA — c'est un simple scan FS + write INDEX.md.
+
+Exécuter **systématiquement** (avant tout STOP/gate aval) :
+
+```bash
+python .claude/python/sdd_scripts/index_adrs.py
+```
+
+Régénère **un seul fichier** : `workspace/output/.sys/.context/adrs/INDEX.md`
+(table-des-matières chronologique des ADRs créés par arch + dev-*).
+
+Coût : **0 token**, latence < 100 ms. Non bloquant : sur exit ≠ 0,
+émettre WARNING et continuer vers STEP 4.5. L'INDEX ADRs est un
+artefact de navigation, pas une dépendance fonctionnelle du pipeline.
+
+**State tracking** : set-phase phase=doc-refresh (schema payload cf. STEP 1.ter).
 
 ---
 
@@ -589,9 +589,9 @@ flippé depuis `false` historique pour fixer l'asymétrie).
 
 | Verdict `/qa-generate` | `QaFailOnSddFull: true` (défaut) | `QaFailOnSddFull: false` (legacy) |
 |---|---|---|
-| `GREEN` | continuer STEP 4.7 | continuer STEP 4.7 |
-| `YELLOW` | continuer STEP 4.7 + WARN récap | continuer STEP 4.7 + WARN récap |
-| `RED` | **STOP** + ERROR `[QA_FAIL_BLOCKING_SDD_FULL]` (exit 1) | continuer STEP 4.7 + WARN récap (bypass audit-log) |
+| `GREEN` | continuer STEP 4.8 | continuer STEP 4.8 |
+| `YELLOW` | continuer STEP 4.8 + WARN récap | continuer STEP 4.8 + WARN récap |
+| `RED` | **STOP** + ERROR `[QA_FAIL_BLOCKING_SDD_FULL]` (exit 1) | continuer STEP 4.8 + WARN récap (bypass audit-log) |
 
 **Format ERROR** :
 ```
@@ -603,39 +603,7 @@ FIX: corriger les tests/coverage via /dev-run {n} (idempotent), puis re-run /sdd
 
 GREEN/YELLOW/RED sont également propagés au récap STEP 5.
 
-**State tracking** : set-phase phase=qa-generate (schema payload cf. STEP 1.quart). Status `skip` si `QAMode ∈ {off, manual}`.
-
----
-
-## STEP 4.7 — Refresh INDEX ADRs (auto, depuis 2026-05-08 ; déterministe en v7.0.0)
-
-> **v7.0.0 BREAKING** — l'agent `dashboard` (Haiku 4.5) est retiré
-> (cf. ADR `governance-major-auditors-trim`). Le script
-> `sdd_scripts/index_adrs.py` le remplace : 0 token, ~50 ms, même
-> output. Pattern : `Bash` direct au lieu de `Agent: dashboard`.
->
-> **v6.10 BREAKING (préservé)** : les rendus HTML
-> (`dashboard/README.html`, `qa/feat-{n}/dashboard.html`) restent
-> retirés. Les métriques vivent dans `workspace/output/db/console.db`
-> (SQLite SSoT) et le rendu graphique est délégué à un consommateur
-> externe (console web `workspace/console/`, BI tool).
-
-Exécuter **systématiquement** :
-
-```bash
-python .claude/python/sdd_scripts/index_adrs.py
-```
-
-Régénère **un seul fichier** :
-
-- `workspace/output/.sys/.context/adrs/INDEX.md` — table-des-matières
-  chronologique des ADRs
-
-Coût : **0 token**, latence < 100 ms. Non bloquant : sur exit ≠ 0,
-émettre WARNING et continuer vers STEP 5. L'INDEX ADRs est un artefact
-de navigation, pas une dépendance fonctionnelle du pipeline.
-
-**State tracking** : set-phase phase=doc-refresh (schema payload cf. STEP 1.quart).
+**State tracking** : set-phase phase=qa-generate (schema payload cf. STEP 1.ter). Status `skip` si `QAMode ∈ {off, manual}`.
 
 ---
 
@@ -676,7 +644,7 @@ Le pipeline `/sdd-review` :
   de `stack.md` → continue vers STEP 5 même sur RED, le verdict est inclus
   dans le récap.
 
-**State tracking** : set-phase phase=sdd-review (schema payload cf. STEP 1.quart).
+**State tracking** : set-phase phase=sdd-review (schema payload cf. STEP 1.ter).
 Status `skip` si `ReviewMode ∈ {off, manual}`.
 
 Coût marginal : ~30 s (re-scan déterministe) + ~10-18 KB tokens si
