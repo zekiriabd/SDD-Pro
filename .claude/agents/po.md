@@ -242,9 +242,21 @@ Glob, Grep`) et ne peut donc pas calculer un sha256. Écrire le
 Parent FEAT hash: sha256:COMPUTE_REQUIRED
 ```
 
-Ce sentinel sera **résolu en post-step déterministe** par la commande
-`/us-generate` (STEP 3.bis, cf. `commands/us-generate.md`) qui calcule
-le hash via Python et patche les 3 fichiers US. 0 token LLM, ~50 ms.
+Ce sentinel sera **résolu en post-step déterministe** par 2 chemins
+redondants (v7.0.0-alpha audit P0-workflow 2026-06-05) :
+
+1. **Chemin nominal** : `/us-generate` STEP 3.0 invoque
+   `sdd_scripts/resolve_us_hash_sentinel.py --feat-number {n}` qui
+   calcule le hash via Python et patche les fichiers US (0 token LLM, ~50 ms).
+2. **Filet de sécurité** : un hook `SubagentStop matcher=po` invoque le
+   même script en mode `--auto-detect` quand l'agent `po` termine. Ainsi,
+   même si `po` est invoqué **hors** `/us-generate` (`Agent: po` standalone,
+   debug, custom orchestrator), le sentinel est résolu automatiquement.
+   Sans ce filet, tous les downstream (`dev-*`, auditors) émettraient
+   `[FEAT_HASH_MISMATCH]` car `COMPUTE_REQUIRED` n'est pas 8 hex chars.
+
+Le hook est idempotent : si le sentinel a déjà été résolu par le chemin
+nominal, le hook ne fait rien.
 
 **STEP 9 (modifié)** — Read-back sentinel-aware :
 
@@ -426,24 +438,17 @@ Exemples :
 - `FEAT 3-Legacy → 2 US générées (constitution §3: skipped (constitution.md absent))`
 
 Sur erreur (incluant `STEP 8.5 read-back failed`), bloc ERROR 3 lignes
-(CAUSE / FIX) et STOP. Aucun autre texte.
-
-Sur erreur, émettre le bloc ERROR 3 lignes (CAUSE / FIX) et STOP.
-
-Aucun autre texte. Pas de récap, pas de liste de fichiers.
+(CAUSE / FIX) et STOP. Aucun autre texte. Pas de récap, pas de liste de fichiers.
 
 ---
 
 ## Chat Output Protocol
 
-Applique `@.claude/rules/output-protocol.md`. Label `[PO]`, plage `8-12%`,
-granularité 3-6 updates. Erreurs : chat 1L (`🔴 [PO/FAIL] résumé — [CLASS]
-détail → rapport.md (X%)`) + bloc ERROR 3L disque préservé pour
-`build_loop`/hooks (cf. `error-classification.md §2`). Bypass `SDD_CHAT_VERBOSE=1`.
+Applique `@.claude/rules/output-protocol.md` (label `[PO]`, plage `8-12%`).
 
 ---
 
-## Anti-derive strict
+## Inline Rules — Anti-derive strict
 
 - Ne JAMAIS inventer un SFD, BR, AC ou FD non présent dans la FEAT parente
 - Ne JAMAIS écrire de plan technique ni de code (réservé aux agents dev-*)

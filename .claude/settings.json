@@ -161,11 +161,30 @@
       "Bash(*SDD_DISABLE_COST_CAP*)",
       "Bash($env:SDD_ALLOW_*=*)",
       "Bash(setx SDD_ALLOW_*)",
-      "Bash(setx SDD_DISABLE_*)"
+      "Bash(setx SDD_DISABLE_*)",
+      "Bash(bash -c *curl*)",
+      "Bash(bash -c *wget*)",
+      "Bash(sh -c *curl*)",
+      "Bash(sh -c *wget*)",
+      "Bash(powershell -c *Invoke-WebRequest*)",
+      "Bash(powershell -c *iwr*)",
+      "Bash(powershell -Command *Invoke-WebRequest*)",
+      "Bash(pwsh -c *Invoke-WebRequest*)",
+      "Bash(pwsh -Command *Invoke-WebRequest*)",
+      "Bash(cmd /c *curl*)",
+      "Bash(cmd /c *certutil -urlcache*)",
+      "Bash(rm -rf workspace/input*)",
+      "Bash(rm -rf workspace/input/feats*)",
+      "Bash(rm -rf workspace/input/stack*)",
+      "Bash(rm -rf workspace/input/ui*)",
+      "Bash(rm -rf workspace/output/us*)",
+      "Bash(rm -rf workspace/output/src*)",
+      "Bash(rm -rf workspace/output/plans*)"
     ],
     "_deny_bypass_doc": "v7.0.0-alpha (audit 2026-06-05) — defense-in-depth contre les bypass envvar SDD_ALLOW_* / SDD_DISABLE_*. Les hooks Python lisaient déjà ces variables et les audit-loggaient, mais rien n'empêchait un agent (ou un Bash exécutif) de les exporter en cours de session. Ces deny rules bloquent les patterns d'export les plus courants (POSIX export, inline VAR=val, PowerShell $env:, Windows setx). Bypass volontaire Tech Lead : éditer settings.local.json (gitignored) et retirer la deny pour la session.",
     "_defaultMode_doc": "v7.0.0-alpha (2026-05-21) : 'acceptEdits' (auto-accept Edit/Write/NotebookEdit silently) → 'default' (prompts on tools not in allow). Edit/Write/MultiEdit are explicitly allowlisted above so the SDD pipeline still flows ; this defaultMode change blocks ONLY tools that slip outside the curated allowlist. To restore the legacy auto-accept behaviour (faster but less safe), set `defaultMode: 'acceptEdits'` in .claude/settings.local.json (per-dev, gitignored).",
-    "defaultMode": "default"
+    "defaultMode": "default",
+    "_deny_M9_doc": "Audit 2026-06-06 M9 — defense-in-depth additions : (a) shell-nesting HTTP fetch (bash -c, sh -c, powershell -c, cmd /c) to close the gap where curl/wget could escape Bash matcher via inline shell; (b) critical user-data paths under workspace/input/ and workspace/output/{us,src,plans} not covered by the broad rm -rf workspace/output/* allow pattern."
   },
   "hooks": {
     "PreToolUse": [

@@ -147,17 +147,23 @@ Pinia + TanStack + VeeValidate), `angular` (19 standalone + signals).
 **UI Design Systems** : `radzen-blazor`, `shadcn` (7 core + 15 onDemand
 Radix par capability), `vuetify`.
 
-**Hors périmètre `.libs.json`** (par design) :
+**Hors périmètre `.libs.json`** (par design — pas de catalogue machine) :
 - `auth/*` : protocoles cross-langage (env vars, flux JWT/OIDC). Les
   libs auth concrètes (`Microsoft.Identity.Web`, `@azure/msal-browser`,
   `spring-security-oauth2-resource-server`, etc.) vivent dans le
   `.libs.json` du backend/frontend consommateur.
 - `qa/code-quality.md` : règles QA pures (seuils sonar-like).
-- `fullstack/blazor-server` : 🟡 expérimental (chargeable mais jamais validé
-  bout-en-bout). Le pattern monolithique est incompatible avec l'isolation
-  front/back du scope `back-front` (cf. `ownership.md §1.bis`) ; à n'utiliser
-  qu'avec `AppType=fullstack` explicite. Pour stabilité maximale en Blazor,
-  préférer `frontend/blazor-webassembly` + un backend `.NET` séparé.
+- `archi/*` (mvc, ddd, microservice) : patterns architecturaux conceptuels
+  sans libs propres — les libs concrètes vivent dans le `.libs.json` du
+  backend qui adopte le pattern.
+
+**Stacks avec `.libs.json` mais pattern monolithique** (à utiliser avec
+prudence) :
+- `fullstack/blazor-server` : 🟢 bench-validated runtime (2026-06-05) avec
+  catalogue `.libs.json` complet, MAIS pattern monolithique incompatible
+  avec l'isolation front/back du scope `back-front` (cf. `ownership.md §1.bis`) ;
+  à n'utiliser qu'avec `AppType=fullstack` explicite. Pour combiner avec
+  une SPA séparée, préférer `frontend/blazor-webassembly` + backend `.NET`.
 
 ### Dé-duplication QA (post-mortem 2026-05-07)
 

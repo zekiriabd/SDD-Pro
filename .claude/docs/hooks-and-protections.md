@@ -7,12 +7,17 @@
 
 ---
 
-## 1. Hooks actifs (5)
+## 1. Hooks actifs (11)
 
 Configurés dans `.claude/settings.json` section `hooks`. Tous invoqués via
 le wrapper `python -c "...import _hook; _hook.run('sdd_hooks.X')"` qui
 détecte automatiquement `CLAUDE_PROJECT_DIR` ou remonte vers `.claude/`
 depuis le cwd.
+
+> **v7.0.0-alpha (audit 2026-06-06 — 6 hooks ajoutés depuis v7.0.0-alpha)** :
+> `block_env_bypass`, `preflight_cost_cap`, `preflight_stack_combo`,
+> `validate_stack_consistency`, `resolve_po_hash_sentinel`,
+> `validate_acceptance_gate` viennent compléter les 5 hooks v6.x.
 
 ### 1.1 `protect_framework` — PreToolUse Edit|Write|MultiEdit
 
@@ -46,11 +51,11 @@ depuis le cwd.
 | Rôle | Vérifie que les fichiers édités en mode `operation: augment` (cf. plans) respectent leur contrat `preserves:`/`adds:`. Émet `[PRESERVES_VIOLATED]` ou `[ADDS_VIOLATED]` si drift détecté. |
 | Exit codes | 0 = pass, 1 = violation |
 
-### 1.4 `audit_file_ownership` — SubagentStop dev-*/qa/auditors
+### 1.4 `audit_file_ownership` — SubagentStop (12 agents)
 
 | Champ | Valeur |
 |---|---|
-| Trigger Claude Code | `SubagentStop` matcher `dev-backend\|dev-frontend\|qa\|code-reviewer\|security-reviewer\|spec-compliance-reviewer\|arch-reviewer\|constitutioner` (v7.0.0 — retirés : `dev-*-strict`, `dashboard`, `accessibility-auditor`, `performance-auditor`) |
+| Trigger Claude Code | `SubagentStop` matcher `arch\|po\|elicitor\|dev-backend\|dev-frontend\|qa\|code-reviewer\|security-reviewer\|spec-compliance-reviewer\|arch-reviewer\|adversarial-reviewer\|constitutioner` (audit 2026-06-06 : étendu aux 12 agents v7.0.0 — retirés : `dev-*-strict`, `dashboard`, `accessibility-auditor`, `performance-auditor`) |
 | Script | [`.claude/python/sdd_hooks/audit_file_ownership.py`](.claude/python/sdd_hooks/audit_file_ownership.py) |
 | LOC | ~150 |
 | Rôle | Vérifie la matrice ownership de `rules/ownership.md §1` (Partie A, ex-file-ownership.md) : un agent dev-backend n'a pas écrit dans `{AppName}/`, un agent QA n'a pas écrit en dehors de `*.Tests/`, etc. Émet `[FILE_OWNERSHIP]` ou `[FILE_OWNERSHIP_NESTED]` si violation. |
@@ -60,11 +65,76 @@ depuis le cwd.
 
 | Champ | Valeur |
 |---|---|
-| Trigger Claude Code | `PostToolUse` matcher `Agent` + `SubagentStop` (les mêmes agents que 1.4) |
+| Trigger Claude Code | `PostToolUse` matcher `Agent` + `SubagentStop` (les mêmes agents que 1.4, + matcher `po` séparé) |
 | Script | [`.claude/python/sdd_hooks/record_token_usage.py`](.claude/python/sdd_hooks/record_token_usage.py) |
 | LOC | ~210 |
 | Rôle | Capture les tokens input/output/cache réellement consommés par un sub-agent et insère dans `console.db` table `token_usage`. **Opt-in** via `SDD_TOKEN_USAGE_MODE=record\|debug` (défaut `off` = exit immédiat, aucun effet). |
 | Ajouté | v6.5.1 (cf. `MIGRATION.md` lignes 551-613) |
+
+### 1.6 `block_env_bypass` — PreToolUse Bash
+
+| Champ | Valeur |
+|---|---|
+| Trigger Claude Code | `PreToolUse` matcher `Bash` |
+| Script | [`.claude/python/sdd_hooks/block_env_bypass.py`](.claude/python/sdd_hooks/block_env_bypass.py) |
+| LOC | ~130 |
+| Rôle | Defense-in-depth : refuse toute commande Bash qui exporte/inline une env var `SDD_ALLOW_*`, `SDD_DISABLE_*`, `SDD_ALLOW_FORCE`, etc. Couvre POSIX `export VAR=val`, inline `VAR=val cmd`, PowerShell `$env:`, Windows `setx`, et `bash -c "..."` chained. Empêche un agent d'auto-bypass un gate via env var. |
+| Exit codes | 0 = allow, 2 = deny (env bypass detected) |
+| Ajouté | v7.0.0-alpha P0 §4 |
+
+### 1.7 `preflight_cost_cap` — PreToolUse Agent
+
+| Champ | Valeur |
+|---|---|
+| Trigger Claude Code | `PreToolUse` matcher `Agent` (chaîné après `preflight_agent_budget`) |
+| Script | [`.claude/python/sdd_hooks/preflight_cost_cap.py`](.claude/python/sdd_hooks/preflight_cost_cap.py) |
+| LOC | ~80 |
+| Rôle | Vérifie que le coût USD cumulatif de la run en cours (lu depuis `console.db` table `token_usage`) n'atteint pas `MaxCostPerRun` (défaut $50). Si dépassement → STOP avec classe `[COST_CAP_EXCEEDED]`. Bypass : `SDD_DISABLE_COST_CAP=1` (one-shot) OU `MaxCostPerRun: 0` (config désactivée). |
+| Exit codes | 0 = allow, 2 = deny (cost cap exceeded) |
+| Ajouté | v7.0.0-alpha P0 §4.3 |
+
+### 1.8 `preflight_stack_combo` — PreToolUse Skill
+
+| Champ | Valeur |
+|---|---|
+| Trigger Claude Code | `PreToolUse` matcher `Skill` |
+| Script | [`.claude/python/sdd_hooks/preflight_stack_combo.py`](.claude/python/sdd_hooks/preflight_stack_combo.py) |
+| LOC | ~150 |
+| Rôle | Avant tout slash-command qui active une combo stack (`/sdd-full`, `/dev-run`, `/sdd-poc`), vérifie que les stacks actifs dans `stack.md` forment une combinaison validée (cf. `docs/validated-combos.md`) ou émet WARN si combo `🟡 experimental`. STOP si stacks malformés OU multi-stacks contradictoires sans `SDD_ALLOW_MULTISTACK=1`. |
+| Exit codes | 0 = allow, 2 = deny (combo invalid) |
+| Ajouté | v7.0.0-alpha audit MIN-7 |
+
+### 1.9 `validate_stack_consistency` — PostToolUse Edit|Write|MultiEdit
+
+| Champ | Valeur |
+|---|---|
+| Trigger Claude Code | `PostToolUse` matcher `Edit\|Write\|MultiEdit` (chaîné avant `validate_augment_contract`) |
+| Script | [`.claude/python/sdd_hooks/validate_stack_consistency.py`](.claude/python/sdd_hooks/validate_stack_consistency.py) |
+| LOC | ~170 |
+| Rôle | Après chaque écriture, vérifie que les libs/imports introduits restent cohérents avec les stacks actifs (§2.4 catalog + capabilities triggered). Emit `[STACK_LIBRARY_MISSING]` si import vers une lib hors §2.4. |
+| Exit codes | 0 = pass, 1 = violation (drift détecté) |
+
+### 1.10 `resolve_po_hash_sentinel` — SubagentStop po (defense-in-depth)
+
+| Champ | Valeur |
+|---|---|
+| Trigger Claude Code | `SubagentStop` matcher `po` |
+| Script | [`.claude/python/sdd_hooks/resolve_po_hash_sentinel.py`](.claude/python/sdd_hooks/resolve_po_hash_sentinel.py) |
+| LOC | ~90 |
+| Rôle | Filet de sécurité : à chaque arrêt de l'agent `po`, scanne les US contenant le sentinel `Parent FEAT hash: sha256:COMPUTE_REQUIRED` et le résout via `resolve_us_hash_sentinel.py --auto-detect`. Couvre les invocations `Agent: po` hors `/us-generate` où le sentinel persistait (causait `[FEAT_HASH_MISMATCH]` downstream). |
+| Exit codes | 0 = ALLOW (idempotent ; non-bloquant même si échec) |
+| Ajouté | v7.0.0-alpha audit P0-workflow 2026-06-05 |
+
+### 1.11 `validate_acceptance_gate` — SubagentStop qa
+
+| Champ | Valeur |
+|---|---|
+| Trigger Claude Code | `SubagentStop` matcher `qa` |
+| Script | [`.claude/python/sdd_hooks/validate_acceptance_gate.py`](.claude/python/sdd_hooks/validate_acceptance_gate.py) |
+| LOC | ~250 |
+| Rôle | Après chaque arrêt de l'agent `qa`, exécute l'acceptance gate sur tous les projets sous `workspace/output/src/*` (cf. `rules/quality.md Partie C`) : `test`, `lint`, `build`, `coverage ≥ seuil`, + smoke browser + E2E Playwright pour projets UI. Émet `[ACCEPTANCE_GATE_FAILED]` si échec. Bypass : `SDD_ALLOW_ACCEPTANCE_BYPASS=1` (audit-loggué). |
+| Exit codes | 0 = pass, 1 = gate failed |
+| Ajouté | v7.0.0-alpha audit P5 |
 
 ---
 
@@ -133,18 +203,17 @@ depuis le cwd.
 | `sync-stack-md.ps1` | [`sdd_admin/sync_stack_md.py`](.claude/python/sdd_admin/sync_stack_md.py) |
 | `validate-libs-catalog.ps1` | [`sdd_admin/validate_libs_catalog.py`](.claude/python/sdd_admin/validate_libs_catalog.py) |
 
-### 3.5 Total migration
+### 3.5 Total migration + ajouts v7.0.0-alpha
 
 | Catégorie | PowerShell supprimé | Python actif | Net |
 |---|---:|---:|---:|
-| Hooks (dossier `.claude/hooks/`) | 2 | 5 (dossier `sdd_hooks/`) | **+3** (3 anciens scripts promus en hooks) |
-| Scripts CLI | 14 | 14 | 0 |
-| Scripts admin | 5 | 5 | 0 |
-| Scripts → hooks | 2 | (comptés ci-dessus) | 0 (déplacement) |
-| **Nouveau v6.5.1** | — | `record_token_usage.py` | +1 |
-| **Total** | **23 PS** | **24 Python** | **+1 hook net** |
+| Hooks v6.x (dossier `.claude/hooks/` → `sdd_hooks/`) | 2 | 5 | **+3** (3 anciens scripts promus en hooks) |
+| Hooks v7.0.0-alpha (ajouts depuis audit P0/P5) | — | 6 | **+6** (`block_env_bypass`, `preflight_cost_cap`, `preflight_stack_combo`, `validate_stack_consistency`, `resolve_po_hash_sentinel`, `validate_acceptance_gate`) |
+| Scripts CLI (`sdd_scripts/`) | 14 | ~50 (v7.0.0-alpha) | +36 net |
+| Scripts admin (`sdd_admin/`) | 5 | ~13 | +8 |
+| **Total Python actif v7.0.0-alpha** | **23 PS** | **11 hooks + 50 scripts + 13 admin = 74 fichiers exécutables** | **+51 net** |
 
-**Aucune protection nette supprimée**. La protection v6.5+ est **strictement plus forte** que v6.4 (un hook supplémentaire `record_token_usage`, et 3 anciens scripts CLI passifs sont devenus hooks actifs branchés sur SubagentStop/PostToolUse).
+**Aucune protection nette supprimée**. La protection v7.0.0-alpha est **strictement plus forte** que v6.10 (6 hooks supplémentaires ; tous activés par défaut sauf `record_token_usage` opt-in).
 
 ---
 
@@ -208,6 +277,6 @@ ADR `governance-protection-{slug}` + 2 approbations.
 - [`.claude/python/sdd_hooks/`](.claude/python/sdd_hooks/) — 5 hooks Python
 - [`.claude/python/sdd_admin/framework_smoke.py`](.claude/python/sdd_admin/framework_smoke.py) — smoke check Stop hook
 - [`.claude/python/_hook.py`](.claude/python/_hook.py) — wrapper d'invocation
-- [`.claude/docs/MIGRATION.md`](.claude/docs/MIGRATION.md) — guide migration entre versions majeures
-- [`.claude/docs/VERSIONING.md`](.claude/docs/VERSIONING.md) — politique SemVer + freeze
+- [`.claude/docs/MIGRATION.md`](./MIGRATION.md) — guide migration entre versions majeures
+- [`.claude/docs/VERSIONING.md`](./VERSIONING.md) — politique SemVer + freeze
 - `workspace/output/.sys/.context/adrs/ADR-20260519T173000-governance-protection-tracing.md` — ADR ex-post de la migration v6.5+

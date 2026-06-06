@@ -387,6 +387,33 @@ si existe).
 
 ---
 
+## STEP 9.bis — Acceptance Gate (déterministe, hoisted from hook, audit P0-security 2026-06-05)
+
+Invoquer le runner Acceptance Gate **avant la confirmation finale**. Il
+parcourt `workspace/output/src/*`, détecte le type (Node / .NET / Kotlin /
+Python) et exécute `test` + `lint` + `build` par projet, puis écrit
+`workspace/output/.sys/.acceptance/acceptance.json` (verdict consommé par
+le hook `SubagentStop` matcher=qa, désormais simple lecteur < 100ms).
+
+```bash
+python .claude/python/sdd_scripts/validate_acceptance.py
+```
+
+| Exit | Sens | Action agent |
+|---|---|---|
+| `0` | verdict `pass` / `warn` / `skipped` / `bypass` (selon `AcceptanceGate` mode) | continuer STEP 10 |
+| `2` | verdict `fail` en mode `strict` | STOP + ERROR `[ACCEPTANCE_GATE_FAILED]` (le hook bloquera le pipeline en sortie de toute façon) |
+| `3` | erreur infra (crash script) | STOP + ERROR `[INFRA_BLOCKED]` |
+
+**Pourquoi script et pas hook** : ce check peut prendre plusieurs minutes
+(`npm test`, `dotnet build`). Les hooks Claude Code doivent rester `< 5s`.
+Le script tourne dans la fenêtre de temps de l'agent qa, le hook ne fait
+que lire le verdict JSON. Cf. `sdd_scripts/validate_acceptance.py` docstring.
+
+Bypass : `SDD_ALLOW_ACCEPTANCE_BYPASS=1` (audit-loggué).
+
+---
+
 ## STEP 10 — Confirmation
 
 Émettre **un seul bloc final** :
@@ -427,9 +454,32 @@ sur la FEAT antérieure ; (c) marque les tests obsolètes `@Disabled` avec
 justification. Auto-fix par agent reste hors scope v6.10 (cf. ADR
 v7.0 `governance-auditors-trim` pour roadmap).
 
-**Toujours exit 0** depuis l'agent (sauf erreurs non-récupérables —
-préconditions manquantes, init failed, framework absent). Les échecs
-de test ou de coverage ne bloquent pas — c'est un audit, pas une gate.
+**Exit code de l'agent qa** (clarification v7.0.0-alpha audit P2a — 2026-06-06) :
+
+- L'agent qa **termine sans STOP** (≈ "exit 0") sur GREEN / YELLOW / RED
+  fonctionnels — il rend la main au caller (`/qa-generate` ou `/sdd-full`)
+  avec le verdict écrit dans `console.db` (qa_coverage, qa_quality,
+  qa_api_tests) **et** dans le bloc final chat (1L emoji + compteurs cf.
+  output-protocol.md §3).
+- Il **STOP avec ERROR** uniquement sur erreurs non-récupérables —
+  préconditions manquantes, init failed, framework absent (cf. classes
+  `[QA_PRECONDITION_FAILED]`, `[QA_FRAMEWORK_MISSING]`, `[QA_INIT_FAILED]`
+  dans error-classification.md §1.7).
+
+**Le gating bloquant RED vit au niveau command/caller, pas dans l'agent** :
+
+- `/qa-generate {n}` standalone (cf. `commands/qa-generate.md` STEP 7
+  l.283-286) lit `console.db` après l'agent et **exit 1** si verdict
+  RED — fail-fast pour caller scriptable.
+- `/sdd-full {n}` (cf. `commands/sdd-full.md` post-STEP 4.5) lit le
+  même verdict console.db et STOP + ERROR `[QA_FAIL_BLOCKING_SDD_FULL]`
+  si RED, bypass `QaFailOnSddFull: false` (audit-loggué).
+
+Cette séparation préserve la composabilité : l'agent reste un audit
+pur (rapport déterministe persisté en DB) ; les commands décident des
+gates selon le contexte d'invocation. Aucun caller ne doit dépendre du
+fait que l'agent "STOP en cas de RED" — toujours lire `console.db` via
+`query_console_db.py` ou les exit codes des commands.
 
 ### STEP 10.bis — Status flip US (v6.10.5, fix CRIT-2)
 
@@ -452,7 +502,7 @@ Idempotent et non-bloquant. Transition `Review → Done` valide sans `--force`.
 
 ---
 
-## Anti-derive strict
+## Inline Rules — Anti-derive strict
 
 **Universels** : `@.claude/rules/build-and-loop.md §3.bis` (autonomous, ambiguïté → STOP, no-spawn).
 
@@ -500,8 +550,5 @@ géré par `parse_coverage.py` (STEP 8).
 
 ## Chat Output Protocol
 
-Applique `@.claude/rules/output-protocol.md`. Label `[QA]`, plage `58-66%` (mode API
-Gate) ou `78-88%` (mode unit/coverage), granularité 3-6. Verdict 1L avec emoji
-(`[QA] 47/47 tests, coverage 82%, 🟢 (88%)`). Erreurs : chat 1L avec préférence
-`[QA_TEST_FAILED] > [QA_COVERAGE_GAP]` + pointeur rapport (§7.2) ; bloc ERROR 3L
-disque préservé. Bypass `SDD_CHAT_VERBOSE=1`.
+Applique `@.claude/rules/output-protocol.md` (label `[QA]`, plage `58-66%` mode API Gate
+ou `78-88%` mode unit/coverage). Précédence erreurs : `[QA_TEST_FAILED] > [QA_COVERAGE_GAP]`.

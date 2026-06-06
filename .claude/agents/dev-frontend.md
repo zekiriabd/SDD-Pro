@@ -32,12 +32,33 @@ N'invente, n'étend, n'optimise rien. QA hors scope.
 ## STEP 0 — 1.bis — Preflight + Context Budget + Mode + Path Safety
 
 Pattern partagé — appliquer `@.claude/rules/dev-shared-preflight.md`
-intégralement (§1 STEP 0 preflight, §2 STEP 0.5 context budget, §3
-STEP 1 mode From Plan, §4 STEP 1.bis path safety). Paramètres
-`dev-frontend` : `--family frontend`, `--agent dev-frontend`, Glob
-mode `*.front.md`, path root `workspace/output/src/{AppName}/`.
-Codes preflight extra : `HTML_AMBIGUOUS`, `UI_DS_NOT_SELECTED` (cf.
-§5 matrice). Mode Normal inclut **fidelity check** post-build (STEP 11).
+intégralement. Sous-STEPs ci-dessous (ancres explicites pour références
+cross-fichier) :
+
+### STEP 0 — Preflight (script `preflight.py`)
+
+Appliquer `dev-shared-preflight.md §1` avec paramètres `dev-frontend` :
+`--family frontend`, Glob mode `*.front.md`, path root
+`workspace/output/src/{AppName}/`. Codes preflight extra :
+`HTML_AMBIGUOUS`, `UI_DS_NOT_SELECTED` (cf. §5 matrice).
+
+### STEP 0.5 — Context budget (HARD-GATE)
+
+Appliquer `dev-shared-preflight.md §2` avec `--agent dev-frontend`.
+Exit non-zero → STOP. Ledger persisté dans `console.db` table
+`context_budget` (SSoT v6.10).
+
+### STEP 1 — Détection mode From Plan
+
+Appliquer `dev-shared-preflight.md §3` (Glob spécifique `*.front.md`).
+Variables résultantes : `FROM_PLAN_PATH` (string|null), `PLAN_ONLY` (bool).
+Mode Normal inclut **fidelity check** post-build (STEP 11).
+
+### STEP 1.bis — Hard-gate path safety (Front/Back isolation)
+
+Appliquer `dev-shared-preflight.md §4`. Bloquant avant tout Write/Edit
+sous `workspace/output/src/`. Violation → STOP + ERROR
+`[FILE_OWNERSHIP_NESTED]`.
 
 Variables résultantes en mémoire pour la suite : `planOnly`, `name`,
 `htmlPath` (peut être `null`), `appOrBackendName`,
@@ -447,7 +468,7 @@ Aucun autre texte.
 
 ---
 
-## Anti-derive strict
+## Inline Rules — Anti-derive strict
 
 Substance partagée — `@.claude/rules/build-and-loop.md §3` (7 bullets canoniques).
 Spécifique dev-frontend :
@@ -497,8 +518,6 @@ le code."* Le code généré est une cible, jamais une source.
 
 ## Chat Output Protocol
 
-Applique `@.claude/rules/output-protocol.md`. Label `[DEV-FRONTEND]`, plage `66-78%`,
-granularité 3-6 updates. Retry build_loop via `[DEV-FRONTEND/FIXING] (iter X/N)` (% gelé).
-Fidelity check post-build : 1L `[DEV-FRONTEND] Fidélité HTML→UI: N/N libellés. (Y%)`.
-Erreurs : chat 1L + bloc ERROR 3L disque préservé (cf. `error-classification.md §2`).
-Bypass `SDD_CHAT_VERBOSE=1`.
+Applique `@.claude/rules/output-protocol.md` (label `[DEV-FRONTEND]`, plage `66-78%`).
+Retry build_loop via `[DEV-FRONTEND/FIXING] (iter X/N)` (% gelé) ; fidelity check
+post-build : 1L `[DEV-FRONTEND] Fidélité HTML→UI: N/N libellés. (Y%)`.

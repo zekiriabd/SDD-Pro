@@ -25,11 +25,32 @@ référence à un framework de test.
 ## STEP 0 — 1.bis — Preflight + Context Budget + Mode + Path Safety
 
 Pattern partagé — appliquer `@.claude/rules/dev-shared-preflight.md`
-intégralement (§1 STEP 0 preflight, §2 STEP 0.5 context budget, §3
-STEP 1 mode From Plan, §4 STEP 1.bis path safety). Paramètres
-`dev-backend` : `--family backend`, `--agent dev-backend`, Glob
-mode `*.back.md`, path root `workspace/output/src/{BackendName}/`.
-Codes preflight extra : aucun (cf. §5 matrice).
+intégralement. Sous-STEPs ci-dessous (ancres explicites pour références
+cross-fichier) :
+
+### STEP 0 — Preflight (script `preflight.py`)
+
+Appliquer `dev-shared-preflight.md §1` avec paramètres `dev-backend` :
+`--family backend`, Glob mode `*.back.md`, path root
+`workspace/output/src/{BackendName}/`. Codes preflight extra : aucun
+(cf. §5 matrice).
+
+### STEP 0.5 — Context budget (HARD-GATE)
+
+Appliquer `dev-shared-preflight.md §2` avec `--agent dev-backend`.
+Exit non-zero → STOP. Ledger persisté dans `console.db` table
+`context_budget` (SSoT v6.10).
+
+### STEP 1 — Détection mode From Plan
+
+Appliquer `dev-shared-preflight.md §3` (Glob spécifique `*.back.md`).
+Variables résultantes : `FROM_PLAN_PATH` (string|null), `PLAN_ONLY` (bool).
+
+### STEP 1.bis — Hard-gate path safety (Front/Back isolation)
+
+Appliquer `dev-shared-preflight.md §4`. Bloquant avant tout Write/Edit
+sous `workspace/output/src/`. Violation → STOP + ERROR
+`[FILE_OWNERSHIP_NESTED]`.
 
 Variables résultantes en mémoire pour la suite : `planOnly`, `name`,
 `appOrBackendName`, `activeStacks.{backend,frontend,uiDs,auth}`,
@@ -375,7 +396,7 @@ Aucun autre texte.
 
 ---
 
-## Anti-derive strict
+## Inline Rules — Anti-derive strict
 
 Substance partagée — `@.claude/rules/build-and-loop.md §3` (7 bullets canoniques).
 Spécifique dev-backend : stacks contraints à `backend|auth/*.md` (pas
@@ -416,8 +437,5 @@ le code."* Le code généré est une cible, jamais une source.
 
 ## Chat Output Protocol
 
-Applique `@.claude/rules/output-protocol.md`. Label `[DEV-BACKEND]`, plage `32-58%`,
-granularité 3-6 updates. Retry build_loop visible via `[DEV-BACKEND/FIXING] (iter X/N)`
-(% gelé, cf. §8.1). Erreurs : chat 1L (`🔴 [DEV-BACKEND/FAIL] résumé — [CLASS] détail
-→ rapport.md (X%)`) + bloc ERROR 3L disque préservé pour `build_loop`/hooks
-(cf. `error-classification.md §2`). Bypass `SDD_CHAT_VERBOSE=1`.
+Applique `@.claude/rules/output-protocol.md` (label `[DEV-BACKEND]`, plage `32-58%`).
+Retry build_loop visible via `[DEV-BACKEND/FIXING] (iter X/N)` (% gelé).
