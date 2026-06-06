@@ -10,7 +10,14 @@ Usage:
     from sdd_lib.atomic_write import atomic_write_text
     atomic_write_text(Path("Shared/BebeDto.cs"), generated_content)
 
-Cross-platform : `os.replace()` is atomic on POSIX and Windows (Python ≥ 3.3).
+Cross-platform notes:
+- POSIX: `os.replace()` is atomic at the inode level (Python ≥ 3.3).
+- Windows: `os.replace()` calls `MoveFileExW(MOVEFILE_REPLACE_EXISTING)`.
+  Atomic at the MFT level, BUT fails with `WinError 5` (ERROR_ACCESS_DENIED)
+  when the destination is open elsewhere (e.g. read by a SubagentStop hook,
+  scanned by antivirus, indexed by Windows Search). Mitigated by the retry
+  loop below (audit 2026-06-06 RUPT-5).
+
 Idempotent : re-applying the same content is a no-op (still atomic on disk).
 
 Cleanup : the `.tmp` is removed if the rename succeeds. If the script
@@ -23,10 +30,54 @@ for SDD_Pro use case where each entity file is < 50 KB.
 from __future__ import annotations
 
 import os
+import sys
+import time
 from pathlib import Path
 from typing import Iterable
 
 DEFAULT_TMP_SUFFIX = ".sddtmp"
+
+#: Audit 2026-06-06 RUPT-5 — `os.replace` on Windows NTFS is not atomic
+#: under sharing violations (live test 5 threads = 1 PermissionError out
+#: of 5 reproducible). Retry with linear backoff to absorb transient
+#: holders (audit hooks, AV scan, indexer). On POSIX the loop usually
+#: succeeds on first try (no sharing violation semantics).
+_REPLACE_MAX_RETRIES = 5
+_REPLACE_BACKOFF_S = 0.05  # 50 ms × 5 = 250 ms worst case
+
+
+def _replace_with_retry(tmp: Path, dst: Path) -> None:
+    """`os.replace(tmp, dst)` with retry on Windows sharing violations.
+
+    Raises the last exception if all retries exhaust. On POSIX this is
+    effectively a single-shot rename (no PermissionError semantics on
+    `rename()`).
+    """
+    last_exc: BaseException | None = None
+    for attempt in range(_REPLACE_MAX_RETRIES):
+        try:
+            os.replace(tmp, dst)
+            return
+        except PermissionError as exc:
+            # Windows ERROR_ACCESS_DENIED (5) — destination held open by
+            # another process. Sleep and retry. On the last attempt, let
+            # the exception propagate.
+            last_exc = exc
+            if attempt == _REPLACE_MAX_RETRIES - 1:
+                break
+            time.sleep(_REPLACE_BACKOFF_S * (attempt + 1))
+        except OSError as exc:
+            # Other transient OS error (rare). Retry on Windows only —
+            # POSIX rename is atomic so any OSError there is terminal.
+            if sys.platform != "win32":
+                raise
+            last_exc = exc
+            if attempt == _REPLACE_MAX_RETRIES - 1:
+                break
+            time.sleep(_REPLACE_BACKOFF_S * (attempt + 1))
+    # All retries exhausted — re-raise the last captured exception
+    assert last_exc is not None
+    raise last_exc
 
 
 def atomic_write_text(
@@ -54,7 +105,7 @@ def atomic_write_text(
             except OSError:
                 # Some FS (e.g. network mounts) don't support fsync — best effort.
                 pass
-        os.replace(tmp, path)  # atomic on POSIX + Windows ≥ NT
+        _replace_with_retry(tmp, path)  # atomic + Windows retry (RUPT-5)
     except Exception:
         # Cleanup tmp if rename failed but file was created
         try:
@@ -83,7 +134,7 @@ def atomic_write_bytes(
                 os.fsync(f.fileno())
             except OSError:
                 pass
-        os.replace(tmp, path)
+        _replace_with_retry(tmp, path)  # atomic + Windows retry (RUPT-5)
     except Exception:
         try:
             if tmp.exists():

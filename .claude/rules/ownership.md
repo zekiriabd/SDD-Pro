@@ -150,24 +150,46 @@ workspace/output/.sys/.context/adrs/*.md`.
 
 ---
 
-## 3. ADR — numérotation atomique par timestamp
+## 3. ADR — numérotation atomique par timestamp + rand4
 
-**Format** : `ADR-{YYYYMMDDTHHmmss}-{slug}.md`
-- `{YYYYMMDDTHHmmss}` = timestamp UTC seconde (ex. `20260505T143022`)
-- Collision (deux agents même seconde) → suffixe `-{rand4}`
-- `{slug}` = kebab-case, lowercase, max 5 mots
+**Format canonique v7.0.0-alpha (audit 2026-06-06 RUPT-6)** :
+`ADR-{YYYYMMDDTHHmmss}-{rand4}-{slug}.md`
+- `{YYYYMMDDTHHmmss}` = timestamp UTC seconde (ex. `20260606T143022`)
+- `{rand4}` = **4 hex chars random SYSTÉMATIQUE** (`secrets.token_hex(2)`,
+  16 bits entropie). Anti-collision même seconde garantie > 99.998 %
+  (au lieu de l'ancien suffixe conditionnel jamais implémenté en code).
+- `{slug}` = kebab-case, lowercase, max 5 mots / 40 caractères
 
 ```
-ADR-20260505T143022-stack-backend-dotnet.md
-ADR-20260605T091533-1234-pagination-strategy.md
+ADR-20260606T143022-a1f2-stack-backend-dotnet.md
+ADR-20260606T143022-b3c4-pagination-cursor-based.md   ← même seconde, no collision
 ```
 
-Tri par filename = ordre temporel stable cross-team/cross-machine.
+**Helper Python obligatoire** (au lieu de générer le filename dans le
+prompt LLM) :
+```python
+from sdd_lib.adr_id import mint_adr_filename
+filename = mint_adr_filename("stack-backend-dotnet")
+# -> "ADR-20260606T143022-a1f2-stack-backend-dotnet.md"
+```
+
+Pour les agents (arch / dev-* / constitutioner) qui ont accès au tool
+`Bash`, invocation via :
+```bash
+python -c "from sdd_lib.adr_id import mint_adr_filename; print(mint_adr_filename('stack-backend-dotnet'))"
+```
+
+Compat regex : `sdd_scripts/index_adrs.py` accepte les 2 formats
+(`(?:-[a-z0-9]+)?` middle segment optionnel) — les ADRs v6.x sans rand4
+restent indexables, les ADRs v7.0.0+ avec rand4 aussi.
+
+Tri par filename = ordre temporel stable cross-team/cross-machine
+(timestamp ISO 8601 compact lexicographiquement croissant).
 
 L'index §6 de `constitution.md` (mis à jour par arch uniquement)
 ré-indexe alphabétiquement (= ordre chronologique). Alias courts
 (`ADR-001`) **non-load-bearing** acceptables dans le H1 du fichier mais
-identifiant réel = nom de fichier timestamp.
+identifiant réel = nom de fichier timestamp+rand4.
 
 ---
 

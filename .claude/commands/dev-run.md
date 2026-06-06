@@ -683,16 +683,23 @@ ou STOP.
 ### 6.4.1 — Construction du batch
 
 ```python
-# Audit 2026-06-06 (CR-6) — hard-fail if phase_planner.py did not produce a
-# usable `phases` object. Previous code silently treated missing keys as
-# `enabled=False`, which caused 3 of the 4 reviewers (code/security/spec)
-# to skip without signal whenever phase_planner.py returned malformed JSON.
+# Audit 2026-06-06 (CR-6 + RUPT-4) — hard-fail if phase_planner.py did not
+# produce a usable `phases` object. Previous code silently treated missing
+# keys as `enabled=False`, which caused 3 of the 4 reviewers (code/security/
+# spec) to skip without signal whenever phase_planner.py returned malformed
+# JSON.
+#
+# RUPT-4 (audit 2026-06-06) : phase_planner.py emits a JSON dict (Python
+# `dict`, not an object with attributes). Use mapping syntax `phases["X"]`
+# and `phases["X"].get("enabled")` — NOT attribute access `phases.X.enabled`
+# which would raise AttributeError if a strict executor evaluates the
+# pseudo-Python literally.
 if not phases or not all(
-    hasattr(phases, k) for k in ("code_review", "security_scan", "spec_compliance")
+    k in phases for k in ("code_review", "security_scan", "spec_compliance")
 ):
     STOP + ERROR(
         "ERROR: /dev-run STEP 6.4.1 — phase plan missing required keys",
-        "CAUSE: [PHASE_PLAN_INIT_FAILED] phases object unusable — phase_planner.py output incomplete",
+        "CAUSE: [PHASE_PLAN_INIT_FAILED] phases dict unusable — phase_planner.py output incomplete",
         "FIX: rerun `python .claude/python/sdd_scripts/phase_planner.py --feat {n}` and inspect output",
     )
 
@@ -703,11 +710,11 @@ arch_review_mode = read_layered_config(keys=("ArchReviewMode",)).get(
 )
 
 BATCH = []  # liste d'invocations à dispatcher en parallèle
-if phases.code_review.enabled:
+if phases["code_review"].get("enabled"):
     BATCH.append(Agent("code-reviewer", args="{n}"))
-if phases.security_scan.enabled:
+if phases["security_scan"].get("enabled"):
     BATCH.append(Agent("security-reviewer", args="{n}"))   # --mode scan supprimé v7.0.0
-if phases.spec_compliance.enabled:
+if phases["spec_compliance"].get("enabled"):
     BATCH.append(Agent("spec-compliance-reviewer", args="{n}"))
 if arch_review_mode == "full":
     BATCH.append(Agent("arch-reviewer", args="{n}"))

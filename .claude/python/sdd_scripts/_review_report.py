@@ -30,6 +30,52 @@ from sdd_scripts.triage_issues import classify_path, load_project_names
 VERDICT_ICON = {"green": "🟢", "yellow": "🟡", "red": "🔴"}
 
 
+#: Issue classes that ALWAYS force verdict 🔴 RED regardless of agent-emitted
+#: severity OR Project Config `*FailOn` threshold (audit 2026-06-06 RUPT-3).
+#:
+#: Source of truth : `rules/error-classification.md §1.10 §1.11 §1.13` +
+#: `python/security_patterns.yaml` `hard_blocking: true` entries.
+#:
+#: Rationale : these classes encode invariants that **cannot** be bypassed
+#: by lowering thresholds (e.g. `SecurityFailOn: critical` shouldn't allow
+#: SQL injection to slip through). Without this list, `_review_report.py`
+#: relied ONLY on `severity in {critical, blocker}` — if an agent emitted a
+#: known-critical class at `serious` severity by mistake, the verdict
+#: degraded silently to YELLOW.
+#:
+#: Add new entries here when extending the taxonomy. Keep in sync with
+#: `error-classification.md §1.11` table (`hard-blocking systématique`).
+HARD_BLOCKING_CLASSES: frozenset[str] = frozenset({
+    # Security (OWASP Top 10 — 8 classes per §1.11)
+    "SEC_SECRET_HARDCODED",       # A02/A07 CWE-798
+    "SEC_SQL_INJECTION",          # A03 CWE-89
+    "SEC_COMMAND_INJECTION",      # A03 CWE-78
+    "SEC_BROKEN_AUTHZ",           # A01 CWE-862
+    "SEC_BROKEN_AUTHN",           # A07 CWE-287
+    "SEC_DESERIALIZATION_UNSAFE", # A08 CWE-502
+    "SEC_JWT_MISCONFIG",          # A07 CWE-1004
+    "SEC_SSRF_RISK",              # A10 CWE-918
+    # Spec compliance (§1.13 — feat-validate STEP 4.5.3/4.5.4)
+    "SPEC_COMPLIANCE_REQUIRED",
+    "SPEC_COMPLIANCE_RED",
+    "SPEC_COMPLIANCE_PARSE_ERROR",
+    # Code review (§1.10 — code-reviewer.md §7.3 hard-blocking override)
+    "FRONTEND_BACKEND_CONTRACT_GAP",
+})
+
+
+def _is_hard_blocking(finding: Finding) -> bool:
+    """Return True if `finding.issue_class` is in HARD_BLOCKING_CLASSES.
+
+    Strip leading `[` and trailing `]` if the agent emitted the bracketed
+    form (defensive — the canonical Finding.issue_class is unbracketed).
+    """
+    cls = (finding.issue_class or "").strip()
+    if cls.startswith("[") and cls.endswith("]"):
+        cls = cls[1:-1]
+    return cls in HARD_BLOCKING_CLASSES
+
+
 @dataclass
 class ReviewReport:
     feat_n: int
@@ -62,11 +108,26 @@ def compute_report(
     counts_by_severity = dict(Counter(f.severity for f in findings))
     counts_by_class    = dict(Counter(f.issue_class for f in findings))
 
-    # Verdict
+    # Verdict (audit 2026-06-06 RUPT-3 — hard_blocking override)
     threshold = SEVERITY_RANK.get(fail_on, SEVERITY_RANK["serious"])
     triggering = [f for f in findings if SEVERITY_RANK.get(f.severity, 0) >= threshold]
 
-    if any(f.severity in ("critical", "blocker") for f in findings):
+    # Hard-blocking classes force RED regardless of severity or fail_on
+    # threshold. This catches the case where an agent emits a known-critical
+    # class (e.g. [SEC_SQL_INJECTION]) at `serious` severity by mistake —
+    # without this check, a `SecurityFailOn: critical` project would silently
+    # downgrade to YELLOW. Promotes the YAML `hard_blocking: true` metadata
+    # from declarative to enforced.
+    hard_blocked = [f for f in findings if _is_hard_blocking(f)]
+
+    if hard_blocked:
+        verdict = "red"
+        # Treat hard-blocked findings as "triggering" so they appear in the
+        # detail section of the report (alongside threshold-triggered ones).
+        for f in hard_blocked:
+            if f not in triggering:
+                triggering.append(f)
+    elif any(f.severity in ("critical", "blocker") for f in findings):
         verdict = "red"
     elif triggering:
         verdict = "red"

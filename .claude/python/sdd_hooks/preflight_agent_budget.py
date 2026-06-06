@@ -48,6 +48,11 @@ ALLOWED_AGENTS: set[str] = {
     # (governance-major-auditors-trim).
     "code-reviewer", "security-reviewer",
     "spec-compliance-reviewer", "arch-reviewer",
+    # Adversarial reviewer (R1 v7.2.0 opt-in, informational verdict).
+    # Audit 2026-06-06 RUPT-1 — l'agent était manifest+prompt+command
+    # mais absent des 3 collections Python -> hard-fail
+    # [AGENT_NOT_ALLOWLISTED] sur tout `/sdd-review --adversarial`.
+    "adversarial-reviewer",
 }
 
 # Agents explicitly removed in v7.0.0 — the hook ACTIVELY rejects these
@@ -182,9 +187,12 @@ def main() -> int:
     if us_id:
         cmd += ["--us-id", us_id]
 
-    # Timeout 10s (audit M6 fix v7.0.0-alpha 2026-06-04) — context_budget.py
-    # should complete in <1s typically. 10s ceiling guards against pathological
-    # cases (DB lock, huge reads/, glob explosion) blocking Agent spawn opaquely.
+    # Timeout 30s (security audit fix 2026-06-06 — was 10s with fail-OPEN, which
+    # could bypass budget enforcement on the largest reads/ patterns precisely
+    # where it matters most — e.g. spec-compliance-reviewer measured 47MB/$35
+    # in 31s). New policy : timeout 30s + fail-CLOSED in strict mode (CI/cost cap)
+    # to prevent silent bypass of budget guards. Warn mode keeps fail-OPEN
+    # interactively to avoid blocking the Tech Lead on a stalled DB lock.
     try:
         result = subprocess.run(
             cmd,
@@ -192,14 +200,22 @@ def main() -> int:
             stderr=subprocess.PIPE,
             text=True,
             check=False,
-            timeout=10,
+            timeout=30,
         )
     except subprocess.TimeoutExpired:
-        warn(f"WARN preflight-agent-budget: context_budget.py timed out (>10s)")
-        warn(f"     Fail-OPEN to avoid blocking Agent spawn. Investigate reads/ patterns in loader.yml.")
+        warn(f"WARN preflight-agent-budget: context_budget.py timed out (>30s)")
+        if mode == "strict":
+            warn(f"ERROR: preflight-agent-budget — agent '{subagent}' refuse (timeout strict)")
+            warn(f"CAUSE: [BUDGET_PRECHECK_TIMEOUT] context_budget.py >30s on {subagent}")
+            warn(f"FIX: investiguer reads/ patterns dans loader.yml ; OU exporter SDD_BUDGET_MODE=warn pour bypass interactif tracé")
+            return HOOK_DENY
+        warn(f"     Fail-OPEN (mode=warn, interactif). Investigate reads/ patterns in loader.yml.")
         return HOOK_ALLOW
     except OSError as e:
         warn(f"WARN preflight-agent-budget: subprocess failed: {e}")
+        if mode == "strict":
+            warn(f"ERROR: preflight-agent-budget — subprocess error en mode strict, refuse")
+            return HOOK_DENY
         return HOOK_ALLOW
     # Forward all output to stderr (visible to Claude/user)
     for line in (result.stdout or "").splitlines():

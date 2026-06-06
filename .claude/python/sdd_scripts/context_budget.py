@@ -56,11 +56,14 @@ CURRENT_AGENTS: tuple[str, ...] = (
     # Core + support (4 + 3)
     "po", "arch", "dev-backend", "dev-frontend",
     "qa", "elicitor", "constitutioner",
-    # Auditors retained in v7.0.0 (4)
+    # Auditors retained in v7.0.0 (4 + 1 opt-in)
     "code-reviewer",
     "security-reviewer",
     "spec-compliance-reviewer",
     "arch-reviewer",
+    # Adversarial reviewer (R1 v7.2.0 opt-in, informational verdict).
+    # Audit 2026-06-06 RUPT-1 — sync avec preflight_agent_budget.ALLOWED_AGENTS.
+    "adversarial-reviewer",
 )
 
 #: Read-side compat list for historical `console.db` rows produced by
@@ -83,6 +86,7 @@ DEFAULT_BUDGETS: dict[str, int] = {
     "po":            60_000,
     "elicitor":      70_000,
     "arch":         180_000,
+    "constitutioner":  90_000,   # security audit 2026-06-06 — manquant, KeyError sur invocation
     "dev-backend":  220_000,
     "dev-frontend": 240_000,
     "qa":           280_000,
@@ -100,6 +104,12 @@ DEFAULT_BUDGETS: dict[str, int] = {
     "security-reviewer":      4_000_000,   # Sonnet, OWASP scan + threat-model
     "performance-auditor":    4_000_000,   # Sonnet, CWV + SLO heuristiques
     "spec-compliance-reviewer": 4_000_000, # Sonnet, AC-by-AC re-lecture code
+    # Audit 2026-06-06 RUPT-1 — adversarial-reviewer (R1 v7.2.0 opt-in).
+    # Sonnet 4.6. Read-only sur workspace/output/qa/feat-{n}/ (consolidated
+    # review reports) + workspace/output/src/{App,Backend}Name/** (code).
+    # Verdict purement informational, jamais bloquant — mais consomme un
+    # budget équivalent aux 4 autres reviewers (mêmes patterns de lecture).
+    "adversarial-reviewer":   4_000_000,
 }
 
 # Exclude these from context budget
@@ -194,8 +204,74 @@ def resolve_pattern(
     return [out]
 
 
+# Dirs prunés AVANT descente lors d'un rglob — évite que workspace/output/src
+# explose le scan (~170k fichiers node_modules sur le bench local 2.7GB).
+# Audit perf 2026-06-06 : excludes étaient appliqués via fnmatch APRÈS rglob
+# complet, donc la traversal coûtait le full I/O. Prune dirs à la racine ici
+# pour réduire à ~50ms typique.
+_PRUNE_DIRS: frozenset[str] = frozenset({
+    "node_modules", ".git", "__pycache__", ".pytest_cache",
+    ".cache", "dist", "build", "out", "target",
+    "bin", "obj", ".next", ".nuxt", ".vite", ".turbo",
+    ".gradle", ".idea", ".vscode", ".vs",
+    "coverage", ".coverage", "htmlcov",
+    ".venv", "venv", "env",
+})
+
+
+def _expand_braces(pattern: str) -> list[str]:
+    """Expand `{a,b,c}` braces — fnmatch ne les supporte pas nativement.
+
+    Exemple : `*.{back,front}.md` → ['*.back.md', '*.front.md']
+    Récursif sur les braces multiples : `{a,b}/{c,d}.md` → 4 résultats.
+    """
+    m = re.search(r"\{([^{}]+)\}", pattern)
+    if not m:
+        return [pattern]
+    alternatives = m.group(1).split(",")
+    head = pattern[: m.start()]
+    tail = pattern[m.end():]
+    expanded: list[str] = []
+    for alt in alternatives:
+        expanded.extend(_expand_braces(head + alt.strip() + tail))
+    return expanded
+
+
+def _walk_pruned(base: Path):
+    """Generator: yield only files, prune known noise dirs avant descente."""
+    try:
+        entries = list(base.iterdir())
+    except (OSError, PermissionError):
+        return
+    for entry in entries:
+        try:
+            if entry.is_dir():
+                if entry.name in _PRUNE_DIRS:
+                    continue
+                yield from _walk_pruned(entry)
+            elif entry.is_file():
+                yield entry
+        except (OSError, PermissionError):
+            continue
+
+
 def expand_files(pattern: str, root: Path) -> list[Path]:
     """Resolve a (possibly glob) pattern against the repo root and return files."""
+    # Expand braces first : loader.yml uses {back,front}, {n}-{m}-*, etc.
+    sub_patterns = _expand_braces(pattern)
+    if len(sub_patterns) > 1:
+        out: list[Path] = []
+        for sub in sub_patterns:
+            out.extend(expand_files(sub, root))
+        # Dédupliquer (préserver ordre)
+        seen: set[Path] = set()
+        deduped: list[Path] = []
+        for p in out:
+            if p not in seen:
+                seen.add(p)
+                deduped.append(p)
+        return deduped
+
     full = root / pattern
     if "*" not in pattern and "?" not in pattern:
         if full.is_file():
@@ -218,27 +294,15 @@ def expand_files(pattern: str, root: Path) -> list[Path]:
     if not base.exists():
         return []
 
-    out: list[Path] = []
-    # Build glob pattern relative to base
-    remainder_parts = parts[len(fixed_parts):]
-    glob_expr = "/".join(remainder_parts)
-
     if base.is_file():
         return [base]
 
-    # rglob if ** present, else glob
-    if "**" in glob_expr:
-        for p in base.rglob("*"):
-            if p.is_file():
-                rel = normalize(p.relative_to(root))
-                if fnmatch.fnmatch(rel, pattern):
-                    out.append(p)
-    else:
-        for p in base.rglob("*"):
-            if p.is_file():
-                rel = normalize(p.relative_to(root))
-                if fnmatch.fnmatch(rel, pattern):
-                    out.append(p)
+    # Walk pruné (excludes AVANT descente) + fnmatch
+    out: list[Path] = []
+    for p in _walk_pruned(base):
+        rel = normalize(p.relative_to(root))
+        if fnmatch.fnmatch(rel, pattern):
+            out.append(p)
     return out
 
 

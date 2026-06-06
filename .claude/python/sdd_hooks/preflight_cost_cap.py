@@ -73,6 +73,32 @@ def _resolve_cap() -> float:
         return 50.00  # defensive default — never break the pipeline
 
 
+def _resolve_us_cap() -> float:
+    """Resolve BuildLoopMaxCostUsd from layered config (audit 2026-06-06 RUPT-2).
+
+    Caps the cumulative USD spent on build_loop iterations for ONE US.
+    Distinguishes cost-pathological convergence from iter-pathological
+    convergence ([BUILD_LOOP_EXHAUSTED]).
+
+    Returns 0.0 to disable. Defaults to $15.00 if config unreadable (per
+    config.base.yml line 194). Shares the env one-shot disable with the
+    run-level cap.
+    """
+    # Env one-shot disable (same as run-level — single bypass for both)
+    if (os.environ.get("SDD_DISABLE_COST_CAP", "").strip().lower()
+            in ("1", "true", "yes")):
+        return 0.0
+    try:
+        from sdd_lib.layered_config import read_layered_config
+        cfg = read_layered_config()
+        raw = cfg.get("BuildLoopMaxCostUsd")
+        if raw is None:
+            return 15.00
+        return float(str(raw).strip())
+    except Exception:
+        return 15.00  # defensive default — never break the pipeline
+
+
 def _check_telemetry_health() -> None:
     """Emit visible WARN if record_token_usage is silently failing.
 
@@ -204,10 +230,110 @@ def _compute_run_cost() -> tuple[float, int, str]:
     return total, len(rows), scope
 
 
+# Module-level cache (process-local) for per-US cost queries (RUPT-2).
+# Same TTL semantics as _COST_CACHE — keyed by (run_id, feat_n, us_id).
+_US_COST_CACHE: dict[tuple[str, int, str], tuple[float, float, int]] = {}
+
+
+def _compute_us_cost(feat_n: int, us_id: str) -> tuple[float, int, str]:
+    """Aggregate USD spent so far on a specific US (audit 2026-06-06 RUPT-2).
+
+    Scopes the cost cumulation to ``token_usage WHERE run_id=? AND feat_n=?
+    AND us_id=?``. Used for ``BuildLoopMaxCostUsd`` enforcement during
+    dev-backend / dev-frontend build_loop iterations.
+
+    Returns (cost_usd, call_count, scope_label).
+    Scope label: ``"us={n}-{m} run={id:.8}"`` or ``"us={n}-{m} (no rows yet)"``.
+
+    Safe ALLOW on any I/O error (cap is best-effort, same defensive stance
+    as ``_compute_run_cost``).
+    """
+    try:
+        from sdd_lib.console_db import connect_ro, default_db_path
+    except Exception:
+        return 0.0, 0, "db error: import failed"
+
+    try:
+        if not default_db_path().exists():
+            return 0.0, 0, "db absent"
+    except Exception:
+        pass
+
+    run_id = get_or_create_run_id()
+    cache_key = (run_id, feat_n, us_id)
+
+    import time
+    now = time.monotonic()
+    cached = _US_COST_CACHE.get(cache_key)
+    if cached is not None:
+        cached_ts, cached_cost, cached_count = cached
+        if (now - cached_ts) < _COST_CACHE_TTL_SEC:
+            return cached_cost, cached_count, f"us={us_id} run={run_id[:8]}"
+
+    try:
+        with connect_ro() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT model, input_tokens, output_tokens, "
+                "       cache_creation_tokens, cache_read_tokens "
+                "FROM token_usage "
+                "WHERE run_id = ? AND feat_n = ? AND us_id = ?",
+                (run_id, feat_n, us_id),
+            )
+            rows = cur.fetchall()
+            if not rows:
+                return 0.0, 0, f"us={us_id} (no rows yet)"
+            scope = f"us={us_id} run={run_id[:8]}"
+    except Exception as e:
+        return 0.0, 0, f"db error: {e}"
+
+    total = 0.0
+    for model, inp, outp, cc, cr in rows:
+        p = PRICING.get(model or "", FALLBACK_PRICING)
+        total += (inp or 0) * p["input"] / 1_000_000
+        total += (outp or 0) * p["output"] / 1_000_000
+        total += (cc or 0) * p["cache_creation"] / 1_000_000
+        total += (cr or 0) * p["cache_read"] / 1_000_000
+
+    _US_COST_CACHE[cache_key] = (now, total, len(rows))
+    return total, len(rows), scope
+
+
+def _extract_feat_us_from_payload(payload: dict) -> tuple[int | None, str | None]:
+    """Extract (feat_n, us_id) from a PreToolUse.Agent payload, if applicable.
+
+    Searches the prompt-side `tool_input` for a `{n}-{m}` pattern in the
+    arguments (e.g. ``Agent: dev-backend args="1-2"``). Returns
+    (None, None) if no SDD-shaped anchor is found.
+
+    Defensive : never raises. Returns (None, None) on any parse failure
+    — caller treats this as "no per-US scope, skip per-US cap".
+    """
+    try:
+        import re
+        # Look in tool_input.prompt OR tool_input.arguments for a {n}-{m} anchor.
+        tool_input = payload.get("tool_input", {}) or {}
+        candidates = []
+        if isinstance(tool_input, dict):
+            for k in ("prompt", "arguments", "args", "description"):
+                v = tool_input.get(k)
+                if isinstance(v, str):
+                    candidates.append(v)
+        for haystack in candidates:
+            # Match the canonical {n}-{m} SDD anchor (with optional :plan suffix
+            # and optional quotes around the arg).
+            m = re.search(r"\b(\d+)-(\d+)(?::plan)?\b", haystack)
+            if m:
+                return int(m.group(1)), f"{m.group(1)}-{m.group(2)}"
+    except Exception:
+        pass
+    return None, None
+
+
 def main() -> int:
     cap = _resolve_cap()
     if cap <= 0:
-        return 0  # disabled
+        return HOOK_ALLOW  # disabled (was bare `return 0`, normalized 2026-06-06)
 
     payload = read_hook_input()
     if not payload:
@@ -270,6 +396,38 @@ def main() -> int:
              f"(b) augmenter MaxCostPerRun dans Project Config (decision tracee) ; "
              f"(c) bypass one-shot : export SDD_DISABLE_COST_CAP=1 puis relancer")
         return HOOK_DENY
+
+    # Audit 2026-06-06 RUPT-2 — per-US build_loop cost cap (BuildLoopMaxCostUsd).
+    # Only applies to dev-backend / dev-frontend (the agents that iterate via
+    # build_loop). Distinguishes cost-pathological convergence from
+    # [BUILD_LOOP_EXHAUSTED] (iter limit). Symmetrical bypass with run-level
+    # cap : SDD_DISABLE_COST_CAP=1 OR BuildLoopMaxCostUsd: 0 config.
+    if subagent in ("dev-backend", "dev-frontend"):
+        us_cap = _resolve_us_cap()
+        if us_cap > 0:
+            feat_n, us_id = _extract_feat_us_from_payload(payload)
+            if feat_n is not None and us_id is not None:
+                us_cost, us_calls, us_scope = _compute_us_cost(feat_n, us_id)
+                if us_scope.startswith("db error:"):
+                    # Same telemetry-trust policy as run-level — visible WARN,
+                    # but don't double-DENY (run-level already handled it).
+                    pass
+                else:
+                    us_pct = (us_cost / us_cap * 100) if us_cap > 0 else 0
+                    if us_cost >= us_cap:
+                        warn(f"ERROR: preflight-cost-cap — cap USD atteint pour cette US")
+                        warn(f"CAUSE: [BUILD_LOOP_COST_EXCEEDED] ${us_cost:.2f} >= "
+                             f"${us_cap:.2f} ({us_calls} calls scope={us_scope}) "
+                             f"— cost-pathological convergence on us={us_id}")
+                        warn(f"FIX: (a) inspecter workspace/output/qa/feat-{feat_n}/ "
+                             f"build.md pour comprendre la cause ; "
+                             f"(b) augmenter BuildLoopMaxCostUsd dans Project Config "
+                             f"(decision tracee) ; "
+                             f"(c) bypass one-shot : export SDD_DISABLE_COST_CAP=1")
+                        return HOOK_DENY
+                    elif us_cap * 0.8 <= us_cost < us_cap:
+                        warn(f"WARN preflight-cost-cap : ${us_cost:.2f} / ${us_cap:.2f} "
+                             f"({us_pct:.0f}% du cap US) — {us_calls} calls scope={us_scope}")
 
     return HOOK_ALLOW
 
