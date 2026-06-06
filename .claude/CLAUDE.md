@@ -90,23 +90,41 @@ Templates : `@.claude/docs/conventions.md §14-§15`.
 
 ---
 
-## 6. Stacks (34 actifs)
+## 6. Stacks (34 actifs — source de vérité = entête `Validation:` du `.md`)
 
-| Catégorie | 🟢 reference | 🟡 experimental |
-|---|---|---|
-| Backend (4) | `dotnet-minimalapi`, `kotlin-spring-boot` | `python-fastapi`, `node-express` |
-| Frontend (4) | `react`, `blazor-webassembly` | `vue`, `angular` |
-| UI DS (3) | `shadcn` | `vuetify`, `radzen-blazor` |
-| QA (9) | `code-quality`, `dotnet-xunit`, `kotlin-junit` | `node-vitest`, `blazor-bunit`, `python-pytest`, `angular-jasmine`, `mutation-testing` (opt-in), `playwright` (opt-in) |
-| Auth (2) | `azure-ad` | `auth-local` |
-| Archi (3) | `mvc` | `ddd`, `microservice` |
-| Fullstack (6) | — | `angular-universal`, `blazor-server`, `kotlin-mustache`, `next`, `node-react`, `nuxt` |
-| Mobiles (3) | — | `kotlin-android`, `maui`, `react-native` |
+> **v7.0.0-alpha bench 2026-06-05** (recount 2026-06-06) :
+> **25 🟢 (15 reference + 10 bench-validated runtime) + 8 🟡 experimental + 1 🟡 POC-only = 34 total**.
+> Validation automatique : `framework_smoke.py --check-stacks-count`.
 
-**Combos validés bout-en-bout : 2** sur ~120 (`dotnet-minimalapi×react×shadcn×dotnet-xunit×azure-ad`,
-`kotlin-spring-boot×react×shadcn×kotlin-junit×azure-ad`). 🟡 chargeables mais non validés
-end-to-end (risque runtime). Source de vérité = entête `Validation:` ; catalogue machine
-`{id}.libs.json` régénéré via `sync_stack_md.py`. Détail : `@.claude/docs/{architecture,validated-combos}.md`.
+| Catégorie | 🟢 reference | 🟢 bench-validated runtime (2026-06-05) | 🟡 experimental |
+|---|---|---|---|
+| Backend (4) | `dotnet-minimalapi`, `kotlin-spring-boot` | `python-fastapi`, `node-express` | — |
+| Frontend (4) | `react`, `blazor-webassembly` | `vue`, `angular` | — |
+| UI DS (3) | `shadcn`, `radzen-blazor` | — | `vuetify` |
+| QA (9) | `code-quality`, `dotnet-xunit`, `kotlin-junit`, `node-vitest`, `blazor-bunit` | — | `python-pytest`, `angular-jasmine`, `mutation-testing` (opt-in), `playwright` (opt-in) |
+| Auth (2) | `azure-ad` | — | `auth-local` |
+| Archi (3) | `mvc` | — | `ddd`, `microservice` |
+| Fullstack (6) | — | `angular-universal`, `blazor-server`, `kotlin-mustache`, `next`, `nuxt` | `node-react` 🟡 POC-only (console interne — non destiné prod externe) |
+| Mobiles (3) | `kotlin-android` | `maui` (Windows desktop runtime), `react-native` (Expo Web runtime) | — |
+
+**Tiers de validation** :
+- 🟢 **validated** (2 combos C1/C2) = `/sdd-full` complet automatisé bout-en-bout sans intervention humaine
+- 🟢 **bench-validated runtime** (10 stacks supp.) = code généré compile + démarre + sert les ACs ; pipeline `/sdd-full` partiellement bypassé (scaffolding manuel mainteneur). Détail bench : `workspace/output/qa/bench/BENCH-GLOBAL-REPORT.md`. Gaps tracés : `docs/benchmarks/known-gaps.md`
+- 🟡 **experimental** = spec stack OK + `.libs.json` valide, jamais exécuté
+
+**23 combinaisons bench runtime validées** (2026-06-05) : 16 cross-origin REST (4 backends × 4 SPA) + 6 monolithes fullstack + 1 MAUI Windows desktop + 1 RN Expo Web ; + 1 mobile scaffold seul (Kotlin Android, SDK absent).
+
+**Cible C3-prod (re-priorisé v7.0.0-alpha audit P0-doc 2026-06-05)** :
+`backend/node-express + frontend/react + ui/shadcn + qa/node-vitest + auth/auth-local + Prisma`
+(combo back-front séparé avec Vite + TS strict, **destiné production**). L'ancienne cible
+« C3-bis » sur `fullstack/node-react` est annulée — ce stack est désormais marqué
+`🟡 POC-only` (usage interne console SDD uniquement, pas de TS natif, pas de bundler,
+pas de pipeline Playwright). PoC partiel Demo conservé en archive (réf
+historique), mais ne compte pas comme combo validé. Cf. `@.claude/docs/validated-combos.md §3`.
+
+🟡 chargeables mais non validés end-to-end (risque runtime). Source de vérité =
+entête `Validation:` ; catalogue machine `{id}.libs.json` régénéré via
+`sync_stack_md.py`. Détail : `@.claude/docs/{architecture,validated-combos}.md`.
 
 ---
 
@@ -124,10 +142,10 @@ Anti-derive, ERROR 3L disque, idempotence, lecture sélective, parallélisme bor
 
 ## 9. Démarrage rapide
 
-0. Greenfield : `python bootstrap.py [--combo c1|c2] [--dry-run]` (ou `/sdd-bootstrap` — détail `python bootstrap.py --help`). Brownfield : `/sdd-discover-stack`.
-1. Éditer `workspace/input/stack/stack.md` (secrets DB, tenant Azure AD, ports).
+0. Greenfield : `python bootstrap.py [--combo c1|c2|c3|c4|c5|custom] [--dry-run|--auto-init]` (ou `/sdd-bootstrap` — détail `python bootstrap.py --help`). Brownfield : `/sdd-discover-stack`.
+1. Éditer `workspace/input/stack/stack.md` (SSoT unique — valeurs en clair `DB_PASSWORD`, `AUTH_JWT_SECRET`, `AZ_TENANTID`, ports ; fichier **gitignored**, arch propage en `appsettings.json` / `application.yml`).
 2. `/feat-generate Auth` (3-6 questions). Optionnel : mockups HTML dans `workspace/input/ui/`.
-3. `/sdd-full 1` → `/sdd-status [{n}]`. Variantes : `@.claude/docs/quickstart.md`.
+3. `/sdd-full 1` → `/sdd-status [{n}]`. **Cookbook 10 min : `@.claude/docs/cookbook.md`**. Variantes complètes : `@.claude/docs/quickstart.md`.
 
 ---
 
@@ -136,6 +154,6 @@ Anti-derive, ERROR 3L disque, idempotence, lecture sélective, parallélisme bor
 - **Architecture & workflow** : `@.claude/docs/{architecture,workflow,conventions,quickstart}.md`
 - **Onboarding** : `@.claude/docs/{glossary,hooks-and-protections,config-precedence}.md`
 - **Gouvernance** : `@.claude/docs/{VERSIONING,CHANGELOG,MIGRATION,WORKING-AGREEMENT}.md`
-- **ROI & roadmap** : `@.claude/docs/{poc-roi-methodology,roi-baseline,roadmap-v7-v8,scope-reduction-v7-ga,version-notes,cache-strategy,validated-combos,orphan-cleanup-policy}.md`
+- **ROI & roadmap** : `@.claude/docs/{poc-roi-methodology,roadmap-v7-v8,cache-strategy,validated-combos,orphan-cleanup-policy}.md`
 - **Règles** : `@.claude/rules/` (5 consolidées + 1 hoist + 1 protocole + 1 annexe)
 - **Python** : `@.claude/python/README.md`

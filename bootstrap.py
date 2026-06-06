@@ -30,12 +30,24 @@ Usage
     python bootstrap.py --combo custom # full interactive
     python bootstrap.py --skip-install # skip pip/npm install (CI use)
     python bootstrap.py --force        # overwrite existing workspace/input/
+    python bootstrap.py --auto-init    # non-interactive CI mode (reads env vars)
+
+Auto-init env vars (when --auto-init)
+=====================================
+    SDD_APP_NAME       (required) PascalCase application name
+    SDD_COMBO          (required) c1 | c2 | c3 | c4 | c5 | custom
+    SDD_BACKEND_NAME   (optional) defaults to {AppName}Back
+    SDD_DB_TYPE        (optional) defaults to PostgreSql
+    SDD_AUTH           (optional) azure-ad | auth-local | none (default: combo's auth)
+    SDD_BACKEND_PORT   (optional) defaults to combo's port
+    SDD_FRONTEND_PORT  (optional) defaults to combo's port
+    SDD_CONFIRM        (optional) "1" auto-confirms proceed prompt
 
 Exit codes
 ==========
     0 : SUCCESS — project ready, next step printed
     1 : USER_ABORT — user declined re-init or stack choice
-    2 : INVALID_INPUT — bad argument / unreachable combo
+    2 : INVALID_INPUT — bad argument / unreachable combo / missing env var in --auto-init
     3 : INFRA_ERROR — pip / npm / file write failure
 """
 from __future__ import annotations
@@ -43,6 +55,7 @@ from __future__ import annotations
 import argparse
 import os
 import re
+import secrets
 import subprocess
 import sys
 import textwrap
@@ -74,7 +87,7 @@ SMOKE_SCRIPT = REPO_ROOT / ".claude" / "python" / "sdd_admin" / "framework_smoke
 # ---------------------------------------------------------------------------
 COMBOS = {
     "c1": {
-        "label": "C1 — .NET Minimal API + React + shadcn + Azure AD (recommended)",
+        "label": "C1 — .NET Minimal API + React + shadcn + Azure AD (validated 🟢)",
         "backend": "dotnet-minimalapi",
         "frontend": "react",
         "ui": "shadcn",
@@ -86,7 +99,7 @@ COMBOS = {
         "frontend_port": "5173",
     },
     "c2": {
-        "label": "C2 — Kotlin Spring Boot + React + shadcn + Azure AD",
+        "label": "C2 — Kotlin Spring Boot + React + shadcn + Azure AD (validated 🟢)",
         "backend": "kotlin-spring-boot",
         "frontend": "react",
         "ui": "shadcn",
@@ -95,6 +108,42 @@ COMBOS = {
         "archi": "mvc",
         "lib_strategy": "openapi-codegen",
         "backend_port": "8080",
+        "frontend_port": "5173",
+    },
+    "c3": {
+        "label": "C3 — Node Express + React + shadcn + auth-local (pending validation 🟡)",
+        "backend": "node-express",
+        "frontend": "react",
+        "ui": "shadcn",
+        "qa": ["node-vitest"],
+        "auth": "auth-local",
+        "archi": "mvc",
+        "lib_strategy": "openapi-codegen",
+        "backend_port": "3000",
+        "frontend_port": "5173",
+    },
+    "c4": {
+        "label": "C4 — Python FastAPI + React + shadcn + auth-local (pending validation 🟡)",
+        "backend": "python-fastapi",
+        "frontend": "react",
+        "ui": "shadcn",
+        "qa": ["python-pytest", "node-vitest"],
+        "auth": "auth-local",
+        "archi": "mvc",
+        "lib_strategy": "openapi-codegen",
+        "backend_port": "8000",
+        "frontend_port": "5173",
+    },
+    "c5": {
+        "label": "C5 — .NET Minimal API + Vue + Vuetify + Azure AD (pending validation 🟡)",
+        "backend": "dotnet-minimalapi",
+        "frontend": "vue",
+        "ui": "vuetify",
+        "qa": ["dotnet-xunit", "node-vitest"],
+        "auth": "azure-ad",
+        "archi": "mvc",
+        "lib_strategy": "openapi-codegen",
+        "backend_port": "5097",
         "frontend_port": "5173",
     },
 }
@@ -192,51 +241,117 @@ def detect_stack_md() -> bool:
 # Interactive flow
 # ---------------------------------------------------------------------------
 
-def choose_combo(forced: str | None) -> dict:
+_UNVALIDATED_COMBOS = {"c3", "c4", "c5"}
+
+# Stacks 🟡 expérimentaux (jamais validés end-to-end via /sdd-full).
+# Cf. .claude/docs/validated-combos.md §2 et CLAUDE.md §6.
+_EXPERIMENTAL_BACKENDS = {"node-express", "python-fastapi"}
+_EXPERIMENTAL_FRONTENDS = {"vue", "angular"}
+_EXPERIMENTAL_UI = {"vuetify", "radzen-blazor"}
+_EXPERIMENTAL_ARCHI = {"ddd", "microservice"}
+
+
+def _confirm_unvalidated_combo(combo_key: str, *, auto_init: bool = False) -> None:
+    """Bloc explicite avant d'engager un combo 🟡 non validé end-to-end.
+
+    v7.0.0-alpha (audit 2026-06-05) : avant ce gate, l'utilisateur pouvait
+    choisir C3/C4/C5 sans réaliser que le pipeline `/sdd-full` n'a jamais
+    tourné end-to-end dessus (risque runtime non-trivial). On force un
+    consentement explicite ; en CI (`--auto-init`), il faut poser
+    SDD_ALLOW_UNTESTED_COMBO=1 pour passer.
+    """
+    if combo_key not in _UNVALIDATED_COMBOS:
+        return
+    if os.environ.get("SDD_ALLOW_UNTESTED_COMBO") == "1":
+        _print_info(f"Combo {combo_key.upper()} 🟡 — bypass via SDD_ALLOW_UNTESTED_COMBO=1")
+        return
+    if auto_init:
+        _print_error(
+            f"Combo {combo_key.upper()} est 🟡 pending validation (jamais "
+            f"validé bout-en-bout). En --auto-init, poser "
+            f"SDD_ALLOW_UNTESTED_COMBO=1 pour confirmer."
+        )
+        sys.exit(2)
+    _print_header(f"⚠️  Combo {combo_key.upper()} non validé end-to-end")
+    print(
+        f"  Le combo {combo_key.upper()} est marqué 🟡 « pending validation » :\n"
+        "    • aucun PoC formel `/sdd-full` FEAT M (3 US back+front) sans intervention.\n"
+        "    • le pipeline peut échouer en runtime (CORS, codegen, capabilities).\n"
+        "    • voir .claude/docs/validated-combos.md pour la matrice à jour.\n"
+        "\n"
+        "  Combos 🟢 validés (recommandés) : C1 (.NET) / C2 (Kotlin Spring).\n"
+    )
+    answer = _ask("Continuer quand même ?", default="N", choices=["y", "Y", "n", "N"])
+    if answer.lower() != "y":
+        _print_info("Bootstrap annulé. Relance avec --combo c1 ou --combo c2.")
+        sys.exit(0)
+
+
+def choose_combo(forced: str | None, *, auto_init: bool = False) -> dict:
     """Return a combo config dict from preset or interactive choice."""
     if forced:
         forced = forced.lower()
         if forced in COMBOS:
             _print_info(f"Using preset {forced.upper()} : {COMBOS[forced]['label']}")
+            _confirm_unvalidated_combo(forced, auto_init=auto_init)
             return dict(COMBOS[forced])
         if forced != "custom":
-            _print_error(f"Unknown combo '{forced}'. Valid : c1 / c2 / custom")
+            _print_error(f"Unknown combo '{forced}'. Valid : c1 / c2 / c3 / c4 / c5 / custom")
             sys.exit(2)
 
     _print_header("Stack combo")
-    print("  Validated combos (bout-en-bout, tested) :")
+    print("  Combos available :")
     print(f"    [1] {COMBOS['c1']['label']}")
     print(f"    [2] {COMBOS['c2']['label']}")
-    print(f"    [3] Custom (pick each stack manually)")
+    print(f"    [3] {COMBOS['c3']['label']}")
+    print(f"    [4] {COMBOS['c4']['label']}")
+    print(f"    [5] {COMBOS['c5']['label']}")
+    print(f"    [6] Custom (pick each stack manually)")
     print()
-    choice = _ask("Pick a combo", default="1", choices=["1", "2", "3"])
-    if choice == "1":
-        return dict(COMBOS["c1"])
-    if choice == "2":
-        return dict(COMBOS["c2"])
+    choice = _ask("Pick a combo", default="1", choices=["1", "2", "3", "4", "5", "6"])
+    combo_key = {"1": "c1", "2": "c2", "3": "c3", "4": "c4", "5": "c5"}.get(choice)
+    if combo_key:
+        _confirm_unvalidated_combo(combo_key, auto_init=auto_init)
+        return dict(COMBOS[combo_key])
 
     # Custom
     _print_header("Custom stack")
+    _print_info(
+        "Stacks 🟢 reference (validés bout-en-bout dans un combo C1/C2) :\n"
+        "  - backend  : dotnet-minimalapi, kotlin-spring-boot\n"
+        "  - frontend : react, blazor-webassembly\n"
+        "  - ui       : shadcn\n"
+        "  - archi    : mvc\n"
+        "Les autres sont 🟡 expérimentaux (chargeables, runtime non garanti)."
+    )
     backend = _ask(
         "Backend stack",
         default="dotnet-minimalapi",
         choices=["dotnet-minimalapi", "kotlin-spring-boot", "node-express", "python-fastapi"],
     )
+    if backend in _EXPERIMENTAL_BACKENDS:
+        _print_warn(f"Backend '{backend}' = 🟡 expérimental (jamais validé /sdd-full end-to-end)")
     frontend = _ask(
         "Frontend stack",
         default="react",
         choices=["react", "vue", "angular", "blazor-webassembly"],
     )
+    if frontend in _EXPERIMENTAL_FRONTENDS:
+        _print_warn(f"Frontend '{frontend}' = 🟡 expérimental (jamais validé /sdd-full end-to-end)")
     ui = _ask(
         "UI design system",
         default="shadcn",
         choices=["shadcn", "vuetify", "radzen-blazor"],
     )
+    if ui in _EXPERIMENTAL_UI:
+        _print_warn(f"UI '{ui}' = 🟡 expérimental (jamais validé /sdd-full end-to-end)")
     archi = _ask(
         "Architecture pattern",
         default="mvc",
         choices=["mvc", "ddd"],
     )
+    if archi in _EXPERIMENTAL_ARCHI:
+        _print_warn(f"Archi '{archi}' = 🟡 expérimental (jamais validé /sdd-full end-to-end)")
 
     qa_map = {
         "dotnet-minimalapi": "dotnet-xunit",
@@ -264,8 +379,48 @@ def choose_combo(forced: str | None) -> dict:
     }
 
 
-def collect_project_info(combo: dict) -> dict:
-    """5-question prompt for the project-specific values."""
+def collect_project_info(combo: dict, auto_init: bool = False) -> dict:
+    """5-question prompt for the project-specific values.
+
+    Args:
+        combo: stack combo dict from choose_combo()
+        auto_init: when True, read all values from SDD_* env vars (no prompts);
+                   missing required env vars -> sys.exit(2)
+    """
+    if auto_init:
+        app_name = os.environ.get("SDD_APP_NAME", "").strip()
+        if not app_name:
+            _print_error("--auto-init requires SDD_APP_NAME env var (PascalCase)")
+            sys.exit(2)
+        err = _validate_app_name(app_name)
+        if err:
+            _print_error(f"SDD_APP_NAME invalid: {err}")
+            sys.exit(2)
+        backend_name = os.environ.get("SDD_BACKEND_NAME", f"{app_name}Back").strip()
+        err = _validate_app_name(backend_name)
+        if err:
+            _print_warn(f"SDD_BACKEND_NAME invalid ({err}), falling back to {app_name}Back")
+            backend_name = f"{app_name}Back"
+        db_type = os.environ.get("SDD_DB_TYPE", "PostgreSql").strip()
+        if db_type not in DB_TYPES:
+            _print_error(f"SDD_DB_TYPE invalid: '{db_type}' (must be one of: {', '.join(DB_TYPES)})")
+            sys.exit(2)
+        # Optional auth + port overrides
+        auth_override = os.environ.get("SDD_AUTH", "").strip()
+        if auth_override and auth_override in ("azure-ad", "auth-local", "none"):
+            combo = {**combo, "auth": auth_override}
+        for env_key, combo_key in (("SDD_BACKEND_PORT", "backend_port"),
+                                    ("SDD_FRONTEND_PORT", "frontend_port")):
+            v = os.environ.get(env_key, "").strip()
+            if v:
+                combo = {**combo, combo_key: v}
+        return {
+            "app_name": app_name,
+            "backend_name": backend_name,
+            "db_type": db_type,
+            **combo,
+        }
+
     _print_header("Project")
     while True:
         app_name = _ask("Application name (PascalCase)", default="MyApp")
@@ -302,25 +457,37 @@ def render_stack_md(info: dict) -> str:
     qa_lines = "\n".join(f" - .claude/stacks/qa/{qa}.md" for qa in info["qa"])
 
     auth = info.get("auth", "none")
-    if auth == "azure-ad":
-        auth_lines = """\
- - .claude/stacks/auth/azure-ad.md
- - AZ_TENANTID:"<your-tenant-id>"
- - AZ_CLIENTID:"<your-client-id>"
- - AZ_DOMAIN:"<your-domain.com>"
- - AZ_AUDIENCES:"'<your-client-id>'"
- - AZ_BE_CALLBACKPATH:"/signin-oidc"
- - AZ_FE_CALLBACKPATH:"/authentication/login-callback\""""
-    elif auth == "auth-local":
+    if auth == "auth-local":  # noqa: E501 — secrets generated; values in clear, stack.md is gitignored (Pattern B)
+        # Generate a real high-entropy JWT secret (64 chars urlsafe base64).
+        # Pattern B (stack.md = SSoT) — value lives in clear in gitignored stack.md.
+        # Previous placeholder `<replace-with-long-random-secret>` was a footgun
+        # (users shipped it to staging unchanged).
+        jwt_secret = secrets.token_urlsafe(48)
         auth_lines = """\
  - .claude/stacks/auth/auth-local.md
  - AUTH_JWT_AUDIENCE:{app_name}
  - AUTH_JWT_EXPIRATION:4
  - AUTH_JWT_ISSUER:{app_name}Back
- - AUTH_JWT_SECRET:<replace-with-long-random-secret>""".format(app_name=info["app_name"])
+ - AUTH_JWT_SECRET:{jwt_secret}""".format(app_name=info["app_name"], jwt_secret=jwt_secret)
+    elif auth == "azure-ad":
+        # Azure AD requires Tech Lead to paste tenant identifiers from the
+        # portal — no random generation possible. Lines are commented to force
+        # explicit action (no fake placeholder shipped to prod).
+        auth_lines = """\
+ - .claude/stacks/auth/azure-ad.md
+# - AZ_TENANTID:<paste-tenant-id-from-azure-portal>
+# - AZ_CLIENTID:<paste-client-id-from-app-registration>
+# - AZ_DOMAIN:<your-domain.com>
+# - AZ_AUDIENCES:<client-id>
+# - AZ_BE_CALLBACKPATH:/signin-oidc
+# - AZ_FE_CALLBACKPATH:/authentication/login-callback"""
     else:
         auth_lines = "# (no auth profile active — uncomment azure-ad or auth-local if needed)"
 
+    # DB password — generated random (caller can replace with the real local DB
+    # password before `dotnet ef` / Prisma generate). Pattern B: lives in
+    # gitignored stack.md, propagated to appsettings/application.yml by arch.
+    db_password = secrets.token_urlsafe(24)
     db_type = info["db_type"]
     if db_type == "none":
         db_env = "# (no DB — DatabaseType=none)"
@@ -328,7 +495,7 @@ def render_stack_md(info: dict) -> str:
         db_env = (
             " - DB_HOST:127.0.0.1\n"
             f" - DB_NAME:{info['app_name']}\n"
-            " - DB_PASSWORD:<replace-with-secret>\n"
+            f" - DB_PASSWORD:{db_password}\n"
             " - DB_PORT:5432\n"
             " - DB_USER:postgres"
         )
@@ -336,7 +503,7 @@ def render_stack_md(info: dict) -> str:
         db_env = (
             " - DB_HOST:127.0.0.1\n"
             f" - DB_NAME:{info['app_name']}\n"
-            " - DB_PASSWORD:<replace-with-secret>\n"
+            f" - DB_PASSWORD:{db_password}\n"
             " - DB_PORT:1433\n"
             " - DB_USER:sa"
         )
@@ -344,9 +511,9 @@ def render_stack_md(info: dict) -> str:
         db_env = (
             " - DB_HOST:127.0.0.1\n"
             f" - DB_NAME:{info['app_name']}\n"
-            " - DB_PASSWORD:<replace-with-secret>\n"
-            " - DB_PORT:<default-port-for-engine>\n"
-            " - DB_USER:<engine-user>"
+            f" - DB_PASSWORD:{db_password}\n"
+            " - DB_PORT:5432\n"
+            " - DB_USER:postgres"
         )
 
     replacements = {
@@ -383,11 +550,18 @@ def write_stack_md(content: str, dry_run: bool) -> None:
 
 
 def create_workspace_skeleton(dry_run: bool) -> None:
+    """Create the canonical workspace tree.
+
+    Idempotent : `mkdir(exist_ok=True)` on every dir, safe to re-run on
+    an existing project. Always invoked (never conditional) so a partial
+    init can be repaired by simply re-running `python bootstrap.py`.
+    """
     targets = [
         REPO_ROOT / "workspace" / "input" / "feats",
         REPO_ROOT / "workspace" / "input" / "ui",
         REPO_ROOT / "workspace" / "input" / "assets",
         REPO_ROOT / "workspace" / "output" / ".sys" / ".audit",
+        REPO_ROOT / "workspace" / "output" / ".sys" / ".cache",
         REPO_ROOT / "workspace" / "output" / ".sys" / ".context" / "adrs",
         REPO_ROOT / "workspace" / "output" / ".sys" / ".state",
         REPO_ROOT / "workspace" / "output" / ".sys" / ".validation",
@@ -395,6 +569,7 @@ def create_workspace_skeleton(dry_run: bool) -> None:
         REPO_ROOT / "workspace" / "output" / "us",
         REPO_ROOT / "workspace" / "output" / "plans",
         REPO_ROOT / "workspace" / "output" / "db",
+        REPO_ROOT / "workspace" / "output" / "qa",
     ]
     for p in targets:
         if dry_run:
@@ -431,16 +606,23 @@ def install_python_deps(dry_run: bool) -> bool:
         return False
 
 
-def install_console_deps(dry_run: bool) -> bool:
-    """Run `npm install` in workspace/console/. Heavy (~50MB) → confirmation."""
+def install_console_deps(dry_run: bool, auto_yes: bool = False) -> bool:
+    """Run `npm install` in workspace/console/. Heavy (~50MB) → confirmation.
+
+    Args:
+        dry_run: preview only.
+        auto_yes: when True (CI / --auto-init), skip the confirmation prompt and install.
+    """
     if not (CONSOLE_DIR / "package.json").is_file():
         _print_warn(f"No package.json at {CONSOLE_DIR} — skipping console deps")
         return False
     if dry_run:
         _print_info(f"(dry-run) would run : npm install in {CONSOLE_DIR.relative_to(REPO_ROOT)}")
         return True
-    if not _ask_yn("Install console deps now (npm install in workspace/console/, ~50MB) ?",
-                   default=True):
+    if not auto_yes and not _ask_yn(
+        "Install console deps now (npm install in workspace/console/, ~50MB) ?",
+        default=True,
+    ):
         _print_info("Skipped — run later via : cd workspace/console && npm install")
         return False
     _print_info("Running npm install (workspace/console/) ...")
@@ -530,15 +712,27 @@ def main() -> int:
               python bootstrap.py --dry-run
         """),
     )
-    parser.add_argument("--combo", choices=["c1", "c2", "custom"],
-                        help="Skip the stack-choice prompt with a preset.")
+    parser.add_argument("--combo", choices=["c1", "c2", "c3", "c4", "c5", "custom"],
+                        help="Skip the stack-choice prompt with a preset (c1/c2 validated, c3/c4/c5 pending validation).")
     parser.add_argument("--dry-run", action="store_true",
                         help="Show actions without writing files / installing.")
     parser.add_argument("--skip-install", action="store_true",
                         help="Skip pip/npm install (CI use).")
     parser.add_argument("--force", action="store_true",
                         help="Overwrite existing workspace/input/ without confirmation.")
+    parser.add_argument("--auto-init", action="store_true",
+                        help="Non-interactive CI mode — reads SDD_* env vars, no prompts.")
     args = parser.parse_args()
+
+    # --auto-init implies --force (idempotent CI) and --skip-install (CI installs deps separately)
+    if args.auto_init:
+        args.force = True
+        if not args.combo:
+            env_combo = os.environ.get("SDD_COMBO", "").lower()
+            if not env_combo:
+                _print_error("--auto-init requires SDD_COMBO env var (c1 | c2 | c3 | c4 | c5 | custom)")
+                return 2
+            args.combo = env_combo
 
     _print_header("SDD_Pro bootstrap")
     print("  Framework version : v7.0.0-alpha")
@@ -565,9 +759,9 @@ def main() -> int:
             _print_info("Aborted — your existing workspace is untouched.")
             return 1
 
-    # Interactive
-    combo = choose_combo(args.combo)
-    info = collect_project_info(combo)
+    # Interactive (or env-driven in --auto-init mode)
+    combo = choose_combo(args.combo, auto_init=args.auto_init)
+    info = collect_project_info(combo, auto_init=args.auto_init)
 
     _print_header("Summary")
     print(f"  AppName       : {info['app_name']}")
@@ -577,7 +771,7 @@ def main() -> int:
     print(f"  Auth          : {info['auth']}")
     print(f"  Ports         : backend={info['backend_port']} / frontend={info['frontend_port']}")
     print()
-    if not args.dry_run and not _ask_yn("Proceed with this config ?", default=True):
+    if not args.dry_run and not args.auto_init and not _ask_yn("Proceed with this config ?", default=True):
         _print_info("Aborted by user.")
         return 1
 
@@ -590,7 +784,7 @@ def main() -> int:
     if not args.skip_install:
         _print_header("Dependencies")
         install_python_deps(args.dry_run)
-        install_console_deps(args.dry_run)
+        install_console_deps(args.dry_run, auto_yes=args.auto_init)
 
     if not args.dry_run:
         _print_header("Verification")

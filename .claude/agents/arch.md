@@ -45,14 +45,11 @@ RAM, phase B uniquement.
 `application.yml` / `config/default.json` / `app/config.py`, jamais
 d'env vars. `stack.md` reste source humaine, propagée par STEP 4.5.
 
-> **Convention numérotation STEPs (v7.0.0-alpha audit MIN-1, 2026-06-04)** :
-> les suffixes `.bis`, `.ter`, `.quart` désignent des **prolongements**
-> (extensions ordonnées) du STEP parent, **pas** une renumérotation. Ordre
-> d'exécution = ordre d'écriture dans le fichier (STEP 0.5 → 1 → 2 →
-> 2.ter → 2.bis → 3 → 3.6 → 3.5 → …). Ce léger « désordre » apparent est
-> volontaire : les sous-STEPs ont été ajoutés en cours d'évolution sans
-> casser les références externes existantes (`@.claude/commands/.../STEP X.bis`).
-> Refactor en numérotation contiguë = follow-up dédié (impact ~30 cross-refs).
+> **Convention numérotation STEPs** : suffixes `.bis`/`.ter`/`.quart` =
+> prolongements ordonnés du STEP parent (ordre d'exécution = ordre du
+> fichier). Refactor en numérotation contiguë = follow-up (impact ~30
+> cross-refs externes).
+
 ---
 
 ## STEP 0.5 - HARD-GATE context budget
@@ -335,17 +332,18 @@ injectant `db_config` + `auth_config` (STEP 2.ter).
      automatique de l'origin frontend dev si `appType=back-front/web`
      (cf. sous-doc §4.5.6 pour matrice port).
 
-3. **🔴 Pattern obligatoire env-var binding (depuis 2026-05-22, audit P0)** :
-   les sections DB/Auth de `appsettings.json` / `application.yml` /
-   `config/default.json` / `app/config.py` doivent contenir **uniquement
-   des placeholders vides** (`""`, `[]`). Aucune valeur résolue littéralement
-   depuis les env vars stack.md (sinon `[SEC_SECRET_HARDCODED]`).
-   Le binding runtime AZ_* / DB_* → clés natives Configuration est généré
-   dans `Program.cs` / `main.kt` / `main.py` / `server.ts` (cf.
-   `stacks/auth/azure-ad.md §2.bis` et `stacks/backend/dotnet-minimalapi.md §5.1`).
-   Inclure systématiquement le helper `StripMsysPrefix` pour
-   `AZ_BE_CALLBACKPATH` / `AZ_FE_CALLBACKPATH` (post-mortem MSYS Git
-   Bash 2026-05-22).
+3. **🔒 Pattern stack.md = SSoT (Pattern B, audit 2026-06-06)** :
+   les sections DB/Auth/SMTP de `appsettings.json` / `application.yml` /
+   `config/default.json` / `app/config.py` sont **peuplées avec les valeurs
+   en clair lues depuis stack.md** (qui est gitignored). Le code applicatif
+   lit la config native (`IConfiguration["ConnectionStrings:Default"]`,
+   `@Value("${spring.datasource.password}")`, `config.get('db.password')`,
+   `Settings().db_password`). **Plus jamais** d'accès direct aux env vars
+   shell pour ces clés — pattern `Environment.GetEnvironmentVariable("DB_*")`,
+   `process.env.DB_*`, `os.environ["DB_*"]`, `@Value("${DB_*}")` dans le code
+   applicatif → `[SEC_ENV_VAR_FORBIDDEN]` (cf. `error-classification.md §1.11`).
+   `appsettings.json` / `application.yml` / `config/default.json` générés
+   doivent figurer dans `.gitignore` du projet généré.
 
 4. **Switch profil auth** (azure-ad ↔ auth-local) : supprimer ancien +
    écrire nouveau (évite double chargement = crash Spring/.NET).
@@ -484,27 +482,23 @@ famille). Bénéfice : -30-40 % tokens + isolation cognitive dev-backend
 
 ---
 
-## STEP 12.5 — Déléguer ADRs + constitution à `constitutioner`
+## STEP 12.5 — Signaler "ready for constitutioner" (no-spawn)
 
-Phase D externalisée. Invoquer :
+Écrire un sentinel disque puis log 1 ligne. Le spawn de `constitutioner`
+vit côté `/arch-init` STEP 3.5 (no-spawn, cf. ADR `governance-major-no-spawn-arch`
+et `@.claude/rules/build-and-loop.md §3.bis`).
 
+```bash
+mkdir -p workspace/output/.sys/.state
+cat > workspace/output/.sys/.state/arch-ready-for-constitutioner.flag <<EOF
+{"feat":${FEAT_NUMBER},"ts":"$(date -u +%Y-%m-%dT%H:%M:%SZ)","reason":"phase-D-ready"}
+EOF
 ```
-Agent: constitutioner
+```
+[ARCH] Phase A-C OK — sentinel constitutioner posé. (28%)
 ```
 
-Le sous-agent gère :
-- Création ADRs (numérotation atomique timestamp, idempotente) par
-  dimension active (backend, frontend, UI, auth, database)
-- Update `workspace/output/.sys/.context/constitution.md` : §4 stack
-  retenu (Edit ligne), §6 index ADRs (append), §1 date
-- Régénération `workspace/output/.sys/.context/adrs/INDEX.md`
-- Validation read-back v5.0 (anti Edit silencieux)
-
-Constitutioner skip silencieux si `constitution.md` absent (projet
-pré-SDD_Pro v3).
-
-**Sortie attendue** : `constitutioner: {K} ADRs ({existants}+{nouveaux}),
-§4/§6/INDEX.md OK`. STOP + ERROR → propager + STOP.
+Skip silencieux si `workspace/output/.sys/.context/constitution.md` absent.
 
 ---
 
@@ -530,10 +524,7 @@ Sur erreur, bloc ERROR 3 lignes (CAUSE / FIX) et STOP. Aucun autre texte.
 
 ## Chat Output Protocol
 
-Applique `@.claude/rules/output-protocol.md`. Label `[ARCH]`, plage `22-32%`,
-granularité 3-6 updates. Erreurs : chat 1L (`🔴 [ARCH/FAIL] résumé — [CLASS]
-détail → rapport.md (X%)`) + bloc ERROR 3L disque préservé pour
-`build_loop`/hooks (cf. `error-classification.md §2`). Bypass `SDD_CHAT_VERBOSE=1`.
+Applique `@.claude/rules/output-protocol.md` (label `[ARCH]`, plage `22-32%`).
 
 ---
 

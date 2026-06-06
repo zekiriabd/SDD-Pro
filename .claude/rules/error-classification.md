@@ -182,7 +182,7 @@ le verdict 🟢/🟡/🔴 contre le seuil `CodeReviewFailOn` du Project Config.
 
 | Préfixe | Catégorie | Sévérité | Phase |
 |---|---|---|---|
-| `[REVIEW_SECRETS_HARDCODED]` | sécurité | critical (hard-blocking) | code-reviewer STEP 5.5 |
+| `[REVIEW_SECRETS_HARDCODED]` | sécurité | minor (info) — **owned exclusivement par `security-reviewer` `[SEC_SECRET_HARDCODED]`** (audit P0-doc 2026-06-05) | code-reviewer STEP 5.5 (info uniquement) |
 | `[REVIEW_ANTI_PATTERN_N_PLUS_ONE]` | perf DB | serious | code-reviewer STEP 5.1 |
 | `[REVIEW_ANTI_PATTERN_BLOCKING_ASYNC]` | concurrence | serious | code-reviewer STEP 5.1 |
 | `[REVIEW_ANTI_PATTERN_SYNC_IO_IN_ASYNC]` | concurrence | serious | code-reviewer STEP 5.1 |
@@ -201,9 +201,16 @@ reviewer pour ne pas proliférer la taxonomie :
 - `[FRONTEND_BACKEND_CONTRACT_GAP]` — front appelle endpoint backend manquant (hard-blocking par code-reviewer)
 
 **Hard-blocking systématique** (override `CodeReviewFailOn`) : tout
-`[REVIEW_SECRETS_HARDCODED]` ou `[FRONTEND_BACKEND_CONTRACT_GAP]` force
-le verdict 🔴 RED quelque soit le seuil configuré. Substance opérationnelle :
-`agents/code-reviewer.md §7.3`.
+`[FRONTEND_BACKEND_CONTRACT_GAP]` force le verdict 🔴 RED quelque soit
+le seuil configuré. Substance opérationnelle : `agents/code-reviewer.md §7.3`.
+
+> **v7.0.0-alpha audit P0-doc 2026-06-05** — `[REVIEW_SECRETS_HARDCODED]`
+> retiré du hard-blocking code-reviewer. Le scan secrets est désormais
+> owned **exclusivement** par `security-reviewer` (classe `[SEC_SECRET_HARDCODED]`
+> §1.11, hard-blocking CWE-798). Si code-reviewer rencontre incidemment un
+> secret évident, il l'émet en `issues.minor` à titre informationnel avec
+> pointeur vers `security-reviewer`. Plus de double-rapport sur les mêmes
+> file:line.
 
 **Anti-duplication** : le reviewer **ne refait pas** les checks couverts
 par `quality_scan.py` (TODO, magic numbers, console.log, méthodes longues
@@ -239,11 +246,21 @@ seuil `SecurityFailOn` du Project Config, sauf classes hard-blocking.
 | `[SEC_LOGGING_SECRETS]` | A09 | CWE-532 | serious | scan §5.9 |
 | `[SEC_STACK_TRACE_EXPOSED]` | A09 | CWE-209 | serious | scan §5.9 |
 | `[SEC_SSRF_RISK]` | A10 | CWE-918 | critical (hard-blocking) | scan §5.10 |
+| `[SEC_ENV_VAR_FORBIDDEN]` | A05 | CWE-1188 | serious | scan §5.11 (audit 2026-06-06) |
 
 **Hard-blocking systématique** (8 classes — override `SecurityFailOn`) :
 `[SEC_SECRET_HARDCODED]`, `[SEC_SQL_INJECTION]`, `[SEC_COMMAND_INJECTION]`,
 `[SEC_BROKEN_AUTHZ]`, `[SEC_BROKEN_AUTHN]`, `[SEC_DESERIALIZATION_UNSAFE]`,
 `[SEC_JWT_MISCONFIG]`, `[SEC_SSRF_RISK]`. Substance : `agents/security-reviewer.md §7.3`.
+
+**Audit 2026-06-06 — `[SEC_ENV_VAR_FORBIDDEN]`** : code applicatif lisant
+directement les env vars (`Environment.GetEnvironmentVariable("DB_*")`,
+`process.env.DB_*`, `os.environ["DB_*"]`, `@Value("${DB_*}")`) pour les clés
+provisionnées via `stack.md` (DB, AUTH_JWT, AZ_*, SMTP_*). Contredit Pattern B
+(stack.md = SSoT, arch peuple les configs natives en clair). Le code doit
+lire la config native (`IConfiguration`, `@Value` sur les clés `spring.datasource.*`,
+`config.get('db.password')`, `Settings().db_password`) — jamais les env vars
+directement. Cf. `agents/arch.md §STEP 4.5`, `rules/library-and-stack.md §1.0`.
 
 **Coordination avec code-reviewer** : `[REVIEW_SECRETS_HARDCODED]` (§1.10)
 est dé-dupliqué par `security-reviewer.md §6` quand `code-review.json`

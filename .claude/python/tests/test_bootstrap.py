@@ -162,18 +162,26 @@ class TestRenderStackMd(unittest.TestCase):
         self.assertIn(".claude/stacks/qa/dotnet-xunit.md", out)
         self.assertIn(".claude/stacks/qa/node-vitest.md", out)
 
-    def test_azure_ad_block_includes_placeholders(self):
+    def test_azure_ad_block_commented_keys(self):
+        # Audit 2026-06-06 — Azure AD keys are commented (Tech Lead must
+        # paste real values from Azure portal). No fake `<your-tenant-id>`
+        # placeholder that could ship to prod unchanged.
         out = self._render(auth="azure-ad")
-        self.assertIn("AZ_TENANTID:", out)
-        self.assertIn("AZ_CLIENTID:", out)
-        self.assertIn("<your-tenant-id>", out)
+        self.assertIn(".claude/stacks/auth/azure-ad.md", out)
+        self.assertIn("# - AZ_TENANTID:", out)
+        self.assertIn("# - AZ_CLIENTID:", out)
+        self.assertIn("paste-tenant-id-from-azure-portal", out)
 
-    def test_auth_local_block_includes_jwt_secret_placeholder(self):
+    def test_auth_local_block_generates_real_jwt_secret(self):
+        # Audit 2026-06-06 — JWT secret is a real random nonce (Pattern B),
+        # not a placeholder. stack.md is gitignored so this is safe.
         out = self._render(auth="auth-local", app_name="MyApp")
         self.assertIn("AUTH_JWT_SECRET:", out)
-        # AUTH_JWT_ISSUER derived from app_name : "MyApp" → "MyAppBack"
         self.assertIn("AUTH_JWT_ISSUER:MyAppBack", out)
         self.assertIn(".claude/stacks/auth/auth-local.md", out)
+        # The generated secret must NOT be a placeholder string.
+        self.assertNotIn("<replace-with-long-random-secret>", out)
+        self.assertNotIn("<replace-with-secret>", out)
 
     def test_auth_none_does_not_activate_any_profile(self):
         out = self._render(auth="none")
