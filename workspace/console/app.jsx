@@ -1,5 +1,41 @@
-﻿/* global React, ReactDOM, marked */
+﻿/* global React, ReactDOM, marked, DOMPurify */
 const { useState, useMemo, useEffect, useCallback, Fragment } = React;
+
+// ───────── CSRF (Audit 2026-06-06 — server.js requires X-CSRF-Token on mutating verbs) ─────────
+let _csrfToken = null;
+let _csrfPromise = null;
+
+async function getCsrfToken() {
+  if (_csrfToken) return _csrfToken;
+  if (_csrfPromise) return _csrfPromise;
+  _csrfPromise = (async () => {
+    try {
+      const r = await fetch("/api/csrf", { credentials: "same-origin" });
+      if (!r.ok) throw new Error(`csrf endpoint returned ${r.status}`);
+      const { csrfToken } = await r.json();
+      _csrfToken = csrfToken;
+      return csrfToken;
+    } catch (e) {
+      console.warn("[csrf] failed to fetch token — mutating requests will 403", e);
+      _csrfPromise = null;
+      return null;
+    }
+  })();
+  return _csrfPromise;
+}
+
+// Wrapper around fetch that auto-injects X-CSRF-Token for mutating verbs.
+// Drop-in replacement: `await mutatingFetch(url, { method: "POST", ... })`.
+async function mutatingFetch(url, options = {}) {
+  const token = await getCsrfToken();
+  const headers = { ...(options.headers || {}) };
+  if (token) headers["X-CSRF-Token"] = token;
+  return fetch(url, { ...options, headers, credentials: "same-origin" });
+}
+
+// Pre-fetch the CSRF token at module load so the first user click doesn't pay
+// the round-trip cost. Fire-and-forget.
+getCsrfToken();
 
 // ───────── HELPERS ─────────
 function getNodePath(node) {
@@ -246,9 +282,11 @@ function DocPage({ docId }) {
 
   if (error) return <div className="doc-content"><div style={{color: "var(--danger)"}}>Erreur : {error}</div></div>;
   if (body === null) return <div className="doc-content"><div style={{color: "var(--ink-3)"}}>Chargement de la documentation…</div></div>;
+  // Sanitize HTML reçu de /api/help/* avant injection (security audit 2026-06-06).
+  const safeBody = (typeof DOMPurify !== "undefined") ? DOMPurify.sanitize(body) : body;
   return (
     <article className="doc-content">
-      <div dangerouslySetInnerHTML={{ __html: body }}/>
+      <div dangerouslySetInnerHTML={{ __html: safeBody }}/>
     </article>
   );
 }
@@ -307,7 +345,7 @@ function GateBanner({ gate, onResolve }) {
   const decide = async (decision) => {
     setBusy(true); setError(null);
     try {
-      const res = await fetch("/api/gate-decide", {
+      const res = await mutatingFetch("/api/gate-decide", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ FeatNum: gate.FeatNum, phase: gate.phase, decision }),
@@ -1022,8 +1060,13 @@ function ExplainView({ path }) {
   const load = useCallback(async (force = false) => {
     setState({ status: "loading", content: null, meta: null, error: null });
     try {
-      const url = `/api/explain?path=${encodeURIComponent(path)}${force ? "&force=1" : ""}`;
-      const res = await fetch(url);
+      // Security audit 2026-06-06 : POST au lieu de GET (effets de bord :
+      // appel Anthropic payant + envoi contenu).
+      const res = await mutatingFetch("/api/explain", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path, force }),
+      });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
       setState({ status: "ok", content: json.content, meta: json, error: null });
@@ -1062,8 +1105,11 @@ function ExplainView({ path }) {
     );
   }
 
-  // marked.parse() est synchrone et safe sur du markdown emis par Claude (pas de raw HTML demande)
-  const html = window.marked ? window.marked.parse(state.content || "", { breaks: false, gfm: true }) : state.content;
+  // marked.parse() suivi de DOMPurify.sanitize (security audit 2026-06-06).
+  // Le contenu vient d'Anthropic API et peut contenir du HTML brut si le LLM est
+  // nudgé par un prompt-injection en amont. Ne JAMAIS injecter sans sanitize.
+  const rawHtml = window.marked ? window.marked.parse(state.content || "", { breaks: false, gfm: true }) : state.content;
+  const html = (typeof DOMPurify !== "undefined") ? DOMPurify.sanitize(rawHtml) : rawHtml;
 
   return (
     <div className="detail-body">
@@ -1114,7 +1160,7 @@ function ActionBar({ node, parents, onValidate }) {
   const submit = useCallback(async (decision, commentText) => {
     setBusy(true); setError(null);
     try {
-      const res = await fetch("/api/validate", {
+      const res = await mutatingFetch("/api/validate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...ctx, decision, comment: commentText }),

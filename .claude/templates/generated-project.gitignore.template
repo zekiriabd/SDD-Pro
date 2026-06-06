@@ -1,0 +1,59 @@
+# SDD_Pro generated project ignores
+#
+# Copy to workspace/output/src/{ProjectName}/.gitignore during arch Phase A.
+# Generated config may contain local secrets copied from stack.md. Keep example
+# files versioned, keep real local config ignored.
+
+# Dependencies / build outputs
+node_modules/
+dist/
+build/
+.next/
+.nuxt/
+.output/
+.angular/
+bin/
+obj/
+target/
+.gradle/
+coverage/
+
+# Local env files are forbidden as SDD config source, but ignored defensively.
+.env
+.env.*
+!.env.example
+
+# .NET local config/certs
+appsettings.json
+appsettings.*.json
+!appsettings.example.json
+Properties/launchSettings.json
+*.pfx
+*.pem
+*.key
+
+# Spring local config
+src/main/resources/application.yml
+src/main/resources/application-*.yml
+!src/main/resources/application.example.yml
+application.yml
+application-*.yml
+!application.example.yml
+
+# Node / fullstack generated server config
+config/default.json
+config/local.json
+config/*.local.json
+lib/server/config.ts
+server/config/app-config.ts
+
+# Python generated config
+app/config.py
+app/config.local.py
+
+# Databases / runtime state
+*.db
+*.db-shm
+*.db-wal
+data/
+logs/
