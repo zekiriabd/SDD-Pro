@@ -127,42 +127,24 @@ Comparer le `stack-md-hash` de la frontmatter avec le sha256 actuel de
 
 `Read HTML_PATH` → contenu ajouté comme **texte** (HTML = texte structuré, pas vision).
 
-**Prééminence en cas de divergence** :
-- **HTML > stack §2/§7** sur visuel (libellés, ordre, structure zones,
-  classes CSS, couleurs) ET sur **layout/containers**.
-- **§7.0 du stack UI actif est SOUVERAINE** sur la décision « HTML
-  natif vs composant DS ». Lecture obligatoire AVANT toute traduction
-  élément par élément. Règle canonique :
-  - **Containers de layout/positionnement** (`<nav>`, `<header>`,
-    `<aside>`, `<main>`, `<footer>`, `<section>`, `<div>` portant
-    `display:flex`/`grid`/`position`, `padding`, `gap`, `border`,
-    `box-shadow`, `background`) → **HTML verbatim** + CSS du mockup
-    porté dans `.razor.css` adjacent. **JAMAIS** mappés vers
-    `RadzenLayout`/`RadzenSidebar`/`RadzenHeader`/`RadzenMenu`.
-  - **Éléments de contenu fonctionnel** (formulaires riches, grilles
-    de données, dialogs, dropdowns data-driven, validation) →
-    composant DS natif (`RadzenDataGrid`, `RadzenDropDown`,
-    `RadzenTextBox`, `DialogService`, …).
-  - **Éléments visuels simples** (boutons icône cosmétiques, SVG
-    inline du mockup, liens nav, sélecteurs custom du mockup) →
-    HTML verbatim + CSS mockup, **PAS** de wrapping Radzen.
-- **Tables §7.bis du stack UI = référence rapide pour le contenu
-  uniquement**, subordonnées à §7.0 (containers exclus).
-- **US > tout** sur workflow (validation, navigation, affichage conditionnel)
+#### Matrice d'arbitrage canonique (SSoT, audit T4 2026-06-07)
 
-#### Matrice d'arbitrage explicite (audit M2 closure 2026-06-07)
-
-Pour clore définitivement toute ambiguïté sur §7.0 vs §7.bis, l'ordre de priorité hiérarchique strict est :
+**Ordre de priorité strict (premier match gagne, jamais d'override)** :
 
 ```
 Conflit décisionnel → Source d'arbitrage (premier match wins) :
-  1. US `## Acceptance Criteria`     (workflow, ACs) — toujours souverain
-  2. Stack UI §7.0  (containers)     — décide DS-native vs HTML+CSS verbatim
-  3. Stack UI §7.bis (contenu)       — mapping HTML→DS UNIQUEMENT pour widgets de contenu
-  4. HTML mockup (workspace/input/ui/)— référence visuelle dernière chance
+  1. US `## Acceptance Criteria`        (workflow, ACs)         — toujours souverain
+  2. Stack UI §7.0  (containers)        — décide DS-native vs HTML+CSS verbatim
+  3. Stack UI §7.bis (contenu)          — mapping HTML→DS UNIQUEMENT pour widgets de contenu
+  4. HTML mockup (workspace/input/ui/)  — référence visuelle dernière chance
 ```
 
-**Concrètement** : si §7.0 dit "containers = HTML verbatim" et §7.bis dit "div.card → RadzenCard", **§7.0 gagne** sur les containers (pas de wrapping Radzen), §7.bis ne s'applique qu'aux widgets de contenu interne (formulaires, grilles, dropdowns). Aucune circularité — §7.bis est un **sous-domaine** de §7.0, jamais un peer.
+**Concrètement** :
+- **Containers de layout/positionnement** (`<nav>`, `<header>`, `<aside>`, `<main>`, `<footer>`, `<section>`, `<div>` portant `display:flex`/`grid`/`position`, `padding`, `gap`, `border`, `box-shadow`, `background`) → **HTML verbatim** + CSS du mockup porté dans `.razor.css` adjacent. **JAMAIS** mappés vers `RadzenLayout`/`RadzenSidebar`/`RadzenHeader`/`RadzenMenu` (gouverné par §7.0).
+- **Éléments de contenu fonctionnel** (formulaires riches, grilles de données, dialogs, dropdowns data-driven, validation) → composant DS natif (`RadzenDataGrid`, `RadzenDropDown`, `RadzenTextBox`, `DialogService`, …) — gouverné par §7.bis.
+- **Éléments visuels simples** (boutons icône cosmétiques, SVG inline, liens nav, sélecteurs custom) → HTML verbatim + CSS mockup, **PAS** de wrapping Radzen.
+
+**Anti-règle** : ne **jamais** raisonner "HTML > Stack" en général. §7.0 dicte la décision DS-vs-HTML pour les containers ; le HTML mockup est **subordonné** à §7.0 pour cette dimension. §7.bis est un **sous-domaine** de §7.0, jamais un peer.
 
 ### 4.2 Configuration auth consommée par le code généré
 

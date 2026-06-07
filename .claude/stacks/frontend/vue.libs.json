@@ -33,7 +33,7 @@
     "eslint": "9.16.0",
     "vue-eslint-config-typescript": "14.1.4",
     "vue-eslint-config-prettier": "10.1.0",
-    "xlsx": "0.18.5",
+    "exceljs": "4.4.0",
     "jspdf": "2.5.2",
     "jspdf-autotable": "3.8.4"
   },
@@ -62,7 +62,7 @@
   "onDemand": [
     { "module": "@azure/msal-browser", "ref": "msal-browser", "capability": "auth-azure-ad", "triggers": ["azure.ad", "msal", "tech-auth-azure"] },
     { "module": "date-fns", "ref": "date-fns", "capability": "date-utils", "triggers": ["dates.*format", "duree", "intervalle.*temps"] },
-    { "module": "xlsx", "ref": "xlsx", "capability": "excel-client", "triggers": ["\\bexcel\\b", "\\.xlsx\\b", "import.*excel", "export.*excel"] },
+    { "module": "exceljs", "ref": "exceljs", "capability": "excel-client", "rationale": "Replaces SheetJS xlsx 0.18.5 (CVE-2023-30533 Prototype Pollution + CVE-2024-22363 ReDoS, audit CTO 2026-06-07)", "triggers": ["\\bexcel\\b", "\\.xlsx\\b", "import.*excel", "export.*excel"] },
     { "module": "jspdf", "ref": "jspdf", "capability": "pdf-client", "triggers": ["\\bpdf\\b", "\\.pdf\\b", "export.*pdf", "imprim"] },
     { "module": "jspdf-autotable", "ref": "jspdf-autotable", "capability": "pdf-client", "triggers": ["\\bpdf\\b", "\\.pdf\\b", "export.*pdf", "imprim"] }
   ],

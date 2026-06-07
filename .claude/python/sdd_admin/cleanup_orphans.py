@@ -109,7 +109,7 @@ def _record_event(root: Path, action: str, paths: list[str]) -> None:
                    VALUES (?, ?, ?, ?, ?)""",
                 (
                     "cleanup-orphans",
-                    _dt.datetime.utcnow().isoformat() + "Z",
+                    _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
                     "cleanup_orphans",
                     action,
                     '{"paths_count": ' + str(len(paths)) + '}',
@@ -189,7 +189,7 @@ def main(argv: list[str] | None = None) -> int:
         return FAIL_FAST
 
     # Move to trash
-    ts = _dt.datetime.utcnow().strftime("%Y%m%dT%H%M%S")
+    ts = _dt.datetime.now(_dt.timezone.utc).strftime("%Y%m%dT%H%M%S")
     trash_dir = root / "workspace" / "output" / ".sys" / ".trash" / ts
     moved: list[str] = []
     for t in safe_targets:

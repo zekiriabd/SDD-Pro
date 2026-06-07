@@ -428,7 +428,7 @@ Bypass : `SDD_ALLOW_ACCEPTANCE_BYPASS=1` (audit-loggué).
 Émettre **un seul bloc final** :
 
 ```
-qa-generate {n} — {GREEN | YELLOW | RED}
+qa-generate {n} — {PASS | WARN | FAIL | SKIPPED | INFRA_BLOCKED}  (legacy: GREEN | YELLOW | RED)
 
 Tests          : {passed}/{total} passants ({skipped} skipped)
 Coverage       : {pct}% (seuil {CoverageMin}%) → {pass | fail}
@@ -440,13 +440,24 @@ Coverage       : workspace/output/qa/feat-{n}/coverage.json
 Quality        : workspace/output/qa/feat-{n}/quality.json
 ```
 
-Décision :
-- **GREEN** : tous tests pass + coverage OK + 0 quality error
-- **YELLOW** : tests pass, mais coverage < seuil OU quality errors
-- **RED** : au moins 1 test échoué **OU compilation des tests échoue**
+Décision (5 statuts canoniques v7.0.0 — cf. `build-and-loop.md §A.1.3`) :
+- **`PASS`** (legacy `GREEN`) : tous tests passent + coverage OK + 0 quality error
+- **`WARN`** (legacy `YELLOW`) : tests pass, mais coverage < seuil OU quality errors (warnings non bloquants)
+- **`FAIL`** (legacy `RED`) : au moins 1 test échoué **OU compilation des tests échoue**
   (alignment `error-classification.md §1.7` : `[QA_TEST_FAILED]` =
-  RED bloquant, y compris `compileTestKotlin`/`tsc --noEmit` échec
+  FAIL bloquant, y compris `compileTestKotlin`/`tsc --noEmit` échec
   sur tests préexistants)
+- **`SKIPPED`** : aucun test à exécuter (FEAT sans code testable OU `QAMode: off`)
+- **`INFRA_BLOCKED`** : test runner absent OU fixtures init failed
+  (`[QA_FRAMEWORK_MISSING]` / `[QA_INIT_FAILED]`) — distinct de FAIL fonctionnel
+
+**Champ booléen dérivé** (consommé par callers legacy) :
+```
+gate_passed = (status in {"PASS", "WARN", "SKIPPED"})
+```
+
+Le rapport `api-tests.json` et `coverage.json` doivent émettre **les deux** :
+`status` canonique (v7.0.0+) ET `verdict` legacy (backward-compat).
 
 **Cas particulier — Régression cross-FEAT par refactoring** : si
 `compileTestKotlin`/`tsc`/`pytest --collect-only` échoue sur des

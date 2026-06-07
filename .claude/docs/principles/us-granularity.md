@@ -14,22 +14,26 @@ d'une FEAT en User Stories structurées.
 
 ---
 
-## 1. Seuils (depuis SDD_Pro v2.5 — soft warning 4-6)
+## 1. Seuils (depuis SDD_Pro v7.0.0 — hard cap relevé à 10, warn dès 7)
 
 - **Min 1 US par FEAT** : une feature triviale a une seule US.
 - **Cible 1-3 US** pour la plupart des features bien scopées.
 - **Zone WARNING 4-6 US** : tolérée, mais l'agent PO émet un WARNING
   invitant à reconsidérer le découpage. Le pipeline continue.
-- **Hard cap 6 US** : au-delà, STOP + ERROR. La FEAT est trop large et
-  doit être splittée en plusieurs FEATs au niveau PO humain.
+- **Warn at 7 US** : signal renforcé (zone 7-10 — accepté mais
+  recommandation forte de splitter la FEAT).
+- **Hard cap 10 US** (default v7.0.0 `UsGranularityHardCap: 10`) :
+  au-delà, STOP + ERROR. La FEAT est trop large et doit être splittée
+  en plusieurs FEATs au niveau PO humain.
 
 Comportement de l'agent PO selon le nombre `N` d'US générées :
 
-| N         | Action                                                            |
-|-----------|-------------------------------------------------------------------|
-| 1-3       | Génération normale, pas de message                                |
-| 4-6       | Génération + WARNING émis dans la sortie de l'agent (non bloquant) |
-| 7+        | STOP + ERROR (pas d'écriture des US)                              |
+| N         | Action                                                                 |
+|-----------|------------------------------------------------------------------------|
+| 1-3       | Génération normale, pas de message                                     |
+| 4-6       | Génération + WARNING émis dans la sortie de l'agent (non bloquant)     |
+| 7-10      | Génération + WARNING renforcé (splitter recommandé)                    |
+| 11+       | STOP + ERROR (pas d'écriture des US)                                   |
 
 WARNING (zone 4-6) :
 ```
@@ -37,9 +41,15 @@ WARNING: FEAT {n}-{Name} génère {N} US (zone 4-6 — tolérée mais à reconsi
 HINT: vérifier si certaines US ne sont pas des comportements dérivés (ACs) ou des détails techniques (plan inline dev-*)
 ```
 
-ERROR (> 6) :
+WARNING renforcé (zone 7-10) :
 ```
-ERROR: FEAT {n}-{Name} produces {N} US (> 6 hard cap)
+WARNING: FEAT {n}-{Name} génère {N} US (zone 7-10 — splitter fortement recommandé)
+HINT: regrouper les SFD bullets par flux utilisateur OU splitter la FEAT en plusieurs FEATs
+```
+
+ERROR (> 10) :
+```
+ERROR: FEAT {n}-{Name} produces {N} US (> 10 hard cap, default UsGranularityHardCap)
 CAUSE: FEAT trop large OU découpage 1:1 SFD → US au lieu de regrouper par flux
 FIX: regrouper les SFD bullets par flux utilisateur OU splitter la FEAT en plusieurs FEATs
 ```

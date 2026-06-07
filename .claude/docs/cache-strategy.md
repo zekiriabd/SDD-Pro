@@ -1,10 +1,45 @@
-# SDD_Pro — Prompt Caching Strategy (v7.0.0 P0-8)
+# SDD_Pro — Prompt Caching Strategy (v7.0.0 GA P0-performance)
 
-> **STATUS v7.0.0-alpha (révision 2026-06-07)** : la baseline 40.8% datée
-> 2026-05-20 sous-mesurait — le caching automatique Claude Code (auto-cache
-> + 5min TTL) atteint en réalité **~99% de hit rate** sur les runs récents.
-> L'ajout de markers `cache_control` reste utile pour les sessions étalées
-> >5min entre 2 agents (rare en pratique). Priorité v7.1 reclassée P2.
+> **STATUS v7.0.0 GA (révision 2026-06-07 audit CTO)** :
+> - Phase 1 — **annotations `cache_layer: stable|semi|volatile` complétées** sur les 12 agents dans [`loader.yml`](../loader.yml) (audit CTO 2026-06-07) ✅
+> - Phase 2 — **helper Python `sdd_lib.cache_control`** parse les annotations et émet le manifest pour le harness ✅ (cf. [`tests/test_cache_control.py`](../python/tests/test_cache_control.py) — 8 tests)
+> - Phase 3 — **wiring harness** (envoi des markers `cache_control: ephemeral` à l'API Anthropic) : reste planifié v7.1 (refacto harness sub-agent spawning)
+>
+> Baseline auto-cache Claude Code (sans markers explicites) : ~99% hit sur runs courts <5min. L'ajout de markers `cache_control` apportera un gain mesurable surtout sur les pipelines longs (`/sdd-full` ≥ 30 min) où le TTL 5min expire entre agents distants temporellement.
+
+## 0. Manifest Phase 1 (v7.0.0 GA — disponible aujourd'hui)
+
+Exécution :
+```bash
+cd .claude/python && python -m sdd_lib.cache_control
+```
+
+Sortie attendue : 12 agents × ~3-13 reads annotés, distribution ~37% stable / 35% semi / 28% volatile (cf. Phase 2 ci-dessus).
+
+Le helper produit pour chaque agent une liste de 1-3 **cache breakpoints** ordonnés stable → semi → volatile (Anthropic max 4 breakpoints par requête, dont 1 réservé au system prompt).
+
+API programmatique :
+```python
+from sdd_lib.cache_control import cache_breakpoints_for, report
+# Manifest texte pour audit
+print(report())
+# Manifest programmatique pour un agent
+breakpoints = cache_breakpoints_for("dev-backend")
+# → [("stable", [".claude/rules/build-and-loop.md", ...]),
+#    ("semi", ["workspace/output/db/schema.json", ...]),
+#    ("volatile", ["workspace/output/us/{n}-{m}-*.md"])]
+```
+
+## 0.bis Phase 3 wiring (v7.1 — TODO harness)
+
+Le harness Claude Code spawn des sub-agents via tool `Agent`. Pour activer le caching :
+
+1. Lire le manifest via `cache_breakpoints_for(agent_name)`
+2. Pour chaque (`layer`, `paths`) tuple, concaténer les contenus en un seul content block
+3. Ajouter `"cache_control": {"type": "ephemeral"}` sur les blocks **stable** et **semi** (PAS sur **volatile** qui changent à chaque US/run)
+4. Ordonner les blocks : `[stable, semi, volatile]` (cache-friendly — préfixe cache, suffixe variable)
+
+Gain attendu post-wiring : `cache_read` (Anthropic `$0.30/MTok` Sonnet 4.6) au lieu de `input` (`$3.00/MTok`) sur les 70% de reads stable+semi → **-65% coût input** sur les sessions >5min.
 
 ## 1. Baseline mesurée
 

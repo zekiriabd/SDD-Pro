@@ -474,8 +474,9 @@ Toute lib utilisée DOIT figurer §2.4.a (CORE — installée par arch) ou
 dev-backend ; côté dev-frontend, les composants DS doivent figurer
 dans mapping §2/§7 du stack `ui-*`).
 
-Absent → STOP + ERROR `[STACK_LIBRARY_MISSING]` (cf. §3 de
-`stack-completeness.md` pour le format ERROR + HINT canonique).
+Absent → STOP + ERROR `[STACK_LIBRARY_MISSING]` (cf.
+`.claude/rules/library-and-stack.md §3 (Partie A)` pour le format
+ERROR + HINT canonique).
 
 **Built-in OK** sans entrée §2.4 :
 - .NET : `System.*` (BCL)

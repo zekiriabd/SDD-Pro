@@ -108,7 +108,7 @@ documentation Claude Code pour le routing.
 ### 4.3 OWASP Top 10 (code généré)
 
 SDD_Pro inclut un **`security-reviewer` agent** (Sonnet 4.6) qui scanne le
-code généré contre les 22 classes `[SEC_*]` mappées OWASP/CWE :
+code généré contre les 23 classes `[SEC_*]` mappées OWASP/CWE :
 
 - Hard-blocking : `[SEC_SQL_INJECTION]` (CWE-89), `[SEC_COMMAND_INJECTION]`
   (CWE-78), `[SEC_BROKEN_AUTHZ]` (CWE-862), `[SEC_BROKEN_AUTHN]` (CWE-287),

@@ -224,7 +224,10 @@ Agent: adversarial-reviewer
   dans `validation_reports(report_type='review')` ni dans l'exit code.
   C'est un canal séparé consultable via :
   ```bash
-  python .claude/python/sdd_scripts/query_console_db.py adversarial --feat {n}
+  # Query directe SQL (sous-commande dédiée à câbler v7.0.2)
+  python .claude/python/sdd_scripts/query_console_db.py --raw-sql \
+    "SELECT feat_number, verdict, payload_json FROM validation_reports \
+     WHERE report_type='adversarial' AND feat_number={n} ORDER BY id DESC LIMIT 1"
   ```
 - Échec adversarial-reviewer (timeout, erreur infra) → WARN dans le
   récap final, ne bloque jamais (par design).

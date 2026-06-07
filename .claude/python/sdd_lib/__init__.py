@@ -20,8 +20,8 @@ Version policy (audit CTO 2026-06-07) :
 
 #: PEP 440 canonical version of the Python package shipping hooks + scripts.
 #: Must equal `pyproject.toml [project] version`.
-__version__ = "7.0.0a0"
+__version__ = "7.0.0"
 
 #: Human-readable framework DSL version (mirror of `loader.yml` `version` field).
-#: Same release as `__version__`, just with the `-alpha` suffix instead of `a0`.
-__framework_version__ = "7.0.0-alpha"
+#: GA tagged 2026-06-07 (cf. CLAUDE.md + VERSIONING.md).
+__framework_version__ = "7.0.0"

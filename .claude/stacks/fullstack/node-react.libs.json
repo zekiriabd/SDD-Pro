@@ -48,7 +48,7 @@
     "eslint-js": "9.17.0",
     "anthropic-sdk": "0.40.1",
     "fastify-jwt": "9.0.1",
-    "bcryptjs": "2.4.3",
+    "bcryptjs": "3.0.2",
     "prisma": "6.1.0",
     "prisma-client": "6.1.0",
     "fastify-websocket": "11.0.1",

@@ -22,11 +22,11 @@ build-backend = "setuptools.build_meta"
 # Surfaces exposing the version :
 #   - this file (PEP 440 canonical)                 : `version`
 #   - sdd_lib.__init__ (Python API)                 : `__version__` + `__framework_version__`
-#   - loader.yml (DSL contract)                     : `version: "7.0.0-alpha"`
+#   - loader.yml (DSL contract)                     : `version: "7.0.0"`
 #   - .claude/CLAUDE.md, docs/CHANGELOG.md           : human-readable
 # All MUST be bumped together. Tested by tests/test_version_alignment.py.
 name = "sdd-pro-tools"
-version = "7.0.0a0"
+version = "7.0.0"
 description = "SDD_Pro framework hooks and scripts (Python port for cross-platform support, no LLM)"
 readme = "README.md"
 requires-python = ">=3.10"

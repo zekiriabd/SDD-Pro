@@ -3,7 +3,7 @@
 > §2.4 (Librairies) régénérée depuis `kotlin-android.libs.json` — ne pas éditer manuellement (`python .claude/python/sdd_admin/sync_stack_md.py --stack-id kotlin-android`).
 
 Status: Stable
-Validation: 🟢 reference (Android 14+ LTS, Kotlin 2.3.21, Jetpack Compose stable)
+Validation: 🟡 scaffold-validated (Android 14+ LTS, Kotlin 2.0.21 LTS-aligned via Java 21, Jetpack Compose stable) — bench 2026-06-05 : scaffold OK, runtime non testé end-to-end (SDK Android absent CI). Downgrade depuis 🟢 reference (audit CTO 2026-06-07 : Kotlin 2.3.21 inexistant registre Maven)
 Tech FEAT ID: tech-kotlin-android
 Scope: **application mobile native Android** — application Kotlin Jetpack Compose cible Android 7+ (API 24-36). Un seul projet `{AppName}/` sous `workspace/output/src/`. UI Compose + state + navigation + acces APIs natives vivent dans le même projet Kotlin. Pas de séparation `{BackendName}` / `{LibName}`.
 

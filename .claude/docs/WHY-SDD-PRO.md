@@ -26,7 +26,7 @@ par une classe d'erreur dans une taxonomie de 174 préfixes `[CLASS]`.
 
 ## 2. 5 axes où SDD_Pro est objectivement supérieur
 
-### 2.1 Gates déterministes (50 scripts Python)
+### 2.1 Gates déterministes (51 scripts Python)
 
 | Gate | SDD_Pro | Cursor | Aider | Devin | BMAD | Superpowers | AgentOS |
 |---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
@@ -106,14 +106,14 @@ Aucun concurrent ne fournit cette piste d'audit.
 | Agents | 12 spécialisés + 5 reviewers | 13 skills composables | 6 personas nommés | N/A | 1 (LLM) | 1 (LLM) | 1 (LLM) |
 | Multi-IDE | ❌ Claude Code only | ✅ 7 harnesses | ✅ any LLM IDE | ✅ 4 IDEs | ✅ Cursor | ✅ CLI | ✅ web |
 | Stacks pré-validés | **34 (25 🟢 + 8 🟡)** | N/A | Via expansion packs | N/A | N/A | N/A | N/A |
-| Gates déterministes Python | **63 scripts/hooks** | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Gates déterministes Python | **64 scripts/hooks** | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | Taxonomie d'erreurs | **174 classes** | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | Idempotence + resume | ✅ `--resume` | ❌ | ⚠️ partiel | ❌ | ❌ | ❌ | ❌ |
 | Cost cap | ✅ par run + par US | ❌ | ❌ | ❌ | ❌ | ❌ | ⚠️ partiel |
 | Audit trail SQLite | ✅ `console.db` | ❌ | ❌ | ❌ | ❌ | ❌ | ⚠️ logs |
 | Compliance ready | ✅ `COMPLIANCE.md` | ❌ | ❌ | ❌ | ⚠️ entreprise SaaS | ❌ | ⚠️ SaaS |
 | Self-hosted | ✅ (workspace local) | ✅ | ✅ | ✅ | ❌ SaaS | ✅ | ❌ SaaS |
-| Licence | (à clarifier) | MIT | MIT | MIT | Commercial | Apache 2.0 | Commercial |
+| Licence | Apache 2.0 (à publier sur tag v7.0.1) | MIT | MIT | MIT | Commercial | Apache 2.0 | Commercial |
 | Coût par FEAT | $15-30 (mesuré) | $5-15 (TDD only) | $20-40 (full SDLC) | $5-10 (planning seul) | $20/mois | $0.50-5/session | $500/run |
 
 ---
@@ -169,7 +169,7 @@ séduisant. Pour un projet industriel auditable, SDD_Pro est plus rigoureux.
 ### O3 — "Mono-IDE Claude Code, c'est un risque vendor-lockin."
 Vrai. SDD_Pro est conçu pour Claude Code (hooks, agents, sub-agent tool, skills).
 Si Anthropic disparaît, le framework est inutilisable. **Mitigation** :
-l'essentiel de la valeur (50 scripts Python + 34 catalogues stacks + taxonomie
+l'essentiel de la valeur (51 scripts Python + 34 catalogues stacks + taxonomie
 [CLASS]) est portable. Une porte v8 pourrait viser multi-IDE.
 
 ### O4 — "On peut tout faire avec un bon prompt."

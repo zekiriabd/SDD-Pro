@@ -189,19 +189,11 @@
     }
   ],
   "metadata": {
-    "lastUpdated": "2026-05-21",
+    "lastUpdated": "2026-06-07",
     "format": "compact (v2)",
     "source": "User Working Agreement 2026-05-07 \u00e2\u20ac\u201d schema v2 compact migration",
-    "runtimeException": {
-      "platform": "kotlin",
-      "pinnedVersion": "2.3.21",
-      "ltsRecommended": "2.1.x",
-      "status": "STS (short-term support)",
-      "rationale": "Kotlin 2.3.x est requis pour la compatibilit\u00c3\u00a9 K2 compiler stable + coroutines 1.9 (utilis\u00c3\u00a9 par spring-boot-starter-webflux 4.0.6). Kotlin 2.1 LTS ne supporte pas Spring Boot 4.0.x ABI. Migration vers Kotlin 2.5 LTS pr\u00c3\u00a9vue d\u00c3\u00a8s sa disponibilit\u00c3\u00a9 (estim\u00c3\u00a9e 2026-Q4).",
-      "rule": "library-and-stack.md \u00c2\u00a70 \u00e2\u20ac\u201d bypass STS trac\u00c3\u00a9 (\u00c3\u00a9quivalent ADR runtime-sts-exception, framework-level)",
-      "reviewedBy": "framework maintainers v7.0.0-alpha",
-      "reviewDate": "2026-05-21",
-      "warningEmitted": "[RUNTIME_STS_EXCEPTION] WARN par validate_libs_catalog.py"
-    }
+    "changeLog": [
+      "2026-06-07 \u2014 Audit CTO 2026-06-07 : suppression du bloc runtimeException factice (pinnedVersion 2.3.21 / spring-boot-starter-webflux 4.0.6 inexistants). Le pin r\u00e9el est kotlin 2.0.21 (LTS-aligned via Java 21) \u2014 aucun bypass STS n\u00e9cessaire."
+    ]
   }
 }

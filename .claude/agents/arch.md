@@ -260,10 +260,6 @@ Précédence pour `versions{}`, `core[]`, `dbDrivers{}`, `plugins[]` :
 utiliser `3.5.0` "default de Spring Initializr". Override defaults CLI
 (`dotnet new`, `npm init`, `ng new`…) avec versions JSON pinnées.
 
-**Anti-derive** : si JSON déclare `spring-boot = "4.0.6"`, NE PAS
-utiliser `3.5.0` "default de Spring Initializr". Override defaults CLI
-(`dotnet new`, `npm init`, `ng new`…) avec versions JSON pinnées.
-
 **Vérification post-bootstrap** : pour chaque manifest généré
 (`build.gradle.kts`, `*.csproj`, `package.json`, `pyproject.toml`) :
 Read, aligner versions avec `versions{}` du JSON, lib hors
@@ -507,9 +503,12 @@ et `@.claude/rules/build-and-loop.md §3.bis`).
 ```bash
 mkdir -p workspace/output/.sys/.state
 cat > workspace/output/.sys/.state/arch-ready-for-constitutioner.flag <<EOF
-{"feat":${FEAT_NUMBER},"ts":"$(date -u +%Y-%m-%dT%H:%M:%SZ)","reason":"phase-D-ready"}
+{"feat":null,"ts":"$(date -u +%Y-%m-%dT%H:%M:%SZ)","reason":"phase-D-ready","triggering_command":"arch-init"}
 EOF
 ```
+> `feat: null` car `arch` opère au niveau **projet** (pas FEAT) — un seul
+> projet peut être initié par N FEATs successives. Le `constitutioner`
+> ne consomme pas cette valeur.
 ```
 [ARCH] Phase A-C OK — sentinel constitutioner posé. (28%)
 ```

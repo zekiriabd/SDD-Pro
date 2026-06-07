@@ -23,8 +23,8 @@ graph TB
     end
 
     subgraph Determ["⚙️ Python deterministic"]
-        SCRIPTS[48 scripts<br/>parse / validate / orchestrate]
-        HOOKS[11 Claude Code hooks<br/>preflight + audit + record]
+        SCRIPTS[51 scripts<br/>parse / validate / orchestrate]
+        HOOKS[13 Claude Code hooks<br/>preflight + audit + record]
         DB[(console.db<br/>SQLite WAL)]
     end
 
@@ -64,7 +64,7 @@ sequenceDiagram
     participant Gate as QA API Gate
     participant DevF as dev-frontend × N
     participant QA as agent qa
-    participant Aud as 4 auditors batch
+    participant Aud as 5 reviewers batch
     participant Rev as /sdd-review
     participant DB as console.db
 
@@ -83,7 +83,7 @@ sequenceDiagram
     DevF->>DB: persist tokens
     CC->>QA: tests + coverage + quality
     QA->>DB: persist verdict
-    CC->>Aud: batch parallel (4 auditors)
+    CC->>Aud: batch parallel (5 reviewers)
     Aud->>DB: persist findings
     CC->>Rev: consolidate
     Rev-->>TL: 🟢/🟡/🔴 verdict
@@ -307,7 +307,7 @@ validé bout-en-bout. Mobile cross-platform avec backend distant séparé :
 - Phase 4 (CODE) — Dev-Backend + Dev-Frontend, plan inline, build loop max 3
 - Phase 5 (QA + Quality) — tests unitaires + coverage + quality scan sonar-like
 - Phase 5.5 (Accessibility, v6.3.0 → retirée v7.0.0) — `accessibility-auditor` (Haiku) supprimé via ADR `governance-major-auditors-trim`. Remplacement v7.2.0 : ingest CI déterministe `sdd_scripts/ingest_axe.py` (axe-core JSON → `qa_a11y`), verdict 🟢/🟡/🔴 selon `A11yFailOn`. Cf. `rules/error-classification-legacy.md §1`.
-- Phase 6.4 (Code Review, v6.3.1) — review cross-fichier post-dev via `code-reviewer` (Sonnet) — anti-patterns stack, layer violations, contract drift, smells. Hard-blocking sur `[REVIEW_SECRETS_HARDCODED]` + `[FRONTEND_BACKEND_CONTRACT_GAP]`.
+- Phase 6.4 (Code Review, v6.3.1) — review cross-fichier post-dev via `code-reviewer` (Sonnet) — anti-patterns stack, layer violations, contract drift, smells. Hard-blocking sur `[FRONTEND_BACKEND_CONTRACT_GAP]` (audit 2026-06-05 : `[REVIEW_SECRETS_HARDCODED]` retiré du hard-blocking code-reviewer — ownership transféré à `security-reviewer` via `[SEC_SECRET_HARDCODED]`).
 - Phase 3.5 + 6.5 (Security Review, v6.3.2) — `security-reviewer` (Sonnet) 2 modes : pré-dev threat model STRIDE (informational) + post-dev scan OWASP Top 10 (verdict 🟢/🟡/🔴, 8 classes hard-blocking).
 - Phase 7 (Performance Audit, v6.4.0 → retirée v7.0.0) — `performance-auditor` (Sonnet) supprimé via ADR `governance-major-auditors-trim`. Remplacement v7.2.0 : ingest CI déterministe `sdd_scripts/ingest_lighthouse.py` (Lighthouse JSON → `qa_performance`), verdict selon `PerfFailOn`. SLO API backend (wrk/k6) prévu v7.3+. Cf. `rules/error-classification-legacy.md §2`.
 - Templates ops (v6.4.0) — `templates/{runbook,postmortem,slo-sli}.template.md` à instancier par le Tech Lead lors de la mise en prod du projet généré.

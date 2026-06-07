@@ -13,7 +13,7 @@
     "versionCatalogPath": "gradle/libs.versions.toml"
   },
   "versions": {
-    "kotlin": "2.3.21",
+    "kotlin": "2.0.21",
     "agp": "8.6.1",
     "compile-sdk": "36",
     "min-sdk": "24",
@@ -27,7 +27,7 @@
     "androidx-datastore": "1.1.1",
     "androidx-work": "2.10.0",
     "hilt": "2.51",
-    "ksp": "2.3.21-1.0.20",
+    "ksp": "2.0.21-1.0.27",
     "retrofit": "2.11.0",
     "okhttp": "4.12.0",
     "kotlinx-json": "1.7.0",

@@ -1,6 +1,6 @@
 # SDD_Pro
 
-FEAT-driven development framework for Claude Code — `next` branch: **v7.0.0-alpha** (see [.claude/docs/VERSIONING.md](.claude/docs/VERSIONING.md)). `main` branch: v6.10.4-LTS (freeze active until 2026-06-18).
+FEAT-driven development framework for Claude Code — `next` branch: **v7.0.0 GA tagged 2026-06-07** (see [.claude/docs/VERSIONING.md](.claude/docs/VERSIONING.md)). `main` branch: v6.10.4-LTS (freeze active until 2026-06-18).
 
 > ⚠ **This English page is a summary, not a translation.** It covers Quickstart + Console essentials only (~10 sections vs ~17 in the French canonical README). For exhaustive docs (architecture, agents, rules, stacks, governance, ROI, roadmap), use the French source.
 >
@@ -100,7 +100,7 @@ Prereqs: Node.js ≥ 20 and Python ≥ 3.8 on PATH (used to query `console.db` v
 
 ## Architecture in one paragraph
 
-SDD_Pro orchestrates **11 Claude Code agents** (PO, arch, dev-backend, dev-frontend, QA, 4 auditors, elicitor, constitutioner) around a **strict file ownership matrix**, a **layered Project Config** (43 keys, JSON-schema validated), a **deterministic Python tooling layer** (~20 KLOC, 1072 tests, framework smoke), and an **opt-in cost/budget cap** ($50/run by default, hard-blocking past threshold). The framework is **source-first**: every decision lives in `.md` files (FEATs, US, plans, ADRs) versioned with the code — no hidden state in the LLM context. The pipeline is **gated backend-first** (dev-backend ALL US → API Gate → dev-frontend ALL US) to avoid silent contract drift between front and back.
+SDD_Pro orchestrates **12 Claude Code agents** (PO, arch, dev-backend, dev-frontend, QA, 5 reviewers, elicitor, constitutioner) around a **strict file ownership matrix**, a **layered Project Config** (43 keys, JSON-schema validated), a **deterministic Python tooling layer** (~20 KLOC, 1072 tests, framework smoke), and an **opt-in cost/budget cap** ($50/run by default, hard-blocking past threshold). The framework is **source-first**: every decision lives in `.md` files (FEATs, US, plans, ADRs) versioned with the code — no hidden state in the LLM context. The pipeline is **gated backend-first** (dev-backend ALL US → API Gate → dev-frontend ALL US) to avoid silent contract drift between front and back.
 
 ---
 
@@ -108,7 +108,7 @@ SDD_Pro orchestrates **11 Claude Code agents** (PO, arch, dev-backend, dev-front
 
 - [.claude/CLAUDE.md](.claude/CLAUDE.md) — framework overview (FR, ~150 lines)
 - [.claude/docs/quickstart.md](.claude/docs/quickstart.md) — full quickstart (FR)
-- [.claude/docs/quickstart.en.md](.claude/docs/quickstart.en.md) — full quickstart (EN, this English mirror)
+- [.claude/docs/getting-started.en.md](.claude/docs/getting-started.en.md) — full getting started (EN, this English mirror)
 - [.claude/docs/architecture.md](.claude/docs/architecture.md) — architecture (FR)
 - [.claude/docs/validated-combos.md](.claude/docs/validated-combos.md) — validated stack combinations
 - [.claude/docs/VERSIONING.md](.claude/docs/VERSIONING.md) — versioning policy

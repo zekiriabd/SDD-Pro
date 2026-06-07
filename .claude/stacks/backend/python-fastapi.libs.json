@@ -30,8 +30,8 @@
     "slowapi": "0.1.9",
     "python-multipart": "0.0.20",
     "babel": "2.16.0",
-    "passlib": "1.7.4",
-    "python-jose": "3.3.0",
+    "pyjwt": "2.10.1",
+    "argon2-cffi": "23.1.0",
     "email-validator": "2.2.0",
     "openpyxl": "3.1.5",
     "reportlab": "4.2.5",
@@ -128,19 +128,22 @@
   ],
   "onDemand": [
     {
-      "module": "passlib[bcrypt]",
-      "ref": "passlib",
+      "module": "argon2-cffi",
+      "ref": "argon2-cffi",
       "capability": "auth-local",
+      "rationale": "Argon2 password hashing — winner Password Hashing Competition 2015, maintained, replaces passlib 1.7.4 (non maintenu 2020) + bcrypt deprecation drift (audit CTO 2026-06-07).",
       "triggers": [
         "auth-local",
         "hash.*password",
-        "bcrypt"
+        "bcrypt",
+        "argon2"
       ]
     },
     {
-      "module": "python-jose[cryptography]",
-      "ref": "python-jose",
+      "module": "pyjwt[crypto]",
+      "ref": "pyjwt",
       "capability": "jwt",
+      "rationale": "JWT encode/decode RFC 7519. Remplace python-jose 3.3.0 (CVE-2024-33663 algorithm confusion + CVE-2024-33664 JWT bomb, package unmaintained 2021) — audit CTO 2026-06-07.",
       "triggers": [
         "\\bjwt\\b",
         "jose",

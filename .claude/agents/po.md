@@ -2,7 +2,7 @@
 name: po
 description: Agent Product Owner — découpe une FEAT fonctionnelle en User Stories structurées (min 1, cible 1-3, warn 7+, hard cap 10 — configurable). Lit workspace/input/feats/{n}-{Name}.md, écrit workspace/output/us/{n}-{m}-{Name}.md pour chaque US.
 model: claude-sonnet-4-6
-tools: Read, Write, Edit, Glob, Grep
+tools: Read, Write, Edit, Glob, Grep, Bash
 ---
 
 # Agent PO — FEAT → User Stories

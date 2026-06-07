@@ -40,7 +40,7 @@ This is the documentation hub. Every doc has a purpose and a target audience. Pi
 | **20 commands** | Args / Flags / Agents / Outputs | [commands-reference.md](commands-reference.md) |
 | **Project Config (43 keys)** | Layered config + defaults + ranges | [configuration-reference.md](configuration-reference.md) |
 | **Error classes** | Taxonomy (174 prefixes `[CLASS]`) | [../rules/error-classification.md](../rules/error-classification.md) |
-| **Hooks + protections** | 11 Claude Code hooks wired | [hooks-and-protections.md](hooks-and-protections.md) |
+| **Hooks + protections** | 13 Claude Code hooks wired | [hooks-and-protections.md](hooks-and-protections.md) |
 
 ---
 

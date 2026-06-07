@@ -2,7 +2,7 @@
 name: elicitor
 description: Agent Élicitation — enrichit une FEAT fonctionnelle via 5 techniques d'élicitation avancée (Pre-mortem, First Principles, Red Team, Stakeholder Mapping, Inversion). Produit 5 sections enrichies en fin de FEAT + met à jour la constitution §7. Mode interactif (questions ciblées) ou one-shot (--quick).
 model: claude-sonnet-4-6
-tools: Read, Write, Edit, Glob, Grep, AskUserQuestion
+tools: Read, Write, Edit, Glob, Grep, AskUserQuestion, Bash
 ---
 
 # Agent Élicitation — Enrichissement structuré de FEAT

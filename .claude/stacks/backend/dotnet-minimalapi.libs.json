@@ -8,10 +8,10 @@
     "files": ["workspace/output/src/{BackendName}/{BackendName}.csproj"]
   },
   "versions": {
-    "ef-core": "10.0.0",
-    "ef-core-sqlserver": "10.0.0",
-    "ef-core-sqlite": "10.0.0",
-    "npgsql-ef": "10.0.0",
+    "ef-core": "9.0.4",
+    "ef-core-sqlserver": "9.0.4",
+    "ef-core-sqlite": "9.0.4",
+    "npgsql-ef": "9.0.4",
     "pomelo-mysql": "9.0.0",
     "oracle-ef": "9.23.60",
     "mongodb-ef": "9.0.0",
@@ -128,8 +128,11 @@
   ],
   "plugins": [],
   "metadata": {
-    "lastUpdated": "2026-05-22",
+    "lastUpdated": "2026-06-07",
     "format": "compact (v2)",
-    "changeLog": "2026-05-22 — fix: removed hardcoded EF.SqlServer from core[] (was installed for ALL projects regardless of DatabaseType). Expanded dbDrivers from 1 → 7 entries (sqlserver, postgres, mysql, mariadb, sqlite, oracle, mongodb). Pinned ef-core 10.0.6 → 9.0.4 (LCD across all drivers since Npgsql.EF 10.x is preview only). Post-mortem CMSPrint 2026-05-22: NU1608 EF 10.0.6 vs Npgsql.EF 9.0.4 became runtime MissingMethodException on first DbSet access."
+    "changeLog": [
+      "2026-05-22 — fix: removed hardcoded EF.SqlServer from core[] (was installed for ALL projects regardless of DatabaseType). Expanded dbDrivers from 1 → 7 entries (sqlserver, postgres, mysql, mariadb, sqlite, oracle, mongodb). Pinned ef-core 10.0.6 → 9.0.4 (LCD across all drivers since Npgsql.EF 10.x is preview only). Post-mortem CMSPrint 2026-05-22: NU1608 EF 10.0.6 vs Npgsql.EF 9.0.4 became runtime MissingMethodException on first DbSet access.",
+      "2026-06-07 — Audit CTO 2026-06-07 : revert ef-core 10.0.0 → 9.0.4 (drift post-mortem CMSPrint 2026-05-22 re-introduced silently)."
+    ]
   }
 }

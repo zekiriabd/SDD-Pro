@@ -140,7 +140,7 @@ appliqué).
 
 ### 5.1 `security-reviewer` scan ≠ pentest
 
-Le scan automatique couvre **22 classes `[SEC_*]`** mappées OWASP/CWE,
+Le scan automatique couvre **23 classes `[SEC_*]`** mappées OWASP/CWE,
 mais ne remplace pas un pentest professionnel. Notamment :
 
 - ❌ Pas de fuzzing automatique
