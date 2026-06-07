@@ -184,8 +184,8 @@ convergence.
 | `[UNDECLARED_DECISION]` | Pattern/lib/convention non déclaré dans stack |
 | `[STACK_LIBRARY_MISSING]` | Lib hors §2.4 du stack actif |
 | `[STACK_LIBRARY_VULNERABLE]` | Lib §2.4 active avec CVE ≥ moderate (vérifié post-install par arch) |
-| `[STACK_RUNTIME_NOT_LTS]` | Runtime STS/prerelease pinné en `versions` (.NET 9, Node 23, Java 22, etc.) sans bypass ADR | arch post-install (CVE check), `validate_libs_catalog.py` |
-| `[RUNTIME_STS_EXCEPTION]` | WARN-level — bypass STS tracé via ADR `runtime-sts-exception` + `RuntimeException:` Project Config | `validate_libs_catalog.py` |
+| `[STACK_RUNTIME_NOT_LTS]` | Runtime STS/prerelease pinné en `versions` (.NET 9, Node 23, Java 22, etc.) sans bypass ADR (cf. `docs/adrs/ADR-20260605T163200-runtime-sts-prerelease-exceptions.md` pour la liste exhaustive des bypass autorisés) | arch post-install (CVE check), `validate_libs_catalog.py` |
+| `[RUNTIME_STS_EXCEPTION]` | WARN-level — bypass STS tracé via ADR `runtime-sts-exception` + `RuntimeException:` Project Config. Voir ADR `runtime-sts-prerelease-exceptions` (`docs/adrs/ADR-20260605T163200-...`) pour la matrice cas-par-cas. | `validate_libs_catalog.py` |
 
 ### 1.6 UI (fidélité HTML mockup → code)
 

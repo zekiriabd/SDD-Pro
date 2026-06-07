@@ -30,7 +30,7 @@ version = "7.0.0"
 description = "SDD_Pro framework hooks and scripts (Python port for cross-platform support, no LLM)"
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "Proprietary" }
+license = { text = "Apache-2.0" }
 authors = [
     { name = "SDD_Pro maintainers" },
 ]

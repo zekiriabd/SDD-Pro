@@ -7,13 +7,47 @@
 
 ## Prérequis
 
-- **Python 3.10+** (stdlib uniquement, pas de venv requis)
+- **Python 3.10+** (stdlib uniquement pour le runtime nominal — pas de
+  dépendance pip pour exécuter le pipeline)
 - Optionnel : **pytest + pytest-cov** pour exécuter la suite de tests
   (`pip install pytest pytest-cov`)
 
 ```bash
 python --version   # ou python3 — doit être ≥ 3.10
 ```
+
+## Installation — éditable (recommandé Sprint 3-5 audit closure 2026-06-07)
+
+Avant le Sprint 3-5, chaque script avait son propre `sys.path.insert(0, ...)`
+hack (~69 occurrences + 215 `noqa: E402`) pour pouvoir importer `sdd_lib`
+sans installation. Cela fonctionnait mais cassait IDE-completion, mypy
+cross-package, et coûtait quelques ms par invocation.
+
+**Workflow recommandé v7.0.2+** — installer en mode éditable :
+
+```bash
+# Depuis la racine du repo SDD_Pro
+pip install -e .claude/python
+```
+
+Cela rend les packages `sdd_lib`, `sdd_scripts`, `sdd_hooks`, `sdd_admin`
+importables nativement (pas de sys.path hack côté caller). Les scripts
+continuent à fonctionner avec les anciens callers (`python .claude/python/sdd_scripts/X.py`)
+ET avec la nouvelle CLI entry-point (`sdd-smoke` directement après install).
+
+### Vérification install
+
+```bash
+python -c "import sdd_lib.paths ; print(sdd_lib.paths.iso_now())"
+sdd-smoke   # CLI entry-point installé par pip install -e .
+```
+
+### Migration progressive (out-of-scope Sprint 3-5)
+
+Le retrait des 69 `sys.path.insert` + 215 `noqa: E402` est planifié
+**v7.1 progressif** (1 fichier touché = 1 cleanup, pas de big-bang).
+La double-compat est assurée : ces hacks deviennent no-op quand le
+package est déjà sur `sys.path` via `pip install -e .`.
 
 ## Layout (refresh 2026-06-07 audit consolidé Sprint 2)
 

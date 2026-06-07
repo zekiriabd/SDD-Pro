@@ -111,6 +111,33 @@ _BYPASS_REGEXES = [
                re.IGNORECASE),
 ]
 
+# Audit consolidé 2026-06-07 Sprint 3-5 — Strip heredoc bodies AVANT le scan
+# bypass. Sinon `git commit -m "$(cat <<'EOF'\n... SDD_ALLOW_X=1 ...\nEOF)"`
+# fait matcher la doc/message commit comme une vraie tentative de bypass.
+# Pattern : `<<['\"]?TAG['\"]?\n ... \nTAG` (heredoc bash) ou son équivalent
+# multiline. La regex DOTALL capture le body et le retire AVANT le scan.
+_HEREDOC_RE = re.compile(
+    r"<<-?\s*['\"]?(\w+)['\"]?\s*\n.*?\n\1\b",
+    re.MULTILINE | re.DOTALL,
+)
+
+
+def _strip_heredocs(cmd: str) -> str:
+    """Remove heredoc bodies (between `<<TAG` and matching `TAG`) from a shell command.
+
+    The bypass scan is intended to catch ACTUAL envvar assignment in the
+    executable command, not envvar mentions inside heredoc bodies (commit
+    messages, doc strings, here-strings). Without this strip, any commit
+    message that legitimately documents `SDD_ALLOW_FORCE=1` (e.g. in this
+    very hook's docstring referenced by example) would falsely trigger.
+    """
+    # Iteratively strip — there may be multiple heredocs.
+    prev = None
+    while prev != cmd:
+        prev = cmd
+        cmd = _HEREDOC_RE.sub("", cmd)
+    return cmd
+
 
 def _read_payload() -> dict:
     try:
@@ -130,11 +157,18 @@ def _extract_command(payload: dict) -> str:
 
 
 def _matches_bypass(cmd: str) -> str | None:
-    """Return the matching pattern (for logging) or None if clean."""
+    """Return the matching pattern (for logging) or None if clean.
+
+    Strips heredoc bodies first (audit Sprint 3-5 closure) — a commit message
+    or doc string containing the literal `SDD_ALLOW_X=1` no longer triggers
+    a false positive. Only ACTUAL assignment in executable command position
+    is flagged.
+    """
     if not cmd:
         return None
+    cleaned = _strip_heredocs(cmd)
     for rx in _BYPASS_REGEXES:
-        m = rx.search(cmd)
+        m = rx.search(cleaned)
         if m:
             return m.group(0)[:120]
     return None

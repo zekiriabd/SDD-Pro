@@ -1,7 +1,13 @@
 # SDD_Pro — Cookbook 10 minutes
 
+> 📚 **Vous découvrez SDD_Pro ?** L'entrée canonique est
+> [`docs/README.md`](README.md) (hub orienté audience). Le présent
+> `cookbook.md` est la fiche **"premier projet en 30 min"**
+> (variante condensée de [`quickstart.md`](quickstart.md) qui couvre
+> plus de cas brownfield + customisation).
+>
 > Quickstart hyper-condensé : produire un premier projet fonctionnel
-> en moins de 30 minutes, sans avoir lu les 8 règles ni les 22 docs.
+> en moins de 30 minutes, sans avoir lu les 8 règles ni les 47 docs.
 > Pour la doctrine complète : `@.claude/docs/architecture.md`.
 
 ---

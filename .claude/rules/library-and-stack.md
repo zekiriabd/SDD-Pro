@@ -54,7 +54,21 @@ prerelease (`-rc/-preview/-alpha/-beta/-snapshot`) sans ADR, version
 **Bypass STS** (rare, tracé) : ADR `ADR-{ts}-runtime-sts-exception.md`
 + `RuntimeException: dotnet9 (fin: 2026-05-12, migration -> dotnet10)`
 dans Project Config → `validate_libs_catalog.py` émet WARN
-`[RUNTIME_STS_EXCEPTION]`.
+`[RUNTIME_STS_EXCEPTION]`. **Référence canonique** :
+`docs/adrs/ADR-20260605T163200-runtime-sts-prerelease-exceptions.md`
+(matrice des bypass autorisés cas-par-cas, contrats expiration, plan
+de migration vers LTS).
+
+**Secrets / config en clair (Pattern B)** : `stack.md` est la SSoT
+unique pour les valeurs sensibles (DB_PASSWORD, AUTH_JWT_SECRET,
+AZ_TENANTID, ports, etc.). Le fichier est **gitignored** ; `arch`
+propage les valeurs en clair dans les configs natives
+(`appsettings.json`, `application.yml`, etc.) lors du scaffolding.
+Le code applicatif lit les configs natives via `IConfiguration` /
+`@Value` / `Settings()` — **jamais** via `process.env` / `os.environ`
+direct (sinon `[SEC_ENV_VAR_FORBIDDEN]` cf. `error-classification.md
+§1.11`). **Référence canonique** :
+`docs/adrs/ADR-20260606T120000-secrets-config-ssot-stack-md.md`.
 
 **Registries canoniques** : NuGet (`api.nuget.org`), npm
 (`registry.npmjs.org`), PyPI (`pypi.org`), Maven Central

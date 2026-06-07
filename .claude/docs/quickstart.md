@@ -1,5 +1,10 @@
 # SDD_Pro — Démarrage rapide
 
+> 📚 **Vous découvrez SDD_Pro ?** L'entrée canonique est
+> [`docs/README.md`](README.md) (hub orienté audience). Le présent
+> `quickstart.md` est la fiche **opérationnelle "30 min" complète**
+> (variante longue de [`cookbook.md`](cookbook.md) "10 min").
+>
 > Document chargé **à la demande** (`Read @.claude/docs/quickstart.md`).
 > Référencé depuis `@.claude/CLAUDE.md §10` (slim entry point).
 
