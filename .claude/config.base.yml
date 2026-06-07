@@ -34,7 +34,9 @@ BuildLoopMaxIter: 3
 # projet généré. Défaut flippé full → off pour éviter spawn d'agent
 # inexistant. Tolérée en lecture mais le caller doit skip.
 A11yMode: "off"
-A11yFailOn: serious
+# A11yFailOn v7.0.0 : deprecated (agent retiré). Retiré du config.base.yml
+# pour éliminer WARN [CONFIG_DEPRECATED_KEY] à chaque lecture. Projets qui
+# l'ont encore dans stack.md verront le WARN (signal de migration utile).
 # --- Auditor modes (v7.0.0 defaults flipped per codex audit 2026-05-20) ---
 # Rationale : audit revealed reviewers were skipped silently when set
 # to "manual" without operator awareness (CRIT-1 v6.10.5). v7.0.0 flips
@@ -90,7 +92,9 @@ SecurityScanEnabled: true
 # (governance-major-auditors-trim). Remplacé par Lighthouse CI + wrk/k6
 # dans le projet généré. Défaut flippé full → off.
 PerfMode: "off"
-PerfFailOn: serious
+# PerfFailOn v7.0.0 : deprecated (agent retiré). Retiré du config.base.yml
+# pour éliminer WARN [CONFIG_DEPRECATED_KEY] à chaque lecture. Projets qui
+# l'ont encore dans stack.md verront le WARN (signal de migration utile).
 # SpecComplianceMode v7.0.0 : flipped manual → full (codex audit P0 #5).
 # Spec compliance is the strongest guarantee that each AC is actually
 # implemented in the generated code ("Do not trust the report" pattern

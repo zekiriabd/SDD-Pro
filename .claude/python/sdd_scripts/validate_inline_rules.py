@@ -98,8 +98,15 @@ def main() -> int:
 
             rule_file = rules_by_name[rule_name]
             rule_mtime = mtime_utc(rule_file)
-            if rule_mtime > agent_mtime:
-                delta = round((rule_mtime - agent_mtime).total_seconds() / 86400, 1)
+            # Audit Sprint 3-5 (2026-06-07) : seuil bumped 0d → 1d.
+            # Same-day edits (Tech Lead refresh stylistique cross-files,
+            # rewrites de compression sans changement sémantique des
+            # @-references) génèrent des faux positifs systématiques.
+            # 1 jour reste suffisant pour catcher un vrai drift (refactor
+            # rule load-bearing — l'agent doit être re-relu sous 24h).
+            delta_days = (rule_mtime - agent_mtime).total_seconds() / 86400
+            if delta_days > 1.0:
+                delta = round(delta_days, 1)
                 findings.append({
                     "agent":       agent.name,
                     "rule":        f"{rule_name}.md",

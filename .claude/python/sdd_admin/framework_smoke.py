@@ -415,7 +415,12 @@ def _compute_timing(t_start: float, skip_heavy: bool, checks: "Checks") -> None:
         ok_thr, warn_thr = 200, 400
         ctx = "hook Stop"
     else:
-        ok_thr, warn_thr = 2500, 4500
+        # Audit Sprint 3-5 (2026-06-07) : seuils bumped 2500/4500 → 4500/6500.
+        # Le full smoke charge la pytest gate (~2s) + 4 subprocess checks
+        # (~200ms each) + I/O. Sur Windows avec AV scanning, baseline réelle
+        # est 3500-4500ms — WARN à 2500 = bruit systématique non-actionnable.
+        # Hard FAIL @ 6500ms = vraie régression nette (>2× baseline).
+        ok_thr, warn_thr = 4500, 6500
         ctx = "full smoke"
     if elapsed_ms < ok_thr:
         checks.add("smoke-timing", "OK",
