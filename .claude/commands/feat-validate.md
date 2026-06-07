@@ -150,7 +150,8 @@ hérité superpowers v5.1).
 > - soit utiliser `/sdd-review {n} --ensure-scans` (spawne
 >   `spec-compliance-reviewer` directement),
 > - soit attendre v7.2.0 qui déplacera le gate à `/sdd-full §4.8`
->   (ADR `governance-sdd-full-spec-gate-post-dev`).
+>   (roadmap v7.2 — cf. `docs/roadmap-v7-v8.md`, ADR à émettre lors
+>   du sprint d'implémentation).
 
 ### 4.5.1 Détection mode (pre-dev vs post-dev)
 

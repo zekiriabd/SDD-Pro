@@ -858,7 +858,18 @@ def _run_plan(args: argparse.Namespace) -> int:
         except AttributeError:
             print(payload)
     else:
-        print(format_text_report(plan))
+        # Audit final 2026-06-07 (BROKEN-5 closure) : `format_text_report` émet
+        # emojis 🔴🟡🟢 ; sur Windows console cp1252 par défaut, `print()` crash
+        # UnicodeEncodeError. Forcer UTF-8 via stdout.buffer pour résilience
+        # cross-platform sans dépendre de `PYTHONIOENCODING=utf-8`.
+        text = format_text_report(plan)
+        try:
+            sys.stdout.buffer.write(text.encode("utf-8"))
+            sys.stdout.buffer.write(b"\n")
+            sys.stdout.flush()
+        except AttributeError:
+            # stdout sans .buffer (test capture, etc.) → fallback ASCII safe
+            print(text.encode("ascii", "replace").decode("ascii"))
 
     return FAIL_FAST if plan.get("errors") else SUCCESS
 

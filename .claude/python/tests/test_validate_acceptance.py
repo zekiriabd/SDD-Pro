@@ -119,9 +119,16 @@ class TestAcceptanceGateHook(unittest.TestCase):
             json.dumps(payload), encoding="utf-8"
         )
 
-    def test_missing_report_allows(self):
+    def test_missing_report_denies(self):
+        # Audit CRIT-4 (2026-06-07) : symmetric CI/interactive DENY.
+        # Bypass requires explicit SDD_ALLOW_ACCEPTANCE_BYPASS=1.
         rc = vag.main()
-        self.assertEqual(rc, 0)  # HOOK_ALLOW
+        self.assertEqual(rc, 2)  # HOOK_DENY
+
+    def test_missing_report_with_bypass_allows(self):
+        with patch.dict(os.environ, {"SDD_ALLOW_ACCEPTANCE_BYPASS": "1"}):
+            rc = vag.main()
+        self.assertEqual(rc, 0)  # HOOK_ALLOW via bypass
 
     def test_pass_verdict_allows(self):
         self._write_report({"verdict": "pass", "mode": "strict", "failures": []})

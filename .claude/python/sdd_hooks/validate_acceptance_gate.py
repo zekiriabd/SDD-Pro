@@ -72,22 +72,21 @@ def main() -> int:
         # call (intentionally or by bug). Now CI fails loud, interactive
         # warns and continues. Bypass for both via SDD_ALLOW_ACCEPTANCE_BYPASS.
         is_ci = _detect_ci()
-        if is_ci:
-            sys.stderr.write(
-                "[acceptance-gate] DENY: no acceptance.json report (CI strict)\n"
-                "CAUSE: [ACCEPTANCE_REPORT_MISSING] qa agent did not invoke "
-                "validate_acceptance.py — gate cannot verify pass/fail\n"
-                "FIX: ensure agent qa runs `python .claude/python/sdd_scripts/"
-                "validate_acceptance.py` before SubagentStop, OR set env var "
-                "SDD_ALLOW_ACCEPTANCE_BYPASS=1 to skip gate (audit-logged)\n"
-            )
-            return HOOK_DENY
+        # Audit final 2026-06-07 (CRIT-4 closure) : retrait du fallback
+        # interactif HOOK_ALLOW. Avant ce fix, agent qa qui oubliait
+        # d'invoquer validate_acceptance.py voyait son SubagentStop allow
+        # silencieusement → l'Acceptance Gate ne tournait JAMAIS en
+        # interactif. Désormais symétrique CI/interactif : DENY systématique
+        # avec bypass explicite SDD_ALLOW_ACCEPTANCE_BYPASS=1.
         sys.stderr.write(
-            "[acceptance-gate] WARN: no acceptance.json report (interactive)\n"
-            "qa agent should invoke `python .claude/python/sdd_scripts/validate_acceptance.py` "
-            "— allowing this SubagentStop because not in CI\n"
+            "[acceptance-gate] DENY: no acceptance.json report\n"
+            "CAUSE: [ACCEPTANCE_REPORT_MISSING] qa agent did not invoke "
+            "validate_acceptance.py — gate cannot verify pass/fail\n"
+            "FIX: ensure agent qa runs `python .claude/python/sdd_scripts/"
+            "validate_acceptance.py` before SubagentStop, OR set env var "
+            "SDD_ALLOW_ACCEPTANCE_BYPASS=1 to skip gate (audit-logged)\n"
         )
-        return HOOK_ALLOW
+        return HOOK_DENY
 
     try:
         payload = json.loads(report_path.read_text(encoding="utf-8"))

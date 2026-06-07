@@ -403,18 +403,32 @@ def action_status(args: argparse.Namespace) -> int:
     return SUCCESS
 
 
-#: Ordered list of phases in the /sdd-full pipeline (audit 2026-06-06 D5).
+#: Ordered list of phases in the /sdd-full pipeline.
 #: Maps a logical phase to the STEP label the orchestrating command should
 #: jump to. The order matters : the first phase whose status is NOT in
 #: {pass, warn, skip} is the resume target.
+#:
+#: Audit final 2026-06-07 (CRIT-1 closure) : labels alignés strictement
+#: sur les `## STEP` headings de `commands/sdd-full.md`. Avant ce fix,
+#: us_generate était mappé STEP_2 (mais doc = STEP 3), readiness STEP_2.6
+#: (doc = STEP 3.5), arch STEP_3.5 (collision avec readiness !), qa STEP_5
+#: (doc = STEP 4.5). Conséquence : `should-skip-step --current STEP_3.5`
+#: était ambigu (arch OU readiness) → `--resume` skip workflow au mauvais
+#: endroit. Désormais : labels = headings réels.
+#:
+#: Note arch : `/sdd-full` ne lance pas `arch` séparément — il est interne
+#: à `/dev-run` (STEP 4.bis short-circuit). Mappé sur STEP_4 (même cible
+#: que dev_run) pour permettre set-phase arch=pass sans casser le routing
+#: pipeline. Pour invocation `/arch-init` standalone, le label STEP_3.5_arch
+#: pourrait être ajouté en v7.1 si un cas standalone se présente.
 _PIPELINE_PHASES_ORDER: tuple[tuple[str, str], ...] = (
-    ("us_generate",  "STEP_2"),    # /us-generate
-    ("readiness",    "STEP_2.6"),  # /feat-validate
-    ("plan",         "STEP_2.7"),  # /dev-plan (optional)
-    ("arch",         "STEP_3.5"),  # /arch-init (Phase A+B)
-    ("dev_run",      "STEP_4"),    # /dev-run (back + API gate + front)
-    ("qa",           "STEP_5"),    # /qa-generate
-    ("sdd_review",   "STEP_4.8"),  # /sdd-review (audit consolidé 2026-06-07 — aligné sur sdd-full.md heading STEP 4.8, ex-STEP_5.5 décalé v6.11.0)
+    ("us_generate",  "STEP_3"),     # /us-generate (sdd-full.md STEP 3)
+    ("readiness",    "STEP_3.5"),   # /feat-validate (sdd-full.md STEP 3.5)
+    ("plan",         "STEP_3.6"),   # /dev-plan optional (sdd-full.md STEP 3.6)
+    ("arch",         "STEP_4"),     # arch interne à /dev-run STEP 4.bis — même cible que dev_run
+    ("dev_run",      "STEP_4"),     # /dev-run (sdd-full.md STEP 4)
+    ("qa",           "STEP_4.5"),   # /qa-generate (sdd-full.md STEP 4.5)
+    ("sdd_review",   "STEP_4.8"),   # /sdd-review (sdd-full.md STEP 4.8)
 )
 
 _RESUME_DONE_STATUSES = {"pass", "warn", "success", "skip"}

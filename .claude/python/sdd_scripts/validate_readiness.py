@@ -39,6 +39,16 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser()
     p.add_argument("--feat-number", type=int, required=True)
     p.add_argument("--json", action="store_true")
+    # Audit final 2026-06-07 (CRIT-3 closure) : flag `--post-dev` accepté
+    # comme no-op signal explicit. Avant ce fix, `/sdd-full` STEP 4.7 invoquait
+    # `/feat-validate {n} --json --post-dev` mais argparse rejetait `--post-dev`
+    # (unrecognized arguments) → STEP 4.7 = dead branch. Le script auto-détecte
+    # déjà le mode post-dev via `find workspace/output/src` (STEP 4.5 logic) ;
+    # ce flag est donc un signal documentaire pour forcer le mode quand le code
+    # est matérialisé. No-op interne — la détection reste basée sur la présence
+    # disque de code matérialisé.
+    p.add_argument("--post-dev", action="store_true",
+                   help="Signal explicite mode post-dev (no-op : détection auto via présence code matérialisé)")
     return p.parse_args()
 
 

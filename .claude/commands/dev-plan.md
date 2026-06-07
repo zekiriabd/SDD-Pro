@@ -123,7 +123,8 @@ Si l'US n'a pas de contrepartie pour la famille → exit silent
 
 > **v7.0.0-alpha audit P0-workflow 2026-06-05** — historiquement appelé
 > « strict-readiness ». Les variants d'agents `dev-*-strict` ont été
-> retirés en v7.0.0 (`governance-major-strict-trim`), il n'y a donc
+> retirés en v7.0.0 (cf. ADR `governance-major-auditors-trim` §3 +
+> `docs/CHANGELOG.md` entrée v7.0.0), il n'y a donc
 > plus de routing strict/classic. Le flag `--strict` de `validate_plan.py`
 > reste accepté en CLI (no-op) pour backward-compat scripts, mais ce
 > STEP ne décide plus de routing — uniquement validation structurelle

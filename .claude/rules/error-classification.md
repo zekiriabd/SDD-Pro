@@ -52,8 +52,9 @@ et inlinés dans les agents (po, dev-*, qa).
 >    un CWE par class (e.g. CWE-327 vs 759 vs 338 pour SEC_CRYPTO_*)
 >
 > Toute fusion exige refactor coordonné des 4 systèmes (sprint dédié
-> ~3-5 jours, cf. ADR `governance-major-error-class-consolidation`
-> roadmap v7.2). Pour l'instant, navigation rapide via §0 ci-dessous.
+> ~3-5 jours, roadmap v7.2 — cf. `docs/roadmap-v7-v8.md`, ADR à émettre
+> lors du sprint d'implémentation). Pour l'instant, navigation rapide
+> via §0 ci-dessous.
 
 ---
 
@@ -185,7 +186,7 @@ convergence.
 | `[STACK_LIBRARY_MISSING]` | Lib hors §2.4 du stack actif |
 | `[STACK_LIBRARY_VULNERABLE]` | Lib §2.4 active avec CVE ≥ moderate (vérifié post-install par arch) |
 | `[STACK_RUNTIME_NOT_LTS]` | Runtime STS/prerelease pinné en `versions` (.NET 9, Node 23, Java 22, etc.) sans bypass ADR (cf. `docs/adrs/ADR-20260605T163200-runtime-sts-prerelease-exceptions.md` pour la liste exhaustive des bypass autorisés) | arch post-install (CVE check), `validate_libs_catalog.py` |
-| `[RUNTIME_STS_EXCEPTION]` | WARN-level — bypass STS tracé via ADR `runtime-sts-exception` + `RuntimeException:` Project Config. Voir ADR `runtime-sts-prerelease-exceptions` (`docs/adrs/ADR-20260605T163200-...`) pour la matrice cas-par-cas. | `validate_libs_catalog.py` |
+| `[RUNTIME_STS_EXCEPTION]` | WARN-level — bypass STS tracé via ADR `runtime-sts-prerelease-exceptions` (`docs/adrs/ADR-20260605T163200-runtime-sts-prerelease-exceptions.md`) + `RuntimeException:` Project Config (matrice cas-par-cas dans l'ADR). | `validate_libs_catalog.py` |
 
 ### 1.6 UI (fidélité HTML mockup → code)
 

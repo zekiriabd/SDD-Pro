@@ -19,12 +19,16 @@ Migrated from .claude/scripts/detect-capabilities.ps1 (2026-05-13).
 """
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 from sdd_lib.exit_codes import SUCCESS  # noqa: E402
 
 import argparse
 import json
 import re
-import sys
 from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path

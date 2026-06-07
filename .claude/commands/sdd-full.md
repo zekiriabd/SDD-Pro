@@ -66,7 +66,8 @@ python .claude/python/sdd_scripts/sdd_full_planner.py recap --run-id "$RUN_ID"
 auto-skip `arch` si bootstrap stable et `us-generate` si US présentes.
 
 > Cible v7.2 : STEPs Markdown re-générés depuis le planner Python pour
-> cohérence permanente (ADR `governance-major-orchestrator-python`).
+> cohérence permanente (roadmap v7.2 — cf. `docs/roadmap-v7-v8.md`,
+> ADR à émettre lors du sprint d'implémentation).
 
 ---
 

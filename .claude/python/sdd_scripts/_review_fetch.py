@@ -19,7 +19,9 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from sdd_lib.console_db import connect
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from sdd_lib.console_db import connect  # noqa: E402
 
 
 # Severity ordering — same as accessibility-auditor / security-reviewer.

@@ -497,8 +497,9 @@ famille). Bénéfice : -30-40 % tokens + isolation cognitive dev-backend
 ## STEP 12.5 — Signaler "ready for constitutioner" (no-spawn)
 
 Écrire un sentinel disque puis log 1 ligne. Le spawn de `constitutioner`
-vit côté `/arch-init` STEP 3.5 (no-spawn, cf. ADR `governance-major-no-spawn-arch`
-et `@.claude/rules/build-and-loop.md §3.bis`).
+vit côté `/arch-init` STEP 3.5 (no-spawn, cf.
+`@.claude/rules/build-and-loop.md §3.bis` — règle anti-derive «no-spawn»
+universelle, plus de dérogation pour arch depuis v7.0.0-alpha).
 
 ```bash
 mkdir -p workspace/output/.sys/.state

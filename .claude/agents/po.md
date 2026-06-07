@@ -197,6 +197,20 @@ Pour chaque US :
   + les SFD bullets couverts)
 - `Covers` = liste des IDs SFD/BR/AC/FD couverts
 
+**Propagation convention `{n}-{m}-{Name}` (audit CRIT-9, 2026-06-07)** :
+le `{Name}` choisi ici devient le basename identique propagé à travers
+les artefacts US/mockup/plan/code (cf. `CLAUDE.md §1`) :
+- US : `workspace/output/us/{n}-{m}-{Name}.md`
+- Mockup HTML (optionnel) : `workspace/input/ui/{n}-{m}-{Name}.html`
+- Plans : `workspace/output/plans/{n}-{m}-{Name}.{back|front}.md`
+
+Si un mockup HTML pré-existant `workspace/input/ui/{n}-{m}-*.html` est
+détecté **avant** la génération US, **réutiliser exactement le `{Name}`**
+du fichier HTML pour éviter le drift (`{n}-{m}-Login.html` côté UX →
+`{n}-{m}-Login.md` côté PO, jamais `{n}-{m}-Connexion.md`). Ce drift
+casse silencieusement le hard-gate STEP 0 de `dev-frontend` (Glob unique
+sur basename — cf. preflight code `HTML_AMBIGUOUS`).
+
 ---
 
 ## STEP 6 — Vérifier la traçabilité 100%

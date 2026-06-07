@@ -5,13 +5,16 @@ _review_fetch.py for Finding + SEVERITY_* constants.
 """
 from __future__ import annotations
 
+import sys
 from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from sdd_lib.console_db import (
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from sdd_lib.console_db import (  # noqa: E402
     connect,
     ensure_initialized,
     insert_validation_report,

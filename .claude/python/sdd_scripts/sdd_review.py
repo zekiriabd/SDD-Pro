@@ -219,6 +219,67 @@ def _auto_ingest_orphan_jsons(feat_n: int) -> list[str]:
     return logs
 
 
+def _detect_stale_reports(feat_n: int) -> list[str]:
+    """Detect QA reports older than the materialized source code (CRIT-5, 2026-06-07).
+
+    Stale signal : any JSON under `workspace/output/qa/feat-{n}/` whose mtime
+    is older than ANY source file mtime under `workspace/output/src/{Project}/`
+    (excluding build artifacts, node_modules, bin/, obj/, dist/, .venv/, __pycache__).
+
+    Rationale : an auditor JSON written before dev-* materialized the latest
+    code can yield a false 🟢 verdict (reviewer saw pre-fix code). Emit a
+    WARN in normal mode ; --ensure-scans does NOT block on stale (block is
+    only for missing sources — staleness is informational because the Tech
+    Lead may have intentionally re-ran a partial scan).
+
+    Returns a list of human-readable warning lines (empty if all fresh).
+    """
+    root = repo_root()
+    qa_dir = root / "workspace" / "output" / "qa" / f"feat-{feat_n}"
+    src_dir = root / "workspace" / "output" / "src"
+    if not qa_dir.is_dir() or not src_dir.is_dir():
+        return []
+
+    json_files = list(qa_dir.glob("*.json"))
+    if not json_files:
+        return []
+
+    SKIP_DIRS = {"node_modules", "bin", "obj", "dist", "build",
+                 ".venv", "venv", "__pycache__", ".gradle", "target",
+                 ".next", ".nuxt", ".angular", ".locks"}
+    latest_src_mtime = 0.0
+    latest_src_path: str | None = None
+    for p in src_dir.rglob("*"):
+        try:
+            if not p.is_file():
+                continue
+            if any(part in SKIP_DIRS for part in p.parts):
+                continue
+            m = p.stat().st_mtime
+            if m > latest_src_mtime:
+                latest_src_mtime = m
+                latest_src_path = str(p.relative_to(root).as_posix())
+        except OSError:
+            continue
+
+    if latest_src_mtime == 0.0:
+        return []
+
+    warnings: list[str] = []
+    for jp in json_files:
+        try:
+            jm = jp.stat().st_mtime
+        except OSError:
+            continue
+        if jm < latest_src_mtime:
+            age_h = (latest_src_mtime - jm) / 3600.0
+            warnings.append(
+                f"stale-report {jp.name} ({age_h:.1f}h older than "
+                f"{latest_src_path or '<src>'})"
+            )
+    return warnings
+
+
 def main() -> int:
     # Windows console: force UTF-8 to avoid charmap codec on emoji/icons
     if sys.stdout.encoding and sys.stdout.encoding.lower() not in ("utf-8", "utf8"):
@@ -255,6 +316,16 @@ def main() -> int:
         ingest_logs = _auto_ingest_orphan_jsons(feat_n)
         if ingest_logs:
             scans_run.extend(ingest_logs)
+
+    # STEP 3.6 — stale reports detection (CRIT-5, audit 2026-06-07)
+    # Warn (never block) if any JSON under qa/feat-{n}/ is older than the
+    # latest source file mtime under workspace/output/src/. A stale report
+    # can yield a false 🟢 verdict (reviewer saw pre-fix code).
+    stale_warns = _detect_stale_reports(feat_n)
+    if stale_warns:
+        for w in stale_warns:
+            print(f"WARNING: [REVIEW_REPORT_STALE] {w}", file=sys.stderr)
+        scans_run.extend(stale_warns)
 
     # STEP 4 — fetch
     findings, missing = fetch_findings(feat_n)

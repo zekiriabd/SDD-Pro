@@ -434,7 +434,7 @@ def test_should_skip_step_target_before_current_runs(monkeypatch, fake_repo):
     # RESUME_TARGET=STEP_2 (early), current=STEP_4 (later) → RUN (we haven't
     # reached resume target yet from a forward-iteration POV).
     rc = _run_main(monkeypatch, [
-        "should-skip-step", "--target", "STEP_2", "--current", "STEP_4",
+        "should-skip-step", "--target", "STEP_3", "--current", "STEP_4",
     ])
     assert rc == 1  # RUN
 
@@ -442,7 +442,7 @@ def test_should_skip_step_target_before_current_runs(monkeypatch, fake_repo):
 def test_should_skip_step_target_after_current_skips(monkeypatch, fake_repo):
     # RESUME_TARGET=STEP_4 (later), current=STEP_2 (earlier) → SKIP (already done).
     rc = _run_main(monkeypatch, [
-        "should-skip-step", "--target", "STEP_4", "--current", "STEP_2",
+        "should-skip-step", "--target", "STEP_4", "--current", "STEP_3",
     ])
     assert rc == 0  # SKIP
 
@@ -456,13 +456,14 @@ def test_should_skip_step_target_equals_current_runs(monkeypatch, fake_repo):
 
 
 def test_should_skip_step_decimal_steps_handled_correctly(monkeypatch, fake_repo):
-    # Critical: STEP_2.6 must compare correctly vs STEP_4 (was broken in bash
-    # lex compare which would treat STEP_2.6 > STEP_4 as false negative on '.').
-    # Pipeline order : STEP_2 → STEP_2.6 → STEP_2.7 → STEP_3.5 → STEP_4 → STEP_5 → STEP_4.8
+    # Critical: STEP_3.5 must compare correctly vs STEP_4 (was broken in bash
+    # lex compare which would treat STEP_3.5 > STEP_4 as false negative on '.').
+    # Pipeline order (audit final 2026-06-07 CRIT-1 fix — labels alignés sdd-full.md) :
+    #   STEP_3 → STEP_3.5 → STEP_3.6 → STEP_4 (arch+dev_run) → STEP_4.5 → STEP_4.8
     rc = _run_main(monkeypatch, [
-        "should-skip-step", "--target", "STEP_4", "--current", "STEP_2.6",
+        "should-skip-step", "--target", "STEP_4", "--current", "STEP_3.5",
     ])
-    assert rc == 0  # SKIP — STEP_2.6 is before STEP_4 in pipeline order
+    assert rc == 0  # SKIP — STEP_3.5 is before STEP_4 in pipeline order
 
 
 def test_should_skip_step_step_end_skips_everything(monkeypatch, fake_repo):

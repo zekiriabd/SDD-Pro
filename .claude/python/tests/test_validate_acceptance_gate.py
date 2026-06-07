@@ -5,9 +5,9 @@ gate (test/lint/build/coverage) on every project under workspace/output/src/.
 Pre-fix : zero test coverage despite being potentially-blocking.
 
 Baseline pinned :
-  - Empty stdin / no qa session → ALLOW
+  - Empty stdin / no qa session → DENY (CRIT-4 audit 2026-06-07 : symmetric)
   - Bypass env `SDD_ALLOW_ACCEPTANCE_BYPASS=1` → ALLOW even with broken project
-  - No projects in workspace/output/src/ → ALLOW silently (nothing to gate)
+  - No projects in workspace/output/src/ → DENY (no acceptance.json) — use bypass
 """
 from __future__ import annotations
 
@@ -48,9 +48,10 @@ def _run_hook(payload: dict, env_extra: dict[str, str] | None = None,
 
 
 class TestValidateAcceptanceGate(unittest.TestCase):
-    def test_empty_stdin_allows(self):
+    def test_empty_stdin_denies(self):
+        # CRIT-4 audit 2026-06-07 : symmetric DENY without acceptance.json
         r = _run_hook({})
-        self.assertEqual(r.returncode, 0)
+        self.assertEqual(r.returncode, 2)
 
     def test_bypass_env_allows(self):
         """SDD_ALLOW_ACCEPTANCE_BYPASS=1 → never blocks (audit-logged)."""
@@ -58,8 +59,8 @@ class TestValidateAcceptanceGate(unittest.TestCase):
         r = _run_hook(payload, {"SDD_ALLOW_ACCEPTANCE_BYPASS": "1"})
         self.assertEqual(r.returncode, 0)
 
-    def test_no_projects_under_src_allows(self):
-        """Empty workspace/output/src/ → nothing to gate → ALLOW."""
+    def test_no_projects_under_src_denies(self):
+        """Empty workspace/output/src/ + no acceptance.json → DENY (CRIT-4)."""
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
             # Create empty .claude marker so paths resolution finds repo root
@@ -67,7 +68,7 @@ class TestValidateAcceptanceGate(unittest.TestCase):
             (root / "workspace" / "output" / "src").mkdir(parents=True)
             payload = {"subagent_type": "qa", "stop_reason": "completed"}
             r = _run_hook(payload, {"SDD_REPO_ROOT": str(root)}, cwd=root)
-            self.assertEqual(r.returncode, 0)
+            self.assertEqual(r.returncode, 2)
 
 
 if __name__ == "__main__":
