@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard — example SDD_Pro</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-50 min-h-screen">
+
+  <header class="bg-white shadow-sm">
+    <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+      <h1 class="text-xl font-semibold text-slate-900">Tableau de bord</h1>
+      <nav class="flex items-center gap-4 text-sm text-slate-600">
+        <a href="/profile" class="hover:text-blue-600">Profil</a>
+        <a href="/settings" class="hover:text-blue-600">Paramètres</a>
+        <button class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-md">Déconnexion</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto p-6">
+    <section class="mb-6">
+      <h2 class="text-lg font-medium text-slate-800 mb-3">Vue d'ensemble</h2>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+
+        <article class="p-5 bg-white rounded-lg shadow-sm border border-slate-200">
+          <p class="text-sm text-slate-500">Utilisateurs actifs</p>
+          <p class="text-3xl font-semibold text-slate-900 mt-1">1 247</p>
+          <p class="text-sm text-green-600 mt-2">+12% vs mois dernier</p>
+        </article>
+
+        <article class="p-5 bg-white rounded-lg shadow-sm border border-slate-200">
+          <p class="text-sm text-slate-500">Commandes</p>
+          <p class="text-3xl font-semibold text-slate-900 mt-1">438</p>
+          <p class="text-sm text-green-600 mt-2">+5% vs mois dernier</p>
+        </article>
+
+        <article class="p-5 bg-white rounded-lg shadow-sm border border-slate-200">
+          <p class="text-sm text-slate-500">Chiffre d'affaires</p>
+          <p class="text-3xl font-semibold text-slate-900 mt-1">€48 320</p>
+          <p class="text-sm text-red-600 mt-2">-3% vs mois dernier</p>
+        </article>
+
+        <article class="p-5 bg-white rounded-lg shadow-sm border border-slate-200">
+          <p class="text-sm text-slate-500">Taux de conversion</p>
+          <p class="text-3xl font-semibold text-slate-900 mt-1">3.8%</p>
+          <p class="text-sm text-slate-500 mt-2">stable</p>
+        </article>
+
+      </div>
+    </section>
+
+    <section>
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-lg font-medium text-slate-800">Activité récente</h2>
+        <a href="/activity" class="text-sm text-blue-600 hover:underline">Tout voir →</a>
+      </div>
+      <div class="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
+        <table class="w-full text-sm">
+          <thead class="bg-slate-50 text-slate-700">
+            <tr>
+              <th class="text-left px-4 py-2 font-medium">Date</th>
+              <th class="text-left px-4 py-2 font-medium">Utilisateur</th>
+              <th class="text-left px-4 py-2 font-medium">Action</th>
+              <th class="text-right px-4 py-2 font-medium">Montant</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            <tr><td class="px-4 py-2">2026-06-08</td><td>alice@example.com</td><td>Nouvelle commande</td><td class="text-right">€120.50</td></tr>
+            <tr><td class="px-4 py-2">2026-06-08</td><td>bob@example.com</td><td>Inscription</td><td class="text-right">—</td></tr>
+            <tr><td class="px-4 py-2">2026-06-07</td><td>carla@example.com</td><td>Remboursement</td><td class="text-right text-red-600">-€48.00</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+</body>
+</html>

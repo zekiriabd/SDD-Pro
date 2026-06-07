@@ -732,6 +732,91 @@ def print_next_steps(info: dict) -> None:
     print(msg)
 
 
+def _check_prereqs(combo: str | None) -> int:
+    """Verify runtime prerequisites for a combo (or all combos).
+
+    Sprint P1 (2026-06-08) — onboarding helper. Reads docs/prerequisites-matrix.md
+    requirements implicitly (canonical version pins per combo) and probes the
+    local machine. Exits 0 if all OK, 3 if any required tool missing.
+    """
+    _print_header(f"SDD_Pro prereq check (combo={combo or 'ALL'})")
+
+    # (combo_key, tool_check, version_extract_pattern, min_version, doc_link)
+    UNIVERSAL = [
+        ("git",       ["git", "--version"],     r"(\d+\.\d+)",      "2.40", "https://git-scm.com"),
+        ("python",    [sys.executable, "--version"], r"(\d+\.\d+)", "3.12", "https://python.org"),
+        ("sqlite3",   ["sqlite3", "-version"],  r"(\d+\.\d+\.\d+)", "3.40", "https://sqlite.org"),
+    ]
+    PER_COMBO = {
+        "c1": [("dotnet", ["dotnet", "--version"], r"(\d+)\.", "10", "https://dot.net")],
+        "c2": [("java",   ["java", "-version"],   r'"(\d+)',     "21", "https://adoptium.net"),
+               ("node",   ["node", "--version"],  r"v(\d+)\.",    "22", "https://nodejs.org")],
+        "c3": [("node",   ["node", "--version"],  r"v(\d+)\.",    "22", "https://nodejs.org")],
+        "c4": [("python", [sys.executable, "--version"], r"(\d+\.\d+)", "3.12", "https://python.org"),
+               ("node",   ["node", "--version"],  r"v(\d+)\.",    "22", "https://nodejs.org")],
+        "c5": [("dotnet", ["dotnet", "--version"], r"(\d+)\.", "10", "https://dot.net"),
+               ("node",   ["node", "--version"],  r"v(\d+)\.",    "22", "https://nodejs.org")],
+    }
+
+    if combo and combo != "custom":
+        checks = UNIVERSAL + PER_COMBO.get(combo, [])
+    else:
+        # All combos = union of all tools
+        seen = set()
+        checks = list(UNIVERSAL)
+        for c_checks in PER_COMBO.values():
+            for ck in c_checks:
+                if ck[0] not in seen:
+                    seen.add(ck[0])
+                    checks.append(ck)
+
+    failures: list[tuple[str, str]] = []
+    for name, cmd, pattern, min_ver, doc in checks:
+        try:
+            r = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+            output = (r.stdout or "") + (r.stderr or "")
+            m = re.search(pattern, output)
+            if not m:
+                failures.append((name, f"could not parse version from `{' '.join(cmd)}` → see {doc}"))
+                _print_warn(f"  {name:<10} : version unparseable")
+                continue
+            found = m.group(1)
+            # Naive version compare (lexicographic ok for single-digit majors)
+            if _version_lt(found, min_ver):
+                failures.append((name, f"installed {found} < required {min_ver} → see {doc}"))
+                _print_warn(f"  {name:<10} : {found} (< {min_ver} required)")
+            else:
+                _print_info(f"  {name:<10} : {found}  [OK]")
+        except (FileNotFoundError, subprocess.SubprocessError, OSError) as e:
+            failures.append((name, f"not installed → see {doc}"))
+            _print_warn(f"  {name:<10} : NOT INSTALLED  → {doc}")
+
+    print()
+    if failures:
+        _print_error(f"{len(failures)} prerequisite(s) failed :")
+        for name, reason in failures:
+            print(f"  - {name} : {reason}")
+        print()
+        print(f"  Full matrix : docs/prerequisites-matrix.md")
+        return 3
+    print(f"  All {len(checks)} prerequisites OK. You can run /sdd-bootstrap.")
+    return 0
+
+
+def _version_lt(found: str, minimum: str) -> bool:
+    """Numeric version compare, returns True if found < minimum."""
+    try:
+        f_parts = [int(p) for p in found.split(".")]
+        m_parts = [int(p) for p in minimum.split(".")]
+        # Pad to same length
+        n = max(len(f_parts), len(m_parts))
+        f_parts += [0] * (n - len(f_parts))
+        m_parts += [0] * (n - len(m_parts))
+        return f_parts < m_parts
+    except ValueError:
+        return False
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="SDD_Pro project bootstrap (interactive).",
@@ -754,7 +839,13 @@ def main() -> int:
                         help="Overwrite existing workspace/input/ without confirmation.")
     parser.add_argument("--auto-init", action="store_true",
                         help="Non-interactive CI mode — reads SDD_* env vars, no prompts.")
+    parser.add_argument("--check-prereqs", action="store_true",
+                        help="Verify runtime prerequisites for the chosen --combo (or all) and exit. See docs/prerequisites-matrix.md")
     args = parser.parse_args()
+
+    # Sprint P1 (2026-06-08) — --check-prereqs: verify runtimes, no scaffold.
+    if args.check_prereqs:
+        return _check_prereqs(args.combo)
 
     # --auto-init implies --force (idempotent CI) AND --skip-install (CI installs
     # deps separately via cached steps). P0-3 fix 2026-06-07 : the docstring

@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login — example SDD_Pro</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-50 min-h-screen flex items-center justify-center px-4">
+
+  <main class="w-full max-w-md p-8 bg-white rounded-lg shadow-md">
+    <header class="mb-6 text-center">
+      <h1 class="text-2xl font-semibold text-slate-900">Connexion</h1>
+      <p class="text-sm text-slate-500 mt-1">Accédez à votre espace</p>
+    </header>
+
+    <form class="space-y-4" novalidate>
+      <div>
+        <label for="email" class="block text-sm font-medium text-slate-700">Email</label>
+        <input id="email" name="email" type="email" required autocomplete="email"
+               class="mt-1 w-full px-3 py-2 border border-slate-300 rounded-md
+                      focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+      </div>
+
+      <div>
+        <label for="password" class="block text-sm font-medium text-slate-700">Mot de passe</label>
+        <input id="password" name="password" type="password" required minlength="8"
+               autocomplete="current-password"
+               class="mt-1 w-full px-3 py-2 border border-slate-300 rounded-md
+                      focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+      </div>
+
+      <div class="flex items-center justify-between text-sm">
+        <label class="flex items-center text-slate-600">
+          <input type="checkbox" class="mr-2"> Se souvenir
+        </label>
+        <a href="/reset-password" class="text-blue-600 hover:underline">Mot de passe oublié ?</a>
+      </div>
+
+      <button type="submit"
+              class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium
+                     py-2 px-4 rounded-md transition disabled:opacity-50">
+        Se connecter
+      </button>
+    </form>
+
+    <p class="mt-6 text-sm text-center text-slate-600">
+      Pas encore de compte ?
+      <a href="/signup" class="text-blue-600 hover:underline">S'inscrire</a>
+    </p>
+
+    <!-- État "error" affiché conditionnellement -->
+    <section data-state="error" hidden class="mt-4 p-3 bg-red-50 text-red-700 text-sm rounded-md">
+      Email ou mot de passe incorrect.
+    </section>
+  </main>
+
+</body>
+</html>

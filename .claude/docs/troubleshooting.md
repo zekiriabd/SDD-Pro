@@ -436,6 +436,208 @@ python .claude/python/sdd_admin/verify_telemetry_health.py
 
 ---
 
+## 🔧 Extended error reference (audit 2026-06-08 — 25+ additional classes)
+
+This appendix complements §🚨 above with classes encountered less
+frequently but documented for completeness. Same format : symptom →
+cause → fix.
+
+### `[INVALID_ARG]` (commands / scripts)
+**Symptom** : `/dev-backend 1` exits with `INVALID_ARG`.
+**Cause** : argument regex `^\d+-\d+(:plan)?$` not matched (you passed `1`
+instead of `1-1`).
+**Fix** : provide both FEAT number AND US number, e.g. `/dev-backend 1-1`.
+
+### `[INVALID_MODE]`
+**Symptom** : `/dev-backend 1-1:plan` exits with `[INVALID_MODE]`.
+**Cause** : a `*.back.md` plan already exists for this US — re-running
+in `:plan` mode is forbidden (use without `:plan` to consume the
+existing plan, or delete it first).
+**Fix** : `rm workspace/output/plans/1-1-*.back.md` then retry.
+
+### `[PROJECT_NOT_INIT]`
+**Symptom** : `dev-backend` STOPs : "no .csproj / package.json / pyproject.toml found".
+**Cause** : `arch` has not yet scaffolded the backend project.
+**Fix** : run `/arch-init` first (or just `/dev-run {n}` which orchestrates it).
+
+### `[FORCE_CUMUL_REJECTED]`
+**Symptom** : `/sdd-full 1 --force --no-validate` rejected.
+**Cause** : ≥ 2 bypass flags cumulated without explicit env auth.
+**Fix** : use only one flag at a time, OR `export SDD_ALLOW_FORCE=1` if
+you really mean to combine them (audit-logged).
+
+### `[GRANULARITY_VIOLATION]`
+**Symptom** : `/us-generate 1` exits with this class.
+**Cause** : FEAT split would produce > 10 US (configurable
+`UsGranularityHardCap`).
+**Fix** : split the FEAT into 2-3 smaller FEATs, OR pass `--allow-large-feat`
+(audit-logged).
+
+### `[TRACEABILITY_GAP]`
+**Symptom** : `/us-generate` warns about SFD-3 not covered by any US.
+**Cause** : the agent could not map SFD-3 to any AC during US generation.
+**Fix** : check that SFD-3 is genuinely a need (not a duplicate of SFD-1)
+and that at least one AC references it. Adjust FEAT, re-run.
+
+### `[READINESS_NO_GO]`
+**Symptom** : `/feat-validate 1` exits NO-GO.
+**Cause** : ≥ 1 blocking finding (ACs without Given/When/Then, missing
+stacks, etc.).
+**Fix** : read the readiness report at `workspace/output/.sys/.validation/1-readiness.md`,
+correct each blocking finding listed. **Don't pass --force unless you
+know what you're doing** — readiness gate is your safety net.
+
+### `[CONFIG_SECURITY_DOWNGRADE]`
+**Symptom** : `read_layered_config` exits with this class.
+**Cause** : your project's `stack.md` tries to lower a security policy
+(e.g. `CoverageMin: 60`) while the team-level baseline requires `80`.
+**Fix** : either accept the team baseline, OR negotiate a team-config
+update with your security officer (audit-logged decision).
+
+### `[SCHEMA_MISMATCH]`
+**Symptom** : `dev-backend` fails STEP 4.5 with `[SCHEMA_MISMATCH]`.
+**Cause** : your US references entity `User.role` but `schema.json` does
+not declare `role` on `User`.
+**Fix** : update `## Data Model` in the FEAT and re-run `/arch-init` to
+regenerate schema, OR remove the `role` reference from the US.
+
+### `[LIBNAME_SIGNATURE_CONFLICT]`
+**Symptom** : second `dev-*` agent STOPs : "{LibName}/Models/User.cs exists
+with different signature".
+**Cause** : `dev-backend US 1-1` and `dev-frontend US 1-2` both want to
+define `User` DTO in the shared LibName project, but with incompatible
+fields.
+**Fix** : harmonize the entity contract upstream — either via
+`/dev-plan` review, or by adjusting the US to use a consistent DTO.
+
+### `[LOCK_HELD]`
+**Symptom** : `/dev-run` STOPs : "console status lock held by ...".
+**Cause** : another `/sdd-full` or console session is updating
+`workspace/console/status.json`.
+**Fix** : wait 10s (lock TTL), retry. If persistent, check no orphan
+process holds `workspace/console/.status.lock` and delete it.
+
+### `[BREAKING_CLEANUP_FAILED]`
+**Symptom** : build is green but `dev-*` STOPs at post-build cleanup.
+**Cause** : `mark_breaking_resolved.py` failed to edit `CLAUDE.md` (file
+permissions, malformed YAML in the BREAKING CHANGES section).
+**Fix** : check write perms on the project `CLAUDE.md`, fix the YAML
+syntax if needed, re-run `/dev-run {n}` (idempotent).
+
+### `[API_GATE_RED]`
+**Symptom** : `/dev-run` STOPs after backend with RED API Gate.
+**Cause** : in-memory API tests detected contract mismatch (404 on
+documented endpoint, 401 instead of 200, etc.).
+**Fix** : open `workspace/output/qa/feat-{n}/api-tests.md`, read which
+endpoint failed, fix the backend (re-run `/dev-backend {n}-{m}`).
+
+### `[QA_OWNERSHIP_VIOLATION]`
+**Symptom** : `dev-backend` STOPs : "trying to write `*.Tests/...`".
+**Cause** : agent confusion — tests are owned by `qa` agent only.
+**Fix** : remove test file references from the dev-* plan. Tests are
+generated separately by `/qa-generate {n}`.
+
+### `[PLAN_AC_COVERAGE_GAP]`
+**Symptom** : `validate_plan.py` exits 2 with this class.
+**Cause** : the plan file `## ACs Coverage Summary` table is missing
+some AC IDs that the US declares.
+**Fix** : re-run `/dev-plan {n}-{m}` (idempotent), or manually edit the
+plan to add the missing AC mappings.
+
+### `[US_DEPS_CYCLE]`
+**Symptom** : `validate_us_deps.py` exits 3.
+**Cause** : US-1-2 depends on US-1-3 which depends on US-1-2 — cycle.
+**Fix** : break the cycle in `## Dependencies` sections of the US files.
+
+### `[STATUS_FLIP_FAILED]`
+**Symptom** : `set_us_status.py` fails to persist Status: Done.
+**Cause** : US frontmatter malformed, `Status:` line not found.
+**Fix** : verify the US file has the standard `Status: {value}` line at
+the top of the frontmatter block.
+
+### `[REVIEW_REPORT_STALE]` (CRIT-5, 2026-06-07)
+**Symptom** : `/sdd-review {n}` prints WARN about stale reports.
+**Cause** : an auditor JSON was written before `dev-*` materialized the
+latest code — verdict may be a false 🟢.
+**Fix** : re-run the relevant auditor (e.g. `Agent: code-reviewer` for
+FEAT {n}) then re-run `/sdd-review {n}`.
+
+### `[REVIEW_SOURCES_MISSING]`
+**Symptom** : `/sdd-review {n} --ensure-scans` exits 3.
+**Cause** : required auditor source (quality / code-review / security /
+spec) has 0 rows in console.db for this FEAT.
+**Fix** : the error message lists the exact invocations to re-run. Copy-paste them.
+
+### `[UI_TOKEN_VIOLATION]`
+**Symptom** : `dev-frontend` STOPs : hardcoded `#2563eb` in component.
+**Cause** : agent wrote hex color directly instead of using `bg-primary` /
+CSS token.
+**Fix** : `dev-frontend` is supposed to catch this automatically. If it
+slipped, edit the file manually : declare `--primary: ...` in
+`src/index.css` then use `bg-primary` Tailwind class.
+
+### `[UI_FIDELITY_GAP]`
+**Symptom** : frontend renders but diverges visibly from mockup.
+**Cause** : labels/structure not matching `workspace/input/ui/{n}-{m}-*.html`.
+**Fix** : adjust the mockup OR adjust the generated component, then
+re-run `/dev-frontend {n}-{m}` (idempotent).
+
+### `[FRONTEND_BACKEND_CONTRACT_GAP]`
+**Symptom** : `code-reviewer` flags 🔴 on a frontend that calls a
+non-existent backend endpoint.
+**Cause** : frontend was generated targeting `POST /api/foo` but backend
+doesn't expose this route.
+**Fix** : either add the endpoint backend-side (`/dev-backend {n}-{m}`)
+or fix the frontend call to match an existing route.
+
+### `[QA_OUTPUT_INVALID]`
+**Symptom** : `/qa-generate` fails to persist coverage.json.
+**Cause** : test runner produced malformed coverage output (cobertura
+XML truncated, lcov empty).
+**Fix** : run the test command manually
+(e.g. `dotnet test --collect:"XPlat Code Coverage"`) and inspect the raw
+output for errors before retrying QA.
+
+### `[QA_PRECONDITION_FAILED]`
+**Symptom** : `/qa-generate 1` STOPs : "no production code under
+workspace/output/src".
+**Cause** : you tried QA before any dev-* matérialisation.
+**Fix** : run `/dev-run 1` first.
+
+### `[ADV_PRECONDITION_FAILED]`
+**Symptom** : `/sdd-review 1 --adversarial` STOPs.
+**Cause** : standard `/sdd-review` has not been run yet (no `review.md`
+file).
+**Fix** : run `/sdd-review 1` first (produces the baseline), then
+`--adversarial`.
+
+### `[DISCOVER_NO_MATCH]`
+**Symptom** : `/sdd-discover-stack` STOPs : "no SDD_Pro combo recognized".
+**Cause** : your repo has unusual manifest combinations (e.g.
+Flutter+Rust) not yet supported.
+**Fix** : either adopt one of the 13 supported combos, OR submit a
+catalog PR to add your combo to `.claude/stacks/`.
+
+### `[RUNTIME_STS_EXCEPTION]`
+**Symptom** : `/arch-init` emits WARN about non-LTS runtime pinned.
+**Cause** : someone pinned .NET 9 (STS) or Node 23 (current) in the
+stack.
+**Fix** : either migrate to LTS (Node 22, .NET 10), OR add explicit ADR
+`runtime-sts-prerelease-exceptions` + `RuntimeException:` in Project
+Config (audit-logged).
+
+### `[ACCEPTANCE_GATE_FAILED]`
+**Symptom** : `/qa-generate` or `SubagentStop` hook DENY with this
+class.
+**Cause** : project test / lint / build / coverage / smoke / E2E check
+failed.
+**Fix** : the error message lists exactly which check failed. Fix that
+specific check (it's not a `dev-*` retry — it's your build or
+config). Bypass : `SDD_ALLOW_ACCEPTANCE_BYPASS=1` (interactive debug
+only).
+
+---
+
 ## 📞 When in doubt
 
 - **The audit report** : `workspace/output/.sys/.audit/` has structured logs for every hook.
