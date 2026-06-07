@@ -224,6 +224,256 @@ class Checks:
         return sum(1 for c in self.items if c["status"] == status)
 
 
+# === Extracted check helpers (audit consolidé 2026-06-07 Sprint 3-5 closure)
+# ==
+# Refactor : main() était 535 LOC monolithique. Découpe en helpers ciblés
+# (sections #15-#18 + timing + emit, les blocs subprocess les plus longs)
+# pour ramener main() à ~250 LOC. Chaque helper est pure-ish : mute `checks`
+# in-place, retourne None. Testable isolément.
+
+def _check_bom_files(claude_root: Path, checks: "Checks") -> None:
+    """#15 BOM check on framework .md files (strip_bom.py --check)."""
+    strip_bom_path = claude_root / "python" / "sdd_admin" / "strip_bom.py"
+    if not strip_bom_path.is_file():
+        return
+    try:
+        res = subprocess.run(
+            [sys.executable, str(strip_bom_path), "--check"],
+            cwd=claude_root.parent,
+            capture_output=True, text=True, timeout=15,
+        )
+        stdout = (res.stdout or "").strip()
+        m_strip = re.search(r"would strip\s+(\d+)\s+files", stdout)
+        n_with_bom = int(m_strip.group(1)) if m_strip else 0
+        if res.returncode == 0 and n_with_bom == 0:
+            checks.add("framework-bom-check", "OK",
+                       "no BOM in framework .md files")
+        elif n_with_bom > 0:
+            checks.add("framework-bom-check", "WARN",
+                       f"{n_with_bom} framework .md file(s) carry UTF-8 BOM — "
+                       f"run `python .claude/python/sdd_admin/strip_bom.py` to fix")
+        else:
+            checks.add("framework-bom-check", "WARN",
+                       f"strip_bom --check exit={res.returncode}")
+    except (OSError, subprocess.TimeoutExpired) as e:
+        checks.add("framework-bom-check", "WARN", f"strip_bom invocation failed: {e}")
+
+
+def _check_telemetry_health(claude_root: Path, checks: "Checks") -> None:
+    """#16 console.db telemetry health (verify_telemetry_health.py)."""
+    telemetry_path = claude_root / "python" / "sdd_admin" / "verify_telemetry_health.py"
+    if not telemetry_path.is_file():
+        return
+    try:
+        res = subprocess.run(
+            [sys.executable, str(telemetry_path), "--json", "--fail-on", "polluted"],
+            cwd=claude_root.parent,
+            capture_output=True, text=True, timeout=15,
+        )
+        try:
+            payload = json.loads(res.stdout) if res.stdout.strip() else {}
+        except json.JSONDecodeError:
+            payload = {}
+        verdict = (payload.get("verdict") or "UNKNOWN").upper()
+        if verdict in ("CLEAN", "ABSENT"):
+            detail = "DB clean" if verdict == "CLEAN" else "no console.db yet (fresh checkout)"
+            checks.add("telemetry-health", "OK", detail)
+        elif verdict == "SUSPECT":
+            checks.add("telemetry-health", "WARN",
+                       "console.db verdict=SUSPECT — see "
+                       "`python .claude/python/sdd_admin/verify_telemetry_health.py`")
+        elif verdict == "POLLUTED":
+            checks.add("telemetry-health", "WARN",
+                       "console.db verdict=POLLUTED (test artifacts) — "
+                       "cost-cap + ROI on stale data. Clean : delete "
+                       "workspace/output/db/console.db (will be recreated)")
+        else:
+            checks.add("telemetry-health", "WARN", f"unknown verdict={verdict}")
+    except (OSError, subprocess.TimeoutExpired) as e:
+        checks.add("telemetry-health", "WARN",
+                   f"verify_telemetry_health invocation failed: {e}")
+
+
+def _check_project_config_schema(py_dir: Path, claude_root: Path, checks: "Checks") -> None:
+    """#17 Project Config JSON-Schema validation (43 keys covered)."""
+    pcfg_validator = py_dir / "validate_project_config.py"
+    if not pcfg_validator.is_file():
+        return
+    try:
+        res = subprocess.run(
+            [sys.executable, str(pcfg_validator), "--json"],
+            cwd=claude_root.parent,
+            capture_output=True, text=True, timeout=10,
+        )
+        try:
+            payload = json.loads(res.stdout) if res.stdout.strip() else {}
+        except json.JSONDecodeError:
+            payload = {}
+        errs = int(payload.get("summary", {}).get("errors", 0))
+        n_keys = int(payload.get("config_keys", 0))
+        if res.returncode == 0 and errs == 0:
+            checks.add("project-config-schema", "OK",
+                       f"Project Config valid ({n_keys} keys)")
+        else:
+            findings = payload.get("findings", [])[:2]
+            hint = ", ".join(f"{f.get('key', '?')}:{f.get('code', '?')}" for f in findings)
+            checks.add("project-config-schema", "WARN",
+                       f"{errs} issue(s) in Project Config ({hint}…) — "
+                       f"`python .claude/python/sdd_scripts/"
+                       f"validate_project_config.py` for full report")
+    except (OSError, subprocess.TimeoutExpired) as e:
+        checks.add("project-config-schema", "WARN",
+                   f"validate_project_config invocation failed: {e}")
+
+
+def _check_pytest_smoke(pytests_dir: Path, claude_root: Path, checks: "Checks") -> None:
+    """#18.bis pytest smoke suite invocation (closes 'smoke gate lying' gap)."""
+    if not pytests_dir.is_dir():
+        return
+    try:
+        res = subprocess.run(
+            [sys.executable, "-m", "pytest", "-m", "smoke", "-q",
+             "--tb=line", "--no-header", str(pytests_dir)],
+            cwd=claude_root.parent,
+            capture_output=True, text=True, timeout=60,
+        )
+        if res.returncode == 0:
+            last_line = next(
+                (line for line in reversed((res.stdout or "").splitlines())
+                 if line.strip() and ("passed" in line or "failed" in line)),
+                "smoke suite passed",
+            )
+            checks.add("pytest-smoke", "OK", last_line.strip())
+        elif res.returncode == 5:
+            checks.add("pytest-smoke", "WARN",
+                       "no tests marked @pytest.mark.smoke — add marker to "
+                       "critical hooks for runtime gate coverage")
+        elif res.returncode == 2:
+            err_excerpt = ((res.stderr or "") + (res.stdout or "")).strip()
+            err_excerpt = err_excerpt[:250] + ("…" if len(err_excerpt) > 250 else "")
+            checks.add("pytest-smoke", "FAIL",
+                       f"pytest collection failed (exit 2): {err_excerpt}")
+        else:
+            fail_line = next(
+                (line for line in (res.stdout or "").splitlines()
+                 if line.startswith("FAILED ")),
+                f"exit {res.returncode}",
+            )
+            checks.add("pytest-smoke", "FAIL",
+                       f"smoke suite failed: {fail_line[:200]}")
+    except (OSError, subprocess.TimeoutExpired) as e:
+        checks.add("pytest-smoke", "WARN",
+                   f"pytest smoke invocation failed: {e}")
+
+
+def _check_stack_md_headers(claude_root: Path, checks: "Checks") -> None:
+    """#18 stack .md headers (Status: + Validation:) validation."""
+    headers_script = claude_root / "python" / "sdd_admin" / "validate_stack_md_headers.py"
+    if not headers_script.is_file():
+        return
+    try:
+        res = subprocess.run(
+            [sys.executable, str(headers_script), "--json"],
+            cwd=claude_root.parent,
+            capture_output=True, text=True, encoding="utf-8",
+            errors="replace", timeout=10,
+        )
+        try:
+            payload = json.loads(res.stdout) if res.stdout.strip() else {}
+        except json.JSONDecodeError:
+            payload = {}
+        s = payload.get("summary", {})
+        problems = (s.get("missing_status", 0)
+                    + s.get("missing_validation", 0)
+                    + s.get("blockquoted_only", 0)
+                    + s.get("invalid_badge", 0))
+        n_stacks = payload.get("stacks_count", 0)
+        expected_total = 34  # CLAUDE.md §6 : 25 🟢 + 8 🟡 exp + 1 🟡 POC
+        if res.returncode == 0 and problems == 0:
+            if n_stacks == expected_total:
+                checks.add("stack-md-headers", "OK",
+                           f"all {n_stacks}/{expected_total} stacks "
+                           f"have Status:+Validation: headers")
+            else:
+                checks.add("stack-md-headers", "WARN",
+                           f"stacks-count drift : {n_stacks} found, "
+                           f"{expected_total} expected (cf. CLAUDE.md §6)")
+        else:
+            checks.add("stack-md-headers", "WARN",
+                       f"{problems} stack(s) have header issues — "
+                       f"`python .claude/python/sdd_admin/"
+                       f"validate_stack_md_headers.py` for details")
+    except (OSError, subprocess.TimeoutExpired) as e:
+        checks.add("stack-md-headers", "WARN",
+                   f"validate_stack_md_headers invocation failed: {e}")
+
+
+def _compute_timing(t_start: float, skip_heavy: bool, checks: "Checks") -> None:
+    """#11 Self-timing — seuil dépendant du mode (hook Stop strict vs full)."""
+    elapsed_ms = (time.perf_counter() - t_start) * 1000
+    if skip_heavy:
+        ok_thr, warn_thr = 200, 400
+        ctx = "hook Stop"
+    else:
+        ok_thr, warn_thr = 2500, 4500
+        ctx = "full smoke"
+    if elapsed_ms < ok_thr:
+        checks.add("smoke-timing", "OK",
+                   f"smoke completed in {elapsed_ms:.0f}ms (< {ok_thr}ms threshold, {ctx})")
+    elif elapsed_ms < warn_thr:
+        checks.add("smoke-timing", "WARN",
+                   f"smoke took {elapsed_ms:.0f}ms (> {ok_thr}ms — {ctx} perçu)")
+    else:
+        checks.add("smoke-timing", "WARN",
+                   f"smoke took {elapsed_ms:.0f}ms (> {warn_thr}ms — {ctx} trop lent ; "
+                   f"hard FAIL seulement si régression nette sur baseline historique)")
+
+
+def _emit_report(checks: "Checks", args: argparse.Namespace, claude_root: Path) -> int:
+    """Émission du rapport (stdout pretty ou JSON) + cache + exit code."""
+    ok = checks.count("OK")
+    warn = checks.count("WARN")
+    fail = checks.count("FAIL")
+
+    # Silent-on-pass: no output if everything OK (suitable for Stop hook)
+    if args.silent_on_pass and fail == 0 and warn == 0:
+        _write_cache(claude_root, "ok")
+        return SUCCESS
+    if args.json:
+        result = {
+            "scanned_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "summary":    {"total": len(checks.items), "ok": ok, "warn": warn, "fail": fail},
+            "checks":     checks.items,
+        }
+        print(json.dumps(result, indent=2, ensure_ascii=False))
+    else:
+        print()
+        print("=== SDD_Pro Framework Smoke Test ===")
+        print()
+        fails = [c for c in checks.items if c["status"] == "FAIL"]
+        warns = [c for c in checks.items if c["status"] == "WARN"]
+        if fails:
+            print(f"[FAIL] {len(fails)} error(s):")
+            for c in fails:
+                print(f"  {c['name']:<32}  {c['message']}")
+            print()
+        if warns:
+            print(f"[WARN] {len(warns)} warning(s):")
+            for c in warns:
+                print(f"  {c['name']:<32}  {c['message']}")
+            print()
+        if not fails and not warns:
+            print(f"[OK] All checks pass ({ok} / {len(checks.items)})")
+        print()
+        print(f"Summary: OK={ok}  WARN={warn}  FAIL={fail}  total={len(checks.items)}")
+
+    if (args.strict and fail > 0) or fail > 0:
+        _write_cache(claude_root, "fail")
+        return FAIL_FAST
+    _write_cache(claude_root, "ok")
+    return SUCCESS
+
+
 def main() -> int:
     args = parse_args()
     t_start = time.perf_counter()
@@ -474,290 +724,20 @@ def main() -> int:
     # These cumulate ~400ms (4× subprocess Python boot + script run). Acceptable
     # for the standard smoke (CI, manual call) but break the hook Stop budget
     # of ≤ 700ms. Skip them when --silent-on-pass is set (= hook Stop context).
-    # They still run on every full smoke invocation, just not on the per-Stop
-    # hot path. The strict CI workflow runs the standalone scripts directly.
+    # Extraits en helpers `_check_*` (audit consolidé 2026-06-07 Sprint 3-5).
     skip_heavy = args.silent_on_pass
 
-    # 15. v7.0.0-alpha — BOM check on framework .md files (strip_bom.py --check)
-    # Detects UTF-8 BOM that break Claude Code's frontmatter parser before
-    # users discover it the hard way (subagents silently not registered).
-    strip_bom_path = claude_root / "python" / "sdd_admin" / "strip_bom.py"
-    if strip_bom_path.is_file() and not skip_heavy:
-        try:
-            res = subprocess.run(
-                [sys.executable, str(strip_bom_path), "--check"],
-                cwd=claude_root.parent,
-                capture_output=True, text=True, timeout=15,
-            )
-            stdout = (res.stdout or "").strip()
-            # Output pattern: "Scanned N .md files\nwould strip K files:\n..."
-            m_strip = re.search(r"would strip\s+(\d+)\s+files", stdout)
-            n_with_bom = int(m_strip.group(1)) if m_strip else 0
-            if res.returncode == 0 and n_with_bom == 0:
-                checks.add("framework-bom-check", "OK",
-                           "no BOM in framework .md files")
-            elif n_with_bom > 0:
-                checks.add("framework-bom-check", "WARN",
-                           f"{n_with_bom} framework .md file(s) carry UTF-8 BOM — "
-                           f"run `python .claude/python/sdd_admin/strip_bom.py` to fix")
-            else:
-                checks.add("framework-bom-check", "WARN",
-                           f"strip_bom --check exit={res.returncode}")
-        except (OSError, subprocess.TimeoutExpired) as e:
-            checks.add("framework-bom-check", "WARN", f"strip_bom invocation failed: {e}")
+    if not skip_heavy:
+        _check_bom_files(claude_root, checks)
+        _check_telemetry_health(claude_root, checks)
+        _check_project_config_schema(py_dir, claude_root, checks)
+        pytests_dir = claude_root / "python" / "tests"
+        _check_pytest_smoke(pytests_dir, claude_root, checks)
+        _check_stack_md_headers(claude_root, checks)
 
-    # 16. v7.0.0-alpha — console.db telemetry health (verify_telemetry_health.py).
-    # Detects test-pollution artifacts (NULL run_id, unrealistic token volumes,
-    # `/x` /`/a` test commands) that would distort cost-cap + ROI aggregation.
-    # Only enforces presence of the script ; runs in --fail-on suspect mode
-    # but reports WARN (not FAIL) because an empty DB on a fresh checkout
-    # is legitimate.
-    telemetry_path = claude_root / "python" / "sdd_admin" / "verify_telemetry_health.py"
-    if telemetry_path.is_file() and not skip_heavy:
-        try:
-            res = subprocess.run(
-                [sys.executable, str(telemetry_path), "--json", "--fail-on", "polluted"],
-                cwd=claude_root.parent,
-                capture_output=True, text=True, timeout=15,
-            )
-            try:
-                payload = json.loads(res.stdout) if res.stdout.strip() else {}
-            except json.JSONDecodeError:
-                payload = {}
-            verdict = (payload.get("verdict") or "UNKNOWN").upper()
-            if verdict in ("CLEAN", "ABSENT"):
-                # ABSENT = fresh checkout, no console.db yet → expected
-                detail = ("DB clean" if verdict == "CLEAN"
-                          else "no console.db yet (fresh checkout)")
-                checks.add("telemetry-health", "OK", detail)
-            elif verdict == "SUSPECT":
-                checks.add("telemetry-health", "WARN",
-                           "console.db verdict=SUSPECT — see "
-                           "`python .claude/python/sdd_admin/verify_telemetry_health.py`")
-            elif verdict == "POLLUTED":
-                # WARN (not FAIL) by design : POLLUTED is operational signal
-                # (cost-cap + ROI are operating on stale data) but not a code
-                # regression. For strict CI gating, call verify_telemetry_health.py
-                # directly with `--fail-on polluted` (exits 3=INFRA_BLOCKED).
-                checks.add("telemetry-health", "WARN",
-                           "console.db verdict=POLLUTED (test artifacts) — "
-                           "cost-cap + ROI on stale data. Clean : delete "
-                           "workspace/output/db/console.db (will be recreated)")
-            else:
-                checks.add("telemetry-health", "WARN", f"unknown verdict={verdict}")
-        except (OSError, subprocess.TimeoutExpired) as e:
-            checks.add("telemetry-health", "WARN",
-                       f"verify_telemetry_health invocation failed: {e}")
+    _compute_timing(t_start, skip_heavy, checks)
+    return _emit_report(checks, args, claude_root)
 
-    # 17. v7.0.0-alpha — Project Config JSON-Schema validation.
-    # Catches typos / wrong enum values / out-of-range scalars / type
-    # mismatches in `## Project Config` of stack.md against
-    # `.claude/templates/project-config.schema.json` (43 keys covered).
-    # WARN (not FAIL) because the validator runs with --strict-unknown
-    # which can flag user-extension keys legitimately added by the project.
-    # For strict CI gating, call directly: `python .claude/python/
-    # sdd_scripts/validate_project_config.py --strict-unknown` (exit 1).
-    pcfg_validator = py_dir / "validate_project_config.py"
-    if pcfg_validator.is_file() and not skip_heavy:
-        try:
-            res = subprocess.run(
-                [sys.executable, str(pcfg_validator), "--json"],
-                cwd=claude_root.parent,
-                capture_output=True, text=True, timeout=10,
-            )
-            try:
-                payload = json.loads(res.stdout) if res.stdout.strip() else {}
-            except json.JSONDecodeError:
-                payload = {}
-            errs = int(payload.get("summary", {}).get("errors", 0))
-            n_keys = int(payload.get("config_keys", 0))
-            if res.returncode == 0 and errs == 0:
-                checks.add("project-config-schema", "OK",
-                           f"Project Config valid ({n_keys} keys)")
-            else:
-                # Show top-2 finding keys for quick diagnosis
-                findings = payload.get("findings", [])[:2]
-                hint = ", ".join(f"{f.get('key', '?')}:{f.get('code', '?')}"
-                                 for f in findings)
-                checks.add("project-config-schema", "WARN",
-                           f"{errs} issue(s) in Project Config ({hint}…) — "
-                           f"`python .claude/python/sdd_scripts/"
-                           f"validate_project_config.py` for full report")
-        except (OSError, subprocess.TimeoutExpired) as e:
-            checks.add("project-config-schema", "WARN",
-                       f"validate_project_config invocation failed: {e}")
 
-    # 18.bis (audit CTO 2026-06-07) — pytest smoke suite invocation.
-    # Closes the gap "smoke gate lying": framework_smoke previously only
-    # verified file presence + JSON schemas, NEVER ran the pytest suite.
-    # A broken hook (e.g. protect_framework CWD bug 2026-06-07) that failed
-    # 2/13 tests still produced `OK=89 WARN=1 FAIL=0` because the gate
-    # didn't invoke pytest.
-    #
-    # Strategy : ONE pytest call with `-m smoke` scoped to the tests/
-    # directory. pytest still performs full collection on all test files
-    # (catching import errors / broken conftest in non-smoke files too),
-    # then filters runs by marker. Critical-path tests (blocking hooks,
-    # atomic write, file locks, env-bypass) MUST be tagged `pytest.mark.smoke`.
-    # Budget ~2-3s. Skipped in --silent-on-pass (Stop hook hot path).
-    # exit 5 (no tests matched marker) → WARN (adoption hint, not regression).
-    pytests_dir = claude_root / "python" / "tests"
-    if pytests_dir.is_dir() and not skip_heavy:
-        try:
-            res = subprocess.run(
-                [sys.executable, "-m", "pytest", "-m", "smoke", "-q",
-                 "--tb=line", "--no-header", str(pytests_dir)],
-                cwd=claude_root.parent,
-                capture_output=True, text=True, timeout=60,
-            )
-            if res.returncode == 0:
-                last_line = next(
-                    (line for line in reversed((res.stdout or "").splitlines())
-                     if line.strip() and ("passed" in line or "failed" in line)),
-                    "smoke suite passed",
-                )
-                checks.add("pytest-smoke", "OK", last_line.strip())
-            elif res.returncode == 5:
-                checks.add(
-                    "pytest-smoke", "WARN",
-                    "no tests marked @pytest.mark.smoke — add marker to "
-                    "critical hooks (protect_framework, block_env_bypass, "
-                    "atomic_write, file_locks) for runtime gate coverage",
-                )
-            elif res.returncode == 2:
-                # Collection error (import failure, broken conftest, syntax)
-                err_excerpt = ((res.stderr or "") + (res.stdout or "")).strip()
-                err_excerpt = err_excerpt[:250] + ("…" if len(err_excerpt) > 250 else "")
-                checks.add(
-                    "pytest-smoke", "FAIL",
-                    f"pytest collection failed (exit 2): {err_excerpt}",
-                )
-            else:
-                fail_line = next(
-                    (line for line in (res.stdout or "").splitlines()
-                     if line.startswith("FAILED ")),
-                    f"exit {res.returncode}",
-                )
-                checks.add(
-                    "pytest-smoke", "FAIL",
-                    f"smoke suite failed: {fail_line[:200]}",
-                )
-        except (OSError, subprocess.TimeoutExpired) as e:
-            checks.add("pytest-smoke", "WARN",
-                       f"pytest smoke invocation failed: {e}")
-
-    # 18. v7.0.0-alpha — stack .md headers (Status: + Validation:) validation.
-    # The agents read these to surface stack maturity to Tech Lead. Drift to
-    # blockquoted format (`> Validation:`) breaks regex-based readers and
-    # phase_planner cannot emit the "experimental stack used in prod" warning.
-    headers_script = claude_root / "python" / "sdd_admin" / "validate_stack_md_headers.py"
-    if headers_script.is_file() and not skip_heavy:
-        try:
-            # encoding=utf-8 explicit : the script's JSON contains 🟢/🟡/🔴
-            # badges which break stdout decode on Windows cp1252 default.
-            res = subprocess.run(
-                [sys.executable, str(headers_script), "--json"],
-                cwd=claude_root.parent,
-                capture_output=True, text=True, encoding="utf-8",
-                errors="replace", timeout=10,
-            )
-            try:
-                payload = json.loads(res.stdout) if res.stdout.strip() else {}
-            except json.JSONDecodeError:
-                payload = {}
-            s = payload.get("summary", {})
-            problems = (s.get("missing_status", 0)
-                        + s.get("missing_validation", 0)
-                        + s.get("blockquoted_only", 0)
-                        + s.get("invalid_badge", 0))
-            n_stacks = payload.get("stacks_count", 0)
-            expected_total = 34  # CLAUDE.md §6 : 25 🟢 + 8 🟡 exp + 1 🟡 POC
-            if res.returncode == 0 and problems == 0:
-                if n_stacks == expected_total:
-                    checks.add("stack-md-headers", "OK",
-                               f"all {n_stacks}/{expected_total} stacks "
-                               f"have Status:+Validation: headers")
-                else:
-                    checks.add("stack-md-headers", "WARN",
-                               f"stacks-count drift : {n_stacks} found, "
-                               f"{expected_total} expected (cf. CLAUDE.md §6)")
-            else:
-                checks.add("stack-md-headers", "WARN",
-                           f"{problems} stack(s) have header issues — "
-                           f"`python .claude/python/sdd_admin/"
-                           f"validate_stack_md_headers.py` for details")
-        except (OSError, subprocess.TimeoutExpired) as e:
-            checks.add("stack-md-headers", "WARN",
-                       f"validate_stack_md_headers invocation failed: {e}")
-
-    # 11. Self-timing — seuil dépendant du mode :
-    #   - silent-on-pass (hook Stop) : seuil strict 200/400ms (les 4 heavy
-    #     checks sont skippés, seule la portion in-process compte)
-    #   - mode normal (CI/manuel) : seuil large 1500/3000ms (les 4 heavy
-    #     checks subprocess ajoutent ~400-1000ms acceptable hors hook Stop —
-    #     P1-6 fix 2026-06-07 : relâché de 1000/1500 vers 1500/3000 pour
-    #     éliminer la flakiness sur machines chargées et Windows AV scanning)
-    elapsed_ms = (time.perf_counter() - t_start) * 1000
-    if skip_heavy:
-        ok_thr, warn_thr = 200, 400
-        ctx = "hook Stop"
-    else:
-        # Audit CTO 2026-06-07 : full smoke invokes pytest -m smoke (~1.5s).
-        # Threshold raised 1500/3000 → 2500/4500 to absorb pytest gate.
-        # The gate is more honest now ; spend the ~1.5s.
-        ok_thr, warn_thr = 2500, 4500
-        ctx = "full smoke"
-    if elapsed_ms < ok_thr:
-        checks.add("smoke-timing", "OK",
-                   f"smoke completed in {elapsed_ms:.0f}ms (< {ok_thr}ms threshold, {ctx})")
-    elif elapsed_ms < warn_thr:
-        checks.add("smoke-timing", "WARN",
-                   f"smoke took {elapsed_ms:.0f}ms (> {ok_thr}ms — {ctx} perçu)")
-    else:
-        checks.add("smoke-timing", "WARN",
-                   f"smoke took {elapsed_ms:.0f}ms (> {warn_thr}ms — {ctx} trop lent ; "
-                   f"hard FAIL seulement si régression nette sur baseline historique)")
-
-    ok = checks.count("OK")
-    warn = checks.count("WARN")
-    fail = checks.count("FAIL")
-
-    # Silent-on-pass: no output if everything OK (suitable for Stop hook)
-    if args.silent_on_pass and fail == 0 and warn == 0:
-        _write_cache(claude_root, "ok")
-        return SUCCESS
-    if args.json:
-        result = {
-            "scanned_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "summary":    {"total": len(checks.items), "ok": ok, "warn": warn, "fail": fail},
-            "checks":     checks.items,
-        }
-        print(json.dumps(result, indent=2, ensure_ascii=False))
-    else:
-        print()
-        print("=== SDD_Pro Framework Smoke Test ===")
-        print()
-        fails = [c for c in checks.items if c["status"] == "FAIL"]
-        warns = [c for c in checks.items if c["status"] == "WARN"]
-        if fails:
-            print(f"[FAIL] {len(fails)} error(s):")
-            for c in fails:
-                print(f"  {c['name']:<32}  {c['message']}")
-            print()
-        if warns:
-            print(f"[WARN] {len(warns)} warning(s):")
-            for c in warns:
-                print(f"  {c['name']:<32}  {c['message']}")
-            print()
-        if not fails and not warns:
-            print(f"[OK] All checks pass ({ok} / {len(checks.items)})")
-        print()
-        print(f"Summary: OK={ok}  WARN={warn}  FAIL={fail}  total={len(checks.items)}")
-
-    if (args.strict and fail > 0) or fail > 0:
-        _write_cache(claude_root, "fail")
-        return FAIL_FAST
-    _write_cache(claude_root, "ok")
-    return SUCCESS
 if __name__ == "__main__":
     sys.exit(main())
