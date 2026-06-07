@@ -27,10 +27,28 @@ from sdd_lib.combos import (  # noqa: E402
 
 
 _VALIDATION_HEADER_RE = re.compile(
-    r"^\s*Validation:\s*([🟢🟡🔴])\s*(\w+)",
+    r"^\s*Validation:\s*([🟢🟡🔴])\s*([\w-]+)",
     re.MULTILINE,
 )
 
+# Sprint 2 closure (audit consolidé 2026-06-07) — mapping enrichi pour le
+# tier `bench-validated` introduit par CRIT-11 (combos.json levelPriority).
+# Le mot-clé après l'emoji est désormais load-bearing pour distinguer
+# `🟢 reference` (validated) de `🟢 bench` (bench-validated).
+_HEADER_TO_LEVEL = {
+    ("🟢", "reference"):          "validated",
+    ("🟢", "validated"):          "validated",
+    ("🟢", "bench"):              "bench-validated",
+    ("🟢", "bench-validated"):    "bench-validated",
+    ("🟡", "experimental"):       "experimental",
+    ("🟡", "scaffold-validated"): "scaffold-validated",
+    ("🟡", "scaffold"):           "scaffold-validated",
+    ("🟡", "POC"):                "poc-only",
+    ("🟡", "poc-only"):           "poc-only",
+    ("🔴", "untested"):           "untested",
+}
+
+# Fallback emoji-only (backward-compat — utilisé si le mot-clé n'est pas mappé)
 _EMOJI_TO_LEVEL = {
     "🟢": "validated",
     "🟡": "experimental",
@@ -54,7 +72,10 @@ def _read_validation_header(stack_md: Path) -> str | None:
     m = _VALIDATION_HEADER_RE.search(text)
     if m is None:
         return None
-    return _EMOJI_TO_LEVEL.get(m.group(1))
+    emoji = m.group(1)
+    keyword = m.group(2)
+    # Try the enriched (emoji, keyword) mapping first ; fall back to emoji-only.
+    return _HEADER_TO_LEVEL.get((emoji, keyword)) or _EMOJI_TO_LEVEL.get(emoji)
 
 
 class TestCombosJsonIntegrity(unittest.TestCase):

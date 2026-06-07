@@ -458,7 +458,7 @@ def test_should_skip_step_target_equals_current_runs(monkeypatch, fake_repo):
 def test_should_skip_step_decimal_steps_handled_correctly(monkeypatch, fake_repo):
     # Critical: STEP_2.6 must compare correctly vs STEP_4 (was broken in bash
     # lex compare which would treat STEP_2.6 > STEP_4 as false negative on '.').
-    # Pipeline order : STEP_2 → STEP_2.6 → STEP_2.7 → STEP_3.5 → STEP_4 → STEP_5 → STEP_5.5
+    # Pipeline order : STEP_2 → STEP_2.6 → STEP_2.7 → STEP_3.5 → STEP_4 → STEP_5 → STEP_4.8
     rc = _run_main(monkeypatch, [
         "should-skip-step", "--target", "STEP_4", "--current", "STEP_2.6",
     ])
@@ -468,7 +468,7 @@ def test_should_skip_step_decimal_steps_handled_correctly(monkeypatch, fake_repo
 def test_should_skip_step_step_end_skips_everything(monkeypatch, fake_repo):
     # Special sentinel : STEP_END means all phases done.
     rc = _run_main(monkeypatch, [
-        "should-skip-step", "--target", "STEP_END", "--current", "STEP_5.5",
+        "should-skip-step", "--target", "STEP_END", "--current", "STEP_4.8",
     ])
     assert rc == 0  # SKIP
 

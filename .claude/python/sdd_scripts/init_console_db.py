@@ -45,7 +45,10 @@ from sdd_lib.exit_codes import FAIL_FAST, SUCCESS  # noqa: E402
 
 
 def _utc_now_iso() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    """Alias of `sdd_lib.paths.iso_now` — kept as `_utc_now_iso` for
+    backward-compat with internal callers (audit consolidé 2026-06-07 Sprint 2)."""
+    from sdd_lib.paths import iso_now
+    return iso_now()
 
 
 def init_db(db_path: Path, force_recreate: bool = False) -> dict:

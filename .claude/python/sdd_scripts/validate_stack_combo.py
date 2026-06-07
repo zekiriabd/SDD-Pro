@@ -340,6 +340,15 @@ def validate(root: Path | None = None) -> dict:
 
     if matched is not None and worst == "validated":
         status, exit_code = "validated", 0
+    elif worst == "bench-validated":
+        # Sprint 2 closure CRIT-11 (audit consolidé 2026-06-07) : bench-validated
+        # devient un statut canonique distinct (priority 0 comme validated).
+        # Représente : runtime OK lors du bench 2026-06-05 mais scaffolding
+        # /sdd-full partiellement manuel. Pas un risque, juste une promesse
+        # plus faible que validated end-to-end.
+        status, exit_code = "bench-validated", 0
+        if matched is None:
+            warnings.append("Combo signature does not match any catalog combo (C1-C13) — components individually bench-validated mais assemblage non listé")
     elif worst in ("experimental", "scaffold-validated"):
         status, exit_code = "experimental", 1
         if matched is None:
@@ -353,9 +362,11 @@ def validate(root: Path | None = None) -> dict:
         status, exit_code = "experimental", 1
 
     # Audit 2026-06-06 (N3) — fullstack/mobile downgrade gate. If we reached
-    # `validated` despite being in a non-C1/C2 family, force experimental.
+    # `validated` despite being in a non-C1/C2 family, force bench-validated
+    # (audit Sprint 2 — was 'experimental' which was too pessimistic now that
+    # fullstack components are bench-validated tier per 2026-06-05 evidence).
     if fullstack_or_mobile_downgrade and status == "validated":
-        status, exit_code = "experimental", 1
+        status, exit_code = "bench-validated", 0
 
     # Archi notes
     if components["archi"]["level"] == "experimental":

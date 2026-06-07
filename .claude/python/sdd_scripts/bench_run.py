@@ -82,7 +82,11 @@ def _snapshot_path(bench_id: str) -> Path:
 
 
 def _iso_now() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    """Thin wrapper around `sdd_lib.paths.iso_now` — kept as `_iso_now`
+    for backward-compat with internal callers (audit consolidé 2026-06-07
+    Sprint 2 : factorisation 5 impls iso_now → 1 SSoT)."""
+    from sdd_lib.paths import iso_now
+    return iso_now()
 
 
 def _table_exists(con: sqlite3.Connection, table: str) -> bool:

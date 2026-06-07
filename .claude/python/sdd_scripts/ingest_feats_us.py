@@ -40,7 +40,10 @@ def _count_ids_pattern(prefix: str) -> re.Pattern[str]:
 
 
 def now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+    """Alias of `sdd_lib.paths.iso_now` — kept for backward-compat with
+    consumers parsing the script output (audit consolidé 2026-06-07 Sprint 2)."""
+    from sdd_lib.paths import iso_now
+    return iso_now()
 
 
 def parse_feat(path: Path) -> dict:

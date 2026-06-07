@@ -414,7 +414,7 @@ _PIPELINE_PHASES_ORDER: tuple[tuple[str, str], ...] = (
     ("arch",         "STEP_3.5"),  # /arch-init (Phase A+B)
     ("dev_run",      "STEP_4"),    # /dev-run (back + API gate + front)
     ("qa",           "STEP_5"),    # /qa-generate
-    ("sdd_review",   "STEP_5.5"),  # /sdd-review
+    ("sdd_review",   "STEP_4.8"),  # /sdd-review (audit consolidé 2026-06-07 — aligné sur sdd-full.md heading STEP 4.8, ex-STEP_5.5 décalé v6.11.0)
 )
 
 _RESUME_DONE_STATUSES = {"pass", "warn", "success", "skip"}

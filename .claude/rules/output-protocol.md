@@ -162,7 +162,7 @@ Régression possible uniquement sur `[…/FIXING]` (retry, le % du retry
 | Planning technique | `[PLAN]` | 15-22 |
 | Architecture + DB | `[ARCH]` | 22-32 |
 | Finalize ADRs + constitution | `[CONSTITUTION]` | 32-36 |
-| Backend (ALL US) | `[DEV-BACKEND]` | 32-58 |
+| Backend (ALL US) | `[DEV-BACKEND]` | 36-58 |
 | API Gate (in-memory) | `[QA]` (gate API) | 58-66 |
 | Frontend (ALL US) | `[DEV-FRONTEND]` | 66-78 |
 | QA (tests + coverage) | `[QA]` | 78-88 |

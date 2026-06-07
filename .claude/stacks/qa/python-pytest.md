@@ -2,9 +2,9 @@
 
 > §2.4 (Librairies) régénérée depuis `python-pytest.libs.json` — ne pas éditer manuellement (`python .claude/python/sdd_admin/sync_stack_md.py --stack-id python-pytest`).
 
-Status: Experimental
-Validation: 🟡 experimental (not yet validated end-to-end in production combo)
-Support: ⚠ Non supporté commercialement (audit C3, 2026-06-06) — exclu du SLA produit. Voir CLAUDE.md §6 et docs/validated-combos.md.
+Status: Bench-validated
+Validation: 🟢 bench (bench 2026-06-05 runtime PASS sur combos C4/C12 — FastAPI + pytest ; pipeline /sdd-full end-to-end pending v7.1)
+Support: 🟢 Supporté best-effort (SLA Tier 2, cf. SLA.md §1.1) — pas de garantie idempotence /sdd-full. Promu de experimental le 2026-06-07 (audit Sprint 2 CRIT-11 closure).
 QA FEAT ID: python-pytest
 Scope: tests unitaires backend Python (FastAPI, Flask, Django)
 

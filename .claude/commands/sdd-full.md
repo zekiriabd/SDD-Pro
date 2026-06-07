@@ -215,6 +215,22 @@ python .claude/python/sdd_scripts/preflight_force_cumul.py \
 | 0 | continuer STEP 1.ter + **`export SDD_FORCE_CUMUL_OK=1`** (sentinelle court-circuit M9 closure) |
 | 1 | **STOP** + ERROR `[FORCE_CUMUL_REJECTED]` déjà émis par le script sur stderr |
 
+> **Comprendre la gate anti-cumul (CRIT-14 closure 2026-06-07)** : un seul
+> flag de bypass est toléré (`BYPASS_COUNT = 1` → WARN audit-loggué). Le
+> cumul de **2 ou plus** parmi `{--force, --no-plan-on-warn, --no-validate}`
+> nécessite l'env var `SDD_ALLOW_FORCE=1` (truthy = `1`/`true`/`yes`/`on`,
+> case-insensitive). Cas légitime : reprise d'un run NO-GO en mode dégradé
+> Tech Lead, après revue manuelle de la FEAT. Usage CLI :
+>
+> ```bash
+> SDD_ALLOW_FORCE=1 claude /sdd-full 1 --force --no-validate
+> ```
+>
+> L'usage du bypass est **tracé dans `workspace/output/.sys/.audit/force-bypass.log`**
+> (commande, flags, timestamp, raison libre via `SDD_FORCE_REASON=...`).
+> Pour audit DSI : ce log est la preuve de la décision humaine, jamais
+> bypass silencieux.
+
 ```bash
 # Audit M9 closure 2026-06-07 — export sentinelle pour court-circuit STEP 3.6.quart
 if [ "$CUMUL_EXIT_STEP_1_BIS" = "0" ]; then
@@ -262,11 +278,13 @@ RUN_ID=$(python .claude/python/sdd_scripts/sdd_state.py get-run --feat-number {n
 # est la première qui n'est PAS dans {pass, warn, skip}.
 RESUME_STATE=$(python .claude/python/sdd_scripts/sdd_state.py show-run --run-id "$RUN_ID" 2>/dev/null)
 
-# Calcul du STEP de reprise (déterministe, pas LLM). Convention :
-#   us_generate=pass   -> skip STEP 2 (us-generate)
-#   us_generate+arch=pass -> skip jusqu'au STEP 4.5 (dev-run)
-#   us_generate+arch+dev_run=pass -> skip jusqu'au STEP 5 (qa)
-#   us_generate+arch+dev_run+qa=pass -> skip jusqu'au STEP 5.5 (sdd-review)
+# Calcul du STEP de reprise (déterministe, pas LLM). Convention v7.0.1 :
+#   us_generate=pass        -> skip STEP 2 (us-generate)
+#   us_generate+arch=pass   -> skip jusqu'au STEP 4 (dev-run)
+#   us_generate+arch+dev=pass -> skip jusqu'au STEP 4.5 (qa)
+#   us_generate+arch+dev+qa=pass -> skip jusqu'au STEP 4.8 (sdd-review)
+# (Labels Python _PIPELINE_PHASES_ORDER de sdd_state.py alignés sur les
+# headings réels de cette commande — audit consolidé CRIT-13 closure)
 # Calculé par sdd_state.py resume-target (audit D5 fix) :
 RESUME_TARGET=$(python .claude/python/sdd_scripts/sdd_state.py resume-target \
   --run-id "$RUN_ID" 2>/dev/null || echo "STEP_2")

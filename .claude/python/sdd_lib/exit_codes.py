@@ -27,7 +27,29 @@ Cas hors convention (legacy granular — préservés pour [CLASS] granularity) :
     (ensure-scans flag) — préservé.
   - `phase_planner.py` exit 2 = STACK_MALFORMED granularité — préservé.
 
+  Régularisations audit consolidé 2026-06-07 Sprint 2 (étaient transgressions
+  non documentées M10-M14) :
+  - `bench_run.py` exit 4 = snapshot-before unreadable (I/O error sur fichier
+    JSON d'état antérieur au bench) — distinct de 3 (INFRA general) pour
+    permettre au caller de re-run avec snapshot fresh ; préservé par design.
+  - `ingest_axe.py` exit 4 = verdict 🔴 RED depasse threshold (sans `--no-fail`)
+    — distinct de 1 (FAIL_FAST config) car le code généré est OK, seul le
+    rapport accessibilité indique une régression. Caller CI peut différencier
+    config-error (1) vs rapport-red (4). Préservé.
+  - `ingest_lighthouse.py` exit 4 = idem ingest_axe (verdict 🔴 perf).
+  - `compute_us_complexity.py` exit 5 = I/O error sur écriture metadata
+    (file permission denied OU disk full) — distinct de 3 (INFRA general)
+    pour préciser que la cause-racine est filesystem write, pas réseau ou
+    DB. Préservé.
+  - `migrate_us_v1_to_v2.py` exit 5 = migration partielle avec ≥ 1 fichier
+    en erreur — distinct de 1 (FAIL_FAST tout-ou-rien) car certains US ont
+    pu être migrés ; caller peut décider relancer sur le subset failed.
+    Préservé.
+
 Pour les nouveaux scripts : utiliser exclusivement les constantes ci-dessous.
+Toute nouvelle dérogation (exit 4/5/6) DOIT être documentée ici avec
+rationale explicite, sinon `framework_smoke.py` check `no hardcoded return [0-3]`
+émettra un WARN (gate non-bloquant mais signalé).
 """
 from __future__ import annotations
 

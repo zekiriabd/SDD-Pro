@@ -36,16 +36,43 @@ import sys
 from pathlib import Path
 
 
+def _looks_like_repo_root(p: Path) -> bool:
+    """Strict repo-root check — mirror of `sdd_lib.paths._looks_like_repo_root`.
+
+    Post-mortem 2026-05-21 : un sous-dossier d'archive `.claude/.claude/`
+    faisait croire au walker que `.claude/` était le repo root → tous
+    les paths Python dérivés résolvaient sous `.claude/workspace/...`
+    au lieu de `workspace/...`. Le check unique `(p / ".claude").is_dir()`
+    est insuffisant.
+
+    Bootstrap-safe duplicate de `sdd_lib.paths._looks_like_repo_root` :
+    ce fichier doit fonctionner AVANT que `sys.path` connaisse `sdd_lib`,
+    donc ne peut pas importer la version canonique. Toute modification
+    de la logique strict-check doit être appliquée aux 2 emplacements
+    (paths.py + _hook.py). Garde-fou : `test_paths.py` vérifie l'alignement.
+    """
+    return (
+        (p / ".claude" / "agents").is_dir()
+        and (p / ".claude" / "commands").is_dir()
+        and (p / "workspace").is_dir()
+    )
+
+
 def find_repo_root() -> Path:
-    """Resolve repo root: CLAUDE_PROJECT_DIR env var, else walk up from cwd."""
+    """Resolve repo root: CLAUDE_PROJECT_DIR env var, else walk up from cwd.
+
+    Uses the strict check `_looks_like_repo_root` (3 markers required)
+    to avoid the v6.x bug where a sub-archive `.claude/.claude/` was
+    mistaken for the real root.
+    """
     env = os.environ.get("CLAUDE_PROJECT_DIR")
     if env:
         p = Path(env).resolve()
-        if (p / ".claude").is_dir():
+        if _looks_like_repo_root(p):
             return p
     cwd = Path.cwd().resolve()
     for cand in [cwd, *cwd.parents]:
-        if (cand / ".claude").is_dir():
+        if _looks_like_repo_root(cand):
             return cand
     return cwd
 

@@ -151,12 +151,24 @@ def emit(line: str, no_emoji: bool = False) -> None:
 
 
 def find_repo_root(start: pathlib.Path) -> pathlib.Path | None:
-    """Walk up from `start` until a `.claude/` directory is found."""
-    cur = start.resolve()
-    for parent in (cur, *cur.parents):
-        if (parent / ".claude").is_dir():
-            return parent
-    return None
+    """Walk up from `start` until a strict SDD_Pro repo root is found.
+
+    Delegates to `sdd_lib.paths.repo_root()` which uses the canonical
+    strict check (`.claude/agents/` + `.claude/commands/` + `workspace/`
+    triple-marker) — post-mortem 2026-05-21 a démontré que le check
+    unique `(p / ".claude").is_dir()` est insuffisant et peut résoudre
+    sur un sous-dossier d'archive.
+
+    `start` est conservé en argument pour backward-compat de l'API
+    (ignoré désormais — `repo_root()` walk depuis CWD avec fallback
+    via $SDD_REPO_ROOT et __file__).
+    """
+    from sdd_lib.paths import repo_root
+    _ = start  # backward-compat: argument no longer used
+    try:
+        return repo_root()
+    except Exception:
+        return None
 
 
 def resolve_db_path(arg: str | None) -> pathlib.Path | None:

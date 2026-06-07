@@ -1,8 +1,8 @@
 # Tech FEAT: auth-local
 
-Status: Experimental
-Validation: 🟡 experimental (not yet validated end-to-end in production combo)
-Support: ⚠ Non supporté commercialement (audit C3, 2026-06-06) — exclu du SLA produit. Voir CLAUDE.md §6 et docs/validated-combos.md.
+Status: Bench-validated
+Validation: 🟢 bench (bench 2026-06-05 runtime PASS sur combos C3/C4/C5/C6/C10/C11/C12/C13 — JWT HS256 + bcrypt natif ; pipeline /sdd-full end-to-end pending v7.1)
+Support: 🟢 Supporté best-effort (SLA Tier 2, cf. SLA.md §1.1) — pas de garantie idempotence /sdd-full. Promu de experimental le 2026-06-07 (audit Sprint 2 CRIT-11 closure).
 Tech FEAT ID: tech-auth-local
 Scope: authentification et autorisation locale via login / password + JWT — independant de toute stack ou langage. Chaque implementation (backend, SPA, monolithe, mobile) doit appliquer ces regles selon sa technologie.
 

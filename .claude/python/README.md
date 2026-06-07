@@ -1,168 +1,218 @@
-# SDD_Pro — Python scripts (cross-platform)
+# SDD_Pro — Python engine (cross-platform)
 
-Migration progressive des hooks et scripts PowerShell vers Python pour
-support natif Mac/Linux (en parallèle de Windows).
+> Engine déterministe pour SDD_Pro v7.0.0+. Tous les hooks Claude Code,
+> scripts agent-invoked, validateurs, ingest CI et outils Tech Lead sont
+> en Python pur (stdlib uniquement — pas de pip install requis pour le
+> runtime nominal).
 
 ## Prérequis
 
-- **Python 3.10+** (stdlib uniquement, pas de pip install requis)
-- Pas de venv requis (scripts standalone)
+- **Python 3.10+** (stdlib uniquement, pas de venv requis)
+- Optionnel : **pytest + pytest-cov** pour exécuter la suite de tests
+  (`pip install pytest pytest-cov`)
 
 ```bash
-# Vérifier
-python --version   # ou python3 --version
-# Doit retourner ≥ 3.10
+python --version   # ou python3 — doit être ≥ 3.10
 ```
 
-## Layout
+## Layout (refresh 2026-06-07 audit consolidé Sprint 2)
 
 ```
 .claude/python/
-├── sdd_lib/              # Helpers partagés
-│   ├── hook_input.py     # Parse stdin JSON (hooks Claude Code)
-│   ├── paths.py          # Repo root + normalize cross-platform
-│   ├── stderr.py         # ERROR/CAUSE/FIX formatter
-│   ├── project_config.py # Parse workspace/input/stack/stack.md
-│   └── loader_yml.py     # Parse .claude/loader.yml `reads:`
-├── sdd_hooks/            # 4 hooks Claude Code (PreToolUse, PostToolUse, SubagentStop)
-│   ├── protect_framework.py
-│   ├── preflight_agent_budget.py
-│   ├── validate_augment_contract.py
-│   └── audit_file_ownership.py
-└── sdd_scripts/          # Scripts agent-invoked (en cours de migration)
-    └── context_budget.py
+├── sdd_lib/              # 21 modules helpers partagés (paths, exit_codes,
+│                         #   atomic_write, file_locks, project_config,
+│                         #   layered_config, console_db/, migrations/...)
+├── sdd_hooks/            # 13 hooks Claude Code (cf. tableau ci-dessous)
+├── sdd_scripts/          # 50 scripts agent-invoked / CLI pipeline
+├── sdd_admin/            # 15 outils Tech Lead (smoke, sync, validateurs)
+├── tests/                # 88 fichiers test pytest
+├── _hook.py              # Bootstrap loader cwd-independent pour settings.json
+├── sitecustomize.py      # Auto-import de .claude/python/ sur sys.path
+└── pyproject.toml        # Config pytest + ruff + mypy + coverage
 ```
 
-## Hooks (déclarés dans `.claude/settings.json`)
+**Compteurs réels au 2026-06-07** : 50 scripts + 13 hooks + 15 admin + 21 lib =
+**99 modules `.py` actifs** + 88 tests. Pour vérifier en live :
+
+```bash
+echo "scripts: $(ls .claude/python/sdd_scripts/*.py | grep -v __init__ | wc -l)"
+echo "hooks:   $(ls .claude/python/sdd_hooks/*.py | grep -v __init__ | wc -l)"
+echo "admin:   $(ls .claude/python/sdd_admin/*.py | grep -v __init__ | wc -l)"
+echo "lib:     $(find .claude/python/sdd_lib -name '*.py' | grep -v __init__ | wc -l)"
+echo "tests:   $(ls .claude/python/tests/test_*.py | wc -l)"
+```
+
+## Exit codes (cf. `sdd_lib/exit_codes.py` — SSoT v7.0.0)
+
+Convention canonique unifiée pour tous les scripts `sdd_scripts/` et `sdd_admin/` :
+
+| Exit | Constante | Sens | Comportement caller attendu |
+|---:|---|---|---|
+| `0` | `SUCCESS` | operation completed, side-effects applied | continue |
+| `1` | `FAIL_FAST` | erreur bloquante non-correctible (config, contrat) | STOP + ERROR |
+| `2` | `CORRECTIBLE` | erreur récupérable par retry/edit (build, lint) | retry `BuildLoopMaxIter` |
+| `3` | `INFRA_BLOCKED` | outil/DB/réseau down (pas une régression code) | STOP + ERROR différent |
+
+**Protocole hooks Claude Code distinct** (`sdd_hooks/` uniquement) :
+
+| Exit | Constante | Sens |
+|---:|---|---|
+| `0` | `HOOK_ALLOW` | allow (continuer normalement) |
+| `2` | `HOOK_DENY` | deny/block (afficher stderr à l'utilisateur, bloquer l'action) |
+
+> ⚠️ Ne pas confondre `CORRECTIBLE = 2` (SDD scripts) avec `HOOK_DENY = 2`
+> (hooks Claude Code) — sémantiques totalement différentes selon le contexte
+> d'invocation. Les hooks utilisent exclusivement `HOOK_ALLOW`/`HOOK_DENY`.
+
+**Dérogations granulaires documentées** (exit 4/5 préservés par design pour
+classification d'erreur fine — cf. docstring `exit_codes.py` §"Cas hors convention") :
+- `mark_breaking_resolved.py` : ✅ MIGRÉ v7.0.0 conforme (0=SUCCESS, 3=INFRA)
+- `validate_us_deps.py` : 3=cycle, 4=missing ref, 5=infra
+- `set_us_status.py` : 1-5 granulaire (US_NOT_FOUND, US_STATUS_INVALID, ...)
+- `sdd_review.py` : 2=invalid arg, 3=sources missing
+- `phase_planner.py` : 2=STACK_MALFORMED
+- `bench_run.py` : 4=snapshot-before unreadable (audit Sprint 2 closure)
+- `ingest_axe.py` / `ingest_lighthouse.py` : 4=verdict RED sans `--no-fail`
+- `compute_us_complexity.py` : 5=I/O error sur écriture metadata
+- `migrate_us_v1_to_v2.py` : 5=migration partielle (≥ 1 file en erreur)
+
+## Hooks Claude Code (13 — déclarés dans `.claude/settings.json`)
 
 | Hook | Trigger | Bloquant ? | Rôle |
 |---|---|---|---|
 | `protect_framework.py` | PreToolUse `Edit\|Write\|MultiEdit` | non (WARN stderr) | WARN si un agent touche un fichier framework |
+| `pre_write_lint.py` | PreToolUse `Write\|Edit` | non (WARN) | Détection précoce BOM/encoding/EOF avant write |
 | `preflight_agent_budget.py` | PreToolUse `Agent` | selon `$SDD_BUDGET_MODE` | Vérifie le budget tokens avant invocation sub-agent |
+| `preflight_cost_cap.py` | PreToolUse `Agent` | oui (`[COST_CAP_EXCEEDED]` ≥ MaxCostPerRun) | Bloque le run si cumul USD dépasse cap |
+| `preflight_glob_scope.py` | PreToolUse `Glob\|Grep` | non (WARN) | Détection patterns Glob trop larges (scope drift) |
+| `preflight_stack_combo.py` | PreToolUse `Agent` | oui si combo non listé SLA sans `SDD_ALLOW_UNTESTED_COMBO=1` | Vérifie que le combo actif appartient aux 13 SLA |
 | `validate_augment_contract.py` | PostToolUse `Edit\|Write\|MultiEdit` | **oui** (exit 2 sur violation) | Vérifie contrats `preserves:`/`adds:` du plan |
-| `audit_file_ownership.py` | SubagentStop | non (log append-only) | Audit matrice `file-ownership.md §1` post-dispatch |
+| `validate_stack_consistency.py` | PostToolUse `Write` (sur `.libs.json`) | oui sur drift | Cross-check `.md` ↔ `.libs.json` à l'édition |
+| `validate_acceptance_gate.py` | SubagentStop matcher=`qa` | oui (`[ACCEPTANCE_GATE_FAILED]` mode strict) | Test/lint/build/coverage/smoke/E2E gate |
+| `block_env_bypass.py` | PreToolUse `Bash` | oui si `export SDD_*=1` détecté sans audit-log | Empêche bypass silencieux env vars |
+| `record_token_usage.py` | PostToolUse `Agent` | non | Ingest `<usage>` Anthropic API → console.db token_usage |
+| `resolve_po_hash_sentinel.py` | SubagentStop matcher=`po` | non | Résout `COMPUTE_REQUIRED` sentinel posé par agent `po` |
+| `audit_file_ownership.py` | SubagentStop | non (log append-only) | Audit matrice `ownership.md §1` post-dispatch |
 
-### Variables d'environnement
+### Variables d'environnement runtime
 
 | Variable | Valeurs | Défaut | Effet |
 |---|---|---|---|
-| `SDD_BUDGET_MODE` | `off` / `warn` / `strict` | `warn` | `off` = skip silencieux (hook désactivé) ; `warn` = ledger + stderr WARN, exit 0 ; `strict` = bloque l'invocation d'agent (exit 2) si budget dépassé |
+| `SDD_BUDGET_MODE` | `off` / `warn` / `strict` | `warn` | `off` = hook désactivé ; `warn` = ledger + stderr WARN, exit 0 ; `strict` = bloque l'invocation d'agent (exit 2) si budget dépassé |
 | `SDD_USER_EMAIL` | email | (vide) | Identifie le validateur lors des gates manuels (`gate_decide.py set --answered-by`) |
+| `SDD_REPO_ROOT` | absolute path | (auto-detect) | Override repo root pour CI/tests/multi-repo (honoré inconditionnellement, cf. `paths.repo_root()`) |
+| `SDD_ALLOW_FORCE` | `1`/`true`/`yes`/`on` | (off) | Autorise cumul ≥ 2 bypass flags `/sdd-full` (cf. `commands/sdd-full.md §1.bis`) |
+| `SDD_ALLOW_UNTESTED_COMBO` | `1`/`true` | (off) | Permet l'invocation d'un combo non listé dans les 13 SLA (audit-loggué) |
+| `SDD_ALLOW_ACCEPTANCE_BYPASS` | `1` | (off) | Skip acceptance gate finale (debug uniquement, audit-loggué) |
+| `SDD_DISABLE_COST_CAP` | `1` | (off) | Désactive le hard cap `MaxCostPerRun` (debug, audit-loggué) |
+| `SDD_FORCE_REASON` | texte libre | (vide) | Raison du bypass tracée dans `workspace/output/.sys/.audit/force-bypass.log` |
 
-> **Note** : `SDD_BUDGET_MODE=warn` (défaut) signifie que le hook
-> `preflight_agent_budget` est **non bloquant**. Pour un garde-fou
-> effectif sur le budget tokens, exporter `$env:SDD_BUDGET_MODE=strict`
-> dans le shell qui lance Claude Code.
+## Outils Tech Lead — `sdd_admin/` (15 scripts)
 
-## Migration status — **100% terminée**
-
-| Phase | Status | Scripts | Lignes Python |
-|---|---|---|---|
-| 1 — Infrastructure `sdd_lib/` | ✅ | 6 modules | 277 |
-| 2 — 4 hooks Claude Code + context_budget | ✅ | 5 | 827 |
-| 3 — Scripts agent-invoked | ✅ | 8 | 1 887 |
-| 4 — Gate/state/validation | ✅ | 5 | 1 396 |
-| 5 — Outils humains | ✅ | 5 | 1 468 |
-| **TOTAL** | ✅ | **29 fichiers** | **5 855** |
-
-Migration PowerShell → Python **terminée** (2026-05-13) : les dossiers
-historiques `.claude/scripts/` et `.claude/hooks/` ont été supprimés ;
-seuls les modules Python sous `.claude/python/sdd_scripts/`,
-`.claude/python/sdd_hooks/`, `.claude/python/sdd_admin/`,
-`.claude/python/sdd_lib/` sont actifs.
-
-### Mapping PowerShell → Python (29 scripts)
-
-| PowerShell `.ps1` | Python `.py` | Phase |
-|---|---|---|
-| `hooks/protect-framework` | `sdd_hooks/protect_framework` | 2 |
-| `hooks/preflight-agent-budget` | `sdd_hooks/preflight_agent_budget` | 2 |
-| `scripts/validate-augment-contract` | `sdd_hooks/validate_augment_contract` | 2 |
-| `scripts/audit-file-ownership` | `sdd_hooks/audit_file_ownership` | 2 |
-| `scripts/context-budget` | `sdd_scripts/context_budget` | 2 |
-| `scripts/preflight` | `sdd_scripts/preflight` | 3 |
-| `scripts/detect-capabilities` | `sdd_scripts/detect_capabilities` | 3 |
-| `scripts/mark-breaking-resolved` | `sdd_scripts/mark_breaking_resolved` | 3 |
-| `scripts/acquire-libname-lock` | `sdd_scripts/acquire_libname_lock` | 3 |
-| `scripts/compact-front-plans` | _(retiré v7.0.0-alpha — script supprimé)_ | 3 |
-| `scripts/validate-fidelity` | `sdd_scripts/validate_fidelity` | 3 |
-| `scripts/quality-scan` | `sdd_scripts/quality_scan` | 3 |
-| `scripts/parse-coverage` | `sdd_scripts/parse_coverage` | 3 |
-| `scripts/init-status-json` | `sdd_admin/init_status_json` | 4 |
-| `scripts/sdd-state` | `sdd_scripts/sdd_state` | 4 |
-| `scripts/gate-decide` | `sdd_scripts/gate_decide` | 4 |
-| `scripts/validate-readiness` | `sdd_scripts/validate_readiness` | 4 |
-| `scripts/validate-semantic` | `sdd_scripts/validate_semantic` | 4 |
-| `scripts/validate-libs-catalog` | `sdd_admin/validate_libs_catalog` | 5 |
-| `scripts/validate-inline-rules` | `sdd_scripts/validate_inline_rules` | 5 |
-| `scripts/framework-smoke` | `sdd_admin/framework_smoke` | 5 |
-| `scripts/measure-batch` | `sdd_admin/measure_batch` | 5 |
-| `scripts/sync-stack-md` | `sdd_admin/sync_stack_md` | 5 |
-
-### Scripts maintenance (hors pipeline) — dossier `sdd_admin/`
-
-Les scripts suivants vivent dans `.claude/python/sdd_admin/` (depuis
-2026-05-13, dossier séparé pour clarté). **Outils Tech Lead**, jamais
-invoqués par les commandes/agents du pipeline. Ils servent à valider,
-mesurer ou synchroniser le framework lui-même :
+Outils opt-in humain, jamais invoqués par le pipeline. À utiliser sur
+édition manuelle du framework, audit ou debug :
 
 | Script | Rôle | Quand l'utiliser |
 |---|---|---|
+| `framework_smoke.py` | Smoke check end-to-end du framework (88+ checks) | Avant release / après refactor profond |
 | `validate_libs_catalog.py` | Valide les `.libs.json` contre le schéma JSON + cohérence | Après édition d'un catalogue stack |
-| `validate_inline_rules.py` | Vérifie que les règles inlinées dans agents/ matchent les rules/ | Après modification d'une règle load-bearing |
-| `framework_smoke.py` | Smoke check end-to-end du framework | Avant release / après refactor profond |
+| `validate_stack_md_headers.py` | Vérifie headers `Validation:` des `.md` stacks | Après ajout/downgrade d'un stack |
+| `validate_inline_rules.py` | Vérifie que les règles inlinées dans agents/ matchent les rules/ SSoT | Après modification d'une règle load-bearing |
+| `validate_templates.py` | Vérifie l'intégrité des `templates/*.template.md` | Après édition template |
+| `sync_stack_md.py` | Régénère §2.4 du `.md` depuis le `.libs.json` | Après mise à jour d'un `.libs.json` |
 | `measure_batch.py` | Mesure tokens/durée d'une série de runs | Audit de performance |
 | `init_status_json.py` | Bootstrap initial du `workspace/console/status.json` | Setup console web (1 fois par projet) |
-| `sync_stack_md.py` | Régénère §2.4 du `.md` depuis le `.libs.json` | Après mise à jour d'un `.libs.json` |
+| `verify_telemetry_health.py` | Diagnose `console.db` (intégrité, schéma, drift) | Si smoke émet `telemetry-health SUSPECT` |
 | `strip_bom.py` | Nettoie le BOM UTF-16/UTF-8 d'un fichier généré | Post-gen si drift encoding |
+| `rotate_audit_logs.py` | Rotate `force-bypass.log` / `legacy-parallel.log` | Maintenance ops (à wirer en `Stop` hook v7.1) |
+| `audit_orphans.py` | Détecte artefacts orphelins (US/plans/qa) sous `workspace/output/` | Audit nettoyage post-run |
+| `cleanup_orphans.py` | Supprime orphelins détectés avec backup `.trash/` | Suite de `audit_orphans` |
+| `cache_manifest.py` | Extrait/exporte JSON du manifest cache (forward-looking v7.1) | Audit cache strategy |
+| `migrate_exit_codes.py` | Refactor one-shot historique (migration achevée v7.0.0) | (archive) |
 
-Ces scripts sont **opt-in humain** — pas de référence depuis
-`commands/*.md` ni `agents/*.md` (par design).
+## Scripts agent-invoked — `sdd_scripts/` (50 scripts)
 
-### Scripts agent-invoked (pipeline)
+Invoqués par les commandes/agents du pipeline. Liste non-exhaustive
+des plus critiques :
 
-Tous les autres scripts dans `sdd_scripts/` sont appelés par les
-commandes/agents (preflight, context_budget, detect_capabilities,
-validate_readiness, validate_semantic, validate_fidelity, parse_coverage,
-quality_scan, mark_breaking_resolved, acquire_libname_lock,
-compact_front_plans, sdd_state, gate_decide).
+- **Preflight** : `preflight.py` (HARD-GATE), `preflight_force_cumul.py`, `context_budget.py`
+- **Détection** : `detect_capabilities.py`, `detect_arch_shortcircuit.py`
+- **Validateurs** : `validate_readiness.py`, `validate_plan.py`, `validate_semantic.py`,
+  `validate_fidelity.py`, `validate_acceptance.py`, `validate_spec_compliance.py`,
+  `validate_us_deps.py`, `validate_stack_combo.py`, `validate_project_config.py`
+- **State / gates** : `sdd_state.py`, `gate_decide.py`, `record_gate_decision.py`
+- **Pipeline orchestration** : `sdd_full_planner.py`, `phase_planner.py`, `run_dev_phase.py`
+- **Plans** : `compute_plan_metadata.py`, `dispatch_fixes.py` (dormant v7.2)
+- **Ingest** : `ingest_axe.py`, `ingest_lighthouse.py`, `ingest_agent_report.py`,
+  `ingest_feats_us.py`, `ingest_plans.py`
+- **DB / observability** : `init_console_db.py`, `query_console_db.py`,
+  `report_roi.py`, `report_token_usage.py`
+- **QA / coverage** : `parse_coverage.py`, `quality_scan.py`
+- **Review** : `sdd_review.py`, `_review_fetch.py`, `_review_report.py`,
+  `triage_issues.py`
+- **Bench** : `bench_run.py` (opt-in mainteneur)
+- **Discover** (brownfield) : `scan_repo.py`, `match_stack_catalog.py`
+- **Profile** : `manage_profile.py`
+- **US** : `set_us_status.py`, `compute_us_complexity.py`, `feat_to_pseudo_us.py`,
+  `migrate_us_v1_to_v2.py`
+- **Locks** : `acquire_libname_lock.py`
+- **Resolve** : `resolve_us_hash_sentinel.py`
+- **Cleanup** : `mark_breaking_resolved.py`
 
-### Scripts From-Plan (v6.2 → v7.0.0)
+Liste détaillée par script : `git ls-files .claude/python/sdd_scripts/*.py`.
 
-Deux scripts pour le chemin From-Plan (validation déterministe avant
-spawn dev-*) :
+## Tests (88 fichiers pytest)
 
-> **v7.0.0 change** : le mode "strict" (variants `dev-*-strict` Sonnet)
-> a été retiré (governance-major-prompts-trim). Le flag `PlanCacheStrict`
-> est désormais **DEPRECATED no-op** — toléré en lecture pour
-> backward-compat, mais le routing `/dev-run` STEP 6.0.bis spawn toujours
-> `dev-*` Opus 4.7 que `validate_plan.py` retourne 0 (plan v2 avec
-> Inline Digest) ou 1 (plan v1 legacy). Seul exit 2 (stale/invalide)
-> reste bloquant.
+```bash
+# Suite complète
+python -m pytest .claude/python/tests/ -v
 
-| Script | Rôle | Invocateurs |
-|---|---|---|
-| `sdd_scripts/validate_plan.py` (~370 LOC, 21 tests) | Validation structurelle + détection staleness (`us-hash` mismatch) d'un plan `.back.md` / `.front.md`. Exit 0 (plan v2 valide), 1 (plan v1 legacy valide), 2 (stale/invalide/corrompu → STOP). Le flag CLI `--strict` est accepté en no-op pour backward-compat. | `dev-run` STEP 6.0.bis (gate staleness), `dev-plan` STEP 5 (post-génération), `sdd-status` (diagnostic) |
-| `sdd_scripts/compute_plan_metadata.py` (~150 LOC, 7 tests) | Helper YAML/JSON pour générer le v2 frontmatter (`plan-schema-version: 2`, `us-hash` SHA-256, `claude-md-hash`, `generated-at` ISO, `capabilities-triggered`). | `dev-backend` STEP 5.2 (mode `:plan`), `dev-frontend` STEP 6.4 (mode `:plan`) |
+# Smoke uniquement (sous-ensemble enforcement load-bearing)
+python -m pytest .claude/python/tests/ -m smoke
 
-Détail design (archive) : `@.claude/archive/v7-design-superseded/DESIGN-FROMPLAN-STRICT.md`.
-Détail format plan v2 : `@.claude/rules/build-and-loop.md §7.4.bis`.
+# Coverage avec seuil (config dans pyproject.toml — fail_under = 60)
+python -m pytest --cov=sdd_lib --cov=sdd_scripts --cov=sdd_admin --cov=sdd_hooks
 
-### Conventions
+# Smoke runner end-to-end (non-pytest, gate CI)
+python .claude/python/sdd_admin/framework_smoke.py
+```
 
-- **CLI args** : `--kebab-case` (équivalent `-CamelCase` PowerShell)
-- **Exit codes** : identiques au PS d'origine (0=OK, 1=erreur, 2=block-hook, etc.)
-- **JSON output** : `--json` au lieu de `-Json` PowerShell
-- **Aucune dépendance externe** : pur stdlib Python 3.10+
+**Gaps connus** (audit Sprint 2 2026-06-07 — `roadmap` v7.1) : 22 scripts
+encore sans test direct, dont 5 critiques visés v7.0.1 (`framework_smoke`,
+`statusline`, `validate_templates`, `validate_libs_catalog`, `query_console_db`).
 
-### Bascule via agents/commandes
+## Conventions
 
-Migration terminée : les agents (`.claude/agents/*.md`), commandes
-(`.claude/commands/*.md`), stacks (`.claude/stacks/**/*.md`) et hooks
-(`.claude/settings.json`) référencent tous l'invocation Python
-canonique :
+- **CLI args** : `--kebab-case` (Python argparse standard)
+- **JSON output** : flag `--json` pour mode machine (caller bash, CI parse)
+- **Atomic writes** : `sdd_lib.atomic_write.atomic_write_text` pour tout fichier
+  partagé entre agents (anti-corruption crash mid-write — `rules/build-and-loop.md §2.bis`)
+- **Path resolution** : `sdd_lib.paths.repo_root()` SSoT (jamais re-implémenter,
+  cf. post-mortem 2026-05-21 — bug `.claude/.claude/` archive)
+- **ISO timestamps** : `sdd_lib.paths.iso_now()` / `iso_now_ms()` SSoT
+- **Type hints** : 100% sur fonctions publiques (`from __future__ import annotations`)
+- **Aucune dépendance externe** runtime : pur stdlib Python 3.10+
+
+## Bascule via agents/commandes
+
+Tous les agents (`.claude/agents/*.md`), commandes (`.claude/commands/*.md`),
+stacks (`.claude/stacks/**/*.md`) et hooks (`.claude/settings.json`)
+référencent l'invocation Python canonique :
 
 ```bash
 python .claude/python/sdd_scripts/context_budget.py --agent po --feat-number {n}
 python .claude/python/sdd_admin/sync_stack_md.py --stack-id react
+python .claude/python/sdd_scripts/validate_plan.py --plan-path {path} --us-path {path} --json
 ```
+
+## Pour aller plus loin
+
+- `sdd_lib/exit_codes.py` — convention exit codes complète + dérogations
+- `sdd_lib/paths.py` — `repo_root()`, `iso_now()`, `iso_now_ms()`, `normalize()`
+- `sdd_lib/atomic_write.py` — write atomique anti-corruption
+- `sdd_lib/file_locks.py` — locks O_EXCL cross-platform
+- `sdd_lib/console_db/` — schéma SQLite + helpers query
+- `sdd_lib/markdown_io.py` — parse_frontmatter SSoT
+- `sdd_lib/combos.py` — chargement combos.json
+- `pyproject.toml` — config pytest + ruff + mypy + coverage
+- `.claude/rules/error-classification.md §1.4` — taxonomie `[BUILD_*]` exit codes

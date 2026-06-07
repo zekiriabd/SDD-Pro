@@ -200,18 +200,18 @@
     "backend": {
       "dotnet-minimalapi": "validated",
       "kotlin-spring-boot": "validated",
-      "python-fastapi": "validated",
-      "node-express": "validated"
+      "python-fastapi": "bench-validated",
+      "node-express": "bench-validated"
     },
     "frontend": {
       "react": "validated",
       "blazor-webassembly": "validated",
-      "vue": "validated",
-      "angular": "validated"
+      "vue": "bench-validated",
+      "angular": "bench-validated"
     },
     "ui": {
       "shadcn": "validated",
-      "vuetify": "experimental",
+      "vuetify": "bench-validated",
       "radzen-blazor": "validated"
     },
     "qa": {
@@ -219,15 +219,15 @@
       "kotlin-junit": "validated",
       "node-vitest": "validated",
       "code-quality": "validated",
-      "python-pytest": "experimental",
-      "angular-jasmine": "experimental",
+      "python-pytest": "bench-validated",
+      "angular-jasmine": "bench-validated",
       "blazor-bunit": "validated",
       "mutation-testing": "experimental",
       "playwright": "experimental"
     },
     "auth": {
       "azure-ad": "validated",
-      "auth-local": "experimental"
+      "auth-local": "bench-validated"
     },
     "db": {
       "postgres": "validated",
@@ -242,28 +242,29 @@
     },
     "archi": {
       "mvc": "validated",
-      "ddd": "experimental",
-      "microservice": "untested"
+      "ddd": "bench-validated",
+      "microservice": "experimental"
     },
     "fullstack": {
-      "_doc": "Fullstack monolithe stacks. poc-only = utilise interne SDD console uniquement, non destine prod externe (cf. audit P3 2026-06-05). experimental = stack OK mais combo jamais valide bout-en-bout en prod.",
-      "angular-universal": "experimental",
-      "blazor-server": "experimental",
-      "kotlin-mustache": "experimental",
-      "next": "experimental",
+      "_doc": "Fullstack monolithe stacks. poc-only = utilise interne SDD console uniquement, non destine prod externe (cf. audit P3 2026-06-05). bench-validated = runtime OK lors du bench 2026-06-05 (scaffolding semi-manuel mainteneur, cf. BENCH-GLOBAL-REPORT.md). experimental = stack OK mais combo jamais teste runtime.",
+      "angular-universal": "bench-validated",
+      "blazor-server": "bench-validated",
+      "kotlin-mustache": "bench-validated",
+      "next": "bench-validated",
       "node-react": "poc-only",
-      "nuxt": "experimental"
+      "nuxt": "bench-validated"
     },
     "mobiles": {
-      "_doc": "Mobile native stacks. scaffold-validated = scaffolding runtime OK mais build/runtime APK/IPA pas teste cette session.",
+      "_doc": "Mobile native stacks. scaffold-validated = scaffolding runtime OK mais build/runtime APK/IPA pas teste cette session. bench-validated = runtime OK lors du bench 2026-06-05 (MAUI Windows desktop, RN Expo Web).",
       "kotlin-android": "scaffold-validated",
-      "maui": "experimental",
-      "react-native": "experimental"
+      "maui": "bench-validated",
+      "react-native": "bench-validated"
     }
   },
   "levelPriority": {
-    "_doc": "Severity ordering used by validate_stack_combo.py to compute the overall verdict from individual component levels (max-severity wins). Audit 2026-06-06 — added scaffold-validated (mobile scaffold-only) = experimental tier, poc-only (node-react console) = untested tier. All declared levels in componentLevels MUST appear here.",
+    "_doc": "Severity ordering used by validate_stack_combo.py to compute the overall verdict from individual component levels (max-severity wins). Audit consolide 2026-06-07 Sprint 2 (CRIT-11 closure) — added bench-validated = 0 (treated as validated for max-severity purposes : a combo entirely composed of validated + bench-validated components computes worst = bench-validated, exit 0, status reflects the lowest tier rank). Audit 2026-06-06 — added scaffold-validated (mobile scaffold-only) = experimental tier, poc-only (node-react console) = untested tier. All declared levels in componentLevels MUST appear here.",
     "validated": 0,
+    "bench-validated": 0,
     "scaffold-validated": 1,
     "experimental": 1,
     "poc-only": 2,
