@@ -133,63 +133,38 @@ Read **uniquement** :
 
 ---
 
-## STEP 4 — Sélection du code à reviewer (lecture sélective stricte)
+## STEP 4 — Sélection code (lecture sélective stricte)
 
-**Ne JAMAIS** faire `Glob workspace/output/src/**/*` (anti-pattern, explosion
-de budget).
+**JAMAIS** `Glob workspace/output/src/**/*` (anti-pattern explosion budget).
 
-Stratégie ordonnée (premier match wins) :
+### 4.1 Plans v2 strict-ready (mode preferred)
 
-### 4.1 Si plans v2 strict-ready présents (mode preferred)
+Glob `workspace/output/plans/{n}-*.{back,front}.md`. Parser `## Files`,
+lire **uniquement** ces paths. Déterministe + traçable.
 
-Glob `workspace/output/plans/{n}-*.{back,front}.md`. Pour chaque plan,
-parser la section `## Files` et collecter `paths[]`.
+### 4.2 Fallback convention (WARN obligatoire)
 
-Lire **uniquement** ces fichiers. Avantage : on review ce qui a été
-matérialisé par les dev-* (déterministe, traçable).
-
-### 4.2 Sinon, fallback via convention
-
-**⚠️ WARN obligatoire** — quand cette branche
-est prise (plan v2 absent ou plan v1 sans `## Files`), émettre **avant
-toute lecture de code** :
+Plan v2 absent → émettre AVANT toute lecture :
 
 ```
-⚠️ WARN code-reviewer FEAT {n} — plan v2 absent, fallback convention activé
-   Cause : aucun `workspace/output/plans/{n}-*.{back,front}.md` matché
-   Conséquence : sélection des fichiers par heuristique nom→path (moins
-                 précise que la `## Files` section du plan v2)
-   Fix     : `/dev-plan {n}` pour matérialiser un plan v2 strict-ready
-             AVANT le code-reviewer (pas de dégradation silencieuse).
+⚠️ WARN code-reviewer FEAT {n} — plan v2 absent, fallback convention
+   Risque : sélection heuristique nom→path moins précise
+   Fix : /dev-plan {n} pour plan v2 strict-ready AVANT code-reviewer
 ```
 
-Persister dans le rapport `.md` (section « Source mode ») et dans
-`{n}-code-review.json` (`"source_mode": "convention-fallback"` + champ
-`"plan_v2_warn": true`).
+Persister `"source_mode": "convention-fallback"` + `"plan_v2_warn": true`
+dans `{n}-code-review.json`. Pour chaque US `{n}-{m}-{Name}` :
+- Backend : `{BackendName}/{Services|Endpoints|DTOs|Mappers|Validators}/*{Name}*`
+- Frontend : `{AppName}/{Pages|Components}/*{Name}*`, `src/components/*{name-kebab}*`
 
-Pour chaque US `{n}-{m}-{Name}` :
-- Backend : lire `workspace/output/src/{BackendName}/Services/*{Name}*.{cs,kt,py,ts}`,
-  `Endpoints/*{Name}*`, `DTOs/*{Name}*`, `Mappers/*{Name}*`,
-  `Validators/*{Name}*`
-- Frontend : lire `workspace/output/src/{AppName}/Pages/*{Name}*`,
-  `Components/*{Name}*`, `src/components/*{name-kebab}*`, etc.
+### 4.3 Bornes
 
-### 4.3 Borne et garde-fou
+- `count > 60` → WARNING + tronquer à 60 (mtime récent)
+- `count == 0` → STOP + ERROR `[REVIEW_NO_TARGETS]` — FIX : `/dev-run {n}` puis `/dev-plan {n}`
 
-- Si `count(files_to_review) > 60` → log WARNING et tronquer à 60 (les
-  plus récents par mtime).
-- Si `count(files_to_review) == 0` → STOP + ERROR :
-  ```
-  ERROR: agent code-reviewer — aucun fichier à reviewer
-  CAUSE: [REVIEW_NO_TARGETS] ni plan v2 ni fichier convention matché pour FEAT {n}
-  FIX: lancer /dev-run {n} d'abord, OU /dev-plan {n} pour avoir un plan v2
-  ```
+### 4.4 Map `file → US`
 
-### 4.4 Build de la map `file → US`
-
-Pour chaque fichier collecté, associer 1 ou plusieurs US (utile pour
-traçabilité dans le rapport). Source : `plan.us` du frontmatter v2 si
-plan présent, sinon match basename.
+Source `plan.us` frontmatter v2 si plan présent, sinon match basename.
 
 ---
 
