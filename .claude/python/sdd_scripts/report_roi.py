@@ -231,6 +231,42 @@ def collect_feat_data(conn, feat_n: int) -> dict[str, Any]:
     out["cost_usd"] = round(total_cost, 4)
     out["tokens_recorded"] = total_calls > 0  # signals TokenUsageMode!=off
 
+    # Cache hit ratio (T1.4 audit 2026-06-08) — Anthropic recommendation §3.3
+    # cache_read tokens are free ; the ratio cache_read / (cache_read + input)
+    # measures how well the prompt cache is exploited. >50% = good ; <10% =
+    # prompts not stable enough between calls.
+    cache_billed = total_in + total_cc
+    cache_total = total_in + total_cc + total_cr
+    out["cache"] = {
+        "cache_read_tokens": total_cr,
+        "cache_billed_tokens": cache_billed,
+        "hit_ratio_pct": round(100.0 * total_cr / cache_total, 2) if cache_total else 0.0,
+    }
+
+    # Build loop convergence stats (T2.6 audit 2026-06-08)
+    # Surfaces : (a) total loops run, (b) convergence success rate, (c) max
+    # streak observed (>= 2 means LLM looped on same [CLASS]), (d) top 5
+    # pathological classes for this FEAT.
+    try:
+        from sdd_lib.build_loop_trace import get_loop_stats
+        loop_stats = get_loop_stats(feat_n=feat_n)
+        if loop_stats.get("available"):
+            total_loops = loop_stats.get("total_loops", 0) or 0
+            converged = loop_stats.get("convergence_events", 0) or 0
+            out["build_loop"] = {
+                "total_loops": total_loops,
+                "convergence_events": converged,
+                "convergence_rate_pct": round(100.0 * converged / total_loops, 2) if total_loops else 0.0,
+                "max_iter_reached": loop_stats.get("max_iter_reached", 0),
+                "max_streak": loop_stats.get("max_streak", 0),
+                "total_iters": loop_stats.get("total_iters", 0),
+                "top_pathological_classes": loop_stats.get("top_pathological_classes", []),
+            }
+        else:
+            out["build_loop"] = None
+    except Exception:  # noqa: BLE001
+        out["build_loop"] = None
+
     # Context budget (fallback when token_usage is empty)
     cb_row = conn.execute(
         "SELECT SUM(tokens_used) AS used, "
@@ -380,6 +416,32 @@ def render_markdown(payloads: list[dict[str, Any]]) -> str:
                     f"${a['cost_usd']:.4f} |"
                 )
             lines.append("")
+        # Cache hit ratio (T1.4 audit 2026-06-08)
+        if p.get("cache") and p["tokens_recorded"]:
+            c = p["cache"]
+            lines.append(f"## {feat_label} -- prompt cache utilization")
+            lines.append("")
+            verdict = "good (>=50%)" if c["hit_ratio_pct"] >= 50 else (
+                "moderate (10-50%)" if c["hit_ratio_pct"] >= 10 else "poor (<10%)"
+            )
+            lines.append(f"- Cache hit ratio : **{c['hit_ratio_pct']}%** ({verdict})")
+            lines.append(f"- Cache read tokens (free) : {c['cache_read_tokens']:,}")
+            lines.append(f"- Billed tokens : {c['cache_billed_tokens']:,}")
+            lines.append("")
+
+        # Build loop convergence (T2.6 audit 2026-06-08)
+        if p.get("build_loop"):
+            bl = p["build_loop"]
+            lines.append(f"## {feat_label} -- build_loop convergence")
+            lines.append("")
+            lines.append(f"- Total loops : {bl['total_loops']} | Convergence rate : **{bl['convergence_rate_pct']}%**")
+            lines.append(f"- Total iterations : {bl['total_iters']} | Max iter reached : {bl['max_iter_reached']} | Max streak : {bl['max_streak']}")
+            if bl.get("top_pathological_classes"):
+                lines.append("- Top pathological `[CLASS]` :")
+                for tc in bl["top_pathological_classes"]:
+                    lines.append(f"  - `{tc['class']}` × {tc['occurrences']}")
+            lines.append("")
+
         # Phase-by-phase timing (codex audit follow-up)
         if p.get("phases"):
             lines.append(f"## {feat_label} -- phase timing")

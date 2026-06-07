@@ -105,6 +105,7 @@ cache_dir = ".cache/pytest"
 # emits PytestUnknownMarkWarning and the smoke gate flags WARN.
 markers = [
     "smoke: critical-path tests gated by `framework_smoke.py` (audit CTO 2026-06-07)",
+    "integration: end-to-end tests using deterministic chain (no LLM agents) — T1.3 audit 2026-06-08",
 ]
 
 # ---------------------------------------------------------------------------

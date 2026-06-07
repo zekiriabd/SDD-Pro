@@ -136,251 +136,70 @@ Wrapper d'annonce — découpage opérationnel intégralement en §5.1-§5.10.
 
 ## STEP 5 — Détection par catégorie OWASP (A01-A10)
 
-Sous-sections déterministes : 1 par catégorie OWASP Top 10 2021, avec
-patterns Grep + heuristiques Sonnet + exclusions canoniques (tests, env
-vars, dev configs).
+> **SSoT regex** : `@.claude/python/security_patterns.yaml` (22 classes
+> + sévérité + hard-blocking + regex/lang). Testé par
+> `tests/test_security_patterns.py` (drift YAML ↔ doc enforced). **Ne PAS
+> dupliquer les regex inline** — étendre le YAML, le test l'enforce.
 
-> **SSoT machine** : patterns regex aussi capturés en
-> `@.claude/python/security_patterns.yaml` (22 classes + sévérité +
-> hard-blocking + regex/lang). Cross-check `tests/test_security_patterns.py`.
+Pour chaque catégorie OWASP, appliquer les patterns YAML matchant le
+stack actif, avec les exclusions canoniques (tests, env var refs, dev
+configs). Liste résumée des classes par OWASP :
 
-### 5.1 A03 Injection — Secrets hardcoded
+| OWASP | Classes émises | Sévérité défaut |
+|---|---|---|
+| **A01** Broken Access Control | `[SEC_BROKEN_AUTHZ]` (hard-block), `[SEC_IDOR]` | critical / serious |
+| **A02** Cryptographic Failures | `[SEC_CRYPTO_WEAK]`, `[SEC_CRYPTO_NO_SALT]`, `[SEC_RANDOM_INSECURE]` | serious |
+| **A03** Injection | `[SEC_SQL_INJECTION]` (hard-block), `[SEC_COMMAND_INJECTION]` (hard-block), `[SEC_XSS_RISK]` | critical (back) / serious (front) |
+| **A05** Security Misconfig | `[SEC_CORS_PERMISSIVE]`, `[SEC_HEADERS_MISSING]`, `[SEC_DEV_ENDPOINTS_EXPOSED]`, `[SEC_CORS_MISSING]`, `[SEC_ENV_VAR_FORBIDDEN]` | serious / moderate |
+| **A07** Identification & Auth | `[SEC_JWT_MISCONFIG]` (hard-block), `[SEC_COOKIE_INSECURE]`, `[SEC_PASSWORD_WEAK_POLICY]` | critical / serious / moderate |
+| **A08** Data Integrity | `[SEC_DESERIALIZATION_UNSAFE]` (hard-block) | critical |
+| **A09** Logging Failures | `[SEC_LOGGING_SECRETS]`, `[SEC_STACK_TRACE_EXPOSED]` | serious |
+| **A10** SSRF | `[SEC_SSRF_RISK]` (hard-block) | critical |
+| **Secrets hardcoded** | `[SEC_SECRET_HARDCODED]` (hard-block), `[SEC_SECRET_DEV_CONFIG]` | critical / moderate |
 
-Patterns Grep (compléments à `code-reviewer.md §5.5`) :
+### 5.1 Exclusions canoniques (s'appliquent à toutes catégories)
 
-```
-[SEC_SECRET_HARDCODED] (critical, hard-blocking)
-  - AWS keys      : "AKIA[0-9A-Z]{16}"
-  - AWS secret    : "aws_secret_access_key\s*=\s*['\"][A-Za-z0-9/+=]{20,}"
-  - GitHub PAT    : "ghp_[A-Za-z0-9]{36}"
-  - GitLab PAT    : "glpat-[A-Za-z0-9_-]{20,}"
-  - Slack token   : "xox[bpoa]-[A-Za-z0-9-]{10,}"
-  - JWT en clair  : "eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+"
-  - Private key   : "-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----"
-  - DB conn str   : "(mongodb|postgres|mysql|mssql|redis)://[^:]+:[^@\s]+@"
-  - API key generic : "(api[_-]?key|secret|token|password)\s*[=:]\s*['\"][^'\"]{16,}['\"]"
-                      (filtré : tests + env var refs `process.env.X`)
-```
+- Fichiers test : `**/test_*`, `**/__tests__/*`, `**/*.test.*`, `**/*Tests/*`
+- Config var refs (= bonne pratique, jamais flagger) : `process.env.X`,
+  `Environment.GetEnvironmentVariable("X")`, `os.environ.get("X")`,
+  `System.getenv("X")`, `@Value("${X}")`
+- `appsettings.Development.json` → downgrade `[SEC_SECRET_HARDCODED]` →
+  `[SEC_SECRET_DEV_CONFIG]` (moderate au lieu de critical)
+- Endpoints publics par convention (skip `[SEC_BROKEN_AUTHZ]`) : `/health`,
+  `/metrics`, `/swagger`, `/openapi.json`, `/api/auth/{login,register,
+  forgot-password,reset-password}`
 
-Exclusions :
-- Fichiers `**/test_*`, `**/__tests__/*`, `**/*.test.*`, `**/*Tests/*`
-- Patterns `process.env.X`, `Environment.GetEnvironmentVariable("X")`,
-  `os.environ.get("X")`, `System.getenv("X")` (config var refs)
-- Configuration `appsettings.Development.json` (dev only — émettre WARNING
-  `[SEC_SECRET_DEV_CONFIG]` sévérité moderate, pas critical)
+### 5.2 Détections spéciales (logique cross-stack, non-YAML-trivial)
 
-### 5.2 A03 Injection — SQL / NoSQL / Command
+**`[SEC_CORS_MISSING]`** (audit 2026-06-07, CWE-942) — grep **négatif** :
+backend SPA-facing sans config CORS du tout. Skip si `appType: fullstack`
+(same-origin SSR). Détection par absence :
+- .NET : `AddCors\(` absent de `Program.cs` ET stack frontend SPA actif
+- Spring : ni `CorsConfig` ni `CorsConfigurationSource` bean
+- FastAPI : `CORSMiddleware` jamais ajouté
+- Express : `cors\(\)` jamais wiré
 
-```
-[SEC_SQL_INJECTION] (critical, hard-blocking)
-  Stack .NET :
-    - "string\.Format\([^,]*\"[^\"]*SELECT.*\{[0-9]+\}.*\""
-    - "[\"'][^\"']*WHERE [^\"']*\" \+ \w+ "
-    - "FromSqlRaw\([\"'][^\"']*\{[0-9]+\}"           # FormatString OK, mais $"..." dangerous
+Cf. `rules/library-and-stack.md §B.2-§B.5` pour le pattern stack-aware.
 
-  Stack Java/Kotlin :
-    - "createQuery\([\"'][^\"']*\$\{[\w.]+\}"          # interpolation dans HQL/JPQL
-    - "jdbcTemplate\.queryForList\([\"'][^\"']*\" \+"
+**`[SEC_ENV_VAR_FORBIDDEN]`** (audit 2026-06-06, CWE-1188) — code lit
+directement les env vars pour clés provisionnées via `stack.md` (DB,
+AUTH_JWT_, AZ_, SMTP_). Contredit Pattern B (stack.md SSoT, arch peuple
+config natives). Détection : `getenv|process.env|os.environ|@Value` sur
+prefix `(DB_|AUTH_JWT_|AZ_|SMTP_)`. Fix : lire `IConfiguration` /
+`@Value("${spring.datasource.url}")` / `Settings().db_password` /
+`config.get(...)`. Cf. `agents/arch.md §STEP 4.5`,
+`rules/library-and-stack.md §1.0`.
 
-  Stack Python :
-    - "\.execute\(f[\"'][^\"']*\{[\w.]+\}"            # f-string dans execute
-    - "\.execute\([\"'][^\"']*%s.*\" % "              # %-formatting
-    - "\.format\([^)]*\)\s*\)\s*$"                    # .format() dans cursor.execute
+**`[SEC_BROKEN_AUTHZ]`** — détection **structurelle** (pas regex pure) :
+chaque endpoint mapping doit avoir une garde auth dans les 20 lignes
+adjacentes. Pour chaque `app.Map{Get,Post,...}` / `@{Get,Post}Mapping`
+/ `app.{get,post}` non listé dans les exclusions ci-dessus, vérifier la
+présence de `.RequireAuthorization` / `[Authorize]` / `@PreAuthorize` /
+`Depends(get_current_user)` / middleware auth déclaré. Absence = flag.
 
-  Stack Node :
-    - "query\([`'\"][^`'\"]*\$\{[\w.]+\}"             # template literal
-    - "query\([`'\"][^`'\"]*['\"]\s*\+\s*\w+"         # string concat
-```
-
-```
-[SEC_COMMAND_INJECTION] (critical, hard-blocking)
-  - "subprocess\.(run|call|Popen)\([^)]*shell\s*=\s*True"
-  - "os\.system\([^)]*\+"
-  - "exec\([\"'][^\"']*\$\{"                            # JS template
-  - "Process\.Start\([\"'](sh|bash|cmd|powershell) -c"
-```
-
-### 5.3 A03 Injection — XSS
-
-```
-[SEC_XSS_RISK] (critical en backend, serious en frontend)
-  React :
-    - "dangerouslySetInnerHTML\s*=\s*\{\{?\s*__html\s*:\s*[\w.]+\s*\}"
-      (matche userValue sans sanitize)
-  Vue :
-    - "v-html\s*=\s*['\"]?[\w.]+['\"]?"
-  Angular :
-    - "\[innerHTML\]\s*=\s*['\"]?[\w.]+"
-    - "bypassSecurityTrust(Html|Script|Style|Url|ResourceUrl)"
-
-  Backend Razor :
-    - "@Html\.Raw\([\w.]+\)"                            # @Html.Raw(userInput) sans Sanitize
-    - "MarkupString\([\w.]+\)"
-
-  Backend FastAPI/Flask :
-    - "Response\(.*content=.*text/html.*[\w.]+"         # HTML response sans escape
-```
-
-### 5.4 A01 Broken Access Control
-
-```
-[SEC_BROKEN_AUTHZ] (critical, hard-blocking)
-  .NET Minimal API :
-    - endpoint mapping sans `.RequireAuthorization(` ni `[Authorize]`
-      attribute. Grep `app\.Map(Get|Post|Put|Delete|Patch)\(` puis check
-      blocs adjacents pour `.RequireAuthorization`/`[Authorize]` dans 20 lignes
-  Spring Boot :
-    - `@GetMapping`/`@PostMapping` sans `@PreAuthorize` ni `@Secured` ni
-      controller annoté `@RequestMapping` + filter Security
-  FastAPI :
-    - `@app.get`/`@app.post` sans `Depends(get_current_user)` ni équivalent
-  Express :
-    - `app.get`/`app.post` sans middleware auth déclaré
-```
-
-Exclusions : endpoints `/health`, `/metrics`, `/swagger`, `/openapi.json`,
-`/api/auth/login`, `/api/auth/register`, `/api/auth/forgot-password`,
-`/api/auth/reset-password` (déclarés publics par convention).
-
-```
-[SEC_IDOR] (serious — Insecure Direct Object Reference)
-  - endpoints avec `{id}` param + pas de check ownership en STEP suivant
-    (heuristique : grep `_id\b` ou `\bid\b` paramètre route, puis
-    grep dans 30 lignes après pour `userId`/`currentUser`/`ownerId`
-    comparison)
-```
-
-### 5.5 A02 Cryptographic Failures
-
-```
-[SEC_CRYPTO_WEAK] (serious)
-  - "MD5\.|md5\(|hashlib\.md5\(|MessageDigest\.getInstance\([\"']MD5"
-  - "SHA1\.|sha1\(|hashlib\.sha1\(|MessageDigest\.getInstance\([\"']SHA-?1"
-  - "DES\.|RC4\.|Cipher\.getInstance\([\"'](DES|RC4)"
-  - "/ECB/" (mode ECB)
-```
-
-```
-[SEC_CRYPTO_NO_SALT] (serious)
-  Backend password hashing patterns :
-    - "hashlib\.(sha256|sha512)\(\s*password" (sans salt visible)
-    - "BCrypt\.HashPassword\([^,)]+\)" (sans workFactor explicite, OK pour
-      bcrypt qui salt auto — pas d'issue)
-    - "MessageDigest.*update\(password\.getBytes\(\)\)" (sans salt)
-```
-
-```
-[SEC_RANDOM_INSECURE] (serious — random non-crypto pour tokens)
-  - "Math\.random\(\).*token"
-  - "Random\(\)\.nextBytes" en C# (Random non-crypto)
-  - "new Random\(\)" Java avec usage en token generation
-```
-
-### 5.6 A05 Security Misconfiguration
-
-```
-[SEC_CORS_PERMISSIVE] (serious)
-  - "AllowAnyOrigin\(\)"
-  - "allowedOrigins\s*=\s*['\"]\\*['\"]"
-  - "Access-Control-Allow-Origin.*\*" en hardcoded response
-  - "app\.use\(cors\(\)\)" sans options (Express default = wildcard)
-
-[SEC_HEADERS_MISSING] (moderate)
-  - HSTS : pas de `app.UseHsts()` / `Strict-Transport-Security` header
-    en backend prod. Skip si dev only.
-  - CSP : pas de `Content-Security-Policy` header en réponse
-  - X-Frame-Options : pas de `DENY`/`SAMEORIGIN`
-  - X-Content-Type-Options : pas de `nosniff`
-
-[SEC_DEV_ENDPOINTS_EXPOSED] (serious)
-  - "app\.UseDeveloperExceptionPage\(\)" sans gate `if (app.Environment.IsDevelopment())`
-  - "/debug", "/test", "/_internal" routes en prod
-  - Swagger/OpenAPI exposé en prod sans auth
-
-[SEC_CORS_MISSING] (serious — CWE-942) — audit 2026-06-07
-  Backend SPA-facing sans configuration CORS du tout (rejet preflight → fetch
-  silencieux côté front). Détection cross-stack par grep négatif :
-  - .NET : `AddCors\(` absent dans `Program.cs` ET stack frontend SPA actif
-  - Spring Boot : ni `@Configuration.*CorsConfig` ni `CorsConfigurationSource` bean
-  - FastAPI : `CORSMiddleware` jamais ajouté à `app.add_middleware`
-  - Express : `cors\(\)` jamais wirée dans `app.use(...)`
-  HINT : cf. `rules/library-and-stack.md §B.2-§B.5` pour le pattern stack-aware.
-  Skip si `appType: fullstack` (same-origin SSR — pas de cross-origin SPA↔API).
-```
-
-### 5.6.bis A05 Security Misconfiguration — Env var bypass (audit 2026-06-06)
-
-```
-[SEC_ENV_VAR_FORBIDDEN] (serious — CWE-1188)
-  Code applicatif lit directement les env vars pour les clés provisionnées via
-  `stack.md` (DB, AUTH_JWT, AZ_*, SMTP_*). Contredit Pattern B (stack.md = SSoT,
-  arch peuple les configs natives en clair). Le code DOIT lire la config native.
-  Détection par stack :
-  - .NET : `Environment\.GetEnvironmentVariable\("(DB_|AUTH_JWT_|AZ_|SMTP_)`
-  - Node : `process\.env\.(DB_|AUTH_JWT_|AZ_|SMTP_)`
-  - Python : `os\.environ\[["'](DB_|AUTH_JWT_|AZ_|SMTP_)` OU `os\.getenv\(["'](DB_|AUTH_JWT_|AZ_|SMTP_)`
-  - Spring : `@Value\("\$\{(DB_|AUTH_JWT_|AZ_|SMTP_)` (avec underscore — la convention SDD_Pro est `spring.datasource.*`/`app.auth.jwt.*`)
-  Fix : remplacer par `IConfiguration["..."]` / `config.get('...')` / `Settings().X` / `@Value("${spring.datasource.url}")`.
-  HINT : cf. `rules/library-and-stack.md §1.0`, `agents/arch.md §STEP 4.5`.
-```
-
-### 5.7 A07 Identification & Authentication Failures
-
-```
-[SEC_JWT_MISCONFIG] (critical)
-  - JWT secret < 32 chars hardcoded (`AUTH_JWT_SECRET: "short"`)
-  - JWT sans expiration (`exp` claim absent dans création token)
-  - JWT validation sans check `iss`/`aud`/`exp`
-
-[SEC_COOKIE_INSECURE] (serious)
-  Cookies auth/session sans :
-    - "HttpOnly" : grep `\.Cookie\(`/`SetCookie\(` sans `httpOnly: true`
-    - "Secure" : sans `secure: true` (en prod)
-    - "SameSite" : sans `SameSite=Strict|Lax`
-
-[SEC_PASSWORD_WEAK_POLICY] (moderate)
-  - Validation password regex < 8 chars
-  - Pas de check complexité (mix maj/min/digit/special)
-  - Stockage password en clair (déjà couvert par [SEC_CRYPTO_NO_SALT])
-```
-
-### 5.8 A08 Software & Data Integrity
-
-```
-[SEC_DESERIALIZATION_UNSAFE] (critical, hard-blocking)
-  .NET :
-    - "BinaryFormatter\." (deprecated, RCE risk)
-    - "JsonSerializer\.Deserialize<object>\(" sans type whitelist
-  Java :
-    - "ObjectInputStream\(.*\)\.readObject\(\)" sans validation
-    - "XMLDecoder\(" sans hardening
-  Python :
-    - "pickle\.loads\(" sur input utilisateur
-    - "yaml\.load\(" sans `Loader=SafeLoader`
-```
-
-### 5.9 A09 Security Logging Failures
-
-```
-[SEC_LOGGING_SECRETS] (serious)
-  - "log(ger)?\.(info|debug|warn|error)\([^)]*\b(password|token|secret|api[_-]?key)\b"
-  - "Console\.WriteLine.*\b(password|token|secret)\b"
-  - "print\(.*\b(password|token|secret)\b.*\)"
-
-[SEC_STACK_TRACE_EXPOSED] (serious)
-  - "exception\.toString\(\)" dans response body
-  - "ex\.StackTrace" exposé en HTTP response
-  - "traceback\.format_exc\(\)" dans HTTPException detail
-```
-
-### 5.10 A10 Server-Side Request Forgery
-
-```
-[SEC_SSRF_RISK] (critical)
-  - HTTP client appelé avec URL provenant directement d'un input utilisateur :
-    "(HttpClient|fetch|axios|requests\.get|urllib\.request)\(.*\b(req\.|request\.|input\.|body\.|params\.|query\.)\w+"
-  - Pas de whitelist d'origines visible (heuristique)
-```
+**`[SEC_IDOR]`** — heuristique cross-fichier : endpoint avec param
+`{id}`/`{userId}` + pas de check ownership (`userId`/`currentUser`/
+`ownerId`) dans les 30 lignes du handler.
 
 ---
 

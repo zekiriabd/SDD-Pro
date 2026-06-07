@@ -189,37 +189,11 @@ scan ne duplique `quality_scan.py`** (cf. comparaison §6 ci-dessous).
 | `angular` | `*ngFor` sans `trackBy`, `subscribe` sans `unsubscribe` ni `takeUntilDestroyed`, fonction appelée dans template (recalcul à chaque CD), `any` type explicite | moderate |
 | `blazor-webassembly` | `StateHasChanged()` appelé en boucle, `async void` (sauf event handler), `Task.Wait()` ou `.Result` côté WASM (deadlock), missing `@implements IDisposable` quand subscribed | moderate |
 
-Implémentation : Grep paramétrés par stack, table inline §5.1 bis ci-dessous
-pour les regex/patterns exacts. **Ne pas découvrir** d'anti-patterns
-hors table — si un cas n'est pas listé, étendre la table d'abord.
-
-### 5.1.bis Patterns regex (extrait, non exhaustif)
-
-```
-[dotnet-minimalapi]
-  REVIEW_ANTI_PATTERN_BLOCKING_ASYNC:
-    pattern: "\.(Result|Wait\(\))\b"
-    exclude: ["Task<.*>", "ConfigureAwait", "test files"]
-  REVIEW_ANTI_PATTERN_N_PLUS_ONE:
-    pattern: "\.Include\([^)]+\)\s*\.Include\([^)]+\)\s*\.Where|\.ToListAsync\(\)\s*\.then.*ToList"
-    hint: "Consider .AsSplitQuery() or single query with .Select projection"
-
-[react]
-  REVIEW_ANTI_PATTERN_KEY_INDEX:
-    pattern: "\.map\(\([^,)]+,\s*(idx|index|i)\)\s*=>[^}]*key=\{(idx|index|i)\}"
-    severity: moderate
-  REVIEW_ANTI_PATTERN_USEEFFECT_NO_DEPS:
-    pattern: "useEffect\(\(\)\s*=>\s*\{[^}]+\}\s*\)\s*;|useEffect\([^,]+,\s*\)"
-    severity: serious  # missing array OR empty array suspicious
-
-[python-fastapi]
-  REVIEW_ANTI_PATTERN_SYNC_IO_IN_ASYNC:
-    pattern: "async def\s+\w+\([^)]*\)[^:]*:\s*[\s\S]{0,500}\b(requests|urllib|time\.sleep)\."
-    severity: serious
-```
-
-(Liste complète maintenue dans cette section et étendue à chaque
-incident — discipline `source-first.md`.)
+Implémentation : Grep paramétrés par stack. **Source de vérité des
+patterns regex** = `.claude/python/code_review_patterns.yaml` (SSoT,
+testé par `tests/test_code_review_patterns.py`). Ne PAS dupliquer ici
+— étendre le YAML, le test l'enforce. **Ne pas découvrir** d'anti-pattern
+hors YAML : si un cas n'est pas listé, étendre le YAML d'abord.
 
 ### 5.2 Layer violations résiduelles
 
