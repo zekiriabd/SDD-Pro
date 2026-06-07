@@ -34,7 +34,7 @@
     "vue-eslint-config-typescript": "14.1.4",
     "vue-eslint-config-prettier": "10.1.0",
     "exceljs": "4.4.0",
-    "jspdf": "2.5.2",
+    "jspdf": "3.0.1",
     "jspdf-autotable": "3.8.4"
   },
   "core": [

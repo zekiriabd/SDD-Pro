@@ -12,15 +12,15 @@
 
 Voir `@.claude/docs/validated-combos.md §1.2` pour la liste détaillée.
 
-**Tier 1 — Validated end-to-end (2 combos)** :
-- **C1** : `dotnet-minimalapi + blazor-webassembly + radzen-blazor + dotnet-xunit + blazor-bunit + azure-ad + mvc`
-- **C2** : `kotlin-spring-boot + react + shadcn + node-vitest + kotlin-junit + azure-ad + mvc`
+**Tier 1 — Validated end-to-end (2 combos)** (SSoT : `validated-combos.md §1.2`) :
+- **C1** : `dotnet-minimalapi + react + shadcn + dotnet-xunit + azure-ad + mvc` — PoC 2026-05-07
+- **C2** : `kotlin-spring-boot + react + shadcn + kotlin-junit + node-vitest + azure-ad + mvc` — PoC 2026-05-11 (workspace CMSPrint)
 
-**Tier 2 — Bench-validated runtime (11 combos)** :
-- 16 cross-origin REST (4 backends × 4 SPA) — partial bench
-- 6 monolithes fullstack (next, nuxt, kotlin-mustache, angular-universal, blazor-server)
-- 1 MAUI Windows desktop
-- 1 React Native Expo Web
+**Tier 2 — Bench-validated runtime (11 combos SLA — sélection au sein du matrix bench 2026-06-05)** :
+- Sélection de 11 combos `bench-validated` parmi les **23 combinaisons** testées au bench du 2026-06-05 (cf. `validated-combos.md §1.3`).
+- Liste exacte : 13 combos `combos.json` (C1, C2 = Tier 1 ci-dessus + 11 combos C3-C13 = Tier 2).
+- Source machine-readable : [`.claude/templates/combos.json`](../templates/combos.json) ; rapport humain : [`workspace/output/qa/bench/BENCH-GLOBAL-REPORT.md`](../../workspace/output/qa/bench/BENCH-GLOBAL-REPORT.md).
+- ⚠️ Pour ces 11 combos, le scaffolding `/sdd-full` a été **partiellement manuel** côté mainteneur lors du bench (Gap 1 — `docs/benchmarks/known-gaps.md`). SLO Tier 2 best-effort, pas Tier 1 (cf. §2.2).
 
 ### 1.2 Hors périmètre SLA
 

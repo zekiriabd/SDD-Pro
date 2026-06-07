@@ -113,7 +113,7 @@ Aucun concurrent ne fournit cette piste d'audit.
 | Audit trail SQLite | ✅ `console.db` | ❌ | ❌ | ❌ | ❌ | ❌ | ⚠️ logs |
 | Compliance ready | ✅ `COMPLIANCE.md` | ❌ | ❌ | ❌ | ⚠️ entreprise SaaS | ❌ | ⚠️ SaaS |
 | Self-hosted | ✅ (workspace local) | ✅ | ✅ | ✅ | ❌ SaaS | ✅ | ❌ SaaS |
-| Licence | Apache 2.0 (à publier sur tag v7.0.1) | MIT | MIT | MIT | Commercial | Apache 2.0 | Commercial |
+| Licence | Apache 2.0 (LICENSE publié 2026-06-07) | MIT | MIT | MIT | Commercial | Apache 2.0 | Commercial |
 | Coût par FEAT | $15-30 (mesuré) | $5-15 (TDD only) | $20-40 (full SDLC) | $5-10 (planning seul) | $20/mois | $0.50-5/session | $500/run |
 
 ---

@@ -181,7 +181,7 @@ def format_text_report(orphans: dict[str, list[dict]]) -> str:
     else:
         lines.append(
             f"\nℹ️  Pour supprimer (avec backup .trash/) : "
-            f"python .claude/python/sdd_scripts/cleanup_orphans.py [--feat N] [--yes]"
+            f"python .claude/python/sdd_admin/cleanup_orphans.py [--feat N] [--yes]"
         )
     return "\n".join(lines)
 

@@ -11,13 +11,34 @@ dans `library-and-stack.md`, `ownership.md`, `quality.md`
 et inlinés dans les agents (po, dev-*, qa).
 
 > **Note granularité (Sprint 2.4 audit 2026-06-07 ; recount CTO audit
-> 2026-06-07)** : **174 classes** recensées dans ce fichier (172 actives
-> + 2 dépréciées). Le chiffre est obtenu par somme déterministe de la
-> colonne "Classes" du quick-ref §0 ci-dessous — enforcé par le test
+> 2026-06-07 ; clarification méthodologique audit consolidé 2026-06-07)** : **174 classes** recensées dans ce fichier (172 actives + 2 dépréciées).
+>
+> **Source de vérité** : somme déterministe de la colonne "Classes" du
+> quick-ref §0 ci-dessous (`8+25+13+5+7+3+10+3+11+12+23+16+9+22+6+1 = 174`).
+> Ce nombre est utilisé dans toute communication commerciale (CLAUDE.md,
+> WHY-SDD-PRO.md, getting-started.md, README.md) et enforcé par le test
 > `tests/test_error_classification_count.py` (gate CI : tout drift entre
-> intro et somme = FAIL). Recount audit CTO 2026-06-07 : §1.7 +1
-> ([ACCEPTANCE_GATE_FAILED]), §1.11 +1 ([SEC_CORS_MISSING]), §1.14
-> sous-comptait body de -9 (réconcilié 13→22).
+> intro et somme = FAIL).
+>
+> **Méthodologie de comptage** :
+> - Le chiffre 174 compte les **familles déclarées** par section §1.X
+>   (chaque entrée de quick-ref agrège plusieurs préfixes apparentés
+>   sous une étiquette canonique).
+> - Un `grep -oE '\[[A-Z_]+\]'` unique sur ce fichier retourne ~152
+>   préfixes distincts (l'écart vient des fusions documentaires comme
+>   `[PLAN_INVALID]` qui englobe 7 sous-cas `_UNREADABLE`,
+>   `_NO_FRONTMATTER`, etc. — cf. §1.2 fusion 2026-06-07).
+> - L'annexe `error-classification-legacy.md` ajoute 27 préfixes
+>   héritage (11 `[A11Y_*]` + 16 `[PERF_*]`), réactivés via ingest CI
+>   v7.2.0 (`ingest_axe.py`, `ingest_lighthouse.py`). Ces 27 préfixes
+>   **ne sont pas comptés** dans le 174 du fichier principal — ils
+>   sont émis par des scripts d'ingest CI, pas par des agents SDD_Pro.
+> - Le test `tests/test_error_classification_count.py` enforce
+>   l'alignement intro ↔ quick-ref §0 ↔ titre `## 0`.
+>
+> Recount audit CTO 2026-06-07 : §1.7 +1 ([ACCEPTANCE_GATE_FAILED]),
+> §1.11 +1 ([SEC_CORS_MISSING]), §1.14 sous-comptait body de -9
+> (réconcilié 13→22).
 >
 > La granularité n'est PAS de la sur-ingénierie — elle est **load-bearing**
 > pour 4 systèmes :

@@ -17,7 +17,7 @@ Scope: backend uniquement (REST API, logique métier, persistance)
 
 ### 1.1 Pattern applicatif (Kotlin/Spring idioms)
 
-Pour `ArchiPattern: MVC` (défaut), suit `archi/mvc.md` avec idioms Spring Boot 4 + Kotlin 2.3 :
+Pour `ArchiPattern: MVC` (défaut), suit `archi/mvc.md` avec idioms Spring Boot 3.3 LTS + Kotlin 2.0.21 :
 - **Data classes Kotlin** pour DTOs (`val` exclusivement → immuables par construction, `equals/hashCode/toString` auto-générés)
 - **Constructor injection** native Kotlin (`class UsersService(val repo: UsersRepository, ...)`)
 - **Coroutines** pour I/O async (`suspend fun` + Spring WebFlux optionnel) OU pattern bloquant Spring MVC classique
@@ -71,9 +71,9 @@ Hérités de `archi/mvc.md §4`. **Ajouts** Kotlin :
 ### 2.1 Identité
 
 - **Stack ID** : `back-kotlin-spring`
-- **Langage** : Kotlin 2.3.21
-- **Runtime** : JDK 21
-- **Framework principal** : Spring Boot 4.0.x
+- **Langage** : Kotlin 2.0.21 (LTS-aligned via Java 21)
+- **Runtime** : JDK 21 LTS
+- **Framework principal** : Spring Boot 3.3.x LTS (canonique SDD_Pro v7.0.0 — Spring Boot 4 sera évalué en roadmap v8 après stabilisation Spring Security 7)
 - **Build tool** : **Gradle 8.10** avec **Kotlin DSL** (`build.gradle.kts`)
 - **Package racine** : `{BackendNamespace}` (ex. `com.sdd-pro.sim`)
 
@@ -222,7 +222,7 @@ Codes prioritaires Kotlin :
 | spring-boot-starter-oauth2-client |  | OAuth2 client flow (utilise par certains scenarios M2M) |
 | spring-boot-starter-data-jpa |  | ORM Hibernate + Spring Data repositories (PagingAndSortingRepository, JpaRepository) |
 | spring-boot-starter-validation |  | Bean Validation Jakarta (@Valid, @NotBlank, @Email) sur DTOs entrants |
-| flyway-core | 10.21.0 | Moteur migrations versionnees V{n}__*.sql + autoconfig Spring (pas de starter dedie). Pin 10.21.0 (compat Spring Boot 4 BOM, Flyway 10 externalise les dialects DB en modules separes). Cf. kotlin-spring-boot.md §4.4 |
+| flyway-core | 10.21.0 | Moteur migrations versionnees V{n}__*.sql + autoconfig Spring (pas de starter dedie). Pin 10.21.0 (compat Spring Boot 3.3.x BOM, Flyway 10 externalise les dialects DB en modules separes). Cf. kotlin-spring-boot.md §4.4 |
 | flyway-database-postgresql | 10.21.0 | Module support PostgreSQL Flyway 10+ (externalise depuis flyway-core en 10.x, n'existe PAS en branche 9.x — d'ou la bump). Necessaire si DatabaseType=postgres |
 | springdoc-openapi-starter-webmvc-ui | 2.7.0 | OpenAPI 3 + Swagger UI auto-generes depuis controllers (path /swagger custom, cf. §5.6) |
 | spring-context |  | DI core (transitive via web, listee explicitement pour clarte) |
@@ -962,8 +962,9 @@ de la chaîne Spring Security visible.
   défaut sain pour tout projet Database-First** ; n'activer `validate`
   qu'après un cycle de tests d'intégration qui prouve l'absence de
   faux-positifs avec le dialect+driver actuel.
-- **`AntPathRequestMatcher`** (Spring Security 7 / Spring Boot 4) —
-  l'API a été retirée dans Spring Security 7 (post-mortem 2026-05-21,
+- **`AntPathRequestMatcher`** (Spring Security 6.4+ deprecation, retrait en v7) —
+  l'API a été dépréciée à partir de Spring Security 6.4 et est retirée
+  en Spring Security 7 (post-mortem 2026-05-21,
   `Unresolved reference 'AntPathRequestMatcher'`). Utiliser des **string
   paths littéraux** dans `requestMatchers(...)` (Spring choisit
   automatiquement `PathPatternRequestMatcher` derrière) :

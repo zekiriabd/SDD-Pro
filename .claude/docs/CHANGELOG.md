@@ -2124,8 +2124,9 @@ python .claude/python/sdd_scripts/report_token_usage.py --json --feat 1 --output
   `sdd_state.py` conservent leur format legacy pour compat consumers).
 
 ### Removed
-- `.claude/templates/explain-po.prompt.md` (orphelin — jamais référencé
-  par agent/command/hook).
+- (entrée retirée 2026-06-07 par audit consolidé : `explain-po.prompt.md`
+  reste **utilisé** par `workspace/console/lib/explain.js` — annotation
+  initiale erronée, fichier conservé).
 
 ### Fixed — Documentation
 - `python/README.md` § "Scripts maintenance (hors pipeline)" déjà en

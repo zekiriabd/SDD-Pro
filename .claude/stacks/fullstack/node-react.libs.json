@@ -48,7 +48,7 @@
     "eslint-js": "9.17.0",
     "anthropic-sdk": "0.40.1",
     "fastify-jwt": "9.0.1",
-    "bcryptjs": "3.0.2",
+    "bcrypt": "5.1.1",
     "prisma": "6.1.0",
     "prisma-client": "6.1.0",
     "fastify-websocket": "11.0.1",
@@ -81,7 +81,7 @@
   "onDemand": [
     { "module": "@anthropic-ai/sdk", "ref": "anthropic-sdk", "capability": "anthropic-ai", "triggers": ["\\bclaude\\b", "anthropic", "reformulation.*ia", "explain.*ia"] },
     { "module": "@fastify/jwt", "ref": "fastify-jwt", "capability": "jwt", "triggers": ["\\bjwt\\b", "auth-local", "auth-azure-ad"] },
-    { "module": "bcryptjs", "ref": "bcryptjs", "capability": "auth-local", "triggers": ["auth-local", "hash.*password", "bcrypt"] },
+    { "module": "bcrypt", "ref": "bcrypt", "capability": "auth-local", "triggers": ["auth-local", "hash.*password", "bcrypt"], "rationale": "Native bcrypt — bcryptjs deprecated upstream 2025" },
     { "module": "prisma", "ref": "prisma", "capability": "prisma", "triggers": ["prisma", "orm", "database.*scaffold", "db-first"] },
     { "module": "@prisma/client", "ref": "prisma-client", "capability": "prisma", "triggers": ["prisma", "orm"] },
     { "module": "@fastify/websocket", "ref": "fastify-websocket", "capability": "websocket", "triggers": ["websocket", "ws", "realtime.*bidirectional"] },

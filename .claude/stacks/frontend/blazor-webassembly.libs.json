@@ -9,7 +9,7 @@
   },
   "versions": {
     "blazor-wasm": "10.0.6",
-    "radzen-blazor": "10.2.3",
+    "radzen-blazor": "5.5.7",
     "refit": "10.1.6",
     "polly-core": "8.6.6",
     "polly-http": "10.0.6",

@@ -139,9 +139,9 @@ Wall-clock par phase remonte automatiquement dans `console.db` table `run_phases
 | **Auditor verdicts** | `qa_a11y` + `qa_code_review` + `qa_security` + `qa_performance` |
 | **Cycles correctifs manuels** | log Tech Lead dans `workspace/output/.sys/.roi-poc/feat-{S\|M\|L}-corrections.md` |
 
-### 4.4 Bench script (cible v7.0.0)
+### 4.4 Bench script (livré v7.0.0)
 
-À créer : `.claude/python/sdd_scripts/bench_run.py` qui orchestre :
+Disponible : `.claude/python/sdd_scripts/bench_run.py` qui orchestre :
 
 ```bash
 python bench_run.py --feat 1 --label "framework-v7.0.0" \

@@ -310,6 +310,32 @@ Exclusions : endpoints `/health`, `/metrics`, `/swagger`, `/openapi.json`,
   - "app\.UseDeveloperExceptionPage\(\)" sans gate `if (app.Environment.IsDevelopment())`
   - "/debug", "/test", "/_internal" routes en prod
   - Swagger/OpenAPI exposé en prod sans auth
+
+[SEC_CORS_MISSING] (serious — CWE-942) — audit 2026-06-07
+  Backend SPA-facing sans configuration CORS du tout (rejet preflight → fetch
+  silencieux côté front). Détection cross-stack par grep négatif :
+  - .NET : `AddCors\(` absent dans `Program.cs` ET stack frontend SPA actif
+  - Spring Boot : ni `@Configuration.*CorsConfig` ni `CorsConfigurationSource` bean
+  - FastAPI : `CORSMiddleware` jamais ajouté à `app.add_middleware`
+  - Express : `cors\(\)` jamais wirée dans `app.use(...)`
+  HINT : cf. `rules/library-and-stack.md §B.2-§B.5` pour le pattern stack-aware.
+  Skip si `appType: fullstack` (same-origin SSR — pas de cross-origin SPA↔API).
+```
+
+### 5.6.bis A05 Security Misconfiguration — Env var bypass (audit 2026-06-06)
+
+```
+[SEC_ENV_VAR_FORBIDDEN] (serious — CWE-1188)
+  Code applicatif lit directement les env vars pour les clés provisionnées via
+  `stack.md` (DB, AUTH_JWT, AZ_*, SMTP_*). Contredit Pattern B (stack.md = SSoT,
+  arch peuple les configs natives en clair). Le code DOIT lire la config native.
+  Détection par stack :
+  - .NET : `Environment\.GetEnvironmentVariable\("(DB_|AUTH_JWT_|AZ_|SMTP_)`
+  - Node : `process\.env\.(DB_|AUTH_JWT_|AZ_|SMTP_)`
+  - Python : `os\.environ\[["'](DB_|AUTH_JWT_|AZ_|SMTP_)` OU `os\.getenv\(["'](DB_|AUTH_JWT_|AZ_|SMTP_)`
+  - Spring : `@Value\("\$\{(DB_|AUTH_JWT_|AZ_|SMTP_)` (avec underscore — la convention SDD_Pro est `spring.datasource.*`/`app.auth.jwt.*`)
+  Fix : remplacer par `IConfiguration["..."]` / `config.get('...')` / `Settings().X` / `@Value("${spring.datasource.url}")`.
+  HINT : cf. `rules/library-and-stack.md §1.0`, `agents/arch.md §STEP 4.5`.
 ```
 
 ### 5.7 A07 Identification & Authentication Failures

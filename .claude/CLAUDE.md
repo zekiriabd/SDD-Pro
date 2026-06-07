@@ -109,21 +109,25 @@ Templates : `@.claude/docs/conventions.md §14-§15`.
 
 **Tiers de validation** (clarifié audit C2 — 2026-06-06) :
 
-| Tier | Couleur | Stacks | Garantie | Support |
-|---|---|---:|---|---|
-| **validated** | 🟢 ref | 2 combos (C1, C2) | `/sdd-full` bout-en-bout 100 % automatisé, sans intervention humaine | **Supporté production**. SLO 95 % runs PASS sur FEATs S/M. |
-| **bench-validated runtime** | 🟢 bench | 11 stacks supp. | Code généré **compile + démarre + sert les ACs**, mais une partie du scaffolding `/sdd-full` a été faite manuellement par le mainteneur. Détail : `workspace/output/qa/bench/BENCH-GLOBAL-REPORT.md`. Gaps : `docs/benchmarks/known-gaps.md` | **Supporté best-effort**. Pas de garantie idempotence `/sdd-full`. |
-| **experimental** | 🟡 exp | 8 stacks | Spec stack OK + `.libs.json` valide, **jamais exécuté end-to-end**. Code généré peut compiler — ou pas. | **⚠ Non supporté commercialement.** À considérer comme « community preview ». |
-| **POC-only** | 🟡 poc | 1 stack (`node-react`) | Usage interne console SDD uniquement. Pas de TS natif, pas de bundler, pas de pipeline Playwright. | **Hors périmètre produit.** Ne sera pas commercialisé. |
+| Tier | Couleur | Granularité | Périmètre | Garantie | Support |
+|---|---|---|---:|---|---|
+| **validated** | 🟢 ref | **combos** (assemblages) | 2 combos (C1, C2) | `/sdd-full` bout-en-bout 100 % automatisé, sans intervention humaine | **Supporté production**. SLO 95 % runs PASS sur FEATs S/M. |
+| **bench-validated runtime** | 🟢 bench | **combos** | 11 combos SLA (C3-C13 dans `combos.json`) sélectionnés parmi les 23 combinaisons bench 2026-06-05 | Code généré **compile + démarre + sert les ACs**, mais une partie du scaffolding `/sdd-full` a été faite manuellement par le mainteneur. Détail : `workspace/output/qa/bench/BENCH-GLOBAL-REPORT.md`. Gaps : `docs/benchmarks/known-gaps.md` | **Supporté best-effort**. Pas de garantie idempotence `/sdd-full`. |
+| **experimental** | 🟡 exp | **stacks atomiques** | 8 stacks (briques) | Spec stack OK + `.libs.json` valide, **jamais exécuté end-to-end**. Code généré peut compiler — ou pas. | **⚠ Non supporté commercialement.** À considérer comme « community preview ». |
+| **POC-only** | 🟡 poc | **stack atomique** | 1 stack (`node-react`) | Usage interne console SDD uniquement. Pas de TS natif, pas de bundler, pas de pipeline Playwright. | **Hors périmètre produit.** Ne sera pas commercialisé. |
 
-> **⚠ Engagement commercial v7.0.0** (clarifié audit CTO 2026-06-07) :
-> seuls les **13 combos** éligibles SLA = 2 combos `validated`
-> end-to-end (C1, C2) + 11 combos `bench-validated runtime` testés
-> 2026-06-05. Côté stacks atomiques (= briques), cela correspond aux
-> **25 stacks 🟢** (14 reference + 11 bench-validated) ; les **8 stacks
-> 🟡 experimental** et le **1 stack 🟡 POC-only** sont **explicitement
-> exclus de tout SLA**. Distinction stack/combo : un combo est un
-> assemblage de 3-6 stacks (backend + frontend + ui + qa + auth + ±archi).
+> **⚠ Engagement commercial v7.0.0** (clarifié audit CTO 2026-06-07,
+> reconfirmé post-audit consolidé) :
+> seuls les **13 combos SLA** = 2 combos `validated` end-to-end (C1, C2)
+> + 11 combos `bench-validated runtime` (C3-C13 dans `combos.json`),
+> sélectionnés parmi les 23 combinaisons testées au bench du 2026-06-05.
+> Le nombre **13** est canonique au niveau **combo** (assemblage de 3-6
+> stacks). Au niveau **stack atomique** (= brique), 25 stacks 🟢 entrent
+> dans la composition de ces combos (13 reference + 11 bench-validated +
+> 1 scaffold-validated `kotlin-android`). Les **8 stacks 🟡 experimental**
+> et le **1 stack 🟡 POC-only** sont **explicitement exclus de tout SLA**.
+> Distinction stack/combo : un combo est un assemblage de 3-6 stacks
+> (backend + frontend + ui + qa + auth + ±archi).
 > Marquage runtime via le hook `preflight_stack_combo` (exit 2 =
 > bloquant si combo non listé, sauf `SDD_ALLOW_UNTESTED_COMBO=1`,
 > audit-loggué).
