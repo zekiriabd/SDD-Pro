@@ -86,39 +86,28 @@ lit `IConfiguration` / `application.yml` / `config/default.json` /
 
 - Toutes valeurs dans `## Active Auth Specs` de `stack.md`, propagées par `arch` STEP 4.5
 - Aucun hardcoding Azure AD dans le code (`.cs`/`.kt`/`.py`/`.ts`)
-- Lecture via mécanismes natifs framework : `IConfiguration["AzureAd:*"]`, `@Value("${azure.ad.*}")`, `config.get("azure.ad")`, `azure_settings.*`
-- **Env var binding runtime INTERDIT pour les clés SDD** (audit
-  2026-06-06, Pattern B canonique) : `stack.md` est la SSoT locale
-  gitignoree, puis `arch` propage les valeurs vers la config native du
-  framework. Le code applicatif ne lit jamais directement `AZ_*`,
-  `DB_*`, `AUTH_*` ou `SMTP_*` via `Environment.GetEnvironmentVariable`,
-  `System.getenv`, `process.env`, `os.environ` ou `@Value("${AZ_*}")`.
-  Toute derive = `[SEC_ENV_VAR_FORBIDDEN]`.
-- Les secrets ne doivent pas etre commites : `workspace/output/` reste
-  ignore, les fichiers locaux generes restent dans le poste dev, et la
-  rotation prod passe par l'outillage ops/secret manager hors repo.
+- Lecture via mécanismes natifs framework : `IConfiguration["AzureAd:*"]`,
+  `@Value("${azure.ad.*}")`, `config.get("azure.ad")`, `azure_settings.*`
+- **Env var binding runtime INTERDIT** (Pattern B 2026-06-06) : `stack.md` =
+  SSoT gitignored, `arch` propage en config native. Lecture directe
+  `AZ_*`/`DB_*`/`AUTH_*`/`SMTP_*` via `process.env`/`os.environ`/
+  `Environment.GetEnvironmentVariable`/`@Value("${AZ_*}")` = `[SEC_ENV_VAR_FORBIDDEN]`
+- Secrets jamais commités : `workspace/output/` gitignored, rotation prod
+  via secret manager hors repo
 
-### §2.bis — Propagation stack.md → Configuration native (load-bearing, depuis 2026-06-06)
+### §2.bis — Propagation stack.md → config native (load-bearing)
 
-**Contexte** : la convention `stack.md` (`AZ_TENANTID`, `DB_PASSWORD`, etc.)
-est lisible par les agents SDD. L'agent `arch` Phase A STEP 4.5 est le
-seul pont autorise : il lit `workspace/input/stack/stack.md`, valide les
-clés, puis ecrit la section native attendue par le framework. Le runtime
-applicatif consomme uniquement cette config native.
-
-**Pattern .NET** (`Program.cs`) :
+`arch` Phase A STEP 4.5 = seul pont autorisé : lit `stack.md`, valide les
+clés, écrit la section native attendue par le framework. Le runtime consomme
+uniquement la config native.
 
 ```csharp
-// appsettings.json est peuple par arch depuis stack.md.
-builder.Services.AddMicrosoftIdentityWebApiAuthentication(
-    builder.Configuration,
-    "AzureAd");
+// .NET — appsettings.json peuplé par arch
+builder.Services.AddMicrosoftIdentityWebApiAuthentication(builder.Configuration, "AzureAd");
 ```
 
-**Pattern Spring Boot** : `application.yml` avec valeurs materialisees par
-`arch`, puis binding natif :
-
 ```yaml
+# Spring Boot — application.yml peuplé par arch
 azure:
   ad:
     tenant-id: "{AZ_TENANTID}"
@@ -127,40 +116,27 @@ azure:
     callback-path: "/signin-oidc"
 ```
 
-**Pattern FastAPI Python** : `app/config.py` genere par `arch`, lu par
-l'application comme module de config :
-
 ```python
+# FastAPI — app/config.py généré par arch
 class AzureADSettings:
     tenant_id = "{AZ_TENANTID}"
     client_id = "{AZ_BE_CLIENTID}"
-
 azure_settings = AzureADSettings()
 ```
 
-**Pattern Express Node** : `config/default.json` genere par `arch`, lu via
-`config.get("azure.ad")`.
+```
+# Express — config/default.json généré par arch, lu via config.get("azure.ad")
+```
 
-### §2.ter — Legacy post-mortems env shell (clos par Pattern B)
+### §2.ter — Règle actuelle (post Pattern B)
 
-Les incidents MSYS Git Bash / pollution du shell parent de 2026-05-22
-restent utiles comme contexte historique : une valeur de callback path
-heritee du shell pouvait produire `AADSTS50011` (`/Git/login-callback` ou
-`/login-callback`). Depuis le Pattern B 2026-06-06, ces incidents ne sont
-plus traites par lecture runtime d'env vars.
-
-**Regle actuelle** :
-- `AZ_FE_CALLBACKPATH` et `AZ_BE_CALLBACKPATH` vivent dans
-  `workspace/input/stack/stack.md`.
-- `arch` les propage dans la config native du framework
-  (`appsettings.json`, `application.yml`, `config/default.json`,
-  `app/config.py`).
-- Le code applicatif lit la config native. Toute lecture shell directe de
-  `AZ_*` = `[SEC_ENV_VAR_FORBIDDEN]`.
-
-**Validation** : `AZ_FE_CALLBACKPATH` doit valoir
-`/authentication/login-callback` (convention SPA universelle) sauf ADR
-explicite et App Registration Azure mise a jour.
+- `AZ_FE_CALLBACKPATH` + `AZ_BE_CALLBACKPATH` vivent dans `stack.md`
+- `arch` propage en config native (`appsettings.json`, `application.yml`,
+  `config/default.json`, `app/config.py`)
+- Code applicatif lit la config native ; lecture shell directe AZ_* =
+  `[SEC_ENV_VAR_FORBIDDEN]`
+- `AZ_FE_CALLBACKPATH` = `/authentication/login-callback` (convention SPA
+  universelle) sauf ADR explicite
 
 ### §dual-app — Pattern canonique 2 App Reg
 
@@ -715,40 +691,28 @@ commençant par `/` (jamais URL complète, jamais vide).
 
 #### 5.2.7.3.ter `navigateToLoginRequestUrl: false` OBLIGATOIRE (post-mortem 2026-05-22, CMSPrint)
 
-**Symptôme** : utilisateur se connecte avec succès sur Azure AD, callback
-revient sur `/authentication/login-callback`, MSAL consomme bien le code,
-puis l'utilisateur est **renvoyé sur `/login`** au lieu de la home page —
-en boucle infinie même après auth réussie.
+**Symptôme** : auth Azure OK, callback consommé, utilisateur **renvoyé en
+boucle sur `/login`** au lieu de home.
 
-**Cause** : par défaut `navigateToLoginRequestUrl: true` dans MSAL fait
-que MSAL **replay l'URL d'origine** du login (typiquement `/login` lui-même
-puisque c'est là que l'utilisateur a cliqué). La page `LoginCallbackPage`
-n'a jamais l'occasion de tourner — MSAL navigue avant elle.
+**Cause** : MSAL défaut `navigateToLoginRequestUrl: true` replay l'URL d'origine
+du login (= `/login` lui-même) → `LoginCallbackPage` jamais rendue.
 
 **Pattern canonique** :
-
 ```ts
 const msalConfig: Configuration = {
   auth: {
     clientId, authority, redirectUri,
     postLogoutRedirectUri: window.location.origin,
-    navigateToLoginRequestUrl: false,  // OBLIGATOIRE — la nav post-login est gérée par LoginCallbackPage
+    navigateToLoginRequestUrl: false,  // OBLIGATOIRE
   },
   cache: { cacheLocation: "sessionStorage", storeAuthStateInCookie: false },
 }
 ```
 
-Anti-patterns rejetés :
-- ❌ `navigateToLoginRequestUrl: true` (défaut MSAL) — provoque le loop
-- ❌ Omettre la clé — MSAL utilise `true` par défaut
-- ❌ Compter sur le replay MSAL pour la navigation post-login — fragile,
-  contradictoire avec une `LoginCallbackPage` qui fait `window.location.href`
+Anti-patterns : `true` ou omis (= true par défaut) ; compter sur replay MSAL.
 
-**Validation grep dev-frontend** :
-```bash
-grep -nE "navigateToLoginRequestUrl" src/auth/msalConfig.ts \
-  | grep "false" || ERROR [MSAL_NAVIGATE_DEFAULT]
-```
+**Validation** : `grep "navigateToLoginRequestUrl.*false" src/auth/msalConfig.ts
+|| ERROR [MSAL_NAVIGATE_DEFAULT]`
 
 #### 5.2.7.4 Route `/login` publique + autonome
 
@@ -770,29 +734,16 @@ function RootComponent() {
   const location = useLocation()
   const isPublic = PUBLIC.has(location.pathname)
 
-  // 1. Non auth + route protégée → /login
   if (!isAuth && !isPublic) return <Navigate to="/login" />
-
-  // 2. Déjà auth + sur /login → home (cas MSAL replay / bookmark / back-button
-  //    post-mortem 2026-05-22 : sans cette garde, utilisateur reste bloqué
-  //    sur le bouton "Se connecter" alors que sa session est valide)
-  if (isAuth && location.pathname === "/login") {
-    return <Navigate to={HOME_AFTER_LOGIN} />
-  }
-
-  // 3. Route publique (login, callback) → outlet nu, sans MainLayout
-  if (isPublic) return <Outlet />
-
-  // 4. Route protégée + auth → wrap MainLayout
+  // Garde anti-loop : auth + bookmark /login → home
+  if (isAuth && location.pathname === "/login") return <Navigate to={HOME_AFTER_LOGIN} />
+  if (isPublic) return <Outlet />  // login, callback : outlet nu sans MainLayout
   return <MainLayout><Outlet /></MainLayout>
 }
 ```
 
-Effet :
-- `/login` sans menu, autres routes wrappées `MainLayout`
-- `/authentication/login-callback` traverse le guard (sinon LoginCallbackPage
-  ne tournerait jamais et `handleRedirectPromise` ne consommerait pas le code)
-- Auto-redirect vers home si utilisateur arrive sur `/login` déjà authentifié
+`/login` sans menu, autres routes wrappées `MainLayout`. Callback traverse
+le guard (sinon `handleRedirectPromise` jamais appelé).
 
 #### 5.2.7.6 Token sessionStorage — clé partagée
 
