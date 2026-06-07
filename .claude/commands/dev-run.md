@@ -71,6 +71,15 @@ Arguments :
 
   Stocker `$rebuild_arch ∈ {true, false}` (STEP 4.bis et 5).
 
+- `--resume` (optionnel) — reprend depuis le dernier checkpoint (cf.
+  `CheckpointMode: resume` Project Config). Skip les STEPs déjà PASS
+  selon `sdd_state.py should-skip-step`. Idempotent. Stocker `$resume`.
+
+- `--unsequenced` (optionnel) — désactive la gate API back→front, lance
+  dev-backend + dev-frontend en parallèle (mode legacy v6.x). Équivalent
+  à `GatedWorkflow: false` dans Project Config. Audit-loggué dans
+  `workspace/output/.sys/.audit/legacy-parallel.log`. Déconseillé.
+
 - ~~`PlanCacheStrict`~~ — **retiré v7.0.0** (les variants `dev-*-strict`
   ont été supprimés ; clé tolérée mais sans effet runtime).
 
@@ -188,7 +197,26 @@ python .claude/python/sdd_scripts/validate_us_deps.py --feat {n} --json
 | 0 | Graphe valide (orphelins tolérés, INFO) | Continuer ; remplacer `US_LIST` par le topo order |
 | 3 | `[US_DEPS_CYCLE]` | STOP + ERROR, Tech Lead corrige les `## Dependencies` |
 | 4 | `[US_DEPS_MISSING]` | STOP + ERROR, ref vers US inexistante |
-| 1/2/5 | erreur infra | STOP + ERROR |
+| 5 | `[US_DEPS_PARSE_ERROR]` | STOP + ERROR, frontmatter `## Dependencies` malformé |
+| 1 | usage error (args malformés) | STOP + ERROR `[INVALID_ARG]` |
+| 2 | erreur infra (I/O, FS) | STOP + ERROR `[INFRA_BLOCKED]` |
+
+**Handling explicite exit 4 & 5 (audit M13 closure 2026-06-07)** :
+```bash
+python .claude/python/sdd_scripts/validate_us_deps.py --feat {n} --json
+DEPS_EXIT=$?
+case $DEPS_EXIT in
+  0) ;;  # OK, continuer
+  3) echo "ERROR: [US_DEPS_CYCLE] cycle détecté dans ## Dependencies" >&2; exit 1 ;;
+  4) echo "ERROR: [US_DEPS_MISSING] ## Dependencies référence une US inexistante" >&2; exit 1 ;;
+  5) echo "ERROR: [US_DEPS_PARSE_ERROR] frontmatter ## Dependencies malformé (vérifier syntaxe YAML)" >&2; exit 1 ;;
+  1) echo "ERROR: [INVALID_ARG] validate_us_deps.py args malformés — bug commande" >&2; exit 2 ;;
+  2) echo "ERROR: [INFRA_BLOCKED] validate_us_deps.py I/O error" >&2; exit 3 ;;
+  *) echo "ERROR: [INFRA_BLOCKED] validate_us_deps.py exit $DEPS_EXIT inconnu" >&2; exit 3 ;;
+esac
+```
+
+> **Avant v7.0.1 (audit M13)** : seuls exit 0/3 étaient handled explicitement ; exit 4/5 tombaient dans le bucket "1/2/5 erreur infra" qui était trop vague (4 = vraie erreur métier "US ref manquante", 5 = vraie erreur parse, pas infra). La séparation rend le diagnostic Tech Lead actionnable.
 
 Sur exit 0, récupérer **les batches layered Kahn** (v7.0.0 audit P0 R3) :
 
@@ -390,16 +418,34 @@ la branche `if phases.X.enabled` faute silencieusement (KeyError ou
 # subshell death between tool-calls. Pre-D1, $PHASE_PLAN was bash-only,
 # dead at the next Bash invocation; STEP 6.4 had to silently re-launch
 # phase_planner.py without explicit documentation.
+#
+# Audit M10 closure 2026-06-07 — atomic write + fsync to survive kill -9
+# OR OS panic mid-write. Pre-M10, the redirection `> phase-plan-{n}.json`
+# left a half-written JSON on disk if the python process was killed before
+# flush; STEP 6.4 would read truncated JSON → silent decision corruption.
+# Fix: write to a sibling `.tmp.{PID}`, fsync, atomic rename. Mirrors
+# the Python sdd_lib.atomic_write pattern but in pure bash for shell-call
+# safety here.
 mkdir -p workspace/output/.sys/.state
+TMP=workspace/output/.sys/.state/phase-plan-{n}.json.tmp.$$
 python .claude/python/sdd_scripts/phase_planner.py \
   --feat-number {n} \
-  --json > workspace/output/.sys/.state/phase-plan-{n}.json
-if [ $? -ne 0 ]; then
+  --json > "$TMP"
+PP_EXIT=$?
+if [ "$PP_EXIT" -ne 0 ]; then
+  rm -f "$TMP"  # cleanup partial — never leave orphan .tmp
   echo "ERROR: /dev-run {n} — phase planner failed"
-  echo "CAUSE: [PHASE_PLAN_INIT_FAILED] phase_planner.py exit $? (FEAT {n})"
+  echo "CAUSE: [PHASE_PLAN_INIT_FAILED] phase_planner.py exit $PP_EXIT (FEAT {n})"
   echo "FIX: vérifier workspace/input/feats/{n}-*.md + Project Config + run /sdd-status {n}"
   exit 2
 fi
+# fsync the tmp file (best-effort — `sync $TMP` on Linux ; on Windows the
+# Python subprocess already flushes; the atomic rename is the durability
+# anchor regardless of fsync portability).
+sync "$TMP" 2>/dev/null || true
+# Atomic rename — POSIX guarantees crash-safety: either old file remains
+# OR new file is fully present, never partial.
+mv "$TMP" workspace/output/.sys/.state/phase-plan-{n}.json
 # Re-read into shell var for the current subshell (legacy convenience).
 # In STEP 6.4 below, callers MUST re-read from disk path
 # `workspace/output/.sys/.state/phase-plan-{n}.json` since the bash
@@ -568,10 +614,28 @@ ingéré et supprimé par `qa-generate` STEP 6.bis) :
 
 ```bash
 GATE_JSON=$(python .claude/python/sdd_scripts/query_console_db.py api-gate --feat {n})
-STATUS=$(echo "$GATE_JSON" | python -c "import json,sys; print(json.load(sys.stdin).get('status', 'INFRA_BLOCKED'))")
+
+# Audit M11 closure 2026-06-07 — explicit schema versioning fallback.
+# v7+ DB schema uses `status` (PASS|WARN|FAIL|SKIPPED|INFRA_BLOCKED canonical).
+# v6 DB schema only had `gate_passed` (bool). For backward-compat on a project
+# upgraded mid-flight, derive `status` from `gate_passed` when missing.
+SCHEMA_VERSION=$(echo "$GATE_JSON" | python -c "import json,sys; d=json.load(sys.stdin); print('v7' if 'status' in d else 'v6')" 2>/dev/null)
+
+if [ "$SCHEMA_VERSION" = "v7" ]; then
+  STATUS=$(echo "$GATE_JSON" | python -c "import json,sys; print(json.load(sys.stdin).get('status', 'INFRA_BLOCKED'))")
+elif [ "$SCHEMA_VERSION" = "v6" ]; then
+  # Legacy DB — derive status from gate_passed boolean (lossy but deterministic).
+  # WARN to stderr so the operator knows a console.db migration is pending.
+  echo "[QA/WARN] api-gate DB schema v6 detected (no 'status' field) — deriving from gate_passed. Run framework_smoke.py to confirm migration health." >&2
+  GATE_PASSED=$(echo "$GATE_JSON" | python -c "import json,sys; print(json.load(sys.stdin).get('gate_passed', False))")
+  if [ "$GATE_PASSED" = "True" ]; then STATUS="PASS"; else STATUS="FAIL"; fi
+else
+  # Schema unknown — fail-safe to INFRA_BLOCKED (don't gamble on production decision).
+  echo "[QA/FAIL] api-gate DB schema unknown — neither 'status' nor 'gate_passed' field. Forcing INFRA_BLOCKED." >&2
+  STATUS="INFRA_BLOCKED"
+fi
+
 TESTS_FAILED=$(echo "$GATE_JSON" | python -c "import json,sys; print(json.load(sys.stdin).get('tests_failed', 0))")
-# legacy fallback si DB pre-v7 sans 'status' :
-# GATE_PASSED=$(echo "$GATE_JSON" | python -c "import json,sys; print(json.load(sys.stdin).get('gate_passed', False))")
 ```
 
 Décision selon `status` (canonique v7.0.0, cf. `build-and-loop.md §1.3`) :
@@ -678,6 +742,26 @@ backend fragile.
 selon `ArchReviewMode` du Project Config. Lecture mode + verdicts
 post-exécution. Le verdict consolidé pilote le passage à STEP 6.5
 ou STOP.
+
+> **Sprint 3.2 — pourquoi le batch ne peut PAS être pré-déclenché**
+> (analyse 2026-06-07) : tentation de lancer `spec-compliance` (le plus
+> léger, ~12K tokens) ou `arch-reviewer` (pattern + ADRs) en parallèle
+> avec `dev-frontend` (6.c) pour gagner ~2min. **Refus motivé** :
+> - `spec-compliance-reviewer` (`agents/spec-compliance-reviewer.md`) :
+>   lit `workspace/output/src/{BackendName,AppName}/**` pour vérifier
+>   chaque AC indépendamment. **Exige le code complet** (back + front).
+> - `arch-reviewer` (`agents/arch-reviewer.md §STEP 4-5`) : lit les
+>   plans + code sous `workspace/output/src/**`. **Exige le code
+>   complet**.
+> - `code-reviewer` : audit cross-fichier inclut `[FRONTEND_BACKEND_CONTRACT_GAP]`
+>   qui nécessite back ET front matérialisés.
+> - `security-reviewer` : scan OWASP scan front+back simultanément
+>   (CORS allowlist match, JWT flow client↔serveur).
+>
+> **Conclusion** : la séquence 6.a→6.b→6.c→6.4→6.5 est **optimale par
+> construction**. Toute tentative d'interleaving briserait soit la
+> détection de contract-drift, soit la couverture d'ACs front. Audit
+> CTO 2026-06-06 §H4 sur ce point était **factuellement incorrect**.
 
 > **v7.0.0-alpha (audit CRIT-4 — 2026-06-04)** : `arch-reviewer` est
 > désormais inclus dans CE batch parallèle quand `ArchReviewMode: full`,

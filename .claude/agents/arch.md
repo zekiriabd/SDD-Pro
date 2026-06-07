@@ -110,9 +110,9 @@ CAUSE: ## Active Tech Specs vide dans workspace/input/stack/stack.md
 FIX: décommenter au moins un stack (backend/frontend/fullstack/mobiles)
 ```
 
-**AppType auto-détecté** (v6.7.7+) depuis `## Active Tech Specs` —
-lecture concrète via `preflight.py` JSON (`appType`, `frontendKind`,
-`appTypeSource`). Matrice :
+**AppType auto-détecté** depuis `## Active Tech Specs` — lecture concrète
+via `preflight.py` JSON (`appType`, `frontendKind`, `appTypeSource`).
+Matrice :
 
 | AppType | Stacks déclarés | frontendKind | Clés Project Config requises |
 |---|---|---|---|
@@ -140,7 +140,7 @@ Le pattern pilote (a) le mapping couche → répertoire scaffolding Phase A,
 Resilience4j), (c) l'ADR `ADR-{ts}-archi-pattern-{pattern}.md`.
 
 > Note : `DatabaseType` est dans `## Active Database` (STEP 2.ter), pas
-> dans `## Project Config` (v6.1.3+).
+> dans `## Project Config`.
 
 ---
 
@@ -201,7 +201,7 @@ Absent → `TO_INIT`.
 
 ---
 
-## STEP 3.6 — Charger le pattern d'architecture (v6.7.6+)
+## STEP 3.6 — Charger le pattern d'architecture
 
 **Bloquant uniquement si** `appType=back-front` ET `backend/*` déclaré.
 Pour `appType=fullstack` OU absence de backend stack → **SKIP** (les
@@ -238,13 +238,27 @@ Procédure :
 
 ## STEP 3.5 — Charger les catalogues `.libs.json` (JSON-FIRST)
 
-**RÈGLE LOAD-BEARING** : `.claude/stacks/{cat}/{stack-id}.libs.json`
-est la **SOURCE DE VÉRITÉ EXCLUSIVE** pour `versions{}`, `core[]`,
-`dbDrivers{}`, `plugins[]`.
+**RÈGLE LOAD-BEARING — précédence explicite (audit M12 closure 2026-06-07)** :
 
-Pour chaque stack actif : Read `.libs.json`. Absent → fallback `.md`
-(legacy). Présent → IGNORER §2.4 du `.md` (régénérée par
-`sync_stack_md.py`).
+```
+Précédence pour `versions{}`, `core[]`, `dbDrivers{}`, `plugins[]` :
+  1. `.claude/stacks/{cat}/{stack-id}.libs.json`  ← SOURCE EXCLUSIVE si présent (cas nominal v7.0+)
+  2. `.claude/stacks/{cat}/{stack-id}.md` §2.4    ← FALLBACK legacy uniquement si .libs.json absent
+  3. `.claude/stacks/{cat}/{stack-id}.md` §2.2.1  ← FALLBACK pour les commandes d'install si §2.4 absent aussi
+```
+
+**Cas exhaustifs** :
+
+| `.libs.json` | `.md §2.4` | Comportement |
+|---|---|---|
+| Présent + schéma valide | (ignoré) | Utiliser JSON exclusivement. §2.4 du .md est **régénérée** par `sync_stack_md.py` — ne JAMAIS la consulter directement. |
+| Présent + schéma invalide | (ignoré) | STOP + ERROR `[STACK_MALFORMED]` (valider via `validate_libs_catalog.py`). |
+| Absent | Présent | Fallback legacy (stacks pré-2026-05-13 non migrés). Émettre WARN `[STACK_LIBS_LEGACY]` au récap. |
+| Absent | Absent | STOP + ERROR `[STACK_MALFORMED]` (stack incomplet, Tech Lead ajoute le catalogue). |
+
+**Anti-derive** : si JSON déclare `spring-boot = "4.0.6"`, NE PAS
+utiliser `3.5.0` "default de Spring Initializr". Override defaults CLI
+(`dotnet new`, `npm init`, `ng new`…) avec versions JSON pinnées.
 
 **Anti-derive** : si JSON déclare `spring-boot = "4.0.6"`, NE PAS
 utiliser `3.5.0` "default de Spring Initializr". Override defaults CLI
@@ -308,7 +322,7 @@ Capability listée mais absente du §2.4.b → STOP + ERROR avec FIX
 Étape **idempotente** : Edit (ou create) le fichier config natif,
 injectant `db_config` + `auth_config` (STEP 2.ter).
 
-> **Substance détaillée extraite v7.0.0 trim** : `@.claude/docs/arch/phase-a-config-propagation.md`
+> **Sous-doc détaillé** : `@.claude/docs/arch/phase-a-config-propagation.md`
 > §4.5.1 (mapping stack→fichier), §4.5.2 (structure canonique), §4.5.3
 > (idempotence), §4.5.4 (anti-derive), §4.5.5 (validation), §4.5.6 (CORS).
 >
@@ -328,11 +342,11 @@ injectant `db_config` + `auth_config` (STEP 2.ter).
    - DB : `ConnectionStrings.Default`, `Database`, `spring.datasource`, `db`
    - Auth `azure-ad` : `AzureAd`, `azure.ad`, `azure`
    - Auth `auth-local` : `Jwt`, `auth.jwt`, `jwt`
-   - CORS (depuis v6.10.4) : `Cors`, `cors`, `app.cors` — injection
-     automatique de l'origin frontend dev si `appType=back-front/web`
-     (cf. sous-doc §4.5.6 pour matrice port).
+   - CORS : `Cors`, `cors`, `app.cors` — injection automatique de l'origin
+     frontend dev si `appType=back-front/web` (cf. sous-doc §4.5.6 pour
+     matrice port).
 
-3. **🔒 Pattern stack.md = SSoT (Pattern B, audit 2026-06-06)** :
+3. **🔒 Pattern stack.md = SSoT (Pattern B)** :
    les sections DB/Auth/SMTP de `appsettings.json` / `application.yml` /
    `config/default.json` / `app/config.py` sont **peuplées avec les valeurs
    en clair lues depuis stack.md** (qui est gitignored). Le code applicatif
@@ -360,7 +374,7 @@ injectant `db_config` + `auth_config` (STEP 2.ter).
      pattern détecté → ERROR `[ARCH_SECRET_LEAK]` + revert.
    Échec → ERROR `[STACK_MALFORMED]` ou `[ARCH_SECRET_LEAK]` + STOP avant STEP 5.
 
-6. **§4.5.ter Validation env vars canoniques** (depuis 2026-05-22) :
+6. **§4.5.ter Validation env vars canoniques** :
    - `AZ_FE_CALLBACKPATH` doit valoir `/authentication/login-callback`
      (convention universelle SPA — cf. `stacks/auth/azure-ad.md §2`).
      Toute autre valeur → WARN `[AUTH_CALLBACK_NON_CANONICAL]` au scaffolding
@@ -368,7 +382,7 @@ injectant `db_config` + `auth_config` (STEP 2.ter).
    - `AZ_BE_CALLBACKPATH` doit valoir `/signin-oidc` (convention
      Microsoft.Identity.Web). Idem WARN si divergent.
 
-7. **§4.5.quart Propagation `FrontendLocalPort` / `BackendLocalPort` (load-bearing, depuis 2026-05-22)** :
+7. **§4.5.quart Propagation `FrontendLocalPort` / `BackendLocalPort`** (load-bearing) :
    après création des `.csproj`, lire `FrontendLocalPort` et `BackendLocalPort`
    du `## Project Config` et écrire `Properties/launchSettings.json` avec
    `applicationUrl` correct :
@@ -381,12 +395,11 @@ injectant `db_config` + `auth_config` (STEP 2.ter).
      }
    }
    ```
-   Anti-pattern bloquant (post-mortem 2026-05-22) : laisser les ports par
-   défaut du template `dotnet new` (5226/5014/7149/7157) au lieu des ports
-   déclarés. La SPA appelle `https://localhost:44328/auth/config` (cf.
-   `wwwroot/appsettings.json Api:BaseAddress`) → si le backend écoute sur
-   5226 par défaut, `TypeError: Failed to fetch` côté browser, "Backend
-   indisponible" affiché.
+   Anti-pattern bloquant : laisser les ports par défaut du template `dotnet
+   new` (5226/5014/7149/7157) au lieu des ports déclarés. La SPA appelle
+   `https://localhost:44328/auth/config` (cf. `wwwroot/appsettings.json
+   Api:BaseAddress`) → si backend écoute 5226 par défaut, `TypeError:
+   Failed to fetch` côté browser, "Backend indisponible".
 
 8. **Idempotence** : re-run modifie uniquement si valeur diverge.
 
@@ -461,8 +474,7 @@ Un `CLAUDE.md` par projet (auto-loading Claude Code, isolation par
 famille). Bénéfice : -30-40 % tokens + isolation cognitive dev-backend
 / dev-frontend.
 
-> **Substance détaillée extraite v7.0.0 phase 2 trim** :
-> `@.claude/docs/arch/phase-c-claude-md-generation.md` §12.1
+> **Sous-doc détaillé** : `@.claude/docs/arch/phase-c-claude-md-generation.md` §12.1
 > (frontmatter), §12.2 (templates + procédure ligne par ligne),
 > §12.3 (calcul hash), §12.4 (mode create), §12.5 (purge BREAKING
 > CHANGES RESOLVED + archivage).
@@ -472,7 +484,7 @@ famille). Bénéfice : -30-40 % tokens + isolation cognitive dev-backend
 1. **3 cibles** : `{BackendName}/CLAUDE.md`, `{AppName}/CLAUDE.md`, et
    `{LibName}/CLAUDE.md` si défini — chacun depuis son template
    `claude-md-{backend|frontend|shared-lib}.template.md`.
-2. **CI template (v7.0.0)** : si `CiTemplatesGeneration: true` (défaut) ET
+2. **CI template** : si `CiTemplatesGeneration: true` (défaut) ET
    frontend actif → écrire `.github/workflows/quality.yml` depuis
    `ci-quality.github-actions.yml.template` (idempotent).
 3. **Frontmatter** : `generated-by + stack-md-hash + project-type +

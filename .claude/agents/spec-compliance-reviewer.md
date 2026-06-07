@@ -74,7 +74,7 @@ Si `{n}` absent ou non numérique → STOP + ERROR :
 ```
 ERROR: agent spec-compliance-reviewer — argument invalide
 CAUSE: [INVALID_ARG] numéro de FEAT manquant ou non numérique
-FIX: relancer avec n entier (ex. /spec-compliance 1)
+FIX: relancer via /sdd-review {n} (auto-spawn spec-compliance-reviewer)
 ```
 
 ### 1.2 Project Config

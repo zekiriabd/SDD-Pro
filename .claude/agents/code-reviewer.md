@@ -64,7 +64,7 @@ Si `{n}` absent ou non numérique → STOP + ERROR :
 ```
 ERROR: agent code-reviewer — argument invalide
 CAUSE: [INVALID_ARG] numéro de FEAT manquant ou non numérique
-FIX: relancer avec n entier (ex. /code-review 1)
+FIX: relancer via /sdd-review {n} (auto-spawn code-reviewer)
 ```
 
 ### 1.2 Project Config
@@ -73,7 +73,7 @@ Lire `## Project Config` de `workspace/input/stack/stack.md` :
 
 ```yaml
 ## Project Config
-CodeReviewMode: off | full | manual    # default: manual (v6.3.1.0 ; full en v6.3.1.1+)
+CodeReviewMode: off | full | manual    # default: full
 CodeReviewFailOn: critical | serious | moderate | minor  # default: critical
                                         # → tout issue ≥ ce niveau fait basculer le verdict 🔴
 ```
@@ -150,7 +150,7 @@ matérialisé par les dev-* (déterministe, traçable).
 
 ### 4.2 Sinon, fallback via convention
 
-**⚠️ WARN obligatoire (v7.0.0-alpha 2026-05-21)** — quand cette branche
+**⚠️ WARN obligatoire** — quand cette branche
 est prise (plan v2 absent ou plan v1 sans `## Files`), émettre **avant
 toute lecture de code** :
 
@@ -295,15 +295,11 @@ Pour les fichiers > 100 lignes ou méthodes > 30 lignes, analyser :
 
 ### 5.5 Secrets hardcoded — délégué à `security-reviewer`
 
-> **v7.0.0-alpha (audit MAJ-7, 2026-06-04)** : le scan des secrets
-> hardcodés est désormais **owned exclusivement** par `security-reviewer`
-> (§5.1, classe `[SEC_SECRET_HARDCODED]` hard-blocking CWE-798). Le
-> reviewer code n'émet plus `[REVIEW_SECRETS_HARDCODED]` — les regex
-> AWS/JWT/DB-connection-string sont identiques dans les 2 agents, leur
-> dé-duplication évite double-rapport sur les mêmes file:line (cf.
-> coordination §6 de `agents/security-reviewer.md`). Si `security-reviewer`
-> n'a pas tourné pour cette FEAT (mode `off`/`manual`), Tech Lead doit
-> l'invoquer séparément — le code-reviewer ne couvre PLUS ce scan.
+Le scan des secrets hardcodés est owned **exclusivement** par
+`security-reviewer` (classe `[SEC_SECRET_HARDCODED]` hard-blocking CWE-798).
+Le code-reviewer n'émet plus `[REVIEW_SECRETS_HARDCODED]`. Si
+`security-reviewer` n'a pas tourné (mode `off`/`manual`), Tech Lead doit
+l'invoquer séparément.
 
 ---
 
@@ -327,7 +323,7 @@ Le reviewer **ne refait pas** ces scans (déjà couverts par
 | **Duplicate code par similarité** | ❌ | ✅ |
 | **Deep nesting ≥ 3** | ❌ | ✅ |
 | **Missing error handling contextuel** | ❌ | ✅ |
-| **Secrets en clair (regex avancées)** | partiel | ✅ |
+| **Secrets en clair (regex avancées)** | ❌ | ❌ (owned exclusivement par `security-reviewer` v7.0.0, cf. §5.5 ci-dessus) |
 | **Confusing naming contextuel** | ❌ | ✅ |
 
 Si une catégorie devient redondante (ex. `quality_scan.py` apprend les
@@ -379,13 +375,10 @@ Indépendamment de `CodeReviewFailOn`, cette classe **force toujours**
 
 - `[FRONTEND_BACKEND_CONTRACT_GAP]` (front appelle endpoint backend manquant)
 
-> **v7.0.0-alpha audit P0-doc 2026-06-05** — `[REVIEW_SECRETS_HARDCODED]`
-> a été retiré de ce hard-blocking : son scan est désormais owned
-> exclusivement par `security-reviewer` (cf. §5.5 et `error-classification.md §1.10`
-> note de coordination). Si le reviewer code rencontre un secret évident,
-> il l'émet **uniquement à titre informationnel** dans `issues.minor`
-> avec un pointeur vers le rapport security. Le hard-block effectif vient
-> de `[SEC_SECRET_HARDCODED]` (security-reviewer §5.1, CWE-798).
+> Note : `[REVIEW_SECRETS_HARDCODED]` retiré du hard-blocking (cf. §5.5).
+> Si rencontré incidemment, émis en `issues.minor` informationnel avec
+> pointeur vers le rapport security. Hard-block effectif vient de
+> `[SEC_SECRET_HARDCODED]` (security-reviewer, CWE-798).
 
 Documenter dans le rapport : `"blocking_class": "[FRONTEND_BACKEND_CONTRACT_GAP]"` quand applicable.
 
@@ -461,16 +454,6 @@ Structure :
 ## Issues par sévérité
 
 ### 🔴 Critical ({C})
-
-#### `[REVIEW_SECRETS_HARDCODED]` — {file}:{line}
-
-```
-{snippet}
-```
-
-**Pourquoi** : {explanation}
-**Suggestion** : {fix_hint}
-**US** : {us}
 
 #### `[FRONTEND_BACKEND_CONTRACT_GAP]` — {file}:{line}
 
@@ -590,8 +573,6 @@ Classes typiques émises :
 
 ---
 
----
-
 ## Chat Output Protocol
 
 Applique `@.claude/rules/output-protocol.md` (label `[CODE-REVIEW]`, plage `88-91%`).
@@ -625,9 +606,7 @@ L'agent est strictement idempotent :
 - Peut être ré-invoqué en parallèle de `qa`, `security-reviewer`,
   `spec-compliance-reviewer`, `arch-reviewer` sans conflit (paths
   distincts dans `workspace/output/.sys/.validation/` vs
-  `workspace/output/qa/`). `accessibility-auditor` + `dashboard`
-  retirés v7.0.0 — remplacés respectivement par axe-core CI et
-  `sdd_scripts/index_adrs.py`.
+  `workspace/output/qa/`).
 
 ---
 
@@ -640,30 +619,12 @@ par similarité, error handling contextuel). Coût cible 8-15 KB / feature.
 
 ## Intégration pipeline
 
-### Invocation manuelle (v6.3.1.0 — initial)
-
-Le Tech Lead invoque via demande directe :
-> "Review le code de la FEAT 3"
-
-Ou via mention du nom d'agent :
-> "@code-reviewer FEAT 3"
-
-### Intégration auto (v6.3.1.1 — à venir)
-
-- `/dev-run {n}` STEP 6.4 : invoque `code-reviewer` si
-  `CodeReviewMode != off`, après 6.c (frontend done), avant 6.5
-  (refresh INDEX ADRs déterministe v7.0.0)
-- Verdict 🔴 RED → STOP + rapport (cohérent avec API Gate 🔴)
-- Verdict 🟡 WARN → continue + log WARN dans STEP 7 récap
+- Invocation manuelle : Tech Lead via `/sdd-review --ensure-scans code-review`
+  ou mention `@code-reviewer FEAT N`
+- Invocation auto : `/dev-run {n}` STEP 6.4 batch parallèle si
+  `CodeReviewMode != off`
+- Verdict 🔴 RED → STOP + rapport
+- Verdict 🟡 WARN → continue + log WARN
 - Verdict 🟢 GREEN → continue silencieusement
 - Consommation rapports : `console.db` (table `qa_code_review`) +
-  `workspace/output/.sys/.validation/{n}-code-review.json`. La console
-  web Fastify lit la DB pour rendu §Code Review (l'agent `dashboard`
-  est retiré v7.0.0 — remplacé par lecture DB directe).
-
----
-
-## Versions
-
-- v1.0.0 (2026-05-15) — initial v6.3.1, scans cross-fichier Sonnet,
-  table anti-patterns 4 stacks back × 4 stacks front
+  `workspace/output/.sys/.validation/{n}-code-review.json`

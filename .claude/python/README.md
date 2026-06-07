@@ -84,7 +84,7 @@ seuls les modules Python sous `.claude/python/sdd_scripts/`,
 | `scripts/detect-capabilities` | `sdd_scripts/detect_capabilities` | 3 |
 | `scripts/mark-breaking-resolved` | `sdd_scripts/mark_breaking_resolved` | 3 |
 | `scripts/acquire-libname-lock` | `sdd_scripts/acquire_libname_lock` | 3 |
-| `scripts/compact-front-plans` | `sdd_scripts/compact_front_plans` | 3 |
+| `scripts/compact-front-plans` | _(retiré v7.0.0-alpha — script supprimé)_ | 3 |
 | `scripts/validate-fidelity` | `sdd_scripts/validate_fidelity` | 3 |
 | `scripts/quality-scan` | `sdd_scripts/quality_scan` | 3 |
 | `scripts/parse-coverage` | `sdd_scripts/parse_coverage` | 3 |

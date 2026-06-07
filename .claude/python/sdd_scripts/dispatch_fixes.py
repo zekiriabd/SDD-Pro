@@ -1,6 +1,13 @@
 #!/usr/bin/env python3
 """SDD_Pro: /sdd-review --fix dispatcher — Phase B auto-fix orchestrator.
 
+⚠️  STATUT v7.0.0 : SCRIPT DORMANT — Phase B unreleased.
+    `/sdd-review --fix` n'est PAS encore câblé (roadmap v7.2).
+    Le code est conservé pour préserver le mapping fix-class ↔ recette
+    + les tests `test_dispatch_fixes_unit.py`. Tech Lead arbitre les
+    findings via le rapport `review.md` consolidé (sortie `/sdd-review`).
+
+
 Read findings already aggregated by /sdd-review (sources : qa_quality,
 qa_code_review, qa_security, qa_a11y, qa_performance, qa_spec_compliance),
 filter to **auto-fixable** classes (conservative whitelist), group by

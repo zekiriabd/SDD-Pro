@@ -243,12 +243,39 @@ def detect_stack_md() -> bool:
 
 _UNVALIDATED_COMBOS = {"c3", "c4", "c5"}
 
-# Stacks 🟡 expérimentaux (jamais validés end-to-end via /sdd-full).
-# Cf. .claude/docs/validated-combos.md §2 et CLAUDE.md §6.
-_EXPERIMENTAL_BACKENDS = {"node-express", "python-fastapi"}
-_EXPERIMENTAL_FRONTENDS = {"vue", "angular"}
-_EXPERIMENTAL_UI = {"vuetify", "radzen-blazor"}
-_EXPERIMENTAL_ARCHI = {"ddd", "microservice"}
+# Audit CTO 2026-06-07 — replaced hardcoded `_EXPERIMENTAL_*` sets with
+# a derivation from `combos.json/componentLevels` (SSoT, cf.
+# `sdd_lib/combos.py`). The previous hardcoded values drifted from
+# reality :
+#   • `node-express` + `python-fastapi` were marked experimental in
+#     bootstrap.py but `combos.json` reports them as `validated`
+#     (bench-validated runtime, supported best-effort).
+#   • `vue` + `angular` were marked experimental but `combos.json`
+#     reports them as `validated`.
+#   • `radzen-blazor` was marked experimental but `combos.json`
+#     reports it as 🟢 reference (`validated`).
+# A stack is flagged as "needs warn" if its declared level in
+# `componentLevels[category]` is NOT `validated` (i.e. one of
+# experimental / untested / poc-only / scaffold-validated).
+_NON_VALIDATED_LEVELS = {"experimental", "untested", "poc-only", "scaffold-validated"}
+
+
+def _is_non_validated(category: str, stack_id: str) -> bool:
+    """Return True if `stack_id` in `category` is NOT `validated` per combos.json.
+
+    Falls back to `False` (treat as validated) when combos.py is unavailable
+    — defensive : bootstrap must still work if `.claude/python/` isn't
+    importable yet (fresh checkout edge case, although unlikely since this
+    script lives at repo root).
+    """
+    try:
+        # Imported lazily to keep bootstrap stdlib-only at module import time.
+        sys.path.insert(0, str(REPO_ROOT / ".claude" / "python"))
+        from sdd_lib.combos import get_component_level  # noqa: E402
+        level = get_component_level(category, stack_id, root=REPO_ROOT)
+        return level in _NON_VALIDATED_LEVELS
+    except (ImportError, FileNotFoundError, OSError):
+        return False
 
 
 def _confirm_unvalidated_combo(combo_key: str, *, auto_init: bool = False) -> None:
@@ -329,29 +356,29 @@ def choose_combo(forced: str | None, *, auto_init: bool = False) -> dict:
         default="dotnet-minimalapi",
         choices=["dotnet-minimalapi", "kotlin-spring-boot", "node-express", "python-fastapi"],
     )
-    if backend in _EXPERIMENTAL_BACKENDS:
-        _print_warn(f"Backend '{backend}' = 🟡 expérimental (jamais validé /sdd-full end-to-end)")
+    if _is_non_validated("backend", backend):
+        _print_warn(f"Backend '{backend}' = 🟡 non-validated end-to-end (cf. combos.json/componentLevels)")
     frontend = _ask(
         "Frontend stack",
         default="react",
         choices=["react", "vue", "angular", "blazor-webassembly"],
     )
-    if frontend in _EXPERIMENTAL_FRONTENDS:
-        _print_warn(f"Frontend '{frontend}' = 🟡 expérimental (jamais validé /sdd-full end-to-end)")
+    if _is_non_validated("frontend", frontend):
+        _print_warn(f"Frontend '{frontend}' = 🟡 non-validated end-to-end (cf. combos.json/componentLevels)")
     ui = _ask(
         "UI design system",
         default="shadcn",
         choices=["shadcn", "vuetify", "radzen-blazor"],
     )
-    if ui in _EXPERIMENTAL_UI:
-        _print_warn(f"UI '{ui}' = 🟡 expérimental (jamais validé /sdd-full end-to-end)")
+    if _is_non_validated("ui", ui):
+        _print_warn(f"UI '{ui}' = 🟡 non-validated end-to-end (cf. combos.json/componentLevels)")
     archi = _ask(
         "Architecture pattern",
         default="mvc",
         choices=["mvc", "ddd"],
     )
-    if archi in _EXPERIMENTAL_ARCHI:
-        _print_warn(f"Archi '{archi}' = 🟡 expérimental (jamais validé /sdd-full end-to-end)")
+    if _is_non_validated("archi", archi):
+        _print_warn(f"Archi '{archi}' = 🟡 non-validated end-to-end (cf. combos.json/componentLevels)")
 
     qa_map = {
         "dotnet-minimalapi": "dotnet-xunit",
@@ -724,9 +751,13 @@ def main() -> int:
                         help="Non-interactive CI mode — reads SDD_* env vars, no prompts.")
     args = parser.parse_args()
 
-    # --auto-init implies --force (idempotent CI) and --skip-install (CI installs deps separately)
+    # --auto-init implies --force (idempotent CI) AND --skip-install (CI installs
+    # deps separately via cached steps). P0-3 fix 2026-06-07 : the docstring
+    # promised this for years but `skip_install` was never set, causing CI to
+    # potentially install deps mid-bootstrap.
     if args.auto_init:
         args.force = True
+        args.skip_install = True
         if not args.combo:
             env_combo = os.environ.get("SDD_COMBO", "").lower()
             if not env_combo:
@@ -781,14 +812,33 @@ def main() -> int:
     write_stack_md(rendered, args.dry_run)
     create_workspace_skeleton(args.dry_run)
 
+    # P0-3 fix 2026-06-07 : install + smoke return booleans that used to be
+    # discarded — meaning a pip/npm failure or a smoke regression silently
+    # produced exit 0. Now aggregated and propagated as EXIT_INFRA_ERROR (3)
+    # to honor the docstring contract.
+    infra_failures: list[str] = []
     if not args.skip_install:
         _print_header("Dependencies")
-        install_python_deps(args.dry_run)
-        install_console_deps(args.dry_run, auto_yes=args.auto_init)
+        if not install_python_deps(args.dry_run):
+            infra_failures.append("pip install (Python deps)")
+        if not install_console_deps(args.dry_run, auto_yes=args.auto_init):
+            # console deps are optional (user can run later) — only fail
+            # when --auto-init since CI cannot recover interactively
+            if args.auto_init:
+                infra_failures.append("npm install (console deps)")
 
     if not args.dry_run:
         _print_header("Verification")
-        run_smoke_check(args.dry_run)
+        if not run_smoke_check(args.dry_run):
+            infra_failures.append("framework smoke check")
+
+    if infra_failures:
+        _print_header("Bootstrap incomplet — infra errors")
+        for f in infra_failures:
+            _print_warn(f"  - {f}")
+        _print_warn("Bootstrap created the workspace but post-install verification failed.")
+        _print_warn("FIX : retry the failed step manually (cf. warnings above) then re-run bootstrap.py --force")
+        return 3  # EXIT_INFRA_ERROR per docstring
 
     print_next_steps(info)
     return 0

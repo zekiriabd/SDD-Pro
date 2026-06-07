@@ -11,7 +11,7 @@
 > (`po`, `arch`, `dev-backend`, `dev-frontend`, `qa`, `elicitor`,
 > `constitutioner`, `code-reviewer`, `security-reviewer`,
 > `spec-compliance-reviewer`, `arch-reviewer`, `adversarial-reviewer`)
-> et les 10 commandes user-facing.
+> et les 12 commandes user-facing.
 
 ## TOC
 

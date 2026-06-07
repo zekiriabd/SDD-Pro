@@ -1,8 +1,25 @@
--- SDD_Pro Console DB — schéma SQLite v1
+-- SDD_Pro Console DB — schéma SQLite (current = v1 baseline + migrations 0002..0005)
 --
 -- Source de vérité unique pour télémétrie/QA/runs.
 -- Localisation : workspace/output/db/console.db
 -- Pragmas : WAL + synchronous=NORMAL + busy_timeout=5000ms + foreign_keys=ON
+--
+-- ⚠ STRUCTURE LAYERED (Sprint immédiat 2026-06-07 — clarification audit C3) :
+--   1. CE FICHIER = baseline v1 (24 tables core). Appliqué au bootstrap initial.
+--   2. MIGRATIONS = `sdd_lib/migrations/000N_*.sql` appliquées séquentiellement
+--      pour atteindre l'état courant. Une DB fraîche aujourd'hui contient :
+--        - 0002 : table `qa_mutation` (mutation testing)              (déjà inclus baseline)
+--        - 0003 : table `qa_e2e`     (Playwright E2E)                 (déjà inclus baseline)
+--        - 0004 : table `auditor_runs` (NOT in this file — voir migrations/0004_*.sql)
+--        - 0005 : column `qa_api_tests.status` (v7.0.0 canonique 5 statuts)
+--   3. Source de vérité runtime = `sdd_lib/console_db/__init__.py`
+--      (table `schema_version` + boucle `migrations/000N_*.sql` au open()).
+--
+-- Si vous ajoutez une nouvelle table/colonne v7+ : **PRÉFÉRER une migration**
+-- `000N_*.sql` plutôt que d'éditer ce fichier (préserve backward-compat avec
+-- les DBs existantes). Ce fichier reste utile comme :
+--   - Documentation lisible humainement de la baseline
+--   - Bootstrap rapide pour outils tiers (mais préférer `init_console_db.py`)
 --
 -- Convention :
 --   - timestamps : TEXT ISO-8601 UTC (ex. "2026-05-17T14:32:18Z")

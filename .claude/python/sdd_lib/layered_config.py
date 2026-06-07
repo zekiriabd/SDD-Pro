@@ -297,6 +297,49 @@ def _merge_with_source_tracking(
     return effective, source
 
 
+#: Deprecated config keys still tolerated for backward-compat but no longer
+#: pilot any runtime behavior. Setting them is silently no-op pre-fix —
+#: audit CTO 2026-06-07 adds a stderr WARN [CONFIG_DEPRECATED_KEY] so that
+#: stale Project Config files surface the dead key instead of dying mute.
+#: Bypass : `SDD_DISABLE_DEPRECATED_CONFIG_WARN=1` (silence noise on legacy projects).
+_DEPRECATED_CONFIG_KEYS: dict[str, str] = {
+    "A11yMode":          "agent accessibility-auditor retiré v7.0.0 — utiliser axe-core CI (cf. ingest_axe.py)",
+    "A11yFailOn":        "agent accessibility-auditor retiré v7.0.0 — utiliser axe-core CI",
+    "PerfMode":          "agent performance-auditor retiré v7.0.0 — utiliser Lighthouse CI (cf. ingest_lighthouse.py)",
+    "PerfFailOn":        "agent performance-auditor retiré v7.0.0 — utiliser Lighthouse CI",
+    "DashboardMode":     "agent dashboard retiré v7.0.0 — utiliser console SDD (workspace/console/)",
+    "PlanCacheStrict":   "dev-*-strict variants retirés v7.0.0 — clé toujours acceptée en lecture mais sans effet",
+    "PlanCacheRoot":     "dev-*-strict variants retirés v7.0.0 — clé toujours acceptée en lecture mais sans effet",
+}
+
+
+def _warn_deprecated_keys(effective: dict[str, Any]) -> None:
+    """Emit stderr WARN [CONFIG_DEPRECATED_KEY] for legacy keys still set.
+
+    Triggered once per `read_layered_config()` call. Silenced globally
+    via `SDD_DISABLE_DEPRECATED_CONFIG_WARN=1` (escape hatch for legacy
+    projects that haven't migrated yet — surfaces in audit log but no
+    chat noise).
+    """
+    if os.environ.get("SDD_DISABLE_DEPRECATED_CONFIG_WARN") == "1":
+        return
+    import sys
+    for key, reason in _DEPRECATED_CONFIG_KEYS.items():
+        if key not in effective:
+            continue
+        val = str(effective[key]).strip()
+        # Don't warn on the no-op "off" / "0" / "" — only on values that
+        # suggest the user expects an effect.
+        if val.lower() in ("", "off", "0", "false", "no", "none"):
+            continue
+        print(
+            f"WARN [CONFIG_DEPRECATED_KEY] Project Config key '{key}={val}' is "
+            f"deprecated and has NO RUNTIME EFFECT — {reason}. "
+            f"Bypass : SDD_DISABLE_DEPRECATED_CONFIG_WARN=1",
+            file=sys.stderr,
+        )
+
+
 def read_layered_config(
     root: Path | None = None,
     *,
@@ -333,6 +376,12 @@ def read_layered_config(
     project = _read_project_section(root)
 
     effective, sources = _merge_with_source_tracking(base, team, project)
+
+    # Audit CTO 2026-06-07 — emit WARN [CONFIG_DEPRECATED_KEY] on legacy
+    # keys still set (A11yMode, PerfMode, PlanCacheStrict, …) so stale
+    # configs surface instead of staying mute. Call before keys-filtering
+    # so the warning fires regardless of caller's narrowed query.
+    _warn_deprecated_keys(effective)
 
     if keys is not None:
         effective = {k: v for k, v in effective.items() if k in keys}

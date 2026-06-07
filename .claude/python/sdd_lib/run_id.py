@@ -58,31 +58,38 @@ def _generate_run_id() -> str:
     return f"{ts}-{secrets.token_hex(2)}"
 
 
-def get_or_create_run_id() -> str:
+def get_or_create_run_id(force_new: bool = False) -> str:
     """Resolve a stable run_id for the current pipeline invocation.
 
-    Order of precedence:
+    Order of precedence (default `force_new=False`):
         1. Env var `SDD_RUN_ID` (set by orchestrating command)
         2. Fresh marker file (within TTL)
         3. Newly generated id (persisted as marker)
 
+    If `force_new=True` (called by `sdd_state.py new-run` when starting a
+    fresh pipeline) : bypass env + marker lookup, generate a new id and
+    overwrite the marker so subsequent hook invocations resolve to the
+    same value (Sprint 1.1 fix 2026-06-06 — was generating uuid that hooks
+    never saw, breaking token_usage→runs FK link).
+
     Returns the run_id as a string. Always succeeds (never raises) —
     fall through to a fresh id on any I/O error.
     """
-    env_id = os.environ.get("SDD_RUN_ID", "").strip()
-    if env_id:
-        return env_id
-
     marker = _marker_path()
-    try:
-        if marker.exists():
-            age = time.time() - marker.stat().st_mtime
-            if age < _RUN_ID_TTL_SECONDS:
-                cached = marker.read_text(encoding="utf-8").strip()
-                if cached:
-                    return cached
-    except OSError:
-        pass  # fall through to generation
+
+    if not force_new:
+        env_id = os.environ.get("SDD_RUN_ID", "").strip()
+        if env_id:
+            return env_id
+        try:
+            if marker.exists():
+                age = time.time() - marker.stat().st_mtime
+                if age < _RUN_ID_TTL_SECONDS:
+                    cached = marker.read_text(encoding="utf-8").strip()
+                    if cached:
+                        return cached
+        except OSError:
+            pass  # fall through to generation
 
     new_id = _generate_run_id()
     try:

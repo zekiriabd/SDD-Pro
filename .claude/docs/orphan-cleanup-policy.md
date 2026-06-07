@@ -127,8 +127,10 @@ python .claude/python/sdd_admin/cleanup_orphans.py [--feat N] [--dry-run] [--yes
   2. `rm` du fichier original
   3. Émet un événement `console.db` table `events` de type `orphan.deleted`
      avec le path + le ts trash + l'opérateur (`USERNAME` env var ou `cli`)
-- **Recovery 7 jours** : un script compagnon `restore_orphan.py` permet
-  de récupérer depuis le trash si erreur Tech Lead.
+- **Recovery 7 jours** : restauration manuelle depuis
+  `workspace/output/.sys/.trash/{ts}/` (commande standard `cp` ou `mv` —
+  l'arborescence préserve les paths relatifs originaux). Pas de script
+  d'auto-restore : la recovery reste un geste **explicite** du Tech Lead.
 
 ### 4.3 Suppression manuelle interdite
 

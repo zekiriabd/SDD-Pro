@@ -46,7 +46,7 @@
 | Terme canonique | Définition | v7.0.0 |
 |---|---|---|
 | **Inline** | Mode dev-* par défaut : agent planifie inline + matérialise dans la même invocation. Modèle Opus 4.7. | conservé |
-| **From-Plan** | Mode dev-* déclenché par présence d'un plan v2 strict-ready. Modèle Sonnet 4.6, 3× plus rapide, 5× moins cher. | conservé (devient default si plan présent) |
+| **From-Plan** | Mode dev-* déclenché par présence d'un plan v1 ou v2 dans `workspace/output/plans/`. Modèle Opus 4.7 (les variants `dev-*-strict` Sonnet ont été supprimés v7.0.0, cf. `architecture.md §2-3` et `governance-major-auditors-trim`). | conservé (devient default si plan présent) |
 | **Plan Only** | Génère uniquement le plan, ne matérialise pas le code. Invoqué par `/dev-plan {n}` (préféré) ou `:plan` suffix (déprécié v7). | `:plan` suffix retiré |
 | **From-Plan Classic** | Variante Opus 4.7 de From-Plan (legacy v6). | **supprimé v7** |
 | **Plan Only** vs **`:plan` suffix** | 2 façons d'invoquer la même chose. | suffix supprimé |

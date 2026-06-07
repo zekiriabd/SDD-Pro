@@ -13,6 +13,29 @@ lock protocol as workspace/console/lib/atomic-write.js:
 Any change must be replicated on both sides. Verified by
 framework_smoke.py check `console-lock-symmetry`.
 
+CONCURRENCY MODEL (audit C6 closure, 2026-06-07):
+  - `pose-pending` and `set`: ACQUIRE the lock for the whole read-modify-write
+    cycle → safe under concurrent writers (both this script AND the Fastify
+    console).
+  - `read` and `is-resolved`: LOCKLESS by design (cheap predicate queries).
+    They MAY see slightly-stale state between a concurrent `set` and the
+    fsync-replace. This is acceptable because:
+      (a) gate state transitions are monotonic (pending → validated|skipped
+          terminal — no back-transitions in normal flow), so a stale read
+          can only delay action by one polling cycle, never corrupt logic.
+      (b) callers that need transactional read-then-act should use
+          `is-resolved` (idempotent predicate) in a retry loop, NOT
+          `read` → app logic → `set`. Pattern:
+              while ! python gate_decide.py is-resolved --feat-num X --phase Y ; do
+                  sleep 5  # poll until human resolves
+              done
+      (c) the only legitimate writer of `validated|skipped` is the Fastify
+          console (or a human via gate_decide.py set). /sdd-full never
+          writes `validated` from the read-set pattern — it only writes
+          `pending` via pose-pending (already locked).
+  If a caller really needs a CAS (compare-and-set) atomic op, the future
+  v7.1.0 `gate_decide.py cas-set` action will provide it (out of scope here).
+
 Usage:
     python gate_decide.py read         --feat-num 1 --phase afterUS
         -> stdout: pending|validated|skipped|none

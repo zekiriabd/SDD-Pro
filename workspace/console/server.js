@@ -840,6 +840,14 @@ function resolveUserEmail() {
 // ─────────────────────────────────────────────
 // POST /api/validate — write status.json (atomic)
 // ─────────────────────────────────────────────
+// Audit CTO 2026-06-07 — tighter regex on identifier fields. CLAUDE.md §1
+// pins basename `{n}-{m}-{Name}` shape ; status.json `FeatId` = `{n}-{Name}`
+// and `usId` = `{n}-{m}-{Name}`. Pre-fix, any string was accepted — opens to
+// path-injection in status.json keys (e.g. `{"../../etc/passwd": ...}`).
+// Lengths capped to mitigate DoS on giant payloads.
+const FEAT_ID_RE = /^\d{1,4}-[A-Za-z][A-Za-z0-9-]{0,60}$/;
+const US_ID_RE = /^\d{1,4}-\d{1,4}(-[A-Za-z][A-Za-z0-9-]{0,60})?$/;
+
 fastify.post("/api/validate", async (req, reply) => {
   const body = req.body || {};
   const { kind, FeatId, usId, family, decision, comment } = body;
@@ -849,10 +857,18 @@ fastify.post("/api/validate", async (req, reply) => {
   const VALID_DECISIONS = new Set(["validated", "rejected", "pending-validation"]);
   if (!VALID_KINDS.has(kind))         return reply.code(400).send({ error: "kind must be 'us' or 'task'" });
   if (!VALID_DECISIONS.has(decision)) return reply.code(400).send({ error: "decision must be 'validated' | 'rejected' | 'pending-validation'" });
-  if (typeof FeatId !== "string" || !FeatId) return reply.code(400).send({ error: "FeatId required" });
-  if (typeof usId !== "string" || !usId)     return reply.code(400).send({ error: "usId required" });
+  if (typeof FeatId !== "string" || !FeatId || !FEAT_ID_RE.test(FeatId)) {
+    return reply.code(400).send({ error: "FeatId must match /^\\d{1,4}-[A-Za-z][A-Za-z0-9-]{0,60}$/" });
+  }
+  if (typeof usId !== "string" || !usId || !US_ID_RE.test(usId)) {
+    return reply.code(400).send({ error: "usId must match /^\\d{1,4}-\\d{1,4}(-[A-Za-z][A-Za-z0-9-]{0,60})?$/" });
+  }
   if (kind === "task" && !["back", "front", "ui", "qa"].includes(family)) {
     return reply.code(400).send({ error: "family must be 'back'|'front'|'ui'|'qa' when kind='task'" });
+  }
+  // Reject pathological `comment` length BEFORE slice (defense-in-depth).
+  if (comment !== undefined && typeof comment === "string" && comment.length > 10000) {
+    return reply.code(413).send({ error: "comment exceeds 10000 chars" });
   }
 
   const validatedBy = resolveUserEmail();
@@ -901,14 +917,24 @@ fastify.post("/api/gate-decide", async (req, reply) => {
 
   const VALID_PHASES = new Set(["afterUS", "afterReadiness", "afterPlan", "afterCode"]);
   const VALID_DECISIONS = new Set(["validated", "skipped", "pending"]);
+  // Audit CTO 2026-06-07 — FeatNum tightened. Was: `number | string` any
+  // value. Now: positive integer in [1, 9999], rejecting NaN/Infinity/zero.
+  // Same DoS cap on comment length as /api/validate.
   if (typeof FeatNum !== "number" && typeof FeatNum !== "string") {
     return reply.code(400).send({ error: "FeatNum required (number|string)" });
+  }
+  const featNumParsed = Number(FeatNum);
+  if (!Number.isInteger(featNumParsed) || featNumParsed < 1 || featNumParsed > 9999) {
+    return reply.code(400).send({ error: "FeatNum must be a positive integer in [1, 9999]" });
   }
   if (!VALID_PHASES.has(phase)) {
     return reply.code(400).send({ error: `phase must be one of ${[...VALID_PHASES].join("|")}` });
   }
   if (!VALID_DECISIONS.has(decision)) {
     return reply.code(400).send({ error: `decision must be one of ${[...VALID_DECISIONS].join("|")}` });
+  }
+  if (comment !== undefined && typeof comment === "string" && comment.length > 10000) {
+    return reply.code(413).send({ error: "comment exceeds 10000 chars" });
   }
 
   const answeredBy = resolveUserEmail();

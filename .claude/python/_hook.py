@@ -61,10 +61,17 @@ def run(module: str, *args: str) -> None:
     runpy.run_module(module, run_name="__main__")
 
 
-# v7.0.0-alpha (audit MAJ-13, 2026-06-04) — CLI entry point. Allows the
-# settings.json hook commands to invoke the launcher as a regular script
-# (`python .claude/python/_hook.py sdd_hooks.X`) instead of repeating
-# the 250-char inline `python -c "..."` bootstrap 8 times.
+# v7.0.0 — CLI entry-point conservé (audit CTO 2026-06-07).
+# La pattern actuelle (`settings.json` → `python -c "...; import _hook;
+# _hook.run('sdd_hooks.X')"`) couvre 14/14 invocations hooks runtime. Le
+# mode `python _hook.py sdd_hooks.X` reste utilisé par 5 tests d'intégration
+# (`test_preflight_glob_scope.py`, `test_preflight_stack_combo.py`,
+# `test_resolve_po_hash_sentinel.py`, `test_validate_acceptance_gate.py`,
+# `test_validate_stack_consistency.py`) qui forkent un sous-process pour
+# tester l'isolation env vars + le code de sortie réel. Roadmap : migrer
+# `settings.json` vers la CLI form (gain -3.5 KB JSON, lisibilité) en v7.1
+# une fois validé sur 3 runs production. Ne pas retirer ce bloc tant que
+# les 5 tests subprocess utilisent la CLI.
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         sys.stderr.write(
@@ -72,9 +79,6 @@ if __name__ == "__main__":
             "       python _hook.py <sdd_admin.statusline> (variant)\n"
         )
         sys.exit(2)
-    # Resolve repo + sys.path BEFORE importing target — the inline
-    # bootstrap (settings.json invocation) is `python .claude/python/_hook.py`
-    # which means cwd may not contain .claude/.
     _root = find_repo_root()
     _py_dir = str(_root / ".claude" / "python")
     if _py_dir not in sys.path:

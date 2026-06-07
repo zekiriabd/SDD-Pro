@@ -1,28 +1,28 @@
 #!/usr/bin/env python3
-"""SDD_Pro: déterministe phase planner (méta-orchestrateur conditionnel, v6.4.1).
+"""SDD_Pro: déterministe phase planner (méta-orchestrateur conditionnel).
 
-Détermine quelles phases auditor (v6.3.x + v6.4.0) doivent tourner pour
-la FEAT courante, en lisant le Project Config + les stacks actifs +
-l'état runtime du workspace.
+Détermine quelles phases auditor doivent tourner pour la FEAT courante,
+en lisant le Project Config + les stacks actifs + l'état runtime du
+workspace.
 
-Phases gérées :
-    - threat_model        (security-reviewer mode threat-model, pré-dev)
-    - a11y_audit          (accessibility-auditor, post-dev frontend)
+Phases gérées (v7.0.0+) :
     - code_review         (code-reviewer, post-dev)
     - security_scan       (security-reviewer mode scan, post-dev)
-    - perf_audit          (performance-auditor, post-qa)
+    - spec_compliance     (spec-compliance-reviewer, post-dev)
+
+Phases retirées v7.0.0 (`governance-major-auditors-trim`) :
+    - threat_model    → templates/threat-model.template.md (humain)
+    - a11y_audit      → axe-core dans CI projet généré
+    - perf_audit      → Lighthouse CI + wrk/k6 dans CI projet généré
+    Sprint immédiat 2026-06-07 — retirées de l'output JSON pour éliminer
+    le code mort déclaratif (~50% de la surface du module).
 
 Logique de skip :
     1. Mode global = `off` → phase désactivée
     2. Mode = `manual` → phase désactivée (Tech Lead invoque à la demande)
     3. Stack-conditional :
-        - a11y_audit : skip si pas de stack frontend actif
-        - threat_model + security_scan : skip A03 SQL si pas de stack backend
-          (mais l'agent reste invocable)
-        - perf_audit : auto-invoke uniquement si PerfMode=full (opt-in strict)
-    4. Stack-content conditional :
-        - perf_audit : si une AC d'US mentionne explicitement LCP/p95/etc.,
-          force enable même en mode manual
+        - security_scan : skip si pas de stack backend ni frontend (rien à scanner)
+        - code_review + spec_compliance : skip si pas de code production
 
 Usage:
     python phase_planner.py --feat-number N [--json]
@@ -49,17 +49,13 @@ from sdd_lib.layered_config import ConfigError, read_layered_config  # noqa: E40
 
 
 PROJECT_CONFIG_KEYS = (
-    # v6.3.x + v6.4.0 auditor modes
-    "A11yMode",
-    "A11yFailOn",
+    # v7.0.0+ auditor modes (3 phases actives — agents threat-model/a11y/perf
+    # retirés `governance-major-auditors-trim`, remplacés par CI déterministe)
     "CodeReviewMode",
     "CodeReviewFailOn",
     "SecurityMode",
-    "SecurityThreatModelEnabled",
     "SecurityScanEnabled",
     "SecurityFailOn",
-    "PerfMode",
-    "PerfFailOn",
     # v6.5.2 spec-compliance-reviewer
     "SpecComplianceMode",
     "SpecComplianceFailOn",
@@ -72,30 +68,23 @@ PROJECT_CONFIG_KEYS = (
 
 # Coûts tokens estimés par phase (cf. agents/*.md "Token footprint cible")
 PHASE_COST_ESTIMATE = {
-    "threat_model": 7_000,    # security-reviewer mode threat-model
-    "a11y_audit": 3_000,      # accessibility-auditor (Haiku)
-    "code_review": 12_000,    # code-reviewer
-    "security_scan": 15_000,  # security-reviewer mode scan
-    "perf_audit": 14_000,     # performance-auditor (avec Lighthouse opt-in)
+    "code_review": 12_000,      # code-reviewer
+    "security_scan": 15_000,    # security-reviewer mode scan
     "spec_compliance": 12_000,  # spec-compliance-reviewer (v6.5.2)
 }
 
 # Modes valides par phase
 VALID_MODES = {"off", "full", "manual"}
 
-# Regex pour détecter mentions perf dans ACs
-PERF_AC_HINTS = re.compile(
-    r"\b(lcp|cls|inp|fid|ttfb|p95|p99|latency|core web vitals|"
-    r"bundle\s+size|page\s+load|response\s+time|throughput|qps|rps)\b",
-    re.IGNORECASE,
-)
-
-# Regex pour détecter mentions security dans ACs (override threat-model si "manual")
+# Regex pour détecter mentions security dans ACs (override si SecurityMode=manual)
 SECURITY_AC_HINTS = re.compile(
     r"\b(owasp|xss|sql\s+injection|csrf|jwt|secret|password\s+policy|"
     r"rate\s+limit|brute\s+force|encrypted|hashing|salt|hsts|csp)\b",
     re.IGNORECASE,
 )
+
+# PERF_AC_HINTS regex retiré v7.0.0 — perf phase removed (Lighthouse CI replace).
+# Kept absent rather than aliased to avoid silent re-introduction.
 
 
 def _read_feat_file(root: Path, feat_number: int) -> tuple[str | None, str | None]:
@@ -251,12 +240,9 @@ def plan(feat_number: int) -> dict[str, object]:
                 "phases": {},
             }
 
-    a11y_mode = _normalize_mode(config.get("A11yMode"), default="full")
     code_review_mode = _normalize_mode(config.get("CodeReviewMode"), default="manual")
     security_mode = _normalize_mode(config.get("SecurityMode"), default="manual")
-    perf_mode = _normalize_mode(config.get("PerfMode"), default="full")
     spec_compliance_mode = _normalize_mode(config.get("SpecComplianceMode"), default="manual")
-    security_threat_model_enabled = _bool_flag(config.get("SecurityThreatModelEnabled"), default=True)
     security_scan_enabled = _bool_flag(config.get("SecurityScanEnabled"), default=True)
 
     # v7.0.0 P2 #12 — Lean reviewers auto-routing (heuristique taille FEAT) :
@@ -300,16 +286,15 @@ def plan(feat_number: int) -> dict[str, object]:
         }
 
     combined_text = feat_content + "\n" + "\n".join(us_contents)
-    has_perf_ac = bool(PERF_AC_HINTS.search(combined_text))
     has_security_ac = bool(SECURITY_AC_HINTS.search(combined_text))
 
     # v7.0.0 P2 #12 — Apply lean preset BEFORE building phases.
-    # Heuristique : FEAT S = ≤ 2 US ET sans AC sécurité ET sans AC perf.
+    # Heuristique : FEAT S = ≤ 2 US ET sans AC sécurité.
     # Sous ces conditions, downgrade security/spec/arch à "manual" (le Tech
     # Lead invoque à la demande). code_review reste full (preuve empirique
     # value sur petites FEATs).
     if lean_preset and us_count_for_lean > 0:
-        is_feat_s = (us_count_for_lean <= 2 and not has_security_ac and not has_perf_ac)
+        is_feat_s = (us_count_for_lean <= 2 and not has_security_ac)
         if is_feat_s:
             if security_mode == "full":
                 security_mode = "manual"
@@ -317,32 +302,8 @@ def plan(feat_number: int) -> dict[str, object]:
                 spec_compliance_mode = "manual"
             # arch_review_mode lu plus bas — laissé en lecture config (déjà manual default)
 
-    # 5. Construction des phases
+    # 5. Construction des phases (3 phases v7.0.0+ — threat_model/a11y/perf retirées)
     phases: dict[str, dict[str, object]] = {}
-
-    # --- threat_model (pré-dev) ---
-    phases["threat_model"] = _decide_threat_model(
-        security_mode=security_mode,
-        threat_model_enabled=security_threat_model_enabled,
-        has_security_ac=has_security_ac,
-        stacks=stacks,
-    )
-
-    # --- a11y_audit (post-dev frontend) ---
-    # v6.7.5 : fullstack/mobile projects ont aussi une UI a auditer.
-    # mobile-maui : UI XAML pas auditable WCAG (pas de markup HTML).
-    # mobile-react-native : pas de markup HTML auditable.
-    # fullstack (next/nuxt/angular-universal/blazor-server/node-react/kotlin-mustache) : oui, ont du HTML rendu.
-    fullstack_has_html_ui = stacks.get("fullstack") is not None
-    has_ui_to_audit = (
-        stacks.get("frontend") is not None
-        or fullstack_has_html_ui
-    )
-    phases["a11y_audit"] = _decide_a11y(
-        a11y_mode=a11y_mode,
-        has_frontend_stack=has_ui_to_audit,
-        has_frontend_code=has_frontend_code,
-    )
 
     # --- code_review (post-dev) ---
     phases["code_review"] = _decide_code_review(
@@ -356,14 +317,6 @@ def plan(feat_number: int) -> dict[str, object]:
         security_mode=security_mode,
         scan_enabled=security_scan_enabled,
         has_security_ac=has_security_ac,
-        has_backend_code=has_backend_code,
-        has_frontend_code=has_frontend_code,
-    )
-
-    # --- perf_audit (post-qa) ---
-    phases["perf_audit"] = _decide_perf(
-        perf_mode=perf_mode,
-        has_perf_ac=has_perf_ac,
         has_backend_code=has_backend_code,
         has_frontend_code=has_frontend_code,
     )
@@ -394,19 +347,15 @@ def plan(feat_number: int) -> dict[str, object]:
         "feat_name": feat_name,
         "stacks": stacks,
         "config": {
-            "A11yMode": a11y_mode,
             "CodeReviewMode": code_review_mode,
             "SecurityMode": security_mode,
-            "SecurityThreatModelEnabled": security_threat_model_enabled,
             "SecurityScanEnabled": security_scan_enabled,
-            "PerfMode": perf_mode,
             "SpecComplianceMode": spec_compliance_mode,
         },
         "runtime_state": {
             "has_frontend_code": has_frontend_code,
             "has_backend_code": has_backend_code,
             "us_count": len(us_contents),
-            "has_perf_ac": has_perf_ac,
             "has_security_ac": has_security_ac,
         },
         "phases": phases,
@@ -417,28 +366,6 @@ def plan(feat_number: int) -> dict[str, object]:
             "estimated_tokens_saved": estimated_saved,
         },
     }
-
-
-def _decide_threat_model(**_kwargs: object) -> dict[str, object]:
-    # v7.0.0-alpha (audit MAJ-6) — agent retiré. Remplacement :
-    # `templates/threat-model.template.md` (humain, STRIDE light, ~15-30 min).
-    ph = _phase("threat_model", enabled=False,
-                reason="agent removed v7.0.0 — fill templates/threat-model.template.md manually")
-    ph["agent_removed"] = True
-    ph["replacement"] = "templates/threat-model.template.md (humain, STRIDE light, ~15-30 min)"
-    return ph
-
-
-def _decide_a11y(**_kwargs: object) -> dict[str, object]:
-    # v7.0.0-alpha (audit MAJ-6) — agent retiré. Toutes les branches précédentes
-    # convergent vers `enabled=False, agent_removed=True`. Stub minimal pour
-    # consumers legacy qui parsent la phase. Remplacement : axe-core dans le
-    # CI du projet généré (`templates/ci-quality.github-actions.yml.template`).
-    ph = _phase("a11y_audit", enabled=False,
-                reason="agent removed v7.0.0 — use axe-core in CI of generated project")
-    ph["agent_removed"] = True
-    ph["replacement"] = "axe-core CI step in the generated project"
-    return ph
 
 
 def _decide_code_review(
@@ -510,16 +437,6 @@ def _decide_spec_compliance(
             reason="aucun code production (/dev-run pas exécuté)",
         )
     return _phase("spec_compliance", enabled=True, reason=None)
-
-
-def _decide_perf(**_kwargs: object) -> dict[str, object]:
-    # v7.0.0-alpha (audit MAJ-6) — agent retiré. Remplacement : Lighthouse CI
-    # + wrk/k6 dans le CI du projet généré.
-    ph = _phase("perf_audit", enabled=False,
-                reason="agent removed v7.0.0 — use Lighthouse CI + wrk/k6 in CI of generated project")
-    ph["agent_removed"] = True
-    ph["replacement"] = "Lighthouse CI + wrk/k6 in the generated project"
-    return ph
 
 
 def _phase(name: str, *, enabled: bool, reason: str | None) -> dict[str, object]:

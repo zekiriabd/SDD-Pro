@@ -1,6 +1,6 @@
 ---
 name: security-reviewer
-description: Agent Security Reviewer — scan déterministe + Sonnet du code généré contre OWASP Top 10 2021 (secrets hardcoded, injections SQL/cmd, XSS, broken authz/authn, crypto faible, CORS permissif, cookies insecure, headers manquants, logging secrets, stack traces exposées). Strictement read-only sur le code. Verdict 🟢/🟡/🔴 selon `SecurityFailOn` + hard-blocking sur 5 classes critiques. Complémentaire de `code-reviewer` (qui couvre déjà secrets hardcoded — coordination §6). Mode `threat-model` retiré en v7.0.0 (remplacé par template humain `templates/threat-model.template.md`).
+description: Agent Security Reviewer — scan déterministe + Sonnet du code généré contre OWASP Top 10 2021 (secrets hardcoded, injections SQL/cmd, XSS, broken authz/authn, crypto faible, CORS permissif, cookies insecure, headers manquants, logging secrets, stack traces exposées). Strictement read-only sur le code. Verdict 🟢/🟡/🔴 selon `SecurityFailOn` + hard-blocking sur 5 classes critiques. Complémentaire de `code-reviewer` (coordination §6 sur secrets). Mode unique : `scan` post-dev. Pour le threat modeling pré-dev, utiliser le template humain `templates/threat-model.template.md`.
 model: claude-sonnet-4-6
 tools: Read, Write, Glob, Grep, Bash
 ---
@@ -27,9 +27,6 @@ Verdict : 🟢/🟡/🔴 selon `SecurityFailOn` + 5 classes **hard-blocking**.
 rapport, le Tech Lead arbitre.
 
 **Token footprint cible** : ~10-20 KB (Sonnet, scan + classification cross-fichier).
-
-> **v7.0.0** : mode `threat-model` retiré → livrable humain via
-> `.claude/templates/threat-model.template.md` (ADR `governance-major-auditors-trim`).
 
 ---
 
@@ -65,23 +62,18 @@ security-reviewer {n}
 
 Si `{n}` manquant/non numérique → STOP + ERROR `[INVALID_ARG]`.
 
-> Flag historique `--mode` (v6.x) ignoré silencieusement en v7.0.0.
-
 ### 1.2 Project Config
 
 Lire `## Project Config` de `workspace/input/stack/stack.md` :
 
 ```yaml
 ## Project Config
-SecurityMode: off | full | manual                        # default: full (v7.0.0, was: manual)
+SecurityMode: off | full | manual                        # default: full
 SecurityScanEnabled: true | false                         # default: true
 SecurityFailOn: critical | serious | moderate | minor    # default: critical
 ```
 
 Validation classique (`[STACK_MALFORMED]` si hors range).
-
-> `SecurityThreatModelEnabled` (v6.3.2) — clé obsolète depuis v7.0.0,
-> tolérée en lecture mais sans effet runtime.
 
 **Skip conditions** :
 - `SecurityMode: off` → exit `security-reviewer: disabled` (1 ligne)
@@ -121,9 +113,9 @@ Absent → STOP + ERROR `[QA_PRECONDITION_FAILED]` : `code production absent, la
 9. Code généré : lecture sélective via plan v2 si présent, sinon
    convention (cf. `code-reviewer.md §4`)
 
-**⚠️ WARN obligatoire (v7.0.0-alpha 2026-05-21)** — quand le fallback
-convention est activé (aucun `workspace/output/plans/{n}-*.{back,front}.md`
-matché), émettre **avant** le scan OWASP :
+**⚠️ WARN obligatoire** — quand le fallback convention est activé
+(aucun `workspace/output/plans/{n}-*.{back,front}.md` matché), émettre
+**avant** le scan OWASP :
 
 ```
 ⚠️ WARN security-reviewer FEAT {n} — plan v2 absent, fallback convention
@@ -142,12 +134,17 @@ dans `{n}-security-scan.json`.
 
 ---
 
-## STEP 4 — Scan OWASP Top 10 2021
+## STEP 4 — Scan OWASP Top 10 2021 (annonce + méta-instructions)
 
-Pour chaque catégorie, exécuter scans **déterministes** (Grep) +
-**raisonnement Sonnet** sur les matches cross-fichier. Le découpage
-opérationnel des 10 catégories OWASP est donné en STEP 5 ci-dessous
-(sous-sections §5.1 à §5.10, une par catégorie A01-A10).
+> **v7.0.1 (audit M3 closure 2026-06-07)** : ce STEP est un **wrapper d'annonce** — il n'exécute **aucun scan en propre**. Le découpage opérationnel des 10 catégories OWASP est intégralement délégué à `## STEP 5 — Détection par catégorie OWASP (A01-A10)` ci-dessous (sous-sections §5.1 à §5.10, une par catégorie). Cette séparation préserve la stabilité des cross-refs externes (loader.yml, sdd-review.md, scripts ingest) qui pointent vers STEP 5 par numéro.
+
+**Méta-instructions valables pour toutes les sous-sections §5.1 à §5.10** :
+- Pour chaque catégorie, exécuter scans **déterministes** (Grep regex avec patterns spécifiques) + **raisonnement Sonnet** sur les matches cross-fichier (cas légitimes vs vrais positifs).
+- Respecter le budget STEP 0.5 — pas de Glob non-borné sous `workspace/output/src/` (cf. C1 closure du fichier `arch-reviewer.md §2.5`).
+- Émettre les classes `[SEC_*]` documentées dans `error-classification.md §1.11` (23 classes + 8 hard-blocking).
+- En cas de doute (regex match mais contexte ambigu) → préférer émettre WARN qu'omettre (bias toward verification).
+
+**Procéder à STEP 5.**
 
 ## STEP 5 — Détection par catégorie OWASP (A01-A10)
 
@@ -155,15 +152,11 @@ Sous-sections déterministes : chaque `### 5.x` ci-dessous correspond
 à une catégorie OWASP Top 10 2021, avec patterns Grep + heuristiques
 Sonnet + exclusions canoniques (tests, env vars, dev configs).
 
-> **SSoT machine (v7.0.0-alpha 2026-06-05)** : la taxonomie + patterns
-> regex est aussi capturée en `@.claude/python/security_patterns.yaml`
-> (22 classes [SEC_*] + sévérité + hard-blocking + regex/lang). Le YAML
-> est cross-checké contre §1.11 d'error-classification.md par
-> `tests/test_security_patterns.py`. **v7.0.0 : prose ci-dessous reste
-> la SSoT runtime** (lue par cet agent à chaque invocation). **v7.1+** :
-> migration prévue où l'agent lira le YAML pour réduire son footprint
-> de ~200 lignes (cf. ADR `governance-security-patterns-yaml-migration`
-> à créer si décidé).
+> **SSoT machine** : la taxonomie + patterns regex est aussi capturée
+> en `@.claude/python/security_patterns.yaml` (22 classes [SEC_*] +
+> sévérité + hard-blocking + regex/lang). Cross-checké contre §1.11
+> d'error-classification.md par `tests/test_security_patterns.py`. La
+> prose ci-dessous reste la SSoT runtime (lue à chaque invocation).
 
 ### 5.1 A03 Injection — Secrets hardcoded
 
@@ -401,40 +394,27 @@ Exclusions : endpoints `/health`, `/metrics`, `/swagger`, `/openapi.json`,
 | Deserialization unsafe | ❌ | ✅ |
 | SSRF | ❌ | ✅ |
 
-**Coordination dé-dup (v7.0.0-alpha audit P1 — 2026-06-06)** :
+**Coordination dé-dup** :
 
-1. **Dé-dup authoritative post-hoc** — c'est `sdd_review.py::compute_report`
-   qui assure la dé-dup au moment de l'agrégation, via
-   `deduplicate_findings()` + table `CANONICAL_CLASS` (cf.
-   `sdd_scripts/_review_fetch.py §6.10 + R3`). Les classes
-   `[REVIEW_SECRETS_HARDCODED]` et `[SEC_SECRET_HARDCODED]` sont
-   mappées sur la même clé canonique `SECRET_HARDCODED` ; le finding
-   au plus haut severity est conservé, les autres droppés. **C'est ce
-   mécanisme qui empêche le double-rapport sur les mêmes file:line
-   dans le verdict consolidé `/sdd-review`**.
+1. **Dé-dup authoritative post-hoc** — `sdd_review.py::compute_report`
+   assure la dé-dup au moment de l'agrégation via `deduplicate_findings()`
+   + table `CANONICAL_CLASS` (cf. `sdd_scripts/_review_fetch.py`). Les
+   classes `[REVIEW_SECRETS_HARDCODED]` et `[SEC_SECRET_HARDCODED]` sont
+   mappées sur la même clé canonique `SECRET_HARDCODED` ; le finding au
+   plus haut severity est conservé.
 
-2. **Dé-dup pré-emit best-effort** — quand security-reviewer tourne
-   APRÈS code-reviewer dans le même run (cas séquentiel rare), il
-   PEUT lire `workspace/output/.sys/.validation/{n}-code-review.json`
-   s'il existe et exclure les items déjà listés (Read tool). C'est un
-   bonus qui réduit le bruit du rapport intermédiaire mais n'est pas
-   load-bearing. **Quand les agents tournent en parallèle dans
-   `/dev-run` STEP 6.4 (cas usuel), le fichier code-review.json
-   n'existe pas encore au moment où security-reviewer démarre** —
-   skip silencieux du pré-emit, la dé-dup post-hoc (1) prend le
-   relais. Aucune erreur, aucun warning : pattern attendu.
+2. **Dé-dup pré-emit best-effort** — si `workspace/output/.sys/.validation/{n}-code-review.json`
+   existe au démarrage, security-reviewer le Read et exclut les items
+   déjà listés. En `/dev-run` STEP 6.4 (parallèle), le fichier n'existe
+   pas encore → skip silencieux, la dé-dup post-hoc (1) prend le relais.
 
-3. **Code-reviewer ne lit jamais le rapport security** (inverse non
-   couvert) — c'est OK car la dé-dup post-hoc traite les deux sens.
+3. **Code-reviewer ne lit jamais le rapport security** — OK car la
+   dé-dup post-hoc traite les deux sens.
 
-> **Conséquence v7.0.0-alpha audit P0-doc 2026-06-05** :
-> `[REVIEW_SECRETS_HARDCODED]` est désormais owned **exclusivement**
-> par security-reviewer (`[SEC_SECRET_HARDCODED]` hard-blocking
-> CWE-798). Si code-reviewer rencontre incidemment un secret évident,
-> il l'émet en `issues.minor` informationnel avec pointeur vers
-> security-reviewer. La dé-dup post-hoc reste utile pour les bases
-> console.db legacy (pre-2026-06-05) qui contiennent encore les deux
-> classes pour les mêmes file:line.
+> **Ownership `[SEC_SECRET_HARDCODED]`** : owned **exclusivement** par
+> security-reviewer (hard-blocking CWE-798). Si code-reviewer rencontre
+> incidemment un secret évident, il l'émet en `issues.minor` informationnel
+> avec pointeur vers security-reviewer.
 
 ---
 
@@ -555,10 +535,6 @@ le rapport, insère dans `qa_security` (console.db), puis supprime le
 python -m sdd_scripts.ingest_agent_report --type security-scan --feat {n}
 ```
 
-> Le type `threat-model` (v6.3.2) est déprécié en v7.0.0 — l'ingest bridge
-> le reconnaît encore pour compat lecture des anciens runs, mais l'agent
-> ne le produit plus.
-
 | Exit | Action |
 |---|---|
 | 0 | continuer STEP 10 |
@@ -572,11 +548,8 @@ via `SELECT … FROM qa_security WHERE feat_n = {n}`.
 
 ## STEP 10 — Output succès
 
-> **v7.0.0** : mode `threat-model` retiré (remplacé par `templates/threat-model.template.md`
-> humain). Cet agent n'émet plus que le mode `scan`. L'ingest bridge accepte
-> encore `threat-model` en lecture pour anciens runs (§STEP 9.5).
-
-Mode `scan` :
+Mode `scan` (seul mode actif depuis v7.0.0 — pour threat modeling
+pré-dev voir `templates/threat-model.template.md`) :
 ```
 security-reviewer feat-{n} mode=scan — {verdict}
 
@@ -617,8 +590,6 @@ ce sont les findings du rapport (verdict 🟢/🟡/🔴, pas STOP de l'agent).
 
 ---
 
----
-
 ## Chat Output Protocol
 
 Applique `@.claude/rules/output-protocol.md` (label `[SECURITY]`, plage `94-96%`).
@@ -633,13 +604,11 @@ Applique `@.claude/rules/output-protocol.md` (label `[SECURITY]`, plage `94-96%`
 - ❌ Modifier le code de production sous `workspace/output/src/**` (read-only strict)
 - ❌ Corriger automatiquement les findings (rapport seul)
 - ❌ Re-builder, exécuter les tests, lancer un linter
-- ❌ Inventer des threats sans assets/surfaces visibles (mode threat-model)
 - ❌ Étendre la table d'OWASP §5 en cours de scan (si pattern manque,
   émettre `[UNKNOWN]` et logger ; étendre la table dans commit séparé
   via discipline `source-first.md`)
 - ❌ Lire les FEATs/US d'autres FEATs
-- ❌ Mode `scan` sans code production présent (STOP en STEP 2.2)
-- ❌ Mode `threat-model` sans constitution.md (STOP en STEP 2.1)
+- ❌ Scan sans code production présent (STOP en STEP 2)
 
 ---
 
@@ -648,12 +617,9 @@ Applique `@.claude/rules/output-protocol.md` (label `[SECURITY]`, plage `94-96%`
 L'agent est strictement idempotent :
 - Aucun état conservé entre runs
 - Les outputs sont overwritten (pas de merge)
-- Mode `threat-model` et mode `scan` produisent des fichiers distincts
-  (pas de conflit même si invoqués séquentiellement sur la même FEAT)
 - Peut être ré-invoqué en parallèle de `code-reviewer`,
   `spec-compliance-reviewer`, `arch-reviewer` sans conflit (paths
   distincts dans `workspace/output/.sys/.validation/`).
-  `accessibility-auditor` + `dashboard` retirés v7.0.0.
 
 ---
 
@@ -667,30 +633,9 @@ Sonnet 4.6 — raisonnement contextuel sur matches Grep (nuance
 
 ## Intégration pipeline
 
-### Invocation manuelle (v6.3.2.0 — initial)
-
-Tech Lead invoque :
-> "Threat model de la FEAT 3"
-> "Security scan de la FEAT 3"
-
-### Intégration auto (v6.3.2.1 — à venir)
-
-- `/feat-validate {n}` STEP X (post-readiness, optionnel) :
-  invoque `security-reviewer --mode threat-model` si
-  `SecurityThreatModelEnabled: true`. Verdict informational uniquement
-  (ne bloque jamais).
-- `/dev-run {n}` STEP 6.4 batch parallèle : invoque
-  `security-reviewer` (sans flag mode — `threat-model` retiré v7.0.0,
-  seul le mode `scan` reste) si `SecurityScanEnabled: true`.
-  Verdict 🔴 RED → STOP + rapport.
+- Invocation manuelle : Tech Lead via `/sdd-review --ensure-scans security`
+- Invocation auto : `/dev-run {n}` STEP 6.4 batch parallèle si
+  `SecurityScanEnabled: true`. Verdict 🔴 RED → STOP + rapport.
 - Consommation rapports : `console.db` (table `qa_security`) +
-  `workspace/output/.sys/.validation/{n}-security-scan.json`. Console
-  Fastify lit la DB pour rendu §Security (`dashboard` retiré v7.0.0).
-
----
-
-## Versions
-
-- v1.0.0 (2026-05-15) — initial v6.3.2, 2 modes (threat-model + scan),
-  OWASP Top 10 2021 coverage A01-A10, 15+ classes [SEC_*],
-  coordination avec code-reviewer (dé-dup secrets)
+  `workspace/output/.sys/.validation/{n}-security-scan.json`. La
+  console web lit la DB pour rendu §Security.

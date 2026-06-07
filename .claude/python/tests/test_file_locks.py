@@ -20,9 +20,17 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+import pytest
+
 _PY_ROOT = Path(__file__).resolve().parent.parent
 if str(_PY_ROOT) not in sys.path:
     sys.path.insert(0, str(_PY_ROOT))
+
+# Smoke marker (audit CTO 2026-06-07) — file_locks underpins LibName
+# parallel write serialization. Lock contention bugs surface only at
+# parallelism ≥ 3 (likely silent under unit-test mono-thread). Gated by
+# `framework_smoke -m smoke`.
+pytestmark = pytest.mark.smoke
 
 from sdd_lib.file_locks import (  # noqa: E402
     acquire_with_retry,

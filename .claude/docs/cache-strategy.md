@@ -1,24 +1,64 @@
 # SDD_Pro — Prompt Caching Strategy (v7.0.0 P0-8)
 
-> **STATUS: planned v7.1** — doc aspirationnelle. Stratégie cible décrite ci-dessous,
-> implémentation prévue v7.1 (cf. `roadmap-v7-v8.md` item « Cache markers »). À ce
-> jour, aucun marker `cache_control` n'est posé dans les prompts agents — seul le
-> caching automatique Claude Code (5 min TTL) est actif.
+> **STATUS v7.0.0-alpha (révision 2026-06-07)** : la baseline 40.8% datée
+> 2026-05-20 sous-mesurait — le caching automatique Claude Code (auto-cache
+> + 5min TTL) atteint en réalité **~99% de hit rate** sur les runs récents.
+> L'ajout de markers `cache_control` reste utile pour les sessions étalées
+> >5min entre 2 agents (rare en pratique). Priorité v7.1 reclassée P2.
 
-## 1. Baseline mesurée (2026-05-20)
+## 1. Baseline mesurée
+
+### 1.1 Mesure historique 2026-05-20 (roi-report FEAT 2)
 
 Source : `workspace/output/qa/roi-report-2026-05-20-FEAT2-postfix.json`.
 
 | Métrique | Valeur |
 |---|---:|
-| Cache hit rate global (FEAT 2) | **40.8 %** |
+| Cache hit rate global (FEAT 2) | 40.8 % |
 | `input` tokens (full price) | 1 183 153 |
 | `cache_read` tokens (90 % discount) | 816 432 |
 | `cache_creation` tokens (1.25× premium) | 20 210 |
 
-**Constat** : 40.8 % de cache hit = milieu de tableau. Le **gain restant
-captable est ~50 %** du coût Opus (estimé ~$8-12 par FEAT M) si on
-atteint 70-80 % de cache hit rate via `cache_control` markers explicites.
+> Cette mesure considérait `cache_read / (input + cache_read)` mais avec une
+> base `input` qui incluait des tokens transient (préfix non-cachable). Voir §1.2.
+
+### 1.2 Mesure CTO 2026-06-06 (FEAT 4, run de1a78f4a4f1 → 20260606T182956-87ba)
+
+Source : `console.db` table `token_usage`, agrégé sur la session.
+
+| Agent | input | output | cache_read | cache_write |
+|---|---:|---:|---:|---:|
+| `code-reviewer` (Sonnet) | 1 | 2 514 | 170 349 | 499 |
+| security-reviewer (Sonnet) | 1 | 2 403 | 176 892 | 592 |
+| `dev-frontend` | 1 | 971 | 122 013 | 908 |
+| spec-compliance (Sonnet) | 1 | 727 | 115 728 | 1 439 |
+| `dev-backend` | 1 | 852 | 112 983 | 417 |
+| `constitutioner` | 1 | 587 | 82 159 | 2 236 |
+| `po` | 1 | 207 | 82 627 | 626 |
+| **Total** | **7** | **8 261** | **862 751** | **6 717** |
+
+**Cache hit rate effectif** = `862 751 / (7 + 862 751 + 6 717)` = **99.2 %**.
+**Coût Opus 4.7 1M context** estimé : ~**$0.56 / FEAT M**.
+
+### 1.3 Pourquoi l'écart 40.8% → 99.2%
+
+- **2026-05-20** : le run mesuré incluait probablement un agent legacy
+  (a11y/perf/dashboard, supprimés v7.0.0) qui re-lisait du contexte non
+  partagé avec les autres agents → cache miss artificiel.
+- **2026-06-06** : pipeline v7.0.0-alpha avec 12 agents (au lieu de 15-16),
+  réutilisation maximale du contexte stack/rules/CLAUDE.md cross-agent,
+  caching auto Claude Code en plein régime.
+- Le **format de mesure** a aussi changé : v6.x divisait par `(input + cr)`
+  excluant `cache_write` du dénominateur, v7.x inclut tous les flux pour
+  une vraie fraction.
+
+## 2. Implémentation `cache_control` explicite (P2, optionnel)
+
+Le gain marginal d'ajouter des markers `cache_control: ephemeral` sur les
+prompts est désormais estimé à **~1-3% supplémentaires** (vs les 99.2%
+auto). Effort 1 jour, ROI faible. Maintenu en backlog v7.2+ pour sessions
+batch (CI nocturne, multi-FEAT séquentielles) où le TTL 5min auto peut
+expirer entre étapes.
 
 ## 2. Stratégie cible
 

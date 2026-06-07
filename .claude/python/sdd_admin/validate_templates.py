@@ -39,6 +39,7 @@ from typing import Callable
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sdd_lib.paths import repo_root  # noqa: E402
+from sdd_lib.exit_codes import CORRECTIBLE, FAIL_FAST, SUCCESS  # noqa: E402
 
 
 @dataclass
@@ -140,8 +141,7 @@ def main() -> int:
     tpl_dir = root / ".claude" / "templates"
     if not tpl_dir.is_dir():
         print(f"FAIL: templates dir missing: {tpl_dir}", file=sys.stderr)
-        return 2
-
+        return CORRECTIBLE
     findings: list[dict] = []
     for spec in SPECS:
         path = tpl_dir / spec.filename
@@ -187,9 +187,7 @@ def main() -> int:
         )
 
     if args.strict and drift > 0:
-        return 1
-    return 0
-
-
+        return FAIL_FAST
+    return SUCCESS
 if __name__ == "__main__":
     sys.exit(main())

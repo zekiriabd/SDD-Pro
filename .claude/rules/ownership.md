@@ -152,12 +152,14 @@ workspace/output/.sys/.context/adrs/*.md`.
 
 ## 3. ADR — numérotation atomique par timestamp + rand4
 
-**Format canonique v7.0.0-alpha (audit 2026-06-06 RUPT-6)** :
+**Format canonique v7.0.0 (audit 2026-06-06 RUPT-6, grâce 2026-06-08)** :
 `ADR-{YYYYMMDDTHHmmss}-{rand4}-{slug}.md`
 - `{YYYYMMDDTHHmmss}` = timestamp UTC seconde (ex. `20260606T143022`)
-- `{rand4}` = **4 hex chars random SYSTÉMATIQUE** (`secrets.token_hex(2)`,
-  16 bits entropie). Anti-collision même seconde garantie > 99.998 %
-  (au lieu de l'ancien suffixe conditionnel jamais implémenté en code).
+- `{rand4}` = **4 hex chars random SYSTÉMATIQUE depuis 2026-06-08**
+  (`secrets.token_hex(2)`, 16 bits entropie). Anti-collision même seconde
+  garantie > 99.998 %. Les ADRs créés **avant 2026-06-08** restent
+  acceptés sans rand4 (tolérance compat — regex `(?:-[a-z0-9]+)?` middle
+  segment optionnel).
 - `{slug}` = kebab-case, lowercase, max 5 mots / 40 caractères
 
 ```
@@ -427,13 +429,18 @@ incrémentale (`Glob + max + 1`) — racy quand plusieurs agents
 créent un ADR en parallèle (`/dev-run` lance dev-backend +
 dev-frontend simultanément).
 
-**Utiliser** : `ADR-{YYYYMMDDTHHmmss}-{slug}.md`
+**Utiliser** : `ADR-{YYYYMMDDTHHmmss}-{rand4}-{slug}.md`
 
 - `{YYYYMMDDTHHmmss}` : timestamp UTC à la seconde
   - Format compact ISO 8601 sans séparateurs de date/heure
   - Exemples : `20260505T143022`, `20260605T091533`
-- En cas de collision théorique (deux agents au même T à la seconde),
-  ajouter un suffixe `-{rand4}` : `20260505T143022-1234`
+- `{rand4}` : **4 hex chars random SYSTÉMATIQUE depuis 2026-06-08**
+  (`secrets.token_hex(2)`, 16 bits entropie). Anti-collision même seconde
+  garantie > 99.998 %. Les ADRs créés **avant 2026-06-08** sont acceptés
+  sans rand4 (compat ; cf. Partie A §3 et `sdd_scripts/index_adrs.py`
+  regex tolérante). La fonction `mint_adr_filename` supporte aussi un
+  `adrs_dir=...` optionnel pour retry-on-collision (jusqu'à 5 tentatives)
+  qui couvre le tail de 0.0015 % de proba collision résiduelle.
 - `{slug}` = kebab-case, lowercase, max 5 mots significatifs
 
 ### 4.2 Tri et lecture
@@ -469,7 +476,7 @@ ADR.
 - **Arch (phase 4)** : après création de chaque ADR, append une ligne
   dans le tableau §6 de `workspace/output/.sys/.context/constitution.md` :
   ```markdown
-  | ADR-{YYYYMMDDTHHmmss}-{slug} | <titre> | Accepted | 4-ARCH |
+  | ADR-{YYYYMMDDTHHmmss}-{rand4}-{slug} | <titre> | Accepted | 4-ARCH |
   ```
 - **Dev-* (phase 5)** : crée uniquement le fichier ADR. L'index §6
   reste à jour seulement pour les ADRs phase 4. Pour les ADRs phase

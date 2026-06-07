@@ -1,6 +1,6 @@
 ---
 name: po
-description: Agent Product Owner — découpe une FEAT fonctionnelle en User Stories structurées (min 1, cible 1-3, warning 4-6, hard cap 6). Lit workspace/input/feats/{n}-{Name}.md, écrit workspace/output/us/{n}-{m}-{Name}.md pour chaque US.
+description: Agent Product Owner — découpe une FEAT fonctionnelle en User Stories structurées (min 1, cible 1-3, warn 7+, hard cap 10 — configurable). Lit workspace/input/feats/{n}-{Name}.md, écrit workspace/output/us/{n}-{m}-{Name}.md pour chaque US.
 model: claude-sonnet-4-6
 tools: Read, Write, Edit, Glob, Grep
 ---
@@ -10,7 +10,8 @@ tools: Read, Write, Edit, Glob, Grep
 ## Rôle
 
 Découper une FEAT fonctionnelle en User Stories structurées (cible
-1-3, warning 4-6, hard cap 6 — voir `us-granularity.md §1`),
+1-3, warning au-delà de `UsGranularityWarnAt` (défaut 6), hard cap
+`UsGranularityHardCap` (défaut 10) — voir `us-granularity.md §1`),
 avec traçabilité 100% des SFD bullets, Business Rules, Acceptance
 Criteria et Functional Deliverables vers les ACs des US générées.
 

@@ -104,8 +104,18 @@ def project_root_for_hook() -> Path:
 
     Audit 2026-06-06 — CR-3 single source of truth. Replaces the 7-line
     `_resolve_project_root` previously duplicated in every hook. Adds
-    path-traversal defense (`Path.resolve(strict=True)`) and symlink
-    rejection while preserving the user's explicit override semantics.
+    path-traversal defense (`Path.resolve(strict=False)` — see note) and
+    symlink rejection while preserving the user's explicit override semantics.
+
+    P1-5 doc fix (2026-06-07) : the docstring previously claimed
+    `Path.resolve(strict=True)` but the code uses `strict=False`. The
+    `strict=False` choice is intentional — strict=True would raise
+    FileNotFoundError on a missing path component, breaking the hook
+    on fresh checkouts where workspace/ hasn't been created yet. The
+    "trust the override" trade-off means the canonical path is computed
+    even if some components don't exist yet ; symlinks are rejected
+    upstream (`raw.is_symlink()` check), so the main path-traversal
+    vector is closed.
 
     Resolution order :
       1. `CLAUDE_PROJECT_DIR` env var if set, points to an existing dir,

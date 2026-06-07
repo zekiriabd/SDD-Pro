@@ -20,9 +20,13 @@ const APP_JSX    = join(__dirname, "..", "app.jsx");
 // Composants critiques attendus dans app.jsx — la liste reflète l'état
 // au moment du refactor v7.0.0. Toute suppression doit être intentionnelle
 // et accompagnée d'une mise à jour de ce test.
+//
+// Maintenance 2026-06-07 : DocMenu/DocPage retirés le 2026-06-06 (cf.
+// commit & app.jsx ligne ~214). HelpModal reste — c'est le composant qui
+// affiche le help inline.
 const EXPECTED_COMPONENTS = [
   // Shell
-  "TopBar", "ProjectSwitcher", "DocMenu", "HelpModal",
+  "TopBar", "ProjectSwitcher", "HelpModal",
   // Navigation
   "Tree", "TreeNode", "Crumb",
   // Detail panes
@@ -48,12 +52,14 @@ const EXPECTED_COMPONENTS = [
 
 // Endpoints API critiques attendus (anti-régression — vérifier que le code
 // consomme bien les endpoints exposés par server.js).
+//
+// Maintenance 2026-06-07 : `/api/help/:id` retiré le 2026-06-06 (cf.
+// server.js ligne ~705) — endpoint absent volontairement.
 const EXPECTED_ENDPOINTS = [
   "/api/tree",
   "/api/dashboard",
   "/api/validate",
   "/api/gate-decide",
-  "/api/help/",
   "/api/events",
 ];
 

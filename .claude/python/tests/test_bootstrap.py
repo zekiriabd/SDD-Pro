@@ -235,6 +235,52 @@ class TestDetection(unittest.TestCase):
 # CLI : dry-run on real repo
 # ============================================================================
 
+class TestNonValidatedDetection(unittest.TestCase):
+    """Audit CTO 2026-06-07 — bootstrap.py previously hardcoded
+    `_EXPERIMENTAL_*` sets that drifted from `combos.json/componentLevels`
+    SSoT. Pin the SSoT-derived behavior so the bug doesn't regress."""
+
+    def test_shadcn_is_validated_not_experimental(self):
+        """shadcn is 🟢 reference in combos.json — must NOT warn."""
+        self.assertFalse(bootstrap._is_non_validated("ui", "shadcn"))
+
+    def test_radzen_blazor_is_validated_not_experimental(self):
+        """radzen-blazor is 🟢 reference in combos.json — must NOT warn."""
+        self.assertFalse(bootstrap._is_non_validated("ui", "radzen-blazor"))
+
+    def test_node_express_is_validated_not_experimental(self):
+        """node-express is `validated` in combos.json — must NOT warn."""
+        self.assertFalse(bootstrap._is_non_validated("backend", "node-express"))
+
+    def test_python_fastapi_is_validated_not_experimental(self):
+        """python-fastapi is `validated` in combos.json — must NOT warn."""
+        self.assertFalse(bootstrap._is_non_validated("backend", "python-fastapi"))
+
+    def test_vue_is_validated_not_experimental(self):
+        """vue is `validated` in combos.json — must NOT warn."""
+        self.assertFalse(bootstrap._is_non_validated("frontend", "vue"))
+
+    def test_angular_is_validated_not_experimental(self):
+        """angular is `validated` in combos.json — must NOT warn."""
+        self.assertFalse(bootstrap._is_non_validated("frontend", "angular"))
+
+    def test_vuetify_remains_experimental(self):
+        """vuetify is 🟡 experimental in combos.json — must warn."""
+        self.assertTrue(bootstrap._is_non_validated("ui", "vuetify"))
+
+    def test_ddd_remains_experimental(self):
+        """ddd is `experimental` in combos.json — must warn."""
+        self.assertTrue(bootstrap._is_non_validated("archi", "ddd"))
+
+    def test_microservice_remains_untested(self):
+        """microservice is `untested` in combos.json — must warn."""
+        self.assertTrue(bootstrap._is_non_validated("archi", "microservice"))
+
+    def test_mvc_is_validated(self):
+        """mvc is `validated` in combos.json — must NOT warn."""
+        self.assertFalse(bootstrap._is_non_validated("archi", "mvc"))
+
+
 class TestCliDryRun(unittest.TestCase):
     """End-to-end check that --dry-run doesn't write anything."""
 

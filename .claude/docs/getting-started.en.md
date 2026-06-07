@@ -36,7 +36,7 @@ The key innovation : **deterministic Python orchestration** (48 scripts, 0-cost)
 | Post-code reviewers | **5 distinct angles** | 1 | 0 |
 | Anti-derive enforcement | strict (ownership matrix + STOP) | partial | ❌ |
 | Stack catalog | `.libs.json` machine-readable + CVE + LTS check | ❌ | ❌ |
-| Error taxonomy | **167 classes `[CLASS]`** cross-agent | ❌ | ❌ |
+| Error taxonomy | **174 classes `[CLASS]`** cross-agent | ❌ | ❌ |
 | Telemetry | SQLite (cost cap, audit trail, gates) | ❌ | ❌ |
 | Determinism | 48 Python scripts (0 token) | ❌ | ❌ |
 | Idempotence / resume | checkpoint mode | ❌ | ❌ |

@@ -2,9 +2,9 @@
 
 FEAT-driven development framework for Claude Code — `next` branch: **v7.0.0-alpha** (see [.claude/docs/VERSIONING.md](.claude/docs/VERSIONING.md)). `main` branch: v6.10.4-LTS (freeze active until 2026-06-18).
 
-> 🇫🇷 [Version française](README.md) — French docs are the canonical source ; this English page mirrors the Quickstart + Console essentials.
-
-Main documentation: [.claude/CLAUDE.md](.claude/CLAUDE.md) (French).
+> ⚠ **This English page is a summary, not a translation.** It covers Quickstart + Console essentials only (~10 sections vs ~17 in the French canonical README). For exhaustive docs (architecture, agents, rules, stacks, governance, ROI, roadmap), use the French source.
+>
+> 🇫🇷 [Version française (canonical, complete)](README.md) — Main documentation: [.claude/CLAUDE.md](.claude/CLAUDE.md) (French).
 
 ---
 

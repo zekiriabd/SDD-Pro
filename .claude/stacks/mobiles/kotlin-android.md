@@ -331,30 +331,46 @@ cd workspace/output/src/{AppName} && ./gradlew compileDebugKotlin --no-daemon
 
 <!-- CORE_PACKAGES_START -->
 ```bash
-# Auto-généré depuis kotlin-android.libs.json -- ne pas éditer (utiliser sync_stack_md.py).
+# Auto-genere depuis kotlin-android.libs.json -- ne pas editer (utiliser sync_stack_md.py).
 # Gradle managed via build.gradle.kts + gradle/libs.versions.toml.
-# Versions auto-dérivées de kotlin-android.libs.json -- régénérer le catalog Gradle
+# Versions auto-derivees de kotlin-android.libs.json -- regenerer le catalog Gradle
 # en cas de bump (cf. gradle/libs.versions.toml).
 ```
 <!-- CORE_PACKAGES_END -->
 
 <!-- ONDEMAND_PACKAGES_START -->
 ```bash
-# Auto-généré depuis kotlin-android.libs.json (on-demand) -- installe par dev-* si l'US déclenche un trigger.
+# Auto-genere depuis kotlin-android.libs.json (on-demand) -- installe par dev-* si l'US declenche un trigger.
 # capability: firebase
 # Gradle : ajouter les modules en implementation(...) dans build.gradle.kts
-#   implementation("com.google.firebase:firebase-bom:33.0.0")
-#   implementation("com.google.firebase:firebase-messaging-ktx")
+#   implementation("com.google.firebase:firebase-bom:33.7.0")
+#   implementation("com.google.firebase:firebase-messaging-ktx:33.7.0")
 
 # capability: room-database
 # Gradle : ajouter les modules en implementation(...) dans build.gradle.kts
-#   implementation("androidx.room:room-runtime:2.6.1")
-#   ksp("androidx.room:room-compiler:2.6.1")
+#   implementation("androidx.room:room-ktx:2.6.1")
 
 # capability: camera
 # Gradle : ajouter les modules en implementation(...) dans build.gradle.kts
-#   implementation("androidx.camera:camera-core:1.3.0")
-#   implementation("androidx.camera:camera-camera2:1.3.0")
+#   implementation("androidx.camera:camera-core:1.4.0")
+#   implementation("androidx.camera:camera-camera2:1.4.0")
+#   implementation("androidx.camera:camera-lifecycle:1.4.0")
+
+# capability: permissions
+# Gradle : ajouter les modules en implementation(...) dans build.gradle.kts
+#   implementation("com.google.accompanist:accompanist-permissions:0.36.0")
+
+# capability: background-jobs
+# Gradle : ajouter les modules en implementation(...) dans build.gradle.kts
+#   implementation("androidx.work:work-runtime-ktx:2.10.0")
+
+# capability: google-maps
+# Gradle : ajouter les modules en implementation(...) dans build.gradle.kts
+#   implementation("com.google.maps.android:maps-compose:6.2.1")
+
+# capability: paging
+# Gradle : ajouter les modules en implementation(...) dans build.gradle.kts
+#   implementation("androidx.paging:paging-compose:3.3.4")
 ```
 <!-- ONDEMAND_PACKAGES_END -->
 
@@ -389,6 +405,68 @@ android {
 ## 2.3 Patterns d'erreurs compilation
 
 Format AGP/Kotlin : `{path}.kt:{line}:{col}: error: {message}`
+
+<!-- LIBS_CATALOG_START -->
+### 2.4 Librairies
+
+> Source de verite : `.claude/stacks/mobiles/kotlin-android.libs.json`. Ne pas editer cette section manuellement -- utiliser `.claude/python/sdd_admin/sync_stack_md.py --stack-id kotlin-android`.
+
+#### 2.4.a Librairies CORE (installees par arch en section 2.2.1, toujours)
+
+| Lib | Version | Role |
+|-----|---------|------|
+| kotlin-stdlib | 2.3.21 | Stdlib Kotlin core |
+| gradle | 8.6.1 | Android Gradle Plugin (compilateur, packaging APK/AAB, resource merging) |
+| ui | 1.7.0 | Jetpack Compose UI foundation (Layout, Modifier, State) |
+| material3 | 1.3.1 | Material Design 3 components (Button, Card, TextField, Navigation, etc.) |
+| runtime | 1.7.0 | Compose runtime (Recomposition, State, Effect) |
+| foundation | 1.7.0 | Foundation layouts (Box, Row, Column, LazyColumn, LazyRow, ScrollState) |
+| navigation-compose | 1.7.0 | Navigation Compose (NavController, NavGraph, Routes typées) |
+| core-ktx | 1.15.0 | Android core APIs extensions (Context, SharedPreferences, etc.) |
+| activity-compose | 1.9.0 | Activity integration with Compose (setContent, LocalContext) |
+| lifecycle-runtime-ktx | 2.8.0 | Lifecycle-aware coroutines (lifecycleScope, repeatOnLifecycle) |
+| lifecycle-viewmodel-ktx | 2.8.0 | ViewModel lifecycle management (viewModelScope) |
+| lifecycle-viewmodel-compose | 2.8.0 | ViewModel integration with Compose (hiltViewModel, collectAsStateWithLifecycle) |
+| room-runtime | 2.6.1 | Room persistence library (SQLite ORM avec @Entity, @Dao, @Database) |
+| room-ktx | 2.6.1 | Room Kotlin extensions (suspend functions, Flow queries) |
+| datastore-preferences | 1.1.1 | DataStore async key-value storage (preference moderne, replacement SharedPreferences) |
+| hilt-android | 2.51 | Hilt dependency injection (DI scopes, @Inject, @Module, @HiltViewModel) |
+| retrofit | 2.11.0 | Retrofit HTTP client (REST API, declarative, interceptors, suspend fun) |
+| converter-kotlinx-serialization | 2.11.0 | Retrofit converter Kotlin Serialization (JSON deserialization) |
+| okhttp | 4.12.0 | OkHttp HTTP client core (connection pooling, interceptors, request/response logging) |
+| logging-interceptor | 4.12.0 | OkHttp logging interceptor (debug HTTP requests/responses) |
+| kotlinx-serialization-json | 1.7.0 | Kotlin Serialization JSON parser (alternative Jackson/GSON, Kotlin-native) |
+| timber | 5.0.1 | Timber logging library (wrapper SLF4J-like Android, debug tree plugin) |
+| kotlinx-coroutines-android | 2.3.21 | Kotlin Coroutines Android support (Dispatchers.Main) |
+| kotlinx-coroutines-core | 2.3.21 | Kotlin Coroutines core (Flow, async, launch, withContext) |
+
+### 2.4.b Librairies ON-DEMAND (installees si l'US declenche)
+
+Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'US + ACs.
+
+| Capability | Lib | Version | Triggers |
+|---|---|---|---|
+| firebase | firebase-bom | 33.7.0 | firebase, cloud messaging, notifications push, fcm |
+| firebase | firebase-messaging-ktx | 33.7.0 | firebase, cloud messaging, notifications push |
+| room-database | room-ktx | 2.6.1 | room, database local, sqlite persistence, dao |
+| camera | camera-core | 1.4.0 | camera, photo capture, video record, image picker |
+| camera | camera-camera2 | 1.4.0 | camera, photo capture, video record |
+| camera | camera-lifecycle | 1.4.0 | camera |
+| permissions | accompanist-permissions | 0.36.0 | permissions runtime, permission compose, permission ui |
+| background-jobs | work-runtime-ktx | 2.10.0 | background job, scheduled task, periodic work, workmanager |
+| google-maps | maps-compose | 6.2.1 | google maps, maps, location map |
+| paging | paging-compose | 3.3.4 | paging, pagination, lazy load, infinite scroll |
+
+#### 2.4.c Plugins build-system
+
+| Plugin | Version | Role |
+|---|---|---|
+| com.android.application | 8.6.1 | Android Application plugin (cible apk/aab, resource packaging, manifest merging) |
+| kotlin-android | 2.3.21 | Kotlin Android plugin (compilateur Kotlin/JVM, Kotlin sources integration) |
+| com.google.dagger.hilt.android | 2.51 | Hilt plugin (code generation DI, @HiltAndroidApp, @HiltViewModel) |
+| com.google.devtools.ksp | 2.3.21-1.0.20 | Kotlin Symbol Processing (KSP compiler plugin pour annotation processors: Hilt, Room, etc.) |
+| com.diffplug.spotless | 7.0.0 | Spotless formatter (ktfmt Kotlin formatting, tasks spotlessCheck / spotlessApply) |
+<!-- LIBS_CATALOG_END -->
 
 ---
 

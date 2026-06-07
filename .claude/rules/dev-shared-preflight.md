@@ -24,6 +24,7 @@
 - §3 — STEP 1 Détection mode From Plan
 - §4 — STEP 1.bis Hard-gate path safety (Front/Back isolation)
 - §5 — Matrice paramètres par famille
+- §6 — Enforcement (référence depuis agents dev-backend/dev-frontend)
 
 ---
 

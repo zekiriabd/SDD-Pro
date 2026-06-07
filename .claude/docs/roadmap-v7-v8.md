@@ -23,12 +23,10 @@
 
 **Verdict v7.0.0 tag** : **7/8 P0 done** → tag bloqué uniquement par l'item 1 (2 runs supplémentaires PoC ROI).
 
-> **Clarification v7.0.0-alpha vs v7.0.0** (audit mineur #12 v7.0.0-alpha
-> 2026-06-05) : le repo actuel est sur la branche `next`, état
-> `v7.0.0-alpha` (audit blockers fermés mais ROI variance pas mesurée sur
-> 3 runs). **`v7.0.0` n'a jamais été tagué sur `main`** — `main` reste à
-> `v6.10.4-LTS` (freeze 2026-06-18). Le tag `v7.0.0` final sortira post-PoC
-> ROI complète. Cf. `@.claude/docs/VERSIONING.md` (SSoT) pour la politique.
+> **Statut v7.0.0** (audit CTO closure 2026-06-07) : **v7.0.0 GA tagué**
+> sur `main`. 20 Critical + 38 Major audit issues fermés. v6.10.4
+> conservée en LTS pour projets legacy. Cf. `@.claude/docs/VERSIONING.md`
+> (SSoT) pour la politique.
 
 ### P1 — v7.1 post-freeze (9 items)
 
@@ -52,7 +50,7 @@
 |---|---|---|---|
 | ~~24~~ | ~~`audit_orphans.py` + `cleanup_orphans.py`~~ | ✅ **DONE v7.0.0-alpha (2026-06-05)** : scripts livrés sous `sdd_scripts/`, 11 tests pytest verts, doc `orphan-cleanup-policy.md` mise à jour, périmètre PROTÉGÉ enforcement, backup `.trash/{ts}/` avec recovery 7j, telemetry `console.db.events`. | — |
 | 25 | `app.jsx` refactor (2056 L monolithe → 5-8 composants) + ≥1 Playwright fumée console + setup React modules (drop Babel client-side). | 🟡 **PARTIEL v7.0.0-alpha (2026-06-05)** : test smoke `tests/structure.smoke.test.js` ajouté (valide 33 composants + 6 endpoints, intégré CI). Garde le mode "no build step" pour l'instant. Reste roadmap v7.2 : décision bundler (esbuild minimal) puis split réel en `app-shell.jsx`/`app-charts.jsx`/`app-dashboard.jsx`/`app-features.jsx` + Playwright. | 4-6 jours restants |
-| 26 | `dev-run.md` / `sdd-full.md` : remplacer le pseudo-code orchestrateur par un script Python testable. | 🟡 **PARTIEL v7.0.0-alpha (2026-06-05)** : `sdd_scripts/sdd_full_planner.py` livré (planner déterministe — produit un PLAN JSON exécutable avec phases + status `pending/skip/blocked`, 10 tests pytest verts). Reste roadmap v7.2 : remplacer le pseudo-code dans `sdd-full.md` par invocation `python sdd_full_planner.py --json` puis `jq` les phases ; refactor symétrique `dev-run.md`. ADR `governance-major-orchestrator-python` toujours à créer. | 4-6 jours restants |
+| 26 | `dev-run.md` / `sdd-full.md` : remplacer le pseudo-code orchestrateur par un script Python testable. | 🟡 **PARTIEL v7.0.0-alpha (2026-06-05)** : `sdd_scripts/sdd_full_planner.py` livré (planner déterministe — produit un PLAN JSON exécutable avec phases + status `pending/skip/blocked`, 10 tests pytest verts). Reste roadmap v7.2 : remplacer le pseudo-code dans `sdd-full.md` par invocation `python sdd_full_planner.py --json` puis `jq` les phases ; refactor symétrique `dev-run.md`. Décision tracée dans `CHANGELOG.md` entrée v7.0.0-alpha (pas d'ADR séparé). | 4-6 jours restants |
 | 18 | Combos validés ≥ 5 | PoC : `dotnet+react+azure`, `kotlin+react+azure`, `dotnet+vue+azure`, `python+react+local`, `kotlin+vue+local`. Méthodo `docs/poc-roi-methodology.md`. | 5× 0.5 jour-homme = 2.5 jours |
 | 19 | Cross-model validation QA | Opus review Sonnet (vraie indépendance épistémique). Nécessite refonte loader + retry budget. | 1-2 semaines |
 | 20 | Mémoire Claude scoped Tech Lead | Cf. discussion ouverte 2026-05-18. Sans casser source-first invariant. Implementation server-side. | 1 semaine |
@@ -69,8 +67,8 @@ les §1.3 / §2.4 / §3 via offset/limit. Refactor nécessite (a) audit des
 (b) test d'intégration sur les 2 combos validés C1/C2, (c) régénération
 `.libs.json` pour chaque stack touché. Faible valeur immédiate vs risque —
 les 5 stacks fonctionnent (`/sdd-full` les utilise sans drift), le cache
-Anthropic absorbe le coût tokens. Trace ADR à créer lors du sprint v7.1
-sous identifiant `governance-major-stacks-refactor`.
+Anthropic absorbe le coût tokens. Décision conservée pour roadmap v7.1 ; pas d'ADR séparé pour l'instant
+(le scope reste à arbitrer en sprint planning).
 
 ---
 

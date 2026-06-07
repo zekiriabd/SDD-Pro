@@ -152,14 +152,17 @@ défaut **avec un commentaire `# TODO`** pour signaler au Tech Lead :
 | `MaxParallel` | défaut `3` | `3` |
 | `PlanReviewDefault` | défaut `true` | `true` |
 
-Pour les modes auditors v6.3+/v6.4+/v6.5.2 : laisser commentés
+Pour les modes auditors v7.0.0 : laisser commentés
 ```yaml
-# A11yMode: full         # uncomment si frontend détecté
 # CodeReviewMode: full
 # SecurityMode: full
-# PerfMode: full
 # SpecComplianceMode: full
+# ArchReviewMode: full
+# AdversarialReviewMode: full   # opt-in, informational
 ```
+> ⚠️ `A11yMode`/`PerfMode` retirés v7.0.0 (agents `accessibility-auditor`
+> et `performance-auditor` supprimés — `governance-major-auditors-trim`).
+> Remplacement : ingest CI v7.2.0 via `ingest_axe.py` / `ingest_lighthouse.py`.
 
 ---
 
@@ -185,12 +188,11 @@ QAMode: manual                    # passer à "full" quand prêt
 CoverageMin: 80                   # obligatoire — voir quality.md §A.2 ; 0 = désactivé (décision tracée)
 MaxParallel: 3
 
-# Auditors v6.3+ — uncomment pour activer
-# A11yMode: full
+# Auditors v7.0.0 — uncomment pour activer
 # CodeReviewMode: full
 # SecurityMode: full
-# PerfMode: full
 # SpecComplianceMode: full
+# ArchReviewMode: full
 
 ## Active Tech Specs
  - .claude/stacks/backend/{backend-stack-id}.md      # score {score}, {confidence}

@@ -10,11 +10,12 @@ le path, calcul du verdict 🟢/🟡/🔴 contre `ReviewFailOn`, persistance dan
 `validation_reports(report_type='review')` + rendu Markdown
 [`workspace/output/qa/feat-{n}/review.md`](workspace/output/qa/feat-).
 
-**Phase B (à venir)** : auto-fix loop (dispatch `dev-backend:fix` et
-`dev-frontend:fix` sur les findings corrigeables).
+**Phase B (à venir v7.2)** : auto-fix loop (dispatcher `dispatch_fixes.py`
+écrit, non encore wired à une commande user-facing).
 
-**Phase C (à venir)** : agent `arch --mode review` (Pattern + Layers + ADRs)
-+ auto-invoke en fin de `/sdd-full`.
+**Phase C (✅ déjà câblée v7.0.0)** : agent `arch-reviewer` (Pattern + Layers
++ ADRs) auto-invoqué par `/dev-run` STEP 6.4 (auditor batch) et `/sdd-review`
+STEP 3.0. Cf. `agents/arch-reviewer.md`.
 
 ---
 
@@ -121,10 +122,16 @@ Agent: arch-reviewer
 
 Vérification rapide avant spawn (lecture déterministe DB) :
 ```bash
-python .claude/python/sdd_scripts/query_console_db.py arch-review-present --feat {n}
-# exit 0 = entrées présentes → SKIP fallback (déjà fait par dev-run)
-# exit 1 = aucune entrée → spawn fallback ci-dessus
+python .claude/python/sdd_scripts/query_console_db.py arch-review-present --feat {n} [--max-age-hours 24]
+# exit 0 = entrées FRAÎCHES présentes (< 24h, défaut) → SKIP fallback (déjà fait par dev-run)
+# exit 1 = aucune entrée fraîche → spawn fallback ci-dessus
 ```
+
+> **TTL 24h par défaut (audit C4 closure 2026-06-07)** : si le dernier
+> `[ARCH_*]` finding est plus vieux que 24h, le code a probablement
+> changé entre-temps. Le fallback re-spawne l'agent pour obtenir une
+> review à jour. Override : `--max-age-hours 0` (no TTL, legacy v7.0.0)
+> ou valeur custom selon contexte CI/CD.
 
 Sur skip (`ArchReviewMode in (manual, off)`) → continuer STEP 3 directement,
 les findings `[ARCH_*]` ne seront simplement pas présents dans l'agrégation.

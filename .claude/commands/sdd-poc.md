@@ -35,10 +35,13 @@ PHASE 6 — Verdict POC      (bannière "ne pas déployer en prod")
 /sdd-poc {n}                  # mode POC standard (plans inline)
 /sdd-poc {n} --with-plans     # opt-in plans externalisés .back.md/.front.md
 /sdd-poc {n} --force          # écrase une US réelle existante
-/sdd-poc {n} --rebuild-arch   # force re-bootstrap arch
 ```
 
 Flags combinables. Si tu veux strict prod-ready → `/sdd-full {n}`.
+
+> `/arch-init` est idempotent par construction (skip silencieux si stable).
+> Pour forcer un re-bootstrap, supprimer manuellement `workspace/output/src/`
+> + `workspace/output/db/` puis relancer `/sdd-poc {n}`.
 
 ---
 
@@ -47,16 +50,50 @@ Flags combinables. Si tu veux strict prod-ready → `/sdd-full {n}`.
 Argument **obligatoire** : `{n}` (entier ≥ 1). Absent → demander. Non
 numérique → ERROR `[INVALID_ARG]` (cf. `error-classification.md §1.2`).
 
-Stocker `$force`, `$rebuild_arch`, `$with_plans` (booléens, présence des flags).
+Stocker `$force`, `$with_plans` (booléens, présence des flags).
 
 ---
 
-## STEP 2 — Vérifier la FEAT
+## STEP 2 — Vérifier la FEAT + détecter US réelles existantes (M8 closure)
+
+### 2.1 FEAT existence
 
 Glob `workspace/input/feats/{n}-*.md` :
 - 0 → ERROR `[FEAT_NOT_FOUND]` (créer via `/feat-generate`)
 - > 1 → ERROR `[FEAT_AMBIGUOUS]` (renommer)
 - 1 → OK, stocker `{FeatName}`
+
+### 2.2 US réelles existantes — guard anti-écrasement (audit M8 closure 2026-06-07)
+
+Avant d'invoquer `feat_to_pseudo_us.py`, détecter si des US **réelles** (générées par `po` via `/us-generate` ou `/sdd-full`) existent déjà sous `workspace/output/us/{n}-*.md`. Distinguer pseudo-US vs réelles par le frontmatter `Status: Pseudo` (ajouté par `feat_to_pseudo_us.py`) :
+
+```bash
+REAL_US=$(grep -L "Status: Pseudo" workspace/output/us/{n}-*.md 2>/dev/null | head -5)
+PSEUDO_US=$(grep -l "Status: Pseudo" workspace/output/us/{n}-*.md 2>/dev/null | head -5)
+
+if [ -n "$REAL_US" ] && [ "$force" != "true" ]; then
+  cat <<EOF >&2
+ERROR: /sdd-poc {n} — US réelles existantes détectées (non-Pseudo)
+CAUSE: [POC_OVERWRITE_REAL_US] $REAL_US a été généré par /us-generate (po agent),
+       pas par /sdd-poc. Lancer /sdd-poc --force écraserait du travail PO légitime.
+FIX: 1. Lancer /sdd-full {n} (pipeline complet avec ces US réelles)
+     2. OU déplacer/archiver les US réelles puis relancer /sdd-poc
+     3. OU passer --force EN CONNAISSANCE DE CAUSE (US réelles archivées
+        en workspace/output/.sys/.archive/us-{TS}/ avant écrasement)
+EOF
+  exit 1
+fi
+
+# Si --force ET REAL_US présents : archiver avant écrasement
+if [ -n "$REAL_US" ] && [ "$force" = "true" ]; then
+  ARCHIVE_DIR="workspace/output/.sys/.archive/us-$(date -u +%Y%m%dT%H%M%S)"
+  mkdir -p "$ARCHIVE_DIR"
+  echo "$REAL_US" | xargs -I{} mv {} "$ARCHIVE_DIR/"
+  echo "[POC/WARN] {n} — $(echo "$REAL_US" | wc -l) US réelles archivées en $ARCHIVE_DIR avant écrasement. (3%)" >&2
+fi
+```
+
+Symétrie : `feat_to_pseudo_us.py --force` archive maintenant **aussi** côté script (defense-in-depth). Le bloc shell ci-dessus s'exécute **avant** l'invocation script, le script protège **a posteriori**.
 
 Émettre : `[ANALYSIS] FEAT {n}-{FeatName} — pipeline POC démarré. (2%)`
 
@@ -111,8 +148,7 @@ Les agents dev-* en STEP 6/7 détectent automatiquement les plans
 ## STEP 5 — Bootstrap (`/arch-init`)
 
 Exécuter intégralement `/arch-init` (idempotent — skip silencieux si
-projets + DB déjà à jour ; rebuild si `$rebuild_arch`). Détail :
-`@.claude/commands/arch-init.md`.
+projets + DB déjà à jour). Détail : `@.claude/commands/arch-init.md`.
 
 Émettre selon résultat :
 - Succès : `[ARCH] Bootstrap projets + DB terminés. (32%)`

@@ -7,7 +7,7 @@
 
 ---
 
-## 1. Hooks actifs (11)
+## 1. Hooks actifs (13)
 
 Configurés dans `.claude/settings.json` section `hooks`. Tous invoqués via
 le wrapper `python -c "...import _hook; _hook.run('sdd_hooks.X')"` qui
@@ -18,6 +18,12 @@ depuis le cwd.
 > `block_env_bypass`, `preflight_cost_cap`, `preflight_stack_combo`,
 > `validate_stack_consistency`, `resolve_po_hash_sentinel`,
 > `validate_acceptance_gate` viennent compléter les 5 hooks v6.x.
+>
+> **v7.0.0-alpha Sprint 1.4 (2026-06-06) — 12ᵉ hook ajouté** :
+> `pre_write_lint` (PreToolUse Edit|Write|MultiEdit) — enforce les
+> forbidden patterns côté stack-CLAUDE.md AU MOMENT DE LA GÉNÉRATION
+> (Kotlin `!!`, Vue raw HTML, hex hardcode, console.log). Documenté §1.12
+> par fix CTO audit 2026-06-07.
 
 ### 1.1 `protect_framework` — PreToolUse Edit|Write|MultiEdit
 
@@ -136,6 +142,33 @@ depuis le cwd.
 | Exit codes | 0 = pass, 1 = gate failed |
 | Ajouté | v7.0.0-alpha audit P5 |
 
+### 1.12 `pre_write_lint` — PreToolUse Edit|Write|MultiEdit
+
+| Champ | Valeur |
+|---|---|
+| Trigger Claude Code | `PreToolUse` matcher `Edit\|Write\|MultiEdit` (chaîné après `protect_framework`) |
+| Script | [`.claude/python/sdd_hooks/pre_write_lint.py`](.claude/python/sdd_hooks/pre_write_lint.py) |
+| LOC | ~200 |
+| Rôle | Enforce les forbidden patterns documentés dans `stack/{cat}/{id}.md` (§Forbidden ou CLAUDE.md projet) **avant** que l'écriture atteigne le disque. Détecte par regex sur le `new_string` / `content` payload : Kotlin `!!` (NPE assertions), Vue `<input type="text">` brut sans validation, console.log/print debug, hex hardcode (`#fff`, `rgba(...)` au lieu de tokens CSS), magic numbers > 100, etc. Skip silencieusement les test paths (`**/test_*.py`, `**/*.test.ts`, `**/*Test.kt`) et les fichiers hors `workspace/output/src/`. |
+| Modes | `warn` (défaut — exit 0 + audit log) ; `strict` via `SDD_PRE_WRITE_LINT_STRICT=1` (exit 2 = bloquant) |
+| Bypass | `SDD_DISABLE_PRE_WRITE_LINT=1` (audit-loggué, narrow per-session) |
+| Exit codes | 0 = allow (warn ou bypass), 2 = deny (strict + violation) |
+| Ajouté | v7.0.0-alpha Sprint 1.4 (2026-06-06) ; documenté audit CTO (2026-06-07) |
+
+### 1.13 `preflight_glob_scope` — PreToolUse Glob
+
+| Champ | Valeur |
+|---|---|
+| Trigger Claude Code | `PreToolUse` matcher `Glob` |
+| Script | [`.claude/python/sdd_hooks/preflight_glob_scope.py`](.claude/python/sdd_hooks/preflight_glob_scope.py) |
+| LOC | ~120 |
+| Rôle | Defense-in-depth anti-token-explosion : refuse les patterns Glob non-bornés (`workspace/output/src/**/*`, `**/*`, `**`) sans contrainte d'extension. Le post-mortem documenté dans `agents/spec-compliance-reviewer.md` (~ligne 178) a tracé un Glob isolé qui a déclenché 1.8M tokens / $35 sur un seul agent reviewer. Le prompt anti-pattern n'a pas suffit à arrêter Sonnet 4.6 — d'où ce garde runtime. Globs scopés (avec sous-dossier ou extension) et globs hors `workspace/output/src/` sont autorisés silencieusement. |
+| Modes | `warn` (défaut — exit 0 + audit log + WARN stderr) ; `strict` via `SDD_GLOB_SCOPE_STRICT=1` (exit 2) |
+| Bypass | `SDD_DISABLE_GLOB_SCOPE=1` (audit-loggué) |
+| Exit codes | 0 = allow (warn ou bypass), 2 = deny (strict + broad) |
+| Audit log | `workspace/output/.sys/.audit/glob-scope.jsonl` |
+| Ajouté | v7.0.0-alpha audit CTO (2026-06-07) — Sprint 4 #18 |
+
 ---
 
 ## 2. Stop hook (smoke check final)
@@ -179,7 +212,7 @@ depuis le cwd.
 | PowerShell (supprimé) | Python (actif) |
 |---|---|
 | `acquire-libname-lock.ps1` | [`sdd_scripts/acquire_libname_lock.py`](.claude/python/sdd_scripts/acquire_libname_lock.py) |
-| `compact-front-plans.ps1` | [`sdd_scripts/compact_front_plans.py`](.claude/python/sdd_scripts/compact_front_plans.py) |
+| `compact-front-plans.ps1` | _(retiré v7.0.0-alpha, script supprimé du disque — cassait contrat plan v2 ; cf. `commands/dev-plan.md` historique)_ |
 | `context-budget.ps1` | [`sdd_scripts/context_budget.py`](.claude/python/sdd_scripts/context_budget.py) |
 | `detect-capabilities.ps1` | [`sdd_scripts/detect_capabilities.py`](.claude/python/sdd_scripts/detect_capabilities.py) |
 | `gate-decide.ps1` | [`sdd_scripts/gate_decide.py`](.claude/python/sdd_scripts/gate_decide.py) |
@@ -209,11 +242,13 @@ depuis le cwd.
 |---|---:|---:|---:|
 | Hooks v6.x (dossier `.claude/hooks/` → `sdd_hooks/`) | 2 | 5 | **+3** (3 anciens scripts promus en hooks) |
 | Hooks v7.0.0-alpha (ajouts depuis audit P0/P5) | — | 6 | **+6** (`block_env_bypass`, `preflight_cost_cap`, `preflight_stack_combo`, `validate_stack_consistency`, `resolve_po_hash_sentinel`, `validate_acceptance_gate`) |
+| Hooks v7.0.0-alpha Sprint 1.4 (lint pre-write) | — | 1 | **+1** (`pre_write_lint`) |
+| Hooks v7.0.0-alpha audit CTO (Glob anti-explosion) | — | 1 | **+1** (`preflight_glob_scope`) |
 | Scripts CLI (`sdd_scripts/`) | 14 | ~50 (v7.0.0-alpha) | +36 net |
 | Scripts admin (`sdd_admin/`) | 5 | ~13 | +8 |
-| **Total Python actif v7.0.0-alpha** | **23 PS** | **11 hooks + 50 scripts + 13 admin = 74 fichiers exécutables** | **+51 net** |
+| **Total Python actif v7.0.0-alpha** | **23 PS** | **13 hooks + 50 scripts + 13 admin = 76 fichiers exécutables** | **+53 net** |
 
-**Aucune protection nette supprimée**. La protection v7.0.0-alpha est **strictement plus forte** que v6.10 (6 hooks supplémentaires ; tous activés par défaut sauf `record_token_usage` opt-in).
+**Aucune protection nette supprimée**. La protection v7.0.0-alpha est **strictement plus forte** que v6.10 (8 hooks supplémentaires ; tous activés par défaut sauf `record_token_usage` opt-in et `pre_write_lint` / `preflight_glob_scope` en mode warn par défaut).
 
 ---
 
@@ -274,7 +309,7 @@ ADR `governance-protection-{slug}` + 2 approbations.
 ## 6. Pointers
 
 - [`.claude/settings.json`](.claude/settings.json) — configuration active
-- [`.claude/python/sdd_hooks/`](.claude/python/sdd_hooks/) — 5 hooks Python
+- [`.claude/python/sdd_hooks/`](.claude/python/sdd_hooks/) — 13 hooks Python
 - [`.claude/python/sdd_admin/framework_smoke.py`](.claude/python/sdd_admin/framework_smoke.py) — smoke check Stop hook
 - [`.claude/python/_hook.py`](.claude/python/_hook.py) — wrapper d'invocation
 - [`.claude/docs/MIGRATION.md`](./MIGRATION.md) — guide migration entre versions majeures

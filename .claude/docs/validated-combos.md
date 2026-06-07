@@ -94,9 +94,9 @@ consolidé : [`workspace/output/qa/bench/BENCH-GLOBAL-REPORT.md`](../../workspac
 | Dimension | 🟢 Validé (combo PoC) | 🟡 Expérimental (stack OK, combo jamais testé) | 🔴 Non testé |
 |---|---|---|---|
 | **Backend** | `dotnet-minimalapi`, `kotlin-spring-boot` | `python-fastapi`, `node-express` | — |
-| **Frontend** | `react` | `blazor-webassembly`, `vue`, `angular` | — |
-| **UI DS** | `shadcn` | `vuetify`, `radzen-blazor` | — |
-| **QA** | `dotnet-xunit`, `kotlin-junit`, `node-vitest`, `code-quality` | `python-pytest`, `angular-jasmine`, `blazor-bunit`, `mutation-testing`, `playwright` | — |
+| **Frontend** | `react`, `blazor-webassembly` (combo C1) | `vue`, `angular` | — |
+| **UI DS** | `shadcn`, `radzen-blazor` (combo C1) | `vuetify` | — |
+| **QA** | `dotnet-xunit`, `kotlin-junit`, `node-vitest`, `blazor-bunit` (combo C1), `code-quality` | `python-pytest`, `angular-jasmine`, `mutation-testing`, `playwright` | — |
 | **Auth** | `azure-ad` | `auth-local` | — |
 | **DB** | PostgreSQL (via Kotlin + .NET) | SqlServer (via .NET stacks, doc OK) | MySql, MariaDb, Sqlite, Oracle, MongoDb |
 | **Archi pattern** | `mvc` (implicite C1) | `ddd` (workspace CMSPrint, non-PoC formel) | `microservice` (en quarantaine v7) |
@@ -110,7 +110,10 @@ consolidé : [`workspace/output/qa/bench/BENCH-GLOBAL-REPORT.md`](../../workspac
 
 ## 3. Combos prioritaires post-v7.0.0 GA
 
-Plan de validation. **Réordonné 2026-06-05** (CHANGELOG `governance-c3-bis-fullstack-node-react`) : Node monté en priorité 3 (combo cible commerciale crédible vs BMad/AgentOS sur écosystème JS).
+Plan de validation. **Réordonné 2026-06-05** (décision tracée dans
+`CHANGELOG.md` entrée v7.0.0-alpha, section "Décision combo C3-bis cible") :
+Node monté en priorité 3 (combo cible commerciale crédible vs BMad/AgentOS
+sur écosystème JS).
 
 | ID | Hypothèse | Backend | Frontend | UI DS | QA | Auth | DB | Effort | Statut |
 |:---:|---|---|---|---|---|---|---|---|---|
@@ -234,9 +237,10 @@ demandeur identifié.
 
 **Position historique v7.0.0** : déplacer tous les stacks 🔴 / 🟡 jamais
 utilisés vers `.claude/stacks/_drafts/`. Cette quarantaine a été **rollback
-en v7.x** (cf. ADR `governance-stacks-quarantine-rollback`) : tous les
-stacks sont désormais chargeables sous `.claude/stacks/{cat}/`. Le statut
-🟢/🟡 reste signalé par le frontmatter `Validation:` de chaque stack.
+en v7.x** (décision tracée dans `CHANGELOG.md` entrée v7.0.0-alpha,
+section "Stacks quarantine `_drafts/` rollback") : tous les stacks sont
+désormais chargeables sous `.claude/stacks/{cat}/`. Le statut 🟢/🟡 reste
+signalé par le frontmatter `Validation:` de chaque stack.
 
 **Avantage de la nouvelle approche** : surface unique, statut explicite
 par stack, plus de mécanisme de filtrage spécial dans les scripts Python.
@@ -279,7 +283,7 @@ Pour information / mitigation préventive si vous tentez un combo 🟡/🔴 :
 - `@.claude/docs/architecture.md §4` — détail des stacks supportés
 - `@.claude/docs/poc-roi-methodology.md` — méthodologie de validation combo
 - `@.claude/python/sdd_scripts/validate_stack_combo.py` — script §4.2
-- ADR `governance-stacks-quarantine-rollback` — décision rollback v7.x
+- `CHANGELOG.md` entrée v7.0.0-alpha — décision rollback `_drafts/` v7.x
 
 ---
 

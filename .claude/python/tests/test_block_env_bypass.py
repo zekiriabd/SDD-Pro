@@ -14,10 +14,18 @@ import sys
 import unittest
 from unittest.mock import patch
 
+import pytest
+
 REPO_ROOT = __import__("pathlib").Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO_ROOT / ".claude" / "python"))
 
 from sdd_hooks import block_env_bypass as beb  # noqa: E402
+
+# Smoke marker (audit CTO 2026-06-07) — env-bypass detection is the last
+# defense against SDD_ALLOW_* / SDD_DISABLE_* exports that would unlock
+# cost-cap, multistack, untested-combo gates. Regression here = silent
+# damage. Gated by `framework_smoke -m smoke`.
+pytestmark = pytest.mark.smoke
 
 
 def _run_with_command(command: str) -> int:

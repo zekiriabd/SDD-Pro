@@ -58,6 +58,8 @@ Variables résultantes en mémoire pour la suite : `planOnly`, `name`,
 
 ---
 
+<!-- STEP 2 retiré v7.0.0 : ancien chargement contexte absorbé par STEP 3. Numérotation 3→9 conservée pour stabilité des cross-refs externes. -->
+
 ## STEP 3 — Charger le contexte minimal
 
 Read **uniquement** :
@@ -263,17 +265,26 @@ Pas de `ds_components`/`source_html_elements` (spécifique frontend).
    - `### Stack §1.3 mapping ({stack-id})` — extrait du mapping couche→répertoire du stack backend actif
    - `### CLAUDE.md backend (extrait pertinent)` — AppNamespace, entities scaffoldées, BREAKING CHANGES si présent
    - `### Schema.json (entités touchées)` — uniquement si `workspace/output/db/schema.json` existe et que le plan référence des entités
-3. Invoquer le helper de métadonnées (déterministe, 0 token LLM) :
+3. Invoquer le helper de métadonnées (déterministe, 0 token LLM) avec **trap stderr/exit obligatoire** (audit M6 closure 2026-06-07) :
    ```bash
-   python .claude/python/sdd_scripts/compute_plan_metadata.py \
+   META_YAML=$(python .claude/python/sdd_scripts/compute_plan_metadata.py \
      --us-path "workspace/output/us/{n}-{m}-{Name}.md" \
      --claude-md-path "workspace/output/src/{BackendName}/CLAUDE.md" \
-     --capabilities "{caps_triggered_comma_separated}"
+     --capabilities "{caps_triggered_comma_separated}" 2>/tmp/cpm-err-{n}-{m}.log)
+   META_EXIT=$?
+   if [ "$META_EXIT" -ne 0 ]; then
+     # STOP fail-fast — JAMAIS écrire un plan v2 sans métadonnées fraîches
+     # (sinon le validate_plan.py downstream marquerait strict-ready=true par défaut → plan corrompu silencieux).
+     echo "ERROR: dev-backend {n}-{m} — compute_plan_metadata.py exit $META_EXIT" >&2
+     echo "CAUSE: [PLAN_INVALID] helper métadonnées plan v2 échec (cf. /tmp/cpm-err-{n}-{m}.log)" >&2
+     echo "FIX: inspecter le log stderr ; vérifier que us-path + claude-md-path existent et sont lisibles" >&2
+     exit 1
+   fi
+   # META_YAML contient le bloc YAML (`plan-schema-version: 2`, `generated-at`,
+   # `us-hash: sha256:...`, `claude-md-hash: sha256:...`,
+   # `capabilities-triggered: ...`, `strict-ready: true`).
    ```
-   stdout retourne un bloc YAML (`plan-schema-version: 2`, `generated-at`,
-   `us-hash: sha256:...`, `claude-md-hash: sha256:...`,
-   `capabilities-triggered: ...`, `strict-ready: true`).
-4. Écrire le plan : frontmatter v1 (us, family, stack-backend, etc.) **+** bloc YAML retourné par le helper **+** sections markdown.
+4. Écrire le plan : frontmatter v1 (us, family, stack-backend, etc.) **+** bloc `$META_YAML` retourné par le helper **+** sections markdown. **Ne JAMAIS écrire le plan si `$META_YAML` est vide ou si l'exit code != 0** — préférer fail-fast à un plan v2 corrompu (audit M6).
 
 Format v1 (sans v2 fields, sans `## Inline Digest`) reste accepté en
 lecture (backward-compat) mais **la génération produit toujours v2**.

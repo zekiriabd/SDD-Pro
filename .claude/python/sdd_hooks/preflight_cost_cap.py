@@ -34,23 +34,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from sdd_lib.ci import is_ci as _detect_ci  # noqa: E402  # SSoT audit 2026-06-07
 from sdd_lib.exit_codes import HOOK_ALLOW, HOOK_DENY  # noqa: E402
 from sdd_lib.hook_input import read_hook_input, get_subagent_type  # noqa: E402
 from sdd_lib.pricing import PRICING, FALLBACK_PRICING  # noqa: E402  # v7.0.1 SSoT
 from sdd_lib.run_id import get_or_create_run_id  # noqa: E402  # v7.0.1 stable scoping
 from sdd_lib.stderr import warn  # noqa: E402
-
-
-def _detect_ci() -> bool:
-    ci_signals = (
-        "CI", "GITHUB_ACTIONS", "GITLAB_CI", "CIRCLECI",
-        "JENKINS_URL", "BUILDKITE", "TRAVIS", "TF_BUILD",
-        "BITBUCKET_BUILD_NUMBER",
-    )
-    return any(
-        (os.environ.get(v, "").strip().lower() not in ("", "0", "false", "no"))
-        for v in ci_signals
-    )
 
 
 def _resolve_cap() -> float:

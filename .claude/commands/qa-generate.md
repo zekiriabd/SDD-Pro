@@ -2,8 +2,7 @@
 
 Délègue à l'agent `qa` (Sonnet 4.6) pour générer les tests unitaires
 (backend + frontend) d'une FEAT, exécuter le coverage parsing
-(PowerShell, 0 token) et le quality scan sonar-like (PowerShell,
-0 token).
+(Python, 0 token) et le quality scan sonar-like (Python, 0 token).
 
 **Usage :**
 - `/qa-generate {n}` — pipeline QA complet selon `QAMode` du Project Config
@@ -144,7 +143,7 @@ Si mode invalide → ERROR `[STACK_MALFORMED]`.
 
 ---
 
-## STEP 4 — Quality scan (PowerShell, 0 token)
+## STEP 4 — Quality scan (Python, 0 token)
 
 Skip si mode = `tests-only` ou `tests+coverage`.
 
@@ -188,7 +187,7 @@ Argument : {n}
 L'agent gère :
 - STEP 2 à 6 internes : préconditions, contexte, init projets test, plan inline tests
 - STEP 7 internes : exécution tests via Bash
-- STEP 8 internes : parse coverage via PowerShell
+- STEP 8 internes : parse coverage via Python (`parse_coverage.py`)
 
 Modes propagés à l'agent via le mode résolu en STEP 3.
 
@@ -258,6 +257,15 @@ elif stats.coverage.coverage_passed == false:     → RED  (cf. quality.md §A.3
 elif stats.quality.errors > 0:                    → YELLOW
 else:                                              → GREEN
 ```
+
+**Acceptance Gate automatique (post-STEP 7, v7.0.0)** : un hook
+`SubagentStop` matcher=qa déclenche `sdd_scripts/validate_acceptance.py`
+(détection auto Node/.NET/Kotlin/Python → exécute `test`+`lint`+`build`+
+`coverage`, et `smoke browser` + `E2E Playwright` pour les projets UI).
+Verdict écrit dans `workspace/output/.sys/.acceptance/acceptance.json`.
+Bloquant en mode `AcceptanceGate: strict` (default v7.0.0) — classe
+`[ACCEPTANCE_GATE_FAILED]`. Bypass : `SDD_ALLOW_ACCEPTANCE_BYPASS=1`
+(audit-loggué). Cf. `quality.md §C`.
 
 Émettre **un seul bloc final** :
 

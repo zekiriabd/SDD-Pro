@@ -319,8 +319,13 @@ def _check_feat_hash(
         us_head = us_path.read_text(encoding="utf-8", errors="replace")[:2000]
     except OSError:
         return  # Can't read US — A2 will catch it elsewhere
+    # Audit C2 closure (2026-06-07) : label `Parent FEAT hash:` matched
+    # case-insensitively on the `h` of `hash` (defense-in-depth — canonical
+    # form is lowercase per us.template.md + po.md §STEP 8, but accept
+    # `Hash`/`HASH` variants to avoid silent FEAT_HASH_LEGACY false
+    # positives if a future template typo slips through).
     hash_match = re.search(
-        r"^Parent FEAT hash:\s*sha256:([0-9a-fA-F]{6,64})\s*$",
+        r"^Parent FEAT [Hh][Aa][Ss][Hh]:\s*sha256:([0-9a-fA-F]{6,64})\s*$",
         us_head,
         re.MULTILINE,
     )

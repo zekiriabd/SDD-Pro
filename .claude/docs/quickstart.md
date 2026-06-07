@@ -115,9 +115,11 @@ Pipeline complet de A à Z (phases 2 → 5).
 - `/sdd-discover-stack` — onboarding brownfield (scan repo → `stack.md.candidate`)
 
 > **Commandes internes (debug)** : `/us-generate`, `/arch-init`, `/dev-plan`,
-> `/dev-run`, `/dev-backend`, `/dev-frontend`, `/qa-generate`, `/doc-refresh`,
-> `/feat-deepen`, `/sdd-profile`. Préférer un orchestrateur (`/sdd-full`,
-> `/dev-run`, `/sdd-poc`) — les internes peuvent court-circuiter des gates.
+> `/dev-backend`, `/dev-frontend`, `/doc-refresh`, `/feat-deepen`,
+> `/sdd-profile`. Préférer un orchestrateur (`/sdd-full`, `/dev-run`,
+> `/sdd-poc`) — les internes peuvent court-circuiter des gates.
+> `/dev-run` et `/qa-generate` sont **user-facing** (cf. CLAUDE.md §3) :
+> ils gèrent leurs propres pré-conditions et idempotence.
 
 ### Variante POC / prototype rapide
 

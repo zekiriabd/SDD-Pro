@@ -39,11 +39,29 @@ DEFAULT_TMP_SUFFIX = ".sddtmp"
 
 #: Audit 2026-06-06 RUPT-5 — `os.replace` on Windows NTFS is not atomic
 #: under sharing violations (live test 5 threads = 1 PermissionError out
-#: of 5 reproducible). Retry with linear backoff to absorb transient
-#: holders (audit hooks, AV scan, indexer). On POSIX the loop usually
-#: succeeds on first try (no sharing violation semantics).
+#: of 5 reproducible). Retry with linear backoff + JITTER to absorb
+#: transient holders (audit hooks, AV scan, indexer). On POSIX the loop
+#: usually succeeds on first try (no sharing violation semantics).
+#:
+#: Audit CTO 2026-06-07 — added jitter (random 0.8x-1.2x multiplier) to
+#: prevent thundering-herd : without jitter, N synchronized agents
+#: (typical `/dev-run --max-parallel 6`) collide every 50ms repeatedly
+#: until last_exc fires. With jitter, retry windows desynchronize and
+#: the effective contention drops.
 _REPLACE_MAX_RETRIES = 5
-_REPLACE_BACKOFF_S = 0.05  # 50 ms × 5 = 250 ms worst case
+_REPLACE_BACKOFF_S = 0.05  # 50 ms × 5 × jitter = 50-300 ms worst case
+
+
+def _backoff_with_jitter(attempt: int) -> float:
+    """Return jittered backoff duration in seconds for `attempt` (0-indexed).
+
+    Linear progression base = ``_REPLACE_BACKOFF_S × (attempt + 1)`` ;
+    multiplied by uniform jitter [0.8, 1.2] to desynchronize parallel
+    retries (audit CTO 2026-06-07).
+    """
+    import random
+    base = _REPLACE_BACKOFF_S * (attempt + 1)
+    return base * random.uniform(0.8, 1.2)
 
 
 def _replace_with_retry(tmp: Path, dst: Path) -> None:
@@ -65,7 +83,7 @@ def _replace_with_retry(tmp: Path, dst: Path) -> None:
             last_exc = exc
             if attempt == _REPLACE_MAX_RETRIES - 1:
                 break
-            time.sleep(_REPLACE_BACKOFF_S * (attempt + 1))
+            time.sleep(_backoff_with_jitter(attempt))
         except OSError as exc:
             # Other transient OS error (rare). Retry on Windows only —
             # POSIX rename is atomic so any OSError there is terminal.
@@ -74,7 +92,7 @@ def _replace_with_retry(tmp: Path, dst: Path) -> None:
             last_exc = exc
             if attempt == _REPLACE_MAX_RETRIES - 1:
                 break
-            time.sleep(_REPLACE_BACKOFF_S * (attempt + 1))
+            time.sleep(_backoff_with_jitter(attempt))
     # All retries exhausted — re-raise the last captured exception
     assert last_exc is not None
     raise last_exc

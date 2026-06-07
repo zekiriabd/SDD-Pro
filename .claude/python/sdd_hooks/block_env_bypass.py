@@ -32,22 +32,24 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from sdd_lib.exit_codes import HOOK_ALLOW, HOOK_DENY  # noqa: E402
+from sdd_lib.paths import project_root_for_hook  # noqa: E402
 
 
 def _resolve_project_root() -> Path | None:
-    """Resolve project root via CLAUDE_PROJECT_DIR or `.claude/` walk-up.
+    """DRY shim — delegate to `sdd_lib.paths.project_root_for_hook`.
 
-    Returns None if no project root can be located — caller skips logging.
+    Audit CTO 2026-06-07 — replaced the 7-line duplicate that pre-dated
+    the introduction of `project_root_for_hook` (SSoT P1-5 fix 2026-06-07).
+    The SSoT additionally hardens against `CLAUDE_PROJECT_DIR` symlink
+    pointing outside the repo (defense against substituted env var).
+
+    Returns the resolved root if a `.claude/` directory exists at it,
+    else None (preserves the "skip silently in isolated tmpdir" semantic
+    of the original implementation).
     """
-    env_root = os.environ.get("CLAUDE_PROJECT_DIR")
-    if env_root:
-        candidate = Path(env_root)
-        if (candidate / ".claude").is_dir():
-            return candidate
-    cwd = Path.cwd()
-    for parent in [cwd] + list(cwd.parents):
-        if (parent / ".claude").is_dir():
-            return parent
+    root = project_root_for_hook()
+    if (root / ".claude").is_dir():
+        return root
     return None
 
 

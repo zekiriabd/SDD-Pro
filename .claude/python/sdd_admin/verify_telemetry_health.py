@@ -176,6 +176,65 @@ def audit_db(db_path: Path) -> dict:
     return report
 
 
+def clean_suspects(db_path: Path, *, dry_run: bool = False) -> dict:
+    """Delete SUSPECT runs from `token_usage` + `runs` (audit CTO 2026-06-07).
+
+    A SUSPECT run = `input_tokens < MIN_REAL_INPUT_TOKENS_PER_RUN` AND
+    `output_tokens < MIN_REAL_OUTPUT_TOKENS_PER_RUN` (typically dev / smoke
+    test artifacts that pollute ROI + cost-cap aggregates). Reversible only
+    via DB backup — use `--dry-run` first.
+
+    Returns ``{deleted_runs: int, deleted_token_rows: int, dry_run: bool}``.
+    """
+    if not db_path.is_file():
+        return {"deleted_runs": 0, "deleted_token_rows": 0, "dry_run": dry_run,
+                "error": f"DB not found at {db_path}"}
+    conn = sqlite3.connect(str(db_path))
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            "SELECT run_id, SUM(input_tokens), SUM(output_tokens) "
+            "FROM token_usage WHERE run_id IS NOT NULL GROUP BY run_id"
+        )
+        suspect_run_ids = [
+            row[0] for row in cur.fetchall()
+            if (row[1] or 0) < MIN_REAL_INPUT_TOKENS_PER_RUN
+            and (row[2] or 0) < MIN_REAL_OUTPUT_TOKENS_PER_RUN
+        ]
+        if not suspect_run_ids:
+            return {"deleted_runs": 0, "deleted_token_rows": 0, "dry_run": dry_run}
+        if dry_run:
+            cur.execute(
+                f"SELECT COUNT(*) FROM token_usage WHERE run_id IN "
+                f"({','.join('?' * len(suspect_run_ids))})",
+                suspect_run_ids,
+            )
+            n_token_rows = cur.fetchone()[0]
+            return {"deleted_runs": len(suspect_run_ids),
+                    "deleted_token_rows": n_token_rows,
+                    "dry_run": True,
+                    "suspect_run_ids": suspect_run_ids}
+        # Actual delete — single transaction
+        placeholders = ",".join("?" * len(suspect_run_ids))
+        cur.execute(f"DELETE FROM token_usage WHERE run_id IN ({placeholders})",
+                    suspect_run_ids)
+        deleted_token_rows = cur.rowcount
+        cur.execute(f"DELETE FROM runs WHERE run_id IN ({placeholders})",
+                    suspect_run_ids)
+        deleted_runs = cur.rowcount
+        # Also clean related run_phases + events if present
+        cur.execute(f"DELETE FROM run_phases WHERE run_id IN ({placeholders})",
+                    suspect_run_ids)
+        cur.execute(f"DELETE FROM events WHERE run_id IN ({placeholders})",
+                    suspect_run_ids)
+        conn.commit()
+        return {"deleted_runs": deleted_runs,
+                "deleted_token_rows": deleted_token_rows,
+                "dry_run": False}
+    finally:
+        conn.close()
+
+
 def main() -> int:
     p = argparse.ArgumentParser(
         description="Verify console.db telemetry health (anti test pollution)"
@@ -185,10 +244,30 @@ def main() -> int:
     p.add_argument("--json", action="store_true", help="JSON output")
     p.add_argument("--fail-on", choices=("polluted", "suspect"), default="polluted",
                    help="Exit non-zero if verdict matches (default: polluted)")
+    p.add_argument("--clean-suspects", action="store_true",
+                   help="(audit CTO 2026-06-07) Delete SUSPECT runs from console.db "
+                        "(under-floor token counts). Reversible only via DB backup.")
+    p.add_argument("--dry-run", action="store_true",
+                   help="With --clean-suspects, preview what would be deleted")
     args = p.parse_args()
 
     db_path = Path(args.db) if args.db else \
         repo_root() / "workspace" / "output" / "db" / "console.db"
+
+    # Mode --clean-suspects : delete and exit
+    if args.clean_suspects:
+        result = clean_suspects(db_path, dry_run=args.dry_run)
+        if args.json:
+            print(json.dumps(result, indent=2))
+        else:
+            prefix = "[DRY-RUN] " if result.get("dry_run") else ""
+            if "error" in result:
+                print(f"{prefix}ERROR: {result['error']}")
+                return INFRA_BLOCKED
+            print(f"{prefix}Deleted {result['deleted_runs']} suspect runs, "
+                  f"{result['deleted_token_rows']} token_usage rows")
+        return OK
+
     report = audit_db(db_path)
 
     if args.json:
@@ -198,6 +277,13 @@ def main() -> int:
         print(f"Verdict: {report['verdict']}")
         for c in report["checks"]:
             print(f"  [{c['status']}] {c['name']}: {c['detail']}")
+        if report["verdict"] == "SUSPECT":
+            print()
+            print("To clean SUSPECT runs (dev/test artifacts) :")
+            print("  python .claude/python/sdd_admin/verify_telemetry_health.py "
+                  "--clean-suspects --dry-run   # preview")
+            print("  python .claude/python/sdd_admin/verify_telemetry_health.py "
+                  "--clean-suspects             # apply")
 
     fail_set = {"polluted", "suspect"} if args.fail_on == "suspect" else {"polluted"}
     return OK if report["verdict"].lower() not in fail_set else INFRA_BLOCKED

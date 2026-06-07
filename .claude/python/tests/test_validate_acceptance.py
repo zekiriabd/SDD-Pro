@@ -196,5 +196,41 @@ class TestProjectsScopingFlag(unittest.TestCase):
                          "Cap to 8 projects max — symptôme de mauvais scoping au-delà.")
 
 
+class TestChangedSinceScoping(unittest.TestCase):
+    """Audit CTO 2026-06-07 — Sprint 4 #20 : per-FEAT auto-scope by mtime."""
+
+    def test_parse_args_accepts_changed_since(self):
+        args = va._parse_args(["--changed-since", "3600"])
+        self.assertEqual(args.changed_since, 3600)
+
+    def test_parse_args_default_changed_since_none(self):
+        args = va._parse_args([])
+        self.assertIsNone(args.changed_since)
+
+    def test_has_recently_modified_files_true(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp) / "Service.cs"
+            p.write_text("class X {}")
+            self.assertTrue(va._has_recently_modified_files(Path(tmp), 60))
+
+    def test_has_recently_modified_files_false_old(self):
+        import os, tempfile, time
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp) / "Service.cs"
+            p.write_text("class X {}")
+            old = time.time() - 7200
+            os.utime(p, (old, old))
+            self.assertFalse(va._has_recently_modified_files(Path(tmp), 3600))
+
+    def test_has_recently_modified_files_skips_node_modules(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            nm = Path(tmp) / "node_modules" / "lodash"
+            nm.mkdir(parents=True)
+            (nm / "index.js").write_text("// freshly generated")
+            self.assertFalse(va._has_recently_modified_files(Path(tmp), 60))
+
+
 if __name__ == "__main__":
     unittest.main()

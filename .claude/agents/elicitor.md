@@ -77,11 +77,17 @@ demander confirmation à l'utilisateur :
 ```
 La FEAT {n}-{FeatName} contient déjà des sections enrichies. Que faire ?
 1. Écraser (relancer toutes les techniques, perdre le contenu actuel)
-2. Annuler (garder l'état actuel)
+2. Annuler (garder l'état actuel)              [DEFAULT si Enter ou input vide]
 3. Étendre seulement les sections vides
 ```
 
-Mode `--quick` : présumer "Étendre seulement les sections vides".
+**Comportement (audit M4 closure 2026-06-07)** :
+- Mode `--quick` → présumer "3. Étendre seulement les sections vides" sans demander (one-shot non-interactif).
+- Mode interactif sans réponse explicite (Enter, EOF stdin, timeout 30s) → **défaut "2. Annuler"** (option safe, jamais destructive). Sortie 1 ligne : `[ELICITOR/SKIP] FEAT {n} — sections existantes préservées (default Annuler). (~7%)` puis exit silencieux.
+- Choix "1. Écraser" exige confirmation explicite (taper `1` ou `ecraser`).
+- Réponse hors {1, 2, 3, ecraser, annuler, etendre} → ré-demander 1 fois ; second échec → fallback défaut "2. Annuler".
+
+**Élimine le soft-hang** (audit M4) : avant ce fix, mode interactif sans réponse explicite restait suspendu indéfiniment ; v7.0.1 garantit une terminaison déterministe en ≤ 30s avec option safe par défaut.
 
 ---
 

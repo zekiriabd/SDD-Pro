@@ -151,5 +151,91 @@ class TestResolvePoHashSentinelHook(unittest.TestCase):
         self.assertEqual(rc, 0)
 
 
+class TestE2EPoToValidateReadiness(unittest.TestCase):
+    """C2 closure (audit CTO 2026-06-07) — E2E chain: po writes sentinel →
+    resolve_us_hash_sentinel patches → preflight._check_feat_hash reads
+    resolved hash → no [FEAT_HASH_MISMATCH] / [FEAT_HASH_LEGACY] false
+    positive. Locks down the case-sensitivity contract (`Parent FEAT hash:`
+    lowercase canonical, `Parent FEAT Hash:` / `Parent FEAT HASH:` accepted
+    by preflight regex defense-in-depth)."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        (self.root / "workspace" / "input" / "feats").mkdir(parents=True)
+        (self.root / "workspace" / "output" / "us").mkdir(parents=True)
+        self.env_patch = patch.dict(os.environ, {"CLAUDE_PROJECT_DIR": str(self.root)})
+        self.env_patch.start()
+
+    def tearDown(self):
+        self.env_patch.stop()
+        self.tmp.cleanup()
+
+    def _write_feat(self, n=1, content="# Auth FEAT\nAC-1 login\n"):
+        p = self.root / "workspace" / "input" / "feats" / f"{n}-Auth.md"
+        raw = content.encode("utf-8")
+        p.write_bytes(raw)
+        return hashlib.sha256(raw).hexdigest()[:8]
+
+    def _write_us(self, n, m, label="Parent FEAT hash"):
+        body = f"# US {n}-{m}-Login\n\n{label}: sha256:COMPUTE_REQUIRED\n\nCovers: AC-1\n"
+        p = self.root / "workspace" / "output" / "us" / f"{n}-{m}-Login.md"
+        p.write_bytes(body.encode("utf-8"))
+        return p
+
+    def test_e2e_canonical_lowercase_hash(self):
+        """po writes lowercase `Parent FEAT hash:` → resolver patches → preflight matches."""
+        expected = self._write_feat(1)
+        us_path = self._write_us(1, 1, label="Parent FEAT hash")
+
+        # Step 1 — resolver patches the sentinel
+        rc = rus.main.__wrapped__ if hasattr(rus.main, "__wrapped__") else None
+        # Direct call via argv simulation
+        import sys as _sys
+        old_argv = _sys.argv
+        try:
+            _sys.argv = ["resolve_us_hash_sentinel.py", "--feat-number", "1", "--quiet"]
+            self.assertEqual(rus.main(), 0)
+        finally:
+            _sys.argv = old_argv
+
+        # Step 2 — verify sentinel removed and real hash present
+        content = us_path.read_text(encoding="utf-8")
+        self.assertNotIn("sha256:COMPUTE_REQUIRED", content)
+        self.assertIn(f"sha256:{expected}", content)
+
+        # Step 3 — preflight._check_feat_hash reads it without error
+        from sdd_scripts.preflight import _check_feat_hash
+        errors, warns = [], []
+        _check_feat_hash(
+            us_path=us_path, feat_number=1, root=self.root,
+            add_err=lambda code, msg: errors.append((code, msg)),
+            add_warn=lambda code, msg: warns.append((code, msg)),
+        )
+        self.assertEqual(errors, [], "no error expected on resolved canonical sentinel")
+        self.assertEqual(warns, [], "no warn expected on resolved canonical sentinel")
+
+    def test_e2e_uppercase_hash_label_still_resolved(self):
+        """Defense-in-depth : if a future typo writes `Parent FEAT Hash:` (capital H),
+        the preflight regex still matches case-insensitively → no FEAT_HASH_LEGACY false positive."""
+        expected = self._write_feat(1)
+        # Write US with already-resolved hash but uppercase H in label (simulates typo)
+        body = f"# US 1-1-Login\n\nParent FEAT Hash: sha256:{expected}\n\nCovers: AC-1\n"
+        us_path = self.root / "workspace" / "output" / "us" / "1-1-Login.md"
+        us_path.write_bytes(body.encode("utf-8"))
+
+        from sdd_scripts.preflight import _check_feat_hash
+        errors, warns = [], []
+        _check_feat_hash(
+            us_path=us_path, feat_number=1, root=self.root,
+            add_err=lambda code, msg: errors.append((code, msg)),
+            add_warn=lambda code, msg: warns.append((code, msg)),
+        )
+        self.assertEqual(errors, [], "uppercase 'Hash' label should match case-insensitively (audit C2)")
+        # WARN FEAT_HASH_LEGACY should NOT fire because the regex matched
+        legacy_warns = [w for w in warns if w[0] == "FEAT_HASH_LEGACY"]
+        self.assertEqual(legacy_warns, [], "FEAT_HASH_LEGACY must not fire when label only differs in case")
+
+
 if __name__ == "__main__":
     unittest.main()

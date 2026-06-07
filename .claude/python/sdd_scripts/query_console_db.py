@@ -244,29 +244,46 @@ def query_feat_stats(feat: int) -> dict:
     }
 
 
-def query_arch_review_present(feat: int) -> dict:
-    """Predicate query : are there `[ARCH_*]` findings persisted for this FEAT ?
+def query_arch_review_present(feat: int, max_age_hours: int = 24) -> dict:
+    """Predicate query : are there FRESH `[ARCH_*]` findings persisted for this FEAT ?
 
     v7.0.0-alpha (audit CRIT-4) : used by `/sdd-review §3.0` to decide
     whether to spawn `arch-reviewer` as a standalone fallback. When the
     invocation arrives downstream of `/dev-run §6.4`, the agent has
     already run and findings exist — fallback is skipped.
 
-    Predicate semantics : main() returns exit 0 when ≥ 1 ``[ARCH_*]`` row
-    exists in `qa_code_review` for this FEAT, exit 1 otherwise. The JSON
-    payload (always emitted on stdout) carries the count for debugging.
+    v7.0.1 (audit C4 closure 2026-06-07) : added TTL filter (default 24h)
+    via `max_age_hours`. Stale findings (e.g. /dev-run ran 7 days ago and
+    the code has since changed) are ignored → fallback re-runs the agent.
+    This eliminates the silent "skip on stale data" failure mode that
+    earlier audit feared. Override via CLI flag `--max-age-hours N`
+    (0 = disable TTL, accept any age — legacy v7.0.0 behavior).
+
+    Predicate semantics : main() returns exit 0 when ≥ 1 fresh ``[ARCH_*]``
+    row exists in `qa_code_review` for this FEAT, exit 1 otherwise. The
+    JSON payload (always emitted on stdout) carries count + max_age_hours
+    for debugging.
     """
     with connect_ro() as conn:
-        row = conn.execute(
-            "SELECT COUNT(*) FROM qa_code_review "
-            "WHERE feat_n = ? AND issue_class LIKE 'ARCH_%'",
-            (feat,),
-        ).fetchone()
+        if max_age_hours and max_age_hours > 0:
+            row = conn.execute(
+                "SELECT COUNT(*) FROM qa_code_review "
+                "WHERE feat_n = ? AND issue_class LIKE 'ARCH_%' "
+                f"AND extracted_at > datetime('now', '-{int(max_age_hours)} hours')",
+                (feat,),
+            ).fetchone()
+        else:
+            row = conn.execute(
+                "SELECT COUNT(*) FROM qa_code_review "
+                "WHERE feat_n = ? AND issue_class LIKE 'ARCH_%'",
+                (feat,),
+            ).fetchone()
     count = int(row[0]) if row else 0
     return {
         "present":   count > 0,
         "feat":      feat,
         "count":     count,
+        "max_age_hours": max_age_hours,
         "_exit_code": 0 if count > 0 else 1,
     }
 
@@ -335,10 +352,16 @@ def main(argv: list[str] | None = None) -> int:
                                      description=__doc__.splitlines()[0])
     parser.add_argument("subcommand", choices=sorted(DISPATCH.keys()))
     parser.add_argument("--feat", type=int, required=True)
+    parser.add_argument("--max-age-hours", type=int, default=24,
+                        help="(arch-review-present only, v7.0.1 audit C4) TTL filter for "
+                             "freshness check ; 0 disables. Default 24h.")
     args = parser.parse_args(argv)
 
     try:
-        result = DISPATCH[args.subcommand](args.feat)
+        if args.subcommand == "arch-review-present":
+            result = query_arch_review_present(args.feat, max_age_hours=args.max_age_hours)
+        else:
+            result = DISPATCH[args.subcommand](args.feat)
     except FileNotFoundError as exc:
         sys.stderr.write(f"ERROR: query_console_db: {exc}\n")
         return CORRECTIBLE

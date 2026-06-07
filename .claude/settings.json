@@ -30,12 +30,6 @@
       "Bash(mkdir:*)",
       "Bash(mv:*)",
       "Bash(cp:*)",
-      "Bash(rm workspace/*)",
-      "Bash(rm -f workspace/*)",
-      "Bash(rm -r workspace/*)",
-      "Bash(rm -rf workspace/*)",
-      "Bash(rm workspace/output/*)",
-      "Bash(rm -rf workspace/output/*)",
       "Bash(rm -rf node_modules)",
       "Bash(rm -rf node_modules/*)",
       "Bash(rm -rf dist)",
@@ -108,9 +102,13 @@
       "Bash(go:*)",
       "Bash(make:*)",
       "Bash(cmake:*)",
-      "Bash(powershell:*)",
-      "Bash(pwsh:*)",
-      "Bash(cmd:*)"
+      "Bash(powershell -Command Get-Content:*)",
+      "Bash(powershell -Command Test-Path:*)",
+      "Bash(powershell -NoProfile -Command Get-Content:*)",
+      "Bash(pwsh -Command Get-Content:*)",
+      "Bash(pwsh -Command Test-Path:*)",
+      "Bash(cmd /c dir:*)",
+      "Bash(cmd /c type:*)"
     ],
     "_allow_bash_doc": "v7.0.0-alpha security hardening 2026-06-06 — `Bash(*)` catch-all retiré (fail-open). Toute invocation Bash hors allowlist explicite déclenche un prompt utilisateur (defaultMode=default). Pour ajouter une commande légitime : éditer cette liste OU settings.local.json (per-dev, gitignored). Deny rules ci-dessous restent en place comme filet de défense additionnel.",
     "deny": [
@@ -230,6 +228,11 @@
           {
             "type": "command",
             "command": "python -c \"import os,sys,pathlib; r=os.environ.get('CLAUDE_PROJECT_DIR') or next((str(p) for p in [pathlib.Path.cwd()]+list(pathlib.Path.cwd().parents) if (p/'.claude').is_dir()),'.'); sys.path.insert(0,r+'/.claude/python'); import _hook; _hook.run('sdd_hooks.protect_framework')\""
+          },
+          {
+            "_doc": "v7.0.0-alpha Sprint 1.4 (2026-06-06) — pre_write_lint enforces stack-CLAUDE.md forbidden patterns (Kotlin !!, Vue raw HTML, console.log, hex hardcode, etc.) at GENERATION time. Default WARN-only (exit 0 + audit log); SDD_PRE_WRITE_LINT_STRICT=1 to make exit 2 (blocking). Bypass via SDD_DISABLE_PRE_WRITE_LINT=1. Skips test paths and non-src files.",
+            "type": "command",
+            "command": "python -c \"import os,sys,pathlib; r=os.environ.get('CLAUDE_PROJECT_DIR') or next((str(p) for p in [pathlib.Path.cwd()]+list(pathlib.Path.cwd().parents) if (p/'.claude').is_dir()),'.'); sys.path.insert(0,r+'/.claude/python'); import _hook; _hook.run('sdd_hooks.pre_write_lint')\""
           }
         ]
       },
@@ -253,6 +256,16 @@
           {
             "type": "command",
             "command": "python -c \"import os,sys,pathlib; r=os.environ.get('CLAUDE_PROJECT_DIR') or next((str(p) for p in [pathlib.Path.cwd()]+list(pathlib.Path.cwd().parents) if (p/'.claude').is_dir()),'.'); sys.path.insert(0,r+'/.claude/python'); import _hook; _hook.run('sdd_hooks.preflight_stack_combo')\""
+          }
+        ]
+      },
+      {
+        "_doc": "v7.0.0-alpha (audit CTO 2026-06-07) — preflight_glob_scope blocks unbounded Globs (workspace/output/src/**/* without extension). Defense-in-depth against the token explosion post-mortem documented in agents/spec-compliance-reviewer.md (1.8M tokens / $35 from one bad Glob). Default WARN ; strict via SDD_GLOB_SCOPE_STRICT=1 ; bypass via SDD_DISABLE_GLOB_SCOPE=1.",
+        "matcher": "Glob",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -c \"import os,sys,pathlib; r=os.environ.get('CLAUDE_PROJECT_DIR') or next((str(p) for p in [pathlib.Path.cwd()]+list(pathlib.Path.cwd().parents) if (p/'.claude').is_dir()),'.'); sys.path.insert(0,r+'/.claude/python'); import _hook; _hook.run('sdd_hooks.preflight_glob_scope')\""
           }
         ]
       }

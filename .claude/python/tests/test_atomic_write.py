@@ -15,6 +15,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sdd_lib.atomic_write import (  # noqa: E402
@@ -23,6 +25,12 @@ from sdd_lib.atomic_write import (  # noqa: E402
     atomic_write_text,
     find_orphan_tmps,
 )
+
+# Smoke marker (audit CTO 2026-06-07) — atomic_write is load-bearing for
+# parallel dev-backend × dev-frontend writes on LibName shared models +
+# CLAUDE.md cleanup. A regression (truncated rename, lost fsync) corrupts
+# user code silently. Gated by `framework_smoke -m smoke`.
+pytestmark = pytest.mark.smoke
 
 
 class TestAtomicWriteText(unittest.TestCase):

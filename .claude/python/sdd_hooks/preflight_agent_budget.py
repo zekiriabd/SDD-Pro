@@ -29,6 +29,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from sdd_lib.ci import is_ci  # noqa: E402
 from sdd_lib.exit_codes import HOOK_ALLOW, HOOK_DENY  # noqa: E402
 from sdd_lib.hook_input import (  # noqa: E402
     get_nested,
@@ -116,30 +117,18 @@ def extract_us_and_feat(haystack: str) -> tuple[int, str]:
     return feat_number, us_id
 
 
-def _detect_ci() -> bool:
-    """Best-effort CI detection : any common CI env var set to a truthy value."""
-    ci_signals = (
-        "CI", "GITHUB_ACTIONS", "GITLAB_CI", "CIRCLECI",
-        "JENKINS_URL", "BUILDKITE", "TRAVIS", "TF_BUILD",   # TF_BUILD = Azure DevOps
-        "BITBUCKET_BUILD_NUMBER",
-    )
-    for var in ci_signals:
-        v = os.environ.get(var, "").strip().lower()
-        if v and v not in ("0", "false", "no"):
-            return True
-    return False
-
-
 def _resolve_mode() -> str:
     """Resolve the operative mode :
     1. SDD_BUDGET_MODE env var if explicitly set
     2. "strict" if CI env detected (codex P0 follow-up)
     3. "warn" otherwise
+
+    CI detection delegated to `sdd_lib.ci.is_ci` (SSoT, audit CTO 2026-06-07).
     """
     explicit = os.environ.get("SDD_BUDGET_MODE", "").strip().lower()
     if explicit:
         return explicit
-    if _detect_ci():
+    if is_ci():
         return "strict"
     return "warn"
 

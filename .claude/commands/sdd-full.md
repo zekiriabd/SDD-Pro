@@ -21,6 +21,92 @@ uniquement si readiness ≠ GO ou si `--plan` activé.
 
 ---
 
+## ⚡ Orchestrateur Python (Sprint 2.5 — v7.0.0-alpha 2026-06-07)
+
+> **Mode thin-wrapper recommandé** (depuis v7.0.0-alpha Sprint 2.5) :
+> au lieu de suivre les 19 STEPs ci-dessous comme pseudo-code Markdown,
+> Claude peut piloter le pipeline via 3 appels Python déterministes.
+> Substance décisionnelle = code testable (28 tests verts), spawns LLM
+> restent en Markdown.
+
+### Pattern d'usage simplifié
+
+```bash
+# 1. Construire le plan complet (0 token LLM, ~50 ms)
+python .claude/python/sdd_scripts/sdd_full_planner.py plan \
+  --feat-number {n} --json > workspace/output/.sys/.state/plan-{n}.json
+
+# 2. Init state + run_id
+RUN_ID=$(python .claude/python/sdd_scripts/sdd_state.py new-run \
+  --feat-number {n} --command "/sdd-full" --tags "$TAGS")
+
+# 3. Boucle d'orchestration jusqu'à action == "done" ou "stop"
+while true; do
+  # State courant (à enrichir au fil des phases)
+  STATE='{"completed_phases":[...],"last_status":"...","last_verdict":"...","flags":{...}}'
+
+  DECISION=$(python .claude/python/sdd_scripts/sdd_full_planner.py next-action \
+    --plan-json workspace/output/.sys/.state/plan-{n}.json \
+    --state-inline "$STATE")
+  ACTION=$(echo "$DECISION" | jq -r '.action')
+
+  case "$ACTION" in
+    skill)
+      # Claude exécute la Skill (us-generate, dev-run, qa-generate, etc.)
+      SKILL=$(echo "$DECISION" | jq -r '.skill')
+      # …Skill invocation (Claude tool call)…
+      ;;
+    script)
+      # Script déterministe (sdd-review, etc.)
+      SCRIPT=$(echo "$DECISION" | jq -r '.script')
+      ARGS=$(echo "$DECISION" | jq -r '.args[]')
+      python "$SCRIPT" $ARGS
+      ;;
+    skip)
+      # Phase skippée par le plan — marquer completed et continuer
+      ;;
+    stop|done)
+      break
+      ;;
+  esac
+
+  # Update state : ajouter la phase à completed_phases, capturer verdict
+done
+
+# 4. Recap final (déterministe — lit state.json + console.db)
+python .claude/python/sdd_scripts/sdd_full_planner.py recap --run-id "$RUN_ID"
+```
+
+### Subcommands `sdd_full_planner.py`
+
+| Subcmd | Rôle | Input | Output |
+|---|---|---|---|
+| `plan` | Construit le plan exécution (phases à pending/skip/blocked) | `--feat-number N` | JSON plan |
+| `next-action` | Décide quoi faire ensuite selon state + plan | `--plan-json` + `--state-inline` | JSON decision (`action`/`skill`/`script`/`reason`) |
+| `recap` | Récap final (read state + tokens + verdicts) | `--run-id R` | Markdown rendu (ou `--json`) |
+
+**Garanties** :
+- Action `dev-backend`/`qa-api-gate`/`dev-frontend` → coalescée en un seul `/dev-run`
+  (le orchestrateur dev-run interne gère la séquence back→gate→front)
+- Action `feat-validate` WARN sans `--force` → automatiquement → action `stop`
+- Phase `fail` propage `stop` immédiat (sauf si flag override explicite)
+- Plan auto-skip arch quand bootstrap stable (`detect_arch_shortcircuit`)
+- Plan auto-skip us-generate quand US déjà présentes
+
+> **Statut** (audit CTO 2026-06-07) : le module `sdd_full_planner.py` est
+> **livré et testé** (33 tests pytest verts, P0 false-positive completion
+> guard câblé). Il est désormais le **pattern recommandé** pour piloter
+> `/sdd-full` — la substance décisionnelle est testable, les spawns LLM
+> restent en Markdown.
+>
+> Le pseudo-bash des STEPs 1-5 ci-dessous reste **valide** comme spec
+> step-by-step (référence humaine + backward-compat). À horizon v7.2.0,
+> les STEPs Markdown seront re-générés depuis le planner Python pour
+> garantir cohérence permanente (ADR `governance-major-orchestrator-python`,
+> cf. `docs/adrs/ADR-20260606T222017-344c-governance-major-sprint-...`).
+
+---
+
 ## Utilisation
 
 ```
@@ -47,6 +133,21 @@ uniquement si readiness ≠ GO ou si `--plan` activé.
 
 **Activation projet** : `PlanReviewDefault: true` dans `## Project Config`
 de `workspace/input/stack/stack.md` rend `--plan` actif par défaut.
+
+**Gates automatiques (hooks Claude Code)** — fire silencieusement sans
+configuration, bypass uniquement par env var (audit-loggué) :
+
+| Gate hook | Script | Bloquant | Bypass env var |
+|---|---|:---:|---|
+| Cost cap par run | `sdd_hooks/preflight_cost_cap.py` | ✅ ($USD ≥ `MaxCostPerRun`, default $50) | `SDD_DISABLE_COST_CAP=1` |
+| Stack combo non listé | `sdd_hooks/preflight_stack_combo.py` | ✅ (combo absent des 13 SLA) | `SDD_ALLOW_UNTESTED_COMBO=1` |
+| Acceptance Gate post-qa | `sdd_hooks/validate_acceptance_gate.py` + `sdd_scripts/validate_acceptance.py` | ✅ en mode `strict` (test/lint/build/coverage/smoke/E2E) | `SDD_ALLOW_ACCEPTANCE_BYPASS=1` |
+| Cost cap par US build_loop | dev-* internal | ✅ ($USD ≥ `BuildLoopMaxCostUsd`, default $15) | `BuildLoopMaxCostUsd: 0` config |
+| Force-cumul anti-bypass | `sdd_hooks/preflight_force_cumul.py` | ✅ (≥ 2 bypass flags cumulés) | `SDD_ALLOW_FORCE=1` |
+
+Cf. `error-classification.md §1.2` pour les classes `[COST_CAP_EXCEEDED]`,
+`[BUILD_LOOP_COST_EXCEEDED]`, `[ACCEPTANCE_GATE_FAILED]`,
+`[FORCE_CUMUL_REJECTED]`.
 
 **Chemin From-Plan Strict (RETIRÉ v7.0.0)** : les variants
 `dev-backend-strict` et `dev-frontend-strict` (Sonnet 4.6, v6.2-v6.10) ont
@@ -111,8 +212,15 @@ python .claude/python/sdd_scripts/preflight_force_cumul.py \
 
 | Exit | Action |
 |:-:|---|
-| 0 | continuer STEP 1.ter (cas normal, bypass simple, ou cumul autorisé via `SDD_ALLOW_FORCE`) |
+| 0 | continuer STEP 1.ter + **`export SDD_FORCE_CUMUL_OK=1`** (sentinelle court-circuit M9 closure) |
 | 1 | **STOP** + ERROR `[FORCE_CUMUL_REJECTED]` déjà émis par le script sur stderr |
+
+```bash
+# Audit M9 closure 2026-06-07 — export sentinelle pour court-circuit STEP 3.6.quart
+if [ "$CUMUL_EXIT_STEP_1_BIS" = "0" ]; then
+  export SDD_FORCE_CUMUL_OK=1
+fi
+```
 
 Le script reproduit fidèlement la logique documentée historiquement à
 STEP 3.6.quart (mêmes seuils, même env var, même format ERROR). STEP
@@ -165,17 +273,25 @@ RESUME_TARGET=$(python .claude/python/sdd_scripts/sdd_state.py resume-target \
 echo "RESUME: skipping to $RESUME_TARGET"
 ```
 
-**Convention de routing post-resume** : chaque STEP majeur (2, 3, 4, 4.5,
-5, 5.5) débute par une garde :
-```
-if [ "$RESUME_TARGET" != "" ] && [ "$RESUME_TARGET" > "STEP_X" ]; then
+**Convention de routing post-resume** : chaque STEP majeur (2, 2.6, 2.7,
+3.5, 4, 5, 5.5) débute par une garde Python (audit CTO 2026-06-07 — le
+bash `[ "$RT" > "STEP_X" ]` antérieur était (a) une redirection vers
+fichier nommé `STEP_X`, (b) lex-compare faux sur `STEP_2.6` vs `STEP_10`).
+
+```bash
+# Exit 0 = SKIP, Exit 1 = RUN. Gate déterministe sur l'ordre canonique
+# défini par _PIPELINE_PHASES_ORDER dans sdd_state.py.
+if python .claude/python/sdd_scripts/sdd_state.py should-skip-step \
+     --target "$RESUME_TARGET" --current "STEP_X" ; then
     echo "[RESUME] skipping STEP X (already done in run $RUN_ID)"
     continue   # passer au STEP suivant
 fi
 ```
+
 Ce garde rend `--resume` vraiment opérationnel (sinon le pipeline relance
-tout, idempotent mais coûteux LLM). Cf. `sdd_state.py resume-target`
-qui implémente la table de décision.
+tout, idempotent mais coûteux LLM). Cf. `sdd_state.py resume-target` qui
+calcule la cible, `should-skip-step` qui gate. Si `--target` ou `--current`
+sont hors pipeline canonique, la gate retombe en RUN (exit 1) par sécurité.
 
 Stocker `$RUN_ID` pour les appels `set-phase` ultérieurs (STEPs 3, 3.5,
 4, 4.5, 4.7). Si la primitive échoue (script absent, FS lecture seule),
@@ -464,18 +580,31 @@ Glob `workspace/output/plans/{n}-*-*.{back,front}.md`.
 
 ## STEP 3.6.quart — Anti-cumul bypass (defense-in-depth)
 
-> **No-op idempotent** si STEP 1.bis a tourné (cas normal). Conservé comme
-> filet de sécurité pour invocations chaînées qui sauteraient le CLI parsing.
-> Logique + convention env var `SDD_ALLOW_FORCE` : cf. STEP 1.bis.
+> **No-op idempotent prouvé** (audit M9 closure 2026-06-07) : ce STEP 3.6.quart est conservé comme **filet de sécurité** pour les invocations chaînées qui sauteraient le CLI parsing du STEP 1.bis. La preuve d'idempotence repose sur :
+>
+> 1. **Inputs identiques** : `preflight_force_cumul.py` ne lit que les flags CLI `$FORCE`/`$NO_PLAN_ON_WARN`/`$NO_VALIDATE` + env var `SDD_ALLOW_FORCE` — aucune mutation entre STEP 1.bis (juste après parse args) et STEP 3.6.quart (post-STEP 3.6 plans). Les variables shell ne sont pas mutées par les STEPs intermédiaires.
+> 2. **Comportement déterministe** : le script est pure-fonction (no FS read/write, no DB, no network) — même input = même output, exit 0 ou 1.
+> 3. **Skip court-circuit** : si la sentinelle `SDD_FORCE_CUMUL_OK=1` est déjà exportée par STEP 1.bis (succès), STEP 3.6.quart court-circuite l'invocation Python (~10ms saved par run).
 
 ```bash
-python .claude/python/sdd_scripts/preflight_force_cumul.py \
-  $( [ "$FORCE" = "true" ]            && echo --force ) \
-  $( [ "$NO_PLAN_ON_WARN" = "true" ]  && echo --no-plan-on-warn ) \
-  $( [ "$NO_VALIDATE" = "true" ]      && echo --no-validate )
+# Court-circuit idempotent — STEP 1.bis a déjà validé
+if [ "$SDD_FORCE_CUMUL_OK" = "1" ]; then
+  echo "[VALIDATE/SKIP] force-cumul defense-in-depth already validated at STEP 1.bis. (~32%)"
+else
+  python .claude/python/sdd_scripts/preflight_force_cumul.py \
+    $( [ "$FORCE" = "true" ]            && echo --force ) \
+    $( [ "$NO_PLAN_ON_WARN" = "true" ]  && echo --no-plan-on-warn ) \
+    $( [ "$NO_VALIDATE" = "true" ]      && echo --no-validate )
+  CUMUL_EXIT=$?
+  if [ "$CUMUL_EXIT" -ne 0 ]; then
+    exit 1  # STOP + ERROR [FORCE_CUMUL_REJECTED] (cf. STEP 1.bis ERROR format)
+  fi
+fi
 ```
 
 Exit 1 → STOP + ERROR `[FORCE_CUMUL_REJECTED]`.
+
+> **À noter** : STEP 1.bis doit `export SDD_FORCE_CUMUL_OK=1` après succès pour activer le court-circuit ci-dessus. Si cette ligne d'export est absente (incident sub-shell mort), STEP 3.6.quart re-invoque le script normalement → comportement legacy préservé.
 
 ---
 
@@ -511,13 +640,25 @@ Exécuter intégralement `/dev-run {n}` (validation blocs `## Active
 Database` / `## Active Auth Specs` de stack.md → short-circuit arch
 ou bootstrap+DB → dev-backend + dev-frontend gated/parallèles bornés).
 
-**Propagation des flags** : si `/sdd-full` a reçu `--rebuild-arch`,
-passer le flag à `/dev-run` :
-```
-/dev-run {n} --rebuild-arch
+**Propagation des flags + run_id (audit M7 closure 2026-06-07)** :
+```bash
+# Toujours propager le RUN_ID actuel via env var SDD_RUN_ID pour que
+# /dev-run puisse (a) reprendre proprement après crash en STEP 4 sans
+# re-créer un nouveau run_id orphelin, (b) écrire ses set-phase sous le
+# même run_id que les phases STEP 2/3 amont (continuité audit-trail).
+export SDD_RUN_ID="$RUN_ID"
+
+# Propagation flag --rebuild-arch si présent
+if [ "$REBUILD_ARCH" = "true" ]; then
+  /dev-run {n} --rebuild-arch
+else
+  /dev-run {n}
+fi
 ```
 Sinon, invocation simple `/dev-run {n}` — qui décidera lui-même via
 son STEP 4.bis si arch est requis.
+
+> **v7.0.1 (audit M7)** : avant ce fix, `/sdd-full` n'exportait pas `SDD_RUN_ID` → si STEP 4 crashait mid-flight (kill -9, OOM, panne réseau), un redémarrage `/dev-run` standalone créait un **nouveau** run_id orphelin et toutes les set-phase ultérieures étaient découplées du run /sdd-full parent. Résultat : audit-trail fragmenté, resume cassé. Le `sdd_state.py new-run` détecte désormais `SDD_RUN_ID` env var et **reprend l'existant** au lieu de créer un nouveau (idempotent).
 
 | Sortie | Action |
 |---|---|
@@ -604,6 +745,46 @@ FIX: corriger les tests/coverage via /dev-run {n} (idempotent), puis re-run /sdd
 GREEN/YELLOW/RED sont également propagés au récap STEP 5.
 
 **State tracking** : set-phase phase=qa-generate (schema payload cf. STEP 1.ter). Status `skip` si `QAMode ∈ {off, manual}`.
+
+---
+
+## STEP 4.7 — Spec-compliance gate post-dev (v7.0.1, audit C3 closure 2026-06-07)
+
+> **v7.0.1 (audit C3 closure)** : ce STEP avait été planifié v7.2.0 sous ADR `governance-sdd-full-spec-gate-post-dev` mais avancé à v7.0.1 suite à l'audit CTO. **Avant ce fix**, `feat-validate` invoqué en STEP 3.5 (pré-dev) skippait silencieusement la spec-compliance gate (`HAS_CODE=null`) et **jamais réinvoqué** post-dev → la valeur ajoutée de spec-compliance était silencieusement contournée dans le flow `/sdd-full` nominal.
+
+**Action** : ré-invoquer `/feat-validate {n}` **post-`/dev-run`** pour activer la spec-compliance gate maintenant que le code est matérialisé.
+
+```bash
+# Lire SpecComplianceRequiredForFeatValidate (défaut true v7.0.0)
+SPEC_REQ=$(python -c "
+import sys; sys.path.insert(0, '.claude/python')
+from sdd_lib.layered_config import read_layered_config
+cfg = read_layered_config()
+print(str(cfg.get('SpecComplianceRequiredForFeatValidate', 'true')).lower())
+" 2>/dev/null || echo 'true')
+
+if [ "$SPEC_REQ" = "false" ]; then
+  echo "[VALIDATE/SKIP] spec-compliance gate bypassed via Project Config. (~89%)"
+else
+  # Re-invoquer /feat-validate — cette fois HAS_CODE != null → gate active
+  /feat-validate {n} --json --post-dev > /tmp/feat-validate-postdev-{RUN_ID}.json 2>/dev/null
+  POSTDEV_EXIT=$?
+fi
+```
+
+**Mapping exit code → comportement** (symétrique STEP 4.5 QA gate) :
+
+| Exit | Verdict | Comportement |
+|---|---|---|
+| `0` | spec-compliance GREEN (ou skipped via bypass) | continuer STEP 4.8 |
+| `1` | spec-compliance RED (≥ 1 AC critical non vérifiée) | **STOP** + ERROR `[SPEC_COMPLIANCE_RED]` (cf. error-classification.md §1.13) |
+| `2` | spec-compliance.json absent | **STOP** + ERROR `[SPEC_COMPLIANCE_REQUIRED]` (`/dev-run §6.4` aurait dû spawner spec-compliance-reviewer — incident infra) |
+
+**Bypass explicite** : `SpecComplianceRequiredForFeatValidate: false` dans `## Project Config` → continuer même sur findings, verdict inclus au récap.
+
+**Idempotence** : si `spec-compliance.json` déjà frais (<1h, ce qui est le cas car `/dev-run §6.4` vient juste de tourner), `/feat-validate` lit le fichier existant — pas de re-spawn d'agent. Coût marginal : ~50ms (lecture JSON + parsing déterministe).
+
+**State tracking** : set-phase phase=feat-validate-postdev. Status `skip` si bypass.
 
 ---
 

@@ -8,10 +8,10 @@
     "files": ["workspace/output/src/{BackendName}/{BackendName}.csproj"]
   },
   "versions": {
-    "ef-core": "9.0.4",
-    "ef-core-sqlserver": "9.0.4",
-    "ef-core-sqlite": "9.0.4",
-    "npgsql-ef": "9.0.4",
+    "ef-core": "10.0.0",
+    "ef-core-sqlserver": "10.0.0",
+    "ef-core-sqlite": "10.0.0",
+    "npgsql-ef": "10.0.0",
     "pomelo-mysql": "9.0.0",
     "oracle-ef": "9.23.60",
     "mongodb-ef": "9.0.0",
@@ -25,21 +25,21 @@
     "fluentvalidation": "11.11.0",
     "fluentvalidation-aspnetcore": "11.3.1",
     "polly": "8.5.1",
-    "http-resilience": "9.0.0",
-    "caching-memory": "9.0.0",
-    "asp-openapi": "9.0.4",
+    "http-resilience": "10.0.0",
+    "caching-memory": "10.0.0",
+    "asp-openapi": "10.0.0",
     "epplus": "7.5.3",
     "closedxml": "0.104.2",
     "questpdf": "2024.12.3",
     "itext7": "9.0.0",
     "mediatr": "12.4.1",
     "stackexchange-redis": "2.8.16",
-    "caching-redis": "9.0.0",
+    "caching-redis": "10.0.0",
     "mapster": "7.4.0",
     "mailkit": "4.8.0",
     "mimekit": "4.8.0",
     "bcrypt-net": "4.0.3",
-    "jwt-bearer": "9.0.4"
+    "jwt-bearer": "10.0.0"
   },
   "dbDrivers": {
     "sqlserver": {

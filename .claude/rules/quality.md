@@ -9,6 +9,9 @@
   schéma `coverage.json` normalisé, classes d'erreur `[QA_*]`.
 - **Partie B — UI Tokens** (§B.1-§B.7) : agent dev-frontend, variables
   CSS, anti-hex-hardcode, classe `[UI_TOKEN_VIOLATION]`.
+- **Partie C — Acceptance Gate** (§C.1-§C.7) : checks bloquants par projet
+  (test/lint/build/coverage/smoke/E2E), hook `SubagentStop` matcher=qa,
+  classe `[ACCEPTANCE_GATE_FAILED]`.
 
 ---
 
@@ -374,7 +377,7 @@ avec des hex différents → violation §B.5.
 **Liens avec autres règles** :
 - `docs/principles/source-first.md` : tout bug de fidélité visuelle →
   patcher cette règle (si gap) AVANT le composant.
-- `file-ownership.md §1` : seul `dev-frontend` édite `theme.css` /
+- `ownership.md §1` (Partie A) : seul `dev-frontend` édite `theme.css` /
   `index.css` (réservé en augment, pas réécriture intégrale).
 - Stacks UI : `stacks/ui/shadcn.md §3`, `vuetify.md §3`,
   `radzen-blazor.md §3` inlinent la syntaxe spécifique. Cette partie

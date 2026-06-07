@@ -3,16 +3,30 @@ requires = ["setuptools>=64", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-# v7.0.0 audit M8 (2026-05-20) : the SDD_Pro framework versions
-# (loader.yml `version: 7.0.0-alpha`, CLAUDE.md, CHANGELOG.md) track the
-# DSL surface (agents/commands/rules/stacks/prompts) which evolves on a
-# different cadence than this Python tooling. Keep these versions
-# intentionally decoupled. Framework version = WHAT the framework
-# promises ; this `version` = the Python package that ships hooks +
-# scripts (utility code, no DSL contract). Bumped only when packaging
-# semantics change (deps, entry points, CLI surface).
+# v7.0.0 audit M8 (2026-05-20, REVISED audit CTO 2026-06-07 — marketing/comm
+# alignment) : Python package version is now **lock-stepped** with the
+# framework version (`loader.yml` / CLAUDE.md / CHANGELOG.md) on the major
+# and minor digits. PEP 440 canonical form maps the framework's "alpha"
+# suffix to the standard `aN` form :
+#   framework `7.0.0-alpha`  ←→  Python `7.0.0a0`
+#   framework `7.1.0`        ←→  Python `7.1.0`
+#   framework `7.2.0-beta.1` ←→  Python `7.2.0b1`
+#
+# Rationale (revised) : the prior "different cadence" decoupling was
+# theoretical — in practice, ANY DSL change (new agent, new hook, new
+# rule format) pulls a Python tooling change (loader.yml parser update,
+# new validate_* script, new hook). External users (pip install
+# sdd-pro-tools) were confused by `0.1.0` vs the v7.0 marketing surface.
+# Lock-step alignment removes that ambiguity.
+#
+# Surfaces exposing the version :
+#   - this file (PEP 440 canonical)                 : `version`
+#   - sdd_lib.__init__ (Python API)                 : `__version__` + `__framework_version__`
+#   - loader.yml (DSL contract)                     : `version: "7.0.0-alpha"`
+#   - .claude/CLAUDE.md, docs/CHANGELOG.md           : human-readable
+# All MUST be bumped together. Tested by tests/test_version_alignment.py.
 name = "sdd-pro-tools"
-version = "0.1.0"
+version = "7.0.0a0"
 description = "SDD_Pro framework hooks and scripts (Python port for cross-platform support, no LLM)"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -84,6 +98,14 @@ testpaths = ["tests"]
 python_files = "test_*.py"
 addopts = "-ra -q"
 cache_dir = ".cache/pytest"
+# Custom markers — `smoke` flags critical-path tests run by
+# `framework_smoke.py` (pytest -m smoke). Add to any test that should
+# never regress silently (blocking hooks, exit_codes, atomic_write,
+# file_locks, ADR collision, etc.). Without registration here, pytest
+# emits PytestUnknownMarkWarning and the smoke gate flags WARN.
+markers = [
+    "smoke: critical-path tests gated by `framework_smoke.py` (audit CTO 2026-06-07)",
+]
 
 # ---------------------------------------------------------------------------
 # Coverage (audit M6, 2026-06-06) — the framework imposes CoverageMin to
@@ -121,3 +143,34 @@ exclude_lines = [
     "if TYPE_CHECKING:",
     "\\.\\.\\.",
 ]
+
+# Ruff config — P1-4 fix 2026-06-07 : baseline-blocking lint enabled on CI.
+# Initial selection = critical rules only (real bugs, not style). After
+# stabilization, expand to E/W (pycodestyle) and I (isort) progressively
+# with dedicated PRs.
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+exclude = [
+    "__pycache__",
+    ".pytest_cache",
+    "tests/fixtures",
+]
+
+[tool.ruff.lint]
+# v7.0.0-alpha baseline (P1-4 fix 2026-06-07) — minimal lint blocking on
+# real bugs only. Style + security rules deferred to dedicated PRs once
+# the codebase has progressive cleanup capacity. Select only the
+# **fail-safe** rules that catch undefined names, undeclared variables,
+# and outright bugs — no style nitpicks, no security false-positives.
+#
+# Roadmap : expand to F541/F401/B/S progressively after dedicated cleanup
+# sprints (~131 pre-existing issues counted 2026-06-07, mostly F-string
+# placeholders + unused imports — non-critical but to be addressed).
+select = ["F821", "F811", "F823"]  # undefined name, redefined import, local before assign
+ignore = []
+
+# Per-file ignores : tests can use private helpers
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["F401"]                       # imports for test fixtures often unused
+"sdd_admin/migrate_exit_codes.py" = ["F811"]     # legitimate redefinition

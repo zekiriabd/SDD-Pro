@@ -211,15 +211,17 @@ Interdiction :
 
 ---
 
-## 4. Librairies
+<!-- LIBS_CATALOG_START -->
+### 2.4 Librairies
 
-- Radzen.Blazor
+> Source de verite : `.claude/stacks/ui/radzen-blazor.libs.json`. Ne pas editer cette section manuellement -- utiliser `.claude/python/sdd_admin/sync_stack_md.py --stack-id radzen-blazor`.
 
-Role :
+#### 2.4.a Librairies CORE (installees par arch en section 2.2.1, toujours)
 
-- Fournit tous les composants UI
-- Fournit les services UX
-- Standardise l’interface utilisateur
+| Lib | Version | Role |
+|-----|---------|------|
+| Radzen.Blazor | 5.5.7 | Design system Radzen complet pour Blazor (Server + WebAssembly) — composants UI, layout, navigation, services UX (Dialog/Notification/Tooltip). |
+<!-- LIBS_CATALOG_END -->
 
 ---
 

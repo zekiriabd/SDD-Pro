@@ -151,10 +151,13 @@ jobs:
         run: python bootstrap.py --auto-init --dry-run --skip-install
 
       - name: Lint Python (ruff)
-        continue-on-error: true   # ruff not yet configured in pyproject; soft for v7.0.0
+        # P1-4 fix 2026-06-07 : ruff is now blocking. Baseline established —
+        # any new lint violation must be fixed (or `# noqa: SPECIFIC_CODE`
+        # with justification). To bypass per-PR : add `continue-on-error: true`
+        # explicitly with `[skip-ruff]` in commit message + reviewer approval.
         run: |
-          pip install ruff
-          ruff check .claude/python/ || true
+          pip install ruff==0.6.9
+          ruff check .claude/python/
 
   console-build:
     name: Console web build smoke

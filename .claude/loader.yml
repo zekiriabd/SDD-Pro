@@ -142,7 +142,11 @@ po:
 arch:
   reads:
     - workspace/input/stack/stack.md
-    - .claude/stacks/{cat}/{active}.md   # tous stacks actifs (sélectif — backend, frontend, ui, auth, qa, fullstack, mobiles). fullstack/* et mobiles/* chargeables mais 🟡 expérimentaux (jamais validés bout-en-bout).
+    - .claude/stacks/{cat}/{active}.md   # tous stacks actifs (sélectif — backend, frontend, ui, auth, qa, fullstack, mobiles).
+    # NOTE MN4 (audit 2026-06-07) — Distinction stack vs combo :
+    #   - Côté STACK atomique : fullstack/* et mobiles/* restent 🟡 « experimental » (jamais validés en isolation end-to-end).
+    #   - Côté COMBO (assemblage de 3-6 stacks) : 5 fullstacks (angular-universal, blazor-server, kotlin-mustache, next, nuxt) et 2 mobiles (maui Windows, react-native Expo Web) sont 🟢 bench-validated runtime 2026-06-05 dans des combos précis (cf. docs/validated-combos.md §1.3).
+    # Marquage runtime via `preflight_stack_combo` (combos.json) ; la doc d'un stack reste à son tier d'isolation.
     - .claude/stacks/archi/{ArchiPattern}.md  # MVC (défaut) / DDD / microservice (🟡 expérimental) — UNIQUEMENT si AppType=back-front (v6.7.6+).
     - .claude/templates/adr.template.md  # v3 — nécessaire pour Phase D
     - workspace/output/.sys/.context/constitution.md     # v3 — si présent
@@ -452,7 +456,14 @@ code-reviewer:
     - workspace/output/src/                       # read-only strict (rapport seul, jamais patch)
     - workspace/output/us/                        # responsabilité po
     - workspace/output/qa/                        # responsabilité qa
-    - workspace/output/dashboard/                 # legacy v6 (agent dashboard retiré v7.0.0)
+    # NOTE M14 (audit 2026-06-07) — la ligne `workspace/output/dashboard/`
+    # ci-dessous est un GUARD-RAIL HISTORIQUE défensif (3 occurrences cumulées
+    # pour les 3 reviewers : code-reviewer + security-reviewer +
+    # spec-compliance-reviewer). L'agent `dashboard` a été retiré v7.0.0
+    # mais l'entrée est conservée à dessein : empêche qu'une future ré-introduction
+    # accidentelle d'un agent dashboard ne fasse Write dans ce chemin par
+    # un auditor. Ne PAS retirer sans ADR `governance-cleanup-forbidden-dashboard`.
+    - workspace/output/dashboard/                 # legacy v6 guard-rail (agent dashboard retiré v7.0.0, cf. note M14 ci-dessus)
     - workspace/output/.sys/.context/             # responsabilité po/arch/elicitor
     - workspace/output/plans/                     # le reviewer ne planifie pas
   modes:                                          # selon CodeReviewMode dans Project Config
@@ -589,42 +600,35 @@ adversarial-reviewer:
   idempotent: true
 
 # -------------------------------------------------------------------------
-# Agent: security-reviewer (Sonnet 4.6) — depuis v6.3.2
-# Phase: 3.5 (mode threat-model, post-arch, pré-dev) ET 6.5 (mode scan, post-dev)
-# Token footprint estimé:
-#   - mode threat-model : ~5-8 KB par feature
-#   - mode scan         : ~10-20 KB par feature
-# Invocation: manuelle en v6.3.2.0 ("threat model de la FEAT N" / "security scan de la FEAT N")
-#             auto-invoke depuis /feat-validate + /dev-run en v6.3.2.1 (à venir)
-# Skip silencieux si SecurityMode: off ou mode désactivé
+# Agent: security-reviewer (Sonnet 4.6)
+# Phase: 6.4 (mode scan uniquement, post-dev — dev-run STEP 6.4 batch auditors)
+# Token footprint estimé: ~10-20 KB par feature
+#
+# v7.0.0 — Mode `threat-model` RETIRÉ (governance-major-auditors-trim).
+# Remplacement : template humain `.claude/templates/threat-model.template.md`
+# (STRIDE light, ~15-30 min, ADR). Le pipeline n'invoque plus l'agent en
+# mode threat-model — seul le mode scan reste actif.
 # -------------------------------------------------------------------------
 security-reviewer:
   reads:
-    # Communes aux 2 modes
-    - workspace/input/stack/stack.md             # Project Config (SecurityMode, SecurityFailOn, *Enabled)
-    - .claude/rules/error-classification.md      # taxonomie [SEC_*] §1.11
-    - workspace/input/feats/{n}-*.md             # FEAT parente
-    - workspace/output/us/{n}-*.md               # US ciblées (passif)
-    # Mode threat-model (pré-dev)
-    - workspace/output/.sys/.context/constitution.md   # §3 acteurs, §4 stack, §7 risques
-    - .claude/stacks/auth/{active}.md      # patterns d'auth + threats §5 si présent
-    - .claude/stacks/backend/{active}.md §3  # conventions endpoint/middleware
-    # Mode scan (post-dev)
+    - workspace/input/stack/stack.md                # Project Config (SecurityMode, SecurityFailOn, *Enabled)
+    - .claude/rules/error-classification.md         # taxonomie [SEC_*] §1.11
+    - workspace/input/feats/{n}-*.md                # FEAT parente
+    - workspace/output/us/{n}-*.md                  # US ciblées (passif)
     - workspace/output/src/{BackendName}/CLAUDE.md  # architecture backend
     - workspace/output/src/{AppName}/CLAUDE.md      # architecture frontend
     - .claude/stacks/backend/{active}.md §1.3+§3+§2.4
     - .claude/stacks/frontend/{active}.md §1.3+§3
+    - .claude/stacks/auth/{active}.md §2-§3         # patterns d'auth (lecture passive)
     - workspace/output/plans/{n}-*.{back,front}.md  # mode preferred : lecture sélective via plan
-    - workspace/output/src/{BackendName}/**        # code production (fallback convention)
-    - workspace/output/src/{AppName}/**            # code production
-    - workspace/output/src/{LibName}/**            # lib partagée si présente
-    - workspace/output/.sys/.validation/{n}-code-review.json  # mode scan : dé-dup secrets avec code-reviewer (§6)
+    - workspace/output/src/{BackendName}/**         # code production (fallback convention)
+    - workspace/output/src/{AppName}/**             # code production
+    - workspace/output/src/{LibName}/**             # lib partagée si présente
+    - workspace/output/.sys/.validation/{n}-code-review.json  # dé-dup secrets avec code-reviewer (§6)
     # Anti-pattern strict : ne JAMAIS Glob workspace/output/src/**/* (lecture sélective)
   writes:
-    - workspace/output/.sys/.validation/{n}-threat-model.md       # mode threat-model
-    - workspace/output/.sys/.validation/{n}-threat-model.json     # mode threat-model
-    - workspace/output/.sys/.validation/{n}-security-scan.md      # mode scan
-    - workspace/output/.sys/.validation/{n}-security-scan.json    # mode scan
+    - workspace/output/.sys/.validation/{n}-security-scan.md
+    - workspace/output/.sys/.validation/{n}-security-scan.json
   forbidden_reads:
     - workspace/output/us/{other-feat}            # autres FEATs
     - workspace/input/feats/{other}.md            # autres FEATs
@@ -650,14 +654,12 @@ security-reviewer:
     - workspace/output/plans/                     # ne planifie pas
     - workspace/output/.sys/.validation/{n}-code-review.*  # responsabilité code-reviewer
     - workspace/output/.sys/.validation/{n}-readiness.md   # responsabilité /feat-validate
-  modes:                                          # --mode arg
-    - threat-model: "pré-dev, post-arch — STRIDE light + assets/actors/surfaces/controls (informational)"
+  modes:                                          # mode `scan` uniquement depuis v7.0.0
     - scan: "post-dev — OWASP Top 10 2021 (A01,A02,A03,A05,A07,A08,A09,A10) + verdict 🟢/🟡/🔴"
   config_flags:                                   # dans Project Config
-    - SecurityMode: "off | full | manual (défaut: manual)"
-    - SecurityThreatModelEnabled: "true | false (défaut: true)"
+    - SecurityMode: "off | full | manual (défaut: full)"
     - SecurityScanEnabled: "true | false (défaut: true)"
-    - SecurityFailOn: "critical | serious | moderate | minor (défaut: critical, scan mode uniquement)"
+    - SecurityFailOn: "critical | serious | moderate | minor (défaut: critical)"
   hard_blocking_classes:                          # override SecurityFailOn → toujours 🔴 RED en mode scan
     - "[SEC_SECRET_HARDCODED]"
     - "[SEC_SQL_INJECTION]"
@@ -671,8 +673,7 @@ security-reviewer:
     - "Mode scan dé-duplique [SEC_SECRET_HARDCODED] vs [REVIEW_SECRETS_HARDCODED] de code-reviewer (cf. agent §6)"
   exit_silent_when:
     - "SecurityMode: off"
-    - "mode=threat-model AND SecurityThreatModelEnabled: false"
-    - "mode=scan AND SecurityScanEnabled: false"
+    - "SecurityScanEnabled: false"
   idempotent: true                                # peut être ré-invoqué sans risque
 
 # (Stub performance-auditor déplacé en fin de fichier

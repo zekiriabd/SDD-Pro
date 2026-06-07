@@ -49,6 +49,26 @@ dotnet add package Microsoft.Playwright
 dotnet build && pwsh bin/Debug/net10.0/playwright.ps1 install
 ```
 
+<!-- LIBS_CATALOG_START -->
+### 2.4 Librairies
+
+> Source de verite : `.claude/stacks/qa/playwright.libs.json`. Ne pas editer cette section manuellement -- utiliser `.claude/python/sdd_admin/sync_stack_md.py --stack-id playwright`.
+
+#### 2.4.a Librairies CORE (installees par arch en section 2.2.1, toujours)
+
+| Lib | Version | Role |
+|-----|---------|------|
+| @playwright/test | 1.48.2 | Test runner E2E Node-based stacks (react, vue, angular). |
+
+### 2.4.b Librairies ON-DEMAND (installees si l'US declenche)
+
+Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'US + ACs.
+
+| Capability | Lib | Version | Triggers |
+|---|---|---|---|
+| blazor-e2e | Microsoft.Playwright | 1.48.0 | frontend/blazor-webassembly, blazor.*e2e, \.cshtml |
+<!-- LIBS_CATALOG_END -->
+
 ## 3. Layout généré
 
 ```

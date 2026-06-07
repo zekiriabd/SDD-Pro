@@ -159,7 +159,12 @@ def test_new_run_returns_runid_and_persists(monkeypatch, fake_repo, db_path, cap
     ])
     assert rc == 0
     run_id = capsys.readouterr().out.strip()
-    assert re.match(r"^[0-9a-f]{12}$", run_id)
+    # Sprint 1.1 fix (2026-06-06) : run_id format is now {YYYYMMDDTHHmmss}-{4-hex}
+    # (unified with hook telemetry via sdd_lib.run_id.get_or_create_run_id).
+    # Accept legacy uuid4().hex[:12] (12-hex) for backward-compat.
+    assert re.match(r"^[0-9a-f]{12}$", run_id) or re.match(
+        r"^[0-9]{8}T[0-9]{6}-[0-9a-f]{4}$", run_id
+    )
     assert db_path.exists()
     with _open_db(db_path) as conn:
         row = conn.execute("SELECT * FROM runs WHERE run_id = ?", (run_id,)).fetchone()
@@ -417,3 +422,65 @@ def test_emit_event_with_unknown_run_still_inserts_with_feat_0(monkeypatch, fake
         ).fetchall()
         assert len(evts) == 1
         assert evts[0]["feat_n"] == 0
+
+
+# ---------- should-skip-step (audit CTO 2026-06-07 — gate shell-safe) ----------
+# These tests pin the contract of the new `should-skip-step` subcommand which
+# replaced the broken bash `[ "$RT" > "STEP_X" ]` in sdd-full.md.
+# Exit 0 = SKIP this step ; Exit 1 = RUN this step.
+
+
+def test_should_skip_step_target_before_current_runs(monkeypatch, fake_repo):
+    # RESUME_TARGET=STEP_2 (early), current=STEP_4 (later) → RUN (we haven't
+    # reached resume target yet from a forward-iteration POV).
+    rc = _run_main(monkeypatch, [
+        "should-skip-step", "--target", "STEP_2", "--current", "STEP_4",
+    ])
+    assert rc == 1  # RUN
+
+
+def test_should_skip_step_target_after_current_skips(monkeypatch, fake_repo):
+    # RESUME_TARGET=STEP_4 (later), current=STEP_2 (earlier) → SKIP (already done).
+    rc = _run_main(monkeypatch, [
+        "should-skip-step", "--target", "STEP_4", "--current", "STEP_2",
+    ])
+    assert rc == 0  # SKIP
+
+
+def test_should_skip_step_target_equals_current_runs(monkeypatch, fake_repo):
+    # RESUME_TARGET=STEP_4, current=STEP_4 → RUN (resume here).
+    rc = _run_main(monkeypatch, [
+        "should-skip-step", "--target", "STEP_4", "--current", "STEP_4",
+    ])
+    assert rc == 1  # RUN
+
+
+def test_should_skip_step_decimal_steps_handled_correctly(monkeypatch, fake_repo):
+    # Critical: STEP_2.6 must compare correctly vs STEP_4 (was broken in bash
+    # lex compare which would treat STEP_2.6 > STEP_4 as false negative on '.').
+    # Pipeline order : STEP_2 → STEP_2.6 → STEP_2.7 → STEP_3.5 → STEP_4 → STEP_5 → STEP_5.5
+    rc = _run_main(monkeypatch, [
+        "should-skip-step", "--target", "STEP_4", "--current", "STEP_2.6",
+    ])
+    assert rc == 0  # SKIP — STEP_2.6 is before STEP_4 in pipeline order
+
+
+def test_should_skip_step_step_end_skips_everything(monkeypatch, fake_repo):
+    # Special sentinel : STEP_END means all phases done.
+    rc = _run_main(monkeypatch, [
+        "should-skip-step", "--target", "STEP_END", "--current", "STEP_5.5",
+    ])
+    assert rc == 0  # SKIP
+
+
+def test_should_skip_step_unknown_label_defaults_to_run(monkeypatch, fake_repo):
+    # Unknown step label → can't gate, default to RUN (safe).
+    rc = _run_main(monkeypatch, [
+        "should-skip-step", "--target", "STEP_4", "--current", "STEP_NONSENSE",
+    ])
+    assert rc == 1  # RUN
+
+    rc = _run_main(monkeypatch, [
+        "should-skip-step", "--target", "STEP_NONSENSE", "--current", "STEP_4",
+    ])
+    assert rc == 1  # RUN

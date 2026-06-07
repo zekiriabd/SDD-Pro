@@ -52,26 +52,9 @@ import os
 import sys
 from pathlib import Path
 
+from sdd_lib.ci import is_ci as _detect_ci  # noqa: E402  # SSoT audit 2026-06-07
 from sdd_lib.exit_codes import HOOK_ALLOW, HOOK_DENY  # noqa: E402
 from sdd_lib.paths import project_root_for_hook as _resolve_project_root
-
-
-def _detect_ci() -> bool:
-    """Detect CI environment (audit 2026-06-06 D7).
-
-    Mirrors the pattern in `preflight_cost_cap.py:_detect_ci` so that the
-    two hooks share the same notion of "strict mode = CI". Any of these
-    env vars being non-empty/non-zero signals CI.
-    """
-    ci_signals = (
-        "CI", "GITHUB_ACTIONS", "GITLAB_CI", "CIRCLECI",
-        "JENKINS_URL", "BUILDKITE", "TRAVIS", "TF_BUILD",
-        "BITBUCKET_BUILD_NUMBER",
-    )
-    return any(
-        (os.environ.get(v, "").strip().lower() not in ("", "0", "false", "no"))
-        for v in ci_signals
-    )
 
 
 def main() -> int:

@@ -163,7 +163,7 @@ gate API ; pour la désactiver, utiliser `GatedWorkflow: false`.
 
 ```
 workspace/output/src/{BackendName}.Tests/
-├── Unit/                  # tests unitaires (qa-coverage.md)
+├── Unit/                  # tests unitaires (quality.md Partie A)
 └── Api/                   # tests intégration HTTP (cette règle)
     ├── Fixtures/          # TestWebApplicationFactory, TestAuthHandler, SeedData
     └── *EndpointsTests.cs

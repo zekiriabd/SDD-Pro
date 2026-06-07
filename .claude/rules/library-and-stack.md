@@ -45,7 +45,7 @@ interdits en `## Active Tech Specs` pour prod.
 | **Node.js** | 22 "Jod" (Oct 2024) | Apr 2027 | ✅ `react`, `vue`, `angular`, `node-express` |
 | **Java**    | 21 (Sep 2023) | Sep 2028 | ✅ `kotlin-spring-boot` |
 | **Python**  | 3.12 (Oct 2023) | Oct 2028 | ✅ `python-fastapi` (3.13 OK) |
-| **Kotlin**  | 2.1 LTS (2025) | TBD | 🟡 pin `kotlin-spring-boot.libs.json` = 2.3.21 (STS exception tracée) |
+| **Kotlin**  | 2.0.21 (Oct 2024) | TBD | ✅ pin `kotlin-spring-boot.libs.json` = 2.0.21 (stable, LTS-aligned via Java 21) |
 
 **Interdictions** : pin sur version STS (.NET 9, Node 23, Java 22…),
 prerelease (`-rc/-preview/-alpha/-beta/-snapshot`) sans ADR, version
@@ -97,7 +97,7 @@ Structure :
   "schemaVersion": 1,
   "buildSystem": "gradle | dotnet | npm | pnpm | yarn | maven | pip | poetry | uv | cargo | go-mod",
   "manifest": { "files": [...], "versionCatalogPath": "..." },
-  "versions": { "kotlin": "2.3.21", "spring-boot": "4.0.6" },
+  "versions": { "kotlin": "2.0.21", "spring-boot": "3.3.5" },
   "core":     [ { "id", "module", "versionRef", "rationale", "installCommand", "license" } ],
   "onDemand": [ { ..., "capability", "triggers": [...], "alternative": false } ],
   "plugins":  [ { "id", "versionRef", "rationale" } ]
@@ -417,7 +417,7 @@ comparable à un `package-lock.json` enrichi.
 
 ## 9. Lien avec autres règles
 
-- `file-ownership.md §1` : agent dev-* ne touche pas les fichiers projet (réservé arch)
+- `ownership.md §1` (Partie A) : agent dev-* ne touche pas les fichiers projet (réservé arch)
 - `constitution.md` : ajout de lib peut justifier un ADR (créé par Tech Lead)
 
 Note : la matrice rôles (Tech Lead = sélection stack ; agent =
@@ -460,7 +460,7 @@ est cassé en runtime.
 |---|:---:|
 | SPA + API séparés (`backend/*` + `frontend/*`) | ✅ OBLIGATOIRE |
 | Mobile + API (`backend/*` + `mobiles/*`) | ✅ OBLIGATOIRE (origins `capacitor://`, `ionic://`, etc.) |
-| ~~Fullstack monolithique~~ (`fullstack/*` en quarantine v7.0.0) | ⊘ non supporté en v7.0.0 — utiliser `back-front` |
+| Fullstack monolithique (`fullstack/*`) | ⊘ N/A (SSR same-origin — pas de cross-origin SPA↔API) |
 | Backend headless (sans SPA) | ❌ N/A |
 
 L'agent `arch` détecte le cas à partir de `## Active Tech Specs` du
@@ -627,12 +627,11 @@ grep -r "cors()" workspace/output/src/{BackendName}/ || ERROR
 
 ### Format ERROR
 
-Préfixe `[SECURITY_CORS_MISSING]` (cf. `error-classification.md §1.6`
-ou §1.11 selon contexte) :
+Préfixe `[SEC_CORS_MISSING]` (cf. `error-classification.md §1.11`) :
 
 ```
 ERROR: dev-backend {n}-{m} — CORS non configuré
-CAUSE: [SECURITY_CORS_MISSING] backend SPA-facing sans config CORS — toute requête front échouera
+CAUSE: [SEC_CORS_MISSING] backend SPA-facing sans config CORS — toute requête front échouera
 FIX: ajouter Program.cs/CorsConfig.kt/main.py selon stack §2.{1..4}
      configurer CORS_ALLOWED_ORIGINS env var (csv des origins SPA dev + prod)
 HINT: cf. .claude/rules/library-and-stack.md (Partie B §2) pour le pattern stack-aware

@@ -79,7 +79,13 @@ class TestSddState(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, msg=result.stderr)
         run_id = result.stdout.strip()
-        self.assertRegex(run_id, r"^[0-9a-f]{12}$")
+        # Sprint 1.1 fix (2026-06-06) : run_id now comes from get_or_create_run_id()
+        # which uses {YYYYMMDDTHHmmss}-{4-hex} format (unified with hook telemetry),
+        # not the legacy uuid4().hex[:12] (12-hex). Accept both for backward-compat
+        # with potential legacy environments.
+        legacy_uuid12 = r"^[0-9a-f]{12}$"
+        new_iso_rand4 = r"^[0-9]{8}T[0-9]{6}-[0-9a-f]{4}$"
+        self.assertRegex(run_id, f"({legacy_uuid12})|({new_iso_rand4})")
         return run_id
 
     def _open_db(self) -> sqlite3.Connection:

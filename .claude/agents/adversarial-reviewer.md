@@ -85,6 +85,9 @@ code en entier (les autres l'ont fait) mais de chercher des angles
 manqués sur les chemins critiques.
 
 ### 2.5 Rapports auditeurs (anti-duplication)
+
+> **Précondition séquentielle** (fix MN6 race condition, 2026-06-07) : cet agent n'est invocable **qu'après** la finalisation et la persistance du verdict consolidé `/sdd-review` (présence du fichier sentinel `workspace/output/.sys/.validation/{n}-review-consolidated.flag` écrit par `sdd_review.py` post-aggregation). Si le flag est absent OU `mtime(flag) < max(mtime(code-review.md), mtime(security-scan.md), mtime(spec-compliance.md))` → STOP + ERROR `[ADV_PRECONDITION_FAILED]` (cf. error-classification.md §1.15). Cela élimine la race condition `/sdd-review --adversarial` où les 3 reviewers en parallèle peuvent encore écrire pendant que l'adversarial lit.
+
 Read résumés (pas le détail) de :
 - `workspace/output/.sys/.validation/{n}-code-review.md` (1ère section, verdict + counts)
 - `workspace/output/.sys/.validation/{n}-security-scan.md` (idem)

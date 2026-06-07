@@ -217,6 +217,46 @@ Règles IA :
 - Respecter la structure Tailwind + Radix
 - Composer les composants plutôt que reconstruire
 
+<!-- LIBS_CATALOG_START -->
+### 2.4 Librairies
+
+> Source de verite : `.claude/stacks/ui/shadcn.libs.json`. Ne pas editer cette section manuellement -- utiliser `.claude/python/sdd_admin/sync_stack_md.py --stack-id shadcn`.
+
+#### 2.4.a Librairies CORE (installees par arch en section 2.2.1, toujours)
+
+| Lib | Version | Role |
+|-----|---------|------|
+| tailwindcss | 4.0.0 | Utility-first CSS (Tailwind v4 native). |
+| @tailwindcss/vite | 4.0.0 | Plugin Vite Tailwind v4. |
+| class-variance-authority | 0.7.0 | Variantes typées pour composants shadcn (cva). |
+| clsx | 2.1.1 | Concaténation conditionnelle de classes CSS. |
+| tailwind-merge | 2.5.5 | Résolution conflits classes Tailwind (helper cn()). |
+| lucide-react | 0.469.0 | Pack icônes officiel shadcn (iconLibrary='lucide'). |
+| @radix-ui/react-slot | 1.1.0 | Primitive Radix utilisée par Button asChild. |
+
+### 2.4.b Librairies ON-DEMAND (installees si l'US declenche)
+
+Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'US + ACs.
+
+| Capability | Lib | Version | Triggers |
+|---|---|---|---|
+| dialog | @radix-ui/react-dialog | 1.1.2 | dialog, modal, popup, fenetre.*modale |
+| dropdown-menu | @radix-ui/react-dropdown-menu | 2.1.2 | dropdown, menu contextuel, menu deroulant |
+| label | @radix-ui/react-label | 2.1.0 | label, form.*label |
+| select | @radix-ui/react-select | 2.1.2 | select, combobox, liste.*deroulante |
+| tabs | @radix-ui/react-tabs | 1.1.1 | tabs?, onglets? |
+| toast-radix | @radix-ui/react-toast (alt) | 1.2.2 | radix.*toast |
+| toast | sonner | 1.7.1 | toast, notification, snackbar |
+| tooltip | @radix-ui/react-tooltip | 1.1.4 | tooltip, infobulle, info.*bulle |
+| checkbox | @radix-ui/react-checkbox | 1.1.2 | checkbox, case.*cocher |
+| avatar | @radix-ui/react-avatar | 1.1.1 | avatar, photo.*profil |
+| progress | @radix-ui/react-progress | 1.1.0 | progress, barre.*progression, loader |
+| switch | @radix-ui/react-switch | 1.1.1 | switch, toggle, interrupteur |
+| separator | @radix-ui/react-separator | 1.1.0 | separator, divider, separateur |
+| popover | @radix-ui/react-popover | 1.1.2 | popover, popup |
+| tw3-animations | tailwindcss-animate (alt) | 1.0.7 | tailwind.*v3, tailwindcss-animate |
+<!-- LIBS_CATALOG_END -->
+
 ---
 
 ## 3. Architecture UI shadcn/ui

@@ -48,6 +48,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from sdd_lib.exit_codes import CORRECTIBLE, FAIL_FAST, SUCCESS  # noqa: E402
 from sdd_lib.loader_yml import (  # noqa: E402
     CACHE_LAYERS,
     loader_path,
@@ -92,12 +93,10 @@ def main() -> int:
     agents = [args.agent] if args.agent else list_agents()
     if not agents:
         print("FAIL: no agents found in loader.yml", file=sys.stderr)
-        return 2
-
+        return CORRECTIBLE
     if args.agent and args.agent not in list_agents():
         print(f"FAIL: unknown agent {args.agent!r}", file=sys.stderr)
-        return 1
-
+        return FAIL_FAST
     manifests = [manifest_for_agent(a) for a in agents]
 
     if args.json:
@@ -119,8 +118,6 @@ def main() -> int:
             "into the Anthropic SDK request payload."
         )
 
-    return 0
-
-
+    return SUCCESS
 if __name__ == "__main__":
     sys.exit(main())

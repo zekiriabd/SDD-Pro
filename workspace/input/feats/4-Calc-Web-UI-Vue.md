@@ -45,6 +45,13 @@ SPA Vue 3 avec 3 champs A/B/C, bouton Calculate qui POST sur backend Kotlin, aff
 - AC-2: back down → alerte
 - AC-3: champ vide → bouton disabled
 
+## Required Stack
+- backend: kotlin-spring-boot
+- frontend: vue
+- ui: vuetify
+- qa: kotlin-junit
+- auth: auth-local
+
 ## Dependencies
 - 1-Calc-A-B-C
 

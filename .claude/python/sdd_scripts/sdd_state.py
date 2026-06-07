@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 import uuid
@@ -74,9 +75,15 @@ def parse_args() -> argparse.Namespace:
     s_end.add_argument("--status", default="success",
                        choices=["success", "partial", "failed"])
 
-    s_get = sub.add_parser("get-run")
-    s_get.add_argument("--feat-number", type=int, required=True)
-    s_get.add_argument("--latest", action="store_true")
+    s_get = sub.add_parser("get-run",
+        help="Return the active (or latest, if --latest) run row for a FEAT as JSON.")
+    s_get.add_argument("--feat-number", type=int, required=True,
+        help="FEAT number to query.")
+    s_get.add_argument("--latest", action="store_true",
+        help="(audit M15 doc 2026-06-07) If set, return the most recent run "
+             "for this FEAT regardless of status (including failed/partial). "
+             "If absent, returns only ACTIVE runs (status='running'). "
+             "Use --latest from /sdd-full STEP 1.ter to resume after a crash.")
 
     s_show = sub.add_parser("show-run")
     s_show.add_argument("--run-id", required=True)
@@ -102,6 +109,22 @@ def parse_args() -> argparse.Namespace:
         help="Compute next STEP to execute for a run, based on phases status")
     s_resume.add_argument("--run-id", required=True,
         help="Existing run_id (typically from `get-run --latest`)")
+
+    # should-skip-step — gate de décision shell-safe pour le routing --resume
+    # (audit CTO 2026-06-07 — pré-fix, sdd-full.md utilisait `[ X > Y ]` qui
+    # est UNE REDIRECTION SHELL, pas une comparaison ; doublement cassé sur
+    # STEP_2.6 vs STEP_10 en compare lexicographique). Encapsule la logique
+    # d'ordre dans Python (déterministe, testé).
+    #
+    # Exit codes : 0 = SKIP this step (resume target is past it),
+    #              1 = RUN this step (we've reached or not yet hit target).
+    # Conçu pour : `if python ... should-skip-step --target $RT --current STEP_X; then continue; fi`
+    s_skip = sub.add_parser("should-skip-step",
+        help="Shell-safe gate : exit 0 to skip STEP, exit 1 to run it")
+    s_skip.add_argument("--target", required=True,
+        help="Resume target STEP label (from `resume-target` output)")
+    s_skip.add_argument("--current", required=True,
+        help="STEP about to be evaluated (e.g. STEP_2, STEP_4.5)")
 
     return p.parse_args()
 
@@ -157,7 +180,24 @@ def action_new_run(args: argparse.Namespace) -> int:
     if args.feat_number <= 0:
         warn("new-run requires --feat-number > 0")
         return FAIL_FAST
-    run_id = uuid.uuid4().hex[:12]
+    # v7.0.0-alpha audit Sprint 1.1 (2026-06-06) — single source of truth for run_id.
+    # Previously generated a 12-char uuid here while hooks resolved their own id via
+    # sdd_lib.run_id.get_or_create_run_id() — two ids never matched, token_usage rows
+    # could not FK-link to runs, ROI metrics broken by construction.
+    # Fix : reuse the hook-side resolver so SDD orchestrator and Claude Code hooks
+    # share one stable run_id. Persisted to marker file workspace/.sys/.state/run-id.current.
+    #
+    # v7.0.1 (audit M7 closure 2026-06-07) : honor SDD_RUN_ID env var if set
+    # by a parent orchestrator (e.g. /sdd-full exports SDD_RUN_ID before
+    # invoking /dev-run). Allows continuous run_id across nested commands
+    # → audit-trail stays linked, resume after crash possible.
+    from sdd_lib.run_id import get_or_create_run_id
+    inherited_run_id = os.environ.get("SDD_RUN_ID", "").strip()
+    if inherited_run_id:
+        run_id = inherited_run_id
+        warn(f"[new-run] reusing inherited SDD_RUN_ID={run_id} (M7 parent-orchestrator propagation)")
+    else:
+        run_id = get_or_create_run_id(force_new=True)
     tags = [t.strip() for t in args.tags.split(",") if t.strip()] if args.tags else []
     command = args.command or "unknown"
     feat_name = get_feat_name(args.feat_number)
@@ -424,6 +464,46 @@ def action_resume_target(args: argparse.Namespace) -> int:
     return SUCCESS
 
 
+def action_should_skip_step(args: argparse.Namespace) -> int:
+    """Gate de décision shell-safe : --current doit-il être skipped ?
+
+    Audit CTO 2026-06-07 — remplace le bash cassé `[ "$RT" > "STEP_X" ]`
+    qui était (a) une redirection vers fichier nommé `STEP_X`, (b)
+    lexicographiquement faux sur `STEP_2.6` vs `STEP_10`. Cette commande
+    encapsule la logique d'ordre déterministe dans Python.
+
+    Logique :
+      - Construit la liste ordonnée des STEP labels du pipeline.
+      - Si --target ∉ pipeline OU --current ∉ pipeline → RUN (exit 1)
+        par sécurité (gate non-applicable, on exécute).
+      - Si --target == "STEP_END" → SKIP toute STEP (exit 0).
+      - Si index(current) < index(target) → SKIP (exit 0).
+      - Sinon → RUN (exit 1).
+
+    Usage shell :
+        if python sdd_state.py should-skip-step --target $RT --current STEP_4; then
+            echo "[RESUME] skipping STEP 4"
+            continue
+        fi
+    """
+    target = (args.target or "").strip()
+    current = (args.current or "").strip()
+    # Built-in: "STEP_END" means all phases done — skip everything.
+    if target == "STEP_END":
+        return SUCCESS  # exit 0 → SKIP
+    # Build ordered STEP list from _PIPELINE_PHASES_ORDER.
+    step_order = [step for _phase, step in _PIPELINE_PHASES_ORDER]
+    try:
+        idx_current = step_order.index(current)
+        idx_target = step_order.index(target)
+    except ValueError:
+        # Either label not in pipeline → can't gate, default to RUN.
+        return 1  # exit 1 → RUN
+    if idx_current < idx_target:
+        return SUCCESS  # exit 0 → SKIP (current is before resume target)
+    return 1  # exit 1 → RUN
+
+
 DISPATCH = {
     "new-run":      action_new_run,
     "set-phase":    action_set_phase,
@@ -434,6 +514,7 @@ DISPATCH = {
     "emit-event":   action_emit_event,
     "status":       action_status,
     "resume-target": action_resume_target,
+    "should-skip-step": action_should_skip_step,
 }
 
 

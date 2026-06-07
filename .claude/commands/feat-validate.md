@@ -129,12 +129,28 @@ mode `deterministic` exclusivement, 0 token.
 
 ---
 
-## STEP 4.5 — Spec-compliance gate (conditionnel post-dev, v7.0.0)
+## STEP 4.5 — Spec-compliance gate (post-dev uniquement, v7.0.0)
 
 **But** : empêcher de valider une FEAT comme "prête / terminée" tant que
 le code matérialisé n'a pas été indépendamment vérifié contre chaque AC
 par `spec-compliance-reviewer` (pattern "Do not trust the report"
 hérité superpowers v5.1).
+
+> **⚠ Portée d'activation** (clarifié audit CTO 2026-06-07) : ce gate
+> se déclenche **uniquement quand `/feat-validate` est invoqué en
+> standalone APRÈS un cycle dev** (`/feat-validate {n}` post-`/dev-run`).
+>
+> Dans le flow nominal `/sdd-full {n}`, `feat-validate` est invoqué
+> **PRÉ-dev** (STEP 3.5) → `HAS_CODE=null` → `MODE=pre-dev` → gate skip
+> silencieusement. C'est **intentionnel** : spec-compliance ne peut pas
+> tourner sans code matérialisé.
+>
+> Pour activer le gate dans un pipeline automatisé post-dev :
+> - soit lancer `/feat-validate {n}` à la main après `/sdd-full`,
+> - soit utiliser `/sdd-review {n} --ensure-scans` (spawne
+>   `spec-compliance-reviewer` directement),
+> - soit attendre v7.2.0 qui déplacera le gate à `/sdd-full §4.8`
+>   (ADR `governance-sdd-full-spec-gate-post-dev`).
 
 ### 4.5.1 Détection mode (pre-dev vs post-dev)
 

@@ -40,8 +40,10 @@ jobs:
           node-version: '{{NodeVersion}}'
           cache: 'npm'
           cache-dependency-path: '{{AppName}}/package-lock.json'
-      - name: Install axe-core CLI
-        run: npm install -g @axe-core/cli
+      - name: Install axe-core CLI (pinned for reproducibility)
+        # P1-4 fix 2026-06-07 : version pinned to avoid supply-chain
+        # variance and silent breaking-change adoption.
+        run: npm install -g @axe-core/cli@4.10.0
       - name: Build {{AppName}}
         working-directory: {{AppName}}
         run: npm ci && npm run build
@@ -86,8 +88,9 @@ jobs:
           node-version: '{{NodeVersion}}'
           cache: 'npm'
           cache-dependency-path: '{{AppName}}/package-lock.json'
-      - name: Install Lighthouse CI
-        run: npm install -g @lhci/cli
+      - name: Install Lighthouse CI (pinned for reproducibility)
+        # P1-4 fix 2026-06-07 : version pinned (same reason as axe-core).
+        run: npm install -g @lhci/cli@0.14.0
       - name: Build {{AppName}}
         working-directory: {{AppName}}
         run: npm ci && npm run build

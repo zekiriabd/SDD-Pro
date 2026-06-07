@@ -49,6 +49,22 @@ liste avec un nouveau N).>
 - AC-1: <condition observable, testable>
 - AC-N: <condition observable, testable>
 
+## Required Stack (v7.0.0-alpha Sprint 1.3 — anti-stack-drift)
+<Déclare les stacks attendus par cette FEAT. /feat-validate vérifie que
+`workspace/input/stack/stack.md` a activé exactement ces stacks (les commentés
+sont rejetés). Évite que l'opérateur lance /sdd-full {n} avec un stack.md
+configuré pour une autre FEAT (cas typique : bench multi-stack).
+
+Format : valeurs slash-style `category/id` correspondant aux fichiers
+`.claude/stacks/{category}/{id}.md`. Catégories valides : backend, frontend,
+fullstack, ui, qa, auth, archi, mobiles. Écrire `none` si la FEAT n'exige
+rien de cette catégorie (ex. front-only sans backend dédié).>
+- backend: <ex. kotlin-spring-boot, ou none>
+- frontend: <ex. vue, ou none>
+- ui: <ex. vuetify, ou none>
+- qa: <ex. kotlin-junit, node-vitest, ou none>
+- auth: <ex. auth-local, azure-ad, ou none>
+
 ## Dependencies
 - <FEAT-id ou NONE>
 

@@ -22,6 +22,17 @@ import sys
 import unittest
 from pathlib import Path
 
+import pytest
+
+# Smoke marker — these tests gate the framework_smoke.py CI / Stop hook.
+# Audit CTO 2026-06-07 : the protect_framework CWD bug had passed previous
+# smoke runs because pytest was NOT invoked. The 2 tests below
+# (`test_user_file_outside_framework_passes_silently` and
+# `test_user_file_unaffected_in_strict`) reproduce the bug deterministically.
+# Tagging them `smoke` ensures any future regression is surfaced by the
+# Stop hook / CI smoke gate, NOT silently green.
+pytestmark = pytest.mark.smoke
+
 _PY_ROOT = Path(__file__).resolve().parent.parent
 if str(_PY_ROOT) not in sys.path:
     sys.path.insert(0, str(_PY_ROOT))

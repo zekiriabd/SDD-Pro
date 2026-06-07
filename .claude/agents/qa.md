@@ -27,8 +27,8 @@ inlinée plus bas, §Ownership).
 
 **Token footprint cible** :
 - Tests BE/FE génération : ~5-8 KB par US
-- Coverage parsing : 0 token (PowerShell)
-- Quality scan : 0 token (PowerShell)
+- Coverage parsing : 0 token (Python — `sdd_scripts/parse_coverage.py`)
+- Quality scan : 0 token (Python — `sdd_scripts/quality_scan.py`)
 - Report : ~2-3 KB par feature
 
 **Anti-pattern strict** : aucun code review LLM "trouve les bugs". Les
@@ -107,11 +107,20 @@ Lire les sections `## Active QA Specs` de `workspace/input/stack/stack.md`.
   FIX: ajouter au moins un .claude/stacks/qa/*.md dans workspace/input/stack/stack.md
   ```
 
-- Sinon, charger chaque stack QA actif. Pour chaque :
+- Sinon, charger chaque stack QA actif. **Structure varie selon le type de stack** (audit M16 closure 2026-06-07) :
+
+  **Stacks "test framework" classiques** (`dotnet-xunit`, `kotlin-junit`, `node-vitest`, `python-pytest`, `angular-jasmine`, `blazor-bunit`) — structure standardisée :
   - §3 Init Commands (bootstrap test project si absent)
   - §5 Test patterns (Arrange/Act/Assert ou équivalent)
   - §6 Run commands (test + coverage)
   - §7 Coverage output format
+
+  **Stacks "special-purpose"** — structure différente (sections numérotées non-uniformes) :
+  - `code-quality` : pas de §3 Init (c'est un script déterministe `quality_scan.py`, pas un framework de test). Lire §2 Activation + §3 Catégories analysées + §5 Output.
+  - `mutation-testing` (opt-in) : pas de §3 Init au sens classique — Read on-demand uniquement (cf. §STEP 9 de cet agent). Lire §1 Activation + §2 Tooling.
+  - `playwright` (opt-in E2E) : pas de §3 Init — Read on-demand uniquement (cf. §STEP 10). Lire §1 Activation + §2 Tooling + §3 Layout généré.
+
+  **Si §3 Init Commands attendue mais absente sur un stack "test framework"** → STOP + ERROR `[QA_FRAMEWORK_MISSING]` (stack incomplet, signaler Tech Lead pour PR sur ce stack). Si stack "special-purpose" reconnu ci-dessus, **skip silencieusement** §3 et utiliser sections alternatives documentées.
 
 ---
 
@@ -134,11 +143,11 @@ Read **uniquement** :
    `[QA_INIT_FAILED]`, `[QA_TEST_INVALID]`, `[QA_OUTPUT_INVALID]`,
    `[QA_PRECONDITION_FAILED]`, `[QA_OWNERSHIP_VIOLATION]`,
    `[API_GATE_RED]`. Ordre de priorité émission documenté §1.7.
-10. **`.claude/rules/build-and-loop.md`** (v6.10.5 fix CRIT-4) — contrat
-    API Gate (post-dev backend, pré-dev frontend). Substance opérationnelle
-    inlinée plus bas (§API Gate STEP 2.7-2.9), Read le fichier source si
-    cas-limite (stratégie fixtures in-memory par stack QA §1.2, critère
-    `gate_passed` §1.3, boucle correction RED→GREEN §2).
+10. **`.claude/rules/build-and-loop.md`** — contrat API Gate (post-dev
+    backend, pré-dev frontend). Substance opérationnelle inlinée plus bas
+    (§API Gate STEP 2.7-2.9), Read le fichier source si cas-limite
+    (stratégie fixtures in-memory par stack QA §1.2, critère `gate_passed`
+    §1.3, boucle correction RED→GREEN §2).
 
 **Rules inline (depuis SDD_Pro v5.0 — économie tokens)** : les règles
 `quality.md` (Partie A, ex-qa-coverage.md) et `library-and-stack.md` (Partie A, ex-stack-completeness.md) ne sont **PLUS lues** en
@@ -297,7 +306,7 @@ flaggué dans le rapport).
 
 ---
 
-## STEP 8 — Parse coverage (PowerShell, 0 token)
+## STEP 8 — Parse coverage (Python, 0 token)
 
 Skip si `QAMode: tests-only`.
 
@@ -327,30 +336,30 @@ décision est tracée en git blame) — JAMAIS contourner via `--force`.
 
 ---
 
-## STEP 8.5 — Mutation testing (opt-in, v7.0.0 P0)
+## STEP 8.5 — Mutation testing (opt-in)
 
 Skip si `MutationTestingMode: off` (défaut). Substance opérationnelle
 (sélection cibles, tool per stack, verdict canonique, anti-derive) :
 **Read on-demand `@.claude/stacks/qa/mutation-testing.md §2-§5`**.
 
-Verdict normalisé v7.0.0 (`PASS/WARN/FAIL/SKIPPED/INFRA_BLOCKED`) selon
+Verdict canonique `PASS/WARN/FAIL/SKIPPED/INFRA_BLOCKED` selon
 `MutationScoreMin` (défaut 60) avec tolérance 0.8×. Persiste
 `workspace/output/qa/feat-{n}/mutation.json` + console.db `qa_mutation`.
 
 Anti-derive : ne pas bloquer sur `INFRA_BLOCKED` (WARN seulement) ;
 respecter `MutationTestingTimeoutSec` (kill -9). Exit silencieux par
-défaut — byte-identical pre-v7.0.0 sauf opt-in explicite.
+défaut sauf opt-in explicite.
 
 ---
 
-## STEP 8.bis — Playwright E2E (opt-in, v7.0.0 P1)
+## STEP 8.bis — Playwright E2E (opt-in)
 
 Skip si `E2EMode: off` (défaut). Substance opérationnelle (start backend
 in-memory + SPA preview, sélection tests `smoke|happy-paths|full`, tool
 per stack, verdict canonique, anti-derive sleeps/HAR) : **Read on-demand
 `@.claude/stacks/qa/playwright.md §2-§5`**.
 
-Verdict normalisé v7.0.0 (`PASS/WARN/FAIL/SKIPPED/INFRA_BLOCKED`) selon
+Verdict canonique `PASS/WARN/FAIL/SKIPPED/INFRA_BLOCKED` selon
 `E2EMinPerUs` (défaut 1) et `E2ETimeoutSec` (défaut 300). Persiste
 `workspace/output/qa/feat-{n}/e2e.json` + console.db `qa_e2e`.
 
@@ -387,7 +396,7 @@ si existe).
 
 ---
 
-## STEP 9.bis — Acceptance Gate (déterministe, hoisted from hook, audit P0-security 2026-06-05)
+## STEP 9.bis — Acceptance Gate (déterministe, hoisted from hook)
 
 Invoquer le runner Acceptance Gate **avant la confirmation finale**. Il
 parcourt `workspace/output/src/*`, détecte le type (Node / .NET / Kotlin /
@@ -437,7 +446,7 @@ Décision :
 - **RED** : au moins 1 test échoué **OU compilation des tests échoue**
   (alignment `error-classification.md §1.7` : `[QA_TEST_FAILED]` =
   RED bloquant, y compris `compileTestKotlin`/`tsc --noEmit` échec
-  sur tests préexistants — v6.10.5 fix CRIT-3)
+  sur tests préexistants)
 
 **Cas particulier — Régression cross-FEAT par refactoring** : si
 `compileTestKotlin`/`tsc`/`pytest --collect-only` échoue sur des
@@ -451,10 +460,9 @@ FIX: re-aligner les test fixtures sur les signatures actuelles OU /qa-generate {
 Verdict = **RED**. Tech Lead arbitre : (a) corrige manuellement les
 signatures de tests cassés ; (b) supprime + régénère via `/qa-generate`
 sur la FEAT antérieure ; (c) marque les tests obsolètes `@Disabled` avec
-justification. Auto-fix par agent reste hors scope v6.10 (cf. ADR
-v7.0 `governance-auditors-trim` pour roadmap).
+justification. Auto-fix par agent hors scope (roadmap v7.2+).
 
-**Exit code de l'agent qa** (clarification v7.0.0-alpha audit P2a — 2026-06-06) :
+**Exit code de l'agent qa** :
 
 - L'agent qa **termine sans STOP** (≈ "exit 0") sur GREEN / YELLOW / RED
   fonctionnels — il rend la main au caller (`/qa-generate` ou `/sdd-full`)
@@ -481,7 +489,7 @@ gates selon le contexte d'invocation. Aucun caller ne doit dépendre du
 fait que l'agent "STOP en cas de RED" — toujours lire `console.db` via
 `query_console_db.py` ou les exit codes des commands.
 
-### STEP 10.bis — Status flip US (v6.10.5, fix CRIT-2)
+### STEP 10.bis — Status flip US
 
 Si verdict global = `GREEN`, flipper toutes les US de la FEAT
 `Review → Done`. Si verdict = `YELLOW` ou `RED`, **NE PAS flipper** (les
@@ -509,11 +517,11 @@ Idempotent et non-bloquant. Transition `Review → Done` valide sans `--force`.
 **Domain-specific QA** :
 - Ne JAMAIS modifier le code de production sous
   `workspace/output/src/{App|Backend|Frontend|*Lib}/**` (read-only strict)
-- **Périmètre QA SDD_Pro v7.0.0** :
+- **Périmètre QA** :
   - ✅ Tests **unitaires** (STEP 5, obligatoire selon `QAMode`)
   - ✅ Tests **mutation** (STEP 8, opt-in `MutationTestingMode != off`, stack `qa/mutation-testing`)
   - ✅ Tests **E2E Playwright** (STEP 8.bis, opt-in `E2EMode != off`, stack `qa/playwright`)
-  - ❌ Tests **performance** → délégué au CI du projet généré (Lighthouse CI + wrk/k6, `accessibility-auditor`/`performance-auditor` retirés v7.0.0)
+  - ❌ Tests **performance** → délégué au CI du projet généré (Lighthouse CI + wrk/k6)
   - ❌ Tests **accessibility** → délégué au CI (axe-core)
   - ❌ Code review → agents dédiés `code-reviewer`/`security-reviewer`/`arch-reviewer`/`spec-compliance-reviewer`
 - Ne JAMAIS auto-corriger un test failure (rapporter, ne pas patcher)

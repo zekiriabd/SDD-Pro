@@ -1,8 +1,8 @@
 # ARCHI_MICROSERVICES
 
 Status: Experimental
-Validation: 🟡 experimental (combo non valide end-to-end dans SDD_Pro v6 — Phase 2 SDD_Pro v6.7.6+)
-Support: ⚠ Non supporté commercialement (audit C3, 2026-06-06) — exclu du SLA produit. Voir CLAUDE.md §6 et docs/validated-combos.md.
+Validation: 🟡 experimental — **roadmap v7.2.0 (cible 2026-Q4 stable, 2027-Q1 bench-validated)**. Pré-requis : ADR `governance-major-microservice-validation` (à créer) couvrant (1) périmètre exact (1 service / N services), (2) contracts inter-service (REST/gRPC/event), (3) observability minimum (OpenTelemetry, health probes), (4) test runtime end-to-end. Tant que cet ADR n'est pas accepté, le pattern reste utilisable mais hors SLA.
+Support: ⚠ Non supporté commercialement (audit C3, 2026-06-06 + MN5, 2026-06-07) — exclu du SLA produit jusqu'à ADR ci-dessus. Voir CLAUDE.md §6 et docs/validated-combos.md.
 Pattern ID: archi-microservice
 Scope: **pattern d'architecture backend** — Microservices (Sam Newman 2015 + Chris Richardson 2018). S'applique aux stacks `backend/*.md` lorsque `ArchiPattern: microservice`. Ne s'applique PAS aux `fullstack/*` (monolithe par définition) ni aux `mobiles/*`.
 

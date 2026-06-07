@@ -100,12 +100,15 @@ CoverageMin: 90
 SecurityFailOn: critical
 SpecComplianceMode: full
 SpecComplianceFailOn: serious
-A11yFailOn: serious
 CodeReviewMode: full
 CodeReviewFailOn: serious
-PerfMode: full
-PerfFailOn: serious
+ArchReviewMode: full
+ArchReviewFailOn: serious
+AcceptanceGate: strict
 ```
+> ⚠️ `A11yFailOn`/`PerfMode`/`PerfFailOn` retirés v7.0.0 (agents
+> `accessibility-auditor`/`performance-auditor` supprimés). Remplacement :
+> ingest CI déterministe v7.2.0 (`ingest_axe.py`, `ingest_lighthouse.py`).
 
 Validation :
 - Le profile doit être valide selon le schéma layered config (parseur

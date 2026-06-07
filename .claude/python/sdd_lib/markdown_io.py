@@ -2,18 +2,17 @@
 
 v7.0.0-alpha (audit CRIT-3) : consolidates 3 `parse_frontmatter` and
 5 `extract_section`/`section_body` implementations previously scattered
-across `validate_plan.py`, `ingest_plans.py`, `compact_front_plans.py`,
-`preflight.py`, `validate_semantic.py`, `project_config.py`,
-`ingest_feats_us.py`. Before this module, each site rolled its own regex
-with subtle divergences (e.g. `(?=^##\\s|\\Z)` vs `(?=^##\\s+|\\Z)`) —
-indistinguishable on canonical inputs but a latent drift risk.
+across `validate_plan.py`, `ingest_plans.py`, `preflight.py`,
+`validate_semantic.py`, `project_config.py`, `ingest_feats_us.py`
+(and the now-retired `compact_front_plans.py`). Before this module,
+each site rolled its own regex with subtle divergences
+(e.g. `(?=^##\\s|\\Z)` vs `(?=^##\\s+|\\Z)`) — indistinguishable on
+canonical inputs but a latent drift risk.
 
 Out of scope (kept local, too specialized) :
   - `index_adrs.parse_adr`        — ADR-specific (H1, Status, Phase, date)
   - `migrate_us_v1_to_v2`         — write/transform, not parse
   - `ingest_feats_us.parse_us`    — Status/AC count regex (bespoke)
-  - `compact_front_plans.extract_frontmatter` returning RAW string
-    (different signature : use `extract_frontmatter_raw` from this module)
 """
 from __future__ import annotations
 
@@ -70,8 +69,7 @@ def extract_frontmatter_raw(text: str) -> str:
     """Return the raw frontmatter block including both `---` fences, or ``""``.
 
     Preserves the source bytes verbatim (newlines, ordering, comments) —
-    used by tools that need to re-emit the frontmatter unchanged (cf.
-    `compact_front_plans.py`).
+    used by tools that need to re-emit the frontmatter unchanged.
     """
     m = _FRONTMATTER_RE.match(text)
     return m.group(0) if m else ""

@@ -2,7 +2,7 @@
 name: constitutioner
 description: Agent Constitutioner — gère les ADRs (création atomique par timestamp) et met à jour workspace/output/.sys/.context/constitution.md (§4 stack technique, §6 ADRs index, §1 date). Invoqué par arch en fin de Phase B (après scaffolding DB). Skip silencieusement si constitution.md absent. Aucune écriture de code applicatif, aucune lecture des FEATs/US/HTML.
 model: claude-sonnet-4-6
-tools: Read, Write, Edit, Glob, Grep
+tools: Read, Write, Edit, Glob, Grep, Bash
 ---
 
 # Agent Constitutioner — ADRs + Constitution
@@ -101,6 +101,15 @@ Pour chaque ADR à créer (= dimension dont le slug n'a pas matché en STEP 1) :
 ---
 
 ## STEP 3 — Mise à jour constitution.md (§1 date, §4, §6)
+
+**Hard-gate re-check (audit M5 closure 2026-06-07)** : avant tout Edit, vérifier que `workspace/output/.sys/.context/constitution.md` existe **toujours** (peut avoir été supprimé/déplacé par un agent parallèle entre STEP 0 et STEP 3, par exemple si `po` tournait en concurrent). Si absent → STOP silencieux + exit 0 (même condition que STEP 0). **Ne JAMAIS créer le fichier en mode `create`** depuis cet agent — la création est owned exclusivement par `/feat-generate` (cf. `ownership.md §3`).
+
+```bash
+if [ ! -f workspace/output/.sys/.context/constitution.md ]; then
+  echo "[CONSTITUTION/SKIP] constitution.md disparu post-STEP 0 (race condition probable avec /feat-generate) — skip STEP 3-6 silencieux. (~35%)"
+  exit 0
+fi
+```
 
 Re-Read `workspace/output/.sys/.context/constitution.md`.
 
@@ -203,8 +212,6 @@ constitutioner: {K} ADRs ({existants_skipped}+{nouveaux_créés}), §4/§6/INDEX
 
 Sur erreur, bloc ERROR 3 lignes (CAUSE / FIX, préfixe `[CLASS]` cf.
 `@.claude/rules/error-classification.md`) puis STOP.
-
----
 
 ---
 

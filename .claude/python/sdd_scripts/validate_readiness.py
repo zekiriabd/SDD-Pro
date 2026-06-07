@@ -427,6 +427,71 @@ def main() -> int:
                 f"Stacks actifs : backend={has_backend}, frontend={has_frontend}, fullstack={has_fullstack}, mobiles={has_mobiles}",
             )
 
+        # v7.0.0-alpha Sprint 1.3 (2026-06-06) — Required Stack validation
+        # FEAT declares ## Required Stack ; compare with stacks_dict (extended
+        # with ui/qa/auth/archi which aren't in the original 6-cat dict).
+        # Mismatch = WARN (not ERR — bench scenarios legitimate, but signal it).
+        extended_stacks: dict[str, str | None] = dict(stacks_dict)
+        for extra_cat in ("qa", "archi"):
+            extended_stacks.setdefault(extra_cat, None)
+        # Refresh ui+auth+qa+archi from full stack content (Active UI/QA/Auth/Architecture Specs)
+        for cat_header, cat_key in (
+            ("Active UI Specs", "ui"),
+            ("Active QA Specs", "qa"),
+            ("Active Auth Specs", "auth"),
+            ("Active Architecture Pattern", "archi"),
+        ):
+            body = section_body(stack_content, cat_header) or ""
+            m = re.search(r"^\s*-\s*\.claude/stacks/(\w+)/([\w-]+)\.md", body, re.MULTILINE)
+            if m and extended_stacks.get(cat_key) is None:
+                extended_stacks[cat_key] = m.group(2)
+
+        required_body = section_body(feat_content, "Required Stack") or ""
+        if required_body.strip():
+            required_stacks: dict[str, str] = {}
+            for m in re.finditer(r"^\s*-\s*(\w+)\s*:\s*([\w-]+)", required_body, re.MULTILINE):
+                cat, sid = m.group(1).strip().lower(), m.group(2).strip().lower()
+                if cat in extended_stacks:
+                    required_stacks[cat] = sid
+
+            mismatches: list[str] = []
+            for cat, sid in required_stacks.items():
+                active = extended_stacks.get(cat)
+                if sid == "none":
+                    if active is not None:
+                        mismatches.append(
+                            f"{cat}: FEAT exige 'none' mais stack.md active '{active}'"
+                        )
+                else:
+                    if active is None:
+                        mismatches.append(
+                            f"{cat}: FEAT exige '{sid}' mais aucun stack {cat}/* actif"
+                        )
+                    elif active != sid:
+                        mismatches.append(
+                            f"{cat}: FEAT exige '{sid}' mais stack.md active '{active}'"
+                        )
+
+            if mismatches:
+                rep.add_warn(
+                    "REQUIRED-STACK-MISMATCH",
+                    "FEAT ## Required Stack ne correspond pas à stack.md ## Active Tech Specs : "
+                    + " ; ".join(mismatches) + ". "
+                    "Aligner stack.md OU corriger la FEAT (cas bench multi-stack légitime).",
+                )
+            else:
+                rep.add_pass(
+                    "REQUIRED-STACK-MATCH",
+                    f"FEAT ## Required Stack ({len(required_stacks)} catégories) "
+                    f"matche stack.md ## Active Tech Specs",
+                )
+        else:
+            rep.add_info(
+                "REQUIRED-STACK-ABSENT",
+                "FEAT n'a pas de ## Required Stack — drift stack non détectable "
+                "(non bloquant ; ajouter pour FEATs futures)",
+            )
+
         pc_body = section_body(stack_content, "Project Config") or ""
         # v6.10.2: accept either AppName (legacy) or FrontendName (preferred)
         if re.search(r"(?m)(AppName|FrontendName)\s*:\s*\S", pc_body):

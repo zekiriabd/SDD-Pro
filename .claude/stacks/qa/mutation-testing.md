@@ -41,6 +41,30 @@ MutationTestingTimeoutSec: 600  # cap durée par stack runtime
 | `qa/angular-jasmine` | StrykerJS (idem Node) | idem |
 | `qa/blazor-bunit` | Stryker.NET (idem .NET) | idem |
 
+<!-- LIBS_CATALOG_START -->
+### 2.4 Librairies
+
+> Source de verite : `.claude/stacks/qa/mutation-testing.libs.json`. Ne pas editer cette section manuellement -- utiliser `.claude/python/sdd_admin/sync_stack_md.py --stack-id mutation-testing`.
+
+#### 2.4.a Librairies CORE (installees par arch en section 2.2.1, toujours)
+
+| Lib | Version | Role |
+|-----|---------|------|
+
+### 2.4.b Librairies ON-DEMAND (installees si l'US declenche)
+
+Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'US + ACs.
+
+| Capability | Lib | Version | Triggers |
+|---|---|---|---|
+| mutation-testing-dotnet | dotnet-stryker | 4.4.1 | MutationTestingMode\s*:\s*(minimal|full) |
+| mutation-testing-node | @stryker-mutator/core | 8.7.1 | MutationTestingMode\s*:\s*(minimal|full) |
+| mutation-testing-vitest | @stryker-mutator/vitest-runner | 8.7.1 | MutationTestingMode\s*:\s*(minimal|full) |
+| mutation-testing-python | mutmut | 3.3.0 | MutationTestingMode\s*:\s*(minimal|full) |
+| mutation-testing-kotlin | gradle-pitest-plugin | 1.15.0 | MutationTestingMode\s*:\s*(minimal|full) |
+| mutation-testing-kotlin | pitest-junit5-plugin (alt) | 1.2.1 | MutationTestingMode\s*:\s*(minimal|full) |
+<!-- LIBS_CATALOG_END -->
+
 ## 3. Critère de passage
 
 ```

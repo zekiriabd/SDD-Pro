@@ -18,7 +18,22 @@ Format : [version] — date courte. Sections : `Breaking`, `Added`, `Changed`, `
 
 ---
 
-## [Unreleased] — 2026-06-05 (next branch)
+## [v7.0.1-dev] — 2026-06-05 → 2026-06-07 (next branch, post v7.0.0 GA audit closure)
+
+> Renommage MN3 (audit hygiène 2026-06-07) : cette section couvre les fixes audit CTO post-v7.0.0 GA. Sera taguée v7.0.1 PATCH (audit closure) ou v7.1.0 MINOR (selon ampleur). L'ancien header `[Unreleased] — 2026-06-05` était antidaté par rapport à `[v7.0.0] — 2026-05-23` ci-dessous, ce qui prêtait à confusion.
+
+### Audit CTO 2026-06-07 — fixes minors + majors + criticals
+
+#### Minors fermés (MN1-MN8)
+
+- **MN1** : `README.en.md` annoté explicitement comme summary (asymétrie FR/EN documentée).
+- **MN2** : `.claude/stacks/README.md` annoté "index non-stack" (clarifie comptage 34 vs 35 fichiers `*.md`).
+- **MN3** : ce header renommé `[Unreleased]` → `[v7.0.1-dev]`.
+- **MN4** : `loader.yml:145` clarifie distinction stack atomique 🟡 vs combo 🟢 bench-validated.
+- **MN5** : `stacks/archi/microservice.md` Validation: précise roadmap v7.2.0 cible Q4 + ADR `governance-major-microservice-validation` requis.
+- **MN6** : `agents/adversarial-reviewer.md §2.5` ajoute précondition sentinel `{n}-review-consolidated.flag` pour éliminer race condition lecture parallèle.
+- **MN7** : **FAUX POSITIF FERMÉ** — l'audit annonçait `sdd_lib/{layered,project}_config.py = 30k L` à consolider. Recompte réel : **433 + 330 = 763 lignes total** (l'audit avait confondu bytes/chars et lignes). Aucune consolidation requise. Trace conservée pour transparence.
+- **MN8** : `CLAUDE.md §3` ajoute parenthèse explicative pour "Implementation Readiness Gate".
 
 ### Audit P0 batch — v7.0.0-alpha audit consolidé (2026-06-05, 30+ fixes)
 

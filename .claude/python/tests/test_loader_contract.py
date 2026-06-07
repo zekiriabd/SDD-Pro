@@ -1,0 +1,120 @@
+"""Cross-agent contract enforcement tests (audit CTO 2026-06-07, Sprint 4 #19).
+
+The `loader.yml` SSoT documents `reads:`, `writes:`, `forbidden_reads:`,
+`forbidden_writes:` per agent. These tests pin the contract at framework
+level so any future drift is surfaced :
+
+  1. Every documented agent has a non-empty `reads:` block.
+  2. Every agent declared in `loader.yml` has a corresponding
+     `.claude/agents/{name}.md` prompt file on disk.
+  3. Every agent prompt on disk has a `loader.yml` entry (no orphan agents).
+  4. The 12 "alive" agents v7.0.0 are all present and accounted for.
+
+These are STATIC contract tests — they don't intercept runtime, but they
+ensure the SSoT relationship `prompts ↔ loader.yml` cannot silently drift.
+"""
+from __future__ import annotations
+
+import sys
+import unittest
+from pathlib import Path
+
+import pytest
+
+_PY_ROOT = Path(__file__).resolve().parent.parent
+if str(_PY_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PY_ROOT))
+
+from sdd_lib.loader_yml import parse_agent_section  # noqa: E402
+from sdd_lib.paths import repo_root  # noqa: E402
+
+pytestmark = pytest.mark.smoke
+
+#: 12 alive agents per CLAUDE.md §4. Static — must stay in sync with
+#: agents/*.md and framework_smoke.EXPECTED_AGENTS.
+ALIVE_AGENTS_V7 = frozenset({
+    "po", "arch", "dev-backend", "dev-frontend",
+    "elicitor", "qa", "constitutioner",
+    "code-reviewer", "security-reviewer",
+    "spec-compliance-reviewer", "arch-reviewer",
+    "adversarial-reviewer",
+})
+
+#: Agents retired in v7.0.0 — must NOT be in loader.yml as active entries
+#: (they may appear in commented "Removed agents" archive section). Listed
+#: here so we can grep for them and ensure their prompt files are absent.
+RETIRED_AGENTS_V7 = frozenset({
+    "dashboard",
+    "accessibility-auditor", "performance-auditor",
+    "dev-backend-strict", "dev-frontend-strict",
+    "validator",
+})
+
+
+def _agents_dir() -> Path:
+    return repo_root() / ".claude" / "agents"
+
+
+class TestLoaderAgentCoverage(unittest.TestCase):
+    """Every alive agent in CLAUDE.md §4 has a loader.yml entry + prompt.
+
+    Note: `parse_agent_section` returns [] for missing agents (no exception),
+    so we use the `reads` list non-emptiness as a proxy for "agent declared".
+    """
+
+    def test_all_12_alive_agents_have_loader_reads(self):
+        missing = [name for name in sorted(ALIVE_AGENTS_V7)
+                   if not parse_agent_section(name, "reads")]
+        self.assertFalse(missing, f"agents missing from loader.yml `reads:`: {missing}")
+
+    def test_all_12_alive_agents_have_prompt_files(self):
+        agents_dir = _agents_dir()
+        missing = [name for name in ALIVE_AGENTS_V7
+                   if not (agents_dir / f"{name}.md").is_file()]
+        self.assertFalse(missing, f"agents missing prompt .md: {missing}")
+
+    def test_no_retired_agents_have_prompt_files(self):
+        """v7.0.0 removals must be effective on disk."""
+        agents_dir = _agents_dir()
+        zombies = [name for name in RETIRED_AGENTS_V7
+                   if (agents_dir / f"{name}.md").is_file()]
+        self.assertFalse(zombies, f"retired v7 agents still on disk: {zombies}")
+
+
+class TestLoaderReadsWritesShape(unittest.TestCase):
+    """Each alive agent has both reads + writes declared."""
+
+    def test_every_agent_declares_reads_non_empty(self):
+        for agent_name in sorted(ALIVE_AGENTS_V7):
+            reads = parse_agent_section(agent_name, "reads")
+            self.assertTrue(reads, f"agent {agent_name} has empty `reads:` in loader.yml")
+
+    def test_every_agent_declares_writes_non_empty(self):
+        """Even read-only reviewers declare writes for report files."""
+        for agent_name in sorted(ALIVE_AGENTS_V7):
+            writes = parse_agent_section(agent_name, "writes")
+            self.assertTrue(
+                writes,
+                f"agent {agent_name} has empty `writes:` — even reviewers "
+                f"write their report files (workspace/output/.sys/.validation/)",
+            )
+
+
+class TestLoaderNoOrphanPromptFiles(unittest.TestCase):
+    """Every `.claude/agents/*.md` is declared in loader.yml (no orphan prompt)."""
+
+    def test_no_orphan_prompts(self):
+        agents_dir = _agents_dir()
+        on_disk = {p.stem for p in agents_dir.glob("*.md")}
+        orphans = [name for name in on_disk
+                   if name not in ALIVE_AGENTS_V7
+                   and name not in RETIRED_AGENTS_V7
+                   and not parse_agent_section(name, "reads")]
+        self.assertFalse(
+            orphans,
+            f"prompt files without loader.yml entry: {orphans}",
+        )
+
+
+if __name__ == "__main__":
+    unittest.main()

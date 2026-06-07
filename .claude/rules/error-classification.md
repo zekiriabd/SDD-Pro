@@ -7,8 +7,59 @@ Tous les agents et scripts SDD_Pro préfixent leurs blocs ERROR avec un
 dashboards de classer sans interprétation textuelle.
 
 Source canonique unique — concentre les codes auparavant dispersés
-dans `stack-completeness.md`, `file-ownership.md`, `qa-coverage.md`
+dans `library-and-stack.md`, `ownership.md`, `quality.md`
 et inlinés dans les agents (po, dev-*, qa).
+
+> **Note granularité (Sprint 2.4 audit 2026-06-07 ; recount CTO audit
+> 2026-06-07)** : **174 classes** recensées dans ce fichier (172 actives
+> + 2 dépréciées). Le chiffre est obtenu par somme déterministe de la
+> colonne "Classes" du quick-ref §0 ci-dessous — enforcé par le test
+> `tests/test_error_classification_count.py` (gate CI : tout drift entre
+> intro et somme = FAIL). Recount audit CTO 2026-06-07 : §1.7 +1
+> ([ACCEPTANCE_GATE_FAILED]), §1.11 +1 ([SEC_CORS_MISSING]), §1.14
+> sous-comptait body de -9 (réconcilié 13→22).
+>
+> La granularité n'est PAS de la sur-ingénierie — elle est **load-bearing**
+> pour 4 systèmes :
+> 1. **YAML patterns** (`security_patterns.yaml`, `code_review_patterns.yaml`)
+>    — détection par regex par sous-classe
+> 2. **Tests enforcement** (`test_security_patterns.py`,
+>    `test_code_review_patterns.py`) — alignment YAML ↔ doc
+> 3. **Fix dispatcher** (`dispatch_fixes.py`) — chaque sous-classe mappe
+>    à une recette de fix précise (ex. `KEY_INDEX` → "stable id from data")
+> 4. **Security tooling CWE-level** — parité Snyk/Semgrep/CodeQL exige
+>    un CWE par class (e.g. CWE-327 vs 759 vs 338 pour SEC_CRYPTO_*)
+>
+> Toute fusion exige refactor coordonné des 4 systèmes (sprint dédié
+> ~3-5 jours, cf. ADR `governance-major-error-class-consolidation`
+> roadmap v7.2). Pour l'instant, navigation rapide via §0 ci-dessous.
+
+---
+
+## 0. Quick reference — 16 familles (174 classes)
+
+| # | Famille | Classes | Émetteur principal | Comportement build_loop |
+|---|---|---:|---|---|
+| §1.1 | **Runtime** (`[NETWORK]`/`[AUTH]`/`[PERMISSION]`/`[NOT_FOUND]`/`[TIMEOUT]`/`[DISK]`/`[ENV_*]`) | 8 | tous | STOP |
+| §1.2 | **Pipeline** (`[STACK_MALFORMED]`/`[FEAT_*]`/`[PLAN_*]`/`[READINESS_*]`/`[INVALID_*]`/...) | 25 | po, arch, validate_plan.py | STOP |
+| §1.3 | **Contrat ownership** (`[PRESERVES_VIOLATED]`/`[ADDS_VIOLATED]`/`[LAYER_VIOLATION]`/`[FILE_*]`/`[US_*]`) | 13 | dev-*, set_us_status.py | STOP |
+| §1.4 | **Build** (`[BUILD_*]`/`[DEP_MISSING]`/`[CIRCULAR_DEP]`) | 5 | dev-* | **ITÈRE** sur `[BUILD_CORRECTIBLE]` uniquement |
+| §1.5 | **Anti-derive** (`[DERIVE_VIOLATION]`/`[STACK_LIBRARY_*]`/`[REFACTOR_HORS_SCOPE]`/...) | 7 | dev-* | STOP |
+| §1.6 | **UI fidelity** (`[UI_FIDELITY_GAP]`/`[UI_TOKEN_VIOLATION]`/`[FRONTEND_BACKEND_CONTRACT_GAP]`) | 3 | dev-frontend | STOP/retry |
+| §1.7 | **QA** (`[QA_TEST_FAILED]`/`[QA_COVERAGE_GAP]`/`[QA_OWNERSHIP_*]`/`[ACCEPTANCE_GATE_FAILED]`/...) | 10 | qa | STOP (RED bloquant) |
+| §1.8 | **Parallélisme** (`[LIBNAME_LOCK_HELD]`/`[LOCK_HELD]`/`[LIBNAME_SIGNATURE_CONFLICT]`) | 3 | dev-* | STOP |
+| §1.9 | **A11Y** (`[A11Y_*]`) — héritage, réactivé via `ingest_axe.py` | 11 | CI ingest (Lighthouse/axe) | report only |
+| §1.10 | **Code Review** (`[REVIEW_*]`) — `code-reviewer` agent | 12 | code-reviewer | report only (verdict 🟢/🟡/🔴) |
+| §1.11 | **Security** (`[SEC_*]`) — OWASP Top 10 2021 | 23 | security-reviewer | report only + 8 hard-blocking |
+| §1.12 | **Perf** (`[PERF_*]`) — héritage, réactivé via `ingest_lighthouse.py` | 16 | CI ingest | report only |
+| §1.13 | **Spec Compliance** (`[SPEC_*]`) — AC-by-AC verification | 9 | spec-compliance-reviewer | report only |
+| §1.14 | **Tooling/Governance** (`[SCAN_*]`/`[DISCOVER_*]`/`[CHECKPOINT_*]`/`[CONFIG_*]`/`[PROFILE_*]`/`[DRIFT_*]`/`[ARCH_*]`/`[REVIEW_*]`) | 22 | scripts mono-shot | mostly info, 2 bloquantes |
+| §1.15 | **Adversarial** (`[ADV_*]`) — opt-in `/sdd-review --adversarial` | 6 | adversarial-reviewer | informational |
+| §1.16 | **Inconnue** (`[UNKNOWN]`) | 1 | fallback | report only |
+
+**Verdict consolidé** (§1.10-1.13) dépend du seuil `{Kind}FailOn` du
+Project Config (`info|minor|moderate|serious|critical`). Voir §3.1 pour
+le tableau d'actions par famille.
 
 ---
 
@@ -55,21 +106,14 @@ et inlinés dans les agents (po, dev-*, qa).
 | `[FEAT_HASH_MISMATCH]` | Hash sha256 de la FEAT parente diffère de celui inscrit dans une US (`Parent FEAT hash: sha256:...`). FEAT modifiée après génération US → `Covers:` potentiellement obsolète. Fix : re-run `/us-generate {n}` (idempotent). | dev-*, validate_readiness, auditors (v7.0.0 audit §6 P1-11) |
 | `[ELICITOR_GAP]` | FEAT contient sections élicitor (FAIL-N, EDGE-N, Red Team) mais ≥ 1 item n'est mappé sur aucune AC d'aucune US. WARN par défaut (`ElicitorGapMode: warn`), `strict` = NO-GO. | po STEP 4 (v7.0.0 audit §6.11 — boucle elicitor) |
 | `[PHASE_PLAN_INIT_FAILED]` | `/dev-run` standalone : `phase_planner.py` exit ≠ 0 (FEAT inexistante / Project Config malformé). Bloquant STEP 5.5.1 — sans `$PHASE_PLAN`, STEP 6.4 (auditor batch) ne peut décider quels reviewers spawner. | dev-run STEP 5.5.1 (v7.0.0 audit P2) |
-| `[PLAN_NOT_FOUND]` | Plan attendu absent | validate_plan.py |
-| `[PLAN_UNREADABLE]` | Plan présent mais I/O error | validate_plan.py |
-| `[PLAN_NO_FRONTMATTER]` | Plan sans bloc YAML `---` ... `---` | validate_plan.py |
-| `[PLAN_FRONTMATTER_INVALID]` | Champ frontmatter invalide (type, valeur) | validate_plan.py |
-| `[PLAN_MISSING_REQUIRED_FIELD]` | Champ `us` ou `family` absent | validate_plan.py |
-| `[PLAN_FILES_SECTION_MISSING]` | Section `## Files` absente ou vide | validate_plan.py |
-| `[PLAN_FILE_ENTRY_INVALID]` | Entrée file sans path/operation/layer/covers_acs | validate_plan.py |
-| `[PLAN_AUGMENT_CONTRACT_MISSING]` | operation=augment sans `preserves:`/`adds:` | validate_plan.py |
-| `[PLAN_AC_COVERAGE_GAP]` | ACs de l'US absents de `## ACs Coverage Summary` | validate_plan.py (strict) |
-| `[PLAN_STALE]` | us-hash mismatch — US modifiée post-plan | validate_plan.py (strict) → STOP, re-`/dev-plan` |
-| `[PLAN_INVALID]` | Plan corrompu/illisible/inconsommable (alias générique des cas exit 2 ≠ PLAN_STALE) | validate_plan.py → STOP, re-`/dev-plan` |
-| `[PLAN_NOT_STRICT_READY]` | Plan v1 ou manque `## Inline Digest` — strict path indisponible | validate_plan.py (strict) → fallback classic |
-| `[PLAN_DIGEST_INSUFFICIENT]` | Info manquante dans `## Inline Digest` du plan (info nécessaire en runtime non capturée) | dev-*-strict STEP 2/5/6 → fallback dev-* (Opus) |
+| `[PLAN_NOT_FOUND]` | Plan attendu absent (Glob 0 match dans `workspace/output/plans/`) | validate_plan.py |
+| `[PLAN_INVALID]` | Plan structurellement invalide. **Englobe 7 sous-cas** (v7.0.0-alpha Sprint 2.4 — fusion documentaire 2026-06-07) : `_UNREADABLE` I/O error, `_NO_FRONTMATTER` YAML missing, `_FRONTMATTER_INVALID` field type/value, `_MISSING_REQUIRED_FIELD` `us`/`family` absent, `_FILES_SECTION_MISSING` `## Files` empty, `_FILE_ENTRY_INVALID` path/operation/layer missing, `_AUGMENT_CONTRACT_MISSING` augment sans preserves/adds. Le message ERROR détaillera le sous-cas. | validate_plan.py |
+| `[PLAN_AC_COVERAGE_GAP]` | ACs de l'US absents de `## ACs Coverage Summary` du plan | validate_plan.py (strict) |
+| `[PLAN_STALE]` | us-hash mismatch — US modifiée post-plan, re-`/dev-plan` requis | validate_plan.py (strict) → STOP |
+| ~~`[PLAN_NOT_STRICT_READY]`~~ | **DÉPRÉCIÉ v7.0.0** — strict variants supprimés (`governance-major-auditors-trim`). Toléré en lecture des bases console.db legacy. | (n/a) |
+| ~~`[PLAN_DIGEST_INSUFFICIENT]`~~ | **DÉPRÉCIÉ v7.0.0** — strict variants supprimés. Toléré en lecture des bases console.db legacy. | (n/a) |
 | `[INVALID_ARG]` | Argument CLI invalide (regex `^\d+-\d+(:plan)?$` ou `^\d+$` non matché) | dev-*, sdd-full, dev-run, dev-plan, feat-validate STEP 1 |
-| `[INVALID_MODE]` | Mode d'exécution incompatible (`:plan` invoqué alors qu'un plan existe ; suffixe `:plan` sur agent strict ; etc.) | dev-shared.md §1.ter.3, dev-*-strict STEP 0 |
+| `[INVALID_MODE]` | Mode d'exécution incompatible (`:plan` invoqué alors qu'un plan existe ; etc.) | `build-and-loop.md §1.ter.3` (Partie B) |
 | `[PROJECT_NOT_INIT]` | Fichier projet absent (`.csproj`/`package.json`/`pyproject.toml`/`build.gradle.kts`/`angular.json`) — arch n'a pas tourné | preflight.py B4, dev-*-strict STEP 4 |
 | `[PLAN_REVIEW_GATE_SKIPPED]` | Plan-then-review gate bypassé (WARN informationnel) | sdd-full STEP 3.6 |
 | `[STACK_SCAFFOLDING_MISSING]` | Arch n'a pas scaffoldé les entities attendues (DB→entities cohérence cassée) | arch Phase B, dev-backend STEP 4.5 |
@@ -81,7 +125,7 @@ et inlinés dans les agents (po, dev-*, qa).
 | `[PRESERVES_VIOLATED]` | Identifier `preserves:` retiré après augment | dev-* post-Edit |
 | `[ADDS_VIOLATED]` | Identifier `adds:` non présent après écriture | dev-* post-Edit |
 | `[LAYER_VIOLATION]` | Code dans couche interdite (ex. business in UI) | dev-* STEP build |
-| `[FILE_OWNERSHIP]` | Path interdit par `file-ownership.md §1` | hook SubagentStop |
+| `[FILE_OWNERSHIP]` | Path interdit par `ownership.md §1` (Partie A) | hook SubagentStop |
 | `[FILE_OWNERSHIP_NESTED]` | Projet front imbriqué dans back (cf. §1.bis) | arch/dev-* STEP 1.bis |
 | `[STATUS_FLIP_FAILED]` | `Status: Done` non persisté sur disque | dev-* post-write |
 | `[US_STATUS_INVALID]` | Valeur de status hors 7 valides v6.8 (`Draft\|Ready\|InProgress\|Review\|Done\|Deferred\|Cancelled`) | `set_us_status.py` |
@@ -142,7 +186,8 @@ convergence.
 | `[QA_OUTPUT_INVALID]` | `coverage.json`/`quality.json` non-parseable | qa STEP 7 |
 | `[QA_PRECONDITION_FAILED]` | FEAT/US/code production absents | qa STEP 0.4 |
 | `[QA_OWNERSHIP_VIOLATION]` | dev-* écrit test OU qa écrit code prod | dev-*, qa |
-| `[API_GATE_RED]` | API Gate (cf. `backend-first.md`) RED, frontend bloqué | dev-run phase 4c |
+| `[API_GATE_RED]` | API Gate (cf. `build-and-loop.md §A`) RED, frontend bloqué | dev-run phase 4c |
+| `[ACCEPTANCE_GATE_FAILED]` | Acceptance Gate (`validate_acceptance.py`) fail en mode `strict` (`test`/`lint`/`build`/`coverage`/`smoke`/`E2E` KO). Bypass : `SDD_ALLOW_ACCEPTANCE_BYPASS=1`. Cf. `quality.md §C`. | qa STEP 9.bis + hook `SubagentStop` matcher=qa |
 
 Priorité d'émission : `[QA_TEST_FAILED] > [QA_COVERAGE_GAP]` ;
 `[API_GATE_RED] > tout autre QA_*`.
@@ -151,7 +196,7 @@ Priorité d'émission : `[QA_TEST_FAILED] > [QA_COVERAGE_GAP]` ;
 
 | Préfixe | Usage |
 |---|---|
-| `[LIBNAME_LOCK_HELD]` | Lock LibName détenu par autre agent (cf. `file-ownership.md §4`) |
+| `[LIBNAME_LOCK_HELD]` | Lock LibName détenu par autre agent (cf. `ownership.md §4`, Partie A) |
 | `[LIBNAME_SIGNATURE_CONFLICT]` | DTO/Model partagé, signatures divergentes |
 | `[LOCK_HELD]` | Lock générique cross-language (sdd_lib/file_locks.py) — `workspace/console/.status.lock`, etc. Alias générique de `[LIBNAME_LOCK_HELD]` pour contextes non-LibName |
 
@@ -247,6 +292,7 @@ seuil `SecurityFailOn` du Project Config, sauf classes hard-blocking.
 | `[SEC_STACK_TRACE_EXPOSED]` | A09 | CWE-209 | serious | scan §5.9 |
 | `[SEC_SSRF_RISK]` | A10 | CWE-918 | critical (hard-blocking) | scan §5.10 |
 | `[SEC_ENV_VAR_FORBIDDEN]` | A05 | CWE-1188 | serious | scan §5.11 (audit 2026-06-06) |
+| `[SEC_CORS_MISSING]` | A05 | CWE-942 | serious | scan §5.6 (audit 2026-06-07 — backend SPA-facing sans config CORS, cf. `library-and-stack.md §B.5`) |
 
 **Hard-blocking systématique** (8 classes — override `SecurityFailOn`) :
 `[SEC_SECRET_HARDCODED]`, `[SEC_SQL_INJECTION]`, `[SEC_COMMAND_INJECTION]`,

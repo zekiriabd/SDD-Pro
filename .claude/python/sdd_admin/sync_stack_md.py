@@ -270,7 +270,13 @@ def replace_marked_section(md: str, start: str, end: str, new_content: str) -> s
         re.escape(start) + r".*?" + re.escape(end),
         re.DOTALL,
     )
-    return pattern.sub(f"{start}\r\n{new_content}\r\n{end}", md)
+    # Audit CTO 2026-06-07 fix: use lambda replacement (not raw string) so that
+    # backslash sequences in `new_content` (e.g. regex triggers `\s` rendered
+    # in §2.4 table for stacks like mutation-testing) are NOT interpreted as
+    # re.sub backreferences. Plain string would raise `re.PatternError: bad
+    # escape \s` on Python 3.12+ stricter validation.
+    replacement = f"{start}\r\n{new_content}\r\n{end}"
+    return pattern.sub(lambda _m: replacement, md)
 
 
 def build_libs_table(cat: dict[str, Any], stack_id: str) -> str:

@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -134,6 +135,90 @@ def resolve_fail_on(cli_value: str | None) -> str:
     return "serious"
 
 
+def _auto_ingest_orphan_jsons(feat_n: int) -> list[str]:
+    """Defensive auto-ingest of agent JSON reports if DB rows are missing.
+
+    Sprint 1.2 fix (2026-06-06) — code-reviewer and security-reviewer agents
+    sometimes finish writing their JSON reports but the SubagentStop hook
+    that triggers `ingest_agent_report.py` misses (background completion,
+    timeout, race condition). Result : `sdd-review` aggregates findings
+    only from `qa_quality` and emits a false 🟢/🟡 verdict.
+
+    This function scans the well-known JSON paths under
+    `workspace/output/qa/feat-{n}/` and triggers ingest for each report
+    type whose corresponding DB table is empty for this FEAT. Idempotent
+    (no-op when ingests already done).
+
+    Returns a list of human-readable log lines for `scans_run` (e.g.
+    ["ingested code-review (3 rows)", ...]).
+    """
+    import sqlite3
+    import subprocess
+    logs: list[str] = []
+    root = repo_root()
+    qa_dir = root / "workspace" / "output" / "qa" / f"feat-{feat_n}"
+    if not qa_dir.is_dir():
+        return logs
+
+    db_path = root / "workspace" / "output" / "db" / "console.db"
+    if not db_path.is_file():
+        return logs
+
+    # (json filename pattern, ingest --type value, DB table to test)
+    candidates = [
+        ("code-review.json",     "code-review",     "qa_code_review"),
+        ("security-scan.json",   "security-scan",   "qa_security"),
+        ("spec-compliance.json", "spec-compliance", "qa_spec_compliance"),
+        ("a11y.json",            "a11y",            "qa_a11y"),
+        ("perf.json",            "perf",            "qa_performance"),
+        ("adversarial.json",     "adversarial",     "validation_reports"),  # special
+    ]
+    try:
+        conn = sqlite3.connect(db_path)
+    except sqlite3.Error:
+        return logs
+
+    for fname, type_arg, table in candidates:
+        path = qa_dir / fname
+        if not path.is_file():
+            continue
+        try:
+            cur = conn.execute(f"SELECT COUNT(*) FROM {table} WHERE feat_n=?", (feat_n,))
+            existing = cur.fetchone()[0]
+        except sqlite3.Error:
+            continue
+        if existing > 0:
+            continue  # already ingested — idempotent skip
+
+        # Trigger ingest. Use subprocess to keep the orchestrator's import
+        # graph clean (ingest_agent_report has its own argparse).
+        # Invoke the script by absolute path (PYTHONPATH not configured at
+        # repo root — `.claude/python/sdd_scripts` is not on sys.path for
+        # subprocess by default).
+        ingest_script = root / ".claude" / "python" / "sdd_scripts" / "ingest_agent_report.py"
+        try:
+            result = subprocess.run(
+                [sys.executable, str(ingest_script),
+                 "--type", type_arg, "--feat", str(feat_n),
+                 "--path", str(path), "--keep-json"],
+                cwd=str(root),
+                capture_output=True, text=True, timeout=30,
+                env={**os.environ, "PYTHONPATH": str(root / ".claude" / "python")},
+            )
+            if result.returncode == 0:
+                logs.append(f"auto-ingest {type_arg}")
+            else:
+                # Best-effort : log on stderr but don't fail sdd-review
+                print(f"WARNING: auto-ingest {type_arg} failed: {result.stderr.strip()[:200]}",
+                      file=sys.stderr)
+        except (subprocess.SubprocessError, OSError) as e:
+            print(f"WARNING: auto-ingest {type_arg} subprocess error: {e}",
+                  file=sys.stderr)
+
+    conn.close()
+    return logs
+
+
 def main() -> int:
     # Windows console: force UTF-8 to avoid charmap codec on emoji/icons
     if sys.stdout.encoding and sys.stdout.encoding.lower() not in ("utf-8", "utf8"):
@@ -159,6 +244,17 @@ def main() -> int:
         if not ok:
             print(f"WARNING: quality_scan failed, continuing on stale DB.\n{tail}",
                   file=sys.stderr)
+
+    # STEP 3.5 — auto-ingest stale JSONs (Sprint 1.2 fix 2026-06-06)
+    # If an agent ran but ingest_agent_report wasn't invoked (e.g. SubagentStop
+    # hook missed, background timeout), .json files exist on disk but DB rows
+    # are empty → verdict aggregates 0 findings from those sources (false 🟢).
+    # Defensive auto-ingest before fetch : scan well-known JSON paths and
+    # pipe through ingest_agent_report.py if the corresponding DB table is empty.
+    if not args.skip_scans:
+        ingest_logs = _auto_ingest_orphan_jsons(feat_n)
+        if ingest_logs:
+            scans_run.extend(ingest_logs)
 
     # STEP 4 — fetch
     findings, missing = fetch_findings(feat_n)

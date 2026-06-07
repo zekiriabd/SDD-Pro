@@ -21,11 +21,11 @@ coordination:
 classes:
   - prefix: "[REVIEW_SECRETS_HARDCODED]"
     category: security
-    severity: critical
-    hard_blocking: true
+    severity: minor
+    hard_blocking: false
     section: "5.5"
-    description: "Secret hardcoded — deduplicated against security-reviewer"
-    note: "security-reviewer.md §6 owns this; code-reviewer emits if security_patterns.yaml not loaded"
+    description: "Secret hardcoded — info only, owned exclusively by security-reviewer [SEC_SECRET_HARDCODED]"
+    note: "Audit P0-doc 2026-06-05: code-reviewer emits as issues.minor (info) with pointer to security-reviewer. Hard-blocking lives in security_patterns.yaml [SEC_SECRET_HARDCODED] (CWE-798)."
 
   - prefix: "[REVIEW_ANTI_PATTERN_N_PLUS_ONE]"
     category: perf-db

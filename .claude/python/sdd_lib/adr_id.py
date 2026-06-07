@@ -47,12 +47,19 @@ from __future__ import annotations
 import re
 import secrets
 from datetime import datetime, timezone
+from pathlib import Path
 
 #: Slug constraints — kebab-case ASCII, max 5 words/40 chars per
 #: ownership.md §3 ("max 5 mots significatifs"). Enforced lightly here
 #: (silent truncation + sanitization) to avoid raising in mid-pipeline.
 _SLUG_INVALID_RE = re.compile(r"[^a-z0-9-]+")
 _SLUG_MAX_LEN = 40
+
+#: Retry budget for collision-on-disk avoidance (audit CTO 2026-06-07).
+#: With rand4 = 16 bits entropy and ≤ 6 agents minting in the same second,
+#: collision proba ≈ 6²/(2·65536) ≈ 0.027 %. 5 retries drives the residual
+#: to ~10⁻²⁵ — effectively never.
+_MAX_COLLISION_RETRIES = 5
 
 
 def _sanitize_slug(slug: str) -> str:
@@ -73,7 +80,12 @@ def _sanitize_slug(slug: str) -> str:
     return slug[:_SLUG_MAX_LEN].rstrip("-") or "unnamed"
 
 
-def mint_adr_filename(slug: str, *, when: datetime | None = None) -> str:
+def mint_adr_filename(
+    slug: str,
+    *,
+    when: datetime | None = None,
+    adrs_dir: Path | str | None = None,
+) -> str:
     """Return a collision-resistant ADR filename matching the v7.0.0 regex.
 
     Format::
@@ -92,6 +104,15 @@ def mint_adr_filename(slug: str, *, when: datetime | None = None) -> str:
     when:
         Optional UTC datetime override (test injection). Defaults to
         ``datetime.now(timezone.utc)``.
+    adrs_dir:
+        Optional ADRs directory path. If provided, the function performs
+        **retry-on-collision** : if the minted filename already exists on
+        disk, a new rand4 is drawn (up to ``_MAX_COLLISION_RETRIES`` times).
+        This covers the 0.0015 % residual collision tail and protects
+        against silent overwrites when 5+ parallel agents (typical for
+        ``/dev-run --max-parallel 6``) mint ADRs within the same second.
+        If ``None`` (legacy callers), no disk check is performed.
+        Added by audit CTO 2026-06-07.
 
     Returns
     -------
@@ -101,6 +122,21 @@ def mint_adr_filename(slug: str, *, when: datetime | None = None) -> str:
     """
     ts_source = when if when is not None else datetime.now(timezone.utc)
     ts = ts_source.strftime("%Y%m%dT%H%M%S")
-    rand4 = secrets.token_hex(2)  # 4 lowercase hex chars (16 bits entropy)
     safe_slug = _sanitize_slug(slug)
-    return f"ADR-{ts}-{rand4}-{safe_slug}.md"
+
+    if adrs_dir is None:
+        # Legacy path : single mint, no disk check (backwards-compat).
+        rand4 = secrets.token_hex(2)
+        return f"ADR-{ts}-{rand4}-{safe_slug}.md"
+
+    # Retry-on-collision : re-roll rand4 if the candidate already exists.
+    dir_path = Path(adrs_dir)
+    for _attempt in range(_MAX_COLLISION_RETRIES):
+        rand4 = secrets.token_hex(2)
+        candidate = f"ADR-{ts}-{rand4}-{safe_slug}.md"
+        if not (dir_path / candidate).exists():
+            return candidate
+
+    # All retries collided — extremely unlikely (~10⁻²⁵). Return the last
+    # candidate and let the caller's atomic_write detect the collision.
+    return candidate

@@ -43,6 +43,29 @@ Règles IA :
 - Ne pas réinventer layout/navigation/forms
 - Composer plutôt que reconstruire
 
+<!-- LIBS_CATALOG_START -->
+### 2.4 Librairies
+
+> Source de verite : `.claude/stacks/ui/vuetify.libs.json`. Ne pas editer cette section manuellement -- utiliser `.claude/python/sdd_admin/sync_stack_md.py --stack-id vuetify`.
+
+#### 2.4.a Librairies CORE (installees par arch en section 2.2.1, toujours)
+
+| Lib | Version | Role |
+|-----|---------|------|
+| vuetify | 3.7.4 | Composants Material Design pour Vue 3 (v-app, v-btn, v-data-table, v-form, etc.). |
+| @mdi/font | 7.4.47 | Pack icônes Material Design (classes mdi-*), iconLibrary par défaut Vuetify. |
+| vite-plugin-vuetify | 2.0.4 | Plugin Vite pour auto-import composants Vuetify (tree-shaking). |
+
+### 2.4.b Librairies ON-DEMAND (installees si l'US declenche)
+
+Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'US + ACs.
+
+| Capability | Lib | Version | Triggers |
+|---|---|---|---|
+| sass | sass-embedded | 1.83.0 | sass, scss, theme.*custom, variables.*scss |
+| form-validation | vee-validate | 4.14.4 | validation.*form, form.*validation, schema.*validation, yup, zod |
+<!-- LIBS_CATALOG_END -->
+
 ---
 
 ## 3. Architecture UI Vuetify

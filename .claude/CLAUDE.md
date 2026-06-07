@@ -1,8 +1,8 @@
-# SDD_Pro v7.0.0-alpha (branche `next`) — FEAT-Driven Development pour Claude Code
+# SDD_Pro v7.0.0 GA — FEAT-Driven Development pour Claude Code
 
-> ⛔ **FREEZE 2026-06-18** sur `main` (v6.10.4-LTS). Sur `next` : v7.0.0-alpha
-> (auditors-trim, prompts-trim, stacks quarantine). Cf. `@.claude/docs/VERSIONING.md`
-> + `@.claude/docs/CHANGELOG.md`.
+> ✅ **v7.0.0 GA tagué 2026-06-07** (audit CTO closure : 20 Critical + 38 Major
+> fermés, taxonomie 174 classes, 13 combos SLA). v6.10.4-LTS conservée pour
+> projets legacy. Cf. `@.claude/docs/VERSIONING.md` + `@.claude/docs/CHANGELOG.md`.
 
 > Framework SDD strict : FEAT → User Stories → Code (back/front parallèle).
 > Lecture sélective, anti-derive, isolation par US et famille.
@@ -45,7 +45,7 @@ supprimer ligne ET régénérer les US. `Covers` réfèrent par valeur.
 |---|---|---|
 | `/sdd-bootstrap` | 0 | Init projet greenfield (génère stack.md + workspace/) |
 | `/feat-generate [Nom]` | 1 | Cadrage FEAT + bootstrap constitution |
-| `/feat-validate {n} [--json]` | 2.6 | Implementation Readiness Gate |
+| `/feat-validate {n} [--json]` | 2.6 | Implementation Readiness Gate (validation déterministe Python 0-token : IDs FEAT↔US stables, stacks actifs, mockups, AC coverage — GO/NO-GO bloquant) |
 | `/sdd-full {n}` | 2→5 | Pipeline complet A→Z (strict, prod-ready) |
 | `/sdd-poc {n}` | 1→4 | **Pipeline minimaliste POC** (skip US/QA/review/API-gate — FEAT→arch→back→front) |
 | `/dev-run {n}` | 4 | Orchestrateur dev (arch+DB → back → API gate → front) |
@@ -116,12 +116,17 @@ Templates : `@.claude/docs/conventions.md §14-§15`.
 | **experimental** | 🟡 exp | 8 stacks | Spec stack OK + `.libs.json` valide, **jamais exécuté end-to-end**. Code généré peut compiler — ou pas. | **⚠ Non supporté commercialement.** À considérer comme « community preview ». |
 | **POC-only** | 🟡 poc | 1 stack (`node-react`) | Usage interne console SDD uniquement. Pas de TS natif, pas de bundler, pas de pipeline Playwright. | **Hors périmètre produit.** Ne sera pas commercialisé. |
 
-> **⚠ Engagement commercial v7.0.0** : seuls les tiers `validated` et
-> `bench-validated runtime` (13 stacks total) sont éligibles à un
-> contrat de support payant. Les tiers `experimental` et `POC-only`
-> sont **explicitement exclus de tout SLA** et marqués comme tels
-> dans le hook `preflight_stack_combo` (exit 2 = bloquant sauf
-> `SDD_ALLOW_UNTESTED_COMBO=1`, audit-loggué).
+> **⚠ Engagement commercial v7.0.0** (clarifié audit CTO 2026-06-07) :
+> seuls les **13 combos** éligibles SLA = 2 combos `validated`
+> end-to-end (C1, C2) + 11 combos `bench-validated runtime` testés
+> 2026-06-05. Côté stacks atomiques (= briques), cela correspond aux
+> **25 stacks 🟢** (14 reference + 11 bench-validated) ; les **8 stacks
+> 🟡 experimental** et le **1 stack 🟡 POC-only** sont **explicitement
+> exclus de tout SLA**. Distinction stack/combo : un combo est un
+> assemblage de 3-6 stacks (backend + frontend + ui + qa + auth + ±archi).
+> Marquage runtime via le hook `preflight_stack_combo` (exit 2 =
+> bloquant si combo non listé, sauf `SDD_ALLOW_UNTESTED_COMBO=1`,
+> audit-loggué).
 
 **23 combinaisons bench runtime validées** (2026-06-05) : 16 cross-origin REST (4 backends × 4 SPA) + 6 monolithes fullstack + 1 MAUI Windows desktop + 1 RN Expo Web ; + 1 mobile scaffold seul (Kotlin Android, SDK absent).
 
@@ -165,6 +170,7 @@ Anti-derive, ERROR 3L disque, idempotence, lecture sélective, parallélisme bor
 - **Architecture & workflow** : `@.claude/docs/{architecture,workflow,conventions,quickstart}.md`
 - **Onboarding** : `@.claude/docs/{glossary,hooks-and-protections,config-precedence}.md`
 - **Gouvernance** : `@.claude/docs/{VERSIONING,CHANGELOG,MIGRATION,WORKING-AGREEMENT}.md`
+- **Commercial / DSI** : `@.claude/docs/{WHY-SDD-PRO,COMPLIANCE,SLA,KNOWN-LIMITATIONS}.md`
 - **ROI & roadmap** : `@.claude/docs/{poc-roi-methodology,roadmap-v7-v8,cache-strategy,validated-combos,orphan-cleanup-policy}.md`
 - **Règles** : `@.claude/rules/` (5 consolidées + 1 hoist + 1 protocole + 1 annexe)
 - **Python** : `@.claude/python/README.md`

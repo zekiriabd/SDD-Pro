@@ -142,28 +142,34 @@ Read `workspace/output/.sys/.context/constitution.md` §6 (index ADRs).
 Pour chaque ADR référencé, Read `workspace/output/.sys/.context/adrs/{name}.md`
 et extraire le `## Decision` (1-3 lignes).
 
+> **Note numérotation** : STEP 3 et 4 retirés v7.0.0 (hoist STEP 0/0.5 via `dev-shared-preflight.md` ; STEP 2 absorbe l'ancien chargement contexte). La numérotation 5→10 est conservée pour stabilité des cross-refs externes (loader.yml, sdd-review.md, scripts ingest).
+
 ### 2.5 Périmètre code (feat-scoped)
 
-Glob les fichiers matérialisés par les US de la FEAT :
-- Read plans `workspace/output/plans/{n}-*.{back,front}.md`
-- Extraire `## Files` section → liste de paths
-- Si plans absents : fallback Glob `workspace/output/src/**/*.{cs,kt,ts,tsx,py,vue,razor}`
-  (filtrer hors `node_modules/bin/obj/dist/build/.Tests/__tests__`)
+**HARD-RULE (audit C1 closure, 2026-06-07)** : **Ne JAMAIS** faire de Glob non-borné sous `workspace/output/src/` (ni `**/*` ni `**/*.{ext1,ext2,...}`). L'incident audit cost-time 2026-06-06 (11.8M tokens / $35 sur 1 FEAT) a justifié l'interdiction dans `spec-compliance-reviewer.md §STEP 5` ; cette règle s'applique **identiquement** à arch-reviewer. Si à un moment tu es tenté de glob largement → **STOP + ERROR `[ARCH_NO_TARGETS]`**.
 
-**⚠️ WARN obligatoire (v7.0.0-alpha 2026-05-21)** — quand le fallback
-Glob est activé, émettre **avant** la phase de vérification §5 :
+Stratégie ordonnée (premier match wins) :
 
-```
-⚠️ WARN arch-reviewer FEAT {n} — plan v2 absent, fallback Glob activé
-   Cause : aucun `workspace/output/plans/{n}-*.{back,front}.md` matché
-   Conséquence : analyse de TOUT le code matérialisé (pas seulement les
-                 fichiers de la FEAT). Risque de **faux positifs**
-                 [ARCH_PATTERN_VIOLATION] sur du code legacy hors scope.
-   Fix     : `/dev-plan {n}` pour scoper l'audit aux fichiers de la FEAT.
-```
+1. **Plans v2 strict-ready présents (mode preferred)** : Glob `workspace/output/plans/{n}-*.{back,front}.md`. Pour chaque plan, parser `## Files` section → `paths[]`. C'est la voie nominale.
 
-Persister `"source_mode": "convention-fallback"` + `"plan_v2_warn": true`
-dans `{n}-arch-review.json`.
+2. **Convention fallback feat-scoped (plans absents)** : pour chaque US `{n}-{m}-{Name}` lue dans `workspace/output/us/`, lister via Glob **borné par nom d'US** uniquement :
+   - Backend : `workspace/output/src/{BackendName}/{Services,Endpoints,Controllers,DTOs,Validators,Entities,Mappers,domain/**,application/**,infrastructure/**}/*{Name}*.{cs,kt,ts,py}`
+   - Frontend : `workspace/output/src/{AppName}/src/{pages,components,layouts,services,validators}/*{Name}*.{tsx,ts,vue,razor}`
+   - Lib partagée (si présente) : `workspace/output/src/{LibName}/**/*{Name}*.{cs,kt,ts}`
+   - **Cap dur** : si `count(files_to_inspect) > 30` → log WARNING, tronquer à 30. Si `count == 0` → STOP + ERROR `[ARCH_NO_TARGETS]` (FEAT non matérialisée correctement, pas élargir le scope).
+   - Filtrer hors `node_modules|bin|obj|dist|build|.Tests|__tests__|.next|.nuxt|target` (post-Glob).
+
+3. **WARN obligatoire si fallback convention** — émettre **avant** STEP 5 :
+   ```
+   ⚠️ WARN arch-reviewer FEAT {n} — plan v2 absent, fallback convention feat-scoped activé
+      Cause : aucun `workspace/output/plans/{n}-*.{back,front}.md` matché
+      Conséquence : analyse limitée aux fichiers matchant `*{Name}*` des US,
+                    pas d'analyse cross-fichier complète. Risque de manquer
+                    des violations [ARCH_PATTERN_VIOLATION] inter-fichiers.
+      Fix     : `/dev-plan {n}` pour scoper l'audit via plan v2.
+   ```
+
+Persister `"source_mode": "convention-fallback"` + `"plan_v2_warn": true` + `"files_count": N` dans `{n}-arch-review.json`.
 
 ---
 

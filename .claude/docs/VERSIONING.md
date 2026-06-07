@@ -7,10 +7,10 @@
 > fait foi. Bump de version → mettre à jour VERSIONING.md puis CHANGELOG +
 > MIGRATION.
 
-> **Statut au 2026-05-19** : v6.10.4 désignée **LTS**. Freeze 30 jours
-> jusqu'au **2026-06-18 inclus**. Seules les versions PATCH (cf. §3) sont
-> autorisées sur la branche `main` pendant cette fenêtre. Toute proposition
-> MINOR/MAJOR est mise en attente sur la branche `next`.
+> **Statut au 2026-06-07** : v7.0.0 **GA tagué** post-audit CTO. v6.10.4
+> conservée comme **LTS** pour projets legacy (support sécurité jusqu'au
+> 2026-12-31). La branche `main` accepte désormais les bumps MINOR et PATCH
+> v7.x. Toute proposition MAJOR (v8.x) reste sur la branche `next`.
 
 ---
 

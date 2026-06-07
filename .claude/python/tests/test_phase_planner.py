@@ -9,12 +9,9 @@ import pytest
 from sdd_scripts.phase_planner import (
     PHASE_COST_ESTIMATE,
     _bool_flag,
-    _decide_a11y,
     _decide_code_review,
-    _decide_perf,
     _decide_security_scan,
     _decide_spec_compliance,
-    _decide_threat_model,
     _normalize_mode,
     plan,
 )
@@ -193,44 +190,11 @@ class TestHelpers:
 # -----------------------------------------------------------------------------
 
 
-class TestDecideA11y:
-    """v7.0.0-alpha (audit MAJ-6) — agent retiré, fonction réduite à un stub.
-    Toutes les branches granulaires de l'ancien code sont écrasées : peu importe
-    les flags d'entrée, le verdict est uniformément enabled=False, agent_removed=True.
-    """
-
-    def test_a11y_stub_always_disabled(self) -> None:
-        for kwargs in (
-            {},  # no kwargs (stub accepts anything)
-            {"a11y_mode": "off"},
-            {"a11y_mode": "manual"},
-            {"a11y_mode": "full", "has_frontend_stack": True, "has_frontend_code": True},
-            {"a11y_mode": "full", "has_frontend_stack": False, "has_frontend_code": False},
-        ):
-            ph = _decide_a11y(**kwargs)
-            assert ph["enabled"] is False
-            assert ph["agent_removed"] is True
-            assert "agent removed v7.0.0" in ph["skip_reason"]
-            assert "axe-core" in ph["replacement"]
-            assert ph["estimated_tokens"] == 0
-
-
-class TestDecidePerf:
-    """v7.0.0-alpha (audit MAJ-6) — agent retiré, stub. Cf. TestDecideA11y."""
-
-    def test_perf_stub_always_disabled(self) -> None:
-        for kwargs in (
-            {},
-            {"perf_mode": "off"},
-            {"perf_mode": "manual", "has_perf_ac": False},
-            {"perf_mode": "manual", "has_perf_ac": True, "has_backend_code": True, "has_frontend_code": True},
-            {"perf_mode": "full", "has_perf_ac": False, "has_backend_code": True, "has_frontend_code": True},
-        ):
-            ph = _decide_perf(**kwargs)
-            assert ph["enabled"] is False
-            assert ph["agent_removed"] is True
-            assert "Lighthouse" in ph["skip_reason"] or "wrk" in ph["skip_reason"]
-            assert ph["estimated_tokens"] == 0
+# Sprint immédiat 2026-06-07 — TestDecideA11y / TestDecidePerf supprimés.
+# Les fonctions `_decide_a11y` et `_decide_perf` ont été retirées de
+# phase_planner.py (agent_removed=True n'avait plus de consommateur depuis
+# que dev-run.md §6.4.1 ne lit plus que les 3 phases actives). Substance
+# tests : voir Git history pre-2026-06-07 si besoin de réintroduire.
 
 
 class TestDecideSecurityScan:
@@ -351,52 +315,8 @@ class TestDecideSpecCompliance:
         assert "aucun code production" in ph["skip_reason"]
 
 
-class TestDecideThreatModel:
-    def test_off(self) -> None:
-        stacks = {"backend": "dotnet-minimalapi", "frontend": "react", "ui": None, "auth": None}
-        ph = _decide_threat_model(
-            security_mode="off",
-            threat_model_enabled=True,
-            has_security_ac=False,
-            stacks=stacks,
-        )
-        assert ph["enabled"] is False
-
-    def test_manual_no_security_ac(self) -> None:
-        stacks = {"backend": "dotnet-minimalapi", "frontend": "react", "ui": None, "auth": None}
-        ph = _decide_threat_model(
-            security_mode="manual",
-            threat_model_enabled=True,
-            has_security_ac=False,
-            stacks=stacks,
-        )
-        assert ph["enabled"] is False
-
-    def test_manual_with_security_ac_disabled_v7(self) -> None:
-        """v7.0.0 : threat_model agent retiré (governance-major-auditors-trim).
-        Même avec security_mode=full + has_security_ac=True + stacks actifs,
-        la phase est TOUJOURS enabled=False avec agent_removed=True.
-        Remplacement : template humain templates/threat-model.template.md."""
-        stacks = {"backend": "dotnet-minimalapi", "frontend": "react", "ui": None, "auth": None}
-        ph = _decide_threat_model(
-            security_mode="manual",
-            threat_model_enabled=True,
-            has_security_ac=True,
-            stacks=stacks,
-        )
-        assert ph["enabled"] is False
-        assert ph.get("agent_removed") is True
-        assert "replacement" in ph
-
-    def test_no_stacks(self) -> None:
-        stacks = {"backend": None, "frontend": None, "ui": None, "auth": None}
-        ph = _decide_threat_model(
-            security_mode="full",
-            threat_model_enabled=True,
-            has_security_ac=True,
-            stacks=stacks,
-        )
-        assert ph["enabled"] is False
+# Sprint immédiat 2026-06-07 — TestDecideThreatModel supprimé.
+# `_decide_threat_model` retiré de phase_planner.py — substance dans Git history.
 
 
 # -----------------------------------------------------------------------------
@@ -420,44 +340,20 @@ class TestPlanIntegration:
         result = plan(feat_number=1)
 
         assert "error" not in result
-        # v7.0.0 : threat_model, a11y_audit, perf_audit RETIRÉS (agent_removed=True).
-        # Restent actifs : code_review, security_scan, spec_compliance.
-        assert result["phases"]["threat_model"]["enabled"] is False
-        assert result["phases"]["threat_model"].get("agent_removed") is True
-        # v7.0.0 P2 fix : agent_removed implies enabled=False (no spawn happens
-        # regardless of upstream gates). The agent_removed flag explains the
-        # forced disable to consumers reading the plan.
-        assert result["phases"]["a11y_audit"]["enabled"] is False
-        assert result["phases"]["a11y_audit"].get("agent_removed") is True
+        # v7.0.0+ (post-Sprint-immédiat 2026-06-07) : 3 phases dans l'output.
+        # threat_model/a11y_audit/perf_audit RETIRÉS du JSON (code mort éliminé).
+        assert set(result["phases"].keys()) == {"code_review", "security_scan", "spec_compliance"}
         assert result["phases"]["code_review"]["enabled"] is True
         assert result["phases"]["security_scan"]["enabled"] is True
-        assert result["phases"]["perf_audit"]["enabled"] is False
-        assert result["phases"]["perf_audit"].get("agent_removed") is True
         assert result["phases"]["spec_compliance"]["enabled"] is True
-        # Phases véritablement actionnables (sans agent_removed) = 3
-        active = [k for k, ph in result["phases"].items()
-                  if ph["enabled"] and not ph.get("agent_removed")]
+        # Phases véritablement actionnables = 3
+        active = [k for k, ph in result["phases"].items() if ph["enabled"]]
         assert len(active) == 3
-
-    def test_plan_backend_only_skips_a11y(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        # v7.0.0-alpha (audit MAJ-6) — a11y agent retiré, raison uniforme.
-        ws = _make_workspace(
-            tmp_path,
-            stack_md=STACK_BACKEND_ONLY,
-            feat_content=FEAT_BASIC,
-            backend_code_files=["AuthService.cs"],
-        )
-        monkeypatch.chdir(ws)
-
-        result = plan(feat_number=1)
-
-        assert result["phases"]["a11y_audit"]["enabled"] is False
-        assert result["phases"]["a11y_audit"]["agent_removed"] is True
 
     def test_plan_all_manual_no_ac_skips_optional(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Tous en manual + FEAT sans mention sec/perf → 5 phases skipped."""
+        """Tous en manual + FEAT sans mention sec → 3 phases skipped."""
         ws = _make_workspace(
             tmp_path,
             stack_md=STACK_ALL_MANUAL,
@@ -470,39 +366,17 @@ class TestPlanIntegration:
         result = plan(feat_number=1)
 
         assert result["summary"]["phases_enabled"] == 0
-        assert result["summary"]["phases_skipped"] == 6
+        # Post-Sprint immédiat : 3 phases au total (vs 6 avant)
+        assert result["summary"]["phases_skipped"] == 3
         # Tokens saved = sum of all phase costs
         expected_saved = sum(PHASE_COST_ESTIMATE.values())
         assert result["summary"]["estimated_tokens_saved"] == expected_saved
 
-    def test_plan_manual_with_perf_ac_surfaces_replacement(
+    def test_plan_manual_with_security_ac_enables_security_scan(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """v7.0.0 P2 fix : PerfMode=manual + AC mentionne LCP USED to force
-        perf_audit enabled. Now the agent is removed — phase stays disabled
-        but skip_reason surfaces Lighthouse CI / wrk-k6 so the Tech Lead
-        knows to verify the perf AC via the CI replacement instead."""
-        ws = _make_workspace(
-            tmp_path,
-            stack_md=STACK_ALL_MANUAL,
-            feat_content=FEAT_WITH_PERF,
-            backend_code_files=["AuthService.cs"],
-            frontend_code_files=["LoginForm.tsx"],
-        )
-        monkeypatch.chdir(ws)
-
-        result = plan(feat_number=1)
-
-        assert result["phases"]["perf_audit"]["enabled"] is False
-        assert result["phases"]["perf_audit"].get("agent_removed") is True
-        skip_reason = result["phases"]["perf_audit"]["skip_reason"]
-        assert "Lighthouse" in skip_reason or "wrk" in skip_reason
-        assert result["runtime_state"]["has_perf_ac"] is True
-
-    def test_plan_manual_with_security_ac_forces_threat_model(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """SecurityMode=manual + AC mentionne JWT → threat_model + security_scan enabled."""
+        """SecurityMode=manual + AC mentionne JWT → security_scan enabled
+        (perf_audit/threat_model retirés v7.0.0, plus de phase à activer)."""
         ws = _make_workspace(
             tmp_path,
             stack_md=STACK_ALL_MANUAL,
@@ -515,12 +389,7 @@ class TestPlanIntegration:
         result = plan(feat_number=1)
 
         assert result["runtime_state"]["has_security_ac"] is True
-        # v7.0.0 : threat_model agent retiré — phase reste False même avec AC sécurité
-        assert result["phases"]["threat_model"]["enabled"] is False
-        assert result["phases"]["threat_model"].get("agent_removed") is True
         assert result["phases"]["security_scan"]["enabled"] is True
-        # Perf reste skippé car pas d'AC perf
-        assert result["phases"]["perf_audit"]["enabled"] is False
 
     def test_plan_all_off(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         ws = _make_workspace(
@@ -553,7 +422,7 @@ class TestPlanIntegration:
     def test_plan_no_dev_run_yet_skips_code_dependent_phases(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Code généré absent → code_review + security_scan + perf_audit skip."""
+        """Code généré absent → toutes les phases skip (besoin de code production)."""
         ws = _make_workspace(
             tmp_path,
             stack_md=STACK_FULLSTACK,
@@ -567,8 +436,4 @@ class TestPlanIntegration:
         assert result["runtime_state"]["has_frontend_code"] is False
         assert result["phases"]["code_review"]["enabled"] is False
         assert result["phases"]["security_scan"]["enabled"] is False
-        # v7.0.0 : threat_model agent retiré — always False with agent_removed
-        assert result["phases"]["threat_model"]["enabled"] is False
-        assert result["phases"]["threat_model"].get("agent_removed") is True
-        # a11y skip car pas de frontend code
-        assert result["phases"]["a11y_audit"]["enabled"] is False
+        assert result["phases"]["spec_compliance"]["enabled"] is False

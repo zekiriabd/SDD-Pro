@@ -66,6 +66,8 @@ Variables résultantes en mémoire pour la suite : `planOnly`, `name`,
 
 ---
 
+<!-- STEP 2 et 3 retirés v7.0.0 : ancien chargement contexte + détection mockup absorbés par STEP 0/1 (hoist dev-shared-preflight.md) et STEP 4. Numérotation 4→12 conservée pour stabilité des cross-refs externes. -->
+
 ## STEP 4 — Charger le contexte minimal
 
 Read **uniquement** :
@@ -90,8 +92,8 @@ Read **uniquement** :
 8. **`.claude/rules/build-and-loop.md`** — patterns partagés (context budget,
    LibName lock, anti-derive, QA ownership, stack-completeness, BREAKING
    CHANGES cleanup, reads on-demand).
-9. **`.claude/rules/quality.md`** — discipline tokens CSS (v6.10.5 fix
-   CRIT-4). Source de vérité unique pour la palette FEAT.md §8 → variables
+9. **`.claude/rules/quality.md`** — discipline tokens CSS. Source de
+   vérité unique pour la palette FEAT.md §8 → variables
    CSS (`--primary`, `--background`, etc.). **Anti-pattern `[UI_TOKEN_VIOLATION]`
    bloquant** au STEP build : hex hardcodé `#xxx` ou `bg-[#xxx]` Tailwind
    arbitrary value dans un composant = STOP + ERROR. Édition autorisée
@@ -125,7 +127,7 @@ Comparer le `stack-md-hash` de la frontmatter avec le sha256 actuel de
 
 `Read HTML_PATH` → contenu ajouté comme **texte** (HTML = texte structuré, pas vision).
 
-**Prééminence en cas de divergence** (révisée 2026-05-22) :
+**Prééminence en cas de divergence** :
 - **HTML > stack §2/§7** sur visuel (libellés, ordre, structure zones,
   classes CSS, couleurs) ET sur **layout/containers**.
 - **§7.0 du stack UI actif est SOUVERAINE** sur la décision « HTML
@@ -148,6 +150,20 @@ Comparer le `stack-md-hash` de la frontmatter avec le sha256 actuel de
   uniquement**, subordonnées à §7.0 (containers exclus).
 - **US > tout** sur workflow (validation, navigation, affichage conditionnel)
 
+#### Matrice d'arbitrage explicite (audit M2 closure 2026-06-07)
+
+Pour clore définitivement toute ambiguïté sur §7.0 vs §7.bis, l'ordre de priorité hiérarchique strict est :
+
+```
+Conflit décisionnel → Source d'arbitrage (premier match wins) :
+  1. US `## Acceptance Criteria`     (workflow, ACs) — toujours souverain
+  2. Stack UI §7.0  (containers)     — décide DS-native vs HTML+CSS verbatim
+  3. Stack UI §7.bis (contenu)       — mapping HTML→DS UNIQUEMENT pour widgets de contenu
+  4. HTML mockup (workspace/input/ui/)— référence visuelle dernière chance
+```
+
+**Concrètement** : si §7.0 dit "containers = HTML verbatim" et §7.bis dit "div.card → RadzenCard", **§7.0 gagne** sur les containers (pas de wrapping Radzen), §7.bis ne s'applique qu'aux widgets de contenu interne (formulaires, grilles, dropdowns). Aucune circularité — §7.bis est un **sous-domaine** de §7.0, jamais un peer.
+
 ### 4.2 Configuration auth consommée par le code généré
 
 Config Azure AD via endpoint backend **`/auth/config`** (cf.
@@ -164,7 +180,7 @@ Le frontend lit **uniquement** :
 - Path callback hardcode (`/login-callback` ou `VITE_AZ_FE_CALLBACKPATH`
   avec défaut, cf. `auth/azure-ad.md §2.bis`)
 
-**INTERDITS** (v7.0.0-alpha audit MIN-7 — regroupés pour clarté LLM) :
+**INTERDITS** :
 - Lire `import.meta.env.VITE_AZ_TENANTID/VITE_AZ_CLIENTID`
   (Vite ne propage pas sans préfixe `VITE_` ; bootstrap MSAL passe par
   fetch `/auth/config` cf. `auth/azure-ad.md §5.2.7.2`)
@@ -180,7 +196,7 @@ Le frontend lit **uniquement** :
 
 ## STEP 5 — Vérifier les stacks frontend + UI actifs
 
-Lire `appType` + `frontendKind` depuis le JSON preflight (v6.7.7+) :
+Lire `appType` + `frontendKind` depuis le JSON preflight :
 
 | `appType` | `frontendKind` | Source du stack à lire | UI Design System |
 |---|---|---|---|
@@ -198,7 +214,7 @@ FIX: décommenter un stack adapté selon appType + frontendKind (cf. tableau ci-
 
 Pour `appType=back-front` + `frontendKind=web` UNIQUEMENT : si aucun stack `ui-*` actif sous `## Active UI Specs` ET mockup HTML présent → ERROR au STEP 6 (HTML brut a besoin du mapping §2/§7). Sinon fallback générique.
 
-**Legacy (v6.7.5)** : si preflight émet warning `[APPTYPE_LEGACY_MOBILE]` (le stack.md contient `AppType: mobile-react-native` ou `mobile-maui`), le mobile est déjà traduit en `back-front` + `frontendKind=mobile` — appliquer la ligne 2 du tableau.
+**Legacy** : si preflight émet warning `[APPTYPE_LEGACY_MOBILE]` (le stack.md contient `AppType: mobile-react-native` ou `mobile-maui`), le mobile est déjà traduit en `back-front` + `frontendKind=mobile` — appliquer la ligne 2 du tableau.
 
 Mémoriser mapping `couche → répertoire` du stack actif (§1.3 du fichier). Pour fullstack/mobile, lire aussi §11 (file ownership override).
 
@@ -212,9 +228,9 @@ silencieux ; structure du plan ; anti-derive plan).
 
 ### 6.1 Analyse du HTML mockup (spécifique frontend)
 
-> ⚠️ **Lire d'abord §7.0 du stack UI actif** (règle souveraine
-> 2026-05-22 : containers HTML verbatim, contenu DS). Les points 1-2
-> ci-dessous sont **subordonnés** à §7.0 du stack UI.
+> ⚠️ **Lire d'abord §7.0 du stack UI actif** (règle souveraine :
+> containers HTML verbatim, contenu DS). Les points 1-2 ci-dessous
+> sont **subordonnés** à §7.0 du stack UI.
 
 À partir de US + HTML mockup (si présent) + stacks frontend/UI actifs :
 
@@ -395,7 +411,7 @@ Exécuter `Build` du stack frontend (§2.2).
 **Limite** : `BuildLoopMaxIter` dans `## Project Config` (défaut `3`, range
 1-10 ; cf. `agents/dev-backend.md STEP 8`). Même paramètre BE/FE.
 
-**Circuit-breaker coût (audit M4, 2026-06-06)** : symétrique avec dev-backend
+**Circuit-breaker coût** : symétrique avec dev-backend
 STEP 8. Sur dépassement `BuildLoopMaxCostUsd * 0.5`, downgrade Opus → Sonnet
 pour la dernière itération via sentinel
 `workspace/output/.sys/.state/dev-build-downgrade-{n}-{m}.flag`.
@@ -498,10 +514,10 @@ Spécifique dev-frontend (résumé) :
 - `[UI_FIDELITY_GAP]` sur divergence libellés/composants/hex extraits
   du HTML mockup (script `validate_fidelity.py`)
 - `[UI_TOKEN_VIOLATION]` sur hex hardcodé `#xxx` dans composants
-  (cf. `@.claude/rules/quality.md §5`, v6.10.5 fix CRIT-4)
+  (cf. `@.claude/rules/quality.md §5`)
 - `[QA_OWNERSHIP_VIOLATION]` sur écriture matchant patterns test Node/Blazor/Kotlin
 
-**Discipline source-first** (v6.10.5 fix CRIT-4) :
+**Discipline source-first** :
 `@.claude/docs/principles/source-first.md` — Read on-demand uniquement si bug
 récurrent en build_loop. Avant un fix créatif, questionner : *"quelle
 source MD (US/plan/stack/rule) a manqué ? Patcher cette source AVANT

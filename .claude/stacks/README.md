@@ -1,5 +1,7 @@
 # `.claude/stacks/` — Catalogue des stacks techniques SDD_Pro
 
+> **Note de comptage** (audit MN2 2026-06-07) : ce fichier `README.md` est un **index documentaire**, PAS un stack. Le comptage canonique "34 stacks actifs" (cf. `CLAUDE.md §6`) **exclut** ce README. Si `find .claude/stacks -name "*.md"` retourne 35 entrées, le delta est ce fichier d'index.
+
 > Tous les stacks listés ici sont **chargeables** par le framework. Leur
 > niveau de maturité (🟢 reference / 🟡 experimental) est signalé par le
 > frontmatter `Validation:` de chaque `{stack-id}.md`.
@@ -14,18 +16,21 @@
 | `qa/` | Frameworks de tests (9) | `## Active QA Specs` |
 | `auth/` | Protocoles auth (2) | `## Active Tech Specs` → `auth/{id}` |
 | `archi/` | Patterns d'architecture (3) | `## Active Architecture Pattern` (uniquement pour AppType=back-front) |
-| `fullstack/` | SSR monolithes (6) — 🟡 expérimental | `## Active Tech Specs` → `fullstack/{id}` (avec AppType=fullstack) |
-| `mobiles/` | Mobile cross-platform (2) — 🟡 expérimental | `## Active Tech Specs` → `mobiles/{id}` (avec frontendKind=mobile) |
+| `fullstack/` | SSR monolithes (6) — tier per-stack | `## Active Tech Specs` → `fullstack/{id}` (avec AppType=fullstack) |
+| `mobiles/` | Mobile cross-platform (3) — tier per-stack | `## Active Tech Specs` → `mobiles/{id}` (avec frontendKind=mobile) |
 
 ## Statut validation
 
 Voir `.claude/CLAUDE.md §6` (table résumée) et `docs/validated-combos.md`
 (détail combos validés bout-en-bout).
 
-- **🟢 reference** : utilisé dans un combo validé bout-en-bout (C1 ou C2).
-- **🟡 experimental** : chargeable et techniquement conforme, mais aucun
-  combo validé bout-en-bout. Risque runtime non trivial — voir
-  `docs/validated-combos.md §6` pour mitigation.
+4 tiers de validation depuis v7.0.0 (cf. `CLAUDE.md §6`) :
+- **🟢 reference** (14 stacks) : combo C1/C2 validé end-to-end (production).
+- **🟢 bench-validated runtime** (11 stacks) : code généré compile +
+  démarre + sert les ACs (best-effort, gaps documentés).
+- **🟡 experimental** (8 stacks) : spec OK, jamais exécuté end-to-end.
+  Non supporté commercialement.
+- **🟡 POC-only** (1 stack — `node-react`) : usage interne SDD uniquement.
 
 ## Catalogue machine `.libs.json`
 

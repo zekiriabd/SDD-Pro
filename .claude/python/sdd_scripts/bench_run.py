@@ -48,18 +48,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from sdd_lib.paths import repo_root  # noqa: E402
 from sdd_lib.exit_codes import FAIL_FAST, INFRA_BLOCKED, SUCCESS  # noqa: E402
 from sdd_lib.atomic_write import atomic_write_text  # noqa: E402
+from sdd_lib.pricing import PRICING, get_pricing  # noqa: E402
 
 # ---------------------------------------------------------------------------
-# Pricing table (USD per million tokens, v7.0.0 / 2026-05-20)
+# Pricing — SSoT delegated to sdd_lib.pricing (audit CTO 2026-06-07).
+# Pre-fix, this module redefined a local PRICING dict with short aliases
+# (`sonnet`, `opus`, `haiku`) which drifted from sdd_lib SSoT. Any Anthropic
+# price change required two PRs. Now we import the canonical table and use
+# `get_pricing(model)` which falls back to Sonnet pricing on unknown ids.
 # ---------------------------------------------------------------------------
-PRICING = {
-    "sonnet": {"input": 3.00, "output": 15.00, "cache_read": 0.30},
-    "claude-sonnet-4-6": {"input": 3.00, "output": 15.00, "cache_read": 0.30},
-    "opus": {"input": 15.00, "output": 75.00, "cache_read": 1.50},
-    "claude-opus-4-7": {"input": 15.00, "output": 75.00, "cache_read": 1.50},
-    "haiku": {"input": 1.00, "output": 5.00, "cache_read": 0.10},
-    "claude-haiku-4-5-20251001": {"input": 1.00, "output": 5.00, "cache_read": 0.10},
-}
 
 
 def _console_db_path() -> Path:
@@ -271,13 +268,14 @@ def _extract_verdicts(feat_n: int | None) -> dict:
 
 
 def _compute_cost(by_model: dict) -> dict:
-    """Compute USD cost per model + total."""
+    """Compute USD cost per model + total.
+
+    Uses sdd_lib.pricing.get_pricing which falls back to Sonnet pricing on
+    unknown model ids (audit CTO 2026-06-07 — removed local PRICING dup).
+    """
     out = {"by_model": {}, "total_usd": 0.0}
     for model, tokens in by_model.items():
-        price = PRICING.get(model) or PRICING.get(model.split("-")[0]) or {}
-        if not price:
-            out["by_model"][model] = {"cost_usd": None, "reason": "no pricing"}
-            continue
+        price = get_pricing(model)
         cost = (
             tokens["input"] * price["input"] / 1_000_000
             + tokens["output"] * price["output"] / 1_000_000
