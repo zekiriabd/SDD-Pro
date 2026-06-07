@@ -61,7 +61,7 @@ _TABLE_ROW_RE = re.compile(
 _PROSE_VERSION_RE = re.compile(
     r"\b(Spring Boot|Spring Security|Kotlin|Vuetify|Angular|React|Vue|Express|FastAPI|"
     r"Next\.?js|Nuxt|Tailwind|TypeScript|Node|Python|JDK|Java|\.NET|EF Core)\s+"
-    r"(\d+(?:\.\d+){1,3}(?:[.x][0-9a-zA-Z._-]*)?)",
+    r"(\d+(?:\.\d+){1,3}(?:[.x][0-9a-zA-Z._-]*)?\+?)",
     re.IGNORECASE,
 )
 
@@ -99,23 +99,44 @@ def _normalize_version(v: str) -> str:
     return v.strip().lower().rstrip(".x").rstrip(".X")
 
 
+def _parse_semver(v: str) -> tuple[int, ...]:
+    """Parse `X.Y.Z` into tuple of ints. Non-numeric segments → 0 (best-effort).
+
+    Returns at least 3 components (pads with zeros). Used for semver-aware
+    comparison in lower-bound `+` cases.
+    """
+    cleaned = v.strip().lstrip("vV").rstrip("+xX.").rstrip(".")
+    parts: list[int] = []
+    for seg in cleaned.split("."):
+        try:
+            parts.append(int(seg))
+        except ValueError:
+            # First non-numeric segment ends parsing (treat suffix as ignored)
+            break
+    while len(parts) < 3:
+        parts.append(0)
+    return tuple(parts[:3])
+
+
 def _versions_compatible(md_v: str, json_v: str) -> bool:
     """Return True if .md version is compatible with .libs.json version.
 
     Cases handled :
     - Exact match : `2.0.21` == `2.0.21` → True
     - Wildcard `.x` : `.md` `4.0.x` matches `.libs.json` `4.0.5`
-    - Lower-bound `+` : `.md` `4.0+` accepts `.libs.json` >= `4.0.0`
+    - Lower-bound `+` : `.md` `3.10+` accepts `.libs.json` `>= 3.10` (semver)
       (used in stacks like shadcn where the catalog pins exact but the
-      .md states the minimum required version)
+      .md states the minimum required version ; also Python `3.10+` prose
+      annotating that a syntax requires that runtime minimum)
     - Prefix : `.md` `3.3` matches `3.3.5`
     """
     md_clean = md_v.strip().lower()
     json_clean = json_v.strip().lower()
-    # Lower-bound `+` suffix : `4.0+` means `>= 4.0`.
+    # Lower-bound `+` suffix : `3.10+` means `>= 3.10` (semver-aware).
     if md_clean.endswith("+"):
-        md_base = md_clean.rstrip("+")
-        return json_clean == md_base or json_clean.startswith(md_base + ".")
+        md_lb = _parse_semver(md_clean)
+        json_v_tuple = _parse_semver(json_clean)
+        return json_v_tuple >= md_lb
     # Wildcard `.x` suffix : `4.0.x` means any patch on `4.0`.
     md_norm = _normalize_version(md_v)
     json_norm = _normalize_version(json_v)
@@ -137,10 +158,31 @@ def _scan_md_table(md_path: Path, md_text: str, libs_versions: dict) -> list[dic
             continue
         lib_raw = m.group(1).strip()
         md_version = m.group(2).strip()
-        # Normalize lib key — strip `@types/`, leading `@`, package scope.
+        # Build candidate keys to look up in libs.json `versions:`.
+        # Priority order (most specific first) :
+        #   1. exact MD key (e.g. `vite`)
+        #   2. `@types/X` → `X-types` (SDD_Pro convention key name)
+        #   3. lowercased + scope-stripped
+        #   4. scope normalized with `-` separator
+        candidates: list[str] = [lib_raw]
+        if lib_raw.startswith("@types/"):
+            type_name = lib_raw[len("@types/"):]
+            # `@types/react` → try `react-types` (SDD_Pro convention) FIRST
+            candidates.append(f"{type_name}-types")
+            candidates.append(f"{type_name.replace('/', '-')}-types")
+            # `@types/swagger-ui-express` → libs key `swagger-ui-types` (stem
+            # `swagger-ui` is a prefix of `swagger-ui-express`). Match by
+            # picking the longest existing `*-types` key whose stem prefixes
+            # the @types target. Avoids false positive against base lib key.
+            existing_type_keys = [
+                k for k in libs_versions
+                if k.endswith("-types") and type_name.startswith(k[: -len("-types")])
+            ]
+            if existing_type_keys:
+                best_match = max(existing_type_keys, key=len)
+                candidates.insert(1, best_match)  # priority right after lib_raw
         lib_key = lib_raw.lower().replace("@types/", "").lstrip("@")
-        # Try exact match first, then with common variations.
-        candidates = [lib_raw, lib_key, lib_key.replace("/", "-")]
+        candidates.extend([lib_key, lib_key.replace("/", "-")])
         json_version = None
         for cand in candidates:
             if cand in libs_versions:

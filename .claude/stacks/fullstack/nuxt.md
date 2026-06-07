@@ -1,7 +1,7 @@
 # Tech FEAT: nuxt (fullstack)
 
 Status: Experimental
-Validation: 🟢 bench-validated runtime (2026-06-05 — CalcABCNuxt :44369, Nuxt 4.4.7 + Nitro 2.13.4 + Vite 7 + Vue 3.5, Server Routes `server/api/calc.post.ts` REST-like via `$fetch`, startup Nitro 1059ms + Vite 39ms, POST 5ms, AC-1/2/3 🟢 bug-free (out-of-the-box). Pipeline `/sdd-full` complet pas encore validé end-to-end — scaffolding manuel mainteneur, cf. `docs/benchmarks/known-gaps.md`)
+Validation: 🟢 bench-validated runtime (2026-06-05 — CalcABCNuxt :44369, Nuxt 3.15.0 + Nitro 2.13.4 + Vite 7 + Vue 3.5, Server Routes `server/api/calc.post.ts` REST-like via `$fetch`, startup Nitro 1059ms + Vite 39ms, POST 5ms, AC-1/2/3 🟢 bug-free (out-of-the-box). Pipeline `/sdd-full` complet pas encore validé end-to-end — scaffolding manuel mainteneur, cf. `docs/benchmarks/known-gaps.md`. Note : bench original mentionnait une preview Nuxt 4.x mais le pin canonique `.libs.json` reste sur Nuxt 3 LTS — la branche 4 en preview au moment du bench, exclue de CORE par policy runtime LTS only)
 Tech FEAT ID: tech-nuxt
 Scope: **fullstack monolithe** — application Nuxt 3 dans UN seul projet `{AppName}/`. UI (Vue 3 SFC server-rendered + client-hydrated) + server routes (Nitro `server/api/`) + middleware + auth vivent dans le meme processus Node.js. Pas de separation `{BackendName}` / `{AppName}` / `{LibName}`. Modele **SSR vrai** : HTML pre-rendu serveur par defaut, hydratation universelle cote client.
 

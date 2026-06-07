@@ -406,7 +406,9 @@ verifier la signature exacte (anti-pattern `[FRONTEND_BACKEND_CONTRACT_GAP]`).
 **Source canonique** : `dotnet-minimalapi.libs.json` `dbDrivers` (catalogue
 machine, lu par arch). Tableau de référence humain ci-dessous, à jour
 2026-05-22 (post-mortem version mismatch NU1608 → MissingMethodException
-runtime sur Npgsql.EF 9.0.4 + EF Core 10.0.6) :
+runtime ; pin actuel EF Core 9.0.4 aligné avec Npgsql.EF 9.0.4 — cf. audit
+CRIT-6 closure 2026-06-07 et `libs.json` changelog "revert 10.0.0→9.0.4" pour
+compat Npgsql 9.x preview) :
 
 | `DatabaseType` | Package NuGet à installer | `Use{X}` extension | Version |
 |---|---|---|---:|

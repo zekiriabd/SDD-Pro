@@ -238,8 +238,8 @@ Erreurs ruff/mypy :
 |-----|---------|------|
 | fastapi | 0.115.5 |  |
 | uvicorn[standard] | 0.32.1 |  |
-| pydantic | 2.10.3 |  |
-| pydantic-settings | 2.6.1 |  |
+| pydantic | 2.11.0 |  |
+| pydantic-settings | 2.7.0 |  |
 | sqlalchemy[asyncio] | 2.0.36 |  |
 | alembic | 1.14.0 |  |
 | structlog | 24.4.0 |  |

@@ -218,7 +218,7 @@ Erreurs spécifiques Vue :
 
 | Lib | Version | Role |
 |-----|---------|------|
-| vue | 3.5.13 |  |
+| vue | 3.5.35 |  |
 | vue-router | 4.5.0 |  |
 | pinia | 2.3.0 |  |
 | @tanstack/vue-query | 5.62.7 |  |

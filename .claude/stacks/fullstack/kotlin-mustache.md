@@ -1,7 +1,7 @@
 # Tech FEAT: kotlin-mustache (fullstack)
 
 Status: Experimental
-Validation: 🟢 bench-validated runtime (2026-06-05 — CalcABCMustache :44349, Spring Boot 3.3.5 + JMustache, monolithe SSR classique form POST reload, 159 LOC le plus compact du bench, AC-1/2/3 🟢. Bug fix appliqué : JMustache rejette `null` keys → populer Model avec strings vides + flags `hasX` booléens. Pattern documenté `library-and-stack.md §7.3`. Pipeline `/sdd-full` complet pas encore validé end-to-end — scaffolding manuel mainteneur, cf. `docs/benchmarks/known-gaps.md`)
+Validation: 🟢 bench-validated runtime (2026-06-05 — CalcABCMustache :44349, Spring Boot 3.4.1 (bumped depuis 3.3.5 du bench original) + JMustache, monolithe SSR classique form POST reload, 159 LOC le plus compact du bench, AC-1/2/3 🟢. Bug fix appliqué : JMustache rejette `null` keys → populer Model avec strings vides + flags `hasX` booléens. Pattern documenté `library-and-stack.md §7.3`. Pipeline `/sdd-full` complet pas encore validé end-to-end — scaffolding manuel mainteneur, cf. `docs/benchmarks/known-gaps.md`)
 Tech FEAT ID: tech-kotlin-mustache
 Scope: **fullstack monolithe** — application Spring Boot 3.x (Kotlin) avec **templates Mustache** rendus serveur dans UN seul projet `{AppName}/`. UI HTML server-rendered + Controllers + Services + Spring Data JPA + Spring Security vivent dans le meme JAR. Pas de separation `{BackendName}` / `{AppName}` / `{LibName}`. Modele **SSR classique JVM** : HTML genere serveur (FreeMarker-like via Mustache), interactivite optionnelle via HTMX ou Alpine.js (capabilities) — pas de JS bundler, pas de SPA.
 
