@@ -14,17 +14,6 @@ le wrapper `python -c "...import _hook; _hook.run('sdd_hooks.X')"` qui
 détecte automatiquement `CLAUDE_PROJECT_DIR` ou remonte vers `.claude/`
 depuis le cwd.
 
-> **v7.0.0-alpha (audit 2026-06-06 — 6 hooks ajoutés depuis v7.0.0-alpha)** :
-> `block_env_bypass`, `preflight_cost_cap`, `preflight_stack_combo`,
-> `validate_stack_consistency`, `resolve_po_hash_sentinel`,
-> `validate_acceptance_gate` viennent compléter les 5 hooks v6.x.
->
-> **v7.0.0-alpha Sprint 1.4 (2026-06-06) — 12ᵉ hook ajouté** :
-> `pre_write_lint` (PreToolUse Edit|Write|MultiEdit) — enforce les
-> forbidden patterns côté stack-CLAUDE.md AU MOMENT DE LA GÉNÉRATION
-> (Kotlin `!!`, Vue raw HTML, hex hardcode, console.log). Documenté §1.12
-> par fix CTO audit 2026-06-07.
-
 ### 1.1 `protect_framework` — PreToolUse Edit|Write|MultiEdit
 
 | Champ | Valeur |

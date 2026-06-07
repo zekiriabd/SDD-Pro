@@ -8,15 +8,6 @@
 > et ne spécifient que les paramètres asymétriques (family, codes
 > family-specific). Source de vérité unique pour évolutions futures.
 
-> **v7.0.0-alpha (audit CRIT-8, 2026-06-04)** : le warning « Sync risk
-> — duplication partielle conservée » historiquement présent ici a été
-> supprimé. Vérification factuelle : `dev-backend.md:25-37` et
-> `dev-frontend.md:32-44` font 9–13 lignes chacun et ne contiennent
-> que l'@-ref + les paramètres asymétriques (cf. §5 matrice). Aucune
-> copie compacte de §1–§4 inlinée. `validate_inline_rules.py` (toujours
-> wired en CI via `framework_smoke.py`) reste utile comme garde-fou
-> si une future section `## Inline Rules` est ré-introduite.
-
 ## TOC
 
 - §1 — STEP 0 HARD-GATE pre-flight (script `preflight.py`)

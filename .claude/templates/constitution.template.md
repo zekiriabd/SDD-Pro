@@ -21,7 +21,6 @@
      ownership.md §2). Le dernier writer wins ; pas de sémantique
      "dernière mise à jour de la section X" — c'est un timestamp global. -->
 
-
 ---
 
 ## 2. Glossaire métier

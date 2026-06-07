@@ -100,15 +100,6 @@ Si `AdversarialReviewMode: full` OU flag CLI `--adversarial` → spawn agent
 
 ## STEP 3.0 — `arch-reviewer` (fallback standalone uniquement)
 
-> **v7.0.0-alpha (audit CRIT-4 — 2026-06-04)** : `arch-reviewer` est
-> désormais spawné **upstream** par `/dev-run §6.4` dans le batch
-> parallèle aux côtés de `code-reviewer`/`security-reviewer`/`spec-compliance-reviewer`.
-> Quand `/sdd-review {n}` est invoqué **post-`/dev-run`** (typique via
-> `/sdd-full §4.8`), les findings `[ARCH_*]` sont déjà présents dans
-> `qa_code_review` table — `sdd_review.py` STEP 3.2 les agrège sans
-> re-spawn. Gain : élimine 1 invocation agent séquentielle (~10-15K
-> tokens Sonnet 4.6).
-
 **Fallback standalone** (`/sdd-review {n}` invoqué directement, hors
 `/sdd-full`) : si `ArchReviewMode: full` ET aucune entrée `[ARCH_*]`
 trouvée pour la FEAT `{n}` dans `qa_code_review` (signal que dev-run

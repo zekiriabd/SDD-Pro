@@ -239,7 +239,6 @@ $argon2id$v=19$m=65536,t=3,p=2$<salt>$<hash>
 - <salt> → sel (aléatoire, encodé en base64)
 - <hash> → résultat du hash (base64)
 
-
 Ce format garantit la portabilite entre :
 
 - .NET

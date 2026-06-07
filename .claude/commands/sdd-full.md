@@ -174,13 +174,6 @@ Activation par `## Project Config` (`ManualGates: true`) ou flag CLI
 (`--manual-gates`). Voir STEP 1.gates et la procédure GATE générique en
 STEP 1.gate-proc.
 
-> **v7.0.0-alpha (audit P0-workflow 2026-06-05)** — la numérotation
-> historique avait deux STEP `1.bis` distincts (anti-cumul + résolution
-> des gates manuels) et `1.ter`/`1.tiers`/`1.quart` dans le désordre.
-> Renumérotation : `1.bis` reste l'anti-cumul (hard-gate), `1.ter` =
-> init state.json, `1.quart` = phase planner placeholder, `1.gates` =
-> résolution `$ManualGates`, `1.gate-proc` = définition procédure GATE.
-
 ---
 
 ## STEP 1 — Valider l'argument
@@ -232,7 +225,6 @@ python .claude/python/sdd_scripts/preflight_force_cumul.py \
 > bypass silencieux.
 
 ```bash
-# Audit M9 closure 2026-06-07 — export sentinelle pour court-circuit STEP 3.6.quart
 if [ "$CUMUL_EXIT_STEP_1_BIS" = "0" ]; then
   export SDD_FORCE_CUMUL_OK=1
 fi
@@ -705,15 +697,6 @@ avant le scan QA. Si gate non actif → skip directement vers STEP 4.5.
 
 ## STEP 4.45 — Refresh INDEX ADRs (déplacé depuis 4.7 — audit P0-workflow 2026-06-05)
 
-> **v7.0.0-alpha (audit P0-workflow 2026-06-05)** — historiquement ce
-> STEP était numéroté 4.7 (après QA gate). Conséquence : si STEP 4.5
-> aboutissait à un STOP `[QA_FAIL_BLOCKING_SDD_FULL]`, l'INDEX ADRs
-> n'était **jamais** rafraîchi — donc les ADRs créés en phase 4 (par
-> `arch` / `dev-*`) restaient orphelins dans `INDEX.md`. Drift
-> documentaire à chaque pipeline RED. Déplacé en 4.45 (avant la QA
-> gate) pour exécution inconditionnelle. Ne dépend d'aucun résultat
-> QA — c'est un simple scan FS + write INDEX.md.
-
 Exécuter **systématiquement** (avant tout STOP/gate aval) :
 
 ```bash
@@ -817,14 +800,6 @@ Lire `ReviewMode` dans `## Project Config` (default `full` depuis v6.11.0
 | `manual` | skip (l'utilisateur lance `/sdd-review {n}` manuellement) |
 | `read-only` | `/sdd-review {n} --skip-scans` (lecture DB seule, pas de re-scan) |
 | `full` (défaut) | `/sdd-review {n}` complet (re-scan quality + agrégation) |
-
-> **v7.0.0-alpha (audit CRIT-4)** : `arch-reviewer` n'est **plus**
-> spawné par `/sdd-review §3.0` quand l'invocation arrive depuis
-> `/sdd-full §4.8` — il a déjà tourné en parallèle dans
-> `/dev-run §6.4` (cf. `commands/dev-run.md §6.4.1`). `/sdd-review`
-> reste en charge du **fallback standalone** (invocation directe
-> `/sdd-review {n}` sans `/dev-run` préalable). Économie ~10-15K
-> tokens + ~20s sur un pipeline `/sdd-full` complet.
 
 Le pipeline `/sdd-review` :
 1. Re-run [`quality_scan.py`](.claude/python/sdd_scripts/quality_scan.py) (refresh `qa_quality`)

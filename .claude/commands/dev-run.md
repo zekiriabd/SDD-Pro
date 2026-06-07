@@ -394,15 +394,6 @@ Sinon, invoquer agent `arch` (équivalent `/arch-init`). L'agent gère :
 
 ## STEP 5.5 — Phase plan initialization (SSoT depuis v7.0.0-alpha audit CRIT-4)
 
-> **v7.0.0-alpha (audit MAJ-5, 2026-06-04)** : l'ancien sous-STEP 5.5
-> "Threat model pré-dev" est retiré (27 L de stub déclaratif sans
-> action runtime). L'agent `security-reviewer --mode threat-model`
-> est supprimé depuis v7.0.0 ; remplacement : template humain
-> `.claude/templates/threat-model.template.md` (STRIDE light, à
-> instancier pré-`/arch-init`). Les classes `[SEC_*]` runtime
-> restent gérées par `security-reviewer --mode scan` (STEP 6.4).
-> Le STEP 5.5.1 ci-dessous devient le STEP 5.5 canonique.
-
 **Owner unique du calcul `$PHASE_PLAN`.** STEP 6.4 (auditor batch)
 dépend de ce JSON pour décider quels reviewers spawner — sans guard,
 la branche `if phases.X.enabled` faute silencieusement (KeyError ou
@@ -419,7 +410,6 @@ la branche `if phases.X.enabled` faute silencieusement (KeyError ou
 # dead at the next Bash invocation; STEP 6.4 had to silently re-launch
 # phase_planner.py without explicit documentation.
 #
-# Audit M10 closure 2026-06-07 — atomic write + fsync to survive kill -9
 # OR OS panic mid-write. Pre-M10, the redirection `> phase-plan-{n}.json`
 # left a half-written JSON on disk if the python process was killed before
 # flush; STEP 6.4 would read truncated JSON → silent decision corruption.
@@ -468,34 +458,6 @@ PHASE_PLAN=$(cat workspace/output/.sys/.state/phase-plan-{n}.json)
 ```
 
 ## STEP 6 — Workflow gated séquentiel (cf. `.claude/rules/build-and-loop.md`)
-
-> **v7.0.0-alpha (audit MAJ-4 → P0-doc 2026-06-05)** — extraction partielle
-> de la logique déterministe vers `sdd_scripts/run_dev_phase.py` :
->
-> - **`plan` subcommand** : chunking US, MaxParallel resolve, From-Plan detection
-> - **`gate-decision` subcommand** : API Gate verdict parsing + continuation decision
->
-> Coût LLM 0 (sortie JSON déterministe), unit-testé (`tests/test_run_dev_phase.py`,
-> 28 tests). Le pseudo-bash ci-dessous reste pour les parties qui ne peuvent
-> PAS être en Python : les invocations `Agent(dev-backend|dev-frontend)` sont
-> des tool-calls Claude qui doivent vivre dans le prompt.
->
-> Pattern d'usage simplifié :
-> ```bash
-> # Avant la phase backend : récupérer le plan d'exécution
-> python .claude/python/sdd_scripts/run_dev_phase.py plan --feat-number {n}
-> # → JSON : {"batches": [...], "from_plan_mode": bool, ...}
-> # Le LLM lit ce JSON et spawn chaque batch séquentiellement.
->
-> # Après l'API gate : décider si on continue vers frontend
-> python .claude/python/sdd_scripts/run_dev_phase.py gate-decision --feat-number {n}
-> # → JSON : {"status": "PASS|WARN|FAIL|SKIPPED|INFRA_BLOCKED",
-> #           "should_continue_frontend": bool, "reason": "..."}
-> ```
->
-> Note : un refactor complet (élimination du pseudo-bash) reste hors-scope
-> CRIT-12 — il exigerait un projet de référence intégré au CI pour valider la
-> non-régression sur les spawns LLM.
 
 **Défaut** : back → QA API gate → front, plus de parallélisme back+front.
 
@@ -614,8 +576,6 @@ ingéré et supprimé par `qa-generate` STEP 6.bis) :
 
 ```bash
 GATE_JSON=$(python .claude/python/sdd_scripts/query_console_db.py api-gate --feat {n})
-
-# Audit M11 closure 2026-06-07 — explicit schema versioning fallback.
 # v7+ DB schema uses `status` (PASS|WARN|FAIL|SKIPPED|INFRA_BLOCKED canonical).
 # v6 DB schema only had `gate_passed` (bool). For backward-compat on a project
 # upgraded mid-flight, derive `status` from `gate_passed` when missing.
@@ -762,15 +722,6 @@ ou STOP.
 > construction**. Toute tentative d'interleaving briserait soit la
 > détection de contract-drift, soit la couverture d'ACs front. Audit
 > CTO 2026-06-06 §H4 sur ce point était **factuellement incorrect**.
-
-> **v7.0.0-alpha (audit CRIT-4 — 2026-06-04)** : `arch-reviewer` est
-> désormais inclus dans CE batch parallèle quand `ArchReviewMode: full`,
-> au lieu d'être spawné séparément en aval par `/sdd-review §3.0`.
-> Gain : 1 batch parallèle de 4 agents au lieu de 3 parallèles + 1
-> séquentiel post-dev-run. Économie ~10-15K tokens (arch-reviewer
-> Sonnet 4.6) + ~20s sur le wall-clock total. `/sdd-review` devient
-> aggregation pure quand invoqué post-`/dev-run` (lit `qa_code_review`
-> table où `arch-reviewer` a écrit ses `[ARCH_*]`).
 
 > **Anti-régression `framework_smoke.py`** : les invocations parallèles
 > ci-dessous utilisent le tool `Agent` (alias `Task`) avec multiples

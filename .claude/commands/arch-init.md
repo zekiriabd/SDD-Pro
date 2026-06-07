@@ -77,13 +77,6 @@ Attendre la fin de l'agent. Relayer sa sortie telle quelle.
 
 ## STEP 3.5 — Spawn `constitutioner` si sentinel posé (no-spawn fix, v7.0.0-alpha audit P0-workflow 2026-06-05)
 
-> **v7.0.0-alpha (audit P0-workflow 2026-06-05)** — déplacé depuis
-> `agents/arch.md` STEP 12.5 qui violait
-> `@.claude/rules/build-and-loop.md §3.bis` (no-spawn cross-agent).
-> Le spawn vit désormais ici, côté commande orchestrante, où il est
-> autorisé. L'agent `arch` se contente de poser un sentinel disque
-> que ce STEP lit.
-
 Lire le sentinel `workspace/output/.sys/.state/arch-ready-for-constitutioner.flag`.
 
 | Cas | Action |

@@ -208,13 +208,6 @@ pour le pipeline qa-generate (le `.md` reste lisible humainement).
 
 ---
 
-> **v7.0.0-alpha (audit MAJ-5, 2026-06-04)** : STEPs 6.4 (Performance
-> audit) et 6.5 (Refresh dashboard QA) — supprimés en v7.0.0 / v6.10 —
-> ont été retirés (31 L de code mort déclaratif). Pour l'historique :
-> performance-auditor remplacé par Lighthouse CI + wrk/k6 ; dashboard
-> HTML remplacé par `console.db` + `workspace/console/`. Cf. CHANGELOG
-> et `error-classification-legacy.md §2`.
-
 ---
 
 ## STEP 6.bis — Checkpoint record (v6.6.3, opt-in)
