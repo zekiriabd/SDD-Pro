@@ -400,11 +400,12 @@ def _emit_human(result: dict) -> None:
     matched = result["matched_combo"] or "-"
     icon = {
         "validated": "[OK]",
+        "bench-validated": "[OK]",  # Sprint 2 CRIT-11 closure : statut canonique distinct
         "experimental": "[WARN]",
         "untested": "[FAIL]",
         "invalid": "[INVALID]",
         "io_error": "[IO_ERR]",
-    }[status]
+    }.get(status, f"[?{status}]")  # garde-fou : statut inconnu n'engendre plus KeyError crash
     print(f"{icon} Stack combo: {status.upper()}")
     print(f"   signature  : {sig}")
     print(f"   matched    : {matched}")

@@ -111,7 +111,7 @@ COMBOS = {
         "frontend_port": "5173",
     },
     "c3": {
-        "label": "C3 — Node Express + React + shadcn + auth-local (pending validation 🟡)",
+        "label": "C3 — Node Express + React + shadcn + auth-local (bench-validated 🟢)",
         "backend": "node-express",
         "frontend": "react",
         "ui": "shadcn",
@@ -123,7 +123,7 @@ COMBOS = {
         "frontend_port": "5173",
     },
     "c4": {
-        "label": "C4 — Python FastAPI + React + shadcn + auth-local (pending validation 🟡)",
+        "label": "C4 — Python FastAPI + React + shadcn + auth-local (bench-validated 🟢)",
         "backend": "python-fastapi",
         "frontend": "react",
         "ui": "shadcn",
@@ -135,7 +135,7 @@ COMBOS = {
         "frontend_port": "5173",
     },
     "c5": {
-        "label": "C5 — .NET Minimal API + Vue + Vuetify + Azure AD (pending validation 🟡)",
+        "label": "C5 — .NET Minimal API + Vue + Vuetify + Azure AD (bench-validated 🟢)",
         "backend": "dotnet-minimalapi",
         "frontend": "vue",
         "ui": "vuetify",
@@ -241,7 +241,12 @@ def detect_stack_md() -> bool:
 # Interactive flow
 # ---------------------------------------------------------------------------
 
-_UNVALIDATED_COMBOS = {"c3", "c4", "c5"}
+# Audit consolidé 2026-06-07 Sprint 2 (CRIT-11 closure) : C3-C13 sont
+# désormais `bench-validated` dans combos.json (SLA Tier 2 best-effort) au
+# lieu de "pending validation". L'ensemble est vidé mais le garde-fou
+# `_confirm_unvalidated_combo` est préservé pour réintroduction future
+# (si un nouveau combo Cx pending validation arrive en pré-bench).
+_UNVALIDATED_COMBOS: set[str] = set()
 
 # Audit CTO 2026-06-07 — replaced hardcoded `_EXPERIMENTAL_*` sets with
 # a derivation from `combos.json/componentLevels` (SSoT, cf.
@@ -740,7 +745,7 @@ def main() -> int:
         """),
     )
     parser.add_argument("--combo", choices=["c1", "c2", "c3", "c4", "c5", "custom"],
-                        help="Skip the stack-choice prompt with a preset (c1/c2 validated, c3/c4/c5 pending validation).")
+                        help="Skip the stack-choice prompt with a preset (c1/c2 validated end-to-end, c3/c4/c5 bench-validated runtime — tous SLA-éligibles depuis v7.0.0 GA).")
     parser.add_argument("--dry-run", action="store_true",
                         help="Show actions without writing files / installing.")
     parser.add_argument("--skip-install", action="store_true",
@@ -766,7 +771,7 @@ def main() -> int:
             args.combo = env_combo
 
     _print_header("SDD_Pro bootstrap")
-    print("  Framework version : v7.0.0-alpha")
+    print("  Framework version : v7.0.0 GA")
     print(f"  Repo root         : {REPO_ROOT}")
     print(f"  Mode              : {'DRY RUN' if args.dry_run else 'EXECUTE'}")
 

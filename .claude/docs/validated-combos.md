@@ -75,17 +75,27 @@ consolidé : [`workspace/output/qa/bench/BENCH-GLOBAL-REPORT.md`](../../workspac
 4. **`pydantic-core 2.10` no-wheel Py3.14** — pin `pydantic>=2.11`
 5. **bUnit `.Change()` ≠ `@bind:event="oninput"`** — utiliser `.Input("value")` avec immediate binding
 
-### 1.4 Combos « pending » full-pipeline post-v7.0.0 GA
+### 1.4 Combos C3-C13 « bench-validated runtime » (SLA Tier 2)
 
-| ID | Backend | Frontend | UI DS | QA | Auth | DB | Bench runtime ? | Pending |
-|:---:|---|---|---|---|---|---|:---:|:---:|
-| **C3** | `node-express` | `react` | `shadcn` | `node-vitest` | `auth-local` | PostgreSQL | 🟢 | `/sdd-full` complet |
-| **C4** | `python-fastapi` | `react` | `shadcn` | `python-pytest` + `node-vitest` | `auth-local` | PostgreSQL | 🟢 | `/sdd-full` complet |
-| **C5** | `dotnet-minimalapi` | `vue` | `vuetify` | `dotnet-xunit` + `node-vitest` | `azure-ad` | PostgreSQL | 🟢 (subst.) | `/sdd-full` complet |
+Les 11 combos C3-C13 (cf. `templates/combos.json`) sont **SLA-éligibles
+best-effort** depuis v7.0.0 GA. Top 3 documentés ci-dessous (cf. combos.json
+pour la liste complète C3-C13) :
 
-**Distinction-clé** : bench runtime ≠ full-pipeline. Le bench prouve que les **stack patterns** sont conformes (code généré tourne). La promotion 🟢 validated demande de prouver que **les agents SDD_Pro orchestrent automatiquement** sans scaffolding manuel — chantier tracé dans `docs/benchmarks/known-gaps.md`.
+| ID | Backend | Frontend | UI DS | QA | Auth | Bench runtime | Pending |
+|:---:|---|---|---|---|---|:---:|:---:|
+| **C3** | `node-express` | `react` | `shadcn` | `node-vitest` | `auth-local` | 🟢 | `/sdd-full` complet (Gap 1, `known-gaps.md`) |
+| **C4** | `python-fastapi` | `react` | `shadcn` | `python-pytest` + `node-vitest` | `auth-local` | 🟢 | idem |
+| **C5** | `dotnet-minimalapi` | `vue` | `vuetify` | `dotnet-xunit` + `node-vitest` | `azure-ad` | 🟢 (subst.) | idem |
 
-**Hors C1-C5 et hors bench 2026-06-05 : aucune garantie.** Le pipeline peut échouer en runtime de manière non triviale (scaffolding DB, mapping HTML→DS, capabilities on-demand, conventions stack-specific).
+**Distinction-clé** : bench runtime ≠ full-pipeline. Le bench prouve que les
+**stack patterns** sont conformes (code généré tourne). La promotion en
+`validated` end-to-end demande de prouver que **les agents SDD_Pro orchestrent
+automatiquement** sans scaffolding manuel — chantier tracé dans
+`docs/benchmarks/known-gaps.md` (Gap 1).
+
+**Hors C1-C13 (combos non listés `combos.json`) : aucune garantie SLA.** Le
+pipeline peut échouer en runtime de manière non triviale (scaffolding DB,
+mapping HTML→DS, capabilities on-demand, conventions stack-specific).
 
 ---
 
@@ -203,15 +213,15 @@ Le script peut être câblé dans :
 
 ## 5. Politique commerciale recommandée
 
-L'audit a identifié un désalignement entre la **promesse marketing**
-(16 stacks supportés) et la **vérité empirique** (2 combos validés).
-Trois positionnements possibles :
+L'audit historique a identifié un désalignement entre la **promesse marketing**
+(34 stacks supportés) et la **vérité empirique** (2 combos validés end-to-end +
+11 bench-validated). Position retenue v7.0.0 GA :
 
-### 5.1 Option A — *« SDD_Pro for .NET & Kotlin »* (recommandé v7.0.0 GA)
+### 5.1 Position canonique v7.0.0 GA — *« 2 combos validated + 11 bench-validated »*
 
-**Communiquer** : SDD_Pro v7.0 supporte officiellement 2 combos
-(C1, C2). Tous les autres sont expérimentaux et nécessitent un PoC
-préalable.
+**Communiquer** : SDD_Pro v7.0 supporte officiellement 13 combos SLA = 2
+combos C1/C2 validated end-to-end + 11 combos C3-C13 bench-validated runtime
+(best-effort, scaffolding semi-manuel — cf. `known-gaps.md` Gap 1).
 
 **Action immédiate** : renommer le tagline dans README + CLAUDE.md.
 Marquer 🟢/🟡/🔴 explicitement dans chaque stack `.md`. Ajouter le

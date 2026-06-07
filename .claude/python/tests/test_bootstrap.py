@@ -264,13 +264,15 @@ class TestNonValidatedDetection(unittest.TestCase):
         """angular is `validated` in combos.json — must NOT warn."""
         self.assertFalse(bootstrap._is_non_validated("frontend", "angular"))
 
-    def test_vuetify_remains_experimental(self):
-        """vuetify is 🟡 experimental in combos.json — must warn."""
-        self.assertTrue(bootstrap._is_non_validated("ui", "vuetify"))
+    def test_vuetify_is_bench_validated_not_experimental(self):
+        """vuetify is 🟢 bench-validated in combos.json (Sprint 2 CRIT-11
+        closure — bench 2026-06-05 PASS sur C5/C7/C10/C12). Pas de warn."""
+        self.assertFalse(bootstrap._is_non_validated("ui", "vuetify"))
 
-    def test_ddd_remains_experimental(self):
-        """ddd is `experimental` in combos.json — must warn."""
-        self.assertTrue(bootstrap._is_non_validated("archi", "ddd"))
+    def test_ddd_is_bench_validated_not_experimental(self):
+        """ddd is 🟢 bench-validated in combos.json (Sprint 2 CRIT-11
+        closure — utilisé dans combo C2 validated). Pas de warn."""
+        self.assertFalse(bootstrap._is_non_validated("archi", "ddd"))
 
     def test_microservice_remains_untested(self):
         """microservice is `untested` in combos.json — must warn."""
