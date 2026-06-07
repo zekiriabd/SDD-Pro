@@ -145,48 +145,31 @@ Project Config).
 | Ajout lib core | append `core[]` (id, module, versionRef, rationale, installCommand, license) → idem |
 | Ajout capability on-demand | append `onDemand[]` avec `capability` + `triggers[]` regex case-insensitive → idem |
 
-### Stacks migrés (17 catalogues au 2026-05-13)
+### Stacks migrés (catalogues `.libs.json`)
 
-**Backend** : `dotnet-minimalapi`, `kotlin-spring-boot`, `python-fastapi`,
-`node-express`.
+| Catégorie | Stacks |
+|---|---|
+| Backend | `dotnet-minimalapi`, `kotlin-spring-boot`, `python-fastapi`, `node-express` |
+| Frontend | `blazor-webassembly`, `react`, `vue`, `angular` |
+| QA | `dotnet-xunit`, `blazor-bunit`, `node-vitest`, `python-pytest`, `kotlin-junit`, `angular-jasmine` |
+| UI DS | `radzen-blazor`, `shadcn` (7 core + 15 onDemand Radix), `vuetify` |
+| Fullstack | `next`, `nuxt`, `angular-universal`, `blazor-server`, `kotlin-mustache`, `node-react` |
+| Mobiles | `kotlin-android`, `maui`, `react-native` |
 
-**Frontend** : `blazor-webassembly`, `react` (React 19 + Vite 6 +
-Tailwind v4 + shadcn + TanStack + RHF/Zod + Turborepo), `vue` (Vue 3.5 +
-Pinia + TanStack + VeeValidate), `angular` (19 standalone + signals).
+**Hors périmètre `.libs.json`** (par design) : `auth/*` (protocoles
+cross-langage — libs concrètes dans `.libs.json` consommateur),
+`qa/code-quality.md` (règles sonar-like), `archi/*` (patterns conceptuels).
 
-**QA** (séparation stricte propriété QA, dé-dupliqué) : `dotnet-xunit`,
-`blazor-bunit`, `node-vitest`, `python-pytest`, `kotlin-junit`,
-`angular-jasmine`.
+**`fullstack/blazor-server`** : `.libs.json` complet MAIS pattern monolithique
+incompatible avec l'isolation back-front (`ownership.md §1.bis`) — usage
+réservé `AppType=fullstack` explicite.
 
-**UI Design Systems** : `radzen-blazor`, `shadcn` (7 core + 15 onDemand
-Radix par capability), `vuetify`.
+### Dé-duplication QA
 
-**Hors périmètre `.libs.json`** (par design — pas de catalogue machine) :
-- `auth/*` : protocoles cross-langage (env vars, flux JWT/OIDC). Les
-  libs auth concrètes (`Microsoft.Identity.Web`, `@azure/msal-browser`,
-  `spring-security-oauth2-resource-server`, etc.) vivent dans le
-  `.libs.json` du backend/frontend consommateur.
-- `qa/code-quality.md` : règles QA pures (seuils sonar-like).
-- `archi/*` (mvc, ddd, microservice) : patterns architecturaux conceptuels
-  sans libs propres — les libs concrètes vivent dans le `.libs.json` du
-  backend qui adopte le pattern.
-
-**Stacks avec `.libs.json` mais pattern monolithique** (à utiliser avec
-prudence) :
-- `fullstack/blazor-server` : 🟢 bench-validated runtime (2026-06-05) avec
-  catalogue `.libs.json` complet, MAIS pattern monolithique incompatible
-  avec l'isolation front/back du scope `back-front` (cf. `ownership.md §1.bis`) ;
-  à n'utiliser qu'avec `AppType=fullstack` explicite. Pour combiner avec
-  une SPA séparée, préférer `frontend/blazor-webassembly` + backend `.NET`.
-
-### Dé-duplication QA (post-mortem 2026-05-07)
-
-Libs de tests initialement en `onDemand` des catalogues backend.
-**Erreur** : QA seul propriétaire des tests (cf. `qa.md` §Ownership) ;
-dev-* n'installe JAMAIS de lib test en prod. Corrigé : backends
-`onDemand` = capabilities **runtime prod** uniquement (excel, pdf,
-redis-cache, cqrs, fast-mapping, file-upload, http-client) ; QA porte
-toutes les libs test + frameworks intégration HTTP + mocking.
+QA seul propriétaire des tests (`qa.md §Ownership`) ; dev-* n'installe
+JAMAIS de lib test en prod. Backends `onDemand` = capabilities **runtime
+prod** uniquement (excel, pdf, redis-cache, cqrs, fast-mapping, file-upload,
+http-client). QA porte libs test + intégration HTTP + mocking.
 
 ---
 
@@ -346,59 +329,50 @@ L'agent NE DOIT JAMAIS :
 
 ---
 
-## 6.bis Schema/regex sync front↔back (post-mortem 2026-05-21)
+## 6.bis Schema/regex sync front↔back
 
-**Règle load-bearing** : tout champ de DTO/payload partagé entre
-backend et frontend DOIT avoir le **même contrat** (type, regex,
-contraintes min/max) des deux côtés. Toute désynchro = bug runtime
-silencieux à la première soumission de form.
+**Règle load-bearing** : tout champ DTO/payload partagé back↔front DOIT
+avoir **même contrat** (type, regex, min/max). Désynchro = bug runtime
+silencieux à la 1ère soumission form.
 
-### 6.bis.1 Type des IDs (post-mortem #1)
+### 6.bis.1 Type des IDs
 
-| Backend Kotlin/Spring | Frontend TS | Convention SDD_Pro |
+| Backend | Frontend | Convention |
 |---|---|---|
-| `val id: Int` (PostgreSQL serial) | `id: string` (RHF + DOM) | Coercer en string AU BOUNDARY fetch via `.map(o => ({ id: String(o.id), ... }))` côté `apiXxx.ts` |
-| `val id: UUID` | `id: string` (UUID hex) | Pas de coercion (déjà string) |
+| `val id: Int` (PG serial) | `id: string` (RHF + DOM) | Coerce string AU BOUNDARY fetch (`.map(o => ({ id: String(o.id), ... }))` dans `apiXxx.ts`) |
+| `val id: UUID` | `id: string` | Pas de coercion (déjà string) |
 
-**Anti-pattern** : laisser un `number` traverser jusqu'au form RHF.
-React state + DOM value sont toujours string ; `===` strict échoue
-silencieusement (`5 !== "5"`).
+**Anti-pattern** : laisser `number` traverser jusqu'au form RHF — React
+state + DOM = string ; `===` échoue (`5 !== "5"`).
 
-### 6.bis.2 Regex de validation (post-mortem #2)
+### 6.bis.2 Regex de validation
 
-| Backend `@Pattern` | Frontend Zod | Risque si désynchro |
+| Backend `@Pattern` | Frontend Zod | Risque désynchro |
 |---|---|---|
-| `^[0-9]{13}$` (EAN-13) | `^[0-9]+$` | 400 ProblemDetail au save sur user qui a tapé 5 chiffres |
-| `^[0-9a-f]{8}-[0-9a-f]{4}-...$` (GUID) | `^\d+$` | rejet UI sur GUIDs valides backend |
-| `@Size(max=100)` | `z.string().max(100)` | back rejette texte de 101 char accepté front |
+| `^[0-9]{13}$` EAN-13 | `^[0-9]+$` | 400 ProblemDetail au save sur 5 chiffres |
+| `^[0-9a-f]{8}-...$` GUID | `^\d+$` | rejet UI sur GUIDs valides backend |
+| `@Size(max=100)` | `z.string().max(100)` | back rejette texte 101 chars accepté front |
 
-**Convention canonique** : copier le regex exact de `@Pattern` (Jackson/
-Jakarta Validation) côté Zod dans `src/schemas/{Domain}Schema.ts`.
-Ajouter un commentaire `// MIRROR backend EanItemRequest.@Pattern "^[0-9]{13}$"`
-pour traçabilité.
+Copier le regex exact `@Pattern` côté Zod dans `src/schemas/{Domain}Schema.ts`
++ commentaire `// MIRROR backend X.@Pattern "..."` pour traçabilité.
 
-**Alternative future** : générer le client TS depuis l'OpenAPI 3 du
-backend (`springdoc-openapi` → `openapi-typescript`) — élimine le drift
-par construction. Non encore systématisé v7.0.0.
+**Alternative future** : générer le client TS depuis OpenAPI 3 backend
+(`springdoc-openapi` → `openapi-typescript`) — élimine drift par
+construction. Non systématisé v7.0.0.
 
 ### 6.bis.3 Field naming (camelCase serialization)
 
-Jackson par défaut sérialise les `val nom` Kotlin en `nom`, `val fkAnnonceur`
-en `fkAnnonceur` (préservation du camelCase). Frontend TS DOIT utiliser
-les mêmes clés. Tout renommage de champ DTO en backend exige un grep
-frontend (`grep -rn "field.nom\|field.fkXxx" workspace/output/src/{AppName}/`)
-pour aligner les consommateurs.
+Jackson préserve camelCase (`val fkAnnonceur` → `fkAnnonceur`). Frontend
+TS DOIT utiliser mêmes clés. Tout renommage DTO backend exige grep front
+(`grep -rn "field.X" workspace/output/src/{AppName}/`).
 
-**Anti-pattern** : un champ `libelle` côté backend mappé sur `nom`
-côté frontend → Jackson rejette le POST (400 `@NotBlank` sur `nom`
-absent), ET la lecture en mode édition retourne `undefined` (front lit
-`detail.nom` mais payload a `detail.libelle`). Cf. post-mortem FEAT 4.
+**Anti-pattern** : champ `libelle` back mappé `nom` front → Jackson rejette
+POST (400 `@NotBlank` sur `nom` absent), lecture retourne `undefined`.
 
 ### 6.bis.4 Pattern de revue
 
-`code-reviewer` détecte ce type de drift via la classe
-`[FRONTEND_BACKEND_CONTRACT_GAP]` (hard-blocking, override
-`CodeReviewFailOn`). Cf. `error-classification.md §1.10`.
+`code-reviewer` détecte ce drift via `[FRONTEND_BACKEND_CONTRACT_GAP]`
+(hard-blocking, override `CodeReviewFailOn`). Cf. `error-classification.md §1.10`.
 
 ---
 
@@ -452,38 +426,28 @@ L'agent est exécutif, jamais autonome dans le choix des outils.
 
 ## Principe
 
-Dès qu'une SPA (React/Vue/Angular/Blazor WebAssembly) est servie sur
-une origin différente du backend (typiquement dev `:5173` ↔ `:8080`,
-prod `app.example.com` ↔ `api.example.com`), une **configuration CORS
-explicite côté backend est OBLIGATOIRE**.
-
-Sans elle, **toute requête `fetch`/`XHR` échoue silencieusement** avec
-`TypeError: Failed to fetch` côté navigateur, page blanche error
-boundary, backend logs vides (le préflight `OPTIONS` est rejeté avant
-d'atteindre les handlers applicatifs).
-
-Cette règle est **load-bearing** pour tout projet `appType: back-front`
-avec `frontendKind: web` ou `mobile`. Sans elle, le contrat front↔back
-est cassé en runtime.
-
----
+SPA (React/Vue/Angular/Blazor WASM) servie sur origin ≠ backend (dev
+`:5173`↔`:8080`, prod `app.example.com`↔`api.example.com`) → **config CORS
+backend OBLIGATOIRE**. Sans elle : `fetch`/`XHR` → `TypeError: Failed to
+fetch` silent, page blanche, backend logs vides (preflight `OPTIONS` rejeté
+avant les handlers). **Load-bearing** pour `appType: back-front`.
 
 ## B.1 Quand cette règle s'applique
 
 | Cas | CORS requis ? |
 |---|:---:|
-| SPA + API séparés (`backend/*` + `frontend/*`) | ✅ OBLIGATOIRE |
-| Mobile + API (`backend/*` + `mobiles/*`) | ✅ OBLIGATOIRE (origins `capacitor://`, `ionic://`, etc.) |
-| Fullstack monolithique (`fullstack/*`) | ⊘ N/A (SSR same-origin — pas de cross-origin SPA↔API) |
-| Backend headless (sans SPA) | ❌ N/A |
+| SPA + API séparés | ✅ OBLIGATOIRE |
+| Mobile + API (origins `capacitor://`, `ionic://`) | ✅ OBLIGATOIRE |
+| Fullstack monolithique | ⊘ N/A (SSR same-origin) |
+| Backend headless | ❌ N/A |
 
-L'agent `arch` détecte le cas à partir de `## Active Tech Specs` du
-`stack.md` (cf. CLAUDE.md §7 matrice de détection AppType).
+`arch` détecte le cas via `## Active Tech Specs` du `stack.md` (cf. CLAUDE.md
+§7 matrice AppType).
 
-### 1.bis Auto-injection arch (depuis v6.10.4)
+### 1.bis Auto-injection arch
 
-L'agent `arch` STEP 4.5.6 propage automatiquement l'origin du frontend dev dans
-la config backend (allowlist explicite, jamais de wildcard). Mapping :
+`arch` STEP 4.5.6 propage l'origin frontend dev dans la config backend
+(allowlist explicite, jamais wildcard) :
 
 | Frontend stack | Port dev | Origin injectée |
 |---|---:|---|
@@ -491,13 +455,8 @@ la config backend (allowlist explicite, jamais de wildcard). Mapping :
 | `angular` | 4200 | `http://localhost:4200` |
 | `blazor-webassembly` | 5097 | `http://localhost:5097` |
 
-**Override possible** dans `## Project Config` de `stack.md` :
-```yaml
-Cors:AllowedOrigins: "http://localhost:5173,http://localhost:4173"
-```
-Si la clé est posée explicitement → arch préserve la valeur (User-set wins).
-
-Détail algorithme : `agents/arch.md §4.5.6`.
+**Override** dans `## Project Config` : `Cors:AllowedOrigins: "..."` (User-set
+wins). Détail : `agents/arch.md §4.5.6`.
 
 ---
 
@@ -668,65 +627,45 @@ implicite couvert par cette règle :
 
 ---
 
-## B.7 Pièges runtime documentés (post-mortem bench 2026-06-05)
+## B.7 Pièges runtime documentés (post-mortem bench)
 
-Bugs détectés lors du bench multi-stack et qui n'apparaissent que **runtime**. Tout
-backend/front SPA-facing DOIT contrôler ces 5 cas :
+5 bugs détectés bench multi-stack qui n'apparaissent que **runtime**.
 
-### B.7.1 CORS `localhost` ≠ `127.0.0.1` (post-mortem bench FEAT 2)
+### B.7.1 CORS `localhost` ≠ `127.0.0.1`
 
-**Symptôme** : UI affiche `Impossible de joindre l'API` malgré curl OK depuis CLI.
+**Symptôme** : UI `Impossible de joindre l'API` malgré curl OK CLI.
+**Cause** : navigateur sur `127.0.0.1:5186` envoie `Origin: http://127.0.0.1:5186`,
+allowlist contient seulement `localhost:5186` → preflight 403 → `TypeError: Failed to fetch`.
 
-**Cause** : navigateur ouvert sur `http://127.0.0.1:5186` envoie `Origin: http://127.0.0.1:5186`.
-Backend allowlist contient `http://localhost:5186` uniquement → preflight `OPTIONS` 403
-"Invalid CORS request" → fetch jette `TypeError: Failed to fetch`.
-
-**Convention obligatoire** : allowlist **multi-host explicite** :
+**Convention** : allowlist **multi-host explicite** pour chaque port :
 ```
-http://localhost:{port}     # DNS resolves to 127.0.0.1
-http://127.0.0.1:{port}     # IP littéral
+http://localhost:{port}
+http://127.0.0.1:{port}
 ```
-Pour chaque port frontend, déclarer **les deux variantes**. Pattern appliqué dans 4 backends
-bench (Kotlin/.NET/Node/Python) avec 14 origins (7 ports × {host, IP}).
 
-### B.7.2 `<input type=number>` coerce → state framework cassé (post-mortem FEATs 4-5)
+### B.7.2 `<input type=number>` coerce → state framework cassé
 
-**Symptôme** : bouton Calculate reste `disabled` côté Vue 3 + Angular 18 malgré valeurs valides.
+**Symptôme** : bouton Calculate `disabled` côté Vue 3 / Angular 18.
+**Cause** : `<input type=number>` + `v-model`/`[(ngModel)]` coerce DOM string
+en `number`. State `ref<string>` reçoit `number` → `.trim()` throw silencieusement.
 
-**Cause** : `<input type=number>` + binding bidirectionnel (Vue `v-model`, Angular `[(ngModel)]`)
-**coerce automatiquement DOM string en `number`** côté framework. Si state est typé
-`ref<string>` / `signal<string>`, runtime reçoit `number`, et appel `.trim()` jette
-`TypeError: a().trim is not a function` silencieusement intercepté par computed → bouton bloqué.
+**Convention** :
+- Vue : `ref<number | null>(null)` + `v-model.number`
+- Angular : `signal<number | null>(null)`
+- React/Blazor : non concernés (string ou `int?` natif)
 
-**Convention obligatoire** :
-- Vue : `ref<number | null>(null)` + `v-model.number` modifier
-- Angular : `signal<number | null>(null)` + adapter validation
-- React : **non concerné** — `useState<string>` reçoit DOM string brute via `e.target.value`
-- Blazor : `@bind` avec `int?` natif type-safe, **non concerné**
+### B.7.3 JMustache rejette `null` keys strict
 
-### B.7.3 JMustache rejette `null` keys strict (post-mortem FEAT 8)
+**Symptôme** : Spring Boot + Mustache → 500 sur `Model.addAttribute("x", null)`.
+**Convention** : populer `Model` avec strings vides (`""`) + flags booléens
+dérivés `hasX`/`hasError` pour sections conditionnelles
+(`{{#hasX}}…{{/hasX}}`, jamais `{{#x}}…{{/x}}`).
 
-**Symptôme** : Spring Boot + `spring-boot-starter-mustache` retourne 500 sur `GET /` avec
-`MustacheException$Context: No key, method or field with name 'X'`.
+### B.7.4 `pydantic-core` no-wheel sur Python récent
 
-**Cause** : JMustache (com.samskivert) en mode strict refuse les keys avec valeur `null`
-dans `Model.addAttribute("x", null)`.
-
-**Convention obligatoire** : populer `Model` avec **strings vides** (`""`) au lieu de `null`
-+ flags booléens dérivés `hasX`/`hasError` pour les sections conditionnelles
-`{{#hasX}}…{{/hasX}}` (pas `{{#x}}…{{/x}}` qui plante).
-
-### B.7.4 `pydantic-core` no-wheel sur Python récent (post-mortem FEAT 13)
-
-**Symptôme** : `pip install pydantic==2.10.3` fail avec `failed-wheel-build-for-install
-pydantic-core` sur Python 3.14.x.
-
-**Cause** : `pydantic-core 2.10.3` n'a pas de wheel pré-compilé pour Python 3.14
-(sorti après pydantic 2.10). Build from source → fail.
-
-**Convention obligatoire** : pin `pydantic>=2.11` dans `requirements.txt` / `pyproject.toml`
-quand Python ≥ 3.13. Pour Python 3.12 LTS stack-pin OK avec 2.10.x. Vérifier
-[PyPI wheels](https://pypi.org/project/pydantic-core/#files) compat avant pin strict.
+**Symptôme** : `pip install pydantic==2.10.3` fail wheel-build sur Python 3.14.
+**Convention** : pin `pydantic>=2.11` si Python ≥ 3.13. Pour Python 3.12 LTS,
+pin 2.10.x OK. Vérifier wheels PyPI avant pin strict.
 
 ### B.7.5 bUnit `.Change()` ≠ `@bind:event="oninput"` (post-mortem FEAT 3 tests)
 
