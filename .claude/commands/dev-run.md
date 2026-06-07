@@ -183,91 +183,47 @@ FEAT {n} — {U} US à matérialiser (back → API gate → front, parallélisme
 
 ---
 
-## STEP 2.bis — Valider le graphe de dépendances `## Dependencies` (v6.8+)
+## STEP 2.bis — Valider le graphe `## Dependencies`
 
-Avant batching, valider et ordonner `US_LIST` selon le graphe de dépendances
-déclaré dans les sections `## Dependencies` des US (cf. `templates/us.template.md`).
+Valider et ordonner `US_LIST` selon le graphe de dépendances des US.
 
-```bash
-python .claude/python/sdd_scripts/validate_us_deps.py --feat {n} --json
-```
-
-| Exit | Sens | Action |
-|---|---|---|
-| 0 | Graphe valide (orphelins tolérés, INFO) | Continuer ; remplacer `US_LIST` par le topo order |
-| 3 | `[US_DEPS_CYCLE]` | STOP + ERROR, Tech Lead corrige les `## Dependencies` |
-| 4 | `[US_DEPS_MISSING]` | STOP + ERROR, ref vers US inexistante |
-| 5 | `[US_DEPS_PARSE_ERROR]` | STOP + ERROR, frontmatter `## Dependencies` malformé |
-| 1 | usage error (args malformés) | STOP + ERROR `[INVALID_ARG]` |
-| 2 | erreur infra (I/O, FS) | STOP + ERROR `[INFRA_BLOCKED]` |
-
-**Handling explicite exit 4 & 5 (audit M13 closure 2026-06-07)** :
 ```bash
 python .claude/python/sdd_scripts/validate_us_deps.py --feat {n} --json
 DEPS_EXIT=$?
 case $DEPS_EXIT in
-  0) ;;  # OK, continuer
-  3) echo "ERROR: [US_DEPS_CYCLE] cycle détecté dans ## Dependencies" >&2; exit 1 ;;
-  4) echo "ERROR: [US_DEPS_MISSING] ## Dependencies référence une US inexistante" >&2; exit 1 ;;
-  5) echo "ERROR: [US_DEPS_PARSE_ERROR] frontmatter ## Dependencies malformé (vérifier syntaxe YAML)" >&2; exit 1 ;;
-  1) echo "ERROR: [INVALID_ARG] validate_us_deps.py args malformés — bug commande" >&2; exit 2 ;;
-  2) echo "ERROR: [INFRA_BLOCKED] validate_us_deps.py I/O error" >&2; exit 3 ;;
-  *) echo "ERROR: [INFRA_BLOCKED] validate_us_deps.py exit $DEPS_EXIT inconnu" >&2; exit 3 ;;
+  0) ;;  # OK
+  3) echo "ERROR: [US_DEPS_CYCLE]" >&2; exit 1 ;;
+  4) echo "ERROR: [US_DEPS_MISSING] ref vers US inexistante" >&2; exit 1 ;;
+  5) echo "ERROR: [US_DEPS_PARSE_ERROR] frontmatter ## Dependencies malformé" >&2; exit 1 ;;
+  1) echo "ERROR: [INVALID_ARG] args malformés" >&2; exit 2 ;;
+  *) echo "ERROR: [INFRA_BLOCKED] exit $DEPS_EXIT" >&2; exit 3 ;;
 esac
 ```
 
-> **Avant v7.0.1 (audit M13)** : seuls exit 0/3 étaient handled explicitement ; exit 4/5 tombaient dans le bucket "1/2/5 erreur infra" qui était trop vague (4 = vraie erreur métier "US ref manquante", 5 = vraie erreur parse, pas infra). La séparation rend le diagnostic Tech Lead actionnable.
-
-Sur exit 0, récupérer **les batches layered Kahn** (v7.0.0 audit P0 R3) :
+Sur exit 0, récupérer **les batches layered Kahn** (v7.0.0) :
 
 ```bash
-# v7.0.0 strict batching — une ligne par layer, ids US séparés par espaces.
 # Garantie : aucun US dans un layer ne dépend d'un autre US du même layer.
 US_LAYERS=$(python .claude/python/sdd_scripts/validate_us_deps.py --feat {n} --layered-batches)
-```
 
-`US_LAYERS` est consommé en STEP 6.a / 6.c comme suit :
-```bash
+# Consommé en STEP 6.a / 6.c :
 while IFS= read -r layer; do
-    # Chaque layer = US indépendants entre eux → safe parallel
-    # Si layer plus grand que MaxParallel, chunk en sous-batches DE LA MÊME LAYER
-    # (toujours safe car tous indépendants par construction).
     for sub_batch in chunk("$layer", $max_parallel); do
-        invoke_parallel(sub_batch)   # dev-backend OU dev-frontend selon STEP
-        wait                          # attendre fin du sous-batch
+        invoke_parallel(sub_batch); wait
     done
 done <<< "$US_LAYERS"
 ```
 
-**Fallback compat** : si `--layered-batches` non supporté (script ancien),
-fallback sur `--topo` :
-```bash
-US_LIST=$(python .claude/python/sdd_scripts/validate_us_deps.py --feat {n} --topo)
-# Heuristique : chunk(US_LIST, $max_parallel) — risque de collision intra-batch
-# si dépendance proche (cf. ancien comportement v6.7–v6.10).
-```
+**Fallback compat** : si `--layered-batches` indisponible →
+`--topo` (risque collision intra-batch sur graphe dense, comportement v6.7).
 
-**Backward-compat strict** : pour les US legacy sans `## Dependencies` (ou avec
-`NONE`), le graphe est vide, le layered Kahn renvoie 1 seul layer contenant
-toutes les US (tri alphabétique stable), et le comportement est byte-identique
-à `--topo` v6.7. Aucune US v1 n'est cassée.
+**Backward-compat** : US legacy sans `## Dependencies` → 1 seul layer
+tri alphabétique stable, byte-identique `--topo` v6.7.
 
-**Invariant aval (STEP 6.a, 6.c) — v7.0.0 strict** : au sein d'un layer, les
-US sont **pairwise indépendantes** (aucune dépendance interne). Donc :
-
-1. Aucune race sur `{LibName}/` ou autre artefact partagé (cf.
-   `ownership.md §4` LibName lock O_EXCL).
-2. Le chunking par `MaxParallel` à l'intérieur d'un layer **préserve** la
-   sécurité (les US d'un sous-batch sont triviallement indépendantes puisque
-   c'est un sous-ensemble d'un layer indépendant).
-3. Inter-layer : layer K attend la fin du layer K-1 avant de démarrer
-   (synchronisation explicite via `wait` shell ou équivalent batched
-   sequencing).
-
-→ La concession historique `dev-run.md` v6.10 (« le topo order minimise les
-violations mais ne les élimine pas pour des graphes denses ») est **résolue**
-en v7.0.0. Le diamant `A→B, A→C, B→D, C→D` est désormais ordonnancé en
-3 layers : `{A}`, `{B, C}`, `{D}` — `D` n'est jamais dans le même batch que `B` ni `C`.
+**Invariant v7.0.0 strict** : intra-layer = pairwise indépendantes →
+(1) aucune race `{LibName}/` (LibName lock O_EXCL, `ownership.md §4`),
+(2) chunking `MaxParallel` préserve sécurité, (3) layer K attend layer K-1.
+Le diamant `A→B, A→C, B→D, C→D` → 3 layers : `{A}`, `{B, C}`, `{D}`.
 
 ---
 
@@ -311,68 +267,26 @@ FIX: renseigner les valeurs dans workspace/input/stack/stack.md (bloc concerné)
 
 ---
 
-## STEP 4.bis — Détection short-circuit arch (script-driven, v6.1)
+## STEP 4.bis — Short-circuit arch (déterministe)
 
-**But** : sur FEATs ≥ 2 (ou re-runs), éviter le coût arch (build,
-ré-introspection DB, ré-écriture CLAUDE.md, refresh INDEX.md) quand le
-bootstrap est stable. Logique déterministe déléguée au script Python.
-
-### 4.bis.0 — Bypass via flag
-
-Si `$rebuild_arch == true` (flag `--rebuild-arch` passé) → forcer
-`$arch_required = true`, skip 4.bis.1 et aller directement à STEP 5.
-Émettre 1 ligne :
-```
-FEAT {n} — arch forcé (--rebuild-arch)
-```
-
-### 4.bis.1 — Invocation du script déterministe
+Évite le coût arch sur FEATs ≥ 2 / re-runs quand bootstrap stable.
+`--rebuild-arch` force `arch_required = true` (1 ligne `FEAT {n} — arch forcé`).
 
 ```bash
-python .claude/python/sdd_scripts/detect_arch_shortcircuit.py \
-  --feat-number {n} --json
+python .claude/python/sdd_scripts/detect_arch_shortcircuit.py --feat-number {n} --json
 ```
 
-Le script vérifie les 4 conditions (cf. `detect_arch_shortcircuit.py`
-docstring) :
-1. `workspace/input/stack/stack.md` lisible avec `## Project Config` + `## Active Database` exploitables
-2. CLAUDE.md projet présents pour chaque famille active (back, front, lib si LibName)
-3. `workspace/output/db/schema.json` présent si `DatabaseType ≠ none` (lu depuis `## Active Database`)
-4. mtime stack.md ≤ mtime du plus ancien CLAUDE.md projet
+Script vérifie 4 conditions (cf. docstring) : stack.md lisible / CLAUDE.md
+projets présents / schema.json présent si DB / mtime stack.md ≤ CLAUDE.md.
 
-Sortie JSON sur stdout :
-```json
-{
-  "required": false,
-  "reason": "bootstrap stable, schema DB présent, CLAUDE.md cohérents",
-  "checks": { ... }
-}
-```
+| Exit | Action |
+|---|---|
+| `0` + `required: false` | Émettre `FEAT {n} — arch skip ({reason})`, → STEP 6 |
+| `0` + `required: true` | Émettre `FEAT {n} — arch requis ({reason})`, → STEP 5 |
+| `≠ 0` | Fallback safe : `arch_required = true` (arch idempotent) |
 
-| Exit | Sens | Action |
-|---|---|---|
-| `0` + `required: false` | Skip arch | Émettre 1 ligne (cf. 4.bis.3 cas skip), aller à STEP 6 |
-| `0` + `required: true` | Arch nécessaire | Émettre 1 ligne (cf. 4.bis.3 cas requis), continuer STEP 5 |
-| `1` ou `2` | Erreur script | Fallback safe : forcer `$arch_required = true` (arch est idempotent) |
-
-### 4.bis.3 — Émission (1 ligne)
-
-**Cas skip** :
-```
-FEAT {n} — arch skip ({reason du JSON})
-```
-
-**Cas requis** :
-```
-FEAT {n} — arch requis ({reason du JSON})
-```
-
-### 4.bis.4 — Anti-derive
-
-- Ne PAS dupliquer les checks en LLM (laisser le script faire)
-- Erreur script (exit ≠ 0) → fallback safe `arch_required: true`
-- Skip = raccourci de performance, jamais de correction (arch
-  idempotent en interne)
+**Anti-derive** : pas de checks LLM dupliqués, fallback safe sur erreur
+script, skip = perf jamais correction.
 
 ---
 
@@ -392,70 +306,36 @@ Sinon, invoquer agent `arch` (équivalent `/arch-init`). L'agent gère :
 
 ---
 
-## STEP 5.5 — Phase plan initialization (SSoT depuis v7.0.0-alpha audit CRIT-4)
+## STEP 5.5 — Phase plan initialization (SSoT)
 
-**Owner unique du calcul `$PHASE_PLAN`.** STEP 6.4 (auditor batch)
-dépend de ce JSON pour décider quels reviewers spawner — sans guard,
-la branche `if phases.X.enabled` faute silencieusement (KeyError ou
-`undefined`) et le batch dégénère.
+**Owner unique du calcul `$PHASE_PLAN`** consommé par STEP 6.4 (auditor batch).
+Sans guard, `if phases.X.enabled` faute silencieusement → batch dégénère.
 
-> **v7.0.0-alpha** : `/sdd-full` ne calcule plus `$PHASE_PLAN` en amont
-> (eager-compute redondant + passage cross-process fragile, cf.
-> `[ENV_PROPAGATION_FAILED]`). Ce STEP est l'**unique** site de calcul,
-> qu'il soit invoqué via `/sdd-full` ou en standalone.
+Atomic write (`.tmp.{PID}` + fsync + rename) anti-corruption mid-write
+(post-mortem : JSON tronqué = décision auditor corrompue silencieusement).
 
 ```bash
-# Audit 2026-06-06 D1 — persist phase plan to disk to survive Claude Code
-# subshell death between tool-calls. Pre-D1, $PHASE_PLAN was bash-only,
-# dead at the next Bash invocation; STEP 6.4 had to silently re-launch
-# phase_planner.py without explicit documentation.
-#
-# OR OS panic mid-write. Pre-M10, the redirection `> phase-plan-{n}.json`
-# left a half-written JSON on disk if the python process was killed before
-# flush; STEP 6.4 would read truncated JSON → silent decision corruption.
-# Fix: write to a sibling `.tmp.{PID}`, fsync, atomic rename. Mirrors
-# the Python sdd_lib.atomic_write pattern but in pure bash for shell-call
-# safety here.
 mkdir -p workspace/output/.sys/.state
 TMP=workspace/output/.sys/.state/phase-plan-{n}.json.tmp.$$
-python .claude/python/sdd_scripts/phase_planner.py \
-  --feat-number {n} \
-  --json > "$TMP"
+python .claude/python/sdd_scripts/phase_planner.py --feat-number {n} --json > "$TMP"
 PP_EXIT=$?
 if [ "$PP_EXIT" -ne 0 ]; then
-  rm -f "$TMP"  # cleanup partial — never leave orphan .tmp
-  echo "ERROR: /dev-run {n} — phase planner failed"
-  echo "CAUSE: [PHASE_PLAN_INIT_FAILED] phase_planner.py exit $PP_EXIT (FEAT {n})"
-  echo "FIX: vérifier workspace/input/feats/{n}-*.md + Project Config + run /sdd-status {n}"
+  rm -f "$TMP"
+  echo "ERROR: [PHASE_PLAN_INIT_FAILED] phase_planner.py exit $PP_EXIT (FEAT {n})"
+  echo "FIX: vérifier workspace/input/feats/{n}-*.md + Project Config + /sdd-status {n}"
   exit 2
 fi
-# fsync the tmp file (best-effort — `sync $TMP` on Linux ; on Windows the
-# Python subprocess already flushes; the atomic rename is the durability
-# anchor regardless of fsync portability).
 sync "$TMP" 2>/dev/null || true
-# Atomic rename — POSIX guarantees crash-safety: either old file remains
-# OR new file is fully present, never partial.
 mv "$TMP" workspace/output/.sys/.state/phase-plan-{n}.json
-# Re-read into shell var for the current subshell (legacy convenience).
-# In STEP 6.4 below, callers MUST re-read from disk path
-# `workspace/output/.sys/.state/phase-plan-{n}.json` since the bash
-# variable does not survive across Claude Code tool-call boundaries.
 PHASE_PLAN=$(cat workspace/output/.sys/.state/phase-plan-{n}.json)
 ```
 
-Détail phase_planner : `.claude/python/sdd_scripts/phase_planner.py`
-(Python pur, 0 LLM, ~50 ms). Le JSON résultat est :
-1. **Persisté sur disque** dans `workspace/output/.sys/.state/phase-plan-{n}.json`
-   (D1 fix — survit aux subshells)
-2. Aussi écrit dans `state.json.phases.planning.payload` (via
-   `sdd_state.py set-phase`) pour consommation par le récap final de
-   `/sdd-full §5`.
+`phase_planner.py` : Python pur, 0 LLM, ~50 ms. JSON persisté disque +
+`state.json.phases.planning.payload` (via `sdd_state.py set-phase`) pour
+récap `/sdd-full §5`.
 
-**Lecture en STEP 6.4** (cross-tool-call) :
-```bash
-PHASE_PLAN=$(cat workspace/output/.sys/.state/phase-plan-{n}.json)
-# parse via jq or python -c "import json; phases=json.loads(...)"
-```
+**Lecture STEP 6.4** (cross-tool-call) : `cat workspace/output/.sys/.state/phase-plan-{n}.json`
+(la bash var $PHASE_PLAN ne survit pas aux tool-call boundaries).
 
 ## STEP 6 — Workflow gated séquentiel (cf. `.claude/rules/build-and-loop.md`)
 
@@ -490,36 +370,21 @@ Chaque dev-* détecte son plan au démarrage et bascule en mode From Plan.
 FEAT {n} — {U} US : {P_back} plans backend + {P_front} plans frontend détectés (mode From Plan)
 ```
 
-### 6.0.bis Plan staleness check (v7.0.0 simplified)
+### 6.0.bis Plan staleness check
 
-> **Note v7.0.0** : la phase historique "Routing strict" (v6.2-v6.10) qui
-> évaluait `plan-schema-version: 2 + strict-ready: true` pour router vers
-> `dev-*-strict` (Sonnet 4.6) a été retirée. Les variants strict sont
-> supprimés. La validation déterministe reste utile pour détecter les
-> plans stale/invalides — mais ne route plus vers un agent alternatif.
-
-Pour chaque plan détecté en 6.0, vérifier qu'il n'est pas stale via
-`validate_plan.py` (0 token LLM) :
+Pour chaque plan détecté en 6.0, vérifier non-stale via `validate_plan.py`
+(0 token) :
 
 ```bash
 python .claude/python/sdd_scripts/validate_plan.py \
   --plan-path "workspace/output/plans/{n}-{m}-{Name}.{back|front}.md" \
-  --us-path "workspace/output/us/{n}-{m}-{Name}.md" \
-  --json
+  --us-path "workspace/output/us/{n}-{m}-{Name}.md" --json
 ```
 
-| Exit script | Action |
+| Exit | Action |
 |---|---|
-| `0` ou `1` | plan valide (avec ou sans Inline Digest) → continuer 6.a |
-| `2` (stale/invalid) | STOP + ERROR `[PLAN_STALE]` ou `[PLAN_INVALID]` |
-
-**Exit 2 bloquant** :
-```
-🔴 /dev-run {n} — plan stale ou invalide
-Plan : workspace/output/plans/{n}-{m}-{Name}.{back|front}.md
-Cause : [PLAN_STALE | PLAN_INVALID] {détail depuis JSON}
-FIX : relancer /dev-plan {n} pour régénérer le plan, puis /dev-run {n}
-```
+| `0` / `1` | plan valide → 6.a |
+| `2` | STOP + ERROR `[PLAN_STALE]` ou `[PLAN_INVALID]` (FIX : `/dev-plan {n}`) |
 
 ### 6.a Phase Backend — invocations dev-backend bornées
 
@@ -571,47 +436,39 @@ Contenu :
 - Données interrogeables : `workspace/output/db/console.db`
   (tables `qa_api_tests` + `qa_api_endpoints`, depuis v6.10)
 
-Lire le verdict consolidé depuis la DB (le `.json` éphémère a été
-ingéré et supprimé par `qa-generate` STEP 6.bis) :
+Lire le verdict consolidé depuis la DB (`.json` éphémère ingéré et supprimé
+par `qa-generate` STEP 6.bis) :
 
 ```bash
 GATE_JSON=$(python .claude/python/sdd_scripts/query_console_db.py api-gate --feat {n})
-# v7+ DB schema uses `status` (PASS|WARN|FAIL|SKIPPED|INFRA_BLOCKED canonical).
-# v6 DB schema only had `gate_passed` (bool). For backward-compat on a project
-# upgraded mid-flight, derive `status` from `gate_passed` when missing.
-SCHEMA_VERSION=$(echo "$GATE_JSON" | python -c "import json,sys; d=json.load(sys.stdin); print('v7' if 'status' in d else 'v6')" 2>/dev/null)
-
-if [ "$SCHEMA_VERSION" = "v7" ]; then
-  STATUS=$(echo "$GATE_JSON" | python -c "import json,sys; print(json.load(sys.stdin).get('status', 'INFRA_BLOCKED'))")
-elif [ "$SCHEMA_VERSION" = "v6" ]; then
-  # Legacy DB — derive status from gate_passed boolean (lossy but deterministic).
-  # WARN to stderr so the operator knows a console.db migration is pending.
-  echo "[QA/WARN] api-gate DB schema v6 detected (no 'status' field) — deriving from gate_passed. Run framework_smoke.py to confirm migration health." >&2
-  GATE_PASSED=$(echo "$GATE_JSON" | python -c "import json,sys; print(json.load(sys.stdin).get('gate_passed', False))")
-  if [ "$GATE_PASSED" = "True" ]; then STATUS="PASS"; else STATUS="FAIL"; fi
-else
-  # Schema unknown — fail-safe to INFRA_BLOCKED (don't gamble on production decision).
-  echo "[QA/FAIL] api-gate DB schema unknown — neither 'status' nor 'gate_passed' field. Forcing INFRA_BLOCKED." >&2
-  STATUS="INFRA_BLOCKED"
-fi
-
+# v7+ schema: `status` PASS|WARN|FAIL|SKIPPED|INFRA_BLOCKED ; v6: `gate_passed` bool.
+STATUS=$(echo "$GATE_JSON" | python -c "
+import json, sys
+d = json.load(sys.stdin)
+if 'status' in d:
+    print(d['status'])
+elif 'gate_passed' in d:
+    print('PASS' if d['gate_passed'] else 'FAIL')  # legacy v6 derive
+    sys.stderr.write('[QA/WARN] api-gate v6 schema — migration console.db pending\n')
+else:
+    print('INFRA_BLOCKED')
+    sys.stderr.write('[QA/FAIL] api-gate schema unknown — fail-safe INFRA_BLOCKED\n')
+")
 TESTS_FAILED=$(echo "$GATE_JSON" | python -c "import json,sys; print(json.load(sys.stdin).get('tests_failed', 0))")
 ```
 
-Décision selon `status` (canonique v7.0.0, cf. `build-and-loop.md §1.3`) :
+Décision (canonique v7.0.0, cf. `build-and-loop.md §1.3`) :
 
 | `status` | Action |
 |---|---|
-| `PASS`           | continuer 6c (vert) |
-| `WARN`           | continuer 6c + propager WARNING au verdict QA global |
-| `SKIPPED`        | continuer 6c silencieusement (aucun endpoint OU gate désactivée) |
-| `FAIL`           | STOP, voir bloc `6.b.STOP` ci-dessous (mismatch contrat back↔front) |
-| `INFRA_BLOCKED`  | STOP + ERROR `[QA_FRAMEWORK_MISSING]` (test runner / fixtures KO — corriger config infra avant retry, **pas** une régression code) |
+| `PASS` | → 6c (vert) |
+| `WARN` | → 6c + propager WARNING verdict QA global |
+| `SKIPPED` | → 6c silent (0 endpoint OU gate désactivée) |
+| `FAIL` | STOP — bloc `6.b.STOP` (mismatch contrat back↔front) |
+| `INFRA_BLOCKED` | STOP + ERROR `[QA_FRAMEWORK_MISSING]` (runner KO — fix infra, **pas** régression code) |
 
-> Compat : la sortie `gate_passed: true` couvre `PASS`, `WARN`, `SKIPPED`.
-> Les callers legacy peuvent continuer à le lire ; les nouveaux callers
-> doivent préférer `status` pour distinguer "rien à tester" (`SKIPPED`)
-> d'un vrai pass (`PASS`).
+> Compat : `gate_passed: true` couvre PASS/WARN/SKIPPED. Préférer `status`
+> pour distinguer "rien à tester" (SKIPPED) d'un vrai pass.
 
 ### 6.b.STOP — Format STOP sur FAIL
 
@@ -658,177 +515,102 @@ honorent leur contrat** (vérifié par 6b). Les mismatches
 `[FRONTEND_BACKEND_CONTRACT_GAP]` ne peuvent plus se produire en
 silence.
 
-**Idempotence (re-run après correction backend, v6.10 ; v7.0.0-alpha audit P3 — status canonique)** :
-au début de 6a, requêter la DB pour le verdict API Gate le plus récent et son
-`extracted_at`. Comparer avec le mtime des fichiers backend. Si le verdict DB
-est postérieur **et** `status ∈ {PASS, WARN}`, skip 6a + 6b et passer
-directement à 6c. **`SKIPPED` ne déclenche pas le skip-idempotence** —
-"aucun endpoint testé" n'est pas une preuve que le backend est stable, donc
-on re-traverse 6.a/6.b par sécurité (au pire ils restent SKIPPED).
+**Idempotence re-run après correction backend** : au début de 6a, requêter
+la DB. Si verdict postérieur au mtime backend ET `status ∈ {PASS, WARN}` →
+skip 6a + 6b → 6c. `SKIPPED` ne déclenche pas le skip ("0 endpoint testé"
+≠ preuve stabilité).
 
 ```bash
 GATE=$(python .claude/python/sdd_scripts/query_console_db.py api-gate --feat {n})
-GATE_STATUS=$(echo "$GATE" | python -c "import json,sys; print(json.load(sys.stdin).get('status', ''))")
+GATE_STATUS=$(echo "$GATE" | python -c "
+import json,sys; d=json.load(sys.stdin)
+print(d.get('status') or ('PASS' if d.get('gate_passed') else 'FAIL'))
+")
 GATE_TS=$(echo "$GATE" | python -c "import json,sys; print(json.load(sys.stdin).get('extracted_at', ''))")
-# Legacy fallback (DB sans colonne `status` pre-v5) — derive uniquement si vide :
-if [ -z "$GATE_STATUS" ]; then
-  GATE_PASSED=$(echo "$GATE" | python -c "import json,sys; print(json.load(sys.stdin).get('gate_passed', False))")
-  if [ "$GATE_PASSED" = "True" ]; then GATE_STATUS="PASS"; else GATE_STATUS="FAIL"; fi
-fi
 ```
 
-Skip 6a+6b si `GATE_STATUS in {PASS, WARN}` ET `GATE_TS > mtime(backend_files)`.
-Émettre :
-```
-FEAT {n} — backend stable (console.db qa_api_tests {GATE_STATUS} @ {GATE_TS}), skip 6a+6b → 6c frontend
-```
+Skip 6a+6b si `GATE_STATUS in {PASS, WARN}` ET `GATE_TS > mtime(backend)`.
+Émettre `FEAT {n} — backend stable, skip 6a+6b → 6c`.
 
 ### Mode legacy parallèle (`GatedWorkflow: false`)
 
-Si `GatedWorkflow: false` dans Project Config OU flag `--unsequenced`
-sur la ligne de commande : revenir au workflow v3.x (back+front
-parallèles dans un même batch). Logger dans
-`workspace/output/.sys/.audit/legacy-parallel.log`. Émettre WARN dans le
-récap STEP 7. Supporté uniquement pour projets simples sans contrat
-backend fragile.
+Fallback workflow v3.x (back+front parallèles même batch). Logger
+`workspace/output/.sys/.audit/legacy-parallel.log`, WARN au récap STEP 7.
+Réservé projets simples sans contrat backend fragile.
 
 ---
 
-## STEP 6.4 — Auditor batch parallèle (4 auditors, v7.0.0)
+## STEP 6.4 — Auditor batch parallèle (4 auditors)
 
-**Conditionnel** : invoque jusqu'à **4 agents auditor EN PARALLÈLE**
-(un seul message Agent multi-tool-use) pour les phases enabled selon
-`phase_planner.py` (cf. STEP 5.5 — réutiliser `$PHASE_PLAN`) **et**
-selon `ArchReviewMode` du Project Config. Lecture mode + verdicts
-post-exécution. Le verdict consolidé pilote le passage à STEP 6.5
-ou STOP.
+**Conditionnel** : jusqu'à **4 agents auditor EN PARALLÈLE** (un seul message
+multi-tool-use) selon `phase_planner.py` (réutiliser `$PHASE_PLAN` STEP 5.5)
++ `ArchReviewMode` Project Config. Verdict consolidé pilote STEP 6.5 ou STOP.
 
-> **Sprint 3.2 — pourquoi le batch ne peut PAS être pré-déclenché**
-> (analyse 2026-06-07) : tentation de lancer `spec-compliance` (le plus
-> léger, ~12K tokens) ou `arch-reviewer` (pattern + ADRs) en parallèle
-> avec `dev-frontend` (6.c) pour gagner ~2min. **Refus motivé** :
-> - `spec-compliance-reviewer` (`agents/spec-compliance-reviewer.md`) :
->   lit `workspace/output/src/{BackendName,AppName}/**` pour vérifier
->   chaque AC indépendamment. **Exige le code complet** (back + front).
-> - `arch-reviewer` (`agents/arch-reviewer.md §STEP 4-5`) : lit les
->   plans + code sous `workspace/output/src/**`. **Exige le code
->   complet**.
-> - `code-reviewer` : audit cross-fichier inclut `[FRONTEND_BACKEND_CONTRACT_GAP]`
->   qui nécessite back ET front matérialisés.
-> - `security-reviewer` : scan OWASP scan front+back simultanément
->   (CORS allowlist match, JWT flow client↔serveur).
->
-> **Conclusion** : la séquence 6.a→6.b→6.c→6.4→6.5 est **optimale par
-> construction**. Toute tentative d'interleaving briserait soit la
-> détection de contract-drift, soit la couverture d'ACs front. Audit
-> CTO 2026-06-06 §H4 sur ce point était **factuellement incorrect**.
-
-> **Anti-régression `framework_smoke.py`** : les invocations parallèles
-> ci-dessous utilisent le tool `Agent` (alias `Task`) avec multiples
-> calls indépendants dans un même message. Pattern identique à STEP 6.a
-> et 6.c. Ne pas casser.
-
-> **v7.0.0** : `accessibility-auditor` **retiré** du batch
-> (governance-major-auditors-trim). Remplacé par axe-core CI dans le
-> projet généré. Si `$PHASE_PLAN.a11y_audit.enabled == true` (legacy
-> Project Config qui n'a pas flippé `A11yMode: off`), l'entrée du batch
-> est **ignorée silencieusement** côté caller — pas d'agent à spawn.
+**Pourquoi pas pré-déclenché en parallèle avec 6.c (dev-frontend)** : les 4
+agents exigent **code complet back + front** : spec-compliance vérifie ACs
+sur src/{BackendName,AppName}/**, arch-reviewer lit plans + code, code-reviewer
+détecte `[FRONTEND_BACKEND_CONTRACT_GAP]` cross-fichier, security scan CORS
+allowlist + JWT flow client↔serveur. Séquence 6.a→6.b→6.c→6.4→6.5 optimale.
 
 ### 6.4.1 — Construction du batch
 
 ```python
-# Audit 2026-06-06 D1 — RE-READ phase plan from disk (not from bash var).
-# The shell var $PHASE_PLAN set in STEP 5.5 does NOT survive across Claude
-# Code tool-call boundaries (each Bash invocation = independent subshell).
-# The plan was persisted to a state file in STEP 5.5 ; read it back here.
+# RE-READ phase plan depuis disque (shell var $PHASE_PLAN STEP 5.5 ne survit
+# pas aux tool-call boundaries — chaque Bash = subshell indépendant).
 import json, pathlib
 plan_path = pathlib.Path(f"workspace/output/.sys/.state/phase-plan-{n}.json")
 if not plan_path.is_file():
-    STOP + ERROR(
-        "ERROR: /dev-run STEP 6.4.1 — phase plan state file missing",
-        "CAUSE: [PHASE_PLAN_INIT_FAILED] expected file not found",
-        f"FIX: re-run STEP 5.5 OR `python .claude/python/sdd_scripts/phase_planner.py --feat {n} --json > {plan_path}`",
-    )
+    STOP + ERROR("[PHASE_PLAN_INIT_FAILED] state file missing",
+                 f"FIX: re-run STEP 5.5 OR phase_planner.py --feat {n}")
 phase_plan = json.loads(plan_path.read_text(encoding="utf-8"))
 phases = phase_plan.get("phases", {})
 
-# Audit 2026-06-06 (CR-6 + RUPT-4) — hard-fail if phase_planner.py did not
-# produce a usable `phases` object. Previous code silently treated missing
-# keys as `enabled=False`, which caused 3 of the 4 reviewers (code/security/
-# spec) to skip without signal whenever phase_planner.py returned malformed
-# JSON.
-#
-# RUPT-4 (audit 2026-06-06) : phase_planner.py emits a JSON dict (Python
-# `dict`, not an object with attributes). Use mapping syntax `phases["X"]`
-# and `phases["X"].get("enabled")` — NOT attribute access `phases.X.enabled`
-# which would raise AttributeError if a strict executor evaluates the
-# pseudo-Python literally.
-if not phases or not all(
-    k in phases for k in ("code_review", "security_scan", "spec_compliance")
-):
-    STOP + ERROR(
-        "ERROR: /dev-run STEP 6.4.1 — phase plan missing required keys",
-        "CAUSE: [PHASE_PLAN_INIT_FAILED] phases dict unusable — phase_planner.py output incomplete",
-        "FIX: rerun `python .claude/python/sdd_scripts/phase_planner.py --feat {n}` and inspect output",
-    )
+# Hard-fail si phase_planner.py JSON malformé (sinon 3/4 reviewers skip silencieux).
+# RUPT-4 : phases est dict Python → mapping `phases["X"]`, PAS attribute access.
+if not phases or not all(k in phases for k in ("code_review", "security_scan", "spec_compliance")):
+    STOP + ERROR("[PHASE_PLAN_INIT_FAILED] phases dict unusable",
+                 f"FIX: rerun phase_planner.py --feat {n} et inspecter output")
 
-# Read ArchReviewMode directly from Project Config — phase_planner.py
-# does not expose it (binary decision, no skip-conditional heuristic).
-arch_review_mode = read_layered_config(keys=("ArchReviewMode",)).get(
-    "ArchReviewMode", "manual"
-)
+arch_review_mode = read_layered_config(keys=("ArchReviewMode",)).get("ArchReviewMode", "manual")
 
-BATCH = []  # liste d'invocations à dispatcher en parallèle
-if phases["code_review"].get("enabled"):
-    BATCH.append(Agent("code-reviewer", args="{n}"))
-if phases["security_scan"].get("enabled"):
-    BATCH.append(Agent("security-reviewer", args="{n}"))   # --mode scan supprimé v7.0.0
-if phases["spec_compliance"].get("enabled"):
-    BATCH.append(Agent("spec-compliance-reviewer", args="{n}"))
-if arch_review_mode == "full":
-    BATCH.append(Agent("arch-reviewer", args="{n}"))
+BATCH = []
+if phases["code_review"].get("enabled"):       BATCH.append(Agent("code-reviewer", args="{n}"))
+if phases["security_scan"].get("enabled"):     BATCH.append(Agent("security-reviewer", args="{n}"))
+if phases["spec_compliance"].get("enabled"):   BATCH.append(Agent("spec-compliance-reviewer", args="{n}"))
+if arch_review_mode == "full":                 BATCH.append(Agent("arch-reviewer", args="{n}"))
 ```
 
-Si `BATCH == []` (toutes phases skipped + ArchReviewMode ≠ full) →
-skip STEP 6.4 entier, passer à STEP 6.5 (Refresh INDEX ADRs via
-`index_adrs.py`).
+Si `BATCH == []` → skip STEP 6.4, passer à STEP 6.5.
 
-Sinon, dispatcher **toutes les invocations en parallèle dans un seul
-message**. Attendre la fin de l'ensemble. Pattern identique aux batches
-dev-* (STEP 6.a, 6.c) — toutes les invocations sont indépendantes
-(paths d'écriture disjoints, cf. `agents/*.md §Idempotence` et matrice
-`ownership.md §1`).
+Sinon dispatcher **en parallèle dans un seul message**. Paths d'écriture
+disjoints (cf. `ownership.md §1`).
+
+> `accessibility-auditor` retiré v7.0.0 (`governance-major-auditors-trim`,
+> remplacé par axe-core CI). Entrée legacy ignorée silencieusement.
 
 ### 6.4.2 — Lecture des verdicts
 
-Après réception des 4 (ou moins) agents, lire les rapports JSON :
-
 | Agent | Verdict path | Champ |
 |---|---|---|
-| code-reviewer | `workspace/output/.sys/.validation/{n}-code-review.json` | `summary.verdict` |
-| security-reviewer | `workspace/output/.sys/.validation/{n}-security-scan.json` | `summary.verdict` |
-| spec-compliance-reviewer | `workspace/output/.sys/.validation/{n}-spec-compliance.json` | `summary.verdict` |
-| arch-reviewer (v7.0.0-alpha CRIT-4) | `workspace/output/.sys/.validation/{n}-arch-review.json` | `summary.verdict` |
+| code-reviewer | `{n}-code-review.json` | `summary.verdict` |
+| security-reviewer | `{n}-security-scan.json` | `summary.verdict` |
+| spec-compliance-reviewer | `{n}-spec-compliance.json` | `summary.verdict` |
+| arch-reviewer | `{n}-arch-review.json` | `summary.verdict` |
 
-Si un fichier attendu est absent (agent a STOP en erreur runtime) →
-agent considéré comme `🔴 RED` avec cause `[AUDITOR_RUNTIME_ERROR]`.
-Exception `arch-reviewer` : échec runtime (timeout, infra) → **WARN**
-seulement (cf. règle historique sdd-review §3.0 — l'audit architecture
-n'est jamais hard-blocking par design, `ArchReviewFailOn: serious` par
-défaut).
+Tous sous `workspace/output/.sys/.validation/`. Fichier absent (agent STOP
+runtime) → `🔴 RED [AUDITOR_RUNTIME_ERROR]`. **Exception arch-reviewer** :
+échec runtime → WARN seulement (jamais hard-blocking par design,
+`ArchReviewFailOn: serious` défaut).
 
 ### 6.4.3 — Verdict consolidé
 
-```
-verdict_overall = max_severity({verdicts non-skipped})
-# ordering : 🔴 RED > 🟡 WARN > 🟢 GREEN
-```
+`verdict_overall = max_severity({non-skipped})` (🔴 > 🟡 > 🟢).
 
 | Verdict | Action |
 |---|---|
-| 🟢 GREEN | continue STEP 6.5 (Refresh INDEX ADRs) |
-| 🟡 WARN  | continue STEP 6.5 + log WARN dans STEP 7 récap |
-| 🔴 RED   | STOP — afficher 6.4.STOP ci-dessous, ne pas exécuter STEP 6.5 |
+| 🟢 GREEN | → STEP 6.5 |
+| 🟡 WARN | → STEP 6.5 + log WARN STEP 7 récap |
+| 🔴 RED | STOP — bloc 6.4.STOP, pas de STEP 6.5 |
 
 ### 6.4.STOP — Format STOP sur RED
 
@@ -836,65 +618,50 @@ verdict_overall = max_severity({verdicts non-skipped})
 🔴 /dev-run {n} — auditor batch RED ({N_red} agents en échec)
 
 Verdicts :
-  - code-reviewer       : {🟢|🟡|🔴} (blocking: {class si applicable})
-  - security-scan       : {🟢|🟡|🔴}
-  - spec-compliance     : {🟢|🟡|🔴}
-  - arch-reviewer       : {🟢|🟡|⚪ skipped} (jamais hard-blocking, cf. §6.4.2)
+  - code-reviewer    : {🟢|🟡|🔴} (blocking: {class si applicable})
+  - security-scan    : {🟢|🟡|🔴}
+  - spec-compliance  : {🟢|🟡|🔴}
+  - arch-reviewer    : {🟢|🟡|⚪ skipped}
 
-Rapports :
-  - workspace/output/.sys/.validation/{n}-code-review.md
-  - workspace/output/.sys/.validation/{n}-security-scan.md
-  - workspace/output/.sys/.validation/{n}-spec-compliance.md
-  - workspace/output/.sys/.validation/{n}-arch-review.md (si ArchReviewMode=full)
+Rapports : workspace/output/.sys/.validation/{n}-*.md
 
-Pour débloquer :
-  1. Lire les rapports en 🔴 RED (issues critical/serious + suggestions FIX)
-  2. Corriger (relancer /dev-{backend|frontend} {n}-{m} ciblé OU édit manuel)
-  3. Relancer /dev-run {n} (idempotent : skip 6.a/6.b/6.c si stables, rerun 6.4)
+Débloquer :
+  1. Lire rapports 🔴 (issues critical/serious + suggestions FIX)
+  2. Corriger (/dev-{backend|frontend} {n}-{m} ou édit manuel)
+  3. Relancer /dev-run {n} (idempotent : skip 6.a/6.b/6.c si stables)
 
-Bypass (à utiliser en connaissance de cause) :
-  - Baisser CodeReviewFailOn / SecurityFailOn / SpecComplianceFailOn dans Project Config
-  - Override hard-blocking impossible (secrets, SQL injection, contract drift)
+Bypass : baisser CodeReviewFailOn / SecurityFailOn / SpecComplianceFailOn
+en Project Config. Hard-blocking (secrets, SQL injection, contract drift)
+non-overridable.
 ```
 
-### 6.4.4 — Émission succès (verdict 🟢 ou 🟡)
-
-1 ligne par agent invoqué + 1 ligne consolidée :
+### 6.4.4 — Émission succès
 
 ```
-✓ code-reviewer       : {🟢 GREEN | 🟡 WARN} — {C}/{S}/{M}/{m} issues
-✓ security-scan       : {🟢 GREEN | 🟡 WARN} — {C}/{S}/{M}/{m} issues
-✓ spec-compliance     : {🟢 GREEN | 🟡 WARN} — {V}/{T} ACs verified
-✓ arch-reviewer       : {🟢 GREEN | 🟡 WARN} — {P} pattern violations  (si ArchReviewMode=full)
-FEAT {n} — auditor batch {🟢 GREEN | 🟡 WARN} (continue → STEP 6.5 INDEX ADRs)
+✓ code-reviewer    : {🟢|🟡} — {C}/{S}/{M}/{m} issues
+✓ security-scan    : {🟢|🟡} — {C}/{S}/{M}/{m} issues
+✓ spec-compliance  : {🟢|🟡} — {V}/{T} ACs verified
+✓ arch-reviewer    : {🟢|🟡} — {P} pattern violations  (si ArchReviewMode=full)
+FEAT {n} — auditor batch {🟢|🟡} (→ STEP 6.5 INDEX ADRs)
 ```
 
-Pour les agents skippés (phase disabled OU ArchReviewMode ≠ full) :
-```
-⊘ {agent_name} : skipped ({skip_reason du phase_planner | ArchReviewMode={mode}})
-```
+Agents skippés : `⊘ {agent} : skipped ({reason})`.
 
 ### 6.4.5 — State tracking
 
 ```bash
 python .claude/python/sdd_scripts/sdd_state.py set-phase \
   --run-id $RUN_ID --phase auditor_batch --status {pass|warn|fail} \
-  --payload-json '{"code_review":"{verdict}","security_scan":"{verdict}","spec_compliance":"{verdict}","arch_review":"{verdict|skipped}"}'
+  --payload-json '{"code_review":"{v}","security_scan":"{v}","spec_compliance":"{v}","arch_review":"{v|skipped}"}'
 ```
 
 ### 6.4.6 — Anti-derive
 
-- Les 4 agents sont **idempotents** (cf. `agents/*.md §Idempotence`) —
-  relancer `/dev-run` les fera ré-tourner et écraser leurs rapports.
-- **Pas de fallback** sur 🔴 RED : le Tech Lead corrige, pas l'agent.
-- Phases auditor n'ont **PAS** de `build_loop` (cf.
-  `error-classification.md §3` — classes `[REVIEW_*]`, `[A11Y_*]`,
-  `[SEC_*]`, `[SPEC_*]` toutes "Itère: NON").
-- Le `phase_planner.py` lui-même n'invoque aucun LLM (Python pur,
-  déterministe, 0 token).
-- **spec-compliance-reviewer ne fait pas confiance** au rapport des
-  autres agents — lit le code indépendamment AC-par-AC (pattern
-  superpowers v5.1, cf. `agents/spec-compliance-reviewer.md §Rôle`).
+- 4 agents **idempotents** (relancer écrase rapports)
+- **Pas de fallback** sur 🔴 : Tech Lead corrige
+- Auditors n'ont **PAS** de `build_loop` (`[REVIEW_*]`/`[SEC_*]`/`[SPEC_*]` "Itère: NON")
+- `phase_planner.py` = 0 token LLM
+- spec-compliance lit le code indépendamment AC-par-AC (pattern superpowers v5.1)
 
 ---
 
