@@ -98,65 +98,51 @@ Absent → STOP + ERROR `[QA_PRECONDITION_FAILED]` : `code production absent, la
 
 ## STEP 3 — Charger contexte minimal
 
-1. `.claude/rules/error-classification.md` — taxonomie `[SEC_*]` §1.11
-2. `workspace/input/feats/{n}-*.md` — FEAT parente
-3. `workspace/output/us/{n}-*.md` — US ciblées (passif, comprendre intent
-   métier + repérer mentions explicites de sécurité dans ACs)
-4. `workspace/output/src/{BackendName}/CLAUDE.md` si présent
-5. `workspace/output/src/{AppName}/CLAUDE.md` si présent
-6. `.claude/stacks/backend/{active}.md` §1.3 layer mapping + §3 + §2.4 libs
-7. `.claude/stacks/frontend/{active}.md` §1.3 + §3
-8. `.claude/stacks/auth/{active}.md` **§2-§3 UNIQUEMENT** (patterns auth
-   attendus). NE PAS Read le fichier entier — `azure-ad.md` fait 795 L
-   (~30 KB) ; §2-§3 ≈ 5–8 KB. Utiliser Read avec offset/limit pour
-   isoler les sections.
-9. Code généré : lecture sélective via plan v2 si présent, sinon
-   convention (cf. `code-reviewer.md §4`)
+1. `.claude/rules/error-classification.md` §1.11 (taxonomie `[SEC_*]`)
+2. `workspace/input/feats/{n}-*.md` (FEAT parente)
+3. `workspace/output/us/{n}-*.md` (US — intent métier + ACs sécurité)
+4. `workspace/output/src/{BackendName|AppName}/CLAUDE.md` si présents
+5. `.claude/stacks/backend/{active}.md` §1.3 + §3 + §2.4 libs
+6. `.claude/stacks/frontend/{active}.md` §1.3 + §3
+7. `.claude/stacks/auth/{active}.md` **§2-§3 UNIQUEMENT** (offset/limit
+   pour éviter `azure-ad.md` 795 L)
+8. Code généré : sélection plan v2 si présent, sinon convention
+   (`code-reviewer.md §4`)
 
-**⚠️ WARN obligatoire** — quand le fallback convention est activé
-(aucun `workspace/output/plans/{n}-*.{back,front}.md` matché), émettre
-**avant** le scan OWASP :
+**⚠️ WARN obligatoire** si fallback convention (aucun plan v2) :
 
 ```
 ⚠️ WARN security-reviewer FEAT {n} — plan v2 absent, fallback convention
-   Cause : aucun plan v2 strict-ready disponible
-   Conséquence : sélection des fichiers par heuristique nom→path. Risque
-                 de **manquer des fichiers** non couverts par la convention
-                 (ex : middleware custom). Faux négatifs OWASP possibles.
-   Fix     : `/dev-plan {n}` puis `/sdd-review --ensure-scans security`
-             pour relancer avec couverture certaine.
+   Risque : sélection heuristique nom→path → faux négatifs OWASP possibles
+   Fix : /dev-plan {n} puis /sdd-review --ensure-scans security
 ```
 
 Persister `"source_mode": "convention-fallback"` + `"plan_v2_warn": true`
-dans `{n}-security-scan.json`.
-
-**Budget cible** : ≤ 20 KB (validé déterministe par `context_budget.py`).
+dans `{n}-security-scan.json`. **Budget** : ≤ 20 KB.
 
 ---
 
-## STEP 4 — Scan OWASP Top 10 2021 (annonce + méta-instructions)
+## STEP 4 — Scan OWASP Top 10 2021 (méta-instructions)
 
-> **v7.0.1 (audit M3 closure 2026-06-07)** : ce STEP est un **wrapper d'annonce** — il n'exécute **aucun scan en propre**. Le découpage opérationnel des 10 catégories OWASP est intégralement délégué à `## STEP 5 — Détection par catégorie OWASP (A01-A10)` ci-dessous (sous-sections §5.1 à §5.10, une par catégorie). Cette séparation préserve la stabilité des cross-refs externes (loader.yml, sdd-review.md, scripts ingest) qui pointent vers STEP 5 par numéro.
+Wrapper d'annonce — découpage opérationnel intégralement en §5.1-§5.10.
 
-**Méta-instructions valables pour toutes les sous-sections §5.1 à §5.10** :
-- Pour chaque catégorie, exécuter scans **déterministes** (Grep regex avec patterns spécifiques) + **raisonnement Sonnet** sur les matches cross-fichier (cas légitimes vs vrais positifs).
-- Respecter le budget STEP 0.5 — pas de Glob non-borné sous `workspace/output/src/` (cf. C1 closure du fichier `arch-reviewer.md §2.5`).
-- Émettre les classes `[SEC_*]` documentées dans `error-classification.md §1.11` (23 classes + 8 hard-blocking).
-- En cas de doute (regex match mais contexte ambigu) → préférer émettre WARN qu'omettre (bias toward verification).
-
-**Procéder à STEP 5.**
+**Méta-instructions pour toutes les sous-sections §5.x** :
+- Scans **déterministes** Grep regex + **raisonnement Sonnet** sur matches
+  cross-fichier (légitimes vs vrais positifs)
+- Respecter budget STEP 0.5 — pas de Glob non-borné sous `workspace/output/src/`
+- Émettre classes `[SEC_*]` documentées `error-classification.md §1.11`
+  (23 classes + 8 hard-blocking)
+- Doute (match ambigu) → préférer WARN qu'omettre (bias verification)
 
 ## STEP 5 — Détection par catégorie OWASP (A01-A10)
 
-Sous-sections déterministes : chaque `### 5.x` ci-dessous correspond
-à une catégorie OWASP Top 10 2021, avec patterns Grep + heuristiques
-Sonnet + exclusions canoniques (tests, env vars, dev configs).
+Sous-sections déterministes : 1 par catégorie OWASP Top 10 2021, avec
+patterns Grep + heuristiques Sonnet + exclusions canoniques (tests, env
+vars, dev configs).
 
-> **SSoT machine** : la taxonomie + patterns regex est aussi capturée
-> en `@.claude/python/security_patterns.yaml` (22 classes [SEC_*] +
-> sévérité + hard-blocking + regex/lang). Cross-checké contre §1.11
-> d'error-classification.md par `tests/test_security_patterns.py`. La
-> prose ci-dessous reste la SSoT runtime (lue à chaque invocation).
+> **SSoT machine** : patterns regex aussi capturés en
+> `@.claude/python/security_patterns.yaml` (22 classes + sévérité +
+> hard-blocking + regex/lang). Cross-check `tests/test_security_patterns.py`.
 
 ### 5.1 A03 Injection — Secrets hardcoded
 
@@ -422,24 +408,18 @@ Exclusions : endpoints `/health`, `/metrics`, `/swagger`, `/openapi.json`,
 
 **Coordination dé-dup** :
 
-1. **Dé-dup authoritative post-hoc** — `sdd_review.py::compute_report`
-   assure la dé-dup au moment de l'agrégation via `deduplicate_findings()`
-   + table `CANONICAL_CLASS` (cf. `sdd_scripts/_review_fetch.py`). Les
-   classes `[REVIEW_SECRETS_HARDCODED]` et `[SEC_SECRET_HARDCODED]` sont
-   mappées sur la même clé canonique `SECRET_HARDCODED` ; le finding au
-   plus haut severity est conservé.
+1. **Post-hoc authoritative** : `sdd_review.py::compute_report` via
+   `deduplicate_findings()` + table `CANONICAL_CLASS` (`_review_fetch.py`).
+   `[REVIEW_SECRETS_HARDCODED]` ↔ `[SEC_SECRET_HARDCODED]` → clé canonique
+   `SECRET_HARDCODED`, max severity conservé.
+2. **Pré-emit best-effort** : si `{n}-code-review.json` existe au démarrage,
+   security-reviewer le Read et exclut. En `/dev-run §6.4` (parallèle),
+   fichier absent → skip silent, post-hoc prend le relais.
+3. **Code-reviewer ne lit jamais** le rapport security (dé-dup post-hoc
+   couvre les 2 sens).
 
-2. **Dé-dup pré-emit best-effort** — si `workspace/output/.sys/.validation/{n}-code-review.json`
-   existe au démarrage, security-reviewer le Read et exclut les items
-   déjà listés. En `/dev-run` STEP 6.4 (parallèle), le fichier n'existe
-   pas encore → skip silencieux, la dé-dup post-hoc (1) prend le relais.
-
-3. **Code-reviewer ne lit jamais le rapport security** — OK car la
-   dé-dup post-hoc traite les deux sens.
-
-> **Ownership `[SEC_SECRET_HARDCODED]`** : owned **exclusivement** par
-> security-reviewer (hard-blocking CWE-798). Si code-reviewer rencontre
-> incidemment un secret évident, il l'émet en `issues.minor` informationnel
+> **Ownership `[SEC_SECRET_HARDCODED]`** : exclusivement security-reviewer
+> (hard-blocking CWE-798). code-reviewer émet en `issues.minor` informationnel
 > avec pointeur vers security-reviewer.
 
 ---
