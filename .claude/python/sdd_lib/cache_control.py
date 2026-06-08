@@ -109,9 +109,20 @@ _READ_LINE_RE = re.compile(
 # Matches inline-mapping lines (dev-backend format):
 #   - { path: "X", cache_layer: stable }                # comment
 #   - { path: X, cache_layer: semi, status: experimental }   # comment
+#
+# Two alternatives so that quoted paths can contain `{` and `}` (e.g.
+# "workspace/output/us/{n}-{m}-*.md") — the previous regex stopped at
+# the first `}` and silently dropped 3 volatile reads of dev-backend.
+# Audit 2026-06-08: bug fix + regression test.
 _INLINE_READ_RE = re.compile(
     r"^\s*-\s*\{\s*"
-    r"path:\s*\"?(?P<path>[^,\"}\s]+)\"?\s*,\s*"
+    r"path:\s*"
+    r"(?:"
+    r"\"(?P<qpath>[^\"]+)\""              # quoted path: anything except `"`
+    r"|"
+    r"(?P<upath>[^,\"}\s]+)"              # unquoted: no `,` `"` `}` ws
+    r")"
+    r"\s*,\s*"
     r"cache_layer:\s*(?P<layer>stable|semi|volatile)"
     r"[^}]*\}"                            # rest of mapping
     r"(?:\s*#\s*(?P<comment>.*?))?"       # optional trailing comment
@@ -205,7 +216,7 @@ def parse_loader_annotations(loader_path: Path | None = None) -> dict[str, Agent
         if in_reads_section and current_agent:
             inline_match = _INLINE_READ_RE.match(raw_line)
             if inline_match is not None:
-                path = inline_match.group("path")
+                path = inline_match.group("qpath") or inline_match.group("upath")
                 layer = inline_match.group("layer")  # type: ignore[assignment]
                 comment = inline_match.group("comment") or ""
             else:
@@ -230,6 +241,124 @@ def parse_loader_annotations(loader_path: Path | None = None) -> dict[str, Agent
                 manifest.volatile.append(entry)
 
     return manifests
+
+
+@dataclass(frozen=True)
+class OrderingViolation:
+    """A single out-of-order cache_layer annotation in loader.yml."""
+    agent: str
+    line_num: int
+    path: str
+    layer: CacheLayer
+    previous_path: str
+    previous_layer: CacheLayer
+
+    def __str__(self) -> str:
+        return (
+            f"{self.agent} line {self.line_num}: "
+            f"{self.layer} '{self.path}' after "
+            f"{self.previous_layer} '{self.previous_path}' "
+            f"(expected stable → semi → volatile)"
+        )
+
+
+def validate_ordering(loader_path: Path | None = None
+                      ) -> dict[str, list[OrderingViolation]]:
+    """Verify that each agent's `reads:` declares cache_layer in source order
+    `stable → semi → volatile`.
+
+    The reconstructed `AgentCacheManifest` always exposes reads in the
+    cache-friendly order via `all_reads()`, so a tautological check on the
+    manifest cannot detect drift. This function inspects loader.yml directly,
+    line by line, to enforce coherent annotations at the source.
+
+    Args:
+        loader_path: optional override (default: <repo>/.claude/loader.yml)
+
+    Returns:
+        dict mapping agent name → list of OrderingViolation (empty list if OK)
+
+    Why this matters:
+        - Coherent ordering documents intent (cacheable first, volatile last)
+        - Detects drift when new reads are appended without respecting layers
+        - Prepares wiring for any future cache_control harness hook
+    """
+    if loader_path is None:
+        loader_path = repo_root() / ".claude" / "loader.yml"
+
+    if not loader_path.exists():
+        raise FileNotFoundError(f"loader.yml not found: {loader_path}")
+
+    text = loader_path.read_text(encoding="utf-8-sig")
+    lines = text.splitlines()
+
+    layer_rank = {"stable": 0, "semi": 1, "volatile": 2}
+    violations: dict[str, list[OrderingViolation]] = {}
+    current_agent: str | None = None
+    in_reads_section = False
+    last_layer: CacheLayer | None = None
+    last_path: str = ""
+
+    for line_num, raw_line in enumerate(lines, start=1):
+        stripped = raw_line.lstrip()
+        if stripped.startswith("#"):
+            continue
+
+        if not raw_line.startswith(" ") and raw_line.rstrip().endswith(":"):
+            header_match = _AGENT_HEADER_RE.match(raw_line)
+            if header_match:
+                name = header_match.group("name")
+                if name in {"version", "updated"}:
+                    current_agent = None
+                    in_reads_section = False
+                    continue
+                current_agent = name
+                in_reads_section = False
+                last_layer = None
+                last_path = ""
+                continue
+
+        if current_agent and raw_line.strip() == "reads:":
+            in_reads_section = True
+            last_layer = None
+            last_path = ""
+            continue
+
+        if in_reads_section and raw_line.strip() and not raw_line.startswith("    "):
+            in_reads_section = False
+            continue
+
+        if in_reads_section and current_agent:
+            inline_match = _INLINE_READ_RE.match(raw_line)
+            if inline_match is not None:
+                path = inline_match.group("qpath") or inline_match.group("upath")
+                layer = inline_match.group("layer")
+            else:
+                line_match = _READ_LINE_RE.match(raw_line)
+                if line_match is None:
+                    continue
+                path = line_match.group("path")
+                comment = line_match.group("comment") or ""
+                detected = _extract_layer(comment)
+                if detected is None:
+                    continue
+                layer = detected
+
+            if last_layer is not None and layer_rank[layer] < layer_rank[last_layer]:
+                violations.setdefault(current_agent, []).append(
+                    OrderingViolation(
+                        agent=current_agent,
+                        line_num=line_num,
+                        path=path,
+                        layer=layer,  # type: ignore[arg-type]
+                        previous_path=last_path,
+                        previous_layer=last_layer,
+                    )
+                )
+            last_layer = layer  # type: ignore[assignment]
+            last_path = path
+
+    return violations
 
 
 def cache_breakpoints_for(agent_name: str, loader_path: Path | None = None

@@ -1,5 +1,7 @@
 # /sdd-poc — Pipeline minimaliste POC (FEAT → arch → back → front)
 
+<!-- @llm-only-flags-file : tous les flags CLI de cette commande slash sont interprétés par Claude. -->
+
 > **Mode POC** — pipeline raccourci pour prototypes, démos, ou exemples.
 > **NE PAS utiliser en production.** Cette commande **saute** :
 > `/us-generate`, `/feat-validate`, `/dev-plan` (sauf opt-in), API Gate,

@@ -40,6 +40,38 @@ le terminal utilisateur — pas du sub-agent Claude).
 
 ---
 
+## STEP 0.5 — Phase 0 Discovery hint (v7.0.0+, opt-in)
+
+**Conditionnel** : si Glob `workspace/input/feats/*.md` retourne ≥ 2 FEATs
+(le 3ᵉ+ FEAT projet, signal de "projet qui grossit"), ET aucun fichier
+`product-brief.md` ni `prfaq.md` dans `workspace/input/discovery/`,
+émettre **avant** les questions de cadrage :
+
+```
+💡 [FEAT-GENERATE] Astuce Phase 0 Discovery (facultative, projets > 3 FEATs)
+
+Vous avez déjà N FEATs. Pour les projets qui grossissent, un brief
+Discovery aide à cadrer la vision avant de continuer à empiler les FEATs :
+  - `.claude/templates/product-brief.template.md` (10 sections : vision, personas, KPIs, hypothèses, risques)
+  - `.claude/templates/prfaq.template.md` (Amazon "Working Backwards" — PR fictive + FAQ interne)
+
+Bénéfice : éviter le scope creep en FEATs parasites. Une FEAT proposée
+qui ne sert pas une promesse du brief = probablement à challenger.
+
+Continuer avec /feat-generate quand même ? (oui / non / voir templates)
+  - "oui" / Enter        → continuer cadrage FEAT [DEFAULT]
+  - "non"                → STOP, copier les templates d'abord dans workspace/input/discovery/
+  - "voir templates"     → afficher 5 lignes d'extrait pour chaque template puis re-demander
+```
+
+Cette astuce ne s'affiche **jamais** sur les FEATs 1-2 (overhead non
+amorti) ni si un brief Discovery est déjà présent (déjà cadré).
+
+**Bypass complet** : `SDD_NO_PHASE0_HINT=1` env var (silence pour
+workflows automatisés).
+
+---
+
 ## STEP 1 — Nom de la feature
 
 Si l'utilisateur a fourni un nom : l'utiliser.

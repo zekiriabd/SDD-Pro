@@ -211,6 +211,18 @@
     "_deny_M9_doc": "Audit 2026-06-06 M9 — defense-in-depth additions : (a) shell-nesting HTTP fetch (bash -c, sh -c, powershell -c, cmd /c) to close the gap where curl/wget could escape Bash matcher via inline shell; (b) critical user-data paths under workspace/input/ and workspace/output/{us,src,plans} not covered by the broad rm -rf workspace/output/* allow pattern."
   },
   "hooks": {
+    "SessionStart": [
+      {
+        "_doc": "v7.0.0+ (2026-06-08, emprunt superpowers v5.1) — session_start injecte le banner SDDPro au démarrage (startup|resume|clear|compact). Texte statique + 1 Glob workspace/input/feats/ = ~5 ms, 0 token LLM. Fournit `additionalContext` qui prime Claude Code sur le pipeline canonique, les 13 commandes user-facing et l'état détecté du projet. Mode CI (env CI=1) → version minimale 1L. Bypass complet : SDD_DISABLE_SESSION_START=1.",
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -c \"import os,sys,pathlib; r=os.environ.get('CLAUDE_PROJECT_DIR') or next((str(p) for p in [pathlib.Path.cwd()]+list(pathlib.Path.cwd().parents) if (p/'.claude').is_dir()),'.'); sys.path.insert(0,r+'/.claude/python'); import _hook; _hook.run('sdd_hooks.session_start')\""
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "_doc": "v7.0.0-alpha (audit P0-security 2026-06-05) — block_env_bypass closes the gap left by case-sensitive Bash deny patterns. Receives the Bash command on stdin, refuses any case-insensitive attempt to SET a SDD_ALLOW_* or SDD_DISABLE_* envvar mid-session (export, NAME=val inline, $env:, setx, Set-Variable). Companion to the `_deny_bypass_doc` patterns in permissions.deny.",
@@ -233,6 +245,11 @@
             "_doc": "v7.0.0-alpha Sprint 1.4 (2026-06-06) — pre_write_lint enforces stack-CLAUDE.md forbidden patterns (Kotlin !!, Vue raw HTML, console.log, hex hardcode, etc.) at GENERATION time. Default WARN-only (exit 0 + audit log); SDD_PRE_WRITE_LINT_STRICT=1 to make exit 2 (blocking). Bypass via SDD_DISABLE_PRE_WRITE_LINT=1. Skips test paths and non-src files.",
             "type": "command",
             "command": "python -c \"import os,sys,pathlib; r=os.environ.get('CLAUDE_PROJECT_DIR') or next((str(p) for p in [pathlib.Path.cwd()]+list(pathlib.Path.cwd().parents) if (p/'.claude').is_dir()),'.'); sys.path.insert(0,r+'/.claude/python'); import _hook; _hook.run('sdd_hooks.pre_write_lint')\""
+          },
+          {
+            "_doc": "v7.0.0+ (audit P3 TDD 2026-06-08, emprunt Superpowers v5.1 test-driven-development) — enforce_tdd détecte écriture de NOUVEAU symbole production (function/class/method/endpoint) sous workspace/output/src/ SANS test compagnon. Default `warn` interactif, `strict` en CI. Bypass : SDD_DISABLE_TDD=1 (one-shot, audit-loggué) OU SDD_TDD_MODE=off. Reconnaît .NET (.cs)/Node-TS/Python/Kotlin/Java. Refactor / Edit existing code = allowed.",
+            "type": "command",
+            "command": "python -c \"import os,sys,pathlib; r=os.environ.get('CLAUDE_PROJECT_DIR') or next((str(p) for p in [pathlib.Path.cwd()]+list(pathlib.Path.cwd().parents) if (p/'.claude').is_dir()),'.'); sys.path.insert(0,r+'/.claude/python'); import _hook; _hook.run('sdd_hooks.enforce_tdd')\""
           }
         ]
       },
@@ -246,6 +263,11 @@
           {
             "type": "command",
             "command": "python -c \"import os,sys,pathlib; r=os.environ.get('CLAUDE_PROJECT_DIR') or next((str(p) for p in [pathlib.Path.cwd()]+list(pathlib.Path.cwd().parents) if (p/'.claude').is_dir()),'.'); sys.path.insert(0,r+'/.claude/python'); import _hook; _hook.run('sdd_hooks.preflight_cost_cap')\""
+          },
+          {
+            "_doc": "v7.0.0+ (audit P3 B + B.bis 2026-06-08) — enforce_two_stage_auditor blocks Stage B reviewers (code/security/arch) from spawning before Stage A (spec-compliance-reviewer) has produced a fresh non-RED verdict in qa_spec_compliance. Default mode `AuditorBatchMode=two-stage` ; bypass `AuditorBatchMode: legacy-parallel` (config) or `SDD_BYPASS_TWO_STAGE=1` (one-shot env). Idempotent : pure DB read, no side effects.",
+            "type": "command",
+            "command": "python -c \"import os,sys,pathlib; r=os.environ.get('CLAUDE_PROJECT_DIR') or next((str(p) for p in [pathlib.Path.cwd()]+list(pathlib.Path.cwd().parents) if (p/'.claude').is_dir()),'.'); sys.path.insert(0,r+'/.claude/python'); import _hook; _hook.run('sdd_hooks.enforce_two_stage_auditor')\""
           }
         ]
       },
@@ -256,6 +278,11 @@
           {
             "type": "command",
             "command": "python -c \"import os,sys,pathlib; r=os.environ.get('CLAUDE_PROJECT_DIR') or next((str(p) for p in [pathlib.Path.cwd()]+list(pathlib.Path.cwd().parents) if (p/'.claude').is_dir()),'.'); sys.path.insert(0,r+'/.claude/python'); import _hook; _hook.run('sdd_hooks.preflight_stack_combo')\""
+          },
+          {
+            "_doc": "v7.0.0+ (audit P3 A + A.bis 2026-06-08) — auto_invoke_complexity_router runs the deterministic Python complexity_router.py BEFORE /sdd-full /sdd-poc /dev-run when `ComplexityRouterMode: auto` is set in Project Config. A.bis idempotent guard skips subprocess if a fresh report (< 1h) already exists. Never blocks — additive only. Bypass: SDD_DISABLE_AUTO_ROUTER=1 OR ComplexityRouterMode!=auto.",
+            "type": "command",
+            "command": "python -c \"import os,sys,pathlib; r=os.environ.get('CLAUDE_PROJECT_DIR') or next((str(p) for p in [pathlib.Path.cwd()]+list(pathlib.Path.cwd().parents) if (p/'.claude').is_dir()),'.'); sys.path.insert(0,r+'/.claude/python'); import _hook; _hook.run('sdd_hooks.auto_invoke_complexity_router')\""
           }
         ]
       },
@@ -303,7 +330,7 @@
     ],
     "SubagentStop": [
       {
-        "matcher": "arch|po|elicitor|dev-backend|dev-frontend|qa|code-reviewer|security-reviewer|spec-compliance-reviewer|arch-reviewer|adversarial-reviewer|constitutioner",
+        "matcher": "arch|po|elicitor|dev-backend|dev-frontend|qa|code-reviewer|security-reviewer|spec-compliance-reviewer|arch-reviewer|adversarial-reviewer|constitutioner|complexity-router",
         "hooks": [
           {
             "type": "command",

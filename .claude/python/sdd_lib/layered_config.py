@@ -313,6 +313,102 @@ _DEPRECATED_CONFIG_KEYS: dict[str, str] = {
 }
 
 
+#: Schema cache to avoid re-loading on every read_layered_config() call.
+#: Populated lazily on first use, invalidated never (schema is frozen per
+#: SDD_Pro release).
+_SCHEMA_KEYS_CACHE: set[str] | None = None
+
+
+def _load_schema_known_keys(root: Path | None = None) -> set[str]:
+    """Load the canonical key list from project-config.schema.json.
+
+    v7.0.0+ audit P3 E1 (2026-06-08) : known-keys validation against schema.
+    Returns the union of `properties` keys + deprecated keys (which are
+    tolerated but warned separately by `_warn_deprecated_keys`).
+
+    Caches result in module-level `_SCHEMA_KEYS_CACHE`. Returns empty set
+    on schema read error (fail-safe: validation downgrades to no-op rather
+    than blocking layered config reads).
+    """
+    global _SCHEMA_KEYS_CACHE
+    if _SCHEMA_KEYS_CACHE is not None:
+        return _SCHEMA_KEYS_CACHE
+
+    import json as _json
+    if root is None:
+        try:
+            root = repo_root()
+        except Exception:
+            _SCHEMA_KEYS_CACHE = set()
+            return _SCHEMA_KEYS_CACHE
+
+    schema_path = root / ".claude" / "templates" / "project-config.schema.json"
+    if not schema_path.is_file():
+        _SCHEMA_KEYS_CACHE = set()
+        return _SCHEMA_KEYS_CACHE
+
+    try:
+        schema = _json.loads(schema_path.read_text(encoding="utf-8"))
+        props = schema.get("properties", {})
+        keys = set(props.keys()) | set(_DEPRECATED_CONFIG_KEYS.keys())
+    except Exception:
+        _SCHEMA_KEYS_CACHE = set()
+        return _SCHEMA_KEYS_CACHE
+
+    _SCHEMA_KEYS_CACHE = keys
+    return _SCHEMA_KEYS_CACHE
+
+
+def _warn_unknown_keys(effective: dict[str, Any], root: Path | None = None) -> None:
+    """Emit stderr WARN [CONFIG_UNKNOWN_KEY] for keys absent from schema.
+
+    v7.0.0+ audit P3 E1 (2026-06-08) — anti-ghost-key validation. Without
+    this check, typos like `RewiewMode` instead of `ReviewMode` are silently
+    ignored at runtime (the original key keeps its default), masking bugs.
+
+    Bypass : `SDD_CONFIG_STRICT=0` (default) emits WARN only.
+             `SDD_CONFIG_STRICT=1` raises ConfigError (fail-fast).
+             `SDD_DISABLE_UNKNOWN_KEY_WARN=1` silences entirely.
+
+    Keys starting with `_` (e.g. `_meta`, `_doc`) are skipped — they are
+    documented `additionalProperties: true` audit-log helpers.
+    """
+    if os.environ.get("SDD_DISABLE_UNKNOWN_KEY_WARN") == "1":
+        return
+    import sys
+
+    known = _load_schema_known_keys(root)
+    if not known:
+        # Schema not loadable — fail-safe to no validation rather than spurious WARNs
+        return
+
+    strict = os.environ.get("SDD_CONFIG_STRICT", "0").strip() in ("1", "true", "yes", "on")
+    unknown = [
+        k for k in effective
+        if k not in known and not k.startswith("_")
+    ]
+    if not unknown:
+        return
+
+    for key in sorted(unknown):
+        val = str(effective[key]).strip()
+        msg = (
+            f"WARN [CONFIG_UNKNOWN_KEY] Project Config key '{key}={val}' is "
+            f"NOT in project-config.schema.json properties (typo? legacy "
+            f"key removed without deprecation? Tech Lead extension?). "
+            f"Strict mode: SDD_CONFIG_STRICT=1 turns this into a hard error. "
+            f"Bypass : SDD_DISABLE_UNKNOWN_KEY_WARN=1."
+        )
+        print(msg, file=sys.stderr)
+
+    if strict:
+        raise ConfigError(
+            error="Project Config validation failed (strict mode)",
+            cause=f"[CONFIG_UNKNOWN_KEY] {len(unknown)} unknown keys: {', '.join(sorted(unknown))}",
+            fix="Register the key in .claude/templates/project-config.schema.json#properties, or remove the typo from stack.md ## Project Config",
+        )
+
+
 def _warn_deprecated_keys(effective: dict[str, Any]) -> None:
     """Emit stderr WARN [CONFIG_DEPRECATED_KEY] for legacy keys still set.
 
@@ -382,6 +478,12 @@ def read_layered_config(
     # configs surface instead of staying mute. Call before keys-filtering
     # so the warning fires regardless of caller's narrowed query.
     _warn_deprecated_keys(effective)
+
+    # Audit P3 E1 2026-06-08 — emit WARN [CONFIG_UNKNOWN_KEY] for typo'd
+    # or ghost keys not declared in project-config.schema.json. Catches
+    # bugs like `RewiewMode` instead of `ReviewMode` silently ignored.
+    # Strict mode (SDD_CONFIG_STRICT=1) escalates to ConfigError.
+    _warn_unknown_keys(effective, root)
 
     if keys is not None:
         effective = {k: v for k, v in effective.items() if k in keys}

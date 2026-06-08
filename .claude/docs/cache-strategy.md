@@ -87,6 +87,29 @@ Source : `console.db` table `token_usage`, agrégé sur la session.
   excluant `cache_write` du dénominateur, v7.x inclut tous les flux pour
   une vraie fraction.
 
+### 1.4 Monitoring continu (v7.0.x, audit 2026-06-08)
+
+Script de mesure runtime contre les logs JSONL Claude Code :
+
+```bash
+cd .claude/python && python -m sdd_admin.measure_cache_hit_rate --days 7
+# or for CI / dashboards:
+python -m sdd_admin.measure_cache_hit_rate --days 30 --json
+```
+
+Lecture : `~/.claude/projects/<encoded-cwd>/**/*.jsonl`, agrège les
+`usage.cache_read_input_tokens` / `cache_creation_input_tokens` /
+`input_tokens` par session et par modèle (Opus/Sonnet/Haiku).
+
+**Mesure 30 jours (audit 2026-06-08, agrégat session-mix réel)** :
+93.8 % hit globalement, Opus 4.7 à 94.5 %, Sonnet 4.6 à 93.7 %, Haiku
+4.5 à 85.0 %. L'écart avec les 99.2 % de §1.2 vient de la fenêtre :
+mesure CTO ciblait une session courte (1 FEAT), monitoring 30 j inclut
+des restarts, sessions multi-FEAT, et cache_creation aux warmups.
+
+Utiliser ce script pour détecter une régression du hit rate après
+modification de `loader.yml` ou ajout de nouveaux Reads non annotés.
+
 ## 2. Implémentation `cache_control` explicite (P2, optionnel)
 
 Le gain marginal d'ajouter des markers `cache_control: ephemeral` sur les
@@ -118,6 +141,12 @@ avec TTL 5 min :
 
 - `CLAUDE.md` per-project (~5 KB) : invariant tant que `arch` n'a pas re-tourné.
 - Schema.json DB (~5-15 KB) : invariant entre US d'une même FEAT.
+  - **Levier 4 v7.0.x** : préférer `workspace/output/db/schema-slice-{n}-{m}.json`
+    (slice per-US, ~30-60 % de la taille du schema complet, contient les
+    tables référencées par l'US + FK transitive). Généré par
+    `python -m sdd_scripts.generate_schema_slice --us-path <us.md>` avant
+    spawn dev-backend / qa. Fallback automatique sur schema complet si
+    le slice est absent (préservé par `loader.yml` ordering).
 
 ### 2.3 Couches volatiles (jamais cachables)
 
@@ -154,6 +183,10 @@ preflight injecte les markers lors de la composition du prompt.
 Critère release v7.0.0 final :
 - Cache hit rate ≥ 60 % sur 3 FEAT M consécutifs (vs 40.8 % actuel)
 - Coût Opus / FEAT M ≤ $15 (vs ~$20 actuel sur FEAT 2 mesuré)
+
+**Statut audit 2026-06-08** : critère **atteint et dépassé**. Hit rate
+mesuré 93.8 % sur 30 j (Opus 4.7 à 94.5 %). Monitoring continu via
+`sdd_admin.measure_cache_hit_rate` (cf. §1.4).
 
 ## 6. ADR à créer
 

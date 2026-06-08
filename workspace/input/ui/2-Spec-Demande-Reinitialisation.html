@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Demo — Mot de passe oublié</title>
+<link rel="stylesheet" href="design-system.css">
+<style>
+  .app{flex:1;display:flex;flex-direction:column;background:var(--nj-cream);overflow:hidden}
+  .topbar{height:var(--nj-topbar-h);flex-shrink:0;display:flex;align-items:center;gap:14px;padding:0 18px;background:var(--nj-surface);border-bottom:1px solid var(--nj-line-soft)}
+  .topbar__back{width:38px;height:38px;border-radius:999px;background:var(--nj-coral-50);color:var(--nj-coral-700);border:0;display:grid;place-items:center;cursor:pointer}
+  .topbar__title{font-size:15px;font-weight:700;color:var(--nj-ink-900)}
+  .form{flex:1;overflow-y:auto;padding:36px 24px 28px;display:flex;flex-direction:column;gap:18px}
+  .form>*{flex-shrink:0}
+  .form__head{text-align:center}
+  .form__head h2{font-size:22px;font-weight:800;color:var(--nj-ink-900);letter-spacing:-0.015em;margin:0}
+  .form__head p{margin:4px 0 0;font-size:13px;color:var(--nj-ink-500);line-height:1.5}
+  .field{display:flex;flex-direction:column;gap:6px}
+  .field label{font-size:12px;font-weight:600;color:var(--nj-ink-700)}
+  .input{display:flex;align-items:center;background:var(--nj-surface);border:1.5px solid var(--nj-line);border-radius:14px;padding:0 14px}
+  .input--filled{border-color:var(--nj-coral-300)}
+  .input svg.lead{color:var(--nj-ink-400);flex-shrink:0}
+  .input input{flex:1;border:0;outline:0;background:transparent;height:48px;padding:0 10px;font-family:inherit;font-size:15px;color:var(--nj-ink-900)}
+  .btn-primary{height:52px;border-radius:14px;background:var(--nj-coral-500);color:#fff;border:0;font-family:inherit;font-weight:700;font-size:15px;cursor:pointer;box-shadow:var(--nj-shadow-brand);display:inline-flex;align-items:center;justify-content:center;gap:8px;margin-top:4px}
+  .secure{margin-top:6px;background:var(--nj-sage-50);border-radius:14px;padding:12px 14px;display:flex;gap:10px;align-items:flex-start;color:var(--nj-sage-700);font-size:12px;line-height:1.45}
+  .secure svg{flex-shrink:0;margin-top:1px;color:var(--nj-sage-500)}
+  .divider{display:flex;align-items:center;gap:10px;color:var(--nj-ink-400);font-size:11px;font-family:var(--nj-font-mono);letter-spacing:.12em;text-transform:uppercase}
+  .divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--nj-line)}
+  .btn-outline{height:48px;border-radius:14px;background:var(--nj-surface);border:1.5px solid var(--nj-line);color:var(--nj-ink-700);font-weight:600;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;font-family:inherit}
+  .form__foot{text-align:center;font-size:13px;color:var(--nj-ink-500)}
+  .form__foot a{color:var(--nj-coral-600);font-weight:700;text-decoration:none}
+  .home-indicator{height:8px;display:flex;justify-content:center;align-items:flex-start;flex-shrink:0;background:var(--nj-surface)}
+  .home-indicator::after{content:'';width:134px;height:5px;background:var(--nj-ink-900);border-radius:999px;opacity:.92}
+</style>
+</head>
+<body>
+<div class="nj-stage">
+  <div class="nj-phone">
+    <div class="nj-phone__notch"></div>
+    <div class="nj-phone__screen">
+      <div class="nj-statusbar"><span>9:41</span><span class="nj-statusbar__icons">
+        <svg width="17" height="11" viewBox="0 0 17 11" fill="currentColor"><rect x="0" y="7" width="3" height="4" rx="0.5"/><rect x="4.5" y="5" width="3" height="6" rx="0.5"/><rect x="9" y="3" width="3" height="8" rx="0.5"/><rect x="13.5" y="0" width="3" height="11" rx="0.5"/></svg>
+        <svg width="15" height="11" viewBox="0 0 15 11" fill="currentColor"><path d="M7.5 0C4.6 0 1.9 1 0 2.7l1.4 1.5C2.9 2.8 5.1 1.9 7.5 1.9s4.6.9 6.1 2.3L15 2.7C13.1 1 10.4 0 7.5 0zm0 3.7c-2 0-3.7.7-5.1 1.9l1.4 1.4c1-.9 2.3-1.4 3.7-1.4s2.7.5 3.7 1.4L12.6 5.6C11.2 4.4 9.5 3.7 7.5 3.7zm0 3.7c-1.1 0-2 .4-2.7 1l2.7 2.6 2.7-2.6c-.7-.6-1.6-1-2.7-1z"/></svg>
+        <svg width="25" height="11" viewBox="0 0 25 11" fill="none"><rect x="0.5" y="0.5" width="21" height="10" rx="2.5" stroke="currentColor" opacity="0.5"/><rect x="2" y="2" width="18" height="7" rx="1.5" fill="currentColor"/><rect x="22.5" y="3.5" width="1.5" height="4" rx="0.5" fill="currentColor" opacity="0.5"/></svg>
+      </span></div>
+      <div class="app" data-screen-label="05 Reinitialisation">
+        <div class="topbar">
+          <a href="03-connexion.html" class="topbar__back" aria-label="Retour"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></a>
+          <div class="topbar__title">Mot de passe oublié</div>
+        </div>
+        <div class="form">
+          <div style="display:flex;justify-content:center">
+            <div style="width:96px;height:96px;border-radius:32px;background:linear-gradient(140deg,var(--nj-coral-100),var(--nj-butter-100));display:grid;place-items:center;color:var(--nj-coral-600);box-shadow:var(--nj-shadow-sm)">
+              <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V8a5 5 0 0 1 9.5-2"/><circle cx="12" cy="16" r="1.5"/></svg>
+            </div>
+          </div>
+          <div class="form__head"><p>Saisissez votre email — on vous envoie un lien sécurisé pour redéfinir votre mot de passe.</p></div>
+          <div class="field">
+            <div class="input input--filled">
+              <svg class="lead" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+              <input type="email" value="marie.dupont@gmail.com" placeholder="Email du compte">
+            </div>
+          </div>
+          <button class="btn-primary">Envoyer le lien
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          </button>
+          <div class="secure">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <div>Le lien expire dans <strong>15 minutes</strong>. Vérifiez votre boîte mail (et le dossier spam).</div>
+          </div>
+          <div class="divider">ou</div>
+          <button class="btn-outline">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+            Contacter le support
+          </button>
+          <div class="form__foot"><a href="03-connexion.html">← Retour à la connexion</a></div>
+        </div>
+        <div class="home-indicator"></div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

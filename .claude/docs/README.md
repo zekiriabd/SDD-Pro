@@ -1,6 +1,6 @@
 # 📚 Documentation SDD_Pro
 
-> **Spec-Driven Development pour Claude Code** — un framework multi-agent qui transforme des spécifications fonctionnelles en code prêt-à-livrer, via 12 agents IA spécialisés, une orchestration Python déterministe, et 5 reviewers qualité.
+> **Spec-Driven Development pour Claude Code** — un framework multi-agent qui transforme des spécifications fonctionnelles en code prêt-à-livrer, via 13 agents IA spécialisés (incl. `complexity-router` opt-in v7.0.0+), une orchestration Python déterministe, et 5 reviewers qualité.
 
 C'est le hub de documentation. Chaque doc a un objectif et une audience cible. Choisis ton parcours ci-dessous.
 
@@ -36,8 +36,8 @@ C'est le hub de documentation. Chaque doc a un objectif et une audience cible. C
 
 | Référence | Objet | Doc |
 |---|---|---|
-| **12 agents** | Rôle / Modèle / Entrées / Sorties / Verdicts | [agents-reference.md](agents-reference.md) |
-| **20 commandes** | Args / Flags / Agents / Sorties | [commands-reference.md](commands-reference.md) |
+| **13 agents** | Rôle / Modèle / Entrées / Sorties / Verdicts | [agents-reference.md](agents-reference.md) |
+| **21 commandes** | Args / Flags / Agents / Sorties | [commands-reference.md](commands-reference.md) |
 | **Project Config (58 clés)** | Config layered + defaults + plages | [configuration-reference.md](configuration-reference.md) |
 | **Classes d'erreur** | Taxonomie (174 préfixes `[CLASS]`) | [../rules/error-classification.md](../rules/error-classification.md) |
 | **Hooks + protections** | 13 hooks Claude Code câblés | [hooks-and-protections.md](hooks-and-protections.md) |

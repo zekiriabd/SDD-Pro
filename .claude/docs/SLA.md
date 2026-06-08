@@ -122,8 +122,8 @@ Cf. `@.claude/docs/VERSIONING.md` (SSoT).
 
 - Les **artefacts utilisateur** (FEATs, US, stack.md, console.db) sont
   garantis compatibles MINOR.
-- Les **commandes user-facing** (12 slash commands) sont stables MINOR.
-- Les **agents nommés** (12 agents) sont stables MINOR.
+- Les **commandes user-facing** (13 slash commands) sont stables MINOR.
+- Les **agents nommés** (12 stables MINOR + `complexity-router` opt-in v7.0.0+ stable PATCH) sont stables MINOR.
 - Les **classes d'erreur** `[CLASS]` sont stables MINOR (additions OK,
   suppressions = MAJOR).
 - Les **commandes internes** (8 commandes debug) peuvent évoluer en PATCH.

@@ -102,10 +102,11 @@ Forme rejetée : `gate` (générique) sans qualificatif → toujours préfixer.
 
 ## 7. Agents (taxonomie)
 
-> **12 agents** en v7.0.0-alpha (sweep 2026-05-20 : `accessibility-auditor`,
+> **13 agents** en v7.0.0+ (sweep 2026-05-20 : `accessibility-auditor`,
 > `performance-auditor`, `dashboard`, `dev-backend-strict`, `dev-frontend-strict`
-> retirés ; `adversarial-reviewer` ajouté). Tous **autonomes** (jamais de
-> question utilisateur) sauf `elicitor` (dérogation `/feat-deepen`).
+> retirés ; `adversarial-reviewer` ajouté ; `complexity-router` ajouté
+> v7.0.0+ opt-in). Tous **autonomes** (jamais de question utilisateur)
+> sauf `elicitor` (dérogation `/feat-deepen`).
 
 | Agent | Modèle | Rôle | Phase |
 |---|---|---|---|
@@ -116,6 +117,8 @@ Forme rejetée : `gate` (générique) sans qualificatif → toujours préfixer.
 | `qa` | Sonnet 4.6 | Tests + coverage + quality scan | 5 |
 | `elicitor` | Sonnet 4.6 | Élicitation FEAT (Pre-mortem, Red Team, etc.) | 1.5 |
 | `constitutioner` | Sonnet 4.6 | Maintien `constitution.md` post-arch | 4 |
+| `complexity-router` | Haiku 4.5 | Routage POC vs full vs critical (opt-in v7.0.0+) | 0 (pré-pipeline) |
+| `adversarial-reviewer` | Sonnet 4.6 | Avocat du diable post-review (opt-in v7.2.0+) | 5+ |
 | ~~`dashboard`~~ | — | **RETIRÉ v7.0.0** — INDEX.md généré par `index_adrs.py` (déterministe) |
 | ~~`accessibility-auditor`~~ | — | **RETIRÉ v7.0.0** — remplacé par `axe-core` au CI projet |
 | `code-reviewer` | Sonnet 4.6 | Review cross-fichier anti-patterns | 5 |

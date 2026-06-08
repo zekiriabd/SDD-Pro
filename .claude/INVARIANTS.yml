@@ -1,0 +1,249 @@
+# SDD_Pro INVARIANTS Manifest (v7.0.0+, audit P3 E4 2026-06-08)
+#
+# This file lists the load-bearing CONTRACTS of the SDDPro framework :
+# behaviors that MUST be true for the pipeline to function correctly.
+# Each invariant points to its enforcer (hook / script / smoke test).
+#
+# Purpose : prevent doc-theater drift. A framework audit should verify
+# that every entry below has a live enforcer that actually catches the
+# violation. If an enforcer is removed without the invariant being
+# explicitly retired, this manifest fails its own smoke test.
+#
+# Schema :
+#   id            : unique kebab-case identifier
+#   name          : human-readable short title
+#   description   : 1-3 sentences explaining the invariant
+#   severity      : critical | major | minor
+#   enforcers     : list of files (relative to repo root) that enforce
+#                   this invariant at runtime OR catch violations at CI time
+#   bypasses      : env vars / config keys that legitimately disable the
+#                   enforcement (audit-logged, opt-in)
+#   added         : ISO date when invariant was introduced
+#   audit_ref     : audit ticket reference (P0/P1/P2/P3 + identifier)
+#
+# Smoke test : .claude/python/tests/test_invariants_manifest.py verifies
+# that every listed enforcer file exists. Removing an enforcer without
+# updating this manifest = test failure.
+
+schema_version: 1
+generated_at: 2026-06-08
+total: 13
+
+invariants:
+
+  - id: spec-gate-before-quality-batch
+    name: Two-stage auditor — Stage A (spec) before Stage B (code/security/arch)
+    description: |
+      When AuditorBatchMode=two-stage (default v7.0.0+), spec-compliance-reviewer
+      MUST run alone first and produce a non-RED verdict before code-reviewer,
+      security-reviewer, or arch-reviewer can spawn for the same FEAT. Aggregating
+      quality findings on code that fails spec is wasteful.
+    severity: critical
+    enforcers:
+      - .claude/python/sdd_hooks/enforce_two_stage_auditor.py
+      - .claude/python/sdd_scripts/sdd_review.py  # check_spec_gate() in standalone /sdd-review
+      - .claude/python/sdd_scripts/query_console_db.py  # spec-compliance-present predicate
+    bypasses:
+      - "Project Config: AuditorBatchMode: legacy-parallel"
+      - "Env: SDD_BYPASS_TWO_STAGE=1 (one-shot, audit-logged)"
+      - "CLI: /sdd-review --no-spec-gate (standalone only)"
+    added: 2026-06-08
+    audit_ref: P0-C2, P3-B, P3-B.bis
+
+  - id: config-key-known-to-schema
+    name: Project Config keys must be declared in project-config.schema.json
+    description: |
+      Every Project Config key set in stack.md ## Project Config must be either
+      in `properties` of the JSON schema OR explicitly deprecated. Typos
+      (e.g. `RewiewMode` for `ReviewMode`) are caught with WARN [CONFIG_UNKNOWN_KEY]
+      at read time. SDD_CONFIG_STRICT=1 turns the WARN into a hard error.
+    severity: major
+    enforcers:
+      - .claude/python/sdd_lib/layered_config.py  # _warn_unknown_keys()
+      - .claude/templates/project-config.schema.json  # canonical key list
+    bypasses:
+      - "Env: SDD_DISABLE_UNKNOWN_KEY_WARN=1 (silence WARN)"
+      - "Schema additionalProperties: true (tolerate at read, warn separately)"
+    added: 2026-06-08
+    audit_ref: P0-C3, P3-E1
+
+  - id: cli-flags-declared-vs-parsed
+    name: CLI flags in commands/*.md must be parsed by Python OR @llm-only-flag annotated
+    description: |
+      Every --flag declared in a slash command .md must either have a real
+      argparse handler in a Python script under .claude/python/ OR be
+      annotated with @llm-only-flag (or @llm-only-flags-file at file level)
+      to make the LLM-interpretation explicit. Prevents doc-theater flags
+      that nobody actually parses.
+    severity: major
+    enforcers:
+      - .claude/python/tests/test_cli_flags_declared.py
+    bypasses: []
+    added: 2026-06-08
+    audit_ref: P3-E2
+
+  - id: agent-references-must-exist
+    name: Every `Agent: foo` reference must have agents/foo.md OR be retired
+    description: |
+      No phantom agent references in commands/rules/agents/skills. An agent
+      that's renamed or retired must either have the .md still on disk
+      (and be in ALIVE_AGENTS_V7) or be explicitly listed in RETIRED_AGENTS_V7.
+      Catches stale references that would silently fail at runtime.
+    severity: major
+    enforcers:
+      - .claude/python/tests/test_agent_references_integrity.py
+      - .claude/python/tests/test_loader_contract.py
+    bypasses: []
+    added: 2026-06-08
+    audit_ref: P3-E3
+
+  - id: file-ownership-matrix
+    name: One owner per file path under workspace/output/src/
+    description: |
+      The file ownership matrix in .claude/rules/ownership.md §1 declares
+      who owns each path (dev-backend → {BackendName}, dev-frontend → {AppName},
+      arch → {LibName} bootstrap, etc.). audit_file_ownership hook detects
+      violations at SubagentStop.
+    severity: critical
+    enforcers:
+      - .claude/python/sdd_hooks/audit_file_ownership.py
+      - .claude/rules/ownership.md  # canonical matrix
+    bypasses: []
+    added: 2026-05-12
+    audit_ref: ownership-v6.x
+
+  - id: lib-must-be-in-stack-2-4
+    name: No library used by dev-* outside stack §2.4 catalog
+    description: |
+      dev-backend / dev-frontend cannot introduce a library (npm/nuget/pip/maven)
+      not declared in §2.4 of the active stack's .libs.json. STOP + ERROR
+      [STACK_LIBRARY_MISSING] forces Tech Lead arbitration before re-run.
+    severity: critical
+    enforcers:
+      - .claude/python/sdd_scripts/detect_capabilities.py
+      - .claude/rules/library-and-stack.md  # canonical workflow
+    bypasses:
+      - "Built-in language stdlib (BCL, Node natives, Python stdlib, java/kotlin.*)"
+      - "Transitive deps auto-installed by package manager"
+    added: 2026-05-08
+    audit_ref: library-and-stack-v6.x
+
+  - id: cost-cap-per-run
+    name: USD cost per /sdd-full or /dev-run run capped at MaxCostPerRun
+    description: |
+      Cumulative USD cost across all sub-agents for one pipeline run cannot
+      exceed MaxCostPerRun (default $50). Hard-blocks further Agent spawns
+      with [COST_CAP_EXCEEDED]. Bypass requires explicit Tech Lead opt-in.
+    severity: critical
+    enforcers:
+      - .claude/python/sdd_hooks/preflight_cost_cap.py
+    bypasses:
+      - "Env: SDD_DISABLE_COST_CAP=1 (one-shot, audit-logged)"
+      - "Project Config: MaxCostPerRun: 0 (disable cap entirely)"
+    added: 2026-06-05
+    audit_ref: v7.0.0-P0-R1
+
+  - id: build-loop-cost-cap
+    name: USD cost per build_loop iteration cycle on a single US capped
+    description: |
+      Distinct from the per-run cap : if a single US's build_loop exceeds
+      BuildLoopMaxCostUsd (default $15) before BuildLoopMaxIter is reached,
+      STOP fail-fast with [BUILD_LOOP_COST_EXCEEDED]. Detects cost-pathological
+      builds (vs convergence-pathological caught by iter limit).
+    severity: major
+    enforcers:
+      - .claude/python/sdd_hooks/preflight_cost_cap.py  # shared mechanism
+      - .claude/rules/error-classification.md  # taxonomy class definition
+    bypasses:
+      - "Project Config: BuildLoopMaxCostUsd: 0"
+    added: 2026-06-05
+    audit_ref: v7.0.0-P1
+
+  - id: env-bypass-not-settable-mid-session
+    name: SDD_ALLOW_* / SDD_DISABLE_* env vars cannot be set mid-session via Bash
+    description: |
+      An agent (or Bash exec) cannot export SDD_ALLOW_* / SDD_DISABLE_* bypass
+      env vars to weaken hooks at runtime. PreToolUse hook block_env_bypass
+      filters these patterns (export, inline VAR=val, PowerShell $env:, setx).
+      Bypass requires editing settings.local.json (Tech Lead, gitignored).
+    severity: critical
+    enforcers:
+      - .claude/python/sdd_hooks/block_env_bypass.py
+      - .claude/settings.json  # deny patterns
+    bypasses:
+      - "Tech Lead edits .claude/settings.local.json (per-dev override, gitignored)"
+    added: 2026-06-05
+    audit_ref: v7.0.0-P0-security
+
+  - id: feat-hash-consistency
+    name: Parent FEAT hash in US frontmatter must match current FEAT file
+    description: |
+      Each US records the SHA-256 of its parent FEAT at generation time.
+      If the FEAT is modified after US generation, [FEAT_HASH_MISMATCH] is
+      emitted by downstream agents (dev-*, validate_readiness, auditors).
+      Fix : re-run /us-generate {n} (idempotent).
+    severity: major
+    enforcers:
+      - .claude/python/sdd_hooks/resolve_po_hash_sentinel.py
+      - .claude/rules/error-classification.md  # [FEAT_HASH_MISMATCH] §1.2
+    bypasses: []
+    added: 2026-06-05
+    audit_ref: v7.0.0-audit-§6-P1-11
+
+  - id: skills-loaded-at-session-start
+    name: SDDPro context injected at every SessionStart via static banner
+    description: |
+      session_start hook emits a byte-identical banner (cache-friendly v7.0.0+)
+      at startup|resume|clear|compact, declaring 13 commands + 13 agents +
+      pipeline canonique. Prompt cache prefix hit cross-session.
+    severity: minor
+    enforcers:
+      - .claude/python/sdd_hooks/session_start.py
+      - .claude/settings.json  # SessionStart matcher
+    bypasses:
+      - "Env: SDD_DISABLE_SESSION_START=1 (no-op empty context)"
+      - "Env: CI=1 (minimal 1L banner instead of full)"
+    added: 2026-06-08
+    audit_ref: P0-chantier-4, P2-M4
+
+  - id: complexity-routing-deterministic-not-llm
+    name: Complexity routing uses Python script, not LLM agent
+    description: |
+      Pipeline routing (POC vs full vs critical) is computed by deterministic
+      Python script (regex + weighted arithmetic, 0 tokens, < 50ms). The
+      complexity-router agent .md is preserved as rubric documentation only,
+      no longer spawned by any pipeline.
+    severity: minor
+    enforcers:
+      - .claude/python/sdd_scripts/complexity_router.py
+      - .claude/python/sdd_hooks/auto_invoke_complexity_router.py  # PreToolUse Skill
+    bypasses:
+      - "Project Config: ComplexityRouterMode: off | manual (default manual)"
+      - "Env: SDD_DISABLE_AUTO_ROUTER=1"
+      - "Env: SDD_FORCE_PIPELINE=poc|standard|full|critical (debug override)"
+    added: 2026-06-08
+    audit_ref: P1-M2, P3-A, P3-A.bis
+
+  - id: tdd-test-first-no-prod-code-without-failing-test
+    name: RED-GREEN-REFACTOR — NO production code without a failing test first
+    description: |
+      Emprunt direct Superpowers v5.1 (test-driven-development skill). Tout
+      nouveau symbole de production (function/class/method/endpoint) sous
+      `workspace/output/src/` doit avoir un test compagnon écrit AVANT le
+      code. Le hook `enforce_tdd` détecte la création de symboles publics
+      (regex .cs/.ts/.tsx/.py/.kt/.java) et flag si aucun fichier test
+      n'existe sous *.Tests/, __tests__/, tests/, src/test/.
+
+      Refactor (Edit sur code existant sans nouveau symbole) = allowed.
+      Test files themselves = allowed. Framework code (.claude/) = allowed.
+    severity: major
+    enforcers:
+      - .claude/python/sdd_hooks/enforce_tdd.py  # PreToolUse Edit|Write|MultiEdit
+      - .claude/skills/test-driven-development/SKILL.md
+    bypasses:
+      - "Env: SDD_TDD_MODE=off (no enforcement)"
+      - "Env: SDD_TDD_MODE=warn (default interactive : warn, no block)"
+      - "Env: SDD_TDD_MODE=strict (default CI : exit 2 = block)"
+      - "Env: SDD_DISABLE_TDD=1 (one-shot, audit-logged)"
+    added: 2026-06-08
+    audit_ref: P3-TDD (emprunt Superpowers v5.1)

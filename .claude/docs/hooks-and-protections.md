@@ -7,7 +7,7 @@
 
 ---
 
-## 1. Hooks actifs (13)
+## 1. Hooks actifs (16)
 
 Configurés dans `.claude/settings.json` section `hooks`. Tous invoqués via
 le wrapper `python -c "...import _hook; _hook.run('sdd_hooks.X')"` qui
@@ -46,11 +46,11 @@ depuis le cwd.
 | Rôle | Vérifie que les fichiers édités en mode `operation: augment` (cf. plans) respectent leur contrat `preserves:`/`adds:`. Émet `[PRESERVES_VIOLATED]` ou `[ADDS_VIOLATED]` si drift détecté. |
 | Exit codes | 0 = pass, 1 = violation |
 
-### 1.4 `audit_file_ownership` — SubagentStop (12 agents)
+### 1.4 `audit_file_ownership` — SubagentStop (13 agents)
 
 | Champ | Valeur |
 |---|---|
-| Trigger Claude Code | `SubagentStop` matcher `arch\|po\|elicitor\|dev-backend\|dev-frontend\|qa\|code-reviewer\|security-reviewer\|spec-compliance-reviewer\|arch-reviewer\|adversarial-reviewer\|constitutioner` (audit 2026-06-06 : étendu aux 12 agents v7.0.0 — retirés : `dev-*-strict`, `dashboard`, `accessibility-auditor`, `performance-auditor`) |
+| Trigger Claude Code | `SubagentStop` matcher `arch\|po\|elicitor\|dev-backend\|dev-frontend\|qa\|code-reviewer\|security-reviewer\|spec-compliance-reviewer\|arch-reviewer\|adversarial-reviewer\|constitutioner\|complexity-router` (étendu v7.0.0+ : ajout `complexity-router` opt-in ; v7.0.0-alpha avait 12 — retirés : `dev-*-strict`, `dashboard`, `accessibility-auditor`, `performance-auditor`) |
 | Script | [`.claude/python/sdd_hooks/audit_file_ownership.py`](.claude/python/sdd_hooks/audit_file_ownership.py) |
 | LOC | ~150 |
 | Rôle | Vérifie la matrice ownership de `rules/ownership.md §1` (Partie A, ex-file-ownership.md) : un agent dev-backend n'a pas écrit dans `{AppName}/`, un agent QA n'a pas écrit en dehors de `*.Tests/`, etc. Émet `[FILE_OWNERSHIP]` ou `[FILE_OWNERSHIP_NESTED]` si violation. |
@@ -157,6 +157,79 @@ depuis le cwd.
 | Exit codes | 0 = allow (warn ou bypass), 2 = deny (strict + broad) |
 | Audit log | `workspace/output/.sys/.audit/glob-scope.jsonl` |
 | Ajouté | v7.0.0-alpha audit CTO (2026-06-07) — Sprint 4 #18 |
+
+### 1.14 `session_start` — SessionStart startup|resume|clear|compact
+
+| Champ | Valeur |
+|---|---|
+| Trigger Claude Code | `SessionStart` matcher `startup\|resume\|clear\|compact` |
+| Script | [`.claude/python/sdd_hooks/session_start.py`](.claude/python/sdd_hooks/session_start.py) |
+| LOC | ~120 |
+| Rôle | Injecte un banner SDDPro statique (2167 bytes full, 203 bytes CI) au démarrage. Cache-friendly v7.0.0+ : byte-identical cross-session → le prompt cache d'Anthropic hit le prefix complet entre `resume`/`compact`. Détail state projet déporté vers `/sdd-help` / `/sdd-status` à la demande. |
+| Modes | `full` (défaut interactif) ; `minimal` 1L si `CI=1` env var |
+| Bypass | `SDD_DISABLE_SESSION_START=1` (no-op empty context) |
+| Exit codes | 0 toujours (defensive, n'échoue jamais une session) |
+| Ajouté | v7.0.0+ chantier #4 (2026-06-08) — emprunt superpowers v5.1 |
+
+### 1.15 `enforce_two_stage_auditor` — PreToolUse Agent (v7.0.0+)
+
+| Champ | Valeur |
+|---|---|
+| Trigger Claude Code | `PreToolUse` matcher `Agent` |
+| Script | [`.claude/python/sdd_hooks/enforce_two_stage_auditor.py`](.claude/python/sdd_hooks/enforce_two_stage_auditor.py) |
+| LOC | ~180 |
+| Rôle | Bloque les agents `code-reviewer`/`security-reviewer`/`arch-reviewer` (Stage B) tant que `spec-compliance-reviewer` (Stage A) n'a pas produit un verdict fresh < 24h dans `qa_spec_compliance` pour la FEAT. Exit 2 + `[TWO_STAGE_GATE_VIOLATION]` si violation. `spec-compliance-reviewer` lui-même et `adversarial-reviewer` (informational) toujours allowed. |
+| Modes | `two-stage` (défaut) ; `legacy-parallel` (no-op) via Project Config `AuditorBatchMode: legacy-parallel` |
+| Bypass | `SDD_BYPASS_TWO_STAGE=1` (one-shot, audit-loggué) |
+| Exit codes | 0 = allow, 2 = deny (gate violation) |
+| Ajouté | v7.0.0+ audit P3 B + B.bis (2026-06-08) |
+
+### 1.16 `auto_invoke_complexity_router` — PreToolUse Skill (v7.0.0+)
+
+| Champ | Valeur |
+|---|---|
+| Trigger Claude Code | `PreToolUse` matcher `Skill` (filtre commandes `sdd-full`/`sdd-poc`/`dev-run`) |
+| Script | [`.claude/python/sdd_hooks/auto_invoke_complexity_router.py`](.claude/python/sdd_hooks/auto_invoke_complexity_router.py) |
+| LOC | ~180 |
+| Rôle | Si `ComplexityRouterMode: auto` ET pas de rapport routing < 1h fresh, lance `sdd_scripts/complexity_router.py` en subprocess AVANT que le slash command démarre. Outputs sous `workspace/output/.sys/.routing/{n}-complexity.{json,md}`. **Additif uniquement** : ne bloque jamais. |
+| Modes | `auto` (script invoqué) ; `manual` (défaut, no-op) ; `off` (no-op) via Project Config `ComplexityRouterMode` |
+| Bypass | `SDD_DISABLE_AUTO_ROUTER=1` ; `ComplexityRouterMode: off\|manual` |
+| Exit codes | 0 toujours (additive, n'échoue jamais un slash command) |
+| Ajouté | v7.0.0+ audit P3 A + A.bis (2026-06-08) |
+
+---
+
+## 1.bis Tableau de bypass — env vars (v7.0.0+ audit P3 W3 2026-06-08)
+
+Tous les hooks SDDPro supportent un mécanisme de bypass via env var pour les
+cas Tech Lead avancés (debug, force, urgence prod). Chaque bypass est
+**audit-loggué** (sauf indication contraire). À utiliser en connaissance de cause.
+
+| Env var | Effet | Hook concerné | Audit | Quand l'utiliser |
+|---|---|---|---|---|
+| `SDD_CONFIG_STRICT=1` | Schéma validation hard fail au lieu de WARN | `layered_config._warn_unknown_keys` | — | CI/CD : forcer FAIL sur clé inconnue |
+| `SDD_DISABLE_UNKNOWN_KEY_WARN=1` | Silencer les WARN clés inconnues | `layered_config._warn_unknown_keys` | — | Projet legacy avec clés Tech Lead extensions |
+| `SDD_DISABLE_DEPRECATED_CONFIG_WARN=1` | Silencer les WARN clés deprecated | `layered_config._warn_deprecated_keys` | — | Migration v6→v7 en cours |
+| `SDD_BYPASS_TWO_STAGE=1` | Allow Stage B sans Stage A passé | `enforce_two_stage_auditor` | ✓ stderr | Urgence : skip spec gate ponctuellement |
+| `SDD_DISABLE_AUTO_ROUTER=1` | No-op du auto-invoke router | `auto_invoke_complexity_router` | — | Debug : forcer parcours pipeline standard |
+| `SDD_DISABLE_SESSION_START=1` | Banner SDDPro vide à l'init session | `session_start` | — | Tests automatisés, sessions ciblées |
+| `SDD_FORCE_PIPELINE=poc\|standard\|full\|critical` | Override score complexity_router | `complexity_router.py` | — | Tech Lead override décision routing |
+| `SDD_BUDGET_MODE=strict\|warn\|off` | Mode preflight context budget | `preflight_agent_budget` | ✓ ledger | Default strict en CI, warn en dev |
+| `SDD_DISABLE_COST_CAP=1` | Bypass cost cap MaxCostPerRun | `preflight_cost_cap` | ✓ audit log | Urgence : run sans cap (rare) |
+| `SDD_PROTECT_FRAMEWORK_MODE=warn\|strict\|off` | Mode protect framework files | `protect_framework` | ✓ stderr | Édition framework légitime |
+| `SDD_PRE_WRITE_LINT_STRICT=1` | Pre-write lint en strict (exit 2) | `pre_write_lint` | ✓ audit log | CI/CD : forcer lint hard fail |
+| `SDD_DISABLE_PRE_WRITE_LINT=1` | No-op pre-write lint | `pre_write_lint` | — | Debug ponctuel |
+| `SDD_GLOB_SCOPE_STRICT=1` | Glob scope guard en strict | `preflight_glob_scope` | ✓ audit log | CI/CD : forcer scope étroit |
+| `SDD_DISABLE_GLOB_SCOPE=1` | No-op glob scope guard | `preflight_glob_scope` | — | Audit forensique large |
+| `SDD_ALLOW_ACCEPTANCE_BYPASS=1` | Skip acceptance gate (qa) | `validate_acceptance_gate` | ✓ audit log | Debug ponctuel |
+| `SDD_ALLOW_MULTISTACK=1` | Allow multi-backend / multi-fullstack | `validate_stack_consistency` | ✓ audit log | Bench / debug |
+| `SDD_ALLOW_UNTESTED_COMBO=1` | Bypass combo SLA gate | `preflight_stack_combo` | ✓ audit log | Combo expérimental |
+
+> **Règle Tech Lead** : tous les `SDD_ALLOW_*` et `SDD_DISABLE_*` sont
+> **bloqués au runtime** par `block_env_bypass` hook si exportés/inlinés
+> via Bash. Ils doivent venir du **shell parent** (avant le start de
+> Claude Code) ou de `.claude/settings.local.json` (per-dev, gitignored).
+> Cf. §1.6.
 
 ---
 

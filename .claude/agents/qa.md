@@ -133,7 +133,12 @@ Read **uniquement** :
 3. `workspace/input/ui/{n}-*.html` si présent (passif, pour comprendre les comportements UI à tester)
 4. **`workspace/output/src/{BackendName}/CLAUDE.md`** si présent (architecture backend)
 5. **`workspace/output/src/{AppName}/CLAUDE.md`** si présent (architecture frontend)
-6. `workspace/output/db/schema.json` si présent (pour fixtures DB)
+6. **Schema DB pour fixtures** — **Levier 4 v7.0.x** : pour chaque US `{n}-{m}`
+   de la FEAT, préférer `workspace/output/db/schema-slice-{n}-{m}.json` s'il
+   existe (slice par US généré par `python -m sdd_scripts.generate_schema_slice`).
+   Fallback `workspace/output/db/schema.json` (complet) si aucun slice présent.
+   Les slices contiennent les tables référencées par l'US + FK transitive,
+   suffisant pour fixtures in-memory.
 7. **Code production** sous `workspace/output/src/{BackendName}|{AppName}|{LibName}/` :
    lecture sélective des fichiers nommément référencés par les US ciblées
    (services, endpoints, components, validators)

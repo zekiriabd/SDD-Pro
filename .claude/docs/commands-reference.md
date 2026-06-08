@@ -1,6 +1,6 @@
 # 💻 Commands Reference
 
-20 slash commands : **12 user-facing** (the public API) + **8 internes [debug]** (low-level building blocks). Use the user-facing ones in everyday workflow ; the internal ones for debugging or surgical fixes.
+21 slash commands : **13 user-facing** (the public API) + **8 internes [debug]** (low-level building blocks). Use the user-facing ones in everyday workflow ; the internal ones for debugging or surgical fixes.
 
 | Quick legend |
 |---|

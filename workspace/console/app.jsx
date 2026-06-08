@@ -1,41 +1,5 @@
-﻿/* global React, ReactDOM, marked, DOMPurify */
+﻿/* global React, ReactDOM, marked */
 const { useState, useMemo, useEffect, useCallback, Fragment } = React;
-
-// ───────── CSRF (Audit 2026-06-06 — server.js requires X-CSRF-Token on mutating verbs) ─────────
-let _csrfToken = null;
-let _csrfPromise = null;
-
-async function getCsrfToken() {
-  if (_csrfToken) return _csrfToken;
-  if (_csrfPromise) return _csrfPromise;
-  _csrfPromise = (async () => {
-    try {
-      const r = await fetch("/api/csrf", { credentials: "same-origin" });
-      if (!r.ok) throw new Error(`csrf endpoint returned ${r.status}`);
-      const { csrfToken } = await r.json();
-      _csrfToken = csrfToken;
-      return csrfToken;
-    } catch (e) {
-      console.warn("[csrf] failed to fetch token — mutating requests will 403", e);
-      _csrfPromise = null;
-      return null;
-    }
-  })();
-  return _csrfPromise;
-}
-
-// Wrapper around fetch that auto-injects X-CSRF-Token for mutating verbs.
-// Drop-in replacement: `await mutatingFetch(url, { method: "POST", ... })`.
-async function mutatingFetch(url, options = {}) {
-  const token = await getCsrfToken();
-  const headers = { ...(options.headers || {}) };
-  if (token) headers["X-CSRF-Token"] = token;
-  return fetch(url, { ...options, headers, credentials: "same-origin" });
-}
-
-// Pre-fetch the CSRF token at module load so the first user click doesn't pay
-// the round-trip cost. Fire-and-forget.
-getCsrfToken();
 
 // ───────── HELPERS ─────────
 function getNodePath(node) {
@@ -63,10 +27,12 @@ const Icon = {
   book:     () => <svg className="i" viewBox="0 0 16 16"><path d="M3 2.5h6c1 0 1.5.5 1.5 1.5v10c0-1-1-1.5-1.5-1.5H3z"/><path d="M13 2.5H9c-1 0-1.5.5-1.5 1.5v10c0-1 .5-1.5 1.5-1.5h4z"/></svg>,
 };
 
-// Documentation framework retirée de la console 2026-06-06 :
-// la console ne sert plus QUE les stats projets. La doc SDD_Pro elle-même
-// vit dans le site MkDocs Material (build local via `mkdocs serve`).
-// Cf. mkdocs.yml + .claude/docs/README.md.
+// Pages de documentation embarquées dans le SPA (depuis v6.10 — plus d'ouverture dans un onglet).
+// Servies via /api/help/:id (server.js) puis rendues inline via iframe srcdoc.
+const DOC_PAGES = [
+  { id: "fonctionnelle", title: "Fonctionnelle", subtitle: "Vue d ensemble du framework SDD_Pro" },
+  { id: "technique",     title: "Technique",     subtitle: "Architecture, agents, pipeline (v6.0)" },
+];
 
 // ───────── STATUS HELPERS ─────────
 const STATUS_LABELS = {
@@ -118,6 +84,7 @@ function TopBar({ page, setPage, theme, toggleTheme }) {
           onClick={() => setPage("workspace")}>
           Features
         </button>
+        <DocMenu page={page} setPage={setPage}/>
       </nav>
       <div className="tb-actions" style={{alignItems: 'center', marginLeft: 'auto'}}>
         <button
@@ -211,8 +178,80 @@ function ProjectSwitcher({ projects, currentProjectId, setCurrentProjectId, fall
   );
 }
 
-// DocMenu + DocPage retirés 2026-06-06 — console = stats projets uniquement.
-// Doc framework SDD_Pro → site MkDocs Material (cf. mkdocs.yml).
+// ───────── DOC MENU (v6.10 — documentation embarquée inline) ─────────
+function DocMenu({ page, setPage }) {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    const onClick = (e) => {
+      if (!e.target.closest(".doc-dropdown") && !e.target.closest(".doc-trigger")) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [open]);
+
+  const onDocPage = page === "doc-fonctionnelle" || page === "doc-technique";
+
+  return (
+    <div style={{position: 'relative'}}>
+      <button
+        className={`nav-tab doc-trigger ${onDocPage ? "active" : ""}`}
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}>
+        Documentation <span style={{fontSize: 10, marginLeft: 4}}>▾</span>
+      </button>
+      {open && (
+        <div className="doc-dropdown" style={{
+          position: 'absolute', top: '100%', left: 0, marginTop: 6,
+          background: 'var(--panel)', border: '1px solid var(--line)',
+          borderRadius: 8, boxShadow: 'var(--shadow-md)',
+          minWidth: 280, zIndex: 100, overflow: 'hidden'
+        }}>
+          {DOC_PAGES.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => { setPage("doc-" + p.id); setOpen(false); }}
+              style={{
+                display: 'block', width: '100%', textAlign: 'left',
+                padding: '12px 14px', border: 0, background: 'transparent',
+                borderBottom: '1px solid var(--line-2)', cursor: 'pointer',
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = 'var(--panel-2)'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+              <div style={{fontSize: 13, fontWeight: 500, color: 'var(--ink)'}}>{p.title}</div>
+              <div style={{fontSize: 11.5, color: 'var(--ink-3)', marginTop: 2}}>{p.subtitle}</div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ───────── DOC PAGE (HTML inliné, style natif du site, theme-aware) ─────────
+function DocPage({ docId }) {
+  const [body, setBody] = useState(null);
+  const [error, setError] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    setBody(null); setError(null);
+    fetch("/api/help/" + docId)
+      .then((res) => res.ok ? res.json() : Promise.reject(new Error("HTTP " + res.status)))
+      .then((payload) => { if (!cancelled) setBody(payload.body || ""); })
+      .catch((err) => { if (!cancelled) setError(err.message); });
+    return () => { cancelled = true; };
+  }, [docId]);
+
+  if (error) return <div className="doc-content"><div style={{color: "var(--danger)"}}>Erreur : {error}</div></div>;
+  if (body === null) return <div className="doc-content"><div style={{color: "var(--ink-3)"}}>Chargement de la documentation…</div></div>;
+  return (
+    <article className="doc-content">
+      <div dangerouslySetInnerHTML={{ __html: body }}/>
+    </article>
+  );
+}
 
 function HelpModal({ page, onClose }) {
   // Echap pour fermer
@@ -268,7 +307,7 @@ function GateBanner({ gate, onResolve }) {
   const decide = async (decision) => {
     setBusy(true); setError(null);
     try {
-      const res = await mutatingFetch("/api/gate-decide", {
+      const res = await fetch("/api/gate-decide", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ FeatNum: gate.FeatNum, phase: gate.phase, decision }),
@@ -983,13 +1022,8 @@ function ExplainView({ path }) {
   const load = useCallback(async (force = false) => {
     setState({ status: "loading", content: null, meta: null, error: null });
     try {
-      // Security audit 2026-06-06 : POST au lieu de GET (effets de bord :
-      // appel Anthropic payant + envoi contenu).
-      const res = await mutatingFetch("/api/explain", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ path, force }),
-      });
+      const url = `/api/explain?path=${encodeURIComponent(path)}${force ? "&force=1" : ""}`;
+      const res = await fetch(url);
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
       setState({ status: "ok", content: json.content, meta: json, error: null });
@@ -1028,11 +1062,8 @@ function ExplainView({ path }) {
     );
   }
 
-  // marked.parse() suivi de DOMPurify.sanitize (security audit 2026-06-06).
-  // Le contenu vient d'Anthropic API et peut contenir du HTML brut si le LLM est
-  // nudgé par un prompt-injection en amont. Ne JAMAIS injecter sans sanitize.
-  const rawHtml = window.marked ? window.marked.parse(state.content || "", { breaks: false, gfm: true }) : state.content;
-  const html = (typeof DOMPurify !== "undefined") ? DOMPurify.sanitize(rawHtml) : rawHtml;
+  // marked.parse() est synchrone et safe sur du markdown emis par Claude (pas de raw HTML demande)
+  const html = window.marked ? window.marked.parse(state.content || "", { breaks: false, gfm: true }) : state.content;
 
   return (
     <div className="detail-body">
@@ -1083,7 +1114,7 @@ function ActionBar({ node, parents, onValidate }) {
   const submit = useCallback(async (decision, commentText) => {
     setBusy(true); setError(null);
     try {
-      const res = await mutatingFetch("/api/validate", {
+      const res = await fetch("/api/validate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...ctx, decision, comment: commentText }),
@@ -1994,6 +2025,10 @@ function App() {
         theme={theme} toggleTheme={toggleTheme}/>
       {page === "dashboard" ? (
         <DashboardPage projectName={project?.name}/>
+      ) : page === "doc-fonctionnelle" ? (
+        <DocPage docId="fonctionnelle"/>
+      ) : page === "doc-technique" ? (
+        <DocPage docId="technique"/>
       ) : (
         <>
           <FeaturesHeader tree={filteredTree} onRefresh={refresh}/>

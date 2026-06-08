@@ -23,11 +23,15 @@ de superpowers v5.1) :
 - Une approbation `✅ verified` requiert un pointer `file:start-end`
   explicite — sinon c'est `❌ not-found`
 
-**Position dans le pipeline** : intégré au batch parallèle STEP 6.4 de
-`/dev-run` (cf. `commands/dev-run.md §6.4.1`), aux côtés de
-`code-reviewer`, `security-reviewer` (mode `scan`), et `arch-reviewer`
-(si `ArchReviewMode: full`). Skip conditionnel via `phase_planner.py`
-selon `SpecComplianceMode`.
+**Position dans le pipeline** : **Stage A gate** du two-stage auditor de
+`/dev-run` STEP 6.4 (cf. `commands/dev-run.md §6.4.A`). Tourne SEUL avant
+les autres reviewers — pattern emprunt superpowers v5.1. Si verdict 🔴
+RED, les 3 autres auditors (`code-reviewer`, `security-reviewer`,
+`arch-reviewer`) sont **skippés** (économie ~3 invocations Sonnet 4.6).
+Si 🟢/🟡, Stage B (batch parallèle 3 reviewers) tourne après. Skip
+conditionnel via `phase_planner.py` selon `SpecComplianceMode`. Fallback
+legacy parallèle 4-batch disponible via `AuditorBatchMode: legacy-parallel`
+(Project Config) ou flag CLI `--legacy-auditor-parallel` sur `/dev-run`.
 
 **Strictement read-only** sur `workspace/output/src/**` et
 `workspace/output/us/**`. **Ne corrige pas, ne re-Read pas le rapport

@@ -1,0 +1,123 @@
+# Project Stack
+
+## Project Config
+AppName: Demo
+FrontendName: Demo
+FrontendLocalPort: 5186
+BackendName: DemoBack
+BackendLocalPort: 44329
+LibStrategy: openapi-codegen
+PlanReviewDefault: false  # mode café — restaurer à true après la session
+
+# Force prisma capability (auto-derive depuis ## Active Database — DatabaseType: SqlServer).
+# Sans cette ligne, le stack node-react fallback en file-based JSON, ce qui ignore
+# silencieusement les INSERT SqlServer attendus par les FEATs. Cf. stacks/fullstack/node-react.md §6.
+Capabilities: prisma
+
+# QAMode: full obligatoire pour ROI PoC (mesure coverage exigée critère §5.2)
+QAMode: full
+CoverageMin: 80
+MaxParallel: 2
+
+# Caps fail-fast conservateurs pour bench reproductible
+MaxCostPerRun: 30
+BuildLoopMaxCostUsd: 10
+BuildLoopMaxIter: 2
+
+# Sélectivité audits — focus verdicts bloquants
+CodeReviewFailOn: serious
+SecurityFailOn: critical
+SpecComplianceFailOn: critical
+ArchReviewFailOn: serious
+
+# Granularité US — cible 3 US (FEAT M = 3 US par design)
+UsGranularityTarget: 3
+
+# Audits actifs (ROI exige scan sécurité réel)
+SecurityScanEnabled: true
+CodeReviewMode: full
+SecurityMode: full
+SpecComplianceMode: full
+ArchReviewMode: manual
+A11yMode: "off"
+PerfMode: "off"
+
+# v6.10.5 backward-compat (no-op v7.0.0)
+PlanCacheStrict: true
+
+## Active Architecture Pattern
+# - .claude/stacks/archi/mvc.md
+# - .claude/stacks/archi/ddd.md
+# - .claude/stacks/archi/microservice.md
+
+
+## Active Tech Specs
+# Bench FEAT 4 Calc-Web-UI-Vue (2026-06-06) : Vue 3 + Vite consommant Kotlin backend :44329 (existant ou bench standalone).
+
+# - .claude/stacks/mobiles/maui.md
+- .claude/stacks/mobiles/react-native.md
+# - .claude/stacks/mobiles/kotlin-android.md
+
+# - .claude/stacks/frontend/vue.md
+# - .claude/stacks/frontend/react.md
+# - .claude/stacks/frontend/blazor-webassembly.md
+
+# - .claude/stacks/backend/dotnet-minimalapi.md
+# - .claude/stacks/backend/kotlin-spring-boot.md
+# - .claude/stacks/backend/node-express.md
+# - .claude/stacks/backend/python-fastapi.md
+
+ - .claude/stacks/fullstack/node-react.md
+# - .claude/stacks/fullstack/next.md
+# - .claude/stacks/fullstack/nuxt.md
+# - .claude/stacks/fullstack/angular-universal.md
+# - .claude/stacks/fullstack/blazor-server.md
+# - .claude/stacks/fullstack/kotlin-mustache.md
+
+## Active UI Specs
+ - .claude/stacks/ui/shadcn.md
+# - .claude/stacks/ui/vuetify.md
+# - .claude/stacks/ui/radzen-blazor.md
+
+## Active QA Specs
+# - .claude/stacks/qa/dotnet-xunit.md
+# - .claude/stacks/qa/node-vitest.md
+# - .claude/stacks/qa/code-quality.md
+# - .claude/stacks/qa/blazor-bunit.md
+# - .claude/stacks/qa/kotlin-junit.md
+# - .claude/stacks/qa/python-pytest.md
+# - .claude/stacks/qa/angular-jasmine.md
+
+## Active Auth Specs
+# 1 seul profil auth actif (azure-ad et auth-local mutuellement exclusifs).
+- .claude/stacks/auth/auth-local.md
+ - AUTH_JWT_AUDIENCE:Demo
+ - AUTH_JWT_EXPIRATION:4
+ - AUTH_JWT_ISSUER:DemoBack
+ - AUTH_JWT_SECRET:DemoSuperSecretKey@2024!XYZ789AbcDef012345678
+
+# Azure AD (mêmes vars que CMSPrint, set côté machine)
+# - .claude/stacks/auth/azure-ad.md
+# - AZ_TENANTID: ${AZ_TENANTID}
+# - AZ_CLIENTID: ${AZ_CLIENTID}
+# - AZ_DOMAIN: ${AZ_DOMAIN}
+# - AZ_AUDIENCES: ${AZ_AUDIENCES}
+# - AZ_BE_CALLBACKPATH: ${AZ_BE_CALLBACKPATH}
+# - AZ_FE_CALLBACKPATH: ${AZ_FE_CALLBACKPATH}
+
+## Active Database
+ - DatabaseType: SqlServer
+ - DB_HOST: ${DB_HOST}
+ - DB_NAME: ${DB_NAME}
+ - DB_PASSWORD: ${DB_PASSWORD}
+ - DB_PORT: ${DB_PORT}
+ - DB_USER: ${DB_USER}
+
+## Active SMTP Server
+ - SMTP_HOST: ${SMTP_HOST}
+ - SMTP_PORT: ${SMTP_PORT}
+ - SMTP_USER: ${SMTP_USER}
+ - SMTP_PASSWORD: ${SMTP_PASSWORD}
+ - SMTP_FROM: ${SMTP_FROM}
+ - SMTP_FROM_NAME: ${SMTP_FROM_NAME}
+ - SMTP_USE_STARTTLS: ${SMTP_USE_STARTTLS}

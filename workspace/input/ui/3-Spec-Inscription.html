@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Demo — Inscription</title>
+<link rel="stylesheet" href="design-system.css">
+<style>
+  .app{flex:1;display:flex;flex-direction:column;background:var(--nj-cream);overflow:hidden}
+  .auth-hero{position:relative;height:120px;background:radial-gradient(120% 120% at 0% 0%,oklch(0.78 0.13 45),transparent 55%),linear-gradient(155deg,var(--nj-coral-500),var(--nj-coral-600));overflow:hidden;flex-shrink:0}
+  .auth-hero::before,.auth-hero::after{content:'';position:absolute;border-radius:999px;background:rgba(255,255,255,.10)}
+  .auth-hero::before{width:200px;height:200px;top:-80px;right:-60px}
+  .auth-hero::after{width:130px;height:130px;bottom:-50px;left:-30px;background:rgba(255,255,255,.08)}
+  .auth-logo{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;z-index:2}
+  .auth-logo__mark{width:42px;height:42px;border-radius:14px;background:rgba(255,255,255,.18);backdrop-filter:blur(8px);display:grid;place-items:center;margin-bottom:8px}
+  .auth-logo__name{font-size:20px;font-weight:800;letter-spacing:-0.02em}
+  .form{flex:1;overflow-y:auto;padding:24px 24px;display:flex;flex-direction:column;gap:16px}
+  .form>*{flex-shrink:0}
+  .form__head h2{font-size:22px;font-weight:800;color:var(--nj-ink-900);letter-spacing:-0.015em;margin:0}
+  .form__head p{margin:4px 0 0;font-size:13px;color:var(--nj-ink-500);line-height:1.5}
+  .field{display:flex;flex-direction:column;gap:6px}
+  .field label{font-size:12px;font-weight:600;color:var(--nj-ink-700)}
+  .input{display:flex;align-items:center;background:var(--nj-surface);border:1.5px solid var(--nj-line);border-radius:14px;padding:0 14px}
+  .input--filled{border-color:var(--nj-coral-300)}
+  .input svg.lead{color:var(--nj-ink-400);flex-shrink:0}
+  .input input{flex:1;border:0;outline:0;background:transparent;height:48px;padding:0 10px;font-family:inherit;font-size:15px;color:var(--nj-ink-900)}
+  .input__action{border:0;background:transparent;color:var(--nj-ink-500);cursor:pointer;padding:6px;border-radius:8px}
+  .row-2{display:grid;grid-template-columns:1fr;gap:12px} /* mobile-first : 1 champ par ligne */
+  .pw-strength{display:flex;gap:4px;height:4px;margin-top:6px}
+  .pw-strength span{flex:1;background:var(--nj-line);border-radius:999px}
+  .pw-strength span.on{background:var(--nj-coral-500)}
+  .pw-strength__label{margin-top:6px;font-family:var(--nj-font-mono);font-size:11px;color:var(--nj-coral-600);letter-spacing:.05em}
+  .pw-hint{display:grid;grid-template-columns:1fr 1fr;gap:6px 10px;font-size:11.5px;color:var(--nj-ink-500);margin-top:2px}
+  .pw-hint span{display:inline-flex;align-items:center;gap:6px}
+  .pw-hint .dot{width:6px;height:6px;border-radius:999px;background:var(--nj-line)}
+  .pw-hint .ok .dot{background:var(--nj-success)}
+  .pw-hint .ok{color:var(--nj-sage-700);font-weight:600}
+  .check{display:flex;gap:10px;align-items:flex-start;font-size:13px;color:var(--nj-ink-700);cursor:pointer;line-height:1.45}
+  .check input{display:none}
+  .check__box{width:20px;height:20px;border-radius:6px;border:1.5px solid var(--nj-line);flex-shrink:0;display:grid;place-items:center;background:var(--nj-surface);margin-top:1px}
+  .check input:checked+.check__box{background:var(--nj-coral-500);border-color:var(--nj-coral-500)}
+  .check input:checked+.check__box::after{content:'';width:10px;height:6px;border-left:2px solid #fff;border-bottom:2px solid #fff;transform:rotate(-45deg) translate(1px,-1px)}
+  .check a{color:var(--nj-coral-600);font-weight:600;text-decoration:none}
+  .btn-primary{height:52px;border-radius:14px;background:var(--nj-coral-500);color:#fff;border:0;font-family:inherit;font-weight:700;font-size:15px;cursor:pointer;box-shadow:var(--nj-shadow-brand);display:inline-flex;align-items:center;justify-content:center;gap:8px;margin-top:4px}
+  .form__foot{text-align:center;font-size:13px;color:var(--nj-ink-500);padding-top:4px}
+  .form__foot a{color:var(--nj-coral-600);font-weight:700;text-decoration:none;margin-left:4px}
+  .home-indicator{height:8px;display:flex;justify-content:center;align-items:flex-start;flex-shrink:0;background:var(--nj-surface)}
+  .home-indicator::after{content:'';width:134px;height:5px;background:var(--nj-ink-900);border-radius:999px;opacity:.92}
+</style>
+</head>
+<body>
+<div class="nj-stage">
+  <div class="nj-phone">
+    <div class="nj-phone__notch"></div>
+    <div class="nj-phone__screen">
+      <div class="nj-statusbar"><span>9:41</span><span class="nj-statusbar__icons">
+        <svg width="17" height="11" viewBox="0 0 17 11" fill="currentColor"><rect x="0" y="7" width="3" height="4" rx="0.5"/><rect x="4.5" y="5" width="3" height="6" rx="0.5"/><rect x="9" y="3" width="3" height="8" rx="0.5"/><rect x="13.5" y="0" width="3" height="11" rx="0.5"/></svg>
+        <svg width="15" height="11" viewBox="0 0 15 11" fill="currentColor"><path d="M7.5 0C4.6 0 1.9 1 0 2.7l1.4 1.5C2.9 2.8 5.1 1.9 7.5 1.9s4.6.9 6.1 2.3L15 2.7C13.1 1 10.4 0 7.5 0zm0 3.7c-2 0-3.7.7-5.1 1.9l1.4 1.4c1-.9 2.3-1.4 3.7-1.4s2.7.5 3.7 1.4L12.6 5.6C11.2 4.4 9.5 3.7 7.5 3.7zm0 3.7c-1.1 0-2 .4-2.7 1l2.7 2.6 2.7-2.6c-.7-.6-1.6-1-2.7-1z"/></svg>
+        <svg width="25" height="11" viewBox="0 0 25 11" fill="none"><rect x="0.5" y="0.5" width="21" height="10" rx="2.5" stroke="currentColor" opacity="0.5"/><rect x="2" y="2" width="18" height="7" rx="1.5" fill="currentColor"/><rect x="22.5" y="3.5" width="1.5" height="4" rx="0.5" fill="currentColor" opacity="0.5"/></svg>
+      </span></div>
+      <div class="app" data-screen-label="04 Inscription">
+        <div class="auth-hero">
+          <div class="auth-logo">
+            <div class="auth-logo__mark"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z"/></svg></div>
+            <div class="auth-logo__name">Demo</div>
+          </div>
+        </div>
+        <div class="form">
+          <div class="form__head"><h2>Créer mon compte</h2><p>Rejoignez Demo — gardez vos petits suivis en un clin d'œil.</p></div>
+            <div class="field">
+            <div class="input input--filled">
+              <svg class="lead" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+              <input type="email" value="marie.dupont@gmail.com" placeholder="Email">
+            </div>
+          </div>
+          <div class="field">
+            <div class="input input--filled">
+              <svg class="lead" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+              <input type="tel" value="06 12 34 56 78" placeholder="Téléphone">
+            </div>
+          </div>
+          <div class="field">
+            <div class="input input--filled">
+              <svg class="lead" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <input type="password" value="••••••••••" placeholder="Mot de passe">
+              <button class="input__action"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+            </div>
+      <div class="field">
+            <div class="input input--filled">
+              <svg class="lead" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+              <input type="password" value="••••••••••" placeholder="Confirmer le mot de passe">
+            </div>
+          </div>
+            <div class="pw-hint">
+              <span class="ok"><span class="dot"></span>8 caractères min.</span>
+              <span class="ok"><span class="dot"></span>1 majuscule</span>
+              <span class="ok"><span class="dot"></span>1 chiffre</span>
+              <span><span class="dot"></span>1 caractère spécial</span>
+            </div>
+          </div>
+    
+          <label class="check"><input type="checkbox" checked><span class="check__box"></span><span>J'accepte les <a href="#">conditions générales</a> et la politique de confidentialité.</span></label>
+          <button class="btn-primary">Créer mon compte</button>
+          <div class="form__foot">Déjà un compte ?<a href="03-connexion.html">Se connecter</a></div>
+        </div>
+        <div class="home-indicator"></div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

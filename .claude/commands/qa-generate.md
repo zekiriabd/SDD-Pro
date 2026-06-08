@@ -1,5 +1,7 @@
 # /qa-generate — Tests unitaires + Coverage + Quality scan
 
+<!-- @llm-only-flags-file : tous les flags CLI de cette commande slash sont interprétés par Claude. -->
+
 Délègue à l'agent `qa` (Sonnet 4.6) pour générer les tests unitaires
 (backend + frontend) d'une FEAT, exécuter le coverage parsing
 (Python, 0 token) et le quality scan sonar-like (Python, 0 token).
@@ -170,6 +172,33 @@ section §4 du rapport (STEP 9).
 
 **Non-bloquant** : un linter qui échoue produit un WARNING dans le
 rapport.
+
+---
+
+## STEP 5.5 — Schema slices per US (Levier 4 v7.0.x, audit 2026-06-08)
+
+Skip si mode = `quality-only` (l'agent qa ne tourne pas).
+
+Pour chaque US `{n}-{m}-{Name}` de la FEAT, générer un slice du schema
+DB restreint aux tables référencées par l'US (+ FK transitive).
+L'agent `qa` consomme les slices en priorité pour ses fixtures
+in-memory (cf. `loader.yml` qa.reads + `agents/qa.md` §STEP 3.6) et
+fallback automatiquement sur le schema complet si aucun slice présent.
+
+```
+for {n}-{m}-{Name} in US_LIST :
+    python -m sdd_scripts.generate_schema_slice \
+        --us-path workspace/output/us/{n}-{m}-{Name}.md
+```
+
+| Exit | Sens | Action `/qa-generate` |
+|---|---|---|
+| `0` | slice écrit `workspace/output/db/schema-slice-{n}-{m}.json` | continue STEP 6 |
+| `2` | CORRECTIBLE — pas de schema OU US ne référence aucune entité | continue STEP 6 (qa fallback) |
+| `1` | FAIL_FAST — US introuvable ou basename invalide | STOP + ERROR (problème US, pas slice) |
+| `3` | INFRA_BLOCKED — disk write failure | WARN, continue STEP 6 (qa fallback) |
+
+Aucune ligne chat émise (déterministe, 0 token LLM, ~50 ms par US).
 
 ---
 

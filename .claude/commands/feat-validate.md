@@ -122,10 +122,11 @@ Capturer `stdout` (= section §2 du rapport readiness) et `exit_code`
 
 ### Mode opt-in d'escalation (futur v6.2)
 
-`SemanticValidationMode: hybrid` (futur) déclenchera un agent
-`validator-lite` (Haiku 4.5) **uniquement** si ≥ N WARN sémantiques, pour
+`SemanticValidationMode: hybrid` (futur, non spécifié) pourrait déclencher
+un sub-agent léger Haiku 4.5 **uniquement** si ≥ N WARN sémantiques, pour
 distinguer les faux positifs des vraies ambiguïtés. Aujourd'hui (v6.1) :
-mode `deterministic` exclusivement, 0 token.
+mode `deterministic` exclusivement, 0 token. Nom et spec exacte du futur
+sub-agent non figés — pas encore créé sur disque.
 
 ---
 

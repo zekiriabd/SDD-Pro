@@ -1,5 +1,7 @@
 # /sdd-full — Pipeline complet de A à Z pour 1 FEAT
 
+<!-- @llm-only-flags-file : tous les flags CLI de cette commande slash sont interprétés par Claude. -->
+
 Enchaîne **toutes les phases** du pipeline SDD pour la FEAT `{n}` :
 
 ```

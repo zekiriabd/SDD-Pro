@@ -25,7 +25,11 @@ vert), produire un rapport de review ciblé sur ce que le build ne catch pas :
 
 **Strictement read-only** sur `workspace/output/src/**`. Ne corrige pas —
 émet un rapport, Tech Lead arbitre. Position : entre `/dev-run` STEP 6.c
-et 6.5. Auto-invoke en STEP 6.4 batch (v6.3.1.1+).
+et 6.5. Auto-invoke en **Stage B** du two-stage auditor (v7.0.0+, cf.
+`commands/dev-run.md §6.4.B`) — tourne en parallèle avec `security-reviewer`
+et `arch-reviewer` (si `ArchReviewMode: full`), **après** que la gate
+Stage A `spec-compliance-reviewer` ait passé 🟢/🟡. Si spec gate RED, cet
+agent est skippé (économie tokens — le code va être réécrit).
 
 **Token footprint cible** : 8-15 KB / feature 3-5 US.
 **Anti-pattern strict** : ne PAS dupliquer `quality_scan.py` (TODO,

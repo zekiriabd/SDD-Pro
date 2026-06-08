@@ -592,9 +592,11 @@ def create_workspace_skeleton(dry_run: bool) -> None:
         REPO_ROOT / "workspace" / "input" / "feats",
         REPO_ROOT / "workspace" / "input" / "ui",
         REPO_ROOT / "workspace" / "input" / "assets",
+        REPO_ROOT / "workspace" / "input" / "discovery",  # v7.0.0+ Phase 0 templates (PRFAQ, Product Brief)
         REPO_ROOT / "workspace" / "output" / ".sys" / ".audit",
         REPO_ROOT / "workspace" / "output" / ".sys" / ".cache",
         REPO_ROOT / "workspace" / "output" / ".sys" / ".context" / "adrs",
+        REPO_ROOT / "workspace" / "output" / ".sys" / ".routing",  # v7.0.0+ complexity-router output
         REPO_ROOT / "workspace" / "output" / ".sys" / ".state",
         REPO_ROOT / "workspace" / "output" / ".sys" / ".validation",
         REPO_ROOT / "workspace" / "output" / "src",

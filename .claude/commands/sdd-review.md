@@ -1,5 +1,8 @@
 # /sdd-review — Audit qualité consolidé par FEAT (style Sonar)
 
+<!-- @llm-only-flags-file : la plupart des flags CLI de cette commande slash sont interprétés par Claude. Exception : `--no-spec-gate` ET `--feat-number/--skip-scans/--ensure-scans/--fail-on/--json/--adversarial` (selon contexte) sont parsés par sdd_review.py argparse. Le test smoke vérifie l'union (Python OR @llm-only). -->
+
+
 **Phase A — rapport seul, 0 auto-fix.** Re-run du scan déterministe
 [`quality_scan.py`](.claude/python/sdd_scripts/quality_scan.py), agrégation
 des findings de tous les auditeurs déjà persistés dans
@@ -28,6 +31,7 @@ STEP 3.0. Cf. `agents/arch-reviewer.md`.
 /sdd-review {n} --fail-on critical    # override seuil (info|minor|moderate|serious|critical)
 /sdd-review {n} --json                # sortie JSON pour CI/tooling
 /sdd-review {n} --adversarial         # v7.2.0 R1 : avocat du diable post-agrégation (informational, jamais bloquant)
+/sdd-review {n} --no-spec-gate        # v7.0.0+ : skip Stage A spec-compliance gate (legacy comportement parallèle)
 ```
 
 `--ensure-scans` (v7.0.0, codex audit follow-up) : exige que toutes les
@@ -95,6 +99,66 @@ Si `ArchReviewMode: full` → spawn agent `arch-reviewer` au STEP 3.5 ci-dessous
 
 Si `AdversarialReviewMode: full` OU flag CLI `--adversarial` → spawn agent
 `adversarial-reviewer` au STEP 6 (post-agrégation, opt-in, jamais bloquant).
+
+---
+
+## STEP 3.0.bis — `spec-compliance-reviewer` (gate two-stage)
+
+**Pattern v7.0.0+ (two-stage, emprunt superpowers)** : avant d'agréger les
+findings code/security/arch, vérifier que la spec est respectée. Si le code
+n'implémente pas les ACs, agréger des findings code/security/arch est
+prématuré (le code sera réécrit, les findings deviennent obsolètes).
+
+Vérification rapide avant spawn (lecture déterministe DB) :
+
+```bash
+python .claude/python/sdd_scripts/query_console_db.py spec-compliance-present \
+  --feat {n} [--max-age-hours 24]
+# exit 0 = entrée FRAÎCHE présente (< 24h, défaut) → SKIP fallback
+# exit 1 = aucune entrée fraîche → spawn fallback ci-dessous
+```
+
+Si exit 1 (aucune entrée spec-compliance fraîche dans `qa_spec_compliance`),
+spawner l'agent en fallback :
+
+```
+Agent: spec-compliance-reviewer
+  prompt: "Audit FEAT {n} — verification AC-by-AC (cf. agents/spec-compliance-reviewer.md). Mode gate two-stage. FailOn={SpecComplianceFailOn}"
+```
+
+Lecture du verdict produit (`{n}-spec-compliance.json` → `summary.verdict`) :
+
+| Verdict spec | Action |
+|---|---|
+| 🟢 GREEN | → STEP 3.0 (arch-reviewer) + STEP 3 (aggregator) |
+| 🟡 WARN | → STEP 3.0 + STEP 3 + propager warning verdict consolidé |
+| 🔴 RED | STOP early — bloc 3.0.bis.STOP (économie : pas d'agrégation inutile) |
+
+### STEP 3.0.bis.STOP — Format STOP sur spec RED
+
+```
+🔴 /sdd-review {n} — spec-compliance gate RED ({NV} ACs non vérifiées)
+
+Verdict spec-compliance : 🔴 RED ({V}/{T} ACs verified)
+Rapport : workspace/output/.sys/.validation/{n}-spec-compliance.md
+
+⊘ arch-reviewer + agrégation code/security/quality : skipped (gate failed)
+   Rationale : agréger des findings sur du code qui ne respecte pas la spec
+   produit un rapport trompeur. Corriger d'abord la spec.
+
+Débloquer :
+  1. Lire {n}-spec-compliance.md §Findings (ACs not_verified + suggestions)
+  2. Corriger (/dev-{backend|frontend} {n}-{m} ou édit manuel)
+  3. Relancer /sdd-review {n} (idempotent : re-run gate puis agrégation)
+
+Bypass : `--no-spec-gate` (rapport agrégat même si spec RED — déconseillé)
+ou baisser SpecComplianceFailOn en Project Config.
+```
+
+**Skip légitime** :
+- `SpecComplianceMode: off` Project Config → skip gate, continuer
+- Flag CLI `--no-spec-gate` → skip gate (audit-loggué)
+- `phases.spec_compliance.enabled == false` (FEAT sans AC testable strict)
 
 ---
 

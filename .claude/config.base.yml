@@ -123,6 +123,22 @@ ReviewFailOnSddFull: true             # v7.0.0 : false → true (blocking)
 ArchReviewMode: manual                # full | manual | off (Sonnet 4.6 cost-aware)
 ArchReviewFailOn: serious
 
+# --- Two-stage auditor pattern (v7.0.0+ emprunt superpowers) ---
+# `two-stage` (default v7.0.0+) : spec-compliance gate (Stage A) tourne
+# SEUL avant les 3 autres reviewers (Stage B parallèle). Si Stage A RED,
+# Stage B est skippé → économie ~3 invocations Sonnet par run.
+# `legacy-parallel` : v6.x — 4 reviewers parallèles dans 1 batch (rétro-compat).
+# Bypass CLI : `--legacy-auditor-parallel` sur /dev-run.
+AuditorBatchMode: two-stage           # two-stage | legacy-parallel
+
+# --- Complexity router (v7.0.0+ emprunt BMad scale-adaptive) ---
+# v7.0.0+ (audit P1 M2 2026-06-08) : agent LLM remplacé par le script
+# déterministe `sdd_scripts/complexity_router.py` (0 token, < 50 ms).
+# `manual` (default) : invocation explicite via `python -m sdd_scripts.complexity_router`.
+# `auto` : /sdd-full STEP 0 invoque le script automatiquement avant cadrage.
+# `off` : routing jamais calculé (recommandation = /sdd-full par défaut).
+ComplexityRouterMode: manual          # off | manual | auto
+
 # --- QA failover within /sdd-full (v7.0.0 audit §6.9 — asymmetry fix) ---
 # Historically, /qa-generate verdict RED was BLOCKING when run standalone
 # but only WARN when invoked from /sdd-full STEP 4.5 (asymmetric gate).

@@ -30,8 +30,8 @@ from sdd_lib.paths import repo_root  # noqa: E402
 
 pytestmark = pytest.mark.smoke
 
-#: 12 alive agents per CLAUDE.md §4. Static — must stay in sync with
-#: agents/*.md and framework_smoke.EXPECTED_AGENTS.
+#: 12 alive agents per CLAUDE.md §4 (v7.0.0+ post-cleanup C2 2026-06-08).
+#: Static — must stay in sync with agents/*.md and framework_smoke.EXPECTED_AGENTS.
 ALIVE_AGENTS_V7 = frozenset({
     "po", "arch", "dev-backend", "dev-frontend",
     "elicitor", "qa", "constitutioner",
@@ -40,9 +40,19 @@ ALIVE_AGENTS_V7 = frozenset({
     "adversarial-reviewer",
 })
 
+#: Documentation-only agents : .md exists on disk as a rubric/spec reference
+#: but the agent is NEVER spawned by any pipeline. Replaced by a deterministic
+#: Python script. Distinct from RETIRED (which deletes the .md from disk).
+#:
+#: Audit C2 cleanup (2026-06-08) : complexity-router's LLM agent was retired
+#: per audit P1 M2 ; the .md stays as the canonical spec of the scoring rubric
+#: that `sdd_scripts/complexity_router.py` implements verbatim.
+DOC_ONLY_AGENTS_V7 = frozenset({
+    "complexity-router",
+})
+
 #: Agents retired in v7.0.0 — must NOT be in loader.yml as active entries
-#: (they may appear in commented "Removed agents" archive section). Listed
-#: here so we can grep for them and ensure their prompt files are absent.
+#: AND must NOT have a .md file on disk. Distinct from DOC_ONLY (kept as spec).
 RETIRED_AGENTS_V7 = frozenset({
     "dashboard",
     "accessibility-auditor", "performance-auditor",
@@ -108,11 +118,21 @@ class TestLoaderNoOrphanPromptFiles(unittest.TestCase):
         on_disk = {p.stem for p in agents_dir.glob("*.md")}
         orphans = [name for name in on_disk
                    if name not in ALIVE_AGENTS_V7
+                   and name not in DOC_ONLY_AGENTS_V7
                    and name not in RETIRED_AGENTS_V7
                    and not parse_agent_section(name, "reads")]
         self.assertFalse(
             orphans,
             f"prompt files without loader.yml entry: {orphans}",
+        )
+
+    def test_doc_only_agents_not_in_alive(self):
+        """A doc-only agent must not also be in ALIVE_AGENTS_V7 (mutually exclusive)."""
+        overlap = ALIVE_AGENTS_V7 & DOC_ONLY_AGENTS_V7
+        self.assertFalse(
+            overlap,
+            f"agents listed in both ALIVE and DOC_ONLY: {overlap}. "
+            f"Decide: spawnable agent OR documentation-only rubric — not both.",
         )
 
 

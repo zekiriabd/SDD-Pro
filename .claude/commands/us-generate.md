@@ -1,5 +1,7 @@
 # /us-generate — Découpe une FEAT en User Stories
 
+<!-- @llm-only-flags-file : tous les flags CLI de cette commande slash sont interprétés par Claude. -->
+
 > ⚠️ **Commande interne v7.0.0** — invoquée par `/sdd-full` STEP 2.
 > Utilisateur final : préférer `/sdd-full` ou `/dev-run` (gèrent pré-conditions, idempotence, état).
 

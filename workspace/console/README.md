@@ -27,29 +27,17 @@ node server.js
 
 ```
 workspace/console/
-├── index.html              # entry point (charge React + babel + marked + dompurify + app.jsx)
+├── index.html              # entry point (charge React + data-loader + app)
 ├── styles.css              # design system (OKLCH palette, Inter + JetBrains Mono)
-├── app.jsx                 # composants React (compilés au runtime par Babel standalone)
+├── app.jsx                 # composants React (compilés au runtime par Babel)
 ├── data-loader.js          # fetch /api/tree au boot
-├── server.js               # Fastify 5 + ~15 endpoints (CORS + HTTPS dev opt-in)
+├── server.js               # Fastify + 4 endpoints
 ├── lib/
-│   ├── markdown-filter.js  # parsers SDD_Pro (FEAT / US / plan)
-│   ├── console-db.js       # SQLite WAL helper (read-only paths)
-│   ├── atomic-write.js     # status.json atomic update + lock partagé Python
-│   └── explain.js          # IA reformulation PO-friendly (Anthropic SDK, opt-in)
-├── help/                   # docs HTML rendues par /api/help/*
-├── tests/
-│   └── structure.smoke.test.js  # smoke npm test (composants + endpoints)
-├── .cache/                 # cache disque .cache/explained/ (content-addressed)
-├── .certs/                 # HTTPS dev keypair (gitignored — npm run gen-cert)
-├── node_modules/           # deps locales (vendor routes pour React/marked/dompurify)
+│   └── markdown-filter.js  # parsers SDD_Pro (FEAT / US / plan)
 ├── status.json             # source de vérité statuts humains (créé par init_status_json.py)
 ├── package.json
 └── README.md
 ```
-
-Vendor libs servies depuis `node_modules` via route `/vendor/:name` :
-React 18.3.1, ReactDOM, Babel standalone, marked 14.1.4, DOMPurify 3.2.4.
 
 ## Endpoints API
 
@@ -67,6 +55,7 @@ Tous les endpoints "stats" (audit, state, dashboard, feat, gates) lisent **exclu
 | `GET`  | `/api/gates?feat=N`      | Historique gates pour 1 FEAT | `console.db` |
 | `GET`  | `/api/audit`             | Budget tokens / coût par agent | `console.db` (tables `context_budget` + `token_usage`) |
 | `GET`  | `/api/state`             | Dernier run `/sdd-full` + 30 derniers events | `console.db` (tables `runs` + `run_phases` + `events`) |
+| `GET`  | `/api/help/:id`          | Page de documentation inline | `workspace/console/help/` |
 | `GET`  | `/api/explain`           | Reformulation IA PO-friendly (cache disque content-addressed) | Anthropic API |
 | `POST` | `/api/validate`          | Valider/refuser un item (atomic write + lock + broadcast SSE) | `status.json` |
 | `POST` | `/api/gate-decide`       | Résout un gate manuel (atomic + broadcast SSE) | `status.json` |

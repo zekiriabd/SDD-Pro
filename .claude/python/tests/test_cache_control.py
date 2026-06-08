@@ -18,9 +18,11 @@ if str(_PY_ROOT) not in sys.path:
 from sdd_lib.cache_control import (  # noqa: E402
     AgentCacheManifest,
     CachedRead,
+    OrderingViolation,
     cache_breakpoints_for,
     parse_loader_annotations,
     report,
+    validate_ordering,
 )
 
 pytestmark = pytest.mark.smoke
@@ -115,6 +117,87 @@ class TestCacheControlParser(unittest.TestCase):
         self.assertIn("stable=", text)
         self.assertIn("semi=", text)
         self.assertIn("volatile=", text)
+
+
+class TestValidateOrdering(unittest.TestCase):
+    """Verify that loader.yml declares cache_layer in source order
+    stable → semi → volatile for every agent.
+
+    Distinct from test_cache_breakpoints_ordering: that one walks
+    the reconstructed manifest (which always re-sorts via all_reads()),
+    so it cannot detect drift in the source file. This suite reads
+    loader.yml line by line.
+    """
+
+    def test_loader_yml_ordering_clean(self):
+        violations = validate_ordering()
+        if violations:
+            msg_lines = ["cache_layer ordering violations in loader.yml:"]
+            for agent, items in sorted(violations.items()):
+                msg_lines.append(f"  {agent}: {len(items)} violation(s)")
+                for v in items:
+                    msg_lines.append(f"    - {v}")
+            self.fail("\n".join(msg_lines))
+
+    def test_ordering_violation_str(self):
+        v = OrderingViolation(
+            agent="dev-backend",
+            line_num=42,
+            path="workspace/input/stack/stack.md",
+            layer="stable",
+            previous_path="workspace/output/us/{n}-{m}-*.md",
+            previous_layer="volatile",
+        )
+        s = str(v)
+        self.assertIn("dev-backend", s)
+        self.assertIn("line 42", s)
+        self.assertIn("stable", s)
+        self.assertIn("volatile", s)
+
+
+class TestInlineQuotedPathRegression(unittest.TestCase):
+    """Audit 2026-06-08 — regression test for the `_INLINE_READ_RE` bug.
+
+    Before the fix, quoted paths containing `{` and `}`
+    (e.g. "workspace/output/us/{n}-{m}-*.md") were silently dropped
+    because the regex's path class `[^,\"}\\s]+` stopped at the first `}`.
+    Result: dev-backend's 3 volatile reads (US, HTML mockup, back plan)
+    were missing from the cache manifest.
+    """
+
+    def test_dev_backend_volatile_reads_parsed_with_curly_braces(self):
+        manifests = parse_loader_annotations()
+        self.assertIn("dev-backend", manifests)
+        volatile_paths = [r.path for r in manifests["dev-backend"].volatile]
+        self.assertIn("workspace/output/us/{n}-{m}-*.md", volatile_paths)
+        self.assertIn("workspace/input/ui/{n}-{m}-*.html", volatile_paths)
+        self.assertIn("workspace/output/plans/{n}-{m}-*.back.md", volatile_paths)
+
+    def test_quoted_path_with_braces_in_synthetic_loader(self):
+        """Inline regression: parse a minimal synthetic loader.yml in-memory."""
+        import tempfile
+        synthetic = """
+version: "test"
+updated: "2026-06-08"
+
+fake-agent:
+  reads:
+    - { path: "workspace/output/us/{n}-{m}-*.md", cache_layer: volatile }
+    - { path: ".claude/stacks/{cat}/{active}.md", cache_layer: stable }
+    - { path: workspace/output/db/schema.json, cache_layer: semi }
+"""
+        with tempfile.TemporaryDirectory() as td:
+            loader = Path(td) / "loader.yml"
+            loader.write_text(synthetic, encoding="utf-8")
+            manifests = parse_loader_annotations(loader)
+            self.assertIn("fake-agent", manifests)
+            m = manifests["fake-agent"]
+            volatile_paths = [r.path for r in m.volatile]
+            stable_paths = [r.path for r in m.stable]
+            semi_paths = [r.path for r in m.semi]
+            self.assertEqual(volatile_paths, ["workspace/output/us/{n}-{m}-*.md"])
+            self.assertEqual(stable_paths, [".claude/stacks/{cat}/{active}.md"])
+            self.assertEqual(semi_paths, ["workspace/output/db/schema.json"])
 
 
 class TestManifestDataclass(unittest.TestCase):

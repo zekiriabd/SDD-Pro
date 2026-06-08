@@ -1,0 +1,744 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Demo — Liste des bébés</title>
+<link rel="stylesheet" href="design-system.css">
+<style>
+  /* ============================================================
+     Screen 02 · Liste des bébés
+     Same shell as menu (topbar + tabbar) — list as content
+     ============================================================ */
+  .app {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: var(--nj-cream);
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* ---- top bar (shared) ---- */
+  .topbar {
+    height: var(--nj-topbar-h);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 0 18px;
+    background: var(--nj-surface);
+    border-bottom: 1px solid var(--nj-line-soft);
+    z-index: 5;
+  }
+  .topbar__menu {
+    width: 40px; height: 40px;
+    border-radius: 999px;
+    background: var(--nj-coral-500);
+    color: white;
+    border: 0;
+    display: grid; place-items: center;
+    box-shadow: var(--nj-shadow-brand);
+    cursor: pointer;
+  }
+  .topbar__title {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--nj-ink-900);
+  }
+  .topbar__title em { font-style: normal; color: var(--nj-coral-500); }
+  .topbar__spacer { flex: 1; }
+  .topbar__icon {
+    width: 38px; height: 38px;
+    border-radius: 999px;
+    background: var(--nj-coral-50);
+    color: var(--nj-coral-700);
+    border: 0;
+    display: grid; place-items: center;
+    cursor: pointer;
+  }
+
+  /* ---- page header ---- */
+  .page-head {
+    padding: 16px 20px 0;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+  }
+  .page-head h1 {
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: var(--nj-ink-900);
+    margin: 0;
+    line-height: 1.1;
+  }
+  .page-head__sub {
+    font-size: 13px;
+    color: var(--nj-ink-500);
+    margin: 4px 0 0;
+  }
+  .page-head__count {
+    background: var(--nj-coral-50);
+    color: var(--nj-coral-700);
+    font-weight: 700;
+    font-size: 13px;
+    padding: 6px 12px;
+    border-radius: 999px;
+  }
+
+  /* ---- filter chips ---- */
+  .filters {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 16px 20px 4px;
+    scrollbar-width: none;
+  }
+  .filters::-webkit-scrollbar { display: none; }
+  .filter {
+    flex-shrink: 0;
+    padding: 8px 14px;
+    border-radius: 999px;
+    border: 1px solid var(--nj-line);
+    background: var(--nj-surface);
+    color: var(--nj-ink-700);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .filter--active {
+    background: var(--nj-ink-900);
+    color: white;
+    border-color: var(--nj-ink-900);
+  }
+  .filter__count {
+    background: rgba(255,255,255,0.18);
+    padding: 1px 7px;
+    border-radius: 999px;
+    font-size: 11px;
+  }
+  .filter:not(.filter--active) .filter__count {
+    background: var(--nj-coral-50);
+    color: var(--nj-coral-700);
+  }
+
+  /* ---- list ---- */
+  .list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 14px 20px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .baby-card {
+    background: var(--nj-surface);
+    border: 1px solid var(--nj-line-soft);
+    border-radius: var(--nj-radius-xl);
+    padding: 14px;
+    box-shadow: var(--nj-shadow-xs);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    position: relative;
+    cursor: pointer;
+    transition: box-shadow var(--nj-dur-fast), transform var(--nj-dur-fast);
+  }
+  .baby-card:active { transform: scale(0.99); }
+  .baby-card:hover { box-shadow: var(--nj-shadow-sm); }
+
+  .baby-card__top {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .baby-card__avatar {
+    width: 64px; height: 64px;
+    border-radius: 999px;
+    overflow: hidden;
+    position: relative;
+    flex-shrink: 0;
+    background: linear-gradient(140deg, var(--nj-coral-100), var(--nj-butter-100));
+    box-shadow: 0 2px 8px rgba(40,20,10,0.08), inset 0 0 0 2px #fff;
+  }
+  .baby-card__avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .baby-card__avatar::after {
+    /* small status dot */
+    content: '';
+    position: absolute;
+    bottom: -2px; right: -2px;
+    width: 16px; height: 16px;
+    border-radius: 999px;
+    border: 3px solid var(--nj-surface);
+    background: var(--nj-success);
+  }
+  .baby-card__avatar--absent::after { background: var(--nj-ink-300); }
+  .baby-card__avatar--late::after { background: var(--nj-warning); }
+
+  /* gradient placeholders by hue */
+  .av-1 { background: linear-gradient(140deg, oklch(0.85 0.08 35), oklch(0.70 0.13 30)); }
+  .av-2 { background: linear-gradient(140deg, oklch(0.86 0.07 90), oklch(0.74 0.12 70)); }
+  .av-3 { background: linear-gradient(140deg, oklch(0.86 0.07 165), oklch(0.70 0.10 175)); }
+  .av-4 { background: linear-gradient(140deg, oklch(0.85 0.07 230), oklch(0.70 0.10 245)); }
+
+  .baby-card__id { flex: 1; min-width: 0; }
+  .baby-card__name {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--nj-ink-900);
+    letter-spacing: -0.01em;
+    line-height: 1.2;
+  }
+  .baby-card__meta {
+    margin-top: 4px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    font-size: 12px;
+    color: var(--nj-ink-500);
+  }
+  .baby-card__meta span { display: inline-flex; align-items: center; gap: 4px; }
+  .baby-card__meta strong { color: var(--nj-ink-700); font-weight: 600; }
+
+  .baby-card__chev {
+    width: 32px; height: 32px;
+    border-radius: 999px;
+    background: var(--nj-coral-50);
+    color: var(--nj-coral-600);
+    display: grid; place-items: center;
+    flex-shrink: 0;
+  }
+
+  /* ---- attendance box (Arrivée / Départ) ---- */
+  .attendance {
+    background: var(--nj-cream);
+    border: 1px solid var(--nj-line-soft);
+    border-radius: 14px;
+    padding: 11px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+  }
+  .attendance__row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .attendance__label {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    font-size: 13.5px;
+    font-weight: 500;
+    color: var(--nj-ink-700);
+  }
+  .attendance__dot {
+    width: 8px; height: 8px;
+    border-radius: 999px;
+    background: var(--nj-success);
+    flex-shrink: 0;
+  }
+  .attendance__dot--pending { background: var(--nj-ink-300); }
+  .attendance__time {
+    font-family: var(--nj-font-mono);
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    color: var(--nj-ink-900);
+  }
+  .attendance__time--empty { color: var(--nj-ink-300); }
+
+  /* ---- status badge ---- */
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: 8px;
+    padding: 3px 9px 3px 7px;
+    border-radius: 999px;
+    font-size: 10.5px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    vertical-align: middle;
+  }
+  .status-badge--pending {
+    background: var(--nj-butter-100);
+    color: oklch(0.50 0.10 80);
+  }
+
+  /* ---- pending card (contrat en attente — état désaturé "en sommeil") ---- */
+  .baby-card--pending {
+    cursor: default;
+    background: oklch(0.972 0.003 255);
+    border-color: oklch(0.90 0.004 255);
+    box-shadow: none;
+  }
+  .baby-card--pending:hover { box-shadow: none; }
+  .baby-card--pending:active { transform: none; }
+  .baby-card--pending .baby-card__avatar img { filter: grayscale(1); opacity: 0.78; }
+  .baby-card--pending .baby-card__avatar::after { display: none; }
+  .baby-card--pending .baby-card__avatar { box-shadow: inset 0 0 0 2px #fff, 0 1px 4px rgba(40,40,50,0.08); }
+  .baby-card--pending .baby-card__name { color: oklch(0.52 0.006 255); }
+  .baby-card--pending .baby-card__meta { color: oklch(0.62 0.005 255); }
+  .baby-card__chev--off {
+    width: 32px; height: 32px;
+    border-radius: 999px;
+    background: oklch(0.93 0.004 255);
+    color: oklch(0.55 0.006 255);
+    display: grid; place-items: center;
+    flex-shrink: 0;
+  }
+  /* (!) info tip — neutre, cohérent avec la carte */
+  .baby-card__info-tip {
+    position: relative;
+    cursor: help;
+    outline: none;
+  }
+  .baby-card__info-tip::after {
+    content: attr(data-tip);
+    position: absolute;
+    top: 50%; right: calc(100% + 10px);
+    transform: translateY(-50%) scale(0.92);
+    transform-origin: right center;
+    background: var(--nj-ink-900);
+    color: #fff;
+    font-size: 11.5px; font-weight: 700;
+    letter-spacing: 0.01em;
+    padding: 6px 10px;
+    border-radius: 8px;
+    white-space: nowrap;
+    opacity: 0; pointer-events: none;
+    transition: opacity var(--nj-dur-fast), transform var(--nj-dur-fast);
+    box-shadow: var(--nj-shadow-sm);
+    z-index: 8;
+  }
+  .baby-card__info-tip::before {
+    content: '';
+    position: absolute;
+    top: 50%; right: calc(100% + 4px);
+    transform: translateY(-50%);
+    border: 5px solid transparent;
+    border-left-color: var(--nj-ink-900);
+    opacity: 0; pointer-events: none;
+    transition: opacity var(--nj-dur-fast);
+    z-index: 8;
+  }
+  .baby-card__info-tip:hover::after,
+  .baby-card__info-tip:focus::after { opacity: 1; transform: translateY(-50%) scale(1); }
+  .baby-card__info-tip:hover::before,
+  .baby-card__info-tip:focus::before { opacity: 1; }
+  .baby-card__pending-row { color: oklch(0.60 0.005 255); }
+  .baby-card__pending-row svg { color: oklch(0.66 0.005 255); flex-shrink: 0; }
+  .baby-card__pending-row strong { color: oklch(0.50 0.006 255); }
+  .baby-card--pending .icon-btn[disabled] {
+    background: oklch(0.94 0.004 255);
+    border-color: oklch(0.94 0.004 255);
+    color: oklch(0.68 0.006 255);
+    box-shadow: none;
+    cursor: not-allowed;
+  }
+
+  /* card bottom — stack of info rows + actions */
+  .baby-card__bottom {
+    display: flex;
+    align-items: stretch;
+    gap: 10px;
+    padding-top: 12px;
+    border-top: 1px dashed var(--nj-line);
+  }
+  .baby-card__info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    justify-content: center;
+  }
+  .baby-card__row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--nj-ink-500);
+    min-width: 0;
+  }
+  .baby-card__row > svg { flex-shrink: 0; }
+  .baby-card__row span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+    flex: 1;
+  }
+  .baby-card__row strong { color: var(--nj-ink-700); font-weight: 600; }
+
+  /* RDV row — same style as report row, no background */
+  .baby-card__rdv { color: var(--nj-ink-500); }
+  .baby-card__rdv > svg { color: var(--nj-lavender-500); flex-shrink: 0; }
+  .baby-card__rdv .time { color: var(--nj-ink-700); font-weight: 600; }
+
+  /* Report row colors */
+  .baby-card__report svg { color: var(--nj-sage-500); }
+  .baby-card__report--pending svg { color: var(--nj-warning); }
+  .baby-card__report--none svg { color: var(--nj-ink-400); }
+
+  .icon-btn {
+    width: 38px; height: 38px;
+    border-radius: 12px;
+    border: 1px solid var(--nj-line);
+    background: var(--nj-surface);
+    color: var(--nj-ink-700);
+    display: grid; place-items: center;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .icon-btn--call {
+    background: var(--nj-coral-500);
+    border-color: var(--nj-coral-500);
+    color: white;
+    box-shadow: 0 6px 14px oklch(0.715 0.135 35 / 0.30);
+  }
+  .icon-btn--report {
+    background: var(--nj-sage-50);
+    border-color: var(--nj-sage-100);
+    color: var(--nj-sage-700);
+  }
+
+  /* action buttons group */
+  .baby-card__actions { display: flex; gap: 8px; align-self: center; }
+
+  /* check-in (vert) → check-out (rouge) toggle */
+  .icon-btn--checkin {
+    background: var(--nj-sage-500);
+    border-color: var(--nj-sage-500);
+    color: #fff;
+    box-shadow: 0 6px 14px oklch(0.72 0.13 160 / 0.30);
+    transition: background var(--nj-dur-fast), box-shadow var(--nj-dur-fast);
+  }
+  .icon-btn--checkin.is-in {
+    background: var(--nj-danger);
+    border-color: var(--nj-danger);
+    box-shadow: 0 6px 14px oklch(0.62 0.20 25 / 0.32);
+  }
+  .icon-btn--checkin .ic-out { display: none; }
+  .icon-btn--checkin.is-in .ic-in { display: none; }
+  .icon-btn--checkin.is-in .ic-out { display: block; }
+
+  /* cadenas (rose) — clôturer la garde du jour */
+  .icon-btn--lock {
+    background: var(--nj-coral-100);
+    border-color: var(--nj-coral-100);
+    color: var(--nj-coral-700);
+  }
+
+  /* FAB ajouter un enfant */
+  .fab {
+    position: absolute;
+    right: 18px;
+    bottom: calc(var(--nj-tabbar-h) + 18px);
+    width: 56px; height: 56px;
+    border-radius: 999px;
+    background: var(--nj-coral-500);
+    color: #fff;
+    border: 0;
+    display: grid; place-items: center;
+    cursor: pointer;
+    z-index: 6;
+    box-shadow: 0 8px 24px oklch(0.715 0.135 35 / 0.45), 0 2px 6px rgba(40,20,10,0.18);
+    transition: transform var(--nj-dur-fast);
+  }
+  .fab:active { transform: scale(0.93); }
+  .fab svg { width: 24px; height: 24px; }
+
+  /* ---- bottom tab bar (shared) ---- */
+  .tabbar {
+    height: var(--nj-tabbar-h);
+    flex-shrink: 0;
+    background: var(--nj-surface);
+    border-top: 1px solid var(--nj-line-soft);
+    display: flex;
+    padding: 0 8px;
+  }
+  .tab {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    color: var(--nj-ink-500);
+    font-size: 11px;
+    font-weight: 600;
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    position: relative;
+    padding-top: 8px;
+  }
+  .tab .icon { width: 22px; height: 22px; }
+  .tab--active { color: var(--nj-coral-600); }
+  .tab--active::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    width: 32px; height: 3px;
+    background: var(--nj-coral-500);
+    border-radius: 0 0 999px 999px;
+  }
+  .home-indicator {
+    height: 8px;
+    display: flex; justify-content: center; align-items: flex-start;
+    flex-shrink: 0;
+    background: var(--nj-surface);
+  }
+  .home-indicator::after {
+    content: '';
+    width: 134px; height: 5px;
+    background: var(--nj-ink-900);
+    border-radius: 999px;
+    opacity: 0.92;
+  }
+
+  /* caption beside the phone */
+  .caption {
+    position: absolute;
+    left: calc(50% + 240px);
+    top: 50%;
+    transform: translateY(-50%);
+    max-width: 280px;
+    color: var(--nj-ink-700);
+  }
+  .caption .eyebrow {
+    font-family: var(--nj-font-mono);
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--nj-coral-600);
+  }
+  .caption h2 {
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin: 8px 0 12px;
+    color: var(--nj-ink-900);
+    line-height: 1.1;
+  }
+  .caption p {
+    font-size: 14px; line-height: 1.55;
+    color: var(--nj-ink-500); margin: 0 0 18px;
+  }
+  .caption ul { list-style: none; padding: 0; margin: 0;
+    display: flex; flex-direction: column; gap: 10px; }
+  .caption li {
+    display: flex; gap: 10px; align-items: flex-start;
+    font-size: 13px; color: var(--nj-ink-700);
+  }
+  .caption li::before {
+    content: '';
+    width: 6px; height: 6px; border-radius: 999px;
+    background: var(--nj-coral-500);
+    flex-shrink: 0; margin-top: 7px;
+  }
+  @media (max-width: 1024px) { .caption { display: none; } }
+</style>
+</head>
+<body>
+
+<div class="nj-stage">
+  <div class="nj-phone">
+    <div class="nj-phone__notch"></div>
+    <div class="nj-phone__screen">
+
+      <!-- iOS status bar -->
+      <div class="nj-statusbar">
+        <span>9:41</span>
+        <span class="nj-statusbar__icons">
+          <svg width="17" height="11" viewBox="0 0 17 11" fill="currentColor"><rect x="0" y="7" width="3" height="4" rx="0.5"/><rect x="4.5" y="5" width="3" height="6" rx="0.5"/><rect x="9" y="3" width="3" height="8" rx="0.5"/><rect x="13.5" y="0" width="3" height="11" rx="0.5"/></svg>
+          <svg width="15" height="11" viewBox="0 0 15 11" fill="currentColor"><path d="M7.5 0C4.6 0 1.9 1 0 2.7l1.4 1.5C2.9 2.8 5.1 1.9 7.5 1.9s4.6.9 6.1 2.3L15 2.7C13.1 1 10.4 0 7.5 0zm0 3.7c-2 0-3.7.7-5.1 1.9l1.4 1.4c1-.9 2.3-1.4 3.7-1.4s2.7.5 3.7 1.4L12.6 5.6C11.2 4.4 9.5 3.7 7.5 3.7zm0 3.7c-1.1 0-2 .4-2.7 1l2.7 2.6 2.7-2.6c-.7-.6-1.6-1-2.7-1z"/></svg>
+          <svg width="25" height="11" viewBox="0 0 25 11" fill="none"><rect x="0.5" y="0.5" width="21" height="10" rx="2.5" stroke="currentColor" opacity="0.5"/><rect x="2" y="2" width="18" height="7" rx="1.5" fill="currentColor"/><rect x="22.5" y="3.5" width="1.5" height="4" rx="0.5" fill="currentColor" opacity="0.5"/></svg>
+        </span>
+      </div>
+
+      <div class="app" data-screen-label="02 Liste des bebes">
+
+        <!-- top bar -->
+        <div class="topbar">
+          <button class="topbar__menu" aria-label="Menu">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+          </button>
+          <div class="topbar__title">Nounou<em>Job</em></div>
+          <div class="topbar__spacer"></div>
+        </div>
+
+        <!-- présents count notification -->
+        <div class="page-head">
+          <span class="page-head__count">2 / 3 présents</span>
+        </div>
+
+        <!-- list -->
+        <div class="list">
+
+          <!-- card 1 — Lina, présente, RDV vaccin à 15:00, rapport envoyé -->
+          <article class="baby-card">
+            <div class="baby-card__top">
+              <div class="baby-card__avatar av-1"><img src="assets/baby-lina.png" alt="Lina"></div>
+              <div class="baby-card__id">
+                <div class="baby-card__name">Lina Bouchet</div>
+                <div class="baby-card__meta">
+                  <span>née le 12 / 03 / 24</span>
+                </div>
+              </div>
+              <a class="baby-card__chev" href="09-fiche-enfant.html" aria-label="Voir la fiche"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></a>
+            </div>
+            <div class="attendance">
+              <div class="attendance__row"><span class="attendance__label"><span class="attendance__dot"></span>Arrivée</span><span class="attendance__time">08:42</span></div>
+              <div class="attendance__row"><span class="attendance__label"><span class="attendance__dot"></span>Départ</span><span class="attendance__time">17:30</span></div>
+            </div>
+            <div class="baby-card__bottom">
+              <div class="baby-card__info">
+                <div class="baby-card__row baby-card__rdv">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                  <span>Vaccination 12 mois… <span class="time">(15:00)</span></span>
+                </div>
+                <div class="baby-card__row baby-card__report">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                  <span>Rapport <strong>du jour</strong> envoyé</span>
+                </div>
+              </div>
+              <div class="baby-card__actions">
+                <button class="icon-btn icon-btn--checkin" data-checkin aria-label="Pointer l'arrivée">
+                  <svg class="ic-in" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+                  <svg class="ic-out" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                </button>
+                <button class="icon-btn icon-btn--call" aria-label="Appeler les parents">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                </button>
+              </div>
+            </div>
+          </article>
+
+          <!-- card 2 — Tom, présent, pas de RDV, rapport à compléter -->
+          <article class="baby-card">
+            <div class="baby-card__top">
+              <div class="baby-card__avatar av-2"><img src="assets/baby-tom.png" alt="Tom"></div>
+              <div class="baby-card__id">
+                <div class="baby-card__name">Tom Lefèvre</div>
+                <div class="baby-card__meta">
+                  <span>né le 04 / 09 / 24</span>
+                </div>
+              </div>
+              <a class="baby-card__chev" href="09-fiche-enfant.html" aria-label="Voir la fiche"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></a>
+            </div>
+            <div class="attendance">
+              <div class="attendance__row"><span class="attendance__label"><span class="attendance__dot"></span>Arrivée</span><span class="attendance__time">09:05</span></div>
+              <div class="attendance__row"><span class="attendance__label"><span class="attendance__dot"></span>Départ</span><span class="attendance__time">16:00</span></div>
+            </div>
+            <div class="baby-card__bottom">
+              <div class="baby-card__info">
+                <div class="baby-card__row baby-card__report baby-card__report--pending">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                  <span>Rapport <strong>à compléter</strong></span>
+                </div>
+              </div>
+              <div class="baby-card__actions">
+                <button class="icon-btn icon-btn--checkin" data-checkin aria-label="Pointer l'arrivée">
+                  <svg class="ic-in" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+                  <svg class="ic-out" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                </button>
+                <button class="icon-btn icon-btn--call" aria-label="Appeler les parents">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                </button>
+              </div>
+            </div>
+          </article>
+
+          <!-- card 3 — Noé, contrat EN ATTENTE (signé, accueil pas encore commencé) -->
+          <article class="baby-card baby-card--pending" aria-disabled="true">
+            <div class="baby-card__top">
+              <div class="baby-card__avatar av-3"><img src="assets/baby-noe.png" alt="Noé"></div>
+              <div class="baby-card__id">
+                <div class="baby-card__name">
+                  Noé Marin
+                </div>
+                <div class="baby-card__meta">
+                  <span>né le 07 / 07 / 23</span>
+                </div>
+              </div>
+            </div>
+            <div class="baby-card__bottom">
+              <div class="baby-card__info">
+                <div class="baby-card__row baby-card__pending-row">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                  <span>Accueil prévu le <strong>16 juin 2025</strong></span>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <!-- (FAB ajouter un enfant ci-dessous) -->
+
+        </div>
+
+        <!-- FAB ajouter un enfant -->
+        <button class="fab" aria-label="Ajouter un enfant">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </button>
+
+        <!-- tab bar -->
+        <nav class="tabbar">
+          <button class="tab tab--active">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/></svg>
+            <span>Accueil</span>
+          </button>
+          <button class="tab">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            <span>Contacts</span>
+          </button>
+          <button class="tab">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            <span>Déconnexion</span>
+          </button>
+        </nav>
+
+        <div class="home-indicator"></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+  // Pointage arrivée / départ : vert (pointer l'arrivée) → rouge (présent, marquer le départ)
+  const checkins = document.querySelectorAll('[data-checkin]');
+  // Lina (0) et Tom (1) sont déjà arrivés → rouge ; Noé (2) pas de garde → vert
+  [0, 1].forEach(i => {
+    if (checkins[i]) {
+      checkins[i].classList.add('is-in');
+      checkins[i].setAttribute('aria-label', 'Marquer le départ (rentré chez lui)');
+    }
+  });
+  checkins.forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const arrived = btn.classList.toggle('is-in');
+      btn.setAttribute('aria-label', arrived ? 'Marquer le départ (rentré chez lui)' : "Pointer l'arrivée");
+    });
+  });
+</script>
+
+</body>
+</html>

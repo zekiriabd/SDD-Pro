@@ -288,6 +288,46 @@ def query_arch_review_present(feat: int, max_age_hours: int = 24) -> dict:
     }
 
 
+def query_spec_compliance_present(feat: int, max_age_hours: int = 24) -> dict:
+    """Predicate query : are there FRESH spec-compliance findings persisted for this FEAT ?
+
+    v7.0.0+ (two-stage auditor pattern, superpowers v5.1) : used by
+    `/sdd-review §3.0.bis` and `/dev-run §6.4.A` to decide whether to
+    spawn `spec-compliance-reviewer` as Stage A gate. When the invocation
+    arrives downstream of a recent run, the agent has already run and
+    findings exist — fallback is skipped.
+
+    TTL filter (default 24h) via `max_age_hours`. Stale findings (e.g.
+    code changed since last run) are ignored → fallback re-runs the agent.
+    Override via CLI flag `--max-age-hours N` (0 = disable TTL).
+
+    Predicate semantics : main() returns exit 0 when ≥ 1 fresh row exists
+    in `qa_spec_compliance` for this FEAT, exit 1 otherwise. The JSON
+    payload (always emitted on stdout) carries count + max_age_hours.
+    """
+    with connect_ro() as conn:
+        if max_age_hours and max_age_hours > 0:
+            row = conn.execute(
+                "SELECT COUNT(*) FROM qa_spec_compliance "
+                "WHERE feat_n = ? "
+                f"AND extracted_at > datetime('now', '-{int(max_age_hours)} hours')",
+                (feat,),
+            ).fetchone()
+        else:
+            row = conn.execute(
+                "SELECT COUNT(*) FROM qa_spec_compliance WHERE feat_n = ?",
+                (feat,),
+            ).fetchone()
+    count = int(row[0]) if row else 0
+    return {
+        "present":   count > 0,
+        "feat":      feat,
+        "count":     count,
+        "max_age_hours": max_age_hours,
+        "_exit_code": 0 if count > 0 else 1,
+    }
+
+
 def query_review(feat: int) -> dict:
     """Read latest /sdd-review run for FEAT (table validation_reports, type='review')."""
     with connect_ro() as conn:
@@ -329,7 +369,8 @@ DISPATCH = {
     "spec":                  query_spec,
     "security":              query_security,
     "review":                query_review,
-    "arch-review-present":   query_arch_review_present,  # v7.0.0-alpha audit CRIT-4
+    "arch-review-present":         query_arch_review_present,    # v7.0.0-alpha audit CRIT-4
+    "spec-compliance-present":     query_spec_compliance_present, # v7.0.0+ two-stage gate
     "run-latest":            query_run_latest,
     "feat-stats":            query_feat_stats,
 }
@@ -337,7 +378,7 @@ DISPATCH = {
 # Predicate-style subcommands : main() propagates `_exit_code` from the
 # payload so callers can use the script as a shell predicate (exit 0 = yes,
 # exit 1 = no), in addition to consuming the JSON on stdout.
-_PREDICATE_SUBCOMMANDS = {"arch-review-present"}
+_PREDICATE_SUBCOMMANDS = {"arch-review-present", "spec-compliance-present"}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -360,6 +401,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.subcommand == "arch-review-present":
             result = query_arch_review_present(args.feat, max_age_hours=args.max_age_hours)
+        elif args.subcommand == "spec-compliance-present":
+            result = query_spec_compliance_present(args.feat, max_age_hours=args.max_age_hours)
         else:
             result = DISPATCH[args.subcommand](args.feat)
     except FileNotFoundError as exc:
