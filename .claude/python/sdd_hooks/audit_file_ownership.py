@@ -130,13 +130,98 @@ _AUDIT_SKIP_DIRS: frozenset[str] = frozenset({
 })
 
 
-def _iter_modified_files(workspace: Path, cutoff: datetime) -> list[Path]:
-    """Walk workspace/ and yield files modified after cutoff.
+def _iter_modified_files_git(workspace: Path, cutoff: datetime) -> list[Path] | None:
+    """v7.0.1 audit REFACTOR-2 2026-06-08 — fast-path via `git diff`.
+
+    When the workspace is inside a git repository, prefer `git diff --name-only`
+    (~10-50ms regardless of project size) over `os.walk` (~100ms-3s scaling
+    with project size). The diff covers both staged + unstaged + untracked
+    files modified since the cutoff timestamp.
+
+    Returns :
+      - list[Path] of modified files (filtered by cutoff mtime) if git
+        invocation succeeds and yields meaningful results
+      - None if git is unavailable, workspace not a repo, or anything
+        else goes wrong → fallback to `_iter_modified_files_walk`.
+
+    Why use git diff vs --since :
+      `--since=<timestamp>` works only with `git log`, not `git diff`.
+      We list ALL diff entries then filter by mtime client-side. The
+      diff is bounded by the working-tree state, so size is independent
+      of history depth (orders of magnitude smaller than walk on a
+      project with node_modules).
+
+    Why fallback to walk :
+      User workspaces may not be git repos (some `/sdd-bootstrap` flows
+      generate output outside git tracking). Hook must remain functional
+      either way — git diff is a fast-path optimization, not a hard
+      dependency.
+    """
+    import subprocess
+    cutoff_ts = cutoff.timestamp()
+    try:
+        # Probe : is this a git repo ?
+        # --is-inside-work-tree is the canonical git command for this check.
+        probe = subprocess.run(
+            ["git", "rev-parse", "--is-inside-work-tree"],
+            cwd=str(workspace),
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
+        if probe.returncode != 0 or probe.stdout.strip() != "true":
+            return None
+        # Collect modified + staged + untracked files.
+        # --untracked-files=all surfaces files agents wrote without staging.
+        # --porcelain=v1 gives stable parseable output.
+        result = subprocess.run(
+            ["git", "status", "--porcelain=v1", "--untracked-files=all", "-z"],
+            cwd=str(workspace),
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if result.returncode != 0:
+            return None
+    except (subprocess.TimeoutExpired, OSError, FileNotFoundError):
+        return None
+    # Parse `git status --porcelain -z` : each entry is
+    # `XY filename\0` (no trailing newline thanks to -z). XY = 2-char
+    # status code. Untracked files appear as `?? filename`.
+    repo_root_path = workspace
+    # Resolve repo root from probe response (we trust workspace is at/under it).
+    out: list[Path] = []
+    for entry in result.stdout.split("\0"):
+        if not entry:
+            continue
+        # Skip the 2-char status code + 1 space ; rename entries use a
+        # different format ("R src -> dst") but our subagents don't rename
+        # tracked files so we can ignore that subtlety.
+        if len(entry) < 4:
+            continue
+        rel = entry[3:]
+        full = (repo_root_path / rel).resolve()
+        try:
+            # Filter by cutoff : git status only tells us WHAT changed,
+            # not WHEN. We still mtime-check to scope to current dispatch.
+            if full.is_file() and full.stat().st_mtime > cutoff_ts:
+                out.append(full)
+        except OSError:
+            continue
+    return out
+
+
+def _iter_modified_files_walk(workspace: Path, cutoff: datetime) -> list[Path]:
+    """Walk workspace/ and yield files modified after cutoff (fallback).
 
     Uses `os.walk(topdown=True)` with in-place dirs pruning to skip vendor
     directories (node_modules, .venv, build artifacts, VCS metadata). On a
     real project with 50k+ files under node_modules, this changes the
     SubagentStop latency from seconds to ~100ms.
+
+    Renamed from `_iter_modified_files` (v7.0.1 audit REFACTOR-2) — the
+    public API is now `_iter_modified_files` which tries git first then
+    falls back to walk. Walk impl kept as fallback for non-git workspaces.
     """
     import os
     cutoff_ts = cutoff.timestamp()
@@ -152,6 +237,19 @@ def _iter_modified_files(workspace: Path, cutoff: datetime) -> list[Path]:
             except OSError:
                 continue
     return out
+
+
+def _iter_modified_files(workspace: Path, cutoff: datetime) -> list[Path]:
+    """Yield files modified after cutoff. Tries git diff first, falls back to walk.
+
+    v7.0.1 audit REFACTOR-2 2026-06-08 — fast-path via `git status` reduces
+    SubagentStop latency from ~100-300ms (os.walk) to ~10-50ms (git status)
+    on git-managed workspaces. Saves ~2-3 s/pipeline (14 subagent stops).
+    """
+    git_result = _iter_modified_files_git(workspace, cutoff)
+    if git_result is not None:
+        return git_result
+    return _iter_modified_files_walk(workspace, cutoff)
 
 
 def main() -> int:

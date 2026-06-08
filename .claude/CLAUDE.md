@@ -74,9 +74,10 @@ Détail : `@.claude/commands/*.md`.
 
 **Script déterministe pré-pipeline** (pas un agent LLM) :
 `sdd_scripts/complexity_router.py` (Python pur, ~50 ms, 0 token) — analyse FEAT
-→ recommandation `/sdd-poc` | `/sdd-full` | `/sdd-full --adversarial`. Le
-`agents/complexity-router.md` est conservé comme **documentation rubric uniquement**,
-plus jamais spawné comme agent LLM (audit P1 M2 2026-06-08). Méta-orchestrateur
+→ recommandation `/sdd-poc` | `/sdd-full` | `/sdd-full --adversarial`. La rubric
+de scoring vit dans `docs/rubrics/complexity-router-scoring.md` (déplacé v7.0.1
+audit REFACTOR-3 — était dans `agents/` mais jamais spawné, source de confusion).
+Méta-orchestrateur
 déterministe : `phase_planner.py`. Retirés v7.0.0 (`a11y`/`perf`/`dashboard`/`*-strict`) :
 cf. `@.claude/docs/architecture.md §2-§3`.
 

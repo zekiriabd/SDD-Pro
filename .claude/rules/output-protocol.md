@@ -7,11 +7,11 @@
 > persistés sur disque (rapports `workspace/output/qa/...`,
 > `workspace/output/.sys/.audit/...`) pour debug/audit.
 >
-> **Load-bearing** : règle universelle chargée par les 12 agents
+> **Load-bearing** : règle universelle chargée par les 13 agents
 > (`po`, `arch`, `dev-backend`, `dev-frontend`, `qa`, `elicitor`,
 > `constitutioner`, `code-reviewer`, `security-reviewer`,
 > `spec-compliance-reviewer`, `arch-reviewer`, `adversarial-reviewer`)
-> et les 12 commandes user-facing.
+> et les 13 commandes user-facing.
 
 ## TOC
 
@@ -106,13 +106,14 @@ après cette ligne sauf bloc ERROR si verdict 🔴 (cf. §7).
 
 ## 3. Mapping agent → label `[AGENT]`
 
-16 labels canoniques (depuis v7.0.0-alpha audit M11/M12 2026-06-05 :
-labels `[REVIEW]` et `[ARCH]` dé-collisionnés). **Aucun autre label admis** dans le chat.
+17 labels canoniques (depuis v7.0.0+ — ajout `[ROUTER]` pour le routeur de complexité).
+**Aucun autre label admis** dans le chat.
 
 | Label chat | Agent / Commande source | Phase pipeline |
 |---|---|---|
 | `[ANALYSIS]` | `/feat-generate` (élicitation initiale) | 1 |
 | `[ELICITOR]` | agent `elicitor` (`/feat-deepen`) | 1.5 |
+| `[ROUTER]` | `sdd_scripts/complexity_router.py` (rubric `docs/rubrics/complexity-router-scoring.md`, opt-in STEP 0 `/sdd-full`) | 1.8 |
 | `[PO]` | agent `po` (`/us-generate`) | 2 |
 | `[VALIDATE]` | `/feat-validate` (Readiness Gate) | 2.6 |
 | `[PLAN]` | `/dev-plan` + agents `dev-*` en mode `:plan` | 2.7 |
@@ -350,9 +351,10 @@ l'env var aux sub-agents (héritée par défaut via subprocess).
 
 ## 11. Enforcement et anti-derive
 
-**Périmètre** : les 12 agents (po, arch, dev-backend, dev-frontend, qa, elicitor,
+**Périmètre** : les 12 agents LLM (po, arch, dev-backend, dev-frontend, qa, elicitor,
 constitutioner, code-reviewer, security-reviewer, spec-compliance-reviewer,
-arch-reviewer, adversarial-reviewer), les 12 commandes user-facing (cf.
+arch-reviewer, adversarial-reviewer) + 1 script déterministe `complexity_router.py`
+(label `[ROUTER]`), les 13 commandes user-facing (cf.
 `CLAUDE.md §3`), et Claude orchestrateur.
 
 **Anti-derive — NE JAMAIS** :

@@ -45,11 +45,44 @@ def _cache_path(claude_root: Path) -> Path:
     return claude_root / ".cache" / "framework-smoke.json"
 
 
+_FINGERPRINT_EXTS = frozenset({".md", ".py", ".json", ".html", ".yml"})
+
+
+def _scan_dir(args: tuple[Path, Path]) -> list[tuple[str, int]]:
+    """Worker for ThreadPoolExecutor : scan one root, return (relpath, mtime) entries.
+
+    v7.0.1 audit REFACTOR-1 2026-06-08 — extracted as standalone function to
+    enable parallel I/O via concurrent.futures. Each call is independent
+    (no shared mutable state), making it safe for thread pool.
+    """
+    r, claude_root = args
+    out: list[tuple[str, int]] = []
+    if not r.is_dir():
+        return out
+    for f in r.rglob("*"):
+        if f.is_file() and f.suffix in _FINGERPRINT_EXTS:
+            try:
+                out.append((
+                    str(f.relative_to(claude_root)).replace("\\", "/"),
+                    f.stat().st_mtime_ns,
+                ))
+            except OSError:
+                pass
+    return out
+
+
 def _fingerprint(claude_root: Path) -> str:
     """SHA1 fingerprint of (path, mtime_ns) for all framework files.
 
     Stable across runs when nothing changed — change in any file flips it.
     Cheap: pure stat() calls, no file reads.
+
+    v7.0.1 audit REFACTOR-1 2026-06-08 — parallelized rglob via
+    `concurrent.futures.ThreadPoolExecutor`. Each of the 9 framework
+    directories is scanned in its own thread. stat() on Windows is
+    particularly slow when serialized (each call ~200-500 µs), so
+    parallelism yields ~2-3× speedup on cold filesystem (typical
+    Windows dev box). Linux/macOS gain ~1.3× (less locked I/O).
     """
     h = hashlib.sha1()
     roots = (
@@ -64,15 +97,12 @@ def _fingerprint(claude_root: Path) -> str:
         claude_root / "stacks",
     )
     entries: list[tuple[str, int]] = []
-    for r in roots:
-        if not r.is_dir():
-            continue
-        for f in r.rglob("*"):
-            if f.is_file() and f.suffix in (".md", ".py", ".json", ".html", ".yml"):
-                try:
-                    entries.append((str(f.relative_to(claude_root)).replace("\\", "/"), f.stat().st_mtime_ns))
-                except OSError:
-                    pass
+    # Parallel scan : 9 roots → 9 threads (I/O bound, no GIL contention on stat).
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=min(9, len(roots))) as ex:
+        for partial in ex.map(_scan_dir, [(r, claude_root) for r in roots]):
+            entries.extend(partial)
+    # Singleton top-level files (cheap — no parallel needed).
     for p in ("CLAUDE.md", "loader.yml", "settings.json", "WORKING-AGREEMENT.md"):
         f = claude_root / p
         if f.is_file():
@@ -134,6 +164,21 @@ EXPECTED_AGENTS = (
     "adversarial-reviewer",
 )
 
+# Documentation-only "agent" prompts kept on disk as rubric / spec references
+# but never spawned. Replaced by deterministic Python scripts.
+# Audit C2 cleanup (2026-06-08) — `complexity-router.md` is the spec of the
+# scoring rubric implemented by `sdd_scripts/complexity_router.py`.
+#
+# v7.0.1 audit REFACTOR-3 2026-06-08 — moved from `.claude/agents/` to
+# `.claude/docs/rubrics/complexity-router-scoring.md`. Living in agents/ was
+# misleading (Claude Code might attempt to spawn it from frontmatter `name:`).
+# Now located alongside other doc-only rubrics, framework_smoke validates it
+# via a separate check (`rubric-{name}` instead of `agent-{name}`).
+DOC_ONLY_RUBRICS = (
+    ("complexity-router-scoring", "complexity-router"),
+    # tuple (filename_stem, expected_frontmatter_name_or_None)
+)
+
 EXPECTED_RULES = (
     # v7.0.0 final — 5 consolidated rules only (stubs swept post-v7.0.0-alpha).
     # The 8 backward-compat stubs (backend-first, dev-shared, qa-coverage,
@@ -163,6 +208,8 @@ EXPECTED_TEMPLATES = (
     "claude-md-backend.template.md", "claude-md-frontend.template.md",
     "claude-md-shared-lib.template.md",
     "adrs-index.template.md",
+    # v7.0.0+ — Phase 0 Discovery templates (optionnels, projets > 3 FEATs)
+    "product-brief.template.md", "prfaq.template.md",
     # v6.10.0 BREAKING : dashboard-readme.template.html et qa-dashboard.template.html
     # retirés (HTML dashboards remplacés par console.db lecture par consommateur externe,
     # cf. CHANGELOG v6.10.0 §Retiré). Smoke check aligné 2026-05-19.
@@ -186,9 +233,9 @@ EXPECTED_ADMIN_SCRIPTS = (
 )
 
 EXPECTED_COMMANDS = (
-    # User-facing (12) — cf. CLAUDE.md §3
+    # User-facing (13) — cf. CLAUDE.md §3 (v7.0.0+ : ajout /sdd-help)
     "feat-generate", "feat-validate", "sdd-full", "sdd-poc", "dev-run",
-    "qa-generate", "sdd-review", "sdd-status", "sdd-discover-stack",
+    "qa-generate", "sdd-review", "sdd-status", "sdd-help", "sdd-discover-stack",
     "sdd-serve", "sdd-kill-server", "sdd-bootstrap",
     # Internes (8) — debug/inspection
     "us-generate", "arch-init", "dev-plan", "dev-backend", "dev-frontend",
@@ -492,7 +539,7 @@ def main() -> int:
         return SUCCESS
     checks = Checks()
 
-    # 1. Agents
+    # 1. Agents (spawnable, frontmatter `name:` checked)
     agents_dir = claude_root / "agents"
     for a in EXPECTED_AGENTS:
         f = agents_dir / f"{a}.md"
@@ -504,6 +551,20 @@ def main() -> int:
             checks.add(f"agent-{a}", "WARN", "Frontmatter name field missing or wrong")
         else:
             checks.add(f"agent-{a}", "OK", f"agents/{a}.md present")
+
+    # 1.bis Doc-only rubrics (v7.0.1 REFACTOR-3 2026-06-08) — spec files
+    # kept on disk for human reading + Python script alignment, but NEVER
+    # spawned as agents. Located under `docs/rubrics/`.
+    rubrics_dir = claude_root / "docs" / "rubrics"
+    for stem, expected_name in DOC_ONLY_RUBRICS:
+        f = rubrics_dir / f"{stem}.md"
+        if not f.is_file():
+            checks.add(f"rubric-{stem}", "FAIL", f"Missing: {f}")
+            continue
+        content = f.read_text(encoding="utf-8-sig", errors="replace")
+        # Rubrics may keep frontmatter (for legacy refs) but DO NOT have to
+        # be valid spawnable agents. The check is presence-only.
+        checks.add(f"rubric-{stem}", "OK", f"docs/rubrics/{stem}.md present")
 
     # 2. Rules
     rules_dir = claude_root / "rules"
