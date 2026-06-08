@@ -343,15 +343,31 @@ def _record_telemetry_failure(audit_dir: Path, exc: Exception) -> None:
         audit_dir.mkdir(parents=True, exist_ok=True)
         log_path = audit_dir / "token-telemetry-failures.log"
         counter_path = audit_dir / "token-telemetry-failure-count"
-        # Append failure line (rotation handled by sdd_admin/rotate_audit_logs.py)
-        log_path.open("a", encoding="utf-8").write(
-            json.dumps({
-                "ts": iso_now_ms(),
-                "error_type": type(exc).__name__,
-                "message": str(exc)[:200],
-            }) + "\n"
-        )
-        # Bump counter atomically (best-effort, eventual consistency OK)
+        # v7.0.1 audit P1 v2 audit anti-patterns 2026-06-08 (AP-1) — use
+        # `with` context manager to guarantee FD closure even on partial
+        # write failure (Windows : orphan FD = file lock for that path).
+        # Rotation handled by sdd_admin/rotate_audit_logs.py.
+        with log_path.open("a", encoding="utf-8") as f:
+            f.write(
+                json.dumps({
+                    "ts": iso_now_ms(),
+                    "error_type": type(exc).__name__,
+                    "message": str(exc)[:200],
+                }) + "\n"
+            )
+        # Bump counter — BEST-EFFORT, EVENTUAL CONSISTENCY.
+        #
+        # v7.0.1 audit AP-4 2026-06-08 : the read-modify-write below is
+        # NOT atomic. Two parallel hook invocations can race and lose
+        # increments. This is intentionally acceptable :
+        #   - The counter is a DIAGNOSTIC (operator alert when telemetry
+        #     is broken), not a billing primitive.
+        #   - Telemetry failures are rare (~0/1000 invocations normally).
+        #   - The threshold check (≥ 3 consecutive) tolerates undercount
+        #     by 1-2 — operator will still see the alert after enough
+        #     failures accumulate.
+        # If exact counting becomes required, replace with file_locks lock
+        # or SQLite atomic INCREMENT (console_db.token_telemetry_failures).
         try:
             cur = int(counter_path.read_text(encoding="utf-8").strip() or "0")
         except (OSError, ValueError):

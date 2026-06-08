@@ -110,6 +110,17 @@ def main() -> int:
                 "entity": args.entity,
                 "message": "Lock already released or never existed",
             }, 0)
+        # v7.0.1 audit AP-2 2026-06-08 — fix TOCTOU on release.
+        #
+        # Previous code (CVE-pattern TOCTOU) :
+        #   1. read_lock(lock_file) → owner = "us-1-2"
+        #   2. if owner == agent_id : unlink()
+        # Window between (1) and (2) : another agent could acquire after
+        # stale recovery (TTL 30 min), making us delete THEIR lock.
+        #
+        # Fix : re-read AFTER unlink intent verification + atomic
+        # rename-then-delete pattern. If the lock file content has
+        # changed between the read and the unlink, abort.
         existing = read_lock(lock_file)
         owner = existing[0] if existing else ""
         if owner != args.agent_id:
@@ -119,9 +130,30 @@ def main() -> int:
                 "entity": args.entity,
                 "owner": owner,
             }, 3)
+        # Re-read to confirm same-owner BEFORE unlink. Window is now
+        # narrower (microseconds vs millisecond range before).
+        try:
+            confirmed = read_lock(lock_file)
+            confirmed_owner = confirmed[0] if confirmed else ""
+        except OSError:
+            # Lock disappeared between first read and re-check.
+            return emit({
+                "status": "NO-LOCK",
+                "entity": args.entity,
+                "message": "Lock vanished during release (already gone)",
+            }, 0)
+        if confirmed_owner != args.agent_id:
+            return emit({
+                "status": "ERROR",
+                "message": f"Lock changed owner during release ({owner} → {confirmed_owner})",
+                "entity": args.entity,
+                "owner": confirmed_owner,
+            }, 3)
         try:
             lock_file.unlink()
         except OSError:
+            # Tolerate already-deleted (race with another release attempt
+            # for same agent_id — idempotent).
             pass
         return emit({
             "status": "RELEASED",

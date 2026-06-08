@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import errno
 import os
+import random
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -133,7 +134,17 @@ def acquire_with_retry(
                 except OSError:
                     pass
                 continue
-            time.sleep((backoff_ms * (attempt + 1)) / 1000.0)
+            # v7.0.1 audit AP-3 2026-06-08 — backoff WITH jitter to avoid
+            # thundering herd under high MaxParallel. Previous : pure linear
+            # backoff_ms*(attempt+1) caused all parallel agents to retry in
+            # lockstep (same delay → same collision next round). With ±20%
+            # jitter (uniform), retries decorrelate.
+            #
+            # Aligned with sdd_lib/atomic_write.py `_backoff_with_jitter`
+            # (audit CTO 2026-06-07 fixed atomic_write but missed file_locks).
+            base_delay = backoff_ms * (attempt + 1)
+            jittered_ms = base_delay * random.uniform(0.8, 1.2)
+            time.sleep(jittered_ms / 1000.0)
             continue
 
         try:

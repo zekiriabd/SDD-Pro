@@ -84,7 +84,14 @@ def replace_qa_coverage_for_feat(conn: sqlite3.Connection, feat_n: int) -> None:
     ).fetchall()]
     if ids:
         placeholders = ",".join("?" * len(ids))
-        conn.execute(f"DELETE FROM qa_coverage_files WHERE coverage_id IN ({placeholders})", ids)
+        # f-string in cursor.execute is SAFE here : `placeholders` is a
+        # generated string of `?` markers (count derived from `ids` length,
+        # internal data). The actual values are passed parameterized in
+        # the second argument. NOT user-controlled — no SQL injection
+        # surface. (audit AP-5 # nosec annotation 2026-06-08)
+        conn.execute(  # nosec — placeholders=trusted count, values parameterized
+            f"DELETE FROM qa_coverage_files WHERE coverage_id IN ({placeholders})", ids
+        )
         conn.execute("DELETE FROM qa_coverage WHERE feat_n = ?", (feat_n,))
 
 

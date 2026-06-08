@@ -83,6 +83,12 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--fail-on", default=None,
                    help="Severity threshold (info|minor|moderate|serious|critical). "
                         "Default: from Project Config ReviewFailOn, else 'serious'.")
+    p.add_argument("--no-spec-gate", action="store_true",
+                   help="v7.0.0+: skip the two-stage spec-compliance early-STOP gate. "
+                        "Default behavior (AuditorBatchMode=two-stage) checks spec-compliance "
+                        "verdict FIRST and STOPs early on RED, skipping cross-source "
+                        "aggregation (which would be misleading on code about to be rewritten). "
+                        "This flag forces legacy v6.x aggregation regardless. Audit-logged.")
     p.add_argument("--json", action="store_true",
                    help="Emit JSON summary on stdout instead of human text")
     return p.parse_args()
@@ -111,6 +117,101 @@ def resolve_arch_required() -> bool:
     except Exception:
         return False
     return (cfg.get("ArchReviewMode") or "").strip().lower() == "full"
+
+
+def resolve_auditor_batch_mode() -> str:
+    """Return `AuditorBatchMode` from layered config. Default 'two-stage' (v7.0.0+).
+
+    Values: 'two-stage' (spec gate → quality batch) | 'legacy-parallel' (v6.x).
+    Fail-safe defaults to 'two-stage' on any read error (the new safer behavior).
+    """
+    from sdd_lib.layered_config import ConfigError, read_layered_config
+    try:
+        cfg = read_layered_config(keys=("AuditorBatchMode",))
+    except ConfigError:
+        raise  # [CONFIG_SECURITY_DOWNGRADE] must surface
+    except Exception:
+        return "two-stage"
+    v = (cfg.get("AuditorBatchMode") or "two-stage").strip().lower()
+    if v not in ("two-stage", "legacy-parallel"):
+        return "two-stage"
+    return v
+
+
+def check_spec_gate(feat_n: int, no_spec_gate_flag: bool) -> tuple[bool, str]:
+    """Two-stage spec-compliance early-STOP gate (v7.0.0+ pattern superpowers).
+
+    Returns (should_continue, early_stop_message).
+
+    Logic :
+    1. If --no-spec-gate flag set → (True, '') — bypass requested
+    2. If AuditorBatchMode = 'legacy-parallel' → (True, '') — legacy v6.x mode
+    3. If spec-compliance.json missing/unparseable → (True, '') — fail-safe to
+       normal flow (the orchestrator will surface missing source via --ensure-scans
+       if requested, otherwise aggregate what's there)
+    4. If summary.verdict in {'green', 'yellow', 'warn'} → (True, '') — proceed
+    5. If summary.verdict == 'red' → (False, structured 5-line message) — STOP early.
+       Rationale : aggregating code/security/arch findings on code that's about to be
+       rewritten produces a misleading verdict. Make the user fix spec first.
+
+    Bypass : `/sdd-review {n} --no-spec-gate` OR set
+    `AuditorBatchMode: legacy-parallel` in Project Config. Both are audit-logged
+    (the orchestrator records `scans_run` which includes the gate decision).
+    """
+    if no_spec_gate_flag:
+        return True, ""
+
+    try:
+        if resolve_auditor_batch_mode() == "legacy-parallel":
+            return True, ""
+    except Exception:
+        # Fail-safe — proceed with normal aggregation if config unreachable.
+        return True, ""
+
+    spec_json = (
+        repo_root() / "workspace" / "output" / ".sys" / ".validation"
+        / f"{feat_n}-spec-compliance.json"
+    )
+    if not spec_json.is_file():
+        # WARN (audit P3 K 2026-06-08) — two-stage mode active but no spec
+        # report on disk. Fail-safe to pass-through is intentional (legacy
+        # /sdd-review pre-spec-gate workflow still aggregates from DB), but
+        # the absence is suspicious : either /dev-run STEP 6.4.A never ran,
+        # or the report was deleted, or the agent crashed pre-write. The
+        # user should know — silent pass-through would mask false-negatives.
+        sys.stderr.write(
+            f"WARNING: [SPEC_GATE_NO_REPORT] two-stage mode active but "
+            f"workspace/output/.sys/.validation/{feat_n}-spec-compliance.json "
+            f"is missing. Gate falls through to legacy aggregation. To enforce "
+            f"the gate, ensure /dev-run STEP 6.4.A ran first OR pass --ensure-scans.\n"
+        )
+        return True, ""
+
+    try:
+        data = json.loads(spec_json.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as exc:
+        sys.stderr.write(
+            f"WARNING: [SPEC_GATE_PARSE_ERROR] cannot parse spec-compliance.json "
+            f"({exc}). Gate falls through to legacy aggregation.\n"
+        )
+        return True, ""
+
+    summary = data.get("summary") or {}
+    verdict = (summary.get("verdict") or "").strip().lower()
+    if verdict != "red":
+        return True, ""
+
+    not_verified = summary.get("not_verified", "?")
+    total = summary.get("total", "?")
+    msg_lines = [
+        f"🔴 /sdd-review FEAT {feat_n} — spec-compliance gate RED "
+        f"({not_verified}/{total} ACs not-verified)",
+        f"   ⊘ aggregation skipped (would be misleading on code about to be rewritten)",
+        f"   Rapport : workspace/output/.sys/.validation/{feat_n}-spec-compliance.md",
+        f"   FIX : corriger les ACs not-verified puis /dev-{{backend,frontend}} {feat_n}-{{m}}",
+        f"   Bypass : /sdd-review {feat_n} --no-spec-gate (audit-loggué)",
+    ]
+    return False, "\n".join(msg_lines) + "\n"
 
 
 def resolve_fail_on(cli_value: str | None) -> str:
@@ -183,7 +284,14 @@ def _auto_ingest_orphan_jsons(feat_n: int) -> list[str]:
         if not path.is_file():
             continue
         try:
-            cur = conn.execute(f"SELECT COUNT(*) FROM {table} WHERE feat_n=?", (feat_n,))
+            # f-string in cursor.execute is SAFE here : `table` comes from
+            # the `candidates` tuple defined statically above (internal
+            # whitelist, not user input). `feat_n` is parameterized as `?`.
+            # NOT user-controlled — no SQL injection surface.
+            # (audit AP-5 # nosec annotation 2026-06-08)
+            cur = conn.execute(  # nosec — table from internal whitelist
+                f"SELECT COUNT(*) FROM {table} WHERE feat_n=?", (feat_n,)
+            )
             existing = cur.fetchone()[0]
         except sqlite3.Error:
             continue
@@ -326,6 +434,30 @@ def main() -> int:
         for w in stale_warns:
             print(f"WARNING: [REVIEW_REPORT_STALE] {w}", file=sys.stderr)
         scans_run.extend(stale_warns)
+
+    # STEP 3.7 — Two-stage spec-compliance gate (v7.0.0+ pattern superpowers)
+    # If AuditorBatchMode=two-stage (default) AND spec-compliance verdict is RED,
+    # STOP early before aggregation. Aggregating code/security/arch findings on
+    # code that's about to be rewritten yields a misleading verdict. Make the
+    # user fix the spec gaps first. Economy : skips ~3 reviewer aggregations.
+    # Bypass : --no-spec-gate CLI flag OR AuditorBatchMode=legacy-parallel.
+    should_continue, gate_msg = check_spec_gate(feat_n, args.no_spec_gate)
+    if not should_continue:
+        if args.json:
+            print(json.dumps({
+                "feat_n": feat_n,
+                "verdict": "red",
+                "early_stop": "spec_gate_red",
+                "message": gate_msg.strip(),
+            }, indent=2))
+        else:
+            print(gate_msg)
+        scans_run.append("spec-gate:stop-on-red")
+        return FAIL_FAST
+    # When the gate runs but does NOT stop (green/yellow/missing), record that
+    # we evaluated it so the audit trail shows the decision was made.
+    if not args.no_spec_gate:
+        scans_run.append("spec-gate:pass-through")
 
     # STEP 4 — fetch
     findings, missing = fetch_findings(feat_n)
