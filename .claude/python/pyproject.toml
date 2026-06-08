@@ -138,6 +138,12 @@ omit = [
 ]
 
 [tool.coverage.report]
+# v7.0.1 audit P0 v2 (2026-06-08) — seuil "aspirational" pyproject 60%
+# kept but CI passe --cov-fail-under=46 explicit (no-regression baseline).
+# Coverage actuel ~46% ; roadmap Sprint 9.x : combler load-bearing 0% →
+# monter par paliers 46 → 60 → 70 → 80 (parité CoverageMin imposé aux
+# projets users). Le `fail_under` ci-dessous est utilisé pour les runs
+# LOCAUX (rappel humain), pas pour CI (qui override en CLI).
 fail_under = 60
 precision = 2
 show_missing = true

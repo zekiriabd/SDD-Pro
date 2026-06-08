@@ -44,14 +44,23 @@ jobs:
       - name: Framework smoke test
         run: python .claude/python/sdd_admin/framework_smoke.py
 
-      - name: pytest + coverage (audit M6, threshold 60% via pyproject ; -n auto P2 perf 2026-06-08)
+      - name: pytest + coverage (audit M6 ; -n auto P2 perf ; --cov-fail-under no-regression P0 v2 2026-06-08)
         run: |
           cd .claude/python
           # -n auto = pytest-xdist parallel runner (audit P2 perf 2026-06-08).
-          # Expected ~50% CI speedup on 1479 tests vs serial.
+          #
+          # --cov-fail-under=46 = NO-REGRESSION gate (audit P0 v2 audit 2026-06-08).
+          # Coverage actuel mesuré ~46% (faux vert CI précédent : --cov sans
+          # --cov-fail-under ignorait le seuil pyproject 60%). On enforce d'abord
+          # le current pour bloquer toute régression. Roadmap Sprint 9.1+ :
+          # combler les modules load-bearing à 0% (complexity_router 0%,
+          # validate_readiness 28%, sdd_review 15%, validate_fidelity 16%,
+          # validate_semantic 15%) puis monter en paliers 46 → 60 → 70 → 80
+          # (parité CoverageMin user projects). Cf. roadmap-v7-v8.md Sprint 9.x.
           python -m pytest tests/ -q --tb=short -n auto \
             --cov=sdd_lib --cov=sdd_scripts --cov=sdd_hooks --cov=sdd_admin \
-            --cov-report=term-missing --cov-report=xml:coverage.xml
+            --cov-report=term-missing --cov-report=xml:coverage.xml \
+            --cov-fail-under=46
 
       - name: Upload coverage artifact (audit M6)
         uses: actions/upload-artifact@v4

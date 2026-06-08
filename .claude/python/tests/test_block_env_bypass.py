@@ -113,5 +113,88 @@ class TestBlockEnvBypass(unittest.TestCase):
         self.assertEqual(rc, 0)
 
 
+class TestBlockEnvBypassP0V2Vectors(unittest.TestCase):
+    """v7.0.1 audit P0 v2 (2026-06-08) — 8 nouveaux vecteurs bypass.
+
+    Audit v2 sécurité a identifié 8 vecteurs non couverts par v7.0.0 :
+      1. `env VAR=val cmd` (env-as-prefix POSIX)
+      2. `eval "$(echo VAR=val cmd)"` (eval expansion)
+      3. `source script.sh` containing VAR=val
+      4. `printf 'VAR=val\\n...' | bash`
+      5. `IFS=; bash -c "VAR=val cmd"` (IFS hack)
+      6. `New-Item env:VAR -Value 1` (PowerShell)
+      7. `[Environment]::SetEnvironmentVariable("VAR", "1")` (PowerShell .NET API)
+      8. `Set-Item env:VAR 1` (sans -Name, ne matchait pas v1)
+
+    Tous DOIVENT être bloqués (exit 2).
+    """
+
+    def test_env_prefix_posix(self):
+        # `env VAR=val cmd` — env tool sets var inline for subprocess
+        self.assertEqual(_run_with_command("env SDD_ALLOW_FORCE=1 claude /sdd-full 1"), 2)
+
+    def test_env_prefix_with_flags(self):
+        # `env -i SDD_ALLOW_FORCE=1 cmd` (with flags)
+        self.assertEqual(_run_with_command("env -i SDD_ALLOW_FORCE=1 cmd"), 2)
+
+    def test_eval_with_protected_var(self):
+        # eval-based bypass : the eval'd string sets the protected var
+        self.assertEqual(
+            _run_with_command('eval "SDD_ALLOW_FORCE=1 cmd"'), 2
+        )
+
+    def test_eval_with_subshell(self):
+        # `eval "$(echo SDD_ALLOW_X=1 cmd)"`
+        self.assertEqual(
+            _run_with_command('eval "$(echo SDD_ALLOW_FORCE=1 cmd)"'), 2
+        )
+
+    def test_printf_pipe_to_eval(self):
+        # printf with VAR=val piped to bash/eval
+        self.assertEqual(
+            _run_with_command("printf 'SDD_ALLOW_FORCE=1\\nclaude\\n'"), 2
+        )
+
+    def test_bash_c_with_protected_var(self):
+        # `IFS=; bash -c "VAR=val cmd"` — the bash -c branch catches this
+        self.assertEqual(
+            _run_with_command('IFS=; bash -c "SDD_ALLOW_FORCE=1 claude /sdd-full 1"'), 2
+        )
+
+    def test_new_item_env_powershell(self):
+        # `New-Item env:VAR -Value 1`
+        self.assertEqual(
+            _run_with_command("New-Item env:SDD_ALLOW_FORCE -Value 1"), 2
+        )
+
+    def test_powershell_dotnet_setenvvar(self):
+        # `[Environment]::SetEnvironmentVariable("VAR", "1")`
+        self.assertEqual(
+            _run_with_command('[Environment]::SetEnvironmentVariable("SDD_ALLOW_FORCE", "1")'),
+            2,
+        )
+
+    def test_powershell_dotnet_setenvvar_system_prefix(self):
+        # `[System.Environment]::SetEnvironmentVariable(...)` (avec prefix System.)
+        self.assertEqual(
+            _run_with_command('[System.Environment]::SetEnvironmentVariable("SDD_DISABLE_COST_CAP", "1")'),
+            2,
+        )
+
+    # ── Should still ALLOW (don't false-positive) ──
+
+    def test_env_command_without_protected_var(self):
+        # `env` invocation without protected var is OK
+        self.assertEqual(_run_with_command("env PATH=/usr/bin echo hello"), 0)
+
+    def test_eval_clean(self):
+        # eval without protected var
+        self.assertEqual(_run_with_command('eval "echo hello"'), 0)
+
+    def test_printf_clean(self):
+        # printf without protected var
+        self.assertEqual(_run_with_command("printf 'hello\\n'"), 0)
+
+
 if __name__ == "__main__":
     unittest.main()

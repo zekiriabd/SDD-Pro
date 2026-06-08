@@ -27,7 +27,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from sdd_lib.hook_input import get_subagent_type, read_hook_input  # noqa: E402
 from sdd_lib.paths import normalize, repo_root  # noqa: E402
 from sdd_lib.stderr import warn  # noqa: E402
-from sdd_lib.exit_codes import HOOK_ALLOW  # noqa: E402
+from sdd_lib.exit_codes import HOOK_ALLOW, HOOK_DENY  # noqa: E402
 
 
 # Matrix extracted from file-ownership.md §1 (must stay in sync)
@@ -199,21 +199,28 @@ def main() -> int:
     # v7.0.0 audit hardening 2026-05-20 — mode resolution :
     #   - $SDD_AUDIT_OWNERSHIP_MODE = warn|strict|off
     #   - default : 'strict' in CI (any CI env var), 'warn' otherwise
-    # strict mode emits visible WARN + exit 0 (still non-blocking : we
-    # don't want to fail a SubagentStop event that completed successfully).
-    # The strict-vs-warn difference is in stderr verbosity — CI logs surface
-    # the violation count immediately, interactive accumulates silently.
+    #
+    # v7.0.1 audit P0 v2 (2026-06-08) — strict mode is now BLOCKING in CI
+    # (HOOK_DENY = exit 2). Previously strict was only verbosity tweak +
+    # exit 0 — which contradicted INVARIANTS.yml "file-ownership-matrix-enforced"
+    # invariant (purely informational despite the load-bearing claim).
+    #
+    # Behavior matrix :
+    #   strict + CI         → HOOK_DENY (exit 2, blocks SubagentStop)
+    #   strict + interactive → WARN only, exit 0 (preserve dev ergonomics)
+    #   warn                → WARN only, exit 0 (legacy non-blocking)
+    #   off                 → silent, exit 0
     mode = (os.environ.get("SDD_AUDIT_OWNERSHIP_MODE") or "").strip().lower()
-    if mode not in ("warn", "strict", "off"):
-        ci = any(
-            (os.environ.get(v, "").strip().lower() not in ("", "0", "false", "no"))
-            for v in (
-                "CI", "GITHUB_ACTIONS", "GITLAB_CI", "CIRCLECI",
-                "JENKINS_URL", "BUILDKITE", "TRAVIS", "TF_BUILD",
-                "BITBUCKET_BUILD_NUMBER",
-            )
+    is_ci = any(
+        (os.environ.get(v, "").strip().lower() not in ("", "0", "false", "no"))
+        for v in (
+            "CI", "GITHUB_ACTIONS", "GITLAB_CI", "CIRCLECI",
+            "JENKINS_URL", "BUILDKITE", "TRAVIS", "TF_BUILD",
+            "BITBUCKET_BUILD_NUMBER",
         )
-        mode = "strict" if ci else "warn"
+    )
+    if mode not in ("warn", "strict", "off"):
+        mode = "strict" if is_ci else "warn"
 
     if mode != "off":
         msg_level = "ERROR" if mode == "strict" else "WARN"
@@ -226,6 +233,15 @@ def main() -> int:
             warn(f"CAUSE: [FILE_OWNERSHIP] cf. log ci-dessus pour la liste")
             warn(f"FIX: (a) corriger le prompt agent ou la matrice ownership.md")
             warn(f"     (b) bypass interactif : export SDD_AUDIT_OWNERSHIP_MODE=warn")
+            # v7.0.1 P0 v2 : block in CI strict mode. Bypass via
+            # SDD_AUDIT_OWNERSHIP_MODE=warn (audit-loggué dans hook stderr).
+            if is_ci:
+                warn(
+                    f"     (c) CI BLOCKING : audit_file_ownership returns HOOK_DENY "
+                    f"in strict mode CI (audit P0 v2 2026-06-08). Set "
+                    f"SDD_AUDIT_OWNERSHIP_MODE=warn explicitly to bypass."
+                )
+                return HOOK_DENY
 
     return HOOK_ALLOW
 if __name__ == "__main__":

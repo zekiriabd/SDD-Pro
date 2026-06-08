@@ -109,6 +109,34 @@ _BYPASS_REGEXES = [
     # PowerShell: Set-Variable / Set-Item env:NAME val
     re.compile(rf"\b(?:Set-Variable|Set-Item)\s+(?:-Name\s+)?[\"']?env:{_NAME_GROUP}[\"']?",
                re.IGNORECASE),
+    # PowerShell: New-Item env:NAME (creating new env var without -Path)
+    re.compile(rf"\bNew-Item\s+(?:-Path\s+)?[\"']?env:{_NAME_GROUP}[\"']?",
+               re.IGNORECASE),
+    # PowerShell: [Environment]::SetEnvironmentVariable("NAME", "val")
+    re.compile(rf"\[(?:System\.)?Environment\]::SetEnvironmentVariable\s*\(\s*[\"']?{_NAME_GROUP}[\"']?",
+               re.IGNORECASE),
+    # v7.0.1 audit P0 v2 (2026-06-08) — bypass vectors étendus :
+    #
+    # POSIX: env VAR=val cmd ... (env-as-prefix invocation, not subshell)
+    # Example: `env SDD_ALLOW_FORCE=1 claude /sdd-full 1` — env tool sets var
+    # inline for the subprocess without touching parent shell.
+    re.compile(rf"\benv\s+(?:-[a-zA-Z]+\s+)*[\"']?{_NAME_GROUP}[\"']?\s*=",
+               re.IGNORECASE),
+    # POSIX: eval / source / . (dot-source) reading text with VAR=val.
+    # Example: `eval "$(echo SDD_ALLOW_X=1 cmd)"` — eval expands then executes.
+    # We block any eval/source/`.` invocation containing the protected name in
+    # arg context (won't catch every obfuscation — base64 / printf still need
+    # the protected name to land in the eventual eval'd string).
+    re.compile(rf"\b(?:eval|source|\.)\s+[\"'`(].*?{_NAME_GROUP}",
+               re.IGNORECASE | re.DOTALL),
+    # POSIX: printf "VAR=val" piped to eval / source.
+    # Example: `printf 'SDD_ALLOW_X=1\nclaude\n' | bash`
+    re.compile(rf"\bprintf\s+[\"'].*?{_NAME_GROUP}\s*=",
+               re.IGNORECASE | re.DOTALL),
+    # POSIX: IFS or similar field separator hack with bash -c containing protected name.
+    # Example: `IFS=; bash -c "SDD_ALLOW_X=1 cmd"`.
+    re.compile(rf"\bbash\s+-c\s+[\"'].*?{_NAME_GROUP}\s*=",
+               re.IGNORECASE | re.DOTALL),
 ]
 
 # Audit consolidé 2026-06-07 Sprint 3-5 — Strip heredoc bodies AVANT le scan
