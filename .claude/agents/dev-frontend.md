@@ -70,35 +70,49 @@ Variables résultantes en mémoire pour la suite : `planOnly`, `name`,
 
 ## STEP 4 — Charger le contexte minimal
 
-Read **uniquement** :
+> **Ordre cache-layer optimal** (audit P1 tokens 2026-06-08) : Read d'abord les
+> `stable` (rules/stacks), puis `semi` (CLAUDE.md), puis `volatile` (US/HTML).
+> Maximise le cache prefix Anthropic 5 min (cf. `docs/cache-strategy.md`).
+> Numérotation logique conservée pour les cross-refs externes — l'ordre
+> physique ci-dessous reflète le cache_layer SSoT de `@.claude/loader.yml`.
 
-1. `workspace/output/us/{n}-{m}-{Name}.md` — US ciblée (workflow, ACs)
-2. **`HTML_PATH`** — `workspace/input/ui/{n}-{m}-{Name}.html` lu en texte via `Read`.
-   **Source visuelle.** OBLIGATOIRE quand `HTML_PATH != null` (mockup UX Designer).
-3. **`workspace/output/src/{AppName}/CLAUDE.md`** — contexte projet frontend
-   par Arch (layer mapping frontend+UI, DS, tokens, forbidden, env vars
-   client). **Priorité.**
-4. `workspace/output/src/{LibName}/CLAUDE.md` (si `LibName` défini) — contrats
-   partagés (DTOs/Models Blazor). Lecture passive.
-5. `workspace/input/stack/stack.md` — **DÉJÀ lu en STEP 0 Phase B (ne PAS Re-Read).**
-   `## Project Config` + `## Active Tech/UI/Auth Specs` en mémoire.
-6. `.claude/stacks/frontend/*.md`, `.claude/stacks/ui/*.md`, et
-   `.claude/stacks/auth/*.md` (si `## Active Auth Specs` non vide) listés
-   sous `## Active …` — **fallback** si CLAUDE.md absent OU info précise
-   manquante (ex. mapping composant DS §2/§7).
-7. **`.claude/rules/error-classification.md`** — taxonomie (BUILD_*, UI_*,
+Read **uniquement** (ordre d'exécution = cache-optimal `stable → semi → volatile`) :
+
+**Stable layer (rules + stacks)** :
+
+1. **`.claude/rules/error-classification.md`** — taxonomie (BUILD_*, UI_*,
    FRONTEND_BACKEND_CONTRACT_GAP, DERIVE_*). Préfixer `CAUSE:`.
    `[BUILD_BLOCKING]` = fail-fast ; `[BUILD_CORRECTIBLE]` = itère.
-8. **`.claude/rules/build-and-loop.md`** — patterns partagés (context budget,
+2. **`.claude/rules/build-and-loop.md`** — patterns partagés (context budget,
    LibName lock, anti-derive, QA ownership, stack-completeness, BREAKING
    CHANGES cleanup, reads on-demand).
-9. **`.claude/rules/quality.md`** — discipline tokens CSS. Source de
+3. **`.claude/rules/quality.md`** — discipline tokens CSS. Source de
    vérité unique pour la palette FEAT.md §8 → variables
    CSS (`--primary`, `--background`, etc.). **Anti-pattern `[UI_TOKEN_VIOLATION]`
    bloquant** au STEP build : hex hardcodé `#xxx` ou `bg-[#xxx]` Tailwind
    arbitrary value dans un composant = STOP + ERROR. Édition autorisée
    uniquement sur le fichier tokens (`src/index.css` / `theme.ts` /
    `styles.css` selon stack UI), jamais sur les composants.
+4. `.claude/stacks/frontend/*.md`, `.claude/stacks/ui/*.md`, et
+   `.claude/stacks/auth/*.md` (si `## Active Auth Specs` non vide) listés
+   sous `## Active …` — **fallback** si CLAUDE.md absent OU info précise
+   manquante (ex. mapping composant DS §2/§7).
+5. `workspace/input/stack/stack.md` — **DÉJÀ lu en STEP 0 Phase B (ne PAS Re-Read).**
+   `## Project Config` + `## Active Tech/UI/Auth Specs` en mémoire.
+
+**Semi layer (CLAUDE.md projet)** :
+
+6. **`workspace/output/src/{AppName}/CLAUDE.md`** — contexte projet frontend
+   par Arch (layer mapping frontend+UI, DS, tokens, forbidden, env vars
+   client). **Priorité.**
+7. `workspace/output/src/{LibName}/CLAUDE.md` (si `LibName` défini) — contrats
+   partagés (DTOs/Models Blazor). Lecture passive.
+
+**Volatile layer (US + mockup)** :
+
+8. `workspace/output/us/{n}-{m}-{Name}.md` — US ciblée (workflow, ACs)
+9. **`HTML_PATH`** — `workspace/input/ui/{n}-{m}-{Name}.html` lu en texte via `Read`.
+   **Source visuelle.** OBLIGATOIRE quand `HTML_PATH != null` (mockup UX Designer).
 
 **Rules inlinées (v5.0)** : `library-and-stack.md` (Partie A, ex-stack-completeness.md) n'est PLUS lue ici —
 substance dans **Anti-derive strict** + **Inline Rules** ci-dessous. Read

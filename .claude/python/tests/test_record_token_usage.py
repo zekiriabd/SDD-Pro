@@ -150,7 +150,16 @@ class TestHookEventName(unittest.TestCase):
 
 
 class TestMainBehaviour(unittest.TestCase):
-    """Black-box test of main(): verify mode=off is a strict no-op."""
+    """Black-box test of main(): verify mode=off is a strict no-op.
+
+    v7.0.1 audit P2 perf — _resolve_mode() is now memoized via _MODE_CACHE
+    and lazy-imports layered_config. Each test must reset the cache to
+    avoid cross-test leakage.
+    """
+
+    def setUp(self) -> None:
+        from sdd_hooks import record_token_usage as mod
+        mod._MODE_CACHE = None
 
     def test_mode_off_is_noop(self):
         from sdd_hooks import record_token_usage as mod
@@ -164,14 +173,18 @@ class TestMainBehaviour(unittest.TestCase):
     def test_unknown_mode_is_noop(self):
         """v7.0.0 : env unknown value falls through to layered config.
         With config also returning unknown/off, mode resolves to 'off' and
-        read_hook_input must not be called."""
+        read_hook_input must not be called.
+
+        v7.0.1 : layered_config is now lazy-imported inside _resolve_mode,
+        so we patch at the source module (sdd_lib.layered_config) rather
+        than at record_token_usage module attribute (which no longer holds
+        a reference at module load time).
+        """
         from sdd_hooks import record_token_usage as mod
 
         with mock.patch.dict(os.environ, {"SDD_TOKEN_USAGE_MODE": "garbage"}, clear=False):
-            # Force layered config to also return an unknown/off value so the
-            # final resolved mode is 'off' (no DB read attempted).
-            with mock.patch.object(
-                mod, "read_layered_config",
+            with mock.patch(
+                "sdd_lib.layered_config.read_layered_config",
                 return_value={"TokenUsageMode": "off"},
             ):
                 with mock.patch.object(mod, "read_hook_input") as mock_read:

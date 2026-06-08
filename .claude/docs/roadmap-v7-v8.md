@@ -48,8 +48,8 @@
 
 | # | Item | Plan v8 | Effort estimé |
 |---|---|---|---|
-| ~~24~~ | ~~`audit_orphans.py` + `cleanup_orphans.py`~~ | ✅ **DONE v7.0.0-alpha (2026-06-05)** : scripts livrés sous `sdd_scripts/`, 11 tests pytest verts, doc `orphan-cleanup-policy.md` mise à jour, périmètre PROTÉGÉ enforcement, backup `.trash/{ts}/` avec recovery 7j, telemetry `console.db.events`. | — |
-| 25 | `app.jsx` refactor (2056 L monolithe → 5-8 composants) + ≥1 Playwright fumée console + setup React modules (drop Babel client-side). | 🟡 **PARTIEL v7.0.0-alpha (2026-06-05)** : test smoke `tests/structure.smoke.test.js` ajouté (valide 33 composants + 6 endpoints, intégré CI). Garde le mode "no build step" pour l'instant. Reste roadmap v7.2 : décision bundler (esbuild minimal) puis split réel en `app-shell.jsx`/`app-charts.jsx`/`app-dashboard.jsx`/`app-features.jsx` + Playwright. | 4-6 jours restants |
+| ~~24~~ | ~~`audit_orphans.py` + `cleanup_orphans.py`~~ | ✅ **DONE v7.0.0-alpha (2026-06-05)** : scripts livrés sous `sdd_admin/`, 11 tests pytest verts, doc `orphan-cleanup-policy.md` mise à jour, périmètre PROTÉGÉ enforcement, backup `.trash/{ts}/` avec recovery 7j, telemetry `console.db.events`. | — |
+| 25 | `app.jsx` refactor (2056 L monolithe → 5-8 composants) + ≥1 Playwright fumée console + setup React modules (drop Babel client-side). | 🟡 **PARTIEL v7.0.0-alpha (2026-06-05)** : test smoke `tests/smoke.test.js` ajouté (intégré CI ; ex `structure.smoke.test.js` renommé/refactor 2026-06-08). Garde le mode "no build step" pour l'instant. Reste roadmap v7.2 : décision bundler (esbuild minimal) puis split réel en `app-shell.jsx`/`app-charts.jsx`/`app-dashboard.jsx`/`app-features.jsx` + Playwright. | 4-6 jours restants |
 | 26 | `dev-run.md` / `sdd-full.md` : remplacer le pseudo-code orchestrateur par un script Python testable. | 🟡 **PARTIEL v7.0.0-alpha (2026-06-05)** : `sdd_scripts/sdd_full_planner.py` livré (planner déterministe — produit un PLAN JSON exécutable avec phases + status `pending/skip/blocked`, 10 tests pytest verts). Reste roadmap v7.2 : remplacer le pseudo-code dans `sdd-full.md` par invocation `python sdd_full_planner.py --json` puis `jq` les phases ; refactor symétrique `dev-run.md`. Décision tracée dans `CHANGELOG.md` entrée v7.0.0-alpha (pas d'ADR séparé). | 4-6 jours restants |
 | 18 | Combos validés ≥ 5 | PoC : `dotnet+react+azure`, `kotlin+react+azure`, `dotnet+vue+azure`, `python+react+local`, `kotlin+vue+local`. Méthodo `docs/poc-roi-methodology.md`. | 5× 0.5 jour-homme = 2.5 jours |
 | 19 | Cross-model validation QA | Opus review Sonnet (vraie indépendance épistémique). Nécessite refonte loader + retry budget. | 1-2 semaines |
@@ -97,15 +97,16 @@ Ordre suggéré (par dépendances) :
 | E2E coverage AC | ≥ 80 % AC UI | qa_e2e aggregate |
 | Variance 3 runs FEAT M | ≤ 15 % | report_roi.py |
 | Stubs backward-compat | 0 (tous supprimés) | grep `Read @.claude/rules/X.md` legacy = 0 |
-| User-facing commands | 12 user-facing + 8 internes (CLAUDE.md §3) | déjà acté v7.0.0-alpha |
+| User-facing commands | 13 user-facing + 8 internes (CLAUDE.md §3) | acté v7.0.0+ (12 v7.0.0-alpha → 13 v7.0.0+ avec `/sdd-help`) |
 
 ---
 
-## 4. Marketing « 12 user-facing + 8 internes » (acté v7.0.0-alpha)
+## 4. Marketing « 13 user-facing + 8 internes » (v7.0.0+ avec `/sdd-help`)
 
-Le découpage final v7.0.0-alpha est `12 user-facing + 8 internes [debug]`
-(cf. CLAUDE.md §3). Les internes sont déjà signalés `[debug]` dans la
-table. Évolutions futures envisagées :
+Le découpage v7.0.0+ est `13 user-facing + 8 internes [debug]`
+(cf. CLAUDE.md §3). v7.0.0-alpha avait 12 ; ajout `/sdd-help` (guidance
+contextuelle, emprunt bmad-help) en v7.0.0+. Les internes sont
+signalés `[debug]` dans la table. Évolutions futures envisagées :
 
 - **v7.1** : audit usage réel (telemetry `token_usage`) — promouvoir
   toute commande interne dépassant un seuil d'invocations en user-facing.

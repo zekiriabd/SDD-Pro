@@ -37,7 +37,7 @@ supprimer ligne ET régénérer les US. `Covers` réfèrent par valeur.
 
 ---
 
-## 3. Commandes (12 user-facing + 8 internes [debug])
+## 3. Commandes (13 user-facing + 8 internes [debug])
 
 **User-facing** (orchestrantes, gèrent pré-conditions et idempotence) :
 
@@ -50,8 +50,9 @@ supprimer ligne ET régénérer les US. `Covers` réfèrent par valeur.
 | `/sdd-poc {n}` | 1→4 | **Pipeline minimaliste POC** (skip US/QA/review/API-gate — FEAT→arch→back→front) |
 | `/dev-run {n}` | 4 | Orchestrateur dev (arch+DB → back → API gate → front) |
 | `/qa-generate {n}` | 5 | Tests + coverage + quality scan |
-| `/sdd-review {n}` | audit | Audit consolidé (style Sonar, bloquant RED) |
-| `/sdd-status [{n}]` | diagnostic | État pipeline (read-only) |
+| `/sdd-review {n}` | audit | Audit consolidé (style Sonar, bloquant RED) — two-stage v7.0.0+ |
+| `/sdd-status [{n}]` | diagnostic | État pipeline brut (tree ASCII, read-only) |
+| `/sdd-help [{n}\|"question"]` | guidance | Aide contextuelle "what's next" (read-only, emprunt bmad-help) |
 | `/sdd-discover-stack` | onboarding | Scan repo brownfield → `stack.md.candidate` |
 | `/sdd-serve` | runtime | Backend + front + console parallèle (ex-`/sdd-run`) |
 | `/sdd-kill-server` | runtime | Arrête backend + front + console (pendant de `/sdd-serve`) |
@@ -64,12 +65,18 @@ Détail : `@.claude/commands/*.md`.
 
 ---
 
-## 4. Agents (12)
+## 4. Agents (12 LLM + 1 rubric déterministe = 13 .md)
 
 **Cœur** : `po`, `arch` (Sonnet 4.6) ; `dev-backend`, `dev-frontend` (Opus 4.7).
 **Support** : `elicitor`, `constitutioner`, `qa` (Sonnet 4.6).
 **Auditors** : `code-reviewer`, `security-reviewer` (scan), `spec-compliance-reviewer`,
-`arch-reviewer`, `adversarial-reviewer` (opt-in, informational). Méta-orchestrateur
+`arch-reviewer`, `adversarial-reviewer` (opt-in, informational).
+
+**Script déterministe pré-pipeline** (pas un agent LLM) :
+`sdd_scripts/complexity_router.py` (Python pur, ~50 ms, 0 token) — analyse FEAT
+→ recommandation `/sdd-poc` | `/sdd-full` | `/sdd-full --adversarial`. Le
+`agents/complexity-router.md` est conservé comme **documentation rubric uniquement**,
+plus jamais spawné comme agent LLM (audit P1 M2 2026-06-08). Méta-orchestrateur
 déterministe : `phase_planner.py`. Retirés v7.0.0 (`a11y`/`perf`/`dashboard`/`*-strict`) :
 cf. `@.claude/docs/architecture.md §2-§3`.
 
@@ -163,18 +170,22 @@ Anti-derive, ERROR 3L disque, idempotence, lecture sélective, parallélisme bor
 ## 9. Démarrage rapide
 
 0. Greenfield : `python bootstrap.py [--combo c1|c2|c3|c4|c5|custom] [--dry-run|--auto-init]` (ou `/sdd-bootstrap` — détail `python bootstrap.py --help`). Brownfield : `/sdd-discover-stack`.
+0.bis **Phase 0 Discovery (facultatif, projets > 3 FEATs)** : copier `.claude/templates/product-brief.template.md` ou `prfaq.template.md` dans `workspace/input/discovery/` pour cadrer vision/personas/KPIs avant les FEATs. Anti-derive : si une FEAT proposée ne sert pas une promesse de la Discovery, c'est probablement du scope creep.
 1. Éditer `workspace/input/stack/stack.md` (SSoT unique — valeurs en clair `DB_PASSWORD`, `AUTH_JWT_SECRET`, `AZ_TENANTID`, ports ; fichier **gitignored**, arch propage en `appsettings.json` / `application.yml`).
 2. `/feat-generate Auth` (3-6 questions). Optionnel : mockups HTML dans `workspace/input/ui/`.
-3. `/sdd-full 1` → `/sdd-status [{n}]`. **Cookbook 10 min : `@.claude/docs/cookbook.md`**. Variantes complètes : `@.claude/docs/quickstart.md`.
+3. `/sdd-full 1` → `/sdd-status [{n}]` (état brut) ou `/sdd-help [{n}]` (guidance "what's next"). **Cookbook 10 min : `@.claude/docs/cookbook.md`**. Variantes complètes : `@.claude/docs/quickstart.md`.
 
 ---
 
 ## 10. Pour aller plus loin
 
 - **Architecture & workflow** : `@.claude/docs/{architecture,workflow,conventions,quickstart}.md`
-- **Onboarding** : `@.claude/docs/{glossary,hooks-and-protections,config-precedence}.md`
+- **Onboarding** : `@.claude/docs/{glossary,hooks-and-protections,config-precedence,po-guide,ux-designer-guide}.md`
+- **Élicitation** : `@.claude/docs/brainstorming-techniques.md` (bibliothèque 15 techniques v7.0.0+, emprunt BMad)
 - **Gouvernance** : `@.claude/docs/{VERSIONING,CHANGELOG,MIGRATION,WORKING-AGREEMENT}.md`
 - **Commercial / DSI** : `@.claude/docs/{WHY-SDD-PRO,COMPLIANCE,SLA,KNOWN-LIMITATIONS}.md`
 - **ROI & roadmap** : `@.claude/docs/{poc-roi-methodology,roadmap-v7-v8,cache-strategy,validated-combos,orphan-cleanup-policy}.md`
 - **Règles** : `@.claude/rules/` (5 consolidées + 1 hoist + 1 protocole + 1 annexe)
+- **Skills auto-triggered** (v7.0.0+ emprunt superpowers) : `@.claude/skills/` (`using-sddpro`, `starting-a-new-feat`, `debugging-failed-pipeline`, `test-driven-development`)
+- **Invariants manifest** (v7.0.0+ audit P3 E4) : `@.claude/INVARIANTS.yml` — 13 contrats load-bearing (two-stage gate, file ownership, cost cap, schema strict, TDD test-first, etc.) avec pointer vers chaque enforcer (hook/script/smoke test). Test `tests/test_invariants_manifest.py` vérifie que chaque enforcer existe sur disque. Anti-rot manifest : retirer un enforcer sans mettre à jour le manifest = FAIL au smoke.
 - **Python** : `@.claude/python/README.md`

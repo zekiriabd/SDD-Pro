@@ -54,6 +54,11 @@ dependencies = []
 dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
+    # pytest-xdist : parallel test execution. Audit P2 perf 2026-06-08 —
+    # 1479 tests in ~30 s serial ; expected ~10-12 s with `-n auto` on a
+    # 4-core CI runner (no per-test sleep / no shared fixtures stateful
+    # enough to block xdist scheduling).
+    "pytest-xdist>=3.5",
 ]
 # Distribution (Top-10 #7 starter, 2026-06-06) :
 # - Build : `python -m build` (requires `pip install build`)

@@ -44,10 +44,12 @@ jobs:
       - name: Framework smoke test
         run: python .claude/python/sdd_admin/framework_smoke.py
 
-      - name: pytest + coverage (audit M6, threshold 60% via pyproject)
+      - name: pytest + coverage (audit M6, threshold 60% via pyproject ; -n auto P2 perf 2026-06-08)
         run: |
           cd .claude/python
-          python -m pytest tests/ -q --tb=short \
+          # -n auto = pytest-xdist parallel runner (audit P2 perf 2026-06-08).
+          # Expected ~50% CI speedup on 1479 tests vs serial.
+          python -m pytest tests/ -q --tb=short -n auto \
             --cov=sdd_lib --cov=sdd_scripts --cov=sdd_hooks --cov=sdd_admin \
             --cov-report=term-missing --cov-report=xml:coverage.xml
 
@@ -104,52 +106,6 @@ jobs:
       - name: Validate stack md headers (Validation: 🟢|🟡)
         run: python .claude/python/sdd_admin/validate_stack_md_headers.py
 
-      - name: Validate stack combos (C1..C5)
-        run: |
-          python .claude/python/sdd_scripts/validate_stack_combo.py --combo c1
-          python .claude/python/sdd_scripts/validate_stack_combo.py --combo c2
-          python .claude/python/sdd_scripts/validate_stack_combo.py --combo c3 || echo "C3 experimental (non-blocking)"
-          python .claude/python/sdd_scripts/validate_stack_combo.py --combo c4 || echo "C4 experimental (non-blocking)"
-          python .claude/python/sdd_scripts/validate_stack_combo.py --combo c5 || echo "C5 experimental (non-blocking)"
-
-      - name: Bootstrap auto-init dry-run — combo C1
-        env:
-          SDD_APP_NAME: CIApp
-          SDD_COMBO: c1
-          SDD_DB_TYPE: PostgreSql
-        run: python bootstrap.py --auto-init --dry-run --skip-install
-
-      - name: Bootstrap auto-init dry-run — combo C2
-        env:
-          SDD_APP_NAME: CIApp
-          SDD_COMBO: c2
-          SDD_DB_TYPE: PostgreSql
-        run: python bootstrap.py --auto-init --dry-run --skip-install
-
-      - name: Bootstrap auto-init dry-run — combo C3 (with SDD_ALLOW_UNTESTED_COMBO)
-        env:
-          SDD_APP_NAME: CIApp
-          SDD_COMBO: c3
-          SDD_DB_TYPE: PostgreSql
-          SDD_ALLOW_UNTESTED_COMBO: "1"
-        run: python bootstrap.py --auto-init --dry-run --skip-install
-
-      - name: Bootstrap auto-init dry-run — combo C4 (with SDD_ALLOW_UNTESTED_COMBO)
-        env:
-          SDD_APP_NAME: CIApp
-          SDD_COMBO: c4
-          SDD_DB_TYPE: PostgreSql
-          SDD_ALLOW_UNTESTED_COMBO: "1"
-        run: python bootstrap.py --auto-init --dry-run --skip-install
-
-      - name: Bootstrap auto-init dry-run — combo C5 (with SDD_ALLOW_UNTESTED_COMBO)
-        env:
-          SDD_APP_NAME: CIApp
-          SDD_COMBO: c5
-          SDD_DB_TYPE: PostgreSql
-          SDD_ALLOW_UNTESTED_COMBO: "1"
-        run: python bootstrap.py --auto-init --dry-run --skip-install
-
       - name: Lint Python (ruff)
         # P1-4 fix 2026-06-07 : ruff is now blocking. Baseline established —
         # any new lint violation must be fixed (or `# noqa: SPECIFIC_CODE`
@@ -158,6 +114,48 @@ jobs:
         run: |
           pip install ruff==0.6.9
           ruff check .claude/python/
+
+  bootstrap-combos:
+    # Audit P2 perf 2026-06-08 — was 5 sequential bootstrap steps (~15-25 s
+    # cumulative) + 5 sequential validate_stack_combo steps in
+    # framework-validation. Now parallel matrix : 5 jobs in parallel,
+    # ~3-5 s wall-clock each = effective ~5× speedup on this phase.
+    name: Bootstrap dry-run + stack combo validation
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        combo: [c1, c2, c3, c4, c5]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install SDD_Pro Python tools
+        run: pip install -e .claude/python[dev]
+
+      - name: Validate stack combo ${{ matrix.combo }}
+        run: |
+          if [ "${{ matrix.combo }}" = "c1" ] || [ "${{ matrix.combo }}" = "c2" ]; then
+            python .claude/python/sdd_scripts/validate_stack_combo.py --combo ${{ matrix.combo }}
+          else
+            python .claude/python/sdd_scripts/validate_stack_combo.py --combo ${{ matrix.combo }} || echo "${{ matrix.combo }} experimental (non-blocking)"
+          fi
+
+      - name: Bootstrap auto-init dry-run — combo ${{ matrix.combo }}
+        env:
+          SDD_APP_NAME: CIApp
+          SDD_COMBO: ${{ matrix.combo }}
+          SDD_DB_TYPE: PostgreSql
+          # C1/C2 = reference validated, no bypass needed.
+          # C3/C4/C5 = experimental, require SDD_ALLOW_UNTESTED_COMBO.
+          SDD_ALLOW_UNTESTED_COMBO: ${{ (matrix.combo == 'c1' || matrix.combo == 'c2') && '' || '1' }}
+        run: python bootstrap.py --auto-init --dry-run --skip-install
 
   console-build:
     name: Console web build smoke
@@ -186,27 +184,11 @@ jobs:
           node --check lib/explain.js
           node --check lib/markdown-filter.js
 
-      - name: App.jsx syntax check via @babel/standalone
+      - name: Build console (esbuild — replaces Babel-CDN runtime, v0.4.1)
         working-directory: workspace/console
-        run: |
-          node -e "
-            const fs = require('node:fs');
-            const babel = require('@babel/standalone');
-            const src = fs.readFileSync('app.jsx', 'utf8');
-            try {
-              babel.transform(src, { presets: ['react'], filename: 'app.jsx' });
-              console.log('OK app.jsx transforms (' + src.length + ' bytes)');
-            } catch (e) {
-              console.error('FAIL app.jsx transform:', e.message);
-              process.exit(1);
-            }
-          "
+        run: npm run build
 
-      - name: App.jsx structure smoke (components + endpoints)
-        working-directory: workspace/console
-        run: node tests/structure.smoke.test.js
-
-      - name: npm test (consolidated)
+      - name: npm test (server syntax + esbuild bundle + CSP regression)
         working-directory: workspace/console
         run: npm test
 

@@ -72,19 +72,19 @@ from sdd_lib.hook_input import (  # noqa: E402
 from sdd_lib.paths import iso_now_ms, repo_root  # noqa: E402
 from sdd_lib.exit_codes import HOOK_ALLOW  # noqa: E402
 
-# layered_config is optional — telemetry must never break on import errors.
-try:
-    from sdd_lib.layered_config import read_layered_config  # noqa: E402
-except Exception:  # pragma: no cover — defensive
-    read_layered_config = None  # type: ignore[assignment]
-
-
 # Valid modes (lower-cased, env + config normalized to these)
 VALID_MODES: frozenset[str] = frozenset({"off", "record", "debug"})
 
+# Module-level memo of the resolved mode. The mode is invariant within a
+# pipeline run (config files are not edited mid-run, env vars set at spawn),
+# so resolving once per process saves ~50 ms × N hook calls (audit P2 perf
+# 2026-06-08 : record_token_usage measured 62 ms cold-start, dominated by
+# the layered_config import + read).
+_MODE_CACHE: str | None = None
+
 
 def _resolve_mode() -> str:
-    """Resolve effective token-usage mode.
+    """Resolve effective token-usage mode (memoized).
 
     Precedence (highest wins):
       1. env $SDD_TOKEN_USAGE_MODE (debug override)
@@ -94,24 +94,32 @@ def _resolve_mode() -> str:
 
     Any unknown value normalizes to "off" (defensive — never break the run).
     """
-    # 1. env var override
+    global _MODE_CACHE
+    if _MODE_CACHE is not None:
+        return _MODE_CACHE
+
+    # 1. env var override — short-circuit, avoid expensive config import
     env_val = (os.environ.get("SDD_TOKEN_USAGE_MODE") or "").strip().lower()
     if env_val in VALID_MODES:
+        _MODE_CACHE = env_val
         return env_val
 
-    # 2. layered config (best-effort, defensive)
-    if read_layered_config is not None:
-        try:
-            cfg = read_layered_config()
-            cfg_val = str(cfg.get("TokenUsageMode") or "").strip().lower()
-            if cfg_val in VALID_MODES:
-                return cfg_val
-        except Exception:
-            # Config layering is opt-in and may fail on partial repos;
-            # telemetry MUST NOT raise — fall through to hard default.
-            pass
+    # 2. layered config (lazy-import — only paid if env was not set).
+    # layered_config is optional; telemetry must never break on import errors.
+    try:
+        from sdd_lib.layered_config import read_layered_config  # noqa: E402
+        cfg = read_layered_config()
+        cfg_val = str(cfg.get("TokenUsageMode") or "").strip().lower()
+        if cfg_val in VALID_MODES:
+            _MODE_CACHE = cfg_val
+            return cfg_val
+    except Exception:
+        # Config layering is opt-in and may fail on partial repos;
+        # telemetry MUST NOT raise — fall through to hard default.
+        pass
 
     # 3. hard default
+    _MODE_CACHE = "off"
     return "off"
 
 

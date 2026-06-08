@@ -154,6 +154,17 @@
       "default": "serious",
       "description": "Threshold for arch-reviewer verdict."
     },
+    "AuditorBatchMode": {
+      "type": "string",
+      "enum": ["two-stage", "legacy-parallel"],
+      "default": "two-stage",
+      "description": "v7.0.0+ (emprunt superpowers two-stage pattern). `two-stage` (default) : spec-compliance-reviewer runs ALONE as Stage A gate ; if 🟢/🟡 → Stage B (code/security/arch reviewers parallel). If 🔴 RED, Stage B is skipped (economy ~3 Sonnet invocations). `legacy-parallel` : v6.x behavior — all 4 reviewers parallel in one batch. Override via CLI `--legacy-auditor-parallel` on /dev-run (distinct from `--unsequenced` which addresses the API gate back/front sequencing)."
+    },
+    "ComplexityRouterMode": {
+      "$ref": "#/definitions/ModeOnOffManualFull",
+      "default": "manual",
+      "description": "v7.0.0+ (emprunt BMad scale-adaptive). Controls the deterministic `sdd_scripts/complexity_router.py` script (audit P1 M2 2026-06-08 — replaced the LLM agent with a 0-token Python implementation). Analyzes FEAT signals (SFD/BR/AC count, Compliance, Volume, SLA) → recommends POC vs full vs critical pipeline. `manual` (default) = explicit `python -m sdd_scripts.complexity_router` invocation ; `auto` = /sdd-full STEP 0 invokes script ; `off` = routing skipped, /sdd-full default."
+    },
     "ReviewMode": {
       "type": "string",
       "enum": ["off", "manual", "scans-only", "read-only", "full"],
@@ -221,6 +232,26 @@
       "$ref": "#/definitions/Boolean",
       "default": false,
       "description": "DEPRECATED v7.0.0 — strict dev-backend / dev-frontend variants removed (ADR governance-major-prompts-trim). Tolerated in stack.md but no runtime effect. Plan v2 schema preserved for human review only."
+    },
+    "BuildLoopAdaptiveFallback": {
+      "$ref": "#/definitions/Boolean",
+      "default": true,
+      "description": "Adaptive Opus→Sonnet downgrade in build_loop past 50% cost cap. `false` = legacy (always Opus until BuildLoopMaxIter). Read by dev-backend/dev-frontend at STEP 7."
+    },
+    "InlineRulesDriftMode": {
+      "$ref": "#/definitions/ModeOnOffWarnStrict",
+      "default": "warn",
+      "description": "Controls validate_inline_rules.py drift detection between agent .md inlined snippets and rules/*.md source. `strict` = exit 1 if drift, `warn` = report only, `off` = skip check. framework_smoke.py invokes --strict explicitly regardless."
+    },
+    "PricingFreshnessMode": {
+      "$ref": "#/definitions/ModeOnOffWarnStrict",
+      "default": "warn",
+      "description": "Controls pricing.py freshness check (Anthropic model pricing data). `warn` = emit WARN if > PricingFreshnessMaxAgeDays, `strict` = exit 1 (CI release-gate), `off` = skip."
+    },
+    "PricingFreshnessMaxAgeDays": {
+      "$ref": "#/definitions/PositiveInt",
+      "default": 90,
+      "description": "Max age (days) for pricing data before PricingFreshnessMode triggers. Default 90 = quarterly review cadence."
     },
     "GatedWorkflow": {
       "$ref": "#/definitions/Boolean",

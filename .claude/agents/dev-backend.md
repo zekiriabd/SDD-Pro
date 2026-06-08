@@ -62,43 +62,62 @@ Variables résultantes en mémoire pour la suite : `planOnly`, `name`,
 
 ## STEP 3 — Charger le contexte minimal
 
-Read **uniquement** :
+> **Ordre cache-layer optimal** (audit P1 tokens 2026-06-08) : Read d'abord les
+> `stable` (rules/stacks), puis `semi` (CLAUDE.md, schema), puis `volatile`
+> (US/HTML). Maximise le cache prefix Anthropic 5 min (cf. `docs/cache-strategy.md`).
+> Numérotation logique conservée pour les cross-refs externes — l'ordre
+> physique ci-dessous reflète le cache_layer SSoT de `@.claude/loader.yml`.
 
-1. `workspace/output/us/{n}-{m}-{Name}.md` — l'US ciblée
-2. `workspace/input/ui/{n}-{m}-{Name}.html` — mockup HTML (lu si présent,
-   passivement, pour identifier d'éventuels endpoints/DTOs déclenchés
-   par les `<form>`, `<table>` (export ?), `<input>` ; jamais pour
-   générer du markup côté backend)
-3. **`workspace/output/src/{BackendName}/CLAUDE.md`** — contexte projet
-   backend produit par Arch (architecture, layer mapping backend
-   uniquement, persistence, auth, forbidden patterns backend, env
-   vars backend). **À lire en priorité** (depuis SDD_Pro v2.5 — un
-   CLAUDE.md par projet, plus de PROJECT.md unique).
-4. `workspace/output/src/{LibName}/CLAUDE.md` (si `LibName` défini dans Project
-   Config) — contrats partagés (DTOs / Models / Inputs / Outputs).
-   Lecture passive pour aligner les références cross-projet.
-5. `workspace/input/stack/stack.md` — **DÉJÀ lu en STEP 0 Phase B (ne PAS Re-Read).**
-   Le `## Project Config` (`BackendName`, etc.) et les sélecteurs
-   `## Active Tech Specs / Auth Specs` sont déjà en mémoire depuis le
-   gate. Cette ligne sert juste à rappeler le périmètre — ne déclenche
-   pas de Read.
-6. Les fichiers `.claude/stacks/backend/*.md` et `.claude/stacks/auth/*.md`
-   listés sous `## Active …` — **fallback** uniquement si CLAUDE.md
-   absent OU si CLAUDE.md ne contient pas l'info précise nécessaire
-   (ex. patterns d'erreur compilation détaillés, librairies pinnées).
-   En lecture normale, CLAUDE.md suffit pour 90 % des décisions.
-7. `workspace/output/db/schema.json` (si présent — source schéma pour Mappers/DTOs)
-8. **`.claude/rules/error-classification.md`** — taxonomie 8 classes
+Read **uniquement** (ordre d'exécution = cache-optimal `stable → semi → volatile`) :
+
+**Stable layer (rules + stacks)** :
+
+1. **`.claude/rules/error-classification.md`** — taxonomie 8 classes
    (BUILD_*, SCHEMA_*, LAYER_*, UI_*, QA_*, DERIVE_*, STACK_*, NETWORK_*,
    etc.). À utiliser pour préfixer tout bloc ERROR dans le `CAUSE:`. La
    classe `[BUILD_BLOCKING]` impose un fail-fast (pas d'itération
    `build_loop`). La classe `[BUILD_CORRECTIBLE]` autorise l'itération.
-9. **`.claude/rules/build-and-loop.md`** — patterns partagés dev-backend/
+2. **`.claude/rules/build-and-loop.md`** — patterns partagés dev-backend/
    dev-frontend (context budget HARD-GATE, LibName lock, anti-derive
    bullets, QA ownership interdits, stack-completeness, BREAKING
    CHANGES cleanup, reads on-demand cas-limite). Source de vérité
    unique pour les fragments strictement identiques entre les deux
    agents.
+3. Les fichiers `.claude/stacks/backend/*.md` et `.claude/stacks/auth/*.md`
+   listés sous `## Active …` — **fallback** uniquement si CLAUDE.md
+   absent OU si CLAUDE.md ne contient pas l'info précise nécessaire
+   (ex. patterns d'erreur compilation détaillés, librairies pinnées).
+   En lecture normale, CLAUDE.md suffit pour 90 % des décisions.
+4. `workspace/input/stack/stack.md` — **DÉJÀ lu en STEP 0 Phase B (ne PAS Re-Read).**
+   Le `## Project Config` (`BackendName`, etc.) et les sélecteurs
+   `## Active Tech Specs / Auth Specs` sont déjà en mémoire depuis le
+   gate. Cette ligne sert juste à rappeler le périmètre — ne déclenche
+   pas de Read.
+
+**Semi layer (CLAUDE.md projet + schema)** :
+
+5. **`workspace/output/src/{BackendName}/CLAUDE.md`** — contexte projet
+   backend produit par Arch (architecture, layer mapping backend
+   uniquement, persistence, auth, forbidden patterns backend, env
+   vars backend). **À lire en priorité** (depuis SDD_Pro v2.5 — un
+   CLAUDE.md par projet, plus de PROJECT.md unique).
+6. `workspace/output/src/{LibName}/CLAUDE.md` (si `LibName` défini dans Project
+   Config) — contrats partagés (DTOs / Models / Inputs / Outputs).
+   Lecture passive pour aligner les références cross-projet.
+7. **Schema DB** (source pour Mappers/DTOs) — **Levier 4 v7.0.x** : préférer
+   `workspace/output/db/schema-slice-{n}-{m}.json` s'il existe (slice par US,
+   tables référencées par l'US + FK transitive — généré par
+   `python -m sdd_scripts.generate_schema_slice` avant spawn dev-backend).
+   Fallback `workspace/output/db/schema.json` si slice absent. Le slice
+   préserve les contrats FK donc les DTOs/Mappers restent corrects.
+
+**Volatile layer (US + mockup)** :
+
+8. `workspace/output/us/{n}-{m}-{Name}.md` — l'US ciblée
+9. `workspace/input/ui/{n}-{m}-{Name}.html` — mockup HTML (lu si présent,
+   passivement, pour identifier d'éventuels endpoints/DTOs déclenchés
+   par les `<form>`, `<table>` (export ?), `<input>` ; jamais pour
+   générer du markup côté backend)
 
 **Rules inline (depuis SDD_Pro v5.0 — économie tokens) :** la règle
 `library-and-stack.md` (Partie A, ex-stack-completeness.md) n'est **PLUS lue en STEP 3**. Sa substance opérationnelle est inlinée dans la section

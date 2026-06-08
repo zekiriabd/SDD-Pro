@@ -18,9 +18,52 @@ Format : [version] — date courte. Sections : `Breaking`, `Added`, `Changed`, `
 
 ---
 
-## [v7.0.1-dev] — 2026-06-05 → 2026-06-07 (next branch, post v7.0.0 GA audit closure)
+## [v7.0.1-dev] — 2026-06-05 → 2026-06-08 (next branch, post v7.0.0 GA audit closure)
 
 > Renommage MN3 (audit hygiène 2026-06-07) : cette section couvre les fixes audit CTO post-v7.0.0 GA. Sera taguée v7.0.1 PATCH (audit closure) ou v7.1.0 MINOR (selon ampleur). L'ancien header `[Unreleased] — 2026-06-05` était antidaté par rapport à `[v7.0.0] — 2026-05-23` ci-dessous, ce qui prêtait à confusion.
+
+### Audit CTO multi-axes 2026-06-08 — tokens + perf + cohérence + code mort
+
+Audit livré par 4 sub-agents Claude en parallèle (axes : consommation tokens,
+cohérence documentation/réalité, performance scripts/hooks, code mort).
+Synthèse → ~13 fixes appliqués sur `next`.
+
+#### Cohérence (drifts doc/code)
+
+- **CLAUDE.md §4** : "12 agents" → "12 LLM + 1 rubric déterministe = 13 .md" (alignement disque + INVARIANTS.yml `total: 13`).
+- **CLAUDE.md §10** : ajout `test-driven-development` au listing skills (4 skills disque, 1 était non documenté).
+- **CLAUDE.md** : "12 contrats load-bearing" → "13 contrats" (alignement INVARIANTS).
+- **roadmap-v7-v8.md §24-25** : path `sdd_scripts/` → `sdd_admin/` (scripts orphan_*) + nom test fumée `structure.smoke.test.js` → `smoke.test.js`.
+- **project-config.schema.json** : ajout 4 keys actives manquantes (`BuildLoopAdaptiveFallback`, `InlineRulesDriftMode`, `PricingFreshnessMode`, `PricingFreshnessMaxAgeDays`). Évite `[CONFIG_UNKNOWN_KEY]` à chaque run.
+
+#### Tokens (cache hit Anthropic 5 min)
+
+- **`agents/dev-backend.md` + `agents/dev-frontend.md` STEP 3** : réordonné en sections `stable → semi → volatile` selon `loader.yml cache_layer` (audit P1 tokens 2026-06-08). Avant : US/HTML lus avant rules/stacks → invalidation prefix cache. Maintenant : prefix stable maximisé.
+- **`rules/library-and-stack.md §B.7`** : hoist runtime-pitfalls (~2.5 KB) vers `docs/runtime-pitfalls.md` (Read on-demand uniquement quand bug runtime suspecté).
+
+#### Performance (hooks + CI)
+
+- **`sdd_hooks/record_token_usage.py`** : lazy-import `layered_config` + memoize `_MODE_CACHE` module-level. Avant : 62 ms cold-start × ~50 tool calls/run = ~3 s/pipeline. Maintenant : 1 résolution puis cache, env-only short-circuit si `SDD_TOKEN_USAGE_MODE=off`.
+- **CI `.github/workflows/sdd-ci.yml`** : pytest `-n auto` via pytest-xdist (~50% speedup sur 1479 tests) + nouveau job `bootstrap-combos` avec matrix `[c1,c2,c3,c4,c5]` parallèle (5 jobs au lieu de 10 steps séquentiels).
+- **`pyproject.toml`** : ajout `pytest-xdist>=3.5` dans `[dev]` dependencies.
+
+#### Hygiène code mort + workspace
+
+- **`docs/combo-concentration-proposal.md`** : brouillon zéro-référence supprimé (168 L).
+- **`docs/po-guide.md` + `docs/ux-designer-guide.md`** : rattachés à CLAUDE.md §10 Onboarding (étaient orphans circulaires).
+- **`workspace/output/db/*.sql` + `schema.prev.json`** : 44 KB héritage migration ponctuelle supprimés.
+- **`workspace/output/.sys/.state/plan-28.json`** : fichier corrompu (WARN logs + JSON mélangés) supprimé (évite `[CHECKPOINT_STATE_UNREADABLE]`).
+- **`workspace/audit-sdd-pro-*.md` (4 fichiers)** : déletions formalisées via `git rm` (étaient deleted sans commit).
+- **`workspace/input/feats/*-Calc-*.md` (16 fichiers)** + `_examples/*` (4) + `qa/bench/BENCH-GLOBAL-REPORT.md` + `console/tests/structure.smoke.test.js` : 24 fichiers bench/legacy formalisés via git rm.
+
+### Backlog v7.2.0 (identifiés cet audit, hors scope sprint)
+
+- **`commands/sdd-full.md` (788 L)** : collapse 19 STEPs en `<details>` (économie ~12-15 KB par run `/sdd-full`, refactor ~1h, dépend planner Python stabilisé).
+- **`commands/dev-run.md` (986 L)** : hoist STEP 6.4 two-stage auditor vers `rules/auditor-orchestration.md` (~8-10 KB/run, refactor ~1h).
+- **`loader.yml`** : retirer `build-and-loop.md` du stable layer dev-* nécessite hoist complet Partie B §1-9 (LibName lock, anti-derive, plan construction) vers `dev-shared-patterns.md` séparé. ~1h, risque casser hoist actuel.
+- **`agents/complexity-router.md`** : déplacement vers `docs/rubrics/` requis (DEPRECATED dans propre frontmatter) — nécessite update loader.yml + cross-refs.
+- **`sdd_hooks/audit_file_ownership.py`** : remplacer `os.walk` par `git diff --name-only --since=$SDD_DISPATCH_START_TS` (gain ~2-3 s/pipeline si repo git).
+- **`framework_smoke.py _fingerprint()`** : `concurrent.futures.ThreadPoolExecutor` pour rglob × 8 dirs (gain ~50-100 ms Windows).
 
 ### Audit CTO 2026-06-07 — fixes minors + majors + criticals
 

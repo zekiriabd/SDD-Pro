@@ -627,59 +627,16 @@ implicite couvert par cette règle :
 
 ---
 
-## B.7 Pièges runtime documentés (post-mortem bench)
+## B.7 Pièges runtime documentés (post-mortem bench) — hoisté v7.0.1
 
-5 bugs détectés bench multi-stack qui n'apparaissent que **runtime**.
+Substance complète déplacée vers `@.claude/docs/runtime-pitfalls.md` (audit P1
+tokens 2026-06-08, économie ~2.5 KB par dispatch dev-*). 5 bugs runtime multi-stack
+documentés : (1) CORS `localhost`≠`127.0.0.1`, (2) `<input type=number>` coerce
+Vue/Angular, (3) JMustache null-strict, (4) `pydantic-core` no-wheel Python récent,
+(5) bUnit `.Change()` ≠ `@bind:event="oninput"`.
 
-### B.7.1 CORS `localhost` ≠ `127.0.0.1`
-
-**Symptôme** : UI `Impossible de joindre l'API` malgré curl OK CLI.
-**Cause** : navigateur sur `127.0.0.1:5186` envoie `Origin: http://127.0.0.1:5186`,
-allowlist contient seulement `localhost:5186` → preflight 403 → `TypeError: Failed to fetch`.
-
-**Convention** : allowlist **multi-host explicite** pour chaque port :
-```
-http://localhost:{port}
-http://127.0.0.1:{port}
-```
-
-### B.7.2 `<input type=number>` coerce → state framework cassé
-
-**Symptôme** : bouton Calculate `disabled` côté Vue 3 / Angular 18.
-**Cause** : `<input type=number>` + `v-model`/`[(ngModel)]` coerce DOM string
-en `number`. State `ref<string>` reçoit `number` → `.trim()` throw silencieusement.
-
-**Convention** :
-- Vue : `ref<number | null>(null)` + `v-model.number`
-- Angular : `signal<number | null>(null)`
-- React/Blazor : non concernés (string ou `int?` natif)
-
-### B.7.3 JMustache rejette `null` keys strict
-
-**Symptôme** : Spring Boot + Mustache → 500 sur `Model.addAttribute("x", null)`.
-**Convention** : populer `Model` avec strings vides (`""`) + flags booléens
-dérivés `hasX`/`hasError` pour sections conditionnelles
-(`{{#hasX}}…{{/hasX}}`, jamais `{{#x}}…{{/x}}`).
-
-### B.7.4 `pydantic-core` no-wheel sur Python récent
-
-**Symptôme** : `pip install pydantic==2.10.3` fail wheel-build sur Python 3.14.
-**Convention** : pin `pydantic>=2.11` si Python ≥ 3.13. Pour Python 3.12 LTS,
-pin 2.10.x OK. Vérifier wheels PyPI avant pin strict.
-
-### B.7.5 bUnit `.Change()` ≠ `@bind:event="oninput"` (post-mortem FEAT 3 tests)
-
-**Symptôme** : bUnit teste Blazor WASM avec `cut.Find("input").Change("5")` →
-`Bunit.MissingEventHandlerException : element does not have event handler 'onchange',
-has 'oninput'`.
-
-**Cause** : `.Change()` déclenche un événement `onchange`, mais le composant utilise
-`@bind:event="oninput"` (binding immediate). Mismatch event handler → exception bUnit.
-
-**Convention obligatoire** :
-- Avec `@bind:event="oninput"` (binding immediate) → tests bUnit avec `.Input("value")`
-- Avec `@bind` simple (binding onchange) → tests avec `.Change("value")`
-- API bUnit v2 : `BunitContext` + `Render<T>()` (au lieu de `TestContext` + `RenderComponent<T>()` v1 obsolètes)
+**Read on-demand uniquement** quand un bug runtime correspondant est suspecté en
+build_loop ou bench — pas en stable layer dev-*.
 
 ---
 
