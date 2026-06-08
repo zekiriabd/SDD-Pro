@@ -52,10 +52,30 @@ const STACK_FILE  = join(WORKSPACE, "input", "stack", "stack.md");
 const PORT = parseInt(process.env.PORT || "4000", 10);
 
 // HTTPS dev — clé/cert auto-signés générés via openssl (cf. .certs/).
-// Si la paire est absente, fallback HTTP (rétro-compat).
+// Si la paire est absente, fallback HTTP (rétro-compat dev local).
+//
+// v7.0.1 audit P1 v2 (2026-06-08) — refus boot HTTP en production :
+// si `NODE_ENV=production` et certs absents → exit 1. Empêche un déploiement
+// accidentel sans TLS (MAJ-5 audit v2 sécurité : silent fallback HTTP
+// permettait MITM-grade access via cert auto-signé arbitraire).
 const CERT_KEY  = join(CONSOLE_DIR, ".certs", "dev-key.pem");
 const CERT_CERT = join(CONSOLE_DIR, ".certs", "dev-cert.pem");
 const HTTPS_ENABLED = existsSync(CERT_KEY) && existsSync(CERT_CERT);
+const IS_PRODUCTION = (process.env.NODE_ENV || "").toLowerCase() === "production";
+
+if (IS_PRODUCTION && !HTTPS_ENABLED) {
+  // Hard-fail : on ne sert pas en clair en production sous aucun pretexte.
+  // Bypass légitime : générer les certs via `npm run gen-certs` ou pointer
+  // CERT_KEY / CERT_CERT vers un reverse-proxy TLS termination (nginx/traefik).
+  console.error(
+    "[FATAL] NODE_ENV=production but no TLS certs found at .certs/dev-{key,cert}.pem.\n" +
+    "        Refusing to boot console server over plain HTTP in production.\n" +
+    "        Fix: (a) generate certs via `npm run gen-certs`,\n" +
+    "             (b) terminate TLS at a reverse proxy and unset NODE_ENV,\n" +
+    "             (c) for dev/CI testing : NODE_ENV=development npm start"
+  );
+  process.exit(1);
+}
 
 const fastifyOptions = { logger: { level: "info" } };
 if (HTTPS_ENABLED) {
@@ -63,6 +83,13 @@ if (HTTPS_ENABLED) {
     key:  readFileSync(CERT_KEY),
     cert: readFileSync(CERT_CERT),
   };
+} else if (!IS_PRODUCTION) {
+  // Dev fallback : explicit WARN to signal we're not on TLS.
+  console.warn(
+    "[WARN] Console server starting in HTTP mode (no TLS certs at .certs/).\n" +
+    "       OK for dev/CI on 127.0.0.1. For production, set NODE_ENV=production\n" +
+    "       and provide certs or use a reverse-proxy TLS termination."
+  );
 }
 const fastify = Fastify(fastifyOptions);
 

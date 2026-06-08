@@ -53,12 +53,57 @@ def _resolve_project_root() -> Path | None:
     return None
 
 
+# v7.0.1 audit P1 v2 (2026-06-08) — secret masking before audit log write.
+# If a user accidentally exports secrets inline with the bypass attempt
+# (e.g. `export MY_DB_PASSWORD=foo SDD_ALLOW_FORCE=1 cmd`), the raw command
+# excerpt would leak `MY_DB_PASSWORD=foo` to `.sys/.audit/env-bypass.jsonl`.
+# This regex masks any `<NAME>=<value>` assignment where NAME matches
+# common secret patterns (PASSWORD/SECRET/TOKEN/KEY/PASSWD/PWD/APIKEY/...).
+# Tuned conservatively : only masks the VALUE, not the NAME, so forensics
+# can still see WHICH key was exposed without the value itself.
+_SECRET_MASK_RE = re.compile(
+    r"(?P<prefix>(?P<name>[A-Za-z0-9_]*"
+    r"(?:PASSWORD|PASSWD|PWD|SECRET|TOKEN|APIKEY|API_KEY|"
+    r"PRIVATE_KEY|ACCESS_KEY|AUTH_KEY|JWT|BEARER|SESSION_ID|"
+    r"COOKIE|CREDENTIAL|CRED))"
+    r"[\s]*=[\s]*)"
+    r"(?P<quote>[\"']?)"
+    r"(?P<value>[^\s\"';|&]+)"
+    r"(?P=quote)",
+    re.IGNORECASE,
+)
+
+
+def _mask_secrets(text: str) -> str:
+    """Replace `SECRET_NAME=value` patterns with `SECRET_NAME=***` in audit text.
+
+    Conservative masking : only the VALUE is replaced. The key NAME is
+    preserved so forensics can identify which secret was exposed without
+    leaking the secret itself. Pattern matches common secret naming
+    conventions (PASSWORD/SECRET/TOKEN/KEY/JWT/etc.) case-insensitive.
+
+    Example :
+        in:  `export DB_PASSWORD=hunter2 SDD_ALLOW_FORCE=1`
+        out: `export DB_PASSWORD=*** SDD_ALLOW_FORCE=1`
+
+    The SDD_ALLOW_* / SDD_DISABLE_* names themselves are NOT masked (they
+    are the protected names we are auditing, not secrets).
+    """
+    return _SECRET_MASK_RE.sub(r"\g<prefix>\g<quote>***\g<quote>", text)
+
+
 def _audit_log(match: str, cmd: str, bypass_set: bool) -> None:
     """Persist a JSONL audit line for env-bypass denials.
 
     Non-blocking: any I/O failure here must NOT change the deny decision.
     Path is anchored to CLAUDE_PROJECT_DIR (fallback : walk-up looking for
     `.claude/`) under workspace/output/.sys/.audit/env-bypass.jsonl.
+
+    v7.0.1 audit P1 v2 (2026-06-08) — secret masking : `command_excerpt`
+    is passed through `_mask_secrets()` before persistence to prevent
+    leaks like `MY_DB_PASSWORD=hunter2` ending up in plain text in the
+    audit log (which is gitignored but still on filesystem with potential
+    read access by other tools / VSCode extensions).
     """
     try:
         root = _resolve_project_root()
@@ -66,11 +111,12 @@ def _audit_log(match: str, cmd: str, bypass_set: bool) -> None:
             return  # no project — skip silently (e.g. pytest in isolated tmpdir)
         audit_dir = root / "workspace" / "output" / ".sys" / ".audit"
         audit_dir.mkdir(parents=True, exist_ok=True)
+        masked_excerpt = _mask_secrets(cmd[:240])
         line = {
             "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
             "event": "env_bypass_blocked",
             "matched_pattern": match,
-            "command_excerpt": cmd[:240],
+            "command_excerpt": masked_excerpt,
             "bypass_flag_inherited": bypass_set,
             "decision": "DENY",
         }

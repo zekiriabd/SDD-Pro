@@ -113,6 +113,56 @@ class TestBlockEnvBypass(unittest.TestCase):
         self.assertEqual(rc, 0)
 
 
+class TestSecretMasking(unittest.TestCase):
+    """v7.0.1 audit P1 v2 (2026-06-08) — secret masking in audit log.
+
+    `_mask_secrets()` replaces values of PASSWORD/SECRET/TOKEN/KEY-like
+    assignments with `***` before they're persisted to env-bypass.jsonl.
+    Conservative : key NAME preserved for forensics, only VALUE masked.
+    """
+
+    def test_mask_password_unquoted(self):
+        out = beb._mask_secrets("export DB_PASSWORD=hunter2 cmd")
+        self.assertIn("DB_PASSWORD=***", out)
+        self.assertNotIn("hunter2", out)
+
+    def test_mask_token_quoted(self):
+        out = beb._mask_secrets('export AUTH_TOKEN="abcd-1234-secret" cmd')
+        self.assertIn('AUTH_TOKEN="***"', out)
+        self.assertNotIn("abcd-1234-secret", out)
+
+    def test_mask_api_key_mixed_case(self):
+        out = beb._mask_secrets("Api_Key=xyz123 cmd")
+        self.assertIn("Api_Key=***", out)
+        self.assertNotIn("xyz123", out)
+
+    def test_mask_jwt_secret(self):
+        out = beb._mask_secrets("AUTH_JWT_SECRET='supersecret' cmd")
+        self.assertIn("AUTH_JWT_SECRET='***'", out)
+        self.assertNotIn("supersecret", out)
+
+    def test_no_mask_when_no_secret(self):
+        out = beb._mask_secrets("export PATH=/usr/bin:$PATH echo hello")
+        # PATH is not a secret pattern — preserved
+        self.assertIn("PATH=/usr/bin:$PATH", out)
+
+    def test_mask_preserves_sdd_allow(self):
+        # SDD_ALLOW_* is the protected name we're auditing — should NOT be masked
+        # (we want to see WHICH bypass var was attempted in the audit log).
+        out = beb._mask_secrets("SDD_ALLOW_FORCE=1 cmd")
+        self.assertIn("SDD_ALLOW_FORCE=1", out)
+
+    def test_mask_multiple_secrets_one_line(self):
+        out = beb._mask_secrets(
+            "DB_PASSWORD=secret1 AUTH_TOKEN=secret2 SDD_ALLOW_FORCE=1 cmd"
+        )
+        self.assertIn("DB_PASSWORD=***", out)
+        self.assertIn("AUTH_TOKEN=***", out)
+        self.assertIn("SDD_ALLOW_FORCE=1", out)  # not masked
+        self.assertNotIn("secret1", out)
+        self.assertNotIn("secret2", out)
+
+
 class TestBlockEnvBypassP0V2Vectors(unittest.TestCase):
     """v7.0.1 audit P0 v2 (2026-06-08) — 8 nouveaux vecteurs bypass.
 

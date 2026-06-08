@@ -1,26 +1,24 @@
 {
   "name": "sdd-console",
-  "version": "0.5.0",
+  "version": "0.4.1",
   "description": "SDD_Pro — Cockpit de validation manuelle (consultation FEATs/US/plans + validation humaine + reformulation IA PO-friendly)",
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node --watch server.js",
-    "gen-cert": "node -e \"const{execSync}=require('child_process');const fs=require('fs');const p='.certs';if(!fs.existsSync(p))fs.mkdirSync(p);execSync('openssl req -x509 -newkey rsa:2048 -nodes -keyout .certs/dev-key.pem -out .certs/dev-cert.pem -days 365 -subj /CN=localhost',{stdio:'inherit'});console.log('OK .certs/dev-{key,cert}.pem regenerated');\"",
-    "test": "node tests/structure.smoke.test.js && node --check server.js"
+    "build": "esbuild app.jsx --bundle --outfile=dist/app.js --loader:.jsx=jsx --jsx=transform --jsx-factory=React.createElement --jsx-fragment=React.Fragment --external:react --external:react-dom --external:marked --format=iife --target=es2020 --log-level=warning",
+    "start": "npm run build && node server.js",
+    "dev": "npm run build && node --watch server.js",
+    "test": "node tests/smoke.test.js"
   },
   "engines": {
-    "node": ">=22.5"
+    "node": ">=20"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.40.1",
-    "@babel/standalone": "7.29.0",
-    "@fastify/static": "^8.0.4",
-    "dompurify": "^3.2.4",
     "fastify": "^5.2.0",
-    "marked": "14.1.4",
-    "react": "18.3.1",
-    "react-dom": "18.3.1"
+    "@fastify/static": "^9.1.3",
+    "@anthropic-ai/sdk": "^0.65.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.0"
   }
 }

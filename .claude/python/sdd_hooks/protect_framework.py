@@ -39,6 +39,7 @@ FRAMEWORK_OWNED: tuple[str, ...] = (
     ".claude/agents/",
     ".claude/templates/",
     ".claude/commands/",
+    ".claude/skills/",
     ".claude/python/",
     ".claude/loader.yml",
     ".claude/CLAUDE.md",
@@ -136,18 +137,54 @@ def _main_inner() -> int:
     return HOOK_ALLOW
 
 
+def _is_ci_environment() -> bool:
+    """Detect CI environment via standard env vars.
+
+    Returns True if any common CI signal env var is set to a truthy value.
+    Shared with audit_file_ownership.py (same heuristic).
+    """
+    return any(
+        (os.environ.get(v, "").strip().lower() not in ("", "0", "false", "no"))
+        for v in (
+            "CI", "GITHUB_ACTIONS", "GITLAB_CI", "CIRCLECI",
+            "JENKINS_URL", "BUILDKITE", "TRAVIS", "TF_BUILD",
+            "BITBUCKET_BUILD_NUMBER",
+        )
+    )
+
+
 def main() -> int:
-    """Outer wrapper — fail-OPEN on any internal exception (audit C4 fix
-    v7.0.0-alpha 2026-06-04). Without this guard, an exception in
-    `normalize()` (e.g. ValueError on UNC paths, broken symlinks, paths
-    outside the repo tree) would propagate up and BLOCK the entire
-    Edit|Write|MultiEdit chain until Claude Code restart. Fail-open
-    preserves user's ability to Edit, with a visible WARN so the issue
-    gets noticed and fixed."""
+    """Outer wrapper — fail-OPEN interactive, fail-CLOSED in CI.
+
+    Interactive (dev local) : fail-OPEN on any internal exception
+    (audit C4 fix v7.0.0-alpha 2026-06-04). Without this guard, an
+    exception in `normalize()` (e.g. ValueError on UNC paths, broken
+    symlinks, paths outside the repo tree) would propagate up and BLOCK
+    the entire Edit|Write|MultiEdit chain until Claude Code restart.
+    Fail-open preserves user's ability to Edit, with a visible WARN.
+
+    CI (v7.0.1 audit P1 v2 2026-06-08) : fail-CLOSED. An exception in
+    the framework-protection logic is a signal that an attacker may be
+    probing edge cases (UNC paths `\\\\?\\GLOBALROOT\\...`, symlink
+    games, etc.) to bypass the protection. In CI, we'd rather block
+    legitimate edits and force investigation than let a bypass attempt
+    through. Bypass via `SDD_PROTECT_FRAMEWORK_FAIL_OPEN=1` (explicit,
+    audit-loggable).
+    """
     try:
         return _main_inner()
     except Exception as e:
         warn(f"WARN protect-framework: internal error suppressed ({type(e).__name__}: {e})")
+        if _is_ci_environment() and (
+            os.environ.get("SDD_PROTECT_FRAMEWORK_FAIL_OPEN", "").strip().lower()
+            not in ("1", "true", "yes")
+        ):
+            # CI fail-CLOSED : block the edit, force investigation.
+            warn(f"     CI fail-CLOSED (audit P1 v2 2026-06-08) : refusing edit.")
+            warn(f"     CAUSE: [INFRA_BLOCKED] hook internal exception — possible bypass probe.")
+            warn(f"     FIX: investigate stderr, then if legitimate :")
+            warn(f"          SDD_PROTECT_FRAMEWORK_FAIL_OPEN=1 to bypass once.")
+            return HOOK_DENY
         warn(f"     Hook fail-OPEN to avoid blocking Edit|Write globally.")
         warn(f"     If this repeats, capture stderr + report at .claude/python/sdd_hooks/protect_framework.py")
         return HOOK_ALLOW

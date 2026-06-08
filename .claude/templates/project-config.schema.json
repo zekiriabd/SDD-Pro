@@ -361,8 +361,8 @@
     },
     "LibStrategy": {
       "type": "string",
-      "enum": ["none", "shared", "openapi-codegen"],
-      "description": "Strategy for sharing DTOs/Models between backend and frontend. `none` = no shared lib ; `shared` = manual {LibName} project ; `openapi-codegen` = backend OpenAPI generates frontend TS client."
+      "enum": ["none", "shared", "openapi-codegen", "single-project"],
+      "description": "Strategy for sharing DTOs/Models between backend and frontend. `none` = no shared lib ; `shared` = manual {LibName} project ; `openapi-codegen` = backend OpenAPI generates frontend TS client ; `single-project` = fullstack monolithic (Next/Nuxt/Angular Universal/Blazor Server/Kotlin Mustache/Node React/MAUI/React Native) — backend and frontend share the same project, no separate {LibName} (audit P1 v2 2026-06-08, alignment with 8 stacks fullstack/mobile and `workspace/input/stack/stack.md` usage)."
     },
     "UsGranularityTarget": {
       "type": "integer",

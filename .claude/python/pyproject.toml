@@ -50,23 +50,32 @@ classifiers = [
 ]
 dependencies = []
 
+# v7.0.1 audit P1 v2 (2026-06-08) — supply-chain hardening :
+# Dev/build deps utilisent `>=` historiquement. Audit v2 a flagué le risque
+# qu'un release malveillant futur (CVE injection sur `twine` ou `pytest-xdist`)
+# soit installé automatiquement en CI via `pip install -e .claude/python[dev]`.
+#
+# Mitigation v7.0.1 :
+#   1. Plancher MINOR `>=X.Y` au lieu de `>=X.0` (limite la fenêtre).
+#   2. PIN ABSOLU recommandé via lockfile (uv / pip-compile) — voir
+#      `.claude/python/requirements-dev.lock.txt` à générer une fois
+#      (sprint 9.1, requires uv install in CI).
+#   3. Dependabot config `.github/dependabot.yml` pour bump auto + review.
 [project.optional-dependencies]
 dev = [
-    "pytest>=7.0",
-    "pytest-cov>=4.0",
-    # pytest-xdist : parallel test execution. Audit P2 perf 2026-06-08 —
-    # 1479 tests in ~30 s serial ; expected ~10-12 s with `-n auto` on a
-    # 4-core CI runner (no per-test sleep / no shared fixtures stateful
-    # enough to block xdist scheduling).
-    "pytest-xdist>=3.5",
+    "pytest>=8.0,<9.0",          # 8.x stable, contain to MAJOR
+    "pytest-cov>=5.0,<7.0",      # 5+ supports modern coverage, sub-7 cap
+    # pytest-xdist : parallel test execution (audit P2 perf 2026-06-08).
+    # 1479 tests in ~40 s serial → ~10-12 s with `-n auto` on 4-core CI.
+    "pytest-xdist>=3.5,<4.0",
 ]
 # Distribution (Top-10 #7 starter, 2026-06-06) :
 # - Build : `python -m build` (requires `pip install build`)
 # - Test PyPI publish : `python -m twine upload --repository testpypi dist/*`
 # - Prod PyPI publish : `python -m twine upload dist/*`
 build = [
-    "build>=1.0",
-    "twine>=4.0",
+    "build>=1.2,<2.0",
+    "twine>=5.0,<7.0",
 ]
 
 [project.urls]
