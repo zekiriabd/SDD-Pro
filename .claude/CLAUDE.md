@@ -68,18 +68,13 @@ Détail : `@.claude/commands/*.md`.
 ## 4. Agents (12 LLM + 1 rubric déterministe = 13 .md)
 
 **Cœur** : `po`, `arch` (Sonnet 4.6) ; `dev-backend`, `dev-frontend` (Opus 4.7).
-**Support** : `elicitor`, `constitutioner`, `qa` (Sonnet 4.6).
-**Auditors** : `code-reviewer`, `security-reviewer` (scan), `spec-compliance-reviewer`,
+**Support** : `elicitor`, `constitutioner`, `qa`.
+**Auditors** : `code-reviewer`, `security-reviewer`, `spec-compliance-reviewer`,
 `arch-reviewer`, `adversarial-reviewer` (opt-in, informational).
-
-**Script déterministe pré-pipeline** (pas un agent LLM) :
-`sdd_scripts/complexity_router.py` (Python pur, ~50 ms, 0 token) — analyse FEAT
-→ recommandation `/sdd-poc` | `/sdd-full` | `/sdd-full --adversarial`. La rubric
-de scoring vit dans `docs/rubrics/complexity-router-scoring.md` (déplacé v7.0.1
-audit REFACTOR-3 — était dans `agents/` mais jamais spawné, source de confusion).
-Méta-orchestrateur
-déterministe : `phase_planner.py`. Retirés v7.0.0 (`a11y`/`perf`/`dashboard`/`*-strict`) :
-cf. `@.claude/docs/architecture.md §2-§3`.
+**Scripts déterministes** (0 token) : `complexity_router.py` (rubric
+`docs/rubrics/complexity-router-scoring.md`), `phase_planner.py`.
+Détail modèles + retraits v7.0.0 (`a11y`/`perf`/`dashboard`/`*-strict`) :
+`@.claude/docs/architecture.md §2-§3`.
 
 ---
 
@@ -98,61 +93,19 @@ Templates : `@.claude/docs/conventions.md §14-§15`.
 
 ---
 
-## 6. Stacks (34 actifs — source de vérité = entête `Validation:` du `.md`)
+## 6. Stacks (34 actifs — SSoT = entête `Validation:` du `.md`)
 
-> **v7.0.0-alpha bench 2026-06-05** (recount 2026-06-06) :
-> **25 🟢 (14 reference + 11 bench-validated runtime) + 8 🟡 experimental + 1 🟡 POC-only = 34 total**.
-> Validation automatique : `python .claude/python/sdd_admin/framework_smoke.py` (la vérif `stacks-count` est intégrée au smoke).
+> **v7.0.0 GA recount 2026-06-09** (audit CTO Major #5 closure) :
+> **29 🟢 (validated/bench-validated/scaffold-validated) + 4 🟡 experimental + 1 🟡 POC-only = 34 total**.
+> Validation auto : `python .claude/python/sdd_admin/framework_smoke.py` (gate `stacks-count`).
 
-| Catégorie | 🟢 reference | 🟢 bench-validated runtime (2026-06-05) | 🟡 experimental |
-|---|---|---|---|
-| Backend (4) | `dotnet-minimalapi`, `kotlin-spring-boot` | `python-fastapi`, `node-express` | — |
-| Frontend (4) | `react`, `blazor-webassembly` | `vue`, `angular` | — |
-| UI DS (3) | `shadcn`, `radzen-blazor` | — | `vuetify` |
-| QA (9) | `code-quality`, `dotnet-xunit`, `kotlin-junit`, `node-vitest`, `blazor-bunit` | — | `python-pytest`, `angular-jasmine`, `mutation-testing` (opt-in), `playwright` (opt-in) |
-| Auth (2) | `azure-ad` | — | `auth-local` |
-| Archi (3) | `mvc` | — | `ddd`, `microservice` |
-| Fullstack (6) | — | `angular-universal`, `blazor-server`, `kotlin-mustache`, `next`, `nuxt` | `node-react` 🟡 POC-only (console interne — non destiné prod externe) |
-| Mobiles (3) | `kotlin-android` | `maui` (Windows desktop runtime), `react-native` (Expo Web runtime) | — |
+**🟡 experimental (4)** : `archi/ddd`, `archi/microservice`, `qa/mutation-testing` (opt-in), `qa/playwright` (opt-in).
+**🟡 POC-only (1)** : `fullstack/node-react` (console SDD interne — non destiné prod externe).
+**🟢 (29)** : tous les autres (cf. table détaillée + tiers `validated` / `bench-validated` / `scaffold-validated` dans `@.claude/docs/validated-combos.md §1-§2`).
 
-**Tiers de validation** (clarifié audit C2 — 2026-06-06) :
+**Engagement commercial — 13 combos SLA** : 2 `validated` end-to-end (C1, C2) + 11 `bench-validated runtime` (C3-C13). SSoT machine : `@.claude/templates/combos.json`. Marquage runtime via hook `preflight_stack_combo` (`SDD_ALLOW_UNTESTED_COMBO=1` = bypass audit-loggué). Stacks 🟡 explicitement exclus de tout SLA.
 
-| Tier | Couleur | Granularité | Périmètre | Garantie | Support |
-|---|---|---|---:|---|---|
-| **validated** | 🟢 ref | **combos** (assemblages) | 2 combos (C1, C2) | `/sdd-full` bout-en-bout 100 % automatisé, sans intervention humaine | **Supporté production**. SLO 95 % runs PASS sur FEATs S/M. |
-| **bench-validated runtime** | 🟢 bench | **combos** | 11 combos SLA (C3-C13 dans `combos.json`) sélectionnés parmi les 23 combinaisons bench 2026-06-05 | Code généré **compile + démarre + sert les ACs**, mais une partie du scaffolding `/sdd-full` a été faite manuellement par le mainteneur. Détail : `workspace/output/qa/bench/BENCH-GLOBAL-REPORT.md`. Gaps : `docs/benchmarks/known-gaps.md` | **Supporté best-effort**. Pas de garantie idempotence `/sdd-full`. |
-| **experimental** | 🟡 exp | **stacks atomiques** | 8 stacks (briques) | Spec stack OK + `.libs.json` valide, **jamais exécuté end-to-end**. Code généré peut compiler — ou pas. | **⚠ Non supporté commercialement.** À considérer comme « community preview ». |
-| **POC-only** | 🟡 poc | **stack atomique** | 1 stack (`node-react`) | Usage interne console SDD uniquement. Pas de TS natif, pas de bundler, pas de pipeline Playwright. | **Hors périmètre produit.** Ne sera pas commercialisé. |
-
-> **⚠ Engagement commercial v7.0.0** (clarifié audit CTO 2026-06-07,
-> reconfirmé post-audit consolidé) :
-> seuls les **13 combos SLA** = 2 combos `validated` end-to-end (C1, C2)
-> + 11 combos `bench-validated runtime` (C3-C13 dans `combos.json`),
-> sélectionnés parmi les 23 combinaisons testées au bench du 2026-06-05.
-> Le nombre **13** est canonique au niveau **combo** (assemblage de 3-6
-> stacks). Au niveau **stack atomique** (= brique), 25 stacks 🟢 entrent
-> dans la composition de ces combos (13 reference + 11 bench-validated +
-> 1 scaffold-validated `kotlin-android`). Les **8 stacks 🟡 experimental**
-> et le **1 stack 🟡 POC-only** sont **explicitement exclus de tout SLA**.
-> Distinction stack/combo : un combo est un assemblage de 3-6 stacks
-> (backend + frontend + ui + qa + auth + ±archi).
-> Marquage runtime via le hook `preflight_stack_combo` (exit 2 =
-> bloquant si combo non listé, sauf `SDD_ALLOW_UNTESTED_COMBO=1`,
-> audit-loggué).
-
-**23 combinaisons bench runtime validées** (2026-06-05) : 16 cross-origin REST (4 backends × 4 SPA) + 6 monolithes fullstack + 1 MAUI Windows desktop + 1 RN Expo Web ; + 1 mobile scaffold seul (Kotlin Android, SDK absent).
-
-**Cible C3-prod (re-priorisé v7.0.0-alpha audit P0-doc 2026-06-05)** :
-`backend/node-express + frontend/react + ui/shadcn + qa/node-vitest + auth/auth-local + Prisma`
-(combo back-front séparé avec Vite + TS strict, **destiné production**). L'ancienne cible
-« C3-bis » sur `fullstack/node-react` est annulée — ce stack est désormais marqué
-`🟡 POC-only` (usage interne console SDD uniquement, pas de TS natif, pas de bundler,
-pas de pipeline Playwright). PoC partiel Demo conservé en archive (réf
-historique), mais ne compte pas comme combo validé. Cf. `@.claude/docs/validated-combos.md §3`.
-
-🟡 chargeables mais non validés end-to-end (risque runtime). Source de vérité =
-entête `Validation:` ; catalogue machine `{id}.libs.json` régénéré via
-`sync_stack_md.py`. Détail : `@.claude/docs/{architecture,validated-combos}.md`.
+Détail tiers, matrice dimensions, 23 combinaisons bench 2026-06-05, cible C3-prod, exceptions `.libs.json` : `@.claude/docs/validated-combos.md`.
 
 ---
 

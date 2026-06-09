@@ -97,34 +97,40 @@ def main() -> int:
     if not PLANS_DIR.exists():
         print(f"[OK] no plans dir — nothing to ingest")
         return SUCCESS
-    conn = sqlite3.connect(str(DB_PATH))
-    cur = conn.cursor()
     ts = now_iso()
     n_ingested = 0
 
-    for fp in sorted(PLANS_DIR.glob("*.md")):
-        data = parse_plan(fp)
-        if not data:
-            continue
-        cur.execute(
-            """INSERT INTO plans(plan_id, us_id, family, file_path, schema_version,
-                  strict_ready, us_hash, capabilities_json, file_count, generated_at, ingested_at)
-               VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-               ON CONFLICT(plan_id) DO UPDATE SET
-                 us_id=excluded.us_id, family=excluded.family, file_path=excluded.file_path,
-                 schema_version=excluded.schema_version, strict_ready=excluded.strict_ready,
-                 us_hash=excluded.us_hash, capabilities_json=excluded.capabilities_json,
-                 file_count=excluded.file_count, generated_at=excluded.generated_at,
-                 ingested_at=excluded.ingested_at""",
-            (
-                data["plan_id"], data["us_id"], data["family"], data["file_path"],
-                data["schema_version"], data["strict_ready"], data["us_hash"],
-                data["capabilities_json"], data["file_count"], data["generated_at"], ts,
-            ),
-        )
-        n_ingested += 1
+    # Audit CTO 2026-06-09 — wrap in `with` context manager (closing) to
+    # guarantee conn.close() on normal exit AND on exception path. Prior
+    # code leaked the connection if any cur.execute() raised.
+    from contextlib import closing
+    with closing(sqlite3.connect(str(DB_PATH))) as conn:
+        cur = conn.cursor()
 
-    conn.commit()
+        for fp in sorted(PLANS_DIR.glob("*.md")):
+            data = parse_plan(fp)
+            if not data:
+                continue
+            cur.execute(
+                """INSERT INTO plans(plan_id, us_id, family, file_path, schema_version,
+                      strict_ready, us_hash, capabilities_json, file_count, generated_at, ingested_at)
+                   VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                   ON CONFLICT(plan_id) DO UPDATE SET
+                     us_id=excluded.us_id, family=excluded.family, file_path=excluded.file_path,
+                     schema_version=excluded.schema_version, strict_ready=excluded.strict_ready,
+                     us_hash=excluded.us_hash, capabilities_json=excluded.capabilities_json,
+                     file_count=excluded.file_count, generated_at=excluded.generated_at,
+                     ingested_at=excluded.ingested_at""",
+                (
+                    data["plan_id"], data["us_id"], data["family"], data["file_path"],
+                    data["schema_version"], data["strict_ready"], data["us_hash"],
+                    data["capabilities_json"], data["file_count"], data["generated_at"], ts,
+                ),
+            )
+            n_ingested += 1
+
+        conn.commit()
+
     print(f"[OK] ingested {n_ingested} plans into {DB_PATH.relative_to(ROOT)}")
     return SUCCESS
 if __name__ == "__main__":

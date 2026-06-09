@@ -101,20 +101,50 @@ mapping HTML→DS, capabilities on-demand, conventions stack-specific).
 
 ## 2. Matrice de couverture — dimensions × statut
 
-| Dimension | 🟢 Validé (combo PoC) | 🟡 Expérimental (stack OK, combo jamais testé) | 🔴 Non testé |
-|---|---|---|---|
-| **Backend** | `dotnet-minimalapi`, `kotlin-spring-boot` | `python-fastapi`, `node-express` | — |
-| **Frontend** | `react`, `blazor-webassembly` (combo C1) | `vue`, `angular` | — |
-| **UI DS** | `shadcn`, `radzen-blazor` (combo C1) | `vuetify` | — |
-| **QA** | `dotnet-xunit`, `kotlin-junit`, `node-vitest`, `blazor-bunit` (combo C1), `code-quality` | `python-pytest`, `angular-jasmine`, `mutation-testing`, `playwright` | — |
-| **Auth** | `azure-ad` | `auth-local` | — |
-| **DB** | PostgreSQL (via Kotlin + .NET) | SqlServer (via .NET stacks, doc OK) | MySql, MariaDb, Sqlite, Oracle, MongoDb |
-| **Archi pattern** | `mvc` (implicite C1) | `ddd` (workspace CMSPrint, non-PoC formel) | `microservice` (en quarantaine v7) |
-| **AppType** | `back-front/web` | `fullstack`, `back-front/mobile` | `mobile-{react-native,maui}` (stacks quarantine) |
+> **MAJ audit CTO 2026-06-09 (Major #5 closure)** : tableau aligné sur
+> la SSoT `componentLevels` de `templates/combos.json` et sur les en-têtes
+> `Validation:` des fichiers `.claude/stacks/{cat}/*.md`. Plusieurs stacks
+> historiquement listés 🟡 sont passés 🟢 bench-validated après le bench
+> du 2026-06-05 (`python-pytest`, `angular-jasmine`, `vuetify`, `auth-local`).
 
-> Lecture : un stack 🟡 est conforme techniquement (entête `Validation:`,
-> `.libs.json` valide, tests stack-level OK) mais **n'a jamais été utilisé
-> dans une PoC `/sdd-full` complète**. La conformité unitaire ≠ garantie d'intégration.
+| Dimension | 🟢 validated (full pipeline) | 🟢 bench-validated runtime (2026-06-05) | 🟡 experimental | 🔴 untested |
+|---|---|---|---|---|
+| **Backend** | `dotnet-minimalapi`, `kotlin-spring-boot` | `python-fastapi`, `node-express` | — | — |
+| **Frontend** | `react`, `blazor-webassembly` | `vue`, `angular` | — | — |
+| **UI DS** | `shadcn`, `radzen-blazor` | `vuetify` | — | — |
+| **QA** | `dotnet-xunit`, `kotlin-junit`, `node-vitest`, `blazor-bunit`, `code-quality` | `python-pytest`, `angular-jasmine` | `mutation-testing` (opt-in), `playwright` (opt-in) | — |
+| **Auth** | `azure-ad` | `auth-local` | — | — |
+| **DB** | PostgreSQL | — | SqlServer (combos non bench) | MySql, MariaDb, Sqlite, Oracle, MongoDb |
+| **Archi pattern** | `mvc` | — | `ddd` (combos C2 exercé, PoC formel pending), `microservice` (quarantaine v7) | — |
+| **Fullstack** | — | `angular-universal`, `blazor-server`, `kotlin-mustache`, `next`, `nuxt` | — | `node-react` (🟡 **POC-only** : console SDD interne, hors prod externe) |
+| **Mobiles** | — | `maui` (Win desktop), `react-native` (Expo Web) | — | `kotlin-android` (scaffold seul, SDK absent) |
+
+**Recount canonique 2026-06-09** : 29 🟢 (4 backend + 4 frontend + 3 UI + 7 QA + 2 auth + 1 archi + 5 fullstack + 3 mobiles) + 4 🟡 experimental + 1 🟡 POC-only = **34 total** (cf. gate `framework_smoke.py` constante `expected_total = 34`).
+
+> Lecture : un stack 🟡 experimental est conforme techniquement (entête
+> `Validation:`, `.libs.json` valide, tests stack-level OK) mais **n'a jamais
+> été utilisé dans un combo bench runtime**. Un stack 🟢 bench-validated a
+> tourné runtime (curl, build vert, AC servies) mais `/sdd-full` end-to-end
+> reste partiellement manuel (cf. `docs/benchmarks/known-gaps.md`).
+
+### 2.bis Stacks sans `.libs.json` compagnon — exceptions documentées
+
+**Major #6 audit closure 2026-06-09**. Convention SDD_Pro : tout stack
+applicatif (backend / frontend / ui / qa-test-runner / fullstack / mobiles)
+a un `.libs.json` compagnon (SSoT install via `arch` Phase A). Exceptions
+légitimes (catalogue machine non pertinent) :
+
+| Stack | Catégorie | Raison de l'exception |
+|---|---|---|
+| `archi/mvc.md` | Pattern architectural | Conceptuel — n'installe aucune lib, librairie consommée via le stack backend actif |
+| `archi/ddd.md` | Pattern architectural | Idem — Domain-Driven Design est un pattern, pas un package |
+| `archi/microservice.md` | Pattern architectural | Idem — pattern d'organisation cross-services |
+| `auth/azure-ad.md` | Protocole d'authentification | Cross-langage (OIDC/OAuth2 + MSAL/JWT) — les libs concrètes vivent dans le `.libs.json` du backend consommateur (`Microsoft.Identity.Web`, `spring-security-oauth2-resource-server`, `python-jose`, etc.) |
+| `auth/auth-local.md` | Protocole d'authentification | Idem — JWT HS256 + bcrypt natif, libs portées par le backend (`bcryptjs`, `jjwt`, `passlib`, etc.) |
+| `qa/code-quality.md` | Ruleset cross-stack | Sonar-like checks déterministes consommés par `quality_scan.py` (script Python), pas de runtime test framework dédié |
+
+Validation enforcement : `python .claude/python/sdd_admin/validate_libs_catalog.py`
+ignore explicitement ces 6 fichiers via leur catégorie / nom.
 
 ---
 

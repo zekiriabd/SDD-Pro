@@ -131,56 +131,62 @@ def main() -> int:
     if not DB_PATH.exists():
         print(f"DB not found: {DB_PATH}", file=sys.stderr)
         return FAIL_FAST
-    conn = sqlite3.connect(str(DB_PATH))
-    cur = conn.cursor()
     ts = now_iso()
     n_feats, n_us = 0, 0
 
-    for fp in sorted(FEATS_DIR.glob("*.md")):
-        data = parse_feat(fp)
-        if not data:
-            continue
-        cur.execute(
-            """INSERT INTO feats(feat_n, name, file_path, status, actors_json,
-                  sfd_count, br_count, ac_count, fd_count, created_at, updated_at, ingested_at)
-               VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT created_at FROM feats WHERE feat_n=?), ?), ?, ?)
-               ON CONFLICT(feat_n) DO UPDATE SET
-                 name=excluded.name, file_path=excluded.file_path, status=excluded.status,
-                 actors_json=excluded.actors_json,
-                 sfd_count=excluded.sfd_count, br_count=excluded.br_count,
-                 ac_count=excluded.ac_count, fd_count=excluded.fd_count,
-                 updated_at=excluded.updated_at, ingested_at=excluded.ingested_at""",
-            (
-                data["feat_n"], data["name"], data["file_path"], data["status"], data["actors_json"],
-                data["sfd_count"], data["br_count"], data["ac_count"], data["fd_count"],
-                data["feat_n"], ts, ts, ts,
-            ),
-        )
-        n_feats += 1
+    # Audit CTO 2026-06-09 — wrap in `with` context manager (closing) to
+    # guarantee conn.close() on normal exit AND on exception path. Prior
+    # code leaked the connection if any cur.execute() raised.
+    from contextlib import closing
+    with closing(sqlite3.connect(str(DB_PATH))) as conn:
+        cur = conn.cursor()
 
-    for fp in sorted(US_DIR.glob("*.md")):
-        data = parse_us(fp)
-        if not data:
-            continue
-        cur.execute(
-            """INSERT INTO us(us_id, feat_n, n, m, name, file_path, status, complexity,
-                  effort_estimate, covers_json, deps_json, ac_count, created_at, updated_at, ingested_at)
-               VALUES(?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, '[]', ?,
-                      COALESCE((SELECT created_at FROM us WHERE us_id=?), ?), ?, ?)
-               ON CONFLICT(us_id) DO UPDATE SET
-                 feat_n=excluded.feat_n, n=excluded.n, m=excluded.m,
-                 name=excluded.name, file_path=excluded.file_path, status=excluded.status,
-                 covers_json=excluded.covers_json, ac_count=excluded.ac_count,
-                 updated_at=excluded.updated_at, ingested_at=excluded.ingested_at""",
-            (
-                data["us_id"], data["feat_n"], data["n"], data["m"], data["name"],
-                data["file_path"], data["status"], data["covers_json"], data["ac_count"],
-                data["us_id"], ts, ts, ts,
-            ),
-        )
-        n_us += 1
+        for fp in sorted(FEATS_DIR.glob("*.md")):
+            data = parse_feat(fp)
+            if not data:
+                continue
+            cur.execute(
+                """INSERT INTO feats(feat_n, name, file_path, status, actors_json,
+                      sfd_count, br_count, ac_count, fd_count, created_at, updated_at, ingested_at)
+                   VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT created_at FROM feats WHERE feat_n=?), ?), ?, ?)
+                   ON CONFLICT(feat_n) DO UPDATE SET
+                     name=excluded.name, file_path=excluded.file_path, status=excluded.status,
+                     actors_json=excluded.actors_json,
+                     sfd_count=excluded.sfd_count, br_count=excluded.br_count,
+                     ac_count=excluded.ac_count, fd_count=excluded.fd_count,
+                     updated_at=excluded.updated_at, ingested_at=excluded.ingested_at""",
+                (
+                    data["feat_n"], data["name"], data["file_path"], data["status"], data["actors_json"],
+                    data["sfd_count"], data["br_count"], data["ac_count"], data["fd_count"],
+                    data["feat_n"], ts, ts, ts,
+                ),
+            )
+            n_feats += 1
 
-    conn.commit()
+        for fp in sorted(US_DIR.glob("*.md")):
+            data = parse_us(fp)
+            if not data:
+                continue
+            cur.execute(
+                """INSERT INTO us(us_id, feat_n, n, m, name, file_path, status, complexity,
+                      effort_estimate, covers_json, deps_json, ac_count, created_at, updated_at, ingested_at)
+                   VALUES(?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, '[]', ?,
+                          COALESCE((SELECT created_at FROM us WHERE us_id=?), ?), ?, ?)
+                   ON CONFLICT(us_id) DO UPDATE SET
+                     feat_n=excluded.feat_n, n=excluded.n, m=excluded.m,
+                     name=excluded.name, file_path=excluded.file_path, status=excluded.status,
+                     covers_json=excluded.covers_json, ac_count=excluded.ac_count,
+                     updated_at=excluded.updated_at, ingested_at=excluded.ingested_at""",
+                (
+                    data["us_id"], data["feat_n"], data["n"], data["m"], data["name"],
+                    data["file_path"], data["status"], data["covers_json"], data["ac_count"],
+                    data["us_id"], ts, ts, ts,
+                ),
+            )
+            n_us += 1
+
+        conn.commit()
+
     print(f"[OK] ingested {n_feats} FEATs + {n_us} US into {DB_PATH.relative_to(ROOT)}")
     return SUCCESS
 if __name__ == "__main__":
