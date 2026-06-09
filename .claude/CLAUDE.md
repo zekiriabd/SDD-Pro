@@ -80,12 +80,13 @@ Détail modèles + retraits v7.0.0 (`a11y`/`perf`/`dashboard`/`*-strict`) :
 
 ## 5. Règles & Templates
 
-`.claude/rules/` (8 fichiers, 6 actives + 2 annexes) :
+`.claude/rules/` (9 fichiers, 7 actives + 2 annexes) :
 - **5 règles consolidées** : `build-and-loop`, `quality`, `ownership`,
   `library-and-stack`, `error-classification`
 - **1 protocole chat** : `output-protocol.md` (1L `[AGENT] résumé (X%)`)
   + statusline `sdd_admin.statusline`
 - **1 hoist** : `dev-shared-preflight.md` (STEP 0-1.bis dev-backend/frontend)
+- **1 orchestration** : `auditor-orchestration.md` (two-stage gate STEP 6.4 dev-run)
 - **1 annexe** : `error-classification-legacy.md` (`[A11Y_*]`/`[PERF_*]` ingest CI)
 
 **2 principes** : `.claude/docs/principles/{source-first,us-granularity}.md`.

@@ -180,7 +180,9 @@ DOC_ONLY_RUBRICS = (
 )
 
 EXPECTED_RULES = (
-    # v7.0.0 final — 5 consolidated rules only (stubs swept post-v7.0.0-alpha).
+    # v7.0.0 final — 5 consolidated rules + 1 protocole + 1 hoist + 1
+    # orchestration (audit CTO 2026-06-09 closure : auditor-orchestration
+    # explicitement enforce, était sur disque sans gate smoke).
     # The 8 backward-compat stubs (backend-first, dev-shared, qa-coverage,
     # ui-tokens, file-ownership, constitution, stack-completeness, cors)
     # were removed after migrating all `Read @.claude/rules/X.md` references
@@ -188,11 +190,17 @@ EXPECTED_RULES = (
     # The 2 principles (source-first, us-granularity) moved to
     # `.claude/docs/principles/` (Tech Lead discipline / mono-agent po,
     # respectively — neither is cross-cutting).
-    "build-and-loop",       # = was backend-first + dev-shared
-    "quality",              # = was qa-coverage + ui-tokens
-    "ownership",            # = was file-ownership + constitution
-    "library-and-stack",    # = was stack-completeness + cors
-    "error-classification", # untouched (still primary, 489 LOC)
+    "build-and-loop",        # = was backend-first + dev-shared
+    "quality",               # = was qa-coverage + ui-tokens
+    "ownership",             # = was file-ownership + constitution
+    "library-and-stack",     # = was stack-completeness + cors
+    "error-classification",  # untouched (still primary, 489 LOC)
+    "output-protocol",       # 1L chat output protocol (v7.0.0+)
+    "dev-shared-preflight",  # STEP 0-1.bis hoist (v7.0.0+)
+    "auditor-orchestration", # two-stage gate STEP 6.4 dev-run (v7.0.1+ hoist)
+    # Annexe `error-classification-legacy` reste un fichier de référence
+    # taxonomie A11Y/PERF, lu uniquement par les scripts d'ingest CI.
+    # Pas listé ici car non load-bearing pour le pipeline LLM.
 )
 
 # v7.0.0 — 2 principles relocated to docs/principles/ (not cross-cutting rules)
@@ -322,8 +330,12 @@ def _check_telemetry_health(claude_root: Path, checks: "Checks") -> None:
         except json.JSONDecodeError:
             payload = {}
         verdict = (payload.get("verdict") or "UNKNOWN").upper()
-        if verdict in ("CLEAN", "ABSENT"):
-            detail = "DB clean" if verdict == "CLEAN" else "no console.db yet (fresh checkout)"
+        if verdict in ("CLEAN", "ABSENT", "PRISTINE"):
+            detail = {
+                "CLEAN":    "DB clean",
+                "ABSENT":   "no console.db yet (fresh checkout)",
+                "PRISTINE": "DB initialized, no telemetry yet (fresh init)",
+            }[verdict]
             checks.add("telemetry-health", "OK", detail)
         elif verdict == "SUSPECT":
             checks.add("telemetry-health", "WARN",
@@ -453,6 +465,50 @@ def _check_stack_md_headers(claude_root: Path, checks: "Checks") -> None:
     except (OSError, subprocess.TimeoutExpired) as e:
         checks.add("stack-md-headers", "WARN",
                    f"validate_stack_md_headers invocation failed: {e}")
+
+
+def _check_adr_naming(claude_root: Path, checks: "Checks") -> None:
+    """#19 ADR filename pattern gate (audit CTO 2026-06-09 Major #18 closure).
+
+    Délègue à `validate_adr_naming.py --json --strict=false` (n'échoue que sur
+    les noms vraiment malformés, tolère les ADRs legacy pre-2026-06-08 sans
+    rand4). Coût typique : ~80ms (subprocess Python + Glob disk).
+    """
+    script = claude_root / "python" / "sdd_admin" / "validate_adr_naming.py"
+    if not script.is_file():
+        return
+    try:
+        res = subprocess.run(
+            [sys.executable, str(script), "--json"],
+            cwd=claude_root.parent,
+            capture_output=True, text=True, encoding="utf-8",
+            errors="replace", timeout=10,
+        )
+        try:
+            payload = json.loads(res.stdout) if res.stdout.strip() else {}
+        except json.JSONDecodeError:
+            payload = {}
+        if not payload.get("found"):
+            # Pas d'ADRs → noop silencieux (projet sans ADRs framework)
+            return
+        counts = payload.get("counts", {})
+        invalid = counts.get("invalid", 0)
+        total = counts.get("total", 0)
+        legacy = counts.get("legacy", 0)
+        canonical = counts.get("canonical", 0)
+        if res.returncode == 0 and invalid == 0:
+            checks.add("adr-naming", "OK",
+                       f"all {total} ADRs valid (canonical={canonical}, legacy={legacy})")
+        else:
+            sample = ", ".join(payload.get("invalid", [])[:3])
+            more = f" (+ {invalid - 3} more)" if invalid > 3 else ""
+            checks.add("adr-naming", "FAIL",
+                       f"{invalid}/{total} ADR filename(s) malformed — "
+                       f"e.g. {sample}{more}. "
+                       f"Run `python -m sdd_admin.validate_adr_naming` for details.")
+    except (OSError, subprocess.TimeoutExpired) as e:
+        checks.add("adr-naming", "WARN",
+                   f"validate_adr_naming invocation failed: {e}")
 
 
 def _compute_timing(t_start: float, skip_heavy: bool, checks: "Checks") -> None:
@@ -800,6 +856,7 @@ def main() -> int:
         pytests_dir = claude_root / "python" / "tests"
         _check_pytest_smoke(pytests_dir, claude_root, checks)
         _check_stack_md_headers(claude_root, checks)
+        _check_adr_naming(claude_root, checks)
 
     _compute_timing(t_start, skip_heavy, checks)
     return _emit_report(checks, args, claude_root)

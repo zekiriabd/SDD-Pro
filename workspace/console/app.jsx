@@ -30,8 +30,24 @@ const Icon = {
 // Pages de documentation embarquées dans le SPA (depuis v6.10 — plus d'ouverture dans un onglet).
 // Servies via /api/help/:id (server.js) puis rendues inline via iframe srcdoc.
 const DOC_PAGES = [
-  { id: "fonctionnelle", title: "Fonctionnelle", subtitle: "Vue d ensemble du framework SDD_Pro" },
-  { id: "technique",     title: "Technique",     subtitle: "Architecture, agents, pipeline (v6.0)" },
+  // Pages HTML stylisées (workspace/console/help/*.html, via /api/help/:id)
+  { id: "fonctionnelle", title: "Fonctionnelle", subtitle: "Vue d'ensemble du framework SDD_Pro", type: "html", section: "Présentation" },
+  { id: "technique",     title: "Technique",     subtitle: "Architecture, agents, pipeline (v6.0)", type: "html", section: "Présentation" },
+  // Documents Markdown du framework (rendus via marked.js, /api/doc-md?id=...)
+  { id: "readme",             title: "README (FR)",      subtitle: "Présentation et installation",          type: "md", section: "Projet" },
+  { id: "readme-en",          title: "README (EN)",      subtitle: "Project overview and installation",     type: "md", section: "Projet" },
+  { id: "license",            title: "Licence (Apache 2.0)", subtitle: "Conditions d'utilisation",          type: "md", format: "text", section: "Projet" },
+  { id: "changelog",          title: "Changelog",        subtitle: "Historique des versions",                type: "md", section: "Projet" },
+  { id: "quickstart",         title: "Quickstart",       subtitle: "Démarrage rapide",                       type: "md", section: "Guides" },
+  { id: "cookbook",           title: "Cookbook",         subtitle: "Recettes en 10 minutes",                 type: "md", section: "Guides" },
+  { id: "workflow",           title: "Workflow",         subtitle: "Cycle FEAT → US → Code",                 type: "md", section: "Guides" },
+  { id: "architecture",       title: "Architecture",     subtitle: "Vue technique du framework",             type: "md", section: "Référence" },
+  { id: "agents-reference",   title: "Agents",           subtitle: "Référence des 12 agents",                type: "md", section: "Référence" },
+  { id: "commands-reference", title: "Commandes",        subtitle: "Référence des 13 commandes",             type: "md", section: "Référence" },
+  { id: "validated-combos",   title: "Combos validés",   subtitle: "13 combos SLA + 4 experimental + 1 POC",  type: "md", section: "Référence" },
+  { id: "why-sdd-pro",        title: "Pourquoi SDD Pro", subtitle: "Vision et bénéfices",                    type: "md", section: "Commercial" },
+  { id: "sla",                title: "SLA",              subtitle: "Engagements de service",                 type: "md", section: "Commercial" },
+  { id: "compliance",         title: "Compliance",       subtitle: "Conformité et sécurité",                 type: "md", section: "Commercial" },
 ];
 
 // ───────── STATUS HELPERS ─────────
@@ -192,7 +208,16 @@ function DocMenu({ page, setPage }) {
     return () => document.removeEventListener("mousedown", onClick);
   }, [open]);
 
-  const onDocPage = page === "doc-fonctionnelle" || page === "doc-technique";
+  const onDocPage = typeof page === "string" && page.startsWith("doc-");
+
+  // Groupement par section (préserve l'ordre d'apparition dans DOC_PAGES)
+  const sections = [];
+  const seen = new Map();
+  for (const p of DOC_PAGES) {
+    const sec = p.section || "Documentation";
+    if (!seen.has(sec)) { seen.set(sec, sections.length); sections.push({ name: sec, items: [] }); }
+    sections[seen.get(sec)].items.push(p);
+  }
 
   return (
     <div style={{position: 'relative'}}>
@@ -207,22 +232,35 @@ function DocMenu({ page, setPage }) {
           position: 'absolute', top: '100%', left: 0, marginTop: 6,
           background: 'var(--panel)', border: '1px solid var(--line)',
           borderRadius: 8, boxShadow: 'var(--shadow-md)',
-          minWidth: 280, zIndex: 100, overflow: 'hidden'
+          minWidth: 320, maxHeight: 'calc(100vh - 80px)', overflowY: 'auto', zIndex: 100
         }}>
-          {DOC_PAGES.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => { setPage("doc-" + p.id); setOpen(false); }}
-              style={{
-                display: 'block', width: '100%', textAlign: 'left',
-                padding: '12px 14px', border: 0, background: 'transparent',
-                borderBottom: '1px solid var(--line-2)', cursor: 'pointer',
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.background = 'var(--panel-2)'}
-              onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
-              <div style={{fontSize: 13, fontWeight: 500, color: 'var(--ink)'}}>{p.title}</div>
-              <div style={{fontSize: 11.5, color: 'var(--ink-3)', marginTop: 2}}>{p.subtitle}</div>
-            </button>
+          {sections.map((sec, idx) => (
+            <div key={sec.name}>
+              <div style={{
+                padding: '10px 14px 6px', fontSize: 11, color: 'var(--ink-3)',
+                textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600,
+                borderTop: idx > 0 ? '1px solid var(--line-2)' : 0,
+                background: 'var(--panel-2)'
+              }}>{sec.name}</div>
+              {sec.items.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => { setPage("doc-" + p.id); setOpen(false); }}
+                  style={{
+                    display: 'block', width: '100%', textAlign: 'left',
+                    padding: '10px 14px', border: 0, background: 'transparent',
+                    borderBottom: '1px solid var(--line-2)', cursor: 'pointer',
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = 'var(--panel-2)'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+                  <div style={{fontSize: 13, fontWeight: 500, color: 'var(--ink)'}}>
+                    {p.title}
+                    {p.type === "md" && <span style={{fontSize: 9, marginLeft: 6, padding: '1px 5px', borderRadius: 3, background: 'var(--accent-soft)', color: 'var(--accent)', verticalAlign: 'middle'}}>MD</span>}
+                  </div>
+                  <div style={{fontSize: 11.5, color: 'var(--ink-3)', marginTop: 2}}>{p.subtitle}</div>
+                </button>
+              ))}
+            </div>
           ))}
         </div>
       )}
@@ -230,24 +268,68 @@ function DocMenu({ page, setPage }) {
   );
 }
 
-// ───────── DOC PAGE (HTML inliné, style natif du site, theme-aware) ─────────
+// ───────── DOC PAGE (HTML stylisé OU Markdown rendu via marked.js) ─────────
 function DocPage({ docId }) {
+  const meta = DOC_PAGES.find((p) => p.id === docId);
+  const isMd = meta?.type === "md";
   const [body, setBody] = useState(null);
   const [error, setError] = useState(null);
+
   useEffect(() => {
     let cancelled = false;
     setBody(null); setError(null);
-    fetch("/api/help/" + docId)
+    const url = isMd
+      ? "/api/doc-md?id=" + encodeURIComponent(docId)
+      : "/api/help/" + docId;
+    fetch(url)
       .then((res) => res.ok ? res.json() : Promise.reject(new Error("HTTP " + res.status)))
-      .then((payload) => { if (!cancelled) setBody(payload.body || ""); })
+      .then((payload) => {
+        if (cancelled) return;
+        if (isMd) {
+          const md = payload.markdown || "";
+          const isPlainText = meta?.format === "text";
+          if (isPlainText || !window.marked || typeof window.marked.parse !== "function") {
+            // Fichier texte brut (ex. LICENSE) OU marked.js indisponible → <pre>
+            const esc = md.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            setBody("<pre style=\"white-space: pre-wrap; font-family: var(--font-mono, monospace); font-size: 12.5px; line-height: 1.6; background: var(--panel-2); padding: 18px; border-radius: 8px; border: 1px solid var(--line-2); overflow-x: auto;\">" + esc + "</pre>");
+          } else {
+            try {
+              window.marked.setOptions({ gfm: true, breaks: false });
+            } catch { /* ignore option errors */ }
+            // Sanitization XSS (audit CTO 2026-06-09 Critical #1) : marked v14
+            // n'a plus de sanitizer natif. DOMPurify whitelist tags/attrs sûrs
+            // pour rendu doc (pas de <script>, <iframe>, on*, javascript:).
+            // Fallback strict si DOMPurify indisponible (CDN slow / offline).
+            const rawHtml = window.marked.parse(md);
+            const safeHtml = (window.DOMPurify && typeof window.DOMPurify.sanitize === "function")
+              ? window.DOMPurify.sanitize(rawHtml, {
+                  USE_PROFILES: { html: true },
+                  FORBID_TAGS: ["style", "iframe", "object", "embed", "form"],
+                  FORBID_ATTR: ["onerror", "onload", "onclick", "onmouseover", "style"],
+                })
+              : "<div style=\"color: var(--danger); padding: 12px; border: 1px solid var(--danger); border-radius: 6px;\">DOMPurify indisponible — rendu Markdown bloqué pour sécurité (XSS risk). Recharger la page.</div>";
+            setBody(safeHtml);
+          }
+        } else {
+          setBody(payload.body || "");
+        }
+      })
       .catch((err) => { if (!cancelled) setError(err.message); });
     return () => { cancelled = true; };
-  }, [docId]);
+  }, [docId, isMd]);
 
   if (error) return <div className="doc-content"><div style={{color: "var(--danger)"}}>Erreur : {error}</div></div>;
   if (body === null) return <div className="doc-content"><div style={{color: "var(--ink-3)"}}>Chargement de la documentation…</div></div>;
+
   return (
-    <article className="doc-content">
+    <article className={`doc-content ${isMd ? "doc-md" : "doc-html"}`}>
+      {meta && (
+        <header style={{marginBottom: 18, paddingBottom: 14, borderBottom: '1px solid var(--line-2)'}}>
+          <div style={{fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600}}>{meta.section || 'Documentation'}</div>
+          <h1 style={{margin: '4px 0 2px', fontSize: 22}}>{meta.title}</h1>
+          <div style={{fontSize: 13, color: 'var(--ink-3)'}}>{meta.subtitle}</div>
+        </header>
+      )}
       <div dangerouslySetInnerHTML={{ __html: body }}/>
     </article>
   );
@@ -2025,10 +2107,8 @@ function App() {
         theme={theme} toggleTheme={toggleTheme}/>
       {page === "dashboard" ? (
         <DashboardPage projectName={project?.name}/>
-      ) : page === "doc-fonctionnelle" ? (
-        <DocPage docId="fonctionnelle"/>
-      ) : page === "doc-technique" ? (
-        <DocPage docId="technique"/>
+      ) : (typeof page === "string" && page.startsWith("doc-")) ? (
+        <DocPage docId={page.slice(4)}/>
       ) : (
         <>
           <FeaturesHeader tree={filteredTree} onRefresh={refresh}/>

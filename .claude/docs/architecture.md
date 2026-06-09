@@ -15,11 +15,12 @@ graph TB
         STACK[stack.md<br/>Project Config]
     end
 
-    subgraph Agents["🤖 13 agents IA"]
+    subgraph Agents["🤖 12 agents LLM + 1 rubric"]
         direction TB
         CORE[Core 4<br/>po + arch<br/>+ dev-backend + dev-frontend]
-        SUPPORT[Support 4<br/>elicitor + constitutioner + qa<br/>+ complexity-router opt-in]
+        SUPPORT[Support 3<br/>elicitor + constitutioner + qa]
         AUDITORS[Auditors 5<br/>code + security + spec<br/>+ arch + adversarial]
+        RUBRIC[Rubric déterministe<br/>complexity-router script Python]
     end
 
     subgraph Determ["⚙️ Python deterministic"]
@@ -137,10 +138,11 @@ graph LR
 
 Le PO humain rédige une FEAT fonctionnelle. L'UX Designer (humain) dépose
 des **mockups HTML statiques** dans `workspace/input/ui/`. Une chaîne de
-**13 agents** spécialisés (4 cœur : PO, Arch, Dev-Backend, Dev-Frontend ;
-4 support : Elicitor, Constitutioner, QA, Complexity-Router opt-in v7.0.0+ ;
-5 auditors : Code-Reviewer, Security-Reviewer, Spec-Compliance-Reviewer,
-Arch-Reviewer, Adversarial-Reviewer) transforme l'ensemble en :
+**12 agents LLM + 1 rubric déterministe** (4 cœur LLM : PO, Arch, Dev-Backend,
+Dev-Frontend ; 3 support LLM : Elicitor, Constitutioner, QA ; 5 auditors LLM :
+Code-Reviewer, Security-Reviewer, Spec-Compliance-Reviewer, Arch-Reviewer,
+Adversarial-Reviewer ; 1 rubric Python `complexity-router` opt-in v7.0.0+,
+0 token) transforme l'ensemble en :
 
 1. **User Stories structurées** (1 à 6 par FEAT, cible 1-3) — agent PO
 2. **Bootstrap solution + projets vides + (si DB) schéma + entities

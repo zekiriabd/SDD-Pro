@@ -1,15 +1,21 @@
 #!/usr/bin/env python3
-"""SDD_Pro v6.10 — Bootstrap workspace/output/db/console.db (SQLite, WAL).
+"""SDD_Pro v7.0.0+ — Bootstrap workspace/output/db/console.db (SQLite, WAL).
 
-DB centralisée pour toute la télémétrie SDD_Pro :
+DB centralisée pour toute la télémétrie SDD_Pro. Schéma split en sub-modules
+depuis v7.0.0 (audit Sprint 2 2026-06-07) : `sdd_lib/console_db/{core,runs,qa}.py`
+définissent les CREATE TABLE par domaine. Ce script orchestre l'init :
   - Métadonnées FEAT/US/plans/ADRs (frontmatter, pas le contenu MD)
   - Résultats QA (coverage, quality, api-tests, a11y, code-review, security, perf, spec-compliance)
   - Runs, gates, events, token_usage, context_budget, validation_reports
 
-Remplace les outputs HTML générés (dashboard/README.html, qa dashboards).
+Remplace les outputs HTML générés (dashboard/README.html, qa dashboards retirés v7.0.0).
 
 Idempotent : ré-exécution = no-op si la DB est déjà au bon schema_version.
-Migration future : table schema_version + scripts upgrade_X_to_Y (TODO).
+Migrations forward-only (audit CTO 2026-06-09 Bug #15 closure) : scripts
+`sdd_lib/migrations/NNNN_slug.sql` appliqués automatiquement par
+`apply_pending_migrations` si `previous < SCHEMA_VERSION`. Pour les changements
+de schéma backward-incompatibles non-couverts par migration : `--force-recreate`
+(destructif, toutes données perdues).
 
 Usage :
     python -m sdd_scripts.init_console_db
@@ -27,7 +33,6 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from datetime import datetime, timezone
 from pathlib import Path
 
 # Permettre l'exécution directe (python init_console_db.py)
@@ -41,6 +46,7 @@ from sdd_lib.console_db import (  # noqa: E402
     default_db_path,
     load_schema_sql,
 )
+from sdd_lib.console_db.core import apply_pending_migrations  # noqa: E402
 from sdd_lib.exit_codes import FAIL_FAST, SUCCESS  # noqa: E402
 
 
@@ -55,8 +61,9 @@ def init_db(db_path: Path, force_recreate: bool = False) -> dict:
     """Create the DB and apply schema. Returns a result dict.
 
     Result schema:
-        {"status": "created"|"up_to_date"|"recreated", "db_path": str,
-         "schema_version": int, "previous_version": int|None}
+        {"status": "created"|"up_to_date"|"recreated"|"migrated",
+         "db_path": str, "schema_version": int,
+         "previous_version": int|None, "applied_migrations": list[int]?}
     """
     db_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -86,9 +93,28 @@ def init_db(db_path: Path, force_recreate: bool = False) -> dict:
                     "previous_version": previous,
                 }
             if previous < SCHEMA_VERSION:
+                # Audit CTO 2026-06-09 Bug #15 closure : appliquer les migrations
+                # forward-only depuis `sdd_lib/migrations/NNNN_slug.sql`
+                # (mécanisme déjà présent dans le module mais non câblé ici).
+                # Plus de RuntimeError "no migration available" trompeur.
+                applied = apply_pending_migrations(conn)
+                new_version = current_schema_version(conn) or previous
+                if new_version == SCHEMA_VERSION:
+                    return {
+                        "status": "migrated",
+                        "db_path": str(db_path),
+                        "schema_version": SCHEMA_VERSION,
+                        "previous_version": previous,
+                        "applied_migrations": applied,
+                    }
+                # Migration partielle : aucune migration disponible OU gap
+                # entre `previous` et `SCHEMA_VERSION` non couvert.
                 raise RuntimeError(
-                    f"[CONSOLE_DB_MIGRATION_NEEDED] DB at v{previous} but expected v{SCHEMA_VERSION}. "
-                    "Use --force-recreate (destructive) or implement migration."
+                    f"[CONSOLE_DB_MIGRATION_GAP] DB at v{previous}, framework "
+                    f"expects v{SCHEMA_VERSION}, but applied migrations only "
+                    f"reached v{new_version}. Missing migration scripts in "
+                    f"`sdd_lib/migrations/`. Use --force-recreate (destructive) "
+                    f"OR add the missing migration."
                 )
             # previous > SCHEMA_VERSION → DB plus récente qu'attendu, on log et on tolère
             return {
@@ -158,6 +184,10 @@ def main(argv: list[str] | None = None) -> int:
             print(f"OK init_console_db: created {path} (schema v{v})")
         elif status == "recreated":
             print(f"OK init_console_db: recreated {path} (schema v{v}, previous v{prev})")
+        elif status == "migrated":
+            applied = result.get("applied_migrations") or []
+            print(f"OK init_console_db: migrated {path} v{prev} -> v{v} "
+                  f"(applied: {applied})")
         else:  # up_to_date
             print(f"OK init_console_db: {path} already at v{v}")
         if "warning" in result:

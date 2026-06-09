@@ -36,11 +36,11 @@ This is the documentation hub. Every doc has a purpose and a target audience. Pi
 
 | Reference | Purpose | Doc |
 |---|---|---|
-| **13 agents** | Role / Model / Inputs / Outputs / Verdicts | [agents-reference.md](agents-reference.md) |
+| **12 LLM agents + 1 rubric** | Role / Model / Inputs / Outputs / Verdicts | [agents-reference.md](agents-reference.md) |
 | **21 commands** | Args / Flags / Agents / Outputs | [commands-reference.md](commands-reference.md) |
 | **Project Config (58 keys)** | Layered config + defaults + ranges | [configuration-reference.md](configuration-reference.md) |
 | **Error classes** | Taxonomy (174 prefixes `[CLASS]`) | [../rules/error-classification.md](../rules/error-classification.md) |
-| **Hooks + protections** | 13 Claude Code hooks wired | [hooks-and-protections.md](hooks-and-protections.md) |
+| **Hooks + protections** | 17 Claude Code hooks wired | [hooks-and-protections.md](hooks-and-protections.md) |
 
 ---
 

@@ -27,6 +27,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sdd_lib.markdown_io import section_body_stripped  # noqa: E402
 from sdd_lib.exit_codes import FAIL_FAST, SUCCESS  # noqa: E402
+from sdd_lib.paths import iso_now as now_iso  # noqa: E402  # consolidation audit CTO 2026-06-09
 
 
 @functools.lru_cache(maxsize=8)
@@ -37,13 +38,6 @@ def _count_ids_pattern(prefix: str) -> re.Pattern[str]:
     on every call (rare hot path but easy fix).
     """
     return re.compile(rf"^\s*[-*]?\s*{re.escape(prefix)}-\d+", re.MULTILINE)
-
-
-def now_iso() -> str:
-    """Alias of `sdd_lib.paths.iso_now` — kept for backward-compat with
-    consumers parsing the script output (audit consolidé 2026-06-07 Sprint 2)."""
-    from sdd_lib.paths import iso_now
-    return iso_now()
 
 
 def parse_feat(path: Path) -> dict:

@@ -281,9 +281,38 @@ class TestVerifyTelemetryHealth(unittest.TestCase):
         )
         self.assertEqual(r.returncode, 0)
         payload = json.loads(r.stdout)
-        # Fresh DB has no token_usage rows → verdict CLEAN (or SUSPECT due
-        # to the WARN-level "table empty" check). Both acceptable.
-        self.assertIn(payload["verdict"], ("CLEAN", "SUSPECT"))
+        # Fresh DB has no token_usage rows → verdict PRISTINE (audit CTO
+        # 2026-06-09 Major #7 closure : distinct de SUSPECT qui réserve
+        # désormais les warnings métier). CLEAN également acceptable si le
+        # check `token_usage_present` n'émet pas de WARN (cas DB pré-remplie).
+        self.assertIn(payload["verdict"], ("CLEAN", "PRISTINE"))
+
+    def test_fresh_db_verdict_pristine(self):
+        """Audit CTO 2026-06-09 Bug #7 closure : DB initialisée vide → PRISTINE
+        (pas SUSPECT). Distinct test du `clean_db` qui tolère soit, ici on
+        ancre strictement le contrat PRISTINE pour une DB fresh init."""
+        import json
+        os.environ["SDD_REPO_ROOT"] = str(self.repo)
+        try:
+            db_path = self.repo / "workspace" / "output" / "db" / "console.db"
+            console_db.ensure_initialized(db_path)
+        finally:
+            os.environ.pop("SDD_REPO_ROOT", None)
+
+        r = subprocess.run(
+            [sys.executable, str(VERIFY), "--json"],
+            env=_clean_env({"SDD_REPO_ROOT": str(self.repo)}),
+            capture_output=True, text=True, check=False,
+        )
+        self.assertEqual(r.returncode, 0)
+        payload = json.loads(r.stdout)
+        # DB fraîchement créée → token_usage vide → seul WARN = token_usage_present
+        # → verdict PRISTINE strict (audit CTO).
+        self.assertEqual(payload["verdict"], "PRISTINE",
+                         f"Expected PRISTINE for fresh DB but got {payload['verdict']}")
+        # Le check token_usage_present doit être présent en WARN
+        warning_names = {c["name"] for c in payload["checks"] if c["status"] == "WARN"}
+        self.assertIn("token_usage_present", warning_names)
 
     def test_corrupt_db_verdict_unreadable(self):
         """New verdict UNREADABLE (v7.0.0-alpha) when DB exists but cannot be opened."""

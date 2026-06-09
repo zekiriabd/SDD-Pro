@@ -7,11 +7,13 @@
 > persistés sur disque (rapports `workspace/output/qa/...`,
 > `workspace/output/.sys/.audit/...`) pour debug/audit.
 >
-> **Load-bearing** : règle universelle chargée par les 13 agents
+> **Load-bearing** : règle universelle chargée par les 12 agents LLM
 > (`po`, `arch`, `dev-backend`, `dev-frontend`, `qa`, `elicitor`,
 > `constitutioner`, `code-reviewer`, `security-reviewer`,
 > `spec-compliance-reviewer`, `arch-reviewer`, `adversarial-reviewer`)
-> et les 13 commandes user-facing.
+> et les 13 commandes user-facing. Le rubric `complexity-router` (script
+> Python déterministe, 0 token) n'est PAS un agent LLM et ne charge pas
+> cette règle (sortie textuelle = exit code uniquement).
 
 ## TOC
 

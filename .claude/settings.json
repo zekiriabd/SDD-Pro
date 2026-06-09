@@ -330,7 +330,7 @@
     ],
     "SubagentStop": [
       {
-        "matcher": "arch|po|elicitor|dev-backend|dev-frontend|qa|code-reviewer|security-reviewer|spec-compliance-reviewer|arch-reviewer|adversarial-reviewer|constitutioner|complexity-router",
+        "matcher": "arch|po|elicitor|dev-backend|dev-frontend|qa|code-reviewer|security-reviewer|spec-compliance-reviewer|arch-reviewer|adversarial-reviewer|constitutioner",
         "hooks": [
           {
             "type": "command",

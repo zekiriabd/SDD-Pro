@@ -97,7 +97,12 @@ CiTemplatesGeneration: true
   (Kahn). Garantie : aucun US dans batch ne dépend d'un autre US du même batch.
 - **Bypass cumulables (R1)** : `--force --no-plan-on-warn --no-validate`
   (2+ flags) exige `SDD_ALLOW_FORCE=1` env var.
-- **Console.db v2** : table `qa_mutation` (migration `0002` auto).
+- **Console.db v6** (audit CTO 2026-06-09 Bug #16 closure) : schéma actuel à v6
+  via migrations forward-only `sdd_lib/migrations/000{2..6}_*.sql`. `init_console_db.py`
+  appelle désormais `apply_pending_migrations` automatiquement (avant : throw
+  `[CONSOLE_DB_MIGRATION_NEEDED]`). Tables ajoutées : `qa_mutation` (v2),
+  `qa_e2e` (v3), `auditor_runs` (v4), `qa_api_tests.status` (v5),
+  `build_loop_traces` (v6 — convergence detection BuildLoop).
 - **Atomic write** (`rules/build-and-loop.md §2.bis`) : écritures
   `{LibName}/` & shared via `sdd_lib.atomic_write.atomic_write_text()`.
 - **Exit codes** (`sdd_lib/exit_codes.py`) : 0=SUCCESS, 1=FAIL_FAST,
@@ -109,7 +114,8 @@ CiTemplatesGeneration: true
 1. Vérifier `stack.md ## Project Config` — ajouter flags v7 nécessaires
 2. Lancer `/feat-validate {n}` sur chaque FEAT (WARN anti-GIGO)
 3. Optionnel : `/us-generate {n}` pour ajouter `Parent FEAT hash`
-4. `console.db` schema_version = 2 (automatique)
+4. `console.db` : `python -m sdd_scripts.init_console_db` — migration auto v1→v6
+   (forward-only, idempotent). Si bloquant : `--force-recreate` (destructif).
 5. Re-run `/sdd-full {n}` — bénéficier des nouveaux gates
 6. CI : vérifier qu'aucun agent custom n'écrit hors matrice ownership
 

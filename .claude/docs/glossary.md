@@ -102,11 +102,14 @@ Forme rejetée : `gate` (générique) sans qualificatif → toujours préfixer.
 
 ## 7. Agents (taxonomie)
 
-> **13 agents** en v7.0.0+ (sweep 2026-05-20 : `accessibility-auditor`,
-> `performance-auditor`, `dashboard`, `dev-backend-strict`, `dev-frontend-strict`
-> retirés ; `adversarial-reviewer` ajouté ; `complexity-router` ajouté
-> v7.0.0+ opt-in). Tous **autonomes** (jamais de question utilisateur)
-> sauf `elicitor` (dérogation `/feat-deepen`).
+> **12 agents LLM + 1 rubric Python déterministe = 13 .md** en v7.0.0+
+> (sweep 2026-05-20 : `accessibility-auditor`, `performance-auditor`,
+> `dashboard`, `dev-backend-strict`, `dev-frontend-strict` retirés ;
+> `adversarial-reviewer` ajouté ; rubric `complexity-router` (sous
+> `docs/rubrics/`, audit REFACTOR-3 2026-06-08) opt-in v7.0.0+).
+> Tous LLM **autonomes** (jamais de question utilisateur) sauf `elicitor`
+> (dérogation `/feat-deepen`). Le rubric n'est PAS un agent LLM —
+> consommé verbatim par `sdd_scripts/complexity_router.py` (0 token).
 
 | Agent | Modèle | Rôle | Phase |
 |---|---|---|---|

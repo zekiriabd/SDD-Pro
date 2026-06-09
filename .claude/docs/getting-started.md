@@ -10,7 +10,7 @@ Ce guide t'emmène de zéro à une application full-stack générée par SDD_Pro
 
 **Spec-Driven Development pour Claude Code** : un framework qui transforme des **spécifications fonctionnelles** en **code prêt-à-livrer** via des agents IA coordonnés.
 
-Tu écris **ce que** le logiciel doit faire (FEAT spec + mockup HTML optionnel). SDD_Pro orchestre **13 agents IA** (12 cœur + `complexity-router` opt-in v7.0.0+) pour déterminer **comment** :
+Tu écris **ce que** le logiciel doit faire (FEAT spec + mockup HTML optionnel). SDD_Pro orchestre **12 agents LLM + 1 rubric Python déterministe** (`complexity-router` opt-in v7.0.0+, 0 token) pour déterminer **comment** :
 
 ```
 Tu écris :              SDD_Pro produit :

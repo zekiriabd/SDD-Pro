@@ -29,7 +29,16 @@ workspace/input/stack/stack.md
 # HTTPS dev cert/key auto-signés (security audit 2026-06-06 — keypair privé
 # ne JAMAIS commiter, même en dev). Régénérer via `npm run gen-cert` ou
 # fallback HTTP automatique si absent (cf. server.js:57).
+#
+# `.certs.disabled/` = bypass HTTPS *strictement dev-local* (audit CTO 2026-06-09).
+# Convention dev : `mv .certs .certs.disabled` pour relancer en HTTP plain
+# sans toucher au code. Impact prod NUL — `existsSync(.certs/)` reste l'unique
+# gate dans server.js:63 et NODE_ENV=production refuse de booter sans certs
+# (server.js:66). Si le besoin se présente en CI, préférer `NODE_ENV=development`
+# explicite plutôt que ce rename (audit-trail meilleur). Ne JAMAIS commiter
+# de clé privée même renommée.
 workspace/console/.certs/
+workspace/console/.certs.disabled/
 
 # Layered config team-level (peut contenir des secrets/policy org)
 .sdd/

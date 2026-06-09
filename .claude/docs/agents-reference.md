@@ -288,4 +288,4 @@ Cross-file post-dev reviewers — each with a distinct angle. **5 verdicts → c
 - [architecture.md §3](architecture.md) — agents communication model
 - [workflow.md](workflow.md) — pipeline phases (FEAT → US → Code → Review)
 - [../rules/error-classification.md](../rules/error-classification.md) — full `[CLASS]` taxonomy
-- [hooks-and-protections.md](hooks-and-protections.md) — 13 hooks that watch agents
+- [hooks-and-protections.md](hooks-and-protections.md) — 17 hooks that watch agents

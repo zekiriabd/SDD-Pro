@@ -46,11 +46,11 @@ depuis le cwd.
 | Rôle | Vérifie que les fichiers édités en mode `operation: augment` (cf. plans) respectent leur contrat `preserves:`/`adds:`. Émet `[PRESERVES_VIOLATED]` ou `[ADDS_VIOLATED]` si drift détecté. |
 | Exit codes | 0 = pass, 1 = violation |
 
-### 1.4 `audit_file_ownership` — SubagentStop (13 agents)
+### 1.4 `audit_file_ownership` — SubagentStop (12 agents LLM)
 
 | Champ | Valeur |
 |---|---|
-| Trigger Claude Code | `SubagentStop` matcher `arch\|po\|elicitor\|dev-backend\|dev-frontend\|qa\|code-reviewer\|security-reviewer\|spec-compliance-reviewer\|arch-reviewer\|adversarial-reviewer\|constitutioner\|complexity-router` (étendu v7.0.0+ : ajout `complexity-router` opt-in ; v7.0.0-alpha avait 12 — retirés : `dev-*-strict`, `dashboard`, `accessibility-auditor`, `performance-auditor`) |
+| Trigger Claude Code | `SubagentStop` matcher `arch\|po\|elicitor\|dev-backend\|dev-frontend\|qa\|code-reviewer\|security-reviewer\|spec-compliance-reviewer\|arch-reviewer\|adversarial-reviewer\|constitutioner` (v7.0.0+ : 12 agents LLM ; v7.0.0-alpha avait 12 dont `complexity-router` qui a depuis été retiré du matcher car promu en script Python `sdd_scripts/complexity_router.py` — pas spawn-able ; v6.x : 16, retirés `dev-*-strict`, `dashboard`, `accessibility-auditor`, `performance-auditor`) |
 | Script | [`.claude/python/sdd_hooks/audit_file_ownership.py`](.claude/python/sdd_hooks/audit_file_ownership.py) |
 | LOC | ~150 |
 | Rôle | Vérifie la matrice ownership de `rules/ownership.md §1` (Partie A, ex-file-ownership.md) : un agent dev-backend n'a pas écrit dans `{AppName}/`, un agent QA n'a pas écrit en dehors de `*.Tests/`, etc. Émet `[FILE_OWNERSHIP]` ou `[FILE_OWNERSHIP_NESTED]` si violation. |
@@ -308,7 +308,7 @@ cas Tech Lead avancés (debug, force, urgence prod). Chaque bypass est
 | Hooks v7.0.0-alpha audit CTO (Glob anti-explosion) | — | 1 | **+1** (`preflight_glob_scope`) |
 | Scripts CLI (`sdd_scripts/`) | 14 | ~50 (v7.0.0-alpha) | +36 net |
 | Scripts admin (`sdd_admin/`) | 5 | ~13 | +8 |
-| **Total Python actif v7.0.0-alpha** | **23 PS** | **13 hooks + 50 scripts + 13 admin = 76 fichiers exécutables** | **+53 net** |
+| **Total Python actif v7.0.0+** (recount 2026-06-09) | **23 PS** | **17 hooks + 55 scripts + 19 admin = 91 fichiers exécutables** | **+68 net** |
 
 **Aucune protection nette supprimée**. La protection v7.0.0-alpha est **strictement plus forte** que v6.10 (8 hooks supplémentaires ; tous activés par défaut sauf `record_token_usage` opt-in et `pre_write_lint` / `preflight_glob_scope` en mode warn par défaut).
 
@@ -371,7 +371,7 @@ ADR `governance-protection-{slug}` + 2 approbations.
 ## 6. Pointers
 
 - [`.claude/settings.json`](.claude/settings.json) — configuration active
-- [`.claude/python/sdd_hooks/`](.claude/python/sdd_hooks/) — 13 hooks Python
+- [`.claude/python/sdd_hooks/`](.claude/python/sdd_hooks/) — 17 hooks Python
 - [`.claude/python/sdd_admin/framework_smoke.py`](.claude/python/sdd_admin/framework_smoke.py) — smoke check Stop hook
 - [`.claude/python/_hook.py`](.claude/python/_hook.py) — wrapper d'invocation
 - [`.claude/docs/MIGRATION.md`](./MIGRATION.md) — guide migration entre versions majeures

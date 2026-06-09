@@ -578,50 +578,24 @@ arch-reviewer:
   idempotent: true
 
 # -------------------------------------------------------------------------
-# Agent: complexity-router (DEPRECATED v7.0.0+ — audit P1 M2 2026-06-08)
-# Status: .md conservé UNIQUEMENT comme documentation du rubric de scoring.
-#         L'agent LLM n'est PLUS spawné par aucun pipeline ; l'invocation
-#         opérationnelle passe par le script Python déterministe
-#         `sdd_scripts/complexity_router.py` (0 token, < 50 ms).
-# Pour invoquer : `python -m sdd_scripts.complexity_router --feat-number {n}`
-#                 (ou auto via ComplexityRouterMode=auto + hook PreToolUse à câbler).
-# Entrée loader conservée car le .md existe sur disque ET pour traçabilité
-# du test contract (cf. tests/test_loader_contract.py ALIVE_AGENTS_V7).
+# complexity-router — DOC-ONLY (audit CTO 2026-06-09 Critical #4 closure)
 # -------------------------------------------------------------------------
-complexity-router:
-  reads:
-    # Order: stable → semi → volatile (cache_control canonical order, cf. sdd_lib/cache_control.py)
-    - workspace/input/stack/stack.md                              # Project Config (ComplexityRouterMode, Capabilities) · cache_layer: stable
-    - workspace/input/feats/{n}-*.md                              # FEAT seule (SFD/BR/AC/NFR/Compliance/Volume/SLA) · cache_layer: volatile
-  writes:
-    - workspace/output/.sys/.routing/{n}-complexity.json          # décision machine (consommée par /sdd-full STEP 0)
-    - workspace/output/.sys/.routing/{n}-complexity.md            # rapport humain 1 page
-  forbidden_reads:
-    - workspace/output/us/                                        # opt-in pré-pipeline, US pas encore générées
-    - workspace/output/src/                                       # hors scope, le code n'existe pas encore
-    - workspace/output/.sys/.context/                             # hors scope
-    - .claude/stacks/                                             # hors scope (déterministe)
-  forbidden_writes:
-    - workspace/input/                                            # read-only
-    - workspace/output/src/                                       # read-only
-    - workspace/output/us/                                        # responsabilité po
-    - workspace/output/plans/                                     # ne planifie pas
-    - workspace/output/.sys/.validation/                          # responsabilité auditors
-    - workspace/output/.sys/.context/                             # responsabilité po/arch/elicitor/constitutioner
-    - workspace/output/qa/                                        # responsabilité qa + reviewers
-  config_flags:                                                   # dans Project Config
-    - ComplexityRouterMode: "off | auto | manual (défaut: manual)"
-  modes:
-    - off: "skip total (recommandation = /sdd-full par défaut)"
-    - manual: "spawn explicite via Agent (défaut)"
-    - auto: "auto-spawn par /sdd-full STEP 0 avant cadrage"
-  fail_on: []                                                     # verdict = routing recommendation, jamais bloquant
-  hard_blocking_classes: []                                       # aucune classe hard-blocking par design
-  exit_silent_when:
-    - "ComplexityRouterMode: off"
-  db_target:
-    - "(none — fichiers disque uniquement sous workspace/output/.sys/.routing/)"
-  idempotent: true
+# Statut v7.0.0+ : agent LLM RETIRÉ. Section loader complète supprimée
+# (était ambiguë — donnait l'impression d'un agent spawnable). Le rubric de
+# scoring documenté dans `.claude/docs/rubrics/complexity-router-scoring.md`
+# (audit REFACTOR-3 2026-06-08 — déplacé depuis agents/ pour éviter la
+# spawn-confusion) est consommé verbatim par le script Python déterministe
+# `sdd_scripts/complexity_router.py` (0 token, < 50 ms, exit code = routing
+# recommendation).
+#
+# Invocation opérationnelle :
+#   python -m sdd_scripts.complexity_router --feat-number {n}
+#   (ou auto via `ComplexityRouterMode=auto` + hook PreToolUse à câbler v7.1+)
+#
+# Test contract : référencé dans `tests/test_loader_contract.py` via
+# `DOC_ONLY_AGENTS_V7 = {"complexity-router"}` — accepte explicitement
+# l'absence d'entrée loader pour les rubrics doc-only.
+# -------------------------------------------------------------------------
 
 # -------------------------------------------------------------------------
 # Agent: adversarial-reviewer (Sonnet 4.6) — depuis v7.2.0 (R1 BMAD)

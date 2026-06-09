@@ -53,7 +53,7 @@ from sdd_lib.exit_codes import SUCCESS  # noqa: E402
 
 _BANNER_FULL = """# SDDPro v7.0.0+ — FEAT-Driven Development Framework
 
-Framework chargé. **13 commandes user-facing** + **13 agents** spécialisés (12 cœur + `complexity-router` opt-in via script Python déterministe).
+Framework chargé. **13 commandes user-facing** + **12 agents LLM** + **1 rubric Python déterministe** (`complexity-router` opt-in v7.0.0+, 0 token).
 
 ## Pipeline canonique (strict, gated)
 
@@ -93,7 +93,7 @@ Raccourci A→Z : `/sdd-full {n}` (pipeline complet). POC rapide : `/sdd-poc {n}
 """
 
 _BANNER_MINIMAL = (
-    "SDDPro v7.0.0+ actif (13 commandes, 13 agents). "
+    "SDDPro v7.0.0+ actif (13 commandes, 12 agents LLM + 1 rubric). "
     "Pour démarrer : `/sdd-help` (guidance) ou `/sdd-status` (état)."
 )
 

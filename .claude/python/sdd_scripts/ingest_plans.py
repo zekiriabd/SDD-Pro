@@ -27,13 +27,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sdd_lib.markdown_io import parse_frontmatter as _parse_frontmatter_pair  # noqa: E402
 from sdd_lib.exit_codes import FAIL_FAST, SUCCESS  # noqa: E402
-
-
-def now_iso() -> str:
-    """Alias of `sdd_lib.paths.iso_now` — kept for backward-compat with
-    consumers parsing the script output (audit consolidé 2026-06-07 Sprint 2)."""
-    from sdd_lib.paths import iso_now
-    return iso_now()
+from sdd_lib.paths import iso_now as now_iso  # noqa: E402  # consolidation audit CTO 2026-06-09
 
 
 def parse_frontmatter(text: str) -> dict:

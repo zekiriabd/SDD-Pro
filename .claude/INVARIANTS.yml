@@ -194,8 +194,9 @@ invariants:
     name: SDDPro context injected at every SessionStart via static banner
     description: |
       session_start hook emits a byte-identical banner (cache-friendly v7.0.0+)
-      at startup|resume|clear|compact, declaring 13 commands + 13 agents +
-      pipeline canonique. Prompt cache prefix hit cross-session.
+      at startup|resume|clear|compact, declaring 13 commands + 12 LLM agents
+      + 1 deterministic rubric (complexity-router script) + pipeline canonique.
+      Prompt cache prefix hit cross-session.
     severity: minor
     enforcers:
       - .claude/python/sdd_hooks/session_start.py

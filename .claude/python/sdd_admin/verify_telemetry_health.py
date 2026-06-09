@@ -165,12 +165,22 @@ def audit_db(db_path: Path) -> dict:
     except Exception:
         pass  # best-effort RO context closure
 
-    # Final verdict
+    # Final verdict (audit CTO 2026-06-09 Major — verdict SUSPECT faux sur DB neuve).
+    # Une DB initialisée sans telemetry (token_usage vide) est l'état attendu post
+    # `init_console_db.py` — pas un signal de pollution. On distingue désormais :
+    #   - PRISTINE : DB fresh, schéma OK, seule warning = `token_usage_present` empty
+    #   - CLEAN    : DB en usage normal, aucune warning
+    #   - SUSPECT  : warning(s) métier (NULL run_id, runs sous-tokens, etc.)
+    #   - POLLUTED : ≥ 1 FAIL (schéma cassé, commandes test, etc.)
     statuses = {c["status"] for c in report["checks"]}
+    warning_names = {c["name"] for c in report["checks"] if c["status"] == "WARN"}
     if "FAIL" in statuses:
         report["verdict"] = "POLLUTED"
     elif "WARN" in statuses:
-        report["verdict"] = "SUSPECT"
+        if warning_names == {"token_usage_present"}:
+            report["verdict"] = "PRISTINE"
+        else:
+            report["verdict"] = "SUSPECT"
     else:
         report["verdict"] = "CLEAN"
     return report

@@ -53,20 +53,21 @@ package est déjà sur `sys.path` via `pip install -e .`.
 
 ```
 .claude/python/
-├── sdd_lib/              # 21 modules helpers partagés (paths, exit_codes,
+├── sdd_lib/              # 23 modules helpers partagés (paths, exit_codes,
 │                         #   atomic_write, file_locks, project_config,
 │                         #   layered_config, console_db/, migrations/...)
-├── sdd_hooks/            # 13 hooks Claude Code (cf. tableau ci-dessous)
-├── sdd_scripts/          # 50 scripts agent-invoked / CLI pipeline
-├── sdd_admin/            # 15 outils Tech Lead (smoke, sync, validateurs)
-├── tests/                # 88 fichiers test pytest
+├── sdd_hooks/            # 17 hooks Claude Code (cf. tableau ci-dessous)
+├── sdd_scripts/          # 55 scripts agent-invoked / CLI pipeline
+├── sdd_admin/            # 19 outils Tech Lead (smoke, sync, validateurs)
+├── tests/                # 103 fichiers test pytest (1500+ tests)
 ├── _hook.py              # Bootstrap loader cwd-independent pour settings.json
 ├── sitecustomize.py      # Auto-import de .claude/python/ sur sys.path
 └── pyproject.toml        # Config pytest + ruff + mypy + coverage
 ```
 
-**Compteurs réels au 2026-06-07** : 50 scripts + 13 hooks + 15 admin + 21 lib =
-**99 modules `.py` actifs** + 88 tests. Pour vérifier en live :
+**Compteurs réels au 2026-06-09** (audit CTO Bug #20 — reconcil doc theater drift) :
+55 scripts + 17 hooks + 19 admin + 23 lib = **114 modules `.py` actifs** + 103 tests.
+Pour vérifier en live :
 
 ```bash
 echo "scripts: $(ls .claude/python/sdd_scripts/*.py | grep -v __init__ | wc -l)"

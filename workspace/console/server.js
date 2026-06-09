@@ -99,9 +99,12 @@ const fastify = Fastify(fastifyOptions);
 // dev who exposes the port via tunnel/reverse-proxy.
 //
 // CSP whitelist matches what index.html actually loads:
-//   - script-src : self (dist/app.js, data-loader.js) + 2 CDNs for React/marked
+//   - script-src : self (dist/app.js, data-loader.js) + 2 CDNs for React/marked/DOMPurify
 //   - style-src  : self + Google Fonts CSS ('unsafe-inline' kept for SVG icons
 //                  and React style={} props — would require a full audit to drop)
+// Note (audit CTO 2026-06-09) : DOMPurify added to sanitize markdown rendered
+// via marked.js (XSS mitigation, cf. DocPage in app.jsx). Both libs on jsdelivr,
+// already whitelisted — no CSP change needed.
 //   - font-src   : Google Fonts files
 //   - connect-src: self (REST + SSE /api/events)
 //   - frame-src  : self (iframe srcdoc for help pages via /api/help/:id)
@@ -666,23 +669,38 @@ const HELP_FILES = {
   "technique":     join(CONSOLE_DIR, "help", "presentation-technique.html"),
 };
 
-// Extrait le contenu utile d une page HTML : body innerHTML, sans <style>/<script>
-// ni attributs `style=` ou `class=` issus du theme original (on re-stylise via .doc-content).
+// Extrait le contenu utile d une page HTML et le sanitize en défense en profondeur.
+// Les fichiers help/*.html sont contrôlés par le framework, mais on durcit quand
+// même côté serveur (audit CTO 2026-06-09 Bug #14) — DOMPurify côté client ne
+// s'applique qu'aux pages MD via /api/doc-md ; cet endpoint /api/help/:id sert
+// du HTML que le client injecte via dangerouslySetInnerHTML sans re-sanitization.
 function extractBody(raw) {
   // 1) body innerHTML uniquement
   const m = raw.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
   let body = m ? m[1] : raw;
-  // 2) supprime <script>, <style>, <link> embarqués
+  // 2) supprime <script>, <style>, <link>, <iframe>, <object>, <embed>, <form> embarqués
   body = body
     .replace(/<script[\s\S]*?<\/script>/gi, "")
     .replace(/<style[\s\S]*?<\/style>/gi, "")
-    .replace(/<link[^>]*>/gi, "");
-  // 3) supprime les attributs style="..." inline (utilisent var(--primary)/--text de la page original)
+    .replace(/<link[^>]*>/gi, "")
+    .replace(/<iframe[\s\S]*?<\/iframe>/gi, "")
+    .replace(/<iframe[^>]*\/?>/gi, "")
+    .replace(/<object[\s\S]*?<\/object>/gi, "")
+    .replace(/<embed[^>]*\/?>/gi, "")
+    .replace(/<form[\s\S]*?<\/form>/gi, "");
+  // 3) supprime tous les handlers inline `on*=` (onclick, onerror, onload, etc.)
+  //    `[\s>]` après évite de matcher des attrs valides commençant par "on" comme une hypothèse théorique.
+  body = body.replace(/\son[a-z]+\s*=\s*"[^"]*"/gi, "")
+             .replace(/\son[a-z]+\s*=\s*'[^']*'/gi, "")
+             .replace(/\son[a-z]+\s*=\s*[^\s>]+/gi, "");
+  // 4) supprime les URLs `javascript:` / `data:text/html` dans href/src
+  body = body.replace(/\s(href|src|action|formaction|xlink:href)\s*=\s*"(?:\s*javascript:|\s*data:text\/html)[^"]*"/gi, "")
+             .replace(/\s(href|src|action|formaction|xlink:href)\s*=\s*'(?:\s*javascript:|\s*data:text\/html)[^']*'/gi, "");
+  // 5) supprime les attributs style="..." inline (utilisent var(--primary)/--text de la page original)
   body = body.replace(/\sstyle="[^"]*"/gi, "");
-  // 4) supprime les class= sauf quelques utilitaires sémantiques. Conserve les classes
-  //    "alt" / "kpi-*" / "hero-*" etc. ne servent à rien sans leur CSS — strip toutes les classes.
+  // 6) supprime les class= (re-stylisées par .doc-content)
   body = body.replace(/\sclass="[^"]*"/gi, "");
-  // 5) trim
+  // 7) trim
   return body.trim();
 }
 
@@ -694,6 +712,36 @@ fastify.get("/api/help/:id", async (req, reply) => {
   const raw = await readFile(file, "utf8");
   reply.header("Cache-Control", "private, max-age=60");
   return { id: req.params.id, html: raw, body: extractBody(raw) };
+});
+
+// GET /api/doc-md?id=X — sert le markdown brut depuis une whitelist de
+// documents projet (README, LICENSE, .claude/docs/*). Le client convertit
+// via marked.js. Whitelist explicite — pas de path traversal possible.
+const DOC_MD_FILES = {
+  "readme":             join(ROOT, "README.md"),
+  "readme-en":          join(ROOT, "README.en.md"),
+  "license":            join(ROOT, "LICENSE"),
+  "quickstart":         join(ROOT, ".claude", "docs", "quickstart.md"),
+  "cookbook":           join(ROOT, ".claude", "docs", "cookbook.md"),
+  "architecture":       join(ROOT, ".claude", "docs", "architecture.md"),
+  "workflow":           join(ROOT, ".claude", "docs", "workflow.md"),
+  "validated-combos":   join(ROOT, ".claude", "docs", "validated-combos.md"),
+  "why-sdd-pro":        join(ROOT, ".claude", "docs", "WHY-SDD-PRO.md"),
+  "agents-reference":   join(ROOT, ".claude", "docs", "agents-reference.md"),
+  "commands-reference": join(ROOT, ".claude", "docs", "commands-reference.md"),
+  "sla":                join(ROOT, ".claude", "docs", "SLA.md"),
+  "compliance":         join(ROOT, ".claude", "docs", "COMPLIANCE.md"),
+  "changelog":          join(ROOT, ".claude", "docs", "CHANGELOG.md"),
+};
+
+fastify.get("/api/doc-md", async (req, reply) => {
+  const id = String(req.query.id || "");
+  const file = DOC_MD_FILES[id];
+  if (!file) return reply.code(404).send({ error: "document inconnu" });
+  if (!existsSync(file)) return reply.code(404).send({ error: "fichier absent sur disque" });
+  const markdown = await readFile(file, "utf8");
+  reply.header("Cache-Control", "private, max-age=60");
+  return { id, markdown };
 });
 
 fastify.get("/api/health", async () => ({
