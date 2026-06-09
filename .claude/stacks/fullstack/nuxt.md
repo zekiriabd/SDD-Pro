@@ -429,7 +429,7 @@ Ce stack est optimise pour :
 - `dev-backend` materialise : `server/api/`, `server/routes/`, `server/middleware/`, `server/services/`, `server/repositories/`, `server/utils/`, `prisma/schema.prisma`, `shared/schemas/`
 - `dev-frontend` materialise : `pages/`, `layouts/`, `components/`, `composables/`, `plugins/`, `app.vue`, `assets/css/`
 
-**File ownership** (override `file-ownership.md §1`) :
+**File ownership** (override `ownership.md §1 (Partie A)`) :
 
 | Path | Owner |
 |---|---|
@@ -445,7 +445,7 @@ Ce stack est optimise pour :
 | `workspace/output/src/{AppName}/prisma/**` | `arch` (create) + `dev-backend` (consommation) |
 | `workspace/output/src/{AppName}/server/config/app-config.ts` | `arch` (create exclusif — secrets/config SDD) |
 
-**Cas frontiere `nuxt.config.ts`** : touche par les 2 agents (modules cote backend, css/components cote frontend). Utiliser **lock** equivalent LibName cf. `dev-shared.md §2`, ou serialiser dans le pipeline.
+**Cas frontiere `nuxt.config.ts`** : touche par les 2 agents (modules cote backend, css/components cote frontend). Utiliser **lock** equivalent LibName cf. `build-and-loop.md §2 (Partie B)`, ou serialiser dans le pipeline.
 
 ---
 

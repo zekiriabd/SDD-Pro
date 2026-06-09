@@ -26,7 +26,7 @@ par une classe d'erreur dans une taxonomie de 174 préfixes `[CLASS]`.
 
 ## 2. 5 axes où SDD_Pro est objectivement supérieur
 
-### 2.1 Gates déterministes (51 scripts Python)
+### 2.1 Gates déterministes (55 scripts Python)
 
 | Gate | SDD_Pro | Cursor | Aider | Devin | BMAD | Superpowers | AgentOS |
 |---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
@@ -169,7 +169,7 @@ séduisant. Pour un projet industriel auditable, SDD_Pro est plus rigoureux.
 ### O3 — "Mono-IDE Claude Code, c'est un risque vendor-lockin."
 Vrai. SDD_Pro est conçu pour Claude Code (hooks, agents, sub-agent tool, skills).
 Si Anthropic disparaît, le framework est inutilisable. **Mitigation** :
-l'essentiel de la valeur (51 scripts Python + 34 catalogues stacks + taxonomie
+l'essentiel de la valeur (55 scripts Python + 34 catalogues stacks + taxonomie
 [CLASS]) est portable. Une porte v8 pourrait viser multi-IDE.
 
 ### O4 — "On peut tout faire avec un bon prompt."

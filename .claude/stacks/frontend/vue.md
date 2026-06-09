@@ -493,9 +493,9 @@ VITE_AZURE_CLIENT_ID=
 VITE_AZURE_TENANT_ID=
 ```
 
-Conformes à `.claude/rules/env_rules.md`. Les variables `VITE_*` sont
-**publiquement exposées** côté navigateur — ne jamais y mettre de
-secret.
+Conformes à `.claude/rules/library-and-stack.md §0 (Partie A — Pattern B
+secrets/config)`. Les variables `VITE_*` sont **publiquement exposées**
+côté navigateur — ne jamais y mettre de secret.
 
 ### 4.2 CORS
 

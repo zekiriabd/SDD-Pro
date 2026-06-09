@@ -107,7 +107,7 @@
     },
     {
       "module": "org.springframework.boot:spring-boot-starter-webmvc-test",
-      "rationale": "MockMvc + @WebMvcTest pour tests controllers slices (utilise par QA API Gate, cf. backend-first.md)"
+      "rationale": "MockMvc + @WebMvcTest pour tests controllers slices (utilise par QA API Gate, cf. build-and-loop.md Partie A)"
     },
     {
       "module": "org.springframework.security:spring-security-test",

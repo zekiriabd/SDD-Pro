@@ -415,7 +415,7 @@ occurrence rejette le fichier généré et stoppe la task avec ERROR
 - `eval()`, `new Function()` (sécurité)
 - `process.exit()` hors `server.ts` startup ou shutdown handler
 
-**Sécurité (cf. `env_rules.md`, `cors.md`)** :
+**Sécurité (cf. `library-and-stack.md §0 (Partie A — Pattern B secrets/config)` + `library-and-stack.md (Partie B — CORS)`)** :
 
 - Connection string littérale (`postgres://user:pass@host:port/db`) hors `prisma.schema` qui lit `env("DATABASE_URL")`
 - Secret hardcodé (JWT_SECRET, API_KEY, OAuth client secret)

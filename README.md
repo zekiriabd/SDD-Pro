@@ -57,7 +57,7 @@ SDD_APP_NAME=MyApp SDD_COMBO=c1 python bootstrap.py --auto-init
 | Error classification cross-agent (174 préfixes `[CLASS]`) | ✅ | ❌ | ❌ | ❌ |
 | Telemetry SQLite (cost cap, audit trail) | ✅ | ❌ | ❌ | partial |
 | Idempotence / resume (checkpoint mode) | ✅ | ❌ | ❌ | partial |
-| Determinisme (scripts 0-coût LLM) | **51 scripts** | ❌ | ❌ | partial |
+| Determinisme (scripts 0-coût LLM) | **55 scripts** | ❌ | ❌ | partial |
 
 **Créneau différenciant** : SDD_Pro **industrialise la qualité** (5 reviewers, telemetry,
 anti-derive strict). C'est l'équivalent **Sonar + Snyk + ADR governance** appliqué au

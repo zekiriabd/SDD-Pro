@@ -444,7 +444,7 @@ Ce stack est optimise pour :
 - `dev-backend` materialise : `server.ts` (augment routes /api/*), `server/services/`, `server/repositories/`, `server/schemas/`, `server/middleware/`, `prisma/schema.prisma`
 - `dev-frontend` materialise : `src/app/**`, `src/styles.scss`, `src/index.html`, `src/main.ts`, `src/main.server.ts`, `src/app/app.config.ts`, `src/app/app.config.server.ts`
 
-**File ownership** (override `file-ownership.md §1`) :
+**File ownership** (override `ownership.md §1 (Partie A)`) :
 
 | Path | Owner |
 |---|---|
@@ -459,7 +459,7 @@ Ce stack est optimise pour :
 | `workspace/output/src/{AppName}/prisma/**` | `arch` (create) + `dev-backend` (consommation) |
 | `workspace/output/src/{AppName}/server/config/app-config.ts` | `arch` (create exclusif — secrets/config SDD) |
 
-**Cas frontiere `server.ts`** : augmente par dev-backend (routes API). Utiliser lock LibName-equivalent cf. `dev-shared.md §2` quand plusieurs US ajoutent des routes en parallele.
+**Cas frontiere `server.ts`** : augmente par dev-backend (routes API). Utiliser lock LibName-equivalent cf. `build-and-loop.md §2 (Partie B)` quand plusieurs US ajoutent des routes en parallele.
 
 ---
 

@@ -201,7 +201,7 @@ mkdir -p workspace/output/src/{AppName}/Resources
 dotnet restore workspace/output/src/{AppName}/{AppName}.csproj
 dotnet build workspace/output/src/{AppName}/{AppName}.csproj --nologo
 
-# STEP 6 — Audit vulnerabilites NuGet (stack-completeness.md §0 : 0 warning libs)
+# STEP 6 — Audit vulnerabilites NuGet (library-and-stack.md §0 (Partie A) : 0 warning libs)
 # Si au moins une vulnerabilite subsiste malgre les non-pinnings (le registre NuGet
 # n'a pas encore publie de version corrigee), la faire remonter au Tech Lead sans
 # bloquer le build — il decidera d'un lockfile ou d'un package override.
@@ -1070,7 +1070,7 @@ Phase C (ADRs) : creer `ADR-{ts}-stack-fullstack-blazor-server.md` documentant l
 - `dev-backend` materialise : `Services/`, `Mappers/`, `Data/Entities/`, `Data/DBcontext/`, `Middleware/`, `Auth/`, `Program.cs` (augment), `appsettings.json` (augment)
 - `dev-frontend` materialise : `Pages/**/*.razor` + `.razor.cs` + `.razor.css`, `Components/**`, `Shared/**`, `Resources/**`, `wwwroot/**`, `App.razor` (augment), `_Imports.razor` (augment)
 
-**File ownership** (override `file-ownership.md §1`) :
+**File ownership** (override `ownership.md §1 (Partie A)`) :
 
 | Path | Owner |
 |---|---|

@@ -523,7 +523,7 @@ Ce stack est optimise pour :
 - `dev-backend` materialise : Controllers (MVC + REST), Services, Repositories, Entities, Models, Mappers, config, validators, `application.yml` (augment), `build.gradle.kts` (augment deps)
 - `dev-frontend` materialise : Templates Mustache (`templates/**/*.mustache`), CSS (`static/css/**`), JS HTMX/Alpine (`static/js/**`), images (`static/img/**`), i18n `messages.properties`
 
-**File ownership** (override `file-ownership.md §1`) :
+**File ownership** (override `ownership.md §1 (Partie A)`) :
 
 | Path | Owner |
 |---|---|

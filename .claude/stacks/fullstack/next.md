@@ -455,7 +455,7 @@ Ce stack est optimise pour :
 
 **Cas frontiere — Server Components** : `app/{segment}/page.tsx` est un **Server Component** qui appelle un Service serveur. Ownership = `dev-frontend` (couche presentation), mais le Service appele appartient a `dev-backend`. **Convention** : `dev-frontend` peut **importer** `{}Service` depuis `lib/server/services/`, mais ne peut **jamais editer** un fichier sous `lib/server/`.
 
-**File ownership** (override `file-ownership.md §1`) :
+**File ownership** (override `ownership.md §1 (Partie A)`) :
 
 | Path | Owner |
 |---|---|

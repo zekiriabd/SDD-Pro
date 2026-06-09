@@ -509,7 +509,7 @@ Ce stack est optimise pour :
 - `dev-backend` **ne touche pas** au projet mobile RN — il code le backend separe declare dans `## Active Tech Specs backend/*`
 - `dev-frontend` materialise **tout** le projet RN : `app/`, `src/`, `assets/`, `app.json`, `package.json`, `tsconfig.json`
 
-**File ownership** (override `file-ownership.md §1`) :
+**File ownership** (override `ownership.md §1 (Partie A)`) :
 
 | Path | Owner |
 |---|---|

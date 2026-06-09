@@ -230,7 +230,7 @@ Codes prioritaires Kotlin :
 | kotlin-reflect | 2.3.21 | Reflection runtime requise par Jackson/Spring (DI Kotlin idiomatique) |
 | nimbus-jose-jwt | 9.40 | JWT decoder + JWKS resolver (utilise par JwtDecoder custom Azure AD, cf. auth/azure-ad.md §5.1 Piege 7) |
 | spring-boot-starter-test |  | Test scaffolding (JUnit 5 + AssertJ + Mockito + Spring TestContext) |
-| spring-boot-starter-webmvc-test |  | MockMvc + @WebMvcTest pour tests controllers slices (utilise par QA API Gate, cf. backend-first.md) |
+| spring-boot-starter-webmvc-test |  | MockMvc + @WebMvcTest pour tests controllers slices (utilise par QA API Gate, cf. build-and-loop.md (Partie A)) |
 | spring-security-test |  | @WithMockUser, SecurityMockMvcRequestPostProcessors (auth mockee dans tests) |
 | kotest-runner-junit5 | 5.9.1 | Runner Kotest sur JUnit Platform (style DescribeSpec/StringSpec) |
 | kotest-assertions-core | 5.9.1 | DSL d'assertions Kotest (`shouldBe`, `shouldThrow`, soft assertions) |

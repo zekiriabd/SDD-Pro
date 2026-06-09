@@ -217,7 +217,7 @@ Chaque backend stack adapte le pattern à ses idioms. Tableau de correspondance 
 
 # 8. Capabilities applicables au pattern
 
-Capabilities (cf. `stack-completeness.md §1.bis`) sont **orthogonales** au pattern — elles ajoutent des fonctionnalités sans changer le pattern de couches :
+Capabilities (cf. `library-and-stack.md §1.bis (Partie A)`) sont **orthogonales** au pattern — elles ajoutent des fonctionnalités sans changer le pattern de couches :
 
 | Capability | Pattern impact |
 |---|---|

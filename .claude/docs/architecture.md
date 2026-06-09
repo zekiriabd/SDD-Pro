@@ -24,8 +24,8 @@ graph TB
     end
 
     subgraph Determ["⚙️ Python deterministic"]
-        SCRIPTS[51 scripts<br/>parse / validate / orchestrate]
-        HOOKS[13 Claude Code hooks<br/>preflight + audit + record]
+        SCRIPTS[55 scripts<br/>parse / validate / orchestrate]
+        HOOKS[17 Claude Code hooks<br/>preflight + audit + record]
         DB[(console.db<br/>SQLite WAL)]
     end
 

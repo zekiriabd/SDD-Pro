@@ -165,7 +165,7 @@ Outils opt-in humain, jamais invoqués par le pipeline. À utiliser sur
 | `cache_manifest.py` | Extrait/exporte JSON du manifest cache (forward-looking v7.1) | Audit cache strategy |
 | `migrate_exit_codes.py` | Refactor one-shot historique (migration achevée v7.0.0) | (archive) |
 
-## Scripts agent-invoked — `sdd_scripts/` (50 scripts)
+## Scripts agent-invoked — `sdd_scripts/` (55 scripts)
 
 Invoqués par les commandes/agents du pipeline. Liste non-exhaustive
 des plus critiques :

@@ -725,7 +725,7 @@ Phase C (ADRs) : créer `ADR-{ts}-stack-fullstack-node-react.md` documentant le 
 - `dev-backend` matérialise : `server.js`, `routes/`, `services/`, `repositories/`, `schemas/`, `middleware/`, `lib/`, `config/`
 - `dev-frontend` matérialise : `public/index.html`, `public/app.jsx`, `public/pages/`, `public/components/`, `public/styles.css`, `public/data-loader.js`
 
-**File ownership** (override `file-ownership.md §1`) :
+**File ownership** (override `ownership.md §1 (Partie A)`) :
 
 | Path | Owner |
 |---|---|

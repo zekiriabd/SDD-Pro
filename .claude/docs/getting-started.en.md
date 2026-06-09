@@ -24,7 +24,7 @@ FEAT spec               • User Stories (atomic, traceable)
                         • Architectural decision records (ADRs)
 ```
 
-The key innovation : **deterministic Python orchestration** (51 scripts, 0-cost) + **LLM agents** (12 specialized) + **5 cross-file reviewers** = pipeline that's auditable, idempotent, and resumable.
+The key innovation : **deterministic Python orchestration** (55 scripts, 0-cost) + **LLM agents** (12 specialized) + **5 cross-file reviewers** = pipeline that's auditable, idempotent, and resumable.
 
 ---
 
@@ -38,7 +38,7 @@ The key innovation : **deterministic Python orchestration** (51 scripts, 0-cost)
 | Stack catalog | `.libs.json` machine-readable + CVE + LTS check | ❌ | ❌ |
 | Error taxonomy | **174 classes `[CLASS]`** cross-agent | ❌ | ❌ |
 | Telemetry | SQLite (cost cap, audit trail, gates) | ❌ | ❌ |
-| Determinism | 51 Python scripts (0 token) | ❌ | ❌ |
+| Determinism | 55 Python scripts (0 token) | ❌ | ❌ |
 | Idempotence / resume | checkpoint mode | ❌ | ❌ |
 
 **Differentiator** : SDD_Pro **industrializes quality** — it's the equivalent of **Sonar + Snyk + ADR governance** applied to LLM pipelines.

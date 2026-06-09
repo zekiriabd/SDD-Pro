@@ -477,7 +477,7 @@ Ce stack est optimise pour :
 - `dev-backend` **ne touche pas** au projet MAUI — il code le backend separe declare dans `## Active Tech Specs backend/*`
 - `dev-frontend` materialise **tout** le projet MAUI : Pages, ViewModels, Services, Repositories, Models, Converters, Behaviors, Resources, Platforms
 
-**File ownership** (override `file-ownership.md §1`) :
+**File ownership** (override `ownership.md §1 (Partie A)`) :
 
 | Path | Owner |
 |---|---|
