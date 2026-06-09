@@ -6,6 +6,22 @@ function getNodePath(node) {
   return node?.file || node?.source || null;
 }
 
+function markdownToSafeHtml(markdown) {
+  const rawHtml = window.marked ? window.marked.parse(markdown || "", { breaks: false, gfm: true }) : (markdown || "");
+  if (window.DOMPurify && typeof window.DOMPurify.sanitize === "function") {
+    return window.DOMPurify.sanitize(rawHtml, {
+      USE_PROFILES: { html: true },
+      FORBID_TAGS: ["style", "script", "iframe", "object", "embed"],
+      FORBID_ATTR: ["style", "onerror", "onload", "onclick"],
+    });
+  }
+  return rawHtml
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/\son\w+=\"[^\"]*\"/gi, "")
+    .replace(/\sstyle=\"[^\"]*\"/gi, "")
+    .trim();
+}
+
 // ───────── ICONS ─────────
 const Icon = {
   caretRight: () => <svg className="i" viewBox="0 0 16 16"><path d="M6 4l4 4-4 4"/></svg>,
@@ -581,29 +597,58 @@ function prettyId(node) {
 }
 
 function FeatureDetail({ node, viewMode, explainAvailable }) {
+  const [displayMode, setDisplayMode] = useState("markdown");
   const total = node.children?.length || 0;
   const validated = node.children?.filter(c => c.status === "validated").length || 0;
   const isPO = viewMode === "po";
+  const mdPath = node.source || node.file || null;
+  const hasMarkdownSource = Boolean(mdPath);
 
   return (
     <div className="detail-body">
       {isPO && <IAReformulateBar path={node.source} explainAvailable={explainAvailable}/>}
 
-      {node.objective && (
+      {hasMarkdownSource && (
+        <div className="section">
+          <div className="detail-switcher">
+            <div className="section-h" style={{marginBottom: 0}}>Rendu de la FEAT</div>
+            <div className="mode-toggle" role="tablist" aria-label="Mode d'affichage de la FEAT">
+              <button
+                className={`mode-pill ${displayMode === "markdown" ? "active" : ""}`}
+                onClick={() => setDisplayMode("markdown")}
+                aria-pressed={displayMode === "markdown"}>
+                Aperçu Markdown
+              </button>
+              <button
+                className={`mode-pill ${displayMode === "structured" ? "active" : ""}`}
+                onClick={() => setDisplayMode("structured")}
+                aria-pressed={displayMode === "structured"}>
+                Vue structurée
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {hasMarkdownSource && displayMode === "markdown" && (
+        <MarkdownSourceView path={mdPath} title={node.title}/>
+      )}
+
+      {(!hasMarkdownSource || displayMode === "structured") && node.objective && (
         <div className="section">
           <div className="section-h">{isPO ? "Objectif" : "Résumé fonctionnel"}</div>
           <div className="objectif"><p>{node.objective || node.summary}</p></div>
         </div>
       )}
 
-      {!isPO && node.context && (
+      {(!hasMarkdownSource || displayMode === "structured") && !isPO && node.context && (
         <div className="section">
           <div className="section-h">Contexte</div>
           <div className="objectif"><p>{node.context}</p></div>
         </div>
       )}
 
-      {node.actors?.length > 0 && (
+      {(!hasMarkdownSource || displayMode === "structured") && node.actors?.length > 0 && (
         <div className="section">
           <div className="section-h">{isPO ? "Pour qui" : "Acteurs"}</div>
           <div className="objectif">
@@ -614,7 +659,7 @@ function FeatureDetail({ node, viewMode, explainAvailable }) {
         </div>
       )}
 
-      {node.businessRules?.length > 0 && (
+      {(!hasMarkdownSource || displayMode === "structured") && node.businessRules?.length > 0 && (
         <div className="section">
           <div className="section-h">{isPO ? "Règles à respecter" : "Règles métier"} · {node.businessRules.length}</div>
           <div className="tasks-list">
@@ -628,7 +673,7 @@ function FeatureDetail({ node, viewMode, explainAvailable }) {
         </div>
       )}
 
-      {node.children?.length > 0 && (
+      {(!hasMarkdownSource || displayMode === "structured") && node.children?.length > 0 && (
         <div className="section">
           <div className="section-h">{isPO ? "Histoires utilisateur" : "User stories rattachées"} · {validated}/{total} validées</div>
           <div className="tasks-list">
@@ -650,7 +695,7 @@ function FeatureDetail({ node, viewMode, explainAvailable }) {
         </div>
       )}
 
-      {!isPO && (
+      {(!hasMarkdownSource || displayMode === "structured") && !isPO && (
         <div className="section">
           <div className="section-h">Source</div>
           <div className="linked">
@@ -669,23 +714,121 @@ function FeatureDetail({ node, viewMode, explainAvailable }) {
   );
 }
 
+function MarkdownSourceView({ path, title }) {
+  const [state, setState] = useState({ status: "loading", content: null, error: null });
+
+  const load = useCallback(async () => {
+    setState({ status: "loading", content: null, error: null });
+    try {
+      const res = await fetch(`/api/file?path=${encodeURIComponent(path)}`);
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+      setState({ status: "ok", content: json.content || "", error: null });
+    } catch (err) {
+      setState({ status: "error", content: null, error: err.message });
+    }
+  }, [path]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (state.status === "loading") {
+    return (
+      <div className="section markdown-section">
+        <div className="markdown-frame">
+          <div className="markdown-meta">Chargement de {title || path}…</div>
+          <div className="objectif markdown-loading">
+            <p>Aperçu du document Markdown en cours de préparation.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (state.status === "error") {
+    return (
+      <div className="section markdown-section">
+        <div className="markdown-frame markdown-frame-error">
+          <div className="markdown-meta">Aperçu indisponible</div>
+          <div className="objectif" style={{color: 'var(--danger)'}}>
+            <p>{state.error}</p>
+          </div>
+          <button className="btn ghost" onClick={load} style={{marginTop: 12}}>
+            <Icon.refresh/> Réessayer
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const html = markdownToSafeHtml(state.content || "");
+
+  return (
+    <div className="section markdown-section">
+      <div className="markdown-frame">
+        <div className="markdown-meta">
+          <div>
+            <div className="markdown-kicker">Aperçu Markdown</div>
+            <div className="markdown-title">{title}</div>
+          </div>
+          <div className="markdown-path">{path}</div>
+        </div>
+        <div className="markdown-paper">
+          <div className="objectif markdown-body" dangerouslySetInnerHTML={{ __html: html }}/>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function USDetail({ node, viewMode, explainAvailable }) {
   const isPO = viewMode === "po";
+  const [displayMode, setDisplayMode] = useState("markdown");
+  const mdPath = node.file || node.source || null;
+  const hasMarkdownSource = Boolean(mdPath);
+
   return (
     <div className="detail-body">
       {isPO && <IAReformulateBar path={node.file} explainAvailable={explainAvailable}/>}
 
-      <div className="section">
-        <div className="section-h">Histoire utilisateur</div>
-        <div className="objectif">
-          {node.asA && <p><b>{node.asA}</b></p>}
-          {node.iWant && <p>{node.iWant}</p>}
-          {node.soThat && <p style={{color: 'var(--ink-2)'}}>{node.soThat}</p>}
-          {!node.asA && !node.iWant && node.objective && <p>{node.objective}</p>}
+      {hasMarkdownSource && (
+        <div className="section">
+          <div className="detail-switcher">
+            <div className="section-h" style={{marginBottom: 0}}>Rendu de l'US</div>
+            <div className="mode-toggle" role="tablist" aria-label="Mode d'affichage de l'US">
+              <button
+                className={`mode-pill ${displayMode === "markdown" ? "active" : ""}`}
+                onClick={() => setDisplayMode("markdown")}
+                aria-pressed={displayMode === "markdown"}>
+                Aperçu Markdown
+              </button>
+              <button
+                className={`mode-pill ${displayMode === "structured" ? "active" : ""}`}
+                onClick={() => setDisplayMode("structured")}
+                aria-pressed={displayMode === "structured"}>
+                Vue structurée
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
 
-      {node.acceptanceCriteria?.length > 0 && (
+      {hasMarkdownSource && displayMode === "markdown" && (
+        <MarkdownSourceView path={mdPath} title={node.title}/>
+      )}
+
+      {(!hasMarkdownSource || displayMode === "structured") && (
+        <div className="section">
+          <div className="section-h">Histoire utilisateur</div>
+          <div className="objectif">
+            {node.asA && <p><b>{node.asA}</b></p>}
+            {node.iWant && <p>{node.iWant}</p>}
+            {node.soThat && <p style={{color: 'var(--ink-2)'}}>{node.soThat}</p>}
+            {!node.asA && !node.iWant && node.objective && <p>{node.objective}</p>}
+          </div>
+        </div>
+      )}
+
+      {(!hasMarkdownSource || displayMode === "structured") && node.acceptanceCriteria?.length > 0 && (
         <div className="section">
           <div className="section-h">{isPO ? "Critères de validation" : "Critères d'acceptation"} · {node.acceptanceCriteria.length}</div>
           <div className="tasks-list">
@@ -740,6 +883,9 @@ function USDetail({ node, viewMode, explainAvailable }) {
 function TaskDetail({ node, viewMode, explainAvailable }) {
   const isUI = node.type === "ui";
   const isPO = viewMode === "po";
+  const [displayMode, setDisplayMode] = useState("markdown");
+  const mdPath = !isUI ? (node.file || node.source || null) : null;
+  const hasMarkdownSource = Boolean(mdPath);
 
   if (isPO && !isUI) {
     return (
@@ -808,14 +954,40 @@ function TaskDetail({ node, viewMode, explainAvailable }) {
 
   return (
     <div className="detail-body">
-      {node.summary && (
+      {hasMarkdownSource && (
+        <div className="section">
+          <div className="detail-switcher">
+            <div className="section-h" style={{marginBottom: 0}}>Rendu du plan technique</div>
+            <div className="mode-toggle" role="tablist" aria-label="Mode d'affichage du plan">
+              <button
+                className={`mode-pill ${displayMode === "markdown" ? "active" : ""}`}
+                onClick={() => setDisplayMode("markdown")}
+                aria-pressed={displayMode === "markdown"}>
+                Aperçu Markdown
+              </button>
+              <button
+                className={`mode-pill ${displayMode === "structured" ? "active" : ""}`}
+                onClick={() => setDisplayMode("structured")}
+                aria-pressed={displayMode === "structured"}>
+                Vue structurée
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {hasMarkdownSource && displayMode === "markdown" && (
+        <MarkdownSourceView path={mdPath} title={node.title}/>
+      )}
+
+      {(!hasMarkdownSource || displayMode === "structured") && node.summary && (
         <div className="section">
           <div className="section-h">Vue d'ensemble du plan</div>
           <div className="objectif"><p>{node.summary}</p></div>
         </div>
       )}
 
-      {node.stack && Object.values(node.stack).some(Boolean) && (
+      {(!hasMarkdownSource || displayMode === "structured") && node.stack && Object.values(node.stack).some(Boolean) && (
         <div className="section">
           <div className="section-h">Stack technique cible</div>
           <div className="linked">
@@ -829,7 +1001,7 @@ function TaskDetail({ node, viewMode, explainAvailable }) {
         </div>
       )}
 
-      {node.filesPlanned?.length > 0 && (
+      {(!hasMarkdownSource || displayMode === "structured") && node.filesPlanned?.length > 0 && (
         <div className="section">
           <div className="section-h">Fichiers à produire · {node.filesPlanned.length}</div>
           <div className="tasks-list">
@@ -875,7 +1047,7 @@ function TaskDetail({ node, viewMode, explainAvailable }) {
         </div>
       )}
 
-      {node.htmlSource && (
+      {(!hasMarkdownSource || displayMode === "structured") && node.htmlSource && (
         <div className="section">
           <div className="section-h">Source visuelle</div>
           <div className="link-card">
@@ -1144,8 +1316,7 @@ function ExplainView({ path }) {
     );
   }
 
-  // marked.parse() est synchrone et safe sur du markdown emis par Claude (pas de raw HTML demande)
-  const html = window.marked ? window.marked.parse(state.content || "", { breaks: false, gfm: true }) : state.content;
+  const html = markdownToSafeHtml(state.content || "");
 
   return (
     <div className="detail-body">

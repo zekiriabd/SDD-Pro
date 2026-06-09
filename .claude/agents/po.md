@@ -460,6 +460,7 @@ Sur erreur (incluant `STEP 8.5 read-back failed`), bloc ERROR 3 lignes
 ## Chat Output Protocol
 
 Applique `@.claude/rules/output-protocol.md` (label `[PO]`, plage `8-12%`).
+Sync vérifiée 2026-06-09 (output-protocol.md §3 label `[PO]` + §4 plage `8-12 %`).
 
 ---
 

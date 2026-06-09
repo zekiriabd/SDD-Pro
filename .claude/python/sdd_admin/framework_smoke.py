@@ -519,11 +519,12 @@ def _compute_timing(t_start: float, skip_heavy: bool, checks: "Checks") -> None:
         ctx = "hook Stop"
     else:
         # Audit Sprint 3-5 (2026-06-07) : seuils bumped 2500/4500 → 4500/6500.
-        # Le full smoke charge la pytest gate (~2s) + 4 subprocess checks
-        # (~200ms each) + I/O. Sur Windows avec AV scanning, baseline réelle
-        # est 3500-4500ms — WARN à 2500 = bruit systématique non-actionnable.
-        # Hard FAIL @ 6500ms = vraie régression nette (>2× baseline).
-        ok_thr, warn_thr = 4500, 6500
+        # Audit CTO v3 (2026-06-09) : seuils re-bumped 4500/6500 → 5500/8000
+        # après croissance organique du suite (220 tests smoke vs ~150 en Sprint
+        # 3-5). Pytest standalone seul = ~4300ms ; framework_smoke = ~5100ms
+        # warm-cache, ~6500-7000ms cold-cache (AV scanning fresh files).
+        # Hard FAIL implicite @ 8000ms+ = vraie régression nette (>1.5× warm baseline).
+        ok_thr, warn_thr = 5500, 8000
         ctx = "full smoke"
     if elapsed_ms < ok_thr:
         checks.add("smoke-timing", "OK",

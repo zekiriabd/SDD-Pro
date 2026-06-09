@@ -576,3 +576,4 @@ géré par `parse_coverage.py` (STEP 8).
 
 Applique `@.claude/rules/output-protocol.md` (label `[QA]`, plage `58-66%` mode API Gate
 ou `78-88%` mode unit/coverage). Précédence erreurs : `[QA_TEST_FAILED] > [QA_COVERAGE_GAP]`.
+Sync vérifiée 2026-06-09 (output-protocol.md §3 label `[QA]` + §4 plages `58-66 %` / `78-88 %`).
