@@ -16,15 +16,19 @@ languages:
   - id: aspx-webforms
     label: ASP.NET WebForms
     family: dotnet
-    file_extensions: [.aspx, .ascx, .master, .ashx]
+    file_extensions: [.aspx, .ascx, .master, .ashx, .asax]   # Bug #3 fix: ajout .asax (Global) explicite
     evidence_patterns:
       - { pattern: '<%@\s+Page\s+', weight: 1.0, description: "Page directive ASPX" }
+      - { pattern: '<%@\s+Master\s+', weight: 1.0, description: "Master page directive" }
+      - { pattern: '<%@\s+Application\s+', weight: 1.0, description: "Global.asax application directive" }
+      - { pattern: '<%@\s+WebHandler\s+', weight: 1.0, description: ".ashx WebHandler directive" }
       - { pattern: 'runat="server"', weight: 0.8, description: "Server-side control" }
       - { pattern: 'CodeBehind="', weight: 0.9, description: "Code-behind attribute" }
       - { pattern: 'CodeFile="', weight: 0.9, description: "Code-file attribute (older)" }
       - { pattern: '<asp:\w+', weight: 0.7, description: "asp: server control tag" }
     framework_signatures:
       - { id: dotnet-framework, evidence: '<compilation\s+targetFramework="', version_extract: 'targetFramework="([0-9.]+)"' }
+      - { id: aspnet-webforms-runtime, evidence: '<httpRuntime\s+targetFramework="', version_extract: 'targetFramework="([0-9.]+)"' }
     confidence_cap: high
     excluded_paths: [bin/, obj/, packages/, App_Data/, .vs/]
 
@@ -38,6 +42,7 @@ languages:
       - { pattern: '@using\s+', weight: 0.6, description: "Razor @using" }
     framework_signatures:
       - { id: aspnet-mvc, evidence: '<add\s+namespace="System\.Web\.Mvc"', version_extract: null }
+      - { id: aspnet-mvc-pkg, evidence: '<package\s+id="Microsoft\.AspNet\.Mvc"\s+version="([^"]+)"', version_extract: 'Microsoft\.AspNet\.Mvc"\s+version="([^"]+)"' }
     confidence_cap: high
     excluded_paths: [bin/, obj/, packages/]
 

@@ -48,6 +48,32 @@ BINARY_EXTENSIONS = frozenset(
      ".sqlite", ".sqlite3"}
 )
 
+# Bug #4 fix: auto-generated files matched by filename suffix (not folder).
+# Excluded from language scoring AND framework detection to avoid LOC inflation.
+AUTO_GENERATED_SUFFIXES = frozenset({
+    ".designer.cs",     # WebForms auto-generated controls
+    ".designer.vb",     # WebForms VB
+    ".g.cs",            # Roslyn source generators
+    ".g.i.cs",          # XAML/MSBuild
+    ".Designer.cs",     # alternate casing
+    ".AssemblyInfo.cs", # MSBuild auto-generated
+})
+
+# Bug #1 fix: cross-language framework manifest files. Scanned independently of
+# any specific language's file_extensions — every framework_signature in
+# language_signatures.yml is evaluated against each of these files.
+FRAMEWORK_MANIFEST_FILES = frozenset({
+    "Web.config", "web.config",
+    "App.config", "app.config",
+    "web.xml", "applicationContext.xml", "faces-config.xml",
+    "pom.xml", "build.gradle", "build.gradle.kts",
+    "package.json", "tsconfig.json",
+    "composer.json",
+    "requirements.txt", "pyproject.toml", "setup.py", "setup.cfg",
+    "packages.config",
+    "Cargo.toml", "go.mod",
+})
+
 # BOMs ordered longest-first to avoid mis-matching the shorter UTF-16 BOM
 # inside a UTF-32 stream (defensive — we only strip the first matching one).
 _BOMS = (
@@ -145,7 +171,7 @@ def _score_to_confidence(score: float, cap: str) -> str:
 
 
 def _should_skip_path(path: Path, project_root: Path, exclusions: set[str]) -> bool:
-    """Return True if `path` should be ignored (excluded dir or binary)."""
+    """Return True if `path` should be ignored (excluded dir, binary, OR auto-gen)."""
     try:
         rel = path.relative_to(project_root)
     except ValueError:
@@ -155,6 +181,11 @@ def _should_skip_path(path: Path, project_root: Path, exclusions: set[str]) -> b
             return True
     if path.suffix.lower() in BINARY_EXTENSIONS:
         return True
+    # Bug #4 fix: exclude auto-generated files (preserve LOC accuracy)
+    name = path.name
+    for suffix in AUTO_GENERATED_SUFFIXES:
+        if name.endswith(suffix):
+            return True
     return False
 
 
@@ -333,6 +364,53 @@ def scan_project(
                         "id": fid,
                         "version": version,
                         "evidence": str(path.relative_to(project)),
+                    }
+
+    # Bug #1 fix: cross-file framework_signatures scan against manifest files
+    # (Web.config, pom.xml, package.json, …) — these files are NOT in any
+    # language's file_extensions but DO carry framework target/version info.
+    for path in project.rglob("*"):
+        if not path.is_file():
+            continue
+        if path.name not in FRAMEWORK_MANIFEST_FILES:
+            continue
+        if _should_skip_path(path, project, excl):
+            continue
+        try:
+            raw = path.read_bytes()
+        except OSError:
+            continue
+        try:
+            text = normalize_bytes(raw).decode("utf-8", errors="replace")
+        except (UnicodeDecodeError, UnicodeError):
+            continue
+        rel_path = str(path.relative_to(project))
+        for lang in signatures["languages"]:
+            for fsig in lang.get("framework_signatures") or []:
+                fevidence = fsig.get("evidence")
+                if not fevidence:
+                    continue
+                try:
+                    m = re.search(fevidence, text)
+                except re.error:
+                    continue
+                if not m:
+                    continue
+                fid = fsig.get("id", "unknown")
+                version: str | None = None
+                vex = fsig.get("version_extract")
+                if vex:
+                    try:
+                        vm = re.search(vex, text)
+                        if vm and vm.groups():
+                            version = vm.group(1)
+                    except re.error:
+                        pass
+                if fid not in frameworks_seen:
+                    frameworks_seen[fid] = {
+                        "id": fid,
+                        "version": version,
+                        "evidence": rel_path,
                     }
 
     duration_ms = int((time.monotonic() - t0) * 1000)

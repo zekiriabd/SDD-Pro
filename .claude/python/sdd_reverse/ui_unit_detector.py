@@ -70,8 +70,15 @@ def _read_normalized(path: Path) -> str:
     return norm.decode("utf-8", errors="replace")
 
 
-def _classify_page(content: str) -> tuple[str, float]:
-    """Return (kind, confidence_score)."""
+def _classify_page(content: str, path_str: str = "") -> tuple[str, float]:
+    """Return (kind, confidence_score). Bug #5 fix: detect layout/master pages."""
+    # Bug #5 fix: master pages are layout components, not user-facing pages
+    # Detected via either filename pattern OR <%@ Master %> directive
+    is_master_directive = bool(re.search(r"<%@\s+Master\s+", content, re.IGNORECASE))
+    is_master_file = path_str.lower().endswith(".master")
+    if is_master_directive or is_master_file:
+        return "layout", 0.0  # score=0 → filtered out of units
+
     grid_hits = sum(1 for p in GRID_PATTERNS if p.search(content))
     form_hits = sum(1 for p in FORM_PATTERNS if p.search(content))
     wizard_hits = sum(1 for p in WIZARD_PATTERNS if p.search(content))
@@ -141,9 +148,9 @@ def detect_units(
         content = _read_normalized(page_path)
         if not content.strip():
             continue
-        kind, score = _classify_page(content)
-        if kind == "confirm-modal":
-            # D2: standalone confirm = 0 unit
+        kind, score = _classify_page(content, page["path"])
+        if kind in {"confirm-modal", "layout"}:
+            # D2 + Bug #5: standalone confirm OR master/layout = 0 unit
             continue
         name = _suggested_name_from_path(page["path"])
         label = _label_from_kind_and_name(kind, name)

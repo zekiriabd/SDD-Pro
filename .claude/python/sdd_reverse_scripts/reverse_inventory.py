@@ -33,6 +33,66 @@ from sdd_reverse.scan_legacy import load_signatures, scan_project
 from sdd_reverse.ui_unit_detector import detect_units
 
 
+# Bug #2 fix: entry-point detection heuristics
+ENTRY_POINT_PATTERNS = {
+    # filename (lowercase) → (type, description)
+    "global.asax": ("lifecycle", "ASP.NET application events (Application_Start, Session_Start)"),
+    "global.asax.cs": ("lifecycle", "ASP.NET application code-behind"),
+    "startup.cs": ("lifecycle", ".NET Core/Framework Startup configuration"),
+    "program.cs": ("lifecycle", ".NET entry point (Main method)"),
+    "webapiconfig.cs": ("router", "Web API route configuration"),
+    "routeconfig.cs": ("router", "MVC route configuration"),
+    "default.aspx": ("landing", "ASP.NET default landing page"),
+    "home.aspx": ("landing", "Home landing page"),
+    "index.aspx": ("landing", "Index landing page"),
+    "index.php": ("landing", "PHP default entry"),
+    "index.jsp": ("landing", "JSP default entry"),
+    "main.java": ("lifecycle", "Java Main class"),
+    "application.java": ("lifecycle", "Spring Boot Application"),
+    "web.xml": ("config", "Java EE servlet configuration"),
+    "web.config": ("config", ".NET application configuration"),
+    "application.properties": ("config", "Spring Boot properties"),
+    "application.yml": ("config", "Spring Boot YAML config"),
+    "pom.xml": ("manifest", "Maven build manifest"),
+    "package.json": ("manifest", "Node.js package manifest"),
+    "composer.json": ("manifest", "PHP Composer manifest"),
+    "requirements.txt": ("manifest", "Python pip requirements"),
+}
+
+
+def _detect_entry_points(scan_result, project_root: Path) -> list[dict[str, Any]]:
+    """Detect entry points (Bug #2 fix). Scans for well-known filenames."""
+    entry_points: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for lm in scan_result.languages:
+        for f in lm.files:
+            key = f.name.lower()
+            if key in ENTRY_POINT_PATTERNS and key not in seen:
+                etype, edesc = ENTRY_POINT_PATTERNS[key]
+                rel = str(f.relative_to(project_root).as_posix())
+                entry_points.append({"path": rel, "type": etype, "description": edesc})
+                seen.add(key)
+    # Also scan files NOT matched by any language (manifest files like Web.config
+    # which might not be in any file_extensions). Use rglob direct.
+    for known_name in ENTRY_POINT_PATTERNS:
+        if known_name in seen:
+            continue
+        for p in project_root.rglob(known_name):
+            if not p.is_file():
+                continue
+            if any(part in {".git", "bin", "obj", "packages", "node_modules", "vendor"} for part in p.parts):
+                continue
+            etype, edesc = ENTRY_POINT_PATTERNS[known_name]
+            entry_points.append({
+                "path": str(p.relative_to(project_root).as_posix()),
+                "type": etype,
+                "description": edesc,
+            })
+            seen.add(known_name)
+            break  # one per filename
+    return entry_points
+
+
 def _build_pages_list(scan_result, project_root: Path) -> list[dict[str, Any]]:
     """Extract pages from detected UI-style files (aspx, cshtml, jsp, php, blade)."""
     pages: list[dict[str, Any]] = []
@@ -216,10 +276,13 @@ def main(argv: list[str] | None = None) -> int:
                 # We'll patch linkedUnits after build_inventory assigns U-N
                 p["linkedUnits"].append(u["label"])  # placeholder
 
+    # Bug #2 fix: detect entry points
+    entry_points = _detect_entry_points(scan_result, project_root)
+
     # Build inventory (assigns U-N)
     inventory = build_inventory(
         project_name, project_root, scan_result, pages, units,
-        signatures, existing_inventory,
+        signatures, existing_inventory, entry_points=entry_points,
     )
 
     # Patch pages.linkedUnits to actual U-N ids

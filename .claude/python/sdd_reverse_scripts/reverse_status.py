@@ -73,7 +73,8 @@ def _scan_reverse_feats(workspace_feats: Path) -> list[dict[str, Any]]:
         confidence = fm.get("confidence", "unknown")
         gate_match = REVERSE_GATE_RE.search(body)
         allow_full = gate_match and gate_match.group(2) == "true"
-        marker = "[REV]" if confidence == "high" else "[REV⚠️]"
+        # ASCII markers (Windows cp1252 console compat — emoji-free)
+        marker = "[REV]" if confidence == "high" else "[REV-WARN]"
         feats.append({
             "file": str(f.relative_to(workspace_feats.parent.parent)),
             "name": f.stem,
@@ -88,7 +89,7 @@ def _scan_reverse_feats(workspace_feats: Path) -> list[dict[str, Any]]:
 
 
 def _render_human(projects: list[dict[str, Any]], feats: list[dict[str, Any]]) -> str:
-    lines = ["═══ Reverse Engineering Status ═══", ""]
+    lines = ["=== Reverse Engineering Status ===", ""]
     if not projects:
         lines.append("Aucun projet legacy détecté sous workspace/old/")
     else:
@@ -96,8 +97,8 @@ def _render_human(projects: list[dict[str, Any]], feats: list[dict[str, Any]]) -
         lines.append("")
         for p in projects:
             ph = p["phases"]
-            phase_str = " → ".join(
-                f"{name}{'✓' if ok else '✗'}"
+            phase_str = " -> ".join(
+                f"{name}{'OK' if ok else '--'}"
                 for name, ok in [
                     ("init", ph["init"]),
                     ("inventory", ph["inventory"]),
@@ -105,7 +106,7 @@ def _render_human(projects: list[dict[str, Any]], feats: list[dict[str, Any]]) -
                     ("merged", ph["db_merged"]),
                 ]
             )
-            lines.append(f"  • {p['name']}")
+            lines.append(f"  * {p['name']}")
             lines.append(f"      {phase_str}")
             if p["units_total"]:
                 pct = (p["feats_extracted"] / p["units_total"] * 100) if p["units_total"] else 0
@@ -117,7 +118,7 @@ def _render_human(projects: list[dict[str, Any]], feats: list[dict[str, Any]]) -
     if feats:
         lines.append("")
         for f in feats:
-            full_marker = "→ /sdd-full OK" if f["allow_sdd_full"] else "→ REVUE HUMAINE OBLIGATOIRE avant /sdd-full"
+            full_marker = "-> /sdd-full OK" if f["allow_sdd_full"] else "-> REVUE HUMAINE OBLIGATOIRE avant /sdd-full"
             lines.append(f"  {f['marker']} {f['name']}  (confidence={f['confidence']}, U={f['source_unit']})")
             lines.append(f"        {full_marker}")
     return "\n".join(lines)

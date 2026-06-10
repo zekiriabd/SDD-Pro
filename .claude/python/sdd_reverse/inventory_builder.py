@@ -124,6 +124,7 @@ def build_inventory(
     units_candidates: list[dict[str, Any]],
     signatures: dict[str, Any],
     existing_inventory: dict[str, Any] | None = None,
+    entry_points: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Assemble inventory.json from scan + page/unit candidates.
 
@@ -229,7 +230,7 @@ def build_inventory(
         "languagesDetected": scan_result.to_dict()["languagesDetected"],
         "primaryLanguage": scan_result.primary_language,
         "frameworksDetected": scan_result.frameworks,
-        "entryPoints": [],
+        "entryPoints": entry_points or [],
         "exclusions": sorted({"bin/", "obj/", "node_modules/", ".git/", "packages/"}),
         "pages": pages,
         "units": finalized_units,
