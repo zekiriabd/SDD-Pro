@@ -60,6 +60,21 @@ RETIRED_AGENTS_V7 = frozenset({
     "validator",
 })
 
+#: Reverse engineering agents (v7.0.0+ workflow) — managed by the AUTONOMOUS
+#: loader.reverse.yml (D4 strict isolation, design doc §3.1 + §7). They have
+#: .md files on disk in .claude/agents/ (so Claude Code can invoke them) but
+#: are intentionally NOT in loader.yml — that would violate the design
+#: contract. The orphan check exempts them via this set.
+#:
+#: SSoT for the reverse workflow: .claude/loader.reverse.yml +
+#: .claude/docs/reverse-engineering-workflow.md
+REVERSE_AGENTS_V7 = frozenset({
+    "reverse-inventory",
+    "reverse-functional-extractor",
+    # V2 (will be added when implemented):
+    # "reverse-tech-auditor", "reverse-ui-extractor",
+})
+
 
 def _agents_dir() -> Path:
     return repo_root() / ".claude" / "agents"
@@ -120,6 +135,7 @@ class TestLoaderNoOrphanPromptFiles(unittest.TestCase):
                    if name not in ALIVE_AGENTS_V7
                    and name not in DOC_ONLY_AGENTS_V7
                    and name not in RETIRED_AGENTS_V7
+                   and name not in REVERSE_AGENTS_V7
                    and not parse_agent_section(name, "reads")]
         self.assertFalse(
             orphans,

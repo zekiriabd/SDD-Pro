@@ -1,0 +1,206 @@
+"""validate_reverse_feat.py — Validate a reverse-generated FEAT (ADV-5).
+
+Distinct from /feat-validate (validate_readiness.py) standard SDD_Pro which
+checks stack/hash/mockups — absent at Phase 3 of reverse pipeline.
+
+Invocation:
+    python -m sdd_reverse_scripts.validate_reverse_feat \
+        --feat-path workspace/input/feats/{n}-{Name}.md \
+        [--json]
+
+Checks (deterministic, 0 token):
+    1. Frontmatter YAML parsable + REQUIRED_FRONTMATTER_KEYS_REVERSE present
+    2. confidence ∈ {high, medium, low}
+    3. Required sections in fixed order (REQUIRED_SECTIONS)
+    4. Stable IDs (SFD-N, FD-N, BR-N, AC-N) non-reordered
+    5. AC in Given/When/Then format
+    6. Each SFD/FD/BR/AC has <!-- evidence: ... --> and <!-- confidence: ... -->
+    7. REVERSE-GATE comment present + sync with frontmatter.confidence (ADV-22)
+    8. Banner present if confidence=low
+
+Exit:
+    0  GREEN
+    1  RED (structural errors)
+    2  I/O error (file unreadable)
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+from sdd_reverse.feat_structure_spec import (
+    AC_GIVEN_WHEN_THEN_RE,
+    CONFIDENCE_COMMENT_RE,
+    CONFIDENCE_ENUM,
+    EVIDENCE_COMMENT_RE,
+    REQUIRED_FRONTMATTER_KEYS_REVERSE,
+    REQUIRED_SECTIONS,
+    REVERSE_GATE_RE,
+    ID_PATTERNS,
+    ids_are_stable,
+    parse_frontmatter,
+    section_order_violations,
+)
+
+
+def _check_items_have_evidence_and_confidence(
+    content: str, section: str,
+) -> list[str]:
+    """For each ID-line in section, verify the following lines/inline have evidence + confidence."""
+    errors: list[str] = []
+    pat = ID_PATTERNS.get(section)
+    if not pat:
+        return errors
+    section_start = content.find(section)
+    if section_start == -1:
+        return errors
+    next_section_start = -1
+    for other in REQUIRED_SECTIONS:
+        if other == section:
+            continue
+        idx = content.find(f"\n{other}", section_start + 1)
+        if idx != -1 and (next_section_start == -1 or idx < next_section_start):
+            next_section_start = idx
+    section_body = content[section_start:next_section_start] if next_section_start != -1 else content[section_start:]
+
+    # Each ID-line should have evidence+confidence comments within the same paragraph
+    # (the same line + next 2 lines).
+    for m in pat.finditer(section_body):
+        item_id = m.group(0).strip("* ")
+        line_start = section_body.rfind("\n", 0, m.start()) + 1
+        # Read up to 3 lines after the ID line (covers inline comments + wrapped)
+        lookahead = section_body[line_start: line_start + 600]
+        has_evidence = bool(EVIDENCE_COMMENT_RE.search(lookahead))
+        has_confidence = bool(CONFIDENCE_COMMENT_RE.search(lookahead))
+        if not has_evidence:
+            errors.append(f"[REVERSE_EVIDENCE_MISSING] {item_id} in {section}: missing <!-- evidence: ... -->")
+        if not has_confidence:
+            errors.append(f"{item_id} in {section}: missing <!-- confidence: ... -->")
+    return errors
+
+
+def validate_feat(feat_path: Path) -> tuple[bool, list[str], list[str]]:
+    """Validate a reverse FEAT.
+
+    Returns (ok, errors, warnings).
+    """
+    if not feat_path.is_file():
+        return False, [f"File not found: {feat_path}"], []
+
+    try:
+        content = feat_path.read_text(encoding="utf-8")
+    except OSError as e:
+        return False, [f"I/O error: {e}"], []
+
+    errors: list[str] = []
+    warnings: list[str] = []
+
+    # 1. Frontmatter
+    fm, body = parse_frontmatter(content)
+    if not fm:
+        return False, ["Frontmatter YAML absent or malformed"], []
+    missing_keys = REQUIRED_FRONTMATTER_KEYS_REVERSE - set(fm.keys())
+    if missing_keys:
+        errors.append(f"Frontmatter missing keys: {sorted(missing_keys)}")
+
+    # 2. confidence enum
+    fm_confidence = fm.get("confidence", "")
+    if fm_confidence not in CONFIDENCE_ENUM:
+        errors.append(
+            f"confidence='{fm_confidence}' not in {sorted(CONFIDENCE_ENUM)} (strict enum)"
+        )
+
+    # 3. Required sections
+    errors.extend(section_order_violations(body))
+
+    # 4. Stable IDs
+    for section in REQUIRED_SECTIONS:
+        ok, msg = ids_are_stable(body, section)
+        if not ok:
+            errors.append(msg)
+
+    # 5. AC Given/When/Then
+    ac_section_start = body.find("## Acceptance Criteria")
+    if ac_section_start != -1:
+        next_idx = body.find("\n## ", ac_section_start + 1)
+        ac_body = body[ac_section_start:next_idx] if next_idx != -1 else body[ac_section_start:]
+        # Check each AC-N has a Given/When/Then nearby
+        ac_pat = ID_PATTERNS["## Acceptance Criteria"]
+        for m in ac_pat.finditer(ac_body):
+            item_id = m.group(0).strip("* ")
+            line_start = ac_body.rfind("\n", 0, m.start()) + 1
+            lookahead = ac_body[line_start: line_start + 800]
+            if not AC_GIVEN_WHEN_THEN_RE.search(lookahead):
+                errors.append(f"AC-{m.group(1)} not in Given/When/Then format")
+
+    # 6. Evidence + confidence per item
+    for section in REQUIRED_SECTIONS:
+        if section == "## Actors" or section == "## Project Config":
+            continue  # no per-ID evidence required
+        errors.extend(_check_items_have_evidence_and_confidence(body, section))
+
+    # 7. REVERSE-GATE comment + sync (ADV-22)
+    gate_match = REVERSE_GATE_RE.search(body)
+    if not gate_match:
+        errors.append("[REVERSE_GATE_DRIFT] <!-- REVERSE-GATE: ... --> comment missing (ADV-15)")
+    else:
+        gate_confidence = gate_match.group(1)
+        if fm_confidence in CONFIDENCE_ENUM and gate_confidence != fm_confidence:
+            errors.append(
+                f"[REVERSE_GATE_DRIFT] frontmatter.confidence='{fm_confidence}' "
+                f"!= comment.confidence='{gate_confidence}'"
+            )
+        gate_allow = gate_match.group(2)
+        expected_allow = "true" if fm_confidence == "high" else "false"
+        if gate_allow != expected_allow:
+            errors.append(
+                f"[REVERSE_GATE_DRIFT] allow-sdd-full='{gate_allow}' "
+                f"inconsistent with confidence='{fm_confidence}' (expected '{expected_allow}')"
+            )
+
+    # 8. Low-confidence banner
+    if fm_confidence == "low":
+        # Banner: "> ⚠️" line within first 30 lines of body
+        first_30 = "\n".join(body.splitlines()[:30])
+        if "⚠️" not in first_30 and "WARNING" not in first_30.upper():
+            warnings.append("confidence=low but no warning banner detected in first 30 lines")
+
+    return not errors, errors, warnings
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        prog="validate_reverse_feat",
+        description="Validate a reverse-generated FEAT (ADV-5 — distinct from /feat-validate).",
+    )
+    parser.add_argument("--feat-path", required=True, help="Path to {n}-{Name}.md")
+    parser.add_argument("--json", action="store_true")
+    args = parser.parse_args(argv)
+
+    feat_path = Path(args.feat_path)
+    ok, errors, warnings = validate_feat(feat_path)
+
+    if args.json:
+        print(json.dumps({
+            "ok": ok,
+            "feat_path": str(feat_path),
+            "errors": errors,
+            "warnings": warnings,
+        }, ensure_ascii=False))
+    else:
+        if ok:
+            print(f"🟢 [VALIDATE_REVERSE] {feat_path.name} — structure valide ({len(warnings)} warning).")
+        else:
+            print(f"🔴 [VALIDATE_REVERSE] {feat_path.name} — {len(errors)} erreur(s) :")
+            for e in errors:
+                print(f"  - {e}")
+            for w in warnings:
+                print(f"  ⚠️ {w}")
+    return 0 if ok else (2 if not feat_path.is_file() else 1)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

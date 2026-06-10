@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-06-10T08:42:50Z",
+  "purpose": "ADV-16 parity tracking. Drift detection: if any hash here differs from current sdd_lib/* hash, reverse helpers may need a refresh sync. WARN-only via reverse_smoke.py (V2).",
+  "snapshots": {
+    "sdd_lib/atomic_write.py": "eeaeb38496e81cd94cef0a638b915283abec069c8a2dceb0fbdf3cdb044e919f",
+    "sdd_lib/file_locks.py": "17cfc359734894549c41e1520f744a70b01eda94b57146c946eb1e191ffc69d8"
+  },
+  "notes": "Hashes computed against sdd_lib/* at MVP delivery time. Local copies in sdd_reverse/{atomic_write_local,file_locks_local}.py are deliberately decoupled; parity tests verify SEMANTIC equivalence, not byte-for-byte. See design doc \u00a712.7."
+}

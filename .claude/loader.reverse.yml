@@ -1,0 +1,127 @@
+# loader.reverse.yml — Reverse engineering manifest (D4 autonomous)
+#
+# Mirror format of loader.yml but isolated. Discovered via frontmatter
+# `loader: .claude/loader.reverse.yml` in the 3 reverse commands and the
+# starting-a-reverse-eng skill. NEVER referenced by loader.yml.
+#
+# ADV-17 closure: reverse-tech-auditor.writes points to db-schema.enrichment.json
+# (NOT db-schema.json — base file is intouchable by Phase 2 agents).
+#
+# See .claude/docs/reverse-engineering-workflow.md §7 for the full design.
+
+schemaVersion: 1
+manifestType: reverse-engineering
+extends: null   # autonomous, does NOT inherit from loader.yml
+
+agents:
+
+  reverse-inventory:
+    model: claude-sonnet-4-6
+    phase: 1
+    reads:
+      - workspace/old/{P}/**                                   # recursive scan
+      - .claude/python/sdd_reverse/language_signatures.yml
+      - workspace/old/{P}/.sys/inventory.json                  # for U-N stability across re-runs
+    writes:
+      - workspace/old/{P}/.sys/inventory.md                    # enriched FR (agent)
+    delegated_to:
+      - .claude/python/sdd_reverse_scripts/reverse_inventory.py   # writes the 5 .json/.md (atomic)
+
+  reverse-tech-auditor:
+    model: claude-sonnet-4-6
+    phase: 2
+    optional: true
+    reads:
+      - workspace/old/{P}/.sys/inventory.json
+      - workspace/old/{P}/.sys/db-schema.json
+      - workspace/old/{P}/**                                   # selective on entry points + config + SQL
+    writes:
+      - workspace/old/{P}/.sys/tech-audit.md
+      - workspace/old/{P}/.sys/deps-graph.json
+      - workspace/old/{P}/.sys/db-schema.enrichment.json       # ADV-3 + ADV-17 : SEPARATE file, never db-schema.json
+    # NOTE ADV-17: this manifest forbids writing to db-schema.json by reverse-tech-auditor.
+    # Union base+enrichment is performed by the deterministic script
+    # sdd_reverse/merge_db_schema.py (V2) which writes db-schema.merged.json.
+
+  reverse-functional-extractor:
+    model: claude-opus-4-8
+    phase: 3
+    reads:
+      - workspace/old/{P}/.sys/inventory.json
+      - workspace/old/{P}/.sys/db-schema.merged.json            # if present (Phase 2 ran)
+      - workspace/old/{P}/.sys/db-schema.json                   # base fallback
+      - workspace/old/{P}/.sys/tech-audit.md                    # optional
+      - workspace/old/{P}/{evidenceFiles}                       # strict, only files listed in unit.evidenceFiles
+      - .claude/python/sdd_reverse/language_signatures.yml
+      - .claude/python/sdd_reverse/feat.reverse.template.md     # ADV-9 isolated template
+    writes:
+      - workspace/input/feats/{n}-{Name}.md                     # the FEAT output
+      - workspace/old/{P}/.sys/modules/{Module}/extraction.md   # extraction log
+
+  reverse-ui-extractor:
+    model: claude-opus-4-8
+    phase: 4
+    optional: true
+    available_from: v0.2.0     # V2 — not in MVP scope
+    reads:
+      - workspace/old/{P}/.sys/inventory.json
+      - workspace/old/{P}/{templateFiles, cssFiles}
+      - workspace/input/feats/{n}-{Name}.md                     # the FEAT produced Phase 3
+    writes:
+      - workspace/input/ui/{n}-{m}-{Name}.html
+
+
+commands:
+  sdd-reverse-init:
+    phase: 0
+    spawns: []
+  sdd-reverse-inventory:
+    phase: 1
+    spawns: [reverse-inventory]
+  sdd-reverse-audit:
+    phase: 2
+    spawns: [reverse-tech-auditor]
+    available_from: v0.2.0
+  sdd-reverse:
+    phase: 3
+    spawns: [reverse-functional-extractor]
+  sdd-reverse-ui:
+    phase: 4
+    spawns: [reverse-ui-extractor]
+    available_from: v0.2.0
+  sdd-reverse-full:
+    phase: "1-4"
+    spawns: []                  # sequences commands, NOT agents (no-spawn rule §9 rules/reverse-engineering.md)
+    available_from: v0.2.0
+  sdd-reverse-status:
+    phase: any
+    spawns: []
+    available_from: v0.2.0
+
+
+scripts:
+  reverse_inventory:
+    path: .claude/python/sdd_reverse_scripts/reverse_inventory.py
+    cli: python -m sdd_reverse_scripts.reverse_inventory --project <PATH> [--use-cache] [--json]
+  validate_reverse_feat:
+    path: .claude/python/sdd_reverse_scripts/validate_reverse_feat.py
+    cli: python -m sdd_reverse_scripts.validate_reverse_feat --feat-path <PATH> [--json]
+  check_reverse_feat_for_full:
+    path: .claude/python/sdd_reverse_scripts/check_reverse_feat_for_full.py
+    cli: python -m sdd_reverse_scripts.check_reverse_feat_for_full --feat-path <GLOB> [--allow-reverse-low] [--json]
+
+
+# Invariants reverse (V2 — to be hoisted in INVARIANTS.reverse.yml)
+invariants_lite:
+  - id: reverse-isolation
+    description: "sdd_reverse/ MUST NOT import from sdd_lib, sdd_scripts, sdd_admin, sdd_hooks (D4 strict)."
+  - id: reverse-loader-autonomous
+    description: "loader.reverse.yml is referenced ONLY by reverse commands/skill, NEVER by loader.yml."
+  - id: reverse-evidence-required
+    description: "Every SFD/FD/BR/AC in a reverse FEAT MUST carry <!-- evidence: path:Lstart-Lend --> (else item rejected)."
+  - id: reverse-confidence-enum-strict
+    description: "confidence ∈ {high, medium, low} ONLY. No medium-high, no other values."
+  - id: reverse-lock-format-valid
+    description: ".alloc.lock file must contain {agent_id, pid, ts_unix, host} JSON (ADV-2/ADV-10)."
+  - id: reverse-gate-comment-sync
+    description: "<!-- REVERSE-GATE: confidence=X ; allow-sdd-full=Y --> MUST match frontmatter.confidence (ADV-22)."

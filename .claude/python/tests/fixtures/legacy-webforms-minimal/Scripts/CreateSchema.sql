@@ -1,0 +1,18 @@
+-- HelloWebForms — schéma initial
+CREATE TABLE Users (
+    Id INT IDENTITY(1,1) PRIMARY KEY,
+    Username NVARCHAR(50) NOT NULL,
+    PasswordHash NVARCHAR(255) NOT NULL,
+    CreatedAt DATETIME2 NOT NULL DEFAULT GETUTCDATE()
+);
+
+CREATE UNIQUE INDEX IX_Users_Username ON Users(Username);
+GO
+
+CREATE TABLE UserRoles (
+    Id INT IDENTITY(1,1) PRIMARY KEY,
+    UserId INT NOT NULL,
+    RoleName NVARCHAR(50) NOT NULL,
+    CONSTRAINT FK_UserRoles_User FOREIGN KEY (UserId) REFERENCES Users(Id)
+);
+GO
