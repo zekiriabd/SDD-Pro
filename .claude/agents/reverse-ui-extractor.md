@@ -121,10 +121,21 @@ Pour chaque écran identifié, produire un fichier HTML5 propre dans `workspace/
 | `<asp:TextBox TextMode=Password>` | `<input type="password" id="..." />` |
 | `<asp:Button OnClick=X>` | `<button type="submit" id="..." data-on-click="X">{Text}</button>` |
 | `<asp:Label AssociatedControlID=X>` | `<label for="X">{Text}</label>` |
-| `<asp:GridView ID=g DataSourceID=ds>` | `<table id="g" data-source="ds"><thead><tr>...</tr></thead><tbody></tbody></table>` |
-| `<asp:Repeater>` | `<ul class="data-list" data-source="...">...</ul>` |
+| `<asp:GridView>` avec `columns[]` (L4) | `<table><thead><tr><th>{header}</th>…</tr></thead><tbody><tr><td>{dataField}</td>…</tr></tbody></table>` — **génère les `<th>` depuis `grid.columns[].header` et une ligne d'exemple depuis `dataField`** (plus de table vide) |
+| `<asp:Repeater>` | `<ul class="data-list">` avec un `<li>` d'exemple par `binding` |
+| `<asp:DropDownList>`/`<select>` (L4 `options[]`) | `<select id="..."><option value="v">{text}</option>…</select>` (toutes les options) |
+| `<asp:CheckBox>` (L4) | `<label><input type="checkbox" id="..." /> {Text}</label>` |
+| `<asp:RadioButtonList>` (L4) | groupe `<input type="radio" name="...">` |
+| `<textarea>` (L4) | `<textarea id="..."></textarea>` + label |
+| `<asp:Image ImageUrl=X>` (L4) | `<img src="X" alt="{AlternateText}" />` |
 | `<form runat=server>` | `<form method="post" action="...">` |
-| `<a href=X>{T}</a>` | `<a href="X">{T}</a>` |
+| `<a href=X>{T}</a>` / `<asp:HyperLink>` | `<a href="X">{T}</a>` |
+
+**Données du parser à exploiter (L4)** : `grids[].columns` (en-têtes + dataField),
+`bindings` (champs `Eval/Bind/@Model.X` — utilise-les pour remplir une **ligne
+d'exemple** représentative dans les tables/listes), `navTargets` (écrans liés —
+ajoute-les en commentaire `<!-- nav: Export.aspx -->` pour préserver le flux).
+Une `<table>` de grid ne doit **jamais** être générée vide quand `columns[]` est non vide.
 
 ### Contraintes anti-derive
 

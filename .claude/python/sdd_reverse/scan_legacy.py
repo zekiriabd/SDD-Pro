@@ -25,6 +25,7 @@ This guarantees cross-OS fingerprint stability.
 
 from __future__ import annotations
 
+import logging
 import re
 import time
 from dataclasses import dataclass, field
@@ -32,6 +33,34 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+
+# Module logger — capture-able by callers, suppressed by default if no
+# handler is configured. Used to surface malformed regex in
+# `language_signatures.yml` instead of swallowing them silently (audit
+# 2026-06-10 P0 closure).
+_LOG = logging.getLogger("sdd_reverse.scan_legacy")
+
+
+def _warn_bad_pattern(
+    lang_id: str,
+    pattern_kind: str,
+    pattern: str,
+    err: re.error,
+    *,
+    file: Path | None = None,
+) -> None:
+    """Emit a structured WARN for a malformed regex in language_signatures.yml.
+
+    Centralizes the previously-silent ``except re.error`` swallows so a
+    misconfigured signature is auditable (CI logs, /sdd-reverse-status,
+    eventual ingest). Does NOT raise — the scan continues with reduced
+    accuracy on the offending pattern.
+    """
+    where = f" file={file}" if file is not None else ""
+    _LOG.warning(
+        "[SCAN_LEGACY_BAD_REGEX] lang=%s kind=%s pattern=%r err=%s%s",
+        lang_id, pattern_kind, pattern, err, where,
+    )
 
 # Default exclusions applied to every scan (in addition to per-language).
 DEFAULT_GLOBAL_EXCLUSIONS = frozenset(
@@ -94,7 +123,9 @@ class LanguageMatch:
     files: list[Path] = field(default_factory=list)
     loc_total: int = 0
     score_total: float = 0.0
-    framework_signatures: list[dict[str, Any]] = field(default_factory=list)
+    # NOTE: framework signatures detected during scan are aggregated globally
+    # in ScanResult.frameworks (cross-language). The previous per-language
+    # field was never populated — removed 2026-06-10 (audit closure).
 
 
 @dataclass
@@ -318,8 +349,9 @@ def scan_project(
                 try:
                     if re.search(pattern, content_str):
                         file_score += weight
-                except re.error:
+                except re.error as err:
                     # Skip malformed regex but don't crash the scan.
+                    _warn_bad_pattern(lang["id"], "evidence_pattern", pattern, err, file=path)
                     continue
 
             if file_score <= 0:
@@ -345,7 +377,8 @@ def scan_project(
                     continue
                 try:
                     m = re.search(fevidence, content_str)
-                except re.error:
+                except re.error as err:
+                    _warn_bad_pattern(lang["id"], "framework_evidence", fevidence, err, file=path)
                     continue
                 if not m:
                     continue
@@ -357,8 +390,8 @@ def scan_project(
                         vm = re.search(vex, content_str)
                         if vm and vm.groups():
                             version = vm.group(1)
-                    except re.error:
-                        pass
+                    except re.error as err:
+                        _warn_bad_pattern(lang["id"], "version_extract", vex, err, file=path)
                 if fid not in frameworks_seen:
                     frameworks_seen[fid] = {
                         "id": fid,
@@ -392,7 +425,8 @@ def scan_project(
                     continue
                 try:
                     m = re.search(fevidence, text)
-                except re.error:
+                except re.error as err:
+                    _warn_bad_pattern(lang["id"], "framework_evidence_manifest", fevidence, err, file=path)
                     continue
                 if not m:
                     continue
@@ -404,8 +438,8 @@ def scan_project(
                         vm = re.search(vex, text)
                         if vm and vm.groups():
                             version = vm.group(1)
-                    except re.error:
-                        pass
+                    except re.error as err:
+                        _warn_bad_pattern(lang["id"], "version_extract_manifest", vex, err, file=path)
                 if fid not in frameworks_seen:
                     frameworks_seen[fid] = {
                         "id": fid,

@@ -1,0 +1,25 @@
+<Page x:Class="HelloWpf.Views.UsersListPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Title="Liste des utilisateurs">
+    <DockPanel>
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="8">
+            <TextBlock Text="Utilisateurs" FontSize="18" FontWeight="Bold" Margin="0,0,16,0" />
+            <Button x:Name="btnRefresh" Content="Rafraîchir" Click="btnRefresh_Click" />
+            <Button x:Name="btnAdd" Content="Ajouter" Margin="8,0,0,0" Command="{Binding AddUserCommand}" />
+        </StackPanel>
+
+        <DataGrid x:Name="dgUsers"
+                  ItemsSource="{Binding Users}"
+                  AutoGenerateColumns="False"
+                  IsReadOnly="True"
+                  Margin="8">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Id" Binding="{Binding Id}" Width="60" />
+                <DataGridTextColumn Header="Nom" Binding="{Binding UserName}" Width="*" />
+                <DataGridTextColumn Header="Email" Binding="{Binding Email}" Width="*" />
+                <DataGridTextColumn Header="Rôle" Binding="{Binding Role}" Width="120" />
+            </DataGrid.Columns>
+        </DataGrid>
+    </DockPanel>
+</Page>

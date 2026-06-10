@@ -164,21 +164,30 @@ def build_inventory(
         k: {**v, "status": "stale"} for k, v in existing_fp_map.items()
     }
 
-    finalized_units: list[dict[str, Any]] = []
-    for cand in units_candidates:
-        evidence_paths_rel = [
+    def _to_rel(paths: list[str]) -> list[str]:
+        return [
             str(Path(p).relative_to(root).as_posix()) if Path(p).is_absolute()
             else str(Path(p).as_posix())
-            for p in cand["evidenceFiles"]
+            for p in paths
         ]
-        evidence_paths_abs = [
+
+    finalized_units: list[dict[str, Any]] = []
+    for cand in units_candidates:
+        # Full (possibly transitively-enriched) evidence — what the agent reads.
+        evidence_paths_rel = _to_rel(cand["evidenceFiles"])
+        # Seed evidence (page + code-behind) — drives the U-N fingerprint so that
+        # L0 graph-walk enrichment never destabilises U-N IDs across re-runs.
+        seed_rel = _to_rel(cand.get("fingerprintSeed") or cand.get("seedEvidenceFiles")
+                           or cand["evidenceFiles"])
+        seed_abs = [
             Path(p) if Path(p).is_absolute() else (root / p)
-            for p in cand["evidenceFiles"]
+            for p in (cand.get("fingerprintSeed") or cand.get("seedEvidenceFiles")
+                      or cand["evidenceFiles"])
         ]
         label = cand["label"]
-        fp_full = compute_unit_fingerprint_full(evidence_paths_rel, label)
+        fp_full = compute_unit_fingerprint_full(seed_rel, label)
         top3 = select_top3_distinctive(
-            evidence_paths_abs, root, signatures, cand.get("language", "unknown")
+            seed_abs, root, signatures, cand.get("language", "unknown")
         )
         fp_core = compute_unit_fingerprint_core(top3, label)
 
@@ -211,7 +220,13 @@ def build_inventory(
             "language": cand.get("language", "unknown"),
             "kind": cand.get("kind", "unknown"),
             "evidenceFiles": evidence_paths_rel,
-            "entities": cand.get("entities", []),
+            # L0: provenance of the seed (page + code-behind) before graph-walk.
+            "seedEvidenceFiles": seed_rel,
+            # L0: role-classified classes reached transitively from the seed.
+            "classes": cand.get("classes", []),
+            # L1: SQL queries + stored-proc calls owned by this unit's files.
+            "dataAccess": cand.get("dataAccess", {}),
+            "entities": sorted(set(cand.get("entities", []))),
             "confidenceEstimate": cand.get("confidenceEstimate", "low"),
             "rationale": cand.get("rationale", ""),
         })

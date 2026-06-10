@@ -97,6 +97,60 @@ invariants:
     enforcer: .claude/python/sdd_reverse_scripts/reverse_smoke.py
     class: REVERSE_TEMPLATE_MISSING
 
+# L0-L6 deepening contracts (V2 2026-06-10 — informational, enforced by the
+# dedicated pytest suites, NOT by the reverse_smoke 11-check parity which stays
+# pinned to the original invariants+drift_checks above).
+deepening_contracts:
+
+  - id: reverse-evidence-transitive-l0
+    description: |
+      units[].evidenceFiles MUST be enriched with the transitive class-reference
+      chain (page→code-behind→service→repository), while the U-N fingerprint is
+      computed from seedEvidenceFiles only (stability). units[].classes carries
+      role-classified reached classes. (L0)
+    enforcer: .claude/python/tests/test_sdd_reverse_code_graph.py
+    class: (informational)
+
+  - id: reverse-deep-technical-extraction-l1
+    description: |
+      Phase 1 MUST emit data-access.json (inline SQL + stored proc defs/calls +
+      params), config.json (connection strings, secrets masked), dependencies.json
+      (NuGet/.csproj PackageReference + assembly refs + bin DLLs). (L1)
+    enforcer: .claude/python/tests/test_sdd_reverse_l1_extraction.py
+    class: (informational)
+
+  - id: reverse-code-driven-units-l2
+    description: |
+      Backend/API-only legacies (no UI page) MUST still yield functional units
+      (controllers → kind:api, orphan modules → kind:module). Support-only types
+      never form a unit alone. (L2)
+    enforcer: .claude/python/tests/test_sdd_reverse_l2_units.py
+    class: (informational)
+
+  - id: reverse-crosscutting-feats-l3
+    description: |
+      generate_crosscutting_feats.py MUST emit {n}-Libraries.md + {n}-Database.md
+      that pass validate_reverse_feat.py, with idempotent allocation. (L3)
+    enforcer: .claude/python/tests/test_sdd_reverse_l3_crosscutting.py
+    class: (informational)
+
+  - id: reverse-preallocation-parallel-safe-l5
+    description: |
+      preallocate_feats.py fixes (n,Name) for all units deterministically; once
+      pre-allocated, Phase 3 extraction is parallel-safe (agent skips inventory
+      write-back). extraction-cache.json skips unchanged units. (L5, rules §8.2)
+    enforcer: .claude/python/tests/test_sdd_reverse_l5_industrial.py
+    class: REVERSE_COMPLETENESS_GAP
+
+  - id: reverse-roundtrip-parity-l6
+    description: |
+      After Phase 1 + cross-cutting, the reverse output MUST capture entities,
+      deep repository class, inline SQL, stored procs (+params/OUTPUT), connection
+      strings, libraries (NuGet + assembly), and class roles — the deterministic
+      contract behind "legacy → specs → /sdd-full → equivalent app". (L6)
+    enforcer: .claude/python/tests/test_sdd_reverse_l6_roundtrip.py
+    class: (informational)
+
 # Drift detection (informational, V2 — see §15.1 design doc)
 drift_checks:
 

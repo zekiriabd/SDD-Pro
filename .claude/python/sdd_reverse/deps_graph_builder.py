@@ -18,6 +18,7 @@ tech-auditor LLM seed material to narrate, not at IDE-grade precision.
 
 from __future__ import annotations
 
+import json
 import re
 import time
 from pathlib import Path
@@ -69,15 +70,63 @@ def _parse_packages_config(content: str) -> list[tuple[str, str]]:
     return _RE_PACKAGES_CONFIG.findall(content)
 
 
+_NPM_DEP_SECTIONS = (
+    "dependencies",
+    "devDependencies",
+    "peerDependencies",        # P3.12 — was missing
+    "optionalDependencies",    # P3.12 — was missing
+)
+
+
 def _parse_npm_json(content: str) -> list[tuple[str, str]]:
-    """Extract dependencies + devDependencies block (naive)."""
+    """Extract dependencies from package.json across the 4 standard sections.
+
+    P3.12 closure (2026-06-10) — switched from regex slicing (which broke
+    on nested objects and silently dropped 3 of the 4 standard npm dep
+    sections) to a proper ``json.loads`` parse with regex fallback for
+    malformed legacy manifests.
+
+    Reads, in priority order :
+        1. ``dependencies``
+        2. ``devDependencies``
+        3. ``peerDependencies``  (was missing before — breaks lib auditing)
+        4. ``optionalDependencies`` (was missing — affects EOL detection)
+
+    Falls back to the old regex-based extraction if JSON parse fails
+    (e.g. legacy package.json with trailing commas, JSON5 syntax, BOM).
+    """
     deps: list[tuple[str, str]] = []
-    # Find "dependencies": { ... } block
-    for match_label in ("dependencies", "devDependencies"):
-        m = re.search(rf'"{match_label}"\s*:\s*\{{([^}}]+)\}}', content, re.DOTALL)
-        if m:
-            for name, version in _RE_NPM_DEP.findall(m.group(1)):
-                deps.append((name, version))
+    seen: set[str] = set()
+
+    try:
+        data = json.loads(content)
+    except (ValueError, TypeError):
+        # Malformed JSON — try regex fallback per section.
+        for label in _NPM_DEP_SECTIONS:
+            m = re.search(rf'"{label}"\s*:\s*\{{([^}}]*)\}}', content, re.DOTALL)
+            if m:
+                for name, version in _RE_NPM_DEP.findall(m.group(1)):
+                    if name not in seen:
+                        seen.add(name)
+                        deps.append((name, version))
+        return deps
+
+    if not isinstance(data, dict):
+        return deps
+
+    for label in _NPM_DEP_SECTIONS:
+        section = data.get(label)
+        if not isinstance(section, dict):
+            continue
+        for name, version in section.items():
+            if not isinstance(name, str) or not isinstance(version, str):
+                continue
+            if name in seen:
+                continue
+            seen.add(name)
+            # Strip ^/~ semver markers for downstream EOL match
+            cleaned = version.lstrip("^~")
+            deps.append((name, cleaned))
     return deps
 
 
@@ -91,12 +140,44 @@ def _parse_pip_requirements(content: str) -> list[tuple[str, str]]:
 
 
 def _parse_composer_json(content: str) -> list[tuple[str, str]]:
+    """Extract `require` + `require-dev` from composer.json.
+
+    P3.12 closure — symmetric fix with `_parse_npm_json` : prefer
+    `json.loads` for nested-safe parsing, fall back to regex for
+    malformed legacy manifests.
+    """
     deps: list[tuple[str, str]] = []
-    for match_label in ("require", "require-dev"):
-        m = re.search(rf'"{match_label}"\s*:\s*\{{([^}}]+)\}}', content, re.DOTALL)
-        if m:
-            for name, version in _RE_COMPOSER_DEP.findall(m.group(1)):
-                deps.append((name, version))
+    seen: set[str] = set()
+
+    try:
+        data = json.loads(content)
+    except (ValueError, TypeError):
+        for label in ("require", "require-dev"):
+            m = re.search(rf'"{label}"\s*:\s*\{{([^}}]*)\}}', content, re.DOTALL)
+            if m:
+                for name, version in _RE_COMPOSER_DEP.findall(m.group(1)):
+                    if name not in seen:
+                        seen.add(name)
+                        deps.append((name, version))
+        return deps
+
+    if not isinstance(data, dict):
+        return deps
+
+    for label in ("require", "require-dev"):
+        section = data.get(label)
+        if not isinstance(section, dict):
+            continue
+        for name, version in section.items():
+            if not isinstance(name, str) or not isinstance(version, str):
+                continue
+            # Skip PHP runtime pseudo-package
+            if name.lower() == "php":
+                continue
+            if name in seen:
+                continue
+            seen.add(name)
+            deps.append((name, version.lstrip("^~")))
     return deps
 
 

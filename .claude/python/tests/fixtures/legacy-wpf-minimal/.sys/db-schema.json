@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "project": "legacy-wpf-minimal",
+  "extractDate": "2026-06-10T21:10:47Z",
+  "source": "(no schema source found)",
+  "completeness": "basic",
+  "databaseType": "Unknown",
+  "entities": [],
+  "relations": [],
+  "indexes": [],
+  "missingPartsHint": [
+    "No DB schema detected. Phase 3 entities will be degraded to confidence: medium (§9.2)."
+  ]
+}

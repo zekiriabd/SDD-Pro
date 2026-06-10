@@ -34,11 +34,38 @@ Lire **uniquement** :
 1. `workspace/old/{P}/.sys/inventory.json` → `units[id={U-N}]`
 2. `workspace/old/{P}/.sys/db-schema.merged.json` si existe, sinon `db-schema.json` (D7 source de vérité entities)
 3. `workspace/old/{P}/.sys/tech-audit.md` si existe (optionnel)
-4. **Chaque fichier listé** dans `units[U-N].evidenceFiles` — strict, rien d'autre
+4. **Chaque fichier listé** dans `units[U-N].evidenceFiles` — strict, rien d'autre.
+   Depuis L0, cette liste inclut **l'evidence profonde** : la chaîne transitive
+   `page → code-behind → service → repository → data-access` résolue par le
+   code-graph Phase 1. Lis-les **tous** — c'est là que vit la logique métier
+   réelle (SQL, règles, validations), pas seulement dans l'écran d'entrée.
 5. `.claude/python/sdd_reverse/language_signatures.yml` (pour `confidence_cap` du langage de l'unité)
 6. `.claude/python/sdd_reverse/feat.reverse.template.md` (template ADV-9)
 
-Interdit absolu : ne JAMAIS Read d'autres unités, autres FEATs, autres pages.
+Interdit absolu : ne JAMAIS Read d'autres unités, autres FEATs, autres pages,
+ni de fichier **hors `evidenceFiles`**. Si une classe métier manque à l'evidence,
+ne la devine pas — émets une note dans le log d'extraction (Phase 1 a borné le
+graphe) ; ne va pas la lire en douce.
+
+### 1.bis — Exploiter `units[U-N].classes` (carte des rôles, L0)
+
+`inventory.json.units[U-N].classes` liste chaque classe atteinte depuis le seed
+avec son **rôle** (`repository` / `service` / `dto` / `code-behind` /
+`controller` / `entity` / `complex` / `classic` / `static-helper`), son fichier,
+ses lignes, et les flags `touchesSql` / `touchesHttp`. Utilise cette carte pour
+**diriger** ta lecture et structurer la FEAT :
+
+| Rôle de classe | Ce que tu en tires pour la FEAT |
+|---|---|
+| `code-behind` | Flux écran, handlers d'événements (boutons), redirections → `FD-N`, `AC-N` |
+| `repository` (`touchesSql`) | Accès données, requêtes, entités touchées → `BR-N` (contraintes), entités |
+| `service` | Règles métier, validations, orchestration → `SFD-N`, `BR-N` |
+| `dto` / `entity` | Champs, types, formats → contraintes de validation `BR-N` |
+| `controller` | Endpoints, routes, verbes → `FD-N` (livrables API) |
+| `complex` | God-class : décompose en plusieurs `SFD-N` (1 par responsabilité visible) |
+
+Une classe `repository` avec `touchesSql=true` non couverte par au moins un
+`BR-N` ou une entité est un signal de sous-extraction — relis le fichier.
 
 ## STEP 2 — Confidence cap effectif
 
@@ -103,6 +130,13 @@ Exit `0` ou `2` → continuer. Exit `1` → STOP + ERROR `[REVERSE_LOCK_HELD]`. 
    > Raison : {pourquoi cap≠high}
    ```
 
+> **Unités sans UI (L2)** : si `unit.kind ∈ {api, module}`, l'unité est
+> **backend-pure** (controller REST ou module de services/repositories, aucune
+> page). Dérive alors les `FD-N` des **endpoints/méthodes publiques** (verbes
+> HTTP, signatures de service) et non d'écrans. Les `## Actors` peuvent être un
+> système appelant (client API, scheduler) plutôt qu'un humain. Le mockup UI
+> (Phase 4) sera skippé pour ces unités — c'est attendu.
+
 5. **`## Actors`** : déduire des Session/Cookie/Role/Auth dans le code. Si rien d'évident → 1 acteur générique "Utilisateur".
 
 6. **`## Functional Needs`** : `SFD-N` séquentiels, 1 par besoin métier identifié. Chaque ligne se termine par `<!-- evidence: path:Lstart-Lend --> <!-- confidence: ... -->`.
@@ -140,9 +174,14 @@ if iter == 3 and exit != 0:
 
 ## STEP 7 — Mise à jour inventory + release lock
 
-1. Mettre à jour `inventory.json` (lecture + write atomique via script Python helper) :
+1. Mettre à jour `inventory.json` **uniquement en mode legacy** (allocation à la volée) :
    - `_featAllocations[{U-N}] = n`
    - `_allocatedNames[Name] = {U-N}`
+   - **Mode pré-alloué (L5)** : si `_featAllocations[{U-N}]` était **déjà présent**
+     à STEP 4 (pré-allocation `preallocate_feats.py` a tourné), **SKIP ce write-back**
+     — la valeur est identique et écrire `inventory.json` casserait la sûreté du
+     parallélisme (cf. `rules/reverse-engineering.md §8.2`). En parallèle borné,
+     l'agent n'écrit QUE son `{n}-{Name}.md` disjoint.
 2. Release lock :
    ```bash
    python -c "from sdd_reverse.file_locks_local import release_lock; release_lock('workspace/input/feats/.alloc.lock', 'reverse-functional-extractor-{U-N}')"

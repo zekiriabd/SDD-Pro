@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "project": "legacy-wpf-minimal",
+  "extractDate": "2026-06-10T21:10:47Z",
+  "packages": [],
+  "assemblyReferences": [],
+  "binaries": [],
+  "summary": {
+    "packagesCount": 0,
+    "assemblyReferencesCount": 0,
+    "binariesCount": 0,
+    "ecosystems": {}
+  }
+}

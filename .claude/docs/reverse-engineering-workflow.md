@@ -1,12 +1,34 @@
 ---
 title: Reverse Engineering Workflow — Design Doc Maître
 status: Draft (en attente validation Tech Lead)
-version: 0.4.1
+version: 0.5.0
 created: 2026-06-10
 updated: 2026-06-10
 authors: SDD_Pro Architect
 scope: workflow nouveau, isolé, cohabitant avec SDD_Pro v7.0.0+ sans édition de fichier existant
 changelog:
+  - v0.5.0 (2026-06-10) — **Refonte profondeur d'extraction (lots L0→L6)** suite audit CTO.
+      L0 : code-graph symbole-level (`code_graph_builder.py` + `class_role_classifier.py`) —
+        chaque classe classée par rôle (repository/service/dto/code-behind/controller/complex/…),
+        evidence `units[].evidenceFiles` enrichie transitivement (page→behind→service→repo),
+        fingerprint U-N pinné sur le seed (stabilité). Corrige « ne capture que la 1ère interface ».
+      L1 : extraction technique profonde — `data_access_extractor.py` (SQL inline + procs DDL/calls +
+        params), `config_extractor.py` (connection strings, secrets masqués), `dependency_inventory.py`
+        (NuGet packages.config + .csproj PackageReference + Directory.Packages.props + assembly refs +
+        bin DLLs), champs ORM remplis. Artefacts §5.6.
+      L2 : `code_unit_detector.py` — unités pilotées par le code (controllers→api, modules backend
+        orphelins→module). Backend/API-only passe de 0 unité → unités exploitables.
+      L3 : `crosscutting_feats.py` + `generate_crosscutting_feats.py` — FEATs transversales
+        déterministes « Librairies à installer » + « Base de données / procédures stockées /
+        connection strings », conformes `validate_reverse_feat.py`.
+      L4 : `ui_template_parser` — colonnes de grid (BoundField/TemplateField), contrôles ASPX
+        (DropDownList/CheckBox/Radio/textarea/select/Image), data-binding (Eval/Bind/@Model),
+        navTargets ; `css_palette_extractor` lit `<style>` inline + `style="…"`.
+      L5 : `preallocate_feats.py` (pré-allocation déterministe → Phase 3 parallèle bornée, ADV-2
+        relâché §8.2), `reverse_cache.py` (skip unités inchangées), `check_feat_completeness.py` +
+        agent `reverse-completeness-reviewer` (revue back informational).
+      L6 : orchestrateur `/sdd-reverse-full` industrialisé (préalloc→parallèle→crosscut→review),
+        test round-trip de parité, INVARIANTS deepening_contracts. Isolation D4 préservée (smoke 11/11).
   - v0.4.1 (2026-06-10) — Patch micro 4ème revue (ADV-23) : initialisation explicite `_allocatedNames: {}` + `_featAllocations: {}` à la création de `inventory.json` (§5.1) ; mode `--use-cache` (§4.1) doit vérifier `schemaVersion` ≥ 1 ET présence `_allocatedNames` sinon refresh forcé. Statement reviewer : **convergence stable, loop adversarial CLOS**.
   - v0.4.0 (2026-06-10) — Closure 3ème revue contradictoire (convergence). Patches micro :
       ADV-18 (§6 tableau inter-phases : `db-schema.json enrichi` stale → `db-schema.enrichment.json` + `db-schema.merged.json`) ;
@@ -83,10 +105,13 @@ changelog:
 
 ## §0 Précondition & hors-scope
 
-**Précondition** : ce workflow opère sur **fichiers source lisibles** (ASPX, .cs, .java, .php, .pas/.dfm, .frm, templates HTML/Razor/Blade/JSP, SQL, CSS, JS, etc.) déposés sous `workspace/old/{LegacyProject}/`.
+**Précondition** : ce workflow opère sur **fichiers source lisibles** (ASPX, .cs, .java, .php, .pas/.dfm, .frm, templates HTML/Razor/Blade/JSP, SQL, CSS, JS, **.xaml**, etc.) déposés sous `workspace/old/{LegacyProject}/`.
 
 **Hors-scope** :
 - Reverse engineering d'**exécutables compilés sans source** (WPF/WinForms/Delphi/VB6 binaire-only) → palier V3, pipeline distinct (UI Automation + décompilation + capture vision). Si projet livré binaire-only : émettre `[REVERSE_BINARY_ONLY]` + STOP + escalade Tech Lead.
+
+  > **Note WPF avec sources** (depuis 2026-06-10) : si les fichiers `.xaml` + `.xaml.cs` sont disponibles (extraits ou non-compilés), le workflow standard les supporte via la signature `wpf-xaml` (`language_signatures.yml`) et la famille `"wpf"` dans `ui_template_parser`. Cf. §4.4 et §8.2 pour le mapping XAML→HTML sémantique. Le cas binaire-only (`.exe` sans XAML extractible) reste hors-scope.
+
 - Migration **runtime** ou **rejeu E2E** du legacy. Le workflow produit des FEATs descriptives ; la (ré)implémentation est ensuite faite par `/sdd-full {n}` via le pipeline SDD_Pro standard.
 - Préservation **bit-à-bit** du look-and-feel : la Phase 4 UI produit une **interprétation sémantique** du legacy, pas un clone pixel-perfect.
 
@@ -119,6 +144,20 @@ Phase 6 [migration] : /sdd-full {n} OU /sdd-poc {n}
 - 1 menu navigation → 1 FEAT
 - 1 wizard multi-étapes → 1 FEAT
 - 1 modale de confirmation isolée → 0 FEAT (intégrée à la FEAT parente)
+
+**Unités pilotées par le code (L2, V2 2026-06-10)** : les unités ne proviennent
+plus uniquement des pages UI. `code_unit_detector.py` ajoute, après les unités
+de page :
+- 1 unité `kind: api` par **controller** MVC/Web API (la tranche
+  controller→service→repository est capturée via le code-graph) ;
+- 1 unité `kind: module` par **module backend orphelin** (services/repositories
+  non atteints depuis une page ou un controller — jobs, tâches planifiées,
+  services domaine), groupés par namespace (sinon dossier racine).
+
+Conséquence : une appli **backend/API-only** (zéro page UI) produit désormais
+des unités exploitables — auparavant elle en produisait **zéro**. Les types
+support seuls (DTO/entity/interface/enum/helper statique) ne forment jamais une
+unité ; ils sont portés par `units[].classes`.
 
 **Reprenabilité** : chaque phase est atomique. Re-lancer une phase écrase son output (pas de merge). L'état est porté par les artefacts disque (`inventory.json`, `db-schema.json`, etc.), pas par un session state.
 
@@ -510,6 +549,65 @@ tools: Read, Write, Edit, Glob, Grep, Bash
 - `ui_template_parser.py` (pré-extraction structure)
 - L'agent synthétise un HTML sémantique propre (semantic tags, accessible markup, CSS vars).
 
+#### 4.4.bis Mapping XAML → HTML sémantique (WPF, depuis 2026-06-10)
+
+Les fichiers `.xaml` (WPF Window / Page / UserControl) sont traités par la
+**famille `"wpf"`** de `ui_template_parser._parse_xaml_template`. Le mapping
+suit la même doctrine que les autres familles : **sémantique, pas pixel-perfect**.
+
+Le parser produit la même structure de sortie que pour ASPX/JSP/Blade
+(`{forms[], elements[], links[], grids[]}`), avec un champ supplémentaire
+`wpf_control` qui trace le contrôle XAML d'origine pour l'agent en aval.
+
+| Contrôle XAML | Élément HTML5 | Champ extrait |
+|---|---|---|
+| `<Window>` / `<Page>` / `<UserControl>` | racine fichier (1 `form` record) | `wpf_root` |
+| `<TextBox x:Name="..." Text="...">` | `<input type="text">` | `id`, `value`, `placeholder` |
+| `<PasswordBox x:Name="...">` | `<input type="password">` | `id` |
+| `<CheckBox Content="..." IsChecked="...">` | `<input type="checkbox"><label>` | `label`, `checked` |
+| `<RadioButton GroupName="..." IsChecked="...">` | `<input type="radio">` | `group`, `checked` |
+| `<ComboBox ItemsSource="{Binding ...}">` | `<select>` | `items_source` |
+| `<Button Content="..." Click="..." Command="...">` | `<button onclick="...">` | `text`, `on_click`, `command` (MVVM) |
+| `<Hyperlink NavigateUri="...">` | `<a href="...">` | `href`, `text` |
+| `<TextBlock Text="...">` | `<span>` / `<p>` | `text`, kind=`"text"` |
+| `<Label Content="..." Target="{Binding ElementName=...}">` | `<label for="...">` | associée via `Target` ElementName |
+| `<DataGrid ItemsSource="...">` | `<table>` | grid, `items_source` |
+| `<ListView>` / `<ListBox>` / `<ItemsControl>` | `<ul>` / `<table>` | grid |
+| `<TreeView>` | `<ul>` (arborescence) | grid |
+| `<Image Source="...">` | `<img src="...">` | — |
+
+**Layout containers délibérément non mappés** :
+`<Grid>`, `<StackPanel>`, `<DockPanel>`, `<Canvas>`, `<WrapPanel>`. L'agent
+`reverse-ui-extractor` décide de la stratégie de layout finale en fonction du
+design system cible (Bootstrap grid, CSS grid, flex, etc.) — figer un mapping
+ici contraindrait inutilement le rendu HTML.
+
+**Filtrage layout / entry-point** (`ui_unit_detector._classify_page`) :
+- `App.xaml` (ou tout XAML avec `<Application>` racine) → kind=`"layout"`, **filtré**.
+- Tout fichier XAML avec **uniquement** `<ResourceDictionary>` racine (thèmes,
+  styles) → kind=`"layout"`, **filtré**.
+- `<Window>`, `<Page>`, `<UserControl>` → candidats à unité fonctionnelle
+  (kind = `form` / `grid` / `wizard` / `page` selon contenu).
+
+**Fidélité attendue** :
+
+| Cas | Fidélité estimée |
+|---|---|
+| `<TextBox>`, `<Button>`, `<PasswordBox>` (contrôles standards) | **95%** |
+| `<DataGrid>` avec colonnes Header/Binding simples | **80%** |
+| Layout `<Grid>` avec `RowDefinition` / `ColumnDefinition` | ~**70%** (agent rebuild via CSS grid) |
+| `<Style>` / `<ControlTemplate>` cascadant | ~**40%** (templates custom non préservés) |
+| Bindings `{Binding ...}` MVVM | préservés sous forme de `items_source` / `command` (l'agent décide quoi en faire) |
+
+**Code-behind discovery** : pour chaque `.xaml`, `_build_pages_list` cherche
+`*.xaml.cs` (C#) ou `*.xaml.vb` (VB.NET) en companion et le lie via
+`codeBehindPath` dans `inventory.json`.
+
+**Cas hors-scope (rappel)** : `.exe` WPF binaire-only — il faut décompiler
+(ILSpy/dotPeek) et extraire le BAML (`baml2xml`) **avant** de déposer les
+sources sous `workspace/old/{P}/`. Le workflow ne fait pas cette
+décompilation lui-même (palier V3, §13.3).
+
 ### 4.5 Récapitulatif modèles
 
 | Agent | Modèle | Phase | Mode |
@@ -578,6 +676,12 @@ tools: Read, Write, Edit, Glob, Grep, Bash
   "legacyMtimeMax": 1717987200
 }
 ```
+
+**Notes schéma — champs L0 (V2, 2026-06-10)** :
+- `units[].seedEvidenceFiles` (L0) : evidence **seed** = `[page, code-behind]` détectée par `ui_unit_detector`. **Le fingerprint U-N est calculé sur ce seed**, jamais sur l'evidence enrichie — l'enrichissement par graphe ne déstabilise donc jamais les IDs U-N entre re-runs.
+- `units[].evidenceFiles` (enrichi L0) : seed **+** chaîne transitive `page→code-behind→service→repository→data-access` résolue par `code_graph_builder` (borné à `max_added_files=30`, profondeur `max_depth=3`). C'est la liste exhaustive que l'agent Phase 3 lit. **C'est le correctif structurel** au défaut « ne capture que la première interface ».
+- `units[].classes` (L0) : `[{name, role, file, lines, methodCount, touchesSql, touchesHttp}]` — toutes les classes atteintes depuis le seed, classées par rôle (`repository`/`service`/`dto`/`code-behind`/`controller`/`entity`/`complex`/`classic`/`static-helper`/`interface`/`enum`). Carte exploitée par l'agent pour structurer la FEAT (cf. `agents/reverse-functional-extractor.md §1.bis`).
+- `units[].entities` : entités DB déduites (classes de rôle `entity` uniquement — un `repository` n'est PAS une entité).
 
 **Notes schéma v0.4.1** :
 - `_allocatedNames` (ADV-13, ADV-19) : mapping `Name → U-N`, mis à jour atomiquement avec `_featAllocations`. Permet la détection de collision intra-run sur `suggestedName`.
@@ -657,6 +761,60 @@ tools: Read, Write, Edit, Glob, Grep, Bash
   "deadCodeHint": []
 }
 ```
+
+### 5.5 `code-graph.json` (Phase 1, L0 — V2 2026-06-10)
+
+Graphe **symbole-level** (classes, pas fichiers) produit par `code_graph_builder.py`
+pendant la Phase 1. Distinct de `deps-graph.json` (Phase 2, niveau fichier via
+`using`/`import`). Consommé par `enrich_units` pour peupler `units[].classes` +
+enrichir `units[].evidenceFiles`. Lecture humaine via `inventory.md`.
+
+```json
+{
+  "schemaVersion": 1,
+  "project": "LegacyProject",
+  "buildDate": "2026-06-10T14:32:20Z",
+  "language": "aspx-webforms",
+  "classes": [
+    {
+      "name": "DataAccess", "kind": "class", "role": "repository",
+      "file": "App_Code/DataAccess.cs", "namespace": "HelloWebForms.App_Code",
+      "baseTypes": [], "attributes": [], "isStatic": true, "isPartial": false,
+      "isAbstract": false, "methodCount": 2, "propertyCount": 1,
+      "locTotal": 40, "lines": "8-48", "touchesSql": true, "touchesHttp": false,
+      "references": []
+    }
+  ],
+  "edges": [
+    { "from": "Login", "to": "DataAccess", "kind": "reference", "evidence": "Login.aspx.cs:23" }
+  ],
+  "rolesSummary": { "code-behind": 2, "repository": 1 },
+  "filesAnalyzed": 3
+}
+```
+
+**Scope L0** : C#/VB.NET (`.cs`/`.vb`). Langages non-.NET → graphe vide
+bien-formé (les unités gardent le seed evidence inchangé). Java/PHP ajoutés dans
+les lots ultérieurs.
+
+### 5.6 `data-access.json` / `config.json` / `dependencies.json` (Phase 1, L1 — V2 2026-06-10)
+
+Trois artefacts d'extraction technique profonde, produits en Phase 1, qui
+comblent des lacunes auparavant à 0 % et alimentent les **FEATs transversales**
+(L3 : « Librairies à installer », « Base de données / Procédures stockées »).
+
+- **`data-access.json`** : `queries[]` (SQL inline avec `verb`/`tables`/`params`/`file:line`),
+  `storedProcedureCalls[]` (`CommandType.StoredProcedure` + `EXEC sp_xxx`),
+  `storedProcedureDefs[]` (`CREATE PROCEDURE` name + paramètres typés + flag `OUTPUT`).
+  Producteur : `data_access_extractor.py`. Rattaché par unité via `units[].dataAccess`.
+- **`config.json`** : `connectionStrings[]` (`name`/`provider`/`server`/`database`/`value` **secrets masqués `***`**),
+  `appSettings[]`. Producteur : `config_extractor.py`.
+- **`dependencies.json`** : `packages[]` (NuGet `packages.config` + `.csproj PackageReference` +
+  `Directory.Packages.props` ; npm/maven/pypi/composer), `assemblyReferences[]`
+  (`<Reference HintPath>`), `binaries[]` (`bin/*.dll`). Producteur : `dependency_inventory.py`.
+
+Ces 3 artefacts sont aussi synthétisés en lecture humaine dans `inventory.md`
+(section « ## Synthèse technique (L1) »).
 
 ---
 
@@ -877,6 +1035,25 @@ languages:
       - { pattern: '\busing\s+System;', weight: 0.5 }
       - { pattern: '\bnamespace\s+', weight: 0.6 }
     confidence_cap: high
+
+  # WPF Windows desktop UI (depuis 2026-06-10)
+  # Couvre WPF .NET Framework 4.x ET WPF moderne (.NET 5/6/7/8).
+  # Filtrage automatique App.xaml + ResourceDictionary-only par ui_unit_detector.
+  # Code-behind .xaml.cs / .xaml.vb détecté par _build_pages_list.
+  - id: wpf-xaml
+    label: WPF (.NET Framework + Core/.NET 5+)
+    family: dotnet
+    file_extensions: [.xaml]
+    evidence_patterns:
+      - { pattern: 'xmlns="http://schemas\.microsoft\.com/winfx/2006/xaml/presentation"', weight: 5.0 }
+      - { pattern: '<Window\b', weight: 3.0 }
+      - { pattern: '<Page\b', weight: 3.0 }
+      - { pattern: '<UserControl\b', weight: 3.0 }
+      - { pattern: 'x:Class="', weight: 2.0 }
+      - { pattern: '<DataGrid\b', weight: 1.5 }
+      - { pattern: '<TextBox\b', weight: 1.0 }
+    confidence_cap: high
+    excluded_paths: [bin/, obj/, packages/, .vs/, AppPackages/]
 
   # === JAVA FAMILY ===
   - id: java-ee
@@ -1233,6 +1410,36 @@ Pour chaque FEAT générée dans une fixture de smoke (§11) :
    - Hash changé → WARN `[REVERSE_HELPER_DRIFT]` : lire le diff upstream, décider si appliquer au local
    - Pas bloquant, juste signal.
 5. **Justification duplication** : la duplication est délibérée (D4 isolation). Les tests de parité sont le contrat qui empêche que la duplication devienne du code mort divergent.
+
+#### 12.7.bis Divergences volontaires documentées (P2.9 closure 2026-06-10)
+
+Tous les écarts d'API ou de comportement entre les helpers locaux et leurs
+versions standard sont **délibérés** et tracés ci-dessous. Toute parité
+nouvelle (ex. ajout d'une fonction publique côté `sdd_lib`) doit faire
+l'objet d'une décision explicite : (a) la dupliquer côté reverse, (b) la
+laisser hors scope reverse, ou (c) faire évoluer la liste ci-dessous.
+
+| Helper | Aspect | `sdd_lib/*` standard | `sdd_reverse/*_local` | Raison |
+|---|---|---|---|---|
+| `atomic_write` | Signature `atomic_write_text` | `atomic_write_text(path, content, *, encoding="utf-8", newline=None, tmp_suffix=".sddtmp")` | `atomic_write_text(path, content, encoding="utf-8")` | API minimale MVP — `newline` et `tmp_suffix` non requis Phase 1-4. Si Phase 5 (impl translator V3) en a besoin, étendre côté reverse en se synchronisant. |
+| `atomic_write` | Mitigation RUPT-5 | `_replace_with_retry` + `_backoff_with_jitter` (5 retries, 50 ms × jitter [0.8, 1.2]) | **Synced 2026-06-10** — mêmes constantes `_REPLACE_MAX_RETRIES=5`, `_REPLACE_BACKOFF_S=0.05` | Avant P0.1 closure, le local n'avait pas de retry. Test parité `test_atomic_write_local_byte_for_byte_against_lib_constants` enforce désormais l'égalité des constantes. |
+| `file_locks` | Format payload | **3-part text** : `AGENT_ID:PID:TS_MS` (lecture multi-format) OU **2-part** : `AGENT_ID:TS_S` | **JSON** : `{"agent_id", "pid", "ts_unix", "host"}` | Le payload JSON porte un champ supplémentaire `host` (anti-confusion cross-machine) qui n'a pas d'équivalent côté `sdd_lib`. Choix design Phase 3 (lock sur `workspace/input/feats/.alloc.lock`). **Conséquence** : un script du framework standard qui lirait ce lock par accident ne pourrait pas le parser — acceptable par design D4, jamais un caller croisé n'est censé apparaître. |
+| `file_locks` | API publique | `try_create_exclusive(path, content) -> bool` + `acquire_with_retry(path, content, ttl_ms, backoff_ms)` | `acquire_lock(path, agent_id, ttl=30) -> int` + `release_lock(path, agent_id) -> int` + `read_lock(path) -> dict\|None` | Exit codes 0/1/2/3 (cf. `ownership.md §4` table standard SDD_Pro) au lieu de booléens. Re-entrant per `agent_id` côté reverse — pas côté standard. **Pas une perte de parité** : c'est l'API attendue par les agents reverse, et le contrat est plus riche (re-entrant + host check). |
+| `file_locks` | Dépendance `psutil` | absente (standard) | **optionnelle** (ADV-10) — fallback TTL-only si absente | Le check pid `_is_pid_alive` est utilisé pour court-circuiter le TTL quand on sait que l'agent crashé n'est plus là. Si `psutil` non installé, le lock attend toujours le TTL (30 s) — comportement strictement plus prudent. |
+| `_parity_snapshots.json` | Régénération | n/a (pas de snapshot côté standard) | manuelle pour l'instant (V0.4 : script `sync_parity_snapshots.py`) | Quand on synchronise volontairement une mitigation upstream (ex. P0.1 RUPT-5), les hashes restent inchangés (le standard est déjà à jour). Si on **diverge volontairement** côté local (ex. retirer un fix qu'on ne veut pas), il faudra capturer le nouveau hash pré-divergence ici. |
+
+**Règle d'or pour ajouter une nouvelle divergence** :
+
+1. Ajouter une ligne dans le tableau ci-dessus avec la raison.
+2. Ajouter un test ciblé dans `tests/test_local_helpers_parity.py` qui asserte la divergence (et empêche un futur sync accidentel de la casser).
+3. Si la divergence touche une mitigation de sécurité (retry, fsync, lock), créer un ADR dans `workspace/output/.sys/.context/adrs/` documentant la décision.
+
+**Symétriquement, règle pour résorber une divergence** :
+
+1. Aligner le code local sur le standard.
+2. Retirer la ligne du tableau ci-dessus.
+3. Retirer le test de divergence dans `tests/test_local_helpers_parity.py` (et ajouter à la place un test de parité positive).
+4. Régénérer `_parity_snapshots.json` si l'alignement modifie les hashes attendus.
 
 ---
 

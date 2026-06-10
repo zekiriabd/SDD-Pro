@@ -52,13 +52,33 @@ def _read_text(path: Path) -> str:
 
 
 def _normalize_hex(hex_str: str) -> str:
-    """Normalize #abc → #aabbcc, #aabbcc → lowercase, #aabbccdd → lowercase 6-digit."""
+    """Normalize ``#abc`` → ``#aabbcc``, ``#aabbcc`` → lowercase 6-digit.
+
+    P1.8 closure (2026-06-10) : 8-digit hex (``#aabbccdd``) keeps its alpha
+    channel in the canonical output. Previously the alpha was silently
+    dropped — palettes grouped translucent colors with their opaque
+    counterpart. Returned value is ``#RRGGBB`` (6 char) for fully-opaque or
+    ``#RRGGBBAA`` (8 char) when an alpha is present.
+    """
     h = hex_str.lower()
     if len(h) == 3:
         h = "".join(c * 2 for c in h)
-    elif len(h) == 8:
-        h = h[:6]  # drop alpha for palette grouping
+    elif len(h) == 4:
+        # CSS3 short form #rgba → expand to #rrggbbaa
+        h = "".join(c * 2 for c in h)
+    # 6 and 8 are preserved as-is (alpha kept for 8-digit)
     return f"#{h}"
+
+
+def _hex_strip_alpha(hex_str: str) -> str:
+    """Return the RGB component only of a 6-or-8-digit normalized hex.
+
+    Used for grouping translucent shades under one palette entry while
+    still allowing the caller to recover the original alpha via
+    ``_normalize_hex``.
+    """
+    h = hex_str.lstrip("#")
+    return f"#{h[:6]}"
 
 
 def _rgb_to_hex(r: int, g: int, b: int) -> str:
@@ -94,13 +114,14 @@ def extract_palette(project_root: str | Path, scan_result: ScanResult) -> dict[s
         if p not in css_paths and p.is_file():
             css_paths.append(p)
 
-    colors_counter: Counter[str] = Counter()
-    color_contexts: dict[str, list[str]] = {}
-    fonts_counter: Counter[str] = Counter()
-    spacing_counter: Counter[int] = Counter()
-    radius_counter: Counter[int] = Counter()
-    css_sources: list[str] = []
+    # L4 — build the list of CSS sources: full .css files PLUS inline <style>
+    # blocks and style="…" attributes embedded in templates (previously the
+    # docstring claimed this but extract_palette only read .css files).
+    _RE_STYLE_BLOCK = re.compile(r"<style\b[^>]*>(.*?)</style>", re.IGNORECASE | re.DOTALL)
+    _RE_STYLE_ATTR = re.compile(r"\bstyle\s*=\s*\"([^\"]*)\"", re.IGNORECASE)
+    _TEMPLATE_EXT = {".aspx", ".ascx", ".master", ".cshtml", ".vbhtml", ".html", ".htm"}
 
+    style_sources: list[tuple[str, str]] = []
     for css_path in css_paths:
         content = _read_text(css_path)
         if not content:
@@ -109,6 +130,37 @@ def extract_palette(project_root: str | Path, scan_result: ScanResult) -> dict[s
             rel = str(css_path.relative_to(root).as_posix())
         except ValueError:
             rel = css_path.name
+        style_sources.append((rel, content))
+
+    seen_templates: set[Path] = set()
+    for lm in scan_result.languages:
+        for f in lm.files:
+            if f.suffix.lower() not in _TEMPLATE_EXT or f in seen_templates:
+                continue
+            seen_templates.add(f)
+            text = _read_text(f)
+            if not text:
+                continue
+            inline_css_parts = _RE_STYLE_BLOCK.findall(text)
+            inline_css_parts += [
+                "x{" + v + "}" for v in _RE_STYLE_ATTR.findall(text)
+            ]
+            if not inline_css_parts:
+                continue
+            try:
+                rel = str(f.relative_to(root).as_posix())
+            except ValueError:
+                rel = f.name
+            style_sources.append((rel + " (inline)", "\n".join(inline_css_parts)))
+
+    colors_counter: Counter[str] = Counter()
+    color_contexts: dict[str, list[str]] = {}
+    fonts_counter: Counter[str] = Counter()
+    spacing_counter: Counter[int] = Counter()
+    radius_counter: Counter[int] = Counter()
+    css_sources: list[str] = []
+
+    for rel, content in style_sources:
         css_sources.append(rel)
 
         # Strip comments to avoid false positives

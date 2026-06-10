@@ -1,0 +1,11 @@
+<Application x:Class="HelloWpf.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             StartupUri="Views/LoginWindow.xaml">
+    <Application.Resources>
+        <ResourceDictionary>
+            <SolidColorBrush x:Key="PrimaryBrush" Color="#2563EB" />
+            <SolidColorBrush x:Key="DangerBrush" Color="#EF4444" />
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

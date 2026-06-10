@@ -10,7 +10,7 @@ loader: .claude/loader.reverse.yml
      Python dédié : elle invoque les sous-commandes (/sdd-reverse-init,
      /sdd-reverse-inventory, etc.) qui chacune ont leur propre parsing. -->
 
-# /sdd-reverse-full {LegacyProject} [--skip-audit] [--skip-ui] [--units U-1,U-2,...] [--allow-low]
+# /sdd-reverse-full {LegacyProject} [--skip-audit] [--skip-ui] [--skip-crosscut] [--skip-review] [--units U-1,U-2,...] [--allow-low] [--max-parallel N] [--no-cache] [--sequential]
 
 ## Rôle
 
@@ -23,37 +23,54 @@ Pipeline complet reverse engineering Phase 0→4 sur un projet legacy. **Séquen
 | `{LegacyProject}` | requis | Sous-dossier `workspace/old/` |
 | `--skip-audit` | flag | Saute Phase 2 (tech audit) — accélère, perd l'enrichissement DB schema |
 | `--skip-ui` | flag | Saute Phase 4 (UI mockups) — utile si le Tech Lead préfère regénérer l'UI via FEAT seule |
-| `--units U-N,U-M` | flag | Limite l'extraction (Phase 3 + 4) à un sous-ensemble d'unités. Par défaut : toutes les unités détectées |
+| `--skip-crosscut` | flag | Saute la génération des FEATs transversales (Librairies + Base de données, L3) |
+| `--skip-review` | flag | Saute la revue de complétude back (L5, `reverse-completeness-reviewer`) |
+| `--units U-N,U-M` | flag | Limite l'extraction (Phase 3 + 4) à un sous-ensemble d'unités. Par défaut : toutes |
 | `--allow-low` | flag | ADV-6 : autorise FEATs `confidence: low` sans bannière bloquante. Audit-loggué. |
+| `--max-parallel N` | flag | Borne de parallélisme Phase 3 (défaut 3, range 1-12, aligné `ownership.md §5`) |
+| `--no-cache` | flag | Force la ré-extraction de toutes les unités (ignore `extraction-cache.json`, L5) |
+| `--sequential` | flag | Force la Phase 3 séquentielle (mode legacy ADV-2, désactive le parallélisme) |
 | `--json` | flag | Émet rapport final en JSON |
 
-## Séquence (Phase 0→4)
+## Séquence (Phase 0→4, industrialisée L5)
 
 ```
 STEP 0 — /sdd-reverse-init {LegacyProject}
    └─ bootstrap workspace/old/{P}/.sys/
 
 STEP 1 — /sdd-reverse-inventory {LegacyProject}
-   └─ Phase 1 : inventory.json + db-schema.json + language-detected.json
+   └─ Phase 1 : inventory.json (+ code-graph/data-access/config/dependencies, L0-L1)
    └─ AGENT : reverse-inventory (Sonnet 4.6)
 
 STEP 2 — (si --skip-audit absent)
-   └─ /sdd-reverse-audit {LegacyProject}
-       └─ Phase 2 : tech-audit.md + deps-graph.json + db-schema.merged.json
-       └─ AGENT : reverse-tech-auditor (Sonnet 4.6)
+   └─ /sdd-reverse-audit {LegacyProject}   → tech-audit.md + db-schema.merged.json
 
-STEP 3 — Pour CHAQUE U-N de inventory.json.units[] (séquentiel, jamais parallèle, ADV-2)
-   └─ /sdd-reverse {U-N} [--allow-low]
-       └─ Phase 3 : workspace/input/feats/{n}-{Name}.md
-       └─ AGENT : reverse-functional-extractor (Opus 4.8)
-       └─ Filtré par --units si présent
+STEP 2.5 — PRÉ-ALLOCATION déterministe (L5 — débloque le parallélisme)
+   └─ python -m sdd_reverse_scripts.preallocate_feats --project workspace/old/{P}
+       └─ fige (n, Name) de TOUTES les unités dans inventory.json (_featAllocations)
+       └─ après ce STEP, les extractions Phase 3 sont parallel-safe (cf. rules §8.2)
+
+STEP 3 — Extraction Phase 3 (PARALLÈLE BORNÉ par défaut, L5)
+   Pour chaque U-N de inventory.json.units[] (filtré par --units) :
+     a. Cache (L5) : si reverse_cache.is_unit_cached(U-N) ET pas --no-cache → SKIP
+     b. Sinon dispatcher /sdd-reverse {U-N} [--allow-low]
+        └─ AGENT : reverse-functional-extractor (Opus 4.8)
+   Dispatch : par lots de --max-parallel (défaut 3) dans un seul message d'agents.
+   Si --sequential OU pré-allocation absente → 1 unité à la fois (mode ADV-2 §8.1).
+
+STEP 3.5 — FEATs transversales (L3, si --skip-crosscut absent)
+   └─ python -m sdd_reverse_scripts.generate_crosscutting_feats --project workspace/old/{P}
+       └─ {n}-Libraries.md + {n}-Database.md (déterministe, 0 token)
+
+STEP 3.6 — Revue de complétude back (L5, si --skip-review absent)
+   Pour chaque U-N extraite :
+     └─ AGENT : reverse-completeness-reviewer {U-N}  (informational, jamais bloquant)
+        └─ signale repositories/services/SQL/procs non capturés ([REVERSE_COMPLETENESS_GAP])
 
 STEP 4 — (si --skip-ui absent)
-   └─ Pour chaque U-N traitée en STEP 3
-       └─ /sdd-reverse-ui {U-N}
-           └─ Phase 4 : workspace/input/ui/{n}-{m}-{Name}.html
-           └─ AGENT : reverse-ui-extractor (Opus 4.8)
-           └─ Skip silencieux si U-N n'a pas de fichier UI evidence
+   └─ Pour chaque U-N extraite (kind ∈ {page,form,grid,wizard}) — parallèle borné aussi
+       └─ /sdd-reverse-ui {U-N}   → workspace/input/ui/{n}-{m}-{Name}.html
+       └─ Skip silencieux si U-N n'a pas de fichier UI evidence (kind api/module)
 ```
 
 ## Reprenabilité
@@ -63,9 +80,16 @@ Chaque phase est **atomique et reprenable indépendamment**. Si `/sdd-reverse-fu
 - Re-lancer `/sdd-reverse-full` reprend là où on en était (les commandes individuelles sont idempotentes)
 - Re-lancer une phase isolée (`/sdd-reverse U-3`) écrase son output sans toucher les autres
 
-## Phase 3 séquentielle stricte (ADV-2)
+## Phase 3 : parallèle borné après pré-allocation (L5)
 
-`/sdd-reverse-full` séquence Phase 3 unité par unité. Jamais en parallèle (le lock `.alloc.lock` empêcherait de toute façon). Pour de gros projets (10+ unités), cette séquence peut durer longtemps — préférer alors lancer manuellement quelques unités prioritaires d'abord.
+Depuis L5, `/sdd-reverse-full` exécute la **pré-allocation déterministe** (STEP 2.5)
+puis dispatche la Phase 3 en **parallèle borné** (`--max-parallel`, défaut 3) :
+chaque unité a un `(n, Name)` figé et écrit un fichier disjoint, sans contention
+de lock (cf. `rules/reverse-engineering.md §8.2`). Pour de gros projets (40+ unités)
+c'est l'accélération principale vs le séquentiel legacy.
+
+`--sequential` rétablit l'ancien comportement strict (ADV-2 §8.1), utile en debug.
+Le cache d'extraction (L5, STEP 3a) skippe les unités inchangées.
 
 ## No-spawn d'agent direct (§9 règle)
 

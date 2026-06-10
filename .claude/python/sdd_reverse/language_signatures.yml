@@ -59,6 +59,33 @@ languages:
     confidence_cap: high
     excluded_paths: [bin/, obj/, packages/, .vs/]
 
+  - id: wpf-xaml
+    label: WPF (.NET Framework + Core/.NET 5+)
+    family: dotnet
+    file_extensions: [.xaml]
+    evidence_patterns:
+      # Namespace WPF canonique — signature certaine (poids fort)
+      - { pattern: 'xmlns="http://schemas\.microsoft\.com/winfx/2006/xaml/presentation"', weight: 5.0, description: "WPF Presentation namespace" }
+      - { pattern: 'xmlns:x="http://schemas\.microsoft\.com/winfx/2006/xaml"', weight: 4.0, description: "XAML namespace" }
+      # Racines de fichier XAML WPF
+      - { pattern: '<Window\b', weight: 3.0, description: "WPF Window root" }
+      - { pattern: '<Page\b', weight: 3.0, description: "WPF Page root" }
+      - { pattern: '<UserControl\b', weight: 3.0, description: "WPF UserControl root" }
+      - { pattern: '<Application\b', weight: 2.5, description: "App.xaml entry" }
+      - { pattern: '<ResourceDictionary\b', weight: 2.0, description: "WPF resource dictionary" }
+      # Contrôles distinctifs (vs Silverlight / UWP / MAUI qui partagent certains tags)
+      - { pattern: '<DataGrid\b', weight: 1.5, description: "WPF DataGrid (post .NET 4.0)" }
+      - { pattern: '<TextBox\b', weight: 1.0, description: "TextBox control" }
+      - { pattern: '<TextBlock\b', weight: 1.0, description: "TextBlock label" }
+      - { pattern: '<StackPanel\b', weight: 1.0, description: "StackPanel layout" }
+      - { pattern: 'x:Class="', weight: 2.0, description: "Code-behind binding" }
+    framework_signatures:
+      # WPF .NET Framework classique — détecté via App.xaml + clr-namespace
+      - { id: wpf-netframework, evidence: 'xmlns:local="clr-namespace:[^"]+"', version_extract: null }
+      # WPF moderne (.NET 5/6/7/8) — TargetFramework dans .csproj voisin (out-of-scope ici, fait via manifest)
+    confidence_cap: high
+    excluded_paths: [bin/, obj/, packages/, .vs/, AppPackages/]
+
   # === JAVA FAMILY ===
 
   - id: java-ee

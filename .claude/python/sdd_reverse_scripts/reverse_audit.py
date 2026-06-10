@@ -67,8 +67,9 @@ def main(argv: list[str] | None = None) -> int:
         return 3
 
     # Re-scan to get scan_result (needed for deps_graph_builder)
-    sig_path = Path(__file__).parent.parent / "sdd_reverse" / "language_signatures.yml"
-    signatures = load_signatures(sig_path)
+    # P1.7 closure — use paths helper instead of fragile __file__ walk
+    from sdd_reverse.paths import language_signatures_path
+    signatures = load_signatures(language_signatures_path())
     scan_result = scan_project(project_root, signatures)
 
     # Build deps graph

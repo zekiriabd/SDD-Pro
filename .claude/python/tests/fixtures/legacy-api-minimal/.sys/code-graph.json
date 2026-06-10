@@ -1,0 +1,156 @@
+{
+  "schemaVersion": 1,
+  "project": "legacy-api-minimal",
+  "buildDate": "2026-06-10T21:10:45Z",
+  "language": "csharp",
+  "classes": [
+    {
+      "name": "OrdersController",
+      "kind": "class",
+      "role": "controller",
+      "file": "Controllers/OrdersController.cs",
+      "namespace": "LegacyApi.Controllers",
+      "baseTypes": [
+        "ControllerBase"
+      ],
+      "attributes": [
+        "ApiController",
+        "Route(\"api/orders\")"
+      ],
+      "isStatic": false,
+      "isPartial": false,
+      "isAbstract": false,
+      "methodCount": 3,
+      "propertyCount": 0,
+      "locTotal": 18,
+      "lines": "10-31",
+      "touchesSql": false,
+      "touchesHttp": false,
+      "references": [
+        "OrderDto",
+        "OrderService"
+      ]
+    },
+    {
+      "name": "NightlyCleanupJob",
+      "kind": "class",
+      "role": "classic",
+      "file": "Jobs/NightlyCleanupJob.cs",
+      "namespace": "LegacyApi.Jobs",
+      "baseTypes": [],
+      "attributes": [],
+      "isStatic": false,
+      "isPartial": false,
+      "isAbstract": false,
+      "methodCount": 3,
+      "propertyCount": 0,
+      "locTotal": 15,
+      "lines": "6-23",
+      "touchesSql": false,
+      "touchesHttp": false,
+      "references": []
+    },
+    {
+      "name": "OrderDto",
+      "kind": "class",
+      "role": "dto",
+      "file": "Models/OrderDto.cs",
+      "namespace": "LegacyApi.Models",
+      "baseTypes": [],
+      "attributes": [],
+      "isStatic": false,
+      "isPartial": false,
+      "isAbstract": false,
+      "methodCount": 0,
+      "propertyCount": 2,
+      "locTotal": 4,
+      "lines": "3-7",
+      "touchesSql": false,
+      "touchesHttp": false,
+      "references": []
+    },
+    {
+      "name": "OrderRepository",
+      "kind": "class",
+      "role": "repository",
+      "file": "Repositories/OrderRepository.cs",
+      "namespace": "LegacyApi.Repositories",
+      "baseTypes": [],
+      "attributes": [],
+      "isStatic": false,
+      "isPartial": false,
+      "isAbstract": false,
+      "methodCount": 5,
+      "propertyCount": 0,
+      "locTotal": 34,
+      "lines": "7-44",
+      "touchesSql": true,
+      "touchesHttp": false,
+      "references": [
+        "OrderDto"
+      ]
+    },
+    {
+      "name": "OrderService",
+      "kind": "class",
+      "role": "service",
+      "file": "Services/OrderService.cs",
+      "namespace": "LegacyApi.Services",
+      "baseTypes": [],
+      "attributes": [],
+      "isStatic": false,
+      "isPartial": false,
+      "isAbstract": false,
+      "methodCount": 3,
+      "propertyCount": 0,
+      "locTotal": 19,
+      "lines": "7-29",
+      "touchesSql": false,
+      "touchesHttp": false,
+      "references": [
+        "OrderDto",
+        "OrderRepository"
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "OrdersController",
+      "to": "OrderService",
+      "kind": "reference",
+      "evidence": "Controllers/OrdersController.cs:11"
+    },
+    {
+      "from": "OrdersController",
+      "to": "OrderDto",
+      "kind": "reference",
+      "evidence": "Controllers/OrdersController.cs:19"
+    },
+    {
+      "from": "OrderRepository",
+      "to": "OrderDto",
+      "kind": "reference",
+      "evidence": "Repositories/OrderRepository.cs:15"
+    },
+    {
+      "from": "OrderService",
+      "to": "OrderDto",
+      "kind": "reference",
+      "evidence": "Services/OrderService.cs:15"
+    },
+    {
+      "from": "OrderService",
+      "to": "OrderRepository",
+      "kind": "reference",
+      "evidence": "Services/OrderService.cs:8"
+    }
+  ],
+  "rolesSummary": {
+    "controller": 1,
+    "classic": 1,
+    "dto": 1,
+    "repository": 1,
+    "service": 1
+  },
+  "filesAnalyzed": 5
+}

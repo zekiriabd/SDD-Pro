@@ -123,6 +123,7 @@ Format ERROR 3-lignes disque, 1 ligne chat (cf. `error-classification.md §2` qu
 | `[REVERSE_GATE_DRIFT]` | **OUI** | Désync frontmatter `confidence` ↔ commentaire REVERSE-GATE (ADV-22) |
 | `[REVERSE_ALLOCATED_NAME_STALE]` | NON (WARN V2) | `_allocatedNames[Name]` orphelin (ADV-21) |
 | `[REVERSE_INVENTORY_SCHEMA_STALE]` | NON (INFO) | `--use-cache` sur cache pre-v0.4.0 (ADV-23) → refresh forcé |
+| `[REVERSE_COMPLETENESS_GAP]` | NON (informational, L5) | `reverse-completeness-reviewer` : une classe repository/service ou une requête SQL/procédure de l'unité n'est mentionnée nulle part dans la FEAT (sous-extraction probable). Verdict 🟢/🟡/🔴 informational, jamais bloquant. |
 
 ### §6.1 Format ERROR
 
@@ -155,13 +156,14 @@ Format ligne unique :
 
 Le label `[REVERSE]` est documenté localement ici (cette règle) et accepté par `output-protocol.md` (qui ne hardcode pas la liste fermée des labels).
 
-## §8 Phase 3 séquentielle stricte (ADV-2)
+## §8 Phase 3 : séquentielle stricte (ADV-2) → parallèle borné après pré-allocation (L5)
 
-`/sdd-reverse {U-N}` **n'est pas conçu** pour tourner en parallèle multi-`U-N` simultanément. Si un utilisateur lance deux `/sdd-reverse` en parallèle manuellement, le second attend le lock (jusqu'à TTL 30s) ou émet `[REVERSE_LOCK_HELD]`.
+### §8.1 Mode legacy (sans pré-allocation) — séquentiel strict (ADV-2)
 
-L'orchestrateur `/sdd-reverse-full` (V2) séquence les invocations Phase 3 sans parallélisme.
-
-Le lock élargi couvre :
+Si la pré-allocation L5 n'a **pas** tourné, `/sdd-reverse {U-N}` alloue `(n, Name)`
+au moment de l'extraction sous `.alloc.lock`, ce qui **force le séquentiel** :
+deux `/sdd-reverse` simultanés → le second attend le lock (TTL 30s) ou émet
+`[REVERSE_LOCK_HELD]`. Le lock élargi couvre :
 ```
 acquire .alloc.lock
   → READ inventory.json (_featAllocations + units)
@@ -170,6 +172,34 @@ acquire .alloc.lock
   → UPDATE inventory.json atomique
 release .alloc.lock
 ```
+
+### §8.2 Mode industrialisé (L5) — pré-allocation déterministe → parallèle borné
+
+Depuis L5, l'orchestrateur lance **d'abord** la pré-allocation déterministe :
+```bash
+python -m sdd_reverse_scripts.preallocate_feats --project workspace/old/{P}
+```
+Elle fige `(n, Name)` pour **toutes** les unités dans `inventory.json`
+(`_featAllocations` + `_allocatedNames`), une fois, sous un unique lock.
+
+**Conséquence** : la race d'allocation disparaît. Chaque extraction Phase 3 lit
+son `(n, Name)` pré-alloué (STEP 4 de l'agent : `_featAllocations[{U-N}]` présent)
+et écrit un fichier `{n}-{Name}.md` **disjoint**, sans toucher `inventory.json`
+→ **pas de write partagé, pas de contention de lock**. La Phase 3 peut donc
+tourner en **parallèle borné** (`MaxParallel`, défaut 3, aligné sur le pipeline
+forward `ownership.md §5`).
+
+**Invariant de sûreté** : la parallélisation n'est autorisée **que si** la
+pré-allocation a tourné (sinon §8.1 séquentiel). L'agent extractor ne ré-écrit
+`inventory.json` que si `_featAllocations[{U-N}]` est **absent** (mode legacy) ;
+en mode pré-alloué il skip le write-back (idempotent, parallel-safe).
+
+### §8.3 Cache d'extraction (L5)
+
+`reverse_cache.py` permet à l'orchestrateur de **skipper** une unité dont
+l'evidence (hash sha256 normalisé des `evidenceFiles`) est inchangée ET dont la
+FEAT existe encore — évite de re-spawner Opus inutilement. Doute → re-extraire
+(fail-safe, jamais skip optimiste).
 
 ## §9 Pas de spawn d'agent (no-spawn)
 

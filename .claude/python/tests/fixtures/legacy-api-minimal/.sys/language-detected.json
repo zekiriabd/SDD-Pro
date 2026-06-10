@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "primary": "csharp",
+  "secondary": [],
+  "confidence_caps_applied": {
+    "csharp": "high"
+  },
+  "_caps_source": ".claude/python/sdd_reverse/language_signatures.yml"
+}

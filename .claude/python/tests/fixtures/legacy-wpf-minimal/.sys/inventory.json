@@ -1,0 +1,132 @@
+{
+  "schemaVersion": 1,
+  "project": "legacy-wpf-minimal",
+  "scanDate": "2026-06-10T21:10:47Z",
+  "scanDurationMs": 6,
+  "languagesDetected": [
+    {
+      "id": "wpf-xaml",
+      "label": "WPF (.NET Framework + Core/.NET 5+)",
+      "family": "dotnet",
+      "confidence": "high",
+      "filesCount": 3,
+      "locTotal": 61
+    },
+    {
+      "id": "csharp",
+      "label": "C# (générique, hors MVC/WebForms)",
+      "family": "dotnet",
+      "confidence": "low",
+      "filesCount": 1,
+      "locTotal": 21
+    }
+  ],
+  "primaryLanguage": "wpf-xaml",
+  "frameworksDetected": [],
+  "entryPoints": [],
+  "exclusions": [
+    ".git/",
+    "bin/",
+    "node_modules/",
+    "obj/",
+    "packages/"
+  ],
+  "pages": [
+    {
+      "id": "P-1",
+      "path": "App.xaml",
+      "codeBehindPath": null,
+      "locTotal": 11,
+      "linkedUnits": []
+    },
+    {
+      "id": "P-2",
+      "path": "Views/LoginWindow.xaml",
+      "codeBehindPath": "Views/LoginWindow.xaml.cs",
+      "locTotal": 26,
+      "linkedUnits": [
+        "U-1"
+      ]
+    },
+    {
+      "id": "P-3",
+      "path": "Views/UsersListPage.xaml",
+      "codeBehindPath": null,
+      "locTotal": 24,
+      "linkedUnits": [
+        "U-2"
+      ]
+    }
+  ],
+  "units": [
+    {
+      "id": "U-1",
+      "label": "Formulaire Loginwindow",
+      "suggestedName": "Loginwindow",
+      "language": "wpf-xaml",
+      "kind": "form",
+      "evidenceFiles": [
+        "Views/LoginWindow.xaml",
+        "Views/LoginWindow.xaml.cs"
+      ],
+      "seedEvidenceFiles": [
+        "Views/LoginWindow.xaml",
+        "Views/LoginWindow.xaml.cs"
+      ],
+      "classes": [
+        {
+          "name": "LoginWindow",
+          "role": "code-behind",
+          "file": "Views/LoginWindow.xaml.cs",
+          "lines": "5-23",
+          "methodCount": 3,
+          "touchesSql": false,
+          "touchesHttp": false
+        }
+      ],
+      "dataAccess": {
+        "queries": [],
+        "storedProcedureCalls": []
+      },
+      "entities": [],
+      "confidenceEstimate": "medium",
+      "rationale": "Page Views/LoginWindow.xaml classified as form (score=1.40)"
+    },
+    {
+      "id": "U-2",
+      "label": "Liste Userslistpage",
+      "suggestedName": "Userslistpage",
+      "language": "wpf-xaml",
+      "kind": "grid",
+      "evidenceFiles": [
+        "Views/UsersListPage.xaml"
+      ],
+      "seedEvidenceFiles": [
+        "Views/UsersListPage.xaml"
+      ],
+      "classes": [],
+      "dataAccess": {
+        "queries": [],
+        "storedProcedureCalls": []
+      },
+      "entities": [],
+      "confidenceEstimate": "medium",
+      "rationale": "Page Views/UsersListPage.xaml classified as grid (score=1.30)"
+    }
+  ],
+  "legacyMtimeMax": 1781102684,
+  "_fingerprintMap": {
+    "0888f14924f90ca9f5a4a7b8405ed62c69fcd49a36f3ae6aa12cf20ba0a025c7": {
+      "unitId": "U-1",
+      "status": "active",
+      "firstSeen": "2026-06-10T21:10:47Z"
+    },
+    "ee6c8e198707deccd10942b169434ed983be5bd6a8e9b93ed0f37929c367a207": {
+      "unitId": "U-2",
+      "status": "active",
+      "firstSeen": "2026-06-10T21:10:47Z"
+    }
+  },
+  "_featAllocations": {},
+  "_allocatedNames": {}
+}

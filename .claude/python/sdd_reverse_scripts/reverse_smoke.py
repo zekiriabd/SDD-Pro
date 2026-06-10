@@ -180,6 +180,210 @@ def check_helper_parity_drift() -> CheckResult:
     return CheckResult("helper-parity-drift", "OK")
 
 
+# ---------------------------------------------------------------------------
+# P1.6 closure — direct checks for invariants previously delegated to
+# validate_reverse_feat.py. Smoke now enforces them STANDALONE so a missing
+# /sdd-reverse run doesn't silently mask malformed FEATs already committed.
+# ---------------------------------------------------------------------------
+
+_REVERSE_FEAT_FRONTMATTER_CONFIDENCE = re.compile(
+    r"^---\s*$.*?^confidence:\s*(\S+)\s*$.*?^---\s*$",
+    re.MULTILINE | re.DOTALL,
+)
+_REVERSE_GATE_COMMENT = re.compile(
+    r"<!--\s*REVERSE-GATE:\s*confidence=(\w+)\s*(?:;\s*allow-sdd-full=(\w+))?\s*-->",
+)
+_REVERSE_FEAT_GENERATED_BY = re.compile(
+    r"^generated-by:\s*sdd-reverse\b", re.MULTILINE,
+)
+_VALID_CONFIDENCE = {"high", "medium", "low"}
+# Section headings in a FEAT that introduce items requiring an evidence comment
+_EVIDENCE_REQUIRED_HEADINGS = (
+    "## Functional Needs",
+    "## Functional Deliverables",
+    "## Business Rules",
+    "## Acceptance Criteria",
+)
+_EVIDENCE_COMMENT_RE = re.compile(r"<!--\s*evidence:\s*[^>]+-->")
+_ITEM_ID_RE = re.compile(r"^\s*-?\s*\*?\*?(SFD|FD|BR|AC)-\d+", re.MULTILINE)
+
+
+def _iter_reverse_feats() -> list[Path]:
+    """Return FEAT files under workspace/input/feats/ that look reverse-generated."""
+    feats_dir = REPO_ROOT / "workspace" / "input" / "feats"
+    if not feats_dir.is_dir():
+        return []
+    out: list[Path] = []
+    for f in feats_dir.glob("*.md"):
+        try:
+            text = f.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        if _REVERSE_FEAT_GENERATED_BY.search(text):
+            out.append(f)
+    return out
+
+
+def check_reverse_evidence_required() -> CheckResult:
+    """INVARIANT #3 reverse-evidence-required — every SFD/FD/BR/AC item in a
+    reverse FEAT must carry an `<!-- evidence: ... -->` comment nearby.
+
+    Heuristic: for each section heading in `_EVIDENCE_REQUIRED_HEADINGS`,
+    count the number of item IDs vs the number of evidence comments in
+    the same section. Mismatch → WARN with file pointer.
+    """
+    feats = _iter_reverse_feats()
+    if not feats:
+        return CheckResult(
+            "reverse-evidence-required", "OK",
+            "(no reverse-generated FEATs found)",
+        )
+    issues: list[str] = []
+    for f in feats:
+        text = f.read_text(encoding="utf-8", errors="replace")
+        # Slice the text by section
+        sections: list[tuple[str, str]] = []
+        current_heading: str | None = None
+        current_lines: list[str] = []
+        for line in text.splitlines():
+            if line.startswith("## "):
+                if current_heading is not None:
+                    sections.append((current_heading, "\n".join(current_lines)))
+                current_heading = line.strip()
+                current_lines = []
+            else:
+                current_lines.append(line)
+        if current_heading is not None:
+            sections.append((current_heading, "\n".join(current_lines)))
+
+        for heading, body in sections:
+            if heading not in _EVIDENCE_REQUIRED_HEADINGS:
+                continue
+            items = _ITEM_ID_RE.findall(body)
+            evidence_count = len(_EVIDENCE_COMMENT_RE.findall(body))
+            if items and evidence_count < len(items):
+                issues.append(
+                    f"{f.relative_to(REPO_ROOT)} [{heading}]: "
+                    f"{len(items)} items, {evidence_count} evidence comments"
+                )
+    if issues:
+        return CheckResult(
+            "reverse-evidence-required", "WARN",
+            f"{len(issues)} section(s) missing evidence",
+            {"issues": issues[:10]},
+        )
+    return CheckResult("reverse-evidence-required", "OK")
+
+
+def check_reverse_confidence_enum_strict() -> CheckResult:
+    """INVARIANT #4 reverse-confidence-enum-strict — confidence values in
+    frontmatter AND in inline `<!-- confidence: X -->` comments must be one
+    of {high, medium, low} (lowercase, no quotes). Any other value = FAIL.
+    """
+    feats = _iter_reverse_feats()
+    if not feats:
+        return CheckResult(
+            "reverse-confidence-enum-strict", "OK",
+            "(no reverse-generated FEATs found)",
+        )
+    violations: list[str] = []
+    inline_re = re.compile(r"<!--\s*confidence:\s*(\S+?)\s*-->")
+    for f in feats:
+        text = f.read_text(encoding="utf-8", errors="replace")
+        # Frontmatter
+        m = _REVERSE_FEAT_FRONTMATTER_CONFIDENCE.search(text)
+        if m:
+            val = m.group(1).strip().strip('"').strip("'").lower()
+            if val not in _VALID_CONFIDENCE:
+                violations.append(
+                    f"{f.relative_to(REPO_ROOT)} frontmatter: confidence={val!r}"
+                )
+        else:
+            violations.append(
+                f"{f.relative_to(REPO_ROOT)}: frontmatter.confidence missing"
+            )
+        # Inline comments
+        for inline_m in inline_re.finditer(text):
+            val = inline_m.group(1).strip('"').strip("'").lower()
+            if val not in _VALID_CONFIDENCE:
+                violations.append(
+                    f"{f.relative_to(REPO_ROOT)} inline comment: confidence={val!r}"
+                )
+    if violations:
+        return CheckResult(
+            "reverse-confidence-enum-strict", "FAIL",
+            f"{len(violations)} invalid confidence value(s)",
+            {"violations": violations[:10]},
+        )
+    return CheckResult("reverse-confidence-enum-strict", "OK")
+
+
+def check_reverse_gate_comment_sync() -> CheckResult:
+    """INVARIANT #5 reverse-gate-comment-sync — the
+    `<!-- REVERSE-GATE: confidence=X ... -->` comment must match
+    `frontmatter.confidence`. Desync = REVERSE_GATE_DRIFT (ADV-22).
+    """
+    feats = _iter_reverse_feats()
+    if not feats:
+        return CheckResult(
+            "reverse-gate-comment-sync", "OK",
+            "(no reverse-generated FEATs found)",
+        )
+    drifts: list[str] = []
+    for f in feats:
+        text = f.read_text(encoding="utf-8", errors="replace")
+        fm_m = _REVERSE_FEAT_FRONTMATTER_CONFIDENCE.search(text)
+        gate_m = _REVERSE_GATE_COMMENT.search(text)
+        if fm_m is None or gate_m is None:
+            # Missing either → reported by other checks (evidence/enum)
+            continue
+        fm_val = fm_m.group(1).strip().strip('"').strip("'").lower()
+        gate_val = gate_m.group(1).strip().lower()
+        if fm_val != gate_val:
+            drifts.append(
+                f"{f.relative_to(REPO_ROOT)}: frontmatter={fm_val!r} ≠ gate={gate_val!r}"
+            )
+    if drifts:
+        return CheckResult(
+            "reverse-gate-comment-sync", "FAIL",
+            f"{len(drifts)} FEAT(s) with frontmatter/gate drift (ADV-22)",
+            {"drifts": drifts[:10]},
+        )
+    return CheckResult("reverse-gate-comment-sync", "OK")
+
+
+def check_validator_parity_drift() -> CheckResult:
+    """DRIFT CHECK #1 validator-parity-drift — verify that
+    `validate_reverse_feat.py` declares the required `REQUIRED_SECTIONS`
+    constants and a `validate_reverse_feat` entry point (sanity guard
+    against accidental deletion / refactor that would silently disable
+    enforcement of invariants #3-#5).
+    """
+    validator = REPO_ROOT / ".claude" / "python" / "sdd_reverse_scripts" / "validate_reverse_feat.py"
+    if not validator.is_file():
+        return CheckResult(
+            "validator-parity-drift", "FAIL",
+            "validate_reverse_feat.py missing — invariants #3-#5 lose their direct enforcer",
+        )
+    src = validator.read_text(encoding="utf-8", errors="replace")
+    missing: list[str] = []
+    # Sanity markers (presence-only, not semantic equivalence)
+    for marker in (
+        "REQUIRED_SECTIONS",
+        "REQUIRED_FRONTMATTER_KEYS_REVERSE",
+        "REVERSE-GATE",
+        "evidence",
+    ):
+        if marker not in src:
+            missing.append(marker)
+    if missing:
+        return CheckResult(
+            "validator-parity-drift", "WARN",
+            f"validate_reverse_feat.py lacks expected markers: {missing}",
+        )
+    return CheckResult("validator-parity-drift", "OK")
+
+
 def check_lock_format() -> CheckResult:
     """If .alloc.lock exists, validate its JSON shape (informational)."""
     lock = REPO_ROOT / "workspace" / "input" / "feats" / ".alloc.lock"
@@ -210,6 +414,12 @@ _ALL_CHECKS = [
     check_template_isolated,
     check_helper_parity_drift,
     check_lock_format,
+    # P1.6 closure (2026-06-10) — direct enforcement of invariants
+    # previously delegated to validate_reverse_feat.py
+    check_reverse_evidence_required,
+    check_reverse_confidence_enum_strict,
+    check_reverse_gate_comment_sync,
+    check_validator_parity_drift,
 ]
 
 

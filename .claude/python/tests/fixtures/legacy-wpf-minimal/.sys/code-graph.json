@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "project": "legacy-wpf-minimal",
+  "buildDate": "2026-06-10T21:10:47Z",
+  "language": "wpf-xaml",
+  "classes": [
+    {
+      "name": "LoginWindow",
+      "kind": "class",
+      "role": "code-behind",
+      "file": "Views/LoginWindow.xaml.cs",
+      "namespace": "HelloWpf.Views",
+      "baseTypes": [
+        "Window"
+      ],
+      "attributes": [],
+      "isStatic": false,
+      "isPartial": true,
+      "isAbstract": false,
+      "methodCount": 3,
+      "propertyCount": 0,
+      "locTotal": 16,
+      "lines": "5-23",
+      "touchesSql": false,
+      "touchesHttp": false,
+      "references": []
+    }
+  ],
+  "edges": [],
+  "rolesSummary": {
+    "code-behind": 1
+  },
+  "filesAnalyzed": 1
+}

@@ -186,7 +186,6 @@ def reconcile_inventories(project_filter: str | None = None) -> dict:
     file still exists on disk, removes stale ones.
     """
     from sdd_reverse.atomic_write_local import atomic_write_text
-    import glob as _glob
 
     workspace_old = Path("workspace/old").resolve()
     workspace_feats = Path("workspace/input/feats").resolve()

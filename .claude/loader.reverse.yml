@@ -25,7 +25,13 @@ agents:
     writes:
       - workspace/old/{P}/.sys/inventory.md                    # enriched FR (agent)
     delegated_to:
-      - .claude/python/sdd_reverse_scripts/reverse_inventory.py   # writes the 5 .json/.md (atomic)
+      - .claude/python/sdd_reverse_scripts/reverse_inventory.py   # writes inventory/db-schema/language/code-graph (atomic)
+      # L0: also writes code-graph.json (symbol-level class graph + roles),
+      # and units[] now carry classes[] + seedEvidenceFiles + transitive evidenceFiles.
+      # L1: also writes data-access.json (inline SQL + stored procs + params),
+      # config.json (connection strings, masked secrets), dependencies.json
+      # (full NuGet/.csproj/PackageReference + assembly refs + bin DLLs).
+      # units[] now also carry dataAccess{queries, storedProcedureCalls}.
 
   reverse-tech-auditor:
     model: claude-sonnet-4-6
@@ -49,16 +55,30 @@ agents:
     model: claude-opus-4-8
     phase: 3
     reads:
-      - workspace/old/{P}/.sys/inventory.json
+      - workspace/old/{P}/.sys/inventory.json                   # units[U-N].classes (L0 role map) + evidenceFiles
       - workspace/old/{P}/.sys/db-schema.merged.json            # if present (Phase 2 ran)
       - workspace/old/{P}/.sys/db-schema.json                   # base fallback
       - workspace/old/{P}/.sys/tech-audit.md                    # optional
-      - workspace/old/{P}/{evidenceFiles}                       # strict, only files listed in unit.evidenceFiles
+      - workspace/old/{P}/{evidenceFiles}                       # strict — now incl. transitive deep layer (L0)
       - .claude/python/sdd_reverse/language_signatures.yml
       - .claude/python/sdd_reverse/feat.reverse.template.md     # ADV-9 isolated template
     writes:
       - workspace/input/feats/{n}-{Name}.md                     # the FEAT output
       - workspace/old/{P}/.sys/modules/{Module}/extraction.md   # extraction log
+
+  reverse-completeness-reviewer:
+    model: claude-sonnet-4-6
+    phase: "3-review"
+    optional: true
+    available_from: v0.5.0       # L5 — back-side completeness review (informational)
+    reads:
+      - workspace/old/{P}/.sys/inventory.json                   # units[U-N].classes + dataAccess
+      - workspace/input/feats/{n}-{Name}.md                     # the FEAT under review
+      - workspace/old/{P}/{evidenceFiles}                       # strict, to judge gaps
+    writes:
+      - workspace/old/{P}/.sys/modules/{Module}/completeness-review.md
+    delegated_to:
+      - .claude/python/sdd_reverse_scripts/check_feat_completeness.py   # deterministic gap engine
 
   reverse-ui-extractor:
     model: claude-opus-4-8
@@ -87,6 +107,10 @@ commands:
   sdd-reverse:
     phase: 3
     spawns: [reverse-functional-extractor]
+  sdd-reverse-crosscut:
+    phase: "3-bis"
+    spawns: []                  # deterministic script, no agent (L3)
+    available_from: v0.5.0
   sdd-reverse-ui:
     phase: 4
     spawns: [reverse-ui-extractor]
@@ -126,6 +150,15 @@ scripts:
   check_reverse_feat_for_full:
     path: .claude/python/sdd_reverse_scripts/check_reverse_feat_for_full.py
     cli: python -m sdd_reverse_scripts.check_reverse_feat_for_full --feat-path <GLOB> [--allow-reverse-low] [--json]
+  generate_crosscutting_feats:                 # L3 — transversal FEATs (libs + DB)
+    path: .claude/python/sdd_reverse_scripts/generate_crosscutting_feats.py
+    cli: python -m sdd_reverse_scripts.generate_crosscutting_feats --project <PATH> [--feats-dir DIR] [--json]
+  preallocate_feats:                           # L5 — deterministic (n,Name) pre-allocation
+    path: .claude/python/sdd_reverse_scripts/preallocate_feats.py
+    cli: python -m sdd_reverse_scripts.preallocate_feats --project <PATH> [--feats-dir DIR] [--json]
+  check_feat_completeness:                     # L5 — back-side completeness gap engine
+    path: .claude/python/sdd_reverse_scripts/check_feat_completeness.py
+    cli: python -m sdd_reverse_scripts.check_feat_completeness --project <PATH> (--unit U-N | --feat-path P) [--json]
 
 
 # Invariants reverse (V2 — to be hoisted in INVARIANTS.reverse.yml)

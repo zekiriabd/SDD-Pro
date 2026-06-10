@@ -76,6 +76,48 @@ _RE_EF_CLASS = re.compile(r"public\s+(?:partial\s+)?class\s+(\w+)\s*[:{]")
 _RE_JPA_ENTITY = re.compile(r"@Entity\b[\s\S]{0,200}?public\s+class\s+(\w+)")
 _RE_DOCTRINE_ENTITY = re.compile(r"@ORM\\Entity\b[\s\S]{0,500}?class\s+(\w+)")
 
+# L1: auto/full property within a C#/Java class body → entity field name + type.
+_RE_CLASS_HEADER = re.compile(r"\b(?:public|internal)?\s*(?:partial\s+)?class\s+(\w+)")
+_RE_AUTO_PROP = re.compile(
+    r"public\s+(?:virtual\s+|override\s+|required\s+)?"
+    r"([\w<>\[\],\.\?]+)\s+(\w+)\s*\{\s*get",
+)
+
+
+def _class_property_registry(content: str) -> dict[str, list[dict[str, Any]]]:
+    """Map className → [{name, type}] of its auto/full properties (coarse, L1).
+
+    Splits the file on `class X` headers and parses public properties in each
+    span. Sufficient to fill ORM entity fields that DDL parsing cannot see
+    (EF Code-First / JPA POCOs). Best-effort — anti-hallucination preserved
+    (only properties literally declared are reported).
+    """
+    registry: dict[str, list[dict[str, Any]]] = {}
+    headers = list(_RE_CLASS_HEADER.finditer(content))
+    for i, hm in enumerate(headers):
+        cname = hm.group(1)
+        start = hm.end()
+        end = headers[i + 1].start() if i + 1 < len(headers) else len(content)
+        span = content[start:end]
+        fields: list[dict[str, Any]] = []
+        seen: set[str] = set()
+        for pm in _RE_AUTO_PROP.finditer(span):
+            ptype, pname = pm.group(1).strip(), pm.group(2).strip()
+            if pname in seen or pname in {"get", "set"}:
+                continue
+            seen.add(pname)
+            fields.append({
+                "name": pname,
+                "type": ptype,
+                "primaryKey": pname.lower() in ("id", cname.lower() + "id"),
+                "identity": False,
+                "nullable": ptype.endswith("?"),
+                "default": None,
+            })
+        if fields:
+            registry[cname] = fields
+    return registry
+
 
 def _read_text(path: Path) -> str:
     try:
@@ -251,7 +293,8 @@ def extract_db_schema(
                     all_entities[e["name"]]["evidence"].extend(e["evidence"])
             all_relations.extend(rels)
 
-    # Pass 2: ORM annotations (fallback / complement)
+    # Pass 2: ORM annotations (fallback / complement) + class property registry.
+    prop_registry: dict[str, list[dict[str, Any]]] = {}
     for lm in scan_result.languages:
         if lm.family not in {"dotnet", "java", "php"}:
             continue
@@ -259,6 +302,9 @@ def extract_db_schema(
             content = _read_text(f)
             content_samples.append(content[:300])
             rel = str(f.relative_to(root).as_posix())
+            # L1: harvest class properties across all OO files for ORM field fill.
+            for cname, fields in _class_property_registry(content).items():
+                prop_registry.setdefault(cname, fields)
             ents = _detect_orm_entities(content, rel)
             if ents:
                 sources.append(rel)
@@ -267,6 +313,12 @@ def extract_db_schema(
                     all_entities[e["name"]] = e
                 else:
                     all_entities[e["name"]]["evidence"].extend(e["evidence"])
+
+    # L1: fill empty ORM entity fields from the property registry (EF Code-First
+    # / JPA POCOs whose columns DDL parsing cannot see).
+    for ent in all_entities.values():
+        if not ent.get("fields") and ent["name"] in prop_registry:
+            ent["fields"] = prop_registry[ent["name"]]
 
     db_type = _detect_db_type(scan_result, content_samples)
 

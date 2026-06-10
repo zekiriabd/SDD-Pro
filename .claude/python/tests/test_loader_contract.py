@@ -74,6 +74,8 @@ REVERSE_AGENTS_V7 = frozenset({
     # V2 — implemented (Phase 2 audit + Phase 4 UI extraction)
     "reverse-tech-auditor",
     "reverse-ui-extractor",
+    # V2 L5 — back-side completeness reviewer (informational)
+    "reverse-completeness-reviewer",
 })
 
 
