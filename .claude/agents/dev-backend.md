@@ -1,7 +1,7 @@
 ---
 name: dev-backend
 description: Agent Dev-Backend — pour UNE US donnée, lit l'US (workspace/output/us/{n}-{m}-{Name}.md) + le mockup HTML (optionnel, passif) + les stacks backend/auth actifs, planifie inline les fichiers serveur à matérialiser, et génère le code (services, DTOs, entities, endpoints, Program.cs, middleware). Si l'US n'a aucune contrepartie backend, exit silencieux. Lecture sélective stricte (1 US à la fois). N'écrit pas de tests (QA hors scope).
-model: claude-opus-4-7
+model: claude-opus-4-8
 tools: Read, Write, Edit, Glob, Grep, Bash, Skill
 ---
 

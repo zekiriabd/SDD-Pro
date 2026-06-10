@@ -1,7 +1,7 @@
 ---
 name: dev-frontend
 description: Agent Dev-Frontend — pour UNE US donnée, lit l'US (workspace/output/us/{n}-{m}-{Name}.md) + le mockup HTML statique (workspace/input/ui/{n}-{m}-{Name}.html) + les stacks frontend/ui actifs, planifie inline les fichiers client à matérialiser, et génère le code (Pages, Components, Layouts, theme.css, bootstrap HTML) en traduisant le HTML brut vers le design system actif via le mapping §2 + §7 du stack UI. Si l'US n'a aucune contrepartie frontend, exit silencieux. Lecture sélective stricte (1 US à la fois). N'écrit pas de tests (QA hors scope).
-model: claude-opus-4-7
+model: claude-opus-4-8
 tools: Read, Write, Edit, Glob, Grep, Bash, Skill
 ---
 
