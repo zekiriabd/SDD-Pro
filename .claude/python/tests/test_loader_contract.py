@@ -71,8 +71,9 @@ RETIRED_AGENTS_V7 = frozenset({
 REVERSE_AGENTS_V7 = frozenset({
     "reverse-inventory",
     "reverse-functional-extractor",
-    # V2 (will be added when implemented):
-    # "reverse-tech-auditor", "reverse-ui-extractor",
+    # V2 — implemented (Phase 2 audit + Phase 4 UI extraction)
+    "reverse-tech-auditor",
+    "reverse-ui-extractor",
 })
 
 

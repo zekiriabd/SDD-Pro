@@ -166,6 +166,46 @@ def _count_loc(content_bytes_normalized: bytes) -> int:
     return sum(1 for line in lines if line.strip())
 
 
+def _normalize_path(p: Path) -> Path:
+    """Resolve to absolute + ensure UTF-8 representation (ADV-8 — Unicode safety)."""
+    try:
+        return p.resolve()
+    except (OSError, ValueError):
+        # Fallback: return as-is, downstream callers handle missing/unreadable
+        return p
+
+
+def _read_file_with_sampling(path: Path, max_size_kb: int | None) -> tuple[bytes, bool]:
+    """Read file bytes, applying head_tail sampling if larger than `max_size_kb`.
+
+    Returns (bytes_to_scan, was_sampled).
+    ADV-8 closure: gros fichiers (> max_size_kb) lus en mode sampling
+    (premiers 200KB + derniers 200KB) pour borner mémoire et tokens.
+    """
+    try:
+        size = path.stat().st_size
+    except OSError:
+        return b"", False
+    if max_size_kb is None or size <= max_size_kb * 1024:
+        try:
+            return path.read_bytes(), False
+        except (OSError, UnicodeDecodeError):
+            return b"", False
+    # Sampling mode: head 200KB + tail 200KB
+    sample_size = 200 * 1024
+    try:
+        with open(path, "rb") as f:
+            head = f.read(sample_size)
+            try:
+                f.seek(-sample_size, 2)  # SEEK_END
+                tail = f.read(sample_size)
+            except OSError:
+                tail = b""
+            return head + b"\n/* ...SAMPLED... */\n" + tail, True
+    except OSError:
+        return b"", False
+
+
 def scan_project(
     project_root: str | Path,
     signatures: dict[str, Any],
@@ -176,8 +216,10 @@ def scan_project(
     - Skips dirs in DEFAULT_GLOBAL_EXCLUSIONS + per-language excluded_paths
     - Reads file bytes, normalizes (BOM + EOL), runs evidence regex
     - Aggregates score per language
+    - Applies per-language max_file_size_kb sampling (ADV-8)
+    - Handles Unicode paths with UnicodeDecodeError fallback (ADV-8)
     """
-    project = Path(project_root).resolve()
+    project = _normalize_path(Path(project_root))
     if not project.is_dir():
         raise FileNotFoundError(f"Project root not found: {project}")
 
@@ -212,16 +254,22 @@ def scan_project(
             files_skipped += 1
             continue
 
-        try:
-            raw = path.read_bytes()
-        except OSError:
+        # Per-language max_file_size_kb sampling (ADV-8). The first matching
+        # candidate language drives the limit (conservative — use min across cands).
+        max_kb = None
+        for lang in candidates:
+            lang_max = lang.get("max_file_size_kb")
+            if lang_max:
+                max_kb = lang_max if max_kb is None else min(max_kb, lang_max)
+        raw, was_sampled = _read_file_with_sampling(path, max_kb)
+        if not raw:
             files_skipped += 1
             continue
 
-        content = normalize_bytes(raw)
         try:
+            content = normalize_bytes(raw)
             content_str = content.decode("utf-8", errors="replace")
-        except UnicodeDecodeError:
+        except (UnicodeDecodeError, UnicodeError):
             files_skipped += 1
             continue
 

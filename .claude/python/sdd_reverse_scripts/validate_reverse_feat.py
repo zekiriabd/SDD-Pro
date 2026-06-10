@@ -7,6 +7,14 @@ Invocation:
     python -m sdd_reverse_scripts.validate_reverse_feat \
         --feat-path workspace/input/feats/{n}-{Name}.md \
         [--json]
+    python -m sdd_reverse_scripts.validate_reverse_feat \
+        --reconcile [--project workspace/old/{P}/] [--json]
+
+--reconcile mode (ADV-21 V2 closure):
+    Scans inventory.json._allocatedNames + _featAllocations for entries
+    whose corresponding FEAT file has been manually deleted from disk.
+    Removes the stale entries (idempotent), so the next /sdd-reverse {U-N}
+    doesn't incorrectly suffix "-Legacy" on a name that's actually free.
 
 Checks (deterministic, 0 token):
     1. Frontmatter YAML parsable + REQUIRED_FRONTMATTER_KEYS_REVERSE present
@@ -171,15 +179,108 @@ def validate_feat(feat_path: Path) -> tuple[bool, list[str], list[str]]:
     return not errors, errors, warnings
 
 
+def reconcile_inventories(project_filter: str | None = None) -> dict:
+    """ADV-21 : remove orphan entries from _allocatedNames + _featAllocations.
+
+    Scans workspace/old/*/.sys/inventory.json, checks if each entry's FEAT
+    file still exists on disk, removes stale ones.
+    """
+    from sdd_reverse.atomic_write_local import atomic_write_text
+    import glob as _glob
+
+    workspace_old = Path("workspace/old").resolve()
+    workspace_feats = Path("workspace/input/feats").resolve()
+    if not workspace_old.is_dir():
+        return {"ok": False, "error": "workspace/old/ not found", "reconciled": []}
+
+    feat_files_on_disk = set()
+    if workspace_feats.is_dir():
+        for f in workspace_feats.glob("*.md"):
+            feat_files_on_disk.add(f.stem)  # e.g. "1-Login"
+
+    reconciled: list[dict] = []
+    for inv_path in workspace_old.rglob(".sys/inventory.json"):
+        project_name = inv_path.parent.parent.name
+        if project_filter and project_name != project_filter:
+            continue
+        try:
+            inv = json.loads(inv_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        feat_allocs = inv.get("_featAllocations") or {}
+        alloc_names = inv.get("_allocatedNames") or {}
+        # Reverse-map U-N → expected file stem
+        unit_by_id = {u["id"]: u for u in (inv.get("units") or [])}
+
+        removed_allocs: list[str] = []
+        removed_names: list[str] = []
+        for unit_id, n in list(feat_allocs.items()):
+            unit = unit_by_id.get(unit_id)
+            if not unit:
+                continue
+            suggested = unit.get("suggestedName", unit_id)
+            # Build all plausible stems (idem resolve_name_collision logic)
+            possible_stems = [
+                f"{n}-{suggested}",
+                f"{n}-{suggested}-Legacy",
+                f"{n}-{suggested}-Legacy-{unit_id}",
+            ]
+            if not any(s in feat_files_on_disk for s in possible_stems):
+                removed_allocs.append(unit_id)
+                del feat_allocs[unit_id]
+        for name, uid in list(alloc_names.items()):
+            # Same check for names: any matching feat stem?
+            if not any(s.endswith(f"-{name}") or s.endswith(f"-{name}-Legacy")
+                       or s.endswith(f"-{name}-Legacy-{uid}")
+                       for s in feat_files_on_disk):
+                removed_names.append(name)
+                del alloc_names[name]
+
+        if removed_allocs or removed_names:
+            inv["_featAllocations"] = feat_allocs
+            inv["_allocatedNames"] = alloc_names
+            atomic_write_text(inv_path,
+                               json.dumps(inv, indent=2, ensure_ascii=False) + "\n")
+            reconciled.append({
+                "project": project_name,
+                "removed_featAllocations": removed_allocs,
+                "removed_allocatedNames": removed_names,
+            })
+
+    return {"ok": True, "reconciled": reconciled}
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="validate_reverse_feat",
         description="Validate a reverse-generated FEAT (ADV-5 — distinct from /feat-validate).",
     )
-    parser.add_argument("--feat-path", required=True, help="Path to {n}-{Name}.md")
+    parser.add_argument("--feat-path", help="Path to {n}-{Name}.md (validation mode)")
+    parser.add_argument("--reconcile", action="store_true",
+        help="Reconcile mode (ADV-21): remove orphan _allocatedNames / _featAllocations entries")
+    parser.add_argument("--project", default=None,
+        help="In --reconcile mode: limit to one project under workspace/old/")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
 
+    # --reconcile mode (ADV-21)
+    if args.reconcile:
+        report = reconcile_inventories(args.project)
+        if args.json:
+            print(json.dumps(report, ensure_ascii=False))
+        else:
+            if not report["reconciled"]:
+                print("[VALIDATE_REVERSE] --reconcile : aucune entrée orpheline détectée.")
+            else:
+                for r in report["reconciled"]:
+                    n_alloc = len(r["removed_featAllocations"])
+                    n_names = len(r["removed_allocatedNames"])
+                    print(f"[VALIDATE_REVERSE/RECONCILE] {r['project']} : "
+                          f"-{n_alloc} _featAllocations, -{n_names} _allocatedNames orphans removed.")
+        return 0
+
+    if not args.feat_path:
+        parser.error("--feat-path required (unless --reconcile)")
     feat_path = Path(args.feat_path)
     ok, errors, warnings = validate_feat(feat_path)
 

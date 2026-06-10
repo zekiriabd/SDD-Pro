@@ -31,17 +31,19 @@ agents:
     model: claude-sonnet-4-6
     phase: 2
     optional: true
+    available_from: v0.2.0   # V2 — implemented
     reads:
       - workspace/old/{P}/.sys/inventory.json
       - workspace/old/{P}/.sys/db-schema.json
-      - workspace/old/{P}/**                                   # selective on entry points + config + SQL
+      - workspace/old/{P}/.sys/deps-graph.json                  # produced by reverse_audit.py
+      - workspace/old/{P}/**                                    # selective on entry points + config + SQL
     writes:
       - workspace/old/{P}/.sys/tech-audit.md
-      - workspace/old/{P}/.sys/deps-graph.json
-      - workspace/old/{P}/.sys/db-schema.enrichment.json       # ADV-3 + ADV-17 : SEPARATE file, never db-schema.json
+      - workspace/old/{P}/.sys/db-schema.enrichment.json        # ADV-3 + ADV-17 : SEPARATE file, never db-schema.json
     # NOTE ADV-17: this manifest forbids writing to db-schema.json by reverse-tech-auditor.
     # Union base+enrichment is performed by the deterministic script
-    # sdd_reverse/merge_db_schema.py (V2) which writes db-schema.merged.json.
+    # sdd_reverse.merge_db_schema (writes db-schema.merged.json).
+    # deps-graph.json is produced by deterministic script reverse_audit.py, not the agent.
 
   reverse-functional-extractor:
     model: claude-opus-4-8
@@ -62,10 +64,10 @@ agents:
     model: claude-opus-4-8
     phase: 4
     optional: true
-    available_from: v0.2.0     # V2 — not in MVP scope
+    available_from: v0.2.0     # V2 — implemented
     reads:
       - workspace/old/{P}/.sys/inventory.json
-      - workspace/old/{P}/{templateFiles, cssFiles}
+      - workspace/old/{P}/{templateFiles, cssFiles}             # selective, ≤ 15 files
       - workspace/input/feats/{n}-{Name}.md                     # the FEAT produced Phase 3
     writes:
       - workspace/input/ui/{n}-{m}-{Name}.html
@@ -81,22 +83,37 @@ commands:
   sdd-reverse-audit:
     phase: 2
     spawns: [reverse-tech-auditor]
-    available_from: v0.2.0
+    available_from: v0.2.0   # V2 — implemented
   sdd-reverse:
     phase: 3
     spawns: [reverse-functional-extractor]
   sdd-reverse-ui:
     phase: 4
     spawns: [reverse-ui-extractor]
-    available_from: v0.2.0
+    available_from: v0.2.0   # V2 — implemented
   sdd-reverse-full:
     phase: "1-4"
     spawns: []                  # sequences commands, NOT agents (no-spawn rule §9 rules/reverse-engineering.md)
-    available_from: v0.2.0
+    available_from: v0.2.0   # V2 — implemented
   sdd-reverse-status:
     phase: any
     spawns: []
-    available_from: v0.2.0
+    available_from: v0.2.0   # V2 — implemented (deterministic, no agent)
+
+
+scripts_v2:
+  reverse_audit:
+    path: .claude/python/sdd_reverse_scripts/reverse_audit.py
+    cli: python -m sdd_reverse_scripts.reverse_audit --project <PATH> [--force-enrichment-on E.f] [--json]
+  reverse_status:
+    path: .claude/python/sdd_reverse_scripts/reverse_status.py
+    cli: python -m sdd_reverse_scripts.reverse_status [--project P] [--json]
+  reverse_smoke:
+    path: .claude/python/sdd_reverse_scripts/reverse_smoke.py
+    cli: python -m sdd_reverse_scripts.reverse_smoke [--json]
+  merge_db_schema:
+    path: .claude/python/sdd_reverse/merge_db_schema.py
+    cli: python -m sdd_reverse.merge_db_schema --base <BASE> --enrichment <ENR> --output <OUT> [--force-enrichment-on E.f]
 
 
 scripts:

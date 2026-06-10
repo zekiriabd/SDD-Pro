@@ -1,0 +1,118 @@
+# INVARIANTS.reverse.yml — Load-bearing contracts of the reverse workflow.
+#
+# ADV-7 closure (v0.4.0 → V2 implementation). Mirror format of INVARIANTS.yml
+# but isolated (D4 strict isolation). The standard test_invariants_manifest.py
+# does NOT pick this file up — reverse_smoke.py is the enforcer.
+#
+# Per design doc §15.1.
+#
+# Each invariant declares:
+#   id          — kebab-case identifier (matches reverse_smoke.py check name)
+#   description — what is being enforced (1-2 sentences)
+#   enforcer    — Python file (relative to repo root) that implements the check
+#   class       — error class emitted on violation (cf. rules/reverse-engineering.md §6)
+
+schemaVersion: 1
+manifestType: reverse-engineering-invariants
+
+invariants:
+
+  - id: reverse-isolation-no-cross-imports
+    description: |
+      sdd_reverse/ modules MUST NOT import from sdd_lib, sdd_scripts, sdd_admin,
+      sdd_hooks. D4 strict isolation. Helpers are duplicated locally
+      (atomic_write_local.py, file_locks_local.py) — parity validated separately.
+    enforcer: .claude/python/sdd_reverse_scripts/reverse_smoke.py
+    class: REVERSE_ISOLATION_VIOLATION
+
+  - id: reverse-loader-autonomous
+    description: |
+      loader.reverse.yml MUST be referenced ONLY by reverse commands (frontmatter
+      `loader:` field) and the starting-a-reverse-eng skill. NEVER by loader.yml.
+    enforcer: .claude/python/sdd_reverse_scripts/reverse_smoke.py
+    class: REVERSE_ISOLATION_VIOLATION
+
+  - id: reverse-evidence-required
+    description: |
+      Every SFD/FD/BR/AC in a reverse FEAT (generated-by: sdd-reverse) MUST
+      carry <!-- evidence: path:Lstart-Lend --> in the same paragraph. Items
+      without evidence MUST be rejected by the agent (never written). Enforced
+      structurally by validate_reverse_feat.py.
+    enforcer: .claude/python/sdd_reverse_scripts/validate_reverse_feat.py
+    class: REVERSE_EVIDENCE_MISSING
+
+  - id: reverse-confidence-enum-strict
+    description: |
+      The `confidence` value (in frontmatter AND in <!-- confidence: ... -->
+      comments) MUST be one of {high, medium, low}. No medium-high, no other
+      values. Strict enum gate enforced by validate_reverse_feat.py.
+    enforcer: .claude/python/sdd_reverse_scripts/validate_reverse_feat.py
+    class: REVERSE_GATE_DRIFT
+
+  - id: reverse-gate-comment-sync
+    description: |
+      The <!-- REVERSE-GATE: confidence=X ; allow-sdd-full=Y --> comment MUST
+      match the frontmatter.confidence. Desync → [REVERSE_GATE_DRIFT] (ADV-22).
+    enforcer: .claude/python/sdd_reverse_scripts/validate_reverse_feat.py
+    class: REVERSE_GATE_DRIFT
+
+  - id: reverse-lock-format-valid
+    description: |
+      The workspace/input/feats/.alloc.lock file MUST contain JSON with keys
+      {agent_id, pid, ts_unix, host}. Format invariant ADV-2/ADV-10 — pid check
+      is opportunistic (psutil optional), TTL 30s is the authority.
+    enforcer: .claude/python/sdd_reverse_scripts/reverse_smoke.py
+    class: REVERSE_LOCK_HELD
+
+  - id: reverse-inventory-schema-v1
+    description: |
+      All inventory.json files under workspace/old/*/.sys/ MUST have
+      schemaVersion == 1 AND _allocatedNames + _featAllocations present
+      (even as empty dicts). ADV-23 closure — refresh forced via
+      --use-cache gate otherwise.
+    enforcer: .claude/python/sdd_reverse_scripts/reverse_smoke.py
+    class: REVERSE_INVENTORY_SCHEMA_STALE
+
+  - id: reverse-db-schema-enrichment-separate
+    description: |
+      Phase 2 (reverse-tech-auditor) MUST write to db-schema.enrichment.json
+      (separate file), NEVER to db-schema.json directly. ADV-3 + ADV-17.
+      Union performed by deterministic merge_db_schema.py.
+    enforcer: .claude/python/sdd_reverse_scripts/reverse_smoke.py
+    class: REVERSE_ENRICHMENT_INVALID
+
+  - id: reverse-no-spawn-of-agents
+    description: |
+      Reverse agents MUST NOT spawn other agents. /sdd-reverse-full is a
+      command sequencer, NOT an agent (§9 rules/reverse-engineering.md).
+    enforcer: .claude/python/sdd_reverse_scripts/reverse_smoke.py
+    class: (informational)
+
+  - id: reverse-template-isolated
+    description: |
+      Phase 3 (reverse-functional-extractor) MUST read its template from
+      .claude/python/sdd_reverse/feat.reverse.template.md (local copy).
+      Never fallback to .claude/templates/feat.template.md (standard SDD_Pro
+      template). ADV-9 closure.
+    enforcer: .claude/python/sdd_reverse_scripts/reverse_smoke.py
+    class: REVERSE_TEMPLATE_MISSING
+
+# Drift detection (informational, V2 — see §15.1 design doc)
+drift_checks:
+
+  - id: validator-parity-drift
+    description: |
+      validate_reverse_feat.py SHOULD stay aligned with structural checks of
+      validate_readiness.py. WARN if a check exists in standard but not in
+      reverse (out-of-scope OK, but should be noticed).
+    enforcer: .claude/python/sdd_reverse_scripts/reverse_smoke.py
+    class: REVERSE_VALIDATOR_DRIFT
+
+  - id: helper-parity-drift
+    description: |
+      sdd_reverse/atomic_write_local.py + file_locks_local.py SHOULD stay
+      semantically equivalent to sdd_lib/atomic_write.py + sdd_lib/file_locks.py.
+      Compare hashes against _parity_snapshots.json — WARN if either upstream
+      file changed (review needed).
+    enforcer: .claude/python/sdd_reverse_scripts/reverse_smoke.py
+    class: REVERSE_HELPER_DRIFT
