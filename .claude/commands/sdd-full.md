@@ -101,7 +101,10 @@ auto-skip `arch` si bootstrap stable et `us-generate` si US présentes.
 de `workspace/input/stack/stack.md` rend `--plan` actif par défaut.
 
 **Gates automatiques (hooks Claude Code)** — fire silencieusement sans
-configuration, bypass uniquement par env var (audit-loggué) :
+configuration, bypass uniquement par env var (audit-loggué). Inventaire
+canonique de TOUTES les gates (classes primaire / defense-in-depth /
+opt-in / observability, règle anti-prolifération « 1 domaine = 1 gate
+primaire ») : `@.claude/docs/gates-map.md` :
 
 | Gate hook | Script | Bloquant | Bypass env var |
 |---|---|:---:|---|

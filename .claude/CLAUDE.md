@@ -142,7 +142,7 @@ Anti-derive, ERROR 3L disque, idempotence, lecture sélective, parallélisme bor
 
 ## 10. Pour aller plus loin
 
-- **Architecture & workflow** : `@.claude/docs/{architecture,workflow,conventions,quickstart}.md`
+- **Architecture & workflow** : `@.claude/docs/{architecture,workflow,conventions,quickstart,gates-map}.md`
 - **Onboarding** : `@.claude/docs/{glossary,hooks-and-protections,config-precedence,po-guide,ux-designer-guide}.md`
 - **Élicitation** : `@.claude/docs/brainstorming-techniques.md` (bibliothèque 15 techniques v7.0.0+, emprunt BMad)
 - **Gouvernance** : `@.claude/docs/{VERSIONING,CHANGELOG,MIGRATION,WORKING-AGREEMENT}.md`
