@@ -59,6 +59,36 @@ languages:
     confidence_cap: high
     excluded_paths: [bin/, obj/, packages/, .vs/]
 
+  - id: vbnet
+    label: VB.NET (source .vb)
+    family: dotnet
+    file_extensions: [.vb]
+    evidence_patterns:
+      # Audit 2026-06-10 C7 : .vb etait absent de TOUTES les signatures —
+      # une app WebForms VB.NET produisait un inventaire quasi vide en silence.
+      - { pattern: '^\s*Imports\s+System', weight: 0.6, description: "Imports System" }
+      - { pattern: '\bPublic\s+Class\s+\w+', weight: 0.8, description: "Public Class declaration" }
+      - { pattern: '\bEnd\s+Class\b', weight: 0.6, description: "End Class terminator" }
+      - { pattern: '\bModule\s+\w+', weight: 0.7, description: "VB Module" }
+      - { pattern: '\bNamespace\s+\w+', weight: 0.5, description: "Namespace declaration" }
+      - { pattern: '\bInherits\s+System\.Web\.UI\.Page\b', weight: 1.0, description: "WebForms VB code-behind" }
+      - { pattern: '\bEnd\s+Sub\b', weight: 0.5, description: "End Sub terminator" }
+    confidence_cap: medium  # parsing structurel best-effort (line-based, pas de braces)
+    excluded_paths: [bin/, obj/, packages/, .vs/, My Project/]
+
+  - id: classic-asp
+    label: Classic ASP (VBScript)
+    family: dotnet
+    file_extensions: [.asp]
+    evidence_patterns:
+      - { pattern: '<%@\s*Language\s*=', weight: 1.0, description: "ASP language directive" }
+      - { pattern: 'Server\.CreateObject\(', weight: 0.9, description: "COM instantiation" }
+      - { pattern: 'Response\.Write\b', weight: 0.8, description: "ASP Response.Write" }
+      - { pattern: 'Request\.(?:Form|QueryString)\b', weight: 0.8, description: "ASP request access" }
+      - { pattern: '<%\s*=', weight: 0.5, description: "ASP inline expression" }
+    confidence_cap: medium
+    excluded_paths: []
+
   - id: wpf-xaml
     label: WPF (.NET Framework + Core/.NET 5+)
     family: dotnet

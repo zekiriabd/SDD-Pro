@@ -42,7 +42,7 @@ Sinon → STOP + ERROR `[REVERSE_NO_SOURCE]` + suggérer `/sdd-reverse-inventory
 ## Actions
 
 ```bash
-python -m sdd_reverse_scripts.generate_crosscutting_feats \
+python .claude/python/sdd_reverse_scripts/generate_crosscutting_feats.py \
     --project workspace/old/{LegacyProject} [--feats-dir DIR] [--json]
 ```
 

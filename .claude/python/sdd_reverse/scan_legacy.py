@@ -168,6 +168,26 @@ def normalize_bytes(file_bytes: bytes) -> bytes:
     return file_bytes
 
 
+def decode_text(data: bytes) -> str:
+    """Decode (normalized) legacy bytes to str with encoding fallback.
+
+    Order : UTF-8 strict → cp1252 (dominant Windows/FR legacy encoding) →
+    UTF-8 with replacement. Audit 2026-06-10 M18 : decoding everything as
+    ``utf-8 errors=replace`` silently corrupted cp1252 accented FR text
+    (labels, comments, SQL littéraux) into U+FFFD without any WARN —
+    evidence quality degraded invisibly. cp1252 is attempted as a whole-file
+    decode so mixed mojibake is impossible (one encoding per file).
+    """
+    try:
+        return data.decode("utf-8")
+    except UnicodeDecodeError:
+        pass
+    try:
+        return data.decode("cp1252")
+    except (UnicodeDecodeError, LookupError):
+        return data.decode("utf-8", errors="replace")
+
+
 def load_signatures(yaml_path: str | Path) -> dict[str, Any]:
     """Load language_signatures.yml into a dict.
 
@@ -199,6 +219,27 @@ def _score_to_confidence(score: float, cap: str) -> str:
     rank = {"high": 3, "medium": 2, "low": 1}
     cap_normalized = cap if cap in rank else "low"
     return computed if rank[computed] <= rank[cap_normalized] else cap_normalized
+
+
+def _lang_excludes_path(lang: dict[str, Any], rel_parts: tuple[str, ...], filename: str) -> bool:
+    """Apply a language's `excluded_paths` YAML entries to one file.
+
+    Audit 2026-06-10 M18 : these entries were declared on all 13 languages
+    but never applied (dead config — `.min.js` was never filtered, `vendor/`
+    only via global defaults). Two entry shapes are supported :
+        - `dir/`  → directory-name match anywhere in the relative path
+        - `.suffix` (no trailing slash) → filename suffix match (e.g. `.min.js`)
+    """
+    for entry in lang.get("excluded_paths") or []:
+        e = str(entry).strip()
+        if not e:
+            continue
+        if e.endswith("/"):
+            if e.rstrip("/") in rel_parts:
+                return True
+        elif filename.endswith(e):
+            return True
+    return False
 
 
 def _should_skip_path(path: Path, project_root: Path, exclusions: set[str]) -> bool:
@@ -316,6 +357,16 @@ def scan_project(
             files_skipped += 1
             continue
 
+        # M18 : per-language excluded_paths (dir/ + filename-suffix entries).
+        rel_parts = path.relative_to(project).parts
+        candidates = [
+            lang for lang in candidates
+            if not _lang_excludes_path(lang, rel_parts, path.name)
+        ]
+        if not candidates:
+            files_skipped += 1
+            continue
+
         # Per-language max_file_size_kb sampling (ADV-8). The first matching
         # candidate language drives the limit (conservative — use min across cands).
         max_kb = None
@@ -330,7 +381,7 @@ def scan_project(
 
         try:
             content = normalize_bytes(raw)
-            content_str = content.decode("utf-8", errors="replace")
+            content_str = decode_text(content)
         except (UnicodeDecodeError, UnicodeError):
             files_skipped += 1
             continue
@@ -414,7 +465,7 @@ def scan_project(
         except OSError:
             continue
         try:
-            text = normalize_bytes(raw).decode("utf-8", errors="replace")
+            text = decode_text(normalize_bytes(raw))
         except (UnicodeDecodeError, UnicodeError):
             continue
         rel_path = str(path.relative_to(project))

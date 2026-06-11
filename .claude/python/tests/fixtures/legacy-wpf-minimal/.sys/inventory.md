@@ -1,7 +1,7 @@
 # Inventaire — legacy-wpf-minimal
 
-**Date scan** : 2026-06-10T21:10:47Z
-**Durée scan** : 6 ms
+**Date scan** : 2026-06-11T12:00:21Z
+**Durée scan** : 4 ms
 **Langage principal** : `wpf-xaml`
 
 ## Langages détectés

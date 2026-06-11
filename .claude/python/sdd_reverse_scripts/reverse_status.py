@@ -23,7 +23,13 @@ import sys
 from pathlib import Path
 from typing import Any
 
+# C6 bootstrap — canonical invocation is by file path, no PYTHONPATH needed.
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from sdd_reverse.console_safe import ensure_console_safe
 from sdd_reverse.feat_structure_spec import REVERSE_GATE_RE, parse_frontmatter
+from sdd_reverse.paths import repo_root
 
 
 def _scan_legacy_projects(workspace_old: Path) -> list[dict[str, Any]]:
@@ -60,7 +66,15 @@ def _scan_legacy_projects(workspace_old: Path) -> list[dict[str, Any]]:
             try:
                 inv = json.loads(inv_path.read_text(encoding="utf-8"))
                 proj["units_total"] = len(inv.get("units") or [])
-                proj["feats_extracted"] = len(inv.get("_featAllocations") or {})
+                # M9 : unit ids + allocations exposed for the caller, which
+                # computes `feats_extracted` from FEAT FILES actually on disk
+                # (len(_featAllocations) lied : it hits 100 % at STEP 2.5
+                # pre-allocation and counts XC-* crosscut keys).
+                proj["_unit_ids"] = [u["id"] for u in (inv.get("units") or [])]
+                proj["_feat_numbers"] = sorted({
+                    n for uid, n in (inv.get("_featAllocations") or {}).items()
+                    if uid in set(proj["_unit_ids"])
+                })
             except json.JSONDecodeError as e:
                 warnings.append(
                     f"[REVERSE_INVENTORY_CORRUPTED] {inv_path.name} unparseable "
@@ -143,6 +157,8 @@ def _render_human(
             if p["units_total"]:
                 pct = (p["feats_extracted"] / p["units_total"] * 100) if p["units_total"] else 0
                 lines.append(f"      FEATs : {p['feats_extracted']}/{p['units_total']} unités extraites ({pct:.0f}%)")
+                if p.get("ui_screens"):
+                    lines.append(f"      Mockups UI : {p['ui_screens']}")
             # P2.11 : surface project-level warnings (corruption, IO)
             for w in p.get("warnings", []):
                 lines.append(f"      [!] {w}")
@@ -172,9 +188,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--json", action="store_true",
         help="Emit report as JSON on stdout")
     args = parser.parse_args(argv)
+    ensure_console_safe()
 
-    workspace_old = Path("workspace/old").resolve()
-    workspace_feats = Path("workspace/input/feats").resolve()
+    # Anchor on the repo root, NEVER on the CWD (audit 2026-06-10 anomalie
+    # env : CWD-relative paths created parasite workspace/ trees under
+    # .claude/python/ when invoked from there). Tests/CI may override via
+    # SDD_REVERSE_WORKSPACE_ROOT (must exist — silently ignored otherwise).
+    import os
+    override = os.environ.get("SDD_REVERSE_WORKSPACE_ROOT")
+    root = Path(override).resolve() if override and Path(override).is_dir() else repo_root()
+    workspace_old = root / "workspace" / "old"
+    workspace_feats = root / "workspace" / "input" / "feats"
 
     if not workspace_old.is_dir():
         if args.json:
@@ -185,9 +209,28 @@ def main(argv: list[str] | None = None) -> int:
 
     projects = _scan_legacy_projects(workspace_old)
     if args.project:
-        projects = [p for p in projects if p["name"] == args.project]
+        wanted = Path(args.project).name
+        projects = [p for p in projects if p["name"] == wanted]
 
     feats, feat_warnings = _scan_reverse_feats(workspace_feats)
+
+    # M9 closure : feats_extracted = FEAT files actually on disk whose
+    # source-unit belongs to the project ; ui_screens = mockups whose leading
+    # FEAT number is allocated to one of the project's units.
+    ui_dir = root / "workspace" / "input" / "ui"
+    ui_numbers: list[int] = []
+    if ui_dir.is_dir():
+        for h in ui_dir.glob("*.html"):
+            m = re.match(r"(\d+)-", h.name)
+            if m:
+                ui_numbers.append(int(m.group(1)))
+    for p in projects:
+        unit_ids = set(p.pop("_unit_ids", []))
+        feat_numbers = set(p.pop("_feat_numbers", []))
+        p["feats_extracted"] = sum(
+            1 for f in feats if f.get("source_unit") in unit_ids
+        )
+        p["ui_screens"] = sum(1 for n in ui_numbers if n in feat_numbers)
 
     # P2.11 : aggregate warning counts for top-level summary
     warnings_total = sum(len(p.get("warnings", [])) for p in projects) + len(feat_warnings)

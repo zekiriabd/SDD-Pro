@@ -27,7 +27,12 @@ import sys
 from pathlib import Path
 from typing import Any
 
+# C6 bootstrap — canonical invocation is by file path, no PYTHONPATH needed.
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 from sdd_reverse.atomic_write_local import atomic_write_text
+from sdd_reverse.console_safe import ensure_console_safe
 from sdd_reverse.crosscutting_feats import build_database_feat, build_libraries_feat
 from sdd_reverse.file_locks_local import acquire_lock, release_lock
 
@@ -58,6 +63,7 @@ def _next_free(used: set[int]) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    ensure_console_safe()
     parser = argparse.ArgumentParser(prog="generate_crosscutting_feats")
     parser.add_argument("--project", required=True, help="workspace/old/{P}/")
     parser.add_argument("--feats-dir", default=None,

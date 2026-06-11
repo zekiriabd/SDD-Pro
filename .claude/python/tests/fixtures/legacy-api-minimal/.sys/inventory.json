@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "project": "legacy-api-minimal",
-  "scanDate": "2026-06-10T21:10:45Z",
-  "scanDurationMs": 3,
+  "scanDate": "2026-06-11T12:00:19Z",
+  "scanDurationMs": 2,
   "languagesDetected": [
     {
       "id": "csharp",
@@ -34,8 +34,8 @@
       "evidenceFiles": [
         "Controllers/OrdersController.cs",
         "Models/OrderDto.cs",
-        "Repositories/OrderRepository.cs",
-        "Services/OrderService.cs"
+        "Services/OrderService.cs",
+        "Repositories/OrderRepository.cs"
       ],
       "seedEvidenceFiles": [
         "Controllers/OrdersController.cs"
@@ -146,14 +146,15 @@
     "d88754d707e02f250090e98f8c693e45f1366363c769890b4bddccd28eb318b3": {
       "unitId": "U-1",
       "status": "active",
-      "firstSeen": "2026-06-10T21:10:45Z"
+      "firstSeen": "2026-06-10T21:35:40Z"
     },
     "7a4daee13c8fa3427a9822e66a53996263c80b2339084b7b5f4bf6554e3d8fea": {
       "unitId": "U-2",
       "status": "active",
-      "firstSeen": "2026-06-10T21:10:45Z"
+      "firstSeen": "2026-06-10T21:35:40Z"
     }
   },
   "_featAllocations": {},
-  "_allocatedNames": {}
+  "_allocatedNames": {},
+  "secretsDetected": []
 }

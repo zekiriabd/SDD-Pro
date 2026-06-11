@@ -30,7 +30,12 @@ import sys
 from pathlib import Path
 from typing import Any
 
+# C6 bootstrap — canonical invocation is by file path, no PYTHONPATH needed.
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 from sdd_reverse.atomic_write_local import atomic_write_text
+from sdd_reverse.console_safe import ensure_console_safe
 from sdd_reverse.file_locks_local import acquire_lock, release_lock
 
 
@@ -117,6 +122,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--feats-dir", default=None)
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
+    ensure_console_safe()
 
     project_root = Path(args.project).resolve()
     inventory_path = project_root / ".sys" / "inventory.json"
@@ -136,7 +142,7 @@ def main(argv: list[str] | None = None) -> int:
     feats_dir.mkdir(parents=True, exist_ok=True)
 
     lock_path = str(feats_dir / ".alloc.lock")
-    code = acquire_lock(lock_path, "preallocate-feats", ttl=30)
+    code = acquire_lock(lock_path, "preallocate-feats", ttl=60)
     if code in (1, 3):
         print("ERROR: [REVERSE_LOCK_HELD] .alloc.lock unavailable.", file=sys.stderr)
         return 3
@@ -157,7 +163,8 @@ def main(argv: list[str] | None = None) -> int:
         preview = ", ".join(
             f"{v['n']}-{v['name']}" for _, v in sorted(mapping.items())
         )[:200]
-        print(f"[REVERSE] Pré-allocation : {len(mapping)} unité(s) → {preview}. (100%)")
+        # ASCII only (M10 — this is the NOMINAL STEP 2.5 path on Windows)
+        print(f"[REVERSE] Pre-allocation : {len(mapping)} unite(s) -> {preview}. (100%)")
     return 0
 
 

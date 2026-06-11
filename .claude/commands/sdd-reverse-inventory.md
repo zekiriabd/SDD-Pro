@@ -30,7 +30,7 @@ Si manquant → STOP + ERROR `[REVERSE_NO_SOURCE]` ou `[INFRA_BLOCKED]`.
 ## Actions
 
 1. **Spawn unique** `Agent(reverse-inventory)` avec args = `{LegacyProject}`
-2. L'agent vérifie préconditions + invoque `python -m sdd_reverse_scripts.reverse_inventory --project workspace/old/{LegacyProject}` (+ `--use-cache` et `--json` si transmis)
+2. L'agent vérifie préconditions + invoque `python .claude/python/sdd_reverse_scripts/reverse_inventory.py --project workspace/old/{LegacyProject}` (+ `--use-cache` / `--refresh` / `--json` si transmis — invocation canonique par chemin de fichier, C6)
 3. Le script écrit les 5 artefacts `.sys/*`
 4. L'agent enrichit `inventory.md` FR avec résumé exécutif + regroupements sémantiques
 5. Émission ligne chat finale `[REVERSE] {LegacyProject} : N unités, M entités, langage primaire {lang}. (15%)`

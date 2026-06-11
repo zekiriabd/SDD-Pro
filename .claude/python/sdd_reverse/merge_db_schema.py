@@ -17,6 +17,15 @@ Rules:
       Override per-field with --force-enrichment-on Entity.field.
     - addedRelation referencing unknown entity → REJECTED, ERROR
       [REVERSE_ENRICHMENT_INVALID] (never silently dropped).
+    - observedEntitiesNotInBase / observedRelationsNotInBase (audit C3
+      2026-06-10) : entités/relations DÉDUITES par le tech-auditor depuis le
+      code (requêtes SQL inline) alors qu'elles sont absentes du DDL source.
+      Appended into merged with `"deduced": true` (clearly flagged — the
+      extractor caps their confidence to medium per §9.2). Base entity of the
+      same name wins (observed skipped + conflict INFO). Invalid observed
+      relations are recorded in conflicts[], never silently dropped, never
+      fatal (the observed channel is explicitly speculative).
+      Avant ce canal, le run EDI perdait 19 entités + 10 FKs en prose.
 
 Exit codes:
     0  merged successfully
@@ -34,6 +43,10 @@ import sys
 import time
 from pathlib import Path
 from typing import Any
+
+# C6 bootstrap — canonical invocation is by file path, no PYTHONPATH needed.
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from sdd_reverse.atomic_write_local import atomic_write_text
 
@@ -73,6 +86,62 @@ def merge_schemas(
     conflicts: list[dict[str, Any]] = []
 
     base_entities = _index_entities(merged)
+
+    # === observedEntitiesNotInBase (C3 — deduced entities channel) ===
+    # Processed FIRST so addedRelations/observedRelations can reference them.
+    # Shape tolerance : `name` OR `entity` ; `fields` (dict list) OR
+    # `observedFields` (bare column-name list — typed "unknown").
+    for obs in enrichment.get("observedEntitiesNotInBase") or []:
+        name = obs.get("name") or obs.get("entity")
+        if not name:
+            continue
+        if name in base_entities:
+            conflicts.append({
+                "class": "REVERSE_ENRICHMENT_TYPE_CONFLICT",
+                "entity": name,
+                "message": "observed entity already in base schema — base wins, "
+                           "observed copy skipped",
+                "resolution": "base_wins",
+            })
+            continue
+        fields = obs.get("fields")
+        if not fields and obs.get("observedFields"):
+            fields = [
+                {"name": fn, "type": "unknown", "primaryKey": fn.lower() == "id",
+                 "identity": False, "nullable": True, "default": None}
+                for fn in obs["observedFields"] if isinstance(fn, str)
+            ]
+        evidence = obs.get("evidence") or []
+        if isinstance(evidence, str):
+            evidence = [evidence]
+        ent = {
+            "name": name,
+            "table": obs.get("table") or name,
+            "fields": fields or [],
+            "evidence": evidence,
+            "deduced": True,
+        }
+        merged.setdefault("entities", []).append(ent)
+        base_entities[name] = ent
+
+    # === observedRelationsNotInBase (C3 — deduced FKs channel) ===
+    for obs_rel in enrichment.get("observedRelationsNotInBase") or []:
+        from_e = obs_rel.get("from", {}).get("entity")
+        to_e = obs_rel.get("to", {}).get("entity")
+        if from_e not in base_entities or to_e not in base_entities:
+            conflicts.append({
+                "class": "REVERSE_ENRICHMENT_INVALID",
+                "entity": from_e or "?",
+                "message": (
+                    f"observed relation references unknown entity "
+                    f"(from={from_e}, to={to_e}) — skipped (speculative channel)"
+                ),
+                "resolution": "skipped",
+            })
+            continue
+        rel = copy.deepcopy(obs_rel)
+        rel["deduced"] = True
+        merged.setdefault("relations", []).append(rel)
 
     # === addedFields ===
     for added in enrichment.get("addedFields") or []:
@@ -186,6 +255,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--json", action="store_true", help="Emit conflicts report as JSON on stdout")
     args = parser.parse_args(argv)
+    from sdd_reverse.console_safe import ensure_console_safe
+    ensure_console_safe()
 
     base_path = Path(args.base)
     enrich_path = Path(args.enrichment)
@@ -228,12 +299,14 @@ def main(argv: list[str] | None = None) -> int:
             "conflicts": conflicts,
         }, ensure_ascii=False))
     else:
-        print(f"🟢 [MERGE-DB-SCHEMA] {output_path.name} — "
-              f"{len(merged.get('entities', []))} entities, "
+        # ASCII markers (M10 — Windows cp1252 console compat)
+        deduced = sum(1 for e in merged.get("entities", []) if e.get("deduced"))
+        print(f"[GREEN] [MERGE-DB-SCHEMA] {output_path.name} - "
+              f"{len(merged.get('entities', []))} entities ({deduced} deduced), "
               f"{len(merged.get('relations', []))} relations, "
               f"{len(conflicts)} conflict(s).")
         for c in conflicts:
-            print(f"  ⚠️ [{c['class']}] {c.get('entity', '')}.{c.get('field', '')}: {c['message']}")
+            print(f"  [WARN] [{c['class']}] {c.get('entity', '')}.{c.get('field', '')}: {c['message']}")
     return 0
 
 

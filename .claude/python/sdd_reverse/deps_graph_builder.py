@@ -24,7 +24,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from sdd_reverse.scan_legacy import ScanResult, normalize_bytes
+from sdd_reverse.scan_legacy import ScanResult, decode_text, normalize_bytes
 
 # Naive EOL deadline map for common ecosystems (informational only)
 EOL_HINTS = {
@@ -35,8 +35,9 @@ EOL_HINTS = {
     # Node — sample
     "moment": {"versions_before": None, "eol_date": "2020-09-15", "reason": "Project in maintenance mode, use date-fns / dayjs"},
     "request": {"versions_before": None, "eol_date": "2020-02-11", "reason": "Deprecated, use axios / undici"},
-    # Java — sample
-    "commons-collections:3": {"versions_before": "3.2.2", "eol_date": "2015-11-04", "reason": "CVE-2015-7501 RCE"},
+    # Java — sample. Key = groupId:artifactId (matchable — audit M17 : the old
+    # key `commons-collections:3` could never match a parsed Maven name).
+    "commons-collections:commons-collections": {"versions_before": "3.2.2", "eol_date": "2015-11-04", "reason": "CVE-2015-7501 RCE"},
     # PHP — sample
     "swiftmailer/swiftmailer": {"versions_before": None, "eol_date": "2021-11-08", "reason": "Use symfony/mailer"},
 }
@@ -63,7 +64,7 @@ def _read_text(path: Path) -> str:
         raw = path.read_bytes()
     except OSError:
         return ""
-    return normalize_bytes(raw).decode("utf-8", errors="replace")
+    return decode_text(normalize_bytes(raw))
 
 
 def _parse_packages_config(content: str) -> list[tuple[str, str]]:
@@ -181,8 +182,22 @@ def _parse_composer_json(content: str) -> list[tuple[str, str]]:
     return deps
 
 
+def _version_tuple(version: str) -> tuple[int, ...] | None:
+    """Parse a dotted numeric version prefix ; None when unparseable."""
+    m = re.match(r"(\d+(?:\.\d+)*)", (version or "").strip())
+    if not m:
+        return None
+    return tuple(int(x) for x in m.group(1).split("."))
+
+
 def _detect_eol(name: str, version: str) -> tuple[bool, str | None, str | None]:
-    """Return (is_eol, eol_date, reason)."""
+    """Return (is_eol, eol_date, reason).
+
+    Audit 2026-06-10 M17 : `versions_before` was IGNORED — every version of a
+    hinted package was reported EOL (Newtonsoft.Json 13.0.3 flagged despite the
+    hint saying `< 13.0.0`). The bound is now compared ; an unparseable version
+    stays flagged (conservative) only when the hint has no version bound.
+    """
     hint = EOL_HINTS.get(name)
     if not hint:
         # Try partial match for composer-style "vendor/lib"
@@ -192,6 +207,12 @@ def _detect_eol(name: str, version: str) -> tuple[bool, str | None, str | None]:
                 break
     if not hint:
         return False, None, None
+    bound = hint.get("versions_before")
+    if bound:
+        v = _version_tuple(version)
+        b = _version_tuple(bound)
+        if v is not None and b is not None and v >= b:
+            return False, None, None   # at/above the fixed version — not EOL
     return True, hint.get("eol_date"), hint.get("reason")
 
 

@@ -1,7 +1,7 @@
 # Inventaire — legacy-api-minimal
 
-**Date scan** : 2026-06-10T21:10:45Z
-**Durée scan** : 3 ms
+**Date scan** : 2026-06-11T12:00:19Z
+**Durée scan** : 2 ms
 **Langage principal** : `csharp`
 
 ## Langages détectés
@@ -21,7 +21,7 @@ _Aucun framework signé._
 
 - **U-1** — API Orders _(suggéré: `Orders`)_ — kind: api, confiance: medium
   - Seed : `Controllers/OrdersController.cs`
-  - Evidence profonde (graphe) : `Models/OrderDto.cs`, `Repositories/OrderRepository.cs`, `Services/OrderService.cs`
+  - Evidence profonde (graphe) : `Models/OrderDto.cs`, `Services/OrderService.cs`, `Repositories/OrderRepository.cs`
   - Classes (4) — controller: OrdersController; dto: OrderDto; repository: OrderRepository; service: OrderService
   - Accès données : 2 requête(s) SQL, 0 appel(s) de procédure
     - `SELECT` sur ['Orders'] (`Repositories/OrderRepository.cs:19`)

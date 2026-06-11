@@ -23,7 +23,7 @@ Diagnostic read-only du workflow reverse engineering. Pendant du `/sdd-status` S
 Invoque le script déterministe (aucun agent) :
 
 ```bash
-python -m sdd_reverse_scripts.reverse_status [--project ...] [--json]
+python .claude/python/sdd_reverse_scripts/reverse_status.py [--project ...] [--json]
 ```
 
 Le script :

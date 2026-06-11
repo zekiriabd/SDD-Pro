@@ -36,7 +36,7 @@ Si le trigger matche, route vers le workflow reverse engineering **au lieu** de 
 5. **Lire `workspace/old/{LegacyProject}/.sys/inventory.md`** pour identifier les unités U-N pertinentes
 6. **Pour chaque unité voulue** : `/sdd-reverse U-N` (Phase 3, séquentiel)
 7. **Phase 5** (humain) : Tech Lead revue + complétion `## Project Config` des FEATs
-8. **Pré-`/sdd-full`** : `python -m sdd_reverse_scripts.check_reverse_feat_for_full --feat-path workspace/input/feats/{n}-*.md`
+8. **Pré-`/sdd-full`** : `python .claude/python/sdd_reverse_scripts/check_reverse_feat_for_full.py --feat-path workspace/input/feats/{n}-*.md`
 9. **`/sdd-full {n}`** (pipeline SDD_Pro standard — workflow EXISTANT inchangé)
 
 ## Décisions architecturales verrouillées (D1-D7)

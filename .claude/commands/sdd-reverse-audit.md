@@ -30,7 +30,7 @@ Sinon → STOP + ERROR `[REVERSE_NO_SOURCE]` + suggérer `/sdd-reverse-inventory
 
 1. **Script déterministe d'abord** :
    ```bash
-   python -m sdd_reverse_scripts.reverse_audit \
+   python .claude/python/sdd_reverse_scripts/reverse_audit.py \
        --project workspace/old/{LegacyProject} \
        [--force-enrichment-on ...]
    ```

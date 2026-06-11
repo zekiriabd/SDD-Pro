@@ -28,7 +28,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from sdd_reverse.scan_legacy import normalize_bytes
+from sdd_reverse.scan_legacy import decode_text, normalize_bytes
 
 DATA_ACCESS_SCHEMA_VERSION = 1
 
@@ -99,18 +99,21 @@ class Query:
         }
 
 
-def _iter_string_literals(text: str):
-    """Yield (content, start_offset) for C#/Java/PHP string literals.
+def _iter_string_literals(text: str, *, include_single_quotes: bool = False):
+    """Yield (content, start_offset, end_offset) for string literals.
 
-    Handles regular ``"..."`` (with ``\\"`` escapes) and C# verbatim ``@"..."``
-    (with ``""`` escapes). Offsets are into `text` for line computation.
+    Handles regular ``"..."`` (with ``\\"`` escapes), C# verbatim ``@"..."``
+    (with ``""`` escapes) and — when ``include_single_quotes`` (audit M3,
+    PHP/JSP dominant channel) — ``'...'`` literals with ``\\'`` escapes.
+    ``end_offset`` is the index of the closing quote (exclusive of content).
     """
     i = 0
     n = len(text)
     while i < n:
         c = text[i]
-        if c == '"':
-            verbatim = i > 0 and text[i - 1] == "@"
+        if c == '"' or (include_single_quotes and c == "'"):
+            quote = c
+            verbatim = quote == '"' and i > 0 and text[i - 1] == "@"
             start = i + 1
             j = start
             buf: list[str] = []
@@ -130,26 +133,71 @@ def _iter_string_literals(text: str):
                         buf.append(text[j + 1])
                         j += 2
                         continue
-                    if cj == '"':
+                    if cj == quote:
                         break
                     if cj == "\n":
                         break
                     buf.append(cj)
                     j += 1
-            yield "".join(buf), start
+            yield "".join(buf), start, j
             i = j + 1
             continue
         i += 1
+
+
+# --- M2 (audit 2026-06-10) : literal concatenation merge ---------------------
+# Legacy SQL is frequently split across several literals :
+#     "SELECT x FROM " + "T1 WHERE y = @p"          (C#/Java +)
+#     "SELECT … " & _                                (VB & with line continuation)
+#     'SELECT … ' . $where                           (PHP .)
+#     sb.Append("SELECT …"); sb.Append(" FROM T")    (StringBuilder chain)
+#     sql += " AND z = 1";                           (compound append)
+# Before this fix only the first fragment was seen → the FROM clause (and thus
+# tables[]) was silently lost.
+_CONCAT_GAP_RES = (
+    # operator join : + & . with optional VB `_` continuation + C# @ verbatim prefix
+    re.compile(r"^[\s_]*[+&.][\s_]*@?$"),
+    # StringBuilder chain : ");  sb.Append("   /  ).AppendLine(@"
+    re.compile(r"^\s*\)?\s*;?\s*[\w.]*\.Append(?:Line|Format)?\s*\(\s*@?$",
+               re.IGNORECASE),
+    # compound append statement : ";  sql += "  /  ; $sql .= '
+    re.compile(r"^\s*;?\s*\$?\w+\s*(?:\+=|\.=|&=)\s*@?$"),
+)
+
+
+def _merge_concatenated_literals(
+    literals: list[tuple[str, int, int]], text: str,
+) -> list[tuple[str, int, int]]:
+    """Merge adjacent literals whose inter-gap looks like a concatenation."""
+    if not literals:
+        return []
+    merged: list[tuple[str, int, int]] = [literals[0]]
+    for content, start, end in literals[1:]:
+        prev_content, prev_start, prev_end = merged[-1]
+        gap = text[prev_end + 1: start - 1]
+        if len(gap) <= 120 and any(p.match(gap) for p in _CONCAT_GAP_RES):
+            merged[-1] = (prev_content + content, prev_start, end)
+        else:
+            merged.append((content, start, end))
+    return merged
 
 
 def _line_at(text: str, offset: int) -> int:
     return text.count("\n", 0, offset) + 1
 
 
-def extract_sql_from_text(text: str, source: str = "") -> list[Query]:
-    """Extract inline SQL queries from a source file's text."""
+def extract_sql_from_text(
+    text: str, source: str = "", *, include_single_quotes: bool = False,
+) -> list[Query]:
+    """Extract inline SQL queries from a source file's text.
+
+    Literals split by concatenation (+ / & / . / StringBuilder.Append chains)
+    are merged first (M2) so multi-fragment queries keep their FROM clause.
+    ``include_single_quotes`` enables '…' literals (M3 — PHP/JSP).
+    """
     out: list[Query] = []
-    for content, off in _iter_string_literals(text):
+    literals = list(_iter_string_literals(text, include_single_quotes=include_single_quotes))
+    for content, off, _end in _merge_concatenated_literals(literals, text):
         if not _SQL_START_RE.match(content):
             continue
         verb_m = _SQL_START_RE.match(content)
@@ -167,23 +215,35 @@ def extract_sql_from_text(text: str, source: str = "") -> list[Query]:
     return out
 
 
+# M1 : the proc-name literal may be BEFORE or AFTER the marker — the most
+# common ADO.NET ordering is `cmd.CommandType = CommandType.StoredProcedure;
+# cmd.CommandText = "sp_X";` (name AFTER). Search both directions, nearest wins.
+_PROC_NAME_WINDOW = 800
+
 def _extract_proc_calls(text: str, source: str) -> list[dict[str, Any]]:
     """Detect stored-procedure call sites (CommandType.StoredProcedure / EXEC)."""
     calls: list[dict[str, Any]] = []
-    # 1. ADO.NET CommandType.StoredProcedure — the proc name is the nearest
-    #    preceding string literal that looks like a bare identifier.
     literals = list(_iter_string_literals(text))
     for m in _STORED_PROC_MARKER_RE.finditer(text):
         marker_off = m.start()
         name = None
         name_off = 0
-        for content, off in literals:
-            if off < marker_off and re.fullmatch(r"(?:dbo\.)?\w+", content.strip()):
-                name = content.strip()
-                name_off = off
+        best_dist: int | None = None
+        for content, off, _end in literals:
+            dist = abs(off - marker_off)
+            if dist > _PROC_NAME_WINDOW:
+                continue
+            stripped = content.strip()
+            if re.fullmatch(r"(?:\[?dbo\]?\.)?\[?\w+\]?", stripped) and len(stripped) >= 3:
+                if best_dist is None or dist < best_dist:
+                    name = stripped.strip("[]").removeprefix("dbo.").strip("[]")
+                    name_off = off
+                    best_dist = dist
         if name:
             # Parameters declared near the call site.
-            window = text[max(0, name_off - 50): marker_off + 600]
+            lo = max(0, min(name_off, marker_off) - 50)
+            hi = max(name_off, marker_off) + 600
+            window = text[lo:hi]
             params = sorted(set(_PARAM_ADD_RE.findall(window)))
             calls.append({
                 "name": name,
@@ -193,7 +253,7 @@ def _extract_proc_calls(text: str, source: str) -> list[dict[str, Any]]:
                 "via": "CommandType.StoredProcedure",
             })
     # 2. EXEC sp_xxx inside SQL strings or .sql files.
-    for content, off in literals:
+    for content, off, _end in literals:
         for em in _EXEC_RE.finditer(content):
             calls.append({
                 "name": em.group(1),
@@ -235,9 +295,36 @@ def parse_stored_procedure_defs(text: str, source: str) -> list[dict[str, Any]]:
 
 def _read_text(path: Path) -> str:
     try:
-        return normalize_bytes(path.read_bytes()).decode("utf-8", errors="replace")
+        return decode_text(normalize_bytes(path.read_bytes()))
     except OSError:
         return ""
+
+
+# M3 : languages whose string literals are dominantly single-quoted.
+_SINGLE_QUOTE_EXTENSIONS = frozenset({".php", ".jsp"})
+
+# M4 : declarative SQL in markup — <asp:SqlDataSource SelectCommand="…">.
+_MARKUP_SQL_EXTENSIONS = frozenset({".aspx", ".ascx"})
+_MARKUP_SQL_RE = re.compile(
+    r"(?:Select|Insert|Update|Delete)Command\s*=\s*\"([^\"]+)\"", re.IGNORECASE,
+)
+# M4 : Typed DataSets / TableAdapters — queries live in <CommandText> of .xsd.
+_XSD_COMMAND_RE = re.compile(r"<CommandText>([\s\S]*?)</CommandText>", re.IGNORECASE)
+
+
+def _query_from_sql(sql: str, rel: str, line: int) -> Query | None:
+    sql = sql.strip()
+    vm = _SQL_START_RE.match(sql)
+    if not vm:
+        return None
+    return Query(
+        verb=vm.group(1),
+        sql=sql,
+        tables=_TABLE_RE.findall(sql),
+        params=_PARAM_RE.findall(sql),
+        file=rel,
+        line=line,
+    )
 
 
 def extract_data_access(project_root: str | Path, scan_result: Any) -> dict[str, Any]:
@@ -258,8 +345,19 @@ def extract_data_access(project_root: str | Path, scan_result: Any) -> dict[str,
             if ext in _CODE_EXTENSIONS:
                 seen.add(key)
                 text = _read_text(f)
-                queries.extend(q.to_dict() for q in extract_sql_from_text(text, rel))
+                queries.extend(q.to_dict() for q in extract_sql_from_text(
+                    text, rel,
+                    include_single_quotes=(ext in _SINGLE_QUOTE_EXTENSIONS),
+                ))
                 proc_calls.extend(_extract_proc_calls(text, rel))
+            elif ext in _MARKUP_SQL_EXTENSIONS:
+                # M4 : SqlDataSource declarative commands in WebForms markup.
+                seen.add(key)
+                text = _read_text(f)
+                for mm in _MARKUP_SQL_RE.finditer(text):
+                    q = _query_from_sql(mm.group(1), rel, _line_at(text, mm.start()))
+                    if q:
+                        queries.append(q.to_dict())
             elif ext in _SQL_FAMILY_EXTENSIONS or lm.family == "sql":
                 seen.add(key)
                 text = _read_text(f)
@@ -273,6 +371,18 @@ def extract_data_access(project_root: str | Path, scan_result: Any) -> dict[str,
                         "line": _line_at(text, em.start()),
                         "via": "EXEC",
                     })
+
+    # M4 : Typed DataSets (.xsd) hold TableAdapter queries — not part of any
+    # language's file_extensions, so walk them explicitly (bounded).
+    for xsd in root.rglob("*.xsd"):
+        if any(part in {"bin", "obj", "packages", "node_modules", ".git"} for part in xsd.parts):
+            continue
+        rel = xsd.relative_to(root).as_posix()
+        text = _read_text(xsd)
+        for mm in _XSD_COMMAND_RE.finditer(text):
+            q = _query_from_sql(mm.group(1), rel, _line_at(text, mm.start()))
+            if q:
+                queries.append(q.to_dict())
 
     return {
         "schemaVersion": DATA_ACCESS_SCHEMA_VERSION,

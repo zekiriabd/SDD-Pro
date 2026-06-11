@@ -38,16 +38,26 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+# C6 bootstrap — canonical invocation is by file path, no PYTHONPATH needed.
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 from sdd_reverse.atomic_write_local import atomic_write_text
+from sdd_reverse.console_safe import ensure_console_safe
 from sdd_reverse.paths import parity_snapshots_path, sdd_reverse_dir
 
 
 # Files whose hashes are tracked. Relative to .claude/python/.
 # Adding a new tracked file = add to this list AND document the
 # rationale in design doc §12.7.bis.
+# Audit 2026-06-10 : LOCAL copies added — the net was unidirectional
+# (only sdd_lib/* hashed), so editing the local duplicates triggered
+# nothing. Both directions now drift-detected.
 _TRACKED: tuple[str, ...] = (
     "sdd_lib/atomic_write.py",
     "sdd_lib/file_locks.py",
+    "sdd_reverse/atomic_write_local.py",
+    "sdd_reverse/file_locks_local.py",
 )
 
 
@@ -75,6 +85,7 @@ def compute_fresh_snapshots(python_root: Path) -> dict[str, str]:
 
 
 def main(argv: list[str] | None = None) -> int:
+    ensure_console_safe()
     parser = argparse.ArgumentParser(
         prog="sync_parity_snapshots",
         description="Regenerate sdd_reverse/_parity_snapshots.json after a deliberate helper sync.",

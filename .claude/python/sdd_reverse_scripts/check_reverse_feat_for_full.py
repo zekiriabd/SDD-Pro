@@ -24,6 +24,11 @@ import json
 import sys
 from pathlib import Path
 
+# C6 bootstrap — canonical invocation is by file path, no PYTHONPATH needed.
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from sdd_reverse.console_safe import ensure_console_safe
 from sdd_reverse.feat_structure_spec import REVERSE_GATE_RE, parse_frontmatter
 
 
@@ -106,6 +111,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
+    ensure_console_safe()
 
     # Resolve glob if needed (single FEAT expected)
     matches = sorted(glob.glob(args.feat_path))
@@ -122,8 +128,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.json:
         print(json.dumps(report, ensure_ascii=False))
     else:
-        icon = "🟢" if code == 0 else "🔴"
-        print(f"{icon} [REVERSE-GATE] {feat_path.name} — {report['reason']}")
+        # ASCII markers (M10 — Windows cp1252 console compat)
+        icon = "[GO]" if code == 0 else "[NO-GO]"
+        print(f"{icon} [REVERSE-GATE] {feat_path.name} - {report['reason']}")
     return code
 
 

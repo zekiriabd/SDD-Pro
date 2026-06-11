@@ -89,12 +89,26 @@ exigent migration prioritaire.)
 
 (Ces observations alimentent db-schema.enrichment.json — voir STEP 3)
 
-## 6. Cycles + dead code
+## 6. Secrets détectés (OBLIGATOIRE — audit C10 2026-06-10)
+
+(Relayer `inventory.json.secretsDetected` — clés privées SSH/SFTP, .pfx,
+.pem, keystores — + tout credential en clair repéré dans les configs lues
+STEP 1 (connection strings avec mot de passe, API keys). Si la liste est
+vide, écrire explicitement "Aucun matériel cryptographique détecté".
+Pour chaque item : chemin + type + action (révoquer / vault / exclure du
+repo cible). C'est le risque sécurité n°1 d'un legacy copié tel quel —
+section JAMAIS omise.)
+
+| Fichier / config | Type | Action recommandée |
+|---|---|---|
+| {path} | {clé privée SSH / cert / password en clair} | {révoquer + vault} |
+
+## 7. Cycles + dead code
 
 - Cycles internes : {liste depuis deps-graph.cyclesDetected, sinon "aucun"}
 - Fichiers sans incoming edge : {N} (suggestion : audit manuel pour dead code)
 
-## 7. Recommandations migration
+## 8. Recommandations migration
 
 (3-7 bullets actionnables. Format : "Avant /sdd-full, considérer X parce que Y.")
 ```
@@ -102,6 +116,15 @@ exigent migration prioritaire.)
 ## STEP 3 — Enrichissement db-schema.enrichment.json (ADV-3 strict)
 
 **Règle d'or ADV-3** : tu écris UNIQUEMENT dans `db-schema.enrichment.json`, JAMAIS dans `db-schema.json` (base intouchable par Phase 2 agent). Le script déterministe `merge_db_schema.py` fera l'union.
+
+**OBLIGATION de matérialisation (audit C3 2026-06-10)** : toute entité, FK,
+index ou champ que tu **déduis** en rédigeant le §5 de tech-audit.md DOIT être
+écrit dans `db-schema.enrichment.json` (avec son evidence file:line), pas
+seulement narré en texte. Sur le run EDI, 7 entités + 5 FKs déduites sont
+restées en prose (§5) pendant que `addedRelations` restait `[]` — le merged
+schema n'a jamais profité de l'audit. Règle mentale : **« si c'est dans le §5,
+c'est dans le JSON »**. Une entité entière absente de la base s'exprime via
+`addedFields` (un item par champ, même entity) + `addedRelations`.
 
 Structure attendue de `db-schema.enrichment.json` :
 
@@ -130,9 +153,34 @@ Structure attendue de `db-schema.enrichment.json` :
                  "nullable": true, "default": null},
       "evidence": "path/file.cs:N"
     }
+  ],
+  "observedEntitiesNotInBase": [
+    {
+      "name": "Commandes",
+      "table": "Commandes",
+      "fields": [{"name": "Id", "type": "int", "primaryKey": true,
+                   "identity": false, "nullable": false, "default": null}],
+      "evidence": ["path/VM.cs:42-45"]
+    }
+  ],
+  "observedRelationsNotInBase": [
+    {
+      "name": "FK_Commandes_Clients_observed",
+      "from": {"entity": "Commandes", "field": "FkClient"},
+      "to": {"entity": "Clients", "field": "Id"},
+      "type": "many-to-one",
+      "evidence": "path/VM.cs:50"
+    }
   ]
 }
 ```
+
+> **Canal `observed*NotInBase` (audit C3 2026-06-10)** : entités/FKs que tu
+> DÉDUIS des requêtes SQL inline (data-access.json) alors qu'elles sont
+> absentes du DDL source. Le merge les appende dans `db-schema.merged.json`
+> avec `"deduced": true` (flag clair — l'extracteur Phase 3 cappe leur
+> confidence à medium, §9.2). Champs minimum : `name` + `evidence` ;
+> remplis `fields[]` avec les colonnes visibles dans les SELECT/INSERT.
 
 **Anti-derive crucial** :
 - Tu ne supprimes JAMAIS d'entries du base `db-schema.json`
@@ -145,11 +193,14 @@ Structure attendue de `db-schema.enrichment.json` :
 Après écriture de `db-schema.enrichment.json`, déclencher le merge :
 
 ```bash
-python -m sdd_reverse.merge_db_schema \
+python .claude/python/sdd_reverse/merge_db_schema.py \
     --base workspace/old/{P}/.sys/db-schema.json \
     --enrichment workspace/old/{P}/.sys/db-schema.enrichment.json \
     --output workspace/old/{P}/.sys/db-schema.merged.json
 ```
+
+> Invocation canonique par chemin de fichier (C6) — bootstrap `sys.path`
+> intégré, aucun `PYTHONPATH` requis depuis la racine repo.
 
 Lire le rapport stdout. Si conflits `[REVERSE_ENRICHMENT_TYPE_CONFLICT]` → mentionner dans `tech-audit.md` §5 (le Tech Lead arbitre).
 

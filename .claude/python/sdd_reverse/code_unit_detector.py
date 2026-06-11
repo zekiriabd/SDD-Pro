@@ -28,10 +28,39 @@ them uniformly.
 from __future__ import annotations
 
 import re
+from pathlib import Path
 from typing import Any
 
+from sdd_reverse.scan_legacy import decode_text, normalize_bytes
+
 # Roles that make a class "behavioural" enough to anchor a backend module unit.
-_BEHAVIOURAL_ROLES = frozenset({"service", "repository", "controller", "complex"})
+# `viewmodel` added 2026-06-10 (audit C1/M7) : MVVM VMs carry the business
+# logic — an unbound VM must anchor an extractible module, not vanish as DTO.
+_BEHAVIOURAL_ROLES = frozenset({"service", "repository", "controller", "complex", "viewmodel"})
+
+# --- CLI / batch entry-point detection (audit 2026-06-10 C2) ------------------
+# Legacy .NET apps frequently run dual-mode : WPF/WinForms UI when launched
+# bare, headless batch when launched with CLI args (Task Scheduler). Before
+# this fix the 47 EDI CLI commands lived in App.xaml.cs and produced ZERO unit.
+
+_ENTRY_POINT_FILENAMES = frozenset({
+    "app.xaml.cs", "app.xaml.vb", "program.cs", "program.vb", "main.cs",
+})
+
+# Evidence that the entry point actually CONSUMES CLI arguments (every WPF
+# App.xaml.cs has `OnStartup(StartupEventArgs e)` — the discriminant is
+# reading `e.Args` / `args[...]`, not the signature).
+_CLI_ARGS_RE = re.compile(
+    r"Environment\.GetCommandLineArgs|\be\.Args\b|\bargs\s*\[|\bargs\.Length\b",
+    re.IGNORECASE,
+)
+
+# Command tokens dispatched on : case "X": / args[i] == "X" / = "X" Then (VB).
+_CLI_COMMAND_TOKEN_RE = re.compile(
+    r"""(?:case\s+|==\s*|=\s*|\.Equals\s*\(\s*)"([A-Za-z][\w\-/]{1,40})"
+    """,
+    re.VERBOSE,
+)
 
 
 def _pascal(token: str) -> str:
@@ -78,20 +107,81 @@ def _closure(seed_classes: set[str], adj: dict[str, set[str]], max_depth: int) -
     return reached
 
 
+def _detect_job_units(
+    classes: list[dict[str, Any]],
+    adj: dict[str, set[str]],
+    project_root: Path | None,
+    lang: str,
+    max_depth: int,
+) -> tuple[list[dict[str, Any]], set[str]]:
+    """One unit kind=job per CLI/batch entry-point file showing args dispatch.
+
+    Returns (units, class_names_consumed). Requires `project_root` to read the
+    entry-point source for CLI evidence — skipped gracefully when absent.
+    """
+    if project_root is None:
+        return [], set()
+    units: list[dict[str, Any]] = []
+    consumed: set[str] = set()
+    seen_files: set[str] = set()
+    for c in sorted(classes, key=lambda x: x["name"]):
+        file_rel = c["file"]
+        if file_rel in seen_files:
+            continue
+        base = file_rel.rsplit("/", 1)[-1].lower()
+        if base not in _ENTRY_POINT_FILENAMES:
+            continue
+        seen_files.add(file_rel)
+        try:
+            text = decode_text(normalize_bytes((project_root / file_rel).read_bytes()))
+        except OSError:
+            continue
+        if not _CLI_ARGS_RE.search(text):
+            continue  # pure UI bootstrap — no headless mode visible
+        tokens = sorted({t for t in _CLI_COMMAND_TOKEN_RE.findall(text)})
+        anchor_classes = {cc["name"] for cc in classes if cc["file"] == file_rel}
+        closure = _closure(anchor_classes, adj, max_depth)
+        consumed |= closure
+        suggested = _pascal(Path(file_rel).stem.split(".")[0]) + "Batch"
+        token_preview = ", ".join(f"`{t}`" for t in tokens[:15])
+        if len(tokens) > 15:
+            token_preview += f" … (+{len(tokens) - 15})"
+        units.append({
+            "label": f"Traitements batch/CLI ({Path(file_rel).name})",
+            "suggestedName": suggested,
+            "language": lang,
+            "kind": "job",
+            "evidenceFiles": [file_rel],
+            "entities": [],
+            "confidenceEstimate": "medium",
+            "cliCommands": tokens,
+            "rationale": (
+                f"Entry-point `{file_rel}` consomme des arguments CLI "
+                f"(mode headless/batch dual-mode) — {len(tokens)} commande(s) "
+                f"détectée(s){' : ' + token_preview if tokens else ''}."
+            ),
+        })
+    return units, consumed
+
+
 def detect_code_units(
     code_graph: dict[str, Any],
     existing_units: list[dict[str, Any]],
     *,
     max_depth: int = 3,
     language: str | None = None,
+    project_root: str | Path | None = None,
 ) -> list[dict[str, Any]]:
-    """Detect controller + orphan-module units from the code graph."""
+    """Detect job + controller + orphan-module units from the code graph."""
     classes = code_graph.get("classes", [])
     if not classes:
         return []
 
     by_name: dict[str, dict[str, Any]] = {c["name"]: c for c in classes}
-    adj: dict[str, set[str]] = {c["name"]: set(c.get("references", [])) for c in classes}
+    # UNION across partial-class duplicates (audit M18 — was overwritten).
+    adj: dict[str, set[str]] = {}
+    for c in classes:
+        adj.setdefault(c["name"], set()).update(c.get("references", []))
     file_to_classes: dict[str, list[str]] = {}
     for c in classes:
         file_to_classes.setdefault(c["file"], []).append(c["name"])
@@ -107,6 +197,15 @@ def detect_code_units(
 
     units: list[dict[str, Any]] = []
     used: set[str] = set(covered)
+
+    # 0. CLI/batch entry-point units (C2) — detected FIRST so the headless
+    #    dispatch layer anchors its own unit even when some handlers are also
+    #    reachable from UI units (dual-mode is the archetypal legacy case).
+    job_units, job_consumed = _detect_job_units(
+        classes, adj, Path(project_root) if project_root else None, lang, max_depth,
+    )
+    units.extend(job_units)
+    used |= job_consumed
 
     # 1. Controllers → one unit each (API surface), unless already covered.
     controllers = sorted(

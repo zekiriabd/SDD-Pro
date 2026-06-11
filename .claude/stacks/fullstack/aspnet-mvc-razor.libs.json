@@ -1,0 +1,77 @@
+{
+  "$schema": "../../templates/libs-catalog.schema.json",
+  "stackId": "aspnet-mvc-razor",
+  "category": "fullstack",
+  "schemaVersion": 1,
+  "buildSystem": "dotnet",
+  "manifest": {
+    "files": [
+      "workspace/output/src/{AppName}/{AppName}.csproj",
+      "workspace/output/src/{AppName}/Program.cs",
+      "workspace/output/src/{AppName}/appsettings.json"
+    ]
+  },
+  "metadata": {
+    "platforms": ["net10.0"],
+    "framework": "ASP.NET Core MVC 10 (Controllers + Razor Views .cshtml) + DevExtreme HtmlHelpers (server-side widgets) + EF Core Database-First",
+    "workflow": "single-project-mvc-ssr",
+    "notes": "Monolithe .NET 10 classique MVC + Razor. Pas de SPA, pas de bundler JS. DevExtreme cote server (Html.DevExtreme().DataGrid()...) + DevExtreme.AspNet.Data (DataSourceLoader server-side filtering/paging/sorting). Microsoft.Identity.Web NON pinne (CVE cycle frequent)."
+  },
+  "dbDrivers": {
+    "sqlserver": { "module": "Microsoft.EntityFrameworkCore.SqlServer", "ref": "ef-core" },
+    "postgres": { "module": "Npgsql.EntityFrameworkCore.PostgreSQL", "ref": "npgsql-ef" },
+    "mysql": { "module": "Pomelo.EntityFrameworkCore.MySql", "ref": "pomelo-ef" },
+    "sqlite": { "module": "Microsoft.EntityFrameworkCore.Sqlite", "ref": "ef-core" }
+  },
+  "versions": {
+    "ef-core": "10.0.6",
+    "automapper": "16.1.1",
+    "fluentvalidation-aspnet": "11.10.0",
+    "serilog-aspnetcore": "10.0.0",
+    "serilog-console": "6.1.1",
+    "serilog-file": "6.0.0",
+    "msal-web": "3.3.0",
+    "msal-web-ui": "3.3.0",
+    "devextreme-aspnet-data": "5.0.0",
+    "devextreme-aspnet-mvc": "25.1.5",
+    "npgsql-ef": "9.0.4",
+    "pomelo-ef": "9.0.0",
+    "closedxml": "0.104.1",
+    "questpdf": "2024.12.3",
+    "http-polly": "9.0.1",
+    "mailkit": "4.9.0",
+    "mimekit": "4.9.0",
+    "memory-cache": "10.0.0",
+    "stackexchange-redis": "2.8.16",
+    "swashbuckle": "7.2.0"
+  },
+  "core": [
+    { "module": "Microsoft.AspNetCore.Mvc.Razor.RuntimeCompilation", "ref": "ef-core", "rationale": "Hot-reload des vues .cshtml en dev (recompile a la volee, ne pas pin sur ef-core, version aligne ASP.NET Core)" },
+    { "module": "Microsoft.EntityFrameworkCore", "ref": "ef-core", "rationale": "ORM principal" },
+    { "module": "Microsoft.EntityFrameworkCore.SqlServer", "ref": "ef-core", "rationale": "Provider defaut (override via dbDrivers selon DatabaseType)" },
+    { "module": "Microsoft.EntityFrameworkCore.Design", "ref": "ef-core" },
+    { "module": "Microsoft.EntityFrameworkCore.Tools", "ref": "ef-core" },
+    { "module": "AutoMapper", "ref": "automapper", "rationale": "Mapping Entity -> ViewModel" },
+    { "module": "FluentValidation.AspNetCore", "ref": "fluentvalidation-aspnet", "rationale": "Validation declarative cote Controller (auto-binding ModelState)" },
+    { "module": "DevExtreme.AspNet.Data", "ref": "devextreme-aspnet-data", "rationale": "DataSourceLoader server-side (filter, sort, group, page sur IQueryable<T>) pour endpoints JSON consommes par les widgets DevExtreme" },
+    { "module": "DevExtreme.AspNet.Mvc", "ref": "devextreme-aspnet-mvc", "rationale": "HtmlHelpers DevExtreme cote Razor: @(Html.DevExtreme().DataGrid()...) — generation widgets server-side" },
+    { "module": "Serilog.AspNetCore", "ref": "serilog-aspnetcore", "rationale": "Logger structure" },
+    { "module": "Serilog.Sinks.Console", "ref": "serilog-console" },
+    { "module": "Microsoft.Extensions.Caching.Memory", "ref": "memory-cache", "rationale": "IMemoryCache integre (pas de package racine, transitif ASP.NET Core)" }
+  ],
+  "onDemand": [
+    { "module": "Npgsql.EntityFrameworkCore.PostgreSQL", "ref": "npgsql-ef", "capability": "db-postgres", "triggers": ["DatabaseType.*PostgreSql", "postgres"] },
+    { "module": "Pomelo.EntityFrameworkCore.MySql", "ref": "pomelo-ef", "capability": "db-mysql", "triggers": ["DatabaseType.*MySql", "mysql", "mariadb"] },
+    { "module": "Microsoft.EntityFrameworkCore.Sqlite", "ref": "ef-core", "capability": "db-sqlite", "triggers": ["DatabaseType.*Sqlite"] },
+    { "module": "Microsoft.Identity.Web", "ref": "msal-web", "capability": "azure-ad", "triggers": ["auth-azure-ad", "azure.*ad", "\\bmsal\\b", "AzureAd"] },
+    { "module": "Microsoft.Identity.Web.UI", "ref": "msal-web-ui", "capability": "azure-ad", "triggers": ["auth-azure-ad", "azure.*ad"] },
+    { "module": "Swashbuckle.AspNetCore", "ref": "swashbuckle", "capability": "openapi", "triggers": ["swagger", "openapi", "/api-docs"] },
+    { "module": "ClosedXML", "ref": "closedxml", "capability": "excel", "triggers": ["\\bexcel\\b", "\\.xlsx\\b", "export.*excel"] },
+    { "module": "QuestPDF", "ref": "questpdf", "capability": "pdf", "triggers": ["\\bpdf\\b", "\\.pdf\\b", "export.*pdf", "generer.*pdf"] },
+    { "module": "Microsoft.Extensions.Http.Polly", "ref": "http-polly", "capability": "http-client", "triggers": ["appel.*api.*externe", "service.*externe", "\\bpolly\\b", "retry.*http"] },
+    { "module": "MailKit", "ref": "mailkit", "capability": "smtp", "triggers": ["email", "smtp", "envoi.*mail", "notification.*mail"] },
+    { "module": "MimeKit", "ref": "mimekit", "capability": "smtp", "triggers": ["email", "smtp"] },
+    { "module": "Serilog.Sinks.File", "ref": "serilog-file", "capability": "logging-file", "triggers": ["log.*file", "log.*rolling", "audit.*log"] },
+    { "module": "StackExchange.Redis", "ref": "stackexchange-redis", "capability": "redis-cache", "triggers": ["\\bredis\\b", "distributed.*cache"] }
+  ]
+}

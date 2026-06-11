@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "project": "legacy-wpf-minimal",
-  "scanDate": "2026-06-10T21:10:47Z",
-  "scanDurationMs": 6,
+  "scanDate": "2026-06-11T12:00:21Z",
+  "scanDurationMs": 4,
   "languagesDetected": [
     {
       "id": "wpf-xaml",
@@ -119,14 +119,15 @@
     "0888f14924f90ca9f5a4a7b8405ed62c69fcd49a36f3ae6aa12cf20ba0a025c7": {
       "unitId": "U-1",
       "status": "active",
-      "firstSeen": "2026-06-10T21:10:47Z"
+      "firstSeen": "2026-06-10T21:35:42Z"
     },
     "ee6c8e198707deccd10942b169434ed983be5bd6a8e9b93ed0f37929c367a207": {
       "unitId": "U-2",
       "status": "active",
-      "firstSeen": "2026-06-10T21:10:47Z"
+      "firstSeen": "2026-06-10T21:35:42Z"
     }
   },
   "_featAllocations": {},
-  "_allocatedNames": {}
+  "_allocatedNames": {},
+  "secretsDetected": []
 }

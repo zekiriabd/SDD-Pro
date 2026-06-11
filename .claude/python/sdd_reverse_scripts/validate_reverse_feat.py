@@ -39,6 +39,11 @@ import json
 import sys
 from pathlib import Path
 
+# C6 bootstrap — canonical invocation is by file path, no PYTHONPATH needed.
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from sdd_reverse.console_safe import ensure_console_safe
 from sdd_reverse.feat_structure_spec import (
     AC_GIVEN_WHEN_THEN_RE,
     CONFIDENCE_COMMENT_RE,
@@ -184,13 +189,30 @@ def reconcile_inventories(project_filter: str | None = None) -> dict:
 
     Scans workspace/old/*/.sys/inventory.json, checks if each entry's FEAT
     file still exists on disk, removes stale ones.
-    """
-    from sdd_reverse.atomic_write_local import atomic_write_text
 
-    workspace_old = Path("workspace/old").resolve()
-    workspace_feats = Path("workspace/input/feats").resolve()
+    Audit 2026-06-10 M14 closure :
+        - `--project` accepts a name OR a path (`workspace/old/P`) — it was
+          compared raw against the directory name, making the filter inert ;
+        - candidate stems are built from the SANITIZED name (same
+          `_sanitize_name` as preallocate_feats) — raw suggestedName drift
+          risked purging live allocations ;
+        - workspace paths anchor on the repo root, never on the CWD.
+    """
+    import os
+
+    from sdd_reverse.atomic_write_local import atomic_write_text
+    from sdd_reverse.paths import repo_root
+    from sdd_reverse_scripts.preallocate_feats import _sanitize_name
+
+    override = os.environ.get("SDD_REVERSE_WORKSPACE_ROOT")
+    root = Path(override).resolve() if override and Path(override).is_dir() else repo_root()
+    workspace_old = root / "workspace" / "old"
+    workspace_feats = root / "workspace" / "input" / "feats"
     if not workspace_old.is_dir():
         return {"ok": False, "error": "workspace/old/ not found", "reconciled": []}
+
+    # Normalize the filter to a bare project name (tolerates path form).
+    filter_name = Path(project_filter).name if project_filter else None
 
     feat_files_on_disk = set()
     if workspace_feats.is_dir():
@@ -200,7 +222,7 @@ def reconcile_inventories(project_filter: str | None = None) -> dict:
     reconciled: list[dict] = []
     for inv_path in workspace_old.rglob(".sys/inventory.json"):
         project_name = inv_path.parent.parent.name
-        if project_filter and project_name != project_filter:
+        if filter_name and project_name != filter_name:
             continue
         try:
             inv = json.loads(inv_path.read_text(encoding="utf-8"))
@@ -211,27 +233,38 @@ def reconcile_inventories(project_filter: str | None = None) -> dict:
         # Reverse-map U-N → expected file stem
         unit_by_id = {u["id"]: u for u in (inv.get("units") or [])}
 
+        def _stems_for(unit_id: str, n: int) -> list[str]:
+            unit = unit_by_id.get(unit_id)
+            base = _sanitize_name(
+                (unit or {}).get("suggestedName") or unit_id
+            )
+            return [
+                f"{n}-{base}",
+                f"{n}-{base}-Legacy",
+                f"{n}-{base}-Legacy-{unit_id}",
+            ]
+
         removed_allocs: list[str] = []
         removed_names: list[str] = []
         for unit_id, n in list(feat_allocs.items()):
-            unit = unit_by_id.get(unit_id)
-            if not unit:
+            if unit_id not in unit_by_id:
+                # Unknown unit (e.g. crosscut XC-* or stale id) — leave intact,
+                # conservative : never purge what we cannot verify.
                 continue
-            suggested = unit.get("suggestedName", unit_id)
-            # Build all plausible stems (idem resolve_name_collision logic)
-            possible_stems = [
-                f"{n}-{suggested}",
-                f"{n}-{suggested}-Legacy",
-                f"{n}-{suggested}-Legacy-{unit_id}",
-            ]
+            # Allocated names registered for this unit take precedence over the
+            # re-derived sanitized base (exact stem knowledge).
+            allocated_for_unit = [nm for nm, uid in alloc_names.items() if uid == unit_id]
+            possible_stems = [f"{n}-{nm}" for nm in allocated_for_unit] + _stems_for(unit_id, n)
             if not any(s in feat_files_on_disk for s in possible_stems):
                 removed_allocs.append(unit_id)
                 del feat_allocs[unit_id]
+        import re as _re
         for name, uid in list(alloc_names.items()):
-            # Same check for names: any matching feat stem?
-            if not any(s.endswith(f"-{name}") or s.endswith(f"-{name}-Legacy")
-                       or s.endswith(f"-{name}-Legacy-{uid}")
-                       for s in feat_files_on_disk):
+            if uid not in unit_by_id and uid not in feat_allocs:
+                continue  # conservative — unknown owner, keep
+            # Orphan iff NO feat file stem matches `{digits}-{name}` exactly.
+            stem_re = _re.compile(rf"^\d+-{_re.escape(name)}$")
+            if not any(stem_re.match(s) for s in feat_files_on_disk):
                 removed_names.append(name)
                 del alloc_names[name]
 
@@ -261,6 +294,7 @@ def main(argv: list[str] | None = None) -> int:
         help="In --reconcile mode: limit to one project under workspace/old/")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
+    ensure_console_safe()
 
     # --reconcile mode (ADV-21)
     if args.reconcile:
@@ -291,14 +325,15 @@ def main(argv: list[str] | None = None) -> int:
             "warnings": warnings,
         }, ensure_ascii=False))
     else:
+        # ASCII markers (M10 — Windows cp1252 console compat)
         if ok:
-            print(f"🟢 [VALIDATE_REVERSE] {feat_path.name} — structure valide ({len(warnings)} warning).")
+            print(f"[GREEN] [VALIDATE_REVERSE] {feat_path.name} - structure valide ({len(warnings)} warning).")
         else:
-            print(f"🔴 [VALIDATE_REVERSE] {feat_path.name} — {len(errors)} erreur(s) :")
+            print(f"[RED] [VALIDATE_REVERSE] {feat_path.name} - {len(errors)} erreur(s) :")
             for e in errors:
                 print(f"  - {e}")
             for w in warnings:
-                print(f"  ⚠️ {w}")
+                print(f"  [WARN] {w}")
     return 0 if ok else (2 if not feat_path.is_file() else 1)
 
 

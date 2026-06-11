@@ -187,6 +187,28 @@ def build_database_feat(
     conn = config.get("connectionStrings", [])
     db_type = db_schema.get("databaseType", "Unknown")
 
+    # Audit C3 2026-06-10 : les procédures APPELÉES par le code dont le DDL
+    # n'est pas dans les sources (cas EDI : 21 SP appelées, 1 définie) sont un
+    # contrat d'interface DB de premier ordre — sans elles la migration casse
+    # au premier batch. Idem pour les tables touchées par les requêtes inline
+    # mais absentes du schéma extrait.
+    defs_names = {p["name"].lower() for p in procs}
+    called_only: dict[str, dict] = {}
+    for c in data_access.get("storedProcedureCalls", []):
+        nm = (c.get("name") or "").strip()
+        if nm and nm.lower() not in defs_names and nm.lower() not in called_only:
+            called_only[nm.lower()] = c
+    called_procs = sorted(called_only.values(), key=lambda c: c["name"].lower())
+
+    entity_names = {e["name"].lower() for e in entities}
+    inline_tables: dict[str, dict] = {}
+    for q in data_access.get("queries", []):
+        for t in q.get("tables", []):
+            if t.lower() not in entity_names and t.lower() not in inline_tables:
+                inline_tables[t.lower()] = {"name": t, "file": q.get("file", "?"),
+                                            "line": q.get("line", 1)}
+    inline_table_list = sorted(inline_tables.values(), key=lambda d: d["name"].lower())
+
     sources: list[str] = []
     for e in entities:
         sources.extend(e.get("evidence", []))
@@ -202,7 +224,9 @@ def build_database_feat(
     lines.append(
         f"> ⚠️ FEAT transversale générée par reverse engineering (déterministe). "
         f"Modèle de données du legacy à reproduire : {len(entities)} entité(s), "
-        f"{len(relations)} relation(s), {len(procs)} procédure(s) stockée(s), "
+        f"{len(relations)} relation(s), {len(procs)} procédure(s) stockée(s) définie(s), "
+        f"{len(called_procs)} procédure(s) appelée(s) sans DDL source, "
+        f"{len(inline_table_list)} table(s) référencée(s) hors schéma, "
         f"{len(conn)} connection string(s). Type DB source : `{db_type}`."
     )
     lines.append("")
@@ -219,12 +243,22 @@ def build_database_feat(
         f"legacy ({len(entities)} table(s)) avec des contraintes équivalentes. "
         + _ev(sources[0] if sources else None)
     )
+    sfd = 2
     if procs:
         lines.append(
-            f"**SFD-2** — La logique encapsulée dans {len(procs)} procédure(s) "
+            f"**SFD-{sfd}** — La logique encapsulée dans {len(procs)} procédure(s) "
             f"stockée(s) doit être reproduite (procédure cible OU service applicatif "
             f"équivalent). {_ev(_fileline(procs[0]))}"
         )
+        sfd += 1
+    if called_procs:
+        lines.append(
+            f"**SFD-{sfd}** — {len(called_procs)} procédure(s) stockée(s) sont "
+            f"APPELÉES par le code sans DDL dans les sources : récupérer leur "
+            f"définition en base (scripting) AVANT migration — contrat d'interface "
+            f"DB obligatoire. {_ev(_fileline(called_procs[0]))}"
+        )
+        sfd += 1
     lines.append("")
 
     lines.append("## Functional Deliverables")
@@ -246,6 +280,22 @@ def build_database_feat(
         lines.append(
             f"**FD-{fd}** — Procédure stockée `{p['name']}`({params}). "
             f"{_ev(_fileline(p))}"
+        )
+        fd += 1
+    for c in called_procs[:_MAX_ITEMS]:
+        params = ", ".join(c.get("params", [])) or "(paramètres au call-site)"
+        lines.append(
+            f"**FD-{fd}** — Procédure stockée APPELÉE `{c['name']}` ({params}) "
+            f"— DDL absent des sources, à scripter depuis la base. "
+            f"{_ev(_fileline(c))}"
+        )
+        fd += 1
+    for t in inline_table_list[:_MAX_ITEMS]:
+        t_ev = "{}:{}".format(t["file"], t["line"])
+        lines.append(
+            f"**FD-{fd}** — Table `{t['name']}` référencée par les requêtes SQL "
+            f"inline mais absente du schéma extrait — récupérer son DDL. "
+            f"{_ev(t_ev)}"
         )
         fd += 1
     for c in conn[:_MAX_ITEMS]:

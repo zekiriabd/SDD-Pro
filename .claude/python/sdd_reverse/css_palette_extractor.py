@@ -166,9 +166,11 @@ def extract_palette(project_root: str | Path, scan_result: ScanResult) -> dict[s
         # Strip comments to avoid false positives
         content_no_comments = re.sub(r"/\*.*?\*/", "", content, flags=re.DOTALL)
 
-        # Colors (hex)
+        # Colors (hex). Translucent shades (#rrggbbaa) are grouped under their
+        # RGB component for palette counting (`_hex_strip_alpha`, wired
+        # 2026-06-10 — was dead code despite the docstring promise).
         for m in _RE_HEX.finditer(content_no_comments):
-            hex_val = _normalize_hex(m.group(1))
+            hex_val = _hex_strip_alpha(_normalize_hex(m.group(1)))
             colors_counter[hex_val] += 1
             # Context : the nearest selector (look back up to 200 chars for `{`)
             back = content_no_comments[max(0, m.start() - 200): m.start()]

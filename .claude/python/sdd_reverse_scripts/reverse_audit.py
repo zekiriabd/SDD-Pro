@@ -27,13 +27,19 @@ import json
 import sys
 from pathlib import Path
 
+# C6 bootstrap — canonical invocation is by file path, no PYTHONPATH needed.
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 from sdd_reverse.atomic_write_local import atomic_write_text
+from sdd_reverse.console_safe import ensure_console_safe
 from sdd_reverse.deps_graph_builder import build_deps_graph
 from sdd_reverse.merge_db_schema import merge_schemas
 from sdd_reverse.scan_legacy import load_signatures, scan_project
 
 
 def main(argv: list[str] | None = None) -> int:
+    ensure_console_safe()
     parser = argparse.ArgumentParser(
         prog="reverse_audit",
         description="Phase 2 reverse engineering: tech audit + deps graph + db-schema enrichment merge.",

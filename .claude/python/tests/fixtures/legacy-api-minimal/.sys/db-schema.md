@@ -1,6 +1,6 @@
 # Schéma DB — legacy-api-minimal
 
-**Date extraction** : 2026-06-10T21:10:45Z
+**Date extraction** : 2026-06-11T12:00:19Z
 **Type DB** : Unknown
 **Complétude** : basic
 **Sources** : (no schema source found)

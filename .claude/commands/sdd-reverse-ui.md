@@ -24,7 +24,7 @@ Lancer la **Phase 4** : traduire les templates legacy d'une unité U-N en mockup
    - `workspace/old/{P}/.sys/inventory.json` contient `units[id={U-N}]`
    - `inventory.json._featAllocations[{U-N}]` renseigné → résolution `n` figée
    - `workspace/input/feats/{n}-{Name}.md` existe (sinon → ERROR `[REVERSE_NO_SOURCE]`)
-2. Les `units[U-N].evidenceFiles` contiennent au moins 1 fichier UI (`.aspx`, `.cshtml`, `.jsp`, `.blade.php`, `.html`, `.dfm`, `.frm`). Sinon → SKIP silencieux (unité backend-only sans UI).
+2. Les `units[U-N].evidenceFiles` contiennent au moins 1 fichier UI (`.aspx`, `.ascx`, `.cshtml`, `.jsp`, `.blade.php`, `.html`, `.dfm`, `.frm`, `.xaml`). Sinon → SKIP silencieux (unité backend-only sans UI). (`.xaml` ajouté 2026-06-10 — audit M12 : WPF supporté en Phase 1 mais SKIPpé en silence en Phase 4.)
 
 ## Actions
 

@@ -31,7 +31,7 @@ Sinon → STOP + ERROR `[REVERSE_UNIT_NOT_FOUND]` ou `[REVERSE_NO_SOURCE]`.
 Read en mémoire :
 1. `workspace/old/{P}/.sys/inventory.json` → `units[id={U-N}]`
 2. `workspace/input/feats/{n}-{Name}.md` (le contrat sémantique de Phase 3)
-3. **Tous les templates de l'unité** : fichiers de `units[U-N].evidenceFiles` dont extension ∈ {`.aspx`, `.ascx`, `.cshtml`, `.jsp`, `.blade.php`, `.html`, `.dfm`, `.frm`}
+3. **Tous les templates de l'unité** : fichiers de `units[U-N].evidenceFiles` dont extension ∈ {`.aspx`, `.ascx`, `.cshtml`, `.jsp`, `.blade.php`, `.html`, `.dfm`, `.frm`, `.xaml`} (`.xaml` ajouté 2026-06-10 — audit M12)
 4. **Sélectif CSS** : tous les `.css` du projet (limite : ≤ 10 fichiers, ≤ 200 KB total)
 
 **Lecture STRICT bornée** : pas plus de 15 fichiers Read par invocation.

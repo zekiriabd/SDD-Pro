@@ -97,19 +97,29 @@ def acquire_lock(
     except OSError:
         return 3
 
+    # Fast path — atomic O_CREAT|O_EXCL creation (audit 2026-06-10 C5 : the
+    # previous read-then-write acquisition was a TOCTOU race — two processes
+    # could both observe "no lock" and both believe they acquired it. O_EXCL
+    # restores the exclusion guarantee of the original sdd_lib/file_locks.py).
+    try:
+        fd = os.open(str(p), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    except FileExistsError:
+        pass  # lock exists — fall through to the decision tree below
+    except OSError:
+        return 3
+    else:
+        try:
+            os.write(fd, payload.encode("utf-8"))
+        finally:
+            os.close(fd)
+        return 0
+
     existing = read_lock(p)
     if existing is None:
-        if p.exists():
-            # Corrupted lock — overwrite (recovery).
-            try:
-                atomic_write_text(p, payload)
-                return 2
-            except OSError:
-                return 3
-        # No lock yet — create.
+        # Present but unparseable → corrupted lock — overwrite (recovery).
         try:
             atomic_write_text(p, payload)
-            return 0
+            return 2
         except OSError:
             return 3
 

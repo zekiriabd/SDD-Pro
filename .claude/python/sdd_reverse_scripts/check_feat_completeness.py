@@ -35,7 +35,14 @@ import sys
 from pathlib import Path
 from typing import Any
 
-_BEHAVIOURAL = {"repository", "service", "controller", "complex"}
+# C6 bootstrap — canonical invocation is by file path, no PYTHONPATH needed.
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from sdd_reverse.console_safe import ensure_console_safe
+
+# `viewmodel` added 2026-06-10 (audit C1) — MVVM business layer is behavioural.
+_BEHAVIOURAL = {"repository", "service", "controller", "complex", "viewmodel"}
 
 
 def _load_json(p: Path) -> dict[str, Any] | None:
@@ -68,7 +75,7 @@ def assess(unit: dict[str, Any], feat_text: str) -> dict[str, Any]:
                     "type": "class_not_mentioned",
                     "item": c["name"],
                     "role": c["role"],
-                    "severity": "serious" if c["role"] in ("repository", "service") else "moderate",
+                    "severity": "serious" if c["role"] in ("repository", "service", "viewmodel") else "moderate",
                     "evidence": f"{c.get('file', '?')}:{c.get('lines', '?')}",
                 })
 
@@ -95,12 +102,14 @@ def assess(unit: dict[str, Any], feat_text: str) -> dict[str, Any]:
             })
 
     serious = sum(1 for g in gaps if g["severity"] == "serious")
+    # ASCII verdict values (M10 — emojis in this JSON field crashed the
+    # human-output path on cp1252 consoles). Consumers match on the bare word.
     if serious:
-        verdict = "🔴 incomplete"
+        verdict = "incomplete"
     elif gaps:
-        verdict = "🟡 partial"
+        verdict = "partial"
     else:
-        verdict = "🟢 complete"
+        verdict = "complete"
     return {
         "unit": unit["id"],
         "verdict": verdict,
@@ -136,6 +145,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--feats-dir", default=None)
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
+    ensure_console_safe()
 
     project_root = Path(args.project).resolve()
     inventory = _load_json(project_root / ".sys" / "inventory.json")

@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "primary": "aspx-webforms",
+  "secondary": [],
+  "confidence_caps_applied": {
+    "aspx-webforms": "high"
+  },
+  "_caps_source": ".claude/python/sdd_reverse/language_signatures.yml"
+}

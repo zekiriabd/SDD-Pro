@@ -213,12 +213,18 @@ def build_inventory(
                 ),
             }
 
+        finalized_unit_extra: dict[str, Any] = {}
+        if cand.get("cliCommands"):
+            # C2 : CLI/batch command tokens detected on kind=job units —
+            # consumed by the Phase 3 extractor (1 FD per commande visible).
+            finalized_unit_extra["cliCommands"] = cand["cliCommands"]
         finalized_units.append({
             "id": unit_id,
             "label": label,
             "suggestedName": cand["suggestedName"],
             "language": cand.get("language", "unknown"),
             "kind": cand.get("kind", "unknown"),
+            **finalized_unit_extra,
             "evidenceFiles": evidence_paths_rel,
             # L0: provenance of the seed (page + code-behind) before graph-walk.
             "seedEvidenceFiles": seed_rel,

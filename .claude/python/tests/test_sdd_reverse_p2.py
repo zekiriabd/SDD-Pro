@@ -89,6 +89,10 @@ def _run_status_cli(cwd: Path) -> dict:
         env={
             **dict(__import__("os").environ),
             "PYTHONPATH": str(project_root),
+            # reverse_status anchors on the repo root since 2026-06-10
+            # (anomalie env closure) — tests target their tmp workspace
+            # explicitly instead of relying on the CWD.
+            "SDD_REVERSE_WORKSPACE_ROOT": str(cwd),
         },
     )
     assert result.returncode in (0, 1), f"unexpected exit: {result.stderr}"
@@ -138,7 +142,13 @@ def test_status_no_warning_on_valid_inventory(tmp_path: Path) -> None:
     assert len(projects) == 1
     p = projects[0]
     assert p["units_total"] == 2
-    assert p["feats_extracted"] == 1
+    # M9 (audit 2026-06-10) : feats_extracted is no longer derived from
+    # len(_featAllocations) (lied at pre-allocation time, counted XC-*) —
+    # the scan now only exposes the raw allocation data ; the CLI main()
+    # cross-references actual FEAT files on disk.
+    assert p["_unit_ids"] == ["U-1", "U-2"]
+    assert p["_feat_numbers"] == [1]
+    assert p["feats_extracted"] == 0  # computed later by main()
     assert p["warnings"] == []
 
 

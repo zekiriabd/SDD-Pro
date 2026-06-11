@@ -76,6 +76,17 @@ def sdd_reverse_dir() -> Path:
     )
 
 
+def repo_root() -> Path:
+    """Return the SDD_Pro repo root (the directory containing `.claude/`).
+
+    Audit 2026-06-10 (anomalie env) : two reverse scripts resolved
+    `workspace/...` relative to the CWD, which silently created parasite
+    `workspace/` trees when invoked from `.claude/python/`. All workspace
+    paths must anchor here instead.
+    """
+    return sdd_reverse_dir().resolve().parents[2]
+
+
 def language_signatures_path() -> Path:
     """Return the path to `language_signatures.yml` (source of D1).
 

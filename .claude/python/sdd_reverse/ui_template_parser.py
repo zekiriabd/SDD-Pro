@@ -127,10 +127,27 @@ _RE_WPF_RADIOBUTTON = re.compile(
 )
 _RE_WPF_COMBOBOX = re.compile(r"<ComboBox\b([^>/]*)/?>", re.IGNORECASE)
 
-# Action primitives
+# Action primitives.
+# Audit 2026-06-10 M18 : the content group was `[^<]*` — a Button with NESTED
+# content (`<Button><StackPanel><Image/><TextBlock Text="Valider"/></StackPanel>
+# </Button>`, the icon+text pattern) did not match AT ALL and vanished from the
+# mockup. Content is now `.*?` (non-greedy) and the label is recovered from
+# inner Text= attributes + bare text via `_wpf_inner_text`.
 _RE_WPF_BUTTON = re.compile(
-    r"<Button\b([^>/]*?)(?:/>|>([^<]*)</Button>)", re.IGNORECASE | re.DOTALL,
+    r"<Button\b([^>/]*?)(?:/>|>(.*?)</Button>)", re.IGNORECASE | re.DOTALL,
 )
+
+_RE_XML_TAG = re.compile(r"<[^>]+>")
+_RE_INNER_TEXT_ATTR = re.compile(r'Text="([^"]+)"')
+
+
+def _wpf_inner_text(inner: str) -> str:
+    """Recover a human label from nested XAML content (icon+text buttons)."""
+    parts = list(_RE_INNER_TEXT_ATTR.findall(inner))
+    bare = _RE_XML_TAG.sub(" ", inner).strip()
+    if bare:
+        parts.append(bare)
+    return " ".join(p.strip() for p in parts if p.strip())
 _RE_WPF_HYPERLINK = re.compile(
     r"<Hyperlink\b([^>/]*?)(?:/>|>([^<]*)</Hyperlink>)", re.IGNORECASE | re.DOTALL,
 )
@@ -377,7 +394,7 @@ def _parse_xaml_template(content: str, source_path: Path) -> dict[str, Any]:
 
     for m in _RE_WPF_BUTTON.finditer(content):
         attrs = _parse_xaml_attrs(m.group(1))
-        text = attrs.get("Content", "") or (m.group(2) or "")
+        text = attrs.get("Content", "") or _wpf_inner_text(m.group(2) or "")
         elements.append({
             "kind": "button",
             "id": attrs.get("Name", ""),

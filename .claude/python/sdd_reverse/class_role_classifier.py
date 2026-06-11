@@ -15,7 +15,12 @@ Roles (closed enum — `ROLES`):
     repository    : data-access layer (touches SQL / EF DbContext / Dapper / *Repository/*Dao)
     entity        : persisted domain entity (EF DbSet / [Table] / mapped to a DB table)
     service        : business-logic layer (*Service/*Manager/*Handler/*Provider/…)
-    dto           : data-transfer / view-model / POCO (auto-properties, no behaviour)
+    viewmodel     : MVVM presentation-logic class (*ViewModel/*VM WITH behaviour —
+                    commands, methods). NOT a passive DTO : in WPF/Silverlight
+                    legacy the ViewModel layer carries the business logic
+                    (audit EDI 2026-06-10 : 26 VMs / 8 750 LOC classified `dto`
+                    → 0 % extracted. Behavioural VMs are now first-class.)
+    dto           : data-transfer / passive POCO (auto-properties, no behaviour)
     interface      : C# interface
     enum           : C# enum
     static-helper : static utility class (*Helper/*Utils/*Extensions)
@@ -33,7 +38,7 @@ import re
 from dataclasses import dataclass, field
 
 ROLES: frozenset[str] = frozenset({
-    "code-behind", "controller", "repository", "entity", "service",
+    "code-behind", "controller", "repository", "entity", "service", "viewmodel",
     "dto", "interface", "enum", "static-helper", "complex", "classic",
 })
 
@@ -61,6 +66,9 @@ _SERVICE_SUFFIXES = (
     "worker", "orchestrator", "coordinator",
 )
 _REPOSITORY_SUFFIXES = ("repository", "repo", "dao", "dataaccess", "store", "context")
+# ViewModel suffixes — promoted to a dedicated behavioural role when the class
+# carries methods (MVVM legacy puts business logic there, cf. audit EDI C1).
+_VIEWMODEL_SUFFIXES = ("viewmodel", "vm")
 _DTO_SUFFIXES = (
     "dto", "viewmodel", "vm", "model", "request", "response", "args", "result",
     "info", "options", "settings", "config", "payload", "record", "input", "output",
@@ -69,19 +77,26 @@ _HELPER_SUFFIXES = ("helper", "helpers", "util", "utils", "utility", "utilities"
                     "extensions", "tools", "constants", "const")
 
 # Regex evidence that a class performs data access (→ repository).
+# Audit 2026-06-10 M5 : added EF6 (ExecuteSqlCommand), LINQ-to-SQL
+# (DataContext), SqlBulkCopy, NHibernate (ISession/CreateSQLQuery), Typed
+# DataSets (TableAdapter) — dominant channels in pre-Core .NET legacies.
 _SQL_TOUCH_RE = re.compile(
     r"\b(?:SqlConnection|SqlCommand|SqlDataReader|SqlDataAdapter|OracleCommand|"
     r"MySqlCommand|NpgsqlCommand|OdbcCommand|OleDbCommand|IDbConnection|IDbCommand|"
-    r"DbContext|ExecuteReader|ExecuteScalar|ExecuteNonQuery|CommandText|"
-    r"FromSqlRaw|ExecuteSqlRaw|BeginTransaction)\b"
+    r"DbContext|DataContext|SqlBulkCopy|TableAdapter|ISession|"
+    r"ExecuteReader|ExecuteScalar|ExecuteNonQuery|ExecuteSqlCommand|CommandText|"
+    r"CreateSQLQuery|FromSqlRaw|ExecuteSqlRaw|BeginTransaction)\b"
     r"|\bDapper\b|\.Query<|\.QueryAsync<|\.Execute\(|\.ExecuteAsync\(",
     re.IGNORECASE,
 )
 
 # Regex evidence that a class performs outbound HTTP / API calls.
+# Audit 2026-06-10 M5 : added WCF (ChannelFactory/ClientBase) + ASMX
+# (SoapHttpClientProtocol) — the dominant outbound channels in .NET legacy.
 _HTTP_TOUCH_RE = re.compile(
     r"\b(?:HttpClient|WebClient|HttpWebRequest|WebRequest|RestClient|"
-    r"HttpRequestMessage|RestRequest)\b"
+    r"HttpRequestMessage|RestRequest|ChannelFactory|ClientBase|"
+    r"SoapHttpClientProtocol)\b"
     r"|\.GetAsync\(|\.PostAsync\(|\.PutAsync\(|\.DeleteAsync\(|\.SendAsync\(",
     re.IGNORECASE,
 )
@@ -192,6 +207,12 @@ def classify_role(ci: ClassInfo, known_entity_names: frozenset[str] | None = Non
         or _has_attribute(ci.attributes, "Table", "Entity")
     ):
         return "entity"
+
+    # 4.bis. MVVM ViewModel WITH behaviour (methods/commands) — behavioural,
+    # NOT a passive DTO. A suffix-matched class with zero methods stays `dto`
+    # (rule 7) — that is the genuinely-passive case.
+    if _name_ends_with_any(ci.name, _VIEWMODEL_SUFFIXES) and ci.method_count >= 1:
+        return "viewmodel"
 
     # 5. Business-logic service layer.
     if _name_ends_with_any(ci.name, _SERVICE_SUFFIXES):

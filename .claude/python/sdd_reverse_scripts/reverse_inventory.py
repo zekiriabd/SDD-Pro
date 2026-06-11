@@ -21,12 +21,20 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 import time
 from pathlib import Path
 from typing import Any
 
+# C6 (audit 2026-06-10) : canonical invocation is
+#   python .claude/python/sdd_reverse_scripts/reverse_inventory.py …
+# This bootstrap makes the package imports below resolvable without PYTHONPATH.
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 from sdd_reverse.atomic_write_local import atomic_write_text
+from sdd_reverse.console_safe import ensure_console_safe
 from sdd_reverse.code_graph_builder import build_code_graph, enrich_units
 from sdd_reverse.code_unit_detector import detect_code_units
 from sdd_reverse.config_extractor import extract_config
@@ -142,6 +150,111 @@ def _build_pages_list(scan_result, project_root: Path) -> list[dict[str, Any]]:
             })
             page_id += 1
     return pages
+
+
+# --- C10 (audit 2026-06-10) : secrets / private-key material detection -------
+# Production SSH/SFTP private keys copied under workspace/old/ were the #1
+# missed security risk on the EDI run (PrivateKey_CRF-MP_Prod.ppk, id_rsa-*).
+_SECRET_FILE_EXTENSIONS = frozenset({
+    ".ppk", ".pem", ".pfx", ".p12", ".key", ".jks", ".keystore",
+    ".snk", ".asc", ".ovpn", ".kdbx",
+})
+_SECRET_FILENAME_RE = re.compile(
+    r"(?:^|[._-])(id_rsa|id_dsa|id_ecdsa|id_ed25519)(?:$|[._-])", re.IGNORECASE,
+)
+_SECRET_SKIP_DIRS = frozenset({".git", "node_modules", "packages", "vendor", ".sys"})
+
+
+def _detect_secret_files(project_root: Path) -> list[dict[str, str]]:
+    """Inventory key/cert material under the legacy tree (deterministic, 0 token)."""
+    found: list[dict[str, str]] = []
+    for p in project_root.rglob("*"):
+        if not p.is_file():
+            continue
+        if any(part in _SECRET_SKIP_DIRS for part in p.parts):
+            continue
+        ext = p.suffix.lower()
+        kind: str | None = None
+        if ext in _SECRET_FILE_EXTENSIONS:
+            kind = f"key/cert material ({ext})"
+            if ext in {".pem", ".key", ".asc"}:
+                try:
+                    head = p.read_bytes()[:400]
+                    if b"PRIVATE KEY" in head:
+                        kind = f"PRIVATE key ({ext})"
+                except OSError:
+                    pass
+        elif _SECRET_FILENAME_RE.search(p.name):
+            kind = "SSH private key (filename)"
+        if kind:
+            found.append({
+                "path": str(p.relative_to(project_root).as_posix()),
+                "type": kind,
+            })
+        if len(found) >= 100:
+            break
+    return sorted(found, key=lambda d: d["path"])
+
+
+def _render_secrets_md(secrets: list[dict[str, str]]) -> str:
+    if not secrets:
+        return ""
+    lines = [
+        "",
+        f"## [!] Secrets / cles privees detectes ({len(secrets)})",
+        "",
+        "> Risque securite : ce materiel cryptographique est present dans",
+        "> l'arborescence legacy. NE PAS le committer ni le copier vers la",
+        "> cible — provisionner via un coffre (vault) et REVOQUER les cles",
+        "> exposees. Section relayee obligatoirement par le tech-audit.",
+        "",
+    ]
+    for s in secrets:
+        lines.append(f"- `{s['path']}` — {s['type']}")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _uncovered_behavioural_classes(
+    inventory: dict[str, Any], code_graph: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """Behavioural classes reached by NO unit (audit M7 — orphans escalation).
+
+    Phase 1 lists them as a blocking-attention WARN in inventory.md so they
+    cannot die as informational noise : either they become a unit on re-run
+    (module detection) or the Tech Lead consciously discards them.
+    """
+    behavioural = {"service", "repository", "controller", "complex", "viewmodel"}
+    covered: set[str] = set()
+    for u in inventory.get("units", []):
+        for c in u.get("classes", []):
+            covered.add(c["name"])
+    out = []
+    for c in code_graph.get("classes", []):
+        if c.get("role") in behavioural and c["name"] not in covered:
+            out.append({"name": c["name"], "role": c["role"], "file": c["file"]})
+    return sorted(out, key=lambda d: (d["role"], d["name"]))
+
+
+def _render_uncovered_md(uncovered: list[dict[str, Any]]) -> str:
+    if not uncovered:
+        return ""
+    lines = [
+        "",
+        f"## [!] Classes metier non couvertes par une unite ({len(uncovered)})",
+        "",
+        "> M7 : chaque classe ci-dessous porte de la logique (service/repository/",
+        "> viewmodel/controller/complex) mais n'est atteinte par AUCUNE unite.",
+        "> Action : re-lancer l'inventaire apres correction du graphe, OU decider",
+        "> explicitement de ne pas migrer (tracer la decision).",
+        "",
+    ]
+    for c in uncovered[:50]:
+        lines.append(f"- `{c['name']}` ({c['role']}) — `{c['file']}`")
+    if len(uncovered) > 50:
+        lines.append(f"- _… (+{len(uncovered) - 50} autres)_")
+    lines.append("")
+    return "\n".join(lines)
 
 
 def _render_inventory_md(inventory: dict[str, Any], project_name: str) -> str:
@@ -319,12 +432,19 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--project", required=True,
         help="Path to workspace/old/{P}/ (project legacy root)")
     parser.add_argument("--use-cache", action="store_true",
-        help="Skip scan if inventory.json exists AND passes schema gate (ADV-23)")
+        help="Skip the scan entirely if inventory.json exists AND passes the "
+             "schema gate (ADV-23). M8 closure : the flag now really "
+             "short-circuits (it previously re-scanned unconditionally).")
+    parser.add_argument("--refresh", action="store_true",
+        help="Force a full re-scan, ignoring any cached inventory.json "
+             "(default behaviour — flag kept explicit for the documented "
+             "`/sdd-reverse-inventory --refresh` recovery path).")
     parser.add_argument("--json", action="store_true",
         help="Emit progress as JSON lines on stdout")
     parser.add_argument("--structured-log", action="store_true",
         help="Emit structured JSON events on stderr (P3.14 observability).")
     args = parser.parse_args(argv)
+    ensure_console_safe()
 
     # P3.14 — structured logging opt-in (CLI flag OR env var SDD_REVERSE_LOG)
     if args.structured_log:
@@ -349,8 +469,11 @@ def main(argv: list[str] | None = None) -> int:
     sys_dir.mkdir(parents=True, exist_ok=True)
 
     inventory_path = sys_dir / "inventory.json"
+    # Existing inventory is ALWAYS loaded when present (U-N stability via the
+    # fingerprint map, ADV-1) ; --use-cache additionally short-circuits the
+    # scan (M8 closure) ; --refresh ignores the cache entirely.
     existing_inventory: dict[str, Any] | None = None
-    if args.use_cache and inventory_path.is_file():
+    if not args.refresh and inventory_path.is_file():
         try:
             existing_inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
@@ -364,6 +487,25 @@ def main(argv: list[str] | None = None) -> int:
                     file=sys.stderr,
                 )
                 existing_inventory = None
+
+        # M8 closure (audit 2026-06-10) : --use-cache now honours the
+        # documented contract — valid cache → NO re-scan. The cached
+        # inventory is returned as-is (artefacts on disk untouched).
+        if args.use_cache and existing_inventory is not None:
+            if args.json:
+                print(json.dumps({
+                    "ok": True,
+                    "cached": True,
+                    "project": project_name,
+                    "primaryLanguage": existing_inventory.get("primaryLanguage"),
+                    "unitsDetected": len(existing_inventory.get("units") or []),
+                }))
+            else:
+                print(f"[REVERSE] Inventory cache hit: "
+                      f"{len(existing_inventory.get('units') or [])} units, "
+                      f"primary language: {existing_inventory.get('primaryLanguage')}. "
+                      f"(--refresh pour forcer le re-scan) (100%)")
+            return 0
 
     # Load signatures
     # P1.7 closure — use paths helper instead of fragile __file__ walk
@@ -405,13 +547,14 @@ def main(argv: list[str] | None = None) -> int:
     code_graph = build_code_graph(
         project_root, scan_result, known_entity_names=known_entity_names
     )
-    # L2 — code-driven units (controllers + orphan backend modules) so that
-    # backend/API-only legacies (no UI page) still produce functional units.
+    # L2 — code-driven units (CLI/batch jobs + controllers + orphan backend
+    # modules) so that headless and backend-only legacies still produce units.
     code_units = detect_code_units(
-        code_graph, units, language=scan_result.primary_language
+        code_graph, units, language=scan_result.primary_language,
+        project_root=project_root,
     )
     units = units + code_units
-    enrich_units(units, code_graph)
+    enrich_units(units, code_graph, project_root=project_root)
     for u in units:
         # Pin the U-N fingerprint to the seed (page + code-behind), not the
         # enriched set — graph-walk changes must never destabilise U-N IDs.
@@ -436,11 +579,32 @@ def main(argv: list[str] | None = None) -> int:
     # Bug #2 fix: detect entry points
     entry_points = _detect_entry_points(scan_result, project_root)
 
+    # C10 (audit 2026-06-10) : secrets / private-key material inventory.
+    secrets_detected = _detect_secret_files(project_root)
+    if secrets_detected:
+        print(
+            f"WARN: [REVERSE_SECRETS_DETECTED] {len(secrets_detected)} fichier(s) "
+            f"de cles/certificats sous workspace/old/{project_name}/ — voir "
+            f"inventory.md section Secrets.",
+            file=sys.stderr,
+        )
+
     # Build inventory (assigns U-N)
     inventory = build_inventory(
         project_name, project_root, scan_result, pages, units,
         signatures, existing_inventory, entry_points=entry_points,
     )
+    inventory["secretsDetected"] = secrets_detected   # C10
+
+    # M7 (audit 2026-06-10) : behavioural classes covered by NO unit are a
+    # WARN — they must either become a unit or be consciously discarded.
+    uncovered = _uncovered_behavioural_classes(inventory, code_graph)
+    if uncovered:
+        print(
+            f"WARN: [REVERSE_COMPLETENESS_GAP] {len(uncovered)} classe(s) metier "
+            f"non couverte(s) par une unite — voir inventory.md.",
+            file=sys.stderr,
+        )
 
     # Patch pages.linkedUnits to actual U-N ids
     label_to_uid = {u["label"]: u["id"] for u in inventory["units"]}
@@ -461,20 +625,27 @@ def main(argv: list[str] | None = None) -> int:
         "_caps_source": ".claude/python/sdd_reverse/language_signatures.yml",
     }
 
-    # Write all artefacts
-    atomic_write_text(inventory_path, json.dumps(inventory, indent=2, ensure_ascii=False) + "\n")
-    atomic_write_text(sys_dir / "code-graph.json", json.dumps(code_graph, indent=2, ensure_ascii=False) + "\n")
-    atomic_write_text(sys_dir / "data-access.json", json.dumps(data_access, indent=2, ensure_ascii=False) + "\n")
-    atomic_write_text(sys_dir / "config.json", json.dumps(config, indent=2, ensure_ascii=False) + "\n")
-    atomic_write_text(sys_dir / "dependencies.json", json.dumps(dependencies, indent=2, ensure_ascii=False) + "\n")
-    inventory_md = (
-        _render_inventory_md(inventory, project_name)
-        + _render_tech_summary_md(code_graph, data_access, config, dependencies)
-    )
-    atomic_write_text(sys_dir / "inventory.md", inventory_md + "\n")
-    atomic_write_text(sys_dir / "db-schema.json", json.dumps(db_schema, indent=2, ensure_ascii=False) + "\n")
-    atomic_write_text(sys_dir / "db-schema.md", _render_db_schema_md(db_schema) + "\n")
-    atomic_write_text(sys_dir / "language-detected.json", json.dumps(lang_detected, indent=2, ensure_ascii=False) + "\n")
+    # Write all artefacts. OSError → exit 3 (documented contract — the
+    # docstring promised exit 3 on I/O error but the path was unreachable).
+    try:
+        atomic_write_text(inventory_path, json.dumps(inventory, indent=2, ensure_ascii=False) + "\n")
+        atomic_write_text(sys_dir / "code-graph.json", json.dumps(code_graph, indent=2, ensure_ascii=False) + "\n")
+        atomic_write_text(sys_dir / "data-access.json", json.dumps(data_access, indent=2, ensure_ascii=False) + "\n")
+        atomic_write_text(sys_dir / "config.json", json.dumps(config, indent=2, ensure_ascii=False) + "\n")
+        atomic_write_text(sys_dir / "dependencies.json", json.dumps(dependencies, indent=2, ensure_ascii=False) + "\n")
+        inventory_md = (
+            _render_inventory_md(inventory, project_name)
+            + _render_tech_summary_md(code_graph, data_access, config, dependencies)
+            + _render_secrets_md(secrets_detected)
+            + _render_uncovered_md(uncovered)
+        )
+        atomic_write_text(sys_dir / "inventory.md", inventory_md + "\n")
+        atomic_write_text(sys_dir / "db-schema.json", json.dumps(db_schema, indent=2, ensure_ascii=False) + "\n")
+        atomic_write_text(sys_dir / "db-schema.md", _render_db_schema_md(db_schema) + "\n")
+        atomic_write_text(sys_dir / "language-detected.json", json.dumps(lang_detected, indent=2, ensure_ascii=False) + "\n")
+    except OSError as e:
+        print(f"ERROR: [INFRA_BLOCKED] cannot write Phase 1 artefacts: {e}", file=sys.stderr)
+        return 3
 
     # P3.14 — structured completion event
     if _log is not None:
