@@ -84,69 +84,84 @@ def _resolve_feat(project: Path | None, unit: str | None, feat_path: Path | None
     return feat, str(n), name
 
 
-def _parse_feat_items(text: str) -> list[dict]:
-    """Each FEAT item line under the 4 spec sections, with its covers refs."""
-    items: list[dict] = []
+def _iter_item_blocks(text: str, headings: tuple[str, ...], id_re: re.Pattern):
+    """Yield (item_id, block_text) for each item under the given section headings.
+
+    An item *block* starts at the line bearing its ID and extends until the next
+    item ID or a section boundary. This makes parsing robust to MULTI-LINE items
+    where the `<!-- covers/evidence -->` comments sit on a trailing line (the
+    realistic agent output format — single-line was a test-only simplification).
+    `headings` are matched by prefix on the stripped `## ` line.
+    """
     in_section = False
+    cur_id: str | None = None
+    cur_lines: list[str] = []
+
+    def _matches(line: str) -> bool:
+        s = line.strip()
+        return any(s == h or s.startswith(h) for h in headings)
+
     for line in text.splitlines():
         if line.startswith("## "):
-            in_section = line.strip() in (
-                "## Functional Needs", "## Functional Deliverables",
-                "## Business Rules", "## Acceptance Criteria",
-            )
+            if cur_id is not None:
+                yield cur_id, "\n".join(cur_lines)
+                cur_id, cur_lines = None, []
+            in_section = _matches(line)
             continue
         if not in_section:
             continue
-        mid = _ITEM_ID_RE.search(line)
-        if not mid:
-            continue
-        covers = []
-        cm = _COVERS_RE.search(line)
+        m = id_re.search(line)
+        if m:
+            if cur_id is not None:
+                yield cur_id, "\n".join(cur_lines)
+            cur_id = m.group(0).strip("*")
+            cur_lines = [line]
+        elif cur_id is not None:
+            cur_lines.append(line)
+    if cur_id is not None:
+        yield cur_id, "\n".join(cur_lines)
+
+
+_FEAT_SECTIONS = (
+    "## Functional Needs", "## Functional Deliverables",
+    "## Business Rules", "## Acceptance Criteria",
+)
+
+
+def _parse_feat_items(text: str) -> list[dict]:
+    """Each FEAT item (block-aware) under the 4 spec sections, with covers/evidence."""
+    items: list[dict] = []
+    for item_id, block in _iter_item_blocks(text, _FEAT_SECTIONS, _ITEM_ID_RE):
+        covers: list[str] = []
+        cm = _COVERS_RE.search(block)
         if cm:
             covers = [f"{a}#{b}" for a, b in _US_AC_REF_RE.findall(cm.group(1))]
         items.append({
-            "id": mid.group(0).strip("*"),
+            "id": item_id,
             "covers_us": covers,
-            "has_evidence": bool(_EVIDENCE_RE.search(line)),
+            "has_evidence": bool(_EVIDENCE_RE.search(block)),
         })
     return items
 
 
 def _parse_us_acs(text: str) -> list[dict]:
-    """US ACs with their covers: T-N refs. Returns [{us_ac, covers_tasks}]."""
-    # derive US short id from `ID: {n}-{m}-{Name}` header
+    """US ACs (block-aware) with their covers: T-N refs. Returns [{us_ac, covers_tasks}]."""
     idm = re.search(r"^ID:\s*(\d+-\d+)-", text, re.MULTILINE)
     us_short = idm.group(1) if idm else "?-?"
     acs: list[dict] = []
-    in_ac = False
-    for line in text.splitlines():
-        if line.startswith("## "):
-            in_ac = line.strip() == "## Acceptance Criteria"
-            continue
-        if not in_ac:
-            continue
-        acm = re.search(r"\bAC-\d+\b", line)
-        if not acm:
-            continue
-        cm = _COVERS_RE.search(line)
+    ac_id_re = re.compile(r"\bAC-\d+\b")
+    for ac_id, block in _iter_item_blocks(text, ("## Acceptance Criteria",), ac_id_re):
+        cm = _COVERS_RE.search(block)
         tasks = _TASK_ID_RE.findall(cm.group(1)) if cm else []
-        acs.append({"us_ac": f"{us_short}#{acm.group(0)}", "covers_tasks": tasks})
+        acs.append({"us_ac": f"{us_short}#{ac_id}", "covers_tasks": tasks})
     return acs
 
 
 def _parse_analysis_tasks(text: str) -> dict[str, bool]:
-    """task id -> has_evidence (only within ## Comportements observés)."""
+    """task id -> has_evidence (block-aware, within ## Comportements observés)."""
     tasks: dict[str, bool] = {}
-    in_tasks = False
-    for line in text.splitlines():
-        if line.startswith("## "):
-            in_tasks = line.strip().startswith("## Comportements observés")
-            continue
-        if not in_tasks:
-            continue
-        tm = _TASK_ID_RE.search(line)
-        if tm:
-            tasks[tm.group(0)] = bool(_EVIDENCE_RE.search(line))
+    for task_id, block in _iter_item_blocks(text, ("## Comportements observés",), _TASK_ID_RE):
+        tasks[task_id] = bool(_EVIDENCE_RE.search(block))
     return tasks
 
 
