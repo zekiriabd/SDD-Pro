@@ -804,34 +804,13 @@ Cas API Gate RED → format §6.b.STOP (seul rapport affiché).
 
 ## Chat Output Protocol
 
-> Cette commande applique strictement `@.claude/rules/output-protocol.md`.
-> Substance non dupliquée — la règle est SSoT.
+> Cette commande applique strictement `@.claude/rules/output-protocol.md`
+> — SSoT non dupliqué ici (format 1L §2, interdits §5, erreurs §7,
+> verdict `[DONE]` §9, bypass `SDD_CHAT_VERBOSE=1` §10).
 
-**Labels canoniques émis** : `[PLAN]`, `[ARCH]`, `[CONSTITUTION]`,
-`[DEV-BACKEND]`, `[QA]` (API Gate), `[DEV-FRONTEND]`, `[CODE-REVIEW]`,
-`[SPEC-REVIEW]`, `[ARCH-REVIEW]`, `[SECURITY]`, `[DONE]` (cf. output-protocol.md §3)
-**Plage de progression couverte** : `15-78%` (sans review/QA finale,
-cf. output-protocol.md §4)
-
-**Granularité cible** : 1 update par phase orchestrée (typiquement
-8-10 updates : plan → arch → backend ALL US → API Gate → frontend
-ALL US → verdict). Chaque sub-agent émet ses updates dans sa plage.
-
-**Interdits stricts** (cf. §5 du protocole) :
-- chemins de fichiers internes (`workspace/...`, `.claude/...`)
-- listes d'US par batch (compteur par batch suffit, ex. `2/3 US livrées`)
-- détail des invocations parallèles dev-backend + dev-frontend
-- stdout/stderr de bash, JSON dumps phase_planner.py
-
-**API Gate** : 1 ligne dédiée transitionnelle entre dev-backend ALL US
-et dev-frontend ALL US, avec statut canonique
-PASS/WARN/FAIL/SKIPPED/INFRA_BLOCKED (cf. `build-and-loop.md §1.3`).
-Exemple : `[QA] API Gate: 16/16 endpoints couverts, status PASS. (66%)`.
-
-**Verdict final** : 1 ligne `[DONE]` (🟢) / `[DONE/WARN]` (🟡) /
-`[DONE/FAIL]` (🔴) (cf. §9.1). Pas de "next steps" après (cf. §9.3).
-
-**Erreurs intermédiaires** : chat 1L avec classe `[CLASS]` + pointeur
-fichier rapport (cf. §7.2). Format 3L disque préservé.
-
-**Bypass debug** : `SDD_CHAT_VERBOSE=1` → mode legacy verbose (§10).
+**Spécifique `/dev-run`** : plage `15-78%` (sans review/QA finale), labels
+`[PLAN]`/`[ARCH]`/`[CONSTITUTION]`/`[DEV-*]`/`[QA]`/`[*-REVIEW]`/`[SECURITY]`/
+`[DONE]`. Granularité : 1 update par phase orchestrée (8-10 updates).
+**API Gate** : 1 ligne transitionnelle dédiée avec statut canonique
+PASS/WARN/FAIL/SKIPPED/INFRA_BLOCKED (`build-and-loop.md §1.3`), ex.
+`[QA] API Gate: 16/16 endpoints couverts, status PASS. (66%)`.

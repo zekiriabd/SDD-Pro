@@ -467,7 +467,7 @@ Succès → 3.6.c. ERROR → STOP.
 
   | Réponse | Action |
   |---|---|
-  | `ok` | → STEP 4 (`/dev-run` détecte les plans, mode From-Plan, cf. CLAUDE.md §11.10) |
+  | `ok` | → STEP 4 (`/dev-run` détecte les plans, mode From-Plan, cf. `rules/build-and-loop.md §7` Partie B) |
   | `stop` | STOP propre. Reprendre via `/dev-run {n}` ou `/sdd-full {n}` (idempotent) |
   | `retry` | relancer 3.6.b puis re-poser la question |
   | autre | ré-afficher le prompt sans avancer |
@@ -606,6 +606,13 @@ GREEN/YELLOW/RED sont également propagés au récap STEP 5.
 
 Ré-invoque `/feat-validate {n}` post-`/dev-run` pour activer la spec-compliance
 gate (le STEP 3.5 pré-dev la skippe car `HAS_CODE=null`).
+
+> **Autorité unique** : le verdict est produit par l'agent
+> `spec-compliance-reviewer` (Stage A de `/dev-run §6.4`, cf.
+> `auditor-orchestration.md §3`) dans
+> `workspace/output/.sys/.validation/{n}-spec-compliance.json`. Ce STEP
+> est un **lecteur pur** de ce JSON (mapping verdict→exit, 0 token) —
+> aucune re-vérification, donc aucun risque de double verdict divergent.
 
 ```bash
 SPEC_REQ=$(python -c "
@@ -750,7 +757,7 @@ Si succès complet sans accroc :
 - **Bypass `--force` traçable** : loggé dans récap STEP 5 avec mention « --force assumé »
 
 ### Référence détaillée
-- Plan-from-Plan mode : `@.claude/CLAUDE.md §11.10`
+- Mode From-Plan : `@.claude/rules/build-and-loop.md §7` (Partie B — plan v1/v2, validate_plan.py, dispatch)
 - BREAKING CHANGES : `@.claude/docs/CHANGELOG.md`
 - Workflow ASCII : `@.claude/docs/workflow.md`
 
@@ -758,31 +765,11 @@ Si succès complet sans accroc :
 
 ## Chat Output Protocol
 
-> Cette commande applique strictement `@.claude/rules/output-protocol.md`.
-> Substance non dupliquée — la règle est SSoT.
+> Cette commande applique strictement `@.claude/rules/output-protocol.md`
+> — SSoT non dupliqué ici (format 1L §2, interdits §5, erreurs §7,
+> verdict `[DONE]` §9, bypass `SDD_CHAT_VERBOSE=1` §10).
 
-**Labels canoniques émis** : `[ANALYSIS]`, `[PO]`, `[VALIDATE]`,
-`[PLAN]`, `[ARCH]`, `[CONSTITUTION]`, `[DEV-BACKEND]`, `[DEV-FRONTEND]`,
-`[QA]`, `[CODE-REVIEW]`, `[SPEC-REVIEW]`, `[ARCH-REVIEW]`, `[ADV-REVIEW]`,
-`[SECURITY]`, `[DONE]` (pipeline complet — cf. §3)
-**Plage de progression couverte** : `0-100%` (cf. output-protocol.md §4)
-
-**Granularité cible** : 1 update par phase orchestrée (typiquement
-12-15 updates pour un pipeline FEAT M). L'orchestrateur émet des
-transitions de phase (`[PO] ...` → `[ARCH] ...`) ; chaque sub-agent
-émet ses propres updates dans sa plage.
-
-**Interdits stricts** (cf. §5 du protocole) :
-- chemins de fichiers internes (`workspace/...`, `.claude/...`)
-- listes d'US/fichiers détaillées (compteurs métier OK)
-- audit logs (`legacy-parallel.log`, etc.)
-- récap "Readiness gate" en mode verbose si pas de `--force`
-
-**Verdict final** : 1 ligne `[DONE]` (🟢 GREEN), `[DONE/WARN]` (🟡)
-ou `[DONE/FAIL]` (🔴) avec compteurs métier + pointeur fichier rapport
-(cf. §9.1). Pas de "next steps" après le verdict (cf. §9.3).
-
-**Erreurs intermédiaires** : chat 1L avec classe `[CLASS]` + pointeur
-fichier rapport (cf. §7.2). Format 3L disque préservé.
-
-**Bypass debug** : `SDD_CHAT_VERBOSE=1` → mode legacy verbose (§10).
+**Spécifique `/sdd-full`** : pipeline complet, plage `0-100%`, tous les
+labels §3 (`[ANALYSIS]` → `[DONE]`). Granularité : 1 update par phase
+orchestrée (12-15 updates pour une FEAT M) ; chaque sub-agent émet ses
+propres updates dans sa plage.

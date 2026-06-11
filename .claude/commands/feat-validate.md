@@ -195,8 +195,16 @@ print(str(cfg.get('SpecComplianceRequiredForFeatValidate', 'true')).lower())
 
 ### 4.5.3 Vérifier la présence d'un rapport spec-compliance récent
 
+> **Autorité unique (audit 2026-06-11)** : l'agent `spec-compliance-reviewer`
+> (Stage A, `auditor-orchestration.md §3`) est le SEUL producteur du verdict.
+> Ce STEP est un **lecteur pur** de son rapport JSON — il ne re-vérifie
+> jamais les ACs lui-même, donc script et agent ne peuvent pas diverger.
+> Path canonique = celui écrit par l'agent (cf. `loader.yml` writes), PAS
+> `workspace/output/qa/feat-{n}/` (bug path corrigé 2026-06-11 : ce chemin
+> n'était écrit par personne → faux NO-GO systématique).
+
 ```bash
-SPEC_PATH="workspace/output/qa/feat-{n}/spec-compliance.json"
+SPEC_PATH="workspace/output/.sys/.validation/{n}-spec-compliance.json"
 if [ ! -f "$SPEC_PATH" ]; then
   cat <<EOF
 ERROR: /feat-validate {n} — spec-compliance absent
@@ -230,7 +238,7 @@ Format ERROR `[SPEC_COMPLIANCE_RED]` :
 ```
 ERROR: /feat-validate {n} — spec-compliance verdict RED
 CAUSE: [SPEC_COMPLIANCE_RED] N ACs non vérifiées dans le code matérialisé
-       (cf. workspace/output/qa/feat-{n}/spec-compliance.md)
+       (cf. workspace/output/.sys/.validation/{n}-spec-compliance.md)
 FIX: corriger les ACs flag NOT_VERIFIED via /dev-run {n} (idempotent)
      puis /sdd-review {n} --ensure-scans
      puis /feat-validate {n} (idempotent)

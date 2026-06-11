@@ -407,6 +407,8 @@ Classes typiques :
 ## Anti-derive
 
 **Universels** : `@.claude/rules/build-and-loop.md §3.bis` (autonomous, ambiguïté → STOP, no-spawn).
+**Ownership findings** : `@.claude/rules/auditor-coordination.md §1` (matrice SSoT 1 domaine = 1 owner — ne jamais émettre un finding bloquant hors de son domaine).
+
 
 **Domain-specific arch-review** :
 1. ❌ JAMAIS écrire de code applicatif (`workspace/output/src/**`)

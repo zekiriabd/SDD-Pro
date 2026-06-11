@@ -424,6 +424,8 @@ Applique `@.claude/rules/output-protocol.md` (label `[SECURITY]`, plage `94-96%`
 ## Anti-derive strict
 
 **Universels** : `@.claude/rules/build-and-loop.md §3.bis` (autonomous, ambiguïté → STOP, no-spawn).
+**Ownership findings** : `@.claude/rules/auditor-coordination.md §1` (matrice SSoT 1 domaine = 1 owner — ne jamais émettre un finding bloquant hors de son domaine).
+
 
 **Domain-specific security-review** :
 - ❌ Modifier le code de production sous `workspace/output/src/**` (read-only strict)

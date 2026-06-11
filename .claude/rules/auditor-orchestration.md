@@ -263,6 +263,9 @@ Distinct de `--unsequenced` (qui adresse la gate API back/front, pas auditor).
 - `commands/dev-run.md §STEP 6.4` : Read par référence au STEP 6.4.
   Substance opérationnelle ICI, pas dans dev-run.md (cf. hoist v7.0.1
   audit REFACTOR-4 2026-06-08).
+- **Ownership des findings entre reviewers** :
+  `@.claude/rules/auditor-coordination.md` (matrice SSoT, v7.0.2 — cette
+  règle-ci séquence les stages, la coordination délimite QUI émet QUOI).
 - Toute évolution du two-stage gate doit être faite ici d'abord, puis
   vérifiée dans `dev-run.md` (qui ne contient plus que le rationale
   séquentiel + le pointer).

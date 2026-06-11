@@ -235,5 +235,7 @@ d'un finding déjà couvert par les autres sources.
 ## Chat Output Protocol
 
 Applique `@.claude/rules/output-protocol.md` (label `[ADV-REVIEW]`, plage `98-99%`).
+**Ownership findings** : `@.claude/rules/auditor-coordination.md §1` (matrice SSoT 1 domaine = 1 owner — ne jamais émettre un finding bloquant hors de son domaine).
+
 Granularité 2-3 updates max ; verdict final 1L `informational` ; pas de file path en chat.
 Bypass `SDD_CHAT_VERBOSE=1`.
