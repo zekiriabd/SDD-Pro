@@ -198,6 +198,7 @@ EXPECTED_RULES = (
     "output-protocol",       # 1L chat output protocol (v7.0.0+)
     "dev-shared-preflight",  # STEP 0-1.bis hoist (v7.0.0+)
     "auditor-orchestration", # two-stage gate STEP 6.4 dev-run (v7.0.1+ hoist)
+    "auditor-coordination",  # matrice ownership findings reviewers (v7.0.2, audit 2026-06-11)
     # Annexe `error-classification-legacy` reste un fichier de référence
     # taxonomie A11Y/PERF, lu uniquement par les scripts d'ingest CI.
     # Pas listé ici car non load-bearing pour le pipeline LLM.
@@ -447,7 +448,7 @@ def _check_stack_md_headers(claude_root: Path, checks: "Checks") -> None:
                     + s.get("blockquoted_only", 0)
                     + s.get("invalid_badge", 0))
         n_stacks = payload.get("stacks_count", 0)
-        expected_total = 34  # CLAUDE.md §6 recount 2026-06-09 : 29 🟢 + 4 🟡 exp + 1 🟡 POC
+        expected_total = 35  # CLAUDE.md §6 recount 2026-06-11 : 29 🟢 + 5 🟡 exp + 1 🟡 POC
         if res.returncode == 0 and problems == 0:
             if n_stacks == expected_total:
                 checks.add("stack-md-headers", "OK",

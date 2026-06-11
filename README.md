@@ -198,10 +198,10 @@ Aucun runtime applicatif imposé sur le code généré — SDD_Pro produit du co
 |:---:|---|:---:|
 | 🟢 **validé** | Combo `/sdd-full` testé bout-en-bout sur ≥ 1 FEAT M (3 US, back+front), pipeline complet sans intervention humaine | **2 combos** ([.claude/docs/validated-combos.md](.claude/docs/validated-combos.md)) |
 | 🟢 **reference** | Stack avec entête `Validation: 🟢 reference` (composant d'un combo validé OU pattern de référence) | **14 stacks** |
-| 🟡 **experimental** | Stack avec entête `Validation: 🟡 experimental` — chargeable mais sans PoC formel bout-en-bout | **19 stacks** |
+| 🟡 **experimental** | Stack avec entête `Validation: 🟡 experimental` — chargeable mais sans PoC formel bout-en-bout | **20 stacks** |
 | 🟡 **POC-only** | Stack `Validation: 🟡 POC-only` — usage interne SDD_Pro uniquement, non destiné prod externe (ex: `fullstack/node-react` pour la console) | **1 stack** |
 
-**Total actif : 34 stacks** répartis : Backend (4), Frontend (4), UI DS (3), QA (9 dont 2 opt-in `mutation-testing` + `playwright`), Auth (2), Archi (3 patterns `mvc`/`ddd`/`microservice`), Fullstack (6 expérimentaux), Mobiles (3 expérimentaux). Détail : [.claude/CLAUDE.md §6](.claude/CLAUDE.md).
+**Total actif : 35 stacks** répartis : Backend (4), Frontend (4), UI DS (3), QA (9 dont 2 opt-in `mutation-testing` + `playwright`), Auth (2), Archi (3 patterns `mvc`/`ddd`/`microservice`), Fullstack (7 dont `aspnet-mvc-razor` expérimental), Mobiles (3). Détail : [.claude/CLAUDE.md §6](.claude/CLAUDE.md).
 
 > ℹ️ **v7.0.0 GA audit P0-doc 2026-06-05** : la ligne "⏸️ draft (quarantaine)" et le dossier `_drafts/` ont été retirés (rollback `governance-stacks-quarantine-rollback` du 2026-05-24 ; cf. CHANGELOG). Aucun stack n'est en quarantaine — les stacks expérimentaux restent chargeables avec l'avertissement runtime.
 

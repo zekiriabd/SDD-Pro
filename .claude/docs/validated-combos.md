@@ -116,16 +116,35 @@ mapping HTML→DS, capabilities on-demand, conventions stack-specific).
 | **Auth** | `azure-ad` | `auth-local` | — | — |
 | **DB** | PostgreSQL | — | SqlServer (combos non bench) | MySql, MariaDb, Sqlite, Oracle, MongoDb |
 | **Archi pattern** | `mvc` | — | `ddd` (combos C2 exercé, PoC formel pending), `microservice` (quarantaine v7) | — |
-| **Fullstack** | — | `angular-universal`, `blazor-server`, `kotlin-mustache`, `next`, `nuxt` | — | `node-react` (🟡 **POC-only** : console SDD interne, hors prod externe) |
+| **Fullstack** | — | `angular-universal`, `blazor-server`, `kotlin-mustache`, `next`, `nuxt` | `aspnet-mvc-razor` (ajouté 2026-06-10, jamais bench) | `node-react` (🟡 **POC-only** : console SDD interne, hors prod externe) |
 | **Mobiles** | — | `maui` (Win desktop), `react-native` (Expo Web) | — | `kotlin-android` (scaffold seul, SDK absent) |
 
-**Recount canonique 2026-06-09** : 29 🟢 (4 backend + 4 frontend + 3 UI + 7 QA + 2 auth + 1 archi + 5 fullstack + 3 mobiles) + 4 🟡 experimental + 1 🟡 POC-only = **34 total** (cf. gate `framework_smoke.py` constante `expected_total = 34`).
+**Recount canonique 2026-06-11** : 29 🟢 (4 backend + 4 frontend + 3 UI + 7 QA + 2 auth + 1 archi + 5 fullstack + 3 mobiles) + 5 🟡 experimental (dont `fullstack/aspnet-mvc-razor`, ajouté 2026-06-10) + 1 🟡 POC-only = **35 total** (cf. gate `framework_smoke.py` constante `expected_total = 35`).
 
 > Lecture : un stack 🟡 experimental est conforme techniquement (entête
 > `Validation:`, `.libs.json` valide, tests stack-level OK) mais **n'a jamais
 > été utilisé dans un combo bench runtime**. Un stack 🟢 bench-validated a
 > tourné runtime (curl, build vert, AC servies) mais `/sdd-full` end-to-end
 > reste partiellement manuel (cf. `docs/benchmarks/known-gaps.md`).
+
+### 2.ter Critères de promotion 🟡 → 🟢 (audit 2026-06-11)
+
+Un stack `🟡 experimental` est promu `🟢 scaffold-validated` puis
+`bench-validated` uniquement sur preuve, jamais sur ancienneté :
+
+1. **scaffold-validated** : un `/sdd-full` complet sur une FEAT CRUD simple
+   (1-2 US) aboutit build vert + structure conforme `ownership.md §1.bis`.
+2. **bench-validated** : run bench runtime (méthodo
+   `docs/poc-roi-methodology.md`) — serveur démarre < 30 s nominal, ≥ 4 ACs
+   servies via curl/navigateur, gate `code-quality` 🟢.
+3. MAJ coordonnée : entête `Validation:` du stack, `combos.json` si combo,
+   recount CLAUDE.md §6 + `framework_smoke.expected_total`.
+
+Stacks en attente (état 2026-06-11) : `fullstack/aspnet-mvc-razor`
+(critère 1 non exécuté), `mobiles/kotlin-android` (scaffold OK, APK runtime
+pending → retour bench-validated au critère 2). Un stack expérimental sans
+candidature de promotion ni consommateur après 2 cycles MINOR est candidat
+retrait (cf. `docs/orphan-cleanup-policy.md`).
 
 ### 2.bis Stacks sans `.libs.json` compagnon — exceptions documentées
 
@@ -244,7 +263,7 @@ Le script peut être câblé dans :
 ## 5. Politique commerciale recommandée
 
 L'audit historique a identifié un désalignement entre la **promesse marketing**
-(34 stacks supportés) et la **vérité empirique** (2 combos validés end-to-end +
+(35 stacks supportés) et la **vérité empirique** (2 combos validés end-to-end +
 11 bench-validated). Position retenue v7.0.0 GA :
 
 ### 5.1 Position canonique v7.0.0 GA — *« 2 combos validated + 11 bench-validated »*

@@ -7,7 +7,7 @@
 > Framework SDD strict : FEAT → User Stories → Code (back/front parallèle).
 > Lecture sélective, anti-derive, isolation par US et famille.
 
-> **Slim entry point** : 150 lignes max (ADR `governance-major-prompts-trim`).
+> **Slim entry point** : ~155 lignes max (ADR `governance-major-prompts-trim`).
 > Substance déléguée à `@.claude/docs/` et `@.claude/rules/`.
 
 ---
@@ -37,7 +37,7 @@ supprimer ligne ET régénérer les US. `Covers` réfèrent par valeur.
 
 ---
 
-## 3. Commandes (13 user-facing + 8 internes [debug])
+## 3. Commandes (33 : 13 user-facing + 8 internes [debug] + 12 reverse)
 
 **User-facing** (orchestrantes, gèrent pré-conditions et idempotence) :
 
@@ -63,14 +63,20 @@ supprimer ligne ET régénérer les US. `Covers` réfèrent par valeur.
 `--rebuild-arch`, `--resume`, `--manual-gates`, `--plan`, `--max-parallel N`.
 Détail : `@.claude/commands/*.md`.
 
+**Reverse engineering** (12, module optionnel legacy→FEAT) : `/sdd-reverse-full`
+(orchestrateur), `/sdd-reverse {U-N}`, `/sdd-reverse-{init,inventory,audit,analyze,stories,feat,crosscut,review,ui,status}`. SSoT : `@.claude/docs/reverse-engineering-workflow.md` + `@.claude/rules/reverse-engineering.md`.
+
 ---
 
-## 4. Agents (12 LLM + 1 rubric déterministe = 13 .md)
+## 4. Agents (19 : 12 LLM forward + 7 reverse, + 1 rubric déterministe)
 
 **Cœur** : `po`, `arch` (Sonnet 4.6) ; `dev-backend`, `dev-frontend` (Opus 4.7).
 **Support** : `elicitor`, `constitutioner`, `qa`.
 **Auditors** : `code-reviewer`, `security-reviewer`, `spec-compliance-reviewer`,
 `arch-reviewer`, `adversarial-reviewer` (opt-in, informational).
+**Reverse** (7, manifest autonome `loader.reverse.yml`) : `reverse-inventory`,
+`reverse-tech-auditor`, `reverse-tech-analyst`, `reverse-us-writer`,
+`reverse-feat-composer`, `reverse-ui-extractor`, `reverse-completeness-reviewer`.
 **Scripts déterministes** (0 token) : `complexity_router.py` (rubric
 `docs/rubrics/complexity-router-scoring.md`), `phase_planner.py`.
 Détail modèles + retraits v7.0.0 (`a11y`/`perf`/`dashboard`/`*-strict`) :
@@ -80,27 +86,29 @@ Détail modèles + retraits v7.0.0 (`a11y`/`perf`/`dashboard`/`*-strict`) :
 
 ## 5. Règles & Templates
 
-`.claude/rules/` (9 fichiers, 7 actives + 2 annexes) :
+`.claude/rules/` (11 fichiers) :
 - **5 règles consolidées** : `build-and-loop`, `quality`, `ownership`,
   `library-and-stack`, `error-classification`
 - **1 protocole chat** : `output-protocol.md` (1L `[AGENT] résumé (X%)`)
   + statusline `sdd_admin.statusline`
 - **1 hoist** : `dev-shared-preflight.md` (STEP 0-1.bis dev-backend/frontend)
-- **1 orchestration** : `auditor-orchestration.md` (two-stage gate STEP 6.4 dev-run)
+- **2 orchestration auditors** : `auditor-orchestration.md` (two-stage gate)
+  + `auditor-coordination.md` (matrice ownership findings, SSoT anti-doublon)
 - **1 annexe** : `error-classification-legacy.md` (`[A11Y_*]`/`[PERF_*]` ingest CI)
+- **1 module reverse** : `reverse-engineering.md` (anti-derive + taxonomie `[REVERSE_*]`)
 
 **2 principes** : `.claude/docs/principles/{source-first,us-granularity}.md`.
 Templates : `@.claude/docs/conventions.md §14-§15`.
 
 ---
 
-## 6. Stacks (34 actifs — SSoT = entête `Validation:` du `.md`)
+## 6. Stacks (35 actifs — SSoT = entête `Validation:` du `.md`)
 
-> **v7.0.0 GA recount 2026-06-09** (audit CTO Major #5 closure) :
-> **29 🟢 (validated/bench-validated/scaffold-validated) + 4 🟡 experimental + 1 🟡 POC-only = 34 total**.
+> **Recount 2026-06-11** (audit : ajout `fullstack/aspnet-mvc-razor` 2026-06-10) :
+> **29 🟢 (validated/bench-validated/scaffold-validated) + 5 🟡 experimental + 1 🟡 POC-only = 35 total**.
 > Validation auto : `python .claude/python/sdd_admin/framework_smoke.py` (gate `stacks-count`).
 
-**🟡 experimental (4)** : `archi/ddd`, `archi/microservice`, `qa/mutation-testing` (opt-in), `qa/playwright` (opt-in).
+**🟡 experimental (5)** : `archi/ddd`, `archi/microservice`, `qa/mutation-testing` (opt-in), `qa/playwright` (opt-in), `fullstack/aspnet-mvc-razor`.
 **🟡 POC-only (1)** : `fullstack/node-react` (console SDD interne — non destiné prod externe).
 **🟢 (29)** : tous les autres (cf. table détaillée + tiers `validated` / `bench-validated` / `scaffold-validated` dans `@.claude/docs/validated-combos.md §1-§2`).
 
