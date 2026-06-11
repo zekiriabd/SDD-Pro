@@ -58,6 +58,10 @@ RETIRED_AGENTS_V7 = frozenset({
     "accessibility-auditor", "performance-auditor",
     "dev-backend-strict", "dev-frontend-strict",
     "validator",
+    # Décommissionné par l'escalier reverse 3a/3b/3c (ADR
+    # governance-major-reverse-spec-ladder) — mentions historiques tolérées
+    # dans sdd-reverse.md / reverse-feat-composer.md.
+    "reverse-functional-extractor",
 })
 
 #: Reverse engineering agents (v7.0.0+ workflow) — managed by the AUTONOMOUS

@@ -95,13 +95,24 @@ def test_database_feat_captures_procs_connstrings_entities():
 
 
 def test_generate_cli_idempotent_allocation(tmp_path):
+    # Copie isolée + Phase 1 explicite : ce test dépendait du .sys/ laissé
+    # dans la fixture par d'autres tests (couplage caché, audit 2026-06-11).
+    from tests.fixture_utils import copy_legacy_fixture
+    project = copy_legacy_fixture("legacy-webforms-minimal", tmp_path)
+    inv = subprocess.run(
+        [sys.executable, "-m", "sdd_reverse_scripts.reverse_inventory",
+         "--project", str(project), "--json"],
+        capture_output=True, text=True, cwd=str(PY_ROOT),
+    )
+    assert inv.returncode == 0, inv.stderr
+
     feats_dir = tmp_path / "feats"
     feats_dir.mkdir()
 
     def _run():
         r = subprocess.run(
             [sys.executable, "-m", "sdd_reverse_scripts.generate_crosscutting_feats",
-             "--project", str(FIXTURE), "--feats-dir", str(feats_dir), "--json"],
+             "--project", str(project), "--feats-dir", str(feats_dir), "--json"],
             capture_output=True, text=True, cwd=str(PY_ROOT),
         )
         assert r.returncode == 0, r.stderr

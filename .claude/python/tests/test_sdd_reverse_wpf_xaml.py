@@ -16,6 +16,10 @@ from pathlib import Path
 
 import pytest
 
+from tests.fixture_utils import copy_legacy_fixture
+
+# Lecture seule (parse_template, scan_project) — le test e2e qui exécute
+# reverse_inventory (écriture .sys/) passe par copy_legacy_fixture.
 FIXTURE_ROOT = Path(__file__).parent / "fixtures" / "legacy-wpf-minimal"
 PROJECT_ROOT = Path(__file__).parent.parent  # .claude/python/
 
@@ -212,11 +216,12 @@ def test_scan_legacy_detects_wpf_primary() -> None:
     assert "wpf-xaml" in detected_ids, f"wpf-xaml not detected, got: {detected_ids}"
 
 
-def test_e2e_reverse_inventory_on_wpf_fixture() -> None:
+def test_e2e_reverse_inventory_on_wpf_fixture(tmp_path) -> None:
     """`reverse_inventory` CLI succeeds on the WPF fixture and reports >=2 units."""
+    project = copy_legacy_fixture("legacy-wpf-minimal", tmp_path)
     result = subprocess.run(
         [sys.executable, "-m", "sdd_reverse_scripts.reverse_inventory",
-         "--project", str(FIXTURE_ROOT), "--json"],
+         "--project", str(project), "--json"],
         capture_output=True, text=True, cwd=str(PROJECT_ROOT),
     )
     assert result.returncode == 0, f"reverse_inventory failed: {result.stderr}"

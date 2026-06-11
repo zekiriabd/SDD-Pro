@@ -18,7 +18,8 @@ import sys
 from pathlib import Path
 
 PY_ROOT = Path(__file__).parent.parent
-WEBFORMS = Path(__file__).parent / "fixtures" / "legacy-webforms-minimal"
+
+from tests.fixture_utils import copy_legacy_fixture  # noqa: E402
 
 
 def _run(module, *args):
@@ -29,15 +30,16 @@ def _run(module, *args):
 
 
 def test_roundtrip_parity_webforms(tmp_path):
+    webforms = copy_legacy_fixture("legacy-webforms-minimal", tmp_path)
     feats = tmp_path / "feats"
     feats.mkdir()
 
     # Phase 1 (L0-L2) + cross-cutting FEATs (L3) — both deterministic.
-    _run("sdd_reverse_scripts.reverse_inventory", "--project", str(WEBFORMS), "--json")
+    _run("sdd_reverse_scripts.reverse_inventory", "--project", str(webforms), "--json")
     _run("sdd_reverse_scripts.generate_crosscutting_feats",
-         "--project", str(WEBFORMS), "--feats-dir", str(feats), "--json")
+         "--project", str(webforms), "--feats-dir", str(feats), "--json")
 
-    sysd = WEBFORMS / ".sys"
+    sysd = webforms / ".sys"
     inv = json.loads((sysd / "inventory.json").read_text(encoding="utf-8"))
     db = json.loads((sysd / "db-schema.json").read_text(encoding="utf-8"))
     da = json.loads((sysd / "data-access.json").read_text(encoding="utf-8"))

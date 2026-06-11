@@ -31,12 +31,7 @@ import pytest
 pytestmark = pytest.mark.smoke
 
 
-def _repo_root() -> Path:
-    cwd = Path(__file__).resolve()
-    for p in [cwd, *cwd.parents]:
-        if (p / ".claude").is_dir():
-            return p
-    raise RuntimeError("Cannot locate repo root")
+from sdd_lib.paths import repo_root as _repo_root  # noqa: E402  (SSoT — conso audit 2026-06-11, ex-copies locales)
 
 
 # Mirror of tests/test_loader_contract.py — must stay in sync
@@ -45,6 +40,7 @@ _RETIRED_AGENTS = frozenset({
     "accessibility-auditor", "performance-auditor",
     "dev-backend-strict", "dev-frontend-strict",
     "validator",
+    "reverse-functional-extractor",  # escalier 3a/3b/3c (ADR reverse-spec-ladder)
 })
 
 # Known agents from .claude/agents/ — populated dynamically at test time

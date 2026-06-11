@@ -19,8 +19,11 @@ if str(PY_ROOT) not in sys.path:
 from sdd_reverse.code_graph_builder import build_code_graph  # noqa: E402
 from sdd_reverse.code_unit_detector import detect_code_units  # noqa: E402
 
+from tests.fixture_utils import copy_legacy_fixture  # noqa: E402
+
+# Lecture seule uniquement (build_code_graph) — les tests qui exécutent
+# reverse_inventory (écriture .sys/) passent par copy_legacy_fixture.
 API_FIXTURE = Path(__file__).parent / "fixtures" / "legacy-api-minimal"
-WEBFORMS_FIXTURE = Path(__file__).parent / "fixtures" / "legacy-webforms-minimal"
 
 
 class _FakeLang:
@@ -78,27 +81,29 @@ def test_empty_graph_yields_no_code_units():
     assert detect_code_units({"classes": []}, existing_units=[]) == []
 
 
-def test_e2e_api_only_fixture_produces_units():
+def test_e2e_api_only_fixture_produces_units(tmp_path):
     """Full Phase 1 on a backend-only project produces >= 2 units (was 0 pre-L2)."""
+    project = copy_legacy_fixture("legacy-api-minimal", tmp_path)
     result = subprocess.run(
         [sys.executable, "-m", "sdd_reverse_scripts.reverse_inventory",
-         "--project", str(API_FIXTURE), "--json"],
+         "--project", str(project), "--json"],
         capture_output=True, text=True, cwd=str(PY_ROOT),
     )
     assert result.returncode == 0, result.stderr
     report = json.loads(result.stdout)
     assert report["unitsDetected"] >= 2
-    inv = json.loads((API_FIXTURE / ".sys" / "inventory.json").read_text(encoding="utf-8"))
+    inv = json.loads((project / ".sys" / "inventory.json").read_text(encoding="utf-8"))
     kinds = {u["kind"] for u in inv["units"]}
     assert "api" in kinds
     assert "module" in kinds
 
 
-def test_webforms_does_not_gain_spurious_code_units():
+def test_webforms_does_not_gain_spurious_code_units(tmp_path):
     """Page-based fixture keeps exactly its 2 page units (DataAccess covered)."""
+    project = copy_legacy_fixture("legacy-webforms-minimal", tmp_path)
     result = subprocess.run(
         [sys.executable, "-m", "sdd_reverse_scripts.reverse_inventory",
-         "--project", str(WEBFORMS_FIXTURE), "--json"],
+         "--project", str(project), "--json"],
         capture_output=True, text=True, cwd=str(PY_ROOT),
     )
     assert result.returncode == 0, result.stderr
