@@ -27,6 +27,7 @@ Usage
     python bootstrap.py --dry-run      # show actions, no write
     python bootstrap.py --combo c1     # combo C1 (.NET + React + Azure AD)
     python bootstrap.py --combo c2     # combo C2 (Kotlin + React + Azure AD)
+    python bootstrap.py --combo c7     # tout combo SLA c1-c13 (SSoT combos.json)
     python bootstrap.py --combo custom # full interactive
     python bootstrap.py --skip-install # skip pip/npm install (CI use)
     python bootstrap.py --force        # overwrite existing workspace/input/
@@ -53,6 +54,7 @@ Exit codes
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
 import secrets
@@ -147,6 +149,59 @@ COMBOS = {
         "frontend_port": "5173",
     },
 }
+
+# Ports dev par défaut pour les presets dérivés de combos.json (les presets
+# c1-c5 ci-dessus restent autoritatifs avec leurs ports historiques).
+_BACKEND_PORTS = {
+    "dotnet-minimalapi": "5097",
+    "kotlin-spring-boot": "8080",
+    "node-express": "3000",
+    "python-fastapi": "8000",
+}
+_FRONTEND_PORTS = {
+    "react": "5173",
+    "vue": "5173",
+    "angular": "4200",
+    "blazor-webassembly": "5004",
+}
+
+
+def _merge_combos_from_json() -> None:
+    """Complète COMBOS avec les combos SLA absents des presets (C6-C13).
+
+    SSoT = `.claude/templates/combos.json` (audit 2026-06-11 : bootstrap
+    hardcodait c1-c5 alors que la doc promet « 13 combos SLA » — asymétrie
+    CLI/doc). Lecture stdlib pure, silencieuse si le fichier est absent ou
+    invalide (fallback : presets hardcodés seuls — bootstrap reste utilisable
+    sur un checkout partiel).
+    """
+    path = Path(__file__).resolve().parent / ".claude" / "templates" / "combos.json"
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return
+    for combo in data.get("combos", []):
+        key = str(combo.get("id", "")).lower()
+        backend = combo.get("backend")
+        frontend = combo.get("frontend")
+        if not key or key in COMBOS or not backend or not frontend:
+            continue
+        tier = combo.get("tier", "bench-validated")
+        COMBOS[key] = {
+            "label": f"{combo['id']} — {combo.get('label', f'{backend} + {frontend}')} ({tier} 🟢)",
+            "backend": backend,
+            "frontend": frontend,
+            "ui": combo.get("ui", "shadcn"),
+            "qa": list(combo.get("qa", [])),
+            "auth": combo.get("auth", "auth-local"),
+            "archi": combo.get("archi", "mvc"),
+            "lib_strategy": "openapi-codegen",
+            "backend_port": _BACKEND_PORTS.get(backend, "8080"),
+            "frontend_port": _FRONTEND_PORTS.get(frontend, "5173"),
+        }
+
+
+_merge_combos_from_json()
 
 DB_TYPES = ("none", "PostgreSql", "SqlServer", "MySql", "Sqlite", "MariaDb", "Oracle", "MongoDb")
 
@@ -328,21 +383,22 @@ def choose_combo(forced: str | None, *, auto_init: bool = False) -> dict:
             _confirm_unvalidated_combo(forced, auto_init=auto_init)
             return dict(COMBOS[forced])
         if forced != "custom":
-            _print_error(f"Unknown combo '{forced}'. Valid : c1 / c2 / c3 / c4 / c5 / custom")
+            valid = " / ".join([*sorted(COMBOS), "custom"])
+            _print_error(f"Unknown combo '{forced}'. Valid : {valid}")
             sys.exit(2)
 
     _print_header("Stack combo")
-    print("  Combos available :")
-    print(f"    [1] {COMBOS['c1']['label']}")
-    print(f"    [2] {COMBOS['c2']['label']}")
-    print(f"    [3] {COMBOS['c3']['label']}")
-    print(f"    [4] {COMBOS['c4']['label']}")
-    print(f"    [5] {COMBOS['c5']['label']}")
-    print(f"    [6] Custom (pick each stack manually)")
+    print("  Combos available (SSoT : .claude/templates/combos.json) :")
+    ordered = sorted(COMBOS, key=lambda k: (len(k), k))  # c1..c9 puis c10..c13
+    for i, key in enumerate(ordered, start=1):
+        print(f"    [{i}] {COMBOS[key]['label']}")
+    custom_idx = str(len(ordered) + 1)
+    print(f"    [{custom_idx}] Custom (pick each stack manually)")
     print()
-    choice = _ask("Pick a combo", default="1", choices=["1", "2", "3", "4", "5", "6"])
-    combo_key = {"1": "c1", "2": "c2", "3": "c3", "4": "c4", "5": "c5"}.get(choice)
-    if combo_key:
+    valid_choices = [str(i) for i in range(1, len(ordered) + 2)]
+    choice = _ask("Pick a combo", default="1", choices=valid_choices)
+    if choice != custom_idx:
+        combo_key = ordered[int(choice) - 1]
         _confirm_unvalidated_combo(combo_key, auto_init=auto_init)
         return dict(COMBOS[combo_key])
 
@@ -831,8 +887,8 @@ def main() -> int:
               python bootstrap.py --dry-run
         """),
     )
-    parser.add_argument("--combo", choices=["c1", "c2", "c3", "c4", "c5", "custom"],
-                        help="Skip the stack-choice prompt with a preset (c1/c2 validated end-to-end, c3/c4/c5 bench-validated runtime — tous SLA-éligibles depuis v7.0.0 GA).")
+    parser.add_argument("--combo", choices=[*sorted(COMBOS), "custom"],
+                        help="Skip the stack-choice prompt with a preset (c1/c2 validated end-to-end, c3-c13 bench-validated runtime — tous SLA-éligibles, SSoT .claude/templates/combos.json).")
     parser.add_argument("--dry-run", action="store_true",
                         help="Show actions without writing files / installing.")
     parser.add_argument("--skip-install", action="store_true",

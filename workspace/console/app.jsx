@@ -2210,7 +2210,10 @@ function App() {
             return keepUs(us, keptTasks) ? { ...us, children: keptTasks } : null;
           })
           .filter(Boolean);
-        return keptUs.length > 0 ? { ...FEAT, children: keptUs } : null;
+        // En UX, on exige une US porteuse du mockup. En PO/Technical, on garde
+        // aussi les FEATs sans US (cas typique : FEATs reverse non encore découpées).
+        if (keptUs.length === 0 && isUX) return null;
+        return { ...FEAT, children: keptUs };
       })
       .filter(Boolean);
   }, [tree, viewMode]);
