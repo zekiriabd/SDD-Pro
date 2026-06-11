@@ -2,7 +2,7 @@
 name: reverse-completeness-reviewer
 description: Reviewer "back" du workflow reverse (L5). Pour UNE FEAT reverse, confronte son contenu à l'evidence profonde de l'unité (inventory units[U-N].classes + dataAccess : repositories, services, requêtes SQL, procédures stockées) et signale ce que l'extraction a OMIS. Verdict informational (jamais bloquant), miroir reverse de spec-compliance-reviewer. Délègue le calcul au script déterministe check_feat_completeness.py. Aucun spawn d'agent.
 model: claude-sonnet-4-6
-tools: Read, Glob, Grep, Bash
+tools: Read, Write, Glob, Grep, Bash
 loader: .claude/loader.reverse.yml
 ---
 
@@ -14,7 +14,7 @@ Garde-fou contre la **sous-extraction** : une FEAT reverse peut passer
 `validate_reverse_feat.py` (structurel) tout en ayant raté la couche métier
 profonde (le symptôme rapporté : « il n'est pas rentré dans chaque classe »).
 Tu vérifies, **indépendamment**, que la FEAT couvre bien les classes
-behaviorales (repository / service / controller / complex) et l'accès données
+behaviorales (repository / service / viewmodel / controller / complex) et l'accès données
 (requêtes SQL, procédures stockées) que la Phase 1 a rattachés à l'unité.
 
 C'est le pendant reverse de `spec-compliance-reviewer` : au lieu de « le code
@@ -31,13 +31,33 @@ Sinon → STOP + ERROR `[REVERSE_UNIT_NOT_FOUND]`.
 ## STEP 1 — Check déterministe (source de vérité)
 
 ```bash
-python -m sdd_reverse_scripts.check_feat_completeness \
+python .claude/python/sdd_reverse_scripts/check_feat_completeness.py \
     --project workspace/old/{P} --unit {U-N} --json
 ```
+
+> Invocation canonique **par chemin de fichier** (C6) — le module bootstrap
+> son `sys.path` lui-même ; aucun `PYTHONPATH` ni `cd` requis depuis la
+> racine repo.
 
 Le script compare la FEAT à `units[U-N].classes` (rôles) + `units[U-N].dataAccess`
 (queries.tables, storedProcedureCalls) et retourne `{verdict, gaps[], summary}`.
 **Ne JAMAIS émuler ce check en LLM** — il est la gate déterministe.
+
+## STEP 1.bis — Check du fil de traçabilité de l'escalier (D3, si artefacts présents)
+
+Si l'unité a été produite par l'escalier 3a→3b→3c (ADR `governance-major-reverse-spec-ladder`),
+vérifier aussi le **fil de traçabilité** FEAT→US→task→evidence :
+
+```bash
+python .claude/python/sdd_reverse_scripts/check_ladder_traceability.py \
+    --project workspace/old/{P} --unit {U-N} --json
+```
+
+- `verdict == "ladder-incomplete-artifacts"` (exit 2) → l'unité vient peut-être de
+  l'ancien flux ou l'escalier est partiel ; **skip ce check** silencieusement (informational).
+- Sinon, joindre les `gaps[]` (`[REVERSE_LADDER_TRACEABILITY_GAP]`) au rapport :
+  items FEAT sans `covers:` vers une US, US AC sans `covers:` vers une task, task
+  orpheline/sans evidence. **Jamais bloquant, jamais comblé par invention**.
 
 ## STEP 2 — Lecture ciblée des gaps (raisonnement)
 
@@ -50,11 +70,15 @@ Pour chaque gap retourné (`class_not_mentioned` / `table_not_mentioned` /
 
 ## STEP 3 — Verdict (informational, jamais bloquant)
 
-| Verdict | Sens | Action |
+| Verdict (`summary.verdict`, ASCII) | Sens | Action |
 |---|---|---|
-| 🟢 complete | aucun gap réel | rien à faire |
-| 🟡 partial | gaps moderate (tables, classes secondaires) | suggérer enrichissement |
-| 🔴 incomplete | ≥ 1 repository/service/proc métier non documenté | recommander re-`/sdd-reverse {U-N}` |
+| `complete` | aucun gap réel | rien à faire |
+| `partial` | gaps moderate (tables, classes secondaires) | suggérer enrichissement |
+| `incomplete` | ≥ 1 repository/service/viewmodel/proc métier non documenté | recommander re-`/sdd-reverse {U-N}` |
+
+> Valeurs **ASCII pures** depuis 2026-06-10 (M10 — les emojis dans le champ
+> JSON crashaient la sortie console cp1252). Le rendu 🟢/🟡/🔴 est un choix
+> d'affichage chat, pas une valeur de payload.
 
 Le verdict **ne bloque pas** `/sdd-full` (comme `adversarial-reviewer`). Il
 informe le Tech Lead et l'orchestrateur. Classe d'erreur émise dans le log :

@@ -51,20 +51,52 @@ agents:
     # sdd_reverse.merge_db_schema (writes db-schema.merged.json).
     # deps-graph.json is produced by deterministic script reverse_audit.py, not the agent.
 
-  reverse-functional-extractor:
+  reverse-tech-analyst:
     model: claude-opus-4-8
-    phase: 3
+    phase: 3a
+    available_from: v0.7.0       # ADR governance-major-reverse-spec-ladder — barreau bas de l'escalier
     reads:
-      - workspace/old/{P}/.sys/inventory.json                   # units[U-N].classes (L0 role map) + evidenceFiles
+      - workspace/old/{P}/.sys/inventory.json                   # units[U-N].classes (L0 role map) + evidenceFiles + dataAccess
       - workspace/old/{P}/.sys/db-schema.merged.json            # if present (Phase 2 ran)
       - workspace/old/{P}/.sys/db-schema.json                   # base fallback
       - workspace/old/{P}/.sys/tech-audit.md                    # optional
-      - workspace/old/{P}/{evidenceFiles}                       # strict — now incl. transitive deep layer (L0)
+      - workspace/old/{P}/{evidenceFiles}                       # strict — incl. transitive deep layer (L0)
       - .claude/python/sdd_reverse/language_signatures.yml
-      - .claude/python/sdd_reverse/feat.reverse.template.md     # ADV-9 isolated template
+      - .claude/python/sdd_reverse/analysis.reverse.template.md # isolated tech-analysis template (D5)
     writes:
-      - workspace/input/feats/{n}-{Name}.md                     # the FEAT output
+      - workspace/output/plans/{n}-{Name}.analysis.md           # tech-analysis output (distinct ext from forward .back/.front)
       - workspace/old/{P}/.sys/modules/{Module}/extraction.md   # extraction log
+      - workspace/old/{P}/.sys/inventory.json                   # _featAllocations + _allocatedNames (legacy mode only — 3a owns allocation)
+
+  reverse-us-writer:
+    model: claude-opus-4-8
+    phase: 3b
+    available_from: v0.7.0       # ADR governance-major-reverse-spec-ladder — barreau moyen
+    reads:
+      - workspace/output/plans/{n}-{Name}.analysis.md          # 3a tech-analysis (SOLE content source)
+      - workspace/old/{P}/.sys/inventory.json                  # units[U-N] metadata (kind, roles, allocation) — NOT new content
+      - .claude/python/sdd_reverse/us.reverse.template.md
+    writes:
+      - workspace/output/us/{n}-{m}-{Name}.md                  # user stories (1 per capability)
+      - workspace/old/{P}/.sys/modules/{Module}/stories-3b.md  # decision log
+    forbidden_reads:
+      - workspace/old/{P}/{evidenceFiles}                      # 3b NEVER reads legacy code — only the 3a analysis
+
+  reverse-feat-composer:
+    model: claude-opus-4-8
+    phase: 3c
+    available_from: v0.7.0       # ADR governance-major-reverse-spec-ladder — barreau haut (remplace reverse-functional-extractor, décommissionné D2)
+    reads:
+      - workspace/output/us/{n}-{m}-{Name}.md                  # 3b user stories (SOLE content source)
+      - workspace/output/plans/{n}-{Name}.analysis.md          # 3a tech-analysis (evidence resolution + plumbing to demote)
+      - workspace/old/{P}/.sys/inventory.json                  # units[U-N] metadata (kind, dataAccess, allocation)
+      - .claude/python/sdd_reverse/language_signatures.yml
+      - .claude/python/sdd_reverse/feat.reverse.template.md    # ADV-9 isolated template (reused)
+    writes:
+      - workspace/input/feats/{n}-{Name}.md                    # the FEAT output (business altitude, plumbing demoted)
+      - workspace/old/{P}/.sys/modules/{Module}/feat-3c.md     # composition log
+    forbidden_reads:
+      - workspace/old/{P}/{evidenceFiles}                      # 3c NEVER reads legacy code — only US 3b + analysis 3a
 
   reverse-completeness-reviewer:
     model: claude-sonnet-4-6
@@ -78,7 +110,8 @@ agents:
     writes:
       - workspace/old/{P}/.sys/modules/{Module}/completeness-review.md
     delegated_to:
-      - .claude/python/sdd_reverse_scripts/check_feat_completeness.py   # deterministic gap engine
+      - .claude/python/sdd_reverse_scripts/check_feat_completeness.py     # deterministic gap engine
+      - .claude/python/sdd_reverse_scripts/check_ladder_traceability.py   # D3 ladder traceability (ADR reverse-spec-ladder)
 
   reverse-ui-extractor:
     model: claude-opus-4-8
@@ -104,9 +137,21 @@ commands:
     phase: 2
     spawns: [reverse-tech-auditor]
     available_from: v0.2.0   # V2 — implemented
+  sdd-reverse-analyze:
+    phase: 3a
+    spawns: [reverse-tech-analyst]
+    available_from: v0.7.0   # ADR governance-major-reverse-spec-ladder — barreau 3a
+  sdd-reverse-stories:
+    phase: 3b
+    spawns: [reverse-us-writer]
+    available_from: v0.7.0   # ADR governance-major-reverse-spec-ladder — barreau 3b
+  sdd-reverse-feat:
+    phase: 3c
+    spawns: [reverse-feat-composer]
+    available_from: v0.7.0   # ADR governance-major-reverse-spec-ladder — barreau 3c
   sdd-reverse:
     phase: 3
-    spawns: [reverse-functional-extractor]
+    spawns: []                  # ADR reverse-spec-ladder : séquenceur de /sdd-reverse-analyze (3a) + /sdd-reverse-stories (3b) + /sdd-reverse-feat (3c), ne spawn AUCUN agent (no-spawn §9)
   sdd-reverse-crosscut:
     phase: "3-bis"
     spawns: []                  # deterministic script, no agent (L3)
@@ -123,42 +168,52 @@ commands:
     phase: any
     spawns: []
     available_from: v0.2.0   # V2 — implemented (deterministic, no agent)
+  sdd-reverse-review:
+    phase: "3.6"
+    spawns: [reverse-completeness-reviewer]
+    available_from: v0.6.0   # audit M11 2026-06-10 — wrapper so /sdd-reverse-full stays no-spawn
 
 
 scripts_v2:
   reverse_audit:
     path: .claude/python/sdd_reverse_scripts/reverse_audit.py
-    cli: python -m sdd_reverse_scripts.reverse_audit --project <PATH> [--force-enrichment-on E.f] [--json]
+    cli: python .claude/python/sdd_reverse_scripts/reverse_audit.py --project <PATH> [--force-enrichment-on E.f] [--json]
   reverse_status:
     path: .claude/python/sdd_reverse_scripts/reverse_status.py
-    cli: python -m sdd_reverse_scripts.reverse_status [--project P] [--json]
+    cli: python .claude/python/sdd_reverse_scripts/reverse_status.py [--project P] [--json]
   reverse_smoke:
     path: .claude/python/sdd_reverse_scripts/reverse_smoke.py
-    cli: python -m sdd_reverse_scripts.reverse_smoke [--json]
+    cli: python .claude/python/sdd_reverse_scripts/reverse_smoke.py [--json]
   merge_db_schema:
     path: .claude/python/sdd_reverse/merge_db_schema.py
-    cli: python -m sdd_reverse.merge_db_schema --base <BASE> --enrichment <ENR> --output <OUT> [--force-enrichment-on E.f]
+    cli: python .claude/python/sdd_reverse/merge_db_schema.py --base <BASE> --enrichment <ENR> --output <OUT> [--force-enrichment-on E.f]
 
 
 scripts:
   reverse_inventory:
     path: .claude/python/sdd_reverse_scripts/reverse_inventory.py
-    cli: python -m sdd_reverse_scripts.reverse_inventory --project <PATH> [--use-cache] [--json]
+    cli: python .claude/python/sdd_reverse_scripts/reverse_inventory.py --project <PATH> [--use-cache] [--json]
   validate_reverse_feat:
     path: .claude/python/sdd_reverse_scripts/validate_reverse_feat.py
-    cli: python -m sdd_reverse_scripts.validate_reverse_feat --feat-path <PATH> [--json]
+    cli: python .claude/python/sdd_reverse_scripts/validate_reverse_feat.py --feat-path <PATH> [--json]
   check_reverse_feat_for_full:
     path: .claude/python/sdd_reverse_scripts/check_reverse_feat_for_full.py
-    cli: python -m sdd_reverse_scripts.check_reverse_feat_for_full --feat-path <GLOB> [--allow-reverse-low] [--json]
+    cli: python .claude/python/sdd_reverse_scripts/check_reverse_feat_for_full.py --feat-path <GLOB> [--allow-reverse-low] [--json]
   generate_crosscutting_feats:                 # L3 — transversal FEATs (libs + DB)
     path: .claude/python/sdd_reverse_scripts/generate_crosscutting_feats.py
-    cli: python -m sdd_reverse_scripts.generate_crosscutting_feats --project <PATH> [--feats-dir DIR] [--json]
+    cli: python .claude/python/sdd_reverse_scripts/generate_crosscutting_feats.py --project <PATH> [--feats-dir DIR] [--json]
   preallocate_feats:                           # L5 — deterministic (n,Name) pre-allocation
     path: .claude/python/sdd_reverse_scripts/preallocate_feats.py
-    cli: python -m sdd_reverse_scripts.preallocate_feats --project <PATH> [--feats-dir DIR] [--json]
+    cli: python .claude/python/sdd_reverse_scripts/preallocate_feats.py --project <PATH> [--feats-dir DIR] [--json]
   check_feat_completeness:                     # L5 — back-side completeness gap engine
     path: .claude/python/sdd_reverse_scripts/check_feat_completeness.py
-    cli: python -m sdd_reverse_scripts.check_feat_completeness --project <PATH> (--unit U-N | --feat-path P) [--json]
+    cli: python .claude/python/sdd_reverse_scripts/check_feat_completeness.py --project <PATH> (--unit U-N | --feat-path P) [--json]
+  check_ladder_traceability:                   # ADR reverse-spec-ladder — D3 fil FEAT→US→task→evidence (informational)
+    path: .claude/python/sdd_reverse_scripts/check_ladder_traceability.py
+    cli: python .claude/python/sdd_reverse_scripts/check_ladder_traceability.py (--project <PATH> --unit U-N | --feat-path P) [--json]
+  update_extraction_cache:                     # C4 audit 2026-06-10 — L5 cache wiring (--check orchestrator / --save extractor)
+    path: .claude/python/sdd_reverse_scripts/update_extraction_cache.py
+    cli: python .claude/python/sdd_reverse_scripts/update_extraction_cache.py --project <PATH> --unit U-N (--check | --save --n N --name NAME) [--json]
 
 
 # Invariants reverse (V2 — to be hoisted in INVARIANTS.reverse.yml)

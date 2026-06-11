@@ -1,72 +1,81 @@
 ---
 command: sdd-reverse
 phase: 3
-description: Phase 3 du workflow reverse — extraction fonctionnelle d'UNE unité U-N en FEAT SDD_Pro standard. Spawn agent reverse-functional-extractor (Opus 4.8). Output workspace/input/feats/{n}-{Name}.md consommable par /sdd-full ou /sdd-poc.
+description: Phase 3 du workflow reverse — SÉQUENCEUR de l'escalier ascendant pour UNE unité U-N (3a analyse → 3b user stories → 3c FEAT). Ne spawn AUCUN agent directement (no-spawn §9) — enchaîne /sdd-reverse-analyze + /sdd-reverse-stories + /sdd-reverse-feat. Output final workspace/input/feats/{n}-{Name}.md consommable par /sdd-full.
 loader: .claude/loader.reverse.yml
 ---
 
-# /sdd-reverse {U-N} [--allow-low] [--json]
+# /sdd-reverse {U-N} [--json]
 
 ## Rôle
 
-Lancer la **Phase 3** : transformer une unité fonctionnelle identifiée par la Phase 1 en FEAT SDD_Pro standard. Une seule unité par invocation (séquentiel strict, ADV-2).
+Lancer la **Phase 3 complète** sur une unité : l'**escalier ascendant** qui
+remonte le code legacy jusqu'à une FEAT métier. `/sdd-reverse` est un **séquenceur
+de commandes** (no-spawn §9 `rules/reverse-engineering.md`) — il n'invoque aucun
+agent directement, il enchaîne les 3 sous-commandes barreau par barreau :
+
+```
+/sdd-reverse {U-N}
+  ├─ 3a  /sdd-reverse-analyze {U-N}   → output/plans/{n}-{Name}.analysis.md   (reverse-tech-analyst)
+  ├─ 3b  /sdd-reverse-stories {U-N}   → output/us/{n}-{m}-{Name}.md           (reverse-us-writer)
+  └─ 3c  /sdd-reverse-feat {U-N}      → input/feats/{n}-{Name}.md             (reverse-feat-composer)
+```
+
+> **Décommission (ADR reverse-spec-ladder D2)** : l'ancien `/sdd-reverse`
+> mono-saut (agent `reverse-functional-extractor`, code→FEAT en un coup) est
+> remplacé par cet escalier. Le saut unique faisait baver l'altitude technique
+> dans la FEAT métier — l'escalier sépare l'analyse fidèle (3a) de la remontée
+> métier (3b/3c). En mode pré-alloué (L5), plusieurs `/sdd-reverse {U-N}` peuvent
+> tourner en parallèle borné (§8.2).
 
 ## Args
 
 | Arg | Type | Description |
 |---|---|---|
-| `{U-N}` | string requis | Identifiant U-N stable (ex. `U-3`) — résolu via `inventory.json.units[]` |
-| `--allow-low` | flag | Autorise génération d'une FEAT `confidence: low` sans bannière de blocage. Audit-loggué. **@llm-only-flag** (lu par l'agent reverse-functional-extractor, pas par un script Python — la commande spawn l'agent directement). |
-| `--json` | flag | Émet le rapport extraction en JSON |
+| `{U-N}` | string requis | Identifiant U-N stable (ex. `U-3`) |
+| `--json` | flag | Propagé aux 3 sous-commandes (rapports JSON) |
 
 ## Pré-conditions
 
-1. `workspace/old/{P}/.sys/inventory.json` existe ET passe gate ADV-23 :
-   - `schemaVersion == 1`
-   - `_allocatedNames` et `_featAllocations` présents (dicts, même vides)
-   - Sinon → ERROR `[REVERSE_INVENTORY_SCHEMA_STALE]` + suggérer `/sdd-reverse-inventory --refresh`
-2. `units[id="{U-N}"]` existe dans `inventory.json`. Sinon → ERROR `[REVERSE_UNIT_NOT_FOUND]`
-3. `.claude/python/sdd_reverse/feat.reverse.template.md` présent (ADV-9). Sinon → ERROR `[REVERSE_TEMPLATE_MISSING]`
-4. (Optionnel) Lock `workspace/input/feats/.alloc.lock` libre OU stale > 30s. Sinon → ERROR `[REVERSE_LOCK_HELD]` (Phase 3 séquentielle stricte, ADV-2)
+Identiques à `/sdd-reverse-analyze` (3a — premier barreau possède l'allocation) :
+`inventory.json` passe gate ADV-23, `units[id={U-N}]` existe, templates présents.
+Sinon → ERROR remontée par le barreau concerné (`[REVERSE_*]`).
 
-## Actions
+## Actions (séquence — STOP au premier barreau en échec)
 
-1. **Résoudre le projet legacy** : lire `workspace/old/*/.sys/inventory.json` pour trouver lequel contient `units[id={U-N}]`. Si plusieurs matchent → ERROR ambiguité, demander `--project {P}` explicite.
-2. **Spawn unique** `Agent(reverse-functional-extractor)` avec args = `{U-N}` (+ `--allow-low` si transmis)
-3. L'agent suit le flux STEP 1 à 8 documenté dans `.claude/agents/reverse-functional-extractor.md`
-4. Validation interne via `validate_reverse_feat.py` (max 3 itérations, ADV-5)
-5. Émission ligne chat finale `[REVERSE] {U-N} → FEAT {n}-{Name} (confidence={cap}, {N} ACs). (PROGRESS%)`
+1. **3a** : exécuter `/sdd-reverse-analyze {U-N}`. Échec (`[REVERSE_*]`) → STOP (pas de 3b/3c).
+2. **3b** : exécuter `/sdd-reverse-stories {U-N}`. Échec → STOP (pas de 3c).
+3. **3c** : exécuter `/sdd-reverse-feat {U-N}`.
+4. Émission ligne chat finale `[REVERSE] {U-N} → escalier 3a→3b→3c terminé, FEAT {n}-{Name} (confidence={cap}). (PROGRESS%)`.
 
 ## Sortie
 
 ```
-workspace/input/feats/{n}-{Name}.md            (FEAT SDD_Pro conforme)
-workspace/old/{P}/.sys/modules/{Name}/extraction.md   (log décision)
-workspace/old/{P}/.sys/inventory.json          (update _featAllocations + _allocatedNames)
+workspace/output/plans/{n}-{Name}.analysis.md         (3a — analyse technique legacy)
+workspace/output/us/{n}-{m}-{Name}.md                 (3b — user stories)
+workspace/input/feats/{n}-{Name}.md                   (3c — FEAT métier, pont vers /sdd-full)
+workspace/old/{P}/.sys/modules/{Name}/{extraction,stories-3b,feat-3c}.md   (logs)
 ```
 
-## Mode `--allow-low`
+## Confidence ≠ high
 
-Sans ce flag : si extraction conclut `confidence: low` (DB schema absent, evidence insuffisante, validation 3 itérations échouée), la FEAT est quand même écrite mais avec bannière `⚠️ revue humaine obligatoire avant /sdd-full` + commentaire REVERSE-GATE `allow-sdd-full=false`.
-
-Avec `--allow-low` : même écriture, mais le commentaire REVERSE-GATE devient `allow-sdd-full=true` ; bannière reste présente. Audit-loggué dans extraction.md.
-
-**Important** : `--allow-low` ne contourne PAS `check_reverse_feat_for_full.py` qui reste opt-in côté `/sdd-full` (cf. ADV-6, §6.1 design doc).
+La confidence est **min-monotone** le long de l'escalier (3c ≤ 3b ≤ 3a). Si la
+FEAT finale est `medium|low`, elle porte la bannière + REVERSE-GATE
+`allow-sdd-full=false`. Consommation forcée : `check_reverse_feat_for_full.py --allow-reverse-low`.
 
 ## Voie d'usage standard
 
-1. `/sdd-reverse-inventory MyLegacy` (Phase 1) → identifier les U-N pertinents
-2. Lire `workspace/old/MyLegacy/.sys/inventory.md` (résumé exécutif)
-3. Pour chaque unité voulue : `/sdd-reverse U-1`, puis `/sdd-reverse U-2`, etc. (séquentiel)
-4. Tech Lead revue Phase 5 (compléter `## Project Config` dans chaque FEAT)
-5. `python -m sdd_reverse_scripts.check_reverse_feat_for_full --feat-path workspace/input/feats/1-*.md`
-6. `/sdd-full 1` (pipeline SDD_Pro standard)
-
-Voir `.claude/docs/reverse-engineering-workflow.md` §1, §3, §4.3, §6.1.
+1. `/sdd-reverse-inventory MyLegacy` (Phase 1)
+2. `/sdd-reverse U-1` (escalier 3a→3b→3c complet) — ou les 3 sous-commandes séparément pour reprendre barreau par barreau
+3. Tech Lead revue Phase 5 (compléter `## Project Config` de la FEAT)
+4. `check_reverse_feat_for_full.py --feat-path workspace/input/feats/1-*.md`
+5. `/sdd-full 1`
 
 ## Anti-derive
 
-- **Une seule unité par invocation** — jamais batch multi-U-N (ADV-2 Phase 3 séquentielle stricte)
-- Lock atomique élargi à la transaction complète (read max_n → write FEAT → update inventory → release)
-- No-spawn d'agent autre que `reverse-functional-extractor`
-- Idempotence : re-lancer `/sdd-reverse U-3` réécrit la même FEAT (mêmes `n` et `Name` via `_featAllocations`)
+- **Une seule unité par invocation**.
+- **No-spawn** : `/sdd-reverse` séquence des COMMANDES, n'invoque aucun agent directement (§9).
+- Échec d'un barreau → STOP (pas de barreau suivant sur données incomplètes).
+- Idempotence : re-lancer ré-exécute les 3 barreaux (mêmes `n`/`Name` via `_featAllocations`).
+
+Voir `.claude/docs/reverse-engineering-workflow.md` §Phase 3 + ADR `governance-major-reverse-spec-ladder`.

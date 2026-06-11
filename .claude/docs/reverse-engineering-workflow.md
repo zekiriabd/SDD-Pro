@@ -1,12 +1,24 @@
 ---
 title: Reverse Engineering Workflow — Design Doc Maître
 status: Draft (en attente validation Tech Lead)
-version: 0.5.0
+version: 0.7.0
 created: 2026-06-10
-updated: 2026-06-10
+updated: 2026-06-11
 authors: SDD_Pro Architect
 scope: workflow nouveau, isolé, cohabitant avec SDD_Pro v7.0.0+ sans édition de fichier existant
 changelog:
+  - v0.7.0 (2026-06-11) — **Escalier ascendant Phase 3 (ADR `governance-major-reverse-spec-ladder`)**.
+      La Phase 3 mono-saut (agent `reverse-functional-extractor`, code→FEAT en un prompt — qui faisait
+      baver l'altitude technique dans la FEAT métier) est **décomposée** en 3 barreaux ascendants :
+      **3a `reverse-tech-analyst`** (code → analyse technique fidèle, `output/plans/{n}-{Name}.analysis.md`),
+      **3b `reverse-us-writer`** (analyse → user stories par capability, `output/us/{n}-{m}-{Name}.md`),
+      **3c `reverse-feat-composer`** (US → FEAT métier propre, plomberie démotée, `input/feats/{n}-{Name}.md`).
+      `reverse-functional-extractor` est **décommissionné** (D2 no-dead-code, gate `reverse_smoke.check_no_dangling_spawn`).
+      `/sdd-reverse` devient un **séquenceur** de `/sdd-reverse-analyze` + `/sdd-reverse-stories` + `/sdd-reverse-feat`.
+      Fil de traçabilité FEAT→US→task→evidence (`check_ladder_traceability.py`, D3), confidence min-monotone
+      ascendante (3c ≤ 3b ≤ 3a). Intent A (documentation legacy) forward-compatible B (rebuild via /sdd-full).
+      **⚠️ Les §4.3 / §tableaux roster / mirror loader ci-dessous décrivant `reverse-functional-extractor`
+      comme agent vivant sont HISTORIQUES — l'autorité courante est l'ADR + les 3 agents 3a/3b/3c.**
   - v0.5.0 (2026-06-10) — **Refonte profondeur d'extraction (lots L0→L6)** suite audit CTO.
       L0 : code-graph symbole-level (`code_graph_builder.py` + `class_role_classifier.py`) —
         chaque classe classée par rôle (repository/service/dto/code-behind/controller/complex/…),
@@ -328,7 +340,7 @@ workspace/
 
 - **Aucun ré-arrangement** : `U-N` n'est jamais renuméroté.
 
-- **Phase 3 séquentielle stricte** : `/sdd-reverse {U-N}` **n'est pas conçu** pour tourner en parallèle sur plusieurs `U-N` simultanément. L'orchestrateur `/sdd-reverse-full` (V2) séquence les invocations. Si un utilisateur lance deux `/sdd-reverse` en parallèle manuellement, le second attend le lock (jusqu'à TTL) ou émet `[REVERSE_LOCK_HELD]`.
+- **Phase 3 : parallèle borné après pré-allocation (L5), séquentiel strict sinon** (M13 — doc alignée 2026-06-10 sur `rules/reverse-engineering.md §8`) : après `preallocate_feats.py` (STEP 2.5 de `/sdd-reverse-full`), chaque unité a son `(n, Name)` figé et écrit un fichier disjoint sans lock → invocations `/sdd-reverse {U-N}` parallèles-safe (borne `--max-parallel`, défaut 3). SANS pré-allocation, mode legacy séquentiel strict (ADV-2) : le second `/sdd-reverse` émet `[REVERSE_LOCK_HELD]` (TTL 1800 s).
 
 - **Lock élargi (couverture full transaction)** : le lock `workspace/input/feats/.alloc.lock` couvre **toute la transaction** (corrigé ADV-2) :
   ```
@@ -449,7 +461,7 @@ tools: Read, Write, Glob, Grep, Bash
    ```
 3. Un script déterministe `sdd_reverse/merge_db_schema.py` applique l'union :
    ```bash
-   python -m sdd_reverse.merge_db_schema \
+   python .claude/python/sdd_reverse/merge_db_schema.py \
      --base workspace/old/{P}/.sys/db-schema.json \
      --enrichment workspace/old/{P}/.sys/db-schema.enrichment.json \
      --output workspace/old/{P}/.sys/db-schema.merged.json
@@ -494,7 +506,7 @@ tools: Read, Write, Edit, Glob, Grep, Bash
 **Solution** : script déterministe dédié `sdd_reverse_scripts/validate_reverse_feat.py` qui valide UNIQUEMENT la structure FEAT (indépendant du pipeline standard) :
 
 ```bash
-python -m sdd_reverse_scripts.validate_reverse_feat \
+python .claude/python/sdd_reverse_scripts/validate_reverse_feat.py \
   --feat-path workspace/input/feats/{n}-{Name}.md \
   --json
 ```
@@ -512,7 +524,7 @@ python -m sdd_reverse_scripts.validate_reverse_feat \
 ```
 loop (max 3):
   write FEAT
-  python -m sdd_reverse_scripts.validate_reverse_feat --feat-path ... --json
+  python .claude/python/sdd_reverse_scripts/validate_reverse_feat.py --feat-path ... --json
   if exit 0: break
   else: read errors JSON (champ `errors[]`), corriger FEAT, iter++
 
@@ -846,7 +858,7 @@ Comme `/sdd-full` est un fichier existant **intouchable** (Annexe B), la gate pr
 
 1. Script `sdd_reverse_scripts/check_reverse_feat_for_full.py` (nouveau, isolé) :
    ```bash
-   python -m sdd_reverse_scripts.check_reverse_feat_for_full \
+   python .claude/python/sdd_reverse_scripts/check_reverse_feat_for_full.py \
      --feat-path workspace/input/feats/{n}-*.md \
      [--allow-reverse-low]
    ```
@@ -856,7 +868,7 @@ Comme `/sdd-full` est un fichier existant **intouchable** (Annexe B), la gate pr
 
 2. **Convention utilisateur** : avant `/sdd-full {n}`, lancer le check :
    ```bash
-   python -m sdd_reverse_scripts.check_reverse_feat_for_full --feat-path workspace/input/feats/7-*.md && /sdd-full 7
+   python .claude/python/sdd_reverse_scripts/check_reverse_feat_for_full.py --feat-path workspace/input/feats/7-*.md && /sdd-full 7
    ```
    Documenté dans la commande `/sdd-reverse-status` (V2).
 
@@ -1559,7 +1571,7 @@ Les 2 attaques adversariales suivantes ne sont **pas** corrigées en MVP. Elles 
   - `reverse-confidence-enum-strict` (uniquement `high|medium|low`)
   - `reverse-lock-format-valid` (.alloc.lock contient `{agent_id, pid, ts_unix}`)
 - Créer `.claude/python/sdd_reverse_scripts/reverse_smoke.py` qui vérifie chaque enforcer (script déterministe, 0 token).
-- Documenter dans la skill `starting-a-reverse-eng` : "Avant chaque release, lancer `python -m sdd_reverse_scripts.reverse_smoke` en plus de `framework_smoke.py`".
+- Documenter dans la skill `starting-a-reverse-eng` : "Avant chaque release, lancer `python .claude/python/sdd_reverse_scripts/reverse_smoke.py` en plus de `framework_smoke.py`".
 - **V3** : proposer un PR officiel sur `test_invariants_manifest.py` pour qu'il accepte un paramètre `--manifest` (lecture multi-manifests). Décision Tech Lead seule.
 
 ### 15.2 ADV-8 — Fichiers > 100k LOC + paths Unicode/espaces (V2)

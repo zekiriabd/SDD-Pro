@@ -14,7 +14,7 @@ Output: list of {label, suggestedName, language, kind, evidenceFiles,
                   entities, confidenceEstimate, rationale}
 
 Heuristic-based, conservative (over-merging is preferred to over-splitting —
-the agent reverse-functional-extractor can refine later).
+the reverse extraction ladder can refine later).
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from sdd_reverse.scan_legacy import normalize_bytes
+from sdd_reverse.scan_legacy import decode_text, normalize_bytes
 
 
 # Default home-page filename stems recognised across western locales.
@@ -110,8 +110,7 @@ def _read_normalized(path: Path) -> str:
         raw = path.read_bytes()
     except OSError:
         return ""
-    norm = normalize_bytes(raw)
-    return norm.decode("utf-8", errors="replace")
+    return decode_text(normalize_bytes(raw))
 
 
 def _classify_page(content: str, path_str: str = "") -> tuple[str, float]:

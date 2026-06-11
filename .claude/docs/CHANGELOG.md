@@ -18,6 +18,124 @@ Format : [version] — date courte. Sections : `Breaking`, `Added`, `Changed`, `
 
 ---
 
+## [reverse-v0.7.0-dev] — 2026-06-11 (branche audit-2026-06-09-v3 — escalier ascendant Phase 3)
+
+> ADR `governance-major-reverse-spec-ladder` (RFC Proposed, branche `next`).
+> Constat : les FEATs reverse « ressemblaient à des tâches techniques, pas à des
+> specs métier » — cause-racine = saut mono-prompt code→FEAT (l'evidence
+> hard-gated faisait baver l'altitude technique dans la FEAT). Intent A
+> (documentation legacy), forward-compatible B (rebuild).
+
+### Added
+- **Escalier ascendant Phase 3 (3 barreaux)** : agents `reverse-tech-analyst` (3a,
+  `output/plans/{n}-{Name}.analysis.md`), `reverse-us-writer` (3b, `output/us/`),
+  `reverse-feat-composer` (3c, `input/feats/`) + commandes `/sdd-reverse-analyze`,
+  `/sdd-reverse-stories`, `/sdd-reverse-feat`.
+- Templates isolés `analysis.reverse.template.md` + `us.reverse.template.md` (ADV-9).
+- `check_ladder_traceability.py` — enforceur déterministe D3 (fil FEAT→US→task→evidence,
+  informational) + 4 tests.
+- Gate `reverse_smoke.check_no_dead_code` (D2) — interdit tout `spawns:` pendant / agent orphelin.
+- Classes `[REVERSE_LADDER_TRACEABILITY_GAP]` + `[REVERSE_LADDER_STALE]` (rule §6).
+- Invariants `reverse-no-dead-code` + `reverse-ladder-traceability` (INVARIANTS.reverse.yml).
+
+### Changed
+- `/sdd-reverse` : agent mono-saut → **séquenceur** 3a→3b→3c (no-spawn §9).
+- Confidence **min-monotone ascendante** (3c ≤ 3b ≤ 3a) ; plomberie **démotée** hors `## Business Rules`.
+
+### Removed
+- **`reverse-functional-extractor` décommissionné** (D2, no dead code) — logique d'extraction
+  evidence migrée en 3a, composition FEAT migrée en 3c. 15 références mises à jour, suite
+  reverse/loader/invariant verte (196 tests) + smoke 13/13.
+
+## [reverse-v0.6.0-dev] — 2026-06-11 (branche audit-2026-06-09-v3 — closure audit consolidé reverse)
+
+> Audit consolidé 2026-06-10 (5 audits parallèles, cas réel EDI WPF ~12 250 LOC) :
+> 10 CRITICAL + 18 MAJOR fermés. Constat initial : extraction métier ~5 % LOC,
+> ViewModels 0 %, 47 commandes CLI invisibles, couche données non structurée.
+> Après closure (re-run EDI) : **110/114 classes couvertes (~96 %)**, unité
+> `kind=job` à 56 commandes CLI, FEAT Database à 49 FDs (28 SP + tables +
+> connection strings), 16 fichiers de clés privées détectés.
+
+### Fixed (CRITICAL)
+- **C1** — `enrich_units` seede le graph-walk via les références markup
+  (XAML/aspx), la résolution **ViewModelLocator** (`{Binding X,
+  Source={StaticResource Locator}}` → property map du locator) et la
+  convention `{View}ViewModel`. Nouveau rôle behavioural `viewmodel`
+  (les VMs avec méthodes ne sont plus classés `dto`).
+  + Fix masker C# : parité d'échappement `"\\"` + resync newline
+  (le masker avalait le reste du fichier → classes tronquées à 1 ligne).
+- **C2** — unités `kind=job` par entry-point CLI/batch (`App.xaml.cs`,
+  `Program.cs` consommant `e.Args`/`args[]`) + champ `cliCommands`.
+- **C3** — crosscut obligatoire dans `/sdd-reverse-full` (flag --skip-crosscut
+  retiré) ; FEAT Database enrichie des **SP appelées sans DDL** + tables
+  inline hors schéma ; tech-auditor OBLIGÉ de matérialiser ses déductions
+  entités/FKs dans `db-schema.enrichment.json` (« si c'est dans le §5,
+  c'est dans le JSON »).
+- **C4** — cache d'extraction câblé : nouveau script
+  `update_extraction_cache.py` (`--save` agent STEP 7 / `--check`
+  orchestrateur STEP 3a).
+- **C5** — locks : acquisition `O_CREAT|O_EXCL` atomique (TOCTOU fermé),
+  STEP 3 extractor conditionnel au mode legacy (aucun lock en pré-alloué),
+  TTL extraction 1800 s.
+- **C6** — invocation canonique `python .claude/python/sdd_reverse_scripts/{x}.py`
+  (bootstrap `sys.path` dans chaque script) — `python -m` sans PYTHONPATH
+  était inexécutable depuis la racine repo.
+- **C7** — VB.NET visible : signature `vbnet` (+ `classic-asp`) + parser
+  `Class…End Class` dans code_graph_builder (cap `medium`).
+- **C8** — DDL SSMS : colonnes `[Id] [int]` bracketées parsées, FK
+  `ALTER TABLE … ADD CONSTRAINT`, `parseWarnings` (plus de drop silencieux).
+- **C9** — flag fantôme `--allow-low` retiré (`/sdd-reverse`,
+  `/sdd-reverse-full`) — voie officielle : `check_reverse_feat_for_full
+  --allow-reverse-low`.
+- **C10** — scan secrets/clés privées (`.ppk`/`.pem`/`.pfx`/`id_rsa*`) →
+  `inventory.json.secretsDetected` + section inventory.md + section §6
+  OBLIGATOIRE du tech-audit. Classe `[REVERSE_SECRETS_DETECTED]`.
+
+### Fixed (MAJOR)
+- **M1-M5** data-access : nom de SP cherché des DEUX côtés du marqueur
+  `CommandType.StoredProcedure` ; merge des littéraux concaténés
+  (`+`/`&`/`.`/StringBuilder/`+=`) ; littéraux single-quote (PHP/JSP) ;
+  `<asp:SqlDataSource *Command>` + `.xsd` `<CommandText>` ; WCF/ASMX +
+  EF6/LINQ-to-SQL/SqlBulkCopy/NHibernate dans les regex touch.
+- **M6** checklist dataAccess obligatoire extractor (STEP 1.ter) +
+  auto-check complétude STEP 6.bis (1 itération corrective max).
+- **M7** classes métier non couvertes → section WARN bloquante-attention
+  d'inventory.md + `[REVERSE_COMPLETENESS_GAP]`.
+- **M8** `--use-cache` court-circuite réellement le scan (+ flag `--refresh`
+  réel) ; inventaire existant TOUJOURS chargé pour la stabilité U-N.
+- **M9** `reverse_status` : `feats_extracted` compté sur FEATs réelles
+  (cross-ref `source-unit`), `ui_screens` calculé, XC-* exclus.
+- **M10** Unicode cp1252 : `console_safe.ensure_console_safe()` dans les
+  10 scripts + sorties ASCII (`[GREEN]`/`[NO-GO]`, verdicts complétude
+  `complete|partial|incomplete`).
+- **M11** nouvelle commande wrapper `/sdd-reverse-review` (STEP 3.6 full
+  redevient no-spawn §9) + check smoke `reverse-no-spawn-of-agents`
+  (enforcer manifest qui manquait).
+- **M12** `.xaml` ajouté aux listes UI Phase 4. **M13** doc
+  séquentiel/parallèle alignée (3 fichiers). **M14** `--reconcile` :
+  filtre projet normalisé, stems sanitisés, ancrage repo-root.
+  **M15** tools agents (completeness +Write, inventory +Edit).
+  **M16** cap contexte extractor (40 Reads, priorité par rôle).
+  **M17** `_detect_eol` honore `versions_before` (Newtonsoft 13.0.3 ≠ EOL)
+  + clé Maven `commons-collections` matchable. **M18** `excluded_paths`
+  YAML appliqués, fallback décodage cp1252 (`decode_text`), boutons WPF
+  imbriqués (icône+texte), refs partial classes unionnées.
+
+### Changed
+- Parité helpers **bidirectionnelle** (`_parity_snapshots.json` hash aussi
+  les copies locales) ; `_hex_strip_alpha` câblé ; helper `paths.repo_root()`
+  (scripts n'utilisent plus de chemins CWD-relatifs — anomalie env fermée,
+  dossier parasite `.claude/python/workspace/` supprimé) ;
+  `loader.reverse.yml` : commande `sdd-reverse-review` + script
+  `update_extraction_cache` + CLIs canoniques.
+
+### Tests
+- `tests/test_sdd_reverse_audit_closures.py` (25 tests) : C1/C2/C4/C5/C7/C8/
+  C10, M1-M3, M17, M18, rôle viewmodel, gates 0 % (reverse_audit e2e,
+  merge_db_schema, check_reverse_feat_for_full). Suite complète verte.
+
+---
+
 ## [v7.0.1-dev] — 2026-06-05 → 2026-06-08 (next branch, post v7.0.0 GA audit closure)
 
 > Renommage MN3 (audit hygiène 2026-06-07) : cette section couvre les fixes audit CTO post-v7.0.0 GA. Sera taguée v7.0.1 PATCH (audit closure) ou v7.1.0 MINOR (selon ampleur). L'ancien header `[Unreleased] — 2026-06-05` était antidaté par rapport à `[v7.0.0] — 2026-05-23` ci-dessous, ce qui prêtait à confusion.

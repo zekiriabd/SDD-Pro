@@ -70,12 +70,16 @@ RETIRED_AGENTS_V7 = frozenset({
 #: .claude/docs/reverse-engineering-workflow.md
 REVERSE_AGENTS_V7 = frozenset({
     "reverse-inventory",
-    "reverse-functional-extractor",
     # V2 — implemented (Phase 2 audit + Phase 4 UI extraction)
     "reverse-tech-auditor",
     "reverse-ui-extractor",
     # V2 L5 — back-side completeness reviewer (informational)
     "reverse-completeness-reviewer",
+    # v0.7.0 — ADR governance-major-reverse-spec-ladder : escalier ascendant 3a/3b/3c
+    # (remplace reverse-functional-extractor, décommissionné D2 — saut mono-prompt)
+    "reverse-tech-analyst",
+    "reverse-us-writer",
+    "reverse-feat-composer",
 })
 
 

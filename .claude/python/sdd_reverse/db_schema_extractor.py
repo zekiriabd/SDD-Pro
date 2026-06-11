@@ -13,8 +13,8 @@ Public API:
     extract_db_schema(project_root, scan_result) -> dict
 
 If no schema source is found → returns minimal `{entities: []}` and the
-agent reverse-functional-extractor will degrade entities to `confidence: medium`
-(per §9.2 design doc).
+reverse extraction ladder (3a reverse-tech-analyst) will degrade entities to
+`confidence: medium` (per §9.2 design doc).
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from sdd_reverse.scan_legacy import ScanResult, normalize_bytes
+from sdd_reverse.scan_legacy import ScanResult, decode_text, normalize_bytes
 
 DB_SCHEMA_VERSION = 1
 
@@ -38,14 +38,29 @@ _RE_CREATE_TABLE_HEADER = re.compile(
 )
 
 # Column line: name TYPE[(args)] [NOT NULL|NULL] [IDENTITY(...)] [PRIMARY KEY] [DEFAULT ...]
+# Audit 2026-06-10 C8 : the type may itself be bracketed (`[Id] [int]
+# IDENTITY(1,1)` — DEFAULT scripting format of SSMS). The previous regex
+# required the type to start with a letter, so EVERY column of an SSMS-scripted
+# DDL was silently dropped (fields: [] without any WARN).
 _RE_COLUMN = re.compile(
     r"^\s*\[?(\w+)\]?\s+"                                       # 1: name
-    r"([A-Za-z][A-Za-z0-9]*(?:\s*\([^)]+\))?)"                  # 2: type (possibly with parens like NVARCHAR(50))
+    r"(\[?[A-Za-z][A-Za-z0-9_]*\]?(?:\s*\([^)]+\))?)"           # 2: type, optionally [bracketed], with optional (args)
     r"(.*)$",                                                    # 3: trailing modifiers
     re.IGNORECASE,
 )
 _RE_FK = re.compile(
-    r"(?:CONSTRAINT\s+\[?(\w+)\]?\s+)?FOREIGN\s+KEY\s*\(\[?(\w+)\]?\)\s+REFERENCES\s+\[?(\w+)\]?\s*\(\[?(\w+)\]?\)",
+    r"(?:CONSTRAINT\s+\[?(\w+)\]?\s+)?FOREIGN\s+KEY\s*\(\[?(\w+)\]?\)\s+"
+    r"REFERENCES\s+(?:\[?dbo\]?\.)?\[?(\w+)\]?\s*\(\[?(\w+)\]?\)",
+    re.IGNORECASE,
+)
+# C8 : FKs scripted as `ALTER TABLE [dbo].[X] [WITH CHECK] ADD CONSTRAINT …
+# FOREIGN KEY … REFERENCES …` (the SSMS default) were never parsed despite the
+# docstring claiming ALTER TABLE support — file-level second pass.
+_RE_ALTER_FK = re.compile(
+    r"ALTER\s+TABLE\s+(?:\[?dbo\]?\.)?\[?(\w+)\]?\s+"
+    r"(?:WITH\s+(?:NO)?CHECK\s+)?ADD\s+"
+    r"(?:CONSTRAINT\s+\[?(\w+)\]?\s+)?FOREIGN\s+KEY\s*\(\[?(\w+)\]?\)\s*"
+    r"REFERENCES\s+(?:\[?dbo\]?\.)?\[?(\w+)\]?\s*\(\[?(\w+)\]?\)",
     re.IGNORECASE,
 )
 
@@ -124,7 +139,7 @@ def _read_text(path: Path) -> str:
         raw = path.read_bytes()
     except OSError:
         return ""
-    return normalize_bytes(raw).decode("utf-8", errors="replace")
+    return decode_text(normalize_bytes(raw))
 
 
 def _split_top_level_commas(body: str) -> list[str]:
@@ -149,8 +164,12 @@ def _split_top_level_commas(body: str) -> list[str]:
     return parts
 
 
-def _parse_sql_ddl(content: str, source_file: str) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    """Return (entities, relations)."""
+def _parse_sql_ddl(
+    content: str, source_file: str,
+    parse_warnings: list[str] | None = None,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Return (entities, relations). Unparseable column lines are logged into
+    `parse_warnings` (C8 — silent drops made SSMS DDL vanish without trace)."""
     entities: list[dict[str, Any]] = []
     relations: list[dict[str, Any]] = []
 
@@ -177,9 +196,15 @@ def _parse_sql_ddl(content: str, source_file: str) -> tuple[list[dict[str, Any]]
                 continue
             cm = _RE_COLUMN.match(col_text)
             if not cm:
+                if parse_warnings is not None:
+                    parse_warnings.append(
+                        f"{source_file} table {table_name}: column line not "
+                        f"parsed: {col_text[:80]!r}"
+                    )
                 continue
             field_name = cm.group(1)
-            field_type = (cm.group(2) or "").strip()
+            # Drop SSMS brackets around the type name: `[nvarchar](100)` → `nvarchar(100)`
+            field_type = re.sub(r"[\[\]]", "", (cm.group(2) or "")).strip()
             modifiers = (cm.group(3) or "").upper()
             is_pk = "PRIMARY KEY" in modifiers
             identity = "IDENTITY" in modifiers
@@ -216,6 +241,19 @@ def _parse_sql_ddl(content: str, source_file: str) -> tuple[list[dict[str, Any]]
             "table": table_name,
             "evidence": [evidence],
             "fields": fields,
+        })
+
+    # C8 : file-level pass — FKs added via ALTER TABLE … ADD CONSTRAINT.
+    for fk in _RE_ALTER_FK.finditer(content):
+        table_name = fk.group(1)
+        from_field = fk.group(3)
+        line = content[: fk.start()].count("\n") + 1
+        relations.append({
+            "name": fk.group(2) or f"FK_{table_name}_{from_field}",
+            "from": {"entity": table_name, "field": from_field},
+            "to": {"entity": fk.group(4), "field": fk.group(5)},
+            "type": "many-to-one",
+            "evidence": f"{source_file}:{line}",
         })
 
     return entities, relations
@@ -274,6 +312,7 @@ def extract_db_schema(
     all_relations: list[dict[str, Any]] = []
     sources: list[str] = []
     content_samples: list[str] = []
+    parse_warnings: list[str] = []   # C8 — surfaced, never silent
 
     # Pass 1: SQL DDL files (most authoritative)
     for lm in scan_result.languages:
@@ -284,7 +323,7 @@ def extract_db_schema(
             content_samples.append(content[:500])
             rel = str(f.relative_to(root).as_posix())
             sources.append(rel)
-            ents, rels = _parse_sql_ddl(content, rel)
+            ents, rels = _parse_sql_ddl(content, rel, parse_warnings)
             for e in ents:
                 if e["name"] not in all_entities:
                     all_entities[e["name"]] = e
@@ -332,6 +371,7 @@ def extract_db_schema(
         "entities": list(all_entities.values()),
         "relations": all_relations,
         "indexes": [],
+        "parseWarnings": parse_warnings[:50],   # C8 — unparsed column lines
         "missingPartsHint": [] if all_entities else [
             "No DB schema detected. Phase 3 entities will be degraded to confidence: medium (§9.2)."
         ],

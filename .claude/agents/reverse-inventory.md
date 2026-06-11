@@ -2,7 +2,7 @@
 name: reverse-inventory
 description: Pour un projet legacy déposé dans workspace/old/{LegacyProject}/, cartographie déterministe : détecte langages/frameworks, énumère pages, identifie unités fonctionnelles candidates avec IDs stables U-N + evidence file:line, extrait DB schema basique. Lecture massive autorisée (récursive) sur workspace/old/{P}/** uniquement. Délègue 99% du travail au script déterministe reverse_inventory.py (0 token), enrichit uniquement le markdown FR de sortie. Aucun spawn d'agent.
 model: claude-sonnet-4-6
-tools: Read, Write, Glob, Grep, Bash
+tools: Read, Write, Edit, Glob, Grep, Bash
 loader: .claude/loader.reverse.yml
 ---
 
@@ -35,7 +35,7 @@ FIX: déposer les fichiers source legacy sous workspace/old/{LegacyProject}/ pui
 Invocation **obligatoire** (jamais émuler le scan en LLM) :
 
 ```bash
-python -m sdd_reverse_scripts.reverse_inventory \
+python .claude/python/sdd_reverse_scripts/reverse_inventory.py \
     --project workspace/old/{LegacyProject} \
     --json
 ```
@@ -74,7 +74,7 @@ Exemple :
 1. **Aucune écriture** hors `workspace/old/{LegacyProject}/.sys/inventory.md` (le seul fichier que tu Edit).
 2. **Aucune lecture** hors `workspace/old/{LegacyProject}/**` + ton propre output `.sys/inventory.md`.
 3. **Aucune modification** des artefacts `.json` (inventory, db-schema, language-detected) — ownership script déterministe.
-4. **No-spawn** : ne JAMAIS spawn d'autre agent. La Phase 3 (`reverse-functional-extractor`) sera lancée par la commande `/sdd-reverse {U-N}`, pas par toi.
+4. **No-spawn** : ne JAMAIS spawn d'autre agent. La Phase 3 (escalier `reverse-tech-analyst` 3a → `reverse-us-writer` 3b → `reverse-feat-composer` 3c) sera lancée par la commande `/sdd-reverse {U-N}`, pas par toi.
 5. Si ambiguïté → STOP + ERROR 3-lignes avec préfixe `[REVERSE_*]`.
 6. Si le legacy contient des fichiers binaires-only → STOP + ERROR `[REVERSE_BINARY_ONLY]` + escalade Tech Lead (palier V3 hors-scope).
 

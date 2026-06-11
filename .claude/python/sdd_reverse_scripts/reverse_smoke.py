@@ -26,6 +26,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+# C6 bootstrap — canonical invocation is by file path, no PYTHONPATH needed.
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from sdd_reverse.console_safe import ensure_console_safe
+
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
@@ -139,8 +145,10 @@ def check_db_schema_enrichment_separate() -> CheckResult:
 
 def check_template_isolated() -> CheckResult:
     """feat.reverse.template.md must exist in sdd_reverse/, not be a symlink to .claude/templates/."""
-    template = REPO_ROOT / ".claude" / "python" / "sdd_reverse" / "feat.reverse.template.md"
-    if not template.is_file():
+    try:
+        from sdd_reverse.paths import feat_reverse_template_path
+        template = feat_reverse_template_path()
+    except FileNotFoundError:
         return CheckResult(
             "reverse-template-isolated", "FAIL",
             "feat.reverse.template.md missing — ADV-9 violation (no fallback inline allowed)",
@@ -151,6 +159,112 @@ def check_template_isolated() -> CheckResult:
             "feat.reverse.template.md is a symlink — ADV-9 requires a deliberate local copy",
         )
     return CheckResult("reverse-template-isolated", "OK")
+
+
+def check_no_spawn_of_agents() -> CheckResult:
+    """INVARIANT reverse-no-spawn-of-agents (§9 rules/reverse-engineering.md).
+
+    Audit 2026-06-10 : declared in INVARIANTS.reverse.yml with this script as
+    enforcer, but the check was absent from `_ALL_CHECKS` (manifest rot).
+
+    Deterministic heuristics :
+        - no reverse AGENT prompt may instruct spawning another agent
+          (`Agent(reverse-` pattern outside no-spawn statements) ;
+        - the orchestrator command must keep its no-spawn statement.
+    """
+    agents_dir = REPO_ROOT / ".claude" / "agents"
+    spawn_re = re.compile(r"Agent\(\s*reverse-", re.IGNORECASE)
+    violations: list[str] = []
+    for p in sorted(agents_dir.glob("reverse-*.md")):
+        try:
+            text = p.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        for line_no, line in enumerate(text.splitlines(), start=1):
+            if spawn_re.search(line) and "no-spawn" not in line.lower():
+                violations.append(f"{p.name}:{line_no}: {line.strip()[:80]}")
+    full_cmd = REPO_ROOT / ".claude" / "commands" / "sdd-reverse-full.md"
+    if full_cmd.is_file():
+        text = full_cmd.read_text(encoding="utf-8", errors="replace")
+        if "no-spawn" not in text.lower() and "ne spawn" not in text.lower():
+            violations.append("sdd-reverse-full.md: no-spawn statement missing")
+    if violations:
+        return CheckResult(
+            "reverse-no-spawn-of-agents", "FAIL",
+            f"{len(violations)} no-spawn violation(s)",
+            {"violations": violations[:10]},
+        )
+    return CheckResult("reverse-no-spawn-of-agents", "OK")
+
+
+def check_no_dangling_spawn() -> CheckResult:
+    """INVARIANT reverse-no-dead-code (ADR governance-major-reverse-spec-ladder D2).
+
+    Verifies the LIVE wiring of loader.reverse.yml has no dead reference :
+      1. every agent named in a command `spawns: [...]` array has a prompt
+         `.claude/agents/{name}.md` on disk (no dangling spawn after an agent
+         is decommissioned) ;
+      2. every reverse-* agent block declared under `agents:` has a `.md` on
+         disk ;
+      3. every `reverse-*.md` prompt on disk is declared as an `agents:` block
+         (no orphan prompt).
+
+    This is the gate that makes the 3a/3b/3c ladder migration safe : removing
+    `reverse-functional-extractor` while a command still spawned it (or its
+    prompt lingered) would FAIL here. Prose mentions in docs/rules/CHANGELOG
+    are intentionally NOT checked (historical references are legitimate).
+    """
+    loader = REPO_ROOT / ".claude" / "loader.reverse.yml"
+    agents_dir = REPO_ROOT / ".claude" / "agents"
+    if not loader.is_file():
+        return CheckResult("reverse-no-dead-code", "WARN", "loader.reverse.yml absent")
+    text = loader.read_text(encoding="utf-8", errors="replace")
+
+    # Slice the `agents:` section (from `agents:` to the next top-level key like `commands:`)
+    agent_block_names: set[str] = set()
+    in_agents = False
+    for line in text.splitlines():
+        if re.match(r"^agents:\s*$", line):
+            in_agents = True
+            continue
+        if in_agents and re.match(r"^\S", line):  # next top-level key ends the section
+            in_agents = False
+        if in_agents:
+            m = re.match(r"^  ([A-Za-z][\w-]*):\s*$", line)
+            if m:
+                agent_block_names.add(m.group(1))
+
+    # Agents named in any `spawns: [...]` array
+    spawned: set[str] = set()
+    for arr in re.findall(r"spawns:\s*\[([^\]]*)\]", text):
+        for tok in arr.split(","):
+            name = tok.strip().strip("'\"")
+            if name:
+                spawned.add(name)
+
+    on_disk = {p.stem for p in agents_dir.glob("reverse-*.md")}
+
+    violations: list[str] = []
+    # (1) dangling spawn → spawned agent missing prompt on disk
+    for name in sorted(spawned):
+        if not (agents_dir / f"{name}.md").is_file():
+            violations.append(f"command spawns '{name}' but .claude/agents/{name}.md is missing (dangling spawn / dead wiring)")
+    # (2) loader agent block without prompt on disk
+    for name in sorted(agent_block_names):
+        if name.startswith("reverse-") and not (agents_dir / f"{name}.md").is_file():
+            violations.append(f"loader agents: declares '{name}' but .claude/agents/{name}.md is missing")
+    # (3) orphan reverse prompt without loader agent block
+    for name in sorted(on_disk):
+        if name not in agent_block_names:
+            violations.append(f".claude/agents/{name}.md exists but has no agents: block in loader.reverse.yml (orphan prompt)")
+
+    if violations:
+        return CheckResult(
+            "reverse-no-dead-code", "FAIL",
+            f"{len(violations)} dead-wiring / orphan issue(s) (ADR reverse-spec-ladder D2)",
+            {"violations": violations[:10]},
+        )
+    return CheckResult("reverse-no-dead-code", "OK")
 
 
 def check_helper_parity_drift() -> CheckResult:
@@ -412,6 +526,8 @@ _ALL_CHECKS = [
     check_inventory_schema_v1,
     check_db_schema_enrichment_separate,
     check_template_isolated,
+    check_no_spawn_of_agents,
+    check_no_dangling_spawn,
     check_helper_parity_drift,
     check_lock_format,
     # P1.6 closure (2026-06-10) — direct enforcement of invariants
@@ -424,6 +540,7 @@ _ALL_CHECKS = [
 
 
 def main(argv: list[str] | None = None) -> int:
+    ensure_console_safe()
     parser = argparse.ArgumentParser(
         prog="reverse_smoke",
         description="Enforcer for INVARIANTS.reverse.yml (ADV-7 closure).",

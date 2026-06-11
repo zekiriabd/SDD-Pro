@@ -10,9 +10,14 @@ to ~40-50% by exercising the critical path of FEAT extraction (lock) +
 UI extraction (parser) on the legacy-webforms-minimal fixture.
 
 NOT covered yet (deferred V0.4) :
-    - Full reverse-functional-extractor agent run (requires LLM)
+    - Full ladder agent runs (reverse-tech-analyst 3a, reverse-us-writer 3b,
+      reverse-feat-composer 3c — require LLM)
     - Full reverse-ui-extractor agent run (requires LLM)
     - merge_db_schema with conflicting enrichments
+
+NOTE : the lock-id labels below use "reverse-tech-analyst-*" because the 3a
+barreau owns the (n, Name) allocation lock (ADR reverse-spec-ladder, ex
+reverse-functional-extractor).
 """
 from __future__ import annotations
 
@@ -34,11 +39,11 @@ def test_phase3_lock_acquire_then_release(tmp_path: Path) -> None:
     from sdd_reverse.file_locks_local import acquire_lock, release_lock, read_lock
 
     lock = tmp_path / ".alloc.lock"
-    assert acquire_lock(lock, "reverse-functional-extractor-U-1") == 0
+    assert acquire_lock(lock, "reverse-tech-analyst-U-1") == 0
     payload = read_lock(lock)
     assert payload is not None
-    assert payload["agent_id"] == "reverse-functional-extractor-U-1"
-    assert release_lock(lock, "reverse-functional-extractor-U-1") == 0
+    assert payload["agent_id"] == "reverse-tech-analyst-U-1"
+    assert release_lock(lock, "reverse-tech-analyst-U-1") == 0
 
 
 def test_phase3_lock_collision_blocks_second_agent(tmp_path: Path) -> None:
@@ -46,9 +51,9 @@ def test_phase3_lock_collision_blocks_second_agent(tmp_path: Path) -> None:
     from sdd_reverse.file_locks_local import acquire_lock
 
     lock = tmp_path / ".alloc.lock"
-    assert acquire_lock(lock, "reverse-functional-extractor-U-1") == 0
+    assert acquire_lock(lock, "reverse-tech-analyst-U-1") == 0
     # Second agent attempts to acquire while first holds the lock
-    assert acquire_lock(lock, "reverse-functional-extractor-U-2") == 1
+    assert acquire_lock(lock, "reverse-tech-analyst-U-2") == 1
 
 
 def test_phase3_lock_idempotent_for_same_agent(tmp_path: Path) -> None:
@@ -56,7 +61,7 @@ def test_phase3_lock_idempotent_for_same_agent(tmp_path: Path) -> None:
     from sdd_reverse.file_locks_local import acquire_lock
 
     lock = tmp_path / ".alloc.lock"
-    agent = "reverse-functional-extractor-U-3"
+    agent = "reverse-tech-analyst-U-3"
     assert acquire_lock(lock, agent) == 0
     assert acquire_lock(lock, agent) == 0  # re-entrant
     assert acquire_lock(lock, agent) == 0  # idempotent
@@ -69,15 +74,15 @@ def test_phase3_lock_ttl_recovery(tmp_path: Path) -> None:
     lock = tmp_path / ".alloc.lock"
     # Simulate a crashed agent's stale lock (3600s old)
     lock.write_text(json.dumps({
-        "agent_id": "reverse-functional-extractor-crashed",
+        "agent_id": "reverse-tech-analyst-crashed",
         "pid": 99999,
         "ts_unix": int(time.time()) - 3600,
         "host": "crashed-machine",
     }), encoding="utf-8")
-    assert acquire_lock(lock, "reverse-functional-extractor-U-1", ttl=30) == 2
+    assert acquire_lock(lock, "reverse-tech-analyst-U-1", ttl=30) == 2
     payload = read_lock(lock)
     assert payload is not None
-    assert payload["agent_id"] == "reverse-functional-extractor-U-1"
+    assert payload["agent_id"] == "reverse-tech-analyst-U-1"
 
 
 def test_phase3_lock_payload_schema(tmp_path: Path) -> None:
@@ -86,7 +91,7 @@ def test_phase3_lock_payload_schema(tmp_path: Path) -> None:
     from sdd_reverse.file_locks_local import acquire_lock, read_lock
 
     lock = tmp_path / ".alloc.lock"
-    acquire_lock(lock, "reverse-functional-extractor-U-1")
+    acquire_lock(lock, "reverse-tech-analyst-U-1")
     payload = read_lock(lock)
     assert payload is not None
     required = {"agent_id", "pid", "ts_unix", "host"}
@@ -102,8 +107,8 @@ def test_phase3_atomic_write_no_orphan_after_lock_cycle(tmp_path: Path) -> None:
     from sdd_reverse.file_locks_local import acquire_lock, release_lock
 
     lock = tmp_path / ".alloc.lock"
-    acquire_lock(lock, "reverse-functional-extractor-U-1")
-    release_lock(lock, "reverse-functional-extractor-U-1")
+    acquire_lock(lock, "reverse-tech-analyst-U-1")
+    release_lock(lock, "reverse-tech-analyst-U-1")
     orphans = list(find_orphan_tmps(tmp_path))
     assert orphans == [], f"unexpected orphan tmp: {orphans}"
 

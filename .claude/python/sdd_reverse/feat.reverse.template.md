@@ -20,8 +20,9 @@
   {Confidence}, {ExtractionDate}, {Actors}, {SFDs}, {FDs}, {BRs}, {ACs},
   {GateConfidence}, {GateAllowSddFull}, {GateReason}, {LowConfidenceBanner}.
 
-  L'agent reverse-functional-extractor remplit ces placeholders en lecture
-  du contenu inventory.json + db-schema + evidence files.
+  L'agent reverse-feat-composer (barreau 3c de l'escalier reverse) remplit ces
+  placeholders à partir des User Stories 3b + l'analyse technique 3a (il ne lit
+  PAS le code legacy directement — ADR governance-major-reverse-spec-ladder).
 
   Validation : validate_reverse_feat.py vérifie structure + sync
   frontmatter.confidence ↔ comment.confidence (ADV-22).

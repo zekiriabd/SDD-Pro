@@ -88,12 +88,35 @@ invariants:
     enforcer: .claude/python/sdd_reverse_scripts/reverse_smoke.py
     class: (informational)
 
+  - id: reverse-no-dead-code
+    description: |
+      ADR governance-major-reverse-spec-ladder D2. The LIVE wiring of
+      loader.reverse.yml has no dead reference : every agent in a command
+      `spawns:` has a prompt .md on disk ; every `agents:` block has a .md ;
+      every reverse-*.md prompt has an `agents:` block. Removing
+      reverse-functional-extractor (decommissioned) while a command still
+      spawned it would FAIL. Prose mentions in docs/rules/CHANGELOG are NOT
+      checked (historical references are legitimate).
+    enforcer: .claude/python/sdd_reverse_scripts/reverse_smoke.py
+    class: (informational)
+
+  - id: reverse-ladder-traceability
+    description: |
+      ADR governance-major-reverse-spec-ladder D3. The 3-rung chain
+      FEAT item --covers--> US AC --covers--> task T-N --evidence--> file:line
+      is verifiable. Gaps emit [REVERSE_LADDER_TRACEABILITY_GAP] (informational,
+      never blocking, never filled by invention). Confidence is min-monotone
+      ascending (3c <= 3b <= 3a).
+    enforcer: .claude/python/sdd_reverse_scripts/check_ladder_traceability.py
+    class: REVERSE_LADDER_TRACEABILITY_GAP
+
   - id: reverse-template-isolated
     description: |
-      Phase 3 (reverse-functional-extractor) MUST read its template from
-      .claude/python/sdd_reverse/feat.reverse.template.md (local copy).
-      Never fallback to .claude/templates/feat.template.md (standard SDD_Pro
-      template). ADV-9 closure.
+      Phase 3c (reverse-feat-composer) MUST read its template from
+      .claude/python/sdd_reverse/feat.reverse.template.md (local copy) ; les
+      barreaux 3a/3b lisent analysis.reverse.template.md / us.reverse.template.md
+      (mêmes copies locales isolées). Never fallback to .claude/templates/*
+      (standard SDD_Pro templates). ADV-9 closure.
     enforcer: .claude/python/sdd_reverse_scripts/reverse_smoke.py
     class: REVERSE_TEMPLATE_MISSING
 

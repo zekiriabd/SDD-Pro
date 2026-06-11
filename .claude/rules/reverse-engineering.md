@@ -1,9 +1,19 @@
 # Règle — Reverse Engineering (anti-derive REVERSE + taxonomie [REVERSE_*])
 
-> **Périmètre** : règle dédiée aux 4 agents reverse (`reverse-inventory`,
-> `reverse-tech-auditor`, `reverse-functional-extractor`, `reverse-ui-extractor`)
+> **Périmètre** : règle dédiée aux 7 agents reverse (`reverse-inventory`,
+> `reverse-tech-auditor`, `reverse-tech-analyst` (3a), `reverse-us-writer` (3b),
+> `reverse-feat-composer` (3c), `reverse-ui-extractor`,
+> `reverse-completeness-reviewer`)
 > et aux scripts/commandes du module `sdd_reverse`. Ne s'applique pas aux 12
 > agents SDD_Pro standards.
+>
+> **Escalier ascendant (ADR `governance-major-reverse-spec-ladder`)** : la
+> Phase 3 (`code → FEAT`) est décomposée en 3 barreaux — 3a `reverse-tech-analyst`
+> (analyse technique → `output/plans/{n}-{Name}.analysis.md`), 3b
+> `reverse-us-writer` (user stories → `output/us/`), 3c `reverse-feat-composer`
+> (FEAT métier → `input/feats/`). Remplace l'ex-`reverse-functional-extractor`
+> (saut mono-prompt décommissionné, D2). Fil de traçabilité FEAT→US→task→evidence,
+> confidence min-monotone ascendante.
 >
 > **Cohabitation** : cette règle vit **à côté** de `error-classification.md`,
 > `output-protocol.md`, `ownership.md`, `library-and-stack.md`, `quality.md`,
@@ -79,9 +89,10 @@ cap_effectif = min(
 
 **Jamais hardcodé** dans le code Python ou les agents. Source unique : `.claude/python/sdd_reverse/language_signatures.yml` champ `confidence_cap`.
 
-Valeurs initiales MVP :
-- `aspx-webforms`, `dotnet-mvc`, `csharp`, `java-ee`, `spring-mvc`, `php-framework`, `delphi-source`, `tsql` → `high`
-- `php-procedural`, `javascript-jquery`, `vb6` → `medium`
+Valeurs initiales MVP (+ ajouts 2026-06-10 audit C7) :
+- `aspx-webforms`, `dotnet-mvc`, `csharp`, `wpf-xaml`, `java-ee`, `spring-mvc`, `php-framework`, `delphi-source`, `tsql` → `high`
+- `php-procedural`, `javascript-jquery`, `vb6`, `vbnet`, `classic-asp` → `medium`
+  (`vbnet` : parsing structurel line-based best-effort ; `classic-asp` : VBScript dynamique)
 - `unknown` → `low`
 
 ## §5 Isolation framework intouchable (D4)
@@ -113,7 +124,7 @@ Format ERROR 3-lignes disque, 1 ligne chat (cf. `error-classification.md §2` qu
 | `[REVERSE_ISOLATION_VIOLATION]` | **OUI** | Tentative d'écriture sur path framework existant |
 | `[REVERSE_INVENTORY_STALE]` | NON (WARN) | mtime legacy > `inventory.legacyMtimeMax` (ADV-1) |
 | `[REVERSE_UNIT_RENAMED]` | NON (info) | Fingerprint `core` match mais pas `full` (ADV-1) |
-| `[REVERSE_LOCK_HELD]` | **OUI** | `.alloc.lock` détenu < 30s (ADV-2 séquentialité Phase 3) |
+| `[REVERSE_LOCK_HELD]` | **OUI** | `.alloc.lock` détenu < TTL (1800s extraction legacy, 60s pré-allocation/crosscut — ADV-2 ; en mode pré-alloué aucun lock n'est pris, C5) |
 | `[REVERSE_NAME_COLLISION]` | NON (info) | Suffixe `-Legacy` appliqué (ADV-4) |
 | `[REVERSE_ENRICHMENT_INVALID]` | **OUI** | enrichment.json référence entity absente de base (ADV-3) |
 | `[REVERSE_ENRICHMENT_TYPE_CONFLICT]` | NON (info, V2) | Conflit type base vs enrichment, base wins (ADV-12) |
@@ -123,7 +134,10 @@ Format ERROR 3-lignes disque, 1 ligne chat (cf. `error-classification.md §2` qu
 | `[REVERSE_GATE_DRIFT]` | **OUI** | Désync frontmatter `confidence` ↔ commentaire REVERSE-GATE (ADV-22) |
 | `[REVERSE_ALLOCATED_NAME_STALE]` | NON (WARN V2) | `_allocatedNames[Name]` orphelin (ADV-21) |
 | `[REVERSE_INVENTORY_SCHEMA_STALE]` | NON (INFO) | `--use-cache` sur cache pre-v0.4.0 (ADV-23) → refresh forcé |
-| `[REVERSE_COMPLETENESS_GAP]` | NON (informational, L5) | `reverse-completeness-reviewer` : une classe repository/service ou une requête SQL/procédure de l'unité n'est mentionnée nulle part dans la FEAT (sous-extraction probable). Verdict 🟢/🟡/🔴 informational, jamais bloquant. |
+| `[REVERSE_COMPLETENESS_GAP]` | NON (informational, L5) | `reverse-completeness-reviewer` + Phase 1 (M7) : une classe repository/service/viewmodel ou une requête SQL/procédure de l'unité n'est mentionnée nulle part dans la FEAT (sous-extraction probable), OU une classe métier n'est couverte par aucune unité (section dédiée d'inventory.md). Verdict ASCII `complete`/`partial`/`incomplete` informational, jamais bloquant. |
+| `[REVERSE_SECRETS_DETECTED]` | NON (WARN, C10) | `reverse_inventory.py` : clés privées / certificats / keystores sous `workspace/old/{P}/` (`.ppk`, `.pem` PRIVATE, `.pfx`, `id_rsa*`, …). Inventoriés dans `inventory.json.secretsDetected` + section `[!]` d'inventory.md + relayés OBLIGATOIREMENT par tech-audit.md §6. Action : révoquer + provisionner via vault, jamais copier vers la cible. |
+| `[REVERSE_LADDER_TRACEABILITY_GAP]` | NON (informational, escalier) | ADR `governance-major-reverse-spec-ladder` D3. Un item d'un barreau n'a pas de `<!-- covers: ... -->` vers le barreau inférieur (FEAT sans US, US AC sans task `T-N`, task sans evidence). Fil de traçabilité incomplet. **Jamais comblé par invention** (`bias toward not-verified`) — l'item reste, le gap est noté. Détecté par `check_ladder_traceability.py` + `reverse-completeness-reviewer`. |
+| `[REVERSE_LADDER_STALE]` | NON (WARN, escalier) | ADR `governance-major-reverse-spec-ladder`. Le hash d'un barreau N (ex. analyse 3a) a changé sans régénération du barreau N+1 (US 3b / FEAT 3c) → escalier désynchronisé. Fix : re-lancer le ou les barreaux supérieurs (`/sdd-reverse-stories`, `/sdd-reverse-feat`). |
 
 ### §6.1 Format ERROR
 
@@ -136,9 +150,9 @@ FIX: {action concrète 1-2L}
 ### §6.2 Exemple
 
 ```
-ERROR: reverse-functional-extractor U-3 — extraction interrompue
-CAUSE: [REVERSE_LOCK_HELD] workspace/input/feats/.alloc.lock détenu par reverse-functional-extractor-U-1 depuis 12s
-FIX: attendre fin Phase 3 en cours OU --force après vérification (Phase 3 séquentielle stricte, ADV-2)
+ERROR: reverse-tech-analyst U-3 — analyse interrompue
+CAUSE: [REVERSE_LOCK_HELD] workspace/input/feats/.alloc.lock détenu par reverse-tech-analyst-U-1 depuis 12s
+FIX: attendre fin Phase 3a en cours OU supprimer manuellement .alloc.lock après vérification que U-1 est mort (mode legacy séquentiel, ADV-2 §8.1 ; le lock est pris par le barreau 3a qui possède l'allocation)
 ```
 
 ## §7 Label chat `[REVERSE]` (output-protocol)
@@ -162,8 +176,11 @@ Le label `[REVERSE]` est documenté localement ici (cette règle) et accepté pa
 
 Si la pré-allocation L5 n'a **pas** tourné, `/sdd-reverse {U-N}` alloue `(n, Name)`
 au moment de l'extraction sous `.alloc.lock`, ce qui **force le séquentiel** :
-deux `/sdd-reverse` simultanés → le second attend le lock (TTL 30s) ou émet
-`[REVERSE_LOCK_HELD]`. Le lock élargi couvre :
+deux `/sdd-reverse` simultanés → le second émet `[REVERSE_LOCK_HELD]` (TTL
+**1800 s** — le lock couvre l'extraction complète, qui dure des minutes ;
+l'ancien TTL 30s faisait voler le lock comme stale en cours d'extraction,
+audit C5 2026-06-09). En mode pré-alloué, **aucun lock n'est pris** (l'agent
+skip son STEP 3). Le lock élargi couvre :
 ```
 acquire .alloc.lock
   → READ inventory.json (_featAllocations + units)
@@ -177,7 +194,7 @@ release .alloc.lock
 
 Depuis L5, l'orchestrateur lance **d'abord** la pré-allocation déterministe :
 ```bash
-python -m sdd_reverse_scripts.preallocate_feats --project workspace/old/{P}
+python .claude/python/sdd_reverse_scripts/preallocate_feats.py --project workspace/old/{P}
 ```
 Elle fige `(n, Name)` pour **toutes** les unités dans `inventory.json`
 (`_featAllocations` + `_allocatedNames`), une fois, sous un unique lock.
@@ -204,9 +221,11 @@ FEAT existe encore — évite de re-spawner Opus inutilement. Doute → re-extra
 ## §9 Pas de spawn d'agent (no-spawn)
 
 Aucun agent reverse ne spawn un autre agent. Règle stricte SDD_Pro étendue au reverse :
-- `reverse-inventory` ne spawn pas `reverse-functional-extractor`
-- `reverse-functional-extractor` ne spawn pas `reverse-ui-extractor` (V2)
-- L'orchestrateur `/sdd-reverse-full` (V2) **séquence des commandes** (qui chacune spawn un agent), il **ne spawn pas** d'agents directement
+- `reverse-inventory` ne spawn pas `reverse-tech-analyst`
+- aucun barreau de l'escalier (`reverse-tech-analyst` 3a, `reverse-us-writer` 3b, `reverse-feat-composer` 3c) ne spawn un autre agent
+- `/sdd-reverse` est un **séquenceur** des 3 sous-commandes 3a→3b→3c — il ne spawn aucun agent directement (chaque sous-commande spawn son agent)
+- L'orchestrateur `/sdd-reverse-full` (V2) **séquence des commandes** (qui chacune spawn un agent), il **ne spawn pas** d'agents directement — y compris pour la revue de complétude L5, qui passe par la commande wrapper `/sdd-reverse-review {U-N}` (audit M11 2026-06-10)
+- Enforcement déterministe : `reverse_smoke.check_no_spawn_of_agents` (INVARIANTS.reverse.yml `reverse-no-spawn-of-agents`)
 
 Cette discipline préserve le contrat d'isolation et la traçabilité (1 invocation utilisateur = 1 agent identifiable).
 
