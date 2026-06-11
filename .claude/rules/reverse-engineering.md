@@ -155,6 +155,33 @@ CAUSE: [REVERSE_LOCK_HELD] workspace/input/feats/.alloc.lock détenu par reverse
 FIX: attendre fin Phase 3a en cours OU supprimer manuellement .alloc.lock après vérification que U-1 est mort (mode legacy séquentiel, ADV-2 §8.1 ; le lock est pris par le barreau 3a qui possède l'allocation)
 ```
 
+### §6.3 État d'implémentation des émetteurs (audit 2026-06-11)
+
+Le tableau §6 déclare le **contrat** ; tous les émetteurs ne sont pas
+encore câblés. État vérifié par grep croisé code/prompts :
+
+- **Émises par scripts déterministes (11)** : `NO_SOURCE`, `UNIT_NOT_FOUND`,
+  `EVIDENCE_MISSING`, `LOCK_HELD`, `ENRICHMENT_INVALID`,
+  `ENRICHMENT_TYPE_CONFLICT`, `GATE_DRIFT`, `INVENTORY_SCHEMA_STALE`,
+  `COMPLETENESS_GAP`, `SECRETS_DETECTED`, `LADDER_TRACEABILITY_GAP`.
+- **Émises par prompts agents/commandes uniquement (6)** : `BINARY_ONLY`,
+  `FEAT_VALIDATE_FAILED`, `ISOLATION_VIOLATION`, `INVENTORY_STALE`,
+  `NAME_COLLISION`, `TEMPLATE_MISSING` (émission LLM, pas de gate
+  déterministe — acceptable, l'agent porte le contrat).
+- **Enforced par `reverse_smoke` sous leur nom de check (2)** :
+  `VALIDATOR_DRIFT` (`check_validator_parity_drift`), `HELPER_DRIFT`
+  (`check_helper_parity_drift`) — le préfixe `[CLASS]` n'apparaît pas
+  littéralement dans l'output smoke.
+- **Déclaratives sans émetteur câblé (6)** : `LANG_UNKNOWN`,
+  `DB_SCHEMA_MISSING`, `DB_SCHEMA_DEGRADED`, `UNIT_RENAMED`,
+  `ALLOCATED_NAME_STALE`, `LADDER_STALE` — **à câbler ou requalifier**
+  avant toute communication les présentant comme actives. Ne pas en
+  ajouter de nouvelles sans émetteur identifié.
+
+> **Monotonie de confidence (Q3)** : enforced depuis 2026-06-11 par
+> `check_ladder_traceability.py` (gaps `confidence uprank: ...` sous
+> `[REVERSE_LADDER_TRACEABILITY_GAP]`, frontmatter-based, informational).
+
 ## §7 Label chat `[REVERSE]` (output-protocol)
 
 Les agents reverse émettent UNIQUEMENT le label `[REVERSE]` en chat (cf. `output-protocol.md` §3 mapping label → agent). Suffixes d'état applicables :

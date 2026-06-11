@@ -87,6 +87,62 @@ def test_ladder_us_ac_without_task_covers(tmp_path, monkeypatch):
     assert any("no `covers:` to any task" in g for g in report["gaps"])
 
 
+_ANALYSIS_WITH_CONF = """---
+confidence: medium
+---
+""" + _ANALYSIS_OK
+
+_US_WITH_CONF = """---
+confidence: medium
+---
+""" + _US_OK
+
+
+def test_ladder_confidence_min_monotone_ok(tmp_path, monkeypatch):
+    """FEAT(medium) ≤ min(US)(medium) ≤ analysis(medium) → no uprank gap."""
+    monkeypatch.setattr(mod, "REPO_ROOT", tmp_path)
+    feat_med = _FEAT_OK.replace("confidence: high", "confidence: medium")
+    feat = _scaffold(tmp_path, feat_body=feat_med, us_body=_US_WITH_CONF,
+                     analysis_body=_ANALYSIS_WITH_CONF)
+    report = mod.check(None, None, feat)
+    assert report["ran"] is True
+    assert not any("uprank" in g for g in report["gaps"]), report["gaps"]
+    assert report["confidence"]["analysis"] == "medium"
+    assert report["confidence"]["feat"] == "medium"
+
+
+def test_ladder_confidence_uprank_feat_over_analysis(tmp_path, monkeypatch):
+    """FEAT(high) > analysis(medium) → min-monotone Q3 gap reported."""
+    monkeypatch.setattr(mod, "REPO_ROOT", tmp_path)
+    feat = _scaffold(tmp_path, feat_body=_FEAT_OK, us_body=_US_WITH_CONF,
+                     analysis_body=_ANALYSIS_WITH_CONF)  # FEAT=high, analysis=medium
+    report = mod.check(None, None, feat)
+    assert report["ran"] is True
+    assert any("uprank" in g and "FEAT" in g for g in report["gaps"]), report["gaps"]
+
+
+def test_ladder_confidence_uprank_us_over_analysis(tmp_path, monkeypatch):
+    """US(high) > analysis(medium) → min-monotone Q3 gap reported."""
+    monkeypatch.setattr(mod, "REPO_ROOT", tmp_path)
+    us_high = _US_WITH_CONF.replace("confidence: medium", "confidence: high")
+    feat_med = _FEAT_OK.replace("confidence: high", "confidence: medium")
+    feat = _scaffold(tmp_path, feat_body=feat_med, us_body=us_high,
+                     analysis_body=_ANALYSIS_WITH_CONF)
+    report = mod.check(None, None, feat)
+    assert report["ran"] is True
+    assert any("uprank" in g and "US" in g for g in report["gaps"]), report["gaps"]
+
+
+def test_ladder_confidence_absent_is_tolerated(tmp_path, monkeypatch):
+    """Barreaux sans frontmatter confidence (3a/3b legacy) → aucune comparaison."""
+    monkeypatch.setattr(mod, "REPO_ROOT", tmp_path)
+    feat = _scaffold(tmp_path, feat_body=_FEAT_OK, us_body=_US_OK,
+                     analysis_body=_ANALYSIS_OK)
+    report = mod.check(None, None, feat)
+    assert report["ran"] is True
+    assert not any("uprank" in g for g in report["gaps"]), report["gaps"]
+
+
 def test_ladder_missing_artifacts_is_informational(tmp_path, monkeypatch):
     monkeypatch.setattr(mod, "REPO_ROOT", tmp_path)
     feats = tmp_path / "workspace" / "input" / "feats"

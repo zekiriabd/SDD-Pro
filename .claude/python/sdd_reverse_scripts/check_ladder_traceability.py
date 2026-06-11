@@ -47,6 +47,19 @@ _EVIDENCE_RE = re.compile(r"<!--\s*evidence:\s*([^>]+?)\s*-->", re.IGNORECASE)
 _TASK_ID_RE = re.compile(r"\bT-\d+\b")
 _US_AC_REF_RE = re.compile(r"(\d+-\d+)\s*#\s*(AC-\d+)", re.IGNORECASE)
 
+# Confidence min-monotone (Q3, ADR reverse-spec-ladder) — frontmatter only
+# (`confidence:` en début de ligne, jamais les commentaires <!-- confidence -->).
+_CONF_RE = re.compile(r"^confidence:\s*(high|medium|low)\b", re.MULTILINE | re.IGNORECASE)
+_CONF_ORDER = {"low": 0, "medium": 1, "high": 2}
+
+
+def _frontmatter_confidence(text: str | None) -> str | None:
+    """Confidence du frontmatter (head du document), ou None si absente."""
+    if not text:
+        return None
+    m = _CONF_RE.search(text[:2000])
+    return m.group(1).lower() if m else None
+
 
 def _read(path: Path) -> str | None:
     try:
@@ -190,9 +203,11 @@ def check(project: Path | None, unit: str | None, feat_path: Path | None) -> dic
 
     feat_items = _parse_feat_items(feat_text)
     us_acs: list[dict] = []
+    us_texts: list[tuple[Path, str]] = []
     for f in us_files:
         t = _read(f)
         if t:
+            us_texts.append((f, t))
             us_acs.extend(_parse_us_acs(t))
     tasks = _parse_analysis_tasks(analysis_text)
 
@@ -232,11 +247,44 @@ def check(project: Path | None, unit: str | None, feat_path: Path | None) -> dic
         if a["us_ac"] not in covered_us_acs:
             gaps.append(f"US {a['us_ac']}: orphan — covered by no FEAT item (downward gap)")
 
+    # Confidence min-monotone (Q3, ADR reverse-spec-ladder) :
+    # confidence(FEAT 3c) ≤ min(confidence(US 3b)) ≤ confidence(analyse 3a).
+    # Frontmatter-based ; comparaisons uniquement quand les deux barreaux la
+    # déclarent (audit 2026-06-11 — la règle était documentée sans enforcer).
+    conf_analysis = _frontmatter_confidence(analysis_text)
+    conf_feat = _frontmatter_confidence(feat_text)
+    us_confs = [(f.name, _frontmatter_confidence(t)) for f, t in us_texts]
+    if conf_analysis:
+        for fname, c in us_confs:
+            if c and _CONF_ORDER[c] > _CONF_ORDER[conf_analysis]:
+                gaps.append(
+                    f"confidence uprank: US {fname} ({c}) > analysis "
+                    f"({conf_analysis}) — min-monotone Q3 violated"
+                )
+        if conf_feat and _CONF_ORDER[conf_feat] > _CONF_ORDER[conf_analysis]:
+            gaps.append(
+                f"confidence uprank: FEAT ({conf_feat}) > analysis "
+                f"({conf_analysis}) — min-monotone Q3 violated"
+            )
+    declared_us = [c for _, c in us_confs if c]
+    if conf_feat and declared_us:
+        floor = min(declared_us, key=lambda c: _CONF_ORDER[c])
+        if _CONF_ORDER[conf_feat] > _CONF_ORDER[floor]:
+            gaps.append(
+                f"confidence uprank: FEAT ({conf_feat}) > min(US) ({floor}) "
+                f"— min-monotone Q3 violated"
+            )
+
     verdict = "ladder-complete" if not gaps else ("partial" if len(gaps) <= 3 else "incomplete")
     return {
         "unit": unit, "n": n, "name": name, "artifacts": artifacts,
         "ran": True,
         "counts": {"feat_items": len(feat_items), "us_acs": len(us_acs), "tasks": len(tasks)},
+        "confidence": {
+            "analysis": conf_analysis,
+            "us": {fname: c for fname, c in us_confs},
+            "feat": conf_feat,
+        },
         "verdict": verdict,
         "gap_count": len(gaps),
         "gaps": gaps,

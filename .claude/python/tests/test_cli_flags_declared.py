@@ -34,12 +34,7 @@ import pytest
 pytestmark = pytest.mark.smoke
 
 
-def _repo_root() -> Path:
-    cwd = Path(__file__).resolve()
-    for p in [cwd, *cwd.parents]:
-        if (p / ".claude").is_dir():
-            return p
-    raise RuntimeError("Cannot locate repo root")
+from sdd_lib.paths import repo_root as _repo_root  # noqa: E402  (SSoT — conso audit 2026-06-11, ex-copies locales)
 
 
 def _extract_command_flags(md_text: str) -> set[str]:

@@ -25,12 +25,7 @@ pytestmark = pytest.mark.smoke
 _PROD_DIRS = ("sdd_admin", "sdd_hooks", "sdd_lib", "sdd_scripts")
 
 
-def _repo_root() -> Path:
-    cwd = Path(__file__).resolve()
-    for p in [cwd, *cwd.parents]:
-        if (p / ".claude").is_dir():
-            return p
-    raise RuntimeError("Cannot locate repo root")
+from sdd_lib.paths import repo_root as _repo_root  # noqa: E402  (SSoT — conso audit 2026-06-11, ex-copies locales)
 
 
 def _find_call_args(text: str, start_pos: int) -> str:
