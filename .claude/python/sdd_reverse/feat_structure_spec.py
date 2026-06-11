@@ -5,8 +5,12 @@ between SDD_Pro's `validate_readiness.py` (standard) and the reverse
 workflow's `validate_reverse_feat.py`.
 
 Strategy: keep the structural invariants here (regex, section order, IDs)
-so that both validators converge on them. Parity tests in
-test_validators_parity.py grep validate_readiness.py for drift.
+so that both validators converge on them. La parité est enforced
+COMPORTEMENTALEMENT par tests/test_validators_parity.py (créé 2026-06-11,
+audit M5 — le fichier était promis ici mais absent) : contrat partagé
+(extraction d'IDs sur la forme canonique `- SFD-1: ...`, rejet des
+doublons) + asymétries assumées pinnées (GWT/evidence reverse-only,
+couverture US/stack forward-only).
 
 Public:
     REQUIRED_FRONTMATTER_KEYS_REVERSE: set[str]
@@ -45,12 +49,20 @@ REQUIRED_SECTIONS = [
     "## Project Config",
 ]
 
-# Stable ID patterns
+# Stable ID patterns.
+#
+# Audit M5 2026-06-11 : la forme CANONIQUE framework-wide est celle du
+# template forward (`- SFD-1: ...`, cf. templates/feat.template.md et le
+# regex `^- SFD-(\d+):` de validate_readiness.py). L'ancien pattern reverse
+# (`^**SFD-1**` sans tiret) rendait /feat-validate AVEUGLE sur les FEATs
+# reverse (section vue « vide » → checks de traçabilité sautés en silence)
+# et inversement. Les deux formes sont désormais acceptées côté reverse ;
+# l'agent composer (3c) prescrit la forme canonique à tiret.
 ID_PATTERNS = {
-    "## Functional Needs": re.compile(r"^\*\*?SFD-(\d+)\*?\*?", re.MULTILINE),
-    "## Functional Deliverables": re.compile(r"^\*\*?FD-(\d+)\*?\*?", re.MULTILINE),
-    "## Business Rules": re.compile(r"^\*\*?BR-(\d+)\*?\*?", re.MULTILINE),
-    "## Acceptance Criteria": re.compile(r"^\*\*?AC-(\d+)\*?\*?", re.MULTILINE),
+    "## Functional Needs": re.compile(r"^(?:-\s+)?\*{0,2}SFD-(\d+)\*{0,2}\s*:?", re.MULTILINE),
+    "## Functional Deliverables": re.compile(r"^(?:-\s+)?\*{0,2}FD-(\d+)\*{0,2}\s*:?", re.MULTILINE),
+    "## Business Rules": re.compile(r"^(?:-\s+)?\*{0,2}BR-(\d+)\*{0,2}\s*:?", re.MULTILINE),
+    "## Acceptance Criteria": re.compile(r"^(?:-\s+)?\*{0,2}AC-(\d+)\*{0,2}\s*:?", re.MULTILINE),
 }
 
 # AC: Given X, when Y, then Z (single-line or multi-line tolerated)
@@ -126,9 +138,13 @@ def section_order_violations(content: str) -> list[str]:
 
 
 def ids_are_stable(content: str, section: str) -> tuple[bool, str]:
-    """Check that IDs in a section are non-decreasing (no reordering).
+    """Check that IDs in a section are non-decreasing (no reordering)
+    and free of duplicates.
 
-    Trous tolérés (e.g. SFD-1, SFD-3, SFD-4 — SFD-2 may have been removed).
+    Trous tolérés (e.g. SFD-1, SFD-3, SFD-4 — SFD-2 may have been removed
+    when its evidence chain broke). Doublons JAMAIS tolérés (audit M5
+    2026-06-11 : [1, 1, 2] passait le check `nums != sorted(nums)` alors
+    que validate_readiness.py les rejette — parité rétablie).
     """
     pat = ID_PATTERNS.get(section)
     if not pat:
@@ -147,6 +163,9 @@ def ids_are_stable(content: str, section: str) -> tuple[bool, str]:
     nums = [int(m.group(1)) for m in pat.finditer(section_body)]
     if not nums:
         return True, ""
+    duplicates = sorted({n for n in nums if nums.count(n) > 1})
+    if duplicates:
+        return False, f"Duplicate IDs in {section}: {duplicates}"
     if nums != sorted(nums):
         return False, f"IDs reordered in {section}: {nums}"
     return True, ""

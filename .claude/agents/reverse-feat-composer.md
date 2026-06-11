@@ -73,9 +73,15 @@ frontmatter `confidence:` + synchroniser le commentaire REVERSE-GATE (ADV-22).
 
 ### 3.bis — Double traçabilité par item (D3 + rule §3)
 
+**Forme canonique des items (audit M5 2026-06-11)** : chaque item commence
+par `- {ID}: ` (tiret + ID + deux-points), identique au template forward —
+seule forme lue à la fois par `validate_reverse_feat.py` ET par
+`/feat-validate` (regex `^- SFD-(\d+):` de validate_readiness). Une autre
+forme (ex. gras sans tiret) rend `/feat-validate` aveugle sur la FEAT.
+
 Chaque `SFD-N`/`FD-N`/`BR-N`/`AC-N` de la FEAT porte **deux** commentaires :
 ```
-... <!-- covers: US {n}-{m}#AC-x --> <!-- evidence: path:Lstart-Lend --> <!-- confidence: ... -->
+- SFD-1: {texte métier} <!-- covers: US {n}-{m}#AC-x --> <!-- evidence: path:Lstart-Lend --> <!-- confidence: ... -->
 ```
 - `covers:` = l'US (et son AC) que l'item agrège → fil ascendant (D3).
 - `evidence:` = résolu **transitivement** : item → US AC `covers: T-N` → task T-N de l'analyse 3a → son `evidence: path:Lx-Ly`. C'est ce qui satisfait `rules/reverse-engineering.md §3` (evidence obligatoire) ET `validate_reverse_feat.py`.

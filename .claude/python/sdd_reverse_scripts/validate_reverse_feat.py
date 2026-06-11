@@ -82,7 +82,7 @@ def _check_items_have_evidence_and_confidence(
     # Each ID-line should have evidence+confidence comments within the same paragraph
     # (the same line + next 2 lines).
     for m in pat.finditer(section_body):
-        item_id = m.group(0).strip("* ")
+        item_id = m.group(0).strip("-*: ")
         line_start = section_body.rfind("\n", 0, m.start()) + 1
         # Read up to 3 lines after the ID line (covers inline comments + wrapped)
         lookahead = section_body[line_start: line_start + 600]
@@ -143,7 +143,7 @@ def validate_feat(feat_path: Path) -> tuple[bool, list[str], list[str]]:
         # Check each AC-N has a Given/When/Then nearby
         ac_pat = ID_PATTERNS["## Acceptance Criteria"]
         for m in ac_pat.finditer(ac_body):
-            item_id = m.group(0).strip("* ")
+            item_id = m.group(0).strip("-*: ")
             line_start = ac_body.rfind("\n", 0, m.start()) + 1
             lookahead = ac_body[line_start: line_start + 800]
             if not AC_GIVEN_WHEN_THEN_RE.search(lookahead):
