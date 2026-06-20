@@ -14,22 +14,21 @@
 /site/
 
 # Workspace généré par le pipeline SDD (artefacts non-versionnés)
-workspace/output/
 workspace/console/status.json
 workspace/console/.status.lock
+workspace/console/.certs/
 
 # Framework smoke cache (fast-path Stop hook)
 .claude/.cache/
+workspace/output/db/*.*
+workspace/output/us/*.*
+workspace/output/plans/*.*
+workspace/output/.sys/*.*
+workspace/input/feats/*.*
+workspace/input/ui/*.*
+workspace/input/discovery/*.*
+workspace/input/assets/*.*
 
-# Local dev secrets — stack.md contient DB_PASSWORD, AUTH_JWT_SECRET,
-# SMTP_PASSWORD etc. en clair pour le dev local. Ne JAMAIS committer.
-# Versionner stack.md.example (placeholders) à la place.
-workspace/input/stack/stack.md
-
-# HTTPS dev cert/key auto-signés (security audit 2026-06-06 — keypair privé
-# ne JAMAIS commiter, même en dev). Régénérer via `npm run gen-cert` ou
-# fallback HTTP automatique si absent (cf. server.js:57).
-workspace/console/.certs/
 
 # Layered config team-level (peut contenir des secrets/policy org)
 .sdd/
