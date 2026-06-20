@@ -1,0 +1,24 @@
+{
+  "name": "sdd-console",
+  "version": "0.4.1",
+  "description": "SDD_Pro — Cockpit de validation manuelle (consultation FEATs/US/plans + validation humaine + reformulation IA PO-friendly)",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "esbuild app.jsx --bundle --outfile=dist/app.js --loader:.jsx=jsx --jsx=transform --jsx-factory=React.createElement --jsx-fragment=React.Fragment --external:react --external:react-dom --external:marked --format=iife --target=es2020 --log-level=warning",
+    "start": "npm run build && node server.js",
+    "dev": "npm run build && node --watch server.js",
+    "test": "node tests/smoke.test.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "fastify": "^5.2.0",
+    "@fastify/static": "^9.1.3",
+    "@anthropic-ai/sdk": "^0.65.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.0"
+  }
+}

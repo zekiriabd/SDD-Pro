@@ -1,0 +1,138 @@
+{
+  "$schema": "../../templates/libs-catalog.schema.json",
+  "stackId": "dotnet-minimalapi",
+  "category": "backend",
+  "schemaVersion": 1,
+  "buildSystem": "dotnet",
+  "manifest": {
+    "files": ["workspace/output/src/{BackendName}/{BackendName}.csproj"]
+  },
+  "versions": {
+    "ef-core": "9.0.4",
+    "ef-core-sqlserver": "9.0.4",
+    "ef-core-sqlite": "9.0.4",
+    "npgsql-ef": "9.0.4",
+    "pomelo-mysql": "9.0.0",
+    "oracle-ef": "9.23.60",
+    "mongodb-ef": "9.0.0",
+    "automapper": "16.1.1",
+    "serilog-aspnetcore": "9.0.0",
+    "serilog-sinks-console": "6.1.1",
+    "swashbuckle": "9.0.4",
+    "asp-versioning": "8.1.1",
+    "microsoft-openapi": "2.4.1",
+    "microsoft-identity-web": "4.9.0",
+    "fluentvalidation": "11.11.0",
+    "fluentvalidation-aspnetcore": "11.3.1",
+    "polly": "8.5.1",
+    "http-resilience": "10.0.0",
+    "caching-memory": "10.0.0",
+    "asp-openapi": "10.0.0",
+    "epplus": "7.5.3",
+    "closedxml": "0.104.2",
+    "questpdf": "2024.12.3",
+    "itext7": "9.0.0",
+    "mediatr": "12.4.1",
+    "stackexchange-redis": "2.8.16",
+    "caching-redis": "10.0.0",
+    "mapster": "7.4.0",
+    "mailkit": "4.8.0",
+    "mimekit": "4.8.0",
+    "bcrypt-net": "4.0.3",
+    "jwt-bearer": "10.0.0"
+  },
+  "dbDrivers": {
+    "sqlserver": {
+      "module": "Microsoft.EntityFrameworkCore.SqlServer",
+      "ref": "ef-core-sqlserver",
+      "providerName": "Microsoft.EntityFrameworkCore.SqlServer",
+      "useExtension": "UseSqlServer"
+    },
+    "postgres": {
+      "module": "Npgsql.EntityFrameworkCore.PostgreSQL",
+      "ref": "npgsql-ef",
+      "providerName": "Npgsql.EntityFrameworkCore.PostgreSQL",
+      "useExtension": "UseNpgsql"
+    },
+    "postgresql": {
+      "module": "Npgsql.EntityFrameworkCore.PostgreSQL",
+      "ref": "npgsql-ef",
+      "providerName": "Npgsql.EntityFrameworkCore.PostgreSQL",
+      "useExtension": "UseNpgsql"
+    },
+    "mysql": {
+      "module": "Pomelo.EntityFrameworkCore.MySql",
+      "ref": "pomelo-mysql",
+      "providerName": "Pomelo.EntityFrameworkCore.MySql",
+      "useExtension": "UseMySql"
+    },
+    "mariadb": {
+      "module": "Pomelo.EntityFrameworkCore.MySql",
+      "ref": "pomelo-mysql",
+      "providerName": "Pomelo.EntityFrameworkCore.MySql",
+      "useExtension": "UseMySql"
+    },
+    "sqlite": {
+      "module": "Microsoft.EntityFrameworkCore.Sqlite",
+      "ref": "ef-core-sqlite",
+      "providerName": "Microsoft.EntityFrameworkCore.Sqlite",
+      "useExtension": "UseSqlite"
+    },
+    "oracle": {
+      "module": "Oracle.EntityFrameworkCore",
+      "ref": "oracle-ef",
+      "providerName": "Oracle.EntityFrameworkCore",
+      "useExtension": "UseOracle"
+    },
+    "mongodb": {
+      "module": "MongoDB.EntityFrameworkCore",
+      "ref": "mongodb-ef",
+      "providerName": "MongoDB.EntityFrameworkCore",
+      "useExtension": "UseMongoDB"
+    }
+  },
+  "core": [
+    { "module": "Microsoft.EntityFrameworkCore", "ref": "ef-core" },
+    { "module": "Microsoft.EntityFrameworkCore.Design", "ref": "ef-core" },
+    { "module": "Microsoft.EntityFrameworkCore.Tools", "ref": "ef-core" },
+    { "module": "Microsoft.AspNetCore.OpenApi", "ref": "asp-openapi" },
+    { "module": "AutoMapper", "ref": "automapper" },
+    { "module": "Serilog.AspNetCore", "ref": "serilog-aspnetcore" },
+    { "module": "Serilog.Sinks.Console", "ref": "serilog-sinks-console" },
+    { "module": "Swashbuckle.AspNetCore", "ref": "swashbuckle" },
+    { "module": "Swashbuckle.AspNetCore.Annotations", "ref": "swashbuckle" },
+    { "module": "Asp.Versioning.Http", "ref": "asp-versioning" },
+    { "module": "Asp.Versioning.Mvc.ApiExplorer", "ref": "asp-versioning" },
+    { "module": "Microsoft.OpenApi", "ref": "microsoft-openapi" },
+    { "module": "Microsoft.Identity.Web", "ref": "microsoft-identity-web" },
+    { "module": "FluentValidation", "ref": "fluentvalidation" },
+    { "module": "FluentValidation.AspNetCore", "ref": "fluentvalidation-aspnetcore" },
+    { "module": "FluentValidation.DependencyInjectionExtensions", "ref": "fluentvalidation" },
+    { "module": "Polly", "ref": "polly" },
+    { "module": "Microsoft.Extensions.Http.Resilience", "ref": "http-resilience" },
+    { "module": "Microsoft.Extensions.Caching.Memory", "ref": "caching-memory" }
+  ],
+  "onDemand": [
+    { "module": "EPPlus", "ref": "epplus", "capability": "excel", "triggers": ["\\bexcel\\b", "\\.xlsx\\b", "export.*excel", "import.*excel", "tableur"] },
+    { "module": "ClosedXML", "ref": "closedxml", "capability": "excel", "triggers": ["\\bexcel\\b", "\\.xlsx\\b", "export.*excel", "import.*excel", "tableur"], "alternative": true },
+    { "module": "QuestPDF", "ref": "questpdf", "capability": "pdf", "triggers": ["\\bpdf\\b", "\\.pdf\\b", "export.*pdf", "generer.*pdf", "imprim"] },
+    { "module": "itext7", "ref": "itext7", "capability": "pdf", "triggers": ["\\bpdf\\b", "\\.pdf\\b", "export.*pdf", "generer.*pdf", "imprim"], "alternative": true },
+    { "module": "MediatR", "ref": "mediatr", "capability": "cqrs", "triggers": ["\\bcqrs\\b", "mediatr", "command.*handler", "query.*handler"] },
+    { "module": "StackExchange.Redis", "ref": "stackexchange-redis", "capability": "redis-cache", "triggers": ["\\bredis\\b", "cache distribu", "distributed cache"] },
+    { "module": "Microsoft.Extensions.Caching.StackExchangeRedis", "ref": "caching-redis", "capability": "redis-cache", "triggers": ["\\bredis\\b", "cache distribu", "distributed cache"] },
+    { "module": "Mapster", "ref": "mapster", "capability": "fast-mapping", "triggers": ["mapster\\b", "mapping perf", "high.?performance.*mapp"] },
+    { "module": "MailKit", "ref": "mailkit", "capability": "email", "triggers": ["\\bsmtp\\b", "envoi.*email", "envoi.*courriel", "send.*email", "email.*notification", "notification.*par.*email", "mail.*confirmation", "verifier.*email"] },
+    { "module": "MimeKit", "ref": "mimekit", "capability": "email", "triggers": ["\\bsmtp\\b", "envoi.*email", "envoi.*courriel", "send.*email", "email.*notification", "notification.*par.*email", "mail.*confirmation", "verifier.*email"] },
+    { "module": "BCrypt.Net-Next", "ref": "bcrypt-net", "capability": "auth-local", "triggers": ["bcrypt", "password.*hash", "hash.*password", "motdepasse.*hash", "mot.*passe.*hash", "auth-local", "password_hash", "verify.*password", "connexion.*mot.*passe", "inscription", "register.*user"] },
+    { "module": "Microsoft.AspNetCore.Authentication.JwtBearer", "ref": "jwt-bearer", "capability": "auth-local", "triggers": ["\\bjwt\\b", "jsonwebtoken", "bearer.*token", "auth-local", "issue.*token", "verify.*token", "validate.*token", "jwt.*authent", "token.*authent", "authorize.*attribute", "\\[Authorize\\]"] }
+  ],
+  "plugins": [],
+  "metadata": {
+    "lastUpdated": "2026-06-07",
+    "format": "compact (v2)",
+    "changeLog": [
+      "2026-05-22 — fix: removed hardcoded EF.SqlServer from core[] (was installed for ALL projects regardless of DatabaseType). Expanded dbDrivers from 1 → 7 entries (sqlserver, postgres, mysql, mariadb, sqlite, oracle, mongodb). Pinned ef-core 10.0.6 → 9.0.4 (LCD across all drivers since Npgsql.EF 10.x is preview only). Post-mortem CMSPrint 2026-05-22: NU1608 EF 10.0.6 vs Npgsql.EF 9.0.4 became runtime MissingMethodException on first DbSet access.",
+      "2026-06-07 — Audit CTO 2026-06-07 : revert ef-core 10.0.0 → 9.0.4 (drift post-mortem CMSPrint 2026-05-22 re-introduced silently)."
+    ]
+  }
+}

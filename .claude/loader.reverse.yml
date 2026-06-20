@@ -1,0 +1,349 @@
+# SDD_Pro Reverse Engineering — Loader Manifest (autonome)
+#
+# ============================================================================
+# Workflow "reverse engineering" séparé du pipeline SDD_Pro principal.
+# ============================================================================
+#
+# CE FICHIER EST AUTONOME — aucune référence vers loader.yml, aucune
+# référence depuis loader.yml. Lecture par les 4 agents reverse + 6 commandes
+# /sdd-reverse-*. Isolation stricte (cf. master prompt §3.1 et règle
+# reverse-engineering.md §9.4).
+#
+# Master prompt   : @.claude/docs/reverse-engineering-master-prompt.md
+# Design doc      : @.claude/docs/reverse-engineering-workflow.md
+# Règle anti-derive : @.claude/rules/reverse-engineering.md
+#
+# Pipeline 6 phases :
+#   Phase 0 [humain]    : dépôt code legacy dans workspace/old/{LegacyProject}/
+#   Phase 1 [scan]      : /sdd-reverse-inventory → inventory.{md,json}
+#   Phase 2 [optionnel] : /sdd-reverse-audit → tech-audit.md (V2)
+#   Phase 3 [extract]   : /sdd-reverse {unit-id} → workspace/input/feats/{n}-{Name}.md
+#   Phase 4 [UI]        : /sdd-reverse-ui {unit-id} → workspace/input/ui/{n}-{m}-*.html (V2)
+#   Phase 5 [humain]    : revue Tech Lead + designer optionnel
+#   Phase 6 [migration] : /sdd-full {n} ou /sdd-poc {n} — pipeline SDD_Pro EXISTANT inchangé
+#
+# Tier MVP (Livraison 1) : phases 1 + 3 uniquement.
+# Tier V2                : phases 2 + 4 + orchestrateur /sdd-reverse-full.
+#
+# ============================================================================
+
+version: "0.2.0-mvp+phase4"
+updated: "2026-06-10"
+
+# =========================================================================
+# Cross-agent reads (règle commune à tous les agents reverse)
+# =========================================================================
+# Tous les agents reverse chargent :
+#   - .claude/rules/reverse-engineering.md  (anti-derive REVERSE, ~5 KB)
+#   - .claude/rules/output-protocol.md      (chat 1L update, partagé avec SDD_Pro)
+#
+# La règle output-protocol.md est référencée mais N'INCLUT PAS les labels
+# [AGENT] des reverse-* dans son mapping §3 (les agents reverse émettent
+# tous sous le label [REVERSE] pour distinguer du pipeline principal).
+# =========================================================================
+
+# -------------------------------------------------------------------------
+# Agent: reverse-inventory (Sonnet 4.6)
+# Phase: 1b (synthèse humaine + arbitrage fusion/split)
+# Token footprint estimé: ~10-15 KB par invocation
+# -------------------------------------------------------------------------
+reverse-inventory:
+  reads:
+    - .claude/rules/reverse-engineering.md                    # règle anti-derive REVERSE
+    - .claude/rules/output-protocol.md                        # chat 1L [REVERSE]
+    - .claude/docs/reverse-engineering-cookbook/_generic-monolith.md  # fallback fiche langage
+    - .claude/docs/reverse-engineering-cookbook/{language}.md # fiche du langage détecté (si présente)
+    - workspace/old/{P}/.sys/inventory-raw.json               # output scan_legacy + inventory_builder
+    - workspace/old/{P}/.sys/units-candidates.json            # output ui_unit_detector
+    # Échantillon 5-10 fichiers représentatifs (chosen by inventory_builder.py)
+    - workspace/old/{P}/{sampled_file}                        # lecture passive, max 10 fichiers
+  writes:
+    - workspace/old/{P}/.sys/inventory.md                     # lisible humain
+    - workspace/old/{P}/.sys/inventory.json                   # machine, source de vérité Phase 3
+  forbidden_reads:
+    - workspace/input/feats/                                  # hors scope (downstream)
+    - workspace/output/                                       # pipeline SDD_Pro inchangé
+    - .claude/agents/                                         # isolation stricte
+    - .claude/commands/                                       # isolation stricte
+    - .claude/python/sdd_lib/                                 # modules existants SDD_Pro
+    - .claude/python/sdd_scripts/                             # modules existants SDD_Pro
+
+# -------------------------------------------------------------------------
+# Agent: reverse-tech-auditor (Sonnet 4.6)         [V2 — hors MVP]
+# Phase: 2 (audit architectural, informational)
+# Token footprint estimé: ~20-30 KB par invocation
+# Optionnel — skippable via /sdd-reverse-inventory --skip-audit
+# -------------------------------------------------------------------------
+reverse-tech-auditor:
+  reads:
+    - .claude/rules/reverse-engineering.md
+    - .claude/rules/output-protocol.md
+    - workspace/old/{P}/.sys/inventory-raw.json
+    - workspace/old/{P}/.sys/inventory.json
+    - workspace/old/{P}/.sys/db-schema.json                   # produit par db_schema_extractor.py
+    - workspace/old/{P}/.sys/deps-graph.json                  # produit par deps_graph_builder.py
+    - workspace/old/{P}/{sampled_file}                        # 20-30 fichiers représentatifs
+  writes:
+    - workspace/old/{P}/.sys/tech-audit.md                    # rapport informational
+  forbidden_reads:
+    - workspace/input/
+    - workspace/output/
+    - .claude/agents/
+    - .claude/commands/
+
+# -------------------------------------------------------------------------
+# Agent: reverse-functional-extractor (Opus 4.7)
+# Phase: 3 (intention métier → FEAT.md)
+# Token footprint estimé: ~25-40 KB par invocation (1 unité)
+# -------------------------------------------------------------------------
+reverse-functional-extractor:
+  reads:
+    - .claude/rules/reverse-engineering.md                    # règle anti-derive REVERSE
+    - .claude/rules/output-protocol.md
+    - .claude/docs/reverse-engineering-cookbook/_generic-monolith.md
+    - .claude/docs/reverse-engineering-cookbook/{language}.md
+    - .claude/templates/feat.template.md                      # format FEAT SDD_Pro (réutilisé)
+    - workspace/old/{P}/.sys/inventory.json                   # unit ciblée + metadata
+    - workspace/old/{P}/.sys/db-schema.json                   # si Phase 2 a tourné (optionnel)
+    - workspace/old/{P}/.sys/tech-audit.md                    # si Phase 2 a tourné (optionnel)
+    # Fichiers en evidence de l'unité ciblée (5-15 typiquement)
+    - workspace/old/{P}/{evidence_file}
+  writes:
+    - workspace/input/feats/{n}-{Name}.md                     # 1 FEAT par invocation
+    - workspace/old/{P}/.sys/modules/{module-id}/extraction-{unit-id}.md  # rapport agent
+  forbidden_reads:
+    - workspace/output/                                       # pipeline SDD_Pro inchangé
+    - workspace/input/feats/{other_n}-*.md                    # autres FEATs (lecture sélective)
+    - .claude/agents/                                         # isolation stricte
+    - .claude/commands/                                       # isolation stricte
+
+# -------------------------------------------------------------------------
+# Agent: reverse-ui-extractor (Sonnet 4.6)          [MVP v0.2 — Phase 4 livrée]
+# Phase: 4 (HTML capturé runtime ou template legacy → HTML mockup sémantique)
+# Token footprint estimé: ~15-25 KB par invocation
+# Note : modèle Sonnet (pas Opus) car transformation HTML déterministe, pas
+# analyse métier — cf. agents/reverse-ui-extractor.md §"Différence avec
+# reverse-functional-extractor".
+# -------------------------------------------------------------------------
+reverse-ui-extractor:
+  reads:
+    - .claude/rules/reverse-engineering.md                    # règle anti-derive (§6 dédiée UI)
+    - .claude/rules/output-protocol.md                        # chat 1L [REVERSE-UI]
+    - workspace/input/feats/{n}-{Name}.md                     # FEAT correspondante (lecture passive)
+    - workspace/old/{P}/.sys/inventory.json                   # metadata unit ciblée
+    - workspace/old/{P}/.sys/captures/{unit_id}.html          # HTML capturé Playwright (ou template static fallback)
+    - workspace/input/ui/_legacy-style/tokens.css             # palette extraite (lecture pour référence)
+    - workspace/input/ui/_legacy-style/components-inventory.md # composants détectés (lecture pour annotations)
+  writes:
+    - workspace/input/ui/{n}-1-{Name}.html                    # mockup sémantique (1 par unité)
+    - workspace/old/{P}/.sys/modules/{module-id}/ui-extraction-{unit-id}.md  # rapport agent
+  forbidden_reads:
+    - workspace/output/                                       # pipeline SDD_Pro inchangé
+    - workspace/input/ui/{other_n}-*.html                     # autres mockups (lecture sélective stricte)
+    - workspace/input/feats/{other_n}-*.md                    # autres FEATs (lecture sélective)
+    - .claude/agents/                                         # isolation stricte
+    - .claude/commands/                                       # isolation stricte
+    - .claude/python/sdd_lib/                                 # modules existants SDD_Pro
+    - workspace/old/{P}/*.aspx                                # PAS les templates bruts — utiliser la capture
+
+# =========================================================================
+# Scripts Python (déterministes, 0 token LLM)
+# =========================================================================
+# Documentés ici pour traçabilité audit, mais ne consomment pas de cache LLM.
+# Invoqués par les commandes /sdd-reverse-* via subprocess.
+# =========================================================================
+
+scripts:
+  - id: scan_legacy
+    path: .claude/python/sdd_reverse/scan_legacy.py
+    role: "Detection langage/framework via language_signatures.yml. Pure deterministic."
+    inputs:
+      - .claude/python/sdd_reverse/language_signatures.yml
+      - workspace/old/{P}/                                    # walked file tree
+    outputs:
+      - (dict in memory, consumed by inventory_builder.py)
+
+  - id: inventory_builder
+    path: .claude/python/sdd_reverse/inventory_builder.py
+    role: "Pages, entry points, modules suggestions, dead code candidates."
+    inputs:
+      - (scan_legacy output dict)
+      - workspace/old/{P}/                                    # for content reads (titles, code-behind)
+    outputs:
+      - (dict consumed by ui_unit_detector.py + reverse_inventory CLI)
+
+  - id: ui_unit_detector
+    path: .claude/python/sdd_reverse/ui_unit_detector.py
+    role: "Pre-detection of UI functional units (GridView, FormView, Menu, etc.) via patterns."
+    inputs:
+      - (inventory pages list)
+      - workspace/old/{P}/                                    # for pattern matching
+    outputs:
+      - (units-candidates dict consumed by reverse_inventory CLI)
+
+  - id: reverse_inventory_cli
+    path: .claude/python/sdd_reverse_scripts/reverse_inventory.py
+    role: "Phase 1 CLI orchestrator. Wraps scan + inventory + units."
+    cli_args: ["--project-path", "--signatures", "--output-dir", "--json"]
+    exit_codes:
+      0: success
+      1: precondition failed (project not found, signatures missing)
+      2: scan failed (I/O or YAML error)
+      3: no language detected (legacy empty or unrecognized)
+    outputs:
+      - workspace/old/{P}/.sys/inventory-raw.json
+      - workspace/old/{P}/.sys/units-candidates.json
+
+  - id: legacy_runner
+    path: .claude/python/sdd_reverse/legacy_runner.py
+    role: "Phase 4a — detect+launch legacy runtime per runner_signatures.yml. Pure library + CLI."
+    inputs:
+      - .claude/python/sdd_reverse/runner_signatures.yml
+      - workspace/old/{P}/.sys/inventory-raw.json               # for language autodetect
+      - workspace/old/{P}/                                      # for artifact lookup (*.csproj, pom.xml)
+    outputs:
+      - workspace/old/{P}/.sys/.runner.pid                      # pidfile for cleanup
+
+  - id: legacy_runner_cli
+    path: .claude/python/sdd_reverse_scripts/legacy_runner.py
+    role: "Phase 4a CLI orchestrator. Launches legacy + waits ready OR cleanup pidfile."
+    cli_args: ["--project-path", "--port", "--language", "--timeout", "--cleanup", "--json"]
+    exit_codes:
+      0: success (runtime launched OR fallback-static decided)
+      1: precondition failed (project path invalid, language undetectable)
+      2: runner_signatures.yml malformed
+    outputs:
+      - stdout JSON {ok, mode, base_url, pid, errors[]}
+
+  - id: playwright_capture
+    path: .claude/python/sdd_reverse/playwright_capture.py
+    role: "Phase 4b — Playwright Chromium headless capture (outerHTML + computed palette + screenshot)."
+    inputs:
+      - http://127.0.0.1:{port}/{route}                         # legacy running URL
+      - workspace/old/{P}/.sys/auth-cookies.json                # optional auth cookies
+    outputs:
+      - workspace/old/{P}/.sys/captures/{unit_id}.html
+      - workspace/old/{P}/.sys/captures/{unit_id}-palette.json
+      - workspace/old/{P}/.sys/captures/{unit_id}.png
+
+  - id: css_palette_extractor
+    path: .claude/python/sdd_reverse/css_palette_extractor.py
+    role: "Aggregate 1+ palette JSONs into deduplicated tokens.css (cluster K-means in RGB)."
+    inputs:
+      - workspace/old/{P}/.sys/captures/*-palette.json
+    outputs:
+      - workspace/input/ui/_legacy-style/tokens.css             # idempotent (sources-hash)
+
+  - id: legacy_components_extractor
+    path: .claude/python/sdd_reverse/legacy_components_extractor.py
+    role: "Heuristic HTML parser : detect grid/form/nav/modal/pagination/filter components."
+    inputs:
+      - workspace/old/{P}/.sys/captures/*.html
+    outputs:
+      - workspace/input/ui/_legacy-style/components-inventory.md
+
+# =========================================================================
+# Commandes /sdd-reverse-* (6 user-facing)
+# =========================================================================
+# Mapping commande → agent + scripts invoqués. Toutes les commandes vivent
+# dans .claude/commands/ en NOUVEAUX fichiers (aucune commande SDD_Pro
+# existante modifiée).
+# =========================================================================
+
+commands:
+  - id: sdd-reverse-init
+    path: .claude/commands/sdd-reverse-init.md
+    role: "Bootstrap workspace/old/{P}/.sys/ (création directory + .gitignore)"
+    invokes: []
+    available_in_mvp: true
+
+  - id: sdd-reverse-inventory
+    path: .claude/commands/sdd-reverse-inventory.md
+    role: "Phase 1 — scan + inventory builder + units pre-detection + agent synthesis"
+    invokes:
+      - scripts/reverse_inventory_cli
+      - agents/reverse-inventory
+    available_in_mvp: true
+
+  - id: sdd-reverse-audit
+    path: .claude/commands/sdd-reverse-audit.md
+    role: "Phase 2 — tech audit (informational, optional)"
+    invokes:
+      - scripts/db_schema_extractor    # V2
+      - scripts/deps_graph_builder     # V2
+      - agents/reverse-tech-auditor    # V2
+    available_in_mvp: false
+
+  - id: sdd-reverse
+    path: .claude/commands/sdd-reverse.md
+    role: "Phase 3 — extraction fonctionnelle d'une unité → FEAT.md"
+    invokes:
+      - agents/reverse-functional-extractor
+    available_in_mvp: true
+
+  - id: sdd-reverse-ui
+    path: .claude/commands/sdd-reverse-ui.md
+    role: "Phase 4 — UI extraction runtime (Playwright capture → HTML mockup sémantique)"
+    invokes:
+      - scripts/legacy_runner_cli
+      - scripts/playwright_capture
+      - scripts/css_palette_extractor
+      - scripts/legacy_components_extractor
+      - agents/reverse-ui-extractor
+    available_in_mvp: true
+
+  - id: sdd-reverse-full
+    path: .claude/commands/sdd-reverse-full.md
+    role: "Orchestrateur phases 1→4 avec validation Tech Lead inter-phases"
+    invokes:
+      - commands/sdd-reverse-inventory
+      - commands/sdd-reverse-audit
+      - commands/sdd-reverse
+      - commands/sdd-reverse-ui
+    available_in_mvp: false
+
+  - id: sdd-reverse-status
+    path: .claude/commands/sdd-reverse-status.md
+    role: "Diagnostic du workflow reverse (état inventory, FEATs extraites)"
+    invokes:
+      - scripts/reverse_status
+    available_in_mvp: false
+
+# =========================================================================
+# Skills auto-triggered
+# =========================================================================
+
+skills:
+  - id: starting-a-reverse-eng
+    path: .claude/skills/starting-a-reverse-eng/SKILL.md
+    role: "Auto-trigger conservative sur intentions reverse engineering"
+    triggers_keywords:
+      - "reverse engineering"
+      - "reverse engineer"
+      - "convertir l'ancien système"
+      - "convertir le legacy"
+      - "j'ai un legacy"
+      - "j'ai une vieille application"
+      - "rétroingénierie"
+      - "ingénierie inverse"
+      - "moderniser l'application"
+      - "moderniser le code legacy"
+      - "migrer le legacy"
+      - "migration legacy"
+      - "workspace/old"
+      - "/sdd-reverse"
+    available_in_mvp: true
+
+# =========================================================================
+# Isolation contract (auto-vérification)
+# =========================================================================
+# Aucun fichier listé en `reads:`/`writes:` ci-dessus ne doit MODIFIER un
+# fichier existant SDD_Pro. Seules les zones nouvelles sont écrites :
+#
+#   - workspace/old/{P}/.sys/*                  (nouveau path)
+#   - workspace/input/feats/{n}-{Name}.md       (nouveau fichier, cohabite)
+#   - workspace/input/ui/{n}-{m}-{Name}.html    (nouveau fichier, cohabite)
+#   - workspace/input/ui/_legacy-style/*        (nouveau sous-dossier)
+#
+# Vérification automatique : tests/test_reverse_*.py + framework_smoke.py.
+# =========================================================================

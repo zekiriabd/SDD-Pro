@@ -1,0 +1,80 @@
+{
+  "$schema": "../../templates/libs-catalog.schema.json",
+  "stackId": "kotlin-mustache",
+  "category": "fullstack",
+  "schemaVersion": 1,
+  "buildSystem": "gradle",
+  "manifest": {
+    "files": [
+      "workspace/output/src/{AppName}/build.gradle.kts",
+      "workspace/output/src/{AppName}/settings.gradle.kts",
+      "workspace/output/src/{AppName}/src/main/resources/application.yml"
+    ]
+  },
+  "metadata": {
+    "platforms": ["jvm-21"],
+    "framework": "Spring Boot 3.4 + Kotlin 2.1 + Mustache (templates server-rendered)",
+    "workflow": "single-project-jvm-ssr",
+    "notes": "Mustache logic-less templates. Interactivite via HTMX (capability) ou Alpine.js. Pas de bundler JS. Database-First scaffolding via jpa-entity-generator OU hibernate-tools."
+  },
+  "dbDrivers": {
+    "postgres": { "module": "org.postgresql:postgresql", "ref": "postgres-driver" },
+    "mysql": { "module": "com.mysql:mysql-connector-j", "ref": "mysql-driver" },
+    "sqlserver": { "module": "com.microsoft.sqlserver:mssql-jdbc", "ref": "sqlserver-driver" },
+    "sqlite": { "module": "org.xerial:sqlite-jdbc", "ref": "sqlite-driver" }
+  },
+  "versions": {
+    "spring-boot": "3.4.1",
+    "kotlin": "2.1.0",
+    "kotlinx-coroutines": "1.10.1",
+    "jackson-kotlin": "2.18.2",
+    "postgres-driver": "42.7.4",
+    "mysql-driver": "9.1.0",
+    "sqlserver-driver": "12.8.1.jre11",
+    "sqlite-driver": "3.47.1.0",
+    "htmx": "2.0.4",
+    "alpinejs": "3.14.8",
+    "flyway": "11.1.0",
+    "springdoc-openapi": "2.7.0",
+    "jjwt": "0.12.6",
+    "spring-azure-ad": "5.18.0",
+    "poi-ooxml": "5.4.0",
+    "itext": "4.0.5",
+    "caffeine": "3.2.0",
+    "ktlint": "12.1.2"
+  },
+  "core": [
+    { "module": "org.springframework.boot:spring-boot-starter-web", "ref": "spring-boot", "rationale": "Spring MVC + Tomcat embedded" },
+    { "module": "org.springframework.boot:spring-boot-starter-mustache", "ref": "spring-boot", "rationale": "Template engine Mustache" },
+    { "module": "org.springframework.boot:spring-boot-starter-data-jpa", "ref": "spring-boot", "rationale": "Spring Data JPA + Hibernate" },
+    { "module": "org.springframework.boot:spring-boot-starter-validation", "ref": "spring-boot", "rationale": "Bean Validation (Jakarta)" },
+    { "module": "org.springframework.boot:spring-boot-starter-security", "ref": "spring-boot", "rationale": "Spring Security" },
+    { "module": "org.springframework.boot:spring-boot-starter-actuator", "ref": "spring-boot", "rationale": "/actuator/health, metrics" },
+    { "module": "com.fasterxml.jackson.module:jackson-module-kotlin", "ref": "jackson-kotlin", "rationale": "JSON Kotlin-aware" },
+    { "module": "org.jetbrains.kotlinx:kotlinx-coroutines-core", "ref": "kotlinx-coroutines" }
+  ],
+  "onDemand": [
+    { "module": "org.postgresql:postgresql", "ref": "postgres-driver", "capability": "db-postgres", "triggers": ["DatabaseType.*PostgreSql", "postgres"] },
+    { "module": "com.mysql:mysql-connector-j", "ref": "mysql-driver", "capability": "db-mysql", "triggers": ["DatabaseType.*MySql", "mysql", "mariadb"] },
+    { "module": "com.microsoft.sqlserver:mssql-jdbc", "ref": "sqlserver-driver", "capability": "db-sqlserver", "triggers": ["DatabaseType.*SqlServer"] },
+    { "module": "org.xerial:sqlite-jdbc", "ref": "sqlite-driver", "capability": "db-sqlite", "triggers": ["DatabaseType.*Sqlite"] },
+    { "module": "org.webjars:htmx.org", "ref": "htmx", "capability": "htmx", "triggers": ["htmx", "partial.*reload", "server.*fragment"] },
+    { "module": "org.webjars:alpinejs", "ref": "alpinejs", "capability": "alpine", "triggers": ["alpine", "alpine\\.js", "mini.*reactive"] },
+    { "module": "org.flywaydb:flyway-core", "ref": "flyway", "capability": "flyway", "triggers": ["flyway", "migrations", "db.*versionning"] },
+    { "module": "org.springdoc:springdoc-openapi-starter-webmvc-ui", "ref": "springdoc-openapi", "capability": "openapi", "triggers": ["swagger", "openapi", "/api-docs"] },
+    { "module": "io.jsonwebtoken:jjwt-api", "ref": "jjwt", "capability": "jwt", "triggers": ["\\bjwt\\b", "auth-local"] },
+    { "module": "com.azure.spring:spring-cloud-azure-starter-active-directory", "ref": "spring-azure-ad", "capability": "azure-ad", "triggers": ["auth-azure-ad", "msal", "azure-ad"] },
+    { "module": "org.apache.poi:poi-ooxml", "ref": "poi-ooxml", "capability": "excel", "triggers": ["\\bexcel\\b", "\\.xlsx\\b", "export.*excel"] },
+    { "module": "com.lowagie:itext", "ref": "itext", "capability": "pdf", "triggers": ["\\bpdf\\b", "export.*pdf"] },
+    { "module": "org.springframework.boot:spring-boot-starter-mail", "ref": "spring-boot", "capability": "smtp", "triggers": ["email", "smtp", "envoi.*mail"] },
+    { "module": "com.github.ben-manes.caffeine:caffeine", "ref": "caffeine", "capability": "caffeine-cache", "triggers": ["cache", "performance", "memoization"] }
+  ],
+  "plugins": [
+    { "id": "org.jetbrains.kotlin.jvm", "ref": "kotlin", "rationale": "Plugin Kotlin JVM" },
+    { "id": "org.jetbrains.kotlin.plugin.spring", "ref": "kotlin", "rationale": "Compiler open des classes Spring" },
+    { "id": "org.jetbrains.kotlin.plugin.jpa", "ref": "kotlin", "rationale": "Compiler no-arg pour entities JPA" },
+    { "id": "org.springframework.boot", "ref": "spring-boot", "rationale": "Spring Boot Gradle plugin (bootJar)" },
+    { "id": "io.spring.dependency-management", "rationale": "BOM management Spring Boot" },
+    { "id": "org.jlleitschuh.gradle.ktlint", "ref": "ktlint", "rationale": "Lint Kotlin (capability code-quality)" }
+  ]
+}

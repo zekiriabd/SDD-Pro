@@ -1,0 +1,148 @@
+# Reverse Engineering Phase 4 — Runner signatures (declarative, extensible)
+# Schema: see .claude/docs/reverse-engineering-phase4-runtime.md §9
+# Adding a new runner: append an entry below. NO Python code changes required.
+#
+# Substitution tokens disponibles dans launch_cmd:
+#   {port}              port assigne (5099 par defaut, decale si conflit)
+#   {abs_project_path}  chemin absolu workspace/old/{Project}
+#   {csproj_path}       chemin absolu du premier *.csproj trouve sous abs_project_path
+#   {pom_path}          chemin absolu du premier pom.xml trouve
+#   {gradle_path}       chemin absolu du premier build.gradle/build.gradle.kts trouve
+#
+# Champ ready_url accepte le token {port}. Le runner poll HTTP (GET, 2s timeout).
+# status_code < 500 = ready (200/302/401/403 acceptes, 404 root path tolere).
+
+schema_version: 1
+
+runners:
+  - language: dotnet-webforms
+    runner_id: iisexpress
+    label: IIS Express (Windows-only)
+    detect_cmd: ["iisexpress.exe", "/?"]
+    detect_exit_ok: [0, 1]   # iisexpress.exe /? renvoie code != 0 mais imprime usage
+    launch_cmd:
+      - "iisexpress.exe"
+      - "/path:{abs_project_path}"
+      - "/port:{port}"
+      - "/clr:v4.0"
+    # IIS Express bind sur "localhost" via HTTP.SYS — Host header strict, refuse 127.0.0.1
+    ready_url: "http://localhost:{port}/"
+    host: "localhost"
+    default_port: 5099
+    timeout_s: 60
+    platform: ["win32"]
+    artifacts_required: []   # Web.config recommande mais pas obligatoire (App_Code/ scenarios)
+    notes: |
+      iisexpress.exe doit etre dans PATH. Sur Windows, generalement
+      "C:\\Program Files (x86)\\IIS Express\\iisexpress.exe".
+      Ajouter ce dossier au PATH si introuvable.
+
+  - language: dotnet-mvc
+    runner_id: dotnet-run
+    label: Kestrel via dotnet CLI
+    detect_cmd: ["dotnet", "--version"]
+    detect_exit_ok: [0]
+    launch_cmd:
+      - "dotnet"
+      - "run"
+      - "--project"
+      - "{csproj_path}"
+      - "--urls"
+      - "http://127.0.0.1:{port}"
+    ready_url: "http://127.0.0.1:{port}/"
+    default_port: 5100
+    timeout_s: 90
+    platform: ["win32", "linux", "darwin"]
+    artifacts_required: ["*.csproj"]
+    notes: |
+      Requiert .NET SDK installe. Compatible Kestrel ASP.NET MVC / Razor Pages.
+      Le premier *.csproj trouve sous abs_project_path est utilise.
+
+  - language: java-jee
+    runner_id: maven-spring-boot
+    label: Maven Spring Boot
+    detect_cmd: ["mvn", "--version"]
+    detect_exit_ok: [0]
+    launch_cmd:
+      - "mvn"
+      - "-f"
+      - "{pom_path}"
+      - "spring-boot:run"
+      - "-Dspring-boot.run.arguments=--server.port={port}"
+    ready_url: "http://127.0.0.1:{port}/"
+    default_port: 8081
+    timeout_s: 180
+    platform: ["win32", "linux", "darwin"]
+    artifacts_required: ["pom.xml"]
+    notes: |
+      Pour Gradle Spring Boot, ajouter une entree avec runner_id=gradle-spring-boot.
+      Maven Wrapper (mvnw) non couvert V1 (necessite shell wrapper specifique).
+
+  - language: java-jee-gradle
+    runner_id: gradle-spring-boot
+    label: Gradle Spring Boot
+    detect_cmd: ["gradle", "--version"]
+    detect_exit_ok: [0]
+    launch_cmd:
+      - "gradle"
+      - "-p"
+      - "{abs_project_path}"
+      - "bootRun"
+      - "--args=--server.port={port}"
+    ready_url: "http://127.0.0.1:{port}/"
+    default_port: 8082
+    timeout_s: 180
+    platform: ["win32", "linux", "darwin"]
+    artifacts_required: ["build.gradle", "build.gradle.kts"]
+    notes: |
+      Match build.gradle OU build.gradle.kts (l'un des deux suffit).
+
+  - language: php-procedural
+    runner_id: php-builtin
+    label: PHP built-in server
+    detect_cmd: ["php", "--version"]
+    detect_exit_ok: [0]
+    launch_cmd:
+      - "php"
+      - "-S"
+      - "127.0.0.1:{port}"
+      - "-t"
+      - "{abs_project_path}"
+    ready_url: "http://127.0.0.1:{port}/"
+    default_port: 8000
+    timeout_s: 30
+    platform: ["win32", "linux", "darwin"]
+    artifacts_required: []
+    notes: |
+      Serveur built-in PHP (php -S). Single-threaded, suffisant pour reverse capture.
+      Ne supporte PAS .htaccess (Apache only). Si le legacy depend de mod_rewrite,
+      considerer fallback static parse.
+
+  - language: php-laravel
+    runner_id: laravel-artisan
+    label: Laravel Artisan serve
+    detect_cmd: ["php", "artisan", "--version"]
+    detect_exit_ok: [0]
+    launch_cmd:
+      - "php"
+      - "artisan"
+      - "serve"
+      - "--host=127.0.0.1"
+      - "--port={port}"
+    ready_url: "http://127.0.0.1:{port}/"
+    default_port: 8001
+    timeout_s: 60
+    platform: ["win32", "linux", "darwin"]
+    artifacts_required: ["artisan", "composer.json"]
+    notes: |
+      Necessite Composer install prealable (vendor/ present).
+      Detection : fichier "artisan" a la racine du projet.
+
+# Port allocation strategy:
+#   Si default_port occupe, le runner essaie default_port+1, +2, ..., +4
+#   (5 tentatives au total). Au-dela, exit 2 [REVERSE_UI_PORT_CONFLICT].
+
+# Cleanup strategy:
+#   Le runner ecrit {abs_project_path}/.sys/.runner.pid au launch.
+#   atexit + SIGINT/SIGTERM handlers garantissent process.terminate().
+#   Cleanup manuel : python -m sdd_reverse_scripts.legacy_runner --cleanup {abs_project_path}

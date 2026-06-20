@@ -1,0 +1,42 @@
+{
+  "$schema": "../../templates/libs-catalog.schema.json",
+  "stackId": "node-vitest",
+  "category": "qa",
+  "schemaVersion": 1,
+  "buildSystem": "pnpm",
+  "manifest": {
+    "files": [
+      "workspace/output/src/{BackendName}/package.json",
+      "workspace/output/src/{AppName}/apps/web/package.json"
+    ]
+  },
+  "versions": {
+    "vitest": "2.1.8",
+    "happy-dom": "16.0.1",
+    "jsdom": "25.0.1",
+    "testing-library-react": "16.1.0",
+    "testing-library-jest-dom": "6.6.3",
+    "testing-library-user-event": "14.5.2",
+    "vue-test-utils": "2.4.6",
+    "supertest": "7.0.0",
+    "supertest-types": "6.0.2",
+    "msw": "2.7.0"
+  },
+  "core": [
+    { "module": "vitest", "ref": "vitest" },
+    { "module": "@vitest/coverage-v8", "ref": "vitest" }
+  ],
+  "onDemand": [
+    { "module": "happy-dom", "ref": "happy-dom", "capability": "dom-env", "triggers": ["happy-dom", "test.*composant", "test.*ui"] },
+    { "module": "jsdom", "ref": "jsdom", "capability": "dom-env", "triggers": ["jsdom", "test.*composant", "test.*ui"], "alternative": true },
+    { "module": "@testing-library/react", "ref": "testing-library-react", "capability": "test-react", "triggers": ["test.*react", "testing-library", "frontend.*react"] },
+    { "module": "@testing-library/jest-dom", "ref": "testing-library-jest-dom", "capability": "test-react", "triggers": ["test.*react", "testing-library", "frontend.*react"] },
+    { "module": "@testing-library/user-event", "ref": "testing-library-user-event", "capability": "test-react", "triggers": ["test.*react", "testing-library", "frontend.*react"] },
+    { "module": "@vue/test-utils", "ref": "vue-test-utils", "capability": "test-vue", "triggers": ["test.*vue", "vue-test-utils", "frontend.*vue"] },
+    { "module": "supertest", "ref": "supertest", "capability": "api-tests", "triggers": ["api.*test", "supertest", "integration.*http", "qa.*api-tests"] },
+    { "module": "@types/supertest", "ref": "supertest-types", "capability": "api-tests", "triggers": ["api.*test", "supertest", "integration.*http", "qa.*api-tests"] },
+    { "module": "msw", "ref": "msw", "capability": "http-mock", "triggers": ["msw", "mock.*service.*worker", "intercept.*http"] }
+  ],
+  "plugins": [],
+  "metadata": { "lastUpdated": "2026-05-07", "format": "compact (v2)" }
+}

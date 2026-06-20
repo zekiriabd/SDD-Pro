@@ -1,0 +1,297 @@
+{
+  "$schema": "../../templates/libs-catalog.schema.json",
+  "stackId": "maui",
+  "category": "mobiles",
+  "schemaVersion": 1,
+  "buildSystem": "dotnet",
+  "manifest": {
+    "files": [
+      "workspace/output/src/{AppName}/{AppName}.csproj",
+      "workspace/output/src/{AppName}/MauiProgram.cs",
+      "workspace/output/src/{AppName}/appsettings.json",
+      "workspace/output/src/{AppName}/Platforms/Android/AndroidManifest.xml",
+      "workspace/output/src/{AppName}/Platforms/iOS/Info.plist"
+    ]
+  },
+  "metadata": {
+    "platforms": [
+      "android",
+      "ios"
+    ],
+    "optionalPlatforms": [
+      "maccatalyst",
+      "windows"
+    ],
+    "framework": "net9.0-maui",
+    "workflow": "single-project-multi-target",
+    "notes": "Stack mobile .NET MAUI. Consomme un backend separe (declare en ## Active Tech Specs). category=mobiles (depuis schema v1 etendu 2026-05-16). buildSystem=dotnet (NuGet, dotnet CLI). SDK Channel: SDK 10 supporte net9.0 et net10.0 ; net8.0 rejete par dotnet new maui template (bench 2026-06-05 cf. ADR-20260605T150000). Si SDK 11+ a venir, retester compat avant bump versions.dotnet."
+  },
+  "versions": {
+    "dotnet": "net9.0",
+    "maui-controls": "9.0.40",
+    "maui-essentials": "9.0.40",
+    "communitytoolkit-mvvm": "8.4.0",
+    "communitytoolkit-maui": "11.0.0",
+    "communitytoolkit-maui-markup": "5.1.0",
+    "sqlite-net-pcl": "1.9.172",
+    "sqlitepclraw-bundle": "2.1.10",
+    "extensions-http": "9.0.0",
+    "extensions-http-resilience": "9.0.0",
+    "refit": "8.0.0",
+    "fluentvalidation": "11.10.0",
+    "serilog-extensions": "9.0.0",
+    "serilog-sinks-debug": "3.0.0",
+    "ef-sqlite": "9.0.0",
+    "msal": "4.66.0",
+    "livecharts-maui": "2.0.0-rc4.1",
+    "microcharts-maui": "1.0.0",
+    "skiasharp-maui": "3.116.1",
+    "zxing-net-maui": "0.4.0",
+    "plugin-firebase": "3.1.0",
+    "plugin-maui-audio": "3.0.1",
+    "plugin-fingerprint": "3.0.0",
+    "plugin-maui-app-rating": "2.0.0",
+    "plugin-in-app-billing": "8.0.5",
+    "maui-maps": "9.0.40",
+    "stripe-net": "47.1.0",
+    "sentry-maui": "5.3.0",
+    "extensions-localization": "9.0.0",
+    "plugin-cert-pinning": "1.0.0"
+  },
+  "core": [
+    {
+      "module": "CommunityToolkit.Mvvm",
+      "ref": "communitytoolkit-mvvm",
+      "rationale": "Source-gen MVVM (ObservableProperty + RelayCommand) \u00e2\u20ac\u201d top-1 standard 2024-2025",
+      "license": "MIT"
+    },
+    {
+      "module": "CommunityToolkit.Maui",
+      "ref": "communitytoolkit-maui",
+      "rationale": "Toolkit officiel communautaire \u00e2\u20ac\u201d Behaviors, Converters, Popup, Snackbar, MediaElement",
+      "license": "MIT"
+    },
+    {
+      "module": "CommunityToolkit.Maui.Markup",
+      "ref": "communitytoolkit-maui-markup",
+      "rationale": "Fluent C# markup (alternative XAML)",
+      "license": "MIT"
+    },
+    {
+      "module": "sqlite-net-pcl",
+      "ref": "sqlite-net-pcl",
+      "rationale": "ORM SQLite local \u00e2\u20ac\u201d top-1 standard de facto MAUI",
+      "license": "MIT"
+    },
+    {
+      "module": "SQLitePCLRaw.bundle_green",
+      "ref": "sqlitepclraw-bundle",
+      "rationale": "Bundle SQLite native (peer sqlite-net-pcl)",
+      "license": "Apache-2.0"
+    },
+    {
+      "module": "Microsoft.Extensions.Http",
+      "ref": "extensions-http",
+      "rationale": "HttpClientFactory DI-friendly"
+    },
+    {
+      "module": "Microsoft.Extensions.Http.Resilience",
+      "ref": "extensions-http-resilience",
+      "rationale": "Retry / circuit breaker / timeout (succede a Polly direct en .NET 8+)"
+    },
+    {
+      "module": "Refit",
+      "ref": "refit",
+      "rationale": "REST client typed \u00e2\u20ac\u201d top-1 wrapper HttpClient C#",
+      "license": "MIT"
+    },
+    {
+      "module": "Refit.HttpClientFactory",
+      "ref": "refit",
+      "rationale": "Integration Refit + DI HttpClientFactory"
+    },
+    {
+      "module": "FluentValidation",
+      "ref": "fluentvalidation",
+      "rationale": "Validation forms / models",
+      "license": "Apache-2.0"
+    },
+    {
+      "module": "Serilog.Extensions.Logging",
+      "ref": "serilog-extensions",
+      "rationale": "Logger structure (peer ILogger<T>)",
+      "license": "Apache-2.0"
+    },
+    {
+      "module": "Serilog.Sinks.Debug",
+      "ref": "serilog-sinks-debug",
+      "rationale": "Sink Debug (console IDE pendant dev)"
+    }
+  ],
+  "onDemand": [
+    {
+      "module": "Microsoft.EntityFrameworkCore.Sqlite",
+      "ref": "ef-sqlite",
+      "capability": "ef-sqlite",
+      "triggers": [
+        "ef-core",
+        "entity.*framework",
+        "ef-sqlite"
+      ],
+      "alternative": true
+    },
+    {
+      "module": "Microsoft.Identity.Client",
+      "ref": "msal",
+      "capability": "msal",
+      "triggers": [
+        "msal",
+        "azure-ad",
+        "auth-azure-ad",
+        "sso"
+      ]
+    },
+    {
+      "module": "LiveChartsCore.SkiaSharpView.Maui",
+      "ref": "livecharts-maui",
+      "capability": "charts",
+      "triggers": [
+        "chart",
+        "graph",
+        "visualisation",
+        "courbe"
+      ]
+    },
+    {
+      "module": "Microcharts.Maui",
+      "ref": "microcharts-maui",
+      "capability": "charts",
+      "triggers": [
+        "microcharts",
+        "chart.*simple"
+      ],
+      "alternative": true
+    },
+    {
+      "module": "SkiaSharp.Views.Maui.Controls",
+      "ref": "skiasharp-maui",
+      "capability": "skia",
+      "triggers": [
+        "skia",
+        "dessin.*custom",
+        "canvas"
+      ]
+    },
+    {
+      "module": "ZXing.Net.Maui.Controls",
+      "ref": "zxing-net-maui",
+      "capability": "barcode",
+      "triggers": [
+        "barcode",
+        "qr.*code",
+        "scan.*qr"
+      ]
+    },
+    {
+      "module": "Plugin.Firebase",
+      "ref": "plugin-firebase",
+      "capability": "firebase-push",
+      "triggers": [
+        "firebase",
+        "push.*notification",
+        "fcm",
+        "notification"
+      ]
+    },
+    {
+      "module": "Plugin.Maui.Audio",
+      "ref": "plugin-maui-audio",
+      "capability": "audio",
+      "triggers": [
+        "audio",
+        "lecture.*son",
+        "enregistrement.*audio"
+      ]
+    },
+    {
+      "module": "Plugin.Fingerprint",
+      "ref": "plugin-fingerprint",
+      "capability": "biometric",
+      "triggers": [
+        "biometric",
+        "fingerprint",
+        "face-id",
+        "touch-id"
+      ]
+    },
+    {
+      "module": "Plugin.Maui.AppRating",
+      "ref": "plugin-maui-app-rating",
+      "capability": "in-app-rating",
+      "triggers": [
+        "rating",
+        "app-store-rating",
+        "demande.*review"
+      ]
+    },
+    {
+      "module": "Plugin.InAppBilling",
+      "ref": "plugin-in-app-billing",
+      "capability": "in-app-billing",
+      "triggers": [
+        "in-app-purchase",
+        "abonnement",
+        "billing"
+      ]
+    },
+    {
+      "module": "Microsoft.Maui.Controls.Maps",
+      "ref": "maui-maps",
+      "capability": "maps",
+      "triggers": [
+        "maps",
+        "carte",
+        "marker"
+      ]
+    },
+    {
+      "module": "Stripe.net",
+      "ref": "stripe-net",
+      "capability": "stripe",
+      "triggers": [
+        "stripe",
+        "paiement",
+        "payment"
+      ]
+    },
+    {
+      "module": "Sentry.Maui",
+      "ref": "sentry-maui",
+      "capability": "sentry",
+      "triggers": [
+        "sentry",
+        "error.*tracking",
+        "monitoring.*erreurs"
+      ]
+    },
+    {
+      "module": "Microsoft.Extensions.Localization",
+      "ref": "extensions-localization",
+      "capability": "localization",
+      "triggers": [
+        "i18n",
+        "localization",
+        "multi.*langue"
+      ]
+    },
+    {
+      "module": "Plugin.MauiCertPinning",
+      "ref": "plugin-cert-pinning",
+      "capability": "cert-pinning",
+      "triggers": [
+        "cert-pinning",
+        "ssl-pinning"
+      ]
+    }
+  ]
+}

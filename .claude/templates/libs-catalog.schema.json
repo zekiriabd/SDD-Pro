@@ -1,0 +1,161 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sdd-pro/schemas/libs-catalog.schema.json",
+  "title": "SDD_Pro Stack Library Catalog (compact)",
+  "description": "Machine-readable catalog of versions, libraries, plugins, and on-demand triggers for a SDD_Pro stack. Companion to the human-facing {stack-id}.md. Compact form: only module + (version|ref) required per lib; id, installCommand, rationale, license are optional and auto-derived when omitted.",
+  "type": "object",
+  "required": ["stackId", "category", "schemaVersion", "buildSystem", "versions", "core"],
+  "additionalProperties": false,
+  "properties": {
+    "stackId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "Identifier matching the .md filename without extension."
+    },
+    "category": {
+      "type": "string",
+      "enum": ["backend", "frontend", "ui", "auth", "qa", "fullstack", "mobiles"],
+      "description": "Stack category. MUST match the parent directory name under .claude/stacks/. 'mobiles' (plural) and 'fullstack' added 2026-05-16 for single-project multi-target stacks (React Native, MAUI, Next.js, Blazor Server, ...)."
+    },
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "buildSystem": {
+      "type": "string",
+      "enum": ["dotnet", "npm", "pnpm", "yarn", "gradle", "maven", "pip", "poetry", "uv", "cargo", "go-mod"],
+      "description": "Drives auto-derivation of installCommand when omitted on a lib entry."
+    },
+    "manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "files": { "type": "array", "items": { "type": "string" } },
+        "versionCatalogPath": { "type": "string" }
+      }
+    },
+    "versions": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-z][a-z0-9-]*$": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "dbDrivers": {
+      "type": "object",
+      "description": "Backend stacks only. Maps DatabaseType (lowercase) to JDBC/ADO/etc. driver coordinate. Replaces §8.1 of the old .md format. Used by arch Phase B step 4.1.",
+      "patternProperties": {
+        "^(postgres|sqlserver|mysql|sqlite|oracle|mariadb)$": {
+          "type": "object",
+          "required": ["module"],
+          "properties": {
+            "module": { "type": "string" },
+            "version": { "type": "string" },
+            "ref": { "type": "string" },
+            "scope": { "type": "string", "enum": ["runtime", "implementation", "compile"], "default": "runtime" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "core": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/library" }
+    },
+    "onDemand": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/onDemandLibrary" },
+      "default": []
+    },
+    "plugins": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/plugin" },
+      "default": []
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "$defs": {
+    "library": {
+      "type": "object",
+      "required": ["module"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Optional. If omitted, derived from module (last segment, kebab-cased)."
+        },
+        "module": {
+          "type": "string",
+          "description": "Package coordinate. NuGet 'PackageName', npm '@scope/pkg' or 'pkg', Maven/Gradle 'group:artifact', PyPI 'package'."
+        },
+        "version": {
+          "type": "string",
+          "description": "Inline pinned version. Mutually exclusive with ref/versionRef."
+        },
+        "ref": {
+          "type": "string",
+          "description": "Alias from versions{} block. Short form of versionRef."
+        },
+        "versionRef": {
+          "type": "string",
+          "description": "Legacy alias for ref. Both supported; ref preferred for compactness."
+        },
+        "rationale": {
+          "type": "string",
+          "description": "Optional. One-line reason this library is in core. Falls back to '' if omitted."
+        },
+        "installCommand": {
+          "type": "string",
+          "description": "Optional. If omitted, derived from buildSystem + module + resolved version. Override only when stack needs a non-canonical install (Gradle catalog accessor, custom flag, etc.)."
+        },
+        "license": {
+          "type": "string",
+          "description": "Optional SPDX license id. Useful for CVE/legal scans, ignored by agents."
+        }
+      },
+      "oneOf": [
+        { "required": ["version"], "not": { "anyOf": [{ "required": ["ref"] }, { "required": ["versionRef"] }] } },
+        { "required": ["ref"],     "not": { "anyOf": [{ "required": ["version"] }, { "required": ["versionRef"] }] } },
+        { "required": ["versionRef"], "not": { "anyOf": [{ "required": ["version"] }, { "required": ["ref"] }] } },
+        { "not": { "anyOf": [{ "required": ["version"] }, { "required": ["ref"] }, { "required": ["versionRef"] }] } }
+      ]
+    },
+    "onDemandLibrary": {
+      "allOf": [
+        { "$ref": "#/$defs/library" },
+        {
+          "type": "object",
+          "required": ["capability", "triggers"],
+          "properties": {
+            "capability": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]*$"
+            },
+            "triggers": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 },
+              "minItems": 1
+            },
+            "alternative": { "type": "boolean", "default": false }
+          }
+        }
+      ]
+    },
+    "plugin": {
+      "type": "object",
+      "required": ["id"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "version": { "type": "string" },
+        "ref": { "type": "string" },
+        "versionRef": { "type": "string" },
+        "rationale": { "type": "string" }
+      }
+    }
+  }
+}

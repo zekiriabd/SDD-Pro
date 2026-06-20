@@ -1,0 +1,197 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+# v7.0.0 audit M8 (2026-05-20, REVISED audit CTO 2026-06-07 — marketing/comm
+# alignment) : Python package version is now **lock-stepped** with the
+# framework version (`loader.yml` / CLAUDE.md / CHANGELOG.md) on the major
+# and minor digits. PEP 440 canonical form maps the framework's "alpha"
+# suffix to the standard `aN` form :
+#   framework `7.0.0-alpha`  ←→  Python `7.0.0a0`
+#   framework `7.1.0`        ←→  Python `7.1.0`
+#   framework `7.2.0-beta.1` ←→  Python `7.2.0b1`
+#
+# Rationale (revised) : the prior "different cadence" decoupling was
+# theoretical — in practice, ANY DSL change (new agent, new hook, new
+# rule format) pulls a Python tooling change (loader.yml parser update,
+# new validate_* script, new hook). External users (pip install
+# sdd-pro-tools) were confused by `0.1.0` vs the v7.0 marketing surface.
+# Lock-step alignment removes that ambiguity.
+#
+# Surfaces exposing the version :
+#   - this file (PEP 440 canonical)                 : `version`
+#   - sdd_lib.__init__ (Python API)                 : `__version__` + `__framework_version__`
+#   - loader.yml (DSL contract)                     : `version: "7.0.0"`
+#   - .claude/CLAUDE.md, docs/CHANGELOG.md           : human-readable
+# All MUST be bumped together. Tested by tests/test_version_alignment.py.
+name = "sdd-pro-tools"
+version = "7.0.0"
+description = "SDD_Pro framework hooks and scripts (Python port for cross-platform support, no LLM)"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+authors = [
+    { name = "SDD_Pro maintainers" },
+]
+keywords = ["sdd", "spec-driven-development", "claude-code", "agentic", "scaffolding"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Code Generators",
+    "Topic :: Software Development :: Quality Assurance",
+]
+dependencies = []
+
+# v7.0.1 audit P1 v2 (2026-06-08) — supply-chain hardening :
+# Dev/build deps utilisent `>=` historiquement. Audit v2 a flagué le risque
+# qu'un release malveillant futur (CVE injection sur `twine` ou `pytest-xdist`)
+# soit installé automatiquement en CI via `pip install -e .claude/python[dev]`.
+#
+# Mitigation v7.0.1 :
+#   1. Plancher MINOR `>=X.Y` au lieu de `>=X.0` (limite la fenêtre).
+#   2. PIN ABSOLU recommandé via lockfile (uv / pip-compile) — voir
+#      `.claude/python/requirements-dev.lock.txt` à générer une fois
+#      (sprint 9.1, requires uv install in CI).
+#   3. Dependabot config `.github/dependabot.yml` pour bump auto + review.
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0,<9.0",          # 8.x stable, contain to MAJOR
+    "pytest-cov>=5.0,<7.0",      # 5+ supports modern coverage, sub-7 cap
+    # pytest-xdist : parallel test execution (audit P2 perf 2026-06-08).
+    # 1479 tests in ~40 s serial → ~10-12 s with `-n auto` on 4-core CI.
+    "pytest-xdist>=3.5,<4.0",
+]
+# Distribution (Top-10 #7 starter, 2026-06-06) :
+# - Build : `python -m build` (requires `pip install build`)
+# - Test PyPI publish : `python -m twine upload --repository testpypi dist/*`
+# - Prod PyPI publish : `python -m twine upload dist/*`
+build = [
+    "build>=1.2,<2.0",
+    "twine>=5.0,<7.0",
+]
+
+[project.urls]
+# À configurer quand le repo est public + page de doc construite.
+# Homepage = "https://github.com/<org>/sdd-pro"
+# Documentation = "https://sdd-pro.dev"
+# Repository = "https://github.com/<org>/sdd-pro"
+# Issues = "https://github.com/<org>/sdd-pro/issues"
+# Changelog = "https://github.com/<org>/sdd-pro/blob/main/.claude/docs/CHANGELOG.md"
+
+# Entry points pour CLI installé via pipx (Top-10 #7 cible v7.1).
+# Aujourd'hui, les scripts sont invoqués via `python .claude/python/sdd_scripts/X.py`.
+# Demain (post-distribution PyPI) : `pipx run sdd-pro <command>` ou `sdd-pro <cmd>`.
+[project.scripts]
+# v7.0.0-alpha entry points — décommentés progressivement à mesure que les
+# scripts ont une CLI stable. Frozen post-1re release PyPI (modification
+# = breaking change CLI). Le `sdd-smoke` est le 1er commit ouvert pour
+# permettre `pipx install sdd-pro && sdd-smoke` testable end-to-end.
+sdd-smoke = "sdd_admin.framework_smoke:main"
+# sdd-bootstrap = "sdd_admin.framework_smoke:main"
+# sdd-context-budget = "sdd_scripts.context_budget:main"
+
+[tool.setuptools]
+packages = ["sdd_lib", "sdd_lib.console_db", "sdd_lib.migrations",
+            "sdd_scripts", "sdd_hooks", "sdd_admin"]
+include-package-data = true
+
+[tool.setuptools.package-data]
+"sdd_lib" = ["console_db_schema.sql", "migrations/*.sql"]
+sdd_scripts = ["*.yaml", "*.yml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+addopts = "-ra -q"
+cache_dir = ".cache/pytest"
+# Custom markers — `smoke` flags critical-path tests run by
+# `framework_smoke.py` (pytest -m smoke). Add to any test that should
+# never regress silently (blocking hooks, exit_codes, atomic_write,
+# file_locks, ADR collision, etc.). Without registration here, pytest
+# emits PytestUnknownMarkWarning and the smoke gate flags WARN.
+markers = [
+    "smoke: critical-path tests gated by `framework_smoke.py` (audit CTO 2026-06-07)",
+    "integration: end-to-end tests using deterministic chain (no LLM agents) — T1.3 audit 2026-06-08",
+]
+
+# ---------------------------------------------------------------------------
+# Coverage (audit M6, 2026-06-06) — the framework imposes CoverageMin to
+# user projects but had no coverage target on its own Python tooling.
+# Threshold deliberately set CONSERVATIVELY (60 %) to be raised over time
+# as legacy modules grow tests. Bump in steps : 60 → 70 → 80 (parity with
+# the default CoverageMin imposed to user projects).
+#
+# Run locally :
+#   cd .claude/python && python -m pytest --cov=sdd_lib --cov=sdd_scripts \
+#       --cov=sdd_hooks --cov=sdd_admin --cov-report=term-missing
+#
+# CI invocation : .github/workflows/framework-ci.yml (audit m5, 2026-06-06)
+# ---------------------------------------------------------------------------
+[tool.coverage.run]
+source = ["sdd_lib", "sdd_scripts", "sdd_hooks", "sdd_admin"]
+branch = true
+omit = [
+    "*/__pycache__/*",
+    "*/migrations/*",
+    "*/tests/*",
+    "*/.cache/*",
+    "sitecustomize.py",
+]
+
+[tool.coverage.report]
+# v7.0.1 audit P0 v2 (2026-06-08) — seuil "aspirational" pyproject 60%
+# kept but CI passe --cov-fail-under=46 explicit (no-regression baseline).
+# Coverage actuel ~46% ; roadmap Sprint 9.x : combler load-bearing 0% →
+# monter par paliers 46 → 60 → 70 → 80 (parité CoverageMin imposé aux
+# projets users). Le `fail_under` ci-dessous est utilisé pour les runs
+# LOCAUX (rappel humain), pas pour CI (qui override en CLI).
+fail_under = 60
+precision = 2
+show_missing = true
+skip_covered = false
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "\\.\\.\\.",
+]
+
+# Ruff config — P1-4 fix 2026-06-07 : baseline-blocking lint enabled on CI.
+# Initial selection = critical rules only (real bugs, not style). After
+# stabilization, expand to E/W (pycodestyle) and I (isort) progressively
+# with dedicated PRs.
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+exclude = [
+    "__pycache__",
+    ".pytest_cache",
+    "tests/fixtures",
+]
+
+[tool.ruff.lint]
+# v7.0.0-alpha baseline (P1-4 fix 2026-06-07) — minimal lint blocking on
+# real bugs only. Style + security rules deferred to dedicated PRs once
+# the codebase has progressive cleanup capacity. Select only the
+# **fail-safe** rules that catch undefined names, undeclared variables,
+# and outright bugs — no style nitpicks, no security false-positives.
+#
+# Roadmap : expand to F541/F401/B/S progressively after dedicated cleanup
+# sprints (~131 pre-existing issues counted 2026-06-07, mostly F-string
+# placeholders + unused imports — non-critical but to be addressed).
+select = ["F821", "F811", "F823"]  # undefined name, redefined import, local before assign
+ignore = []
+
+# Per-file ignores : tests can use private helpers
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["F401"]                       # imports for test fixtures often unused
+"sdd_admin/migrate_exit_codes.py" = ["F811"]     # legitimate redefinition

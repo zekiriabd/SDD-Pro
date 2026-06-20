@@ -1,0 +1,38 @@
+{
+  "$schema": "../../templates/libs-catalog.schema.json",
+  "stackId": "angular-jasmine",
+  "category": "qa",
+  "schemaVersion": 1,
+  "buildSystem": "npm",
+  "manifest": {
+    "files": [
+      "workspace/output/src/{AppName}/package.json",
+      "workspace/output/src/{AppName}/karma.conf.js",
+      "workspace/output/src/{AppName}/angular.json"
+    ]
+  },
+  "versions": {
+    "jasmine-core": "5.5.0",
+    "jasmine-types": "5.1.4",
+    "karma": "6.4.4",
+    "karma-jasmine": "5.1.0",
+    "karma-chrome-launcher": "3.2.0",
+    "karma-coverage": "2.2.1",
+    "karma-jasmine-html-reporter": "2.1.0",
+    "ng-mocks": "14.13.2"
+  },
+  "core": [
+    { "module": "jasmine-core", "ref": "jasmine-core" },
+    { "module": "@types/jasmine", "ref": "jasmine-types" },
+    { "module": "karma", "ref": "karma" },
+    { "module": "karma-jasmine", "ref": "karma-jasmine" },
+    { "module": "karma-chrome-launcher", "ref": "karma-chrome-launcher" },
+    { "module": "karma-coverage", "ref": "karma-coverage" }
+  ],
+  "onDemand": [
+    { "module": "karma-jasmine-html-reporter", "ref": "karma-jasmine-html-reporter", "capability": "test-reporter-html", "triggers": ["html.*reporter", "karma.*html"] },
+    { "module": "ng-mocks", "ref": "ng-mocks", "capability": "ng-mocks", "triggers": ["ng-mocks", "MockBuilder", "MockComponent"] }
+  ],
+  "plugins": [],
+  "metadata": { "lastUpdated": "2026-05-07", "format": "compact (v2)" }
+}

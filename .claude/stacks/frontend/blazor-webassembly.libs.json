@@ -1,0 +1,50 @@
+{
+  "$schema": "../../templates/libs-catalog.schema.json",
+  "stackId": "blazor-webassembly",
+  "category": "frontend",
+  "schemaVersion": 1,
+  "buildSystem": "dotnet",
+  "manifest": {
+    "files": ["workspace/output/src/{AppName}/{AppName}.csproj"]
+  },
+  "versions": {
+    "blazor-wasm": "10.0.6",
+    "radzen-blazor": "5.5.7",
+    "refit": "10.1.6",
+    "polly-core": "8.6.6",
+    "polly-http": "10.0.6",
+    "serilog": "4.3.1",
+    "serilog-browser-console": "8.0.0",
+    "blazored-localstorage": "4.5.0",
+    "blazored-sessionstorage": "2.4.0",
+    "blazored-toast": "4.2.1",
+    "blazored-modal": "7.3.1",
+    "fluentvalidation": "11.11.0",
+    "localization": "10.0.6",
+    "closedxml": "0.104.2"
+  },
+  "$comment_dataannotations": "v7.0.0 audit fix 2026-05-20 — `Microsoft.AspNetCore.Components.DataAnnotations.Validation` 3.2.0-rc1 retiré (prerelease Microsoft figé depuis 2020, viole policy `library-and-stack.md §0` runtime LTS only). Couvert par FluentValidation 11.11.0 (déjà en core). Si nested DataAnnotations validation strictement requise par une FEAT : ADR `runtime-prerelease-exception` + bypass explicite.",
+  "core": [
+    { "module": "Microsoft.AspNetCore.Components.WebAssembly", "ref": "blazor-wasm" },
+    { "module": "Microsoft.AspNetCore.Components.WebAssembly.DevServer", "ref": "blazor-wasm" },
+    { "module": "Microsoft.AspNetCore.Components.WebAssembly.Authentication", "ref": "blazor-wasm" },
+    { "module": "Radzen.Blazor", "ref": "radzen-blazor" },
+    { "module": "Refit", "ref": "refit" },
+    { "module": "Refit.HttpClientFactory", "ref": "refit" },
+    { "module": "Polly.Core", "ref": "polly-core" },
+    { "module": "Microsoft.Extensions.Http.Polly", "ref": "polly-http" },
+    { "module": "Serilog", "ref": "serilog" },
+    { "module": "Serilog.Sinks.BrowserConsole", "ref": "serilog-browser-console" },
+    { "module": "Blazored.LocalStorage", "ref": "blazored-localstorage" },
+    { "module": "Blazored.SessionStorage", "ref": "blazored-sessionstorage" },
+    { "module": "Blazored.Toast", "ref": "blazored-toast" },
+    { "module": "Blazored.Modal", "ref": "blazored-modal" },
+    { "module": "FluentValidation", "ref": "fluentvalidation" },
+    { "module": "Microsoft.Extensions.Localization", "ref": "localization" }
+  ],
+  "onDemand": [
+    { "module": "ClosedXML", "ref": "closedxml", "capability": "excel-client", "triggers": ["\\bexcel\\b", "\\.xlsx\\b", "upload.*excel", "parse.*excel"] }
+  ],
+  "plugins": [],
+  "metadata": { "lastUpdated": "2026-05-07", "format": "compact (v2)" }
+}

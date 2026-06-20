@@ -1,0 +1,374 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sdd-pro.dev/schemas/project-config.schema.json",
+  "title": "SDD_Pro Project Config",
+  "description": "JSON Schema (draft 2020-12) for the merged Project Config (3-layer hierarchy: .claude/config.base.yml + ~/.sdd/config.team.yml + workspace/input/stack/stack.md ## Project Config). Generated from v7.0.0-alpha keys; mirrors config.base.yml. Authoritative for validate_layered_config.py (to be wired). Source of truth for ALL Project Config keys consumed by SDD_Pro agents and scripts.",
+  "type": "object",
+  "_additionalProperties_note": "Audit P0-doc 2026-06-05 — kept `true` intentionally to tolerate forward-compat keys added by Tech Lead extensions / future versions. A strict schema would reject benign keys like `_doc` or `_legacy` and break audit-log inspection of historical configs. The exhaustive whitelist for SDD_Pro framework keys lives in `properties` below; `validate_project_config.py` separately warns on unknown keys (soft check). For strict mode, run with `--strict` flag (validates `additionalProperties: false` semantics dynamically).",
+  "additionalProperties": true,
+  "_meta": {
+    "version": "v7.0.0-alpha",
+    "generated": "2026-05-21",
+    "consumers": [
+      "sdd_lib/layered_config.py",
+      "sdd_scripts/preflight.py",
+      "sdd_scripts/phase_planner.py",
+      "sdd_hooks/preflight_cost_cap.py",
+      "agents/qa.md (CoverageMin, QAMode)",
+      "agents/code-reviewer.md (CodeReviewMode, CodeReviewFailOn)",
+      "agents/security-reviewer.md (SecurityMode, SecurityFailOn, SecurityScanEnabled)",
+      "agents/spec-compliance-reviewer.md (SpecComplianceMode, SpecComplianceFailOn)",
+      "agents/arch-reviewer.md (ArchReviewMode, ArchReviewFailOn)"
+    ],
+    "experimental_or_noop": {
+      "PlanCacheStrict": "DEPRECATED v7.0.0 — accepted in stack.md but no runtime effect (strict variants removed)",
+      "MaxOpusInflight": "NOT IMPLEMENTED v7.0.0 — slated v7.1 preflight_inflight_cap.py",
+      "IntegrationTestMode": "NOT IMPLEMENTED v7.0.0 — fixture templates pending v7.1",
+      "SecurityThreatModelEnabled": "DEPRECATED v7.0.0 — threat-model mode removed from agent"
+    }
+  },
+  "definitions": {
+    "ModeOnOffManualFull": {
+      "type": "string",
+      "enum": ["off", "manual", "full"]
+    },
+    "ModeOnOffWarnStrict": {
+      "type": "string",
+      "enum": ["off", "warn", "strict"]
+    },
+    "FailOnSeverity": {
+      "type": "string",
+      "enum": ["info", "minor", "moderate", "serious", "critical"],
+      "description": "Threshold against which agent verdicts (auditeurs) flip to RED. critical = most permissive (only critical → RED), minor = strictest."
+    },
+    "Boolean": { "type": "boolean" },
+    "PositiveInt": { "type": "integer", "minimum": 1 },
+    "NonNegativeInt": { "type": "integer", "minimum": 0 },
+    "NonNegativeNumber": { "type": "number", "minimum": 0 },
+    "Percent0To100": { "type": "integer", "minimum": 0, "maximum": 100 }
+  },
+  "properties": {
+    "QAMode": {
+      "type": "string",
+      "enum": ["off", "quality-only", "tests-only", "tests+coverage", "full", "manual"],
+      "default": "manual",
+      "description": "Controls /qa-generate phase. `off` = agent skipped, `quality-only` = quality_scan.py only, `tests-only` = generate+run tests, `tests+coverage` = + coverage parsing, `full` = all steps, `manual` = skip auto-invoke from /sdd-full."
+    },
+    "CoverageMin": {
+      "$ref": "#/definitions/Percent0To100",
+      "default": 80,
+      "description": "Lines coverage threshold (%). `coverage_lines_pct < CoverageMin` → 🔴 RED + `[QA_COVERAGE_GAP]`. Mandatory key (no framework default — Tech Lead must explicitly set or bypass with 0). Security-down protected (project cannot relax team value)."
+    },
+    "MaxParallel": {
+      "type": "integer", "minimum": 1, "maximum": 12,
+      "default": 3,
+      "description": "Maximum US batched in parallel by /dev-run (dev-backend + dev-frontend = 2× this in flight at peak). Hard ceiling 12."
+    },
+    "BuildLoopMaxIter": {
+      "type": "integer", "minimum": 1, "maximum": 10,
+      "default": 3,
+      "description": "Max retry iterations on [BUILD_CORRECTIBLE] before fail-fast. Above this → [BUILD_LOOP_EXHAUSTED]."
+    },
+    "BuildLoopMaxCostUsd": {
+      "$ref": "#/definitions/NonNegativeNumber",
+      "default": 15.00,
+      "description": "Per-US build loop hard $ cap. Above this → [BUILD_LOOP_COST_EXCEEDED] even if BuildLoopMaxIter not yet reached. 0 = disabled (only iter limit applies)."
+    },
+    "MaxCostPerRun": {
+      "$ref": "#/definitions/NonNegativeNumber",
+      "default": 50.00,
+      "description": "Run-wide $ cap (cumulative token_usage scoped by run_id). preflight_cost_cap.py blocks next Agent spawn above this. 0 = disabled (NOT recommended in CI). Default $50 = FEAT M ~$24 with 2× safety margin."
+    },
+    "A11yMode": {
+      "$ref": "#/definitions/ModeOnOffManualFull",
+      "default": "off",
+      "description": "DEPRECATED v7.0.0 — accessibility-auditor agent removed (governance-major-auditors-trim). Default flipped full → off. Replaced by axe-core CI in generated project (.github/workflows/quality.yml)."
+    },
+    "A11yFailOn": {
+      "$ref": "#/definitions/FailOnSeverity",
+      "default": "serious",
+      "description": "DEPRECATED v7.0.0 (see A11yMode). Kept for backward-compat parsing of legacy stack.md."
+    },
+    "PerfMode": {
+      "$ref": "#/definitions/ModeOnOffManualFull",
+      "default": "off",
+      "description": "DEPRECATED v7.0.0 — performance-auditor agent removed (governance-major-auditors-trim). Default flipped full → off. Replaced by Lighthouse CI + wrk/k6 in generated project."
+    },
+    "PerfFailOn": {
+      "$ref": "#/definitions/FailOnSeverity",
+      "default": "serious",
+      "description": "DEPRECATED v7.0.0 (see PerfMode). Kept for backward-compat parsing."
+    },
+    "CodeReviewMode": {
+      "$ref": "#/definitions/ModeOnOffManualFull",
+      "default": "full",
+      "description": "Controls code-reviewer (Sonnet 4.6) post-dev cross-file anti-pattern scan. Default flipped manual → full in v7.0.0 (codex audit CRIT-1)."
+    },
+    "CodeReviewFailOn": {
+      "$ref": "#/definitions/FailOnSeverity",
+      "default": "critical",
+      "description": "Threshold for code-reviewer verdict 🟢/🟡/🔴. Hard-blocking classes (override threshold) : [REVIEW_SECRETS_HARDCODED], [FRONTEND_BACKEND_CONTRACT_GAP]."
+    },
+    "SecurityMode": {
+      "$ref": "#/definitions/ModeOnOffManualFull",
+      "default": "full",
+      "description": "Controls security-reviewer (Sonnet 4.6, mode=scan post-dev). Default flipped manual → full in v7.0.0."
+    },
+    "SecurityFailOn": {
+      "$ref": "#/definitions/FailOnSeverity",
+      "default": "critical",
+      "description": "Threshold for security-reviewer scan mode. 8 hard-blocking classes override (cf. agent §7.3): SEC_SECRET_HARDCODED, SEC_SQL_INJECTION, etc."
+    },
+    "SecurityScanEnabled": {
+      "$ref": "#/definitions/Boolean",
+      "default": true,
+      "description": "Toggle for the OWASP Top 10 scan (security-reviewer mode=scan). Explicit `false` in project stack.md is allowed but logged [SEC_SCAN_DISABLED_BY_PROJECT] for audit trail. NEVER disable for CI/release."
+    },
+    "SecurityThreatModelEnabled": {
+      "$ref": "#/definitions/Boolean",
+      "default": false,
+      "description": "DEPRECATED v7.0.0 — threat-model mode removed from security-reviewer. Tolerated in legacy stack.md but no runtime effect (replaced by templates/threat-model.template.md as a human deliverable)."
+    },
+    "SpecComplianceMode": {
+      "$ref": "#/definitions/ModeOnOffManualFull",
+      "default": "full",
+      "description": "Controls spec-compliance-reviewer (Sonnet 4.6) AC-by-AC code verification. `Do not trust the report` pattern. Default flipped manual → full in v7.0.0."
+    },
+    "SpecComplianceFailOn": {
+      "$ref": "#/definitions/FailOnSeverity",
+      "default": "serious",
+      "description": "Threshold for spec-compliance verdict. Cumulative AC not-verified count flips the verdict."
+    },
+    "SpecComplianceRequiredForFeatValidate": {
+      "$ref": "#/definitions/Boolean",
+      "default": true,
+      "description": "When code already materialized, /feat-validate REQUIRES non-RED spec-compliance run. Pre-dev calls skip this gate. Bypass via --no-validate / --force (audit-logged)."
+    },
+    "ArchReviewMode": {
+      "$ref": "#/definitions/ModeOnOffManualFull",
+      "default": "manual",
+      "description": "Controls arch-reviewer (Sonnet 4.6) read-only architectural audit (MVC/DDD pattern conformance). Default `manual` (cost-aware — only run on demand). `full` = auto-invoke from /sdd-review STEP 3.0."
+    },
+    "ArchReviewFailOn": {
+      "$ref": "#/definitions/FailOnSeverity",
+      "default": "serious",
+      "description": "Threshold for arch-reviewer verdict."
+    },
+    "AuditorBatchMode": {
+      "type": "string",
+      "enum": ["two-stage", "legacy-parallel"],
+      "default": "two-stage",
+      "description": "v7.0.0+ (emprunt superpowers two-stage pattern). `two-stage` (default) : spec-compliance-reviewer runs ALONE as Stage A gate ; if 🟢/🟡 → Stage B (code/security/arch reviewers parallel). If 🔴 RED, Stage B is skipped (economy ~3 Sonnet invocations). `legacy-parallel` : v6.x behavior — all 4 reviewers parallel in one batch. Override via CLI `--legacy-auditor-parallel` on /dev-run (distinct from `--unsequenced` which addresses the API gate back/front sequencing)."
+    },
+    "ComplexityRouterMode": {
+      "$ref": "#/definitions/ModeOnOffManualFull",
+      "default": "manual",
+      "description": "v7.0.0+ (emprunt BMad scale-adaptive). Controls the deterministic `sdd_scripts/complexity_router.py` script (audit P1 M2 2026-06-08 — replaced the LLM agent with a 0-token Python implementation). Analyzes FEAT signals (SFD/BR/AC count, Compliance, Volume, SLA) → recommends POC vs full vs critical pipeline. `manual` (default) = explicit `python -m sdd_scripts.complexity_router` invocation ; `auto` = /sdd-full STEP 0 invokes script ; `off` = routing skipped, /sdd-full default."
+    },
+    "ReviewMode": {
+      "type": "string",
+      "enum": ["off", "manual", "scans-only", "read-only", "full"],
+      "default": "full",
+      "description": "Consolidated /sdd-review orchestration mode (v6.11.0+). `scans-only` = re-run quality_scan.py only ; `read-only` = DB-only aggregation, no agent spawn ; `full` = orchestrate all enabled reviewers."
+    },
+    "ReviewFailOn": {
+      "$ref": "#/definitions/FailOnSeverity",
+      "default": "serious",
+      "description": "Threshold for the consolidated /sdd-review verdict (post-aggregation)."
+    },
+    "ReviewFailOnSddFull": {
+      "$ref": "#/definitions/Boolean",
+      "default": true,
+      "description": "When /sdd-review verdict ≥ RED, /sdd-full STEP 4.8 STOPs (instead of WARN). Default flipped false → true in v7.0.0 (codex audit P0 #9). Bypass: explicit false in stack.md."
+    },
+    "QaFailOnSddFull": {
+      "$ref": "#/definitions/Boolean",
+      "default": true,
+      "description": "Symmetrizes /qa-generate verdict gating between standalone (was blocking) and /sdd-full (was WARN-only). Default flipped to true in v7.0.0. Bypass: explicit false (audit-logged)."
+    },
+    "LeanReviewersPreset": {
+      "$ref": "#/definitions/Boolean",
+      "default": false,
+      "description": "Opt-in 'lean' preset for small FEATs (S, < 3 US). Keeps only code-reviewer at `full` ; security/spec/arch flipped to `manual`. Saves ~$1.50-3 per FEAT S. Auto-activation by FEAT size deferred v7.1."
+    },
+    "MutationTestingMode": {
+      "type": "string",
+      "enum": ["off", "minimal", "full"],
+      "default": "off",
+      "description": "Opt-in mutation testing (Stryker .NET / mutmut Python / Pitest Kotlin / Stryker JS). `minimal` = business services only, `full` = all production code. Breaks the auto-confirmation bias (same IA generates code + tests)."
+    },
+    "MutationScoreMin": {
+      "$ref": "#/definitions/Percent0To100",
+      "default": 60,
+      "description": "Mutation kill-rate threshold (%). Below this → [QA_MUTATION_GAP]."
+    },
+    "MutationTestingTimeoutSec": {
+      "$ref": "#/definitions/PositiveInt",
+      "default": 600,
+      "description": "Hard timeout for the mutation testing run (seconds)."
+    },
+    "E2EMode": {
+      "type": "string",
+      "enum": ["off", "smoke", "happy-paths", "full"],
+      "default": "off",
+      "description": "Opt-in Playwright E2E. `smoke` = 1 login test, `happy-paths` = 1 per US, `full` = full coverage."
+    },
+    "E2EMinPerUs": {
+      "$ref": "#/definitions/PositiveInt",
+      "default": 1,
+      "description": "Minimum E2E tests per US (only meaningful in happy-paths / full modes)."
+    },
+    "E2ETimeoutSec": {
+      "$ref": "#/definitions/PositiveInt",
+      "default": 300,
+      "description": "Hard timeout per E2E test run (seconds)."
+    },
+    "ElicitorGapMode": {
+      "$ref": "#/definitions/ModeOnOffWarnStrict",
+      "default": "warn",
+      "description": "When FEAT has elicitor sections (FAIL-N, EDGE-N, Red Team) with items not mapped to any AC, po emits [ELICITOR_GAP]. `strict` = NO-GO, `warn` = informational."
+    },
+    "PlanCacheStrict": {
+      "$ref": "#/definitions/Boolean",
+      "default": false,
+      "description": "DEPRECATED v7.0.0 — strict dev-backend / dev-frontend variants removed (ADR governance-major-prompts-trim). Tolerated in stack.md but no runtime effect. Plan v2 schema preserved for human review only."
+    },
+    "BuildLoopAdaptiveFallback": {
+      "$ref": "#/definitions/Boolean",
+      "default": true,
+      "description": "Adaptive Opus→Sonnet downgrade in build_loop past 50% cost cap. `false` = legacy (always Opus until BuildLoopMaxIter). Read by dev-backend/dev-frontend at STEP 7."
+    },
+    "InlineRulesDriftMode": {
+      "$ref": "#/definitions/ModeOnOffWarnStrict",
+      "default": "warn",
+      "description": "Controls validate_inline_rules.py drift detection between agent .md inlined snippets and rules/*.md source. `strict` = exit 1 if drift, `warn` = report only, `off` = skip check. framework_smoke.py invokes --strict explicitly regardless."
+    },
+    "PricingFreshnessMode": {
+      "$ref": "#/definitions/ModeOnOffWarnStrict",
+      "default": "warn",
+      "description": "Controls pricing.py freshness check (Anthropic model pricing data). `warn` = emit WARN if > PricingFreshnessMaxAgeDays, `strict` = exit 1 (CI release-gate), `off` = skip."
+    },
+    "PricingFreshnessMaxAgeDays": {
+      "$ref": "#/definitions/PositiveInt",
+      "default": 90,
+      "description": "Max age (days) for pricing data before PricingFreshnessMode triggers. Default 90 = quarterly review cadence."
+    },
+    "GatedWorkflow": {
+      "$ref": "#/definitions/Boolean",
+      "default": true,
+      "description": "Enforces backend-first gated workflow in /dev-run (dev-backend ALL US → QA API Gate → dev-frontend ALL US). Disabling falls back to legacy parallel mode (audit-logged)."
+    },
+    "ApiGateRequired": {
+      "$ref": "#/definitions/Boolean",
+      "default": true,
+      "description": "When false, API Gate FAIL becomes WARN (not blocking). Disabling NOT recommended in CI."
+    },
+    "ApiGateMinPerEndpoint": {
+      "$ref": "#/definitions/PositiveInt",
+      "default": 2,
+      "description": "Minimum API Gate tests per endpoint (1 happy + 1 negative)."
+    },
+    "PlanReviewDefault": {
+      "$ref": "#/definitions/Boolean",
+      "default": true,
+      "description": "When true, `/sdd-full N` and `/dev-run N` enable --plan by default (mode :plan + manual review gate)."
+    },
+    "CheckpointMode": {
+      "type": "string",
+      "enum": ["off", "record", "resume"],
+      "default": "off",
+      "description": "Opt-in pipeline checkpointing. `record` = persist state per phase, `resume` = skip phases whose input_hash matches the recorded one."
+    },
+    "TokenUsageMode": {
+      "type": "string",
+      "enum": ["off", "record", "debug"],
+      "default": "record",
+      "description": "Controls record_token_usage hook (PostToolUse.Agent). `record` = insert into console.db, `debug` = also dump payload to .audit/. Default flipped off → record in v7.0.0."
+    },
+    "CiTemplatesGeneration": {
+      "$ref": "#/definitions/Boolean",
+      "default": true,
+      "description": "When /arch-init scaffolds a frontend project, generate .github/workflows/quality.yml (axe-core + Lighthouse CI + dep scan). Required to compensate for the v7.0.0 retirement of a11y/perf auditor agents."
+    },
+    "FeatAntiGigoMode": {
+      "$ref": "#/definitions/ModeOnOffWarnStrict",
+      "default": "warn",
+      "description": "Anti-GIGO FEAT validation (Quantified Goal + Non-Functional Constraints sections). `strict` = NO-GO if either missing."
+    },
+    "FeatDeepenMode": {
+      "$ref": "#/definitions/ModeOnOffWarnStrict",
+      "default": "warn",
+      "description": "Gate on /feat-deepen recommendation. `strict` = NO-GO if FEAT complexity ≥ threshold and deepen not yet run."
+    },
+    "FeatDeepenThreshold": {
+      "type": "integer", "minimum": 0, "maximum": 5,
+      "default": 3,
+      "description": "Complexity score (0-5) above which /feat-deepen is recommended."
+    },
+    "UsGranularityHardCap": {
+      "$ref": "#/definitions/PositiveInt",
+      "default": 10,
+      "description": "Maximum US per FEAT. Above this → [GRANULARITY_VIOLATION] unless --allow-large-feat (audit-logged)."
+    },
+    "UsGranularityWarnAt": {
+      "$ref": "#/definitions/PositiveInt",
+      "default": 6,
+      "description": "Soft threshold : WARN above this number of US, escalate to HardCap before rejection."
+    },
+    "RuntimeException": {
+      "type": "string",
+      "description": "Free-form ADR-tracked bypass for runtime LTS check (e.g. 'dotnet9 (fin: 2026-05-12, migration -> dotnet10)'). When set, validate_libs_catalog.py emits [RUNTIME_STS_EXCEPTION] WARN instead of STOP."
+    },
+    "Capabilities": {
+      "type": "string",
+      "description": "CSV of capabilities to force-install at arch bootstrap (e.g. 'excel,pdf'). Override default trigger detection (Capabilities Override sub-block in stack.md)."
+    },
+    "AppName": {
+      "type": "string",
+      "description": "Canonical name of the frontend / main application project under workspace/output/src/{AppName}/. Aliased by FrontendName (legacy v6.10.2). Used by arch scaffolding + path safety guard (rules/ownership.md §1.bis)."
+    },
+    "FrontendName": {
+      "type": "string",
+      "description": "Alias for AppName (v6.10.2+). Project Config may use either ; AppName wins when both are present (cf. normalize_project_aliases)."
+    },
+    "BackendName": {
+      "type": "string",
+      "description": "Canonical name of the backend project under workspace/output/src/{BackendName}/."
+    },
+    "LibName": {
+      "type": "string",
+      "description": "Name of the optional shared library project under workspace/output/src/{LibName}/ (DTOs/Models partagés). Triggered when LibStrategy=shared or openapi-codegen."
+    },
+    "AppNamespace": {
+      "type": "string",
+      "description": "Code namespace for the frontend project. Auto-derived from AppName when absent (convention 'namespace = project name'). Override only for non-PascalCase project names."
+    },
+    "BackendNamespace": {
+      "type": "string",
+      "description": "Code namespace for the backend project. Auto-derived from BackendName when absent."
+    },
+    "FrontendLocalPort": {
+      "type": "integer",
+      "minimum": 1024,
+      "maximum": 65535,
+      "description": "Local dev port for the frontend (consumed by /sdd-serve + CORS auto-injection). 5173 (Vite), 4200 (Angular), 5097 (Blazor WASM) selon stack."
+    },
+    "BackendLocalPort": {
+      "type": "integer",
+      "minimum": 1024,
+      "maximum": 65535,
+      "description": "Local dev port for the backend. 8080 (Spring Boot), 5000-5xxx (ASP.NET Core), 8000 (FastAPI) selon stack."
+    },
+    "LibStrategy": {
+      "type": "string",
+      "enum": ["none", "shared", "openapi-codegen", "single-project"],
+      "description": "Strategy for sharing DTOs/Models between backend and frontend. `none` = no shared lib ; `shared` = manual {LibName} project ; `openapi-codegen` = backend OpenAPI generates frontend TS client ; `single-project` = fullstack monolithic (Next/Nuxt/Angular Universal/Blazor Server/Kotlin Mustache/Node React/MAUI/React Native) — backend and frontend share the same project, no separate {LibName} (audit P1 v2 2026-06-08, alignment with 8 stacks fullstack/mobile and `workspace/input/stack/stack.md` usage)."
+    },
+    "UsGranularityTarget": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 6,
+      "description": "Soft target for US count per FEAT (informational, used by po STEP 5 to pick the right split — not enforced). Hard cap = UsGranularityHardCap (10)."
+    }
+  }
+}

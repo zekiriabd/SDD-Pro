@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="SDD Pro">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="40%" r="80%">
+      <stop offset="0%" stop-color="#1e293b"/>
+      <stop offset="100%" stop-color="#020617"/>
+    </radialGradient>
+    <linearGradient id="ring" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1d4ed8"/>
+      <stop offset="50%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#60a5fa"/>
+    </linearGradient>
+    <linearGradient id="silver" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#f8fafc"/>
+      <stop offset="55%" stop-color="#cbd5e1"/>
+      <stop offset="100%" stop-color="#94a3b8"/>
+    </linearGradient>
+    <linearGradient id="blue" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#60a5fa"/>
+      <stop offset="60%" stop-color="#2563eb"/>
+      <stop offset="100%" stop-color="#1d4ed8"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="40" fill="url(#bg)"/>
+  <!-- Outer ring (arc top) -->
+  <path d="M 60 110 A 75 75 0 0 1 196 110" fill="none" stroke="url(#ring)" stroke-width="10" stroke-linecap="round"/>
+  <!-- Outer ring (arc bottom) -->
+  <path d="M 60 146 A 75 75 0 0 0 196 146" fill="none" stroke="url(#ring)" stroke-width="10" stroke-linecap="round" opacity="0.85"/>
+  <!-- SDD letters -->
+  <text x="128" y="138" text-anchor="middle"
+        font-family="Inter, Segoe UI, sans-serif"
+        font-size="56" font-weight="800"
+        letter-spacing="-2"
+        fill="url(#silver)">SDD</text>
+  <!-- Pro label -->
+  <text x="128" y="170" text-anchor="middle"
+        font-family="Inter, Segoe UI, sans-serif"
+        font-size="22" font-weight="800"
+        letter-spacing="2"
+        fill="url(#blue)">Pro</text>
+  <!-- Arrow accent -->
+  <path d="M 64 195 L 90 169 L 80 169 L 80 158 L 90 158 L 90 165 L 100 165 Z"
+        fill="url(#blue)" opacity="0.95"/>
+</svg>

@@ -1,0 +1,62 @@
+{
+  "$schema": "../../templates/libs-catalog.schema.json",
+  "stackId": "blazor-server",
+  "category": "fullstack",
+  "schemaVersion": 1,
+  "buildSystem": "dotnet",
+  "manifest": {
+    "files": [
+      "workspace/output/src/{AppName}/{AppName}.csproj",
+      "workspace/output/src/{AppName}/Program.cs",
+      "workspace/output/src/{AppName}/appsettings.json"
+    ]
+  },
+  "metadata": {
+    "platforms": ["net10.0"],
+    "framework": "ASP.NET Core Blazor Server (legacy stack — Razor Pages + SignalR Hub + _Host.cshtml)",
+    "workflow": "single-project-ssr-signalr",
+    "notes": "Monolithe .NET 10. UI rendue serveur, synchronisee via SignalR. Pas de bundler JS. Microsoft.Identity.Web NON pinne (CVE cycle frequent)."
+  },
+  "dbDrivers": {
+    "sqlserver": { "module": "Microsoft.EntityFrameworkCore.SqlServer", "ref": "ef-core" },
+    "postgres": { "module": "Npgsql.EntityFrameworkCore.PostgreSQL", "ref": "npgsql-ef" },
+    "mysql": { "module": "Pomelo.EntityFrameworkCore.MySql", "ref": "pomelo-ef" },
+    "sqlite": { "module": "Microsoft.EntityFrameworkCore.Sqlite", "ref": "ef-core" }
+  },
+  "versions": {
+    "ef-core": "10.0.6",
+    "automapper": "16.1.1",
+    "serilog-aspnetcore": "10.0.0",
+    "serilog-console": "6.1.1",
+    "msal-web": "3.3.0",
+    "msal-web-ui": "3.3.0",
+    "npgsql-ef": "9.0.4",
+    "pomelo-ef": "9.0.0",
+    "closedxml": "0.104.1",
+    "questpdf": "2024.12.3",
+    "http-polly": "9.0.1",
+    "mailkit": "4.9.0",
+    "mimekit": "4.9.0"
+  },
+  "core": [
+    { "module": "Microsoft.EntityFrameworkCore", "ref": "ef-core", "rationale": "ORM principal" },
+    { "module": "Microsoft.EntityFrameworkCore.SqlServer", "ref": "ef-core", "rationale": "Provider defaut (override via dbDrivers selon DatabaseType)" },
+    { "module": "Microsoft.EntityFrameworkCore.Design", "ref": "ef-core" },
+    { "module": "Microsoft.EntityFrameworkCore.Tools", "ref": "ef-core" },
+    { "module": "AutoMapper", "ref": "automapper", "rationale": "Mapping Entity → Model" },
+    { "module": "Serilog.AspNetCore", "ref": "serilog-aspnetcore", "rationale": "Logger structure" },
+    { "module": "Serilog.Sinks.Console", "ref": "serilog-console" },
+    { "module": "Microsoft.Identity.Web", "ref": "msal-web", "rationale": "Auth Azure AD — NON PINNE (CVE cycle, dotnet add sans --version)" },
+    { "module": "Microsoft.Identity.Web.UI", "ref": "msal-web-ui", "rationale": "UI auth Azure AD — NON PINNE" }
+  ],
+  "onDemand": [
+    { "module": "Npgsql.EntityFrameworkCore.PostgreSQL", "ref": "npgsql-ef", "capability": "db-postgres", "triggers": ["DatabaseType.*PostgreSql", "postgres"] },
+    { "module": "Pomelo.EntityFrameworkCore.MySql", "ref": "pomelo-ef", "capability": "db-mysql", "triggers": ["DatabaseType.*MySql", "mysql", "mariadb"] },
+    { "module": "Microsoft.EntityFrameworkCore.Sqlite", "ref": "ef-core", "capability": "db-sqlite", "triggers": ["DatabaseType.*Sqlite"] },
+    { "module": "ClosedXML", "ref": "closedxml", "capability": "excel", "triggers": ["\\bexcel\\b", "\\.xlsx\\b", "export.*excel"] },
+    { "module": "QuestPDF", "ref": "questpdf", "capability": "pdf", "triggers": ["\\bpdf\\b", "\\.pdf\\b", "export.*pdf", "generer.*pdf"] },
+    { "module": "Microsoft.Extensions.Http.Polly", "ref": "http-polly", "capability": "http-client", "triggers": ["appel.*api.*externe", "service.*externe"] },
+    { "module": "MailKit", "ref": "mailkit", "capability": "smtp", "triggers": ["email", "smtp", "envoi.*mail", "notification.*mail"] },
+    { "module": "MimeKit", "ref": "mimekit", "capability": "smtp", "triggers": ["email", "smtp"] }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "$schema": "../../templates/libs-catalog.schema.json",
+  "stackId": "kotlin-junit",
+  "category": "qa",
+  "schemaVersion": 1,
+  "buildSystem": "gradle",
+  "manifest": {
+    "files": [
+      "workspace/output/src/{BackendName}/build.gradle.kts",
+      "workspace/output/src/{BackendName}/gradle/libs.versions.toml"
+    ],
+    "versionCatalogPath": "gradle/libs.versions.toml"
+  },
+  "versions": {
+    "junit-jupiter": "5.11.4",
+    "kotlin-test": "2.0.21",
+    "mockk": "1.13.13",
+    "spring-boot-test": "3.3.5",
+    "spring-security-test": "6.4.1",
+    "kotest-assertions": "5.9.1",
+    "testcontainers": "1.20.4"
+  },
+  "core": [
+    { "module": "org.junit.jupiter:junit-jupiter", "ref": "junit-jupiter" },
+    { "module": "org.jetbrains.kotlin:kotlin-test-junit5", "ref": "kotlin-test" },
+    { "module": "io.mockk:mockk", "ref": "mockk" }
+  ],
+  "onDemand": [
+    { "module": "org.springframework.boot:spring-boot-starter-test", "ref": "spring-boot-test", "capability": "spring-test", "triggers": ["spring", "MockMvc", "WebTestClient"] },
+    { "module": "org.springframework.security:spring-security-test", "ref": "spring-security-test", "capability": "spring-security-test", "triggers": ["WithMockUser", "spring.*security", "auth.*test"] },
+    { "module": "io.kotest:kotest-assertions-core", "ref": "kotest-assertions", "capability": "fluent-assertions", "triggers": ["kotest", "shouldBe"] },
+    { "module": "org.testcontainers:postgresql", "ref": "testcontainers", "capability": "testcontainers", "triggers": ["testcontainers", "docker.*test", "postgresql.*test"] }
+  ],
+  "plugins": [
+    { "id": "jacoco", "version": "built-in-gradle" }
+  ],
+  "metadata": { "lastUpdated": "2026-05-07", "format": "compact (v2)" }
+}

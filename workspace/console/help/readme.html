@@ -1,0 +1,1256 @@
+﻿<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SDD Console — Exemple Dashboard (page d'aide statique)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #f4f6fb;
+  --surface: #ffffff;
+  --primary: #1a2b4c;
+  --primary-soft: #eff3fa;
+  --accent: #4a90e2;
+  --text: #1f2937;
+  --text-muted: #6b7280;
+  --text-soft: #9ca3af;
+  --border: #e5e7eb;
+  --done: #10b981;
+  --done-soft: #ecfdf5;
+  --inprogress: #f59e0b;
+  --inprogress-soft: #fffbeb;
+  --todo: #9ca3af;
+  --todo-soft: #f3f4f6;
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, .04), 0 1px 3px rgba(15, 23, 42, .06);
+  --shadow-md: 0 4px 12px rgba(15, 23, 42, .08);
+  --radius: 12px;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+.container {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 32px 24px 48px;
+}
+
+/* === Header === */
+.header {
+  background: linear-gradient(135deg, var(--primary), #2c4476);
+  color: #fff;
+  border-radius: var(--radius);
+  padding: 32px 28px;
+  margin-bottom: 28px;
+  box-shadow: var(--shadow-md);
+}
+.header h1 {
+  margin: 0 0 6px;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+}
+.header .subtitle {
+  margin: 0 0 24px;
+  font-size: 15px;
+  opacity: .85;
+}
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+.kpi {
+  background: rgba(255, 255, 255, .12);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, .15);
+  border-radius: 10px;
+  padding: 16px 18px;
+}
+.kpi-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: .75;
+  margin-bottom: 6px;
+}
+.kpi-value {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+.kpi-bar {
+  height: 6px;
+  background: rgba(255, 255, 255, .2);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-top: 10px;
+}
+.kpi-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--done);
+  border-radius: 999px;
+  transition: width .8s ease;
+}
+
+/* === Section card === */
+.section {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 24px 28px;
+  margin-bottom: 24px;
+  box-shadow: var(--shadow-sm);
+}
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.section-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--primary);
+}
+.section-subtitle {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 4px 0 0;
+}
+
+/* === Toolbar === */
+.toolbar {
+  display: flex;
+  gap: 8px;
+}
+.btn {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font: 500 13px 'Inter', sans-serif;
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all .15s ease;
+}
+.btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.btn-primary {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+.btn-primary:hover {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+/* === Tree === */
+.tree details {
+  margin-bottom: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  overflow: hidden;
+  transition: border-color .2s, box-shadow .2s;
+}
+.tree details[open] {
+  box-shadow: var(--shadow-sm);
+  border-color: var(--primary-soft);
+}
+.tree summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  font-weight: 600;
+  color: var(--primary);
+  user-select: none;
+}
+.tree summary::-webkit-details-marker { display: none; }
+.tree summary::before {
+  content: '▶';
+  font-size: 10px;
+  color: var(--text-muted);
+  transition: transform .2s ease;
+  flex-shrink: 0;
+}
+.tree details[open] > summary::before {
+  transform: rotate(90deg);
+}
+.tree summary:hover {
+  background: var(--primary-soft);
+}
+.tree-feat > summary { font-size: 16px; }
+.tree-us {
+  margin: 0 18px 12px 36px !important;
+  background: #fafbff !important;
+}
+.tree-us > summary { font-size: 14px; padding: 12px 16px; }
+.tree-task-list {
+  margin: 0 18px 16px 56px;
+  padding: 0;
+  list-style: none;
+}
+.tree-task {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-left: 3px solid var(--border);
+  background: #fafbff;
+  border-radius: 6px;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+.tree-task.done { border-left-color: var(--done); background: var(--done-soft); }
+.tree-task.inprogress { border-left-color: var(--inprogress); background: var(--inprogress-soft); }
+.tree-task.todo { border-left-color: var(--todo); background: var(--todo-soft); }
+
+/* === Status badge === */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.badge.done { background: var(--done-soft); color: var(--done); }
+.badge.inprogress { background: var(--inprogress-soft); color: var(--inprogress); }
+.badge.todo { background: var(--todo-soft); color: var(--todo); }
+
+.summary-info {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.us-meta {
+  padding: 4px 18px 12px 42px;
+  font-size: 13px;
+  color: var(--text-muted);
+  border-bottom: 1px dashed var(--border);
+  margin: 0 18px 10px;
+}
+.us-meta strong { color: var(--text); font-weight: 600; }
+.us-actor {
+  display: inline-block;
+  background: var(--primary-soft);
+  color: var(--primary);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  margin-right: 8px;
+}
+
+/* === Charts === */
+.charts-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+}
+.chart-card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 20px 22px;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border);
+}
+.chart-card h3 {
+  margin: 0 0 14px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--primary);
+}
+.chart-wrapper {
+  position: relative;
+  height: 240px;
+}
+
+/* === Footer === */
+.footer {
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-soft);
+  padding: 24px 0 8px;
+}
+
+@media (max-width: 720px) {
+  .container { padding: 16px 12px 32px; }
+  .charts-grid { grid-template-columns: 1fr; }
+  .header { padding: 24px 18px; }
+  .header h1 { font-size: 22px; }
+  .summary-info { display: none; }
+}
+
+/* === QA Report Table === */
+.qa-table-wrap {
+  overflow-x: auto;
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border);
+}
+.qa-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.qa-table th, .qa-table td {
+  padding: 10px 14px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--border);
+}
+.qa-table thead th {
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  border-bottom: 2px solid var(--border);
+}
+.qa-table th.qa-group {
+  text-align: center;
+  border-bottom: 1px solid var(--border);
+}
+.qa-table th.qa-sub {
+  text-align: center;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+  border-bottom: 2px solid var(--border);
+}
+.qa-table tbody td:nth-child(n+5):nth-child(-n+7),
+.qa-table tfoot td:nth-child(n+5):nth-child(-n+7) {
+  text-align: center;
+}
+.qa-table tbody tr:hover { background: #fafbfd; }
+.qa-table tfoot td {
+  background: #f9fafb;
+  font-weight: 500;
+  border-top: 2px solid var(--border);
+  border-bottom: 0;
+}
+.qa-pill {
+  display: inline-block;
+  font-size: 16px;
+  line-height: 1;
+  cursor: help;
+}
+.qa-pill.green, .qa-pill.red { background: transparent; padding: 0; }
+.qa-table tbody td:last-child,
+.qa-table tfoot td:last-child { text-align: center; }
+.qa-actions {
+  margin: 16px 0 0;
+  padding-left: 22px;
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.7;
+}
+.qa-actions li { margin-bottom: 4px; }
+.qa-actions code {
+  font-family: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+  font-size: 12px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+/* === Tokens budget & Pipeline state — palette identique au QA === */
+.obs-num {
+  font-variant-numeric: tabular-nums;
+  font-family: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  text-align: right !important;
+}
+.qa-table td.obs-num,
+.qa-table th.obs-num { text-align: right; }
+.agent-chip {
+  display: inline-block;
+  font-family: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--primary-soft);
+  color: var(--primary);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+.usage-bar {
+  display: inline-block;
+  width: 90px; height: 7px;
+  background: var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+  vertical-align: middle;
+  margin-right: 8px;
+}
+.usage-bar > span {
+  display: block; height: 100%;
+  border-radius: 999px;
+  transition: width 0.2s ease;
+}
+.usage-bar > span.ok { background: var(--done); }
+.usage-bar > span.warn { background: var(--inprogress); }
+.usage-bar > span.danger { background: #ef4444; }
+.usage-pct {
+  font-family: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+  font-size: 12px; color: var(--text-muted);
+}
+.dot {
+  display: inline-block; width: 8px; height: 8px;
+  border-radius: 999px; margin-right: 6px;
+  background: var(--todo);
+  vertical-align: middle;
+}
+.dot.pass, .dot.done, .dot.validated { background: var(--done); }
+.dot.warn { background: var(--inprogress); }
+.dot.fail, .dot.error, .dot.rejected { background: #ef4444; }
+.dot.running, .dot.in-progress { background: var(--accent); }
+
+.run-meta {
+  display: flex; flex-wrap: wrap; gap: 10px 22px;
+  font-size: 13px; color: var(--text);
+  padding: 14px 16px;
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border);
+  margin-bottom: 14px;
+}
+.run-meta .lbl { color: var(--text-muted); font-weight: 500; margin-right: 4px; }
+.run-meta code {
+  font-family: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+  font-size: 12px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  padding: 1px 5px; border-radius: 3px;
+}
+.run-pill {
+  display: inline-block;
+  padding: 2px 8px; border-radius: 4px;
+  font-size: 11.5px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.4px;
+}
+.run-pill.running { background: #e0f2fe; color: #075985; }
+.run-pill.pass, .run-pill.done { background: var(--done-soft); color: #047857; }
+.run-pill.warn { background: var(--inprogress-soft); color: #92400e; }
+.run-pill.fail, .run-pill.error { background: #fee2e2; color: #991b1b; }
+.payload-cell {
+  font-family: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+  font-size: 11.5px; color: var(--text-muted);
+  max-width: 480px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.obs-empty {
+  padding: 24px;
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: center;
+  background: var(--surface);
+  border-radius: var(--radius);
+  border: 1px dashed var(--border);
+}
+.obs-empty code {
+  font-family: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+  font-size: 12px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  padding: 1px 5px; border-radius: 3px;
+}
+.events-details {
+  margin-top: 14px;
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border);
+  padding: 12px 16px;
+  font-size: 13px;
+}
+.events-details summary {
+  cursor: pointer; color: var(--text-muted); user-select: none;
+  font-weight: 500;
+}
+.events-details ul {
+  list-style: none; margin: 10px 0 0; padding: 0;
+}
+.events-details li {
+  display: flex; align-items: center; gap: 12px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 12.5px;
+}
+.events-details li:last-child { border-bottom: 0; }
+.events-details .ev-ts {
+  font-family: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+  color: var(--text-soft); min-width: 80px;
+}
+.events-details .ev-name { font-weight: 500; }
+.events-details .ev-phase {
+  font-family: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+  color: var(--accent); font-size: 12px;
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Header -->
+  <header class="header">
+    <h1>SDD Console — Exemple Dashboard (page d'aide statique)</h1>
+    <p style="background:#fff3cd;border-left:4px solid #f0ad4e;padding:12px 16px;margin:8px 0 24px;color:#856404;font-size:14px;line-height:1.5">
+      <b>⚠️ Page d'aide statique (démo)</b> — Cette page illustre la structure d'un dashboard
+      SDD avec des données <b>fictives</b> issues d'un projet de démonstration. Le <b>vrai
+      dashboard dynamique</b> du projet courant est servi par <code>/api/tree</code> et
+      consomme automatiquement <code>workspace/input/feats/*.md</code>,
+      <code>workspace/output/us/*.md</code>, <code>workspace/output/qa/feat-*/coverage.json</code>,
+      <code>workspace/output/.sys/.state/run-*.json</code>. <a href="/">← Retour au vrai
+      dashboard de ton projet</a>.
+    </p>
+    <p class="subtitle" id="globalSubtitle">Chargement…</p>
+    <div class="kpis" id="kpis"></div>
+  </header>
+
+  <!-- QA Quality Report (snapshot) -->
+  <section class="section">
+    <div class="section-header">
+      <div>
+        <h2 class="section-title">Rapport QA — exemple démo (données fictives)</h2>
+        <p class="section-subtitle">Tests, couverture, API gate, qualité (warnings) — snapshot du dernier run <code>/qa-generate</code> par FEAT.</p>
+      </div>
+    </div>
+    <div class="qa-table-wrap">
+      <table class="qa-table">
+        <thead>
+          <tr>
+            <th rowspan="2">FEAT</th>
+            <th rowspan="2">Tests</th>
+            <th rowspan="2">Coverage</th>
+            <th rowspan="2">API Gate</th>
+            <th colspan="3" class="qa-group">Quality</th>
+            <th rowspan="2">Warnings — détail</th>
+            <th rowspan="2">Décision</th>
+          </tr>
+          <tr>
+            <th class="qa-sub">err</th>
+            <th class="qa-sub">warn</th>
+            <th class="qa-sub">info</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><b>1 Authentification</b></td>
+            <td>81 / 81</td>
+            <td><b>67.86 %</b> (min 60)</td>
+            <td>3 tests / 1 endpoint</td>
+            <td>0</td>
+            <td>22</td>
+            <td>29</td>
+            <td>22 × hardcoded-hex</td>
+            <td><span class="qa-pill green" title="GREEN">🟢</span></td>
+          </tr>
+          <tr>
+            <td><b>2 Menu</b></td>
+            <td>71 / 71</td>
+            <td><b>100 %</b></td>
+            <td>pas d'API</td>
+            <td>0</td>
+            <td>32</td>
+            <td>33</td>
+            <td>31 × hardcoded-hex · 1 × long-method</td>
+            <td><span class="qa-pill green" title="GREEN">🟢</span></td>
+          </tr>
+          <tr>
+            <td><b>3 Campagnes Vue Liste</b></td>
+            <td>266 / 266</td>
+            <td><b>32.08 %</b> &lt; 60</td>
+            <td>4 tests / 1 endpoint</td>
+            <td>0</td>
+            <td>38</td>
+            <td>62</td>
+            <td>35 × hardcoded-hex · 3 × long-method</td>
+            <td><span class="qa-pill red" title="RED — [QA_COVERAGE_GAP]">🔴</span></td>
+          </tr>
+          <tr>
+            <td><b>4 Campagne</b></td>
+            <td>371 / 371</td>
+            <td><b>36.37 %</b> &lt; 60</td>
+            <td>29 tests / 11 endpoints</td>
+            <td>0</td>
+            <td>38</td>
+            <td>62</td>
+            <td>35 × hardcoded-hex · 3 × long-method</td>
+            <td><span class="qa-pill red" title="RED — [QA_COVERAGE_GAP]">🔴</span></td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr>
+            <td><b>Totaux</b></td>
+            <td><b>789 / 789</b></td>
+            <td></td>
+            <td>36 tests / 13 endpoints</td>
+            <td>0</td>
+            <td>130</td>
+            <td>186</td>
+            <td>123 × hardcoded-hex · 7 × long-method</td>
+            <td title="2 FEATs GREEN · 2 FEATs RED">2 🟢 · 2 🔴</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+    <ul class="qa-actions">
+      <li><b>hardcoded-hex</b> (123) → remplacer les <code>#xxxxxx</code> isolés dans CSS/TSX par <code>var(--token)</code> du design system (front)</li>
+      <li><b>long-method</b> (7) → fonctions à découper (exemple démo, paths fictifs <code>{AppName}/src/components/{XXX}.tsx</code>)</li>
+      <li><b>Couverture</b> feat-N → ajouter tests sous <code>{BackendName}.Tests/</code> &amp; <code>{AppName}/src/**.test.tsx</code> jusqu'à ≥ <code>CoverageMin</code>, ou baisser <code>CoverageMin</code> dans <code>## Project Config</code> de <code>workspace/input/stack/stack.md</code> (décision tracée)</li>
+    </ul>
+  </section>
+
+  <!-- Budget tokens par agent (console.db tables context_budget + token_usage) -->
+  <section class="section">
+    <div class="section-header">
+      <div>
+        <h2 class="section-title">Budget tokens par agent</h2>
+        <p class="section-subtitle">
+          Agrégé depuis <code>workspace/output/db/console.db</code> (tables <code>context_budget</code> + <code>token_usage</code>, v6.10 SSoT) — émis par le hook
+          <code>preflight_agent_budget.py</code> + <code>record_token_usage.py</code> à chaque invocation d'agent. Usage = <code>tokensMax / budgetTokens</code>.
+        </p>
+      </div>
+      <div class="toolbar" id="auditMeta"></div>
+    </div>
+    <div class="qa-table-wrap" id="auditWrap">
+      <table class="qa-table" id="auditTable">
+        <thead>
+          <tr>
+            <th>Agent</th>
+            <th class="obs-num">Runs</th>
+            <th class="obs-num">Tokens moy.</th>
+            <th class="obs-num">Tokens max</th>
+            <th class="obs-num">Budget</th>
+            <th>Usage</th>
+            <th class="obs-num">Coût ($)</th>
+            <th class="obs-num">Warnings</th>
+            <th class="obs-num">Errors</th>
+            <th>Dernier run</th>
+          </tr>
+        </thead>
+        <tbody id="auditBody">
+          <tr><td colspan="10" style="text-align:center;color:var(--text-muted);padding:24px">Chargement…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- État pipeline (console.db tables runs + run_phases + events) -->
+  <section class="section">
+    <div class="section-header">
+      <div>
+        <h2 class="section-title">État pipeline</h2>
+        <p class="section-subtitle">
+          Dernier run <code>/sdd-full</code> depuis <code>console.db</code> (tables <code>runs</code> + <code>run_phases</code>) + événements récents de la table
+          <code>events</code> (émis par <code>.claude/python/sdd_scripts/sdd_state.py</code>, v6.10 SSoT).
+        </p>
+      </div>
+      <div class="toolbar" id="stateMeta"></div>
+    </div>
+    <div id="stateContent">
+      <div class="obs-empty">Chargement…</div>
+    </div>
+  </section>
+
+  <!-- Tree -->
+  <section class="section">
+    <div class="section-header">
+      <div>
+        <h2 class="section-title">Arborescence du projet</h2>
+        <p class="section-subtitle">Cliquez pour développer une FEAT, une User Story ou voir les tâches back/front.</p>
+      </div>
+      <div class="toolbar">
+        <button class="btn" id="btnExpandAll">Tout ouvrir</button>
+        <button class="btn" id="btnCollapseAll">Tout fermer</button>
+      </div>
+    </div>
+    <div class="tree" id="tree"></div>
+  </section>
+
+  <!-- Charts -->
+  <section class="section">
+    <div class="section-header">
+      <div>
+        <h2 class="section-title">Indicateurs visuels</h2>
+        <p class="section-subtitle">Vue synthétique de l'avancement et de la répartition.</p>
+      </div>
+    </div>
+    <div class="charts-grid">
+      <div class="chart-card"><h3>📊 Répartition des tâches</h3><div class="chart-wrapper"><canvas id="chartTasks"></canvas></div></div>
+      <div class="chart-card"><h3>📊 Répartition des User Stories</h3><div class="chart-wrapper"><canvas id="chartUs"></canvas></div></div>
+      <div class="chart-card"><h3>📈 Avancement global</h3><div class="chart-wrapper"><canvas id="chartProgress"></canvas></div></div>
+      <div class="chart-card"><h3>⏱️ Tâches par FEAT</h3><div class="chart-wrapper"><canvas id="chartFeatTasks"></canvas></div></div>
+    </div>
+  </section>
+
+  <footer class="footer">
+    Généré automatiquement à partir de <code>workspace/output/us/</code> · Framework SDD Pro v6.0.0
+  </footer>
+</div>
+
+<script>
+// ============================================================
+// DATA — extrait de workspace/output/us/
+// PROJECT : exemple démo (données fictives)
+// Note : ce fichier d'aide est statique. Pour le vrai dashboard dynamique
+// du projet courant, voir /api/tree depuis la racine de la console.
+// ============================================================
+const DATA = {
+  features: [
+    {
+      id: "1-demo-project",
+      name: "Projet de démo (exemple statique)",
+      summary: "Données fictives illustrant la structure attendue par la console. Le vrai projet est résolu dynamiquement via /api/tree depuis workspace/input/stack/stack.md (clés AppName/BackendName/LibName) et workspace/output/us/*.md. Architecture 4-agents cœur SDD Pro v6 (PO + Arch + Dev-Backend + Dev-Frontend) + 2 agents support (Elicitor + QA). Mockups HTML déposés en workspace/input/ui/ par UX Designer humain.",
+      us: [
+        {
+          id: "US-1",
+          title: "Connexion",
+          actor: "Utilisateur connecté (Azure AD)",
+          summary: "Authentification via popup Azure AD, transmission automatique du token JWT en Bearer sur chaque requête sortante, validation Backend (signature, émetteur, audience, expiration), rejet 401 sur token invalide ou absent, déconnexion explicite depuis le menu utilisateur.",
+          status: "Done",
+          tasks: [
+            {
+              id: "TASK-back",
+              title: "Backend — Middleware JWT Azure AD + endpoints sécurisés",
+              summary: "Middleware d'authentification Minimal API qui valide le JWT Azure AD à chaque requête entrante. Aucun appel anonyme accepté ; absence d'en-tête Authorization → 401 avant exécution de la logique métier.",
+              stacks: ["dotnet-minimalapi", "azure-ad"],
+              status: "Done"
+            },
+            {
+              id: "TASK-front",
+              title: "Frontend — MSAL Blazor + intercepteur Bearer + Logout",
+              summary: "Configuration MSAL côté Blazor WASM, lecture du token Azure AD à la connexion, ajout automatique de l'en-tête Authorization: Bearer sur chaque requête sortante, page Logout + UserMenu avec handler de déconnexion.",
+              stacks: ["blazor-wasm", "azure-ad"],
+              status: "Done"
+            }
+          ]
+        },
+        {
+          id: "US-2",
+          title: "Navigation",
+          actor: "Admin retail",
+          summary: "Menu latéral avec entrées Périmètre d'exploitation et Configuration de redevances (placeholders), menu utilisateur avec avatar (Voir profil / Se déconnecter), dropdown de bascule de plateforme accessible depuis toutes les pages.",
+          status: "Done",
+          tasks: [
+            {
+              id: "TASK-back",
+              title: "Backend — Endpoint /api/config/auth + claims utilisateur",
+              summary: "Exposition des informations de l'utilisateur connecté (nom, email, groupes Azure AD) via mécanisme unique côté Backend pour alimenter le menu utilisateur du Frontend.",
+              stacks: ["dotnet-minimalapi"],
+              status: "Done"
+            },
+            {
+              id: "TASK-front",
+              title: "Frontend — MainLayout + composants PlatformSwitcher et UserMenu",
+              summary: "Augment MainLayout avec en-tête (PlatformSwitcher dropdown + UserMenu avatar), pages placeholder PerimetreExploitation / ConfigurationRedevances / Profil, menu latéral Radzen avec entrées de navigation.",
+              stacks: ["blazor-wasm", "radzen-blazor"],
+              status: "Done"
+            }
+          ]
+        },
+        {
+          id: "US-3",
+          title: "Consultation Points de Vente",
+          actor: "Admin retail",
+          summary: "Liste paginée avec 13 colonnes (ID PDV, Enseigne, Format, CP, Commune, Nature Lien, Surface, CATP, Pays, Exploit, Actif, Motif, Exploité), recherche globale, filtres par colonne, sélecteur taille de page (10/25/50), titre Points de vente (N) avant filtrage, statut Exploité OUI/NON calculé depuis périmètres.",
+          status: "Done",
+          tasks: [
+            {
+              id: "TASK-back",
+              title: "Backend — Endpoint paginé + service EF Core + DTOs partagés",
+              summary: "PointVenteOutputDto avec 13 colonnes, service EF Core qui charge enseigne + référentiels (groupes 9/15/16) + périmètres d'exploitation, calcul Exploité OUI/NON, endpoint GET /api/points-vente paginé.",
+              stacks: ["dotnet-minimalapi"],
+              status: "Done"
+            },
+            {
+              id: "TASK-front",
+              title: "Frontend — PointsVente.razor avec RadzenDataGrid filtrable",
+              summary: "Page Blazor PointsVente.razor avec RadzenDataGrid paginé (10/25/50), recherche globale, filtres par colonne, libellés exacts des 13 colonnes, titre dynamique Points de vente (N).",
+              stacks: ["blazor-wasm", "radzen-blazor"],
+              status: "Done"
+            }
+          ]
+        },
+        {
+          id: "US-4",
+          title: "Gestion Points de Vente",
+          actor: "Admin retail",
+          summary: "Création, modification et suppression de points de vente depuis la page liste. Validation Frontend (DataAnnotations) avec messages d'erreur explicites et blocage envoi tant que validation rouge. Revalidation automatique Backend (corps JSON, query, route) avant logique métier et accès DB. Suppression protégée par dialog de confirmation. Cohérence Front/Back sur règles métier.",
+          status: "Done",
+          tasks: [
+            {
+              id: "TASK-back",
+              title: "Backend — Endpoints CRUD + FluentValidation + cohérence métier",
+              summary: "POST/PUT/DELETE sur /api/points-vente avec FluentValidation au pipeline Minimal API : rejet 400 structuré avant logique métier et avant tout accès DB. Validation des champs obligatoires, longueurs, types, valeurs autorisées via référentiels.",
+              stacks: ["dotnet-minimalapi"],
+              status: "Done"
+            },
+            {
+              id: "TASK-front",
+              title: "Frontend — Pages Create/Edit + PointVenteForm + ConfirmDeleteDialog",
+              summary: "Pages PointVenteCreate / PointVenteEdit, composant PointVenteForm réutilisable avec DataAnnotations + messages d'erreur par champ, ConfirmDeleteDialog Radzen, blocage envoi tant que validation Frontend non verte.",
+              stacks: ["blazor-wasm", "radzen-blazor"],
+              status: "Done"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+};
+
+// ============================================================
+// HELPERS
+// ============================================================
+function normalizeStatus(s) {
+  if (!s) return "todo";
+  const v = s.toLowerCase();
+  if (v === "done" || v === "livrée" || v === "livree" || v === "approved") return "done";
+  if (v === "en cours" || v === "in progress" || v === "inprogress" || v === "draft") return "inprogress";
+  return "todo";
+}
+function statusLabel(s) {
+  const n = normalizeStatus(s);
+  return n === "done" ? "Terminé" : n === "inprogress" ? "En cours" : "À faire";
+}
+function statusIcon(s) {
+  const n = normalizeStatus(s);
+  return n === "done" ? "✅" : n === "inprogress" ? "🟡" : "⚪";
+}
+function statusBadge(s) {
+  const n = normalizeStatus(s);
+  return `<span class="badge ${n}">${statusIcon(s)} ${statusLabel(s)}</span>`;
+}
+
+// Compute feature status from US (all done = done, mix = inprogress, none = todo)
+function computeFeatureStatus(feat) {
+  const all = feat.us;
+  if (all.every(u => normalizeStatus(u.status) === "done")) return "Done";
+  if (all.some(u => normalizeStatus(u.status) !== "todo")) return "En cours";
+  return "Ready";
+}
+
+// ============================================================
+// COUNTERS
+// ============================================================
+function computeCounters() {
+  let totFeats = DATA.features.length, doneFeats = 0, progFeats = 0;
+  let totUs = 0, doneUs = 0, progUs = 0;
+  let totTasks = 0, doneTasks = 0, progTasks = 0;
+  const featTaskCount = {};
+
+  DATA.features.forEach(f => {
+    const fStatus = normalizeStatus(computeFeatureStatus(f));
+    if (fStatus === "done") doneFeats++;
+    else if (fStatus === "inprogress") progFeats++;
+
+    let count = 0;
+    f.us.forEach(u => {
+      totUs++;
+      const us = normalizeStatus(u.status);
+      if (us === "done") doneUs++;
+      else if (us === "inprogress") progUs++;
+
+      u.tasks.forEach(t => {
+        totTasks++; count++;
+        const ts = normalizeStatus(t.status);
+        if (ts === "done") doneTasks++;
+        else if (ts === "inprogress") progTasks++;
+      });
+    });
+    featTaskCount[f.name] = count;
+  });
+  return {
+    feats: { tot: totFeats, done: doneFeats, prog: progFeats, todo: totFeats - doneFeats - progFeats },
+    us:    { tot: totUs,    done: doneUs,    prog: progUs,    todo: totUs    - doneUs    - progUs },
+    tasks: { tot: totTasks, done: doneTasks, prog: progTasks, todo: totTasks - doneTasks - progTasks },
+    featTaskCount
+  };
+}
+
+// ============================================================
+// HEADER + KPIs
+// ============================================================
+function renderHeader(c) {
+  const sub = `${c.feats.tot} FEAT${c.feats.tot > 1 ? 's' : ''} · ${c.us.tot} user stor${c.us.tot > 1 ? 'ies' : 'y'} · ${c.tasks.tot} tâche${c.tasks.tot > 1 ? 's' : ''}`;
+  document.getElementById("globalSubtitle").textContent = sub;
+
+  const pctTasks = c.tasks.tot ? Math.round(100 * c.tasks.done / c.tasks.tot) : 0;
+  const pctUs    = c.us.tot    ? Math.round(100 * c.us.done    / c.us.tot)    : 0;
+  const pctFeats = c.feats.tot ? Math.round(100 * c.feats.done / c.feats.tot) : 0;
+
+  document.getElementById("kpis").innerHTML = `
+    <div class="kpi">
+      <div class="kpi-label">Tâches terminées</div>
+      <div class="kpi-value">${pctTasks}%</div>
+      <div class="kpi-bar"><span style="width:${pctTasks}%"></span></div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">User Stories terminées</div>
+      <div class="kpi-value">${pctUs}%</div>
+      <div class="kpi-bar"><span style="width:${pctUs}%"></span></div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">FEATs livrées</div>
+      <div class="kpi-value">${pctFeats}%</div>
+      <div class="kpi-bar"><span style="width:${pctFeats}%"></span></div>
+    </div>
+  `;
+}
+
+// ============================================================
+// TREE
+// ============================================================
+function renderTree() {
+  const root = document.getElementById("tree");
+  root.innerHTML = DATA.features.map(f => {
+    const fStatus = computeFeatureStatus(f);
+    const usCount = f.us.length;
+    const taskCount = f.us.reduce((s, u) => s + u.tasks.length, 0);
+    const doneCount = f.us.reduce((s, u) => s + u.tasks.filter(t => normalizeStatus(t.status) === "done").length, 0);
+
+    const usHtml = f.us.map(u => {
+      const tasksHtml = u.tasks.map(t => `
+        <li class="tree-task ${normalizeStatus(t.status)}">
+          <span style="font-size:14px">${statusIcon(t.status)}</span>
+          <div style="flex:1">
+            <div style="font-weight:500;color:var(--text)">${t.id} — ${t.title}</div>
+            <div style="font-size:12px;color:var(--text-muted);margin-top:2px">${t.summary}</div>
+            <div style="font-size:11px;color:var(--text-soft);margin-top:4px">Stack(s) : ${t.stacks.join(", ")}</div>
+          </div>
+          ${statusBadge(t.status)}
+        </li>
+      `).join("");
+      return `
+        <details class="tree-us">
+          <summary>
+            ${u.id} — ${u.title}
+            <span class="summary-info">
+              ${u.tasks.length} tâche${u.tasks.length > 1 ? 's' : ''}
+              ${statusBadge(u.status)}
+            </span>
+          </summary>
+          <div class="us-meta">
+            <span class="us-actor">👤 ${u.actor}</span>
+            <strong>Description :</strong> ${u.summary}
+          </div>
+          <ul class="tree-task-list">${tasksHtml}</ul>
+        </details>
+      `;
+    }).join("");
+
+    return `
+      <details class="tree-feat" open>
+        <summary>
+          📦 ${f.name}
+          <span class="summary-info">
+            ${usCount} US · ${doneCount}/${taskCount} tâches
+            ${statusBadge(fStatus)}
+          </span>
+        </summary>
+        <div class="us-meta" style="margin-top:8px"><strong>Synthèse :</strong> ${f.summary}</div>
+        ${usHtml}
+      </details>
+    `;
+  }).join("");
+}
+
+// ============================================================
+// CHARTS
+// ============================================================
+function renderCharts(c) {
+  const palette = {
+    done: getCss('--done'),
+    inprogress: getCss('--inprogress'),
+    todo: getCss('--todo'),
+    primary: getCss('--primary'),
+    accent: getCss('--accent')
+  };
+  Chart.defaults.font.family = "'Inter', sans-serif";
+  Chart.defaults.color = getCss('--text-muted');
+  Chart.defaults.animation = { duration: 800, easing: 'easeOutQuart' };
+
+  // 1. Tâches
+  new Chart(document.getElementById("chartTasks"), {
+    type: 'doughnut',
+    data: {
+      labels: ['Terminé', 'En cours', 'À faire'],
+      datasets: [{
+        data: [c.tasks.done, c.tasks.prog, c.tasks.todo],
+        backgroundColor: [palette.done, palette.inprogress, palette.todo],
+        borderWidth: 0
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '65%',
+      plugins: { legend: { position: 'bottom', labels: { padding: 12, boxWidth: 12 } } }
+    }
+  });
+
+  // 2. US
+  new Chart(document.getElementById("chartUs"), {
+    type: 'doughnut',
+    data: {
+      labels: ['Terminé', 'En cours', 'À faire'],
+      datasets: [{
+        data: [c.us.done, c.us.prog, c.us.todo],
+        backgroundColor: [palette.done, palette.inprogress, palette.todo],
+        borderWidth: 0
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '65%',
+      plugins: { legend: { position: 'bottom', labels: { padding: 12, boxWidth: 12 } } }
+    }
+  });
+
+  // 3. Avancement global (radial bar)
+  const pctTasks = c.tasks.tot ? Math.round(100 * c.tasks.done / c.tasks.tot) : 0;
+  const pctUs    = c.us.tot    ? Math.round(100 * c.us.done    / c.us.tot)    : 0;
+  const pctFeats = c.feats.tot ? Math.round(100 * c.feats.done / c.feats.tot) : 0;
+  new Chart(document.getElementById("chartProgress"), {
+    type: 'bar',
+    data: {
+      labels: ['FEATs', 'User Stories', 'Tâches'],
+      datasets: [{
+        label: '% terminé',
+        data: [pctFeats, pctUs, pctTasks],
+        backgroundColor: [palette.primary, palette.accent, palette.done],
+        borderRadius: 6, borderSkipped: false, barThickness: 28
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+      scales: {
+        x: { beginAtZero: true, max: 100, ticks: { callback: v => v + '%' }, grid: { color: '#f3f4f6' } },
+        y: { grid: { display: false } }
+      },
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ' ' + ctx.parsed.x + '%' } } }
+    }
+  });
+
+  // 4. Tâches par FEAT
+  const featNames = Object.keys(c.featTaskCount);
+  const featCounts = featNames.map(n => c.featTaskCount[n]);
+  new Chart(document.getElementById("chartFeatTasks"), {
+    type: 'bar',
+    data: {
+      labels: featNames,
+      datasets: [{
+        label: 'Nombre de tâches',
+        data: featCounts,
+        backgroundColor: palette.accent,
+        borderRadius: 6, borderSkipped: false
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: {
+        y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#f3f4f6' } },
+        x: { grid: { display: false } }
+      },
+      plugins: { legend: { display: false } }
+    }
+  });
+}
+
+function getCss(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+// ============================================================
+// TOOLBAR
+// ============================================================
+document.getElementById("btnExpandAll").addEventListener("click", () => {
+  document.querySelectorAll("#tree details").forEach(d => d.open = true);
+});
+document.getElementById("btnCollapseAll").addEventListener("click", () => {
+  document.querySelectorAll("#tree details").forEach(d => d.open = false);
+});
+
+// ============================================================
+// INIT
+// ============================================================
+const counters = computeCounters();
+renderHeader(counters);
+renderTree();
+renderCharts(counters);
+
+// ============================================================
+// OBSERVABILITE — /api/audit + /api/state (dynamic blocks)
+// ============================================================
+function escapeHtml(s) {
+  return String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+}
+function fmtUsd(n) { return "$" + (Number(n) || 0).toFixed(4); }
+function fmtNum(n) { return (Number(n) || 0).toLocaleString("fr-FR"); }
+function fmtTime(ts) {
+  if (!ts) return "—";
+  try { return new Date(ts).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "medium" }); }
+  catch { return ts; }
+}
+
+async function loadAudit() {
+  try {
+    const res = await fetch("/api/audit");
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    return await res.json();
+  } catch (err) {
+    return { available: false, error: err.message };
+  }
+}
+
+async function loadState() {
+  try {
+    const res = await fetch("/api/state");
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    return await res.json();
+  } catch (err) {
+    return { available: false, error: err.message };
+  }
+}
+
+function renderAudit(audit) {
+  const meta = document.getElementById("auditMeta");
+  const body = document.getElementById("auditBody");
+  const wrap = document.getElementById("auditWrap");
+
+  if (!audit.available) {
+    wrap.innerHTML = `<div class="obs-empty">Table <code>context_budget</code> vide dans <code>console.db</code>${audit.error ? " · " + escapeHtml(audit.error) : ""}. Lance <code>/sdd-full</code> pour générer des entrées.</div>`;
+    meta.innerHTML = "";
+    return;
+  }
+
+  meta.innerHTML = `
+    <span style="font-size:12.5px;color:var(--text-muted)">
+      <b>${audit.summary.totalRuns}</b> runs · <b>${audit.summary.agentsCount}</b> agents · <b>${fmtUsd(audit.summary.totalCostUsd)}</b> total
+      ${audit.summary.totalWarnings ? ` · ${audit.summary.totalWarnings} warnings` : ""}
+      ${audit.summary.totalErrors ? ` · ${audit.summary.totalErrors} errors` : ""}
+    </span>`;
+
+  if (audit.byAgent.length === 0) {
+    body.innerHTML = `<tr><td colspan="10" style="text-align:center;color:var(--text-muted);padding:24px">Aucune entrée.</td></tr>`;
+    return;
+  }
+
+  body.innerHTML = audit.byAgent.map((a) => {
+    const pct = Math.min(100, a.usagePct);
+    const cls = pct >= 90 ? "danger" : pct >= 70 ? "warn" : "ok";
+    return `
+      <tr>
+        <td><span class="agent-chip">${escapeHtml(a.agent)}</span></td>
+        <td class="obs-num">${fmtNum(a.runs)}</td>
+        <td class="obs-num">${fmtNum(a.avgTokens)}</td>
+        <td class="obs-num">${fmtNum(a.tokensMax)}</td>
+        <td class="obs-num">${fmtNum(a.budgetTokens)}</td>
+        <td>
+          <span class="usage-bar"><span class="${cls}" style="width:${pct}%"></span></span>
+          <span class="usage-pct">${a.usagePct}%</span>
+        </td>
+        <td class="obs-num">${fmtUsd(a.costUsd)}</td>
+        <td class="obs-num" style="color:${a.warnings ? "var(--inprogress)" : "var(--text-soft)"}">${a.warnings}</td>
+        <td class="obs-num" style="color:${a.errors ? "#ef4444" : "var(--text-soft)"}">${a.errors}</td>
+        <td><span class="dot ${escapeHtml(a.lastResult || "")}"></span>${escapeHtml(fmtTime(a.lastTimestamp))}</td>
+      </tr>`;
+  }).join("");
+}
+
+function renderState(state) {
+  const meta = document.getElementById("stateMeta");
+  const content = document.getElementById("stateContent");
+
+  if (!state.available || !state.lastRun) {
+    content.innerHTML = `<div class="obs-empty">Aucun run trouvé dans <code>workspace/output/.sys/.state/</code>${state.error ? " · " + escapeHtml(state.error) : ""}. Lance <code>/sdd-full</code> pour observer les phases.</div>`;
+    meta.innerHTML = "";
+    return;
+  }
+
+  const run = state.lastRun;
+  meta.innerHTML = `<span style="font-size:12.5px;color:var(--text-muted)"><b>${state.runsCount}</b> run(s) trackés</span>`;
+
+  const phaseEntries = Object.entries(run.phases || {});
+  const phasesHtml = phaseEntries.length === 0 ? "" : `
+    <div class="qa-table-wrap">
+      <table class="qa-table">
+        <thead><tr><th>Phase</th><th>Statut</th><th>Démarré</th><th>Fini</th><th>Détail</th></tr></thead>
+        <tbody>
+          ${phaseEntries.map(([name, p]) => `
+            <tr>
+              <td><code style="font-family:'JetBrains Mono',monospace;font-size:12px;background:var(--primary-soft);color:var(--primary);padding:1px 5px;border-radius:3px">${escapeHtml(name)}</code></td>
+              <td><span class="dot ${escapeHtml(p.status || "")}"></span>${escapeHtml(p.status || "—")}</td>
+              <td style="font-size:12px;color:var(--text-muted)">${escapeHtml(fmtTime(p.startedAt))}</td>
+              <td style="font-size:12px;color:var(--text-muted)">${p.endedAt ? escapeHtml(fmtTime(p.endedAt)) : "—"}</td>
+              <td class="payload-cell">${p.payload ? escapeHtml(JSON.stringify(p.payload)) : "—"}</td>
+            </tr>`).join("")}
+        </tbody>
+      </table>
+    </div>`;
+
+  const eventsHtml = state.recentEvents && state.recentEvents.length > 0 ? `
+    <details class="events-details">
+      <summary>Événements récents (${state.recentEvents.length})</summary>
+      <ul>
+        ${state.recentEvents.slice(0, 15).map((e) => `
+          <li>
+            <span class="ev-ts">${escapeHtml(fmtTime(e.ts))}</span>
+            <span class="ev-name">${escapeHtml(e.event || "")}</span>
+            ${e.phase ? `<span class="ev-phase">${escapeHtml(e.phase)}</span>` : ""}
+          </li>`).join("")}
+      </ul>
+    </details>` : "";
+
+  content.innerHTML = `
+    <div class="run-meta">
+      <span><span class="lbl">Run ID :</span><code>${escapeHtml(run.runId)}</code></span>
+      <span><span class="lbl">FEAT :</span><code>${escapeHtml(run.FeatNumber + "-" + (run.FeatName || ""))}</code></span>
+      <span><span class="lbl">Status :</span><span class="run-pill ${escapeHtml(run.status || "")}">${escapeHtml(run.status || "—")}</span></span>
+      <span><span class="lbl">Phase courante :</span><code>${escapeHtml(run.currentPhase || "—")}</code></span>
+      <span><span class="lbl">Démarré :</span>${escapeHtml(fmtTime(run.startedAt))}</span>
+      ${run.endedAt ? `<span><span class="lbl">Fini :</span>${escapeHtml(fmtTime(run.endedAt))}</span>` : ""}
+    </div>
+    ${phasesHtml}
+    ${eventsHtml}
+  `;
+}
+
+async function refreshObs() {
+  const [audit, state] = await Promise.all([loadAudit(), loadState()]);
+  renderAudit(audit);
+  renderState(state);
+}
+
+refreshObs();
+setInterval(refreshObs, 10_000);
+</script>
+</body>
+</html>

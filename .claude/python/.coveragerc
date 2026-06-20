@@ -1,0 +1,25 @@
+[run]
+# Track subprocess invocations of sdd_scripts/* so tests that use
+# subprocess.run([...python, script]) contribute to coverage. Several
+# existing tests (test_compute_plan_metadata, test_gate_decide,
+# test_sdd_state, test_validate_plan, test_validate_readiness,
+# test_validate_fidelity, test_acquire_libname_lock, test_context_budget)
+# rely on subprocess invocation rather than direct import — without
+# parallel mode + sitecustomize, those tests don't move the coverage
+# needle.
+parallel = True
+source =
+    sdd_lib
+    sdd_scripts
+omit =
+    tests/*
+    */__pycache__/*
+
+[report]
+exclude_lines =
+    pragma: no cover
+    if __name__ == .__main__.:
+    raise NotImplementedError
+    \.\.\.
+show_missing = True
+skip_empty = True

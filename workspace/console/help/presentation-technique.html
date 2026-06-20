@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8"/>
+<title>SDD Pro — Présentation technique</title>
+</head>
+<body>
+
+<h1>SDD Pro — Architecture technique</h1>
+
+<p>
+Cette page documente l'architecture interne de SDD Pro v6.10 : agents, pipeline, base de données, console web, intégrations. Cible : Tech Lead, architecte, développeur framework.
+</p>
+
+<blockquote>
+SDD Pro est <strong>écrit en Python</strong> (stdlib pure pour le moteur, pytest pour les 570 tests). La <strong>console web</strong> est en Node.js 20+ (Fastify 5 + React 18 via CDN). La <strong>télémétrie</strong> vit dans une base <strong>SQLite WAL</strong>. Le code applicatif généré est dans le stack du projet cible (28 stacks supportés).
+</blockquote>
+
+<hr/>
+
+<h2>1 — Topologie générale</h2>
+
+<pre><code>SDD_Pro/
+├── .claude/                          framework (lecture seule pendant un run)
+│   ├── CLAUDE.md                     entry-point slim (~150 lignes)
+│   ├── agents/                       12 agents (4 cœur + 8 support/audit)
+│   ├── commands/                     14 slash-commands
+│   ├── rules/                        9 règles opérationnelles
+│   ├── stacks/                       28 stacks applicatifs + 3 patterns archi
+│   ├── templates/                    templates ADR, runbook, postmortem, etc.
+│   ├── docs/                         architecture / workflow / conventions
+│   ├── python/                       moteur déterministe + helpers
+│   │   ├── sdd_lib/                  librairie commune (console_db, paths, ...)
+│   │   ├── sdd_scripts/              scripts CLI (init_console_db, parse_coverage, ...)
+│   │   ├── sdd_hooks/                hooks Claude Code (token usage, preflight)
+│   │   ├── sdd_mcp/                  serveur MCP (14 tools, stdio + HTTP)
+│   │   └── tests/                    570 tests pytest
+│   ├── loader.yml                    manifest reads/writes par agent
+│   └── config.base.yml               framework defaults (layered config)
+│
+└── workspace/
+    ├── input/
+    │   ├── stack/stack.md            Project Config + Active Tech Specs
+    │   ├── feats/{n}-{Name}.md       spec fonctionnelle (entrée du pipeline)
+    │   └── ui/{n}-{m}-{Name}.html    mockup HTML statique (optionnel)
+    ├── output/
+    │   ├── us/{n}-{m}-{Name}.md      User Story générée par l'agent PO
+    │   ├── plans/{n}-{m}-*.{back,front}.md  plan technique (mode :plan)
+    │   ├── src/{AppName,BackendName,LibName}/  code applicatif
+    │   ├── db/console.db             ★ source de vérité SQLite v6.10
+    │   └── .sys/.context/            constitution + ADRs (markdown seulement)
+    └── console/                      console web (Node + React)
+        ├── server.js                 backend Fastify
+        ├── app.jsx                   UI React (single file)
+        ├── lib/                      console-db, atomic-write, explain
+        └── help/                     pages doc inlinées</code></pre>
+
+<hr/>
+
+<h2>2 — Les agents</h2>
+
+<h3>4 agents cœur</h3>
+<table>
+<thead><tr><th>Agent</th><th>Modèle</th><th>Rôle</th></tr></thead>
+<tbody>
+<tr><td><code>po</code></td><td>Sonnet 4.6</td><td>Découpe FEAT en User Stories (min 1, cible 1-3, hard cap 6). Traçabilité SFD/BR/AC/FD.</td></tr>
+<tr><td><code>arch</code></td><td>Sonnet 4.6</td><td>Bootstrap idempotent solution + projets vides. Introspection READ-ONLY de la DB applicative + scaffolding Database-First (entities + DbContext).</td></tr>
+<tr><td><code>dev-backend</code></td><td>Opus 4.7</td><td>Pour UNE US, génère le code serveur (services, DTOs, endpoints, middlewares).</td></tr>
+<tr><td><code>dev-frontend</code></td><td>Opus 4.7</td><td>Pour UNE US, génère le code client (pages, composants) en traduisant le HTML mockup vers le design-system actif.</td></tr>
+</tbody>
+</table>
+
+<h3>Variants strict (v6.2)</h3>
+<ul>
+<li><code>dev-backend-strict</code> et <code>dev-frontend-strict</code> — Sonnet 4.6, consomment un <em>plan v2 strict-ready</em> (avec inline digest), 3× plus rapides et 5× moins chers que les Opus pour le chemin From-Plan.</li>
+<li>Opt-in via <code>PlanCacheStrict: true</code> dans Project Config.</li>
+</ul>
+
+<h3>8 agents support / audit</h3>
+<table>
+<thead><tr><th>Agent</th><th>Modèle</th><th>Rôle</th></tr></thead>
+<tbody>
+<tr><td><code>elicitor</code></td><td>Sonnet 4.6</td><td>5 techniques d'élicitation (Pre-mortem, Red Team, First Principles, Stakeholder Mapping, Inversion). Enrichit la FEAT + constitution §7.</td></tr>
+<tr><td><code>constitutioner</code></td><td>Sonnet 4.6</td><td>Gère les ADRs (création atomique par timestamp) et met à jour <code>constitution.md</code>.</td></tr>
+<tr><td><code>qa</code></td><td>Sonnet 4.6</td><td>Génère tests unitaires + parse coverage + quality scan déterministe.</td></tr>
+<tr><td><code>dashboard</code></td><td>Haiku 4.5</td><td>v6.10 : réduit à la regénération de <code>INDEX.md</code> des ADRs (HTML retirés).</td></tr>
+<tr><td><code>accessibility-auditor</code></td><td>Haiku 4.5</td><td>Scan déterministe WCAG 2.2 AA. 10 classes <code>[A11Y_*]</code>. Skip si projet backend-only.</td></tr>
+<tr><td><code>code-reviewer</code></td><td>Sonnet 4.6</td><td>Anti-patterns cross-fichier (N+1, sync over async, useEffect sans deps, duplicate code, deep nesting). 11 classes <code>[REVIEW_*]</code>.</td></tr>
+<tr><td><code>security-reviewer</code></td><td>Sonnet 4.6</td><td>2 modes — <em>threat-model</em> (STRIDE light, post-arch) et <em>scan</em> (OWASP Top 10 2021, 21 classes <code>[SEC_*]</code>, 8 hard-blocking).</td></tr>
+<tr><td><code>performance-auditor</code></td><td>Sonnet 4.6</td><td>Core Web Vitals (LCP/CLS/INP/FID) + SLO API p95/p99 + bundle size + N+1 + memory leaks. 16 classes <code>[PERF_*]</code>.</td></tr>
+<tr><td><code>spec-compliance-reviewer</code></td><td>Sonnet 4.6</td><td>Re-lit le code matérialisé et vérifie AC-par-AC qu'il existe une preuve concrète (<code>file:line</code>). Pattern « Do not trust the report » — biais vers ❌ not-verified en cas de doute.</td></tr>
+</tbody>
+</table>
+
+<h3>Isolation stricte</h3>
+<ul>
+<li>Chaque agent <strong>déclare ses reads/writes</strong> dans <code>.claude/loader.yml</code>. Le hook <code>preflight</code> rejette toute lecture hors patterns autorisés.</li>
+<li>Le hook <code>SubagentStop</code> applique <code>file-ownership.md §1</code> : refuse les Write hors matrice (par exemple : <code>dev-frontend</code> ne peut pas écrire dans <code>{BackendName}/</code>).</li>
+<li>Concurrence cross-agent : <code>file-ownership.md §4</code> impose un <em>lock file</em> pour <code>{LibName}/</code> (cas DTOs partagés back+front).</li>
+</ul>
+
+<hr/>
+
+<h2>3 — Le pipeline (4 phases)</h2>
+
+<h3>Vue d'ensemble</h3>
+
+<pre><code>Phase 1   /feat-generate Auth           → workspace/input/feats/1-Auth.md
+Phase 1.5 /feat-deepen 1 [--quick]      → enrichit FEAT + constitution §7
+Phase 2   /us-generate 1                → workspace/output/us/1-{m}-{Name}.md
+Phase 2.6 /feat-validate 1              → validation déterministe (GO/WARN/NO-GO)
+Phase 3   /arch-init                    → scaffolding projets + entities DB
+Phase 3.5 /dev-plan 1                   → plans techniques sans coder
+Phase 4a  dev-backend (parallèle)       → workspace/output/src/{BackendName}/
+Phase 4b  QA API Gate                   → tests intégration HTTP (in-memory)
+Phase 4c  dev-frontend (parallèle)      → workspace/output/src/{AppName}/
+Phase 5   /qa-generate 1                → tests unitaires + coverage + 5 auditeurs</code></pre>
+
+<p>Tout cela est piloté par <code>/sdd-full 1</code> qui orchestre les 4 phases en chaîne, avec gates manuels optionnels (<code>--manual-gates=us,readiness,plan,code</code>) résolus depuis la console web.</p>
+
+<h3>Backend-first gated workflow</h3>
+<p>
+Depuis 2026-05-07 (règle <code>backend-first.md</code>), <code>/dev-run</code> exécute <strong>dev-backend ALL US</strong> puis une <strong>API Gate</strong> (tests d'intégration HTTP <em>in-memory</em>) puis <strong>dev-frontend ALL US</strong>. Le frontend n'est généré que si l'API Gate passe en 🟢 ou 🟡.
+</p>
+
+<hr/>
+
+<h2>4 — Base de données SQLite (v6.10 BREAKING)</h2>
+
+<p>
+Tous les outputs <code>.json</code> / <code>.jsonl</code> / <code>.log</code> de statistiques et télémétrie sont retirés du filesystem et centralisés dans une <strong>unique base SQLite</strong> en mode WAL.
+</p>
+
+<h3>Localisation &amp; pragmas</h3>
+
+<pre><code>workspace/output/db/console.db
+
+PRAGMA journal_mode = WAL          # lectures concurrentes
+PRAGMA synchronous  = NORMAL       # compromis durabilité/perf
+PRAGMA busy_timeout = 5000         # tolère 5s d'attente sur lock
+PRAGMA foreign_keys = ON</code></pre>
+
+<h3>24 tables organisées en 4 familles</h3>
+
+<table>
+<thead><tr><th>Famille</th><th>Tables</th><th>Écrit par</th></tr></thead>
+<tbody>
+<tr>
+  <td><strong>Méta</strong></td>
+  <td><code>schema_version</code></td>
+  <td><code>init_console_db.py</code></td>
+</tr>
+<tr>
+  <td><strong>Artefacts SDD</strong> (métadonnées uniquement)</td>
+  <td><code>feats</code> · <code>us</code> · <code>plans</code> · <code>adrs</code></td>
+  <td>helpers <code>ensure_feat_row</code> / <code>ensure_us_row</code> appelés par les writers</td>
+</tr>
+<tr>
+  <td><strong>Runs &amp; Telemetry</strong></td>
+  <td><code>runs</code> · <code>run_phases</code> · <code>gates</code> · <code>events</code> · <code>token_usage</code> · <code>context_budget</code> · <code>validation_reports</code> · <code>breaking_changes</code></td>
+  <td><code>sdd_state.py</code> · <code>context_budget.py</code> · <code>gate_decide.py</code> · hook <code>record_token_usage.py</code></td>
+</tr>
+<tr>
+  <td><strong>QA</strong></td>
+  <td><code>qa_coverage</code> (+ <code>qa_coverage_files</code>) · <code>qa_quality</code> · <code>qa_api_tests</code> (+ <code>qa_api_endpoints</code>) · <code>qa_a11y</code> · <code>qa_code_review</code> · <code>qa_security</code> · <code>qa_performance</code> · <code>qa_spec_compliance</code></td>
+  <td><code>parse_coverage.py</code> · <code>quality_scan.py</code> · agents auditor (via bridge <code>ingest_agent_report.py</code>)</td>
+</tr>
+</tbody>
+</table>
+
+<h3>Writers refactorés (v6.10)</h3>
+<p>Plus aucun fichier JSON de stats sur le FS. Tous les writers déterministes écrivent en DB directement :</p>
+<ul>
+<li><code>sdd_state.py</code> → tables <code>runs</code> / <code>run_phases</code> / <code>events</code> (remplace <code>state/run-*.json</code> + <code>events.jsonl</code>)</li>
+<li><code>parse_coverage.py</code> → <code>qa_coverage</code> + <code>qa_coverage_files</code> (remplace <code>coverage.json</code>)</li>
+<li><code>quality_scan.py</code> → <code>qa_quality</code> (remplace <code>quality.json</code>)</li>
+<li><code>validate_fidelity.py</code> → <code>validation_reports</code> (remplace <code>fidelity-*.json</code>)</li>
+<li><code>context_budget.py</code> → <code>context_budget</code> (remplace <code>context-budget.jsonl</code>)</li>
+<li><code>record_token_usage.py</code> (hook) → <code>token_usage</code> (remplace <code>token-usage.jsonl</code>)</li>
+<li><code>gate_decide.py</code> → table <code>gates</code> en dual-write avec <code>workspace/console/status.json</code> (la console UI reste compatible)</li>
+</ul>
+
+<h3>Bridge LLM → DB pour les agents auditor</h3>
+<p>
+Les 5 auditeurs LLM (a11y, code-review, security, performance, spec-compliance) ne peuvent pas écrire directement en DB. Ils émettent un JSON éphémère dans leur emplacement canonique, puis <em>appellent</em> <code>ingest_agent_report.py --type X --feat N</code> qui :
+</p>
+<ol>
+<li>parse le JSON</li>
+<li>INSERT dans la table <code>qa_*</code> correspondante</li>
+<li>supprime le JSON</li>
+</ol>
+<p>Au final : aucun <code>.json</code> ne subsiste sur le FS. Le <code>.md</code> compagnon (lecture humaine) reste.</p>
+
+<h3>Helper canonique (Python)</h3>
+
+<pre><code>from sdd_lib.console_db import connect, ensure_initialized, insert_event, upsert_run
+
+ensure_initialized()  # bootstrap si nécessaire (idempotent)
+with connect() as conn:
+    upsert_run(conn, run_id="abc123", command="/dev-run",
+               feat_n=1, status="running")
+    insert_event(conn, event_type="phase.start",
+                 run_id="abc123", feat_n=1, phase="backend")</code></pre>
+
+<h3>Helper canonique (Bash / commands)</h3>
+
+<pre><code>GATE=$(python .claude/python/sdd_scripts/query_console_db.py api-gate --feat 1)
+COV=$(python  .claude/python/sdd_scripts/query_console_db.py coverage --feat 1)
+ALL=$(python  .claude/python/sdd_scripts/query_console_db.py feat-stats --feat 1)</code></pre>
+
+<hr/>
+
+<h2>5 — Console web (Fastify + React)</h2>
+
+<h3>Stack</h3>
+<ul>
+<li><strong>Node.js</strong> ≥ 20 — runtime</li>
+<li><strong>Fastify</strong> 5 — serveur HTTP + SSE</li>
+<li><strong>@fastify/static</strong> — sert <code>/</code> (console SPA), <code>/ui/</code> (mockups HTML avec leur CSS relatif)</li>
+<li><strong>React 18</strong> via CDN unpkg (pas de build step)</li>
+<li><strong>@babel/standalone</strong> transforme <code>app.jsx</code> in-browser</li>
+<li><strong>@anthropic-ai/sdk</strong> — opt-in pour <code>/api/explain</code> (reformulation IA PO-friendly)</li>
+<li><strong>better-sqlite3</strong> volontairement <em>évité</em> (native bindings) — la console requête <code>console.db</code> via subprocess Python (<code>query_console_db.py</code>). Zéro dépendance native.</li>
+</ul>
+
+<h3>Endpoints HTTP</h3>
+<table>
+<thead><tr><th>Méthode</th><th>Endpoint</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td>GET</td><td><code>/api/tree</code></td><td>Arbre FEATs → US → plans + status.json mergé</td></tr>
+<tr><td>GET</td><td><code>/api/dashboard</code></td><td>Vue agrégée toutes FEATs (KPIs + stats par FEAT, enrichie avec le vrai nom depuis le filename)</td></tr>
+<tr><td>GET</td><td><code>/api/feat/:n</code></td><td>Détail d'une FEAT (coverage, quality, security, api-tests)</td></tr>
+<tr><td>GET</td><td><code>/api/feat/:n/details</code></td><td>Drill-down sonar : vulns + smells + coverage gaps (max 100 + 200 + 50)</td></tr>
+<tr><td>GET</td><td><code>/api/audit</code></td><td>Aggrégat tokens + context budget par agent (depuis <code>context_budget</code> + <code>token_usage</code>)</td></tr>
+<tr><td>GET</td><td><code>/api/state</code></td><td>Dernier run + 30 derniers events</td></tr>
+<tr><td>GET</td><td><code>/api/gates?feat=N</code></td><td>Historique gates (table <code>gates</code>)</td></tr>
+<tr><td>GET</td><td><code>/api/help/:id</code></td><td>Body extrait et nettoyé d'une page de doc</td></tr>
+<tr><td>GET</td><td><code>/api/file?path=…</code></td><td>Lecture brute d'un fichier MD du workspace (restreint à <code>workspace/</code>)</td></tr>
+<tr><td>POST</td><td><code>/api/validate</code></td><td>Enregistre décision PO/Tech Lead (atomic write protégé par lock)</td></tr>
+<tr><td>POST</td><td><code>/api/gate-decide</code></td><td>Résout un gate manuel (lock cross-language Python ↔ Node)</td></tr>
+<tr><td>GET</td><td><code>/api/explain</code></td><td>Reformulation IA d'un fichier MD (Anthropic SDK, opt-in via env)</td></tr>
+<tr><td>GET</td><td><code>/api/events</code></td><td>Server-Sent Events (broadcast FS + status changes)</td></tr>
+<tr><td>GET</td><td><code>/api/health</code></td><td>Liveness</td></tr>
+<tr><td>GET</td><td><code>/ui/*</code></td><td>Sert <code>workspace/input/ui/</code> tel quel (mockups HTML + design-system.css relatif)</td></tr>
+</tbody>
+</table>
+
+<h3>UI</h3>
+<ul>
+<li><strong>Theme</strong> : variables CSS <code>--bg</code>, <code>--panel</code>, <code>--ink</code>, <code>--chart-1..7</code> commutées via <code>:root[data-theme="dark"]</code>. Toggle persisté en localStorage, suit <code>prefers-color-scheme</code> au premier load.</li>
+<li><strong>Charts</strong> : SVG natifs (donut, bar stacks, sparklines, gradient bars). Aucune librairie chart externe.</li>
+<li><strong>Dashboard sonar</strong> : ratings A→E avec couleurs dérivées (green / lime / amber / orange / red). Une métrique n'apparaît que si la table DB correspondante a des données (pas de placeholder vide).</li>
+<li><strong>Vue UX</strong> : carrousel <code>&lt;iframe src="/ui/X.html"&gt;</code> — les mockups chargent leur CSS relatif (<code>design-system.css</code>) sans duplication.</li>
+<li><strong>Documentation inline</strong> : <code>/api/help/:id</code> extrait le body et strip <code>&lt;style&gt;/&lt;script&gt;/&lt;link&gt;</code> + attrs <code>style=</code>/<code>class=</code> → injecté dans <code>&lt;article class="doc-content"&gt;</code> qui re-stylise via les variables CSS du site (cette page est rendue ainsi).</li>
+</ul>
+
+<hr/>
+
+<h2>6 — Stacks supportés</h2>
+
+<ul>
+<li><strong>28 stacks applicatifs</strong> + <strong>3 patterns d'architecture</strong> (MVC / DDD / microservice)</li>
+<li>Backend (4) 🟢 : <code>dotnet-minimalapi</code> · <code>kotlin-spring-boot</code> · <code>python-fastapi</code> · <code>node-express</code></li>
+<li>Frontend (4) 🟢 : <code>react</code> · <code>vue</code> · <code>angular</code> · <code>blazor-webassembly</code></li>
+<li>UI Design Systems (3) 🟢 : <code>shadcn</code> · <code>vuetify</code> · <code>radzen-blazor</code></li>
+<li>Fullstack (6) 🟡 : <code>node-react</code> · <code>blazor-server</code> · <code>next</code> · <code>nuxt</code> · <code>angular-universal</code> · <code>kotlin-mustache</code></li>
+<li>Mobiles (2) 🟡 : <code>react-native</code> · <code>maui</code></li>
+<li>QA (7) 🟢 : <code>dotnet-xunit</code> · <code>blazor-bunit</code> · <code>node-vitest</code> · <code>python-pytest</code> · <code>kotlin-junit</code> · <code>angular-jasmine</code> · <code>code-quality</code></li>
+<li>Auth (2) 🟢 : <code>auth-local</code> · <code>azure-ad</code></li>
+</ul>
+
+<p>
+Chaque stack expose un fichier <code>{stack-id}.libs.json</code> (catalogue machine : versions LTS, libs CORE / ON-DEMAND, plugins, triggers). Le <code>.md</code> compagnon est documentation humaine ; le tableau <code>§2.4</code> est régénéré via <code>sync_stack_md.py</code>.
+</p>
+
+<p>
+Les <strong>combos validés end-to-end</strong> sont : <code>dotnet-minimalapi × react × shadcn</code> et <code>kotlin-spring-boot × react × shadcn</code>.
+</p>
+
+<hr/>
+
+<h2>7 — Configuration en 3 couches (v6.7.1)</h2>
+
+<pre><code>.claude/config.base.yml          # framework defaults (lecture seule)
+~/.sdd/config.team.yml           # policy équipe / org (opt-in)
+workspace/input/stack/stack.md   # ## Project Config (per-project)</code></pre>
+
+<p>
+Précédence : project &gt; team &gt; base. <strong>Sécurité</strong> : un project ne peut <em>jamais</em> relâcher la policy team sur <code>SecurityFailOn</code> / <code>A11yFailOn</code> / <code>CoverageMin</code> → ERROR <code>[CONFIG_SECURITY_DOWNGRADE]</code>.
+</p>
+
+<p>
+Snapshots de la policy team via <code>/sdd-profile export strict-prod</code> et <code>/sdd-profile import dev-only</code>. Stockage : <code>~/.sdd/profiles/{name}.yml</code>.
+</p>
+
+<hr/>
+
+<h2>8 — Serveur MCP (v6.9, opt-in)</h2>
+
+<p>
+Serveur Model Context Protocol qui expose <strong>14 tools SDD Pro</strong> à des clients non-Claude-Code (Cursor, Windsurf, Cline, Claude Desktop, n8n, scripts CI). Stdlib pure (0 dépendance externe), protocole JSON-RPC 2.0 implémenté à la main.
+</p>
+
+<h3>Tools déterministes (7) — wrappers <code>sdd_scripts/*.py</code></h3>
+<ul>
+<li><code>sdd_status</code> · <code>validate_readiness</code> · <code>feat_validate</code> · <code>set_us_status</code></li>
+<li><code>validate_us_deps</code> · <code>compute_us_complexity</code> · <code>migrate_us_v1_to_v2</code></li>
+</ul>
+
+<h3>Tools LLM-driven (7) — subprocess <code>claude</code> CLI</h3>
+<ul>
+<li><code>claude_check</code> · <code>feat_generate</code> · <code>us_generate</code></li>
+<li><code>sdd_full</code> (async avec job_id) · <code>get_sdd_full_status</code> · <code>cancel_sdd_full</code> · <code>list_sdd_full_jobs</code></li>
+</ul>
+
+<h3>Transports</h3>
+<ul>
+<li><strong>stdio</strong> (défaut) : <code>python -m sdd_mcp.server</code></li>
+<li><strong>HTTP</strong> opt-in : <code>python -m sdd_mcp.server --transport http --port 8765</code></li>
+<li><strong>MCPB bundle</strong> pour Claude Desktop : <code>python -m sdd_mcp.build_mcpb</code></li>
+</ul>
+
+<p>Tests : <strong>98 tests pytest dédiés</strong> (offline grâce à <code>SDD_MCP_FAKE_CLAUDE=1</code>).</p>
+
+<hr/>
+
+<h2>9 — Taxonomie d'erreur unifiée</h2>
+
+<p>
+Tous les agents et scripts préfixent leurs blocs ERROR avec un code <code>[CLASS]</code> dans le <code>CAUSE:</code>. Permet à <code>build_loop</code>, hooks et dashboards de classer sans interprétation textuelle.
+</p>
+
+<h3>Format canonique 3 lignes</h3>
+
+<pre><code>ERROR: {pipeline-step ou agent} — résumé
+CAUSE: [{CLASS}] détail 1 ligne
+FIX: action 1 ligne</code></pre>
+
+<h3>Classes principales (~80 au total, voir <code>error-classification.md</code>)</h3>
+<ul>
+<li><strong>Runtime</strong> : <code>[NETWORK]</code> · <code>[AUTH]</code> · <code>[PERMISSION]</code> · <code>[NOT_FOUND]</code> · <code>[TIMEOUT]</code> · <code>[DISK]</code> · <code>[ENV_MISSING]</code></li>
+<li><strong>Pipeline</strong> : <code>[STACK_MALFORMED]</code> · <code>[FEAT_REJECTED]</code> · <code>[READINESS_NO_GO]</code> · <code>[PLAN_STALE]</code> · <code>[INVALID_ARG]</code></li>
+<li><strong>Build</strong> (pilote <code>build_loop</code>) : <code>[BUILD_CORRECTIBLE]</code> (itère) · <code>[BUILD_BLOCKING]</code> (fail-fast)</li>
+<li><strong>QA</strong> : <code>[QA_TEST_FAILED]</code> · <code>[QA_COVERAGE_GAP]</code> · <code>[QA_OUTPUT_INVALID]</code></li>
+<li><strong>Anti-derive</strong> : <code>[DERIVE_VIOLATION]</code> · <code>[STACK_LIBRARY_MISSING]</code> · <code>[OPTIMIZATION_PROACTIVE]</code></li>
+<li><strong>A11Y</strong> (10) · <strong>REVIEW</strong> (11) · <strong>SEC</strong> (21) · <strong>PERF</strong> (16) · <strong>SPEC</strong> (6)</li>
+</ul>
+
+<hr/>
+
+<h2>10 — Tests &amp; CI</h2>
+
+<ul>
+<li><strong>570 tests pytest passants</strong> (Python 3.8+, framework moteur + helpers + scripts + MCP)</li>
+<li>Test runner : <code>cd .claude/python &amp;&amp; python -m pytest</code></li>
+<li>Pas de tests sur le code applicatif <em>généré</em> — c'est le rôle des <code>/qa-generate {n}</code> au sein du projet cible</li>
+<li>Pre-commit hook recommandé : <code>validate_inline_rules.py</code> (détecte le drift entre <code>.md</code> agents et <code>rules/*.md</code>)</li>
+</ul>
+
+<hr/>
+
+<h2>11 — Versions récentes</h2>
+
+<ul>
+<li><strong>v7.0.0-alpha</strong> (branche <code>next</code>, en cours 2026-05) — Consolidation 11 rules → 5 (<code>build-and-loop</code>, <code>ownership</code>, <code>quality</code>, <code>library-and-stack</code>, <code>error-classification</code>) ; auditors trim (accessibility/performance retirés, remplacés par axe-core / Lighthouse CI dans le projet généré) ; stacks quarantine (9 stacks fullstack/mobile déplacés en <code>_drafts/</code>) ; gated workflow back→API gate→front par défaut ; layered config (base/team/project) durci avec downgrade protection ; auditor_runs table pour présence-vs-findings sur <code>--ensure-scans</code> ; gates DB mirror depuis la console web ; iframe sandbox durci sur les mockups UI.</li>
+<li><strong>v6.10.4-LTS</strong> (branche <code>main</code>, freeze jusqu'au 2026-06-18) — Auto-injection CORS depuis Project Config (allowlist explicite, jamais wildcard) ; alias <code>FrontendName</code>/<code>BackendName</code>/<code>AppNamespace</code> ; durcissement layered config.</li>
+<li><strong>v6.10.0</strong> — Console DB SQLite source-of-truth (BREAKING : retrait JSON stats), refactor 8 writers + 5 auditeurs, console web v2 (dashboard SonarQube-style, theme dark/light, doc inline, vue UX carrousel)</li>
+<li><strong>v6.9.0</strong> — Serveur MCP livré (14 tools, stdio + HTTP + MCPB, 98 tests)</li>
+<li><strong>v6.8.0</strong> — US schema v2 + dependency graph (statuts granulaires, DAG validation)</li>
+<li><strong>v6.7.x</strong> — Layered config + profile manager (3 couches : base / team / project)</li>
+<li><strong>v6.6.x</strong> — Brownfield discover stack + checkpoint resume</li>
+<li><strong>v6.5.2</strong> — spec-compliance-reviewer (5ème auditeur LLM)</li>
+<li><strong>v6.4.x</strong> — performance-auditor + méta-orchestrateur conditionnel</li>
+<li><strong>v6.3.x</strong> — accessibility-auditor + code-reviewer + security-reviewer</li>
+<li><strong>v6.2</strong> — Plan v2 strict-ready + variants Sonnet (×3 plus rapide)</li>
+<li><strong>v6.1</strong> — Gates manuels console + hardening coverage</li>
+</ul>
+
+<p>Détail complet : <code>.claude/CHANGELOG.md</code>.</p>
+
+<hr/>
+
+<footer>
+<p>SDD Pro v6.10 — Architecture technique</p>
+<p>Conçu et maintenu par <strong>Zekiri Abdelali</strong> · 2026</p>
+</footer>
+
+</body>
+</html>

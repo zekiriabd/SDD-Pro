@@ -1,0 +1,362 @@
+# Reverse Engineering — Language signatures (declarative, extensible)
+# Schema: see .claude/docs/reverse-engineering-workflow.md §6
+# Adding a new language: append an entry below. NO Python code changes required.
+
+schema_version: 1
+
+languages:
+  - id: dotnet-webforms
+    label: ASP.NET WebForms
+    extensions: [".aspx", ".ascx", ".asmx", ".ashx", ".master"]
+    companion_extensions: [".aspx.cs", ".aspx.vb", ".ascx.cs", ".ascx.vb", ".master.cs", ".master.vb"]
+    manifests: ["*.csproj", "Web.config"]
+    folder_signals: ["App_Code/", "App_Data/", "Scripts/"]
+    grep_signals:
+      - 'runat="server"'
+      - "@\\s*Page\\s+Language="
+      - "@\\s*Control\\s+Language="
+    confidence_hint: high
+    cookbook_fiche: "dotnet-webforms.md"
+
+  - id: dotnet-mvc
+    label: ASP.NET MVC / Razor
+    extensions: [".cshtml", ".razor"]
+    # NOTE: companion_extensions used ONLY for double-extension files (.aspx.cs).
+    # Bare ".cs" files belong to csharp-classic unless folder/grep signals say otherwise.
+    companion_extensions: []
+    manifests: ["*.csproj"]
+    folder_signals: ["Controllers/", "Views/", "Models/", "Areas/", "Pages/"]
+    grep_signals:
+      - "@\\s*model\\s+"
+      - "@\\s*page\\s+"
+      - "ActionResult"
+      - "\\[HttpGet\\]|\\[HttpPost\\]"
+    confidence_hint: high
+    cookbook_fiche: "dotnet-mvc.md"
+
+  - id: dotnet-blazor
+    label: .NET Blazor
+    extensions: [".razor"]
+    companion_extensions: [".razor.cs"]
+    manifests: ["*.csproj"]
+    folder_signals: ["Components/", "Pages/", "Shared/"]
+    grep_signals:
+      - "@page\\s+\""
+      - "@inject\\s+"
+      - "ComponentBase"
+    confidence_hint: high
+    cookbook_fiche: "dotnet-blazor.md"
+
+  - id: csharp-classic
+    label: C# (console / library)
+    extensions: [".cs"]
+    manifests: ["*.csproj", "*.sln"]
+    folder_signals: []
+    grep_signals:
+      - "namespace\\s+\\w+"
+      - "public\\s+class\\s+"
+    confidence_hint: medium
+    cookbook_fiche: "_generic-monolith.md"
+
+  - id: java-jee
+    label: Java JEE / Servlets
+    extensions: [".java", ".jsp", ".jspx", ".tag"]
+    manifests: ["web.xml", "pom.xml", "build.gradle", "build.gradle.kts"]
+    folder_signals: ["WEB-INF/", "src/main/java/", "src/main/webapp/"]
+    grep_signals:
+      - "@WebServlet"
+      - "javax\\.servlet|jakarta\\.servlet"
+      - "extends\\s+HttpServlet"
+    confidence_hint: high
+    cookbook_fiche: "java-jee.md"
+
+  - id: java-spring
+    label: Java Spring (Boot/MVC)
+    extensions: [".java"]
+    manifests: ["pom.xml", "build.gradle", "build.gradle.kts", "application.yml", "application.properties"]
+    folder_signals: ["src/main/java/", "src/main/resources/"]
+    grep_signals:
+      - "@SpringBootApplication"
+      - "@RestController|@Controller"
+      - "org\\.springframework"
+    confidence_hint: high
+    cookbook_fiche: "java-spring.md"
+
+  - id: java-swing
+    label: Java Swing (desktop)
+    extensions: [".java"]
+    manifests: ["pom.xml", "build.gradle"]
+    folder_signals: ["src/main/java/"]
+    grep_signals:
+      - "javax\\.swing\\."
+      - "extends\\s+JFrame|extends\\s+JPanel|extends\\s+JDialog"
+      - "ActionListener"
+    confidence_hint: medium
+    cookbook_fiche: "java-swing.md"
+
+  - id: javascript-jquery
+    label: JavaScript + jQuery
+    extensions: [".js"]
+    manifests: []
+    folder_signals: []
+    grep_signals:
+      - "\\$\\("
+      - "jQuery\\("
+      - "\\.ajax\\("
+      - "\\.click\\(|\\.on\\(['\"]click"
+    confidence_hint: medium
+    cookbook_fiche: "javascript-jquery.md"
+
+  - id: javascript-modern
+    label: JavaScript / TypeScript moderne
+    extensions: [".js", ".mjs", ".ts", ".jsx", ".tsx"]
+    manifests: ["package.json", "tsconfig.json"]
+    folder_signals: ["src/", "node_modules/"]
+    grep_signals:
+      - "import\\s+.*\\s+from"
+      - "export\\s+(default\\s+)?(function|class|const)"
+    confidence_hint: high
+    cookbook_fiche: "_generic-monolith.md"
+
+  - id: php-procedural
+    label: PHP procedural
+    extensions: [".php", ".phtml", ".inc"]
+    manifests: [".htaccess"]
+    folder_signals: []
+    grep_signals:
+      - "<\\?php"
+      - "\\$_POST|\\$_GET|\\$_SESSION|\\$_REQUEST"
+      - "mysqli_query|mysql_query|mysqli_connect"
+    confidence_hint: medium
+    cookbook_fiche: "php-procedural.md"
+
+  - id: php-framework
+    label: PHP framework (Laravel / Symfony)
+    extensions: [".php"]
+    manifests: ["composer.json", "artisan", "symfony.lock"]
+    folder_signals: ["app/", "src/Controller/", "bootstrap/", "vendor/"]
+    grep_signals:
+      - "namespace\\s+App\\\\"
+      - "Illuminate\\\\|Symfony\\\\"
+      - "extends\\s+Controller"
+    confidence_hint: high
+    cookbook_fiche: "php-framework.md"
+
+  - id: delphi
+    label: Delphi (Object Pascal)
+    extensions: [".pas", ".dpr", ".dfm", ".dproj"]
+    companion_extensions: []
+    manifests: ["*.dproj", "*.dpr"]
+    folder_signals: []
+    grep_signals:
+      - "unit\\s+\\w+;"
+      - "interface\\s+uses"
+      - "TForm\\s*=\\s*class"
+    confidence_hint: medium
+    cookbook_fiche: "delphi.md"
+
+  - id: vb6
+    label: Visual Basic 6 (legacy desktop)
+    extensions: [".bas", ".frm", ".cls", ".vbp"]
+    manifests: ["*.vbp"]
+    folder_signals: []
+    grep_signals:
+      - "Begin VB\\."
+      - "Attribute VB_Name"
+    confidence_hint: low
+    cookbook_fiche: "_generic-monolith.md"
+
+  - id: vbnet
+    label: VB.NET
+    extensions: [".vb"]
+    manifests: ["*.vbproj", "*.sln"]
+    folder_signals: []
+    grep_signals:
+      - "Imports\\s+System"
+      - "Public\\s+Class\\s+"
+      - "End\\s+Class"
+    confidence_hint: medium
+    cookbook_fiche: "_generic-monolith.md"
+
+  - id: python-django
+    label: Python Django
+    extensions: [".py"]
+    manifests: ["manage.py", "requirements.txt", "pyproject.toml"]
+    folder_signals: ["templates/", "static/"]
+    grep_signals:
+      - "from\\s+django\\."
+      - "urlpatterns\\s*="
+      - "models\\.Model"
+    confidence_hint: high
+    cookbook_fiche: "_generic-monolith.md"
+
+  - id: python
+    label: Python (générique)
+    extensions: [".py", ".pyw"]
+    manifests: ["requirements.txt", "pyproject.toml", "setup.py", "Pipfile"]
+    folder_signals: []
+    grep_signals: []
+    confidence_hint: medium
+    cookbook_fiche: "_generic-monolith.md"
+
+  - id: ruby-rails
+    label: Ruby on Rails
+    extensions: [".rb", ".erb"]
+    manifests: ["Gemfile", "config.ru", "Rakefile"]
+    folder_signals: ["app/controllers/", "app/models/", "app/views/", "config/"]
+    grep_signals:
+      - "Rails\\.application"
+      - "class\\s+\\w+Controller\\s+<"
+    confidence_hint: high
+    cookbook_fiche: "_generic-monolith.md"
+
+  - id: html-static
+    label: HTML statique
+    extensions: [".html", ".htm"]
+    manifests: []
+    folder_signals: []
+    grep_signals:
+      - "<html"
+      - "<!DOCTYPE\\s+html"
+    confidence_hint: medium
+    cookbook_fiche: "_generic-monolith.md"
+
+  - id: css
+    label: CSS / LESS / SASS
+    extensions: [".css", ".less", ".scss", ".sass"]
+    manifests: []
+    folder_signals: []
+    grep_signals: []
+    confidence_hint: n/a
+    cookbook_fiche: null
+
+  - id: sql-scripts
+    label: Scripts SQL
+    extensions: [".sql"]
+    manifests: []
+    folder_signals: ["Database/", "Migrations/", "Scripts/Sql/"]
+    grep_signals:
+      - "CREATE\\s+TABLE"
+      - "ALTER\\s+TABLE"
+      - "CREATE\\s+PROCEDURE"
+    confidence_hint: high
+    cookbook_fiche: null
+
+  - id: xml-config
+    label: XML config
+    extensions: [".xml", ".config"]
+    manifests: []
+    folder_signals: []
+    grep_signals: []
+    confidence_hint: n/a
+    cookbook_fiche: null
+
+  - id: yaml
+    label: YAML / config déclarative
+    extensions: [".yml", ".yaml"]
+    manifests: []
+    folder_signals: []
+    grep_signals: []
+    confidence_hint: n/a
+    cookbook_fiche: null
+
+  - id: json
+    label: JSON / config déclarative
+    extensions: [".json"]
+    manifests: []
+    folder_signals: []
+    grep_signals: []
+    confidence_hint: n/a
+    cookbook_fiche: null
+
+  - id: shell
+    label: Shell scripts
+    extensions: [".sh", ".bash", ".zsh", ".ps1"]
+    manifests: []
+    folder_signals: []
+    grep_signals: []
+    confidence_hint: low
+    cookbook_fiche: null
+
+  - id: markdown
+    label: Markdown
+    extensions: [".md", ".markdown"]
+    manifests: []
+    folder_signals: []
+    grep_signals: []
+    confidence_hint: n/a
+    cookbook_fiche: null
+
+  - id: unknown
+    label: Inconnu (fallback)
+    extensions: []
+    manifests: []
+    folder_signals: []
+    grep_signals: []
+    fallback: true
+    confidence_hint: low
+    cookbook_fiche: "_generic-monolith.md"
+
+# Exclusions appliquées avant détection langage
+# (les patterns matchent en glob relatif au project_path)
+exclusions:
+  vendored_patterns:
+    - "node_modules/**"
+    - "vendor/**"
+    - "packages/**"
+    - "bower_components/**"
+    - "Scripts/jquery-*.min.js"
+    - "Scripts/jquery-*.js"
+    - "Scripts/jquery-ui/**"
+    - "Scripts/bootstrap*.min.js"
+    - "Scripts/bootstrap*.css"
+    - "Scripts/modernizr-*.js"
+    - "Scripts/angular*.min.js"
+    - "Scripts/react*.min.js"
+    - "wwwroot/lib/**"
+    - "Content/lib/**"
+    - "*.min.js"
+    - "*.min.css"
+  generated_patterns:
+    - "obj/**"
+    - "bin/**"
+    - "*.designer.cs"
+    - "*.g.cs"
+    - "*.Designer.vb"
+    - "Properties/AssemblyInfo.cs"
+    - "target/**"
+    - "build/**"
+    - "dist/**"
+    - ".next/**"
+    - ".nuxt/**"
+    - "out/**"
+    - "__pycache__/**"
+    - "*.pyc"
+    - ".gradle/**"
+    - "*.class"
+  test_patterns:
+    - "*.test.js"
+    - "*.test.ts"
+    - "*.spec.js"
+    - "*.spec.ts"
+    - "**/__tests__/**"
+    - "**/Tests/**"
+    - "**/test/**"
+    - "**/spec/**"
+    - "*_test.py"
+    - "test_*.py"
+    - "*Tests.cs"
+  ide_patterns:
+    - ".vs/**"
+    - ".vscode/**"
+    - ".idea/**"
+    - "*.suo"
+    - "*.user"
+    - ".DS_Store"
+    - "Thumbs.db"
+
+# Limites runtime (anti-explosion)
+limits:
+  max_file_size_kb: 512        # fichiers > 512 KB ignorés (binaires probables)
+  grep_max_bytes: 16384         # grep signals testés sur les 16 premiers KB du fichier uniquement
+  max_files_scanned: 10000      # cap total — si dépassé, INFO emitted

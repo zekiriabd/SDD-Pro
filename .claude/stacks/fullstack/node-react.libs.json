@@ -1,0 +1,98 @@
+{
+  "$schema": "../../templates/libs-catalog.schema.json",
+  "stackId": "node-react",
+  "category": "fullstack",
+  "schemaVersion": 1,
+  "buildSystem": "npm",
+  "manifest": {
+    "files": [
+      "workspace/output/src/{AppName}/package.json",
+      "workspace/output/src/{AppName}/eslint.config.js"
+    ]
+  },
+  "metadata": {
+    "platforms": ["node-22"],
+    "workflow": "single-project-zero-build",
+    "notes": "Stack fullstack Node + React UMD CDN + Babel-in-browser. Pas de bundler client. Modele de la console SDD_Pro workspace/console v0.4.0.",
+    "autoCapabilitiesByDbType": {
+      "sqlserver": ["prisma"],
+      "postgres": ["prisma"],
+      "postgresql": ["prisma"],
+      "mysql": ["prisma"],
+      "mariadb": ["prisma"],
+      "sqlite": ["prisma"]
+    },
+    "autoCapabilitiesByDbTypeNote": "Lu par arch STEP 4.2 : si DatabaseType lowercase match une cle, force-install les capabilities correspondantes (equivalent Capabilities: <list> en Project Config) — sans necessite de l'override manuel."
+  },
+  "dbDrivers": {
+    "sqlserver": { "module": "@prisma/client", "ref": "prisma-client", "scope": "runtime" },
+    "postgres":  { "module": "@prisma/client", "ref": "prisma-client", "scope": "runtime" },
+    "mysql":     { "module": "@prisma/client", "ref": "prisma-client", "scope": "runtime" },
+    "sqlite":    { "module": "@prisma/client", "ref": "prisma-client", "scope": "runtime" },
+    "mariadb":   { "module": "@prisma/client", "ref": "prisma-client", "scope": "runtime" }
+  },
+  "versions": {
+    "fastify": "5.2.0",
+    "fastify-static": "8.0.4",
+    "fastify-swagger": "9.4.0",
+    "fastify-swagger-ui": "5.2.0",
+    "fastify-cors": "10.0.1",
+    "fastify-helmet": "13.0.1",
+    "fastify-rate-limit": "10.2.1",
+    "fastify-sensible": "6.0.1",
+    "pino": "9.5.0",
+    "pino-pretty": "13.0.0",
+    "zod": "3.24.0",
+    "config": "3.3.12",
+    "eslint": "9.17.0",
+    "eslint-js": "9.17.0",
+    "anthropic-sdk": "0.40.1",
+    "fastify-jwt": "9.0.1",
+    "bcrypt": "5.1.1",
+    "prisma": "6.1.0",
+    "prisma-client": "6.1.0",
+    "fastify-websocket": "11.0.1",
+    "undici": "7.2.0",
+    "marked": "14.1.4",
+    "dayjs": "1.11.13",
+    "fastify-multipart": "9.0.1",
+    "exceljs": "4.4.0",
+    "pdfkit": "0.15.2",
+    "nodemailer": "6.9.16",
+    "fastify-compress": "8.0.1",
+    "node-cron": "3.0.3"
+  },
+  "core": [
+    { "module": "fastify", "ref": "fastify", "rationale": "Serveur HTTP + routing + plugins" },
+    { "module": "@fastify/static", "ref": "fastify-static", "rationale": "Sert public/ (index.html, app.jsx, styles.css)" },
+    { "module": "@fastify/swagger", "ref": "fastify-swagger" },
+    { "module": "@fastify/swagger-ui", "ref": "fastify-swagger-ui" },
+    { "module": "@fastify/cors", "ref": "fastify-cors" },
+    { "module": "@fastify/helmet", "ref": "fastify-helmet", "rationale": "Security headers (CSP, HSTS)" },
+    { "module": "@fastify/rate-limit", "ref": "fastify-rate-limit" },
+    { "module": "@fastify/sensible", "ref": "fastify-sensible" },
+    { "module": "pino", "ref": "pino", "rationale": "Logger JSON structure" },
+    { "module": "pino-pretty", "ref": "pino-pretty" },
+    { "module": "zod", "ref": "zod", "rationale": "Validation schemas (body/query/params)" },
+    { "module": "config", "ref": "config", "rationale": "Lecture config/default.json peuple par arch" },
+    { "module": "eslint", "ref": "eslint" },
+    { "module": "@eslint/js", "ref": "eslint-js" }
+  ],
+  "onDemand": [
+    { "module": "@anthropic-ai/sdk", "ref": "anthropic-sdk", "capability": "anthropic-ai", "triggers": ["\\bclaude\\b", "anthropic", "reformulation.*ia", "explain.*ia"] },
+    { "module": "@fastify/jwt", "ref": "fastify-jwt", "capability": "jwt", "triggers": ["\\bjwt\\b", "auth-local", "auth-azure-ad"] },
+    { "module": "bcrypt", "ref": "bcrypt", "capability": "auth-local", "triggers": ["auth-local", "hash.*password", "bcrypt"], "rationale": "Native bcrypt — bcryptjs deprecated upstream 2025" },
+    { "module": "prisma", "ref": "prisma", "capability": "prisma", "triggers": ["prisma", "orm", "database.*scaffold", "db-first"] },
+    { "module": "@prisma/client", "ref": "prisma-client", "capability": "prisma", "triggers": ["prisma", "orm"] },
+    { "module": "@fastify/websocket", "ref": "fastify-websocket", "capability": "websocket", "triggers": ["websocket", "ws", "realtime.*bidirectional"] },
+    { "module": "undici", "ref": "undici", "capability": "http-client", "triggers": ["appel.*api.*externe", "http-client", "fetch.*backend"] },
+    { "module": "marked", "ref": "marked", "capability": "markdown", "triggers": ["markdown.*render", "\\bmd\\b.*rendu", "\\bmarked\\b"] },
+    { "module": "dayjs", "ref": "dayjs", "capability": "date-utils", "triggers": ["dates.*format", "duree", "intervalle.*temps"] },
+    { "module": "@fastify/multipart", "ref": "fastify-multipart", "capability": "file-upload", "triggers": ["upload.*fichier", "multipart", "form-data"] },
+    { "module": "exceljs", "ref": "exceljs", "capability": "excel", "triggers": ["\\bexcel\\b", "\\.xlsx\\b", "export.*excel"] },
+    { "module": "pdfkit", "ref": "pdfkit", "capability": "pdf", "triggers": ["\\bpdf\\b", "\\.pdf\\b", "export.*pdf"] },
+    { "module": "nodemailer", "ref": "nodemailer", "capability": "smtp", "triggers": ["email", "smtp", "envoi.*mail", "notification.*mail"] },
+    { "module": "@fastify/compress", "ref": "fastify-compress", "capability": "compression", "triggers": ["compression", "gzip", "brotli"] },
+    { "module": "node-cron", "ref": "node-cron", "capability": "scheduled-jobs", "triggers": ["scheduled.*job", "cron", "\\bscheduler\\b", "nightly", "background.*service", "task.*planifi", "tache.*planifi"] }
+  ]
+}

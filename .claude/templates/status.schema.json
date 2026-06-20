@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sdd-pro.local/schemas/status.schema.json",
+  "title": "SDD_Pro — Console human validation status",
+  "description": "Source unique de verite des statuts humains (validation manuelle) et des decisions de gates entre phases du pipeline /sdd-full. Ecrit par la console web (clic Valider) et par /sdd-full (pose pending aux gates). Atomic write avec lock file workspace/console/.status.lock.",
+  "type": "object",
+  "required": ["version", "updatedAt", "FEATs", "gates"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 1,
+      "description": "Schema version. Bump en cas de breaking change."
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 UTC, timestamp du dernier write."
+    },
+    "FEATs": {
+      "type": "object",
+      "description": "Cle = basename FEAT sans extension (ex: '1-FEAT-connexion'). Une entree par fichier workspace/input/feats/{n}-{name}.md.",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["humanStatus"],
+        "additionalProperties": false,
+        "properties": {
+          "humanStatus": { "$ref": "#/$defs/humanStatus" },
+          "validatedBy": { "type": "string", "description": "Email du validateur (PO pour FEAT/US, Tech Lead pour plan)." },
+          "validatedAt": { "type": "string", "format": "date-time" },
+          "comment": { "type": "string", "description": "Commentaire libre du validateur." },
+          "us": {
+            "type": "object",
+            "description": "Cle = basename US (ex: '1-1-Connexion'). Une entree par fichier workspace/output/us/{n}-{m}-{Name}.md.",
+            "additionalProperties": {
+              "type": "object",
+              "required": ["humanStatus"],
+              "additionalProperties": false,
+              "properties": {
+                "humanStatus": { "$ref": "#/$defs/humanStatus" },
+                "validatedBy": { "type": "string" },
+                "validatedAt": { "type": "string", "format": "date-time" },
+                "comment": { "type": "string" },
+                "plans": {
+                  "type": "object",
+                  "description": "Plans techniques par famille. Cle = 'back' | 'front' | 'ui' | 'qa'.",
+                  "additionalProperties": {
+                    "type": "object",
+                    "required": ["humanStatus"],
+                    "additionalProperties": false,
+                    "properties": {
+                      "humanStatus": { "$ref": "#/$defs/humanStatus" },
+                      "validatedBy": { "type": "string" },
+                      "validatedAt": { "type": "string", "format": "date-time" },
+                      "comment": { "type": "string" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "gates": {
+      "type": "object",
+      "description": "Decisions humaines aux gates manuels du pipeline /sdd-full. Cle = numero FEAT (ex: '1').",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "afterUS":        { "$ref": "#/$defs/gateDecision" },
+          "afterReadiness": { "$ref": "#/$defs/gateDecision" },
+          "afterPlan":      { "$ref": "#/$defs/gateDecision" },
+          "afterCode":      { "$ref": "#/$defs/gateDecision" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "humanStatus": {
+      "type": "string",
+      "enum": ["not-started", "in-progress", "pending-validation", "validated", "rejected"],
+      "description": "5 etats alignes sur la maquette. not-started = pas encore touche par un agent. in-progress = agent travaille / a produit un brouillon. pending-validation = en attente de validation humaine. validated = valide par humain. rejected = refuse par humain (boucle de revision)."
+    },
+    "gateDecision": {
+      "type": "object",
+      "required": ["decision"],
+      "additionalProperties": false,
+      "properties": {
+        "decision": {
+          "type": "string",
+          "enum": ["pending", "validated", "skipped"],
+          "description": "pending = /sdd-full attend la decision humaine via la console. validated = humain a valide manuellement (pipeline reprend via --resume). skipped = humain a choisi 'continuer sans valider' (pipeline a continue immediatement)."
+        },
+        "askedAt":    { "type": "string", "format": "date-time" },
+        "answeredAt": { "type": "string", "format": "date-time" },
+        "answeredBy": { "type": "string" }
+      }
+    }
+  }
+}

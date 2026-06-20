@@ -1,0 +1,71 @@
+{
+  "$schema": "../../templates/libs-catalog.schema.json",
+  "stackId": "vue",
+  "category": "frontend",
+  "schemaVersion": 1,
+  "buildSystem": "npm",
+  "manifest": {
+    "files": [
+      "workspace/output/src/{AppName}/package.json",
+      "workspace/output/src/{AppName}/vite.config.ts",
+      "workspace/output/src/{AppName}/tsconfig.json"
+    ]
+  },
+  "versions": {
+    "vue": "3.5.35",
+    "vue-router": "4.5.0",
+    "pinia": "2.3.0",
+    "tanstack-vue-query": "5.62.7",
+    "vue-i18n": "10.0.5",
+    "vee-validate": "4.15.0",
+    "zod": "3.24.0",
+    "msal-browser": "3.27.0",
+    "vueuse": "11.3.0",
+    "date-fns": "4.1.0",
+    "loglevel": "1.9.2",
+    "loglevel-prefix": "0.8.4",
+    "vite": "6.0.5",
+    "vitejs-plugin-vue": "5.2.1",
+    "vue-tsc": "2.1.10",
+    "typescript": "5.6.3",
+    "node-types": "22.10.0",
+    "prettier": "3.4.2",
+    "eslint": "9.16.0",
+    "vue-eslint-config-typescript": "14.1.4",
+    "vue-eslint-config-prettier": "10.1.0",
+    "exceljs": "4.4.0",
+    "jspdf": "3.0.1",
+    "jspdf-autotable": "3.8.4"
+  },
+  "core": [
+    { "module": "vue", "ref": "vue" },
+    { "module": "vue-router", "ref": "vue-router" },
+    { "module": "pinia", "ref": "pinia" },
+    { "module": "@tanstack/vue-query", "ref": "tanstack-vue-query" },
+    { "module": "vue-i18n", "ref": "vue-i18n" },
+    { "module": "vee-validate", "ref": "vee-validate" },
+    { "module": "@vee-validate/zod", "ref": "vee-validate" },
+    { "module": "zod", "ref": "zod" },
+    { "module": "@vueuse/core", "ref": "vueuse" },
+    { "module": "loglevel", "ref": "loglevel" },
+    { "module": "loglevel-plugin-prefix", "ref": "loglevel-prefix" },
+    { "module": "vite", "ref": "vite" },
+    { "module": "@vitejs/plugin-vue", "ref": "vitejs-plugin-vue" },
+    { "module": "vue-tsc", "ref": "vue-tsc" },
+    { "module": "typescript", "ref": "typescript" },
+    { "module": "@types/node", "ref": "node-types" },
+    { "module": "prettier", "ref": "prettier" },
+    { "module": "eslint", "ref": "eslint" },
+    { "module": "@vue/eslint-config-typescript", "ref": "vue-eslint-config-typescript" },
+    { "module": "@vue/eslint-config-prettier", "ref": "vue-eslint-config-prettier" }
+  ],
+  "onDemand": [
+    { "module": "@azure/msal-browser", "ref": "msal-browser", "capability": "auth-azure-ad", "triggers": ["azure.ad", "msal", "tech-auth-azure"] },
+    { "module": "date-fns", "ref": "date-fns", "capability": "date-utils", "triggers": ["dates.*format", "duree", "intervalle.*temps"] },
+    { "module": "exceljs", "ref": "exceljs", "capability": "excel-client", "rationale": "Replaces SheetJS xlsx 0.18.5 (CVE-2023-30533 Prototype Pollution + CVE-2024-22363 ReDoS, audit CTO 2026-06-07)", "triggers": ["\\bexcel\\b", "\\.xlsx\\b", "import.*excel", "export.*excel"] },
+    { "module": "jspdf", "ref": "jspdf", "capability": "pdf-client", "triggers": ["\\bpdf\\b", "\\.pdf\\b", "export.*pdf", "imprim"] },
+    { "module": "jspdf-autotable", "ref": "jspdf-autotable", "capability": "pdf-client", "triggers": ["\\bpdf\\b", "\\.pdf\\b", "export.*pdf", "imprim"] }
+  ],
+  "plugins": [],
+  "metadata": { "lastUpdated": "2026-05-07", "format": "compact (v2)" }
+}

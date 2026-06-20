@@ -1,0 +1,74 @@
+{
+  "$schema": "../../templates/libs-catalog.schema.json",
+  "stackId": "mutation-testing",
+  "category": "qa",
+  "schemaVersion": 1,
+  "buildSystem": "dotnet",
+  "$comment": "v7.0.0 audit P0 §6.2 — opt-in mutation testing stack (default MutationTestingMode: off). NOTE buildSystem='dotnet' est nominal — ce catalogue est en réalité multi-runtime, le tool effectif est sélectionné par qa.md STEP 8.5 selon le stack backend actif (Stryker.NET / Stryker.js / mutmut / Pitest). Not installed by arch — Tech Lead invokes tool manually (cf. stacks/qa/mutation-testing.md §2 installation). core=[] est INTENTIONNEL et tracé via metadata.manualInstall=true (cf. validate_libs_catalog.py qui WARN sur core=[] sauf si ce flag est posé).",
+  "metadata": {
+    "manualInstall": true,
+    "manualInstallRationale": "Multi-runtime stack (Stryker.NET/.js/Vitest, mutmut, Pitest). Le runtime cible n'est connu qu'à l'instant où qa.md STEP 8.5 inspecte le stack backend actif. arch Phase A ne peut pas pré-installer sans surinstaller des outils inutiles. Cf. stacks/qa/mutation-testing.md §2."
+  },
+  "manifest": {
+    "files": [
+      "workspace/output/src/{BackendName}.Tests/{BackendName}.Tests.csproj",
+      "workspace/output/src/{AppName}/package.json",
+      "workspace/output/src/{BackendName}/build.gradle.kts",
+      "workspace/output/src/{BackendName}/pyproject.toml"
+    ]
+  },
+  "versions": {
+    "stryker-net": "4.4.1",
+    "stryker-js": "8.7.1",
+    "stryker-vitest-runner": "8.7.1",
+    "mutmut": "3.3.0",
+    "pitest-junit5": "1.2.1",
+    "pitest-gradle-plugin": "1.15.0"
+  },
+  "core": [],
+  "onDemand": [
+    {
+      "module": "dotnet-stryker",
+      "ref": "stryker-net",
+      "capability": "mutation-testing-dotnet",
+      "triggers": ["MutationTestingMode\\s*:\\s*(minimal|full)"],
+      "installCommand": "dotnet tool install -g dotnet-stryker"
+    },
+    {
+      "module": "@stryker-mutator/core",
+      "ref": "stryker-js",
+      "capability": "mutation-testing-node",
+      "triggers": ["MutationTestingMode\\s*:\\s*(minimal|full)"],
+      "installCommand": "npm install -D @stryker-mutator/core"
+    },
+    {
+      "module": "@stryker-mutator/vitest-runner",
+      "ref": "stryker-vitest-runner",
+      "capability": "mutation-testing-vitest",
+      "triggers": ["MutationTestingMode\\s*:\\s*(minimal|full)"],
+      "installCommand": "npm install -D @stryker-mutator/vitest-runner"
+    },
+    {
+      "module": "mutmut",
+      "ref": "mutmut",
+      "capability": "mutation-testing-python",
+      "triggers": ["MutationTestingMode\\s*:\\s*(minimal|full)"],
+      "installCommand": "pip install mutmut"
+    },
+    {
+      "module": "info.solidsoft.gradle.pitest:gradle-pitest-plugin",
+      "ref": "pitest-gradle-plugin",
+      "capability": "mutation-testing-kotlin",
+      "triggers": ["MutationTestingMode\\s*:\\s*(minimal|full)"],
+      "installCommand": "see stacks/qa/mutation-testing.md §2 (Gradle plugin block)"
+    },
+    {
+      "module": "org.pitest:pitest-junit5-plugin",
+      "ref": "pitest-junit5",
+      "capability": "mutation-testing-kotlin",
+      "triggers": ["MutationTestingMode\\s*:\\s*(minimal|full)"],
+      "alternative": true
+    }
+  ],
+  "plugins": []
+}

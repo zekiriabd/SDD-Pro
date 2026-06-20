@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Commandes — Nouvelle commande</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f8fafc; margin: 0; padding: 24px; color: #0f172a; }
+    .container { max-width: 1000px; margin: 0 auto; }
+    .breadcrumb { font-size: 14px; color: #64748b; margin-bottom: 8px; }
+    .breadcrumb a { color: #2563eb; text-decoration: none; }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+    h1 { font-size: 24px; font-weight: 600; margin: 0; }
+    .card { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin-bottom: 16px; }
+    .card-title { font-size: 16px; font-weight: 600; margin: 0 0 16px 0; color: #0f172a; }
+    .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+    .field label { font-size: 13px; font-weight: 500; color: #475569; }
+    .field label .required { color: #dc2626; margin-left: 2px; }
+    .field select, .field input { padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; background: white; }
+    .field select:focus, .field input:focus { outline: 2px solid #2563eb; outline-offset: -1px; border-color: #2563eb; }
+    .lines-table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+    .lines-table th { background: #f1f5f9; padding: 10px 12px; text-align: left; font-size: 12px; font-weight: 600; text-transform: uppercase; color: #475569; letter-spacing: 0.05em; border-bottom: 1px solid #e2e8f0; }
+    .lines-table th.amount { text-align: right; }
+    .lines-table td { padding: 8px 12px; border-bottom: 1px solid #f1f5f9; font-size: 14px; vertical-align: middle; }
+    .lines-table td.amount { text-align: right; font-variant-numeric: tabular-nums; font-weight: 500; }
+    .lines-table input[type="number"] { width: 80px; text-align: right; padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; }
+    .lines-table select { padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; min-width: 200px; }
+    .btn-icon-danger { background: none; border: none; color: #dc2626; cursor: pointer; font-size: 16px; padding: 4px 8px; border-radius: 4px; }
+    .btn-icon-danger:hover { background: #fee2e2; }
+    .btn-link { background: none; border: none; color: #2563eb; cursor: pointer; font-size: 14px; padding: 8px 0; font-weight: 500; }
+    .btn-link:hover { text-decoration: underline; }
+    .totals { display: flex; justify-content: flex-end; padding: 12px 0; border-top: 2px solid #e2e8f0; margin-top: 8px; }
+    .totals-grid { display: grid; grid-template-columns: auto auto; gap: 8px 24px; font-size: 14px; }
+    .totals-grid .label { color: #64748b; }
+    .totals-grid .value { text-align: right; font-variant-numeric: tabular-nums; font-weight: 500; }
+    .totals-grid .total-row .label { font-weight: 600; color: #0f172a; font-size: 16px; }
+    .totals-grid .total-row .value { font-weight: 600; color: #0f172a; font-size: 18px; }
+    .actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px; }
+    .btn { padding: 8px 16px; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; border: 1px solid transparent; }
+    .btn-secondary { background: white; border-color: #cbd5e1; color: #0f172a; }
+    .btn-secondary:hover { background: #f8fafc; }
+    .btn-primary { background: #2563eb; color: white; border-color: #2563eb; }
+    .btn-primary:hover { background: #1d4ed8; }
+    .helper { font-size: 12px; color: #64748b; margin-top: 4px; }
+    .helper-warning { color: #b45309; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="breadcrumb">
+      <a href="/orders">Commandes</a> &gt; Nouvelle commande
+    </div>
+    <div class="header">
+      <h1>Nouvelle commande</h1>
+    </div>
+
+    <form>
+      <div class="card">
+        <h2 class="card-title">Client</h2>
+        <div class="field">
+          <label for="customer">Client<span class="required">*</span></label>
+          <select id="customer" required>
+            <option value="">— Sélectionner un client —</option>
+            <option value="1">ACME Corp</option>
+            <option value="2" selected>Globex Inc</option>
+            <option value="3">Initech SARL</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title">Lignes de commande</h2>
+        <table class="lines-table">
+          <thead>
+            <tr>
+              <th style="width: 50%;">Produit</th>
+              <th style="width: 15%;" class="amount">Quantité</th>
+              <th style="width: 15%;" class="amount">Prix unitaire</th>
+              <th style="width: 15%;" class="amount">Total ligne</th>
+              <th style="width: 5%;"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+                <select>
+                  <option value="">— Sélectionner —</option>
+                  <option value="1">SKU-001 — Câble HDMI 2m</option>
+                  <option value="2" selected>SKU-002 — Souris ergonomique</option>
+                  <option value="3">SKU-003 — Clavier mécanique</option>
+                </select>
+              </td>
+              <td class="amount"><input type="number" min="1" max="999" value="2"></td>
+              <td class="amount">45,00 €</td>
+              <td class="amount">90,00 €</td>
+              <td><button type="button" class="btn-icon-danger" title="Supprimer la ligne">✕</button></td>
+            </tr>
+            <tr>
+              <td>
+                <select>
+                  <option value="">— Sélectionner —</option>
+                  <option value="1">SKU-001 — Câble HDMI 2m</option>
+                  <option value="3" selected>SKU-003 — Clavier mécanique</option>
+                  <option value="4">SKU-004 — Webcam HD</option>
+                </select>
+              </td>
+              <td class="amount"><input type="number" min="1" max="999" value="1"></td>
+              <td class="amount">120,00 €</td>
+              <td class="amount">120,00 €</td>
+              <td><button type="button" class="btn-icon-danger" title="Supprimer la ligne">✕</button></td>
+            </tr>
+          </tbody>
+        </table>
+        <button type="button" class="btn-link">+ Ajouter une ligne</button>
+        <p class="helper">La quantité doit être comprise entre 1 et 999. Le prix unitaire est figé au moment de l'ajout.</p>
+
+        <div class="totals">
+          <div class="totals-grid">
+            <div class="label">Nombre de lignes</div>
+            <div class="value">2</div>
+            <div class="label">Sous-total</div>
+            <div class="value">210,00 €</div>
+            <div class="total-row label">Total commande</div>
+            <div class="total-row value">210,00 €</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <a href="/orders" class="btn btn-secondary">Annuler</a>
+        <button type="submit" class="btn btn-primary">Enregistrer en brouillon</button>
+      </div>
+    </form>
+  </div>
+</body>
+</html>

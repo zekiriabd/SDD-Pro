@@ -1,0 +1,298 @@
+# SDD_Pro v7.0.0-alpha — Layered Project Config defaults
+# (3-layer hierarchy introduced in v6.9.0, durci en v7.0.0)
+#
+# This file is the **base layer** of the 3-level config hierarchy:
+#   1. .claude/config.base.yml          (this file — framework defaults)
+#   2. ~/.sdd/config.team.yml           (org/team policy, override)
+#   3. workspace/input/stack/stack.md   (per-project ## Project Config, final override)
+#
+# Behavior: each layer merges into the next (project > team > base).
+# Deep-merge semantics: scalars replaced, lists replaced (no concat).
+#
+# Backward compatibility:
+#   - Scripts call read_layered_config() (new) OR read_project_config() (legacy).
+#   - read_project_config() is unchanged — only parses stack.md, ignores this file.
+#   - read_layered_config() reads all 3 layers; if this file is absent, falls
+#     back to project-only (= behavior identical to read_project_config()).
+#
+# Security-down protection:
+#   Project cannot relax team's policy on SecurityFailOn, A11yFailOn,
+#   CodeReviewFailOn, PerfFailOn, SpecComplianceFailOn, CoverageMin.
+#   Violation → [CONFIG_SECURITY_DOWNGRADE] ConfigError.
+
+# --- QA & Coverage ---
+QAMode: manual
+CoverageMin: 80
+
+# --- Pipeline parallelism ---
+MaxParallel: 3
+BuildLoopMaxIter: 3
+
+# --- Auditor modes (v6.3.x + v6.4 + v6.5.2) ---
+# A11yMode v7.0.0 : agent accessibility-auditor RETIRÉ
+# (governance-major-auditors-trim). Remplacé par axe-core CI dans le
+# projet généré. Défaut flippé full → off pour éviter spawn d'agent
+# inexistant. Tolérée en lecture mais le caller doit skip.
+A11yMode: "off"
+# A11yFailOn v7.0.0 : deprecated (agent retiré). Retiré du config.base.yml
+# pour éliminer WARN [CONFIG_DEPRECATED_KEY] à chaque lecture. Projets qui
+# l'ont encore dans stack.md verront le WARN (signal de migration utile).
+# --- Auditor modes (v7.0.0 defaults flipped per codex audit 2026-05-20) ---
+# Rationale : audit revealed reviewers were skipped silently when set
+# to "manual" without operator awareness (CRIT-1 v6.10.5). v7.0.0 flips
+# the 3 retained reviewers to "full" by default so projects get full
+# coverage out of the box ; explicit "manual" or "off" in stack.md
+# Project Config still wins (project layer).
+CodeReviewMode: full
+CodeReviewFailOn: critical
+SecurityMode: full
+SecurityFailOn: critical
+# v7.0.0 audit §6.15 — "Lean reviewers" preset opt-in pour les FEAT de petit
+# scope (S, < 3 US, pas de stack auth/sécurité) où le coût marginal des
+# 4 reviewers complets dépasse leur valeur. Quand `LeanReviewersPreset: true`,
+# seul `code-reviewer` reste full ; security/spec/arch passent à `manual`
+# (Tech Lead invoque à la demande). Économie estimée : ~$1.50-3 par FEAT S.
+# Par défaut false (les 4 reviewers actifs — sécurité maximale pour FEAT moy/large).
+LeanReviewersPreset: false
+
+# --- Mutation testing (v7.0.0 audit §6.2 P0-2) ---
+# Opt-in mutation testing — break auto-confirmation bias where same IA
+# generates code + tests. See stacks/qa/mutation-testing.md.
+# Modes : off (default, byte-identical pre-v7) | minimal (services métier) |
+#         full (tout code production matérialisé).
+MutationTestingMode: "off"
+MutationScoreMin: 60         # 0-100 % kill rate threshold
+MutationTestingTimeoutSec: 600
+
+# --- E2E navigator testing (v7.0.0 audit §6.5 P1-16) ---
+# Opt-in E2E via Playwright (multi-navigateur). See stacks/qa/playwright.md.
+# Modes : off (default) | smoke (1 test login) | happy-paths (1/US) | full.
+E2EMode: "off"
+E2EMinPerUs: 1
+E2ETimeoutSec: 300
+
+# --- Elicitor gap (v7.0.0 audit §6.11) ---
+# When FEAT has elicitor sections (FAIL-N, EDGE-N, Red Team) but ≥ 1
+# item is not mapped to any AC, po emits [ELICITOR_GAP]. warn (default)
+# or strict (NO-GO).
+ElicitorGapMode: warn
+# SecurityThreatModelEnabled v7.0.0 : threat-model mode REMOVED from
+# security-reviewer agent. Key kept for backward-compat in legacy
+# stack.md files but has no runtime effect (replaced by
+# templates/threat-model.template.md as a human deliverable).
+SecurityThreatModelEnabled: false
+# SecurityScanEnabled (v7.0.0 hardened for serious runs) : the OWASP Top 10
+# scan is the only active security gate after threat-model removal. Default
+# true ; explicit `false` in project stack.md ## Project Config is allowed
+# but logged via [SEC_SCAN_DISABLED_BY_PROJECT] in layered_config dump for
+# audit trail. For CI/release runs : NEVER disable. Tied to phase_planner
+# _decide_security_scan (returns enabled=False with reason if false here).
+SecurityScanEnabled: true
+# PerfMode v7.0.0 : agent performance-auditor RETIRÉ
+# (governance-major-auditors-trim). Remplacé par Lighthouse CI + wrk/k6
+# dans le projet généré. Défaut flippé full → off.
+PerfMode: "off"
+# PerfFailOn v7.0.0 : deprecated (agent retiré). Retiré du config.base.yml
+# pour éliminer WARN [CONFIG_DEPRECATED_KEY] à chaque lecture. Projets qui
+# l'ont encore dans stack.md verront le WARN (signal de migration utile).
+# SpecComplianceMode v7.0.0 : flipped manual → full (codex audit P0 #5).
+# Spec compliance is the strongest guarantee that each AC is actually
+# implemented in the generated code ("Do not trust the report" pattern
+# from superpowers v5.1). For production runs, the reviewer must
+# default to running.
+SpecComplianceMode: full
+SpecComplianceFailOn: serious
+# SpecComplianceRequiredForFeatValidate (v7.0.0+) — when code is already
+# materialized for the FEAT (post-dev re-validation), /feat-validate
+# REQUIRES that spec-compliance has run and is non-RED. Pre-dev calls
+# (no code generated yet) skip this gate. Bypass : set to false in
+# stack.md ## Project Config (project layer wins) OR pass --no-validate
+# / --force to /sdd-full (audit logged). Default true for serious runs.
+SpecComplianceRequiredForFeatValidate: true
+
+# --- /sdd-review consolidated audit (v6.11.0, defaults flipped v7.0.0) ---
+# Rationale (codex audit P0 #9, 2026-05-20) : "Rendre /sdd-review
+# bloquant par défaut sur RED pour les projets sérieux". /sdd-full
+# STEP 4.8 historically continued past a RED verdict (warning only) —
+# this masked real quality issues at release time. v7.0.0 flips to
+# blocking. Bypass : explicit ReviewFailOnSddFull: false in stack.md
+# ## Project Config (project layer wins).
+ReviewMode: full                      # full | scans-only | read-only | manual | off
+ReviewFailOn: serious                 # info | minor | moderate | serious | critical
+ReviewFailOnSddFull: true             # v7.0.0 : false → true (blocking)
+ArchReviewMode: manual                # full | manual | off (Sonnet 4.6 cost-aware)
+ArchReviewFailOn: serious
+
+# --- Two-stage auditor pattern (v7.0.0+ emprunt superpowers) ---
+# `two-stage` (default v7.0.0+) : spec-compliance gate (Stage A) tourne
+# SEUL avant les 3 autres reviewers (Stage B parallèle). Si Stage A RED,
+# Stage B est skippé → économie ~3 invocations Sonnet par run.
+# `legacy-parallel` : v6.x — 4 reviewers parallèles dans 1 batch (rétro-compat).
+# Bypass CLI : `--legacy-auditor-parallel` sur /dev-run.
+AuditorBatchMode: two-stage           # two-stage | legacy-parallel
+
+# --- Complexity router (v7.0.0+ emprunt BMad scale-adaptive) ---
+# v7.0.0+ (audit P1 M2 2026-06-08) : agent LLM remplacé par le script
+# déterministe `sdd_scripts/complexity_router.py` (0 token, < 50 ms).
+# `manual` (default) : invocation explicite via `python -m sdd_scripts.complexity_router`.
+# `auto` : /sdd-full STEP 0 invoque le script automatiquement avant cadrage.
+# `off` : routing jamais calculé (recommandation = /sdd-full par défaut).
+ComplexityRouterMode: manual          # off | manual | auto
+
+# --- QA failover within /sdd-full (v7.0.0 audit §6.9 — asymmetry fix) ---
+# Historically, /qa-generate verdict RED was BLOCKING when run standalone
+# but only WARN when invoked from /sdd-full STEP 4.5 (asymmetric gate).
+# This let coverage gaps + test failures sneak past pipelines runs.
+# v7.0.0 flips default to blocking (symmetric with ReviewFailOnSddFull).
+# Bypass : explicit `QaFailOnSddFull: false` in stack.md (audit-logged).
+QaFailOnSddFull: true
+
+# --- Plan Cache Strict (v6.2 → v7.0.0 DEPRECATED) ---
+# DEPRECATED in v7.0.0 (cf. ADR governance-major-prompts-trim) :
+#   - dev-backend-strict / dev-frontend-strict variants removed.
+#   - Audit revealed maintenance overhead (2 extra agents to keep in sync
+#     with dev-*) outweighed ROI on real-world FEATs.
+#   - Plan v2 schema is preserved (Inline Digest still helpful for human
+#     review) but no longer routes to alternate agents.
+#   - This key is kept for backward-compat in stack.md ## Project Config
+#     parsers but has no runtime effect anymore.
+PlanCacheStrict: false
+
+# --- Gated workflow (backend-first) ---
+GatedWorkflow: true
+ApiGateRequired: true
+ApiGateMinPerEndpoint: 2
+
+# --- Plan review ---
+PlanReviewDefault: true
+
+# --- Checkpoint (v6.6.3) ---
+CheckpointMode: "off"
+
+# --- Token telemetry (v6.5.1, flipped v7.0.0 per codex audit P0 #4) ---
+# Rationale : codex audit 2026-05-20 found 0 rows in console.db
+# token_usage table → real $/feature cost impossible to audit. v7.0.0
+# flips default off → record so every Agent invocation captures
+# input/output/cache tokens via the PostToolUse.Agent hook. ~0 overhead
+# per call (lightweight DB INSERT). Env var SDD_TOKEN_USAGE_MODE still
+# takes precedence ; set to "off" in Project Config to opt out.
+TokenUsageMode: "record"
+
+# --- Cost caps (v7.0.0 audit P0 §4.3) ---
+# Hard cap USD on a single /sdd-full or /dev-run invocation. The PreToolUse
+# Agent hook (preflight_cost_cap.py) queries console.db token_usage table
+# tagged with current run_id ; if the cumulative cost exceeds this value,
+# blocks the next Agent spawn with [COST_CAP_EXCEEDED]. Default $50 covers
+# a FEAT M (3 US fullstack ~$24 measured 2026-05-20) with 2× safety margin.
+# Bypass : set to 0 to disable (NOT recommended in CI). Tied to RunId
+# emitted by sdd_state.py at /sdd-full start.
+MaxCostPerRun: 50.00          # USD ; 0 = disabled
+
+# Max simultaneous Opus 4.7 invocations (dev-backend + dev-frontend × parallel).
+# Default MaxParallel=3 → up to 6 Opus calls in flight at peak. Setting this
+# to 6 cap protects against accidental --max-parallel 6 burst (~$30 instant)
+# while still allowing 3-US fullstack standard runs. Hard ceiling 12.
+#
+# ⚠ EXPERIMENTAL — NOT IMPLEMENTED (v7.0.0 audit M1, 2026-05-20). Aucun
+# preflight hook ne lit cette valeur. MaxParallel (line 27) sert de cap
+# de facto via batching. Slated v7.1 (preflight_inflight_cap.py).
+# COMMENTÉ pour éviter de l'exposer comme clé "active" dans le layered
+# config — réactiver quand le hook sera câblé.
+# MaxOpusInflight: 6
+
+# --- Build loop cost cap (v7.0.0 P1 §6, 2026-05-20) ---
+# Per-US build loop hard cap : maximum USD spent on retries for ONE US
+# (dev-backend or dev-frontend invocations triggered by [BUILD_CORRECTIBLE]).
+# Above this, build_loop emits [BUILD_LOOP_COST_EXCEEDED] and STOPs even
+# if BuildLoopMaxIter not yet reached. Prevents runaway cost on pathological
+# US where each iteration adds ~$3-5 of Opus tokens.
+# Default $15 = ~3-5 Opus invocations on a medium US (each ~$3-4 measured).
+# 0 = disabled (legacy behavior, only BuildLoopMaxIter applies).
+# Note: BuildLoopMaxIter canonique défini ligne 29 (valeur 3). NE PAS
+# redéfinir ici — le parser layered_config rejette les doublons via
+# [CONFIG_DUPLICATE_KEY] depuis v7.0.0.
+BuildLoopMaxCostUsd: 15.00
+
+# --- Build loop adaptive fallback (v7.0.0-alpha audit M4, 2026-06-06) ---
+# Quand un build_loop dev-backend / dev-frontend a déjà consommé
+# BuildLoopMaxCostUsd * 0.5 ET qu'il reste UNE seule itération autorisée,
+# le runtime peut downgrade Opus 4.7 → Sonnet 4.6 pour la dernière tentative.
+# Justification : 2 retries Opus identiques convergent rarement sur la 3ᵉ ;
+# un changement de modèle apporte une perspective différente pour ~5× moins
+# cher. Sentinel file utilisé par /dev-run pour re-spawn avec --fallback-model.
+#
+# true  : downgrade automatique au-delà du seuil 50 % cost cap (défaut)
+# false : comportement legacy (toujours Opus jusqu'à BuildLoopMaxIter)
+BuildLoopAdaptiveFallback: true
+
+# --- Integration test depth (v7.0.0 audit §6.1) ---
+# API Gate default uses in-memory DB (EF Core InMemory, H2, SQLite:memory:).
+# This is fast but semantically DIFFERENT from production (no FK strict
+# constraints, no NULL sort order, no collation, no real transaction
+# isolation). `containers` mode opts into testcontainers (Docker required)
+# for parity with prod. `hybrid` runs in-memory + 1 smoke test per endpoint
+# against a real container as canary.
+# Modes : memory (default, fast) | hybrid (memory + 1 container canary) |
+#         containers (full container, slowest, prod-faithful)
+#
+# ⚠ EXPERIMENTAL — NOT IMPLEMENTED (v7.0.0 audit M1, 2026-05-20). Aucun
+# agent ne branche sur cette valeur. API Gate fixtures (cf. build-and-
+# loop.md Partie A §1.2) sont toujours in-memory. Les modes `hybrid` et
+# `containers` requièrent des fixture templates par stack QA (dotnet-
+# xunit, kotlin-junit, etc.) non écrits. Slated v7.1.
+# COMMENTÉ pour éviter de l'exposer comme clé "active" — réactiver
+# quand les fixture templates seront prêts.
+# IntegrationTestMode: memory
+
+# --- CI generation policy (v7.0.0 audit §6.7) ---
+# When /arch-init scaffolds a frontend project, generate .github/workflows/
+# quality.yml that wires axe-core (a11y) + Lighthouse CI (perf) + dependency
+# scan (CVE). Required to compensate the v7.0.0 retirement of
+# accessibility-auditor + performance-auditor agents — without this, a11y
+# and perf coverage drops to ZERO post-v7.0.0. Default true.
+CiTemplatesGeneration: true
+
+# --- Anti-GIGO FEAT validation (v7.0.0 audit §6.3) ---
+# Toggle the new structured FEAT checks (Quantified Goal, Non-Functional
+# Constraints). off = pre-v7 behavior, warn = WARN only (default),
+# strict = NO-GO if either section missing/empty.
+FeatAntiGigoMode: warn
+
+# --- US granularity (v7.0.0 audit §6.14) ---
+# Historical hard cap was 6 US per FEAT (too rigid for real-world FEATs
+# with 8-12 legitimate user flows like product catalog). v7.0.0 raises
+# default to 10 ; FEATs >10 require explicit --allow-large-feat flag
+# (audit-logged in force-bypass.log).
+UsGranularityHardCap: 10
+UsGranularityWarnAt: 6      # WARN above this (was historical hard cap)
+
+# --- /feat-deepen elicitation gate (v7.0.0 audit §6.3 — revert v6.10.5) ---
+# v6.10.5 raised the deepen recommendation threshold from 2 to 4 (out of 5)
+# to silence chronic --force bypasses. This made elicitor effectively
+# optional for all but the most complex FEATs, contributing to GIGO.
+# v7.0.0 reverts to threshold 3 AND makes it WARN-blocking in strict mode.
+FeatDeepenThreshold: 3       # complexity score (0-5) above which deepen is recommended
+FeatDeepenMode: warn         # off | warn (default) | strict (NO-GO if not run)
+
+# --- Inline rules drift detection (v7.0.0-alpha audit m10, 2026-06-06) ---
+# validate_inline_rules.py compare mtime des agents/*.md inlinant une rule
+# vs mtime du rule fichier source. Si rule modifiée APRÈS agent → drift
+# suspecté ([DRIFT_SUSPECTED]). Historiquement WARN-only ; cet audit M10
+# rend le comportement configurable :
+#   - off    : skip total (legacy v6.x)
+#   - warn   : émet le rapport mais exit 0 (défaut — non-bloquant)
+#   - strict : exit 1 si ≥ 1 drift détecté (bloque framework-ci.yml)
+# Le script invoque encore --strict en CLI explicit (ex. framework_smoke.py
+# strict mode) ; cette clé pilote le comportement DEFAULT sans argument.
+InlineRulesDriftMode: warn
+
+# --- Pricing freshness check (v7.0.0-alpha audit m4, 2026-06-06) ---
+# sdd_lib/pricing.py contient la table USD/M tokens par modèle. Anthropic
+# révise sa grille tarifaire ~tous les 2-4 mois. Pour éviter une dérive
+# silencieuse coût-réel vs coût-affiché, framework_smoke.py vérifie la
+# date du dernier "reviewed YYYY-MM-DD" dans le docstring pricing.py.
+#   - off    : skip check
+#   - warn   : émet WARN si > MaxAgeDays (défaut — non-bloquant)
+#   - strict : exit 1 si stale (CI release-gate)
+PricingFreshnessMode: warn
+PricingFreshnessMaxAgeDays: 90  # ~quarterly review cadence

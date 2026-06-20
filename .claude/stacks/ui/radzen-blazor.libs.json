@@ -1,0 +1,28 @@
+{
+  "$schema": "../../templates/libs-catalog.schema.json",
+  "stackId": "radzen-blazor",
+  "category": "ui",
+  "schemaVersion": 1,
+  "buildSystem": "dotnet",
+  "manifest": {
+    "files": ["workspace/output/src/{AppName}/{AppName}.csproj"]
+  },
+  "versions": {
+    "radzen-blazor": "5.5.7"
+  },
+  "core": [
+    {
+      "module": "Radzen.Blazor",
+      "ref": "radzen-blazor",
+      "rationale": "Design system Radzen complet pour Blazor (Server + WebAssembly) — composants UI, layout, navigation, services UX (Dialog/Notification/Tooltip).",
+      "license": "MIT"
+    }
+  ],
+  "onDemand": [],
+  "plugins": [],
+  "metadata": {
+    "lastUpdated": "2026-05-13",
+    "format": "compact (v2)",
+    "notes": "Bootstrap obligatoire : <script src='_content/Radzen.Blazor/Radzen.Blazor.js'> et <link rel='stylesheet' href='_content/Radzen.Blazor/css/material-base.css' /> dans wwwroot/index.html (cf. radzen-blazor.md §4.1)."
+  }
+}

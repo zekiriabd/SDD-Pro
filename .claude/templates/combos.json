@@ -1,0 +1,274 @@
+{
+  "_doc": "SDD_Pro validated combos + per-component validation levels — SSoT v7.0.1 (audit CRIT-5 closure, 2026-06-07). Consumed by: validate_stack_combo.py (combo signature match), match_stack_catalog.py (brownfield level derivation), preflight_stack_combo.py hook. v7.0.1 update (C5 fix audit CTO 2026-06-07) : reconciles CLAUDE.md §6 claim '13 combos SLA' with this catalog. Was C1-C5 only (5 combos vs 13 claimed). Now C1-C13 = 2 full-pipeline validated (C1, C2) + 11 bench-validated runtime (C3-C13, bench 2026-06-05). Distinction tier: 'validated' = /sdd-full bout-en-bout 100% automatisé sans intervention humaine ; 'bench-validated' = code généré compile + démarre + sert les ACs runtime (curl, build vert, page rendue), mais scaffolding /sdd-full partiellement manuel (cf. workspace/output/qa/bench/BENCH-GLOBAL-REPORT.md). Update workflow: edit this file + docs/validated-combos.md + CLAUDE.md §6 if count changes, then run framework_smoke.py.",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "schemaVersion": 2,
+  "syncedFrom": ".claude/docs/validated-combos.md",
+  "lastValidated": "2026-06-07",
+  "slaScope": {
+    "_doc": "Counts that MUST stay aligned with CLAUDE.md §6 'engagement commercial v7.0.0'. Drift triggers framework_smoke WARN.",
+    "totalSlaCombos": 13,
+    "validatedFullPipeline": 2,
+    "benchValidatedRuntime": 11,
+    "pendingFullPipeline": 3
+  },
+  "combos": [
+    {
+      "id": "C1",
+      "tier": "validated",
+      "label": "stack-microsoft + react",
+      "backend": "dotnet-minimalapi",
+      "frontend": "react",
+      "ui": "shadcn",
+      "qa": ["dotnet-xunit"],
+      "auth": "azure-ad",
+      "db": "postgres",
+      "archi": "mvc",
+      "validatedAt": "2026-05-07",
+      "notes": "Full /sdd-full pipeline end-to-end validated. SqlServer also documented but formal PoC on postgres."
+    },
+    {
+      "id": "C2",
+      "tier": "validated",
+      "label": "stack-kotlin + react (workspace CMSPrint)",
+      "backend": "kotlin-spring-boot",
+      "frontend": "react",
+      "ui": "shadcn",
+      "qa": ["kotlin-junit", "node-vitest"],
+      "auth": "azure-ad",
+      "db": "postgres",
+      "archi": "ddd",
+      "validatedAt": "2026-05-11",
+      "notes": "Full /sdd-full pipeline end-to-end validated on real workspace. ddd archi pattern itself remains experimental but exercised in this combo."
+    },
+    {
+      "id": "C3",
+      "tier": "bench-validated",
+      "label": "node-express + react + auth-local (OSS-friendly C3-prod)",
+      "backend": "node-express",
+      "frontend": "react",
+      "ui": "shadcn",
+      "qa": ["node-vitest"],
+      "auth": "auth-local",
+      "db": "postgres",
+      "archi": "mvc",
+      "validatedAt": "2026-06-05",
+      "notes": "Bench runtime PASS (cross-origin REST :44329 substitution). Full /sdd-full pipeline still PENDING (priority #1 v7.1.0)."
+    },
+    {
+      "id": "C4",
+      "tier": "bench-validated",
+      "label": "python-fastapi + react + auth-local",
+      "backend": "python-fastapi",
+      "frontend": "react",
+      "ui": "shadcn",
+      "qa": ["python-pytest", "node-vitest"],
+      "auth": "auth-local",
+      "db": "postgres",
+      "archi": "mvc",
+      "validatedAt": "2026-06-05",
+      "notes": "Bench runtime PASS. POST 5+5 = 33ms (best of bench). Full /sdd-full pipeline still PENDING (priority #2)."
+    },
+    {
+      "id": "C5",
+      "tier": "bench-validated",
+      "label": "vue + dotnet-minimalapi + azure-ad (Vue differentiation)",
+      "backend": "dotnet-minimalapi",
+      "frontend": "vue",
+      "ui": "vuetify",
+      "qa": ["dotnet-xunit", "node-vitest"],
+      "auth": "azure-ad",
+      "db": "postgres",
+      "archi": "mvc",
+      "validatedAt": "2026-06-05",
+      "notes": "Bench runtime PASS (substitution :44329). Full /sdd-full pipeline still PENDING (priority #3)."
+    },
+    {
+      "id": "C6",
+      "tier": "bench-validated",
+      "label": "kotlin-spring-boot + blazor-webassembly",
+      "backend": "kotlin-spring-boot",
+      "frontend": "blazor-webassembly",
+      "ui": "radzen-blazor",
+      "qa": ["kotlin-junit", "blazor-bunit"],
+      "auth": "azure-ad",
+      "db": "postgres",
+      "archi": "mvc",
+      "validatedAt": "2026-06-05",
+      "notes": "Bench runtime PASS (cross-origin REST kotlin :44329 → blazor-wasm :5004)."
+    },
+    {
+      "id": "C7",
+      "tier": "bench-validated",
+      "label": "kotlin-spring-boot + vue",
+      "backend": "kotlin-spring-boot",
+      "frontend": "vue",
+      "ui": "vuetify",
+      "qa": ["kotlin-junit", "node-vitest"],
+      "auth": "azure-ad",
+      "db": "postgres",
+      "archi": "mvc",
+      "validatedAt": "2026-06-05",
+      "notes": "Bench runtime PASS (kotlin :44329 → vue :5180)."
+    },
+    {
+      "id": "C8",
+      "tier": "bench-validated",
+      "label": "kotlin-spring-boot + angular",
+      "backend": "kotlin-spring-boot",
+      "frontend": "angular",
+      "ui": "shadcn",
+      "qa": ["kotlin-junit", "angular-jasmine"],
+      "auth": "azure-ad",
+      "db": "postgres",
+      "archi": "mvc",
+      "validatedAt": "2026-06-05",
+      "notes": "Bench runtime PASS (kotlin :44329 → angular :4200)."
+    },
+    {
+      "id": "C9",
+      "tier": "bench-validated",
+      "label": "dotnet-minimalapi + blazor-webassembly",
+      "backend": "dotnet-minimalapi",
+      "frontend": "blazor-webassembly",
+      "ui": "radzen-blazor",
+      "qa": ["dotnet-xunit", "blazor-bunit"],
+      "auth": "azure-ad",
+      "db": "postgres",
+      "archi": "mvc",
+      "validatedAt": "2026-06-05",
+      "notes": "Bench runtime PASS (cold JIT 237ms). Microsoft-aligned stack."
+    },
+    {
+      "id": "C10",
+      "tier": "bench-validated",
+      "label": "node-express + vue",
+      "backend": "node-express",
+      "frontend": "vue",
+      "ui": "vuetify",
+      "qa": ["node-vitest"],
+      "auth": "auth-local",
+      "db": "postgres",
+      "archi": "mvc",
+      "validatedAt": "2026-06-05",
+      "notes": "Bench runtime PASS (node :44329 → vue :5180)."
+    },
+    {
+      "id": "C11",
+      "tier": "bench-validated",
+      "label": "node-express + angular",
+      "backend": "node-express",
+      "frontend": "angular",
+      "ui": "shadcn",
+      "qa": ["node-vitest", "angular-jasmine"],
+      "auth": "auth-local",
+      "db": "postgres",
+      "archi": "mvc",
+      "validatedAt": "2026-06-05",
+      "notes": "Bench runtime PASS (node :44329 → angular :4200)."
+    },
+    {
+      "id": "C12",
+      "tier": "bench-validated",
+      "label": "python-fastapi + vue",
+      "backend": "python-fastapi",
+      "frontend": "vue",
+      "ui": "vuetify",
+      "qa": ["python-pytest", "node-vitest"],
+      "auth": "auth-local",
+      "db": "postgres",
+      "archi": "mvc",
+      "validatedAt": "2026-06-05",
+      "notes": "Bench runtime PASS. Python/AI market + Vue differentiation."
+    },
+    {
+      "id": "C13",
+      "tier": "bench-validated",
+      "label": "python-fastapi + angular",
+      "backend": "python-fastapi",
+      "frontend": "angular",
+      "ui": "shadcn",
+      "qa": ["python-pytest", "angular-jasmine"],
+      "auth": "auth-local",
+      "db": "postgres",
+      "archi": "mvc",
+      "validatedAt": "2026-06-05",
+      "notes": "Bench runtime PASS (fastapi :44329 → angular :4200). Python/Angular enterprise."
+    }
+  ],
+  "componentLevels": {
+    "_doc": "Per-component validation level — `validated` (🟢) | `experimental` (🟡) | `untested` (🔴). MUST stay in sync with the `Validation:` header of each .claude/stacks/{cat}/{stack-id}.md file. Asserted by tests/test_combos_cross_check.py at CI time.",
+    "backend": {
+      "dotnet-minimalapi": "validated",
+      "kotlin-spring-boot": "validated",
+      "python-fastapi": "bench-validated",
+      "node-express": "bench-validated"
+    },
+    "frontend": {
+      "react": "validated",
+      "blazor-webassembly": "validated",
+      "vue": "bench-validated",
+      "angular": "bench-validated"
+    },
+    "ui": {
+      "shadcn": "validated",
+      "vuetify": "bench-validated",
+      "radzen-blazor": "validated"
+    },
+    "qa": {
+      "dotnet-xunit": "validated",
+      "kotlin-junit": "validated",
+      "node-vitest": "validated",
+      "code-quality": "validated",
+      "python-pytest": "bench-validated",
+      "angular-jasmine": "bench-validated",
+      "blazor-bunit": "validated",
+      "mutation-testing": "experimental",
+      "playwright": "experimental"
+    },
+    "auth": {
+      "azure-ad": "validated",
+      "auth-local": "bench-validated"
+    },
+    "db": {
+      "postgres": "validated",
+      "postgresql": "validated",
+      "sqlserver": "experimental",
+      "mysql": "untested",
+      "mariadb": "untested",
+      "sqlite": "untested",
+      "oracle": "untested",
+      "mongodb": "untested",
+      "none": "validated"
+    },
+    "archi": {
+      "mvc": "validated",
+      "ddd": "bench-validated",
+      "microservice": "experimental"
+    },
+    "fullstack": {
+      "_doc": "Fullstack monolithe stacks. poc-only = utilise interne SDD console uniquement, non destine prod externe (cf. audit P3 2026-06-05). bench-validated = runtime OK lors du bench 2026-06-05 (scaffolding semi-manuel mainteneur, cf. BENCH-GLOBAL-REPORT.md). experimental = stack OK mais combo jamais teste runtime.",
+      "angular-universal": "bench-validated",
+      "blazor-server": "bench-validated",
+      "kotlin-mustache": "bench-validated",
+      "next": "bench-validated",
+      "node-react": "poc-only",
+      "nuxt": "bench-validated"
+    },
+    "mobiles": {
+      "_doc": "Mobile native stacks. scaffold-validated = scaffolding runtime OK mais build/runtime APK/IPA pas teste cette session. bench-validated = runtime OK lors du bench 2026-06-05 (MAUI Windows desktop, RN Expo Web).",
+      "kotlin-android": "scaffold-validated",
+      "maui": "bench-validated",
+      "react-native": "bench-validated"
+    }
+  },
+  "levelPriority": {
+    "_doc": "Severity ordering used by validate_stack_combo.py to compute the overall verdict from individual component levels (max-severity wins). Audit consolide 2026-06-07 Sprint 2 (CRIT-11 closure) — added bench-validated = 0 (treated as validated for max-severity purposes : a combo entirely composed of validated + bench-validated components computes worst = bench-validated, exit 0, status reflects the lowest tier rank). Audit 2026-06-06 — added scaffold-validated (mobile scaffold-only) = experimental tier, poc-only (node-react console) = untested tier. All declared levels in componentLevels MUST appear here.",
+    "validated": 0,
+    "bench-validated": 0,
+    "scaffold-validated": 1,
+    "experimental": 1,
+    "poc-only": 2,
+    "untested": 2,
+    "missing": 3
+  }
+}

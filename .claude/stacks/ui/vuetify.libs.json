@@ -1,0 +1,32 @@
+{
+  "$schema": "../../templates/libs-catalog.schema.json",
+  "stackId": "vuetify",
+  "category": "ui",
+  "schemaVersion": 1,
+  "buildSystem": "npm",
+  "manifest": {
+    "files": ["workspace/output/src/{AppName}/package.json"]
+  },
+  "versions": {
+    "vuetify": "3.7.4",
+    "mdi-font": "7.4.47",
+    "vite-plugin-vuetify": "2.0.4",
+    "sass-embedded": "1.83.0",
+    "vee-validate": "4.14.4"
+  },
+  "core": [
+    { "module": "vuetify", "ref": "vuetify", "rationale": "Composants Material Design pour Vue 3 (v-app, v-btn, v-data-table, v-form, etc.).", "license": "MIT" },
+    { "module": "@mdi/font", "ref": "mdi-font", "rationale": "Pack icônes Material Design (classes mdi-*), iconLibrary par défaut Vuetify.", "license": "Apache-2.0" },
+    { "module": "vite-plugin-vuetify", "ref": "vite-plugin-vuetify", "rationale": "Plugin Vite pour auto-import composants Vuetify (tree-shaking).", "license": "MIT" }
+  ],
+  "onDemand": [
+    { "module": "sass-embedded", "ref": "sass-embedded", "capability": "sass", "triggers": ["\\bsass\\b", "\\bscss\\b", "theme.*custom", "variables.*scss"], "rationale": "Compilateur SASS pour theming Vuetify avancé (overrides $primary, $secondary, etc.)." },
+    { "module": "vee-validate", "ref": "vee-validate", "capability": "form-validation", "triggers": ["validation.*form", "form.*validation", "schema.*validation", "yup", "zod"], "rationale": "Validation déclarative pour <v-form> avec schémas (alternative aux rules functions)." }
+  ],
+  "plugins": [],
+  "metadata": {
+    "lastUpdated": "2026-05-13",
+    "format": "compact (v2)",
+    "notes": "Setup obligatoire : npm install vuetify @mdi/font vite-plugin-vuetify ; puis dans main.ts : import 'vuetify/styles' + createVuetify(). vite.config.ts : import vuetify from 'vite-plugin-vuetify' ; plugins: [vue(), vuetify({ autoImport: true })]."
+  }
+}

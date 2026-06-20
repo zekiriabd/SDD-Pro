@@ -1,0 +1,39 @@
+{
+  "$comment": "SDD_Pro API Gate report — produced by /qa-generate --mode api-tests (cf. rules/build-and-loop.md §1.3-§1.4). v7.0.0: canonical 'status' field (PASS|WARN|FAIL|SKIPPED|INFRA_BLOCKED) added; 'verdict' (GREEN|YELLOW|RED) retained as legacy alias; readers MUST prefer 'status' for new code.",
+  "FEAT": "{n}-{FeatName}",
+  "extractedAt": "2026-05-14T10:30:00Z",
+  "stack": "qa-dotnet-xunit",
+  "fixturesStrategy": "WebApplicationFactory + EF Core InMemory",
+  "endpoints": [
+    {
+      "verb": "GET",
+      "route": "/api/items",
+      "tests": { "total": 3, "passed": 3, "failed": 0 },
+      "cases": [
+        { "name": "happy: list returns 200 + page", "outcome": "passed" },
+        { "name": "negative: missing Bearer returns 401",  "outcome": "passed" },
+        { "name": "negative: scope insufficient returns 403", "outcome": "passed" }
+      ]
+    },
+    {
+      "verb": "POST",
+      "route": "/api/items",
+      "tests": { "total": 2, "passed": 2, "failed": 0 },
+      "cases": [
+        { "name": "happy: valid body returns 201 + Location", "outcome": "passed" },
+        { "name": "negative: invalid body returns 400 ProblemDetails", "outcome": "passed" }
+      ]
+    }
+  ],
+  "summary": {
+    "endpoints_total": 2,
+    "tests_total": 5,
+    "tests_passed": 5,
+    "tests_failed": 0,
+    "min_per_endpoint": 2,
+    "min_per_endpoint_required": 2,
+    "gate_passed": true,
+    "status": "PASS",
+    "verdict": "GREEN"
+  }
+}

@@ -1,0 +1,248 @@
+# SDD_Pro — MkDocs Material site (Azure DevOps private project)
+# Build local  : mkdocs build         → produces site/ (static HTML)
+# Serve local  : mkdocs serve         → http://localhost:8000 (live reload)
+# Deploy       : copier site/ vers le partage interne (Azure Static Web Apps,
+#                file share, intranet, etc.). PAS de GitHub Actions/gh-pages.
+
+site_name: SDD_Pro
+site_description: Spec-Driven Development for Claude Code — multi-agent framework that turns FEAT specs into production-ready code
+site_author: Zekiri Abdelali
+# site_url, repo_url, edit_uri laissés vides : projet privé Azure DevOps,
+# pas d'URL publique stable. Décommenter et personnaliser si besoin.
+
+# Documentation source — we use .claude/docs as source, not the default docs/
+docs_dir: .claude/docs
+site_dir: site
+
+# Don't fail build on warnings (some legacy links use absolute paths)
+strict: false
+
+# ─── Navigation hierarchy (curated, BMAD-style) ──────────────────────────────
+nav:
+  - Home: README.md
+  - Getting Started:
+      - Tutorial (30 min): getting-started.md
+      - Cookbook (10 min recipes): cookbook.md
+      - Quickstart (brownfield): quickstart.md
+      - Glossary: glossary.md
+  - Reference:
+      - Agents (12 cards): agents-reference.md
+      - Commands (20 cards): commands-reference.md
+      - Configuration (43 keys): configuration-reference.md
+      - Hooks & Protections: hooks-and-protections.md
+  - Architecture:
+      - Component model: architecture.md
+      - Pipeline workflow: workflow.md
+      - Conventions: conventions.md
+      - Source-first principle: principles/source-first.md
+      - US granularity: principles/us-granularity.md
+  - Operations:
+      - Troubleshooting + FAQ: troubleshooting.md
+      - Config precedence: config-precedence.md
+      - Orphan cleanup: orphan-cleanup-policy.md
+      - Cache strategy: cache-strategy.md
+      - Validated combos: validated-combos.md
+  - Governance:
+      - Versioning: VERSIONING.md
+      - Working Agreement: WORKING-AGREEMENT.md
+      - Changelog: CHANGELOG.md
+      - Migration v6→v7: MIGRATION.md
+      - Roadmap v7→v8: roadmap-v7-v8.md
+      - PoC ROI methodology: poc-roi-methodology.md
+  - Subsystems:
+      - Arch — Phase A (config propagation): arch/phase-a-config-propagation.md
+      - Arch — Phase B (DB scaffolding): arch/phase-b-db-scaffolding.md
+      - Arch — Phase C (CLAUDE.md generation): arch/phase-c-claude-md-generation.md
+      - Benchmarks index: benchmarks/README.md
+      - Known gaps: benchmarks/known-gaps.md
+
+# ─── Theme — Material Design ─────────────────────────────────────────────────
+theme:
+  name: material
+  language: fr   # primary language (FR docs canonical) ; EN via i18n plugin
+  logo: assets/logo.svg     # optional — place at .claude/docs/assets/logo.svg
+  favicon: assets/favicon.ico
+
+  # Color palette : dark + light toggle (matches our console web theme)
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: cyan
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: cyan
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+  font:
+    text: Inter
+    code: JetBrains Mono
+
+  features:
+    # Navigation
+    - navigation.instant       # SPA-like fast page transitions
+    - navigation.tracking      # URL updates on scroll
+    - navigation.tabs          # top-level nav in tabs
+    - navigation.tabs.sticky   # tabs stay on scroll
+    - navigation.sections      # group sections in sidebar
+    - navigation.expand        # auto-expand sections
+    - navigation.indexes       # section index pages
+    - navigation.top           # back-to-top button
+    - navigation.footer        # prev/next page links
+    - toc.follow               # ToC follows scroll
+    - toc.integrate            # ToC integrated in sidebar
+
+    # Search
+    - search.suggest           # autocomplete
+    - search.highlight         # highlight matches
+    - search.share             # shareable search URL
+
+    # Content
+    - content.code.copy        # copy button on code blocks
+    - content.code.annotate    # annotations on code blocks
+    - content.tabs.link        # synced content tabs
+    - content.tooltips         # rich tooltips on abbreviations
+    - content.action.edit      # edit-this-page button
+    - content.action.view      # view-source button
+
+  icon:
+    edit: material/pencil
+    view: material/eye
+
+# ─── Plugins ─────────────────────────────────────────────────────────────────
+plugins:
+  # i18n FIRST — defines languages before search uses them
+  - i18n:
+      docs_structure: suffix       # page.md (FR default) + page.en.md (EN)
+      reconfigure_material: true   # auto-add language switcher to topbar
+      reconfigure_search: true     # search adapts per language
+      fallback_to_default: true    # if EN page missing, fall back to FR
+      languages:
+        - locale: fr
+          default: true
+          name: Français
+          build: true
+        - locale: en
+          name: English
+          build: true
+          site_name: SDD_Pro — Spec-Driven Development for Claude Code
+          nav_translations:
+            Home: Home
+            Getting Started: Getting Started
+            Reference: Reference
+            Architecture: Architecture
+            Operations: Operations
+            Governance: Governance
+            Subsystems: Subsystems
+            Tutorial (30 min): Tutorial (30 min)
+            Cookbook (10 min recipes): Cookbook (10 min recipes)
+            Quickstart (brownfield): Quickstart (brownfield)
+            Glossary: Glossary
+            Agents (12 cards): Agents (12 cards)
+            Commands (20 cards): Commands (20 cards)
+            Configuration (43 keys): Configuration (43 keys)
+            Hooks & Protections: Hooks & Protections
+            Component model: Component model
+            Pipeline workflow: Pipeline workflow
+            Conventions: Conventions
+            Source-first principle: Source-first principle
+            US granularity: US granularity
+            Troubleshooting + FAQ: Troubleshooting + FAQ
+            Config precedence: Config precedence
+            Orphan cleanup: Orphan cleanup
+            Cache strategy: Cache strategy
+            Validated combos: Validated combos
+            Versioning: Versioning
+            Working Agreement: Working Agreement
+            Changelog: Changelog
+            Migration v6→v7: Migration v6→v7
+            Roadmap v7→v8: Roadmap v7→v8
+            PoC ROI methodology: PoC ROI methodology
+            Arch — Phase A (config propagation): Arch — Phase A (config propagation)
+            Arch — Phase B (DB scaffolding): Arch — Phase B (DB scaffolding)
+            Arch — Phase C (CLAUDE.md generation): Arch — Phase C (CLAUDE.md generation)
+            Benchmarks index: Benchmarks index
+            Known gaps: Known gaps
+
+  - search:
+      lang:
+        - fr
+        - en
+  # Optional plugins (install via requirements-docs.txt) :
+  # - awesome-pages   # automatic nav from .pages files
+  # - mike            # versioned docs (v6.10-LTS + v7.0.0-alpha)
+  # Mermaid built-in via theme features when using pymdownx.superfences (below)
+
+# ─── Markdown extensions (Material recommended set) ──────────────────────────
+markdown_extensions:
+  # Python Markdown
+  - abbr
+  - admonition           # !!! note / warning / tip blocks
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+      permalink_title: Link to this section
+      toc_depth: 4
+
+  # PyMdown extensions (Material recommended)
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys                  # ++key++ for keyboard keys
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.snippets:
+      check_paths: true
+  - pymdownx.superfences:            # mermaid native rendering here
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+
+# ─── Extra config ────────────────────────────────────────────────────────────
+extra:
+  # Version selector (optional — useful when v6.10-LTS + v7.0.0 coexist)
+  # Décommenter quand mike sera installé (voir requirements-docs.txt) :
+  # version:
+  #   provider: mike
+  #   default: latest
+
+  # Pas de social links : projet privé Azure DevOps.
+  # Si besoin d'un lien Azure DevOps interne, ajouter ici.
+
+  generator: false   # Hide "Made with Material for MkDocs" footer
+  status:
+    new: Recently added
+    deprecated: Deprecated
+
+extra_css:
+  - assets/extra.css   # optional custom overrides
+
+extra_javascript:
+  - https://unpkg.com/mermaid@10/dist/mermaid.min.js

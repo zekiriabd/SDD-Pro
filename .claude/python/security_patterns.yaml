@@ -1,0 +1,333 @@
+# SDD_Pro — Security patterns SSoT (OWASP Top 10 2021)
+#
+# Mirrors security-reviewer.md §5.1-5.10. This YAML is the machine-readable
+# source of truth for the 22 [SEC_*] error classes. security-reviewer.md
+# §5 keeps prose patterns for LLM context; future v7.0.1 will switch the
+# agent to read this YAML at runtime (preserving cache hits).
+#
+# Schema: {classes: [{prefix, owasp, cwe, severity, hard_blocking, mode,
+#                     description, patterns: [{lang, regex, file_glob, hint}]}]}
+#
+# CI tests: tests/test_security_patterns.py validates schema + cross-checks
+# with error-classification.md §1.11.
+
+schemaVersion: 1
+lastSync: 2026-06-06
+syncedFrom:
+  - .claude/agents/security-reviewer.md
+  - .claude/rules/error-classification.md
+modes:
+  - threat-model    # pre-dev STRIDE, informational only
+  - scan            # post-dev, deterministic patterns + verdict
+
+classes:
+  - prefix: "[SEC_SECRET_HARDCODED]"
+    owasp: A02/A07
+    cwe: CWE-798
+    severity: critical
+    hard_blocking: true
+    mode: scan
+    section: "5.1"
+    description: "Secret (AWS/GitHub/Stripe key, etc.) hardcoded in source"
+    patterns:
+      - lang: any
+        regex: 'AKIA[0-9A-Z]{16}'
+        hint: "AWS access key"
+      - lang: any
+        regex: 'ghp_[A-Za-z0-9]{36}'
+        hint: "GitHub personal access token"
+      - lang: any
+        regex: 'sk_(test|live)_[A-Za-z0-9]{24,}'
+        hint: "Stripe secret key"
+
+  - prefix: "[SEC_SECRET_DEV_CONFIG]"
+    owasp: A05
+    cwe: CWE-798
+    severity: moderate
+    hard_blocking: false
+    mode: scan
+    section: "5.1"
+    description: "Secret in dev config (appsettings.Development.json, .env.local)"
+    patterns:
+      - lang: any
+        regex: 'password\s*[:=]\s*["''][^"'']{3,}["'']'
+        file_glob: "**/appsettings.Development.json"
+        hint: "Dev config password"
+
+  - prefix: "[SEC_ENV_VAR_FORBIDDEN]"
+    owasp: A05
+    cwe: CWE-1188
+    severity: serious
+    hard_blocking: false
+    mode: scan
+    section: "5.11"
+    description: "Generated application code reads SDD config/secrets directly from env vars instead of native config populated from stack.md"
+    patterns:
+      - lang: csharp
+        regex: 'Environment\.GetEnvironmentVariable\(\s*["''](?:(?:DB|AUTH|AZ|SMTP)_[A-Z0-9_]*|DATABASE_URL)["'']'
+        hint: ".NET SDD config env read"
+      - lang: jvm
+        regex: 'System\.getenv\(\s*["''](?:(?:DB|AUTH|AZ|SMTP)_[A-Z0-9_]*|DATABASE_URL)["'']'
+        hint: "JVM SDD config env read"
+      - lang: node
+        regex: 'process\.env\.(?:(?:DB|AUTH|AZ|SMTP)_[A-Z0-9_]*|DATABASE_URL)\b'
+        hint: "Node SDD config env read"
+      - lang: python
+        regex: 'os\.environ(?:\.get)?\(\s*["''](?:(?:DB|AUTH|AZ|SMTP)_[A-Z0-9_]*|DATABASE_URL)["'']|os\.environ\[\s*["''](?:(?:DB|AUTH|AZ|SMTP)_[A-Z0-9_]*|DATABASE_URL)["'']\s*\]'
+        hint: "Python SDD config env read"
+      - lang: kotlin
+        regex: '@Value\(\s*["'']\\?\$\{(?:(?:DB|AUTH|AZ|SMTP)_[A-Z0-9_]*|DATABASE_URL)'
+        hint: "Spring direct env placeholder for SDD config"
+      - lang: react
+        regex: 'import\.meta\.env\.VITE_AZ_[A-Z0-9_]*\b'
+        hint: "Frontend Azure config must come from /auth/config or generated public config"
+
+  - prefix: "[SEC_CORS_MISSING]"
+    owasp: A05
+    cwe: CWE-942
+    severity: serious
+    hard_blocking: false
+    mode: scan
+    section: "5.6"
+    description: "Backend SPA-facing without CORS configuration — all SPA fetch will fail silently in browser"
+    patterns:
+      - lang: csharp
+        regex: 'WebApplication\.CreateBuilder'
+        anti_pattern: true
+        hint: ".NET backend without AddCors/UseCors — required if frontend SPA detected"
+      - lang: jvm
+        regex: '@SpringBootApplication'
+        anti_pattern: true
+        hint: "Spring backend without CorsConfiguration bean — required if frontend SPA detected"
+      - lang: node
+        regex: 'express\(\)'
+        anti_pattern: true
+        hint: "Express app without cors() middleware — required if frontend SPA detected"
+      - lang: python
+        regex: 'FastAPI\(\)'
+        anti_pattern: true
+        hint: "FastAPI without CORSMiddleware — required if frontend SPA detected"
+
+  - prefix: "[SEC_SQL_INJECTION]"
+    owasp: A03
+    cwe: CWE-89
+    severity: critical
+    hard_blocking: true
+    mode: scan
+    section: "5.2"
+    description: "SQL string concatenation or interpolation"
+    patterns:
+      - lang: csharp
+        regex: '\.FromSqlRaw\([^)]*\$"|\.FromSqlRaw\([^)]*\+'
+        hint: "EF Core raw SQL with interpolation/concat"
+      - lang: csharp
+        regex: 'new SqlCommand\([^)]*\$"|new SqlCommand\([^)]*\+'
+        hint: "ADO.NET concatenated SQL"
+      - lang: kotlin
+        regex: 'createQuery\("[^"]*\$\{'
+        hint: "JPA query interpolation"
+      - lang: python
+        regex: 'execute\([^)]*%[^)]*\)|execute\(f"'
+        hint: "Python DB cursor.execute with %/f-string"
+
+  - prefix: "[SEC_COMMAND_INJECTION]"
+    owasp: A03
+    cwe: CWE-78
+    severity: critical
+    hard_blocking: true
+    mode: scan
+    section: "5.2"
+    description: "OS command with user-controlled input"
+    patterns:
+      - lang: python
+        regex: 'os\.system\(|subprocess\.\w+\([^)]*shell\s*=\s*True'
+        hint: "os.system or shell=True subprocess"
+      - lang: node
+        regex: 'child_process\.exec\(|execSync\('
+        hint: "Node exec without sanitization"
+
+  - prefix: "[SEC_XSS_RISK]"
+    owasp: A03
+    cwe: CWE-79
+    severity: critical    # back; serious on front
+    hard_blocking: false
+    mode: scan
+    section: "5.3"
+    description: "innerHTML, dangerouslySetInnerHTML, v-html with user input"
+    patterns:
+      - lang: react
+        regex: 'dangerouslySetInnerHTML\s*=\s*\{\s*__html'
+        hint: "React dangerouslySetInnerHTML"
+      - lang: vue
+        regex: 'v-html\s*=\s*"'
+        hint: "Vue v-html directive"
+
+  - prefix: "[SEC_BROKEN_AUTHZ]"
+    owasp: A01
+    cwe: CWE-862
+    severity: critical
+    hard_blocking: true
+    mode: scan
+    section: "5.4"
+    description: "Endpoint without authorization attribute/middleware"
+    patterns:
+      - lang: csharp
+        regex: 'app\.MapGet\("/api/'
+        hint: "Endpoint without .RequireAuthorization()"
+
+  - prefix: "[SEC_BROKEN_AUTHN]"
+    owasp: A07
+    cwe: CWE-287
+    severity: critical
+    hard_blocking: true
+    mode: scan
+    section: "5.4"
+    description: "Missing JWT validation, no auth scheme"
+
+  - prefix: "[SEC_IDOR]"
+    owasp: A01
+    cwe: CWE-639
+    severity: serious
+    hard_blocking: false
+    mode: scan
+    section: "5.4"
+    description: "Insecure Direct Object Reference (user reads other user's data by ID)"
+
+  - prefix: "[SEC_CRYPTO_WEAK]"
+    owasp: A02
+    cwe: CWE-327
+    severity: serious
+    hard_blocking: false
+    mode: scan
+    section: "5.5"
+    description: "Weak hash (MD5/SHA-1) or cipher (DES/RC4)"
+    patterns:
+      - lang: any
+        regex: '(?i)\b(MD5|SHA-?1|DES|RC4|ECB)\b'
+        hint: "Weak crypto algorithm"
+
+  - prefix: "[SEC_CRYPTO_NO_SALT]"
+    owasp: A02
+    cwe: CWE-759
+    severity: serious
+    hard_blocking: false
+    mode: scan
+    section: "5.5"
+    description: "Password hashing without salt or bcrypt/argon2"
+
+  - prefix: "[SEC_RANDOM_INSECURE]"
+    owasp: A02
+    cwe: CWE-338
+    severity: serious
+    hard_blocking: false
+    mode: scan
+    section: "5.5"
+    description: "Math.random()/Random() used for token/secret generation"
+    patterns:
+      - lang: csharp
+        regex: 'new Random\(\)|Random\.Shared'
+        hint: ".NET Random for security context — use RandomNumberGenerator"
+      - lang: node
+        regex: 'Math\.random\(\)'
+        hint: "JS Math.random — use crypto.randomBytes"
+
+  - prefix: "[SEC_CORS_PERMISSIVE]"
+    owasp: A05
+    cwe: CWE-942
+    severity: serious
+    hard_blocking: false
+    mode: scan
+    section: "5.6"
+    description: "Wildcard CORS with credentials, or AllowAnyOrigin"
+    patterns:
+      - lang: csharp
+        regex: '\.AllowAnyOrigin\(\)'
+        hint: "AllowAnyOrigin with credentials is forbidden"
+
+  - prefix: "[SEC_HEADERS_MISSING]"
+    owasp: A05
+    cwe: CWE-693
+    severity: moderate
+    hard_blocking: false
+    mode: scan
+    section: "5.6"
+    description: "Missing CSP/HSTS/X-Content-Type-Options"
+
+  - prefix: "[SEC_DEV_ENDPOINTS_EXPOSED]"
+    owasp: A05
+    cwe: CWE-1188
+    severity: serious
+    hard_blocking: false
+    mode: scan
+    section: "5.6"
+    description: "Swagger UI / GraphQL playground exposed in prod"
+
+  - prefix: "[SEC_JWT_MISCONFIG]"
+    owasp: A07
+    cwe: CWE-1004
+    severity: critical
+    hard_blocking: true
+    mode: scan
+    section: "5.7"
+    description: "JWT with algorithm=none, short expiry, weak secret, no audience/issuer check"
+
+  - prefix: "[SEC_COOKIE_INSECURE]"
+    owasp: A07
+    cwe: CWE-614
+    severity: serious
+    hard_blocking: false
+    mode: scan
+    section: "5.7"
+    description: "Cookie without HttpOnly/Secure/SameSite"
+
+  - prefix: "[SEC_PASSWORD_WEAK_POLICY]"
+    owasp: A07
+    cwe: CWE-521
+    severity: moderate
+    hard_blocking: false
+    mode: scan
+    section: "5.7"
+    description: "Password policy < 12 chars OR no complexity"
+
+  - prefix: "[SEC_DESERIALIZATION_UNSAFE]"
+    owasp: A08
+    cwe: CWE-502
+    severity: critical
+    hard_blocking: true
+    mode: scan
+    section: "5.8"
+    description: "BinaryFormatter, pickle.load, ObjectInputStream on untrusted input"
+    patterns:
+      - lang: python
+        regex: 'pickle\.loads?\('
+        hint: "Python pickle on untrusted data"
+      - lang: csharp
+        regex: 'BinaryFormatter'
+        hint: ".NET BinaryFormatter is deprecated unsafe"
+
+  - prefix: "[SEC_LOGGING_SECRETS]"
+    owasp: A09
+    cwe: CWE-532
+    severity: serious
+    hard_blocking: false
+    mode: scan
+    section: "5.9"
+    description: "Logging of password, token, secret fields"
+
+  - prefix: "[SEC_STACK_TRACE_EXPOSED]"
+    owasp: A09
+    cwe: CWE-209
+    severity: serious
+    hard_blocking: false
+    mode: scan
+    section: "5.9"
+    description: "Full stack trace returned in 500 response (UseDeveloperExceptionPage in prod)"
+
+  - prefix: "[SEC_SSRF_RISK]"
+    owasp: A10
+    cwe: CWE-918
+    severity: critical
+    hard_blocking: true
+    mode: scan
+    section: "5.10"
+    description: "HttpClient/fetch with user-supplied URL and no allowlist"

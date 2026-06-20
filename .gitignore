@@ -1,0 +1,94 @@
+﻿################################################################################
+# Ce fichier .gitignore a été automatiquement créé par Microsoft(R) Visual Studio.
+################################################################################
+
+/.vs
+
+# Python bytecode (sdd_hooks, sdd_lib, sdd_scripts)
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+
+# MkDocs build output (statique, généré par `mkdocs build`)
+# Build local + déploiement manuel sur Azure / intranet, jamais committé.
+/site/
+
+# Workspace généré par le pipeline SDD (artefacts non-versionnés)
+workspace/output/
+workspace/console/status.json
+workspace/console/.status.lock
+
+# Framework smoke cache (fast-path Stop hook)
+.claude/.cache/
+
+# Local dev secrets — stack.md contient DB_PASSWORD, AUTH_JWT_SECRET,
+# SMTP_PASSWORD etc. en clair pour le dev local. Ne JAMAIS committer.
+# Versionner stack.md.example (placeholders) à la place.
+workspace/input/stack/stack.md
+
+# HTTPS dev cert/key auto-signés (security audit 2026-06-06 — keypair privé
+# ne JAMAIS commiter, même en dev). Régénérer via `npm run gen-cert` ou
+# fallback HTTP automatique si absent (cf. server.js:57).
+workspace/console/.certs/
+
+# Layered config team-level (peut contenir des secrets/policy org)
+.sdd/
+~/.sdd/
+
+# Pytest coverage artefact (run-local)
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Console Fastify deps (lourdes, ~27MB, restituables via npm install)
+workspace/console/node_modules/
+
+# v7.0.0 cleanup 2026-05-20 — node_modules orphelins (pas de package.json
+# racine ni dans workspace/output/src/*). Ignore tout node_modules récursif
+# par sécurité (le projet généré dans workspace/output/src/ a son propre
+# node_modules quand frontend Node — toujours ignoré).
+node_modules/
+**/node_modules/
+
+# Console DB (SQLite local — généré par init_console_db.py, contient stats run-locale)
+workspace/output/db/*.db
+workspace/output/db/*.db-shm
+workspace/output/db/*.db-wal
+workspace/console/*.db
+workspace/console/*.db-shm
+workspace/console/*.db-wal
+
+# Runtime transient — scheduler lock (regénéré, ne pas committer)
+.claude/scheduled_tasks.lock
+
+# Scripts dev ad-hoc oubliés à la racine (PO/dev workflow)
+/.tmp_*.py
+
+# Orphan crash forensic traces (atomic_write .sddtmp pattern + .json.tmp)
+**/*.sddtmp
+**/.sys/.validation/*.tmp
+
+# MCPB bundle build artifact (régénérable via python -m sdd_mcp.build_mcpb)
+.claude/python/.mcpb-build/
+.claude/python/*.mcpb
+
+# .NET / Java / Node build outputs (au cas où des projets seraient générés à la racine)
+**/bin/
+**/obj/
+**/dist/
+**/build/
+**/.gradle/
+**/target/
+
+# IDE
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Settings local Claude Code (additionalDirectories cross-poste)
+.claude/settings.local.json

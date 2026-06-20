@@ -1,0 +1,134 @@
+# SDD_Pro — Code review patterns SSoT
+#
+# Mirrors code-reviewer.md §5.1-5.5. Machine-readable SSoT for the 12
+# [REVIEW_*] classes. Coordinates with security_patterns.yaml for
+# [REVIEW_SECRETS_HARDCODED] (deduplication: security-reviewer wins
+# when both fire on the same file:line).
+#
+# CI tests: tests/test_code_review_patterns.py validates schema +
+# cross-checks with error-classification.md §1.10.
+
+schemaVersion: 1
+lastSync: 2026-06-05
+syncedFrom:
+  - .claude/agents/code-reviewer.md
+  - .claude/rules/error-classification.md
+coordination:
+  dedup_against:
+    - security_patterns.yaml   # [REVIEW_SECRETS_HARDCODED] deduped by security
+    - quality_scan.py          # TODO/magic numbers/console.log not duplicated
+
+classes:
+  - prefix: "[REVIEW_SECRETS_HARDCODED]"
+    category: security
+    severity: minor
+    hard_blocking: false
+    section: "5.5"
+    description: "Secret hardcoded — info only, owned exclusively by security-reviewer [SEC_SECRET_HARDCODED]"
+    note: "Audit P0-doc 2026-06-05: code-reviewer emits as issues.minor (info) with pointer to security-reviewer. Hard-blocking lives in security_patterns.yaml [SEC_SECRET_HARDCODED] (CWE-798)."
+
+  - prefix: "[REVIEW_ANTI_PATTERN_N_PLUS_ONE]"
+    category: perf-db
+    severity: serious
+    hard_blocking: false
+    section: "5.1"
+    description: "Lazy-load inside loop (N+1 queries)"
+    patterns:
+      - lang: csharp
+        regex: 'foreach\s*\([^)]+\)\s*\{[^}]*\.\w+\s*\.(First|Single)OrDefault\('
+        hint: "EF Core lazy nav inside foreach"
+      - lang: kotlin
+        regex: '\.forEach\s*\{[^}]*repository\.\w+'
+        hint: "JPA lazy fetch inside forEach"
+
+  - prefix: "[REVIEW_ANTI_PATTERN_BLOCKING_ASYNC]"
+    category: concurrency
+    severity: serious
+    hard_blocking: false
+    section: "5.1"
+    description: "Blocking call inside async context"
+    patterns:
+      - lang: csharp
+        regex: '\.Result\b|\.Wait\(\)|\.GetAwaiter\(\)\.GetResult\(\)'
+        hint: ".Result/.Wait() deadlock risk"
+      - lang: kotlin
+        regex: 'runBlocking\s*\{'
+        hint: "runBlocking in suspend context"
+
+  - prefix: "[REVIEW_ANTI_PATTERN_SYNC_IO_IN_ASYNC]"
+    category: concurrency
+    severity: serious
+    hard_blocking: false
+    section: "5.1"
+    description: "Sync IO (File.ReadAllText, Thread.Sleep) inside async method"
+    patterns:
+      - lang: csharp
+        regex: 'File\.(Read|Write)(AllText|AllBytes|AllLines)\('
+        hint: "Use File.ReadAllTextAsync / WriteAllTextAsync"
+      - lang: csharp
+        regex: 'Thread\.Sleep\('
+        hint: "Use Task.Delay (preserves async context)"
+
+  - prefix: "[REVIEW_ANTI_PATTERN_KEY_INDEX]"
+    category: react-stability
+    severity: moderate
+    hard_blocking: false
+    section: "5.1"
+    description: "React key={index} causes reconciliation bugs on reorder/insert"
+    patterns:
+      - lang: react
+        regex: '\.map\(\s*\([^)]*,\s*(\w+)\)\s*=>\s*<[^>]+key=\{\1\}'
+        hint: "key={index} — use stable ID"
+
+  - prefix: "[REVIEW_ANTI_PATTERN_USEEFFECT_NO_DEPS]"
+    category: react-reactivity
+    severity: serious
+    hard_blocking: false
+    section: "5.1"
+    description: "useEffect without dependency array runs on every render"
+    patterns:
+      - lang: react
+        regex: 'useEffect\(\s*\(\)\s*=>\s*\{[^}]*\}\s*\)\s*;'
+        hint: "useEffect with no deps — likely bug; add [] or proper deps"
+
+  - prefix: "[REVIEW_MISSING_ERROR_HANDLING]"
+    category: robustness
+    severity: serious
+    hard_blocking: false
+    section: "5.4"
+    description: "External call (HTTP/DB/file) without try/catch"
+
+  - prefix: "[REVIEW_DUPLICATE_CODE]"
+    category: maintainability
+    severity: moderate
+    hard_blocking: false
+    section: "5.4"
+    description: "≥ 4 consecutive duplicate lines in same file or across files"
+
+  - prefix: "[REVIEW_DEEP_NESTING]"
+    category: readability
+    severity: moderate
+    hard_blocking: false
+    section: "5.4"
+    description: "Nesting depth > 4 (if/for/while/try)"
+
+  - prefix: "[REVIEW_CONFUSING_NAMING]"
+    category: readability
+    severity: minor
+    hard_blocking: false
+    section: "5.4"
+    description: "1-char vars (other than i/j loop), abbreviations, misleading names"
+
+  - prefix: "[REVIEW_ORPHAN_ENDPOINT]"
+    category: contract
+    severity: minor
+    hard_blocking: false
+    section: "5.3"
+    description: "Backend endpoint with no frontend consumer (informational)"
+
+  - prefix: "[REVIEW_NO_TARGETS]"
+    category: infra
+    severity: critical
+    hard_blocking: true
+    section: "4.3"
+    description: "code-reviewer invoked with no source files in scope"

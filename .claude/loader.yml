@@ -1,0 +1,897 @@
+﻿# SDD_Pro — Loader Manifest
+#
+# ============================================================================
+# Sémantique des 3 layers documentation (audit C1 closure 2026-06-08)
+# ============================================================================
+#
+# SDD_Pro a 3 couches documentaires complémentaires (PAS 3 SSoT en conflit) :
+#
+#   1. `agents/{agent}.md`  — **BEHAVIOR & SUBSTANCE**
+#      Comportement de l'agent : STEPs ordonnés, prompts inline, anti-derive,
+#      substance des règles inlinée pour économie tokens (v5.0 hoist).
+#      Le LLM lit CE fichier comme prompt système. Quand un agent dit
+#      "rule X inlinée, plus lue", il signifie : "la substance est ici dans
+#      mon prompt, je n'invoque pas le tool Read sur le fichier rule".
+#
+#   2. `loader.yml`         — **CONTEXT BUDGET & CACHE STRATEGY** (CE FICHIER)
+#      Liste les paths dont le **contenu est présent dans le contexte de
+#      l'agent** au moment de son exécution — que ce soit via Read tool OU
+#      via inlining dans son .md. Utilisé par `context_budget.py` pour
+#      estimer le coût tokens, par `cache_control.py` pour placer les
+#      breakpoints Anthropic, par `audit_file_ownership.py` pour vérifier
+#      qu'un agent n'écrit que dans son scope `writes:`. **Pas une
+#      duplication des STEPs de l'agent — un complément budget-aware.**
+#
+#   3. `python/{sdd_lib,sdd_scripts,sdd_hooks,sdd_admin}/` — **ENFORCEMENT**
+#      Les scripts Python qui valident, calculent, et bloquent les violations
+#      au runtime. Pas du contenu LLM — du code déterministe.
+#
+# Conséquence : un agent peut dire "rule X inlinée" dans son .md ET loader.yml
+# peut lister `rules/X.md` dans ses `reads:` — c'est COHÉRENT. Le premier
+# documente le mécanisme de loading (inline), le second documente le contenu
+# présent dans le contexte (budget). Pas de SSoT conflict.
+#
+# Toute modification d'un agent → mise à jour synchrone de cette section
+# pour préserver l'audit budget cross-agent.
+# ============================================================================
+
+version: "7.0.0"
+updated: "2026-06-08"
+
+# =========================================================================
+# Cache layers (v7.0.0 P2 #11 — Anthropic prompt caching strategy)
+# =========================================================================
+# Chaque entrée `reads:` peut être annotée `cache_layer: stable|semi|volatile`
+# pour piloter le placement des markers `cache_control: ephemeral` :
+#
+# - stable    : invariant inter-runs (loader.yml, stacks, rules consolidées).
+#               Cachable jusqu'à 5 min TTL Anthropic. Gain ~90% prompt cache hit.
+# - semi      : invariant intra-FEAT (CLAUDE.md per-project, schema.json).
+#               Cachable courte durée — invalidé à chaque /arch-init.
+# - volatile  : variable per-US (US courante, mockup HTML, plan from-plan).
+#               JAMAIS cachable.
+#
+# Stratégie d'application (max 4 cache breakpoints / requête Anthropic) :
+#   [1] System prompt agent (.md inline)                  → cache_layer: stable
+#   [2] Stacks + règles concaténés                         → cache_layer: stable
+#   [3] CLAUDE.md projet + schema.json                     → cache_layer: semi
+#   [4] US + HTML mockup + plan                            → cache_layer: volatile (NO CACHE)
+#
+# Gain mesuré baseline 2026-05-20 : 40.8% cache hit (sans markers).
+# Cible post-implémentation : ≥ 60% (estimé -50% coût Opus / FEAT M).
+# Détail : @.claude/docs/cache-strategy.md
+#
+# v7.0.0-alpha : annotations ajoutées sur les sections critiques ci-dessous.
+# Implémentation effective des cache_control markers : v7.1 (refacto harness).
+# =========================================================================
+
+# =========================================================================
+# Convention de langue (v5.0 — décision documentée, pas un bug)
+# =========================================================================
+# - Identifiants techniques (US, AC, SFD, FD, BR, ADR, classes d'erreur
+#   `[STACK_LIBRARY_MISSING]`, `[QA_TEST_FAILED]`, etc.) → ANGLAIS
+#   (parsing scripts + conventions agile universelles)
+# - Documentation utilisateur (CLAUDE.md, docs/, rules/, agents prompts) → FRANÇAIS
+#   (public cible Tech Lead francophone)
+# - Code généré (Razor, services C#, etc.) → ANGLAIS (convention universelle)
+# - Mockups HTML libellés métier → FRANÇAIS (métier francophone)
+#
+# Le mix est intentionnel et ne fait pas l'objet d'un fix unilatéral.
+# =========================================================================
+
+# =========================================================================
+# Cross-agent reads (v7.0.0+)
+# =========================================================================
+# Règles chargées implicitement par TOUS les agents listés ci-dessous via
+# référence `@.claude/rules/{nom}.md` dans leur prompt. Annotation
+# `cache_layer: stable` car invariant inter-runs (cachable 5 min TTL).
+#
+# - .claude/rules/output-protocol.md (v7.0.0)
+#     Référencée par les 12 agents (po, arch, dev-backend, dev-frontend,
+#     qa, elicitor, constitutioner, code-reviewer, security-reviewer,
+#     spec-compliance-reviewer, arch-reviewer, adversarial-reviewer) ET
+#     les 12 commandes user-facing (sdd-bootstrap, feat-generate,
+#     feat-validate, sdd-full, sdd-poc, dev-run, qa-generate,
+#     sdd-review, sdd-status, sdd-discover-stack, sdd-serve,
+#     sdd-kill-server). Définit le protocole de sortie chat executive
+#     (1L `[AGENT] résumé (X%)`, anti-verbose, ERROR 3L disque préservé).
+#     Coût ~4-6 KB par invocation (substance dans la règle, agents/
+#     commandes ne portent qu'un mini bloc 20L de paramétrage).
+#
+#     Couches complémentaires (hors prompt agent) :
+#       * Statusline `sdd_admin.statusline` (`.claude/python/sdd_admin/
+#         statusline.py`) — single-line bottom-of-screen view du run
+#         actif (`[AGENT] X% · FEAT N-Name · US m-Name · elapsed`).
+#         Lit `workspace/output/db/console.db` (table `runs` + `events`).
+#         Câblé dans `.claude/settings.json` clé `statusLine`. Désactivable
+#         per-dev via `.claude/settings.local.json` (statusLine: null).
+#
+# =========================================================================
+# Sérialisation des writes sur constitution.md (v3+)
+# =========================================================================
+# La matrice phase → agent → section de constitution.md est définie dans
+# **@.claude/rules/ownership.md §2 (Partie B "Constitution & ADRs")**.
+# Cette section est l'UNIQUE Source of Truth (SSoT) pour la sérialisation.
+#
+# Audit C4 closure 2026-06-08 — déduplication : avant ce commit, la matrice
+# était redéclarée verbatim ici, créant une maintenance double. Le contenu
+# est désormais centralisé dans `ownership.md §2` ; loader.yml pointe.
+#
+# Source canonique : @.claude/rules/ownership.md §2
+# Détails procéduraux : agents/po.md STEP 8.5, agents/arch.md STEP 12.5-12.6
+#                       (read-back validation v5.0)
+# =========================================================================
+
+# -------------------------------------------------------------------------
+# Agent: po (Sonnet 4.6)
+# Phase: 2 (US generation)
+# Token footprint estimé: ~5-15 KB par invocation
+# -------------------------------------------------------------------------
+po:
+  reads:
+    # Order: stable → semi → volatile (cache_control canonical order, cf. sdd_lib/cache_control.py)
+    - .claude/templates/us.template.md         # cache_layer: stable (template invariant)
+    - workspace/output/.sys/.context/constitution.md # v3 — si présent (lecture acteurs/glossaire) · cache_layer: semi
+    - workspace/input/feats/{n}-*.md           # FEAT parente (1 fichier) · cache_layer: volatile
+    # v5.0 Inline Rules (dans agents/po.md, plus de Read mandatory) :
+    #   - us-granularity.md §1-§4 (5 anti-patterns détaillés)
+    #   - .claude/rules/ownership.md (procédure §3 inline en STEP 8.5)
+    # v5.0 Économie : ~16-20k tokens/invocation
+  writes:
+    - workspace/output/us/{n}-{m}-*.md         # 1 à 6 fichiers par FEAT (cible 1-3)
+    - workspace/output/.sys/.context/constitution.md # v3 — append-only §3 (acteurs), §2 (glossaire)
+  forbidden_reads:
+    - workspace/input/stack/                   # hors périmètre PO
+    - workspace/input/ui/                      # hors périmètre PO (mockups HTML)
+    - workspace/output/us/{m}-*.md             # autres FEATs
+    - workspace/output/src/                    # responsabilité dev-*
+
+# -------------------------------------------------------------------------
+# Agent UI : SUPPRIMÉ en v4.0.0
+# Les mockups HTML déposés dans workspace/input/ui/ sont lus directement par
+# dev-frontend (pas d'extraction PNG → markdown intermédiaire).
+# -------------------------------------------------------------------------
+
+# -------------------------------------------------------------------------
+# Agent: arch (Sonnet 4.6)
+# Phase: 3 (bootstrap + DB scaffolding + digest)
+# Token footprint estimé: ~10-30 KB (lecture stacks complète)
+# Une seule invocation par projet (idempotent)
+# -------------------------------------------------------------------------
+arch:
+  reads:
+    # Order: stable → semi → volatile (cache_control canonical order, cf. sdd_lib/cache_control.py)
+    # v7.0.x audit 2026-06-08 — stack.md unified to `stable` across all 9 agents
+    # (was `volatile` here only — incoherent. Tech Lead edits stack.md rarely
+    # between sessions, not per-run; the 5min TTL absorbs the rare changes.)
+    - workspace/input/stack/stack.md     # cache_layer: stable (Project Config invariant intra-session)
+    - .claude/stacks/{cat}/{active}.md   # tous stacks actifs (sélectif — backend, frontend, ui, auth, qa, fullstack, mobiles). · cache_layer: stable
+    # NOTE MN4 (audit 2026-06-07) — Distinction stack vs combo :
+    #   - Côté STACK atomique : fullstack/* et mobiles/* restent 🟡 « experimental » (jamais validés en isolation end-to-end).
+    #   - Côté COMBO (assemblage de 3-6 stacks) : 5 fullstacks (angular-universal, blazor-server, kotlin-mustache, next, nuxt) et 2 mobiles (maui Windows, react-native Expo Web) sont 🟢 bench-validated runtime 2026-06-05 dans des combos précis (cf. docs/validated-combos.md §1.3).
+    # Marquage runtime via `preflight_stack_combo` (combos.json) ; la doc d'un stack reste à son tier d'isolation.
+    - .claude/stacks/archi/{ArchiPattern}.md  # MVC (défaut) / DDD / microservice (🟡 expérimental) — UNIQUEMENT si AppType=back-front (v6.7.6+). · cache_layer: stable
+    - .claude/templates/adr.template.md  # v3 — nécessaire pour Phase D · cache_layer: stable
+    - workspace/output/.sys/.context/constitution.md     # v3 — si présent · cache_layer: semi
+    - workspace/output/.sys/.context/adrs/ADR-*.md       # v3 — index existants (idempotence) · cache_layer: semi
+    # v5.0 Inline Rules (dans agents/arch.md, plus de Read mandatory) :
+    #   - .claude/rules/ownership.md (writes par §, ADR atomique)
+    #   - ownership.md §1 (matrice owner arch, was file-ownership.md)
+    #   - library-and-stack.md §0 (runtime LTS / CVE / origine, ex-library-policy.md)
+    # v6.1 Read mandatory ajouté (depuis 2026-05-08) :
+    #   - .claude/rules/error-classification.md
+    # v5.0 Économie : ~12-18k tokens/invocation
+  writes:
+    - workspace/output/src/{AppName}.sln
+    - workspace/output/src/{AppName}/             # projet frontend vide
+    - workspace/output/src/{BackendName}/         # projet backend vide
+    - workspace/output/src/{LibName}/             # lib partagée si configurée
+    - workspace/output/db/schema.json             # si DatabaseType ≠ none
+    - workspace/output/db/schema.prev.json        # backup ancienne version
+    - workspace/output/db/schema.md               # si DatabaseType ≠ none
+    - workspace/output/db/schema.diff.md          # diff vs prev
+    - workspace/output/src/{BackendName}/Entities/ # scaffolding Database-First
+    - workspace/output/src/{BackendName}/CLAUDE.md # contexte projet backend
+    - workspace/output/src/{AppName}/CLAUDE.md    # contexte projet frontend
+    - workspace/output/src/{LibName}/CLAUDE.md    # contexte projet lib
+    - workspace/output/.sys/.context/adrs/ADR-{YYYYMMDDTHHmmss}-*.md # timestamp atomique
+    - workspace/output/.sys/.context/constitution.md    # update §4 stack + append §6 ADRs
+  reads_env:                            # uniquement si DatabaseType ≠ none
+    - DB_HOST
+    - DB_PORT
+    - DB_NAME
+    - DB_USER
+    - DB_PASSWORD
+  forbidden_reads:
+    - workspace/input/feats/
+    - workspace/output/us/
+    - workspace/input/ui/                         # mockups HTML hors scope arch
+  forbidden_writes:
+    - workspace/output/src/**/*.cs                # code applicatif (sauf Entities)
+    - workspace/output/src/**/*.razor             # responsabilité dev-frontend
+
+# -------------------------------------------------------------------------
+# Agent: dev-backend (Opus 4.7 — depuis 2026-05-08, split modèles)
+# Phase: 4 (génération code serveur)
+# Token footprint estimé: ~3-7 KB par US (grâce à CLAUDE.md projet)
+# Invocations parallèles : 1 par US backend
+# -------------------------------------------------------------------------
+dev-backend:
+  # cache_layer annotations v7.0.0 P2 #11 — gain estimé -50% coût Opus
+  # après implémentation cache_control markers (v7.1).
+  # Order: stable → semi → volatile (cache_control canonical order, cf. sdd_lib/cache_control.py)
+  reads:
+    # --- stable (invariant inter-FEAT, cachable 5 min TTL) ---
+    - { path: workspace/input/stack/stack.md, cache_layer: stable }                # Project Config
+    - { path: ".claude/stacks/backend/{active}.md", cache_layer: stable }
+    # fullstack/* chargeable mais 🟡 expérimental (aucun combo validé bout-en-bout) — n'utiliser que si AppType=fullstack.
+    - { path: ".claude/stacks/fullstack/{active}.md", cache_layer: stable, status: experimental }
+    - { path: ".claude/stacks/archi/{ArchiPattern}.md", cache_layer: stable }  # MVC | DDD | microservice (🟡 expérimental pour microservice)
+    - { path: ".claude/stacks/auth/{active}.md", cache_layer: stable }
+    - { path: .claude/rules/dev-shared-preflight.md, cache_layer: stable }   # v7.0.0 — STEP 0/0.5/1/1.bis hoist cross-agent
+    - { path: .claude/rules/build-and-loop.md, cache_layer: stable }         # v7.0.0 — SSOT patterns dev-* (ex backend-first + dev-shared)
+    - { path: .claude/rules/error-classification.md, cache_layer: stable }   # v6.1 — taxonomie classes + pilotage build_loop
+    # --- semi-stable (invariant intra-FEAT, invalidé par /arch-init) ---
+    - { path: "workspace/output/src/{Project}/CLAUDE.md", cache_layer: semi }        # CLAUDE.md projet
+    - workspace/output/db/schema-slice-{n}-{m}.json   # per-US slice Levier 4 (audit 2026-06-08), preferred · cache_layer: semi
+    - { path: workspace/output/db/schema.json, cache_layer: semi }                 # fallback if no slice present
+    # --- volatile (per-US, jamais cachable) ---
+    - { path: "workspace/output/us/{n}-{m}-*.md", cache_layer: volatile }            # US ciblée (1 fichier)
+    - { path: "workspace/input/ui/{n}-{m}-*.html", cache_layer: volatile }           # HTML mockup passif
+    - { path: "workspace/output/plans/{n}-{m}-*.back.md", cache_layer: volatile }    # plan From Plan
+    # v5.0 Inline Rules (dans agents/dev-backend.md, plus de Read mandatory) :
+    #   - library-and-stack.md
+    #   - ownership.md§1-§2
+    # v6.1 Read mandatory ajoutés :
+    #   - .claude/rules/error-classification.md (depuis 2026-05-08) — taxonomie
+    #     8 classes, pilotage build_loop CORRECTIBLE vs BLOCKING (listée ci-dessus)
+    #   - .claude/rules/build-and-loop.md (depuis 2026-05-08) — SSOT 7 patterns
+    #     partagés (context budget, path safety, mode detection, LibName lock,
+    #     anti-derive, QA ownership, plan construction) (listée ci-dessus)
+    # v7.0.0 Read mandatory ajouté :
+    #   - .claude/rules/dev-shared-preflight.md — substance hoistée des STEP 0/0.5/1/1.bis
+    #     (preflight script-driven, context budget, mode From Plan, path safety
+    #     Front/Back isolation) (listée ci-dessus)
+    # v5.0 Reads conditionnels (lazy) :
+    #   - workspace/output/.sys/.context/constitution.md  # uniquement si terme ambigu
+    #   - workspace/output/.sys/.context/adrs/INDEX.md    # uniquement au STEP 5 avant création ADR
+    #   - workspace/output/.sys/.context/adrs/*.md        # fallback si INDEX.md absent
+    # v5.0 Économie : ~16-20k tokens/dispatch
+  writes:
+    - workspace/output/src/{BackendName}/Services/
+    - workspace/output/.sys/.context/adrs/ADR-{YYYYMMDDTHHmmss}-*.md # timestamp atomique
+    - workspace/output/src/{BackendName}/Endpoints/
+    - workspace/output/src/{BackendName}/DTOs/
+    - workspace/output/src/{BackendName}/Mappers/
+    - workspace/output/src/{BackendName}/Program.cs  # augment
+    - workspace/output/plans/{n}-{m}-*.back.md    # mode :plan uniquement
+  forbidden_reads:
+    - workspace/output/us/{other}                 # autres US
+    - workspace/input/feats/
+    - workspace/input/ui/{other}.html             # mockups HTML d'autres US
+    - .claude/stacks/frontend/
+    - .claude/stacks/ui/
+  modes:
+    - normal: "{n}-{m}"                 # plan inline + code + build
+    - plan_only: "{n}-{m}:plan"         # produit plan, STOP avant code
+    - from_plan: "{n}-{m} + plan exists" # consomme plan, code + build
+  exit_silent_when:
+    - "frontend-only US"                # skipped sans erreur
+
+# -------------------------------------------------------------------------
+# Agent: dev-frontend (Opus 4.7 — depuis 2026-05-08, split modèles)
+# Phase: 4 (génération code client)
+# Token footprint estimé: ~5-10 KB par US (HTML + CLAUDE.md + stacks)
+# Invocations parallèles : 1 par US frontend
+# v4.0.0 : plus de PNG vision, plus de UI markdown intermédiaire.
+# Lecture directe du mockup HTML statique (texte).
+# -------------------------------------------------------------------------
+dev-frontend:
+  # cache_layer annotations v7.0.0 P2 #11 — symétrie avec dev-backend
+  # Order: stable → semi → volatile (cache_control canonical order, cf. sdd_lib/cache_control.py)
+  reads:
+    # --- stable (invariant inter-FEAT, cachable 5 min TTL) ---
+    - workspace/input/stack/stack.md              # lu UNE FOIS en STEP 0 Phase B (v5.0) · cache_layer: stable
+    - .claude/stacks/frontend/{active}.md  # fallback si CLAUDE.md insuffisant · cache_layer: stable
+    - .claude/stacks/ui/{active}.md        # mapping composants DS (§2 + §7) · cache_layer: stable
+    - .claude/stacks/auth/{active}.md      # patterns d'injection auth client · cache_layer: stable
+    - .claude/rules/dev-shared-preflight.md   # v7.0.0 — STEP 0/0.5/1/1.bis hoist cross-agent · cache_layer: stable
+    - .claude/rules/build-and-loop.md         # v7.0.0 — SSOT patterns dev-* (ex backend-first + dev-shared) · cache_layer: stable
+    - .claude/rules/error-classification.md   # v6.1 — taxonomie classes + pilotage build_loop · cache_layer: stable
+    # --- semi-stable (invariant intra-FEAT) ---
+    - workspace/output/src/{Project}/CLAUDE.md    # CLAUDE.md par projet · cache_layer: semi
+    # --- volatile (per-US, jamais cachable) ---
+    - workspace/output/us/{n}-{m}-*.md            # US ciblée (1 fichier) · cache_layer: volatile
+    - workspace/input/ui/{n}-{m}-*.html           # mockup HTML statique = source · cache_layer: volatile
+                                        # de vérité visuelle (libellés,
+                                        # structure, classes, couleurs
+                                        # inline). Lecture texte directe.
+    - workspace/output/plans/{n}-{m}-*.front.md   # plan existant si /dev-plan · cache_layer: volatile
+                                        # a tourné — mode From Plan
+    # v5.0 Inline Rules (dans agents/dev-frontend.md, plus de Read mandatory) :
+    #   - library-and-stack.md
+    #   - ownership.md§1-§2
+    # v6.1 Read mandatory ajoutés (listés ci-dessus avec path complet) :
+    #   - .claude/rules/error-classification.md (depuis 2026-05-08)
+    #   - .claude/rules/build-and-loop.md (depuis 2026-05-08) — SSOT 7 patterns
+    #     partagés avec dev-backend (cf. §note dev-backend ci-dessus)
+    # v7.0.0 Read mandatory ajouté :
+    #   - .claude/rules/dev-shared-preflight.md — substance hoistée des STEP 0/0.5/1/1.bis
+    # v5.0 Reads conditionnels (lazy) :
+    #   - workspace/output/.sys/.context/constitution.md  # uniquement si terme ambigu
+    #   - workspace/output/.sys/.context/adrs/INDEX.md    # uniquement au STEP 6 avant création ADR
+    #   - workspace/output/.sys/.context/adrs/*.md        # fallback si INDEX.md absent
+    # v5.0 Économie : ~16-20k tokens/dispatch
+  writes:
+    - workspace/output/src/{AppName}/Pages/
+    - workspace/output/.sys/.context/adrs/ADR-{YYYYMMDDTHHmmss}-*.md # timestamp atomique
+    - workspace/output/src/{AppName}/Components/
+    - workspace/output/src/{AppName}/Layouts/
+    - workspace/output/src/{AppName}/wwwroot/css/theme.css  # augment
+    - "**/*.razor.css"                  # CSS isolé adjacent
+    - workspace/output/src/{AppName}/Program.cs   # augment éventuel
+    - workspace/output/plans/{n}-{m}-*.front.md   # mode :plan uniquement
+  forbidden_reads:
+    - workspace/output/us/{other}                 # autres US
+    - workspace/input/feats/
+    - workspace/input/ui/{other}.html             # mockups HTML des autres US
+    - .claude/stacks/backend/           # hors auth
+  exit_silent_when:
+    - "backend-only US"                 # skipped sans erreur
+  modes:
+    - normal: "{n}-{m}"                 # plan inline + code + build + fidelity check
+    - plan_only: "{n}-{m}:plan"         # produit plan, STOP avant code
+    - from_plan: "{n}-{m} + plan exists" # consomme plan, code + build + fidelity check
+  fidelity_check:                       # v4 — STEP 11 dev-frontend (text-based)
+    - extraire libellés, classes-clés, structure du HTML source
+    - grep le markup généré pour vérifier présence des libellés
+    - vérifier que les composants HTML mappés vers le DS ont leur
+      pendant dans le markup (RadzenButton, RadzenDataGrid, etc.)
+    - STOP + ERROR sur libellé/structure absent
+
+# (Stubs dev-backend-strict / dev-frontend-strict / validator déplacés
+#  en fin de fichier — cf. section "## Removed agents (backward-compat)".)
+
+# -------------------------------------------------------------------------
+# Agent: elicitor (Sonnet 4.6) — v3, P3
+# Phase: 1.5 (élicitation structurée, optionnelle)
+# Token footprint estimé:
+#   - interactif: ~10-15 KB (5×1-2 questions + synthèse)
+#   - --quick: ~5-8 KB (génération directe)
+# -------------------------------------------------------------------------
+elicitor:
+  reads:
+    # Order: stable → semi → volatile (cache_control canonical order, cf. sdd_lib/cache_control.py)
+    - .claude/templates/risks-assumptions.template.md  # cache_layer: stable
+    - workspace/output/.sys/.context/constitution.md   # si présent (acteurs cumulés) · cache_layer: semi
+    - workspace/input/feats/{n}-*.md             # FEAT ciblée · cache_layer: volatile
+    # v5.0 Inline Rules : substance inlinée dans agents/elicitor.md, plus de Read mandatory
+    # v5.0 Économie : ~6-8k tokens/invocation
+  writes:
+    - workspace/input/feats/{n}-*.md             # APPEND-ONLY 5 sections enrichies
+    - workspace/output/.sys/.context/constitution.md   # APPEND-ONLY §7 (risques + hypothèses)
+  forbidden_reads:
+    - workspace/input/stack/                     # hors scope élicitation
+    - workspace/input/ui/                        # hors scope élicitation
+    - workspace/output/us/                       # antérieur dans le pipeline
+    - workspace/output/src/                      # post-implementation
+  techniques:                          # 5 techniques d'élicitation
+    - 1_pre_mortem: "risques projet (3-5 risques classifiés)"
+    - 2_first_principles: "hypothèses implicites (max 7)"
+    - 3_red_team: "edge cases (max 8)"
+    - 4_stakeholder_mapping: "RACI (max 6)"
+    - 5_inversion: "failure modes (max 4)"
+  modes:
+    - interactive: "5×1-2 questions, default"
+    - quick: "--quick flag, génération directe sans question"
+
+# -------------------------------------------------------------------------
+# Agent: qa (Sonnet 4.6) — v3.1.0
+# Phase: 5 (tests unitaires + coverage + quality scan)
+# Token footprint estimé:
+#   - quality-only: ~3 KB (rapport seulement, scan déterministe)
+#   - tests-only: ~17-27 KB (génération tests Sonnet)
+#   - tests+coverage: ~17-27 KB (coverage parsing gratuit en tokens)
+#   - full: ~20-30 KB (recommandé)
+# -------------------------------------------------------------------------
+qa:
+  reads:
+    # Order: stable → semi → volatile (cache_control canonical order, cf. sdd_lib/cache_control.py)
+    - .claude/stacks/qa/{active}.md    # tous QA stacks actifs (sélectif) · cache_layer: stable
+    - workspace/output/src/{BackendName}/CLAUDE.md  # architecture backend (passif) · cache_layer: semi
+    - workspace/output/src/{AppName}/CLAUDE.md      # architecture frontend (passif) · cache_layer: semi
+    - workspace/output/db/schema-slice-{n}-*.json # per-US slices Levier 4 (preferred for fixtures) · cache_layer: semi
+    - workspace/output/db/schema.json            # fallback (full schema) si slices absents · cache_layer: semi
+    - workspace/output/src/{BackendName}/**/*    # code production (read-only sélectif) · cache_layer: semi
+    - workspace/output/src/{AppName}/**/*        # code production (read-only sélectif) · cache_layer: semi
+    - workspace/output/src/{LibName}/**/*        # contrats partagés · cache_layer: semi
+    - workspace/input/feats/{n}-*.md             # FEAT parente (passif, ACs) · cache_layer: volatile
+    - workspace/output/us/{n}-*.md               # US ciblées · cache_layer: volatile
+    - workspace/input/ui/{n}-*.html              # HTML mockups (passif, comportements UI) · cache_layer: volatile
+    # v5.0 Inline Rules (dans agents/qa.md, plus de Read mandatory) :
+    #   - quality.md§2-§3
+    #   - library-and-stack.md (scope étendu : tous stacks actifs §2.4)
+    #   - ownership QA (substance inlinée §Ownership)
+    # v6.1 Read mandatory ajouté (depuis 2026-05-08) :
+    #   - .claude/rules/error-classification.md (taxonomie QA §1.7)
+    # v5.0 Reads conditionnels (lazy) :
+    #   - workspace/output/.sys/.context/constitution.md  # uniquement si terme ambigu
+    # v5.0 Économie : ~25-35k tokens/invocation
+  writes:
+    - workspace/output/src/{BackendName}.Tests/**     # tests backend (xUnit/JUnit/pytest)
+    - workspace/output/src/{AppName}.Tests/**         # tests Blazor (bUnit) si applicable
+    - "workspace/output/src/**/__tests__/**"          # tests Node/React/Vue
+    - "workspace/output/src/**/*.FEAT.ts"             # tests Angular Jasmine
+    - "workspace/output/src/**/*.test.ts"             # tests Vitest adjacents
+    - "workspace/output/src/**/test_*.py"             # tests Python
+    - "workspace/output/src/**/*Test.kt"              # tests Kotlin JUnit
+    - workspace/output/qa/feat-{n}/report.md          # rapport consolidé
+    - workspace/output/qa/feat-{n}/coverage.json      # schéma normalisé (via parse_coverage.py)
+    - workspace/output/qa/feat-{n}/quality.json       # sonar-like (via quality_scan.py)
+  forbidden_reads:
+    - workspace/input/stack/                     # hors scope QA (lecture indirecte via QA stacks)
+  forbidden_writes:
+    - workspace/output/src/{BackendName}/Services/  # code production (read-only strict)
+    - workspace/output/src/{AppName}/Pages/         # code production (read-only strict)
+    - workspace/output/src/{LibName}/Models/        # code production (read-only strict)
+    - workspace/output/.sys/.context/constitution.md      # constitution read-only
+    - workspace/output/.sys/.context/adrs/                # ADRs read-only
+  modes:                               # selon QAMode dans Project Config
+    - off: "agent jamais invoqué"
+    - quality-only: "skip génération tests + coverage, ne fait que quality scan + linter"
+    - tests-only: "skip quality scan + coverage, ne fait que génération + run tests"
+    - tests+coverage: "skip quality scan, fait tests + run + coverage parsing"
+    - full: "tous les STEP (recommandé)"
+    - manual: "skip auto-invoke par /sdd-full ; user lance /qa-generate manuellement"
+
+# (Stubs dashboard / accessibility-auditor déplacés en fin de fichier
+#  — cf. section "## Removed agents (backward-compat)".)
+
+# -------------------------------------------------------------------------
+# Agent: code-reviewer (Sonnet 4.6) — depuis v6.3.1
+# Phase: 6.4 (post-dev backend + API Gate + frontend, avant /qa-generate)
+# Token footprint estimé: ~8-15 KB par feature de 3-5 US
+# Invocation: manuelle en v6.3.1.0 ("review le code de la FEAT N")
+#             auto-invoke depuis /dev-run STEP 6.4 en v6.3.1.1 (à venir)
+# Skip silencieux si CodeReviewMode: off
+# -------------------------------------------------------------------------
+code-reviewer:
+  reads:
+    # Order: stable → semi → volatile (cache_control canonical order, cf. sdd_lib/cache_control.py)
+    - workspace/input/stack/stack.md             # Project Config (CodeReviewMode, CodeReviewFailOn) · cache_layer: stable
+    - .claude/rules/error-classification.md      # taxonomie [REVIEW_*] §1.10 + classes réutilisées §1.3/§1.6 · cache_layer: stable
+    - .claude/rules/build-and-loop.md            # Partie B : anti-derive bullets, plan structure, QA ownership (was dev-shared.md, consolidated v7.0.0) · cache_layer: stable
+    - .claude/stacks/backend/{active}.md   # §1.3 layer mapping + §3 conventions + §2.4 libs · cache_layer: stable
+    - .claude/stacks/frontend/{active}.md  # §1.3 + §3 (frontend uniquement) · cache_layer: stable
+    - workspace/output/src/{BackendName}/CLAUDE.md  # architecture backend · cache_layer: semi
+    - workspace/output/src/{AppName}/CLAUDE.md      # architecture frontend · cache_layer: semi
+    - workspace/output/src/{BackendName}/**       # code production (fallback convention si pas de plan) · cache_layer: semi
+    - workspace/output/src/{AppName}/**           # code production · cache_layer: semi
+    - workspace/output/src/{LibName}/**           # lib partagée si présente · cache_layer: semi
+    - workspace/input/feats/{n}-*.md             # FEAT parente (passif, intent métier) · cache_layer: volatile
+    - workspace/output/us/{n}-*.md               # toutes les US ciblées (passif) · cache_layer: volatile
+    - workspace/output/plans/{n}-*.{back,front}.md  # mode preferred : lecture sélective via plan · cache_layer: volatile
+    # Budget cible : ≤ 15 KB par invocation (Sonnet 4.6)
+    # Anti-pattern strict : ne JAMAIS Glob workspace/output/src/**/* (lecture sélective via plans ou convention)
+  writes:
+    - workspace/output/.sys/.validation/{n}-code-review.md     # rapport humain
+    - workspace/output/.sys/.validation/{n}-code-review.json   # schéma machine
+  forbidden_reads:
+    - workspace/output/us/{other-feat}            # autres FEATs
+    - workspace/input/feats/{other}.md            # autres FEATs
+    - .claude/stacks/qa/                          # hors scope review (responsabilité qa)
+    - .claude/stacks/auth/                        # hors scope (review focus code applicatif)
+    - .claude/stacks/ui/                          # hors scope (a11y-auditor s'en charge si actif)
+    - workspace/output/.sys/.context/             # constitution/ADRs hors scope
+    - workspace/output/db/                        # schema DB hors scope
+    - workspace/output/qa/feat-{n}/coverage.json  # responsabilité qa
+    - workspace/output/qa/feat-{n}/quality.json   # responsabilité qa
+  forbidden_writes:
+    - workspace/output/src/                       # read-only strict (rapport seul, jamais patch)
+    - workspace/output/us/                        # responsabilité po
+    - workspace/output/qa/                        # responsabilité qa
+    # NOTE M14 (audit 2026-06-07) — la ligne `workspace/output/dashboard/`
+    # ci-dessous est un GUARD-RAIL HISTORIQUE défensif (3 occurrences cumulées
+    # pour les 3 reviewers : code-reviewer + security-reviewer +
+    # spec-compliance-reviewer). L'agent `dashboard` a été retiré v7.0.0
+    # mais l'entrée est conservée à dessein : empêche qu'une future ré-introduction
+    # accidentelle d'un agent dashboard ne fasse Write dans ce chemin par
+    # un auditor. Ne PAS retirer sans ADR `governance-cleanup-forbidden-dashboard`.
+    - workspace/output/dashboard/                 # legacy v6 guard-rail (agent dashboard retiré v7.0.0, cf. note M14 ci-dessus)
+    - workspace/output/.sys/.context/             # responsabilité po/arch/elicitor
+    - workspace/output/plans/                     # le reviewer ne planifie pas
+  modes:                                          # selon CodeReviewMode dans Project Config
+    - off: "agent jamais invoqué (exit immédiat 'disabled')"
+    - full: "review complet, verdict 🟢/🟡/🔴 selon CodeReviewFailOn"
+    - manual: "skip auto-invoke ; Tech Lead lance via demande directe (défaut v6.3.1.0)"
+  fail_on:
+    - critical: "🔴 RED dès 1 issue critical (défaut)"
+    - serious: "🔴 RED dès 1 issue serious ou critical"
+    - moderate: "🔴 RED dès 1 issue moderate ou pire"
+    - minor: "🔴 RED dès 1 issue (strict)"
+  hard_blocking_classes:                          # override CodeReviewFailOn → toujours 🔴 RED
+    # NOTE v7.0.0-alpha (audit P2 2026-06-06) — [REVIEW_SECRETS_HARDCODED] retiré :
+    # ownership exclusif délégué à security-reviewer ([SEC_SECRET_HARDCODED], CWE-798)
+    # cf. error-classification.md §1.10. code-reviewer peut encore émettre la classe
+    # en `issues.minor` à titre informationnel (pointeur vers security-reviewer),
+    # mais elle n'est plus hard-blocking ici pour éviter le double-rapport sur les
+    # mêmes file:line. La dé-dup cross-source (REVIEW_SECRETS_HARDCODED ↔
+    # SEC_SECRET_HARDCODED) reste assurée par sdd_review.deduplicate_findings()
+    # via CANONICAL_CLASS (cf. _review_fetch.py §6.10).
+    - "[FRONTEND_BACKEND_CONTRACT_GAP]"           # feature ne marchera pas en prod
+  exit_silent_when:
+    - "CodeReviewMode: off"
+  idempotent: true                                # peut être ré-invoqué sans risque
+
+# -------------------------------------------------------------------------
+# Agent: arch-reviewer (Sonnet 4.6) — depuis v6.11.0
+# Phase: 4.8 (post-QA, post-dashboard, dans /sdd-review via /sdd-full STEP 4.8)
+# Token footprint estimé: ~6-12 KB par feature de 3-5 US
+# Invocation: spawn par /sdd-review STEP 3.0 si ArchReviewMode=full
+# Skip silencieux si ArchReviewMode in (manual, off) — défaut "manual"
+# -------------------------------------------------------------------------
+arch-reviewer:
+  reads:
+    # Order: stable → semi → volatile (cache_control canonical order, cf. sdd_lib/cache_control.py)
+    - workspace/input/stack/stack.md                # Project Config + Active Architecture Pattern + Active Tech Specs · cache_layer: stable
+    - .claude/rules/error-classification.md         # taxonomie [ARCH_*] §1.18 · cache_layer: stable
+    - .claude/stacks/archi/{mvc|ddd|microservice}.md  # §2 couches + §3 principes + §4 naming canonique (microservice 🟡 expérimental) · cache_layer: stable
+    - .claude/stacks/backend/{active}.md            # §1.3 layer mapping backend · cache_layer: stable
+    - .claude/stacks/frontend/{active}.md           # §1.3 layer mapping frontend · cache_layer: stable
+    - workspace/output/.sys/.context/constitution.md  # §2 glossaire + §6 ADRs index · cache_layer: semi
+    - workspace/output/.sys/.context/adrs/ADR-*.md  # ADRs (## Decision pour drift check ; pattern whitelisté is_unbounded_glob) · cache_layer: semi
+    - workspace/output/src/{BackendName}/**         # code production (Glob via plan) · cache_layer: semi
+    - workspace/output/src/{AppName}/**             # code production · cache_layer: semi
+    - workspace/output/src/{LibName}/**             # lib partagée si présente · cache_layer: semi
+    - workspace/output/plans/{n}-*.{back,front}.md  # lecture sélective des fichiers à reviewer · cache_layer: volatile
+    # Budget cible : ≤ 12 KB par invocation (Sonnet 4.6)
+  writes:
+    - workspace/output/.sys/.validation/{n}-arch-review.md     # rapport humain
+    - workspace/output/.sys/.validation/{n}-arch-review.json   # transport vers DB
+  forbidden_reads:
+    - workspace/output/us/{other-feat}              # autres FEATs
+    - workspace/input/feats/{other}.md              # autres FEATs
+    - .claude/stacks/qa/                            # hors scope arch (responsabilité qa)
+    - workspace/output/qa/                          # rapports auditeurs hors scope (lecture via DB)
+  forbidden_writes:
+    - workspace/output/src/                         # read-only strict (rapport seul)
+    - workspace/output/us/                          # responsabilité po
+    - workspace/output/qa/                          # responsabilité qa
+    - workspace/output/.sys/.context/               # ADRs + constitution = responsabilité po/arch/elicitor
+    - workspace/output/plans/                       # ne planifie pas
+    - workspace/input/stack/                        # immutable côté agent
+  modes:                                            # selon ArchReviewMode dans Project Config
+    - off: "agent jamais invoqué (exit immédiat 'disabled')"
+    - manual: "skip auto-invoke ; lance via /sdd-review manuel ou demande directe (défaut)"
+    - full: "review complet, verdict 🟢/🟡/🔴 selon ArchReviewFailOn"
+  fail_on:
+    - critical: "🔴 RED dès 1 issue critical (très permissif)"
+    - serious: "🔴 RED dès 1 issue serious ou critical (défaut)"
+    - moderate: "🔴 RED dès 1 issue moderate ou pire"
+    - minor: "🔴 RED dès 1 issue (strict)"
+  hard_blocking_classes: []                         # aucune classe hard-blocking par défaut
+  exit_silent_when:
+    - "ArchReviewMode: off"
+    - "ArchReviewMode: manual (sauf demande explicite)"
+  db_target:                                        # réutilise table existante (pas de schema change)
+    - "qa_code_review (issue_class LIKE 'ARCH_%')"  # via ingest_agent_report --type arch-review
+  idempotent: true
+
+# -------------------------------------------------------------------------
+# Agent: complexity-router (DEPRECATED v7.0.0+ — audit P1 M2 2026-06-08)
+# Status: .md conservé UNIQUEMENT comme documentation du rubric de scoring.
+#         L'agent LLM n'est PLUS spawné par aucun pipeline ; l'invocation
+#         opérationnelle passe par le script Python déterministe
+#         `sdd_scripts/complexity_router.py` (0 token, < 50 ms).
+# Pour invoquer : `python -m sdd_scripts.complexity_router --feat-number {n}`
+#                 (ou auto via ComplexityRouterMode=auto + hook PreToolUse à câbler).
+# Entrée loader conservée car le .md existe sur disque ET pour traçabilité
+# du test contract (cf. tests/test_loader_contract.py ALIVE_AGENTS_V7).
+# -------------------------------------------------------------------------
+complexity-router:
+  reads:
+    # Order: stable → semi → volatile (cache_control canonical order, cf. sdd_lib/cache_control.py)
+    - workspace/input/stack/stack.md                              # Project Config (ComplexityRouterMode, Capabilities) · cache_layer: stable
+    - workspace/input/feats/{n}-*.md                              # FEAT seule (SFD/BR/AC/NFR/Compliance/Volume/SLA) · cache_layer: volatile
+  writes:
+    - workspace/output/.sys/.routing/{n}-complexity.json          # décision machine (consommée par /sdd-full STEP 0)
+    - workspace/output/.sys/.routing/{n}-complexity.md            # rapport humain 1 page
+  forbidden_reads:
+    - workspace/output/us/                                        # opt-in pré-pipeline, US pas encore générées
+    - workspace/output/src/                                       # hors scope, le code n'existe pas encore
+    - workspace/output/.sys/.context/                             # hors scope
+    - .claude/stacks/                                             # hors scope (déterministe)
+  forbidden_writes:
+    - workspace/input/                                            # read-only
+    - workspace/output/src/                                       # read-only
+    - workspace/output/us/                                        # responsabilité po
+    - workspace/output/plans/                                     # ne planifie pas
+    - workspace/output/.sys/.validation/                          # responsabilité auditors
+    - workspace/output/.sys/.context/                             # responsabilité po/arch/elicitor/constitutioner
+    - workspace/output/qa/                                        # responsabilité qa + reviewers
+  config_flags:                                                   # dans Project Config
+    - ComplexityRouterMode: "off | auto | manual (défaut: manual)"
+  modes:
+    - off: "skip total (recommandation = /sdd-full par défaut)"
+    - manual: "spawn explicite via Agent (défaut)"
+    - auto: "auto-spawn par /sdd-full STEP 0 avant cadrage"
+  fail_on: []                                                     # verdict = routing recommendation, jamais bloquant
+  hard_blocking_classes: []                                       # aucune classe hard-blocking par design
+  exit_silent_when:
+    - "ComplexityRouterMode: off"
+  db_target:
+    - "(none — fichiers disque uniquement sous workspace/output/.sys/.routing/)"
+  idempotent: true
+
+# -------------------------------------------------------------------------
+# Agent: adversarial-reviewer (Sonnet 4.6) — depuis v7.2.0 (R1 BMAD)
+# Phase: 99% (post-agrégation `/sdd-review`, opt-in `--adversarial`)
+# Token footprint estimé: ~8-15 KB par FEAT
+# Invocation: spawn par /sdd-review --adversarial (manuel) OU auto si
+#             AdversarialReviewMode=full dans Project Config
+# Rôle: avocat du diable — 5-10 attaques que les autres reviewers
+#       n'auraient pas vues. Verdict informational (jamais bloquant).
+# -------------------------------------------------------------------------
+adversarial-reviewer:
+  reads:
+    # Order: stable → semi → volatile (cache_control canonical order, cf. sdd_lib/cache_control.py)
+    - workspace/input/stack/stack.md                              # Project Config (AdversarialReviewMode, Min/Max) · cache_layer: stable
+    - .claude/rules/error-classification.md                       # taxonomie [ADV_*] §1.16 · cache_layer: stable
+    - workspace/output/src/{BackendName}/**                       # ≤ 3 fichiers ciblés via §2.3, jamais Glob récursif · cache_layer: semi
+    - workspace/output/src/{AppName}/**                           # idem · cache_layer: semi
+    - workspace/output/src/{LibName}/**                           # idem si présent · cache_layer: semi
+    - workspace/input/feats/{n}-*.md                              # FEAT (Functional Needs, Business Rules, ACs, §7 Risks) · cache_layer: volatile
+    - workspace/output/us/{n}-*.md                                # US (ACs) · cache_layer: volatile
+    - workspace/output/plans/{n}-*.{back,front}.md                # cartographie fichiers — sélection ≤ 5 chemins critiques · cache_layer: volatile
+    - workspace/output/qa/feat-{n}/review.md                      # verdict consolidé (précondition stricte) · cache_layer: volatile
+    - workspace/output/.sys/.validation/{n}-code-review.md        # résumé findings (header uniquement, anti-dup §2.5) · cache_layer: volatile
+    - workspace/output/.sys/.validation/{n}-security-scan.md      # idem · cache_layer: volatile
+    - workspace/output/.sys/.validation/{n}-spec-compliance.md    # idem · cache_layer: volatile
+    - workspace/output/.sys/.validation/{n}-arch-review.md        # idem (si ArchReviewMode=full) · cache_layer: volatile
+    # Anti-pattern strict : pas de Glob récursif workspace/output/src/** — lecture sélective via plan
+  writes:
+    - workspace/output/qa/feat-{n}/adversarial.md                 # rapport humain (canal séparé Tech Lead)
+    - workspace/output/qa/feat-{n}/adversarial.json               # schéma machine (consommé par ingest_agent_report)
+  forbidden_reads:
+    - workspace/output/us/{other-feat}                            # autres FEATs
+    - workspace/input/feats/{other}.md                            # autres FEATs
+    - workspace/output/.sys/.context/                             # hors scope direct
+    - .claude/stacks/qa/                                          # hors scope
+  forbidden_writes:
+    - workspace/output/src/                                       # read-only strict
+    - workspace/output/us/                                        # responsabilité po
+    - workspace/output/.sys/.context/                             # responsabilité po/arch/elicitor/constitutioner
+    - workspace/output/plans/                                     # ne planifie pas
+    - workspace/input/                                            # read-only
+    - workspace/output/.sys/.validation/                          # responsabilité auditors classiques
+  config_flags:                                                   # dans Project Config
+    - AdversarialReviewMode: "off | full | manual (défaut: manual)"
+    - AdversarialMinAttacks: "entier ≥ 1 (défaut: 5)"
+    - AdversarialMaxAttacks: "entier ≥ AdversarialMinAttacks (défaut: 10)"
+  modes:
+    - off: "skip total (exit silencieux)"
+    - manual: "invocation explicite uniquement via /sdd-review --adversarial (défaut)"
+    - full: "auto-invoke par /sdd-review post-agrégation (sans nécessiter --adversarial)"
+  fail_on: []                                                     # verdict TOUJOURS informational — jamais de bascule 🟢/🟡/🔴
+  hard_blocking_classes: []                                       # aucune classe hard-blocking par design
+  exit_silent_when:
+    - "AdversarialReviewMode: off"
+    - "AdversarialReviewMode: manual ET /sdd-review invoqué sans --adversarial"
+  db_target:
+    - "validation_reports (report_type='adversarial', verdict='informational', payload_json={attacks:[...]})"
+  idempotent: true
+
+# -------------------------------------------------------------------------
+# Agent: security-reviewer (Sonnet 4.6)
+# Phase: 6.4 (mode scan uniquement, post-dev — dev-run STEP 6.4 batch auditors)
+# Token footprint estimé: ~10-20 KB par feature
+#
+# v7.0.0 — Mode `threat-model` RETIRÉ (governance-major-auditors-trim).
+# Remplacement : template humain `.claude/templates/threat-model.template.md`
+# (STRIDE light, ~15-30 min, ADR). Le pipeline n'invoque plus l'agent en
+# mode threat-model — seul le mode scan reste actif.
+# -------------------------------------------------------------------------
+security-reviewer:
+  reads:
+    # Order: stable → semi → volatile (cache_control canonical order, cf. sdd_lib/cache_control.py)
+    - workspace/input/stack/stack.md                # Project Config (SecurityMode, SecurityFailOn, *Enabled) · cache_layer: stable
+    - .claude/rules/error-classification.md         # taxonomie [SEC_*] §1.11 · cache_layer: stable
+    - .claude/stacks/backend/{active}.md §1.3+§3+§2.4   # cache_layer: stable
+    - .claude/stacks/frontend/{active}.md §1.3+§3       # cache_layer: stable
+    - .claude/stacks/auth/{active}.md §2-§3         # patterns d'auth (lecture passive) · cache_layer: stable
+    - workspace/output/src/{BackendName}/CLAUDE.md  # architecture backend · cache_layer: semi
+    - workspace/output/src/{AppName}/CLAUDE.md      # architecture frontend · cache_layer: semi
+    - workspace/output/src/{BackendName}/**         # code production (fallback convention) · cache_layer: semi
+    - workspace/output/src/{AppName}/**             # code production · cache_layer: semi
+    - workspace/output/src/{LibName}/**             # lib partagée si présente · cache_layer: semi
+    - workspace/input/feats/{n}-*.md                # FEAT parente · cache_layer: volatile
+    - workspace/output/us/{n}-*.md                  # US ciblées (passif) · cache_layer: volatile
+    - workspace/output/plans/{n}-*.{back,front}.md  # mode preferred : lecture sélective via plan · cache_layer: volatile
+    - workspace/output/.sys/.validation/{n}-code-review.json  # dé-dup secrets avec code-reviewer (§6) · cache_layer: volatile
+    # Anti-pattern strict : ne JAMAIS Glob workspace/output/src/**/* (lecture sélective)
+  writes:
+    - workspace/output/.sys/.validation/{n}-security-scan.md
+    - workspace/output/.sys/.validation/{n}-security-scan.json
+  forbidden_reads:
+    - workspace/output/us/{other-feat}            # autres FEATs
+    - workspace/input/feats/{other}.md            # autres FEATs
+    - .claude/stacks/qa/                          # hors scope (responsabilité qa)
+    - .claude/stacks/ui/                          # hors scope (responsabilité a11y/dev-frontend)
+    - workspace/output/db/                        # schema DB hors scope direct (mentionné via constitution §4)
+    - workspace/output/qa/feat-{n}/coverage.json  # responsabilité qa
+    - workspace/output/qa/feat-{n}/quality.json   # responsabilité qa
+    # a11y-report.json retiré v7.0.0 (agent accessibility-auditor supprimé,
+    # remplacé par axe-core CI). Entrée préservée pour cohérence path-prefix
+    # forbidden_reads — l'agent ne lit toujours pas le dossier /qa/ qui peut
+    # contenir des fichiers axe-core JSON si un éventuel pont d'ingest CI
+    # est câblé par le projet consommateur (out-of-scope SDD_Pro v7.0.0).
+    - workspace/output/qa/feat-{n}/a11y-report.json  # (legacy v6, agent retiré v7.0.0)
+  forbidden_writes:
+    - workspace/output/src/                       # read-only strict (jamais de patch)
+    - workspace/output/us/                        # responsabilité po
+    - workspace/output/qa/                        # responsabilité qa
+    # dashboard/ retiré v7.0.0 (agent dashboard supprimé, INDEX ADRs via
+    # sdd_scripts/index_adrs.py). Entrée préservée comme garde-fou.
+    - workspace/output/dashboard/                 # (legacy v6, agent retiré v7.0.0)
+    - workspace/output/.sys/.context/             # responsabilité po/arch/elicitor
+    - workspace/output/plans/                     # ne planifie pas
+    - workspace/output/.sys/.validation/{n}-code-review.*  # responsabilité code-reviewer
+    - workspace/output/.sys/.validation/{n}-readiness.md   # responsabilité /feat-validate
+  modes:                                          # mode `scan` uniquement depuis v7.0.0
+    - scan: "post-dev — OWASP Top 10 2021 (A01,A02,A03,A05,A07,A08,A09,A10) + verdict 🟢/🟡/🔴"
+  config_flags:                                   # dans Project Config
+    - SecurityMode: "off | full | manual (défaut: full)"
+    - SecurityScanEnabled: "true | false (défaut: true)"
+    - SecurityFailOn: "critical | serious | moderate | minor (défaut: critical)"
+  hard_blocking_classes:                          # override SecurityFailOn → toujours 🔴 RED en mode scan
+    - "[SEC_SECRET_HARDCODED]"
+    - "[SEC_SQL_INJECTION]"
+    - "[SEC_COMMAND_INJECTION]"
+    - "[SEC_BROKEN_AUTHZ]"
+    - "[SEC_BROKEN_AUTHN]"
+    - "[SEC_DESERIALIZATION_UNSAFE]"
+    - "[SEC_JWT_MISCONFIG]"
+    - "[SEC_SSRF_RISK]"
+  coordination:
+    - "Mode scan dé-duplique [SEC_SECRET_HARDCODED] vs [REVIEW_SECRETS_HARDCODED] de code-reviewer (cf. agent §6)"
+  exit_silent_when:
+    - "SecurityMode: off"
+    - "SecurityScanEnabled: false"
+  idempotent: true                                # peut être ré-invoqué sans risque
+
+# (Stub performance-auditor déplacé en fin de fichier
+#  — cf. section "## Removed agents (backward-compat)".)
+
+# -------------------------------------------------------------------------
+# Agent: spec-compliance-reviewer (Sonnet 4.6) — depuis v6.5.2
+# Phase: 6.4 (post-dev, parallèle à code-reviewer + a11y + security scan)
+# Token footprint estimé: ~8-15 KB par feature (Sonnet 4.6, sélectif via plans + AC ciblage)
+# Pattern: "Do not trust the report" hérité de superpowers v5.1 — re-lit le
+#          code matérialisé AC-par-AC indépendamment des rapports dev-*.
+# Activation: opt-in via SpecComplianceMode (défaut: manual = skip).
+# -------------------------------------------------------------------------
+spec-compliance-reviewer:
+  reads:
+    # Order: stable → semi → volatile (cache_control canonical order, cf. sdd_lib/cache_control.py)
+    - workspace/input/stack/stack.md             # Project Config (SpecComplianceMode, SpecComplianceFailOn) · cache_layer: stable
+    - .claude/rules/error-classification.md      # taxonomie [SPEC_*] §1.13 · cache_layer: stable
+    - workspace/output/src/{BackendName}/**      # code production (fallback convention si pas de plan) · cache_layer: semi
+    - workspace/output/src/{AppName}/**          # code production · cache_layer: semi
+    - workspace/output/src/{LibName}/**          # lib partagée si présente · cache_layer: semi
+    - workspace/input/feats/{n}-*.md             # FEAT parente (passif, contexte) · cache_layer: volatile
+    - workspace/output/us/{n}-*.md               # toutes les US (source de vérité ACs) · cache_layer: volatile
+    - workspace/output/plans/{n}-*.{back,front}.md  # mode preferred : sélection fichiers par AC · cache_layer: volatile
+    # Anti-pattern strict : pas de Glob workspace/output/src/**/*
+    # Anti-pattern par design : NE LIT PAS les rapports d'autres agents
+    #   (cf. agent §STEP 0 "Périmètre strict")
+  writes:
+    - workspace/output/.sys/.validation/{n}-spec-compliance.md       # rapport humain
+    - workspace/output/.sys/.validation/{n}-spec-compliance.json     # schéma machine validé par validate_spec_compliance.py
+  forbidden_reads:
+    - workspace/output/us/{other-feat}            # autres FEATs
+    - workspace/input/feats/{other}.md            # autres FEATs
+    - workspace/output/.sys/.validation/{n}-code-review.*   # NEVER (bias toward not-trust-report)
+    - workspace/output/.sys/.validation/{n}-security-scan.* # NEVER
+    - workspace/output/qa/feat-{n}/a11y-report.*  # NEVER
+    - .claude/stacks/qa/                          # hors scope
+    - workspace/output/.sys/.context/             # hors scope direct
+  forbidden_writes:
+    - workspace/output/src/                       # read-only strict (jamais de patch)
+    - workspace/output/us/                        # responsabilité po
+    - workspace/output/qa/                        # responsabilité qa
+    - workspace/output/dashboard/                 # legacy v6 (agent dashboard retiré v7.0.0)
+    - workspace/output/.sys/.context/             # responsabilité po/arch/elicitor
+    - workspace/output/plans/                     # ne planifie pas
+    - workspace/output/.sys/.validation/{n}-code-review.*  # responsabilité code-reviewer
+    - workspace/output/.sys/.validation/{n}-readiness.md   # responsabilité /feat-validate
+  config_flags:                                   # dans Project Config
+    - SpecComplianceMode: "off | full | manual (défaut: manual)"
+    - SpecComplianceFailOn: "critical | serious | moderate | minor (défaut: serious)"
+  exit_silent_when:
+    - "SpecComplianceMode: off"
+    - "SpecComplianceMode: manual"                # skip auto-invoke (cf. phase_planner.py _decide_spec_compliance)
+  idempotent: true                                # peut être ré-invoqué sans risque
+
+# -------------------------------------------------------------------------
+# Agent constitutioner (Sonnet 4.6) — externalisé d'arch Phase D 2026-05-13
+# Rôle: ADRs (atomic timestamp) + §4/§6/§1 constitution.md + INDEX.md
+#       ADRs + read-back v5.0.
+# Invocation: arch STEP 12.5 (fin de Phase B).
+# Token footprint estimé: ~5-10 KB (lecture stack.md + constitution.md +
+#       glob ADRs existants + template ADR).
+# -------------------------------------------------------------------------
+constitutioner:
+  reads:
+    # Order: stable → semi → volatile (cache_control canonical order, cf. sdd_lib/cache_control.py)
+    - workspace/input/stack/stack.md                   # cache_layer: stable
+    - .claude/templates/adr.template.md                # cache_layer: stable
+    - .claude/rules/ownership.md                       # Partie B §3 numérotation atomique ADR (was file-ownership.md, consolidated v7.0.0) · cache_layer: stable
+    - .claude/rules/error-classification.md            # cache_layer: stable
+    - workspace/output/.sys/.context/constitution.md   # cache_layer: semi
+    - workspace/output/.sys/.context/adrs/ADR-*.md     # idempotence par slug · cache_layer: semi
+  writes:
+    - workspace/output/.sys/.context/adrs/ADR-{YYYYMMDDTHHmmss}-{slug}.md
+    - workspace/output/.sys/.context/constitution.md   # Edit ligne par ligne §1/§4/§6
+    - workspace/output/.sys/.context/adrs/INDEX.md     # régénéré
+  forbidden_reads:
+    - workspace/input/feats/                # hors scope (décisions déjà actées)
+    - workspace/output/us/                  # hors scope
+    - workspace/input/ui/                   # hors scope
+    - workspace/output/src/                 # hors scope
+  forbidden_writes:
+    - workspace/output/src/                 # responsabilité dev-* / arch
+    - workspace/output/us/                  # responsabilité po
+    - workspace/input/                      # read-only
+  idempotent: true
+
+# -------------------------------------------------------------------------
+# v4.0.0 — Suppression agent UI + bascule HTML direct
+# -------------------------------------------------------------------------
+# - Agent UI supprimé : plus d'extraction PNG → markdown
+# - Mockups HTML statiques dans workspace/input/ui/{n}-{m}-{Name}.html
+# - dev-frontend lit l'HTML directement en texte (pas multimodal)
+# - Mapping HTML → composant DS dans stacks/ui/*.md §2 + §7
+# - Plus de workspace/output/ui/ (dossier supprimé)
+# - Économie tokens : -10-25 KB/PNG (agent UI) + -3-5 KB/US (vision dev-frontend)
+# - Économie tokens totale : ~15-30 KB par US ayant un mockup
+# - Fidelity check devient text-based (grep libellés HTML vs markup généré)
+
+# -------------------------------------------------------------------------
+# Économie tokens v3.1.0 (Phase 5 QA)
+# -------------------------------------------------------------------------
+# - Coverage parsing 100% déterministe (Python parse_coverage.py) → 0 token
+# - Quality scan 100% déterministe (Python quality_scan.py) → 0 token
+# - Linter / type checker stack-native (subprocess) → 0 token
+# - Sonnet 4.6 (pas Opus) sur génération de tests
+# - Lecture sélective stricte par US (jamais Glob *)
+# - Total Phase 5 : ~17-27k tokens par feature en mode "full"
+
+# =========================================================================
+# ## Removed agents (backward-compat reference, consolidated v7.0.1)
+# =========================================================================
+# Block consolidé qui regroupe les ex-agents retirés et leurs remplacements.
+# Sert deux usages : (1) audit forensique des sorties console.db legacy qui
+# référencent ces noms ; (2) recovery procedure si réintroduction locale.
+#
+# **Aucun de ces agents n'est invocable en v7.0.x.** Toute tentative de spawn
+# via Agent() est rejetée par `sdd_hooks/preflight_agent_budget.py` avec
+# `REJECTED_AGENTS_V7` (HOOK_DENY).
+#
+# | Agent retiré              | Version | ADR / Raison                                     | Remplacement v7.0.0                              |
+# |---------------------------|---------|--------------------------------------------------|--------------------------------------------------|
+# | `validator`               | v6.0    | Coût ~1.4M tokens/run, faux positifs sémantiques | `feat-validate` 100% déterministe (Python)       |
+# | `dev-backend-strict`      | v7.0.0  | Maintenance double > ROI réel                    | `dev-backend` (Opus 4.7) — plan v2 conservé      |
+# | `dev-frontend-strict`     | v7.0.0  | idem                                             | `dev-frontend` (Opus 4.7) — plan v2 conservé     |
+# | `dashboard`               | v7.0.0  | 100% mécanique, jamais raisonnement LLM          | `sdd_scripts/index_adrs.py` (0 token, ~50 ms)    |
+# | `accessibility-auditor`   | v7.0.0  | WCAG mieux couvert par tooling CI                | `axe-core` CI (mapping `[A11Y_*]` cf. legacy.md) |
+# | `performance-auditor`     | v7.0.0  | Core Web Vitals mieux mesurés par browser réel   | `Lighthouse CI` + `wrk/k6` (mapping `[PERF_*]`)  |
+#
+# Recovery (si réintroduction locale strictement nécessaire) :
+#   - dev-*-strict : restaurer depuis git history avant tag v7.0.0
+#     (commit d4330c5) + remettre la branche dans preflight_agent_budget.py
+#   - dashboard / a11y / perf : restaurer agents/{name}.md + retirer l'entrée
+#     correspondante de `REJECTED_AGENTS_V7` (sdd_hooks/preflight_agent_budget.py)
+#
+# Source de vérité côté code : `error-classification-legacy.md §6` pour
+# les références "load-bearing" intentionnelles (whitelists READ-side
+# backward-compat, annotations historiques agents/CHANGELOG, etc.)

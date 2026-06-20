@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8"/>
+<title>SDD Pro — Présentation fonctionnelle</title>
+</head>
+<body>
+
+<h1>SDD Pro — De la spécification fonctionnelle à l'application livrée</h1>
+
+<p>
+<strong>SDD Pro</strong> (<em>Spec-Driven Development</em>) est un framework qui transforme une spécification fonctionnelle écrite en français en une <strong>application complète, testée et auditée</strong>, exécutée par des agents IA orchestrés sous Claude Code. Version actuelle&nbsp;: <strong>v7.0.0-alpha</strong> sur la branche <code>next</code> (en cours de stabilisation vers v7.0.0 GA &mdash; cf. <code>.claude/docs/scope-reduction-v7-ga.md</code>). La branche <code>main</code> reste sur <strong>v6.10.4-LTS</strong> (freeze actif jusqu'au 2026-06-18).
+</p>
+
+<blockquote>
+Vous décrivez la <strong>valeur métier</strong>. SDD Pro produit le <strong>code</strong>, les <strong>tests</strong>, l'<strong>audit qualité</strong> et la <strong>traçabilité</strong>.
+</blockquote>
+
+<hr/>
+
+<h2>Le problème que SDD Pro résout</h2>
+
+<p>Le développement logiciel classique perd 30 à 60 % de l'intention initiale entre la rédaction d'une spec et la livraison du code. Causes habituelles :</p>
+
+<ul>
+<li>Les agents IA non encadrés <em>dérivent</em> : ajout de features non demandées, refactor non sollicité, choix techniques opaques.</li>
+<li>La <strong>traçabilité</strong> spec → code est artisanale et perdue dès la 2ᵉ itération.</li>
+<li>Les <strong>tests, la sécurité, la performance, l'accessibilité</strong> sont des étapes optionnelles, souvent négligées.</li>
+<li>Le <strong>Product Owner</strong> ne peut pas valider à chaque étape sans lire du code.</li>
+</ul>
+
+<p>SDD Pro répond à ces 4 points avec un pipeline strict, des agents spécialisés et une console de validation humaine.</p>
+
+<hr/>
+
+<h2>Comment ça marche en 4 phases</h2>
+
+<h3>Phase 1 — Cadrage fonctionnel</h3>
+<p>
+Une <strong>commande unique</strong> <code>/feat-generate Auth</code> ouvre un dialogue de cadrage : besoins, acteurs, règles métier, critères d'acceptation. Le résultat est une <strong>FEAT</strong> structurée (<code>workspace/input/feats/1-Auth.md</code>) avec des identifiants stables (<code>SFD-1</code>, <code>BR-1</code>, <code>AC-1</code>) qui serviront de traçabilité dans toute la chaîne.
+</p>
+<p>
+Option : <code>/feat-deepen 1</code> applique 5 techniques d'élicitation (Pre-mortem, Red Team, First Principles, Stakeholder Mapping, Inversion) pour révéler les risques cachés <em>avant</em> de coder.
+</p>
+
+<h3>Phase 2 — Découpe en User Stories</h3>
+<p>
+L'agent <strong>PO</strong> découpe la FEAT en User Stories (1 à 6 max). Chaque US est autonome, validée par le Product Owner, et trace explicitement les <code>SFD/BR/AC/FD</code> qu'elle couvre. Aucun bullet de la spec ne peut être orphelin (validation déterministe via <code>/feat-validate</code>).
+</p>
+
+<h3>Phase 3 — Bootstrap technique</h3>
+<p>
+L'agent <strong>Architecte</strong> bootstrap le projet selon le stack déclaré (28 stacks supportés — .NET / Spring Boot / FastAPI / Node Express côté serveur ; React / Vue / Angular / Blazor côté client ; Shadcn / Vuetify / Radzen Blazor côté UI). Si une base de données est déclarée, il introspecte sa structure et génère les entités correspondantes (Database-First).
+</p>
+
+<h3>Phase 4 — Génération du code</h3>
+<p>
+Pour chaque US, deux agents tournent <strong>en parallèle</strong> :
+</p>
+<ul>
+<li><strong>Dev-Backend</strong> — endpoints HTTP, services, validation, persistance</li>
+<li><strong>Dev-Frontend</strong> — pages, composants, formulaires, traduction HTML mockup → code design-system</li>
+</ul>
+<p>
+Entre les deux familles, une <strong>API Gate</strong> automatique vérifie via tests d'intégration HTTP que les endpoints backend honorent leur contrat avant d'autoriser la génération frontend (règle <code>backend-first</code>, depuis 2026-05-07).
+</p>
+
+<h3>Phase 5 — QA & audit qualité</h3>
+<p>
+La commande <code>/qa-generate {n}</code> orchestre :
+</p>
+<ul>
+<li><strong>Tests unitaires</strong> + coverage (xUnit / Vitest / pytest / JUnit / Jasmine / bUnit)</li>
+<li><strong>Quality scan</strong> sonar-like (TODO/FIXME, magic numbers, méthodes longues, debug output)</li>
+<li><strong>5 auditeurs spécialisés</strong> en parallèle : accessibility (WCAG 2.2 AA), code-review (anti-patterns cross-fichier), security (OWASP Top 10 + STRIDE), performance (Core Web Vitals + SLO API), spec-compliance (vérification AC par AC indépendante)</li>
+</ul>
+
+<hr/>
+
+<h2>La console web — votre cockpit de validation</h2>
+
+<p>
+Depuis la v6.10, SDD Pro embarque une <strong>console web</strong> qui centralise toute la télémétrie projet dans une base SQLite unique (<code>workspace/output/db/console.db</code>). Plus aucun fichier <code>.json</code> ou <code>.jsonl</code> de stats sur le disque — tout est interrogeable, exportable, comparable dans le temps.
+</p>
+
+<h3>Lancement</h3>
+
+<pre><code>cd workspace/console
+npm install      # 1ère fois uniquement
+npm start        # http://127.0.0.1:4000</code></pre>
+
+<h3>Trois pages, trois publics</h3>
+
+<h4>Dashboard — vue exécutive</h4>
+<ul>
+<li>4 <strong>KPI cards</strong> : nombre de FEATs, tests API totaux, issues sécurité, code smells</li>
+<li><strong>Grille statuts</strong> par FEAT : Run / API Gate / Coverage / Quality / Sécurité</li>
+<li><strong>Audit qualité style SonarQube</strong> avec ratings A→E (Vulnerabilities, Code Smells, Coverage). Une ligne par FEAT, cartes <em>uniquement</em> pour les métriques disponibles (pas de placeholder vide).</li>
+<li><strong>Drill-down</strong> : un clic sur une ligne FEAT déplie le détail des issues (fichier, ligne, classe OWASP/CWE, message, règle, fichiers sous-couverts)</li>
+<li>4 <strong>graphes</strong> SVG natifs : coverage par FEAT, quality stacked, tests API passed/failed, donut sécurité</li>
+</ul>
+
+<h4>Features — vue métier</h4>
+<ul>
+<li><strong>Vue PO</strong> : FEAT → User Stories (pas de plan technique — pour validation Product Owner)</li>
+<li><strong>Vue technique</strong> : FEAT → US → plans back/front (pour Tech Lead / dev)</li>
+<li><strong>Vue UX</strong> : carrousel des mockups HTML par FEAT (rendu avec leur design-system natif via route statique <code>/ui/</code> — pas de duplication)</li>
+<li><strong>Validation humaine</strong> en un clic : validé / rejeté / en attente — décision tracée (email + timestamp + commentaire optionnel)</li>
+<li><strong>Live updates</strong> : SSE push les modifications du filesystem → l'arbre se met à jour sans rechargement</li>
+<li><strong>Bouton Rafraîchir</strong> dans l'en-tête : re-scan du filesystem (nouveaux <code>.md</code> et <code>.html</code> apparaissent dynamiquement)</li>
+</ul>
+
+<h4>Documentation — vous êtes ici</h4>
+<ul>
+<li>Page <strong>Fonctionnelle</strong> (cette page) — pour PO, Product Manager, sponsors</li>
+<li>Page <strong>Technique</strong> — pour Tech Lead, architecte, développeurs</li>
+</ul>
+
+<h3>Theme &amp; ergonomie</h3>
+<ul>
+<li><strong>Thème clair / sombre</strong> en un clic, persisté en local storage, suit la préférence système au premier chargement</li>
+<li><strong>Logos adaptatifs</strong> (versions claire / sombre selon le thème)</li>
+<li><strong>Charts modernes</strong> avec gradients vifs (indigo / cyan / amber / red / emerald / pink / violet), sparklines sur les KPIs</li>
+<li><strong>Spinner animé</strong> SVG natif (rotation + 3 dots pulse) — pas de GIF, pas de dépendance externe</li>
+</ul>
+
+<hr/>
+
+<h2>Les gains concrets</h2>
+
+<h3>Pour le Product Owner</h3>
+<ul>
+<li>Lecture des US sans toucher au code (Vue PO de la console)</li>
+<li>Validation à chaque gate (PO → Readiness → Plan → Code) — l'IA attend votre feu vert</li>
+<li>Reformulation IA des plans techniques en langage métier (bouton intégré console, opt-in via API key Anthropic)</li>
+<li>Traçabilité 100 % SFD → AC → US → Code (garantie déterministe par <code>/feat-validate</code>)</li>
+</ul>
+
+<h3>Pour le Tech Lead</h3>
+<ul>
+<li>Anti-derive strict : aucun fichier hors plan, aucune lib hors stack déclaré, aucun refactor non demandé</li>
+<li>Build loop borné : 3 itérations max par US, classes d'erreur déterministes (<code>[BUILD_CORRECTIBLE]</code> / <code>[BUILD_BLOCKING]</code>)</li>
+<li>Audit qualité automatique (sécurité, performance, accessibility, code-review, spec-compliance) à chaque livraison</li>
+<li>ADRs générés automatiquement pour chaque décision structurante</li>
+</ul>
+
+<h3>Pour la direction technique</h3>
+<ul>
+<li>Réduction du time-to-market : pipeline 2-3 jours là où le développement manuel prend 2-3 semaines</li>
+<li>Conformité OWASP Top 10 + WCAG 2.2 AA <strong>par défaut</strong>, pas en option</li>
+<li>Télémétrie tokens (coût par agent, par FEAT, par US) pour optimiser le budget IA — table <code>token_usage</code> dans <code>console.db</code></li>
+<li>Profiles configurables (<code>~/.sdd/config.team.yml</code>) : un preset <em>strict-prod</em>, un preset <em>dev-only</em>, etc.</li>
+<li>Serveur MCP optionnel exposant 14 tools SDD Pro à Cursor / Windsurf / Cline / Claude Desktop / scripts CI</li>
+</ul>
+
+<hr/>
+
+<h2>Pour qui ?</h2>
+
+<ul>
+<li>Équipes <strong>2-12 personnes</strong> qui veulent industrialiser leur production logicielle</li>
+<li>Projets en stack <strong>.NET / Java / Node / Python</strong> côté serveur, <strong>React / Vue / Angular / Blazor</strong> côté client</li>
+<li>Contextes <strong>réglementés</strong> (santé, banque, public) où la traçabilité spec → code est exigée</li>
+<li>Organisations qui adoptent <strong>Claude Code</strong> et veulent un cadre opérationnel</li>
+</ul>
+
+<h2>Pour aller plus loin</h2>
+
+<ul>
+<li>Page <strong>Technique</strong> (menu Documentation) — architecture, agents, MCP server</li>
+<li>Documentation framework : <code>.claude/CLAUDE.md</code></li>
+<li>Quickstart : <code>.claude/docs/quickstart.md</code></li>
+<li>Changelog : <code>.claude/CHANGELOG.md</code></li>
+</ul>
+
+<footer>
+<p>SDD Pro v6.10 — Spec-Driven Development pour Claude Code</p>
+<p>Conçu et maintenu par <strong>Zekiri Abdelali</strong> · 2026</p>
+</footer>
+
+</body>
+</html>

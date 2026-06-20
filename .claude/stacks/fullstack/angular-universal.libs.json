@@ -1,0 +1,82 @@
+{
+  "$schema": "../../templates/libs-catalog.schema.json",
+  "stackId": "angular-universal",
+  "category": "fullstack",
+  "schemaVersion": 1,
+  "buildSystem": "npm",
+  "manifest": {
+    "files": [
+      "workspace/output/src/{AppName}/package.json",
+      "workspace/output/src/{AppName}/angular.json",
+      "workspace/output/src/{AppName}/tsconfig.json",
+      "workspace/output/src/{AppName}/server.ts"
+    ]
+  },
+  "metadata": {
+    "platforms": ["node-22"],
+    "framework": "Angular 19 + @angular/ssr (Express integre)",
+    "workflow": "single-project-ssr-hydration",
+    "notes": "Standalone components + signals. Build produit dist/{AppName}/browser/ + dist/{AppName}/server/. SSR Express bootstrappe par @angular/ssr."
+  },
+  "versions": {
+    "angular": "19.0.0",
+    "express": "4.21.2",
+    "rxjs": "7.8.1",
+    "zod": "3.24.0",
+    "typescript": "5.7.0",
+    "zone-js": "0.15.0",
+    "ngx-translate-core": "16.0.4",
+    "ngx-translate-http": "16.1.1",
+    "msal-angular": "4.0.3",
+    "msal-browser": "4.0.0",
+    "eslint": "9.17.0",
+    "angular-eslint": "19.0.0",
+    "prisma": "6.1.0",
+    "prisma-client": "6.1.0",
+    "tailwindcss": "4.0.0",
+    "postcss": "8.5.0",
+    "ngrx-signals": "19.0.0",
+    "undici": "7.2.0",
+    "exceljs": "4.4.0",
+    "pdfmake": "0.2.15",
+    "nodemailer": "6.9.16",
+    "date-fns": "4.1.0",
+    "ng2-charts": "7.0.0"
+  },
+  "core": [
+    { "module": "@angular/core", "ref": "angular" },
+    { "module": "@angular/common", "ref": "angular" },
+    { "module": "@angular/router", "ref": "angular" },
+    { "module": "@angular/forms", "ref": "angular" },
+    { "module": "@angular/platform-browser", "ref": "angular" },
+    { "module": "@angular/platform-browser-dynamic", "ref": "angular" },
+    { "module": "@angular/ssr", "ref": "angular", "rationale": "SSR engine (Express)" },
+    { "module": "@angular/material", "ref": "angular", "rationale": "UI Design System defaut" },
+    { "module": "@angular/cdk", "ref": "angular" },
+    { "module": "@angular/animations", "ref": "angular" },
+    { "module": "express", "ref": "express", "rationale": "Server bootstrappe par @angular/ssr" },
+    { "module": "rxjs", "ref": "rxjs" },
+    { "module": "zod", "ref": "zod", "rationale": "Validation schemas (server + client)" },
+    { "module": "typescript", "ref": "typescript" },
+    { "module": "zone.js", "ref": "zone-js", "rationale": "Change detection (deprecate progressif vers signals, reste CORE en v19)" },
+    { "module": "@ngx-translate/core", "ref": "ngx-translate-core" },
+    { "module": "@ngx-translate/http-loader", "ref": "ngx-translate-http" },
+    { "module": "@azure/msal-angular", "ref": "msal-angular", "rationale": "Auth Azure AD (selon ## Active Auth Specs)" },
+    { "module": "@azure/msal-browser", "ref": "msal-browser" },
+    { "module": "eslint", "ref": "eslint" },
+    { "module": "@angular-eslint/builder", "ref": "angular-eslint" }
+  ],
+  "onDemand": [
+    { "module": "prisma", "ref": "prisma", "capability": "prisma", "triggers": ["DatabaseType.*\\b(SqlServer|PostgreSql|MySql|Sqlite)\\b", "orm", "db-first"] },
+    { "module": "@prisma/client", "ref": "prisma-client", "capability": "prisma", "triggers": ["prisma", "orm"] },
+    { "module": "tailwindcss", "ref": "tailwindcss", "capability": "tailwind", "triggers": ["tailwind", "atomic.*css"] },
+    { "module": "postcss", "ref": "postcss", "capability": "tailwind", "triggers": ["tailwind"] },
+    { "module": "@ngrx/signals", "ref": "ngrx-signals", "capability": "signals-store", "triggers": ["ngrx", "store.*signal", "state-mgmt"] },
+    { "module": "undici", "ref": "undici", "capability": "http-client", "triggers": ["appel.*api.*externe"] },
+    { "module": "exceljs", "ref": "exceljs", "capability": "excel", "triggers": ["\\bexcel\\b", "\\.xlsx\\b", "export.*excel"] },
+    { "module": "pdfmake", "ref": "pdfmake", "capability": "pdf", "triggers": ["\\bpdf\\b", "export.*pdf"] },
+    { "module": "nodemailer", "ref": "nodemailer", "capability": "smtp", "triggers": ["email", "smtp"] },
+    { "module": "date-fns", "ref": "date-fns", "capability": "date-utils", "triggers": ["dates.*format"] },
+    { "module": "ng2-charts", "ref": "ng2-charts", "capability": "charts", "triggers": ["graph", "chart", "visualisation"] }
+  ]
+}

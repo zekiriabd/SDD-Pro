@@ -1,0 +1,184 @@
+{
+  "$schema": "../../templates/libs-catalog.schema.json",
+  "stackId": "python-fastapi",
+  "category": "backend",
+  "schemaVersion": 1,
+  "buildSystem": "uv",
+  "manifest": {
+    "files": [
+      "workspace/output/src/{BackendName}/pyproject.toml",
+      "workspace/output/src/{BackendName}/uv.lock"
+    ]
+  },
+  "versions": {
+    "python": "3.12",
+    "fastapi": "0.115.5",
+    "uvicorn": "0.32.1",
+    "pydantic": "2.11.0",
+    "pydantic-settings": "2.7.0",
+    "sqlalchemy": "2.0.36",
+    "alembic": "1.14.0",
+    "asyncpg": "0.30.0",
+    "aiomysql": "0.2.0",
+    "aioodbc": "0.5.0",
+    "aiosqlite": "0.20.0",
+    "structlog": "24.4.0",
+    "python-json-logger": "2.0.7",
+    "httpx": "0.28.0",
+    "tenacity": "9.0.0",
+    "fastapi-pagination": "0.12.32",
+    "slowapi": "0.1.9",
+    "python-multipart": "0.0.20",
+    "babel": "2.16.0",
+    "pyjwt": "2.10.1",
+    "argon2-cffi": "23.1.0",
+    "email-validator": "2.2.0",
+    "openpyxl": "3.1.5",
+    "reportlab": "4.2.5",
+    "ruff": "0.8.4",
+    "mypy": "1.13.0"
+  },
+  "dbDrivers": {
+    "postgres": {
+      "module": "asyncpg",
+      "ref": "asyncpg"
+    },
+    "mysql": {
+      "module": "aiomysql",
+      "ref": "aiomysql"
+    },
+    "sqlserver": {
+      "module": "aioodbc",
+      "ref": "aioodbc"
+    },
+    "sqlite": {
+      "module": "aiosqlite",
+      "ref": "aiosqlite"
+    }
+  },
+  "core": [
+    {
+      "module": "fastapi",
+      "ref": "fastapi"
+    },
+    {
+      "module": "uvicorn[standard]",
+      "ref": "uvicorn"
+    },
+    {
+      "module": "pydantic",
+      "ref": "pydantic"
+    },
+    {
+      "module": "pydantic-settings",
+      "ref": "pydantic-settings"
+    },
+    {
+      "module": "sqlalchemy[asyncio]",
+      "ref": "sqlalchemy"
+    },
+    {
+      "module": "alembic",
+      "ref": "alembic"
+    },
+    {
+      "module": "structlog",
+      "ref": "structlog"
+    },
+    {
+      "module": "python-json-logger",
+      "ref": "python-json-logger"
+    },
+    {
+      "module": "httpx",
+      "ref": "httpx"
+    },
+    {
+      "module": "tenacity",
+      "ref": "tenacity"
+    },
+    {
+      "module": "fastapi-pagination",
+      "ref": "fastapi-pagination"
+    },
+    {
+      "module": "slowapi",
+      "ref": "slowapi"
+    },
+    {
+      "module": "python-multipart",
+      "ref": "python-multipart"
+    },
+    {
+      "module": "babel",
+      "ref": "babel"
+    },
+    {
+      "module": "email-validator",
+      "ref": "email-validator"
+    },
+    {
+      "module": "ruff",
+      "ref": "ruff"
+    },
+    {
+      "module": "mypy",
+      "ref": "mypy"
+    }
+  ],
+  "onDemand": [
+    {
+      "module": "argon2-cffi",
+      "ref": "argon2-cffi",
+      "capability": "auth-local",
+      "rationale": "Argon2 password hashing — winner Password Hashing Competition 2015, maintained, replaces passlib 1.7.4 (non maintenu 2020) + bcrypt deprecation drift (audit CTO 2026-06-07).",
+      "triggers": [
+        "auth-local",
+        "hash.*password",
+        "bcrypt",
+        "argon2"
+      ]
+    },
+    {
+      "module": "pyjwt[crypto]",
+      "ref": "pyjwt",
+      "capability": "jwt",
+      "rationale": "JWT encode/decode RFC 7519. Remplace python-jose 3.3.0 (CVE-2024-33663 algorithm confusion + CVE-2024-33664 JWT bomb, package unmaintained 2021) — audit CTO 2026-06-07.",
+      "triggers": [
+        "\\bjwt\\b",
+        "jose",
+        "auth-local",
+        "auth-azure-ad"
+      ]
+    },
+    {
+      "module": "openpyxl",
+      "ref": "openpyxl",
+      "capability": "excel",
+      "triggers": [
+        "\\bexcel\\b",
+        "\\.xlsx\\b",
+        "export.*excel",
+        "import.*excel",
+        "tableur"
+      ]
+    },
+    {
+      "module": "reportlab",
+      "ref": "reportlab",
+      "capability": "pdf",
+      "triggers": [
+        "\\bpdf\\b",
+        "\\.pdf\\b",
+        "export.*pdf",
+        "generer.*pdf",
+        "imprim"
+      ]
+    }
+  ],
+  "plugins": [],
+  "metadata": {
+    "lastUpdated": "2026-05-07",
+    "format": "compact (v2) \u00e2\u20ac\u201d DB drivers moved to top-level dbDrivers"
+  }
+}
