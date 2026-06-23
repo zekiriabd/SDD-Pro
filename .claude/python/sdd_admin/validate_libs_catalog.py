@@ -31,7 +31,7 @@ from sdd_lib.exit_codes import FAIL_FAST  # noqa: E402
 
 BUILD_SYSTEMS = (
     "dotnet", "npm", "pnpm", "yarn", "gradle", "maven",
-    "pip", "poetry", "uv", "cargo", "go-mod",
+    "pip", "poetry", "uv", "cargo", "go-mod", "msbuild",
 )
 REQUIRED_TOP_KEYS = ("stackId", "category", "schemaVersion", "buildSystem", "versions", "core")
 VERSION_KEY_RE = re.compile(r"^[a-z][a-z0-9-]*$")

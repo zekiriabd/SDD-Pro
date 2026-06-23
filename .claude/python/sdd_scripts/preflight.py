@@ -696,12 +696,13 @@ def main() -> int:
             else:
                 add_err("PROJECT_NOT_INIT", hint)
 
-    # B5 — UI DS selected if HTML mockup present (frontend, back-front only)
+    # B5 — UI DS selected if HTML mockup present (frontend, back-front web only)
     # v6.7.5+ : skip pour fullstack/mobile-* (gerent leur UI en interne — NativeWind RN,
-    # MAUI Resources/Styles, Mustache CSS custom, Tailwind Next/Nuxt, Material Angular, Radzen Blazor)
+    # MAUI Resources/Styles, FMX StyleBook, Mustache CSS custom, Tailwind Next/Nuxt, Material Angular, Radzen Blazor)
     if (
         args.family == "frontend"
         and app_type == "back-front"
+        and result.get("frontendKind") != "mobile"
         and result["htmlPath"]
         and not ui_ids
     ):
