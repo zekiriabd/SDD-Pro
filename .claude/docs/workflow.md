@@ -7,25 +7,33 @@
 
 ```mermaid
 flowchart TD
-    A[Human: /feat-generate Auth] --> B[FEAT .md spec written]
-    B -.optional.-> C[/feat-deepen — elicitor enriches]
-    C --> D[/us-generate — agent PO]
+    A["Human: /feat-generate Auth"] --> B["FEAT .md spec written"]
+    B -. optional .-> C["/feat-deepen - elicitor enriches"]
+    C --> D["/us-generate - agent PO"]
     B --> D
-    D --> E[US files generated 1-3, max 6]
-    E --> F{/feat-validate readiness gate}
-    F -->|NO-GO| X1[STOP — fix FEAT/US]
-    F -->|GO/WARN| G[/dev-plan optional — plans review]
+
+    D --> E["US files generated 1-3, max 6"]
+    E --> F{"feat-validate readiness gate"}
+
+    F -->|NO-GO| X1["STOP - fix FEAT/US"]
+    F -->|GO/WARN| G["/dev-plan optional - plans review"]
     F -->|GO/WARN| H
-    G --> H[/arch-init — bootstrap + DB scaffold]
-    H --> I[dev-backend × N US in parallel]
-    I --> J{QA API Gate in-memory}
-    J -->|RED| X2[STOP — fix backend contract]
-    J -->|PASS/WARN| K[dev-frontend × N US in parallel]
-    K --> L[/qa-generate — tests + coverage + quality]
-    L --> M[Auditors batch: code + security + spec + arch]
-    M --> N[/sdd-review — consolidate verdicts]
-    N -->|RED| X3[STOP — fix critical issues]
-    N -->|GREEN/WARN| Z[FEAT delivered]
+
+    G --> H["/arch-init - bootstrap + DB scaffold"]
+
+    H --> I["dev-backend x N US in parallel"]
+
+    I --> J{"QA API Gate in-memory"}
+
+    J -->|RED| X2["STOP - fix backend contract"]
+    J -->|PASS/WARN| K["dev-frontend x N US in parallel"]
+
+    K --> L["/qa-generate - tests + coverage + quality"]
+    L --> M["Auditors batch: code + security + spec + arch"]
+    M --> N["/sdd-review - consolidate verdicts"]
+
+    N -->|RED| X3["STOP - fix critical issues"]
+    N -->|GREEN/WARN| Z["FEAT delivered"]
 
     style A fill:#e1f5ff,stroke:#0288d1
     style Z fill:#c8e6c9,stroke:#388e3c
