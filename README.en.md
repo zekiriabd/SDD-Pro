@@ -37,7 +37,7 @@ Validated end-to-end combos:
 - `--combo custom`: manual composition (4 backends × 4 frontends × 3 UI systems)
 
 <p align="center">
-   <img src="https://i.imgur.com/UksSX8R.gif" alt="badges" style="margin:auto">
+   <img src="https://i.imgur.com/xsrEp63.gif" alt="badges" style="margin:auto">
 </p>
 ---
 
