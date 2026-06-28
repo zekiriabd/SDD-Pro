@@ -36,6 +36,9 @@ Validated end-to-end combos:
 - **C2**: Kotlin Spring Boot + React + shadcn + Azure AD + JUnit
 - `--combo custom`: manual composition (4 backends × 4 frontends × 3 UI systems)
 
+<p align="center">
+   <img src="https://i.imgur.com/UksSX8R.gif" alt="badges" style="margin:auto">
+</p>
 ---
 
 ## After bootstrap
