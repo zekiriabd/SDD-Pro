@@ -43,6 +43,9 @@ CI mode (no prompts) :
 ```bash
 SDD_APP_NAME=MyApp SDD_COMBO=c1 python bootstrap.py --auto-init
 ```
+<p align="center">
+   <img src="https://imgur.com/r6aWPt1.png" alt="badges" style="margin:auto">
+</p>
 
 ---
 
