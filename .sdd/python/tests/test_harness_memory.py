@@ -119,9 +119,9 @@ def test_memory_variants_generated(build_dir, adapter_cls, filename, matrix_key)
 def test_variants_do_not_rewrite_plain_claude_paths(build_dir):
     """Les mentions littérales `.claude/...` sans `@` restent intactes."""
     live = _normalize(LIVE_MEMORY.read_text(encoding="utf-8-sig"))
-    assert ".claude/rules/" in live.replace("@.claude/", "")  # précondition
+    assert ".sdd/rules/" in live.replace("@.claude/", "")  # précondition
     target = CodexAdapter(repo_root=REPO_ROOT).emit_memory_file(build_dir)
-    assert ".claude/rules/" in target.read_text(encoding="utf-8")
+    assert ".sdd/rules/" in target.read_text(encoding="utf-8")
 
 
 # --------------------------------------------------------------------- #

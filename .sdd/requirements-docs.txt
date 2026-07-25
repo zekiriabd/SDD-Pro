@@ -1,0 +1,15 @@
+# SDD_Pro — Documentation site dependencies
+# Install with : pip install -r requirements-docs.txt
+# Serve with   : mkdocs serve
+# Build with   : mkdocs build
+# Deploy with  : mkdocs gh-deploy
+
+mkdocs==1.6.1
+mkdocs-material==9.5.49
+mkdocs-static-i18n==1.2.3            # bilingual FR (canonical) + EN
+mkdocs-awesome-pages-plugin==2.9.3   # optional
+mike==2.1.3                          # versioned docs (v6.10 / v7.0.0) — optional
+pymdown-extensions==10.12
+
+# Mermaid : built-in via the Material theme's pymdownx.superfences config
+# (no extra Python dep needed — mermaid.js loaded via CDN in mkdocs.yml)

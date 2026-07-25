@@ -54,7 +54,7 @@ from sdd_lib.harness_diff import DiffReport, diff_agent_texts  # noqa: E402
 LIVE_COMMANDS_DIR = REPO_ROOT / ".claude" / "commands"
 PIVOTS_DIR = SDD_HOME / "commands"
 
-COMMANDS = sorted(p.name.removesuffix(".cmd.yaml") for p in PIVOTS_DIR.glob("*.cmd.yaml"))
+COMMANDS = sorted(p.name.replace(".md", "") for p in PIVOTS_DIR.glob("*.md"))
 
 
 def _normalize(text: str) -> str:
@@ -100,11 +100,13 @@ def test_command_pivot_count_is_40():
 
 
 def test_frontmatter_split_is_18_with_22_without():
-    """Verrou de forme : 18 commandes avec frontmatter, 22 corps pur."""
-    with_fm = [
-        c for c in COMMANDS
-        if load_yaml(PIVOTS_DIR / f"{c}.cmd.yaml").get("has_frontmatter")
-    ]
+    """Verrou de forme : 18 commandes avec frontmatter, 22 corps pur.
+
+    Post-consolidation 2026-07-25 : les pivots vivent dans le frontmatter YAML
+    du `.md` unique (fusionné avec le body). `_pivot_from_md` retourne un dict
+    équivalent à l'ancien `.cmd.yaml` (contient `has_frontmatter`).
+    """
+    with_fm = [c for c in COMMANDS if _pivot_from_md(c).get("has_frontmatter")]
     assert len(with_fm) == 18, f"attendu 18 pivots has_frontmatter=true, trouvé {with_fm}"
 
 
@@ -122,6 +124,30 @@ def build_dir():
     shutil.rmtree(out, ignore_errors=True)
 
 
+def _pivot_from_md(command: str) -> dict:
+    """Extract frontmatter from consolidated `.sdd/commands/{cmd}.md`.
+
+    Format post-consolidation 2026-07-25 : le pivot vit dans le frontmatter
+    YAML du .md unique (fusionné avec le body). `has_frontmatter` est
+    déduit de la présence des clés (command/phase/description = commande
+    reverse avec frontmatter, sinon corps pur).
+    """
+    import re
+    text = (PIVOTS_DIR / f"{command}.md").read_text(encoding="utf-8-sig")
+    m = re.match(r"^---\s*\n(.*?)\n---\s*(?:\n|$)", text, re.DOTALL)
+    if not m:
+        return {"has_frontmatter": False}
+    try:
+        import yaml
+        fm = yaml.safe_load(m.group(1)) or {}
+    except ImportError:
+        fm = {}
+    # Emit-frontmatter for the target file iff we have command/phase (reverse)
+    # or the classical name/description keys.
+    has_fm = bool(fm.get("command") or fm.get("phase"))
+    return {"has_frontmatter": has_fm, "frontmatter": fm if has_fm else {}}
+
+
 @pytest.mark.parametrize("command", COMMANDS)
 def test_command_roundtrip_semantic_identity(build_dir, command):
     """Régénéré vs vivant : frontmatter par valeur + corps identique (norm. CRLF/BOM)."""
@@ -129,7 +155,7 @@ def test_command_roundtrip_semantic_identity(build_dir, command):
     live = LIVE_COMMANDS_DIR / f"{command}.md"
     assert generated.is_file(), f"{command}: fichier régénéré absent"
     assert live.is_file(), f"{command}: commande vivante absente de .claude/commands/"
-    pivot = load_yaml(PIVOTS_DIR / f"{command}.cmd.yaml")
+    pivot = _pivot_from_md(command)
     report = _diff_command(generated, live, pivot)
     assert report.identical, f"{command}: round-trip non sémantique — {report.summary()}"
 
@@ -140,7 +166,7 @@ def test_commands_roundtrip_rate_is_measured(build_dir):
         command: _diff_command(
             build_dir / "commands" / f"{command}.md",
             LIVE_COMMANDS_DIR / f"{command}.md",
-            load_yaml(PIVOTS_DIR / f"{command}.cmd.yaml"),
+            _pivot_from_md(command),
         )
         for command in COMMANDS
     }

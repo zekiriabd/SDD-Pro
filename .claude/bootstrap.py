@@ -80,14 +80,23 @@ for _stream in (sys.stdout, sys.stderr):
 REPO_ROOT = Path(__file__).resolve().parent
 if REPO_ROOT.name == ".claude":
     REPO_ROOT = REPO_ROOT.parent
-STACK_TEMPLATE = REPO_ROOT / ".claude" / "templates" / "stack.md.template"
+# Bi-racine 2026-07-25 : templates migrées vers .sdd/templates/ (Phase 1).
+import sys as _sys
+_sys.path.insert(0, str(REPO_ROOT / ".sdd" / "python"))
+try:
+    from sdd_lib.paths import templates_dir as _templates_dir_helper  # type: ignore
+    STACK_TEMPLATE = _templates_dir_helper(REPO_ROOT) / "stack.md.template"
+except ImportError:
+    STACK_TEMPLATE = REPO_ROOT / ".sdd" / "templates" / "stack.md.template"
+    if not STACK_TEMPLATE.is_file():
+        STACK_TEMPLATE = REPO_ROOT / ".claude" / "templates" / "stack.md.template"
 STACK_TARGET = REPO_ROOT / "workspace" / "stack" / "stack.md"
 FEATS_DIR = REPO_ROOT / "workspace" / "feats"
 UI_DIR = REPO_ROOT / "workspace" / "ui"
 SYS_DIR = REPO_ROOT / "workspace" / ".sys"
-PYTHON_DIR = REPO_ROOT / ".claude" / "python"
+PYTHON_DIR = REPO_ROOT / ".sdd" / "python"
 CONSOLE_DIR = REPO_ROOT / "workspace" / "console"
-SMOKE_SCRIPT = REPO_ROOT / ".claude" / "python" / "sdd_admin" / "framework_smoke.py"
+SMOKE_SCRIPT = REPO_ROOT / ".sdd" / "python" / "sdd_admin" / "framework_smoke.py"
 
 
 # ---------------------------------------------------------------------------
@@ -175,13 +184,19 @@ _FRONTEND_PORTS = {
 def _merge_combos_from_json() -> None:
     """Complète COMBOS avec les combos SLA absents des presets (C6-C13).
 
-    SSoT = `.claude/templates/combos.json` (audit 2026-06-11 : bootstrap
+    SSoT = `.sdd/templates/combos.json` (audit 2026-06-11 : bootstrap
     hardcodait c1-c5 alors que la doc promet « 13 combos SLA » — asymétrie
     CLI/doc). Lecture stdlib pure, silencieuse si le fichier est absent ou
     invalide (fallback : presets hardcodés seuls — bootstrap reste utilisable
     sur un checkout partiel).
     """
-    path = Path(__file__).resolve().parent / ".claude" / "templates" / "combos.json"
+    # Bi-racine 2026-07-25 : combos.json migré vers .sdd/templates/.
+    _root = Path(__file__).resolve().parent
+    if _root.name == ".claude":
+        _root = _root.parent
+    path = _root / ".sdd" / "templates" / "combos.json"
+    if not path.is_file():
+        path = _root / ".claude" / "templates" / "combos.json"
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
@@ -330,13 +345,13 @@ def _is_non_validated(category: str, stack_id: str) -> bool:
     """Return True if `stack_id` in `category` is NOT `validated` per combos.json.
 
     Falls back to `False` (treat as validated) when combos.py is unavailable
-    — defensive : bootstrap must still work if `.claude/python/` isn't
+    — defensive : bootstrap must still work if `.sdd/python/` isn't
     importable yet (fresh checkout edge case, although unlikely since this
     script lives at repo root).
     """
     try:
         # Imported lazily to keep bootstrap stdlib-only at module import time.
-        sys.path.insert(0, str(REPO_ROOT / ".claude" / "python"))
+        sys.path.insert(0, str(REPO_ROOT / ".sdd" / "python"))
         from sdd_lib.combos import get_component_level  # noqa: E402
         level = get_component_level(category, stack_id, root=REPO_ROOT)
         return level in _NON_VALIDATED_LEVELS
@@ -370,7 +385,7 @@ def _confirm_unvalidated_combo(combo_key: str, *, auto_init: bool = False) -> No
         f"  Le combo {combo_key.upper()} est marqué 🟡 « pending validation » :\n"
         "    • aucun PoC formel `/sdd-full` FEAT M (3 US back+front) sans intervention.\n"
         "    • le pipeline peut échouer en runtime (CORS, codegen, capabilities).\n"
-        "    • voir .claude/docs/validated-combos.md pour la matrice à jour.\n"
+        "    • voir .sdd/docs/validated-combos.md pour la matrice à jour.\n"
         "\n"
         "  Combos 🟢 validés (recommandés) : C1 (.NET) / C2 (Kotlin Spring).\n"
     )
@@ -394,7 +409,7 @@ def choose_combo(forced: str | None, *, auto_init: bool = False) -> dict:
             sys.exit(2)
 
     _print_header("Stack combo")
-    print("  Combos available (SSoT : .claude/templates/combos.json) :")
+    print("  Combos available (SSoT : .sdd/templates/combos.json) :")
     ordered = sorted(COMBOS, key=lambda k: (len(k), k))  # c1..c9 puis c10..c13
     for i, key in enumerate(ordered, start=1):
         print(f"    [{i}] {COMBOS[key]['label']}")
@@ -545,10 +560,10 @@ def collect_project_info(combo: dict, auto_init: bool = False) -> dict:
 def render_stack_md(info: dict) -> str:
     """Substitute placeholders in stack.md.template."""
     tpl = STACK_TEMPLATE.read_text(encoding="utf-8")
-    backend_line = f" - .claude/stacks/backend/{info['backend']}.md"
-    frontend_line = f" - .claude/stacks/frontend/{info['frontend']}.md"
-    ui_line = f" - .claude/stacks/ui/{info['ui']}.md" if info["ui"] else "# (no UI)"
-    qa_lines = "\n".join(f" - .claude/stacks/qa/{qa}.md" for qa in info["qa"])
+    backend_line = f" - .sdd/stacks/backend/{info['backend']}.md"
+    frontend_line = f" - .sdd/stacks/frontend/{info['frontend']}.md"
+    ui_line = f" - .sdd/stacks/ui/{info['ui']}.md" if info["ui"] else "# (no UI)"
+    qa_lines = "\n".join(f" - .sdd/stacks/qa/{qa}.md" for qa in info["qa"])
 
     auth = info.get("auth", "none")
     if auth == "auth-local":  # noqa: E501 — secrets generated; values in clear, stack.md is gitignored (Pattern B)
@@ -558,7 +573,7 @@ def render_stack_md(info: dict) -> str:
         # (users shipped it to staging unchanged).
         jwt_secret = secrets.token_urlsafe(48)
         auth_lines = """\
- - .claude/stacks/auth/auth-local.md
+ - .sdd/stacks/auth/auth-local.md
  - AUTH_JWT_AUDIENCE:{app_name}
  - AUTH_JWT_EXPIRATION:4
  - AUTH_JWT_ISSUER:{app_name}Back
@@ -568,7 +583,7 @@ def render_stack_md(info: dict) -> str:
         # portal — no random generation possible. Lines are commented to force
         # explicit action (no fake placeholder shipped to prod).
         auth_lines = """\
- - .claude/stacks/auth/azure-ad.md
+ - .sdd/stacks/auth/azure-ad.md
 # - AZ_TENANTID:<paste-tenant-id-from-azure-portal>
 # - AZ_CLIENTID:<paste-client-id-from-app-registration>
 # - AZ_DOMAIN:<your-domain.com>
@@ -674,6 +689,70 @@ def create_workspace_skeleton(dry_run: bool) -> None:
             p.mkdir(parents=True, exist_ok=True)
     if not dry_run:
         _print_ok(f"Created {len(targets)} workspace directories")
+
+
+def build_harness_facades(dry_run: bool, harness: str = "claude-code", provider: str = "anthropic") -> bool:
+    """Regénère les façades harnais depuis `.sdd/` via harness_build.py.
+
+    Post-clone : les répertoires `.claude/{agents,commands,rules}/`, `.claude/CLAUDE.md`,
+    `.codex/`, `.gemini/` sont gitignorés (SSoT unique = `.sdd/`). Cette étape
+    matérialise les façades pour que Claude Code / Codex / Gemini puissent lire
+    leurs fichiers natifs au démarrage de session.
+
+    Args:
+        dry_run: preview only.
+        harness: harnais à builder (`claude-code | codex | gemini-cli`).
+        provider: fournisseur modèle (`anthropic | openai | google | moonshot`).
+    """
+    builder = REPO_ROOT / ".sdd" / "harness_build.py"
+    out_dir = REPO_ROOT / ".sdd" / ".build" / harness.replace("-", "-")
+    if dry_run:
+        _print_info(f"(dry-run) would build façade {harness}/{provider} from .sdd/")
+        return True
+    if not builder.is_file():
+        _print_warn(f"No harness_build.py at {builder} — skipping façade build")
+        return False
+    layers = ["--agents-only", "--commands-only", "--rules-only", "--memory-only"]
+    # Codex & Gemini n'ont pas de couche agents matérialisée
+    if harness in ("codex", "gemini-cli"):
+        layers = ["--commands-only", "--memory-only"]
+    cmd = [
+        sys.executable, str(builder),
+        "--harness", harness,
+        "--provider", provider,
+        "--out", str(out_dir),
+        *layers,
+    ]
+    if harness != "claude-code":
+        cmd.append("--deploy")  # codex/gemini installent la façade en racine
+    _print_info(f"Building harness façade {harness} ({provider}) ...")
+    try:
+        env = os.environ.copy()
+        env["SDD_ALLOW_UNTESTED_HARNESS"] = "1"  # codex/gemini pas encore conformance-tested
+        result = subprocess.run(cmd, cwd=REPO_ROOT, capture_output=True, text=True, check=False, env=env)
+        if result.returncode != 0:
+            _print_warn(f"harness_build.py exited {result.returncode}")
+            _print_warn(f"stderr (tail) : {result.stderr[-300:]}")
+            return False
+        # Pour claude-code : deploy manuel (le --deploy est bloqué sur .claude/ par design)
+        if harness == "claude-code":
+            claude_dir = REPO_ROOT / ".claude"
+            for layer in ("agents", "commands", "rules"):
+                src = out_dir / layer
+                dst = claude_dir / layer
+                if src.is_dir():
+                    dst.mkdir(parents=True, exist_ok=True)
+                    for f in src.iterdir():
+                        if f.is_file():
+                            (dst / f.name).write_bytes(f.read_bytes())
+            claude_md_src = out_dir / "CLAUDE.md"
+            if claude_md_src.is_file():
+                (claude_dir / "CLAUDE.md").write_bytes(claude_md_src.read_bytes())
+        _print_ok(f"Façade {harness} built + deployed")
+        return True
+    except (OSError, subprocess.SubprocessError) as e:
+        _print_warn(f"harness_build.py failed: {e}")
+        return False
 
 
 def install_python_deps(dry_run: bool) -> bool:
@@ -790,7 +869,7 @@ def print_next_steps(info: dict) -> None:
       5. **Run the live console** (optional) :
          /sdd-serve                   # spawns backend + frontend + console (http://127.0.0.1:4000)
 
-      Docs : .claude/docs/quickstart.md (full walkthrough)
+      Docs : .sdd/docs/quickstart.md (full walkthrough)
              .claude/CLAUDE.md         (framework overview)
     """)
     print(msg)
@@ -894,7 +973,7 @@ def main() -> int:
         """),
     )
     parser.add_argument("--combo", choices=[*sorted(COMBOS), "custom"],
-                        help="Skip the stack-choice prompt with a preset (c1/c2 validated end-to-end, c3-c13 bench-validated runtime — tous SLA-éligibles, SSoT .claude/templates/combos.json).")
+                        help="Skip the stack-choice prompt with a preset (c1/c2 validated end-to-end, c3-c13 bench-validated runtime — tous SLA-éligibles, SSoT .sdd/templates/combos.json).")
     parser.add_argument("--dry-run", action="store_true",
                         help="Show actions without writing files / installing.")
     parser.add_argument("--skip-install", action="store_true",
@@ -981,6 +1060,18 @@ def main() -> int:
         _print_header("Dependencies")
         if not install_python_deps(args.dry_run):
             infra_failures.append("pip install (Python deps)")
+
+        # Régénère les façades harnais depuis .sdd/ (gitignorées post-Phase 1).
+        # Sans ce build, `.claude/agents/`, `.claude/commands/`, etc. sont
+        # vides après un checkout frais → Claude Code perd tous ses agents.
+        _print_header("Harness façades (regenerated from .sdd/)")
+        if not build_harness_facades(args.dry_run, harness="claude-code", provider="anthropic"):
+            infra_failures.append("harness_build.py claude-code (façade Claude)")
+        # Codex + Gemini : opt-in silencieux (build si les binaires sont dispos)
+        # — non-bloquant même si absents.
+        build_harness_facades(args.dry_run, harness="codex", provider="anthropic")
+        build_harness_facades(args.dry_run, harness="gemini-cli", provider="anthropic")
+
         if not install_console_deps(args.dry_run, auto_yes=args.auto_init):
             # console deps are optional (user can run later) — only fail
             # when --auto-init since CI cannot recover interactively

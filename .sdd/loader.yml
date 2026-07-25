@@ -46,7 +46,7 @@ po:
   model_tier: balanced   # loader Claude: claude-sonnet-4-6 — parité pivot .sdd/agents/po.agent.yaml + agent-bounds.yaml
   reads:
     # Order: stable → semi → volatile (spécifique provider Anthropic — réinterprété par adaptateur)
-    - .claude/templates/us.template.md         # cache_layer: stable (spécifique provider Anthropic)
+    - .sdd/templates/us.template.md         # cache_layer: stable (spécifique provider Anthropic)
     - workspace/.sys/.context/constitution.md # v3 — si présent (lecture acteurs/glossaire) · cache_layer: semi
     - workspace/feats/{n}-*.md           # FEAT parente (1 fichier) · cache_layer: volatile
   writes:
@@ -65,9 +65,9 @@ arch:
   model_tier: balanced   # loader Claude: claude-sonnet-4-6 — parité pivot + bounds
   reads:
     - workspace/stack/stack.md     # cache_layer: stable (spécifique provider Anthropic)
-    - .claude/stacks/{cat}/{active}.md   # tous stacks actifs (sélectif) · cache_layer: stable
-    - .claude/stacks/archi/{ArchiPattern}.md  # MVC (défaut) / DDD / microservice — UNIQUEMENT si AppType=back-front · cache_layer: stable
-    - .claude/templates/adr.template.md  # v3 — nécessaire pour Phase D · cache_layer: stable
+    - .sdd/stacks/{cat}/{active}.md   # tous stacks actifs (sélectif) · cache_layer: stable
+    - .sdd/stacks/archi/{ArchiPattern}.md  # MVC (défaut) / DDD / microservice — UNIQUEMENT si AppType=back-front · cache_layer: stable
+    - .sdd/templates/adr.template.md  # v3 — nécessaire pour Phase D · cache_layer: stable
     - workspace/.sys/.context/constitution.md     # v3 — si présent · cache_layer: semi
     - workspace/.sys/.context/adrs/ADR-*.md       # v3 — index existants (idempotence) · cache_layer: semi
   writes:
@@ -106,12 +106,12 @@ dev-backend:
   reads:
     # --- stable (spécifique provider Anthropic — réinterprété par adaptateur) ---
     - workspace/stack/stack.md                     # Project Config · cache_layer: stable
-    - .claude/stacks/backend/{active}.md           # cache_layer: stable
-    - .claude/stacks/fullstack/{active}.md         # cache_layer: stable · status: experimental (n'utiliser que si AppType=fullstack)
-    - .claude/stacks/archi/{ArchiPattern}.md       # MVC | DDD | microservice · cache_layer: stable
-    - .claude/stacks/auth/{active}.md              # cache_layer: stable
-    - .claude/rules/dev-shared-preflight.md        # v7.0.0 — STEP 0/0.5/1/1.bis hoist cross-agent · cache_layer: stable
-    - .claude/rules/build-and-loop.md              # v7.0.0 — SSOT patterns dev-* · cache_layer: stable
+    - .sdd/stacks/backend/{active}.md           # cache_layer: stable
+    - .sdd/stacks/fullstack/{active}.md         # cache_layer: stable · status: experimental (n'utiliser que si AppType=fullstack)
+    - .sdd/stacks/archi/{ArchiPattern}.md       # MVC | DDD | microservice · cache_layer: stable
+    - .sdd/stacks/auth/{active}.md              # cache_layer: stable
+    - .sdd/rules/dev-shared-preflight.md        # v7.0.0 — STEP 0/0.5/1/1.bis hoist cross-agent · cache_layer: stable
+    - .sdd/rules/build-and-loop.md              # v7.0.0 — SSOT patterns dev-* · cache_layer: stable
     - .claude/digests/error-classification.dev-backend.md   # taxonomie classes + pilotage build_loop · cache_layer: stable
     # --- semi-stable (invariant intra-FEAT, invalidé par /arch-init) ---
     - workspace/src/{Project}/CLAUDE.md            # CLAUDE.md projet · cache_layer: semi
@@ -133,8 +133,8 @@ dev-backend:
     - workspace/us/{other}                 # autres US
     - workspace/feats/
     - workspace/ui/{other}.html             # mockups HTML d'autres US
-    - .claude/stacks/frontend/
-    - .claude/stacks/ui/
+    - .sdd/stacks/frontend/
+    - .sdd/stacks/ui/
   modes:
     - normal: "{n}-{m}"                 # plan inline + code + build
     - plan_only: "{n}-{m}:plan"         # produit plan, STOP avant code
@@ -149,11 +149,11 @@ dev-frontend:
   model_tier: deep   # loader Claude: claude-opus-4-8 — parité pivot + bounds
   reads:
     - workspace/stack/stack.md              # lu UNE FOIS en STEP 0 Phase B (v5.0) · cache_layer: stable
-    - .claude/stacks/frontend/{active}.md  # fallback si CLAUDE.md insuffisant · cache_layer: stable
-    - .claude/stacks/ui/{active}.md        # mapping composants DS (§2 + §7) · cache_layer: stable
-    - .claude/stacks/auth/{active}.md      # patterns d'injection auth client · cache_layer: stable
-    - .claude/rules/dev-shared-preflight.md   # v7.0.0 — STEP 0/0.5/1/1.bis hoist cross-agent · cache_layer: stable
-    - .claude/rules/build-and-loop.md         # v7.0.0 — SSOT patterns dev-* · cache_layer: stable
+    - .sdd/stacks/frontend/{active}.md  # fallback si CLAUDE.md insuffisant · cache_layer: stable
+    - .sdd/stacks/ui/{active}.md        # mapping composants DS (§2 + §7) · cache_layer: stable
+    - .sdd/stacks/auth/{active}.md      # patterns d'injection auth client · cache_layer: stable
+    - .sdd/rules/dev-shared-preflight.md   # v7.0.0 — STEP 0/0.5/1/1.bis hoist cross-agent · cache_layer: stable
+    - .sdd/rules/build-and-loop.md         # v7.0.0 — SSOT patterns dev-* · cache_layer: stable
     - .claude/digests/error-classification.dev-frontend.md   # taxonomie classes + pilotage build_loop · cache_layer: stable
     - workspace/src/{Project}/CLAUDE.md    # CLAUDE.md par projet · cache_layer: semi
     - workspace/us/{n}-{m}-*.md            # US ciblée (1 fichier) · cache_layer: volatile
@@ -172,7 +172,7 @@ dev-frontend:
     - workspace/us/{other}                 # autres US
     - workspace/feats/
     - workspace/ui/{other}.html             # mockups HTML des autres US
-    - .claude/stacks/backend/           # hors auth
+    - .sdd/stacks/backend/           # hors auth
   exit_silent_when:
     - "backend-only US"                 # skipped sans erreur
   modes:
@@ -192,7 +192,7 @@ dev-frontend:
 elicitor:
   model_tier: balanced   # loader Claude: claude-sonnet-4-6 — parité pivot + bounds (ceiling balanced, arbitrage 2026-07-24)
   reads:
-    - .claude/templates/risks-assumptions.template.md  # cache_layer: stable
+    - .sdd/templates/risks-assumptions.template.md  # cache_layer: stable
     - workspace/.sys/.context/constitution.md   # si présent (acteurs cumulés) · cache_layer: semi
     - workspace/feats/{n}-*.md             # FEAT ciblée · cache_layer: volatile
   writes:
@@ -219,7 +219,7 @@ elicitor:
 qa:
   model_tier: balanced   # loader Claude: claude-sonnet-4-6 — parité pivot + bounds
   reads:
-    - .claude/stacks/qa/{active}.md    # tous QA stacks actifs (sélectif) · cache_layer: stable
+    - .sdd/stacks/qa/{active}.md    # tous QA stacks actifs (sélectif) · cache_layer: stable
     - workspace/src/{BackendName}/CLAUDE.md  # architecture backend (passif) · cache_layer: semi
     - workspace/src/{AppName}/CLAUDE.md      # architecture frontend (passif) · cache_layer: semi
     - workspace/db/schema-slice-{n}-*.json # per-US slices Levier 4 (preferred for fixtures) · cache_layer: semi
@@ -261,12 +261,12 @@ qa:
 code-reviewer:
   model_tier: balanced   # loader Claude: claude-sonnet-4-6 — parité pivot + bounds
   reads:
-    - .claude/rules/auditor-coordination.md    # matrice ownership findings 1 domaine = 1 owner · cache_layer: stable
+    - .sdd/rules/auditor-coordination.md    # matrice ownership findings 1 domaine = 1 owner · cache_layer: stable
     - workspace/stack/stack.md             # Project Config (CodeReviewMode, CodeReviewFailOn) · cache_layer: stable
     - .claude/digests/error-classification.code-reviewer.md      # taxonomie [REVIEW_*] §1.10 · cache_layer: stable
-    - .claude/rules/build-and-loop.md            # Partie B : anti-derive bullets, plan structure, QA ownership · cache_layer: stable
-    - .claude/stacks/backend/{active}.md   # §1.3 layer mapping + §3 conventions + §2.4 libs · cache_layer: stable
-    - .claude/stacks/frontend/{active}.md  # §1.3 + §3 (frontend uniquement) · cache_layer: stable
+    - .sdd/rules/build-and-loop.md            # Partie B : anti-derive bullets, plan structure, QA ownership · cache_layer: stable
+    - .sdd/stacks/backend/{active}.md   # §1.3 layer mapping + §3 conventions + §2.4 libs · cache_layer: stable
+    - .sdd/stacks/frontend/{active}.md  # §1.3 + §3 (frontend uniquement) · cache_layer: stable
     - workspace/src/{BackendName}/CLAUDE.md  # architecture backend · cache_layer: semi
     - workspace/src/{AppName}/CLAUDE.md      # architecture frontend · cache_layer: semi
     - workspace/src/{BackendName}/**       # code production (fallback convention si pas de plan) · cache_layer: semi
@@ -281,9 +281,9 @@ code-reviewer:
   forbidden_reads:
     - workspace/us/{other-feat}            # autres FEATs
     - workspace/feats/{other}.md            # autres FEATs
-    - .claude/stacks/qa/                          # hors scope review (responsabilité qa)
-    - .claude/stacks/auth/                        # hors scope (review focus code applicatif)
-    - .claude/stacks/ui/                          # hors scope (a11y → ingest axe-core CI)
+    - .sdd/stacks/qa/                          # hors scope review (responsabilité qa)
+    - .sdd/stacks/auth/                        # hors scope (review focus code applicatif)
+    - .sdd/stacks/ui/                          # hors scope (a11y → ingest axe-core CI)
     - workspace/.sys/.context/             # constitution/ADRs hors scope
     - workspace/db/                        # console.db (responsabilité qa, hors scope)
   forbidden_writes:
@@ -314,12 +314,12 @@ code-reviewer:
 arch-reviewer:
   model_tier: balanced   # loader Claude: claude-sonnet-4-6 — parité pivot + bounds
   reads:
-    - .claude/rules/auditor-coordination.md    # matrice ownership findings 1 domaine = 1 owner · cache_layer: stable
+    - .sdd/rules/auditor-coordination.md    # matrice ownership findings 1 domaine = 1 owner · cache_layer: stable
     - workspace/stack/stack.md                # Project Config + Active Architecture Pattern + Active Tech Specs · cache_layer: stable
     - .claude/digests/error-classification.arch-reviewer.md         # taxonomie [ARCH_*] · cache_layer: stable
-    - .claude/stacks/archi/{mvc|ddd|microservice}.md  # §2 couches + §3 principes + §4 naming canonique · cache_layer: stable
-    - .claude/stacks/backend/{active}.md            # §1.3 layer mapping backend · cache_layer: stable
-    - .claude/stacks/frontend/{active}.md           # §1.3 layer mapping frontend · cache_layer: stable
+    - .sdd/stacks/archi/{mvc|ddd|microservice}.md  # §2 couches + §3 principes + §4 naming canonique · cache_layer: stable
+    - .sdd/stacks/backend/{active}.md            # §1.3 layer mapping backend · cache_layer: stable
+    - .sdd/stacks/frontend/{active}.md           # §1.3 layer mapping frontend · cache_layer: stable
     - workspace/.sys/.context/constitution.md  # §2 glossaire + §6 ADRs index · cache_layer: semi
     - workspace/.sys/.context/adrs/ADR-*.md  # ADRs (## Decision pour drift check) · cache_layer: semi
     - workspace/src/{BackendName}/**         # code production (Glob via plan) · cache_layer: semi
@@ -332,7 +332,7 @@ arch-reviewer:
   forbidden_reads:
     - workspace/us/{other-feat}              # autres FEATs
     - workspace/feats/{other}.md              # autres FEATs
-    - .claude/stacks/qa/                            # hors scope arch (responsabilité qa)
+    - .sdd/stacks/qa/                            # hors scope arch (responsabilité qa)
     - workspace/db/                          # console.db (rapports auditeurs = lecture via DB)
   forbidden_writes:
     - workspace/src/                         # read-only strict (rapport seul)
@@ -370,7 +370,7 @@ arch-reviewer:
 adversarial-reviewer:
   model_tier: balanced   # loader Claude: claude-sonnet-4-6 — parité pivot + bounds
   reads:
-    - .claude/rules/auditor-coordination.md    # matrice ownership findings 1 domaine = 1 owner · cache_layer: stable
+    - .sdd/rules/auditor-coordination.md    # matrice ownership findings 1 domaine = 1 owner · cache_layer: stable
     - workspace/stack/stack.md                              # Project Config (AdversarialReviewMode, Min/Max) · cache_layer: stable
     - .claude/digests/error-classification.adversarial-reviewer.md                       # taxonomie [ADV_*] §1.15 · cache_layer: stable
     - workspace/src/{BackendName}/**                       # ≤ 3 fichiers ciblés via §2.3, jamais Glob récursif · cache_layer: semi
@@ -390,7 +390,7 @@ adversarial-reviewer:
     - workspace/us/{other-feat}                            # autres FEATs
     - workspace/feats/{other}.md                            # autres FEATs
     - workspace/.sys/.context/                             # hors scope direct
-    - .claude/stacks/qa/                                          # hors scope
+    - .sdd/stacks/qa/                                          # hors scope
   forbidden_writes:
     - workspace/src/                                       # read-only strict
     - workspace/us/                                        # responsabilité po
@@ -421,12 +421,12 @@ adversarial-reviewer:
 security-reviewer:
   model_tier: balanced   # loader Claude: claude-sonnet-4-6 — parité pivot + bounds (floor balanced : 8 classes [SEC_*] hard-blocking)
   reads:
-    - .claude/rules/auditor-coordination.md    # matrice ownership findings 1 domaine = 1 owner · cache_layer: stable
+    - .sdd/rules/auditor-coordination.md    # matrice ownership findings 1 domaine = 1 owner · cache_layer: stable
     - workspace/stack/stack.md                # Project Config (SecurityMode, SecurityFailOn, *Enabled) · cache_layer: stable
     - .claude/digests/error-classification.security-reviewer.md         # taxonomie [SEC_*] §1.11 · cache_layer: stable
-    - .claude/stacks/backend/{active}.md §1.3+§3+§2.4   # cache_layer: stable
-    - .claude/stacks/frontend/{active}.md §1.3+§3       # cache_layer: stable
-    - .claude/stacks/auth/{active}.md §2-§3         # patterns d'auth (lecture passive) · cache_layer: stable
+    - .sdd/stacks/backend/{active}.md §1.3+§3+§2.4   # cache_layer: stable
+    - .sdd/stacks/frontend/{active}.md §1.3+§3       # cache_layer: stable
+    - .sdd/stacks/auth/{active}.md §2-§3         # patterns d'auth (lecture passive) · cache_layer: stable
     - workspace/src/{BackendName}/CLAUDE.md  # architecture backend · cache_layer: semi
     - workspace/src/{AppName}/CLAUDE.md      # architecture frontend · cache_layer: semi
     - workspace/src/{BackendName}/**         # code production (fallback convention) · cache_layer: semi
@@ -442,8 +442,8 @@ security-reviewer:
   forbidden_reads:
     - workspace/us/{other-feat}            # autres FEATs
     - workspace/feats/{other}.md            # autres FEATs
-    - .claude/stacks/qa/                          # hors scope (responsabilité qa)
-    - .claude/stacks/ui/                          # hors scope
+    - .sdd/stacks/qa/                          # hors scope (responsabilité qa)
+    - .sdd/stacks/ui/                          # hors scope
     - workspace/db/                        # console.db (responsabilité qa, hors scope direct)
   forbidden_writes:
     - workspace/src/                       # read-only strict (jamais de patch)
@@ -482,7 +482,7 @@ security-reviewer:
 spec-compliance-reviewer:
   model_tier: balanced   # loader Claude: claude-sonnet-4-6 — parité pivot + bounds
   reads:
-    - .claude/rules/auditor-coordination.md    # matrice ownership findings 1 domaine = 1 owner · cache_layer: stable
+    - .sdd/rules/auditor-coordination.md    # matrice ownership findings 1 domaine = 1 owner · cache_layer: stable
     - workspace/stack/stack.md             # Project Config (SpecComplianceMode, SpecComplianceFailOn) · cache_layer: stable
     - .claude/digests/error-classification.spec-compliance-reviewer.md      # taxonomie [SPEC_*] §1.13 · cache_layer: stable
     - workspace/src/{BackendName}/**      # code production (fallback convention si pas de plan) · cache_layer: semi
@@ -500,7 +500,7 @@ spec-compliance-reviewer:
     - workspace/.sys/.validation/{n}-code-review.*   # NEVER (bias toward not-trust-report)
     - workspace/.sys/.validation/{n}-security-scan.* # NEVER
     - workspace/db/                        # console.db qa_* (NEVER, bias not-trust-report)
-    - .claude/stacks/qa/                          # hors scope
+    - .sdd/stacks/qa/                          # hors scope
     - workspace/.sys/.context/             # hors scope direct
   forbidden_writes:
     - workspace/src/                       # read-only strict (jamais de patch)
@@ -526,8 +526,8 @@ constitutioner:
   model_tier: balanced   # loader Claude: claude-sonnet-4-6 — parité pivot + bounds (floor fast confirmé 2026-07-24)
   reads:
     - workspace/stack/stack.md                   # cache_layer: stable
-    - .claude/templates/adr.template.md                # cache_layer: stable
-    - .claude/rules/ownership.md                       # Partie B §3 numérotation atomique ADR · cache_layer: stable
+    - .sdd/templates/adr.template.md                # cache_layer: stable
+    - .sdd/rules/ownership.md                       # Partie B §3 numérotation atomique ADR · cache_layer: stable
     - .claude/digests/error-classification.constitutioner.md            # cache_layer: stable
     - workspace/.sys/.context/constitution.md   # cache_layer: semi
     - workspace/.sys/.context/adrs/ADR-*.md     # idempotence par slug · cache_layer: semi
@@ -552,8 +552,8 @@ constitutioner:
 specbook-writer:
   model_tier: balanced   # loader Claude: claude-sonnet-4-6 — parité pivot + bounds (floor fast, candidat fast canonique)
   reads:
-    - .claude/rules/output-protocol.md                 # cache_layer: stable
-    - .claude/rules/error-classification.md             # cache_layer: stable
+    - .sdd/rules/output-protocol.md                 # cache_layer: stable
+    - .sdd/rules/error-classification.md             # cache_layer: stable
     - workspace/feats/{n}-*.md                          # FEAT source · cache_layer: semi
     - workspace/us/{n}-*-*.md                           # US filles (enrichissement optionnel) · cache_layer: volatile
   writes:

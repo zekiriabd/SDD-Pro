@@ -32,7 +32,7 @@ from harness_build import (  # noqa: E402
     main,
 )
 
-N_COMMANDS = len(list((SDD_HOME / "commands").glob("*.cmd.yaml")))
+N_COMMANDS = len(list((SDD_HOME / "commands").glob("*.md")))
 
 
 @pytest.fixture()

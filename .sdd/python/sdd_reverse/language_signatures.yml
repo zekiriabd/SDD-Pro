@@ -1,0 +1,254 @@
+# language_signatures.yml — SDD_Pro reverse engineering language detection
+#
+# SSoT for D1 (language-agnostic detection) + §5.6 (confidence_cap per language).
+# All confidence_cap values ∈ {high, medium, low} — never hardcoded elsewhere.
+#
+# Schema: see .sdd/docs/reverse-engineering-workflow.md §8.1
+#
+# Extensibility: add a new language entry, then re-run framework_smoke.
+# No code change required.
+
+schemaVersion: 1
+languages:
+
+  # === DOTNET FAMILY ===
+
+  - id: aspx-webforms
+    label: ASP.NET WebForms
+    family: dotnet
+    file_extensions: [.aspx, .ascx, .master, .ashx, .asax]   # Bug #3 fix: ajout .asax (Global) explicite
+    evidence_patterns:
+      - { pattern: '<%@\s+Page\s+', weight: 1.0, description: "Page directive ASPX" }
+      - { pattern: '<%@\s+Master\s+', weight: 1.0, description: "Master page directive" }
+      - { pattern: '<%@\s+Application\s+', weight: 1.0, description: "Global.asax application directive" }
+      - { pattern: '<%@\s+WebHandler\s+', weight: 1.0, description: ".ashx WebHandler directive" }
+      - { pattern: 'runat="server"', weight: 0.8, description: "Server-side control" }
+      - { pattern: 'CodeBehind="', weight: 0.9, description: "Code-behind attribute" }
+      - { pattern: 'CodeFile="', weight: 0.9, description: "Code-file attribute (older)" }
+      - { pattern: '<asp:\w+', weight: 0.7, description: "asp: server control tag" }
+    framework_signatures:
+      - { id: dotnet-framework, evidence: '<compilation\s+targetFramework="', version_extract: 'targetFramework="([0-9.]+)"' }
+      - { id: aspnet-webforms-runtime, evidence: '<httpRuntime\s+targetFramework="', version_extract: 'targetFramework="([0-9.]+)"' }
+    confidence_cap: high
+    excluded_paths: [bin/, obj/, packages/, App_Data/, .vs/]
+
+  - id: dotnet-mvc
+    label: ASP.NET MVC (classique)
+    family: dotnet
+    file_extensions: [.cshtml, .vbhtml]
+    evidence_patterns:
+      - { pattern: '@model\s+', weight: 1.0, description: "Razor @model directive" }
+      - { pattern: '@Html\.', weight: 0.8, description: "HtmlHelper usage" }
+      - { pattern: '@using\s+', weight: 0.6, description: "Razor @using" }
+    framework_signatures:
+      - { id: aspnet-mvc, evidence: '<add\s+namespace="System\.Web\.Mvc"', version_extract: null }
+      - { id: aspnet-mvc-pkg, evidence: '<package\s+id="Microsoft\.AspNet\.Mvc"\s+version="([^"]+)"', version_extract: 'Microsoft\.AspNet\.Mvc"\s+version="([^"]+)"' }
+    confidence_cap: high
+    excluded_paths: [bin/, obj/, packages/]
+
+  - id: csharp
+    label: C# (générique, hors MVC/WebForms)
+    family: dotnet
+    file_extensions: [.cs]
+    evidence_patterns:
+      - { pattern: '\busing\s+System;', weight: 0.5, description: "Standard using" }
+      - { pattern: '\bnamespace\s+', weight: 0.6, description: "Namespace declaration" }
+      - { pattern: ':\s*Controller\s*\b', weight: 0.9, description: "Controller class" }
+      - { pattern: ':\s*ControllerBase\s*\b', weight: 0.9, description: "API Controller" }
+      - { pattern: '\bActionResult\b', weight: 0.7, description: "Action return type" }
+    confidence_cap: high
+    excluded_paths: [bin/, obj/, packages/, .vs/]
+
+  - id: vbnet
+    label: VB.NET (source .vb)
+    family: dotnet
+    file_extensions: [.vb]
+    evidence_patterns:
+      # Audit 2026-06-10 C7 : .vb etait absent de TOUTES les signatures —
+      # une app WebForms VB.NET produisait un inventaire quasi vide en silence.
+      - { pattern: '^\s*Imports\s+System', weight: 0.6, description: "Imports System" }
+      - { pattern: '\bPublic\s+Class\s+\w+', weight: 0.8, description: "Public Class declaration" }
+      - { pattern: '\bEnd\s+Class\b', weight: 0.6, description: "End Class terminator" }
+      - { pattern: '\bModule\s+\w+', weight: 0.7, description: "VB Module" }
+      - { pattern: '\bNamespace\s+\w+', weight: 0.5, description: "Namespace declaration" }
+      - { pattern: '\bInherits\s+System\.Web\.UI\.Page\b', weight: 1.0, description: "WebForms VB code-behind" }
+      - { pattern: '\bEnd\s+Sub\b', weight: 0.5, description: "End Sub terminator" }
+    confidence_cap: medium  # parsing structurel best-effort (line-based, pas de braces)
+    excluded_paths: [bin/, obj/, packages/, .vs/, My Project/]
+
+  - id: classic-asp
+    label: Classic ASP (VBScript)
+    family: dotnet
+    file_extensions: [.asp]
+    evidence_patterns:
+      - { pattern: '<%@\s*Language\s*=', weight: 1.0, description: "ASP language directive" }
+      - { pattern: 'Server\.CreateObject\(', weight: 0.9, description: "COM instantiation" }
+      - { pattern: 'Response\.Write\b', weight: 0.8, description: "ASP Response.Write" }
+      - { pattern: 'Request\.(?:Form|QueryString)\b', weight: 0.8, description: "ASP request access" }
+      - { pattern: '<%\s*=', weight: 0.5, description: "ASP inline expression" }
+    confidence_cap: medium
+    excluded_paths: []
+
+  - id: wpf-xaml
+    label: WPF (.NET Framework + Core/.NET 5+)
+    family: dotnet
+    file_extensions: [.xaml]
+    evidence_patterns:
+      # Namespace WPF canonique — signature certaine (poids fort)
+      - { pattern: 'xmlns="http://schemas\.microsoft\.com/winfx/2006/xaml/presentation"', weight: 5.0, description: "WPF Presentation namespace" }
+      - { pattern: 'xmlns:x="http://schemas\.microsoft\.com/winfx/2006/xaml"', weight: 4.0, description: "XAML namespace" }
+      # Racines de fichier XAML WPF
+      - { pattern: '<Window\b', weight: 3.0, description: "WPF Window root" }
+      - { pattern: '<Page\b', weight: 3.0, description: "WPF Page root" }
+      - { pattern: '<UserControl\b', weight: 3.0, description: "WPF UserControl root" }
+      - { pattern: '<Application\b', weight: 2.5, description: "App.xaml entry" }
+      - { pattern: '<ResourceDictionary\b', weight: 2.0, description: "WPF resource dictionary" }
+      # Contrôles distinctifs (vs Silverlight / UWP / MAUI qui partagent certains tags)
+      - { pattern: '<DataGrid\b', weight: 1.5, description: "WPF DataGrid (post .NET 4.0)" }
+      - { pattern: '<TextBox\b', weight: 1.0, description: "TextBox control" }
+      - { pattern: '<TextBlock\b', weight: 1.0, description: "TextBlock label" }
+      - { pattern: '<StackPanel\b', weight: 1.0, description: "StackPanel layout" }
+      - { pattern: 'x:Class="', weight: 2.0, description: "Code-behind binding" }
+    framework_signatures:
+      # WPF .NET Framework classique — détecté via App.xaml + clr-namespace
+      - { id: wpf-netframework, evidence: 'xmlns:local="clr-namespace:[^"]+"', version_extract: null }
+      # WPF moderne (.NET 5/6/7/8) — TargetFramework dans .csproj voisin (out-of-scope ici, fait via manifest)
+    confidence_cap: high
+    excluded_paths: [bin/, obj/, packages/, .vs/, AppPackages/]
+
+  # === JAVA FAMILY ===
+
+  - id: java-ee
+    label: Java EE (servlets/JSP/JSF)
+    family: java
+    file_extensions: [.java, .jsp, .jspx, .xhtml]
+    evidence_patterns:
+      - { pattern: '@WebServlet', weight: 1.0, description: "Servlet 3.0+ annotation" }
+      - { pattern: 'extends\s+HttpServlet', weight: 0.9, description: "Legacy servlet" }
+      - { pattern: '<%@\s+page\s+', weight: 0.9, description: "JSP directive" }
+      - { pattern: '@ManagedBean', weight: 0.8, description: "JSF bean" }
+      - { pattern: '<f:view', weight: 0.8, description: "JSF view tag" }
+    framework_signatures:
+      - { id: java-ee, evidence: '<web-app\s+xmlns', version_extract: null }
+    confidence_cap: high
+    excluded_paths: [target/, .gradle/, build/, .idea/]
+
+  - id: spring-mvc
+    label: Spring MVC (legacy)
+    family: java
+    file_extensions: [.java]
+    evidence_patterns:
+      - { pattern: '@Controller\b', weight: 1.0, description: "Spring controller" }
+      - { pattern: '@RequestMapping', weight: 0.9, description: "Spring routing" }
+      - { pattern: 'import\s+org\.springframework', weight: 0.7, description: "Spring import" }
+    confidence_cap: high
+    excluded_paths: [target/, .gradle/, build/, .idea/]
+
+  # === PHP FAMILY ===
+
+  - id: php-framework
+    label: PHP framework (Laravel/Symfony/CodeIgniter)
+    family: php
+    file_extensions: [.php, .blade.php, .twig]
+    evidence_patterns:
+      - { pattern: '\bnamespace\s+App\\', weight: 0.8, description: "App namespace (PSR-4)" }
+      - { pattern: '\buse\s+Illuminate\\', weight: 1.0, description: "Laravel" }
+      - { pattern: '\buse\s+Symfony\\', weight: 1.0, description: "Symfony" }
+      - { pattern: '\bextends\s+CI_Controller', weight: 0.9, description: "CodeIgniter controller" }
+      - { pattern: '@extends\(', weight: 0.8, description: "Blade template" }
+    confidence_cap: high
+    excluded_paths: [vendor/, node_modules/, storage/, cache/]
+
+  - id: php-procedural
+    label: PHP procédural (sans framework)
+    family: php
+    file_extensions: [.php]
+    evidence_patterns:
+      - { pattern: '<\?php', weight: 0.5, description: "PHP open tag" }
+      - { pattern: '\bmysql_query\(', weight: 0.7, description: "ext/mysql legacy" }
+      - { pattern: '\binclude\s*\(.+\.php', weight: 0.5, description: "Include-based architecture" }
+      - { pattern: '\$_POST\[', weight: 0.5, description: "Direct POST access" }
+    confidence_cap: medium  # legacy procédural = qualité inférieure attendue
+    excluded_paths: [vendor/]
+    max_file_size_kb: 500   # ADV-8 : monolithic PHP can hit 100k+ LOC, sample head+tail
+
+  # === DELPHI ===
+
+  - id: delphi-source
+    label: Delphi (source .pas + DFM)
+    family: delphi
+    file_extensions: [.pas, .dfm, .dpr]
+    evidence_patterns:
+      - { pattern: '\bunit\s+\w+;', weight: 0.9, description: "Pascal unit declaration" }
+      - { pattern: '\bobject\s+\w+:\s*T\w+', weight: 1.0, description: "DFM form/object" }
+      - { pattern: '\binterface\s*\n', weight: 0.6, description: "Pascal interface section" }
+      - { pattern: '\bimplementation\s*\n', weight: 0.6, description: "Pascal implementation section" }
+      - { pattern: '\bprocedure\s+T\w+\.', weight: 0.7, description: "Method definition" }
+    # Downgrade high→medium (audit 2026-06-11 M14) : pas de graphe de
+    # classes hors .NET — extraction limitée à détection + data-access + UI.
+    confidence_cap: medium
+    excluded_paths: [__history/, __recovery/, dcu/, exe/]
+
+  # === JS/JQUERY ===
+
+  - id: javascript-jquery
+    label: JavaScript + jQuery (legacy)
+    family: web
+    file_extensions: [.js]
+    evidence_patterns:
+      - { pattern: '\$\(document\)\.ready', weight: 1.0, description: "jQuery ready" }
+      - { pattern: '\$\.ajax\(', weight: 0.8, description: "jQuery ajax" }
+      - { pattern: '\$\(["''][^"'']+["'']\)\.', weight: 0.7, description: "jQuery selector" }
+    confidence_cap: medium  # legacy front, beaucoup d'imprécisions runtime
+    excluded_paths: [node_modules/, dist/, build/, .min.js]
+    max_file_size_kb: 500   # ADV-8 : bundled jQuery legacy can be huge
+
+  # === VB6 ===
+
+  - id: vb6
+    label: Visual Basic 6 (source .frm/.bas)
+    family: vb
+    file_extensions: [.frm, .bas, .cls, .vbp]
+    evidence_patterns:
+      - { pattern: 'VERSION\s+5\.00', weight: 1.0, description: "VB6 file version" }
+      - { pattern: 'Begin\s+VB\.Form\s+', weight: 1.0, description: "VB6 form" }
+      - { pattern: 'Begin\s+VB\.\w+\s+', weight: 0.8, description: "VB6 control declaration" }
+      - { pattern: '^Attribute\s+VB_Name\s+=', weight: 0.9, description: "VB attribute" }
+    confidence_cap: medium  # legacy critique, qualité variable
+    excluded_paths: []
+
+  # === SQL (always detected alongside main language) ===
+
+  - id: tsql
+    label: T-SQL (SQL Server)
+    family: sql
+    file_extensions: [.sql]
+    evidence_patterns:
+      - { pattern: '\bCREATE\s+TABLE\b', weight: 1.0, description: "DDL CREATE TABLE" }
+      - { pattern: '\bCREATE\s+PROCEDURE\b', weight: 1.0, description: "Stored procedure" }
+      - { pattern: '\bGO\s*\n', weight: 0.7, description: "T-SQL batch separator" }
+      - { pattern: '\bNVARCHAR\(', weight: 0.6, description: "T-SQL type" }
+    confidence_cap: high
+    excluded_paths: []
+
+  - id: plpgsql
+    label: PL/pgSQL (PostgreSQL)
+    family: sql
+    file_extensions: [.sql, .pgsql]
+    evidence_patterns:
+      - { pattern: '\bCREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\b', weight: 1.0, description: "PL/pgSQL function" }
+      - { pattern: '\bCREATE\s+(?:OR\s+REPLACE\s+)?PROCEDURE\b', weight: 1.0, description: "PG 11+ procedure" }
+      - { pattern: '\bLANGUAGE\s+plpgsql\b', weight: 1.0, description: "plpgsql language tag" }
+      - { pattern: '\bRETURNS\s+(?:SETOF\s+|TABLE)', weight: 0.7, description: "set-returning function" }
+    confidence_cap: high
+    excluded_paths: []
+
+  # === FALLBACK ===
+
+  - id: unknown
+    label: Langage non signé
+    family: unknown
+    file_extensions: []
+    evidence_patterns: []
+    confidence_cap: low
+    excluded_paths: []

@@ -17,9 +17,32 @@
 .claude/.cache/
 
 # Cache de build du transpileur multi-harnais (.sdd/.build/ = jetable, régénéré
-# par harness_build.py). Les façades déployées .codex/ et .gemini/ sont, elles,
-# des produits de build versionnables (garde CI anti-drift prévue Phase 2.4).
+# par harness_build.py).
 .sdd/.build/
+
+# ============================================================================
+# Façades générées (harness_build.py) — MIGRATION-PLAN Phase 1 close 2026-07-25.
+# ============================================================================
+# `.sdd/` = SSoT unique édité à la main (agents, commands, rules, skills,
+# templates, stacks, docs, python, providers). Les 3 harnais consomment ce
+# foyer neutre via des FAÇADES générées :
+#   - `.claude/{agents,commands,rules}/` + `.claude/CLAUDE.md` : matérialisées
+#     par ClaudeAdapter (le harness natif lit sur disque).
+#   - `.codex/` : matérialisée par CodexAdapter (AGENTS.md + prompts/ + config.toml).
+#   - `.gemini/` : matérialisée par GeminiAdapter (GEMINI.md + commands/*.toml).
+#
+# Régénération : `python .sdd/harness_build.py --harness <h> --provider <p>
+#                 --out .sdd/.build/<h> --agents-only --commands-only
+#                 --memory-only --rules-only [--deploy]`
+# bootstrap.py appelle cette commande au clone du repo. La garde
+# `protect_framework.py` refuse toute édition manuelle (agents produit) —
+# seul harness_build.py peut écrire dans ces répertoires.
+.claude/agents/
+.claude/commands/
+.claude/rules/
+.claude/CLAUDE.md
+.codex/
+.gemini/
 
 # Workspace runtime SDD (scaffolding, secrets, projets générés) — jamais commité.
 # stack.md porte DB_PASSWORD / AUTH_JWT_SECRET en clair (CLAUDE.md §9), les

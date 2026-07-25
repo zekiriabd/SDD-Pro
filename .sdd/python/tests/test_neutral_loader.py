@@ -66,9 +66,46 @@ def _loader_agents() -> dict[str, dict]:
 
 
 def _pivots() -> dict[str, dict]:
-    files = sorted(AGENTS_DIR.glob("*.agent.yaml"))
-    assert files, f"aucun pivot *.agent.yaml sous {AGENTS_DIR}"
-    return {f.name.removesuffix(".agent.yaml"): _load_yaml(f) for f in files}
+    """Retourne les pivots agents parseés depuis les .md consolidés (2026-07-25).
+
+    Chaque `.sdd/agents/{name}.md` porte un frontmatter YAML avec name/description/
+    model_tier/tier_default/tier_floor/tier_ceiling/tools. Le body markdown suit.
+    """
+    import re
+    files = sorted(AGENTS_DIR.glob("*.md"))
+    assert files, f"aucun pivot *.md sous {AGENTS_DIR}"
+    result: dict[str, dict] = {}
+    for f in files:
+        text = f.read_text(encoding="utf-8-sig")
+        m = re.match(r"^---\s*\n(.*?)\n---\s*(?:\n|$)", text, re.DOTALL)
+        if not m:
+            continue
+        # Parse YAML frontmatter (minimal, no external dep needed for our simple format)
+        try:
+            import yaml
+            fm = yaml.safe_load(m.group(1)) or {}
+        except ImportError:
+            fm = _load_yaml_inline(m.group(1))
+        result[f.stem] = fm
+    return result
+
+
+def _load_yaml_inline(text: str) -> dict:
+    """Fallback minimal YAML parser (no PyYAML)."""
+    out: dict = {}
+    for line in text.splitlines():
+        line = line.rstrip()
+        if not line or line.startswith("#") or line.startswith(" "):
+            continue
+        if ":" in line:
+            k, _, v = line.partition(":")
+            v = v.strip()
+            # Simple list [a, b, c]
+            if v.startswith("[") and v.endswith("]"):
+                out[k.strip()] = [x.strip() for x in v[1:-1].split(",") if x.strip()]
+            else:
+                out[k.strip()] = v
+    return out
 
 
 def _bounds() -> dict[str, dict]:

@@ -80,7 +80,7 @@ nav:
 theme:
   name: material
   language: fr   # primary language (FR docs canonical) ; EN via i18n plugin
-  # logo: assets/logo.svg     # à réactiver quand les assets existent (.claude/docs/assets/ absent)
+  # logo: assets/logo.svg     # à réactiver quand les assets existent (.sdd/docs/assets/ absent)
   # favicon: assets/favicon.ico   # à réactiver quand les assets existent
 
   # Color palette : dark + light toggle (matches our console web theme)

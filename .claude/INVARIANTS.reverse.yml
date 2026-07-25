@@ -22,14 +22,14 @@ invariants:
       sdd_reverse/ modules MUST NOT import from sdd_lib, sdd_scripts, sdd_admin,
       sdd_hooks. D4 strict isolation. Helpers are duplicated locally
       (atomic_write_local.py, file_locks_local.py) — parity validated separately.
-    enforcer: .claude/python/sdd_reverse_scripts/reverse_smoke.py
+    enforcer: .sdd/python/sdd_reverse_scripts/reverse_smoke.py
     class: REVERSE_ISOLATION_VIOLATION
 
   - id: reverse-loader-autonomous
     description: |
       loader.reverse.yml MUST be referenced ONLY by reverse commands (frontmatter
       `loader:` field) and the starting-a-reverse-eng skill. NEVER by loader.yml.
-    enforcer: .claude/python/sdd_reverse_scripts/reverse_smoke.py
+    enforcer: .sdd/python/sdd_reverse_scripts/reverse_smoke.py
     class: REVERSE_ISOLATION_VIOLATION
 
   - id: reverse-evidence-required
@@ -38,7 +38,7 @@ invariants:
       carry <!-- evidence: path:Lstart-Lend --> in the same paragraph. Items
       without evidence MUST be rejected by the agent (never written). Enforced
       structurally by validate_reverse_feat.py.
-    enforcer: .claude/python/sdd_reverse_scripts/validate_reverse_feat.py
+    enforcer: .sdd/python/sdd_reverse_scripts/validate_reverse_feat.py
     class: REVERSE_EVIDENCE_MISSING
 
   - id: reverse-confidence-enum-strict
@@ -46,14 +46,14 @@ invariants:
       The `confidence` value (in frontmatter AND in <!-- confidence: ... -->
       comments) MUST be one of {high, medium, low}. No medium-high, no other
       values. Strict enum gate enforced by validate_reverse_feat.py.
-    enforcer: .claude/python/sdd_reverse_scripts/validate_reverse_feat.py
+    enforcer: .sdd/python/sdd_reverse_scripts/validate_reverse_feat.py
     class: REVERSE_GATE_DRIFT
 
   - id: reverse-gate-comment-sync
     description: |
       The <!-- REVERSE-GATE: confidence=X ; allow-sdd-full=Y --> comment MUST
       match the frontmatter.confidence. Desync → [REVERSE_GATE_DRIFT] (ADV-22).
-    enforcer: .claude/python/sdd_reverse_scripts/validate_reverse_feat.py
+    enforcer: .sdd/python/sdd_reverse_scripts/validate_reverse_feat.py
     class: REVERSE_GATE_DRIFT
 
   - id: reverse-lock-format-valid
@@ -63,7 +63,7 @@ invariants:
       is opportunistic (psutil optional), TTL is the authority. TTL is
       parameterized per phase (audit C5 2026-06-09) : 1800s for Phase 3
       extraction, 60s for preallocation/crosscut, 30s = bare helper default.
-    enforcer: .claude/python/sdd_reverse_scripts/reverse_smoke.py
+    enforcer: .sdd/python/sdd_reverse_scripts/reverse_smoke.py
     class: REVERSE_LOCK_HELD
 
   - id: reverse-inventory-schema-v1
@@ -78,7 +78,7 @@ invariants:
       reverse_smoke.check_inventory_schema_v1 runtime returns WARN; this
       manifest is aligned to the code (audit 2026-06-11 MA-8), not vice versa.
     severity: WARN
-    enforcer: .claude/python/sdd_reverse_scripts/reverse_smoke.py
+    enforcer: .sdd/python/sdd_reverse_scripts/reverse_smoke.py
     class: REVERSE_INVENTORY_SCHEMA_STALE
 
   - id: reverse-db-schema-enrichment-separate
@@ -86,14 +86,14 @@ invariants:
       Phase 2 (reverse-tech-auditor) MUST write to db-schema.enrichment.json
       (separate file), NEVER to db-schema.json directly. ADV-3 + ADV-17.
       Union performed by deterministic merge_db_schema.py.
-    enforcer: .claude/python/sdd_reverse_scripts/reverse_smoke.py
+    enforcer: .sdd/python/sdd_reverse_scripts/reverse_smoke.py
     class: REVERSE_ENRICHMENT_INVALID
 
   - id: reverse-no-spawn-of-agents
     description: |
       Reverse agents MUST NOT spawn other agents. /sdd-reverse-full is a
       command sequencer, NOT an agent (§9 rules/reverse-engineering.md).
-    enforcer: .claude/python/sdd_reverse_scripts/reverse_smoke.py
+    enforcer: .sdd/python/sdd_reverse_scripts/reverse_smoke.py
     class: (informational)
 
   - id: reverse-no-dead-code
@@ -105,7 +105,7 @@ invariants:
       reverse-functional-extractor (decommissioned) while a command still
       spawned it would FAIL. Prose mentions in docs/rules/CHANGELOG are NOT
       checked (historical references are legitimate).
-    enforcer: .claude/python/sdd_reverse_scripts/reverse_smoke.py
+    enforcer: .sdd/python/sdd_reverse_scripts/reverse_smoke.py
     class: (informational)
 
   - id: reverse-ladder-traceability
@@ -115,17 +115,17 @@ invariants:
       is verifiable. Gaps emit [REVERSE_LADDER_TRACEABILITY_GAP] (informational,
       never blocking, never filled by invention). Confidence is min-monotone
       ascending (3c <= 3b <= 3a).
-    enforcer: .claude/python/sdd_reverse_scripts/check_ladder_traceability.py
+    enforcer: .sdd/python/sdd_reverse_scripts/check_ladder_traceability.py
     class: REVERSE_LADDER_TRACEABILITY_GAP
 
   - id: reverse-template-isolated
     description: |
       Phase 3c (reverse-feat-composer) MUST read its template from
-      .claude/python/sdd_reverse/feat.reverse.template.md (local copy) ; les
+      .sdd/python/sdd_reverse/feat.reverse.template.md (local copy) ; les
       barreaux 3a/3b lisent analysis.reverse.template.md / us.reverse.template.md
-      (mêmes copies locales isolées). Never fallback to .claude/templates/*
+      (mêmes copies locales isolées). Never fallback to .sdd/templates/*
       (standard SDD_Pro templates). ADV-9 closure.
-    enforcer: .claude/python/sdd_reverse_scripts/reverse_smoke.py
+    enforcer: .sdd/python/sdd_reverse_scripts/reverse_smoke.py
     class: REVERSE_TEMPLATE_MISSING
 
 # L0-L6 deepening contracts (V2 2026-06-10 — informational, enforced by the
@@ -141,7 +141,7 @@ deepening_contracts:
       chain (page→code-behind→service→repository), while the U-N fingerprint is
       computed from seedEvidenceFiles only (stability). units[].classes carries
       role-classified reached classes. (L0)
-    enforcer: .claude/python/tests/test_sdd_reverse_code_graph.py
+    enforcer: .sdd/python/tests/test_sdd_reverse_code_graph.py
     class: (informational)
 
   - id: reverse-deep-technical-extraction-l1
@@ -149,7 +149,7 @@ deepening_contracts:
       Phase 1 MUST emit data-access.json (inline SQL + stored proc defs/calls +
       params), config.json (connection strings, secrets masked), dependencies.json
       (NuGet/.csproj PackageReference + assembly refs + bin DLLs). (L1)
-    enforcer: .claude/python/tests/test_sdd_reverse_l1_extraction.py
+    enforcer: .sdd/python/tests/test_sdd_reverse_l1_extraction.py
     class: (informational)
 
   - id: reverse-code-driven-units-l2
@@ -157,14 +157,14 @@ deepening_contracts:
       Backend/API-only legacies (no UI page) MUST still yield functional units
       (controllers → kind:api, orphan modules → kind:module). Support-only types
       never form a unit alone. (L2)
-    enforcer: .claude/python/tests/test_sdd_reverse_l2_units.py
+    enforcer: .sdd/python/tests/test_sdd_reverse_l2_units.py
     class: (informational)
 
   - id: reverse-crosscutting-feats-l3
     description: |
       generate_crosscutting_feats.py MUST emit {n}-Libraries.md + {n}-Database.md
       that pass validate_reverse_feat.py, with idempotent allocation. (L3)
-    enforcer: .claude/python/tests/test_sdd_reverse_l3_crosscutting.py
+    enforcer: .sdd/python/tests/test_sdd_reverse_l3_crosscutting.py
     class: (informational)
 
   - id: reverse-preallocation-parallel-safe-l5
@@ -172,7 +172,7 @@ deepening_contracts:
       preallocate_feats.py fixes (n,Name) for all units deterministically; once
       pre-allocated, Phase 3 extraction is parallel-safe (agent skips inventory
       write-back). extraction-cache.json skips unchanged units. (L5, rules §8.2)
-    enforcer: .claude/python/tests/test_sdd_reverse_l5_industrial.py
+    enforcer: .sdd/python/tests/test_sdd_reverse_l5_industrial.py
     class: REVERSE_COMPLETENESS_GAP
 
   - id: reverse-db-readonly-proc
@@ -185,7 +185,7 @@ deepening_contracts:
       framework rule [DB_STRUCTURE_CHANGE_FORBIDDEN]. Defence-in-depth: a
       dedicated read-only DB login (GRANT VIEW DEFINITION + db_datareader) is
       recommended. Enforced by the offline test suite (no DB needed).
-    enforcer: .claude/python/tests/test_sdd_reverse_proc.py
+    enforcer: .sdd/python/tests/test_sdd_reverse_proc.py
     class: REVERSE_DB_READONLY_VIOLATION
 
   - id: reverse-proc-model-1proc-1us-1module-1feat
@@ -195,7 +195,7 @@ deepening_contracts:
       the FEAT is composed from the module's US (build_proc_feats) WITHOUT
       re-reading the T-SQL bodies. Confidence is min-monotone over the module's
       procedures. Generated FEATs pass validate_reverse_feat.py.
-    enforcer: .claude/python/tests/test_sdd_reverse_proc.py
+    enforcer: .sdd/python/tests/test_sdd_reverse_proc.py
     class: (informational)
 
   - id: reverse-roundtrip-parity-l6
@@ -204,7 +204,7 @@ deepening_contracts:
       deep repository class, inline SQL, stored procs (+params/OUTPUT), connection
       strings, libraries (NuGet + assembly), and class roles — the deterministic
       contract behind "legacy → specs → /sdd-full → equivalent app". (L6)
-    enforcer: .claude/python/tests/test_sdd_reverse_l6_roundtrip.py
+    enforcer: .sdd/python/tests/test_sdd_reverse_l6_roundtrip.py
     class: (informational)
 
 # Drift detection (informational, V2 — see §15.1 design doc)
@@ -215,7 +215,7 @@ drift_checks:
       validate_reverse_feat.py SHOULD stay aligned with structural checks of
       validate_readiness.py. WARN if a check exists in standard but not in
       reverse (out-of-scope OK, but should be noticed).
-    enforcer: .claude/python/sdd_reverse_scripts/reverse_smoke.py
+    enforcer: .sdd/python/sdd_reverse_scripts/reverse_smoke.py
     class: REVERSE_VALIDATOR_DRIFT
 
   - id: helper-parity-drift
@@ -224,5 +224,5 @@ drift_checks:
       semantically equivalent to sdd_lib/atomic_write.py + sdd_lib/file_locks.py.
       Compare hashes against _parity_snapshots.json — WARN if either upstream
       file changed (review needed).
-    enforcer: .claude/python/sdd_reverse_scripts/reverse_smoke.py
+    enforcer: .sdd/python/sdd_reverse_scripts/reverse_smoke.py
     class: REVERSE_HELPER_DRIFT

@@ -1,7 +1,7 @@
 """Tests de la couche RULES (Phase 2 multi-harness — surface identité Claude).
 
 (a) MANIFEST — `.sdd/rules-manifest.yaml` liste les 11 rules vivantes, chaque
-    entrée porte `name` + `body_source` (-> `.claude/rules/*.md` existant) +
+    entrée porte `name` + `body_source` (-> `.sdd/rules/*.md` existant) +
     `scope` (universal|path-scoped). Aucune rule vivante orpheline.
 (b) ROUND-TRIP identité — `ClaudeAdapter.emit_rules` régénère chaque rule sous
     un temp SOUS `.sdd/.build/` ; le contenu régénéré DOIT être byte-identique
@@ -39,7 +39,8 @@ from harness_build import (  # noqa: E402
     main,
 )
 
-LIVE_RULES_DIR = REPO_ROOT / ".claude" / "rules"
+# Bi-racine 2026-07-25 : rules migrées vers .sdd/rules/.
+LIVE_RULES_DIR = SDD_HOME / "rules"
 MANIFEST = SDD_HOME / "rules-manifest.yaml"
 VALID_SCOPES = {"universal", "path-scoped"}
 
@@ -76,7 +77,7 @@ def test_manifest_present_and_wellformed():
 
 
 def test_manifest_covers_every_live_rule():
-    """Aucune rule vivante orpheline (parité manifest <-> .claude/rules/)."""
+    """Aucune rule vivante orpheline (parité manifest <-> .sdd/rules/)."""
     live = {p.stem for p in LIVE_RULES_DIR.glob("*.md")}
     manifested = {e["name"] for e in _load_rules_manifest(SDD_HOME)}
     assert manifested == live, (

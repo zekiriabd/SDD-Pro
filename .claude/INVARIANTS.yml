@@ -21,7 +21,7 @@
 #   added         : ISO date when invariant was introduced
 #   audit_ref     : audit ticket reference (P0/P1/P2/P3 + identifier)
 #
-# Smoke test : .claude/python/tests/test_invariants_manifest.py verifies
+# Smoke test : .sdd/python/tests/test_invariants_manifest.py verifies
 # that every listed enforcer file exists. Removing an enforcer without
 # updating this manifest = test failure.
 
@@ -40,9 +40,9 @@ invariants:
       quality findings on code that fails spec is wasteful.
     severity: critical
     enforcers:
-      - .claude/python/sdd_hooks/enforce_two_stage_auditor.py
-      - .claude/python/sdd_scripts/sdd_review.py  # check_spec_gate() in standalone /sdd-review
-      - .claude/python/sdd_scripts/query_console_db.py  # spec-compliance-present predicate
+      - .sdd/python/sdd_hooks/enforce_two_stage_auditor.py
+      - .sdd/python/sdd_scripts/sdd_review.py  # check_spec_gate() in standalone /sdd-review
+      - .sdd/python/sdd_scripts/query_console_db.py  # spec-compliance-present predicate
     bypasses:
       - "Project Config: AuditorBatchMode: legacy-parallel"
       - "Env: SDD_BYPASS_TWO_STAGE=1 (one-shot, audit-logged)"
@@ -59,8 +59,8 @@ invariants:
       at read time. SDD_CONFIG_STRICT=1 turns the WARN into a hard error.
     severity: major
     enforcers:
-      - .claude/python/sdd_lib/layered_config.py  # _warn_unknown_keys()
-      - .claude/templates/project-config.schema.json  # canonical key list
+      - .sdd/python/sdd_lib/layered_config.py  # _warn_unknown_keys()
+      - .sdd/templates/project-config.schema.json  # canonical key list
     bypasses:
       - "Env: SDD_DISABLE_UNKNOWN_KEY_WARN=1 (silence WARN)"
       - "Schema additionalProperties: true (tolerate at read, warn separately)"
@@ -71,13 +71,13 @@ invariants:
     name: CLI flags in commands/*.md must be parsed by Python OR @llm-only-flag annotated
     description: |
       Every --flag declared in a slash command .md must either have a real
-      argparse handler in a Python script under .claude/python/ OR be
+      argparse handler in a Python script under .sdd/python/ OR be
       annotated with @llm-only-flag (or @llm-only-flags-file at file level)
       to make the LLM-interpretation explicit. Prevents doc-theater flags
       that nobody actually parses.
     severity: major
     enforcers:
-      - .claude/python/tests/test_cli_flags_declared.py
+      - .sdd/python/tests/test_cli_flags_declared.py
     bypasses: []
     added: 2026-06-08
     audit_ref: P3-E2
@@ -91,8 +91,8 @@ invariants:
       Catches stale references that would silently fail at runtime.
     severity: major
     enforcers:
-      - .claude/python/tests/test_agent_references_integrity.py
-      - .claude/python/tests/test_loader_contract.py
+      - .sdd/python/tests/test_agent_references_integrity.py
+      - .sdd/python/tests/test_loader_contract.py
     bypasses: []
     added: 2026-06-08
     audit_ref: P3-E3
@@ -100,14 +100,14 @@ invariants:
   - id: file-ownership-matrix
     name: One owner per file path under workspace/src/
     description: |
-      The file ownership matrix in .claude/rules/ownership.md §1 declares
+      The file ownership matrix in .sdd/rules/ownership.md §1 declares
       who owns each path (dev-backend → {BackendName}, dev-frontend → {AppName},
       arch → {LibName} bootstrap, etc.). audit_file_ownership hook detects
       violations at SubagentStop.
     severity: critical
     enforcers:
-      - .claude/python/sdd_hooks/audit_file_ownership.py
-      - .claude/rules/ownership.md  # canonical matrix
+      - .sdd/python/sdd_hooks/audit_file_ownership.py
+      - .sdd/rules/ownership.md  # canonical matrix
     bypasses: []
     added: 2026-05-12
     audit_ref: ownership-v6.x
@@ -120,8 +120,8 @@ invariants:
       [STACK_LIBRARY_MISSING] forces Tech Lead arbitration before re-run.
     severity: critical
     enforcers:
-      - .claude/python/sdd_scripts/detect_capabilities.py
-      - .claude/rules/library-and-stack.md  # canonical workflow
+      - .sdd/python/sdd_scripts/detect_capabilities.py
+      - .sdd/rules/library-and-stack.md  # canonical workflow
     bypasses:
       - "Built-in language stdlib (BCL, Node natives, Python stdlib, java/kotlin.*)"
       - "Transitive deps auto-installed by package manager"
@@ -136,7 +136,7 @@ invariants:
       with [COST_CAP_EXCEEDED]. Bypass requires explicit Tech Lead opt-in.
     severity: critical
     enforcers:
-      - .claude/python/sdd_hooks/preflight_cost_cap.py
+      - .sdd/python/sdd_hooks/preflight_cost_cap.py
     bypasses:
       - "Env: SDD_DISABLE_COST_CAP=1 (one-shot, audit-logged)"
       - "Project Config: MaxCostPerRun: 0 (disable cap entirely)"
@@ -152,8 +152,8 @@ invariants:
       builds (vs convergence-pathological caught by iter limit).
     severity: major
     enforcers:
-      - .claude/python/sdd_hooks/preflight_cost_cap.py  # shared mechanism
-      - .claude/rules/error-classification.md  # taxonomy class definition
+      - .sdd/python/sdd_hooks/preflight_cost_cap.py  # shared mechanism
+      - .sdd/rules/error-classification.md  # taxonomy class definition
     bypasses:
       - "Project Config: BuildLoopMaxCostUsd: 0"
     added: 2026-06-05
@@ -168,7 +168,7 @@ invariants:
       Bypass requires editing settings.local.json (Tech Lead, gitignored).
     severity: critical
     enforcers:
-      - .claude/python/sdd_hooks/block_env_bypass.py
+      - .sdd/python/sdd_hooks/block_env_bypass.py
       - .claude/settings.json  # deny patterns
     bypasses:
       - "Tech Lead edits .claude/settings.local.json (per-dev override, gitignored)"
@@ -184,8 +184,8 @@ invariants:
       Fix : re-run /us-generate {n} (idempotent).
     severity: major
     enforcers:
-      - .claude/python/sdd_hooks/resolve_po_hash_sentinel.py
-      - .claude/rules/error-classification.md  # [FEAT_HASH_MISMATCH] §1.2
+      - .sdd/python/sdd_hooks/resolve_po_hash_sentinel.py
+      - .sdd/rules/error-classification.md  # [FEAT_HASH_MISMATCH] §1.2
     bypasses: []
     added: 2026-06-05
     audit_ref: v7.0.0-audit-§6-P1-11
@@ -199,7 +199,7 @@ invariants:
       Prompt cache prefix hit cross-session.
     severity: minor
     enforcers:
-      - .claude/python/sdd_hooks/session_start.py
+      - .sdd/python/sdd_hooks/session_start.py
       - .claude/settings.json  # SessionStart matcher
     bypasses:
       - "Env: SDD_DISABLE_SESSION_START=1 (no-op empty context)"
@@ -216,8 +216,8 @@ invariants:
       no longer spawned by any pipeline.
     severity: minor
     enforcers:
-      - .claude/python/sdd_scripts/complexity_router.py
-      - .claude/python/sdd_hooks/auto_invoke_complexity_router.py  # PreToolUse Skill
+      - .sdd/python/sdd_scripts/complexity_router.py
+      - .sdd/python/sdd_hooks/auto_invoke_complexity_router.py  # PreToolUse Skill
     bypasses:
       - "Project Config: ComplexityRouterMode: off | manual (default manual)"
       - "Env: SDD_DISABLE_AUTO_ROUTER=1"
@@ -239,8 +239,8 @@ invariants:
       Test files themselves = allowed. Framework code (.claude/) = allowed.
     severity: major
     enforcers:
-      - .claude/python/sdd_hooks/enforce_tdd.py  # PreToolUse Edit|Write|MultiEdit
-      - .claude/skills/test-driven-development/SKILL.md
+      - .sdd/python/sdd_hooks/enforce_tdd.py  # PreToolUse Edit|Write|MultiEdit
+      - .sdd/skills/test-driven-development/SKILL.md
     bypasses:
       - "Env: SDD_TDD_MODE=off (no enforcement)"
       - "Env: SDD_TDD_MODE=warn (default interactive : warn, no block)"

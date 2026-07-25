@@ -1,7 +1,7 @@
 # Sections proposées pour `stack.md.template` — 2 axes + sélection de modèle
 
 > **PROPOSITION versionnée à part (Phase 1.7 / 1.9)** — le vrai
-> `.claude/templates/stack.md.template` n'est PAS modifié par cet incrément.
+> `.sdd/templates/stack.md.template` n'est PAS modifié par cet incrément.
 > Insertion prévue : ~l.34, avant `## Project Config`. Défauts
 > rétro-compatibles : **absence de section = claude-code / anthropic / static**.
 

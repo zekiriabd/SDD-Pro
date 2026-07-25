@@ -32,31 +32,31 @@ Détection : regex `@\.claude/[^\s\x60)\]]*` sur `body_source`
 |---|---|
 | 1 | `@.claude/INVARIANTS.yml` |
 | 1 | `@.claude/commands/*.md` |
-| 1 | `@.claude/docs/` |
-| 1 | `@.claude/docs/CHANGELOG.md` |
-| 1 | `@.claude/docs/VERSIONING.md` |
-| 1 | `@.claude/docs/architecture.md` |
-| 1 | `@.claude/docs/brainstorming-techniques.md` |
-| 2 | `@.claude/docs/conventions.md` |
-| 1 | `@.claude/docs/cookbook.md` |
-| 1 | `@.claude/docs/quickstart.md` |
-| 1 | `@.claude/docs/reverse-db-audit-2026-07.md` |
-| 1 | `@.claude/docs/reverse-engineering-workflow.md` |
-| 1 | `@.claude/docs/reverse-proc-engineering.audit.md` |
-| 2 | `@.claude/docs/validated-combos.md` |
-| 1 | `@.claude/docs/{VERSIONING,CHANGELOG,MIGRATION,WORKING-AGREEMENT}.md` |
-| 1 | `@.claude/docs/{WHY-SDD-PRO,COMPLIANCE,SLA,KNOWN-LIMITATIONS}.md` |
-| 1 | `@.claude/docs/{architecture,workflow,conventions,quickstart,gates-map}.md` |
-| 1 | `@.claude/docs/{glossary,hooks-and-protections,config-precedence,po-guide,ux-designer-guide}.md` |
-| 1 | `@.claude/docs/{poc-roi-methodology,roadmap-v7-v8,cache-strategy,validated-combos,orphan-cleanup-policy}.md` |
+| 1 | `@.sdd/docs/` |
+| 1 | `@.sdd/docs/CHANGELOG.md` |
+| 1 | `@.sdd/docs/VERSIONING.md` |
+| 1 | `@.sdd/docs/architecture.md` |
+| 1 | `@.sdd/docs/brainstorming-techniques.md` |
+| 2 | `@.sdd/docs/conventions.md` |
+| 1 | `@.sdd/docs/cookbook.md` |
+| 1 | `@.sdd/docs/quickstart.md` |
+| 1 | `@.sdd/docs/reverse-db-audit-2026-07.md` |
+| 1 | `@.sdd/docs/reverse-engineering-workflow.md` |
+| 1 | `@.sdd/docs/reverse-proc-engineering.audit.md` |
+| 2 | `@.sdd/docs/validated-combos.md` |
+| 1 | `@.sdd/docs/{VERSIONING,CHANGELOG,MIGRATION,WORKING-AGREEMENT}.md` |
+| 1 | `@.sdd/docs/{WHY-SDD-PRO,COMPLIANCE,SLA,KNOWN-LIMITATIONS}.md` |
+| 1 | `@.sdd/docs/{architecture,workflow,conventions,quickstart,gates-map}.md` |
+| 1 | `@.sdd/docs/{glossary,hooks-and-protections,config-precedence,po-guide,ux-designer-guide}.md` |
+| 1 | `@.sdd/docs/{poc-roi-methodology,roadmap-v7-v8,cache-strategy,validated-combos,orphan-cleanup-policy}.md` |
 | 1 | `@.claude/loader.yml` |
-| 1 | `@.claude/python/README.md` |
-| 2 | `@.claude/rules/` |
-| 1 | `@.claude/rules/library-and-stack.md` |
-| 1 | `@.claude/rules/output-protocol.md` |
-| 1 | `@.claude/rules/reverse-engineering.md` |
-| 1 | `@.claude/skills/` |
-| 1 | `@.claude/templates/combos.json` |
+| 1 | `@.sdd/python/README.md` |
+| 2 | `@.sdd/rules/` |
+| 1 | `@.sdd/rules/library-and-stack.md` |
+| 1 | `@.sdd/rules/output-protocol.md` |
+| 1 | `@.sdd/rules/reverse-engineering.md` |
+| 1 | `@.sdd/skills/` |
+| 1 | `@.sdd/templates/combos.json` |
 
 ## Politique de réécriture (variantes non-Claude)
 

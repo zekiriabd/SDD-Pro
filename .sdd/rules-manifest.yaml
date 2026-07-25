@@ -2,7 +2,7 @@
 #
 # Les 11 rules sont du markdown pur harness-neutre. Le foyer neutre ne
 # duplique PAS leur contenu : chaque entrée porte un `body_source` pointant
-# vers le fichier vivant `.claude/rules/*.md` (lecture seule), même patron
+# vers le fichier vivant `.sdd/rules/*.md` (lecture seule), même patron
 # que les pivots agents/commandes/entrypoint. La régénération Claude est une
 # IDENTITÉ (normalisation BOM + CRLF/CR -> LF uniquement) — golden test
 # byte-identique.
@@ -15,7 +15,7 @@
 #                  Code). 9 rules. TOK-C1 (CLAUDE.md §5).
 #
 # harness_mapping — comment chaque harnais consomme la couche rules :
-#   claude-code : fichiers `.claude/rules/*.md` (path-scoped natif). IDENTITÉ.
+#   claude-code : fichiers `.sdd/rules/*.md` (path-scoped natif). IDENTITÉ.
 #   codex       : PAS de mécanisme path-scoped. Les 2 universelles sont
 #                 inlinées dans AGENTS.md ; les 9 path-scoped sont référencées
 #                 par pointeur (chargement paresseux non disponible -> l'agent
@@ -36,35 +36,35 @@ harness_mapping:
 
 rules:
   - name: auditor-coordination
-    body_source: .claude/rules/auditor-coordination.md
+    body_source: .sdd/rules/auditor-coordination.md
     scope: path-scoped
   - name: auditor-orchestration
-    body_source: .claude/rules/auditor-orchestration.md
+    body_source: .sdd/rules/auditor-orchestration.md
     scope: path-scoped
   - name: build-and-loop
-    body_source: .claude/rules/build-and-loop.md
+    body_source: .sdd/rules/build-and-loop.md
     scope: path-scoped
   - name: dev-shared-preflight
-    body_source: .claude/rules/dev-shared-preflight.md
+    body_source: .sdd/rules/dev-shared-preflight.md
     scope: path-scoped
   - name: error-classification-legacy
-    body_source: .claude/rules/error-classification-legacy.md
+    body_source: .sdd/rules/error-classification-legacy.md
     scope: path-scoped
   - name: error-classification
-    body_source: .claude/rules/error-classification.md
+    body_source: .sdd/rules/error-classification.md
     scope: universal
   - name: library-and-stack
-    body_source: .claude/rules/library-and-stack.md
+    body_source: .sdd/rules/library-and-stack.md
     scope: path-scoped
   - name: output-protocol
-    body_source: .claude/rules/output-protocol.md
+    body_source: .sdd/rules/output-protocol.md
     scope: universal
   - name: ownership
-    body_source: .claude/rules/ownership.md
+    body_source: .sdd/rules/ownership.md
     scope: path-scoped
   - name: quality
-    body_source: .claude/rules/quality.md
+    body_source: .sdd/rules/quality.md
     scope: path-scoped
   - name: reverse-engineering
-    body_source: .claude/rules/reverse-engineering.md
+    body_source: .sdd/rules/reverse-engineering.md
     scope: path-scoped

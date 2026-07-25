@@ -13,10 +13,10 @@ This guide covers : **how to set up**, **what to work on**, **how to test**, and
 | Doc | Why |
 |---|---|
 | [.claude/CLAUDE.md](.claude/CLAUDE.md) | 150-line entry point — orient yourself |
-| [.claude/docs/getting-started.md](.claude/docs/getting-started.md) | Tutorial — try the framework end-to-end |
-| [.claude/docs/architecture.md](.claude/docs/architecture.md) | Component model + mermaid diagrams |
-| [.claude/docs/WORKING-AGREEMENT.md](.claude/docs/WORKING-AGREEMENT.md) | Norms (PR size, naming, tests) |
-| [.claude/docs/VERSIONING.md](.claude/docs/VERSIONING.md) | SemVer + ADR policy for governance changes |
+| [.sdd/docs/getting-started.md](.sdd/docs/getting-started.md) | Tutorial — try the framework end-to-end |
+| [.sdd/docs/architecture.md](.sdd/docs/architecture.md) | Component model + mermaid diagrams |
+| [.sdd/docs/WORKING-AGREEMENT.md](.sdd/docs/WORKING-AGREEMENT.md) | Norms (PR size, naming, tests) |
+| [.sdd/docs/VERSIONING.md](.sdd/docs/VERSIONING.md) | SemVer + ADR policy for governance changes |
 
 ### Pick the right type of contribution
 
@@ -24,11 +24,11 @@ This guide covers : **how to set up**, **what to work on**, **how to test**, and
 |---|---|
 | Fix a typo / improve doc | PR directly to `next` branch |
 | Fix a bug in a Python script | Add a test, then fix |
-| Add a new stack (`backend/`, `frontend/`, `ui/`...) | Follow [poc-roi-methodology.md](.claude/docs/poc-roi-methodology.md) — the bar is real |
+| Add a new stack (`backend/`, `frontend/`, `ui/`...) | Follow [poc-roi-methodology.md](.sdd/docs/poc-roi-methodology.md) — the bar is real |
 | Modify an agent prompt | Discuss in an issue first — agent prompts are load-bearing |
-| Change the hooks chain / settings.json | Requires ADR `governance-protection-*` (cf. [WORKING-AGREEMENT.md](.claude/docs/WORKING-AGREEMENT.md)) |
+| Change the hooks chain / settings.json | Requires ADR `governance-protection-*` (cf. [WORKING-AGREEMENT.md](.sdd/docs/WORKING-AGREEMENT.md)) |
 | Modify a rule (`build-and-loop`, `quality`, `ownership`...) | Requires ADR `governance-*` |
-| Add a new error class `[CLASS]` | Edit `.claude/rules/error-classification.md` + ensure emitter exists |
+| Add a new error class `[CLASS]` | Edit `.sdd/rules/error-classification.md` + ensure emitter exists |
 
 ---
 
@@ -56,7 +56,7 @@ pip install -e .claude/python[dev]
 cd workspace/console && npm install && cd ../..
 
 # Verify
-python .claude/python/sdd_admin/framework_smoke.py
+python .sdd/python/sdd_admin/framework_smoke.py
 # Expected: OK=88+ / WARN=0-2 / FAIL=0
 ```
 
@@ -81,13 +81,13 @@ Example : `feat/stack-go-fiber`, `fix/cost-cap-windows-race`.
 
 ```bash
 # Pytest (recommended, comprehensive)
-python -m pytest .claude/python/tests/ -q
+python -m pytest .sdd/python/tests/ -q
 
 # Subset compatible with stdlib only
-python -m unittest discover -s .claude/python/tests -p "test_*.py"
+python -m unittest discover -s .sdd/python/tests -p "test_*.py"
 
 # Framework smoke (deterministic checks)
-python .claude/python/sdd_admin/framework_smoke.py
+python .sdd/python/sdd_admin/framework_smoke.py
 ```
 
 **All tests must pass** before submitting a PR. **No exceptions** — even for docs PRs (smoke validates cross-references).
@@ -95,7 +95,7 @@ python .claude/python/sdd_admin/framework_smoke.py
 ### Add a test when fixing a bug
 
 ```python
-# .claude/python/tests/test_your_fix.py
+# .sdd/python/tests/test_your_fix.py
 import unittest
 from sdd_lib.your_module import your_function
 
@@ -158,9 +158,9 @@ Before opening a PR :
 
 - [ ] Branch from `next` (not `main`)
 - [ ] Title : conventional commit format (`feat:`, `fix:`, `docs:`, `chore:`, `refactor:`)
-- [ ] All tests pass : `python -m pytest .claude/python/tests/ -q`
-- [ ] Framework smoke passes : `python .claude/python/sdd_admin/framework_smoke.py`
-- [ ] If you touched a rule / hook / agent → ADR added under `.claude/docs/adrs/`
+- [ ] All tests pass : `python -m pytest .sdd/python/tests/ -q`
+- [ ] Framework smoke passes : `python .sdd/python/sdd_admin/framework_smoke.py`
+- [ ] If you touched a rule / hook / agent → ADR added under `.sdd/docs/adrs/`
 - [ ] CHANGELOG.md updated (add/extend the top-most dated dev section, e.g. `## [v7.0.1-dev] — YYYY-MM-DD` — there is no `[Unreleased]` section)
 - [ ] No secret committed (`stack.md` is gitignored — verify with `git status`)
 - [ ] No `print()` left in production scripts (use `sys.stderr.write` or `logging`)
@@ -199,7 +199,7 @@ Pattern B (canonized 2026-06-06) : `stack.md` is the secrets SSoT. `arch` propag
 
 ### ❌ Don't create files under `workspace/` outside agents' ownership
 
-Read [`.claude/rules/ownership.md §1`](.claude/rules/ownership.md). Each agent has a strict write path. The `audit_file_ownership` hook will catch you.
+Read [`.sdd/rules/ownership.md §1`](.sdd/rules/ownership.md). Each agent has a strict write path. The `audit_file_ownership` hook will catch you.
 
 ### ❌ Don't mock the database in QA tests
 
@@ -207,7 +207,7 @@ Use `InMemoryDatabase` (EF Core), `:memory:` SQLite, or `@DataJpaTest` H2 — bu
 
 ### ❌ Don't add a new stack without running the PoC ROI
 
-The validation bar is **2 combos × 1 FEAT M end-to-end**. Read [`poc-roi-methodology.md`](.claude/docs/poc-roi-methodology.md) first. We've already had to mark `fullstack/node-react` as 🟡 POC-only after promising prematurely.
+The validation bar is **2 combos × 1 FEAT M end-to-end**. Read [`poc-roi-methodology.md`](.sdd/docs/poc-roi-methodology.md) first. We've already had to mark `fullstack/node-react` as 🟡 POC-only after promising prematurely.
 
 ---
 
@@ -220,8 +220,8 @@ If you're new, look for these labels :
 - `test` — add missing tests
 
 Examples of what makes a good first contribution :
-- Fix a typo in `.claude/docs/troubleshooting.md`
-- Add a new error class to `.claude/rules/error-classification.md` with a regression test
+- Fix a typo in `.sdd/docs/troubleshooting.md`
+- Add a new error class to `.sdd/rules/error-classification.md` with a regression test
 - Improve a mermaid diagram in `architecture.md`
 - Add a recipe to `cookbook.md` (your favorite stack combo, gotchas)
 - Add a one-pager for an existing stack (e.g. `stacks/backend/python-fastapi.md`)
@@ -230,7 +230,7 @@ Examples of what makes a good first contribution :
 
 ## 🏛 Governance — ADRs
 
-For changes that affect the public API or load-bearing behavior, create an ADR under `.claude/docs/adrs/` :
+For changes that affect the public API or load-bearing behavior, create an ADR under `.sdd/docs/adrs/` :
 
 ```bash
 # Generate the filename via the helper (collision-safe)
@@ -242,7 +242,7 @@ print(mint_adr_filename('your-decision-slug'))
 # Example output: ADR-20260606T143022-a1f2-your-decision-slug.md
 ```
 
-Then write the ADR using the template `.claude/templates/adr.template.md` (Context / Decision / Consequences / Alternatives considered).
+Then write the ADR using the template `.sdd/templates/adr.template.md` (Context / Decision / Consequences / Alternatives considered).
 
 The `arch-reviewer` agent + `index_adrs.py` will pick it up automatically.
 
@@ -275,10 +275,10 @@ By contributing, you agree your work is licensed under the same terms as the fra
 ## 🔗 Quick links
 
 - [README.md](README.md) — top-level overview
-- [.claude/docs/README.md](.claude/docs/README.md) — docs hub
-- [.claude/docs/getting-started.md](.claude/docs/getting-started.md) — tutorial
-- [.claude/docs/architecture.md](.claude/docs/architecture.md) — component model
-- [.claude/docs/troubleshooting.md](.claude/docs/troubleshooting.md) — common errors
+- [.sdd/docs/README.md](.sdd/docs/README.md) — docs hub
+- [.sdd/docs/getting-started.md](.sdd/docs/getting-started.md) — tutorial
+- [.sdd/docs/architecture.md](.sdd/docs/architecture.md) — component model
+- [.sdd/docs/troubleshooting.md](.sdd/docs/troubleshooting.md) — common errors
 
 ---
 

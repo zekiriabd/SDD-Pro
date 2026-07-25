@@ -1,5 +1,5 @@
 # Error Classification — digest for `constitutioner`
-> **GENERATED — do not edit.** Slice of `@.claude/rules/error-classification.md` for the `constitutioner` agent (audit 2026-06-12, block 5). Regenerate via `python .claude/python/sdd_admin/sync_error_class_digests.py`.
+> **GENERATED — do not edit.** Slice of `@.claude/rules/error-classification.md` for the `constitutioner` agent (audit 2026-06-12, block 5). Regenerate via `python .sdd/python/sdd_admin/sync_error_class_digests.py`.
 >
 > Contains the §0 quick-ref (full 16-family map) + this agent's families + the universal format/loop sections. For a class OUTSIDE this slice, §0 names its family — Read the full file on-demand (rule `build-and-loop.md §8`).
 ## 0. Quick reference — 16 familles (189 classes)

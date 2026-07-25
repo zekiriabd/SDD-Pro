@@ -11,7 +11,7 @@ Ce module est la GLU entre le `stack.md` (choix Tech Lead) et :
 - ``impact_report.build_impact_report`` (harnais + provider actifs).
 
 Discipline (cf. `.sdd/stack-sections.proposed.md`) : le vrai
-`.claude/templates/stack.md.template` n'est PAS modifié ici — l'édition du
+`.sdd/templates/stack.md.template` n'est PAS modifié ici — l'édition du
 template est réservée à la fenêtre coordonnée de Phase 1. Ce parseur tolère
 donc l'absence totale des sections (stack.md legacy) sans erreur.
 

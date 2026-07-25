@@ -35,7 +35,7 @@ from harness_build import (  # noqa: E402
     main,
 )
 
-N_COMMANDS = len(list((SDD_HOME / "commands").glob("*.cmd.yaml")))
+N_COMMANDS = len(list((SDD_HOME / "commands").glob("*.md")))
 
 
 @pytest.fixture()
@@ -217,8 +217,8 @@ def test_rewrite_at_includes_only_when_target_exists():
     # .sdd/loader.yml existe → réécrit vers le foyer.
     assert adapter._rewrite_at_includes("voir @.claude/loader.yml") == "voir .sdd/loader.yml"
     # .sdd/rules/ n'est PAS matérialisé → repli .claude/ résolvable (pas .sdd/ mort).
-    got = adapter._rewrite_at_includes("charge @.claude/rules/output-protocol.md")
-    assert got == "charge .claude/rules/output-protocol.md"
+    got = adapter._rewrite_at_includes("charge @.sdd/rules/output-protocol.md")
+    assert got == "charge .sdd/rules/output-protocol.md"
     # Le `@` est toujours retiré, jamais conservé.
     assert "@.claude" not in got
 

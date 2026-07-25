@@ -50,8 +50,8 @@ LIVE_AGENTS_DIR = REPO_ROOT / ".claude" / "agents"
 
 # Les 13 agents forward = pivots hors module reverse (reverse-*).
 FORWARD_AGENTS = sorted(
-    p.name.removesuffix(".agent.yaml")
-    for p in (SDD_HOME / "agents").glob("*.agent.yaml")
+    p.name.replace(".md", "")
+    for p in (SDD_HOME / "agents").glob("*.md")
     if not p.name.startswith("reverse-")
 )
 

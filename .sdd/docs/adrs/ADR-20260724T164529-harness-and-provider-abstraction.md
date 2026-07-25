@@ -171,6 +171,6 @@ et exige `SDD_ALLOW_UNTESTED_HARNESS=1` (audit-loggué, symétrique de
   `.sdd/python/tests/test_model_resolver.py`
 - Sections stack.md proposées : `.sdd/stack-sections.proposed.md`
 - ADR précédent (routage reverse) :
-  `.claude/docs/adrs/ADR-20260629T120000-7c3a-governance-reverse-complexity-ladder.md`
+  `.sdd/docs/adrs/ADR-20260629T120000-7c3a-governance-reverse-complexity-ladder.md`
 - Prototype go/no-go P0.4 (Codex spawn) : **à réaliser** — verdict à
   annexer ici avant clôture Phase 0

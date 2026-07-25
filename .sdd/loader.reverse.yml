@@ -15,7 +15,7 @@
 #     mode dynamic du resolver (level low|medium|high -> tier, clampé
 #     floor/ceiling) — plus aucun nom de modèle Anthropic dans ce fichier.
 #   - reads/writes/forbidden_reads/delegated_to conservés VERBATIM
-#     (chemins workspace/ déjà neutres ; chemins moteur .claude/python/...
+#     (chemins workspace/ déjà neutres ; chemins moteur .sdd/python/...
 #     conservés tels quels en Phase 1, re-rootés en Phase 2).
 #
 # Miroir isolé : jamais référencé par .sdd/loader.yml (invariant
@@ -37,12 +37,12 @@ agents:
     phase: 1
     reads:
       - workspace/old/{P}/**                                   # recursive scan
-      - .claude/python/sdd_reverse/language_signatures.yml
+      - .sdd/python/sdd_reverse/language_signatures.yml
       - workspace/old/{P}/.sys/inventory.json                  # for U-N stability across re-runs
     writes:
       - workspace/old/{P}/.sys/inventory.md                    # enriched FR (agent)
     delegated_to:
-      - .claude/python/sdd_reverse_scripts/reverse_inventory.py   # writes inventory/db-schema/language/code-graph (atomic)
+      - .sdd/python/sdd_reverse_scripts/reverse_inventory.py   # writes inventory/db-schema/language/code-graph (atomic)
 
   reverse-tech-auditor:
     model_tier: balanced   # loader Claude: claude-sonnet-4-6 — parité pivot + bounds
@@ -68,8 +68,8 @@ agents:
       - workspace/old/{P}/.sys/db-schema.json                   # base fallback
       - workspace/old/{P}/.sys/tech-audit.md                    # optional
       - workspace/old/{P}/{evidenceFiles}                       # strict — incl. transitive deep layer (L0)
-      - .claude/python/sdd_reverse/language_signatures.yml
-      - .claude/python/sdd_reverse/analysis.reverse.template.md # isolated tech-analysis template (D5)
+      - .sdd/python/sdd_reverse/language_signatures.yml
+      - .sdd/python/sdd_reverse/analysis.reverse.template.md # isolated tech-analysis template (D5)
     writes:
       - workspace/plans/{n}-{Name}.analysis.md           # tech-analysis output
       - workspace/old/{P}/.sys/modules/{Module}/extraction.md   # extraction log
@@ -82,7 +82,7 @@ agents:
     reads:
       - workspace/plans/{n}-{Name}.analysis.md          # 3a tech-analysis (SOLE content source)
       - workspace/old/{P}/.sys/inventory.json                  # units[U-N] metadata — NOT new content
-      - .claude/python/sdd_reverse/us.reverse.template.md
+      - .sdd/python/sdd_reverse/us.reverse.template.md
     writes:
       - workspace/us/{n}-{m}-{Name}.md                  # user stories (1 per capability)
       - workspace/old/{P}/.sys/modules/{Module}/stories-3b.md  # decision log
@@ -97,8 +97,8 @@ agents:
       - workspace/us/{n}-{m}-{Name}.md                  # 3b user stories (SOLE content source)
       - workspace/plans/{n}-{Name}.analysis.md          # 3a tech-analysis (evidence resolution + plumbing to demote)
       - workspace/old/{P}/.sys/inventory.json                  # units[U-N] metadata (kind, dataAccess, allocation)
-      - .claude/python/sdd_reverse/language_signatures.yml
-      - .claude/python/sdd_reverse/feat.reverse.template.md    # ADV-9 isolated template (reused)
+      - .sdd/python/sdd_reverse/language_signatures.yml
+      - .sdd/python/sdd_reverse/feat.reverse.template.md    # ADV-9 isolated template (reused)
     writes:
       - workspace/feats/{n}-{Name}.md                    # the FEAT output (business altitude, plumbing demoted)
       - workspace/old/{P}/.sys/modules/{Module}/feat-3c.md     # composition log
@@ -117,8 +117,8 @@ agents:
     writes:
       - workspace/old/{P}/.sys/modules/{Module}/completeness-review.md
     delegated_to:
-      - .claude/python/sdd_reverse_scripts/check_feat_completeness.py     # deterministic gap engine
-      - .claude/python/sdd_reverse_scripts/check_ladder_traceability.py   # D3 ladder traceability
+      - .sdd/python/sdd_reverse_scripts/check_feat_completeness.py     # deterministic gap engine
+      - .sdd/python/sdd_reverse_scripts/check_ladder_traceability.py   # D3 ladder traceability
 
   reverse-ui-extractor:
     model_tier: deep   # loader Claude: claude-opus-4-8 — parité pivot + bounds
@@ -141,14 +141,14 @@ agents:
       - workspace/feats/{n}-{Name}.md                     # FEAT reverse (SOLE behavioral source)
       - workspace/us/{n}-{m}-{Name}.md                   # US 3b (scenario granularity)
       - workspace/plans/{n}-{Name}.analysis.md           # 3a (evidence resolution only)
-      - .claude/python/sdd_reverse/parity.reverse.template.feature
+      - .sdd/python/sdd_reverse/parity.reverse.template.feature
     writes:
       - workspace/parity/feat-{n}/{m}-{Slug}.feature
       - workspace/parity/feat-{n}/parity-map.md
     forbidden_reads:
       - workspace/old/{P}/**                                    # NEVER reads legacy code (altitude FEAT/US)
     delegated_to:
-      - .claude/python/sdd_reverse_scripts/validate_parity_features.py   # deterministic Gherkin gate
+      - .sdd/python/sdd_reverse_scripts/validate_parity_features.py   # deterministic Gherkin gate
 
   reverse-paradigm-advisor:
     model_tier: balanced   # loader Claude: claude-sonnet-4-6 — parité pivot + bounds
@@ -160,7 +160,7 @@ agents:
       - workspace/old/{P}/.sys/tech-audit.md                    # optional (Phase 2)
       - workspace/old/{P}/.sys/deps-graph.json                  # optional (Phase 2) — orphan signal for DISCARD
       - workspace/stack/stack.md                          # target stack paradigm
-      - .claude/python/sdd_reverse/language_signatures.yml
+      - .sdd/python/sdd_reverse/language_signatures.yml
       - workspace/old/{P}/{evidenceFiles}                       # ≤ 10 example files, file:line citations only
     writes:
       - workspace/old/{P}/.sys/paradigm-decision.md
@@ -178,15 +178,15 @@ agents:
       - workspace/parity/feat-{n}/parity-map.md       # optional (Phase 3.8)
       - workspace/feats/{n}-{Name}.md                     # items medium/low + ingest target
       - workspace/old/{P}/.sys/questions.md                     # Q-N stability + answers (--ingest)
-      - .claude/python/sdd_reverse/questions.reverse.template.md
+      - .sdd/python/sdd_reverse/questions.reverse.template.md
     writes:
       - workspace/old/{P}/.sys/questions.md
       - workspace/feats/{n}-{Name}.md                     # --ingest ONLY (human-validated patching, §10 resync)
     forbidden_reads:
       - workspace/old/{P}/{evidenceFiles}                       # never re-reads legacy code — gaps come from reports
     delegated_to:
-      - .claude/python/sdd_reverse_scripts/check_ladder_traceability.py   # gap collection (generate)
-      - .claude/python/sdd_reverse_scripts/validate_reverse_feat.py       # post-ingest revalidation
+      - .sdd/python/sdd_reverse_scripts/check_ladder_traceability.py   # gap collection (generate)
+      - .sdd/python/sdd_reverse_scripts/validate_reverse_feat.py       # post-ingest revalidation
 
   reverse-sql-analyst:
     model_tier: deep   # loader Claude: claude-opus-4-8 — parité pivot + bounds
@@ -197,12 +197,12 @@ agents:
       - workspace/old/{P}/.sys/inventory.json                    # units = modules (source: proc-reverse)
       - workspace/old/{P}/.sys/proc-snapshot/{schema}.{proc}.sql # READ-ONLY body snapshot (Phase 1)
       - workspace/old/{P}/.sys/db-introspection.json             # deterministic signals (no secret)
-      - .claude/python/sdd_reverse/us.proc.reverse.template.md
-      - .claude/python/sdd_reverse/language_signatures.yml
+      - .sdd/python/sdd_reverse/us.proc.reverse.template.md
+      - .sdd/python/sdd_reverse/language_signatures.yml
     writes:
       - workspace/us/{n}-{m}-{Name}.md                    # 1 user story per stored procedure
     delegated_to:
-      - .claude/python/sdd_reverse_scripts/reverse_proc_introspect.py  # Phase 1 read-only introspection
+      - .sdd/python/sdd_reverse_scripts/reverse_proc_introspect.py  # Phase 1 read-only introspection
     # READ-ONLY: ne se connecte JAMAIS à la base live — lit uniquement les
     # snapshots .sys/proc-snapshot/*.sql extraits en Phase 1 (readonly_guard).
 
@@ -215,13 +215,13 @@ agents:
       - workspace/old/{P}/.sys/inventory.json                    # module metadata + _featAllocations
       - workspace/us/{n}-{m}-{Name}.md                           # the module's SQL-object User Stories (only content source)
       - workspace/old/{P}/.sys/proc-snapshot/{schema}.{proc}.sql # READ-ONLY, evidence resolution only
-      - .claude/python/sdd_reverse/feat.reverse.template.md
-      - .claude/python/sdd_reverse/language_signatures.yml
+      - .sdd/python/sdd_reverse/feat.reverse.template.md
+      - .sdd/python/sdd_reverse/language_signatures.yml
     writes:
       - workspace/feats/{n}-{Name}.md                            # the module business FEAT
       - workspace/us/{n}-{m}-{Name}.md                           # Edit-augment back-fill (Covers/Status/hash) — pont /sdd-full
     delegated_to:
-      - .claude/python/sdd_reverse_scripts/validate_reverse_feat.py    # deterministic gate (max 3 iters)
+      - .sdd/python/sdd_reverse_scripts/validate_reverse_feat.py    # deterministic gate (max 3 iters)
     forbidden_reads:
       - workspace/src/         # never the application code
 
@@ -302,41 +302,41 @@ commands:
 # verbatim en Phase 1 (re-rootage Phase 2).
 scripts_v2:
   reverse_audit:
-    path: .claude/python/sdd_reverse_scripts/reverse_audit.py
+    path: .sdd/python/sdd_reverse_scripts/reverse_audit.py
   reverse_status:
-    path: .claude/python/sdd_reverse_scripts/reverse_status.py
+    path: .sdd/python/sdd_reverse_scripts/reverse_status.py
   reverse_smoke:
-    path: .claude/python/sdd_reverse_scripts/reverse_smoke.py
+    path: .sdd/python/sdd_reverse_scripts/reverse_smoke.py
   merge_db_schema:
-    path: .claude/python/sdd_reverse/merge_db_schema.py
+    path: .sdd/python/sdd_reverse/merge_db_schema.py
 
 scripts:
   reverse_inventory:
-    path: .claude/python/sdd_reverse_scripts/reverse_inventory.py
+    path: .sdd/python/sdd_reverse_scripts/reverse_inventory.py
   validate_reverse_feat:
-    path: .claude/python/sdd_reverse_scripts/validate_reverse_feat.py
+    path: .sdd/python/sdd_reverse_scripts/validate_reverse_feat.py
   check_reverse_feat_for_full:
-    path: .claude/python/sdd_reverse_scripts/check_reverse_feat_for_full.py
+    path: .sdd/python/sdd_reverse_scripts/check_reverse_feat_for_full.py
   generate_crosscutting_feats:
-    path: .claude/python/sdd_reverse_scripts/generate_crosscutting_feats.py
+    path: .sdd/python/sdd_reverse_scripts/generate_crosscutting_feats.py
   preallocate_feats:
-    path: .claude/python/sdd_reverse_scripts/preallocate_feats.py
+    path: .sdd/python/sdd_reverse_scripts/preallocate_feats.py
   check_feat_completeness:
-    path: .claude/python/sdd_reverse_scripts/check_feat_completeness.py
+    path: .sdd/python/sdd_reverse_scripts/check_feat_completeness.py
   check_ladder_traceability:
-    path: .claude/python/sdd_reverse_scripts/check_ladder_traceability.py
+    path: .sdd/python/sdd_reverse_scripts/check_ladder_traceability.py
   update_extraction_cache:
-    path: .claude/python/sdd_reverse_scripts/update_extraction_cache.py
+    path: .sdd/python/sdd_reverse_scripts/update_extraction_cache.py
   reverse_synth:
-    path: .claude/python/sdd_reverse_scripts/reverse_synth.py
+    path: .sdd/python/sdd_reverse_scripts/reverse_synth.py
   validate_parity_features:
-    path: .claude/python/sdd_reverse_scripts/validate_parity_features.py
+    path: .sdd/python/sdd_reverse_scripts/validate_parity_features.py
   reverse_proc_introspect:
-    path: .claude/python/sdd_reverse_scripts/reverse_proc_introspect.py
+    path: .sdd/python/sdd_reverse_scripts/reverse_proc_introspect.py
   build_proc_us:
-    path: .claude/python/sdd_reverse_scripts/build_proc_us.py
+    path: .sdd/python/sdd_reverse_scripts/build_proc_us.py
   build_proc_feats:
-    path: .claude/python/sdd_reverse_scripts/build_proc_feats.py
+    path: .sdd/python/sdd_reverse_scripts/build_proc_feats.py
 
 
 # Invariants reverse (repris verbatim du manifeste Claude)

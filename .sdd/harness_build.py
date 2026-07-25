@@ -203,17 +203,33 @@ class ClaudeAdapter(Adapter):
         return get_provider_tier_map(self._provider, env={}, base=self._repo_root)
 
     def _pivot_paths(self) -> list[Path]:
-        return sorted((self._sdd_home / "agents").glob("*.agent.yaml"))
+        # Consolidation 2026-07-25 : un seul fichier .md par agent (frontmatter enrichi
+        # + body), remplace le couple .agent.yaml + .body.md.
+        return sorted((self._sdd_home / "agents").glob("*.md"))
 
     def _emit_one(self, pivot_path: Path, agents_out: Path, tier_map: dict[str, str]) -> EmitResult:
-        pivot = load_yaml(pivot_path)
-        agent = str(pivot.get("name") or pivot_path.name.removesuffix(".agent.yaml"))
+        # Format consolidé : pivot ET body dans un seul .md ; parse frontmatter direct.
+        agent = pivot_path.stem
+        try:
+            fields, body = parse_frontmatter(pivot_path.read_text(encoding="utf-8-sig"))
+        except FrontmatterError as exc:
+            return EmitResult(agent, None, f"frontmatter illisible: {exc}")
 
-        for key in ("name", "description", "model_tier", "tools", "body_source"):
+        # Convertit dict-of-strings potentiellement RAW en pivot exploitable.
+        pivot: dict[str, object] = dict(fields)
+        # Normalisation `tools` : accepte liste YAML `[a, b]`, virgules `a, b`.
+        tools_raw = pivot.get("tools", "")
+        if isinstance(tools_raw, str):
+            tools_str = tools_raw.strip().lstrip("[").rstrip("]")
+            tools_list = [t.strip() for t in tools_str.split(",") if t.strip()]
+        else:
+            tools_list = [str(t).strip() for t in (tools_raw or []) if str(t).strip()]
+
+        for key in ("name", "description", "model_tier"):
             if key not in pivot:
                 return EmitResult(agent, None, f"pivot incomplet: clé '{key}' absente")
 
-        model = tier_map.get(pivot["model_tier"])
+        model = tier_map.get(str(pivot["model_tier"]))
         if model is None:
             return EmitResult(
                 agent, None,
@@ -221,16 +237,7 @@ class ClaudeAdapter(Adapter):
                 f"du provider {self._provider!r}",
             )
 
-        body_path = (self._repo_root / pivot["body_source"]).resolve()
-        if not body_path.is_file():
-            return EmitResult(agent, None, f"body_source introuvable: {body_path}")
-        try:
-            _live_fields, body = parse_frontmatter(body_path.read_text(encoding="utf-8-sig"))
-        except FrontmatterError as exc:
-            return EmitResult(agent, None, f"body_source sans frontmatter exploitable: {exc}")
-
-        tools = pivot["tools"]
-        tools_line = ", ".join(tools) if isinstance(tools, (list, tuple)) else str(tools)
+        tools_line = ", ".join(tools_list) if tools_list else ""
         frontmatter = compose_frontmatter(
             {
                 "name": pivot["name"],
@@ -251,7 +258,7 @@ class ClaudeAdapter(Adapter):
         tier_map = self._tier_map()
         results: list[EmitResult] = []
         for pivot_path in self._pivot_paths():
-            agent = pivot_path.name.removesuffix(".agent.yaml")
+            agent = pivot_path.stem
             if only is not None and agent not in only:
                 continue
             try:
@@ -261,44 +268,32 @@ class ClaudeAdapter(Adapter):
         return results
 
     # ------------------------------------------------------------------ #
-    # Couche COMMANDES (mode identité — pivots .sdd/commands/*.cmd.yaml) #
+    # Couche COMMANDES (mode identité — pivots .sdd/commands/*.md consolidés) #
     # ------------------------------------------------------------------ #
 
     def _command_pivot_paths(self) -> list[Path]:
-        return sorted((self._sdd_home / "commands").glob("*.cmd.yaml"))
+        return sorted((self._sdd_home / "commands").glob("*.md"))
 
     def _emit_one_command(self, pivot_path: Path, commands_out: Path) -> EmitResult:
-        pivot = load_yaml(pivot_path)
-        name = str(pivot.get("name") or pivot_path.name.removesuffix(".cmd.yaml"))
+        # Format consolidé 2026-07-25 : un seul fichier .md par commande. Le
+        # frontmatter (name, description, spawns, ...) est optionnel ; s'il
+        # est présent, il est réémis pour Claude Code. Sinon corps pur.
+        name = pivot_path.stem
+        source_text = pivot_path.read_text(encoding="utf-8-sig")
+        try:
+            fields, body = parse_frontmatter(source_text)
+        except FrontmatterError:
+            fields, body = {}, source_text
 
-        for key in ("name", "has_frontmatter", "body_source"):
-            if key not in pivot:
-                return EmitResult(name, None, f"pivot incomplet: clé '{key}' absente")
-
-        body_path = (self._repo_root / pivot["body_source"]).resolve()
-        if not body_path.is_file():
-            return EmitResult(name, None, f"body_source introuvable: {body_path}")
-        source_text = body_path.read_text(encoding="utf-8-sig")
-
-        if pivot["has_frontmatter"]:
-            fields = pivot.get("frontmatter")
-            if not isinstance(fields, dict) or not fields:
-                return EmitResult(
-                    name, None,
-                    "pivot incohérent: has_frontmatter=true mais mapping "
-                    "'frontmatter' absent ou vide",
-                )
-            try:
-                _live_fields, body = parse_frontmatter(source_text)
-            except FrontmatterError as exc:
-                return EmitResult(
-                    name, None, f"body_source sans frontmatter exploitable: {exc}"
-                )
-            content = compose_command_frontmatter(fields) + body
+        if fields:
+            # Émet le frontmatter conservé (name, description, éventuel argument-hint).
+            emit_fields: dict[str, str] = {}
+            for key in ("name", "description", "argument-hint"):
+                if key in fields:
+                    emit_fields[key] = str(fields[key])
+            content = compose_command_frontmatter(emit_fields) + body if emit_fields else _normalize_body_text(body)
         else:
-            # Commande corps pur (pas de frontmatter) : miroir normalisé
-            # (BOM retiré, LF) du fichier vivant — rien à recomposer.
-            content = _normalize_body_text(source_text)
+            content = _normalize_body_text(body)
 
         target = commands_out / f"{name}.md"
         target.write_text(content, encoding="utf-8", newline="\n")
@@ -311,7 +306,7 @@ class ClaudeAdapter(Adapter):
         commands_out.mkdir(parents=True, exist_ok=True)
         results: list[EmitResult] = []
         for pivot_path in self._command_pivot_paths():
-            name = pivot_path.name.removesuffix(".cmd.yaml")
+            name = pivot_path.stem
             if only is not None and name not in only:
                 continue
             try:
@@ -349,7 +344,7 @@ class ClaudeAdapter(Adapter):
         """Régénère les rules (toutes, ou restreintes à `only`) sous `{out_dir}/rules/`.
 
         Mode IDENTITÉ : chaque rule est du markdown pur ; le corps est lu
-        VERBATIM depuis `body_source` (le `.claude/rules/{name}.md` vivant —
+        VERBATIM depuis `body_source` (le `.sdd/rules/{name}.md` vivant —
         lecture seule) puis normalisé (BOM retiré, CRLF/CR -> LF). Le golden
         test byte-diffe le résultat contre le vivant (post-normalisation).
         """
@@ -549,18 +544,15 @@ class _MemoryVariantAdapter(Adapter):
         )
 
     def _rewrite_at_includes(self, body: str) -> str:
-        """Réécrit les refs lazy-load `@.claude/...` du corps pour le harnais.
+        """Réécrit les refs lazy-load `@.claude/...` et `@.sdd/...` du corps.
 
         Le `@` est la syntaxe lazy-load de Claude Code, sans sens pour
         Codex/Gemini : on le retire toujours. La cible dépend de ce qui est
         RÉELLEMENT matérialisé sous `.sdd/` :
 
-        - si `.sdd/<path>` existe → réécrit `@.claude/<path>` -> `.sdd/<path>`
-          (le foyer neutre porte ce fichier : loaders, pivots, providers…) ;
+        - si `.sdd/<path>` existe → `@.claude/<path>` OU `@.sdd/<path>` -> `.sdd/<path>` ;
         - sinon → `.claude/<path>` (résolvable — `.claude/` est co-présent —
-          au lieu d'un `.sdd/<path>` fantôme : les arbres `rules/`, `docs/`,
-          `skills/`, `templates/`, `sdd_scripts/` ne sont PAS (encore)
-          matérialisés sous `.sdd/`, cf. Phase 1 invasive non faite).
+          au lieu d'un `.sdd/<path>` fantôme).
 
         Les mentions littérales `.claude/...` SANS `@` (chemins descriptifs
         d'invocation Python) sont conservées telles quelles.
@@ -573,8 +565,11 @@ class _MemoryVariantAdapter(Adapter):
         # pour les refs brace-expansion (`{a,b}.md`) — l'existence échoue alors
         # et on retombe proprement sur `.claude/`.
         rewritten = re.sub(r"@\.claude/([A-Za-z0-9_./{},-]+)", _repl, body)
-        # `@.claude` nu (sans slash) — dégrade en `.claude` littéral.
-        return rewritten.replace("@.claude", ".claude")
+        # Idem pour `@.sdd/...` (le `@` doit toujours être retiré ; la cible
+        # reste `.sdd/` si elle existe, sinon fallback `.claude/`).
+        rewritten = re.sub(r"@\.sdd/([A-Za-z0-9_./{},-]+)", _repl, rewritten)
+        # `@.claude` / `@.sdd` nus (sans slash) — dégrade en littéral.
+        return rewritten.replace("@.claude", ".claude").replace("@.sdd", ".sdd")
 
     def emit_memory_file(self, out_dir: Path) -> Path:
         safe_out = _ensure_under_build(Path(out_dir), self._sdd_home)
