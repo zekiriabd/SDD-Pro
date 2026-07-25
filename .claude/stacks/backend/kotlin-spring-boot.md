@@ -75,7 +75,7 @@ Hérités de `archi/mvc.md §4`. **Ajouts** Kotlin :
 - **Runtime** : JDK 21 LTS
 - **Framework principal** : Spring Boot 3.3.x LTS (canonique SDD_Pro v7.0.0 — Spring Boot 4 sera évalué en roadmap v8 après stabilisation Spring Security 7)
 - **Build tool** : **Gradle 8.10** avec **Kotlin DSL** (`build.gradle.kts`)
-- **Package racine** : `{BackendNamespace}` (ex. `com.sdd-pro.sim`)
+- **Package racine** : `{BackendNamespace}` (ex. `com.demo.sim`)
 
 ### 2.2 Outils
 

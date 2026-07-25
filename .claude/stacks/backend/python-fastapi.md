@@ -318,10 +318,10 @@ class DBSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="DB_")
 
 class AzureADSettings(BaseSettings):
-    tenant_id: str = "<REDACTED>-..."         # depuis AZ_TENANTID
-    client_id: str = "<REDACTED>-..."         # depuis AZ_CLIENTID
-    domain: str = "demo.com"           # depuis AZ_DOMAIN
-    audiences: List[str] = ["<REDACTED>-...", "<REDACTED>-..."]  # split/strip de AZ_AUDIENCES
+    tenant_id: str = "<AZ_TENANTID>"        # depuis AZ_TENANTID
+    client_id: str = "<AZ_CLIENTID>"        # depuis AZ_CLIENTID
+    domain: str = "demo.com"             # depuis AZ_DOMAIN
+    audiences: List[str] = ["<AZ_CLIENTID>", "<AUDIENCE_ID>"]  # split/strip de AZ_AUDIENCES
     backend_callback_path: str = "/signin-oidc"
     frontend_callback_path: str = "/login-callback"
     model_config = SettingsConfigDict(env_prefix="AZ_")
