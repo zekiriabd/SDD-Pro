@@ -163,12 +163,12 @@ class TestExpandFiles(unittest.TestCase):
 
 
 def _setup_fake_repo(root: Path, agent: str, reads_patterns: list[str]) -> None:
-    """Crée un repo factice minimal avec .claude/loader.yml + Project Config + fichiers ciblés."""
-    claude_dir = root / ".claude"
-    claude_dir.mkdir(parents=True)
+    """Crée un repo factice minimal avec .sdd/loader.yml + Project Config + fichiers ciblés."""
+    sdd_dir = root / ".sdd"
+    sdd_dir.mkdir(parents=True)
     # loader.yml minimal avec un agent
     reads_block = "\n".join(f"    - {p}" for p in reads_patterns)
-    (claude_dir / "loader.yml").write_text(
+    (sdd_dir / "loader.yml").write_text(
         f"{agent}:\n  reads:\n{reads_block}\n",
         encoding="utf-8",
     )

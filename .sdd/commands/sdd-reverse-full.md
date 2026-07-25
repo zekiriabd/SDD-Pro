@@ -2,7 +2,7 @@
 command: sdd-reverse-full
 phase: '"0-5"'
 description: 'Orchestrateur COMPLET du reverse engineering (Phase 0→5). Séquence init + inventory + audit + paradigm + extraction (escalier 3a→3b→3c) + crosscut + review + synth + UI + questions + status — tous PAR DÉFAUT (décision Tech Lead 2026-06-13), opt-out via --skip-* / --minimal. SEULE exception : la parité (Phase 3.8) est opt-in via --with-parity (et ses artefacts vont dans output/parity/, jamais dans qa/). N''EST PAS UN AGENT — séquenceur de commandes (no-spawn rule §9 rules/reverse-engineering.md). Reprenable phase par phase.'
-loader: .claude/loader.reverse.yml
+loader: .sdd/loader.reverse.yml
 ---
 <!-- @llm-only-flags-file — tous les flags de /sdd-reverse-full sont
      interprétés par le LLM orchestrateur. Cette commande n'a pas de script

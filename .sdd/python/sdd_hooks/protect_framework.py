@@ -49,9 +49,7 @@ FRAMEWORK_OWNED: tuple[str, ...] = (
     ".claude/rules/",
     ".claude/agents/",
     ".claude/commands/",
-    ".claude/python/",
-    ".claude/loader.yml",       # operational until Batch C migration
-    ".claude/loader.reverse.yml",
+    ".claude/rules/",
     ".claude/CLAUDE.md",
     ".claude/settings.json",
     ".claude/settings.local.json",
@@ -166,9 +164,9 @@ def _main_inner() -> int:
     warn("         Les agents produit (po, arch, dev-*, qa) ne doivent pas le modifier.")
     warn("         Maintenance framework autorisee deliberement (Tech Lead).")
 
-    if ".claude/CLAUDE.md" in norm:
-        warn("         Rappel: synchroniser .claude/docs/CHANGELOG.md et docs/ si changement architectural.")
-    if ".claude/loader.yml" in norm:
+    if "CLAUDE.md" in norm:
+        warn("         Rappel: synchroniser .sdd/docs/CHANGELOG.md et docs/ si changement architectural.")
+    if ".sdd/loader" in norm or ".claude/loader" in norm:
         warn("         Rappel: loader.yml doit refleter les reads/writes reels des agents.")
 
     return HOOK_ALLOW

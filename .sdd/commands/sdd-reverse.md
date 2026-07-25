@@ -2,7 +2,7 @@
 command: sdd-reverse
 phase: '3'
 description: Phase 3 du workflow reverse — SÉQUENCEUR de l'escalier ascendant pour UNE unité U-N (3a analyse → 3b user stories → 3c FEAT). Ne spawn AUCUN agent directement (no-spawn §9) — enchaîne /sdd-reverse-analyze + /sdd-reverse-stories + /sdd-reverse-feat. Output final workspace/feats/{n}-{Name}.md consommable par /sdd-full.
-loader: .claude/loader.reverse.yml
+loader: .sdd/loader.reverse.yml
 ---
 # /sdd-reverse {U-N} [--json]
 

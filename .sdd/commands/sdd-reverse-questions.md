@@ -2,7 +2,7 @@
 command: sdd-reverse-questions
 phase: '"3.9"'
 description: Boucle de validation humaine structurée. Mode generate (défaut) — consolide les gaps reverse (complétude, traçabilité, items medium/low, AC non dérivables, curation HUMAN-DECISION) en questions.md à remplir par le Tech Lead. Mode --ingest — ré-injecte les réponses dans les FEATs (human-validated, confidence, REVERSE-GATE, hash US). Spawn agent reverse-clarifier (Sonnet 4.6). Emprunt Reversa (questions.md + answer_mode) — audit comparatif 2026-06-12.
-loader: .claude/loader.reverse.yml
+loader: .sdd/loader.reverse.yml
 ---
 <!-- @llm-only-flags-file — les flags de /sdd-reverse-questions sont
      interprétés par le LLM (l'agent reverse-clarifier) ; les scripts

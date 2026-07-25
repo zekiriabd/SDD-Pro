@@ -29,7 +29,7 @@ from sdd_lib.loader_yml import parse_agent_section  # noqa: E402
 
 
 def _write_loader(root: Path, content: str) -> None:
-    loader_dir = root / ".claude"
+    loader_dir = root / ".sdd"
     loader_dir.mkdir(parents=True, exist_ok=True)
     (loader_dir / "loader.yml").write_text(textwrap.dedent(content), encoding="utf-8")
 

@@ -95,10 +95,10 @@ class TestProtectFrameworkWarnMode(unittest.TestCase):
         self.assertIn("propriete framework SDD_Pro", r.stderr)
 
     def test_framework_loader_yml_emits_loader_specific_reminder(self):
-        """Edit on .claude/loader.yml → reminder line about loader sync."""
+        """Edit on .sdd/loader.yml → reminder line about loader sync."""
         payload = {
             "tool_name": "Edit",
-            "tool_input": {"file_path": ".claude/loader.yml"},
+            "tool_input": {"file_path": ".sdd/loader.yml"},
         }
         r = _run_hook(payload)
         self.assertEqual(r.returncode, 0)
@@ -187,10 +187,10 @@ class TestProtectFrameworkEdgeCases(unittest.TestCase):
         self.assertEqual(r.returncode, 0)
 
     def test_python_subdir_is_protected(self):
-        """All .claude/python/ files are framework-owned."""
+        """All .sdd/python/ files are framework-owned (post-migration 2026-07-25)."""
         payload = {
             "tool_name": "Edit",
-            "tool_input": {"file_path": ".claude/python/sdd_lib/paths.py"},
+            "tool_input": {"file_path": ".sdd/python/sdd_lib/paths.py"},
         }
         r = _run_hook(payload, {"SDD_PROTECT_FRAMEWORK_MODE": "strict"})
         self.assertEqual(r.returncode, 2)

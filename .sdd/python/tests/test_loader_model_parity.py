@@ -1,17 +1,20 @@
-"""Parité modèle loader.yml ↔ frontmatter agents (audit 2026-06-11, minor #10).
+"""Parité tier loader.yml ↔ frontmatter agents (post-Batch C 2026-07-25).
 
-loader.reverse.yml déclarait déjà `model:` en YAML pour ses 7 agents ;
-loader.yml ne portait les modèles forward qu'en COMMENTAIRES — toute dérive
-(ex. le drift Opus 4.8 / Sonnet 4.6 de reverse-us-writer, major M6) était
-indétectable côté forward. Ce test enforce :
+Post-migration : `.sdd/loader.yml` + `.sdd/agents/*.md` déclarent tous les
+deux `model_tier: deep|balanced|fast` (neutral, provider-agnostic). Le
+mapping tier -> ID modèle concret est résolu par `sdd_lib.model_resolver`
+via `.sdd/providers/{p}.yaml`.
 
-  1. chaque entrée agent de loader.yml porte un champ `model:` ;
-  2. sa valeur est STRICTEMENT égale au `model:` du frontmatter de
-     `.claude/agents/{agent}.md` ;
+Ce test enforce :
+  1. chaque entrée agent de loader.yml porte un champ `model_tier:` ;
+  2. sa valeur matche le `model_tier:` du frontmatter de
+     `.sdd/agents/{agent}.md` (SSoT pivot neutre) ;
   3. symétriquement pour loader.reverse.yml ↔ agents/reverse-*.md.
 
-Un fait = une source + un test de parité (leçon des 4 majors de l'audit
-2026-06-11, tous des drifts de synchronisation multi-fichiers).
+Historique : le test comparait auparavant `model: claude-opus-4-8` avec
+`model:` du frontmatter — pré-migration. Post-Batch C, l'invariant est
+sur le TIER (neutre) plutôt que sur l'ID modèle concret (résolu par
+provider). Cf. `.sdd/providers/*.yaml` pour la résolution finale.
 """
 from __future__ import annotations
 
@@ -26,18 +29,20 @@ if str(_PY_ROOT) not in sys.path:
 
 # Bi-racine 2026-07-25 (Phase 1) : python migré vers .sdd/python/, mais
 # loader.yml + agents/*.md restent encore sous .claude/ (façade active).
-# Le loader.yml opérationnel (avec `model:` en clair) reste `.claude/loader.yml`
+# Le loader.yml opérationnel (avec `model:` en clair) est `.sdd/loader.yml` (post-Batch C 2026-07-25)
 # ; `.sdd/loader.yml` est un pivot Phase 1 avec `model_tier:` (généré).
 _REPO_ROOT = _PY_ROOT.parent.parent  # <repo>/ (parent of .sdd)
-_CLAUDE_DIR = _REPO_ROOT / ".claude"
+_CLAUDE_DIR = _REPO_ROOT / ".sdd"
 _AGENTS_DIR = _CLAUDE_DIR / "agents"
 
 # Entrées top-level de loader.yml qui ne sont pas des agents.
 _NON_AGENT_KEYS = {"version", "updated"}
 
 _TOP_KEY_RE = re.compile(r"^([a-z][a-z0-9-]*):\s*$", re.MULTILINE)
-_MODEL_LINE_RE = re.compile(r"^\s{2}model:\s*(\S+)", re.MULTILINE)
-_FRONTMATTER_MODEL_RE = re.compile(r"^model:\s*(\S+)", re.MULTILINE)
+# Post-Batch C 2026-07-25 : loader.yml + agents/*.md portent `model_tier:`.
+# La regex tolère aussi `model:` pour rétrocompat historique (façades .claude/).
+_MODEL_LINE_RE = re.compile(r"^\s{2}model_tier:\s*(\S+)", re.MULTILINE)
+_FRONTMATTER_MODEL_RE = re.compile(r"^model_tier:\s*(\S+)", re.MULTILINE)
 
 
 def _loader_agent_models(loader_path: Path) -> dict[str, str | None]:
@@ -112,22 +117,22 @@ class TestReverseLoaderModelParity(unittest.TestCase):
         )
         entries = doc.get("agents") or {}
         agents = {
-            a: (spec or {}).get("model")
+            a: (spec or {}).get("model_tier") or (spec or {}).get("model")
             for a, spec in entries.items()
             if a.startswith("reverse-")
         }
         self.assertGreaterEqual(len(agents), 7, msg=f"roster reverse incomplet: {sorted(agents)}")
         mismatches = []
-        for agent, loader_model in agents.items():
+        for agent, loader_tier in agents.items():
             md = _AGENTS_DIR / f"{agent}.md"
             if not md.is_file():
                 mismatches.append(f"{agent}: .md manquant")
                 continue
-            fm_model = _frontmatter_model(md)
-            if loader_model is None:
-                mismatches.append(f"{agent}: pas de model: dans loader.reverse.yml")
-            elif fm_model != loader_model:
-                mismatches.append(f"{agent}: loader={loader_model} != frontmatter={fm_model}")
+            fm_tier = _frontmatter_model(md)
+            if loader_tier is None:
+                mismatches.append(f"{agent}: pas de model_tier: dans loader.reverse.yml")
+            elif fm_tier != loader_tier:
+                mismatches.append(f"{agent}: loader={loader_tier} != frontmatter={fm_tier}")
         self.assertEqual(mismatches, [], msg="; ".join(mismatches))
 
 

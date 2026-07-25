@@ -2,7 +2,7 @@
 command: sdd-reverse-init
 phase: '0'
 description: Bootstrap workspace/old/{LegacyProject}/.sys/ pour le workflow reverse engineering. Crée le squelette de dossiers + un README minimal. Ne touche pas au framework. Read-only sur le legacy.
-loader: .claude/loader.reverse.yml
+loader: .sdd/loader.reverse.yml
 ---
 # /sdd-reverse-init {LegacyProject}
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """SDD_Pro Context budget gate.
 
-Makes .claude/loader.yml executable:
+Makes .sdd/loader.yml executable:
 - expands `reads:` patterns per agent
 - rejects unbounded globs (anti context bomb)
 - enforces per-agent byte budget

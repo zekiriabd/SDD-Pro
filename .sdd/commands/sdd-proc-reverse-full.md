@@ -2,7 +2,7 @@
 command: sdd-proc-reverse-full
 phase: proc-reverse
 description: "Reverse engineering de TOUS les objets SQL exécutables d'une base (lecture seule) — procédures stockées, fonctions, vues et triggers (P0.1 2026-07-24). Introspecte via la connection string de stack.md (## Active Database), regroupe les objets en modules, génère 1 User Story par objet SQL et 1 FEAT par module. Multi-dialecte (SQL Server complet ; PostgreSQL procs/fonctions). Ne modifie JAMAIS la base."
-loader: .claude/loader.reverse.yml
+loader: .sdd/loader.reverse.yml
 ---
 # /sdd-proc-reverse-full [--project DB] [--json]
 

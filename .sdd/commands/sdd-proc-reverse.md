@@ -2,7 +2,7 @@
 command: sdd-proc-reverse
 phase: proc-reverse
 description: Reverse engineering d'UN objet SQL exécutable — procédure stockée, fonction, vue ou trigger (P0.1 2026-07-24) — en lecture seule via la connection string de stack.md. Introspecte l'objet, génère sa User Story (1 objet SQL = 1 US) et met à jour/crée la FEAT du module métier auquel il appartient. Multi-dialecte (SQL Server complet ; PostgreSQL procs/fonctions). Ne modifie JAMAIS la base.
-loader: .claude/loader.reverse.yml
+loader: .sdd/loader.reverse.yml
 ---
 # /sdd-proc-reverse {proc-name} [--project DB] [--json]
 

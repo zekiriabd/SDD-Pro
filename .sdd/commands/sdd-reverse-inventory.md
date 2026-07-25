@@ -2,7 +2,7 @@
 command: sdd-reverse-inventory
 phase: '1'
 description: Phase 1 du workflow reverse — cartographie déterministe d'un projet legacy. Spawn agent reverse-inventory (Sonnet 4.6) qui délègue au script reverse_inventory.py + enrichit inventory.md. Output bloquant pour Phase 3 (/sdd-reverse {U-N}).
-loader: .claude/loader.reverse.yml
+loader: .sdd/loader.reverse.yml
 ---
 # /sdd-reverse-inventory {LegacyProject} [--use-cache] [--json]
 

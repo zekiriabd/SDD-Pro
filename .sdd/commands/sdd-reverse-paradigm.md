@@ -2,7 +2,7 @@
 command: sdd-reverse-paradigm
 phase: '"2.7"'
 description: Analyse de gap de paradigme legacy↔stack cible + curation des unités (MIGRATE / DISCARD / HUMAN-DECISION). Spawn agent reverse-paradigm-advisor (Sonnet 4.6). Verdict informational/WARN, jamais bloquant, jamais destructif. Emprunt Reversa (agents Paradigm Advisor + Curator) — audit comparatif 2026-06-12.
-loader: .claude/loader.reverse.yml
+loader: .sdd/loader.reverse.yml
 ---
 <!-- @llm-only-flags-file — les flags de /sdd-reverse-paradigm sont
      interprétés par le LLM (l'agent reverse-paradigm-advisor) ; aucune

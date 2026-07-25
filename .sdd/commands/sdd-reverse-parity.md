@@ -2,7 +2,7 @@
 command: sdd-reverse-parity
 phase: '"3.8"'
 description: Génération des specs de parité comportementale Gherkin (.feature) pour UNE FEAT reverse. Spawn agent reverse-parity-inspector (Sonnet 4.6), validation déterministe validate_parity_features.py. Verdict informational, jamais bloquant. Emprunt Reversa (agent Inspector) — audit comparatif 2026-06-12.
-loader: .claude/loader.reverse.yml
+loader: .sdd/loader.reverse.yml
 ---
 <!-- @llm-only-flags-file — les flags de /sdd-reverse-parity sont interprétés
      par le LLM (l'agent reverse-parity-inspector) ; la gate déterministe

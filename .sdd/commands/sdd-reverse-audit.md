@@ -2,7 +2,7 @@
 command: sdd-reverse-audit
 phase: '2'
 description: Phase 2 du workflow reverse — audit informational. Spawn reverse-tech-auditor (Sonnet 4.6) après exécution du script déterministe reverse_audit.py (deps-graph + merge db-schema). Output non bloquant pour Phase 3.
-loader: .claude/loader.reverse.yml
+loader: .sdd/loader.reverse.yml
 ---
 # /sdd-reverse-audit {LegacyProject} [--force-enrichment-on Entity.field] [--json]
 

@@ -1,54 +1,143 @@
-# =============================================================================
-# .sdd/loader.yml — Loader manifest NEUTRE du foyer .sdd/ (Phase 1, ADDITIF)
-# =============================================================================
-# Dérivé de .claude/loader.yml (v7.0.0) le 2026-07-24. NON CÂBLÉ au pipeline
-# actuel (scaffolding — le loader Claude reste la SSoT opérationnelle jusqu'à
-# la Phase 2 harness_build).
+﻿# SDD_Pro — Loader Manifest
 #
-# Transformation appliquée (ADR harness-and-provider-abstraction) :
-#   - `model: claude-opus-4-8`   -> `model_tier: deep`
-#   - `model: claude-sonnet-4-6` -> `model_tier: balanced`
-#     Le mapping tier -> ID modèle concret vient de .sdd/providers/*.yaml
-#     (section `tier_map`), résolu par sdd_lib/model_resolver.py avec les
-#     bornes tier_floor/tier_ceiling de .sdd/agent-bounds.yaml (SSoT bornes).
-#   - `reads:` / `writes:` / `forbidden_reads:` / `forbidden_writes:` /
-#     `modes:` etc. conservés VERBATIM (chemins workspace/ déjà neutres).
-#     Les chemins moteur `.claude/...` (stacks, rules, digests, templates)
-#     sont conservés tels quels en Phase 1 — ils seront re-rootés vers le
-#     foyer neutre en Phase 2.
-#   - Annotations `cache_layer: stable|semi|volatile` : spécifique provider
-#     Anthropic (prompt caching) — réinterprété par adaptateur. Conservées
-#     ici UNIQUEMENT en commentaire ; les entrées `reads:` structurées
-#     `{ path: ..., cache_layer: ... }` du loader Claude sont aplaties en
-#     chaînes de chemin + commentaire.
+# ============================================================================
+# Sémantique des 3 layers documentation (audit C1 closure 2026-06-08)
+# ============================================================================
 #
-# Périmètre : 13 agents forward LLM (po, arch, dev-backend, dev-frontend,
-# elicitor, qa, code-reviewer, arch-reviewer, adversarial-reviewer,
-# security-reviewer, spec-compliance-reviewer, constitutioner,
-# specbook-writer). NB : `complexity-router` est doc-only (rubric consommé
-# par un script Python déterministe, 0 token) — pas d'entrée loader, comme
-# dans le loader Claude (DOC_ONLY_AGENTS_V7). Les agents reverse vivent dans
-# .sdd/loader.reverse.yml (manifeste autonome, jamais référencé ici).
+# SDD_Pro a 3 couches documentaires complémentaires (PAS 3 SSoT en conflit) :
 #
-# Cohérence enforced par .sdd/python/tests/test_neutral_loader.py :
-# loader <-> pivots .sdd/agents/*.agent.yaml <-> .sdd/agent-bounds.yaml.
-# =============================================================================
+#   1. `agents/{agent}.md`  — **BEHAVIOR & SUBSTANCE**
+#      Comportement de l'agent : STEPs ordonnés, prompts inline, anti-derive,
+#      substance des règles inlinée pour économie tokens (v5.0 hoist).
+#      Le LLM lit CE fichier comme prompt système. Quand un agent dit
+#      "rule X inlinée, plus lue", il signifie : "la substance est ici dans
+#      mon prompt, je n'invoque pas le tool Read sur le fichier rule".
+#
+#   2. `loader.yml`         — **CONTEXT BUDGET & CACHE STRATEGY** (CE FICHIER)
+#      Liste les paths dont le **contenu est présent dans le contexte de
+#      l'agent** au moment de son exécution — que ce soit via Read tool OU
+#      via inlining dans son .md. Utilisé par `context_budget.py` pour
+#      estimer le coût tokens, par `cache_control.py` pour placer les
+#      breakpoints Anthropic, par `audit_file_ownership.py` pour vérifier
+#      qu'un agent n'écrit que dans son scope `writes:`. **Pas une
+#      duplication des STEPs de l'agent — un complément budget-aware.**
+#
+#   3. `python/{sdd_lib,sdd_scripts,sdd_hooks,sdd_admin}/` — **ENFORCEMENT**
+#      Les scripts Python qui valident, calculent, et bloquent les violations
+#      au runtime. Pas du contenu LLM — du code déterministe.
+#
+# Conséquence : un agent peut dire "rule X inlinée" dans son .md ET loader.yml
+# peut lister `rules/X.md` dans ses `reads:` — c'est COHÉRENT. Le premier
+# documente le mécanisme de loading (inline), le second documente le contenu
+# présent dans le contexte (budget). Pas de SSoT conflict.
+#
+# Toute modification d'un agent → mise à jour synchrone de cette section
+# pour préserver l'audit budget cross-agent.
+# ============================================================================
 
 version: "7.0.0"
-updated: "2026-07-24"
-schema: sdd.loader/v1
-status: scaffolding-phase-1   # non consommé par le pipeline actuel
+updated: "2026-06-08"
+
+# =========================================================================
+# Cache layers (v7.0.0 P2 #11 — Anthropic prompt caching strategy)
+# =========================================================================
+# Chaque entrée `reads:` peut être annotée `cache_layer: stable|semi|volatile`
+# pour piloter le placement des markers `cache_control: ephemeral` :
+#
+# - stable    : invariant inter-runs (loader.yml, stacks, rules consolidées).
+#               Cachable jusqu'à 5 min TTL Anthropic. Gain ~90% prompt cache hit.
+# - semi      : invariant intra-FEAT (CLAUDE.md per-project, schema.json).
+#               Cachable courte durée — invalidé à chaque /arch-init.
+# - volatile  : variable per-US (US courante, mockup HTML, plan from-plan).
+#               JAMAIS cachable.
+#
+# Stratégie d'application (max 4 cache breakpoints / requête Anthropic) :
+#   [1] System prompt agent (.md inline)                  → cache_layer: stable
+#   [2] Stacks + règles concaténés                         → cache_layer: stable
+#   [3] CLAUDE.md projet + schema.json                     → cache_layer: semi
+#   [4] US + HTML mockup + plan                            → cache_layer: volatile (NO CACHE)
+#
+# Gain mesuré baseline 2026-05-20 : 40.8% cache hit (sans markers).
+# Cible post-implémentation : ≥ 60% (estimé -50% coût Opus / FEAT M).
+# Détail : @.sdd/docs/cache-strategy.md
+#
+# v7.0.0-alpha : annotations ajoutées sur les sections critiques ci-dessous.
+# Implémentation effective des cache_control markers : v7.1 (refacto harness).
+# =========================================================================
+
+# =========================================================================
+# Convention de langue (v5.0 — décision documentée, pas un bug)
+# =========================================================================
+# - Identifiants techniques (US, AC, SFD, FD, BR, ADR, classes d'erreur
+#   `[STACK_LIBRARY_MISSING]`, `[QA_TEST_FAILED]`, etc.) → ANGLAIS
+#   (parsing scripts + conventions agile universelles)
+# - Documentation utilisateur (CLAUDE.md, docs/, rules/, agents prompts) → FRANÇAIS
+#   (public cible Tech Lead francophone)
+# - Code généré (Razor, services C#, etc.) → ANGLAIS (convention universelle)
+# - Mockups HTML libellés métier → FRANÇAIS (métier francophone)
+#
+# Le mix est intentionnel et ne fait pas l'objet d'un fix unilatéral.
+# =========================================================================
+
+# =========================================================================
+# Cross-agent reads (v7.0.0+)
+# =========================================================================
+# Règles chargées implicitement par TOUS les agents listés ci-dessous via
+# référence `@.sdd/rules/{nom}.md` dans leur prompt. Annotation
+# `cache_layer: stable` car invariant inter-runs (cachable 5 min TTL).
+#
+# - .sdd/rules/output-protocol.md (v7.0.0)
+#     Référencée par les 12 agents (po, arch, dev-backend, dev-frontend,
+#     qa, elicitor, constitutioner, code-reviewer, security-reviewer,
+#     spec-compliance-reviewer, arch-reviewer, adversarial-reviewer) ET
+#     les 13 commandes user-facing (sdd-bootstrap, feat-generate,
+#     feat-validate, sdd-full, sdd-poc, dev-run, qa-generate,
+#     sdd-review, sdd-status, sdd-help, sdd-discover-stack, sdd-serve,
+#     sdd-kill-server). Définit le protocole de sortie chat executive
+#     (1L `[AGENT] résumé (X%)`, anti-verbose, ERROR 3L disque préservé).
+#     Coût ~4-6 KB par invocation (substance dans la règle, agents/
+#     commandes ne portent qu'un mini bloc 20L de paramétrage).
+#
+#     Couches complémentaires (hors prompt agent) :
+#       * Statusline `sdd_admin.statusline` (`.sdd/python/sdd_admin/
+#         statusline.py`) — single-line bottom-of-screen view du run
+#         actif (`[AGENT] X% · FEAT N-Name · US m-Name · elapsed`).
+#         Lit `workspace/db/console.db` (table `runs` + `events`).
+#         Câblé dans `.claude/settings.json` clé `statusLine`. Désactivable
+#         per-dev via `.claude/settings.local.json` (statusLine: null).
+#
+# =========================================================================
+# Sérialisation des writes sur constitution.md (v3+)
+# =========================================================================
+# La matrice phase → agent → section de constitution.md est définie dans
+# **@.sdd/rules/ownership.md §2 (Partie B "Constitution & ADRs")**.
+# Cette section est l'UNIQUE Source of Truth (SSoT) pour la sérialisation.
+#
+# Audit C4 closure 2026-06-08 — déduplication : avant ce commit, la matrice
+# était redéclarée verbatim ici, créant une maintenance double. Le contenu
+# est désormais centralisé dans `ownership.md §2` ; loader.yml pointe.
+#
+# Source canonique : @.sdd/rules/ownership.md §2
+# Détails procéduraux : agents/po.md STEP 8.5, agents/arch.md STEP 12.5-12.6
+#                       (read-back validation v5.0)
+# =========================================================================
 
 # -------------------------------------------------------------------------
-# Agent: po — Phase 2 (US generation)
+# Agent: po (Sonnet 4.6)
+# Phase: 2 (US generation)
+# Token footprint estimé: ~5-15 KB par invocation
 # -------------------------------------------------------------------------
 po:
-  model_tier: balanced   # loader Claude: claude-sonnet-4-6 — parité pivot .sdd/agents/po.agent.yaml + agent-bounds.yaml
+  model_tier: balanced   # parité frontmatter agents/po.md — enforced par tests/test_loader_model_parity.py
   reads:
-    # Order: stable → semi → volatile (spécifique provider Anthropic — réinterprété par adaptateur)
-    - .sdd/templates/us.template.md         # cache_layer: stable (spécifique provider Anthropic)
+    # Order: stable → semi → volatile (cache_control canonical order, cf. sdd_lib/cache_control.py)
+    - .sdd/templates/us.template.md         # cache_layer: stable (template invariant)
     - workspace/.sys/.context/constitution.md # v3 — si présent (lecture acteurs/glossaire) · cache_layer: semi
     - workspace/feats/{n}-*.md           # FEAT parente (1 fichier) · cache_layer: volatile
+    # v5.0 Inline Rules (dans agents/po.md, plus de Read mandatory) :
+    #   - us-granularity.md §1-§4 (5 anti-patterns détaillés)
+    #   - .sdd/rules/ownership.md (procédure §3 inline en STEP 8.5)
+    # v5.0 Économie : ~16-20k tokens/invocation
   writes:
     - workspace/us/{n}-{m}-*.md         # 1 à 6 fichiers par FEAT (cible 1-3)
     - workspace/.sys/.context/constitution.md # v3 — append-only §3 (acteurs), §2 (glossaire)
@@ -59,17 +148,41 @@ po:
     - workspace/src/                    # responsabilité dev-*
 
 # -------------------------------------------------------------------------
-# Agent: arch — Phase 3 (bootstrap + DB scaffolding + digest)
+# Agent UI : SUPPRIMÉ en v4.0.0
+# Les mockups HTML déposés dans workspace/ui/ sont lus directement par
+# dev-frontend (pas d'extraction PNG → markdown intermédiaire).
+# -------------------------------------------------------------------------
+
+# -------------------------------------------------------------------------
+# Agent: arch (Sonnet 4.6)
+# Phase: 3 (bootstrap + DB scaffolding + digest)
+# Token footprint estimé: ~10-30 KB (lecture stacks complète)
+# Une seule invocation par projet (idempotent)
 # -------------------------------------------------------------------------
 arch:
-  model_tier: balanced   # loader Claude: claude-sonnet-4-6 — parité pivot + bounds
+  model_tier: balanced   # parité frontmatter agents/arch.md — enforced par tests/test_loader_model_parity.py
   reads:
-    - workspace/stack/stack.md     # cache_layer: stable (spécifique provider Anthropic)
-    - .sdd/stacks/{cat}/{active}.md   # tous stacks actifs (sélectif) · cache_layer: stable
-    - .sdd/stacks/archi/{ArchiPattern}.md  # MVC (défaut) / DDD / microservice — UNIQUEMENT si AppType=back-front · cache_layer: stable
+    # Order: stable → semi → volatile (cache_control canonical order, cf. sdd_lib/cache_control.py)
+    # v7.0.x audit 2026-06-08 — stack.md unified to `stable` across all 9 agents
+    # (was `volatile` here only — incoherent. Tech Lead edits stack.md rarely
+    # between sessions, not per-run; the 5min TTL absorbs the rare changes.)
+    - workspace/stack/stack.md     # cache_layer: stable (Project Config invariant intra-session)
+    - .sdd/stacks/{cat}/{active}.md   # tous stacks actifs (sélectif — backend, frontend, ui, auth, qa, fullstack, mobiles). · cache_layer: stable
+    # NOTE MN4 (audit 2026-06-07) — Distinction stack vs combo :
+    #   - Côté STACK atomique : fullstack/* et mobiles/* restent 🟡 « experimental » (jamais validés en isolation end-to-end).
+    #   - Côté COMBO (assemblage de 3-6 stacks) : 5 fullstacks (angular-universal, blazor-server, kotlin-mustache, next, nuxt) et 2 mobiles (maui Windows, react-native Expo Web) sont 🟢 bench-validated runtime 2026-06-05 dans des combos précis (cf. docs/validated-combos.md §1.3).
+    # Marquage runtime via `preflight_stack_combo` (combos.json) ; la doc d'un stack reste à son tier d'isolation.
+    - .sdd/stacks/archi/{ArchiPattern}.md  # MVC (défaut) / DDD / microservice (🟡 expérimental) — UNIQUEMENT si AppType=back-front (v6.7.6+). · cache_layer: stable
     - .sdd/templates/adr.template.md  # v3 — nécessaire pour Phase D · cache_layer: stable
     - workspace/.sys/.context/constitution.md     # v3 — si présent · cache_layer: semi
     - workspace/.sys/.context/adrs/ADR-*.md       # v3 — index existants (idempotence) · cache_layer: semi
+    # v5.0 Inline Rules (dans agents/arch.md, plus de Read mandatory) :
+    #   - .sdd/rules/ownership.md (writes par §, ADR atomique)
+    #   - ownership.md §1 (matrice owner arch, was file-ownership.md)
+    #   - library-and-stack.md §0 (runtime LTS / CVE / origine, ex-library-policy.md)
+    # v6.1 Read mandatory ajouté (depuis 2026-05-08) :
+    #   - .sdd/rules/error-classification.md
+    # v5.0 Économie : ~12-18k tokens/invocation
   writes:
     - workspace/src/{AppName}.sln
     - workspace/src/{AppName}/             # projet frontend vide
@@ -83,7 +196,9 @@ arch:
     - workspace/src/{BackendName}/CLAUDE.md # contexte projet backend
     - workspace/src/{AppName}/CLAUDE.md    # contexte projet frontend
     - workspace/src/{LibName}/CLAUDE.md    # contexte projet lib
-    - workspace/.sys/.state/arch-ready-for-constitutioner.flag # sentinel disque (Phase D déléguée à constitutioner)
+    - workspace/.sys/.state/arch-ready-for-constitutioner.flag # sentinel disque (Phase D déléguée à constitutioner, no-spawn préservé)
+    # NB (CR-2, 2026-05-13) : ADRs + constitution.md §1/§4/§6 + INDEX sont owned EXCLUSIVEMENT par constitutioner.
+    # arch ne fait PLUS la Phase D — il pose seulement le sentinel ci-dessus, /arch-init STEP 3.5 spawn constitutioner.
   reads_env:                            # uniquement si DatabaseType ≠ none
     - DB_HOST
     - DB_PORT
@@ -99,28 +214,53 @@ arch:
     - workspace/src/**/*.razor             # responsabilité dev-frontend
 
 # -------------------------------------------------------------------------
-# Agent: dev-backend — Phase 4 (génération code serveur)
+# Agent: dev-backend (Opus 4.8 — depuis 2026-05-08, split modèles)
+# Phase: 4 (génération code serveur)
+# Token footprint estimé: ~3-7 KB par US (grâce à CLAUDE.md projet)
+# Invocations parallèles : 1 par US backend
 # -------------------------------------------------------------------------
 dev-backend:
-  model_tier: deep   # loader Claude: claude-opus-4-8 — parité pivot + bounds
+  model_tier: deep   # parité frontmatter agents/dev-backend.md — enforced par tests/test_loader_model_parity.py
+  # cache_layer annotations v7.0.0 P2 #11 — gain estimé -50% coût Opus
+  # après implémentation cache_control markers (v7.1).
+  # Order: stable → semi → volatile (cache_control canonical order, cf. sdd_lib/cache_control.py)
   reads:
-    # --- stable (spécifique provider Anthropic — réinterprété par adaptateur) ---
-    - workspace/stack/stack.md                     # Project Config · cache_layer: stable
-    - .sdd/stacks/backend/{active}.md           # cache_layer: stable
-    - .sdd/stacks/fullstack/{active}.md         # cache_layer: stable · status: experimental (n'utiliser que si AppType=fullstack)
-    - .sdd/stacks/archi/{ArchiPattern}.md       # MVC | DDD | microservice · cache_layer: stable
-    - .sdd/stacks/auth/{active}.md              # cache_layer: stable
-    - .sdd/rules/dev-shared-preflight.md        # v7.0.0 — STEP 0/0.5/1/1.bis hoist cross-agent · cache_layer: stable
-    - .sdd/rules/build-and-loop.md              # v7.0.0 — SSOT patterns dev-* · cache_layer: stable
-    - .claude/digests/error-classification.dev-backend.md   # taxonomie classes + pilotage build_loop · cache_layer: stable
+    # --- stable (invariant inter-FEAT, cachable 5 min TTL) ---
+    - { path: workspace/stack/stack.md, cache_layer: stable }                # Project Config
+    - { path: ".sdd/stacks/backend/{active}.md", cache_layer: stable }
+    # fullstack/* chargeable mais 🟡 expérimental (aucun combo validé bout-en-bout) — n'utiliser que si AppType=fullstack.
+    - { path: ".sdd/stacks/fullstack/{active}.md", cache_layer: stable, status: experimental }
+    - { path: ".sdd/stacks/archi/{ArchiPattern}.md", cache_layer: stable }  # MVC | DDD | microservice (🟡 expérimental pour microservice)
+    - { path: ".sdd/stacks/auth/{active}.md", cache_layer: stable }
+    - { path: .sdd/rules/dev-shared-preflight.md, cache_layer: stable }   # v7.0.0 — STEP 0/0.5/1/1.bis hoist cross-agent
+    - { path: .sdd/rules/build-and-loop.md, cache_layer: stable }         # v7.0.0 — SSOT patterns dev-* (ex backend-first + dev-shared)
+    - { path: .claude/digests/error-classification.dev-backend.md, cache_layer: stable }   # v6.1 — taxonomie classes + pilotage build_loop
     # --- semi-stable (invariant intra-FEAT, invalidé par /arch-init) ---
-    - workspace/src/{Project}/CLAUDE.md            # CLAUDE.md projet · cache_layer: semi
-    - workspace/db/schema-slice-{n}-{m}.json   # per-US slice Levier 4, preferred · cache_layer: semi
-    - workspace/db/schema.json                     # fallback if no slice present · cache_layer: semi
+    - { path: "workspace/src/{Project}/CLAUDE.md", cache_layer: semi }        # CLAUDE.md projet
+    - workspace/db/schema-slice-{n}-{m}.json   # per-US slice Levier 4 (audit 2026-06-08), preferred · cache_layer: semi
+    - { path: workspace/db/schema.json, cache_layer: semi }                 # fallback if no slice present
     # --- volatile (per-US, jamais cachable) ---
-    - workspace/us/{n}-{m}-*.md                    # US ciblée (1 fichier) · cache_layer: volatile
-    - workspace/ui/{n}-{m}-*.html                  # HTML mockup passif · cache_layer: volatile
-    - workspace/plans/{n}-{m}-*.back.md            # plan From Plan · cache_layer: volatile
+    - { path: "workspace/us/{n}-{m}-*.md", cache_layer: volatile }            # US ciblée (1 fichier)
+    - { path: "workspace/ui/{n}-{m}-*.html", cache_layer: volatile }           # HTML mockup passif
+    - { path: "workspace/plans/{n}-{m}-*.back.md", cache_layer: volatile }    # plan From Plan
+    # v5.0 Inline Rules (dans agents/dev-backend.md, plus de Read mandatory) :
+    #   - library-and-stack.md
+    #   - ownership.md§1-§2
+    # v6.1 Read mandatory ajoutés :
+    #   - .sdd/rules/error-classification.md (depuis 2026-05-08) — taxonomie
+    #     8 classes, pilotage build_loop CORRECTIBLE vs BLOCKING (listée ci-dessus)
+    #   - .sdd/rules/build-and-loop.md (depuis 2026-05-08) — SSOT 7 patterns
+    #     partagés (context budget, path safety, mode detection, LibName lock,
+    #     anti-derive, QA ownership, plan construction) (listée ci-dessus)
+    # v7.0.0 Read mandatory ajouté :
+    #   - .sdd/rules/dev-shared-preflight.md — substance hoistée des STEP 0/0.5/1/1.bis
+    #     (preflight script-driven, context budget, mode From Plan, path safety
+    #     Front/Back isolation) (listée ci-dessus)
+    # v5.0 Reads conditionnels (lazy) :
+    #   - workspace/.sys/.context/constitution.md  # uniquement si terme ambigu
+    #   - workspace/.sys/.context/adrs/INDEX.md    # uniquement au STEP 5 avant création ADR
+    #   - workspace/.sys/.context/adrs/*.md        # fallback si INDEX.md absent
+    # v5.0 Économie : ~16-20k tokens/dispatch
   writes:
     - workspace/src/{BackendName}/Services/
     - workspace/.sys/.context/adrs/ADR-{YYYYMMDDTHHmmss}-*.md # timestamp atomique
@@ -143,22 +283,50 @@ dev-backend:
     - "frontend-only US"                # skipped sans erreur
 
 # -------------------------------------------------------------------------
-# Agent: dev-frontend — Phase 4 (génération code client)
+# Agent: dev-frontend (Opus 4.8 — depuis 2026-05-08, split modèles)
+# Phase: 4 (génération code client)
+# Token footprint estimé: ~5-10 KB par US (HTML + CLAUDE.md + stacks)
+# Invocations parallèles : 1 par US frontend
+# v4.0.0 : plus de PNG vision, plus de UI markdown intermédiaire.
+# Lecture directe du mockup HTML statique (texte).
 # -------------------------------------------------------------------------
 dev-frontend:
-  model_tier: deep   # loader Claude: claude-opus-4-8 — parité pivot + bounds
+  model_tier: deep   # parité frontmatter agents/dev-frontend.md — enforced par tests/test_loader_model_parity.py
+  # cache_layer annotations v7.0.0 P2 #11 — symétrie avec dev-backend
+  # Order: stable → semi → volatile (cache_control canonical order, cf. sdd_lib/cache_control.py)
   reads:
+    # --- stable (invariant inter-FEAT, cachable 5 min TTL) ---
     - workspace/stack/stack.md              # lu UNE FOIS en STEP 0 Phase B (v5.0) · cache_layer: stable
     - .sdd/stacks/frontend/{active}.md  # fallback si CLAUDE.md insuffisant · cache_layer: stable
     - .sdd/stacks/ui/{active}.md        # mapping composants DS (§2 + §7) · cache_layer: stable
     - .sdd/stacks/auth/{active}.md      # patterns d'injection auth client · cache_layer: stable
     - .sdd/rules/dev-shared-preflight.md   # v7.0.0 — STEP 0/0.5/1/1.bis hoist cross-agent · cache_layer: stable
-    - .sdd/rules/build-and-loop.md         # v7.0.0 — SSOT patterns dev-* · cache_layer: stable
-    - .claude/digests/error-classification.dev-frontend.md   # taxonomie classes + pilotage build_loop · cache_layer: stable
+    - .sdd/rules/build-and-loop.md         # v7.0.0 — SSOT patterns dev-* (ex backend-first + dev-shared) · cache_layer: stable
+    - .claude/digests/error-classification.dev-frontend.md   # v6.1 — taxonomie classes + pilotage build_loop · cache_layer: stable
+    # --- semi-stable (invariant intra-FEAT) ---
     - workspace/src/{Project}/CLAUDE.md    # CLAUDE.md par projet · cache_layer: semi
+    # --- volatile (per-US, jamais cachable) ---
     - workspace/us/{n}-{m}-*.md            # US ciblée (1 fichier) · cache_layer: volatile
-    - workspace/ui/{n}-{m}-*.html           # mockup HTML statique = source de vérité visuelle · cache_layer: volatile
-    - workspace/plans/{n}-{m}-*.front.md   # plan existant si /dev-plan a tourné — mode From Plan · cache_layer: volatile
+    - workspace/ui/{n}-{m}-*.html           # mockup HTML statique = source · cache_layer: volatile
+                                        # de vérité visuelle (libellés,
+                                        # structure, classes, couleurs
+                                        # inline). Lecture texte directe.
+    - workspace/plans/{n}-{m}-*.front.md   # plan existant si /dev-plan · cache_layer: volatile
+                                        # a tourné — mode From Plan
+    # v5.0 Inline Rules (dans agents/dev-frontend.md, plus de Read mandatory) :
+    #   - library-and-stack.md
+    #   - ownership.md§1-§2
+    # v6.1 Read mandatory ajoutés (listés ci-dessus avec path complet) :
+    #   - .sdd/rules/error-classification.md (depuis 2026-05-08)
+    #   - .sdd/rules/build-and-loop.md (depuis 2026-05-08) — SSOT 7 patterns
+    #     partagés avec dev-backend (cf. §note dev-backend ci-dessus)
+    # v7.0.0 Read mandatory ajouté :
+    #   - .sdd/rules/dev-shared-preflight.md — substance hoistée des STEP 0/0.5/1/1.bis
+    # v5.0 Reads conditionnels (lazy) :
+    #   - workspace/.sys/.context/constitution.md  # uniquement si terme ambigu
+    #   - workspace/.sys/.context/adrs/INDEX.md    # uniquement au STEP 6 avant création ADR
+    #   - workspace/.sys/.context/adrs/*.md        # fallback si INDEX.md absent
+    # v5.0 Économie : ~16-20k tokens/dispatch
   writes:
     - workspace/src/{AppName}/Pages/
     - workspace/.sys/.context/adrs/ADR-{YYYYMMDDTHHmmss}-*.md # timestamp atomique
@@ -186,15 +354,25 @@ dev-frontend:
       pendant dans le markup (RadzenButton, RadzenDataGrid, etc.)
     - STOP + ERROR sur libellé/structure absent
 
+# (Stubs dev-backend-strict / dev-frontend-strict / validator déplacés
+#  en fin de fichier — cf. section "## Removed agents (backward-compat)".)
+
 # -------------------------------------------------------------------------
-# Agent: elicitor — Phase 1.5 (élicitation structurée, optionnelle)
+# Agent: elicitor (Sonnet 4.6) — v3, P3
+# Phase: 1.5 (élicitation structurée, optionnelle)
+# Token footprint estimé:
+#   - interactif: ~10-15 KB (5×1-2 questions + synthèse)
+#   - --quick: ~5-8 KB (génération directe)
 # -------------------------------------------------------------------------
 elicitor:
-  model_tier: balanced   # loader Claude: claude-sonnet-4-6 — parité pivot + bounds (ceiling balanced, arbitrage 2026-07-24)
+  model_tier: balanced   # parité frontmatter agents/elicitor.md — enforced par tests/test_loader_model_parity.py
   reads:
+    # Order: stable → semi → volatile (cache_control canonical order, cf. sdd_lib/cache_control.py)
     - .sdd/templates/risks-assumptions.template.md  # cache_layer: stable
     - workspace/.sys/.context/constitution.md   # si présent (acteurs cumulés) · cache_layer: semi
     - workspace/feats/{n}-*.md             # FEAT ciblée · cache_layer: volatile
+    # v5.0 Inline Rules : substance inlinée dans agents/elicitor.md, plus de Read mandatory
+    # v5.0 Économie : ~6-8k tokens/invocation
   writes:
     - workspace/feats/{n}-*.md             # APPEND-ONLY 5 sections enrichies
     - workspace/.sys/.context/constitution.md   # APPEND-ONLY §7 (risques + hypothèses)
@@ -214,11 +392,18 @@ elicitor:
     - quick: "--quick flag, génération directe sans question"
 
 # -------------------------------------------------------------------------
-# Agent: qa — Phase 5 (tests unitaires + coverage + quality scan)
+# Agent: qa (Sonnet 4.6) — v3.1.0
+# Phase: 5 (tests unitaires + coverage + quality scan)
+# Token footprint estimé:
+#   - quality-only: ~3 KB (rapport seulement, scan déterministe)
+#   - tests-only: ~17-27 KB (génération tests Sonnet)
+#   - tests+coverage: ~17-27 KB (coverage parsing gratuit en tokens)
+#   - full: ~20-30 KB (recommandé)
 # -------------------------------------------------------------------------
 qa:
-  model_tier: balanced   # loader Claude: claude-sonnet-4-6 — parité pivot + bounds
+  model_tier: balanced   # parité frontmatter agents/qa.md — enforced par tests/test_loader_model_parity.py
   reads:
+    # Order: stable → semi → volatile (cache_control canonical order, cf. sdd_lib/cache_control.py)
     - .sdd/stacks/qa/{active}.md    # tous QA stacks actifs (sélectif) · cache_layer: stable
     - workspace/src/{BackendName}/CLAUDE.md  # architecture backend (passif) · cache_layer: semi
     - workspace/src/{AppName}/CLAUDE.md      # architecture frontend (passif) · cache_layer: semi
@@ -230,6 +415,15 @@ qa:
     - workspace/feats/{n}-*.md             # FEAT parente (passif, ACs) · cache_layer: volatile
     - workspace/us/{n}-*.md               # US ciblées · cache_layer: volatile
     - workspace/ui/{n}-*.html              # HTML mockups (passif, comportements UI) · cache_layer: volatile
+    # v5.0 Inline Rules (dans agents/qa.md, plus de Read mandatory) :
+    #   - quality.md§2-§3
+    #   - library-and-stack.md (scope étendu : tous stacks actifs §2.4)
+    #   - ownership QA (substance inlinée §Ownership)
+    # v6.1 Read mandatory ajouté (depuis 2026-05-08) :
+    #   - .sdd/rules/error-classification.md (taxonomie QA §1.7)
+    # v5.0 Reads conditionnels (lazy) :
+    #   - workspace/.sys/.context/constitution.md  # uniquement si terme ambigu
+    # v5.0 Économie : ~25-35k tokens/invocation
   writes:
     - workspace/src/{BackendName}.Tests/**     # tests backend (xUnit/JUnit/pytest)
     - workspace/src/{AppName}.Tests/**         # tests Blazor (bUnit) si applicable
@@ -238,6 +432,9 @@ qa:
     - "workspace/src/**/*.test.ts"             # tests Vitest adjacents
     - "workspace/src/**/test_*.py"             # tests Python
     - "workspace/src/**/*Test.kt"              # tests Kotlin JUnit
+    # 2026-07-06 : QA telemetry SQLite-only (no qa/). quality/coverage
+    # are persisted directly to console.db by quality_scan.py/parse_coverage.py.
+    # The only file written is the transient api-tests JSON (ingested+deleted).
     - workspace/.sys/.validation/{n}-api-tests.json  # transient (ingest_agent_report → console.db, then unlink)
   forbidden_reads:
     - workspace/stack/                     # hors scope QA (lecture indirecte via QA stacks)
@@ -255,16 +452,25 @@ qa:
     - full: "tous les STEP (recommandé)"
     - manual: "skip auto-invoke par /sdd-full ; user lance /qa-generate manuellement"
 
+# (Stubs dashboard / accessibility-auditor déplacés en fin de fichier
+#  — cf. section "## Removed agents (backward-compat)".)
+
 # -------------------------------------------------------------------------
-# Agent: code-reviewer — Phase 6.4 (post-dev, avant /qa-generate)
+# Agent: code-reviewer (Sonnet 4.6) — depuis v6.3.1
+# Phase: 6.4 (post-dev backend + API Gate + frontend, avant /qa-generate)
+# Token footprint estimé: ~8-15 KB par feature de 3-5 US
+# Invocation: manuelle en v6.3.1.0 ("review le code de la FEAT N")
+#             auto-invoke depuis /dev-run STEP 6.4 en v6.3.1.1 (à venir)
+# Skip silencieux si CodeReviewMode: off
 # -------------------------------------------------------------------------
 code-reviewer:
-  model_tier: balanced   # loader Claude: claude-sonnet-4-6 — parité pivot + bounds
+  model_tier: balanced   # parité frontmatter agents/code-reviewer.md — enforced par tests/test_loader_model_parity.py
   reads:
-    - .sdd/rules/auditor-coordination.md    # matrice ownership findings 1 domaine = 1 owner · cache_layer: stable
+    - .sdd/rules/auditor-coordination.md    # matrice ownership findings 1 domaine = 1 owner (v7.0.1-dev, audit 2026-06-11 M7) · cache_layer: stable
+    # Order: stable → semi → volatile (cache_control canonical order, cf. sdd_lib/cache_control.py)
     - workspace/stack/stack.md             # Project Config (CodeReviewMode, CodeReviewFailOn) · cache_layer: stable
-    - .claude/digests/error-classification.code-reviewer.md      # taxonomie [REVIEW_*] §1.10 · cache_layer: stable
-    - .sdd/rules/build-and-loop.md            # Partie B : anti-derive bullets, plan structure, QA ownership · cache_layer: stable
+    - .claude/digests/error-classification.code-reviewer.md      # taxonomie [REVIEW_*] §1.10 + classes réutilisées §1.3/§1.6 · cache_layer: stable
+    - .sdd/rules/build-and-loop.md            # Partie B : anti-derive bullets, plan structure, QA ownership (was dev-shared.md, consolidated v7.0.0) · cache_layer: stable
     - .sdd/stacks/backend/{active}.md   # §1.3 layer mapping + §3 conventions + §2.4 libs · cache_layer: stable
     - .sdd/stacks/frontend/{active}.md  # §1.3 + §3 (frontend uniquement) · cache_layer: stable
     - workspace/src/{BackendName}/CLAUDE.md  # architecture backend · cache_layer: semi
@@ -275,6 +481,8 @@ code-reviewer:
     - workspace/feats/{n}-*.md             # FEAT parente (passif, intent métier) · cache_layer: volatile
     - workspace/us/{n}-*.md               # toutes les US ciblées (passif) · cache_layer: volatile
     - workspace/plans/{n}-*.{back,front}.md  # mode preferred : lecture sélective via plan · cache_layer: volatile
+    # Budget cible : ≤ 15 KB par invocation (Sonnet 4.6)
+    # Anti-pattern strict : ne JAMAIS Glob workspace/src/**/* (lecture sélective via plans ou convention)
   writes:
     - workspace/.sys/.validation/{n}-code-review.md     # rapport humain
     - workspace/.sys/.validation/{n}-code-review.json   # schéma machine
@@ -283,14 +491,21 @@ code-reviewer:
     - workspace/feats/{other}.md            # autres FEATs
     - .sdd/stacks/qa/                          # hors scope review (responsabilité qa)
     - .sdd/stacks/auth/                        # hors scope (review focus code applicatif)
-    - .sdd/stacks/ui/                          # hors scope (a11y → ingest axe-core CI)
+    - .sdd/stacks/ui/                          # hors scope (a11y → ingest axe-core CI depuis v7.0.0, agent retiré)
     - workspace/.sys/.context/             # constitution/ADRs hors scope
-    - workspace/db/                        # console.db (responsabilité qa, hors scope)
+    - workspace/db/                        # console.db (qa_coverage/qa_quality = responsabilité qa, hors scope)
   forbidden_writes:
     - workspace/src/                       # read-only strict (rapport seul, jamais patch)
     - workspace/us/                        # responsabilité po
-    - workspace/.sys/.validation/{n}-api-tests.json  # responsabilité qa
-    - workspace/dashboard/                 # legacy v6 guard-rail (agent dashboard retiré v7.0.0, note M14)
+    - workspace/.sys/.validation/{n}-api-tests.json  # responsabilité qa (2026-07-06, ex-qa/)
+    # NOTE M14 (audit 2026-06-07) — la ligne `workspace/dashboard/`
+    # ci-dessous est un GUARD-RAIL HISTORIQUE défensif (3 occurrences cumulées
+    # pour les 3 reviewers : code-reviewer + security-reviewer +
+    # spec-compliance-reviewer). L'agent `dashboard` a été retiré v7.0.0
+    # mais l'entrée est conservée à dessein : empêche qu'une future ré-introduction
+    # accidentelle d'un agent dashboard ne fasse Write dans ce chemin par
+    # un auditor. Ne PAS retirer sans ADR `governance-cleanup-forbidden-dashboard`.
+    - workspace/dashboard/                 # legacy v6 guard-rail (agent dashboard retiré v7.0.0, cf. note M14 ci-dessus)
     - workspace/.sys/.context/             # responsabilité po/arch/elicitor
     - workspace/plans/                     # le reviewer ne planifie pas
   modes:                                          # selon CodeReviewMode dans Project Config
@@ -303,29 +518,43 @@ code-reviewer:
     - moderate: "🔴 RED dès 1 issue moderate ou pire"
     - minor: "🔴 RED dès 1 issue (strict)"
   hard_blocking_classes:                          # override CodeReviewFailOn → toujours 🔴 RED
+    # NOTE v7.0.0-alpha (audit P2 2026-06-06) — [REVIEW_SECRETS_HARDCODED] retiré :
+    # ownership exclusif délégué à security-reviewer ([SEC_SECRET_HARDCODED], CWE-798)
+    # cf. error-classification.md §1.10. code-reviewer peut encore émettre la classe
+    # en `issues.minor` à titre informationnel (pointeur vers security-reviewer),
+    # mais elle n'est plus hard-blocking ici pour éviter le double-rapport sur les
+    # mêmes file:line. La dé-dup cross-source (REVIEW_SECRETS_HARDCODED ↔
+    # SEC_SECRET_HARDCODED) reste assurée par sdd_review.deduplicate_findings()
+    # via CANONICAL_CLASS (cf. _review_fetch.py §6.10).
     - "[FRONTEND_BACKEND_CONTRACT_GAP]"           # feature ne marchera pas en prod
   exit_silent_when:
     - "CodeReviewMode: off"
   idempotent: true                                # peut être ré-invoqué sans risque
 
 # -------------------------------------------------------------------------
-# Agent: arch-reviewer — Phase 4.8 (post-QA, dans /sdd-review)
+# Agent: arch-reviewer (Sonnet 4.6) — depuis v6.11.0
+# Phase: 4.8 (post-QA, dans /sdd-review via /sdd-full STEP 4.8)
+# Token footprint estimé: ~6-12 KB par feature de 3-5 US
+# Invocation: spawn par /sdd-review STEP 3.0 si ArchReviewMode=full
+# Skip silencieux si ArchReviewMode in (manual, off) — défaut "manual"
 # -------------------------------------------------------------------------
 arch-reviewer:
-  model_tier: balanced   # loader Claude: claude-sonnet-4-6 — parité pivot + bounds
+  model_tier: balanced   # parité frontmatter agents/arch-reviewer.md — enforced par tests/test_loader_model_parity.py
   reads:
-    - .sdd/rules/auditor-coordination.md    # matrice ownership findings 1 domaine = 1 owner · cache_layer: stable
+    - .sdd/rules/auditor-coordination.md    # matrice ownership findings 1 domaine = 1 owner (v7.0.1-dev, audit 2026-06-11 M7) · cache_layer: stable
+    # Order: stable → semi → volatile (cache_control canonical order, cf. sdd_lib/cache_control.py)
     - workspace/stack/stack.md                # Project Config + Active Architecture Pattern + Active Tech Specs · cache_layer: stable
-    - .claude/digests/error-classification.arch-reviewer.md         # taxonomie [ARCH_*] · cache_layer: stable
-    - .sdd/stacks/archi/{mvc|ddd|microservice}.md  # §2 couches + §3 principes + §4 naming canonique · cache_layer: stable
+    - .claude/digests/error-classification.arch-reviewer.md         # taxonomie [ARCH_*] §1.18 · cache_layer: stable
+    - .sdd/stacks/archi/{mvc|ddd|microservice}.md  # §2 couches + §3 principes + §4 naming canonique (microservice 🟡 expérimental) · cache_layer: stable
     - .sdd/stacks/backend/{active}.md            # §1.3 layer mapping backend · cache_layer: stable
     - .sdd/stacks/frontend/{active}.md           # §1.3 layer mapping frontend · cache_layer: stable
     - workspace/.sys/.context/constitution.md  # §2 glossaire + §6 ADRs index · cache_layer: semi
-    - workspace/.sys/.context/adrs/ADR-*.md  # ADRs (## Decision pour drift check) · cache_layer: semi
+    - workspace/.sys/.context/adrs/ADR-*.md  # ADRs (## Decision pour drift check ; pattern whitelisté is_unbounded_glob) · cache_layer: semi
     - workspace/src/{BackendName}/**         # code production (Glob via plan) · cache_layer: semi
     - workspace/src/{AppName}/**             # code production · cache_layer: semi
     - workspace/src/{LibName}/**             # lib partagée si présente · cache_layer: semi
     - workspace/plans/{n}-*.{back,front}.md  # lecture sélective des fichiers à reviewer · cache_layer: volatile
+    # Budget cible : ≤ 12 KB par invocation (Sonnet 4.6)
   writes:
     - workspace/.sys/.validation/{n}-arch-review.md     # rapport humain
     - workspace/.sys/.validation/{n}-arch-review.json   # transport vers DB
@@ -337,7 +566,7 @@ arch-reviewer:
   forbidden_writes:
     - workspace/src/                         # read-only strict (rapport seul)
     - workspace/us/                          # responsabilité po
-    - workspace/db/                          # console.db = responsabilité qa/scripts
+    - workspace/db/                          # console.db = responsabilité qa/scripts (2026-07-06, ex-qa/)
     - workspace/.sys/.context/               # ADRs + constitution = responsabilité po/arch/elicitor
     - workspace/plans/                       # ne planifie pas
     - workspace/stack/                        # immutable côté agent
@@ -359,18 +588,39 @@ arch-reviewer:
   idempotent: true
 
 # -------------------------------------------------------------------------
-# complexity-router — DOC-ONLY (identique loader Claude) : rubric consommé
-# par le script déterministe complexity_router.py (0 token). Pas d'entrée
-# loader, pas de pivot .agent.yaml, pas de model_tier.
+# complexity-router — DOC-ONLY (audit CTO 2026-06-09 Critical #4 closure)
+# -------------------------------------------------------------------------
+# Statut v7.0.0+ : agent LLM RETIRÉ. Section loader complète supprimée
+# (était ambiguë — donnait l'impression d'un agent spawnable). Le rubric de
+# scoring documenté dans `.sdd/docs/rubrics/complexity-router-scoring.md`
+# (audit REFACTOR-3 2026-06-08 — déplacé depuis agents/ pour éviter la
+# spawn-confusion) est consommé verbatim par le script Python déterministe
+# `sdd_scripts/complexity_router.py` (0 token, < 50 ms, exit code = routing
+# recommendation).
+#
+# Invocation opérationnelle :
+#   python -m sdd_scripts.complexity_router --feat-number {n}
+#   (ou auto via `ComplexityRouterMode=auto` + hook PreToolUse à câbler v7.1+)
+#
+# Test contract : référencé dans `tests/test_loader_contract.py` via
+# `DOC_ONLY_AGENTS_V7 = {"complexity-router"}` — accepte explicitement
+# l'absence d'entrée loader pour les rubrics doc-only.
 # -------------------------------------------------------------------------
 
 # -------------------------------------------------------------------------
-# Agent: adversarial-reviewer — Phase 99% (opt-in /sdd-review --adversarial)
+# Agent: adversarial-reviewer (Sonnet 4.6) — depuis v7.0.0 (R1 BMAD, 2026-05-24)
+# Phase: 99% (post-agrégation `/sdd-review`, opt-in `--adversarial`)
+# Token footprint estimé: ~8-15 KB par FEAT
+# Invocation: spawn par /sdd-review --adversarial (manuel) OU auto si
+#             AdversarialReviewMode=full dans Project Config
+# Rôle: avocat du diable — 5-10 attaques que les autres reviewers
+#       n'auraient pas vues. Verdict informational (jamais bloquant).
 # -------------------------------------------------------------------------
 adversarial-reviewer:
-  model_tier: balanced   # loader Claude: claude-sonnet-4-6 — parité pivot + bounds
+  model_tier: balanced   # parité frontmatter agents/adversarial-reviewer.md — enforced par tests/test_loader_model_parity.py
   reads:
-    - .sdd/rules/auditor-coordination.md    # matrice ownership findings 1 domaine = 1 owner · cache_layer: stable
+    - .sdd/rules/auditor-coordination.md    # matrice ownership findings 1 domaine = 1 owner (v7.0.1-dev, audit 2026-06-11 M7) · cache_layer: stable
+    # Order: stable → semi → volatile (cache_control canonical order, cf. sdd_lib/cache_control.py)
     - workspace/stack/stack.md                              # Project Config (AdversarialReviewMode, Min/Max) · cache_layer: stable
     - .claude/digests/error-classification.adversarial-reviewer.md                       # taxonomie [ADV_*] §1.15 · cache_layer: stable
     - workspace/src/{BackendName}/**                       # ≤ 3 fichiers ciblés via §2.3, jamais Glob récursif · cache_layer: semi
@@ -379,12 +629,15 @@ adversarial-reviewer:
     - workspace/feats/{n}-*.md                              # FEAT (Functional Needs, Business Rules, ACs, §7 Risks) · cache_layer: volatile
     - workspace/us/{n}-*.md                                # US (ACs) · cache_layer: volatile
     - workspace/plans/{n}-*.{back,front}.md                # cartographie fichiers — sélection ≤ 5 chemins critiques · cache_layer: volatile
-    - workspace/db/console.db                             # verdict consolidé (précondition stricte) · cache_layer: volatile
+    - workspace/db/console.db                             # verdict consolidé (précondition stricte, via query_console_db review) · cache_layer: volatile
     - workspace/.sys/.validation/{n}-code-review.md        # résumé findings (header uniquement, anti-dup §2.5) · cache_layer: volatile
     - workspace/.sys/.validation/{n}-security-scan.md      # idem · cache_layer: volatile
     - workspace/.sys/.validation/{n}-spec-compliance.md    # idem · cache_layer: volatile
     - workspace/.sys/.validation/{n}-arch-review.md        # idem (si ArchReviewMode=full) · cache_layer: volatile
+    # Anti-pattern strict : pas de Glob récursif workspace/src/** — lecture sélective via plan
   writes:
+    # 2026-07-06 : plus de qa/ ni de .md disque — un seul JSON transitoire,
+    # ingéré puis supprimé par ingest_agent_report (persisté en console.db).
     - workspace/.sys/.validation/{n}-adversarial.json      # schéma machine (ingest_agent_report → console.db, puis unlink)
   forbidden_reads:
     - workspace/us/{other-feat}                            # autres FEATs
@@ -406,7 +659,7 @@ adversarial-reviewer:
     - off: "skip total (exit silencieux)"
     - manual: "invocation explicite uniquement via /sdd-review --adversarial (défaut)"
     - full: "auto-invoke par /sdd-review post-agrégation (sans nécessiter --adversarial)"
-  fail_on: []                                                     # verdict TOUJOURS informational
+  fail_on: []                                                     # verdict TOUJOURS informational — jamais de bascule 🟢/🟡/🔴
   hard_blocking_classes: []                                       # aucune classe hard-blocking par design
   exit_silent_when:
     - "AdversarialReviewMode: off"
@@ -416,12 +669,20 @@ adversarial-reviewer:
   idempotent: true
 
 # -------------------------------------------------------------------------
-# Agent: security-reviewer — Phase 6.4 (mode scan uniquement depuis v7.0.0)
+# Agent: security-reviewer (Sonnet 4.6)
+# Phase: 6.4 (mode scan uniquement, post-dev — dev-run STEP 6.4 batch auditors)
+# Token footprint estimé: ~10-20 KB par feature
+#
+# v7.0.0 — Mode `threat-model` RETIRÉ (governance-major-auditors-trim).
+# Remplacement : template humain `.sdd/templates/threat-model.template.md`
+# (STRIDE light, ~15-30 min, ADR). Le pipeline n'invoque plus l'agent en
+# mode threat-model — seul le mode scan reste actif.
 # -------------------------------------------------------------------------
 security-reviewer:
-  model_tier: balanced   # loader Claude: claude-sonnet-4-6 — parité pivot + bounds (floor balanced : 8 classes [SEC_*] hard-blocking)
+  model_tier: balanced   # parité frontmatter agents/security-reviewer.md — enforced par tests/test_loader_model_parity.py
   reads:
-    - .sdd/rules/auditor-coordination.md    # matrice ownership findings 1 domaine = 1 owner · cache_layer: stable
+    - .sdd/rules/auditor-coordination.md    # matrice ownership findings 1 domaine = 1 owner (v7.0.1-dev, audit 2026-06-11 M7) · cache_layer: stable
+    # Order: stable → semi → volatile (cache_control canonical order, cf. sdd_lib/cache_control.py)
     - workspace/stack/stack.md                # Project Config (SecurityMode, SecurityFailOn, *Enabled) · cache_layer: stable
     - .claude/digests/error-classification.security-reviewer.md         # taxonomie [SEC_*] §1.11 · cache_layer: stable
     - .sdd/stacks/backend/{active}.md §1.3+§3+§2.4   # cache_layer: stable
@@ -436,6 +697,7 @@ security-reviewer:
     - workspace/us/{n}-*.md                  # US ciblées (passif) · cache_layer: volatile
     - workspace/plans/{n}-*.{back,front}.md  # mode preferred : lecture sélective via plan · cache_layer: volatile
     - workspace/.sys/.validation/{n}-code-review.json  # dé-dup secrets avec code-reviewer (§6) · cache_layer: volatile
+    # Anti-pattern strict : ne JAMAIS Glob workspace/src/**/* (lecture sélective)
   writes:
     - workspace/.sys/.validation/{n}-security-scan.md
     - workspace/.sys/.validation/{n}-security-scan.json
@@ -443,13 +705,15 @@ security-reviewer:
     - workspace/us/{other-feat}            # autres FEATs
     - workspace/feats/{other}.md            # autres FEATs
     - .sdd/stacks/qa/                          # hors scope (responsabilité qa)
-    - .sdd/stacks/ui/                          # hors scope
-    - workspace/db/                        # console.db (responsabilité qa, hors scope direct)
+    - .sdd/stacks/ui/                          # hors scope (responsabilité a11y/dev-frontend)
+    - workspace/db/                        # console.db (qa_coverage/qa_quality/qa_a11y = responsabilité qa, hors scope direct)
   forbidden_writes:
     - workspace/src/                       # read-only strict (jamais de patch)
     - workspace/us/                        # responsabilité po
-    - workspace/.sys/.validation/{n}-api-tests.json  # responsabilité qa
-    - workspace/dashboard/                 # (legacy v6, agent retiré v7.0.0 — garde-fou)
+    - workspace/.sys/.validation/{n}-api-tests.json  # responsabilité qa (2026-07-06, ex-qa/)
+    # dashboard/ retiré v7.0.0 (agent dashboard supprimé, INDEX ADRs via
+    # sdd_scripts/index_adrs.py). Entrée préservée comme garde-fou.
+    - workspace/dashboard/                 # (legacy v6, agent retiré v7.0.0)
     - workspace/.sys/.context/             # responsabilité po/arch/elicitor
     - workspace/plans/                     # ne planifie pas
     - workspace/.sys/.validation/{n}-code-review.*  # responsabilité code-reviewer
@@ -476,13 +740,22 @@ security-reviewer:
     - "SecurityScanEnabled: false"
   idempotent: true                                # peut être ré-invoqué sans risque
 
+# (Stub performance-auditor déplacé en fin de fichier
+#  — cf. section "## Removed agents (backward-compat)".)
+
 # -------------------------------------------------------------------------
-# Agent: spec-compliance-reviewer — Phase 6.4 ("Do not trust the report")
+# Agent: spec-compliance-reviewer (Sonnet 4.6) — depuis v6.5.2
+# Phase: 6.4 (post-dev, parallèle à code-reviewer + a11y + security scan)
+# Token footprint estimé: ~8-15 KB par feature (Sonnet 4.6, sélectif via plans + AC ciblage)
+# Pattern: "Do not trust the report" hérité de superpowers v5.1 — re-lit le
+#          code matérialisé AC-par-AC indépendamment des rapports dev-*.
+# Activation: opt-in via SpecComplianceMode (défaut: manual = skip).
 # -------------------------------------------------------------------------
 spec-compliance-reviewer:
-  model_tier: balanced   # loader Claude: claude-sonnet-4-6 — parité pivot + bounds
+  model_tier: balanced   # parité frontmatter agents/spec-compliance-reviewer.md — enforced par tests/test_loader_model_parity.py
   reads:
-    - .sdd/rules/auditor-coordination.md    # matrice ownership findings 1 domaine = 1 owner · cache_layer: stable
+    - .sdd/rules/auditor-coordination.md    # matrice ownership findings 1 domaine = 1 owner (v7.0.1-dev, audit 2026-06-11 M7) · cache_layer: stable
+    # Order: stable → semi → volatile (cache_control canonical order, cf. sdd_lib/cache_control.py)
     - workspace/stack/stack.md             # Project Config (SpecComplianceMode, SpecComplianceFailOn) · cache_layer: stable
     - .claude/digests/error-classification.spec-compliance-reviewer.md      # taxonomie [SPEC_*] §1.13 · cache_layer: stable
     - workspace/src/{BackendName}/**      # code production (fallback convention si pas de plan) · cache_layer: semi
@@ -491,6 +764,9 @@ spec-compliance-reviewer:
     - workspace/feats/{n}-*.md             # FEAT parente (passif, contexte) · cache_layer: volatile
     - workspace/us/{n}-*.md               # toutes les US (source de vérité ACs) · cache_layer: volatile
     - workspace/plans/{n}-*.{back,front}.md  # mode preferred : sélection fichiers par AC · cache_layer: volatile
+    # Anti-pattern strict : pas de Glob workspace/src/**/*
+    # Anti-pattern par design : NE LIT PAS les rapports d'autres agents
+    #   (cf. agent §STEP 0 "Périmètre strict")
   writes:
     - workspace/.sys/.validation/{n}-spec-compliance.md       # rapport humain
     - workspace/.sys/.validation/{n}-spec-compliance.json     # schéma machine validé par validate_spec_compliance.py
@@ -499,13 +775,13 @@ spec-compliance-reviewer:
     - workspace/feats/{other}.md            # autres FEATs
     - workspace/.sys/.validation/{n}-code-review.*   # NEVER (bias toward not-trust-report)
     - workspace/.sys/.validation/{n}-security-scan.* # NEVER
-    - workspace/db/                        # console.db qa_* (NEVER, bias not-trust-report)
+    - workspace/db/                        # console.db qa_* (rapports auditeurs = NEVER, bias not-trust-report)
     - .sdd/stacks/qa/                          # hors scope
     - workspace/.sys/.context/             # hors scope direct
   forbidden_writes:
     - workspace/src/                       # read-only strict (jamais de patch)
     - workspace/us/                        # responsabilité po
-    - workspace/db/                        # console.db = responsabilité qa/scripts
+    - workspace/db/                        # console.db = responsabilité qa/scripts (2026-07-06, ex-qa/)
     - workspace/dashboard/                 # legacy v6 (agent dashboard retiré v7.0.0)
     - workspace/.sys/.context/             # responsabilité po/arch/elicitor
     - workspace/plans/                     # ne planifie pas
@@ -516,18 +792,24 @@ spec-compliance-reviewer:
     - SpecComplianceFailOn: "critical | serious | moderate | minor (défaut: serious)"
   exit_silent_when:
     - "SpecComplianceMode: off"
-    - "SpecComplianceMode: manual"                # skip auto-invoke (cf. phase_planner.py)
+    - "SpecComplianceMode: manual"                # skip auto-invoke (cf. phase_planner.py _decide_spec_compliance)
   idempotent: true                                # peut être ré-invoqué sans risque
 
 # -------------------------------------------------------------------------
-# Agent: constitutioner — externalisé d'arch Phase D 2026-05-13
+# Agent constitutioner (Sonnet 4.6) — externalisé d'arch Phase D 2026-05-13
+# Rôle: ADRs (atomic timestamp) + §4/§6/§1 constitution.md + INDEX.md
+#       ADRs + read-back v5.0.
+# Invocation: `/arch-init` STEP 3.5 après sentinel disque posé par arch (no-spawn préservé).
+# Token footprint estimé: ~5-10 KB (lecture stack.md + constitution.md +
+#       glob ADRs existants + template ADR).
 # -------------------------------------------------------------------------
 constitutioner:
-  model_tier: balanced   # loader Claude: claude-sonnet-4-6 — parité pivot + bounds (floor fast confirmé 2026-07-24)
+  model_tier: balanced   # parité frontmatter agents/constitutioner.md — enforced par tests/test_loader_model_parity.py
   reads:
+    # Order: stable → semi → volatile (cache_control canonical order, cf. sdd_lib/cache_control.py)
     - workspace/stack/stack.md                   # cache_layer: stable
     - .sdd/templates/adr.template.md                # cache_layer: stable
-    - .sdd/rules/ownership.md                       # Partie B §3 numérotation atomique ADR · cache_layer: stable
+    - .sdd/rules/ownership.md                       # Partie B §3 numérotation atomique ADR (was file-ownership.md, consolidated v7.0.0) · cache_layer: stable
     - .claude/digests/error-classification.constitutioner.md            # cache_layer: stable
     - workspace/.sys/.context/constitution.md   # cache_layer: semi
     - workspace/.sys/.context/adrs/ADR-*.md     # idempotence par slug · cache_layer: semi
@@ -547,10 +829,14 @@ constitutioner:
   idempotent: true
 
 # -------------------------------------------------------------------------
-# Agent: specbook-writer (2026-07-24) — humaniseur du Cahier des charges
+# specbook-writer (2026-07-24) — humaniseur du Cahier des charges (.docx)
 # -------------------------------------------------------------------------
+# Reformule UNE FEAT (forward OU reverse) en prose fonctionnelle simple pour
+# un lecteur non-IT, mise en cache par hash. Le rendu .docx final est
+# déterministe (sdd_scripts/generate_specbook.py, 0 token). Lecture seule sur
+# les FEATs/US ; n'écrit QUE la section en cache.
 specbook-writer:
-  model_tier: balanced   # loader Claude: claude-sonnet-4-6 — parité pivot + bounds (floor fast, candidat fast canonique)
+  model_tier: balanced   # parité frontmatter agents/specbook-writer.md — enforced par tests/test_loader_model_parity.py
   reads:
     - .sdd/rules/output-protocol.md                 # cache_layer: stable
     - .sdd/rules/error-classification.md             # cache_layer: stable
@@ -567,3 +853,55 @@ specbook-writer:
     - workspace/src/                 # responsabilité dev-* / arch
     - workspace/docs/cahier-des-charges.docx  # rendu = script déterministe, pas l'agent
   idempotent: true
+
+# -------------------------------------------------------------------------
+# v4.0.0 — Suppression agent UI + bascule HTML direct
+# -------------------------------------------------------------------------
+# - Agent UI supprimé : plus d'extraction PNG → markdown
+# - Mockups HTML statiques dans workspace/ui/{n}-{m}-{Name}.html
+# - dev-frontend lit l'HTML directement en texte (pas multimodal)
+# - Mapping HTML → composant DS dans stacks/ui/*.md §2 + §7
+# - Plus de workspace/ui/ (dossier supprimé)
+# - Économie tokens : -10-25 KB/PNG (agent UI) + -3-5 KB/US (vision dev-frontend)
+# - Économie tokens totale : ~15-30 KB par US ayant un mockup
+# - Fidelity check devient text-based (grep libellés HTML vs markup généré)
+
+# -------------------------------------------------------------------------
+# Économie tokens v3.1.0 (Phase 5 QA)
+# -------------------------------------------------------------------------
+# - Coverage parsing 100% déterministe (Python parse_coverage.py) → 0 token
+# - Quality scan 100% déterministe (Python quality_scan.py) → 0 token
+# - Linter / type checker stack-native (subprocess) → 0 token
+# - Sonnet 4.6 (pas Opus) sur génération de tests
+# - Lecture sélective stricte par US (jamais Glob *)
+# - Total Phase 5 : ~17-27k tokens par feature en mode "full"
+
+# =========================================================================
+# ## Removed agents (backward-compat reference, consolidated v7.0.1)
+# =========================================================================
+# Block consolidé qui regroupe les ex-agents retirés et leurs remplacements.
+# Sert deux usages : (1) audit forensique des sorties console.db legacy qui
+# référencent ces noms ; (2) recovery procedure si réintroduction locale.
+#
+# **Aucun de ces agents n'est invocable en v7.0.x.** Toute tentative de spawn
+# via Agent() est rejetée par `sdd_hooks/preflight_agent_budget.py` avec
+# `REJECTED_AGENTS_V7` (HOOK_DENY).
+#
+# | Agent retiré              | Version | ADR / Raison                                     | Remplacement v7.0.0                              |
+# |---------------------------|---------|--------------------------------------------------|--------------------------------------------------|
+# | `validator`               | v6.0    | Coût ~1.4M tokens/run, faux positifs sémantiques | `feat-validate` 100% déterministe (Python)       |
+# | `dev-backend-strict`      | v7.0.0  | Maintenance double > ROI réel                    | `dev-backend` (Opus 4.8) — plan v2 conservé      |
+# | `dev-frontend-strict`     | v7.0.0  | idem                                             | `dev-frontend` (Opus 4.8) — plan v2 conservé     |
+# | `dashboard`               | v7.0.0  | 100% mécanique, jamais raisonnement LLM          | `sdd_scripts/index_adrs.py` (0 token, ~50 ms)    |
+# | `accessibility-auditor`   | v7.0.0  | WCAG mieux couvert par tooling CI                | `axe-core` CI (mapping `[A11Y_*]` cf. legacy.md) |
+# | `performance-auditor`     | v7.0.0  | Core Web Vitals mieux mesurés par browser réel   | `Lighthouse CI` + `wrk/k6` (mapping `[PERF_*]`)  |
+#
+# Recovery (si réintroduction locale strictement nécessaire) :
+#   - dev-*-strict : restaurer depuis git history avant tag v7.0.0
+#     (commit d4330c5) + remettre la branche dans preflight_agent_budget.py
+#   - dashboard / a11y / perf : restaurer agents/{name}.md + retirer l'entrée
+#     correspondante de `REJECTED_AGENTS_V7` (sdd_hooks/preflight_agent_budget.py)
+#
+# Source de vérité côté code : `error-classification-legacy.md §6` pour
+# les références "load-bearing" intentionnelles (whitelists READ-side
+# backward-compat, annotations historiques agents/CHANGELOG, etc.)

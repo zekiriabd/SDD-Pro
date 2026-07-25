@@ -155,7 +155,7 @@ def parse_loader_annotations(loader_path: Path | None = None) -> dict[str, Agent
     """Parse loader.yml and return manifest per agent.
 
     Args:
-        loader_path: optional path override (default: <repo>/.claude/loader.yml)
+        loader_path: optional path override (default: <repo>/.sdd/loader.yml)
 
     Returns:
         dict mapping agent name → AgentCacheManifest
@@ -168,7 +168,7 @@ def parse_loader_annotations(loader_path: Path | None = None) -> dict[str, Agent
     intentionally avoid external deps).
     """
     if loader_path is None:
-        loader_path = repo_root() / ".claude" / "loader.yml"
+        loader_path = repo_root() / ".sdd" / "loader.yml"
 
     if not loader_path.exists():
         raise FileNotFoundError(f"loader.yml not found: {loader_path}")
@@ -273,7 +273,7 @@ def validate_ordering(loader_path: Path | None = None
     line by line, to enforce coherent annotations at the source.
 
     Args:
-        loader_path: optional override (default: <repo>/.claude/loader.yml)
+        loader_path: optional override (default: <repo>/.sdd/loader.yml)
 
     Returns:
         dict mapping agent name → list of OrderingViolation (empty list if OK)
@@ -284,7 +284,7 @@ def validate_ordering(loader_path: Path | None = None
         - Prepares wiring for any future cache_control harness hook
     """
     if loader_path is None:
-        loader_path = repo_root() / ".claude" / "loader.yml"
+        loader_path = repo_root() / ".sdd" / "loader.yml"
 
     if not loader_path.exists():
         raise FileNotFoundError(f"loader.yml not found: {loader_path}")

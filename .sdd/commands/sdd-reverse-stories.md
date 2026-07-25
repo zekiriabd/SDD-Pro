@@ -2,7 +2,7 @@
 command: sdd-reverse-stories
 phase: 3b
 description: Phase 3b du workflow reverse — remontée de l'analyse technique 3a en User Stories par capability (barreau moyen de l'escalier). Spawn agent reverse-us-writer (Sonnet 4.6 — downgrade audité 2026-06-11, 3a/3c restent Opus 4.8). Lit plans/{n}-{Name}.analysis.md, écrit us/{n}-{m}-{Name}.md. Consommé par /sdd-reverse-feat (3c).
-loader: .claude/loader.reverse.yml
+loader: .sdd/loader.reverse.yml
 ---
 # /sdd-reverse-stories {U-N} [--json]
 

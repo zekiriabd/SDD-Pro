@@ -27,7 +27,7 @@ _HERE = Path(__file__).resolve()
 _PYTHON_DIR = _HERE.parent.parent  # .sdd/python/
 if str(_PYTHON_DIR) not in sys.path:
     sys.path.insert(0, str(_PYTHON_DIR))
-from sdd_lib.exit_codes import SUCCESS, FAIL_FAST, INVALID_ARG  # noqa: E402
+from sdd_lib.exit_codes import SUCCESS, FAIL_FAST  # noqa: E402
 
 
 def _repo_root() -> Path:

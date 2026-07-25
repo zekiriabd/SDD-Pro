@@ -2,7 +2,7 @@
 command: sdd-reverse-synth
 phase: '"3.7"'
 description: Phase 3.7 — couche de synthèse système (vue au-dessus de l'escalier 3a→3b→3c). Rend C4 (contexte/conteneurs/composants), ERD complet et soul.md à partir des SEULS artefacts déterministes (inventory.json, deps-graph.json, db-schema.merged.json). Lecture seule, aucun agent spawné, écrit uniquement sous .sys/synthesis/ (jamais feats/). Déterministe (0 token), non-cassant pour le pipeline existant.
-loader: .claude/loader.reverse.yml
+loader: .sdd/loader.reverse.yml
 ---
 # /sdd-reverse-synth {LegacyProject} [--doc-level essentiel|complet|detaille] [--only c4,erd,soul] [--json]
 

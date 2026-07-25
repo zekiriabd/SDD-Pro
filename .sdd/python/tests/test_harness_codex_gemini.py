@@ -215,7 +215,7 @@ def test_rewrite_at_includes_only_when_target_exists():
     """@.claude/X → .sdd/X si .sdd/X existe, sinon .claude/X (jamais un .sdd/ mort)."""
     adapter = CodexAdapter(repo_root=REPO_ROOT, provider="moonshot")
     # .sdd/loader.yml existe → réécrit vers le foyer.
-    assert adapter._rewrite_at_includes("voir @.claude/loader.yml") == "voir .sdd/loader.yml"
+    assert adapter._rewrite_at_includes("voir @.sdd/loader.yml") == "voir .sdd/loader.yml"
     # .sdd/rules/ n'est PAS matérialisé → repli .claude/ résolvable (pas .sdd/ mort).
     got = adapter._rewrite_at_includes("charge @.sdd/rules/output-protocol.md")
     assert got == "charge .sdd/rules/output-protocol.md"

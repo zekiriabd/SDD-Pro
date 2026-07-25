@@ -1,4 +1,4 @@
-"""Parse `.claude/loader.yml` to extract reads/writes per agent.
+"""Parse `.sdd/loader.yml` to extract reads/writes per agent.
 
 Hand-rolled YAML parser limited to the loader.yml structure (avoids PyYAML dep).
 
@@ -56,7 +56,7 @@ _DICT_CACHE_LAYER_RE = re.compile(
 
 
 def loader_path(root: Path | None = None) -> Path:
-    return (root or repo_root()) / ".claude" / "loader.yml"
+    return (root or repo_root()) / ".sdd" / "loader.yml"
 
 
 def parse_agent_section(

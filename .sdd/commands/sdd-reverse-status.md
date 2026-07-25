@@ -2,7 +2,7 @@
 command: sdd-reverse-status
 phase: diagnostic
 description: Diagnostic du workflow reverse engineering (pendant de /sdd-status). Liste les projets legacy sous workspace/old/ avec leur phase status, et les FEATs reverse dans workspace/feats/ avec marker [REV]/[REV⚠️] (ADV-6). Read-only, jamais bloquant. Script déterministe, aucun agent spawné.
-loader: .claude/loader.reverse.yml
+loader: .sdd/loader.reverse.yml
 ---
 # /sdd-reverse-status [--project {LegacyProject}] [--json]
 

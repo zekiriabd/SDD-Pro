@@ -2,7 +2,7 @@
 command: sdd-reverse-crosscut
 phase: '"3-bis"'
 description: Phase 3-bis du workflow reverse — génère les FEATs transversales déterministes (Librairies à installer + Base de données/procédures stockées/connection strings) depuis les artefacts L1. Script pur (0 token, aucun agent spawné).
-loader: .claude/loader.reverse.yml
+loader: .sdd/loader.reverse.yml
 ---
 # /sdd-reverse-crosscut {LegacyProject} [--feats-dir DIR] [--json]
 

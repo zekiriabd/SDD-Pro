@@ -1,7 +1,7 @@
 ---
 name: starting-a-reverse-eng
 description: Use when the user expresses intent to reverse engineer a legacy codebase, convert an existing legacy system into SDD_Pro FEATs, or has uploaded code under workspace/old/. Triggers strictly on phrases like "reverse engineering", "convertir l'ancien système", "migrer le legacy", "j'ai un legacy", "workspace/old". Does NOT trigger generically on "vieux code", "ancien code" or "rewrite this" — keep triggers conservative (D5 design doc).
-loader: .claude/loader.reverse.yml
+loader: .sdd/loader.reverse.yml
 ---
 
 # Skill — Starting a Reverse Engineering workflow

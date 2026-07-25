@@ -2,7 +2,7 @@
 command: sdd-reverse-review
 phase: '"3.6"'
 description: Revue de complétude back (L5) d'UNE FEAT reverse. Spawn agent reverse-completeness-reviewer (Sonnet 4.6) après le check déterministe check_feat_completeness.py. Verdict informational, jamais bloquant. Commande wrapper créée 2026-06-10 (audit M11) pour que /sdd-reverse-full reste un pur séquenceur de commandes (no-spawn §9).
-loader: .claude/loader.reverse.yml
+loader: .sdd/loader.reverse.yml
 ---
 # /sdd-reverse-review {U-N} [--project {P}] [--json]
 

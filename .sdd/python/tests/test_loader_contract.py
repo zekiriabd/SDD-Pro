@@ -70,7 +70,7 @@ RETIRED_AGENTS_V7 = frozenset({
 #: are intentionally NOT in loader.yml — that would violate the design
 #: contract. The orphan check exempts them via this set.
 #:
-#: SSoT for the reverse workflow: .claude/loader.reverse.yml +
+#: SSoT for the reverse workflow: .sdd/loader.reverse.yml +
 #: .sdd/docs/reverse-engineering-workflow.md
 REVERSE_AGENTS_V7 = frozenset({
     "reverse-inventory",

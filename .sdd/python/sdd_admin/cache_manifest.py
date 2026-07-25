@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """SDD_Pro cache manifest exporter (audit C1 partial, 2026-06-06).
 
-Reads `.claude/loader.yml` and emits a JSON manifest binding each agent
+Reads `.sdd/loader.yml` and emits a JSON manifest binding each agent
 to the cache_layer of each file it reads. Used by the v7.1 Anthropic SDK
 wrapper to place `cache_control: ephemeral` markers on stable/semi
 content, cutting Opus cost ~50 % on average.
