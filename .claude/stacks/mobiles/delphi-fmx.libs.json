@@ -1,0 +1,431 @@
+{
+  "$schema": "../../templates/libs-catalog.schema.json",
+  "stackId": "delphi-fmx",
+  "category": "mobiles",
+  "schemaVersion": 1,
+  "buildSystem": "msbuild",
+  "manifest": {
+    "files": [
+      "workspace/output/src/{AppName}/{AppName}.dproj",
+      "workspace/output/src/{AppName}/{AppName}.dpr",
+      "workspace/output/src/{AppName}/{AppName}.dproj.local",
+      "workspace/output/src/{AppName}/AndroidManifest.template.xml",
+      "workspace/output/src/{AppName}/Info.plist.TemplateiOS.xml"
+    ]
+  },
+  "metadata": {
+    "platforms": [
+      "windows",
+      "android",
+      "ios",
+      "macos",
+      "linux"
+    ],
+    "framework": "FireMonkey FMX (RAD Studio 13 Florence)",
+    "language": "Object Pascal (Delphi 13)",
+    "workflow": "single-project-multi-target",
+    "ide": "RAD Studio 13 Florence (recommended) — earlier 12 Athens / 11 Alexandria also supported",
+    "buildCli": "MSBuild.exe {AppName}.dproj /p:Config=Debug /p:Platform=Win32|Win64|Android|Android64|iOSDevice64|OSX64|Linux64",
+    "packageManagers": [
+      "GetIt (Embarcadero official, IDE-integrated)",
+      "DPM (Delphi Package Manager, community — github.com/DelphiPackageManager/DPM)",
+      "Boss (community, modeled after npm — github.com/HashLoad/boss)"
+    ],
+    "notes": "Stack mobile/desktop cross-platform Delphi FMX (FireMonkey). UI declarative .fmx + code-behind .pas. buildSystem='msbuild' (Delphi dproj/dpk projects compile via MSBuild.exe + EmbarcaderoCommonProps targets). Aucune install CLI canonique pour les libs — installCommand explicite par lib (GetIt CLI, DPM restore, Boss install, ou clone+search-path manuel). Le catalog reflète l'écosystème OSS dominant : Spring4D (DI/Collections), Skia4Delphi (Skia rendering, bundled depuis RAD 12 Athens), DUnitX (tests), Neon (JSON), TFrameStand (FMX state mgmt). Backend séparé déclaré en ## Active Tech Specs. Pré-requis arch : MSBuild + RAD Studio Command Prompt (rsvars.bat) dans PATH. category=mobiles — couvre aussi desktop FMX (Win/macOS/Linux) car même framework UI."
+  },
+  "versions": {
+    "rad-studio": "13.0",
+    "delphi": "13.0",
+    "fmx": "13.0",
+    "skia4delphi": "6.2.0",
+    "spring4d": "2.0.0",
+    "dunitx": "1.6.0",
+    "delphi-neon": "1.8.0",
+    "tframestand": "1.6.0",
+    "tsubjectstand": "1.0.1",
+    "indy": "10.6.3",
+    "mormot2": "2.3.7",
+    "kastri": "2025.06.01",
+    "zxing-delphi": "1.4.0",
+    "delphi-openssl": "1.2.0",
+    "ddetours": "2.5",
+    "jsondataobjects": "1.9.6",
+    "synpdf": "2.3.7",
+    "fastmm5": "5.04",
+    "omnixml": "1.2",
+    "dsharp": "1.2",
+    "sempare-template": "1.9.0",
+    "teechart-fmx": "2024.39",
+    "fastreport-fmx": "2024.2.20",
+    "tms-fnc-uipack": "5.0.1.0",
+    "tms-fnc-chart": "2.0.5.0",
+    "sgcwebsockets": "4.5.5",
+    "delphi-mqtt": "1.0.0",
+    "scrypt": "1.0",
+    "synopse-mormot-orm": "2.3.7",
+    "delphi-redis-client": "0.7.0",
+    "unidac": "11.0",
+    "zeoslib": "8.0.0",
+    "delphi-jose-jwt": "3.2.0"
+  },
+  "core": [
+    {
+      "module": "Skia4Delphi",
+      "ref": "skia4delphi",
+      "rationale": "Google Skia binding — text rendering haute qualité, SVG, Lottie animations, shaders, codecs images étendus. Bundled dans RAD 12 Athens+ (officiellement endossé par Embarcadero) — top-1 must-have FMX moderne.",
+      "license": "MIT",
+      "installCommand": "GetIt Package Manager → Search 'Skia4Delphi' → Install (RAD 12+) OR git clone https://github.com/skia4delphi/skia4delphi && Setup\\Setup.exe install"
+    },
+    {
+      "module": "Spring4D",
+      "ref": "spring4d",
+      "rationale": "Framework Spring pour Delphi — DI container, collections génériques (TList<T>, TDictionary<T>, IEnumerable<T>), persistence ORM. Standard de facto OSS pour SOLID/clean code Delphi cross-VCL/FMX.",
+      "license": "Apache-2.0",
+      "installCommand": "git clone https://github.com/spring4d/spring4d C:\\Lib\\Spring4D && ajouter $(SPRING4D)\\Source aux Library Paths du projet via dproj"
+    },
+    {
+      "module": "DUnitX",
+      "ref": "dunitx",
+      "rationale": "Framework de tests unitaires moderne pour Delphi — successeur de DUnit. Annotations TestCase, Setup/TearDown, runner console/IDE. Pré-requis QA Delphi.",
+      "license": "Apache-2.0",
+      "installCommand": "GetIt → 'DUnitX' OR git clone https://github.com/VSoftTechnologies/DUnitX C:\\Lib\\DUnitX && add to Library Path"
+    },
+    {
+      "module": "Delphi-Neon",
+      "ref": "delphi-neon",
+      "rationale": "Sérialiseur/désérialiseur JSON moderne, annotations-driven (NeonProperty, NeonInclude), supporte objets, génériques, énums. Top-1 OSS pour JSON typé en Delphi FMX/VCL.",
+      "license": "Apache-2.0",
+      "installCommand": "git clone https://github.com/paolo-rossi/delphi-neon C:\\Lib\\Neon && add Source\\Neon.Core+Source\\Neon.Newton to Library Path"
+    },
+    {
+      "module": "TFrameStand",
+      "ref": "tframestand",
+      "rationale": "State management FMX pour Frames/Forms — show/hide/animate frames empilés (modal, drawer, toast) avec lifecycle propre. Solution communautaire dominante pour SPA-like navigation en FMX (Andrea Magni).",
+      "license": "Apache-2.0",
+      "installCommand": "git clone https://github.com/andrea-magni/TFrameStand C:\\Lib\\TFrameStand && add Source to Library Path"
+    },
+    {
+      "module": "TSubjectStand",
+      "ref": "tsubjectstand",
+      "rationale": "Companion de TFrameStand — pattern Observer générique pour Subject/Observer en Delphi (notification UI ↔ ViewModel sans Bindings lourd).",
+      "license": "Apache-2.0",
+      "installCommand": "git clone https://github.com/andrea-magni/TSubjectStand C:\\Lib\\TSubjectStand && add Source to Library Path"
+    },
+    {
+      "module": "Indy",
+      "ref": "indy",
+      "rationale": "Internet Direct — bibliothèque réseau historique (HTTP/HTTPS, SMTP, FTP, TCP, UDP). Bundled avec RAD Studio depuis Delphi 2007 — composants TIdHTTP, TIdSMTP utilisés massivement.",
+      "license": "MIT",
+      "installCommand": "Bundled avec RAD Studio (aucune install requise) — unité dans uses : IdHTTP, IdSSLOpenSSL, IdSMTP, etc."
+    },
+    {
+      "module": "JsonDataObjects",
+      "ref": "jsondataobjects",
+      "rationale": "Parser/serializer JSON ultra-rapide (Andreas Hausladen) — alternative légère à System.JSON pour gros volumes. ~3-5× plus rapide que System.JSON intégré.",
+      "license": "MIT",
+      "installCommand": "git clone https://github.com/ahausladen/JsonDataObjects C:\\Lib\\JsonDataObjects && add Source to Library Path (1 fichier .pas)"
+    }
+  ],
+  "onDemand": [
+    {
+      "module": "mORMot2",
+      "ref": "mormot2",
+      "capability": "ormot-orm",
+      "triggers": [
+        "ormot",
+        "mormot",
+        "soa.*framework",
+        "rest.*server"
+      ],
+      "rationale": "Framework SOA/ORM/REST/JSON ultra-performant cross-platform (Synopse) — alternative tout-en-un à Spring4D + Indy + Neon pour projets exigeants.",
+      "license": "MPL-1.1/GPL/LGPL",
+      "installCommand": "git clone https://github.com/synopse/mORMot2 C:\\Lib\\mORMot2 && add src + src\\core + src\\rest + src\\orm to Library Path"
+    },
+    {
+      "module": "Kastri",
+      "ref": "kastri",
+      "capability": "fmx-cross-platform-helpers",
+      "triggers": [
+        "kastri",
+        "push.*notification",
+        "fcm",
+        "firebase",
+        "biometric",
+        "fingerprint",
+        "face-id",
+        "share.*sheet",
+        "in-app-purchase",
+        "ble",
+        "bluetooth.*low.*energy",
+        "geolocation",
+        "background.*service"
+      ],
+      "rationale": "Boîte à outils cross-platform FMX par DelphiWorlds (Dave Nottage) — wrappers pour FCM push, biométrie, location, sharing, BLE, in-app billing Android/iOS. Top OSS pour combler les gaps Platforms/.",
+      "license": "BSD-3-Clause",
+      "installCommand": "git clone https://github.com/DelphiWorlds/Kastri C:\\Lib\\Kastri && add Core+API+Features\\<Feature> to Library Path par feature utilisée"
+    },
+    {
+      "module": "ZXing.Delphi",
+      "ref": "zxing-delphi",
+      "capability": "barcode",
+      "triggers": [
+        "barcode",
+        "qr.*code",
+        "scan.*qr",
+        "code-128",
+        "ean-13"
+      ],
+      "rationale": "Port Delphi de ZXing (Zebra Crossing) — lecture/génération QR codes, EAN, Code128, DataMatrix. 100% Pascal natif, fonctionne sur toutes plateformes FMX.",
+      "license": "Apache-2.0",
+      "installCommand": "git clone https://github.com/Spelt/ZXing.Delphi C:\\Lib\\ZXing.Delphi && add Lib to Library Path"
+    },
+    {
+      "module": "Delphi-OpenSSL",
+      "ref": "delphi-openssl",
+      "capability": "openssl",
+      "triggers": [
+        "openssl",
+        "tls",
+        "crypto.*aes",
+        "x509"
+      ],
+      "rationale": "Wrappers OpenSSL pour Delphi — crypto AES/RSA, signatures, X.509. Complément à Indy (qui utilise déjà OpenSSL pour HTTPS).",
+      "license": "MIT",
+      "installCommand": "git clone https://github.com/lminuti/Delphi-OpenSSL C:\\Lib\\OpenSSL && add Source to Library Path + binaires OpenSSL dans output"
+    },
+    {
+      "module": "DDetours",
+      "ref": "ddetours",
+      "capability": "method-hooking",
+      "triggers": [
+        "ddetours",
+        "method.*hook",
+        "mock.*runtime",
+        "detour"
+      ],
+      "rationale": "Méthod hooking runtime (style Microsoft Detours) — utile pour mocks de tests d'intégration ou instrumentation. Plus rare en prod, utile en QA avancé.",
+      "license": "MPL-2.0",
+      "installCommand": "git clone https://github.com/MahdiSafsafi/DDetours C:\\Lib\\DDetours && add Source to Library Path"
+    },
+    {
+      "module": "SynPDF",
+      "ref": "synpdf",
+      "capability": "pdf-generation",
+      "triggers": [
+        "pdf.*generation",
+        "rapport.*pdf",
+        "synpdf",
+        "export.*pdf"
+      ],
+      "rationale": "Générateur PDF natif (sous-projet mORMot mais utilisable seul) — création PDF sans dépendre d'Acrobat ou de DLL externe. Top OSS gratuit pour PDF en Delphi.",
+      "license": "MPL-1.1",
+      "installCommand": "Récupérer src/lib/SynPdf.pas + SynCommons.pas depuis https://github.com/synopse/mORMot2/tree/master/src/lib && add to Library Path"
+    },
+    {
+      "module": "FastMM5",
+      "ref": "fastmm5",
+      "capability": "memory-manager",
+      "triggers": [
+        "fastmm",
+        "memory.*leak.*tracking",
+        "memory.*manager"
+      ],
+      "rationale": "Gestionnaire mémoire haute performance avec leak tracking détaillé (Pierre le Riche) — successeur de FastMM4, recommandé en dev pour traquer fuites mémoire.",
+      "license": "Dual (FastMM5 Open OR Commercial)",
+      "installCommand": "git clone https://github.com/pleriche/FastMM5 C:\\Lib\\FastMM5 && ajouter FastMM5 en tout PREMIER unité du .dpr"
+    },
+    {
+      "module": "OmniXML",
+      "ref": "omnixml",
+      "capability": "xml-parsing",
+      "triggers": [
+        "omnixml",
+        "xml.*parsing",
+        "xml.*dom"
+      ],
+      "rationale": "Parser XML 100% Pascal cross-platform — alternative à MSXML (Windows-only) pour Android/iOS/macOS/Linux.",
+      "license": "MPL-1.1",
+      "installCommand": "git clone https://github.com/mremec/omnixml C:\\Lib\\OmniXML && add Source to Library Path"
+    },
+    {
+      "module": "DSharp",
+      "ref": "dsharp",
+      "capability": "mvvm-bindings",
+      "triggers": [
+        "dsharp",
+        "mvvm.*binding",
+        "two.*way.*binding"
+      ],
+      "rationale": "Bindings MVVM Delphi (Stefan Glienke) — alternative aux LiveBindings natifs (souvent jugés trop verbeux). Couplé idéalement avec Spring4D.",
+      "license": "Apache-2.0",
+      "installCommand": "git clone https://bitbucket.org/sglienke/dsharp C:\\Lib\\DSharp && add Source to Library Path"
+    },
+    {
+      "module": "Sempare.Template",
+      "ref": "sempare-template",
+      "capability": "templating",
+      "triggers": [
+        "template.*engine",
+        "sempare",
+        "mustache",
+        "handlebars"
+      ],
+      "rationale": "Moteur de templates Pascal puissant — syntaxe Mustache/Handlebars-like avec helpers, conditions, loops. Utile pour génération HTML/emails/rapports.",
+      "license": "Apache-2.0",
+      "installCommand": "git clone https://github.com/sempare/sempare-delphi-template-engine C:\\Lib\\Sempare && add src to Library Path"
+    },
+    {
+      "module": "TeeChart-FMX-Standard",
+      "ref": "teechart-fmx",
+      "capability": "charts",
+      "triggers": [
+        "teechart",
+        "chart",
+        "graph",
+        "courbe",
+        "graphique"
+      ],
+      "rationale": "Bibliothèque de graphiques native FMX (Steema Software) — TChart inclus dans RAD Studio Pro+ (version Standard). 60+ types de graphiques cross-platform.",
+      "license": "Commercial (Standard bundled RAD Pro+)",
+      "installCommand": "Bundled dans RAD Studio Pro+ (auto-installé) — unité dans uses : FMXTee.Chart, FMXTee.Series.*"
+    },
+    {
+      "module": "FastReport-FMX",
+      "ref": "fastreport-fmx",
+      "capability": "reporting",
+      "triggers": [
+        "fastreport",
+        "rapport",
+        "report.*generator",
+        "édition.*pdf"
+      ],
+      "rationale": "Générateur de rapports natif FMX (Fast Reports) — éditeur visuel WYSIWYG, export PDF/Excel/HTML, scripting Pascal. Standard de facto en environnement Embarcadero.",
+      "license": "Commercial",
+      "installCommand": "GetIt → 'FastReport FMX' (version trial) OR fastreports.com/buy-fastreport-fmx"
+    },
+    {
+      "module": "TMS.FNC.UIPack",
+      "ref": "tms-fnc-uipack",
+      "capability": "ui-controls-premium",
+      "triggers": [
+        "tms.*fnc",
+        "tms.*ui",
+        "premium.*controls",
+        "ui-pack"
+      ],
+      "rationale": "Suite de composants premium FNC (Framework Neutral Components) — fonctionne identiquement sur FMX/VCL/Web. Grids avancés, planners, ribbons, kanban (TMS Software).",
+      "license": "Commercial",
+      "installCommand": "GetIt → 'TMS FNC UI Pack' (trial) OR tmssoftware.com/site/tmsfncuipack.asp"
+    },
+    {
+      "module": "TMS.FNC.Chart",
+      "ref": "tms-fnc-chart",
+      "capability": "charts",
+      "triggers": [
+        "tms.*chart",
+        "fnc.*chart"
+      ],
+      "rationale": "Bibliothèque charts FNC (TMS) — alternative à TeeChart, intégration FNC homogène avec UI Pack.",
+      "license": "Commercial",
+      "alternative": true,
+      "installCommand": "GetIt → 'TMS FNC Chart' OR tmssoftware.com/site/tmsfncchart.asp"
+    },
+    {
+      "module": "sgcWebSockets",
+      "ref": "sgcwebsockets",
+      "capability": "websockets",
+      "triggers": [
+        "websocket",
+        "socket.*temps.*reel",
+        "real.*time.*push",
+        "sgcwebsockets"
+      ],
+      "rationale": "Client/serveur WebSockets natif Delphi (eSeGeCe) — supporte WSS, sub-protocols, MQTT-over-WS, STOMP. Cross-platform FMX/VCL.",
+      "license": "Commercial",
+      "installCommand": "GetIt → 'sgcWebSockets' OR esegece.com/websockets"
+    },
+    {
+      "module": "Delphi.MQTT",
+      "ref": "delphi-mqtt",
+      "capability": "mqtt",
+      "triggers": [
+        "mqtt",
+        "iot.*broker",
+        "mosquitto"
+      ],
+      "rationale": "Client MQTT pour Delphi (DelphiWorlds/JustHomeSoft) — pub/sub IoT, QoS 0/1/2, TLS. Compatible Mosquitto, AWS IoT, Azure IoT Hub.",
+      "license": "MIT",
+      "installCommand": "git clone https://github.com/jamiei/Delphi-MQTT C:\\Lib\\DelphiMQTT && add Source to Library Path"
+    },
+    {
+      "module": "Delphi-Redis-Client",
+      "ref": "delphi-redis-client",
+      "capability": "redis",
+      "triggers": [
+        "redis",
+        "cache.*distribue",
+        "key.*value.*store"
+      ],
+      "rationale": "Client Redis natif Delphi (DanieleTeti) — pipelining, pub/sub, cluster, transactions. Cross-platform.",
+      "license": "Apache-2.0",
+      "installCommand": "git clone https://github.com/danieleteti/delphiredisclient C:\\Lib\\DelphiRedis && add to Library Path"
+    },
+    {
+      "module": "UniDAC",
+      "ref": "unidac",
+      "capability": "db-universal",
+      "triggers": [
+        "unidac",
+        "devart.*data.*access",
+        "db.*universel",
+        "multi-db"
+      ],
+      "rationale": "Universal Data Access Components (Devart) — drivers unifiés pour 20+ DB (Oracle, MySQL, PostgreSQL, SQL Server, SQLite, Mongo). Alternative à FireDAC pour multi-DB lourd.",
+      "license": "Commercial",
+      "alternative": true,
+      "installCommand": "devart.com/unidac/download.html (trial) — installer fournit l'IDE setup"
+    },
+    {
+      "module": "ZeosLib",
+      "ref": "zeoslib",
+      "capability": "db-zeos",
+      "triggers": [
+        "zeos",
+        "zeoslib",
+        "db.*open.*source"
+      ],
+      "rationale": "Bibliothèque DB OSS gratuite (Zeos Project) — drivers MySQL/PostgreSQL/SQLite/Firebird/Oracle. Alternative gratuite à FireDAC/UniDAC.",
+      "license": "LGPL-2.1",
+      "alternative": true,
+      "installCommand": "git clone https://github.com/marsupilami79/zeoslib C:\\Lib\\Zeos && add src + packages to Library Path"
+    },
+    {
+      "module": "Delphi-JOSE-JWT",
+      "ref": "delphi-jose-jwt",
+      "capability": "jwt-auth",
+      "triggers": [
+        "jwt",
+        "jose",
+        "json.*web.*token",
+        "bearer.*token"
+      ],
+      "rationale": "Implémentation JOSE/JWT (Paolo Rossi) — encode/decode JWT, signatures HMAC/RSA/EC, validation claims (iss/aud/exp). Standard pour auth API REST.",
+      "license": "Apache-2.0",
+      "installCommand": "git clone https://github.com/paolo-rossi/delphi-jose-jwt C:\\Lib\\DelphiJOSE && add Source to Library Path (dépend de OpenSSL pour RS256)"
+    },
+    {
+      "module": "scrypt",
+      "ref": "scrypt",
+      "capability": "password-hashing",
+      "triggers": [
+        "scrypt",
+        "bcrypt",
+        "password.*hash",
+        "kdf"
+      ],
+      "rationale": "Implémentation Scrypt (memory-hard KDF) pour hashage password — alternative à bcrypt/Argon2 pour stockage credentials.",
+      "license": "BSD-2-Clause",
+      "installCommand": "git clone https://github.com/JoseLagares/scrypt-pas C:\\Lib\\Scrypt && add to Library Path"
+    }
+  ]
+}
