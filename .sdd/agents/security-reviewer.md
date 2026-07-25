@@ -104,7 +104,7 @@ Précondition bloquante absente → STOP + ERROR `[QA_PRECONDITION_FAILED]` : `c
 
 ## STEP 3 — Charger contexte minimal
 
-1. `.claude/digests/error-classification.security-reviewer.md` §1.11 (taxonomie `[SEC_*]`)
+1. `.sdd/digests/error-classification.security-reviewer.md` §1.11 (taxonomie `[SEC_*]`)
 2. `workspace/feats/{n}-*.md` (FEAT parente)
 3. `workspace/us/{n}-*.md` (US — intent métier + ACs sécurité)
 4. `workspace/src/{BackendName|AppName}/CLAUDE.md` si présents

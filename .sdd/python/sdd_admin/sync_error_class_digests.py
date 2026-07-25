@@ -12,7 +12,7 @@ Deterministic, 0-token. Idempotent. Mirrors `sync_stack_md.py` ergonomics:
     sync_error_class_digests.py --check    # exit 1 if any digest is stale (CI)
     sync_error_class_digests.py --dry-run  # print what would change
 
-Outputs: .claude/digests/error-classification.{agent}.md
+Outputs: .sdd/digests/error-classification.{agent}.md
 
 NOTE (TOK-C1/C2 fix, audit 2026-06-12): digests live OUTSIDE `.claude/rules/`
 on purpose. Claude Code natively auto-injects every `.md` under `.claude/rules/`
@@ -20,7 +20,7 @@ on purpose. Claude Code natively auto-injects every `.md` under `.claude/rules/`
 lived under `.claude/rules/digests/`, ALL 12 were force-loaded into EVERY
 context (~139 KB) on top of the full `error-classification.md` — the exact
 opposite of the per-agent slimming they were built for. Keeping them under
-`.claude/digests/` makes them Read-on-demand only (their intended access).
+`.sdd/digests/` makes them Read-on-demand only (their intended access).
 
 Agents keep §0 + their families; anything outside their slice is still listed
 (by family) in §0 and resolvable by reading the full file — consistent with

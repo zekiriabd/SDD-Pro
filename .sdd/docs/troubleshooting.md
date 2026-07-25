@@ -378,7 +378,7 @@ In CI, hooks DENY on missing acceptance reports (strict mode) and cost cap telem
 ### How can I add a new agent ?
 
 1. Add the prompt under `.claude/agents/your-agent.md`
-2. Add metadata to `.claude/loader.yml`
+2. Add metadata to `.sdd/loader.yml`
 3. Add to `sdd_hooks/preflight_agent_budget.py::ALLOWED_AGENTS`
 4. Add to `sdd_scripts/context_budget.py::CURRENT_AGENTS` + `DEFAULT_BUDGETS`
 5. Wire SubagentStop matcher in `settings.json`

@@ -72,7 +72,7 @@ Tous les arguments sont passés tels quels. Le script retourne :
 
 - Cette commande **ne modifie jamais** :
   - `workspace/stack/stack.md` (ni les autres workspace/)
-  - `.claude/config.base.yml`
+  - `.sdd/config.base.yml`
   - Le code de prod, FEATs, US, rapports
 - Outputs uniquement :
   - `~/.sdd/profiles/{name}.yml` (create/overwrite/delete)

@@ -20,7 +20,7 @@ précédence du plus FAIBLE au plus FORT :
 ┌─────────────────────────────────────────────────────────────────────┐
 │ #1  Code defaults (Python constants : COVERAGE_HARDENING_KEYS, …)   │ ← le plus faible
 ├─────────────────────────────────────────────────────────────────────┤
-│ #2  .claude/config.base.yml         (framework, versionné SDD_Pro)  │
+│ #2  .sdd/config.base.yml            (framework, versionné SDD_Pro)  │
 ├─────────────────────────────────────────────────────────────────────┤
 │ #3  ~/.sdd/config.team.yml          (org/team policy, opt-in)       │
 ├─────────────────────────────────────────────────────────────────────┤
@@ -30,7 +30,7 @@ précédence du plus FAIBLE au plus FORT :
 ├─────────────────────────────────────────────────────────────────────┤
 │ #6  .sdd/stacks/{cat}/{id}.libs.json  (libs/versions par stack)  │
 ├─────────────────────────────────────────────────────────────────────┤
-│ #7  .claude/loader.yml              (reads/writes par agent — gouv) │
+│ #7  .sdd/loader.yml                 (reads/writes par agent — gouv) │
 ├─────────────────────────────────────────────────────────────────────┤
 │ #8  .claude/settings.json           (Claude Code harness — hooks)   │
 ├─────────────────────────────────────────────────────────────────────┤
@@ -54,7 +54,7 @@ premier hit. Exception : **security hardening** (cf. §3.2 ci-dessous).
 
 | Source | Format | Précédence | Géré par |
 |---|---|:---:|---|
-| `.claude/config.base.yml` | YAML flat | base | versionné SDD_Pro |
+| `.sdd/config.base.yml` | YAML flat | base | versionné SDD_Pro |
 | `~/.sdd/config.team.yml` | YAML flat | team override | équipe (opt-in, %USERPROFILE%/.sdd/) |
 | `workspace/stack/stack.md` `## Project Config` | KV inline `Key: value` | project final | Tech Lead projet |
 | `workspace/stack/stack.md` `## Auditors` | bloc alias `name: mode/failOn` | project final (depuis v6.10.5) | Tech Lead projet |
@@ -128,7 +128,7 @@ Source de vérité = `.libs.json`, jamais le `.md`.
 
 ### 2.4 Loader manifest (calque #7)
 
-`.claude/loader.yml` — qui lit/écrit quoi, par agent. **Source de vérité
+`.sdd/loader.yml` — qui lit/écrit quoi, par agent. **Source de vérité
 unique** pour :
 - context budget (`context_budget.py` HARD-GATE 10/11 agents)
 - audit chevauchements cross-agent
@@ -415,7 +415,7 @@ JAMAIS éditer manuellement `build.gradle.kts`/`package.json` — éditer
 | *Quelle valeur de `CoverageMin` ?* | `dump_effective_config()` |
 | *Quel stack backend actif ?* | `stack.md` `## Active Tech Specs` |
 | *Quelle lib `core` installée par arch ?* | `.sdd/stacks/{cat}/{id}.libs.json` `core[]` |
-| *Quel agent lit quel fichier ?* | `.claude/loader.yml` `{agent}: reads:` |
+| *Quel agent lit quel fichier ?* | `.sdd/loader.yml` `{agent}: reads:` |
 | *Quel hook s'exécute sur Bash ?* | `.claude/settings.json` `hooks.PreToolUse.Bash` |
 | *Quelle env var override le team config ?* | `SDD_TEAM_CONFIG` |
 | *Quels flags ont été utilisés ?* | `workspace/.sys/.audit/force-bypass.log` |
@@ -464,8 +464,8 @@ en moins de 30 secondes — sans avoir à croiser manuellement les 11 sources.
 - `@.sdd/python/sdd_lib/project_config.py` — parser stack.md (legacy + alias)
 - `@.sdd/python/sdd_scripts/phase_planner.py` — méta-décideur dérivé
 - `@.sdd/python/sdd_scripts/preflight.py` — détection AppType + validation stacks
-- `@.claude/config.base.yml` — calque #2 (lecture directe)
-- `@.claude/loader.yml` — calque #7
+- `@.sdd/config.base.yml` — calque #2 (lecture directe)
+- `@.sdd/loader.yml` — calque #7
 - `@.claude/settings.json` — calque #8
 - `@.sdd/rules/library-and-stack.md` — règles libs (CORE vs on-demand, CVE, LTS)
 - `@.sdd/docs/architecture.md §4` — stacks supportés + combos validés

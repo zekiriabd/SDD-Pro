@@ -902,7 +902,7 @@ Comme `/sdd-full` est un fichier existant **intouchable** (Annexe B), la gate pr
 ### 7.1 Schéma `loader.reverse.yml`
 
 ```yaml
-# .claude/loader.reverse.yml — SSoT du workflow reverse engineering
+# .sdd/loader.reverse.yml — SSoT du workflow reverse engineering
 # Format miroir de loader.yml, périmètre limité aux 4 agents reverse.
 
 schemaVersion: 1
@@ -986,7 +986,7 @@ Le loader n'est pas chargé automatiquement par le framework. Il est **explicite
    ```yaml
    ---
    command: sdd-reverse-inventory
-   loader: .claude/loader.reverse.yml
+   loader: .sdd/loader.reverse.yml
    ---
    ```
 
@@ -994,7 +994,7 @@ Le loader n'est pas chargé automatiquement par le framework. Il est **explicite
    ```yaml
    ---
    name: starting-a-reverse-eng
-   loader: .claude/loader.reverse.yml
+   loader: .sdd/loader.reverse.yml
    ---
    ```
 
@@ -1498,7 +1498,7 @@ laisser hors scope reverse, ou (c) faire évoluer la liste ci-dessous.
 17. `.claude/commands/sdd-reverse-inventory.md`
 18. `.claude/commands/sdd-reverse.md`
 19. `.sdd/rules/reverse-engineering.md`
-20. `.claude/loader.reverse.yml`
+20. `.sdd/loader.reverse.yml`
 21. `.sdd/skills/starting-a-reverse-eng/SKILL.md`
 22. Fixture `.sdd/python/tests/fixtures/legacy-webforms-minimal/`
 
@@ -1583,7 +1583,7 @@ Les 2 attaques adversariales suivantes ne sont **pas** corrigées en MVP. Elles 
 **Problème** : `INVARIANTS.yml` du framework SDD_Pro est déclaré intouchable (Annexe B). Les nouveaux contrats reverse (`loader.reverse.yml` autonome, `sdd_reverse/` sans import de `sdd_lib`, FEAT reverse avec evidence obligatoire) ne peuvent pas y être inscrits. Conséquence : ces invariants ne sont pas enforcés par `test_invariants_manifest.py` standard et peuvent régresser silencieusement à chaque release SDD_Pro qui touche aux modules adjacents.
 
 **Mitigation V2** :
-- Créer `.claude/INVARIANTS.reverse.yml` (format miroir de `INVARIANTS.yml`) avec les contrats reverse :
+- Créer `.sdd/INVARIANTS.reverse.yml` (format miroir de `INVARIANTS.yml`) avec les contrats reverse :
   - `reverse-isolation` (sdd_reverse/ n'importe rien de sdd_lib)
   - `reverse-loader-autonomous` (loader.reverse.yml référencé uniquement par commandes/skill reverse)
   - `reverse-evidence-required` (chaque AC/SFD/BR de FEAT reverse a son commentaire evidence)
@@ -1708,8 +1708,8 @@ Toute FEAT produite par `reverse-feat-composer` (3c) DOIT respecter :
 .sdd/python/sdd_scripts/**
 .sdd/python/sdd_admin/**
 .sdd/python/sdd_hooks/**
-.claude/loader.yml
-.claude/INVARIANTS.yml
+.sdd/loader.yml
+.sdd/INVARIANTS.yml
 .claude/CLAUDE.md
 .claude/settings.json
 .claude/settings.local.json

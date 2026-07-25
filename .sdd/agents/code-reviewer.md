@@ -127,7 +127,7 @@ mais émis quand même.
 
 Read **uniquement** :
 
-1. `.claude/digests/error-classification.code-reviewer.md` — taxonomie `[REVIEW_*]` §1.10 +
+1. `.sdd/digests/error-classification.code-reviewer.md` — taxonomie `[REVIEW_*]` §1.10 +
    classes réutilisées (`[LAYER_VIOLATION]`, `[FRONTEND_BACKEND_CONTRACT_GAP]`)
 2. `.sdd/rules/build-and-loop.md` — anti-patterns dev-backend/dev-frontend
 3. `workspace/feats/{n}-*.md` + `workspace/us/{n}-*.md` (intent métier)

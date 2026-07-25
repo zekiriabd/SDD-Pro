@@ -68,13 +68,13 @@ Variables résultantes en mémoire pour la suite : `planOnly`, `name`,
 > `stable` (rules/stacks), puis `semi` (CLAUDE.md, schema), puis `volatile`
 > (US/HTML). Maximise le cache prefix Anthropic 5 min (cf. `docs/cache-strategy.md`).
 > Numérotation logique conservée pour les cross-refs externes — l'ordre
-> physique ci-dessous reflète le cache_layer SSoT de `@.claude/loader.yml`.
+> physique ci-dessous reflète le cache_layer SSoT de `@.sdd/loader.yml`.
 
 Read **uniquement** (ordre d'exécution = cache-optimal `stable → semi → volatile`) :
 
 **Stable layer (rules + stacks)** :
 
-1. **`.claude/digests/error-classification.dev-backend.md`** — taxonomie 8 classes
+1. **`.sdd/digests/error-classification.dev-backend.md`** — taxonomie 8 classes
    (BUILD_*, SCHEMA_*, LAYER_*, UI_*, QA_*, DERIVE_*, STACK_*, NETWORK_*,
    etc.). À utiliser pour préfixer tout bloc ERROR dans le `CAUSE:`. La
    classe `[BUILD_BLOCKING]` impose un fail-fast (pas d'itération

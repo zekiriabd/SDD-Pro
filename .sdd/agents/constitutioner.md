@@ -38,7 +38,7 @@ Read :
 3. `.sdd/templates/adr.template.md` — template de chaque ADR.
 4. **`.sdd/rules/ownership.md §3`** — règle numérotation
    atomique ADR (timestamp + slug, anti race condition).
-5. **`.claude/digests/error-classification.constitutioner.md`** — taxonomie pour
+5. **`.sdd/digests/error-classification.constitutioner.md`** — taxonomie pour
    préfixer tout ERROR émis.
 
 Glob existants : `workspace/.sys/.context/adrs/ADR-*.md`.

@@ -133,7 +133,7 @@ warnings — le Tech Lead arbitre.
 
 Read **uniquement** :
 
-1. `.claude/digests/error-classification.spec-compliance-reviewer.md` §1.13 — taxonomie `[SPEC_*]`
+1. `.sdd/digests/error-classification.spec-compliance-reviewer.md` §1.13 — taxonomie `[SPEC_*]`
 2. `workspace/feats/{n}-*.md` — FEAT parente (lecture passive,
    compréhension du périmètre fonctionnel global)
 3. `workspace/us/{n}-*.md` — **toutes** les US de la FEAT (lecture

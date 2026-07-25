@@ -91,7 +91,7 @@ Forme rejetée : `gate` (générique) sans qualificatif → toujours préfixer.
 |---|---|---|
 | **Project Config** | Bloc `## Project Config` de `stack.md`. ~10 clés en v7. | per-projet, override final |
 | **`config.team.yml`** | Policy team `~/.sdd/config.team.yml`. | per-machine |
-| **`config.base.yml`** | Défauts framework `.claude/config.base.yml`. | framework |
+| **`config.base.yml`** | Défauts framework `.sdd/config.base.yml`. | framework |
 | **Layered config** | Lecture mergée des 3 couches (project > team > base). Réalisée par `read_layered_config()`. | v6.7.1+ |
 | **Active * Specs** | Sections `## Active Tech/UI/QA/Auth Specs` + `## Active Database` + `## Active Architecture Pattern` de `stack.md`. Sélection des stacks. | per-projet |
 | **Capabilities** | Features opt-in mappées à des libs `onDemand` des `.libs.json` (e.g., `excel`, `pdf`, `redis-cache`). | `## Project Config Capabilities` |

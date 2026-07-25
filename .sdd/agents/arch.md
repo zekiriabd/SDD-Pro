@@ -74,7 +74,7 @@ Read **uniquement** :
 3. `workspace/.sys/.context/constitution.md` — **si présent** (créé par
    `/feat-generate`). Acteurs, glossaire, ADRs tracés. Absent →
    continuer sans blocage (projet pré-SDD_Pro v3).
-4. **`.claude/digests/error-classification.arch.md`** — taxonomie 8 classes.
+4. **`.sdd/digests/error-classification.arch.md`** — taxonomie 8 classes.
    Émission principale par arch : `[STACK_MALFORMED]`, `[SCHEMA_MISMATCH]`,
    `[NETWORK]`, `[AUTH]`, `[PERMISSION]`, `[ENV_MISSING]`, `[DEP_MISSING]`,
    `[STACK_LIBRARY_VULNERABLE]`, `[NOT_FOUND]`. Préfixer tout `CAUSE:`.

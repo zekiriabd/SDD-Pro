@@ -227,7 +227,7 @@ script et consomme son JSON. Détail : `agents/dev-backend.md STEP 5.bis`.
 
 ## 16. Loader manifest
 
-`@.claude/loader.yml` est le **miroir consolidé** de ce que chaque
+`@.sdd/loader.yml` est le **miroir consolidé** de ce que chaque
 agent charge en lecture pendant son exécution (source de vérité
 unique pour l'audit du contexte par agent, les chevauchements, et
 l'estimation des coûts tokens).

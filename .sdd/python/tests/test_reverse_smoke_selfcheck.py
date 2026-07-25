@@ -8,7 +8,7 @@ reverse-engineering workflow. Guards against two silent drifts :
    if a check is added/removed without updating the pinned count, this fails.
 
 2. **Manifest ↔ registry mapping** — every `invariants[].id` declared in
-   `.claude/INVARIANTS.reverse.yml` whose `enforcer` is `reverse_smoke.py`
+   `.sdd/INVARIANTS.reverse.yml` whose `enforcer` is `reverse_smoke.py`
    must correspond to a check in `_ALL_CHECKS` (matched by the `CheckResult.name`
    the check returns). Same for `drift_checks[].id`. Invariants enforced by a
    *different* file (validate_reverse_feat.py, check_ladder_traceability.py) and

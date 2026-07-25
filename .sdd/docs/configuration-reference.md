@@ -1,6 +1,6 @@
 # ⚙️ Configuration Reference
 
-All Project Config keys + their layered defaults, ranges, and behaviour. Source of truth : `.claude/config.base.yml` (framework defaults) ← `~/.sdd/config.team.yml` (team overrides) ← `workspace/stack/stack.md ## Project Config` (project specific).
+All Project Config keys + their layered defaults, ranges, and behaviour. Source of truth : `.sdd/config.base.yml` (framework defaults) ← `~/.sdd/config.team.yml` (team overrides) ← `workspace/stack/stack.md ## Project Config` (project specific).
 
 > 💡 **Precedence rule** : the **most specific layer wins**. Security thresholds **cannot be lowered** by a project override (cf. [config-precedence.md](config-precedence.md) §4).
 
@@ -214,7 +214,7 @@ These are intentional. Lowering security is always a **tracked decision** (git b
 
 ## 🌐 Layered config example
 
-`.claude/config.base.yml` (framework default) :
+`.sdd/config.base.yml` (framework default) :
 ```yaml
 SecurityFailOn: critical
 CoverageMin: 80

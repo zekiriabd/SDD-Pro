@@ -2,7 +2,7 @@
 # (3-layer hierarchy introduced in v6.9.0, durci en v7.0.0)
 #
 # This file is the **base layer** of the 3-level config hierarchy:
-#   1. .claude/config.base.yml          (this file — framework defaults)
+#   1. .sdd/config.base.yml             (this file — framework defaults)
 #   2. ~/.sdd/config.team.yml           (org/team policy, override)
 #   3. workspace/stack/stack.md   (per-project ## Project Config, final override)
 #

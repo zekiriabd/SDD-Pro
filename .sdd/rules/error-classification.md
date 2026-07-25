@@ -586,7 +586,7 @@ Une seule classe déclenche une itération `build_loop` :
   qa, elicitor, constitutioner, code-reviewer, security-reviewer,
   spec-compliance-reviewer, arch-reviewer, **adversarial-reviewer**
   (R1 v7.0.0)) chargent cette règle en STEP contexte. Voir
-  `@.claude/loader.yml` pour le mapping détaillé.
+  `@.sdd/loader.yml` pour le mapping détaillé.
   Retirés v7.0.0 (`accessibility-auditor`, `performance-auditor`,
   `dashboard`, `dev-*-strict`) — classes héritage conservées pour ingest
   futur de `axe-core` / Lighthouse CI.

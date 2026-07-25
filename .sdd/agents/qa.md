@@ -147,7 +147,7 @@ Read **uniquement** :
    lecture sélective des fichiers nommément référencés par les US ciblées
    (services, endpoints, components, validators)
 8. Les stacks QA actifs (chargement déjà fait en STEP 2.4)
-9. **`.claude/digests/error-classification.qa.md`** — taxonomie complète QA :
+9. **`.sdd/digests/error-classification.qa.md`** — taxonomie complète QA :
    `[QA_TEST_FAILED]`, `[QA_COVERAGE_GAP]`, `[QA_FRAMEWORK_MISSING]`,
    `[QA_INIT_FAILED]`, `[QA_TEST_INVALID]`, `[QA_OUTPUT_INVALID]`,
    `[QA_PRECONDITION_FAILED]`, `[QA_OWNERSHIP_VIOLATION]`,

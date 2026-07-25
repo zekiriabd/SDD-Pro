@@ -234,7 +234,7 @@ dev-backend:
     - { path: ".sdd/stacks/auth/{active}.md", cache_layer: stable }
     - { path: .sdd/rules/dev-shared-preflight.md, cache_layer: stable }   # v7.0.0 — STEP 0/0.5/1/1.bis hoist cross-agent
     - { path: .sdd/rules/build-and-loop.md, cache_layer: stable }         # v7.0.0 — SSOT patterns dev-* (ex backend-first + dev-shared)
-    - { path: .claude/digests/error-classification.dev-backend.md, cache_layer: stable }   # v6.1 — taxonomie classes + pilotage build_loop
+    - { path: .sdd/digests/error-classification.dev-backend.md, cache_layer: stable }   # v6.1 — taxonomie classes + pilotage build_loop
     # --- semi-stable (invariant intra-FEAT, invalidé par /arch-init) ---
     - { path: "workspace/src/{Project}/CLAUDE.md", cache_layer: semi }        # CLAUDE.md projet
     - workspace/db/schema-slice-{n}-{m}.json   # per-US slice Levier 4 (audit 2026-06-08), preferred · cache_layer: semi
@@ -302,7 +302,7 @@ dev-frontend:
     - .sdd/stacks/auth/{active}.md      # patterns d'injection auth client · cache_layer: stable
     - .sdd/rules/dev-shared-preflight.md   # v7.0.0 — STEP 0/0.5/1/1.bis hoist cross-agent · cache_layer: stable
     - .sdd/rules/build-and-loop.md         # v7.0.0 — SSOT patterns dev-* (ex backend-first + dev-shared) · cache_layer: stable
-    - .claude/digests/error-classification.dev-frontend.md   # v6.1 — taxonomie classes + pilotage build_loop · cache_layer: stable
+    - .sdd/digests/error-classification.dev-frontend.md   # v6.1 — taxonomie classes + pilotage build_loop · cache_layer: stable
     # --- semi-stable (invariant intra-FEAT) ---
     - workspace/src/{Project}/CLAUDE.md    # CLAUDE.md par projet · cache_layer: semi
     # --- volatile (per-US, jamais cachable) ---
@@ -469,7 +469,7 @@ code-reviewer:
     - .sdd/rules/auditor-coordination.md    # matrice ownership findings 1 domaine = 1 owner (v7.0.1-dev, audit 2026-06-11 M7) · cache_layer: stable
     # Order: stable → semi → volatile (cache_control canonical order, cf. sdd_lib/cache_control.py)
     - workspace/stack/stack.md             # Project Config (CodeReviewMode, CodeReviewFailOn) · cache_layer: stable
-    - .claude/digests/error-classification.code-reviewer.md      # taxonomie [REVIEW_*] §1.10 + classes réutilisées §1.3/§1.6 · cache_layer: stable
+    - .sdd/digests/error-classification.code-reviewer.md      # taxonomie [REVIEW_*] §1.10 + classes réutilisées §1.3/§1.6 · cache_layer: stable
     - .sdd/rules/build-and-loop.md            # Partie B : anti-derive bullets, plan structure, QA ownership (was dev-shared.md, consolidated v7.0.0) · cache_layer: stable
     - .sdd/stacks/backend/{active}.md   # §1.3 layer mapping + §3 conventions + §2.4 libs · cache_layer: stable
     - .sdd/stacks/frontend/{active}.md  # §1.3 + §3 (frontend uniquement) · cache_layer: stable
@@ -544,7 +544,7 @@ arch-reviewer:
     - .sdd/rules/auditor-coordination.md    # matrice ownership findings 1 domaine = 1 owner (v7.0.1-dev, audit 2026-06-11 M7) · cache_layer: stable
     # Order: stable → semi → volatile (cache_control canonical order, cf. sdd_lib/cache_control.py)
     - workspace/stack/stack.md                # Project Config + Active Architecture Pattern + Active Tech Specs · cache_layer: stable
-    - .claude/digests/error-classification.arch-reviewer.md         # taxonomie [ARCH_*] §1.18 · cache_layer: stable
+    - .sdd/digests/error-classification.arch-reviewer.md         # taxonomie [ARCH_*] §1.18 · cache_layer: stable
     - .sdd/stacks/archi/{mvc|ddd|microservice}.md  # §2 couches + §3 principes + §4 naming canonique (microservice 🟡 expérimental) · cache_layer: stable
     - .sdd/stacks/backend/{active}.md            # §1.3 layer mapping backend · cache_layer: stable
     - .sdd/stacks/frontend/{active}.md           # §1.3 layer mapping frontend · cache_layer: stable
@@ -622,7 +622,7 @@ adversarial-reviewer:
     - .sdd/rules/auditor-coordination.md    # matrice ownership findings 1 domaine = 1 owner (v7.0.1-dev, audit 2026-06-11 M7) · cache_layer: stable
     # Order: stable → semi → volatile (cache_control canonical order, cf. sdd_lib/cache_control.py)
     - workspace/stack/stack.md                              # Project Config (AdversarialReviewMode, Min/Max) · cache_layer: stable
-    - .claude/digests/error-classification.adversarial-reviewer.md                       # taxonomie [ADV_*] §1.15 · cache_layer: stable
+    - .sdd/digests/error-classification.adversarial-reviewer.md                       # taxonomie [ADV_*] §1.15 · cache_layer: stable
     - workspace/src/{BackendName}/**                       # ≤ 3 fichiers ciblés via §2.3, jamais Glob récursif · cache_layer: semi
     - workspace/src/{AppName}/**                           # idem · cache_layer: semi
     - workspace/src/{LibName}/**                           # idem si présent · cache_layer: semi
@@ -684,7 +684,7 @@ security-reviewer:
     - .sdd/rules/auditor-coordination.md    # matrice ownership findings 1 domaine = 1 owner (v7.0.1-dev, audit 2026-06-11 M7) · cache_layer: stable
     # Order: stable → semi → volatile (cache_control canonical order, cf. sdd_lib/cache_control.py)
     - workspace/stack/stack.md                # Project Config (SecurityMode, SecurityFailOn, *Enabled) · cache_layer: stable
-    - .claude/digests/error-classification.security-reviewer.md         # taxonomie [SEC_*] §1.11 · cache_layer: stable
+    - .sdd/digests/error-classification.security-reviewer.md         # taxonomie [SEC_*] §1.11 · cache_layer: stable
     - .sdd/stacks/backend/{active}.md §1.3+§3+§2.4   # cache_layer: stable
     - .sdd/stacks/frontend/{active}.md §1.3+§3       # cache_layer: stable
     - .sdd/stacks/auth/{active}.md §2-§3         # patterns d'auth (lecture passive) · cache_layer: stable
@@ -757,7 +757,7 @@ spec-compliance-reviewer:
     - .sdd/rules/auditor-coordination.md    # matrice ownership findings 1 domaine = 1 owner (v7.0.1-dev, audit 2026-06-11 M7) · cache_layer: stable
     # Order: stable → semi → volatile (cache_control canonical order, cf. sdd_lib/cache_control.py)
     - workspace/stack/stack.md             # Project Config (SpecComplianceMode, SpecComplianceFailOn) · cache_layer: stable
-    - .claude/digests/error-classification.spec-compliance-reviewer.md      # taxonomie [SPEC_*] §1.13 · cache_layer: stable
+    - .sdd/digests/error-classification.spec-compliance-reviewer.md      # taxonomie [SPEC_*] §1.13 · cache_layer: stable
     - workspace/src/{BackendName}/**      # code production (fallback convention si pas de plan) · cache_layer: semi
     - workspace/src/{AppName}/**          # code production · cache_layer: semi
     - workspace/src/{LibName}/**          # lib partagée si présente · cache_layer: semi
@@ -810,7 +810,7 @@ constitutioner:
     - workspace/stack/stack.md                   # cache_layer: stable
     - .sdd/templates/adr.template.md                # cache_layer: stable
     - .sdd/rules/ownership.md                       # Partie B §3 numérotation atomique ADR (was file-ownership.md, consolidated v7.0.0) · cache_layer: stable
-    - .claude/digests/error-classification.constitutioner.md            # cache_layer: stable
+    - .sdd/digests/error-classification.constitutioner.md            # cache_layer: stable
     - workspace/.sys/.context/constitution.md   # cache_layer: semi
     - workspace/.sys/.context/adrs/ADR-*.md     # idempotence par slug · cache_layer: semi
   writes:

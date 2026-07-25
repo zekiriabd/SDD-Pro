@@ -1,7 +1,7 @@
 # loader.reverse.yml — Reverse engineering manifest (D4 autonomous)
 #
 # Mirror format of loader.yml but isolated. Discovered via frontmatter
-# `loader: .claude/loader.reverse.yml` in the 12 reverse commands and the
+# `loader: .sdd/loader.reverse.yml` in the 12 reverse commands and the
 # starting-a-reverse-eng skill. NEVER referenced by loader.yml.
 #
 # ADV-17 closure: reverse-tech-auditor.writes points to db-schema.enrichment.json

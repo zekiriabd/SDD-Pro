@@ -134,7 +134,7 @@ les autres langages, l'extraction couvre la détection d'unités + data-access
 **Zéro édition** de fichier existant sous :
 - `.claude/agents/`, `.claude/commands/`, `.sdd/rules/`, `.sdd/skills/`
 - `.sdd/python/sdd_lib/`, `.sdd/python/sdd_scripts/`, `.sdd/python/sdd_admin/`, `.sdd/python/sdd_hooks/`
-- `.claude/loader.yml`, `.claude/INVARIANTS.yml`, `.claude/CLAUDE.md`, `.claude/settings.json`
+- `.sdd/loader.yml`, `.sdd/INVARIANTS.yml`, `.claude/CLAUDE.md`, `.claude/settings.json`
 - `bootstrap.py`, `workspace/console/`
 
 **Création de nouveaux fichiers** autorisée dans ces répertoires. Toute tentative d'**édition** → STOP + ERROR `[REVERSE_ISOLATION_VIOLATION]` + escalade.

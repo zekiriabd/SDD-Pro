@@ -69,7 +69,7 @@ Si le trigger matche, route vers le workflow reverse engineering **au lieu** de 
 
 - Design doc complet : `.sdd/docs/reverse-engineering-workflow.md` (v0.4.1)
 - Règle anti-derive REVERSE : `.sdd/rules/reverse-engineering.md`
-- Loader autonome : `.claude/loader.reverse.yml`
+- Loader autonome : `.sdd/loader.reverse.yml`
 - Module Python isolé : `.sdd/python/sdd_reverse/`
 - 3 CLI scripts : `.sdd/python/sdd_reverse_scripts/`
 - Fixture exemple : `.sdd/python/tests/fixtures/legacy-webforms-minimal/`
