@@ -1,0 +1,25 @@
+# .sdd/agents/reverse-paradigm-advisor.agent.yaml — pivot neutre Phase 1 (ADDITIF, généré
+# 2026-07-24 depuis le frontmatter de .claude/agents/reverse-paradigm-advisor.md — source
+# NON déplacée). model_tier dérivé de `model: claude-sonnet-4-6`
+# (opus→deep, sonnet→balanced). Bornes reprises de .sdd/agent-bounds.yaml.
+# NOTE body_source : le corps markdown de l'agent N'EST PAS recopié ici —
+# il reste dans .claude/agents/reverse-paradigm-advisor.md et sera migré/transpilé en Phase 2
+# (harness_build.py). Ce pivot est réversible (suppression sans impact).
+schema: sdd.agent/v1
+name: reverse-paradigm-advisor
+description: Conseiller de paradigme + curateur de migration (Phase 2.7, optionnel). Détecte le paradigme
+  du legacy (ex. WebForms event-driven postback) vs celui de la stack cible (ex. React SPA unidirectionnel),
+  documente le gap avec exemples concrets du legacy, et force une décision consciente du Tech Lead. Classe
+  ensuite chaque unité U-N en MIGRATE / DISCARD / HUMAN-DECISION (curation, jamais destructive). Verdict
+  informational/WARN, jamais bloquant. Aucun spawn d'agent.
+model_tier: balanced
+tools:
+- Read
+- Write
+- Glob
+- Grep
+- Bash
+tier_default: balanced
+tier_floor: balanced
+tier_ceiling: deep
+body_source: .claude/agents/reverse-paradigm-advisor.md

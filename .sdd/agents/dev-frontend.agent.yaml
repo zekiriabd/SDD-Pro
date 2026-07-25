@@ -1,0 +1,28 @@
+# .sdd/agents/dev-frontend.agent.yaml — pivot neutre Phase 1 (ADDITIF, généré
+# 2026-07-24 depuis le frontmatter de .claude/agents/dev-frontend.md — source
+# NON déplacée). model_tier dérivé de `model: claude-opus-4-8`
+# (opus→deep, sonnet→balanced). Bornes reprises de .sdd/agent-bounds.yaml.
+# NOTE body_source : le corps markdown de l'agent N'EST PAS recopié ici —
+# il reste dans .claude/agents/dev-frontend.md et sera migré/transpilé en Phase 2
+# (harness_build.py). Ce pivot est réversible (suppression sans impact).
+schema: sdd.agent/v1
+name: dev-frontend
+description: Agent Dev-Frontend — pour UNE US donnée, lit l'US (workspace/us/{n}-{m}-{Name}.md) + le mockup
+  HTML statique (workspace/ui/{n}-{m}-{Name}.html) + les stacks frontend/ui actifs, planifie inline les
+  fichiers client à matérialiser, et génère le code (Pages, Components, Layouts, theme.css, bootstrap
+  HTML) en traduisant le HTML brut vers le design system actif via le mapping §2 + §7 du stack UI. Si
+  l'US n'a aucune contrepartie frontend, exit silencieux. Lecture sélective stricte (1 US à la fois).
+  N'écrit pas de tests (QA hors scope).
+model_tier: deep
+tools:
+- Read
+- Write
+- Edit
+- Glob
+- Grep
+- Bash
+- Skill
+tier_default: deep
+tier_floor: balanced
+tier_ceiling: deep
+body_source: .claude/agents/dev-frontend.md

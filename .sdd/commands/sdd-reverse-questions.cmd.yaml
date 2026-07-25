@@ -1,0 +1,17 @@
+# .sdd/commands/sdd-reverse-questions.cmd.yaml — pivot neutre couche COMMANDES (ADDITIF,
+# généré 2026-07-24 depuis .claude/commands/sdd-reverse-questions.md — source NON déplacée,
+# lecture seule). NOTE body_source : le corps markdown N'EST PAS recopié ici —
+# il reste dans .claude/commands/sdd-reverse-questions.md et est réattaché par
+# harness_build.py (ClaudeAdapter.emit_commands). Les valeurs `frontmatter:`
+# sont RAW (guillemets préservés) pour un round-trip exact.
+# Pivot réversible (suppression sans impact sur le vivant).
+schema: sdd.command/v1
+name: sdd-reverse-questions
+has_frontmatter: true
+description: Boucle de validation humaine structurée. Mode generate (défaut) — consolide les gaps reverse (complétude, traçabilité, items medium/low, AC non dérivables, curation HUMAN-DECISION) en questions.md à remplir par le Tech Lead. Mode --ingest — ré-injecte les réponses dans les FEATs (human-validated, confidence, REVERSE-GATE, hash US). Spawn agent reverse-clarifier (Sonnet 4.6). Emprunt Reversa (questions.md + answer_mode) — audit comparatif 2026-06-12.
+frontmatter:
+  command: sdd-reverse-questions
+  phase: '"3.9"'
+  description: Boucle de validation humaine structurée. Mode generate (défaut) — consolide les gaps reverse (complétude, traçabilité, items medium/low, AC non dérivables, curation HUMAN-DECISION) en questions.md à remplir par le Tech Lead. Mode --ingest — ré-injecte les réponses dans les FEATs (human-validated, confidence, REVERSE-GATE, hash US). Spawn agent reverse-clarifier (Sonnet 4.6). Emprunt Reversa (questions.md + answer_mode) — audit comparatif 2026-06-12.
+  loader: .claude/loader.reverse.yml
+body_source: .claude/commands/sdd-reverse-questions.md

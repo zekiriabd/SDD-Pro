@@ -1,0 +1,27 @@
+# .sdd/agents/arch.agent.yaml — pivot neutre Phase 1 (ADDITIF, généré
+# 2026-07-24 depuis le frontmatter de .claude/agents/arch.md — source
+# NON déplacée). model_tier dérivé de `model: claude-sonnet-4-6`
+# (opus→deep, sonnet→balanced). Bornes reprises de .sdd/agent-bounds.yaml.
+# NOTE body_source : le corps markdown de l'agent N'EST PAS recopié ici —
+# il reste dans .claude/agents/arch.md et sera migré/transpilé en Phase 2
+# (harness_build.py). Ce pivot est réversible (suppression sans impact).
+schema: sdd.agent/v1
+name: arch
+description: 'Agent Arch — bootstrap idempotent de la solution / des projets vides selon les stacks actifs
+  (Init Commands §2.2.1) + propagation des blocs `## Active Database` / `## Active Auth Specs` de stack.md
+  vers les fichiers de configuration applicatifs (appsettings.json / application.yml / config/default.json
+  / app/config.py) + (si DatabaseType ≠ none) introspection READ-ONLY de la base et scaffolding Database-First
+  (entities + DbContext). Pas de code applicatif (responsabilité dev-backend / dev-frontend). Idempotent
+  : skip si projet déjà initialisé, scaffolding incrémental, configs régénérables.'
+model_tier: balanced
+tools:
+- Read
+- Write
+- Edit
+- Glob
+- Grep
+- Bash
+tier_default: balanced
+tier_floor: balanced
+tier_ceiling: deep
+body_source: .claude/agents/arch.md

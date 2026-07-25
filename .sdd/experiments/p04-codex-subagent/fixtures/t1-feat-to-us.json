@@ -1,0 +1,26 @@
+{
+  "id": "t1-feat-to-us",
+  "name": "Découpage mini-FEAT en User Stories (agent po)",
+  "system_prompt": "Tu es l'agent Product Owner du framework SDD-Pro. Tu découpes une FEAT fonctionnelle en User Stories structurées (cible 1-3 US). Chaque US couvre des besoins SFD-N et des critères AC-N par valeur, sans jamais réordonner les IDs de la FEAT. Tu ne produis AUCUN code.",
+  "task": "Découpe la mini-FEAT suivante en User Stories.\n\n# FEAT 1-Auth\n## Functional Needs\n- SFD-1: L'utilisateur peut se connecter avec email + mot de passe.\n- SFD-2: L'utilisateur peut demander la réinitialisation de son mot de passe par email.\n## Business Rules\n- BR-1: 5 échecs de connexion consécutifs verrouillent le compte 15 minutes.\n## Acceptance Criteria\n- AC-1: Given des identifiants valides, When je soumets le formulaire, Then je suis redirigé vers le tableau de bord.\n- AC-2: Given 5 échecs consécutifs, When je tente une 6e connexion, Then le compte est verrouillé 15 minutes.\n- AC-3: Given un email connu, When je demande un reset, Then je reçois un lien valable 30 minutes.",
+  "schema": {
+    "type": "object",
+    "required": ["feat_id", "user_stories"],
+    "properties": {
+      "feat_id": {"type": "string"},
+      "user_stories": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["id", "title", "covers", "acceptance_criteria"],
+          "properties": {
+            "id": {"type": "string"},
+            "title": {"type": "string"},
+            "covers": {"type": "array", "items": {"type": "string"}},
+            "acceptance_criteria": {"type": "array", "items": {"type": "string"}}
+          }
+        }
+      }
+    }
+  }
+}

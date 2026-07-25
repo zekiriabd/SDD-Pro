@@ -1,0 +1,106 @@
+# Manifest neutre des SKILLS (Phase 2 multi-harness — classification + support)
+#
+# Les skills sont des ARBORESCENCES de répertoires (SKILL.md + ressources,
+# parfois binaires), pas des fichiers markdown simples. Le foyer neutre ne
+# les duplique PAS physiquement (Phase 1 invasive différée) : ce manifest
+# les CLASSIFIE et déclare leur support par harnais. `source` pointe vers
+# l'arborescence vivante `.claude/skills/<name>/`.
+#
+# provenance:
+#   owned    — skill natif SDD-PRO (versionné dans le repo, maintenu ici).
+#   vendored — skill tiers vendorisé (copie locale, MAJ manuelle — cf.
+#              .claude/skills/VENDORED.md pour source upstream + licence).
+#
+# harness_support — la couche skills est la MOINS portable :
+#   claude-code : mécanisme natif (auto-trigger par description). Support
+#                 complet. Émission = passthrough (arborescence copiée telle
+#                 quelle — différé Phase 1, non régénéré en Phase 2 identité).
+#   codex       : PAS d'équivalent natif de skills auto-déclenchés. Les
+#                 skills owned "process" (using-sddpro, starting-*, debugging-*)
+#                 doivent être reformulés en instructions AGENTS.md ou en
+#                 commandes. Les skills SAST vendorisés (semgrep/codeql/...)
+#                 restent invocables comme outils CLI hors-harnais (déjà le
+#                 cas — ils tournent hors pipeline).
+#   gemini-cli  : idem codex.
+#
+# NOTE — aucune transpilation skills n'est câblée en Phase 2 (ni identité
+# Claude, ni variantes). Ce manifest est un artefact de CONCEPTION qui borne
+# le travail Phase 1 et documente honnêtement le gap multi-harnais.
+
+schema: sdd.skills-manifest/v1
+
+harness_support:
+  claude-code: native-autotrigger
+  codex: reformulate-or-cli-only
+  gemini-cli: reformulate-or-cli-only
+
+skills:
+  # --- Owned (natifs SDD-PRO) ---
+  - name: using-sddpro
+    source: .claude/skills/using-sddpro
+    provenance: owned
+    kind: process
+  - name: starting-a-new-feat
+    source: .claude/skills/starting-a-new-feat
+    provenance: owned
+    kind: process
+  - name: starting-a-reverse-eng
+    source: .claude/skills/starting-a-reverse-eng
+    provenance: owned
+    kind: process
+  - name: debugging-failed-pipeline
+    source: .claude/skills/debugging-failed-pipeline
+    provenance: owned
+    kind: process
+  - name: test-driven-development
+    source: .claude/skills/test-driven-development
+    provenance: owned
+    kind: process
+  - name: a11y-local
+    source: .claude/skills/a11y-local
+    provenance: owned
+    kind: tooling
+
+  # --- Vendored (tiers, MAJ manuelle — cf. skills/VENDORED.md) ---
+  - name: webapp-testing
+    source: .claude/skills/webapp-testing
+    provenance: vendored
+    kind: tooling
+    upstream: https://github.com/anthropics/skills
+    license: Apache-2.0
+  - name: semgrep
+    source: .claude/skills/semgrep
+    provenance: vendored
+    kind: tooling
+    upstream: https://github.com/trailofbits/skills
+    license: CC-BY-SA-4.0
+  - name: codeql
+    source: .claude/skills/codeql
+    provenance: vendored
+    kind: tooling
+    upstream: https://github.com/trailofbits/skills
+    license: CC-BY-SA-4.0
+  - name: sarif-parsing
+    source: .claude/skills/sarif-parsing
+    provenance: vendored
+    kind: tooling
+    upstream: https://github.com/trailofbits/skills
+    license: CC-BY-SA-4.0
+  - name: insecure-defaults
+    source: .claude/skills/insecure-defaults
+    provenance: vendored
+    kind: tooling
+    upstream: https://github.com/trailofbits/skills
+    license: CC-BY-SA-4.0
+  - name: frontend-design
+    source: .claude/skills/frontend-design
+    provenance: vendored
+    kind: tooling
+    upstream: https://github.com/anthropics/skills
+    license: Apache-2.0
+  - name: c4-model
+    source: .claude/skills/c4-model
+    provenance: vendored
+    kind: tooling
+    upstream: https://github.com/cheriftj/c4-model-skill
+    license: MIT

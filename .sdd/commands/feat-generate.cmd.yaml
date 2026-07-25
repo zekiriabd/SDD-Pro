@@ -1,0 +1,12 @@
+# .sdd/commands/feat-generate.cmd.yaml — pivot neutre couche COMMANDES (ADDITIF,
+# généré 2026-07-24 depuis .claude/commands/feat-generate.md — source NON déplacée,
+# lecture seule). NOTE body_source : le corps markdown N'EST PAS recopié ici —
+# il reste dans .claude/commands/feat-generate.md et est réattaché par
+# harness_build.py (ClaudeAdapter.emit_commands). Les valeurs `frontmatter:`
+# sont RAW (guillemets préservés) pour un round-trip exact.
+# Pivot réversible (suppression sans impact sur le vivant).
+schema: sdd.command/v1
+name: feat-generate
+has_frontmatter: false
+description: /feat-generate — Création guidée d'une FEAT fonctionnelle
+body_source: .claude/commands/feat-generate.md

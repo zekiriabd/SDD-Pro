@@ -1,0 +1,26 @@
+# .sdd/agents/reverse-inventory.agent.yaml — pivot neutre Phase 1 (ADDITIF, généré
+# 2026-07-24 depuis le frontmatter de .claude/agents/reverse-inventory.md — source
+# NON déplacée). model_tier dérivé de `model: claude-sonnet-4-6`
+# (opus→deep, sonnet→balanced). Bornes reprises de .sdd/agent-bounds.yaml.
+# NOTE body_source : le corps markdown de l'agent N'EST PAS recopié ici —
+# il reste dans .claude/agents/reverse-inventory.md et sera migré/transpilé en Phase 2
+# (harness_build.py). Ce pivot est réversible (suppression sans impact).
+schema: sdd.agent/v1
+name: reverse-inventory
+description: 'Pour un projet legacy déposé dans workspace/old/{LegacyProject}/, cartographie déterministe
+  : détecte langages/frameworks, énumère pages, identifie unités fonctionnelles candidates avec IDs stables
+  U-N + evidence file:line, extrait DB schema basique. Lecture massive autorisée (récursive) sur workspace/old/{P}/**
+  uniquement. Délègue 99% du travail au script déterministe reverse_inventory.py (0 token), enrichit uniquement
+  le markdown FR de sortie. Aucun spawn d''agent.'
+model_tier: balanced
+tools:
+- Read
+- Write
+- Edit
+- Glob
+- Grep
+- Bash
+tier_default: balanced
+tier_floor: fast
+tier_ceiling: balanced
+body_source: .claude/agents/reverse-inventory.md

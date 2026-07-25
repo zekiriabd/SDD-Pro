@@ -1,0 +1,72 @@
+# .sdd/capability-matrix.yml — Matrice harnais × mécanismes SDD-Pro
+# SSoT machine du §7.1 du plan MIGRATION-PLAN-multi-harness-multi-provider.md.
+# Consommée (à terme) par harness_build.py pour imprimer le rapport d'impact.
+# Valeurs : native | emulated | ci_fallback | unsupported
+#   native      = mécanisme fourni par le harnais lui-même
+#   emulated    = dégradation contrôlée via wrapper (spawn_agent.py, inline statique…)
+#   ci_fallback = mécanisme reporté au CI-time / scripts déterministes
+#   unsupported = absent, aucune émulation prévue (documenté dans le rapport d'impact)
+# protection_level : A (référence) / B (émulations, gates déplacés au wrapper+CI)
+#                    / C (mono-agent seulement ou combo non conformance-testé)
+schema: sdd.capabilities/v1
+generated: 2026-07-24
+status: consumed-phase-2.5   # consommé par sdd_lib/impact_report.py (rapport d'impact obligatoire par build)
+
+mechanisms:
+  subagent_spawn:        # sous-agents isolés + parallélisme borné (MaxParallel) — 26 commandes spawnantes
+  runtime_hooks:         # hooks bloquants PreToolUse/SubagentStop (aujourd'hui NON câblés dans settings.json)
+  skills_autotrigger:    # 13 skills à déclenchement contextuel
+  at_include:            # lazy-load @file (328 refs @.claude/…)
+  slash_commands:        # 40 commandes
+  deterministic_python:  # 331 scripts 0-token (gates, validate_*, build_loop)
+  mcp:                   # Model Context Protocol
+
+harnesses:
+  claude-code:
+    protection_level: A
+    mechanisms:
+      subagent_spawn: native          # tool Task/Agent
+      runtime_hooks: native           # disponible ; non câblé aujourd'hui (permissions only)
+      skills_autotrigger: native
+      at_include: native
+      slash_commands: native          # .claude/commands/*.md
+      deterministic_python: native
+      mcp: native
+
+  codex:
+    protection_level: B               # sous réserve verdict GO prototype P0.4
+    mechanisms:
+      subagent_spawn: emulated        # `codex exec` sous-processus isolé — RISQUE #1, prototype P0.4
+      runtime_hooks: ci_fallback      # pas d'équivalent hook → gates pre/post-exec du wrapper + CI
+      skills_autotrigger: emulated    # injection statique des skills SDD-owned critiques dans AGENTS.md
+      at_include: unsupported         # repli : inline ou consigne « Read X avant STEP n »
+      slash_commands: emulated        # .codex/prompts/*.md (custom prompts)
+      deterministic_python: native
+      mcp: native
+
+  antigravity:
+    protection_level: B
+    mechanisms:
+      subagent_spawn: emulated        # agents Antigravity existants mais API d'orchestration différente
+      runtime_hooks: ci_fallback
+      skills_autotrigger: emulated    # extensions/context, partiel
+      at_include: emulated            # `@` supporté dans les prompts, pas en mémoire — à confirmer
+      slash_commands: native          # .gemini/commands/*.toml
+      deterministic_python: native
+      mcp: native
+
+  gemini-cli:
+    protection_level: B
+    mechanisms:
+      subagent_spawn: emulated        # `gemini -p` non-interactif via wrapper spawn_agent.py
+      runtime_hooks: ci_fallback
+      skills_autotrigger: emulated
+      at_include: emulated            # à confirmer (prompts oui, mémoire non)
+      slash_commands: native          # .gemini/commands/*.toml
+      deterministic_python: native
+      mcp: native
+
+# Rules path-scoped (frontmatter paths:, 9/11) et prompt-caching (cache_layer
+# loader.yml) : hors des 7 mécanismes pivot ci-dessus — traités par le rapport
+# d'impact (repli = Read explicite au STEP contexte / cache appliqué seulement
+# si provider=anthropic). Cf. plan §7.1 lignes 6 et 9.

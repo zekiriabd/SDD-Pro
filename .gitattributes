@@ -1,0 +1,14 @@
+# Audit 2026-06-11 (info #15) — normalisation fins de ligne : le repo mixait
+# LF/CRLF (warnings "LF will be replaced by CRLF" sur chaque checkout Windows).
+* text=auto
+*.py text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.js text eol=lf
+*.jsx text eol=lf
+*.ps1 text eol=crlf
+*.png binary
+*.ico binary
+*.svg text

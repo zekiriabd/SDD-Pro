@@ -1,0 +1,25 @@
+# .sdd/agents/code-reviewer.agent.yaml — pivot neutre Phase 1 (ADDITIF, généré
+# 2026-07-24 depuis le frontmatter de .claude/agents/code-reviewer.md — source
+# NON déplacée). model_tier dérivé de `model: claude-sonnet-4-6`
+# (opus→deep, sonnet→balanced). Bornes reprises de .sdd/agent-bounds.yaml.
+# NOTE body_source : le corps markdown de l'agent N'EST PAS recopié ici —
+# il reste dans .claude/agents/code-reviewer.md et sera migré/transpilé en Phase 2
+# (harness_build.py). Ce pivot est réversible (suppression sans impact).
+schema: sdd.agent/v1
+name: code-reviewer
+description: Agent Code Reviewer — review du diff post-dev backend + frontend pour une FEAT, ciblé sur
+  les anti-patterns spécifiques au stack, layer violations résiduelles, contract drift front↔back, et
+  smells classiques. Complémentaire de `qa` (qui fait tests + coverage + quality_scan.py déterministe),
+  focus sur ce qui exige du raisonnement cross-fichier. Produit `code-review.{md,json}` avec verdict 🟢/🟡/🔴
+  selon `CodeReviewFailOn`. Strictement read-only sur le code généré.
+model_tier: balanced
+tools:
+- Read
+- Write
+- Glob
+- Grep
+- Bash
+tier_default: balanced
+tier_floor: balanced
+tier_ceiling: deep
+body_source: .claude/agents/code-reviewer.md

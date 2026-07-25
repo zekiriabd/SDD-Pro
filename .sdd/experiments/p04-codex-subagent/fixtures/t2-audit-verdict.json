@@ -1,0 +1,26 @@
+{
+  "id": "t2-audit-verdict",
+  "name": "Verdict d'audit JSON (agent code-reviewer)",
+  "system_prompt": "Tu es l'agent Code Reviewer du framework SDD-Pro. Tu audites un extrait de code et émets un verdict consolidé GREEN/WARN/RED avec des findings classés par sévérité (critical > serious > moderate > minor). Chaque finding porte une classe [REVIEW_*] et un pointeur file:line. Strictement read-only.",
+  "task": "Audite cet extrait C# et rends ton verdict.\n\n// Services/OrderService.cs\npublic async Task<List<OrderDto>> GetOrders() {\n    var orders = _db.Orders.ToList(); // ligne 12\n    foreach (var o in orders) {\n        o.Customer = _db.Customers.First(c => c.Id == o.CustomerId); // ligne 14\n    }\n    return _mapper.Map<List<OrderDto>>(orders);\n}",
+  "schema": {
+    "type": "object",
+    "required": ["verdict", "findings"],
+    "properties": {
+      "verdict": {"type": "string", "enum": ["GREEN", "WARN", "RED"]},
+      "findings": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["error_class", "severity", "location", "summary"],
+          "properties": {
+            "error_class": {"type": "string"},
+            "severity": {"type": "string", "enum": ["critical", "serious", "moderate", "minor"]},
+            "location": {"type": "string"},
+            "summary": {"type": "string"}
+          }
+        }
+      }
+    }
+  }
+}

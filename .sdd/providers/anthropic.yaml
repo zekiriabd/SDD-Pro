@@ -1,0 +1,18 @@
+# .sdd/providers/anthropic.yaml — provider de référence (schéma plan §8.2)
+schema: sdd.provider/v1
+name: anthropic
+endpoint_kind: native            # API Anthropic native (référence)
+base_url_env: ANTHROPIC_BASE_URL # défaut SDK : https://api.anthropic.com
+auth_env: ANTHROPIC_API_KEY
+tier_map:
+  deep: claude-opus-4-8
+  balanced: claude-sonnet-4-6
+  fast: claude-haiku-4-5
+context_window:
+  deep: 200000
+  balanced: 200000
+  fast: 200000
+capabilities:
+  structured_output_fidelity: unknown   # référence de facto — à formaliser au 1er conformance run (§10)
+  tool_calling: native
+  prompt_caching: anthropic-ephemeral

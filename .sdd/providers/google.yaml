@@ -1,0 +1,18 @@
+# .sdd/providers/google.yaml — squelette (IDs à confirmer avant conformance run)
+schema: sdd.provider/v1
+name: google
+endpoint_kind: native            # API Gemini native (Gemini CLI / Antigravity)
+base_url_env: GOOGLE_GEMINI_BASE_URL  # défaut SDK : https://generativelanguage.googleapis.com
+auth_env: GEMINI_API_KEY
+tier_map:                        # à confirmer — mapping indicatif, non qualifié
+  deep: gemini-3-pro             # à confirmer
+  balanced: gemini-3-flash       # à confirmer
+  fast: gemini-3-flash-lite      # à confirmer
+context_window:
+  deep: 1000000                  # à confirmer
+  balanced: 1000000              # à confirmer
+  fast: 1000000                  # à confirmer
+capabilities:
+  structured_output_fidelity: unknown   # verdict au 1er conformance run (§10)
+  tool_calling: google-native
+  prompt_caching: context-caching       # API différente — appliqué seulement si provider=google

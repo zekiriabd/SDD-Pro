@@ -1,0 +1,17 @@
+# .sdd/commands/sdd-reverse-synth.cmd.yaml — pivot neutre couche COMMANDES (ADDITIF,
+# généré 2026-07-24 depuis .claude/commands/sdd-reverse-synth.md — source NON déplacée,
+# lecture seule). NOTE body_source : le corps markdown N'EST PAS recopié ici —
+# il reste dans .claude/commands/sdd-reverse-synth.md et est réattaché par
+# harness_build.py (ClaudeAdapter.emit_commands). Les valeurs `frontmatter:`
+# sont RAW (guillemets préservés) pour un round-trip exact.
+# Pivot réversible (suppression sans impact sur le vivant).
+schema: sdd.command/v1
+name: sdd-reverse-synth
+has_frontmatter: true
+description: Phase 3.7 — couche de synthèse système (vue au-dessus de l'escalier 3a→3b→3c). Rend C4 (contexte/conteneurs/composants), ERD complet et soul.md à partir des SEULS artefacts déterministes (inventory.json, deps-graph.json, db-schema.merged.json). Lecture seule, aucun agent spawné, écrit uniquement sous .sys/synthesis/ (jamais feats/). Déterministe (0 token), non-cassant pour le pipeline existant.
+frontmatter:
+  command: sdd-reverse-synth
+  phase: '"3.7"'
+  description: Phase 3.7 — couche de synthèse système (vue au-dessus de l'escalier 3a→3b→3c). Rend C4 (contexte/conteneurs/composants), ERD complet et soul.md à partir des SEULS artefacts déterministes (inventory.json, deps-graph.json, db-schema.merged.json). Lecture seule, aucun agent spawné, écrit uniquement sous .sys/synthesis/ (jamais feats/). Déterministe (0 token), non-cassant pour le pipeline existant.
+  loader: .claude/loader.reverse.yml
+body_source: .claude/commands/sdd-reverse-synth.md

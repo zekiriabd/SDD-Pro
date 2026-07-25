@@ -1,0 +1,24 @@
+# .sdd/agents/po.agent.yaml — pivot neutre Phase 1 (ADDITIF, généré
+# 2026-07-24 depuis le frontmatter de .claude/agents/po.md — source
+# NON déplacée). model_tier dérivé de `model: claude-sonnet-4-6`
+# (opus→deep, sonnet→balanced). Bornes reprises de .sdd/agent-bounds.yaml.
+# NOTE body_source : le corps markdown de l'agent N'EST PAS recopié ici —
+# il reste dans .claude/agents/po.md et sera migré/transpilé en Phase 2
+# (harness_build.py). Ce pivot est réversible (suppression sans impact).
+schema: sdd.agent/v1
+name: po
+description: Agent Product Owner — découpe une FEAT fonctionnelle en User Stories structurées (min 1,
+  cible 1-3, warn 7+, hard cap 10 — configurable). Lit workspace/feats/{n}-{Name}.md, écrit workspace/us/{n}-{m}-{Name}.md
+  pour chaque US.
+model_tier: balanced
+tools:
+- Read
+- Write
+- Edit
+- Glob
+- Grep
+- Bash
+tier_default: balanced
+tier_floor: balanced
+tier_ceiling: deep
+body_source: .claude/agents/po.md

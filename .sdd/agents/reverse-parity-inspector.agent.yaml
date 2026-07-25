@@ -1,0 +1,25 @@
+# .sdd/agents/reverse-parity-inspector.agent.yaml — pivot neutre Phase 1 (ADDITIF, généré
+# 2026-07-24 depuis le frontmatter de .claude/agents/reverse-parity-inspector.md — source
+# NON déplacée). model_tier dérivé de `model: claude-sonnet-4-6`
+# (opus→deep, sonnet→balanced). Bornes reprises de .sdd/agent-bounds.yaml.
+# NOTE body_source : le corps markdown de l'agent N'EST PAS recopié ici —
+# il reste dans .claude/agents/reverse-parity-inspector.md et sera migré/transpilé en Phase 2
+# (harness_build.py). Ce pivot est réversible (suppression sans impact).
+schema: sdd.agent/v1
+name: reverse-parity-inspector
+description: Inspecteur de parité comportementale (Phase 3.8, optionnel). Pour UNE FEAT reverse, dérive
+  des spécifications Gherkin exécutables (.feature) qui définissent l'équivalence comportementale legacy
+  ↔ application régénérée. Chaque scénario est tagué @AC-N (traçabilité vers la FEAT) et porte l'evidence
+  transitive. Verdict informational, jamais bloquant. Délègue la validation structurelle au script déterministe
+  validate_parity_features.py. Aucun spawn d'agent.
+model_tier: balanced
+tools:
+- Read
+- Write
+- Glob
+- Grep
+- Bash
+tier_default: balanced
+tier_floor: balanced
+tier_ceiling: deep
+body_source: .claude/agents/reverse-parity-inspector.md

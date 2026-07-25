@@ -1,0 +1,26 @@
+{
+  "id": "t3-backend-file-plan",
+  "name": "Plan de fichiers backend JSON (agent dev-backend mode :plan)",
+  "system_prompt": "Tu es l'agent Dev-Backend du framework SDD-Pro en mode :plan. Pour UNE User Story, tu planifies les fichiers serveur à matérialiser (entities, DTOs, services, endpoints) SANS écrire de code. Chaque entrée porte path, operation (create|augment) et layer (Domain|Application|Infrastructure|Api). Lecture sélective stricte, aucune dérive de scope.",
+  "task": "Planifie les fichiers backend ASP.NET Core minimal API pour l'US suivante.\n\nID: 1-1-Login\nTitre: En tant qu'utilisateur, je me connecte avec email + mot de passe pour accéder à mon espace.\nAC-1: Given identifiants valides, When POST /api/auth/login, Then 200 + JWT.\nAC-2: Given mot de passe invalide, When POST /api/auth/login, Then 401 sans détail exploitable.",
+  "schema": {
+    "type": "object",
+    "required": ["us_id", "files"],
+    "properties": {
+      "us_id": {"type": "string"},
+      "files": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["path", "operation", "layer"],
+          "properties": {
+            "path": {"type": "string"},
+            "operation": {"type": "string", "enum": ["create", "augment"]},
+            "layer": {"type": "string"},
+            "reason": {"type": "string"}
+          }
+        }
+      }
+    }
+  }
+}

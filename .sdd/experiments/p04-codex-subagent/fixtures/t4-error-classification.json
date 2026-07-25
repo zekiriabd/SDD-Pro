@@ -1,0 +1,23 @@
+{
+  "id": "t4-error-classification",
+  "name": "Classification d'erreur build [CLASS] (contrat build_loop)",
+  "system_prompt": "Tu es un agent du framework SDD-Pro soumis au contrat error-classification : tout bloc ERROR porte une classe [CLASS]. Tu classes une erreur de build en [BUILD_CORRECTIBLE] (import, typo, nullability — build_loop itère) ou [BUILD_BLOCKING] (violation de couche, cycle DI — fail-fast), et tu produis le bloc ERROR/CAUSE/FIX 3 lignes.",
+  "task": "Classe cette erreur de compilation et produis le bloc structuré.\n\nBebesEndpoints.cs(1,7): error CS0246: The type or namespace name 'IBebeService' could not be found (are you missing a using directive or an assembly reference?)",
+  "schema": {
+    "type": "object",
+    "required": ["error_class", "iterate", "error_block"],
+    "properties": {
+      "error_class": {"type": "string", "enum": ["[BUILD_CORRECTIBLE]", "[BUILD_BLOCKING]"]},
+      "iterate": {"type": "boolean"},
+      "error_block": {
+        "type": "object",
+        "required": ["error", "cause", "fix"],
+        "properties": {
+          "error": {"type": "string"},
+          "cause": {"type": "string"},
+          "fix": {"type": "string"}
+        }
+      }
+    }
+  }
+}

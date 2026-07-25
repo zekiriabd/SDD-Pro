@@ -1,0 +1,17 @@
+# .sdd/commands/sdd-reverse-full.cmd.yaml — pivot neutre couche COMMANDES (ADDITIF,
+# généré 2026-07-24 depuis .claude/commands/sdd-reverse-full.md — source NON déplacée,
+# lecture seule). NOTE body_source : le corps markdown N'EST PAS recopié ici —
+# il reste dans .claude/commands/sdd-reverse-full.md et est réattaché par
+# harness_build.py (ClaudeAdapter.emit_commands). Les valeurs `frontmatter:`
+# sont RAW (guillemets préservés) pour un round-trip exact.
+# Pivot réversible (suppression sans impact sur le vivant).
+schema: sdd.command/v1
+name: sdd-reverse-full
+has_frontmatter: true
+description: 'Orchestrateur COMPLET du reverse engineering (Phase 0→5). Séquence init + inventory + audit + paradigm + extraction (escalier 3a→3b→3c) + crosscut + review + synth + UI + questions + status — tous PAR DÉFAUT (décision Tech Lead 2026-06-13), opt-out via --skip-* / --minimal. SEULE exception : la parité (Phase 3.8) est opt-in via --with-parity (et ses artefacts vont dans output/parity/, jamais dans qa/). N''EST PAS UN AGENT — séquenceur de commandes (no-spawn rule §9 rules/reverse-engineering.md). Reprenable phase par phase.'
+frontmatter:
+  command: sdd-reverse-full
+  phase: '"0-5"'
+  description: 'Orchestrateur COMPLET du reverse engineering (Phase 0→5). Séquence init + inventory + audit + paradigm + extraction (escalier 3a→3b→3c) + crosscut + review + synth + UI + questions + status — tous PAR DÉFAUT (décision Tech Lead 2026-06-13), opt-out via --skip-* / --minimal. SEULE exception : la parité (Phase 3.8) est opt-in via --with-parity (et ses artefacts vont dans output/parity/, jamais dans qa/). N''EST PAS UN AGENT — séquenceur de commandes (no-spawn rule §9 rules/reverse-engineering.md). Reprenable phase par phase.'
+  loader: .claude/loader.reverse.yml
+body_source: .claude/commands/sdd-reverse-full.md

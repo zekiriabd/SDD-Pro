@@ -1,0 +1,17 @@
+# .sdd/commands/sdd-reverse-stories.cmd.yaml — pivot neutre couche COMMANDES (ADDITIF,
+# généré 2026-07-24 depuis .claude/commands/sdd-reverse-stories.md — source NON déplacée,
+# lecture seule). NOTE body_source : le corps markdown N'EST PAS recopié ici —
+# il reste dans .claude/commands/sdd-reverse-stories.md et est réattaché par
+# harness_build.py (ClaudeAdapter.emit_commands). Les valeurs `frontmatter:`
+# sont RAW (guillemets préservés) pour un round-trip exact.
+# Pivot réversible (suppression sans impact sur le vivant).
+schema: sdd.command/v1
+name: sdd-reverse-stories
+has_frontmatter: true
+description: Phase 3b du workflow reverse — remontée de l'analyse technique 3a en User Stories par capability (barreau moyen de l'escalier). Spawn agent reverse-us-writer (Sonnet 4.6 — downgrade audité 2026-06-11, 3a/3c restent Opus 4.8). Lit plans/{n}-{Name}.analysis.md, écrit us/{n}-{m}-{Name}.md. Consommé par /sdd-reverse-feat (3c).
+frontmatter:
+  command: sdd-reverse-stories
+  phase: 3b
+  description: Phase 3b du workflow reverse — remontée de l'analyse technique 3a en User Stories par capability (barreau moyen de l'escalier). Spawn agent reverse-us-writer (Sonnet 4.6 — downgrade audité 2026-06-11, 3a/3c restent Opus 4.8). Lit plans/{n}-{Name}.analysis.md, écrit us/{n}-{m}-{Name}.md. Consommé par /sdd-reverse-feat (3c).
+  loader: .claude/loader.reverse.yml
+body_source: .claude/commands/sdd-reverse-stories.md

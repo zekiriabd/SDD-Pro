@@ -1,0 +1,22 @@
+# .sdd/providers/openai.yaml — OpenAI native; qualification SDD à mesurer au conformance run.
+schema: sdd.provider/v1
+name: openai
+endpoint_kind: openai-compat     # API OpenAI native (chat/responses)
+base_url_env: OPENAI_BASE_URL    # défaut SDK : https://api.openai.com/v1
+auth_env: OPENAI_API_KEY
+endpoints:
+  openai: https://api.openai.com/v1
+tier_map:
+  # Resolver OpenAI (2026-07-25): current model = gpt-5.6-sol.
+  # SDD tier quality and cost remain subject to conformance qualification.
+  deep: gpt-5.6-sol
+  balanced: gpt-5.6-sol
+  fast: gpt-5-mini
+context_window:
+  deep: 400000                   # à confirmer
+  balanced: 400000               # à confirmer
+  fast: 200000                   # à confirmer
+capabilities:
+  structured_output_fidelity: unknown   # verdict au 1er conformance run (§10)
+  tool_calling: openai-native
+  prompt_caching: implicit

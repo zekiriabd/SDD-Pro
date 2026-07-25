@@ -1,0 +1,24 @@
+# .sdd/providers/moonshot.yaml — Kimi (décision Tech Lead 2026-07-24 :
+# IDs modèles + endpoints = défauts de travail RETENUS — re-vérifier au câblage Phase 2).
+# Double exposition : Anthropic-compat (Claude Code) ET OpenAI-compat (Codex).
+schema: sdd.provider/v1
+name: moonshot
+endpoint_kind: anthropic-compat  # principal (Claude Code) ; aussi openai-compat, cf. endpoints
+endpoints:
+  anthropic: https://api.moonshot.ai/anthropic   # défaut retenu — re-vérifier au câblage
+  openai: https://api.moonshot.ai/v1             # défaut retenu — re-vérifier au câblage
+base_url_env: ANTHROPIC_BASE_URL # sous Claude Code ; base_url config.toml sous Codex
+auth_env: MOONSHOT_API_KEY
+tier_map:                        # défauts retenus 2026-07-24 (série K2 classique retirée 25/05/2026)
+  deep: kimi-k3                  # défaut retenu — re-vérifier au câblage — thinking always-on
+  balanced: kimi-k2.7-code      # défaut retenu — re-vérifier au câblage — coding-tuné
+  fast: kimi-k2.5                # défaut retenu — re-vérifier au câblage
+context_window:
+  deep: 1000000                  # à confirmer
+  balanced: 256000               # à confirmer
+  fast: 128000                   # à confirmer
+capabilities:
+  structured_output_fidelity: unknown   # à mesurer au conformance run (§10) avant tout SLA
+  tool_calling: anthropic-compat
+  prompt_caching: none
+# pricing absent → tout run cost-cappé émettra [TELEMETRY_UNAVAILABLE] (fail-open loggué)

@@ -1,0 +1,51 @@
+# .sdd/agent-bounds.yaml — Bornes de tier par agent (plan §8.bis.7)
+# tier_default : dérivé mécaniquement du `model:` frontmatter réel de
+#   .claude/agents/*.md lu le 2026-07-24 (claude-opus-4-8 → deep,
+#   claude-sonnet-4-6 → balanced). 7 deep / 18 balanced / 0 fast.
+# tier_floor / tier_ceiling : INVARIANTS de qualité (clamp du mode dynamic),
+#   non surchargeables par le Project Config — seul un commit framework les
+#   modifie. Arbitrages Tech Lead 2026-07-24 (ADR harness-and-provider-abstraction
+#   Accepted) : elicitor plafonné balanced ; floors fast CONFIRMÉS pour
+#   constitutioner, reverse-inventory, reverse-us-writer (plus aucun marqueur
+#   "a_valider_tech_lead").
+schema: sdd.agent-bounds/v1
+generated: 2026-07-24
+status: scaffolding-phase-0   # non consommé par le pipeline actuel
+
+agents:
+  # --- Forward — cœur ---
+  po:                          { tier_default: balanced, tier_floor: balanced, tier_ceiling: deep }
+  arch:                        { tier_default: balanced, tier_floor: balanced, tier_ceiling: deep }
+  dev-backend:                 { tier_default: deep,     tier_floor: balanced, tier_ceiling: deep }
+  dev-frontend:                { tier_default: deep,     tier_floor: balanced, tier_ceiling: deep }
+  qa:                          { tier_default: balanced, tier_floor: balanced, tier_ceiling: deep }
+  # --- Forward — support ---
+  elicitor:                    { tier_default: balanced, tier_floor: balanced, tier_ceiling: balanced }  # ceiling balanced arbitré 2026-07-24 (latence interactive)
+  constitutioner:              { tier_default: balanced, tier_floor: fast,     tier_ceiling: balanced }  # floor fast confirmé 2026-07-24 (tâche éditoriale bornée, idempotente)
+  # --- Forward — auditors ---
+  code-reviewer:               { tier_default: balanced, tier_floor: balanced, tier_ceiling: deep }
+  security-reviewer:           { tier_default: balanced, tier_floor: balanced, tier_ceiling: deep }   # 8 classes [SEC_*] hard-blocking — cas d'école du garde-fou floor
+  spec-compliance-reviewer:    { tier_default: balanced, tier_floor: balanced, tier_ceiling: deep }
+  arch-reviewer:               { tier_default: balanced, tier_floor: balanced, tier_ceiling: deep }
+  adversarial-reviewer:        { tier_default: balanced, tier_floor: balanced, tier_ceiling: deep }
+  # --- Docs ---
+  specbook-writer:             { tier_default: balanced, tier_floor: fast,     tier_ceiling: balanced }  # candidat fast canonique (reformulation bornée)
+  # --- Reverse (10 + 2 proc-reverse) ---
+  reverse-inventory:           { tier_default: balanced, tier_floor: fast,     tier_ceiling: balanced }  # floor fast confirmé 2026-07-24 (délègue au script déterministe)
+  reverse-tech-auditor:        { tier_default: balanced, tier_floor: balanced, tier_ceiling: deep }
+  reverse-tech-analyst:        { tier_default: deep,     tier_floor: balanced, tier_ceiling: deep }   # précédent existant : déjà routé Sonnet/Opus (ADR ladder)
+  reverse-us-writer:           { tier_default: balanced, tier_floor: fast,     tier_ceiling: balanced }  # floor fast confirmé 2026-07-24 (altitude-lift sans lecture code legacy)
+  reverse-feat-composer:       { tier_default: deep,     tier_floor: balanced, tier_ceiling: deep }
+  reverse-completeness-reviewer: { tier_default: balanced, tier_floor: balanced, tier_ceiling: balanced }  # pinné balanced (reviewer checklist bornée)
+  reverse-paradigm-advisor:    { tier_default: balanced, tier_floor: balanced, tier_ceiling: deep }
+  reverse-parity-inspector:    { tier_default: balanced, tier_floor: balanced, tier_ceiling: deep }
+  reverse-clarifier:           { tier_default: balanced, tier_floor: fast,     tier_ceiling: balanced }  # candidat fast déjà identifié §8.1
+  reverse-ui-extractor:        { tier_default: deep,     tier_floor: balanced, tier_ceiling: deep }
+  reverse-sql-analyst:         { tier_default: deep,     tier_floor: balanced, tier_ceiling: deep }
+  reverse-sql-feat-composer:   { tier_default: deep,     tier_floor: balanced, tier_ceiling: deep }   # opt-in SDD_REVERSE_FEAT_LLM=1
+
+# Bilan (post-arbitrage 2026-07-24) : 25 agents — 20 floor=balanced,
+# 5 floor=fast (constitutioner, specbook-writer, reverse-inventory,
+# reverse-us-writer, reverse-clarifier), 0 floor=deep.
+# 18 ceiling=deep, 7 plafonnés balanced (dont elicitor, arbitré 2026-07-24).
+# Plus aucune entrée "a_valider_tech_lead".
