@@ -48,7 +48,7 @@
 
 ## 4. Stack technique retenu
 
-> Cumul des choix `workspace/input/stack/stack.md` au moment du dernier
+> Cumul des choix `workspace/stack/stack.md` au moment du dernier
 > `/arch-init`. Voir ADRs §6 pour le rationale.
 
 | Famille | Stack actif | ADR |
@@ -80,7 +80,7 @@ Voir `.claude/CLAUDE.md §4` — `SFD-N`, `BR-N`, `AC-N`, `FD-N`.
 ## 6. Architecture Decision Records (ADRs)
 
 > Chaque décision technique structurante est tracée dans
-> `workspace/output/.sys/.context/adrs/ADR-{nnn}-{slug}.md`. L'index ci-dessous est
+> `workspace/.sys/.context/adrs/ADR-{nnn}-{slug}.md`. L'index ci-dessous est
 > maintenu par l'agent Arch (Phase C) et par les agents dev-* lors
 > d'un choix non couvert par les ADRs existants.
 

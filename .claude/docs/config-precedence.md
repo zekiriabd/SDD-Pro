@@ -24,9 +24,9 @@ précédence du plus FAIBLE au plus FORT :
 ├─────────────────────────────────────────────────────────────────────┤
 │ #3  ~/.sdd/config.team.yml          (org/team policy, opt-in)       │
 ├─────────────────────────────────────────────────────────────────────┤
-│ #4  workspace/input/stack/stack.md  (## Project Config, ## Auditors)│
+│ #4  workspace/stack/stack.md  (## Project Config, ## Auditors)│
 ├─────────────────────────────────────────────────────────────────────┤
-│ #5  workspace/input/stack/stack.md  (## Active * — selection stacks)│
+│ #5  workspace/stack/stack.md  (## Active * — selection stacks)│
 ├─────────────────────────────────────────────────────────────────────┤
 │ #6  .claude/stacks/{cat}/{id}.libs.json  (libs/versions par stack)  │
 ├─────────────────────────────────────────────────────────────────────┤
@@ -56,8 +56,8 @@ premier hit. Exception : **security hardening** (cf. §3.2 ci-dessous).
 |---|---|:---:|---|
 | `.claude/config.base.yml` | YAML flat | base | versionné SDD_Pro |
 | `~/.sdd/config.team.yml` | YAML flat | team override | équipe (opt-in, %USERPROFILE%/.sdd/) |
-| `workspace/input/stack/stack.md` `## Project Config` | KV inline `Key: value` | project final | Tech Lead projet |
-| `workspace/input/stack/stack.md` `## Auditors` | bloc alias `name: mode/failOn` | project final (depuis v6.10.5) | Tech Lead projet |
+| `workspace/stack/stack.md` `## Project Config` | KV inline `Key: value` | project final | Tech Lead projet |
+| `workspace/stack/stack.md` `## Auditors` | bloc alias `name: mode/failOn` | project final (depuis v6.10.5) | Tech Lead projet |
 
 **Lecture** : `sdd_lib/layered_config.py` → `read_layered_config()`. Merge
 deep, scalaires écrasés, listes remplacées. Bloc `## Auditors` expandu en
@@ -87,7 +87,7 @@ avec `# source: base|team|project` par clé.
 
 ### 2.2 Sélection de stacks (calque #5)
 
-`workspace/input/stack/stack.md` blocs **liste** (pas KV) :
+`workspace/stack/stack.md` blocs **liste** (pas KV) :
 
 | Bloc | Rôle | Multi ? |
 |---|---|:---:|
@@ -174,7 +174,7 @@ Les env vars `SDD_*` sont lues directement par les scripts Python (ex.
 ### 2.7 CLI flags (calque #11)
 
 Override le plus fort, audit-loggué dans
-`workspace/output/.sys/.audit/force-bypass.log` :
+`workspace/.sys/.audit/force-bypass.log` :
 
 | Flag | Commandes | Effet | Audit |
 |---|---|---|:---:|
@@ -313,7 +313,7 @@ Question : V vient quand même d'ailleurs (calque non couvert par dump) ?
 │ ÉTAPE 2 : CLI flag passé ?                                          │
 │                                                                     │
 │  Relire l'invocation : /sdd-full {n} --force --plan …               │
-│  + workspace/output/.sys/.audit/force-bypass.log                    │
+│  + workspace/.sys/.audit/force-bypass.log                    │
 └─────────────────────────────────────────────────────────────────────┘
                               │
                               ↓
@@ -364,7 +364,7 @@ Question : V vient quand même d'ailleurs (calque non couvert par dump) ?
 | `## Active UI Specs` contient un `ui/*.md` ? | `stack.md` calque #5 (requis si frontend web) |
 | AppType détecté = `back-front/web` ? | `python preflight.py --json` |
 | US non frontend-pure ? | check US `Covers:` (si que backend AC, skip silencieux dev-frontend) |
-| Gate API verdict = `FAIL` ? | `workspace/output/qa/feat-{n}/api-tests.json` champ `status` |
+| Gate API verdict = `FAIL` ? | `query_console_db.py api-gate --feat {n}` champ `status` |
 
 ### 5.3 *« Mon `--force` ne marche pas »*
 
@@ -418,10 +418,10 @@ JAMAIS éditer manuellement `build.gradle.kts`/`package.json` — éditer
 | *Quel agent lit quel fichier ?* | `.claude/loader.yml` `{agent}: reads:` |
 | *Quel hook s'exécute sur Bash ?* | `.claude/settings.json` `hooks.PreToolUse.Bash` |
 | *Quelle env var override le team config ?* | `SDD_TEAM_CONFIG` |
-| *Quels flags ont été utilisés ?* | `workspace/output/.sys/.audit/force-bypass.log` |
+| *Quels flags ont été utilisés ?* | `workspace/.sys/.audit/force-bypass.log` |
 | *Quelle phase auditor est enabled ?* | `phase_planner.py --json` |
-| *Quel ADR a décidé X ?* | `workspace/output/.sys/.context/adrs/INDEX.md` ou grep adrs/*.md |
-| *Pourquoi le pipeline n'a pas tourné Y ?* | `workspace/output/.sys/.state/run-*.json` |
+| *Quel ADR a décidé X ?* | `workspace/.sys/.context/adrs/INDEX.md` ou grep adrs/*.md |
+| *Pourquoi le pipeline n'a pas tourné Y ?* | `workspace/.sys/.state/run-*.json` |
 
 ---
 
@@ -434,23 +434,23 @@ JAMAIS éditer manuellement `build.gradle.kts`/`package.json` — éditer
 python -c @"
 from sdd_lib.layered_config import dump_effective_config
 from pathlib import Path
-dump_effective_config(Path('workspace/output/.sys/config-effective.yml'))
+dump_effective_config(Path('workspace/.sys/config-effective.yml'))
 "@
 
 # 2. Phase planner status
-python .claude/python/sdd_scripts/phase_planner.py --feat-number 1 --json > workspace/output/.sys/phase-plan.json
+python .claude/python/sdd_scripts/phase_planner.py --feat-number 1 --json > workspace/.sys/phase-plan.json
 
 # 3. AppType + stacks détectés
-python .claude/python/sdd_scripts/preflight.py --json 2>&1 | Tee-Object workspace/output/.sys/preflight.json
+python .claude/python/sdd_scripts/preflight.py --json 2>&1 | Tee-Object workspace/.sys/preflight.json
 
 # 4. Env vars SDD_*
 Get-ChildItem env: | Where-Object Name -Like 'SDD_*'
 
 # 5. CLI flags du dernier run
-Get-Content workspace/output/.sys/.audit/force-bypass.log -Tail 20
+Get-Content workspace/.sys/.audit/force-bypass.log -Tail 20
 
 # 6. État pipeline
-Get-Content workspace/output/.sys/.state/run-*.json | Select-Object -Last 5
+Get-Content workspace/.sys/.state/run-*.json | Select-Object -Last 5
 ```
 
 Les 6 fichiers résultants donnent une image **complète** de l'état config

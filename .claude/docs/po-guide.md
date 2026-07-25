@@ -8,7 +8,7 @@
 
 ## 1. Pourquoi la FEAT est centrale
 
-`workspace/input/feats/{n}-{Name}.md` est l'**unique** artefact que l'humain
+`workspace/feats/{n}-{Name}.md` est l'**unique** artefact que l'humain
 doit rédiger pour piloter le pipeline. Les User Stories, le code, les tests,
 les ADRs en découlent automatiquement. Si la FEAT est ambiguë, le code
 généré le sera aussi (garbage in → garbage out — pas de magie LLM).
@@ -88,7 +88,7 @@ Réponses courtes — éviter les essais de 3 paragraphes.
 Vérifie :
 - IDs stables présents (`SFD-N`, `BR-N`, `AC-N`)
 - ACs au format Given/When/Then
-- Stacks actifs détectés dans `workspace/input/stack/stack.md`
+- Stacks actifs détectés dans `workspace/stack/stack.md`
 - Mockups HTML matchant les US (si présents)
 - Couverture AC ≥ 80% (chaque AC mappée à ≥ 1 US potentiel)
 
@@ -143,7 +143,7 @@ L'agent `arch` lit cette section pour scaffolder le schéma DB. Pas besoin
 de SQL — l'arch convertit selon le DatabaseType (`postgres` / `sqlite` /
 `sqlserver`) déclaré dans `stack.md`.
 
-### Mockups HTML (`workspace/input/ui/{n}-{m}-{Name}.html`)
+### Mockups HTML (`workspace/ui/{n}-{m}-{Name}.html`)
 Pour les FEATs avec UI, un mockup HTML statique (Tailwind autorisé)
 **accélère la convergence** du frontend généré. Convention :
 - Basename strict : `{n}-{m}-{Name}.html` (matchant la future US)
@@ -194,18 +194,18 @@ Cycle moyen : 15-20 min.
 - [ ] `## Functional Deliverables` liste les artefacts concrets (UI/API)
 - [ ] `## Out of Scope` exclut explicitement les sujets connexes hors périmètre
 - [ ] `/feat-validate {n}` retourne GO (ou WARN consciemment accepté)
-- [ ] Si UI complexe : mockup HTML `workspace/input/ui/{n}-{m}-*.html` présent
+- [ ] Si UI complexe : mockup HTML `workspace/ui/{n}-{m}-*.html` présent
 - [ ] Si FEAT sensible : `/feat-deepen {n}` exécuté + sections enrichies revues
 
 ---
 
 ## 10. Exemples de FEATs validées
 
-Voir le repo bench : `workspace/output/qa/bench/BENCH-GLOBAL-REPORT.md`
+Voir le repo bench : `workspace/.sys/.bench/BENCH-GLOBAL-REPORT.md`
 référence 14 FEATs réelles passées en pipeline `/sdd-full` complet
 (stacks variés : React+.NET, Vue+Spring, Angular+FastAPI, etc.).
 
-Pour chaque combo bench, le diff `workspace/input/feats/{n}-{Name}.md`
+Pour chaque combo bench, le diff `workspace/feats/{n}-{Name}.md`
 montre une FEAT canonique de 80-200 lignes, lisible en < 5 minutes.
 
 ---

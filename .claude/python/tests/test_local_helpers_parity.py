@@ -198,12 +198,35 @@ def test_file_locks_local_stale_recovery(tmp_path: Path) -> None:
 
 
 def test_file_locks_local_corrupted_lock_recovery(tmp_path: Path) -> None:
-    """Corrupted JSON in lock file → overwrite (exit 2)."""
+    """OLD corrupted JSON in lock file → takeover (exit 2).
+
+    Audit 2026-06-11 M3 : le recovery ne s'applique qu'aux locks corrompus
+    ANCIENS (mtime hors fenêtre de grâce). On backdate le mtime pour
+    simuler un crash mid-write passé.
+    """
+    import os
+    import time as _time
     from sdd_reverse.file_locks_local import acquire_lock
 
     lock = tmp_path / ".alloc.lock"
     lock.write_text("{not-json", encoding="utf-8")
+    past = _time.time() - 60
+    os.utime(lock, (past, past))
     assert acquire_lock(lock, "agent-A") == 2
+
+
+def test_file_locks_local_fresh_corrupted_lock_is_held(tmp_path: Path) -> None:
+    """FRESH unparseable lock → HELD (exit 1), jamais volé.
+
+    Audit 2026-06-11 M3 : un lock O_EXCL fraîchement créé est VIDE entre
+    open et write — l'écraser comme "corrompu" produisait 2 détenteurs
+    simultanés (race prouvée par test_acquire_lock_concurrent_o_excl_race).
+    """
+    from sdd_reverse.file_locks_local import acquire_lock
+
+    lock = tmp_path / ".alloc.lock"
+    lock.write_text("", encoding="utf-8")  # mtime = now → fenêtre de grâce
+    assert acquire_lock(lock, "agent-A") == 1
 
 
 def test_file_locks_local_foreign_release_rejected(tmp_path: Path) -> None:

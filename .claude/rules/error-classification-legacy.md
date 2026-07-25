@@ -1,4 +1,16 @@
-# Error Classification — Legacy classes (v6.x heritage, réactivées CI v7.2.0)
+---
+# TOK-C1 (audit 2026-06-12) : chargement paresseux (path-scoped rule). Annexe archivale
+# consommée uniquement par l'ingest CI déterministe (axe-core / Lighthouse). Ne s'injecte
+# qu'au contact des scripts/rapports d'ingest — jamais en pipeline forward ou reverse.
+paths:
+  - "**/ingest_axe.py"
+  - "**/ingest_lighthouse.py"
+  - "**/*axe*.json"
+  - "**/*lighthouse*.json"
+  - "**/.lighthouseci/**"
+---
+
+# Error Classification — Legacy classes (v6.x heritage, réactivées CI 2026-05-24 / v7.0.0)
 
 > **Rôle de ce fichier** (audit mineur #8 v7.0.0-alpha 2026-06-05 — clarification) :
 >
@@ -8,7 +20,7 @@
 >   étaient émis par des agents LLM (`accessibility-auditor`, `performance-auditor`).
 >
 > Ces deux rôles **cohabitent sans contradiction** : le schéma de mapping
-> conservé en archive **est aussi** la SSoT consommée par les ingests CI v7.2.0.
+> conservé en archive **est aussi** la SSoT consommée par les ingests CI (v7.0.0).
 > Si un ingest CI futur a besoin d'un nouveau préfixe, l'ajouter ici (pas dans
 > `error-classification.md` qui couvre seulement les classes émises par les
 > agents/scripts en vie).
@@ -16,7 +28,7 @@
 > Annexe extraite de `error-classification.md` lors de l'audit
 > v7.0.0-alpha (2026-05-20).
 >
-> **MAJ v7.2.0 (R7 — réactivation Option B)** : ces classes sont
+> **MAJ R7 — réactivation Option B (2026-05-24, v7.0.0)** : ces classes sont
 > désormais émises par les **scripts d'ingest CI** déterministes
 > `sdd_scripts/ingest_axe.py` (axe-core → qa_a11y) et
 > `sdd_scripts/ingest_lighthouse.py` (Lighthouse → qa_performance) —
@@ -117,15 +129,15 @@ projet consommateur).
 
 ---
 
-## 3. Migration path — pont d'ingest CI (réalisé v7.2.0)
+## 3. Migration path — pont d'ingest CI (réalisé 2026-05-24, v7.0.0)
 
-Pont câblé v7.2.0 (`R7 Option B`) — scripts déterministes, pas d'agent LLM :
+Pont câblé 2026-05-24 / v7.0.0 (`R7 Option B`) — scripts déterministes, pas d'agent LLM :
 
 | Source CI | Script ingest | Table cible | Classes émises |
 |---|---|---|---|
 | `@axe-core/cli` JSON (`axe-report.json`) | `sdd_scripts/ingest_axe.py` | `qa_a11y` | 10 canoniques `[A11Y_MISSING_ALT]`, `[A11Y_INPUT_NO_LABEL]`, … + fallback `[A11Y_RULE_<RULE_ID>]` |
 | Lighthouse CI (`.lighthouseci/lhr-*.json`) | `sdd_scripts/ingest_lighthouse.py` | `qa_performance` | 7 actives `[PERF_LCP_TOO_HIGH]`, `[PERF_CLS_TOO_HIGH]`, `[PERF_INP_TOO_HIGH]`, `[PERF_TTFB_TOO_HIGH]`, `[PERF_BUNDLE_TOO_LARGE]`, `[PERF_BUNDLE_LARGE]`, `[PERF_RENDER_BLOCKING]` |
-| wrk/k6 SLO API (futur) | (à câbler v7.3+) | `qa_performance` | `[PERF_API_P95_HIGH]`, `[PERF_DB_QUERY_*]`, … |
+| wrk/k6 SLO API (futur) | (à câbler — roadmap) | `qa_performance` | `[PERF_API_P95_HIGH]`, `[PERF_DB_QUERY_*]`, … |
 
 Garanties tenues :
 1. Classes importées depuis ce fichier (source de vérité — pas de
@@ -161,11 +173,11 @@ opérationnelle quotidienne.
 ## 5. Pointers
 
 - `@.claude/rules/error-classification.md §1.9, §1.12` — fichier
-  principal (stubs MAJ v7.2.0 pour pointer vers ingest CI)
+  principal (stubs MAJ v7.0.0 pour pointer vers ingest CI)
 - ADR `governance-major-auditors-trim` (2026-05-19) — retrait initial
   des agents (cf. `docs/adrs/ADR-20260519T120000-governance-major-auditors-trim.md`)
 - `sdd_scripts/ingest_axe.py` + `sdd_scripts/ingest_lighthouse.py`
-  — ingest CI déterministe (v7.2.0)
+  — ingest CI déterministe (v7.0.0)
 - `templates/ci-quality.github-actions.yml.template` — workflow
   GitHub Actions auto-généré par arch quand `CiTemplatesGeneration: true`
 - Tables `qa_a11y` et `qa_performance` dans `console.db` (schéma

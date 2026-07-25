@@ -6,11 +6,11 @@
   "buildSystem": "dotnet",
   "manifest": {
     "files": [
-      "workspace/output/src/{AppName}/{AppName}.csproj",
-      "workspace/output/src/{AppName}/MauiProgram.cs",
-      "workspace/output/src/{AppName}/appsettings.json",
-      "workspace/output/src/{AppName}/Platforms/Android/AndroidManifest.xml",
-      "workspace/output/src/{AppName}/Platforms/iOS/Info.plist"
+      "workspace/src/{AppName}/{AppName}.csproj",
+      "workspace/src/{AppName}/MauiProgram.cs",
+      "workspace/src/{AppName}/appsettings.json",
+      "workspace/src/{AppName}/Platforms/Android/AndroidManifest.xml",
+      "workspace/src/{AppName}/Platforms/iOS/Info.plist"
     ]
   },
   "metadata": {

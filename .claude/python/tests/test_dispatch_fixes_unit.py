@@ -28,7 +28,7 @@ from sdd_scripts import triage_issues as ti  # noqa: E402
 def fake_repo(tmp_path, monkeypatch):
     (tmp_path / ".claude").mkdir()
     # Minimal stack.md so load_project_names() finds AppName/BackendName
-    stack_dir = tmp_path / "workspace" / "input" / "stack"
+    stack_dir = tmp_path / "workspace" / "stack"
     stack_dir.mkdir(parents=True)
     (stack_dir / "stack.md").write_text(
         "## Project Config\n"
@@ -64,17 +64,17 @@ def _seed(repo: Path, table: str, rows: list[dict]) -> None:
 
 def test_classify_path_backend(fake_repo):
     names = ti.load_project_names()
-    assert ti.classify_path("workspace/output/src/ApiSrv/Foo.cs", names) == "backend"
+    assert ti.classify_path("workspace/src/ApiSrv/Foo.cs", names) == "backend"
 
 
 def test_classify_path_frontend(fake_repo):
     names = ti.load_project_names()
-    assert ti.classify_path("workspace/output/src/WebApp/src/Home.tsx", names) == "frontend"
+    assert ti.classify_path("workspace/src/WebApp/src/Home.tsx", names) == "frontend"
 
 
 def test_classify_path_shared(fake_repo):
     names = ti.load_project_names()
-    assert ti.classify_path("workspace/output/src/Shared/Dto.cs", names) == "shared"
+    assert ti.classify_path("workspace/src/Shared/Dto.cs", names) == "shared"
 
 
 def test_classify_path_unknown_outside_src(fake_repo):
@@ -84,26 +84,26 @@ def test_classify_path_unknown_outside_src(fake_repo):
 
 def test_classify_path_unknown_unknown_project(fake_repo):
     names = ti.load_project_names()
-    assert ti.classify_path("workspace/output/src/OtherProj/X.cs", names) == "unknown"
+    assert ti.classify_path("workspace/src/OtherProj/X.cs", names) == "unknown"
 
 
 def test_classify_path_normalizes_backslashes(fake_repo):
     names = ti.load_project_names()
-    assert ti.classify_path(r"workspace\output\src\ApiSrv\Foo.cs", names) == "backend"
+    assert ti.classify_path(r"workspace\src\ApiSrv\Foo.cs", names) == "backend"
 
 
 def test_classify_path_strips_absolute_prefix(fake_repo):
     names = ti.load_project_names()
-    p = "/c/repo/workspace/output/src/ApiSrv/Foo.cs"
+    p = "/c/repo/workspace/src/ApiSrv/Foo.cs"
     assert ti.classify_path(p, names) == "backend"
 
 
 def test_classify_batch_groups_by_owner(fake_repo):
     names = ti.load_project_names()
     issues = [
-        {"file_path": "workspace/output/src/ApiSrv/A.cs"},
-        {"file_path": "workspace/output/src/WebApp/B.tsx"},
-        {"file_path": "workspace/output/src/Shared/C.cs"},
+        {"file_path": "workspace/src/ApiSrv/A.cs"},
+        {"file_path": "workspace/src/WebApp/B.tsx"},
+        {"file_path": "workspace/src/Shared/C.cs"},
         {"file_path": "elsewhere/D.md"},
         {"file_path": ""},
     ]
@@ -175,10 +175,10 @@ def test_build_plan_empty_db_returns_zero(fake_repo):
 def test_build_plan_filters_to_fixable_and_groups_by_owner(fake_repo):
     _seed(fake_repo, "qa_quality", [
         {"feat_n": 1, "severity": "moderate", "issue_class": "",
-         "rule": "hex-hardcoded", "file_path": "workspace/output/src/WebApp/Home.tsx",
+         "rule": "hex-hardcoded", "file_path": "workspace/src/WebApp/Home.tsx",
          "line": 10, "message": "color #fff"},
         {"feat_n": 1, "severity": "info", "issue_class": "",
-         "rule": "commented-code", "file_path": "workspace/output/src/ApiSrv/Foo.cs",
+         "rule": "commented-code", "file_path": "workspace/src/ApiSrv/Foo.cs",
          "line": 20, "message": "dead block"},
     ])
     plan = df.build_plan(1, dry_run=True)
@@ -194,7 +194,7 @@ def test_build_plan_counts_escalated(fake_repo):
     _seed(fake_repo, "qa_security", [
         {"feat_n": 1, "mode": "scan", "severity": "critical",
          "issue_class": "[SEC_SQL_INJECTION]",
-         "file_path": "workspace/output/src/ApiSrv/X.cs",
+         "file_path": "workspace/src/ApiSrv/X.cs",
          "line": 5, "message": "raw sql"},
     ])
     plan = df.build_plan(1, dry_run=True)
@@ -229,7 +229,7 @@ def test_build_plan_skips_findings_without_file_path(fake_repo):
 def test_build_plan_writes_fixlist_files_when_not_dry_run(fake_repo):
     _seed(fake_repo, "qa_a11y", [
         {"feat_n": 1, "severity": "critical", "issue_class": "[A11Y_MISSING_ALT]",
-         "file_path": "workspace/output/src/WebApp/Img.tsx", "line": 3,
+         "file_path": "workspace/src/WebApp/Img.tsx", "line": 3,
          "message": "no alt"},
     ])
     plan = df.build_plan(1, dry_run=False)
@@ -249,7 +249,7 @@ def test_build_plan_replaces_stale_fixlists(fake_repo):
     stale.write_text("stale content", encoding="utf-8")
     _seed(fake_repo, "qa_a11y", [
         {"feat_n": 5, "severity": "critical", "issue_class": "[A11Y_MISSING_ALT]",
-         "file_path": "workspace/output/src/WebApp/X.tsx", "line": 1, "message": "x"},
+         "file_path": "workspace/src/WebApp/X.tsx", "line": 1, "message": "x"},
     ])
     df.build_plan(5, dry_run=False)
     # Stale file replaced by the new payload
@@ -278,7 +278,7 @@ def test_main_with_fixable_returns_0(monkeypatch, fake_repo, capsys):
     _seed(fake_repo, "qa_quality", [
         {"feat_n": 1, "severity": "moderate", "issue_class": "",
          "rule": "hex-hardcoded",
-         "file_path": "workspace/output/src/WebApp/Home.tsx",
+         "file_path": "workspace/src/WebApp/Home.tsx",
          "line": 10, "message": "#fff"},
     ])
     rc = _run(monkeypatch, ["--feat-number", "1"])
@@ -290,7 +290,7 @@ def test_main_with_fixable_returns_0(monkeypatch, fake_repo, capsys):
 def test_main_json_output(monkeypatch, fake_repo, capsys):
     _seed(fake_repo, "qa_a11y", [
         {"feat_n": 2, "severity": "critical", "issue_class": "[A11Y_MISSING_ALT]",
-         "file_path": "workspace/output/src/WebApp/img.tsx",
+         "file_path": "workspace/src/WebApp/img.tsx",
          "line": 1, "message": "alt"},
     ])
     rc = _run(monkeypatch, ["--feat-number", "2", "--json"])
@@ -303,7 +303,7 @@ def test_main_json_output(monkeypatch, fake_repo, capsys):
 def test_main_dry_run_does_not_write_fixlist(monkeypatch, fake_repo, capsys):
     _seed(fake_repo, "qa_a11y", [
         {"feat_n": 3, "severity": "critical", "issue_class": "[A11Y_MISSING_ALT]",
-         "file_path": "workspace/output/src/WebApp/img.tsx",
+         "file_path": "workspace/src/WebApp/img.tsx",
          "line": 1, "message": "alt"},
     ])
     rc = _run(monkeypatch, ["--feat-number", "3", "--dry-run"])

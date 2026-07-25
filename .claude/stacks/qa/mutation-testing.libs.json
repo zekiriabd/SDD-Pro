@@ -11,10 +11,10 @@
   },
   "manifest": {
     "files": [
-      "workspace/output/src/{BackendName}.Tests/{BackendName}.Tests.csproj",
-      "workspace/output/src/{AppName}/package.json",
-      "workspace/output/src/{BackendName}/build.gradle.kts",
-      "workspace/output/src/{BackendName}/pyproject.toml"
+      "workspace/src/{BackendName}.Tests/{BackendName}.Tests.csproj",
+      "workspace/src/{AppName}/package.json",
+      "workspace/src/{BackendName}/build.gradle.kts",
+      "workspace/src/{BackendName}/pyproject.toml"
     ]
   },
   "versions": {

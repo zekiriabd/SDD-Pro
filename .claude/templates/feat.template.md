@@ -51,7 +51,7 @@ liste avec un nouveau N).>
 
 ## Required Stack (v7.0.0-alpha Sprint 1.3 — anti-stack-drift)
 <Déclare les stacks attendus par cette FEAT. /feat-validate vérifie que
-`workspace/input/stack/stack.md` a activé exactement ces stacks (les commentés
+`workspace/stack/stack.md` a activé exactement ces stacks (les commentés
 sont rejetés). Évite que l'opérateur lance /sdd-full {n} avec un stack.md
 configuré pour une autre FEAT (cas typique : bench multi-stack).
 

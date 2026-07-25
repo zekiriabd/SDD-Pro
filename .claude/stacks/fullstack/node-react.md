@@ -1,7 +1,7 @@
 # Tech FEAT: node-react (fullstack)
 
 Status: POC-only
-Validation: 🟡 POC-only — **utilisé exclusivement par workspace/console SDD interne** (v0.4.0 — Fastify 5 + React 18 CDN + Babel-standalone, 2026-05-16). **NON destiné à un usage production externe** (décision CTO 2026-06-05 audit P3) : pas de bundler, pas de TS natif, pas de pipeline build/lint/Playwright standard. Pour Node/React prod commercial, utiliser combo `backend/node-express` + `frontend/react` (back-front séparés avec Vite + TS strict).
+Validation: 🟡 POC-only — **utilisé exclusivement par workspace/console SDD interne** (Fastify 5 + React 18 — console migrée vers **esbuild bundler** (remplace Babel-CDN, v0.4.1) ; le présent stack documente encore le pattern zero-build Babel-standalone v0.4.0 historique). **NON destiné à un usage production externe** (décision CTO 2026-06-05 audit P3) : pas de TS natif, pas de pipeline build/lint/Playwright standard. Pour Node/React prod commercial, utiliser combo `backend/node-express` + `frontend/react` (back-front séparés avec Vite + TS strict).
 Support: ⚠ Hors périmètre produit (audit C3/m2/m9, 2026-06-06) — usage interne console SDD uniquement, jamais commercialisé. Toute génération `/sdd-full` ciblant ce stack est bloquée par `preflight_stack_combo` (sauf `SDD_ALLOW_UNTESTED_COMBO=1`).
 Tech FEAT ID: tech-node-react
 Scope: **fullstack monolithe** — backend Node.js + frontend React servis depuis le MEME projet (zero-build, JSX transpilé in-browser via Babel Standalone). Pas de séparation `{BackendName}` / `{AppName}` / `{LibName}`. Modèle SSR-adjacent (le serveur sert l'HTML initial + l'API ; React hydrate côté client).
@@ -41,7 +41,7 @@ Node.js (Fastify)
 ```
 
 **Différence vs combo `node-express` × `react`** :
-- Ici **un seul projet** (`workspace/output/src/{AppName}/`), pas de monorepo, pas de `{BackendName}` ni `{LibName}`
+- Ici **un seul projet** (`workspace/src/{AppName}/`), pas de monorepo, pas de `{BackendName}` ni `{LibName}`
 - **Pas de CORS** (même origine)
 - **Pas de contract drift** front↔back (même codebase, types partagés via JSDoc ou simple convention)
 - **Pas de bundler** côté client (`vite`/`webpack` exclus) — Babel-standalone fait tout au runtime
@@ -66,36 +66,36 @@ Node.js (Fastify)
 
 ## 1.3 Mapping couche → répertoire
 
-Un seul projet sous `workspace/output/src/{AppName}/`. **Convention single-project — `{BackendName}` et `{LibName}` ne s'appliquent pas à ce stack**. L'agent `arch` lève une ERROR `[STACK_MALFORMED]` si `## Project Config` les déclare avec valeur ≠ `null`.
+Un seul projet sous `workspace/src/{AppName}/`. **Convention single-project — `{BackendName}` et `{LibName}` ne s'appliquent pas à ce stack**. L'agent `arch` lève une ERROR `[STACK_MALFORMED]` si `## Project Config` les déclare avec valeur ≠ `null`.
 
 **Code serveur** :
 
-- Entry server → `workspace/output/src/{AppName}/server.js`
-- Routes (API) → `workspace/output/src/{AppName}/routes/` (`{domain}.routes.js`)
-- Services → `workspace/output/src/{AppName}/services/`
-- Repositories → `workspace/output/src/{AppName}/repositories/`
-- Schemas (Zod) → `workspace/output/src/{AppName}/schemas/`
-- Lib (helpers serveur) → `workspace/output/src/{AppName}/lib/` (`atomic-write.js`, `markdown-filter.js`, `sse-broadcaster.js`)
-- Middleware → `workspace/output/src/{AppName}/middleware/` (auth, error, logger)
-- Config → `workspace/output/src/{AppName}/config/default.json` (DB, JWT, SMTP)
-- Persistance fichiers (file-based store) → `workspace/output/src/{AppName}/data/` (gitignored)
+- Entry server → `workspace/src/{AppName}/server.js`
+- Routes (API) → `workspace/src/{AppName}/routes/` (`{domain}.routes.js`)
+- Services → `workspace/src/{AppName}/services/`
+- Repositories → `workspace/src/{AppName}/repositories/`
+- Schemas (Zod) → `workspace/src/{AppName}/schemas/`
+- Lib (helpers serveur) → `workspace/src/{AppName}/lib/` (`atomic-write.js`, `markdown-filter.js`, `sse-broadcaster.js`)
+- Middleware → `workspace/src/{AppName}/middleware/` (auth, error, logger)
+- Config → `workspace/src/{AppName}/config/default.json` (DB, JWT, SMTP)
+- Persistance fichiers (file-based store) → `workspace/src/{AppName}/data/` (gitignored)
 
 **Code client (servi par `@fastify/static`)** :
 
-- HTML entry → `workspace/output/src/{AppName}/public/index.html`
-- Bootstrap React → `workspace/output/src/{AppName}/public/app.jsx`
-- Pages → `workspace/output/src/{AppName}/public/pages/` (un fichier `.jsx` par route, exposé en global ou imports `<script type="module">`)
-- Components → `workspace/output/src/{AppName}/public/components/`
-- Styles → `workspace/output/src/{AppName}/public/styles.css`
-- Data loader (vanilla JS) → `workspace/output/src/{AppName}/public/data-loader.js`
-- Assets statiques → `workspace/output/src/{AppName}/public/assets/`
+- HTML entry → `workspace/src/{AppName}/public/index.html`
+- Bootstrap React → `workspace/src/{AppName}/public/app.jsx`
+- Pages → `workspace/src/{AppName}/public/pages/` (un fichier `.jsx` par route, exposé en global ou imports `<script type="module">`)
+- Components → `workspace/src/{AppName}/public/components/`
+- Styles → `workspace/src/{AppName}/public/styles.css`
+- Data loader (vanilla JS) → `workspace/src/{AppName}/public/data-loader.js`
+- Assets statiques → `workspace/src/{AppName}/public/assets/`
 
 **Manifestes** :
 
-- Project file → `workspace/output/src/{AppName}/package.json`
-- ESLint → `workspace/output/src/{AppName}/eslint.config.js`
-- Prettier → `workspace/output/src/{AppName}/.prettierrc`
-- (optionnel) Prisma schema → `workspace/output/src/{AppName}/prisma/schema.prisma`
+- Project file → `workspace/src/{AppName}/package.json`
+- ESLint → `workspace/src/{AppName}/eslint.config.js`
+- Prettier → `workspace/src/{AppName}/.prettierrc`
+- (optionnel) Prisma schema → `workspace/src/{AppName}/prisma/schema.prisma`
 
 ---
 
@@ -146,7 +146,7 @@ Patterns reconnus comme persistants (déclenche `DB_REQUIRED` dans le pipeline s
 Tout projet généré sur ce stack DOIT exposer Swagger UI sur `/api-docs` et la spec JSON sur `/api-docs.json`.
 
 ### Fichiers obligatoires
-- `workspace/output/src/{AppName}/lib/swagger-config.js` — exporte `swaggerSpec` (OpenAPI 3.0.3)
+- `workspace/src/{AppName}/lib/swagger-config.js` — exporte `swaggerSpec` (OpenAPI 3.0.3)
 - `info.title` = `{AppName} API`
 - `components.securitySchemes.bearerAuth` = `{ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }` (si auth-local active)
 - `paths` enrichis à chaque route ajoutée (mode `augment`, `preserves: [swaggerSpec]`, `adds: [path:/api/...]`)
@@ -190,18 +190,18 @@ Mount **AVANT** `@fastify/static` pour que `/api-docs` ne soit pas masqué par `
 
 ## 2.2 Outils
 
-- **Project file** : `workspace/output/src/{AppName}/package.json`
-- **Build** : `(cd workspace/output/src/{AppName} && npm install)` — pas de bundle step, seulement install des deps serveur
-- **Dev** : `(cd workspace/output/src/{AppName} && node --watch server.js)`
-- **Start** : `(cd workspace/output/src/{AppName} && node server.js)`
+- **Project file** : `workspace/src/{AppName}/package.json`
+- **Build** : `(cd workspace/src/{AppName} && npm install)` — pas de bundle step, seulement install des deps serveur
+- **Dev** : `(cd workspace/src/{AppName} && node --watch server.js)`
+- **Start** : `(cd workspace/src/{AppName} && node server.js)`
 - **Smoke Command** :
 
 ```bash
-(cd workspace/output/src/{AppName} && npm install --silent)
-test -f workspace/output/src/{AppName}/server.js
-test -f workspace/output/src/{AppName}/public/index.html
-test -f workspace/output/src/{AppName}/public/app.jsx
-node --check workspace/output/src/{AppName}/server.js
+(cd workspace/src/{AppName} && npm install --silent)
+test -f workspace/src/{AppName}/server.js
+test -f workspace/src/{AppName}/public/index.html
+test -f workspace/src/{AppName}/public/app.jsx
+node --check workspace/src/{AppName}/server.js
 ```
 
 - **Smoke Timeout** : 60s
@@ -215,11 +215,11 @@ node --check workspace/output/src/{AppName}/server.js
 
 ```bash
 # Garde-fou idempotent
-if [ ! -f "workspace/output/src/{AppName}/package.json" ]; then
+if [ ! -f "workspace/src/{AppName}/package.json" ]; then
 
 # STEP 1 — Project init
-mkdir -p workspace/output/src/{AppName}/{routes,services,repositories,schemas,lib,middleware,config,data,public/{pages,components,assets}}
-cd workspace/output/src/{AppName}
+mkdir -p workspace/src/{AppName}/{routes,services,repositories,schemas,lib,middleware,config,data,public/{pages,components,assets}}
+cd workspace/src/{AppName}
 npm init -y
 
 # STEP 2 — package.json patch ESM + scripts + engines
@@ -512,7 +512,7 @@ Quand `DatabaseType ≠ none`, l'agent `arch` **force l'activation de la capabil
 Pattern legacy de la console SDD_Pro. Adapté aux outils internes / cockpits / POC < 10k lignes de données.
 
 ```
-workspace/output/src/{AppName}/
+workspace/src/{AppName}/
 ├── data/
 │   ├── status.json        ← état applicatif principal
 │   ├── users.json         ← (si auth-local)
@@ -535,7 +535,7 @@ Quand `DatabaseType ≠ none`, l'agent `arch` Phase B :
 3. **Introspecte** la base existante via `npx prisma db pull` (génère le bloc `model` pour chaque table)
 4. **Génère** le client TypeScript-flavored via `npx prisma generate` (sortie `node_modules/.prisma/client/`)
 5. **Écrit** `lib/db.js` — singleton Prisma client (cf. §6.2.2)
-6. **Persiste** le mapping `schema.json` dans `workspace/output/db/` pour consommation par `dev-backend` (mêmes invariants que les autres stacks)
+6. **Persiste** le mapping `schema.json` dans `workspace/db/` pour consommation par `dev-backend` (mêmes invariants que les autres stacks)
 
 #### 6.2.1 Variables d'environnement
 
@@ -696,7 +696,7 @@ Ce stack est optimisé pour :
 À l'init du projet (Phase A) :
 
 1. **Détecter** que `Active Tech Specs` pointe sur `fullstack/node-react.md` — si OUI, **ignorer** `BackendName` et `LibName` de `## Project Config` (lever WARNING `[STACK_MALFORMED]` non bloquant si déclarés)
-2. **Créer** UNE structure `workspace/output/src/{AppName}/` avec layout §1.3
+2. **Créer** UNE structure `workspace/src/{AppName}/` avec layout §1.3
 3. **Installer** §2.4.a CORE via §2.2.1
 4. **Composer** `config/default.json` depuis `## Active Database` + `## Active Auth Specs` + `## Active SMTP Server` (mêmes clés que `node-express.md §8.2`)
 5. **Pas de `Active UI Specs`** attendu — l'UI est ad-hoc CSS dans `public/styles.css`. Si `shadcn` ou `vuetify` est déclaré → WARNING (le stack ne les supporte pas avec Babel-standalone)
@@ -711,7 +711,7 @@ Phase B (DB scaffolding) :
   3. `npx prisma db pull` pour introspecter la base existante
   4. `npx prisma generate` pour produire le client
   5. Crée `lib/db.js` (singleton client, cf. §6.2.2) si absent — sinon préservé (idempotent)
-  6. Persiste `workspace/output/db/schema.json` (mêmes invariants que les autres stacks) à partir du résultat de `prisma db pull`
+  6. Persiste `workspace/db/schema.json` (mêmes invariants que les autres stacks) à partir du résultat de `prisma db pull`
 - Si `DatabaseType ≠ none` mais introspection échoue (DB inaccessible) → STOP + ERROR `[NETWORK]` ou `[AUTH]` selon stderr. **Pas de fallback file-based silencieux** : le contrat utilisateur (DB déclarée = DB utilisée) est tenu strictement.
 
 Phase C (ADRs) : créer `ADR-{ts}-stack-fullstack-node-react.md` documentant le choix monolithe + zero-build.
@@ -729,16 +729,16 @@ Phase C (ADRs) : créer `ADR-{ts}-stack-fullstack-node-react.md` documentant le 
 
 | Path | Owner |
 |---|---|
-| `workspace/output/src/{AppName}/server.js` | `dev-backend` |
-| `workspace/output/src/{AppName}/routes/**` | `dev-backend` |
-| `workspace/output/src/{AppName}/services/**` | `dev-backend` |
-| `workspace/output/src/{AppName}/repositories/**` | `dev-backend` |
-| `workspace/output/src/{AppName}/schemas/**` | `dev-backend` |
-| `workspace/output/src/{AppName}/lib/**` | `dev-backend` |
-| `workspace/output/src/{AppName}/middleware/**` | `dev-backend` |
-| `workspace/output/src/{AppName}/config/**` | `arch` (create) + `dev-backend` (lecture seule) |
-| `workspace/output/src/{AppName}/public/**` | `dev-frontend` |
-| `workspace/output/src/{AppName}/package.json` | `arch` (create) + `dev-backend` (augment deps) |
+| `workspace/src/{AppName}/server.js` | `dev-backend` |
+| `workspace/src/{AppName}/routes/**` | `dev-backend` |
+| `workspace/src/{AppName}/services/**` | `dev-backend` |
+| `workspace/src/{AppName}/repositories/**` | `dev-backend` |
+| `workspace/src/{AppName}/schemas/**` | `dev-backend` |
+| `workspace/src/{AppName}/lib/**` | `dev-backend` |
+| `workspace/src/{AppName}/middleware/**` | `dev-backend` |
+| `workspace/src/{AppName}/config/**` | `arch` (create) + `dev-backend` (lecture seule) |
+| `workspace/src/{AppName}/public/**` | `dev-frontend` |
+| `workspace/src/{AppName}/package.json` | `arch` (create) + `dev-backend` (augment deps) |
 
 **Anti-pattern** : `dev-frontend` ne doit JAMAIS écrire sous un autre dossier que `public/`. `dev-backend` ne doit JAMAIS écrire dans `public/`.
 
@@ -747,7 +747,7 @@ Phase C (ADRs) : créer `ADR-{ts}-stack-fullstack-node-react.md` documentant le 
 ## 12. Smoke test attendu (post-init arch)
 
 ```bash
-cd workspace/output/src/{AppName}
+cd workspace/src/{AppName}
 npm install --silent
 node --check server.js                     # syntaxe OK
 test -f public/index.html                  # bootstrap HTML

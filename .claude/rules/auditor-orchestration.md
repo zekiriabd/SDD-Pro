@@ -1,3 +1,11 @@
+---
+# TOK-C1 (audit 2026-06-12) : chargement paresseux (path-scoped rule). Lue par dev-run/sdd-full
+# au STEP 6.4 (Read explicite) ; auto-injection au contact des rapports de validation/qa.
+paths:
+  - "workspace/.sys/.validation/**"
+  - "workspace/db/**"
+---
+
 # Règle — Auditor Orchestration (Two-stage gate, v7.0.1)
 
 > **v7.0.1 audit REFACTOR-4 hoist 2026-06-08** : substance opérationnelle extraite
@@ -53,7 +61,7 @@ Stage B (parallèle, 3 max) :
 # RE-READ phase plan depuis disque (shell var $PHASE_PLAN STEP 5.5 ne survit
 # pas aux tool-call boundaries — chaque Bash = subshell indépendant).
 import json, pathlib
-plan_path = pathlib.Path(f"workspace/output/.sys/.state/phase-plan-{n}.json")
+plan_path = pathlib.Path(f"workspace/.sys/.state/phase-plan-{n}.json")
 if not plan_path.is_file():
     STOP + ERROR("[PHASE_PLAN_INIT_FAILED] state file missing",
                  f"FIX: re-run STEP 5.5 OR phase_planner.py --feat {n}")
@@ -92,10 +100,15 @@ Lire son verdict :
 
 | Verdict path | Champ |
 |---|---|
-| `workspace/output/.sys/.validation/{n}-spec-compliance.json` | `summary.verdict` |
+| `workspace/.sys/.validation/{n}-spec-compliance.json` | `summary.verdict` |
 
 Fichier absent → `🔴 RED [AUDITOR_RUNTIME_ERROR]` (gate stricte, jamais
 de fallback silencieux).
+
+> **Dépendance load-bearing (FWD-C1 fix, audit 2026-06-12)** : `spec-compliance-reviewer`
+> STEP 11 ingère avec `--keep-json` exprès, sinon le `.json` est supprimé
+> avant cette lecture (faux 🔴 RED). Même contrat que `/feat-validate`
+> STEP 4.5.3 qui exige ce fichier. Donnée aussi en DB (`qa_spec_compliance`).
 
 ### 3.1 Décision gate
 
@@ -111,7 +124,7 @@ de fallback silencieux).
 🔴 /dev-run {n} — spec-compliance gate RED ({N_red} ACs non vérifiées)
 
 Verdict spec-compliance : 🔴 RED ({V}/{T} ACs verified, {NV} not-verified)
-Rapport : workspace/output/.sys/.validation/{n}-spec-compliance.md
+Rapport : workspace/.sys/.validation/{n}-spec-compliance.md
 
 ⊘ code-reviewer / security-reviewer / arch-reviewer : skipped (gate failed)
    Rationale : reviewer le code et son architecture serait gaspilleur tant
@@ -164,10 +177,18 @@ disjoints (cf. `ownership.md §1`).
 | security-reviewer | `{n}-security-scan.json` | `summary.verdict` |
 | arch-reviewer | `{n}-arch-review.json` | `summary.verdict` |
 
-Tous sous `workspace/output/.sys/.validation/`. Fichier absent (agent STOP
+Tous sous `workspace/.sys/.validation/`. Fichier absent (agent STOP
 runtime) → `🔴 RED [AUDITOR_RUNTIME_ERROR]`. **Exception arch-reviewer** :
 échec runtime → WARN seulement (jamais hard-blocking par design,
 `ArchReviewFailOn: serious` défaut).
+
+> **Dépendance load-bearing (FWD-C1 fix, audit 2026-06-12)** : ces `.json`
+> ne sont lisibles ici **que parce que** les agents auditors ingèrent avec
+> `--keep-json` (cf. `agents/{code,security,arch}-reviewer.md` STEP ingest).
+> `ingest_agent_report` supprime le `.json` par défaut — si un mainteneur
+> retire `--keep-json`, l'agent efface son verdict avant que ce STEP ne le
+> lise → faux `🔴 RED [AUDITOR_RUNTIME_ERROR]` systématique. La donnée reste
+> aussi dans `console.db` (`qa_code_review` / `qa_security`) pour `/sdd-review`.
 
 ### 4.3 Verdict consolidé (spec + batch)
 
@@ -191,7 +212,7 @@ Verdicts :
   - security-scan    : {🟢|🟡|🔴}
   - arch-reviewer    : {🟢|🟡|⚪ skipped}
 
-Rapports : workspace/output/.sys/.validation/{n}-*.md
+Rapports : workspace/.sys/.validation/{n}-*.md
 
 Débloquer :
   1. Lire rapports 🔴 (issues critical/serious + suggestions FIX)
@@ -247,7 +268,7 @@ python .claude/python/sdd_scripts/sdd_state.py set-phase \
 
 Bypass via flag CLI `--legacy-auditor-parallel` ou Project Config
 `AuditorBatchMode: legacy-parallel`. Audit-loggué dans
-`workspace/output/.sys/.audit/legacy-auditor-parallel.log`.
+`workspace/.sys/.audit/legacy-auditor-parallel.log`.
 
 En mode legacy-parallel :
 - Stage A skip (pas de gate spec-compliance pré-batch)
@@ -264,7 +285,7 @@ Distinct de `--unsequenced` (qui adresse la gate API back/front, pas auditor).
   Substance opérationnelle ICI, pas dans dev-run.md (cf. hoist v7.0.1
   audit REFACTOR-4 2026-06-08).
 - **Ownership des findings entre reviewers** :
-  `@.claude/rules/auditor-coordination.md` (matrice SSoT, v7.0.2 — cette
+  `@.claude/rules/auditor-coordination.md` (matrice SSoT, v7.0.1-dev — cette
   règle-ci séquence les stages, la coordination délimite QUI émet QUOI).
 - Toute évolution du two-stage gate doit être faite ici d'abord, puis
   vérifiée dans `dev-run.md` (qui ne contient plus que le rationale

@@ -33,22 +33,22 @@ Pour `ArchiPattern: microservice` → voir `archi/microservice.md` (Polly + Open
 
 | Couche canonique (archi/mvc.md §3) | Path .NET Minimal API |
 |---|---|
-| Endpoint | `workspace/output/src/{BackendName}/Endpoints/` (static methods, `MapGroup`) |
-| Service (interface) | `workspace/output/src/{BackendName}/Services/Interfaces/` |
-| Service (implementation) | `workspace/output/src/{BackendName}/Services/` |
-| Mapper | `workspace/output/src/{BackendName}/Mappers/` (AutoMapper `Profile`) |
-| Entity | `workspace/output/src/{BackendName}/Entities/` (`@Entity`-like — EF Core scaffolde) |
-| DbContext | `workspace/output/src/{BackendName}/Entities/DBcontext/` |
-| Input DTO | `workspace/output/src/{LibName}/Inputs/` |
-| Output DTO | `workspace/output/src/{LibName}/Outputs/` |
-| Model DTO | `workspace/output/src/{LibName}/Models/` |
-| Validators FluentValidation | `workspace/output/src/{BackendName}/Validators/` |
-| Middleware | `workspace/output/src/{BackendName}/Middleware/` |
-| App entry | `workspace/output/src/{BackendName}/Program.cs` |
-| Ressources multilingue | `workspace/output/src/{BackendName}/Resources/` (`.resx`) |
-| Project (API) | `workspace/output/src/{BackendName}/{BackendName}.csproj` |
-| Project (Lib partagee) | `workspace/output/src/{LibName}/{LibName}.csproj` |
-| Solution | `workspace/output/src/{AppName}.sln` |
+| Endpoint | `workspace/src/{BackendName}/Endpoints/` (static methods, `MapGroup`) |
+| Service (interface) | `workspace/src/{BackendName}/Services/Interfaces/` |
+| Service (implementation) | `workspace/src/{BackendName}/Services/` |
+| Mapper | `workspace/src/{BackendName}/Mappers/` (AutoMapper `Profile`) |
+| Entity | `workspace/src/{BackendName}/Entities/` (`@Entity`-like — EF Core scaffolde) |
+| DbContext | `workspace/src/{BackendName}/Entities/DBcontext/` |
+| Input DTO | `workspace/src/{LibName}/Inputs/` |
+| Output DTO | `workspace/src/{LibName}/Outputs/` |
+| Model DTO | `workspace/src/{LibName}/Models/` |
+| Validators FluentValidation | `workspace/src/{BackendName}/Validators/` |
+| Middleware | `workspace/src/{BackendName}/Middleware/` |
+| App entry | `workspace/src/{BackendName}/Program.cs` |
+| Ressources multilingue | `workspace/src/{BackendName}/Resources/` (`.resx`) |
+| Project (API) | `workspace/src/{BackendName}/{BackendName}.csproj` |
+| Project (Lib partagee) | `workspace/src/{LibName}/{LibName}.csproj` |
+| Solution | `workspace/src/{AppName}.sln` |
 
 ### 1.4 Override principes (.NET-specific)
 
@@ -74,9 +74,9 @@ Herites de `archi/mvc.md §4`. **Ajouts** .NET :
 - **Namespace racine** : `{BackendNamespace}`
 
 ### 2.2 Outils
-- **Project file** : `workspace/output/src/{BackendName}/{BackendName}.csproj`
-- **Build** : `dotnet build workspace/output/src/{BackendName}/{BackendName}.csproj --nologo` (project-scoped, not solution-wide; allows parallel builds across stacks)
-- **Smoke Command** : `dotnet run --project workspace/output/src/{BackendName}/{BackendName}.csproj --no-build --urls http://localhost:5099 & APP_PID=$!; sleep 4; curl -sf http://localhost:5099/api/config/auth -o /dev/null; RC=$?; kill $APP_PID 2>/dev/null; wait $APP_PID 2>/dev/null; exit $RC`
+- **Project file** : `workspace/src/{BackendName}/{BackendName}.csproj`
+- **Build** : `dotnet build workspace/src/{BackendName}/{BackendName}.csproj --nologo` (project-scoped, not solution-wide; allows parallel builds across stacks)
+- **Smoke Command** : `dotnet run --project workspace/src/{BackendName}/{BackendName}.csproj --no-build --urls http://localhost:5099 & APP_PID=$!; sleep 4; curl -sf http://localhost:5099/api/config/auth -o /dev/null; RC=$?; kill $APP_PID 2>/dev/null; wait $APP_PID 2>/dev/null; exit $RC`
 - **Smoke Timeout** : 60s
 - **Preserves identifier syntax** : `\b<id>\b` (mot entier, sensible à la casse)
 - **Lint / Format** : `dotnet format`
@@ -94,87 +94,87 @@ Herites de `archi/mvc.md §4`. **Ajouts** .NET :
 # (dotnet add reference/package, mkdir -p, restore, build) sont idempotents.
 
 # 1a — Creer {BackendName} (webapi)
-if [ ! -f "workspace/output/src/{BackendName}/{BackendName}.csproj" ]; then
-dotnet new webapi -n {BackendName} -o workspace/output/src/{BackendName} --framework net10.0 --no-restore --force
+if [ ! -f "workspace/src/{BackendName}/{BackendName}.csproj" ]; then
+dotnet new webapi -n {BackendName} -o workspace/src/{BackendName} --framework net10.0 --no-restore --force
 
 # 2 — Supprimer le boilerplate webapi (sous le meme guard que la creation)
-rm -f "workspace/output/src/{BackendName}/Controllers/WeatherForecastController.cs"
-rm -f "workspace/output/src/{BackendName}/WeatherForecast.cs"
+rm -f "workspace/src/{BackendName}/Controllers/WeatherForecastController.cs"
+rm -f "workspace/src/{BackendName}/WeatherForecast.cs"
 fi  # fin garde {BackendName}
 
 # 1b — Creer {LibName} (classlib)
-if [ ! -f "workspace/output/src/{LibName}/{LibName}.csproj" ]; then
-dotnet new classlib -n {LibName} -o workspace/output/src/{LibName} --framework net10.0 --no-restore --force
+if [ ! -f "workspace/src/{LibName}/{LibName}.csproj" ]; then
+dotnet new classlib -n {LibName} -o workspace/src/{LibName} --framework net10.0 --no-restore --force
 
 # 3 — Supprimer le boilerplate classlib (sous le meme guard que la creation)
-rm -f "workspace/output/src/{LibName}/Class1.cs"
+rm -f "workspace/src/{LibName}/Class1.cs"
 fi  # fin garde {LibName}
 
 # 4 — Reference {LibName} depuis {BackendName}
-dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj reference workspace/output/src/{LibName}/{LibName}.csproj
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj reference workspace/src/{LibName}/{LibName}.csproj
 ```
 
 <!-- CORE_PACKAGES_START -->
 ```bash
 # Auto-genere depuis dotnet-minimalapi.libs.json -- ne pas editer (utiliser sync_stack_md.py).
-dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package Microsoft.EntityFrameworkCore --version 9.0.4
-dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package Microsoft.EntityFrameworkCore.Design --version 9.0.4
-dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package Microsoft.EntityFrameworkCore.Tools --version 9.0.4
-dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package Microsoft.AspNetCore.OpenApi --version 9.0.4
-dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package AutoMapper --version 16.1.1
-dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package Serilog.AspNetCore --version 9.0.0
-dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package Serilog.Sinks.Console --version 6.1.1
-dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package Swashbuckle.AspNetCore --version 9.0.4
-dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package Swashbuckle.AspNetCore.Annotations --version 9.0.4
-dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package Asp.Versioning.Http --version 8.1.1
-dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package Asp.Versioning.Mvc.ApiExplorer --version 8.1.1
-dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package Microsoft.OpenApi --version 2.4.1
-dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package Microsoft.Identity.Web --version 4.9.0
-dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package FluentValidation --version 11.11.0
-dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package FluentValidation.AspNetCore --version 11.3.1
-dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package FluentValidation.DependencyInjectionExtensions --version 11.11.0
-dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package Polly --version 8.5.1
-dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package Microsoft.Extensions.Http.Resilience --version 9.0.0
-dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package Microsoft.Extensions.Caching.Memory --version 9.0.0
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj package Microsoft.EntityFrameworkCore --version 9.0.4
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj package Microsoft.EntityFrameworkCore.Design --version 9.0.4
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj package Microsoft.EntityFrameworkCore.Tools --version 9.0.4
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj package Microsoft.AspNetCore.OpenApi --version 9.0.4
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj package AutoMapper --version 16.1.1
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj package Serilog.AspNetCore --version 9.0.0
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj package Serilog.Sinks.Console --version 6.1.1
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj package Swashbuckle.AspNetCore --version 9.0.4
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj package Swashbuckle.AspNetCore.Annotations --version 9.0.4
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj package Asp.Versioning.Http --version 8.1.1
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj package Asp.Versioning.Mvc.ApiExplorer --version 8.1.1
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj package Microsoft.OpenApi --version 2.4.1
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj package Microsoft.Identity.Web --version 4.9.0
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj package FluentValidation --version 11.11.0
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj package FluentValidation.AspNetCore --version 11.3.1
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj package FluentValidation.DependencyInjectionExtensions --version 11.11.0
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj package Polly --version 8.5.1
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj package Microsoft.Extensions.Http.Resilience --version 9.0.0
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj package Microsoft.Extensions.Caching.Memory --version 9.0.0
 ```
 <!-- CORE_PACKAGES_END -->
 
 ```bash
 # 6 — Packages {LibName} (cross-projet, manuel — hors catalog)
-dotnet add workspace/output/src/{LibName}/{LibName}.csproj package AutoMapper --version 16.1.1
+dotnet add workspace/src/{LibName}/{LibName}.csproj package AutoMapper --version 16.1.1
 
 # Note Excel + PDF (RETIRES depuis v3.1.3) : installation on-demand uniquement,
 # pilotee par dev-backend selon les triggers de l'US courante.
 # Voir §2.2.2 (commandes on-demand auto-generees), §2.4.b (catalogue capabilities)
 # et agents/dev-backend.md STEP 5.bis (capability detection).
 # Forcer l'install au bootstrap : ajouter `Capabilities: excel, pdf` dans
-# `## Project Config` de workspace/input/stack/stack.md.
+# `## Project Config` de workspace/stack/stack.md.
 
 # 7 — Creer l'arborescence des couches {BackendName}
-mkdir -p workspace/output/src/{BackendName}/Endpoints
-mkdir -p workspace/output/src/{BackendName}/Services/Interfaces
-mkdir -p workspace/output/src/{BackendName}/Services
-mkdir -p workspace/output/src/{BackendName}/Mappers
-mkdir -p workspace/output/src/{BackendName}/Entities/DBcontext
-mkdir -p workspace/output/src/{BackendName}/Middleware
-mkdir -p workspace/output/src/{BackendName}/Resources
-mkdir -p workspace/output/src/{BackendName}/Properties
+mkdir -p workspace/src/{BackendName}/Endpoints
+mkdir -p workspace/src/{BackendName}/Services/Interfaces
+mkdir -p workspace/src/{BackendName}/Services
+mkdir -p workspace/src/{BackendName}/Mappers
+mkdir -p workspace/src/{BackendName}/Entities/DBcontext
+mkdir -p workspace/src/{BackendName}/Middleware
+mkdir -p workspace/src/{BackendName}/Resources
+mkdir -p workspace/src/{BackendName}/Properties
 
 # 8 — Creer l'arborescence des couches {LibName}
-mkdir -p workspace/output/src/{LibName}/Inputs
-mkdir -p workspace/output/src/{LibName}/Outputs
-mkdir -p workspace/output/src/{LibName}/Models
+mkdir -p workspace/src/{LibName}/Inputs
+mkdir -p workspace/src/{LibName}/Outputs
+mkdir -p workspace/src/{LibName}/Models
 
 # 9 — Restaurer + builder les deux projets
-dotnet restore workspace/output/src/{BackendName}/{BackendName}.csproj
-dotnet restore workspace/output/src/{LibName}/{LibName}.csproj
-dotnet build workspace/output/src/{BackendName}/{BackendName}.csproj --nologo
-dotnet build workspace/output/src/{LibName}/{LibName}.csproj --nologo
+dotnet restore workspace/src/{BackendName}/{BackendName}.csproj
+dotnet restore workspace/src/{LibName}/{LibName}.csproj
+dotnet build workspace/src/{BackendName}/{BackendName}.csproj --nologo
+dotnet build workspace/src/{LibName}/{LibName}.csproj --nologo
 ```
 
 **Contrat post-init :**
-- `workspace/output/src/{BackendName}/{BackendName}.csproj` DOIT exister et le build DOIT etre vert.
-- `workspace/output/src/{LibName}/{LibName}.csproj` DOIT exister et le build DOIT etre vert.
+- `workspace/src/{BackendName}/{BackendName}.csproj` DOIT exister et le build DOIT etre vert.
+- `workspace/src/{LibName}/{LibName}.csproj` DOIT exister et le build DOIT etre vert.
 - Les fichiers generes par `dotnet new` conserves (`Program.cs`) seront **augmentes**
   par les agents (operation: augment) avec `preserves:` declarant leurs identifiants
   courants : `builder`, `app`, `MapGet`, `Run`.
@@ -192,35 +192,35 @@ piloter l'alternative.
 ```bash
 # Auto-genere depuis dotnet-minimalapi.libs.json (on-demand) -- installe par dev-* si l'US declenche un trigger.
 # capability: excel
-dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package EPPlus --version 7.5.3
-# OU (alt mutuellement exclusif) : dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package ClosedXML --version 0.104.2
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj package EPPlus --version 7.5.3
+# OU (alt mutuellement exclusif) : dotnet add workspace/src/{BackendName}/{BackendName}.csproj package ClosedXML --version 0.104.2
 
 # capability: pdf
-dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package QuestPDF --version 2024.12.3
-# OU (alt mutuellement exclusif) : dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package itext7 --version 9.0.0
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj package QuestPDF --version 2024.12.3
+# OU (alt mutuellement exclusif) : dotnet add workspace/src/{BackendName}/{BackendName}.csproj package itext7 --version 9.0.0
 
 # capability: cqrs
-dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package MediatR --version 12.4.1
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj package MediatR --version 12.4.1
 
 # capability: redis-cache
-dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package StackExchange.Redis --version 2.8.16
-dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package Microsoft.Extensions.Caching.StackExchangeRedis --version 9.0.0
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj package StackExchange.Redis --version 2.8.16
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj package Microsoft.Extensions.Caching.StackExchangeRedis --version 9.0.0
 
 # capability: fast-mapping
-dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package Mapster --version 7.4.0
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj package Mapster --version 7.4.0
 
 # capability: email
-dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package MailKit --version 4.8.0
-dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package MimeKit --version 4.8.0
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj package MailKit --version 4.8.0
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj package MimeKit --version 4.8.0
 
 # capability: auth-local
-dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package BCrypt.Net-Next --version 4.0.3
-dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package Microsoft.AspNetCore.Authentication.JwtBearer --version 9.0.4
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj package BCrypt.Net-Next --version 4.0.3
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj package Microsoft.AspNetCore.Authentication.JwtBearer --version 9.0.4
 ```
 <!-- ONDEMAND_PACKAGES_END -->
 
 **Forçage au bootstrap** : pour pré-installer une capability dès `/arch-init`,
-ajouter dans `## Project Config` de `workspace/input/stack/stack.md` :
+ajouter dans `## Project Config` de `workspace/stack/stack.md` :
 ```
 Capabilities: excel, pdf
 ```
@@ -380,12 +380,12 @@ verifier la signature exacte (anti-pattern `[FRONTEND_BACKEND_CONTRACT_GAP]`).
 ## 3. Base de donnees
 
 - **Moteur** : déterminé par `DatabaseType` dans `## Active Database` de
-  `workspace/input/stack/stack.md` (cf. §3.0 matrice).
+  `workspace/stack/stack.md` (cf. §3.0 matrice).
 - **Acces** : Entity Framework Core, approche Database-First, scaffolding
   incremental.
 - **Migrations** : `dotnet ef dbcontext scaffold` en mode continuation.
 - **DbContext** : `OperationsDbContext` dans
-  `workspace/output/src/{BackendName}/Entities/DBcontext/`.
+  `workspace/src/{BackendName}/Entities/DBcontext/`.
 - **Strategie de scaffolding** : verifier les entites existantes, generer
   uniquement les tables manquantes, etendre le DbContext avec les
   nouveaux `DbSet`, conserver les configurations existantes.
@@ -439,7 +439,7 @@ compat Npgsql 9.x preview) :
 
 ```bash
 # 1. Lire DatabaseType depuis stack.md ## Active Database
-DB_TYPE=$(grep -oE 'DatabaseType:\s*\S+' workspace/input/stack/stack.md | awk '{print tolower($2)}')
+DB_TYPE=$(grep -oE 'DatabaseType:\s*\S+' workspace/stack/stack.md | awk '{print tolower($2)}')
 
 # 2. Lookup dans dbDrivers du libs.json
 DRIVER_MODULE=$(jq -r ".dbDrivers.\"$DB_TYPE\".module" .claude/stacks/backend/dotnet-minimalapi.libs.json)
@@ -448,7 +448,7 @@ DRIVER_VERSION=$(jq -r ".versions.\"$DRIVER_VERSION_REF\"" .claude/stacks/backen
 
 # 3. Si DB_TYPE == "none" → SKIP (pas de driver). Sinon installer.
 if [ "$DB_TYPE" != "none" ] && [ -n "$DRIVER_MODULE" ]; then
-  dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj \
+  dotnet add workspace/src/{BackendName}/{BackendName}.csproj \
     package "$DRIVER_MODULE" --version "$DRIVER_VERSION"
 fi
 ```
@@ -457,7 +457,7 @@ fi
 
 ### 3.1 Commandes de scaffolding EF Core
 
-Lire `DatabaseType` dans `workspace/input/stack/stack.md ## Active Database`
+Lire `DatabaseType` dans `workspace/stack/stack.md ## Active Database`
 et executer la commande correspondante. **Toutes les valeurs de
 connexion proviennent exclusivement du bloc `## Active Database` de
 stack.md — jamais d'env vars, jamais en dur.**
@@ -484,7 +484,7 @@ CONN="Server=${DB_HOST},${DB_PORT};Database=${DB_NAME};User Id=${DB_USER};Passwo
 
 dotnet ef dbcontext scaffold "$CONN" \
   Microsoft.EntityFrameworkCore.SqlServer \
-  --project workspace/output/src/{BackendName}/{BackendName}.csproj \
+  --project workspace/src/{BackendName}/{BackendName}.csproj \
   --context OperationsDbContext \
   --context-dir Entities/DBcontext \
   --output-dir Entities \
@@ -499,14 +499,14 @@ dotnet ef dbcontext scaffold "$CONN" \
 
 ```bash
 # Prerequis : ajouter le package si absent
-dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj \
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj \
   package Npgsql.EntityFrameworkCore.PostgreSQL --version 9.0.4
 
 CONN="Host=${DB_HOST};Port=${DB_PORT};Database=${DB_NAME};Username=${DB_USER};Password=${DB_PASSWORD};"
 
 dotnet ef dbcontext scaffold "$CONN" \
   Npgsql.EntityFrameworkCore.PostgreSQL \
-  --project workspace/output/src/{BackendName}/{BackendName}.csproj \
+  --project workspace/src/{BackendName}/{BackendName}.csproj \
   --context OperationsDbContext \
   --context-dir Entities/DBcontext \
   --output-dir Entities \
@@ -521,14 +521,14 @@ dotnet ef dbcontext scaffold "$CONN" \
 
 ```bash
 # Prerequis : ajouter le package si absent
-dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj \
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj \
   package Pomelo.EntityFrameworkCore.MySql --version 9.0.0
 
 CONN="Server=${DB_HOST};Port=${DB_PORT};Database=${DB_NAME};Uid=${DB_USER};Pwd=${DB_PASSWORD};"
 
 dotnet ef dbcontext scaffold "$CONN" \
   Pomelo.EntityFrameworkCore.MySql \
-  --project workspace/output/src/{BackendName}/{BackendName}.csproj \
+  --project workspace/src/{BackendName}/{BackendName}.csproj \
   --context OperationsDbContext \
   --context-dir Entities/DBcontext \
   --output-dir Entities \
@@ -621,7 +621,7 @@ exploites sont dans `tech-auth-azure.md`.
 >
 > Motif : la scaffolding `arch` v6.x écrivait `Password=***REMOVED***` en
 > littéral dans `appsettings.json`, créant un `[SEC_SECRET_HARDCODED]`
-> critique même si `workspace/output/` est gitignored (leak via dev
+> critique même si `workspace/` est gitignored (leak via dev
 > machine, template partagé, screenshot debug).
 
 La chaine de connexion est **assemblée au boot dans `Program.cs`**
@@ -698,7 +698,7 @@ var connectionString = builder.Configuration.GetConnectionString("Default")
 
 **Anti-pattern à grep en STEP build** (dev-backend STEP 8) :
 ```bash
-grep -rnE 'GetConnectionString\("(?!Default")' workspace/output/src/{BackendName}/ && \
+grep -rnE 'GetConnectionString\("(?!Default")' workspace/src/{BackendName}/ && \
   echo "[STACK_DERIVE_VIOLATION] GetConnectionString avec clé != Default"
 ```
 
@@ -871,7 +871,7 @@ Capabilities: email   # force install MailKit + MimeKit au bootstrap arch
 
 ## 6. Multilingue
 Parametre de requete optionnel `langue`. Traductions dans
-`workspace/output/src/{BackendName}/Resources/` (fichiers `.resx`), resolution via
+`workspace/src/{BackendName}/Resources/` (fichiers `.resx`), resolution via
 `IStringLocalizer` / `IHtmlLocalizer`.
 
 ---
@@ -967,7 +967,7 @@ production reelles, jamais de wildcard. Cf. `rules/library-and-stack.md §4` (an
 
 ## 8. URLs de developpement
 
-**Source autoritaire** : `workspace/output/src/{BackendName}/Properties/launchSettings.json`
+**Source autoritaire** : `workspace/src/{BackendName}/Properties/launchSettings.json`
 (produit par `dotnet new webapi` lors du bootstrap arch). Lire `profiles.http.applicationUrl`
 ET `profiles.https.applicationUrl` pour obtenir les ports effectifs du projet.
 
@@ -1096,7 +1096,7 @@ restent installés quel que soit le DatabaseType (déjà en §2.4).
 Arch Phase A lit `## Active Database: DatabaseType` puis installe le
 provider correspondant via `dotnet add package` :
 ```bash
-dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package <Provider>
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj package <Provider>
 ```
 
 ### 8.2 Connection String Pattern (composition côté arch, depuis 2026-05-14)
@@ -1164,7 +1164,7 @@ Outil canonique : **`dotnet ef dbcontext scaffold`** (toolchain
 Pattern d'invocation par Arch Phase B :
 ```bash
 dotnet ef dbcontext scaffold "<connstr>" <ProviderAssembly> \
-  --project workspace/output/src/{BackendName}/{BackendName}.csproj \
+  --project workspace/src/{BackendName}/{BackendName}.csproj \
   --output-dir Entities \
   --context-dir Entities/DBcontext \
   --context AppDbContext \

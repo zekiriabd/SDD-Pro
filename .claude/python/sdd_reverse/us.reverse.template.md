@@ -16,8 +16,17 @@
   Le fil de traçabilité (D3) se construit bas → haut.
 
   `Parent FEAT: {n}-{Name}` est PRÉ-ALLOUÉ par 3a (la FEAT n'existe pas encore à
-  3b — elle sera composée en 3c). Pas de `Parent FEAT hash` (mécanique forward
-  inversée ici : US précède FEAT).
+  3b — elle sera composée en 3c).
+
+  `Parent FEAT hash: sha256:COMPUTE_REQUIRED` (sentinel, REV-C1 audit 2026-06-12) :
+  posé non-résolu par 3b (la FEAT n'existe pas encore). 3c le résout via le
+  resolver canonique `resolve_us_hash_sentinel.py` APRÈS composition de la FEAT
+  — c'est le pont reverse→/sdd-full (sinon dev-*/auditors émettent
+  `[FEAT_HASH_MISMATCH]` sur l'US reverse). Idem `Covers:` (back-fill 3c).
+
+  `Confidence:` (ligne header, audit 2026-06-11 M2) : enforce la monotonie Q3
+  (US ≤ analyse 3a, FEAT 3c ≤ min(US)) via check_ladder_traceability.py —
+  doit rester synchrone avec le commentaire de provenance ci-dessous.
 
   Placeholders : {n}, {m}, {Name}, {Title}, {SourceUnit}, {Confidence},
   {ExtractionDate}, {Actor}, {Action}, {Value}, {ACs}, {SourceTasks},
@@ -27,7 +36,11 @@
 
 ID: {n}-{m}-{Name}
 Parent FEAT: {n}-{Name}
+Parent FEAT hash: sha256:COMPUTE_REQUIRED
 Status: Draft
+Confidence: {Confidence}
+
+<!-- Covers: back-fillé par 3c (reverse-feat-composer) après composition FEAT — REV-C1. Format forward : SFD-N, FD-N, BR-N, AC-N que cette US implémente. -->
 
 <!-- LADDER: rung=3b ; produces=user-story ; from=tech-analysis ; consumed-by=reverse-feat-composer -->
 <!-- generated-by: sdd-reverse ; artifact: user-story ; source-unit: {SourceUnit} ; confidence: {Confidence} ; extraction-date: {ExtractionDate} -->
@@ -43,7 +56,7 @@ Afin de {Value}
 {ACs}
 
 ## Source (barreau 3a — analyse technique)
-<!-- Tasks T-N de output/plans/{n}-{Name}.analysis.md que cette US abstrait.
+<!-- Tasks T-N de plans/{n}-{Name}.analysis.md que cette US abstrait.
      Fil de traçabilité descendant (D3) : US → tasks → evidence file:line. -->
 {SourceTasks}
 

@@ -137,7 +137,7 @@ def main(argv: list[str] | None = None) -> int:
         return 3
 
     feats_dir = Path(args.feats_dir).resolve() if args.feats_dir else (
-        project_root.parent.parent / "input" / "feats"
+        project_root.parent.parent / "feats"
     )
     feats_dir.mkdir(parents=True, exist_ok=True)
 

@@ -15,7 +15,7 @@ class TestNormalizePath(unittest.TestCase):
 
     def test_full_repo_relative(self) -> None:
         self.assertEqual(
-            _normalize_path("workspace/output/src/X/Auth.cs"),
+            _normalize_path("workspace/src/X/Auth.cs"),
             "x/auth.cs",
         )
 
@@ -27,7 +27,7 @@ class TestNormalizePath(unittest.TestCase):
 
     def test_windows_backslashes(self) -> None:
         self.assertEqual(
-            _normalize_path(r"workspace\output\src\X\Auth.cs"),
+            _normalize_path(r"workspace\src\X\Auth.cs"),
             "x/auth.cs",
         )
 
@@ -67,7 +67,7 @@ class TestDeduplicateFindings(unittest.TestCase):
         """Same logical file emitted with different prefixes still dedups."""
         findings = [
             self._make("code-review", "REVIEW_SECRETS_HARDCODED", "critical",
-                       "workspace/output/src/Auth.cs", 42),
+                       "workspace/src/Auth.cs", 42),
             self._make("security", "SEC_SECRET_HARDCODED", "critical",
                        "src/Auth.cs", 42),  # same logical file, shorter prefix
         ]

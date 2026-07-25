@@ -7,7 +7,7 @@ Makes .claude/loader.yml executable:
 - enforces per-agent byte budget
 - v6.10 BREAKING : writes to console.db (table `context_budget`) as the
   single source of truth. Legacy JSONL ledger at
-  workspace/output/.sys/.audit/context-budget.jsonl is no longer the
+  workspace/.sys/.audit/context-budget.jsonl is no longer the
   primary sink ; only emitted when `--out-file` is explicitly provided
   (backward-compat for tests / explicit overrides).
 
@@ -92,7 +92,7 @@ DEFAULT_BUDGETS: dict[str, int] = {
     "qa":           280_000,
     "dashboard":    180_000,
     # Auditors — les 5 reviewers cross-fichier scannent le code matérialisé
-    # complet (workspace/output/src/{AppName,BackendName}/**) qui pèse
+    # complet (workspace/src/{AppName,BackendName}/**) qui pèse
     # facilement 2-3 MB sur une FEAT moyenne. Budget calé à 4 MB (= ~1 Mtok)
     # pour absorber le scope réel. L'anti-context-bomb reste effectif via
     # [UNBOUNDED_GLOB] (refus des reads sans borne FEAT/US).
@@ -105,8 +105,8 @@ DEFAULT_BUDGETS: dict[str, int] = {
     "performance-auditor":    4_000_000,   # Sonnet, CWV + SLO heuristiques
     "spec-compliance-reviewer": 4_000_000, # Sonnet, AC-by-AC re-lecture code
     # Audit 2026-06-06 RUPT-1 — adversarial-reviewer (R1 v7.2.0 opt-in).
-    # Sonnet 4.6. Read-only sur workspace/output/qa/feat-{n}/ (consolidated
-    # review reports) + workspace/output/src/{App,Backend}Name/** (code).
+    # Sonnet 4.6. Read-only sur console.db (consolidated review, via
+    # query_console_db) + workspace/src/{App,Backend}Name/** (code).
     # Verdict purement informational, jamais bloquant — mais consomme un
     # budget équivalent aux 4 autres reviewers (mêmes patterns de lecture).
     "adversarial-reviewer":   4_000_000,
@@ -159,7 +159,7 @@ def is_unbounded_glob(pattern: str) -> bool:
     if any(m in pattern for m in bounded_markers):
         return False
     # Whitelist: ADR-* sous .sys/.context/adrs/ (bounded by timestamp prefix)
-    if pattern == "workspace/output/.sys/.context/adrs/ADR-*.md":
+    if pattern == "workspace/.sys/.context/adrs/ADR-*.md":
         return False
     return True
 
@@ -204,7 +204,7 @@ def resolve_pattern(
     return [out]
 
 
-# Dirs prunés AVANT descente lors d'un rglob — évite que workspace/output/src
+# Dirs prunés AVANT descente lors d'un rglob — évite que workspace/src
 # explose le scan (~170k fichiers node_modules sur le bench local 2.7GB).
 # Audit perf 2026-06-06 : excludes étaient appliqués via fnmatch APRÈS rglob
 # complet, donc la traversal coûtait le full I/O. Prune dirs à la racine ici

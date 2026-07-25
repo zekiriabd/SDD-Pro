@@ -58,18 +58,26 @@ invariants:
 
   - id: reverse-lock-format-valid
     description: |
-      The workspace/input/feats/.alloc.lock file MUST contain JSON with keys
+      The workspace/feats/.alloc.lock file MUST contain JSON with keys
       {agent_id, pid, ts_unix, host}. Format invariant ADV-2/ADV-10 — pid check
-      is opportunistic (psutil optional), TTL 30s is the authority.
+      is opportunistic (psutil optional), TTL is the authority. TTL is
+      parameterized per phase (audit C5 2026-06-09) : 1800s for Phase 3
+      extraction, 60s for preallocation/crosscut, 30s = bare helper default.
     enforcer: .claude/python/sdd_reverse_scripts/reverse_smoke.py
     class: REVERSE_LOCK_HELD
 
   - id: reverse-inventory-schema-v1
     description: |
-      All inventory.json files under workspace/old/*/.sys/ MUST have
+      All inventory.json files under workspace/old/*/.sys/ SHOULD have
       schemaVersion == 1 AND _allocatedNames + _featAllocations present
       (even as empty dicts). ADV-23 closure — refresh forced via
       --use-cache gate otherwise.
+      Severity: WARN (NOT FAIL). [REVERSE_INVENTORY_SCHEMA_STALE] is
+      INFO/WARN in rules/reverse-engineering.md §6 — a stale/pre-v0.4.0 cache
+      triggers a forced refresh, it is not a hard contract breach. The
+      reverse_smoke.check_inventory_schema_v1 runtime returns WARN; this
+      manifest is aligned to the code (audit 2026-06-11 MA-8), not vice versa.
+    severity: WARN
     enforcer: .claude/python/sdd_reverse_scripts/reverse_smoke.py
     class: REVERSE_INVENTORY_SCHEMA_STALE
 
@@ -121,8 +129,10 @@ invariants:
     class: REVERSE_TEMPLATE_MISSING
 
 # L0-L6 deepening contracts (V2 2026-06-10 — informational, enforced by the
-# dedicated pytest suites, NOT by the reverse_smoke 11-check parity which stays
-# pinned to the original invariants+drift_checks above).
+# dedicated pytest suites, NOT by the reverse_smoke 13-check registry which
+# stays pinned to the invariants+drift_checks above. Count corrected 11→13
+# audit 2026-06-11 MA-8 ; authoritative count = len(_ALL_CHECKS), pinned by
+# tests/test_reverse_smoke_selfcheck.py).
 deepening_contracts:
 
   - id: reverse-evidence-transitive-l0
@@ -164,6 +174,29 @@ deepening_contracts:
       write-back). extraction-cache.json skips unchanged units. (L5, rules §8.2)
     enforcer: .claude/python/tests/test_sdd_reverse_l5_industrial.py
     class: REVERSE_COMPLETENESS_GAP
+
+  - id: reverse-db-readonly-proc
+    description: |
+      proc-reverse (stored-procedure reverse) is strictly READ-ONLY against the
+      live database. Every dialect catalog query MUST pass
+      readonly_guard.is_readonly (SELECT-only, no DDL/DML/EXEC/INTO/batch), and
+      db_introspect MUST call assert_readonly before executing any statement. It
+      never runs procedures, never modifies structure or data. Mirrors the
+      framework rule [DB_STRUCTURE_CHANGE_FORBIDDEN]. Defence-in-depth: a
+      dedicated read-only DB login (GRANT VIEW DEFINITION + db_datareader) is
+      recommended. Enforced by the offline test suite (no DB needed).
+    enforcer: .claude/python/tests/test_sdd_reverse_proc.py
+    class: REVERSE_DB_READONLY_VIOLATION
+
+  - id: reverse-proc-model-1proc-1us-1module-1feat
+    description: |
+      proc-reverse mapping: 1 stored procedure = 1 User Story, 1 business module
+      (cluster of procedures by object) = 1 FEAT. Ascending ladder (remontée):
+      the FEAT is composed from the module's US (build_proc_feats) WITHOUT
+      re-reading the T-SQL bodies. Confidence is min-monotone over the module's
+      procedures. Generated FEATs pass validate_reverse_feat.py.
+    enforcer: .claude/python/tests/test_sdd_reverse_proc.py
+    class: (informational)
 
   - id: reverse-roundtrip-parity-l6
     description: |

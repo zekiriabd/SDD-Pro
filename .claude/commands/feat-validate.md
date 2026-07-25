@@ -13,7 +13,12 @@ Toujours 0 token LLM ; WARN non bloquant par défaut.
 
 **Usage :**
 - `/feat-validate {n}` — valide la FEAT `{n}` et produit le rapport
-- `/feat-validate {n} --json` — sortie JSON pour CI/CD
+- `/feat-validate {n} --json` — sortie JSON pour CI/CD (n'affecte QUE le
+  format de sortie — ne bypasse JAMAIS la spec-compliance gate STEP 4.5,
+  cf. FWD-C3 fix 2026-06-12)
+- `/feat-validate {n} --post-dev` — force `MODE=post-dev` (active la
+  spec-compliance gate STEP 4.5 sans dépendre de l'heuristique `HAS_CODE`).
+  Utilisé par `/sdd-full` STEP 4.7. Combinable avec `--json`.
 
 **Décisions possibles** :
 - 🟢 **GO** : prêt pour `/dev-run`
@@ -25,6 +30,12 @@ Toujours 0 token LLM ; WARN non bloquant par défaut.
 ## STEP 1 — Valider l'argument
 
 Argument **obligatoire** : `{n}` (entier ≥ 1).
+
+**Flags optionnels** (parsés ici, ordre libre) :
+- `--json` → `JSON_FLAG=1` (format de sortie JSON, cf. Mode JSON)
+- `--post-dev` → `POST_DEV_FLAG=1` (force `MODE=post-dev` au STEP 4.5.1)
+
+Tout autre flag inconnu → ignoré silencieusement (forward-compat).
 
 Si absent →
 ```
@@ -44,7 +55,7 @@ FIX: relancer /feat-validate {n}
 
 ## STEP 2 — Localiser la FEAT
 
-Glob `workspace/input/feats/{n}-*.md`.
+Glob `workspace/feats/{n}-*.md`.
 
 - 0 fichier → ERROR `[FEAT_NOT_FOUND]` (créer via `/feat-generate`)
 - > 1 fichier → ERROR `[FEAT_AMBIGUOUS]` (renommer)
@@ -98,7 +109,7 @@ ce WARN bloque le pipeline sauf `--force`.
 regex). Aucun agent LLM, aucun coût token.
 
 Lire la valeur `SemanticValidationStrictness` dans `## Project Config`
-de `workspace/input/stack/stack.md` (défaut `standard`). Valeurs valides :
+de `workspace/stack/stack.md` (défaut `standard`). Valeurs valides :
 `conservative` (~2-5 WARN/FEAT), `standard` (~5-15 WARN/FEAT), `strict`
 (~20-40 WARN/FEAT).
 
@@ -118,7 +129,7 @@ Capturer `stdout` (= section §2 du rapport readiness) et `exit_code`
 | `VAGUE_TERM` | Ambiguïté | Mots qualitatifs non mesurables (`fast`, `easy`, `scalable`, `user-friendly`…) dans AC/BR/SFD/Objective |
 | `SECURITY_GAP` | Sécurité | Mention de `password`/`token`/`auth`/`credential` sans mention de mécanisme (`hash`, `bcrypt`, `encrypt`, `https`, `httponly`…) |
 | `SENSITIVE_DATA` | PII | Mention de `email`/`phone`/`adresse`/`iban`/`ssn` sans mention de privacy (`encrypt`, `mask`, `anonymis`, `gdpr/rgpd`) |
-| `ROUTE_CONTRACT_GAP` | Contrat back/front | Route `/api/*` mentionnée dans FEAT/US sans endpoint correspondant dans `workspace/output/src/{BackendName}/` (skip si code pas encore généré) |
+| `ROUTE_CONTRACT_GAP` | Contrat back/front | Route `/api/*` mentionnée dans FEAT/US sans endpoint correspondant dans `workspace/src/{BackendName}/` (skip si code pas encore généré) |
 
 ### Mode opt-in d'escalation (futur v6.2)
 
@@ -146,29 +157,33 @@ hérité superpowers v5.1).
 > silencieusement. C'est **intentionnel** : spec-compliance ne peut pas
 > tourner sans code matérialisé.
 >
-> Pour activer le gate dans un pipeline automatisé post-dev :
-> - soit lancer `/feat-validate {n}` à la main après `/sdd-full`,
-> - soit utiliser `/sdd-review {n} --ensure-scans` (spawne
->   `spec-compliance-reviewer` directement),
-> - soit attendre v7.2.0 qui déplacera le gate à `/sdd-full §4.8`
->   (roadmap v7.2 — cf. `docs/roadmap-v7-v8.md`, ADR à émettre lors
->   du sprint d'implémentation).
+> Le gate est **câblé dans `/sdd-full`** : STEP 4.7 (post-`/dev-run`) invoque
+> `/feat-validate {n} --json --post-dev`, qui force `MODE=post-dev` et lit le
+> verdict spec-compliance (lecteur pur — cf. FWD-C3, 2026-06-12). Autres
+> activations manuelles :
+> - lancer `/feat-validate {n}` à la main après `/dev-run` (HAS_CODE détecte post-dev),
+> - `/sdd-review {n} --ensure-scans` (spawne `spec-compliance-reviewer` directement).
 
 ### 4.5.1 Détection mode (pre-dev vs post-dev)
 
 Le gate ne tourne qu'**après** matérialisation du code. Détecter via
-présence d'un projet sous `workspace/output/src/` :
+présence d'un projet sous `workspace/src/` :
 
 ```bash
-HAS_CODE=$(find workspace/output/src -maxdepth 3 \
-  \( -name '*.csproj' -o -name 'package.json' -o -name 'pyproject.toml' \
-  -o -name 'build.gradle.kts' -o -name 'angular.json' -o -name 'vite.config.*' \) \
-  2>/dev/null | head -1)
-
-if [ -z "$HAS_CODE" ]; then
-  MODE="pre-dev"   # pas de code → skip silencieusement, continuer STEP 5
+# FWD-C3 fix (2026-06-12) : --post-dev force le mode (contrat /sdd-full STEP 4.7),
+# sinon heuristique HAS_CODE (find code sous src/).
+if [ "$POST_DEV_FLAG" = "1" ]; then
+  MODE="post-dev"  # forcé explicitement par le caller
 else
-  MODE="post-dev"  # code matérialisé → gate active
+  HAS_CODE=$(find workspace/src -maxdepth 3 \
+    \( -name '*.csproj' -o -name 'package.json' -o -name 'pyproject.toml' \
+    -o -name 'build.gradle.kts' -o -name 'angular.json' -o -name 'vite.config.*' \) \
+    2>/dev/null | head -1)
+  if [ -z "$HAS_CODE" ]; then
+    MODE="pre-dev"   # pas de code → skip silencieusement, continuer STEP 5
+  else
+    MODE="post-dev"  # code matérialisé → gate active
+  fi
 fi
 ```
 
@@ -176,6 +191,10 @@ fi
   `spec-compliance gate: pre-dev — skipped (no materialized code yet)`,
   passer STEP 5.
 - **`post-dev`** : continuer 4.5.2.
+
+> **`--json` ne court-circuite PAS ce STEP** : la spec-compliance gate
+> (4.5.2-4.5.4) tourne identiquement avec ou sans `--json` ; seul le
+> format de sortie (STEP 5 vs Mode JSON) change. Cf. anti-bypass §4.5.5.
 
 ### 4.5.2 Lire la config layered
 
@@ -199,12 +218,13 @@ print(str(cfg.get('SpecComplianceRequiredForFeatValidate', 'true')).lower())
 > (Stage A, `auditor-orchestration.md §3`) est le SEUL producteur du verdict.
 > Ce STEP est un **lecteur pur** de son rapport JSON — il ne re-vérifie
 > jamais les ACs lui-même, donc script et agent ne peuvent pas diverger.
-> Path canonique = celui écrit par l'agent (cf. `loader.yml` writes), PAS
-> `workspace/output/qa/feat-{n}/` (bug path corrigé 2026-06-11 : ce chemin
-> n'était écrit par personne → faux NO-GO systématique).
+> Path canonique = `workspace/.sys/.validation/{n}-spec-compliance.json`
+> (celui écrit par l'agent, cf. `loader.yml` writes). Ne jamais chercher sous
+> un dossier `qa/` (supprimé 2026-07-06 ; historiquement un bug de path
+> qui provoquait un faux NO-GO systématique).
 
 ```bash
-SPEC_PATH="workspace/output/.sys/.validation/{n}-spec-compliance.json"
+SPEC_PATH="workspace/.sys/.validation/{n}-spec-compliance.json"
 if [ ! -f "$SPEC_PATH" ]; then
   cat <<EOF
 ERROR: /feat-validate {n} — spec-compliance absent
@@ -213,7 +233,8 @@ FIX: lancer /sdd-review {n} --ensure-scans (spawne spec-compliance-reviewer)
      OU /qa-generate {n} (pipeline QA complet)
      OU baisser SpecComplianceRequiredForFeatValidate à false (décision tracée)
 EOF
-  exit 1
+  exit 2   # FWD-C3 (2026-06-12) : exit 2 = rapport ABSENT (distinct de RED=1).
+           # Contrat /sdd-full STEP 4.7 : 0=GREEN, 1=[SPEC_COMPLIANCE_RED], 2=[SPEC_COMPLIANCE_REQUIRED].
 fi
 ```
 
@@ -238,7 +259,7 @@ Format ERROR `[SPEC_COMPLIANCE_RED]` :
 ```
 ERROR: /feat-validate {n} — spec-compliance verdict RED
 CAUSE: [SPEC_COMPLIANCE_RED] N ACs non vérifiées dans le code matérialisé
-       (cf. workspace/output/.sys/.validation/{n}-spec-compliance.md)
+       (cf. workspace/.sys/.validation/{n}-spec-compliance.md)
 FIX: corriger les ACs flag NOT_VERIFIED via /dev-run {n} (idempotent)
      puis /sdd-review {n} --ensure-scans
      puis /feat-validate {n} (idempotent)
@@ -272,8 +293,8 @@ si readiness OU semantic produisent ≥ 1 warning ; sinon `GO`. La couche
 sémantique ne peut pas escalader en NO-GO (par design — WARN non
 bloquant, cf. STEP 4).
 
-Write `workspace/output/.sys/.validation/{n}-readiness.md` (mode `create`, écrase si
-existe). Créer le répertoire `workspace/output/.sys/.validation/` si absent.
+Write `workspace/.sys/.validation/{n}-readiness.md` (mode `create`, écrase si
+existe). Créer le répertoire `workspace/.sys/.validation/` si absent.
 
 ---
 
@@ -285,7 +306,7 @@ Non-bloquant : un échec de transition (US déjà Ready/InProgress/Done)
 n'interrompt pas le pipeline.
 
 ```bash
-for us_file in workspace/output/us/{n}-*.md; do
+for us_file in workspace/us/{n}-*.md; do
   us_id=$(basename "$us_file" .md | grep -oE '^[0-9]+-[0-9]+')
   python .claude/python/sdd_scripts/set_us_status.py \
     --us "$us_id" --status Ready 2>/dev/null || true
@@ -307,18 +328,24 @@ Validations  : {N_pass_struct} struct + {N_pass_sem} sém (déterministes, 0 tok
 Erreurs      : {E} (bloquantes, struct uniquement)
 Warnings     : {W_struct} struct + {W_sem} sém (non bloquantes)
 
-Rapport      : workspace/output/.sys/.validation/{n}-readiness.md
+Rapport      : workspace/.sys/.validation/{n}-readiness.md
 
 Prochaine étape :
   - 🟢 GO     : /dev-run {n}
-  - 🟡 WARN   : review workspace/output/.sys/.validation/{n}-readiness.md puis /dev-run {n}
+  - 🟡 WARN   : review workspace/.sys/.validation/{n}-readiness.md puis /dev-run {n}
   - 🔴 NO-GO  : corriger les erreurs (§3 du rapport) puis /feat-validate {n}
                 (bypass exceptionnel : /dev-run {n} --force)
 ```
 
-**Exit code** :
-- `GO` ou `WARN` → exit 0
-- `NO-GO` → exit 1
+**Exit code** (FWD-C3 — contrat unifié avec `/sdd-full` STEP 4.7, 2026-06-12) :
+- `0` — readiness `GO`/`WARN` ET spec gate GREEN/YELLOW/skip/bypass
+- `1` — readiness `NO-GO` **OU** spec-compliance verdict `RED`/`PARSE_ERROR`
+- `2` — post-dev ET rapport `spec-compliance.json` ABSENT (`[SPEC_COMPLIANCE_REQUIRED]`)
+
+Précédence : la spec-compliance gate (STEP 4.5) prime sur la readiness —
+si elle déclenche un exit `1`/`2`, la commande retourne ce code sans écraser
+par l'exit `0` d'une readiness GO. (`exit 2` > `exit 1` > `exit 0` en sévérité
+de blocage.) Ce contrat vaut **avec ou sans `--json`**.
 
 ---
 
@@ -326,10 +353,15 @@ Prochaine étape :
 
 Si l'argument `--json` est fourni :
 - Exécuter `validate_readiness.py --json` ET `validate_semantic.py --json`
-- Fusionner en un objet `{ readiness: {...}, semantic: {...} }` sur stdout
-- Ne PAS écrire `workspace/output/.sys/.validation/{n}-readiness.md`
-- Exit code = exit code de `validate_readiness.py` (la sémantique
-  est toujours 0)
+- **Exécuter aussi STEP 4.5 (spec-compliance gate)** — `--json` ne change QUE
+  le format de sortie, jamais les STEPs exécutés ni les exit codes (FWD-C3
+  fix 2026-06-12 ; corrige la contradiction avec §4.5.5 « jamais bypass par
+  `--json` »).
+- Fusionner en un objet `{ readiness: {...}, semantic: {...}, spec_compliance: {verdict|absent|skipped} }` sur stdout
+- Ne PAS écrire `workspace/.sys/.validation/{n}-readiness.md`
+- **Exit code = contrat unifié STEP 5** : `max_severity(readiness_exit, spec_gate_exit)`
+  → `2` si spec absent, sinon `1` si readiness NO-GO ou spec RED, sinon `0`.
+  (La sémantique `validate_semantic.py` reste toujours `0`, non bloquante.)
 
 ---
 
@@ -367,6 +399,6 @@ verdict). Format `[VALIDATE] Action au gérondif... (X%)`.
 
 **Verdict final** : 1 ligne avec emoji 🟢 GO / 🟡 WARN / 🔴 NO-GO +
 pointeur fichier rapport en cas de WARN/NO-GO. Exemple :
-`🔴 [VALIDATE/FAIL] FEAT {n} NO-GO — [READINESS_NO_GO] 2 ACs sans Given/When/Then → workspace/output/.sys/.validation/{n}-readiness.md. (15%)`.
+`🔴 [VALIDATE/FAIL] FEAT {n} NO-GO — [READINESS_NO_GO] 2 ACs sans Given/When/Then → workspace/.sys/.validation/{n}-readiness.md. (15%)`.
 
 **Bypass debug** : `SDD_CHAT_VERBOSE=1` → mode legacy verbose (§10).

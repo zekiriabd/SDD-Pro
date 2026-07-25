@@ -36,14 +36,14 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sdd_lib.exit_codes import SUCCESS, INFRA_BLOCKED, CORRECTIBLE  # noqa: E402
-from sdd_lib.paths import project_root_for_hook as _resolve_project_root
+from sdd_lib.paths import workspace_root, project_root_for_hook as _resolve_project_root
 
 SENTINEL = "sha256:COMPUTE_REQUIRED"
 
 
 def _find_feat_file(root: Path, feat_number: int) -> Path | None:
-    """Glob workspace/input/feats/{n}-*.md."""
-    feats_dir = root / "workspace" / "input" / "feats"
+    """Glob workspace/feats/{n}-*.md."""
+    feats_dir = workspace_root(root) / "feats"
     if not feats_dir.is_dir():
         return None
     matches = sorted(feats_dir.glob(f"{feat_number}-*.md"))
@@ -53,14 +53,14 @@ def _find_feat_file(root: Path, feat_number: int) -> Path | None:
 
 
 def _us_files_for_feat(root: Path, feat_number: int) -> list[Path]:
-    us_dir = root / "workspace" / "output" / "us"
+    us_dir = workspace_root(root) / "us"
     if not us_dir.is_dir():
         return []
     return sorted(us_dir.glob(f"{feat_number}-*.md"))
 
 
 def _all_us_files(root: Path) -> list[Path]:
-    us_dir = root / "workspace" / "output" / "us"
+    us_dir = workspace_root(root) / "us"
     if not us_dir.is_dir():
         return []
     return sorted(us_dir.glob("*.md"))
@@ -96,7 +96,7 @@ def _resolve_one_feat(root: Path, feat_number: int, quiet: bool) -> tuple[int, i
         if not quiet:
             sys.stderr.write(
                 f"WARN: FEAT {feat_number} file missing or ambiguous under "
-                f"workspace/input/feats/ — skipping hash resolution\n"
+                f"workspace/feats/ — skipping hash resolution\n"
             )
         return (0, 0)  # not an error — the qa or other agent that produced the US
                       # may have been working on a draft. SubagentStop hook should

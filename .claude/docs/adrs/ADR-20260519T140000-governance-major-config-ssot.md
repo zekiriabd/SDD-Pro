@@ -21,7 +21,7 @@ Single Source of Truth: `.claude/loader.yml` declares, per agent:
 - `reads:` — file globs the agent is expected to Read
 - `writes:` — file globs the agent is allowed to Write
 - `forbidden_writes:` — explicit denylist for paths the agent must
-  never touch (e.g. `dev-backend` must not write under `workspace/output/src/{AppName}/`)
+  never touch (e.g. `dev-backend` must not write under `workspace/src/{AppName}/`)
 - `modes:` — agent invocation modes (e.g. `qa.modes = {full, manual, off}`)
 
 Agents reference `@.claude/loader.yml` in their preamble rather than

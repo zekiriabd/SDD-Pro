@@ -4,9 +4,9 @@ ADR governance-major-reverse-spec-ladder. Deterministic (0 token, stdlib only,
 D4-isolated — no sdd_lib import). Verifies the traceability chain produced by
 the 3-rung ladder for ONE unit :
 
-    FEAT item (input/feats/{n}-{Name}.md)
-        --covers--> US AC (output/us/{n}-{m}-{Name}.md)
-            --covers--> task T-N (output/plans/{n}-{Name}.analysis.md)
+    FEAT item (feats/{n}-{Name}.md)
+        --covers--> US AC (us/{n}-{m}-{Name}.md)
+            --covers--> task T-N (plans/{n}-{Name}.analysis.md)
                 --evidence--> path:Lx-Ly
 
 Emits [REVERSE_LADDER_TRACEABILITY_GAP] findings. **Informational, never
@@ -18,7 +18,7 @@ Invocation :
     python .claude/python/sdd_reverse_scripts/check_ladder_traceability.py \
         --project workspace/old/{P} --unit U-3 [--json]
     python .claude/python/sdd_reverse_scripts/check_ladder_traceability.py \
-        --feat-path workspace/input/feats/3-Login.md [--json]
+        --feat-path workspace/feats/3-Login.md [--json]
 
 Exit codes :
     0  ran OK (verdict in {ladder-complete, partial, incomplete} — informational)
@@ -38,6 +38,7 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from sdd_reverse.console_safe import ensure_console_safe
+from sdd_reverse.paths import workspace_root
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
@@ -47,17 +48,144 @@ _EVIDENCE_RE = re.compile(r"<!--\s*evidence:\s*([^>]+?)\s*-->", re.IGNORECASE)
 _TASK_ID_RE = re.compile(r"\bT-\d+\b")
 _US_AC_REF_RE = re.compile(r"(\d+-\d+)\s*#\s*(AC-\d+)", re.IGNORECASE)
 
-# Confidence min-monotone (Q3, ADR reverse-spec-ladder) — frontmatter only
-# (`confidence:` en début de ligne, jamais les commentaires <!-- confidence -->).
+# Confidence min-monotone (Q3, ADR reverse-spec-ladder).
+# Source primaire : ligne header `confidence:`/`Confidence:` en début de ligne
+# (frontmatter 3a/3c ; ligne header US 3b depuis l'audit 2026-06-11 M2).
+# Fallback : commentaire de provenance `<!-- generated-by: ... confidence: X -->`
+# pour les US 3b générées AVANT le fix M2 (template sans ligne Confidence —
+# l'enforcement Q3 « US ≤ analyse » / « FEAT ≤ min(US) » était silencieusement
+# skippé pour 100 % d'entre elles).
 _CONF_RE = re.compile(r"^confidence:\s*(high|medium|low)\b", re.MULTILINE | re.IGNORECASE)
+_CONF_COMMENT_RE = re.compile(
+    r"<!--[^>]*\bconfidence:\s*(high|medium|low)\b[^>]*-->", re.IGNORECASE
+)
 _CONF_ORDER = {"low": 0, "medium": 1, "high": 2}
+
+# Confidence cap per language (D1, rule §4). SSoT = language_signatures.yml
+# `confidence_cap` — NEVER hardcoded. Parsed line-based (no PyYAML dep on this
+# deterministic script): a `- id: <lang>` line opens an entry, a later
+# `confidence_cap: <cap>` line (same entry) closes the association.
+_LANG_SIG_PATH = (
+    Path(__file__).resolve().parents[1] / "sdd_reverse" / "language_signatures.yml"
+)
+_LANG_ID_RE = re.compile(r"^\s*-\s+id:\s*([A-Za-z0-9_-]+)\s*$")
+_LANG_CAP_RE = re.compile(r"^\s*confidence_cap:\s*(high|medium|low)\b", re.IGNORECASE)
+_LANG_CAP_CACHE: dict[str, str] | None = None
+
+
+def _load_language_caps() -> dict[str, str]:
+    """Map language id → confidence_cap from language_signatures.yml (best-effort)."""
+    global _LANG_CAP_CACHE
+    if _LANG_CAP_CACHE is not None:
+        return _LANG_CAP_CACHE
+    caps: dict[str, str] = {}
+    raw = _read(_LANG_SIG_PATH)
+    if raw:
+        cur: str | None = None
+        for line in raw.splitlines():
+            m = _LANG_ID_RE.match(line)
+            if m:
+                cur = m.group(1)
+                continue
+            if cur is not None:
+                cm = _LANG_CAP_RE.match(line)
+                if cm:
+                    caps[cur] = cm.group(1).lower()
+                    cur = None
+    _LANG_CAP_CACHE = caps
+    return caps
+
+
+def _load_unit(project: Path | None, unit: str | None) -> dict | None:
+    """Load the units[id == unit] dict from inventory.json (best-effort, None on any failure)."""
+    if project is None or unit is None:
+        return None
+    raw = _read(project / ".sys" / "inventory.json")
+    if not raw:
+        return None
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return None
+    return next((x for x in (data.get("units") or []) if x.get("id") == unit), None)
+
+
+def _db_degraded(project: Path | None, entities) -> bool:
+    """True if the unit declares entities that are NOT DDL-backed in db-schema.
+
+    Deterministic form of the analyst's `cap_db` (rule §4 / agent 3a STEP 2:
+    "cap_db = medium si db-schema vide pour entities de l'unité"). Previously this
+    cap lived ONLY in the 3a prompt ("cap_db runtime-only reste prompt-side"), so a
+    3a writing `high` on code-deduced entities passed every gate. Now enforced here.
+    A unit with NO declared entities is never db-degraded (nothing to back).
+    """
+    if not entities or project is None:
+        return False
+    for fn in ("db-schema.merged.json", "db-schema.json"):
+        raw = _read(project / ".sys" / fn)
+        if not raw:
+            continue
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            continue
+        names = {e.get("name") for e in (data.get("entities") or [])}
+        # Degraded if ANY unit entity is absent from the DDL-sourced schema.
+        return any(e not in names for e in entities)
+    # No db-schema file at all but the unit declares entities → deduced from code.
+    return True
+
+
+def _unit_cap(project: Path | None, unit: str | None) -> tuple[str | None, str | None]:
+    """Return (language, effective_cap) for a unit, or (None, None) if unresolved.
+
+    effective_cap = min(confidence_cap[language], unit.confidenceEstimate,
+    cap_db) — the deterministic floor of the rule §4 formula. `cap_db` (medium
+    when the unit's entities are not DDL-backed) is now enforced here too
+    (audit 2026-06-29: was prompt-only). Best-effort: any failure (no inventory,
+    no project/unit, unknown language) yields (None, None) so the caller skips
+    the check — informational, never breaks.
+    """
+    u = _load_unit(project, unit)
+    if not u:
+        return (None, None)
+    language = u.get("language")
+    cap = _load_language_caps().get(language) if language else None
+    if cap is None:
+        return (language, None)
+    estimate = u.get("confidenceEstimate")
+    if estimate in _CONF_ORDER and _CONF_ORDER[estimate] < _CONF_ORDER[cap]:
+        cap = estimate  # tighten to the lower of lang-cap and per-unit estimate
+    if _db_degraded(project, u.get("entities") or []) and _CONF_ORDER["medium"] < _CONF_ORDER[cap]:
+        cap = "medium"  # cap_db: entities deduced from code, not DDL-sourced
+    return (language, cap)
+
+
+def _graph_built(project: Path | None, unit: str | None) -> bool | None:
+    """Whether a class graph (L0) was built for the unit.
+
+    True  → units[].classes non-empty (deep extraction available, .NET path).
+    False → units[].classes present but empty (graph ran, nothing — non-.NET
+            languages where code_graph_builder is unavailable).
+    None  → unknown (no inventory / no `classes` key / pre-L0 cache) → no signal.
+    """
+    u = _load_unit(project, unit)
+    if not u:
+        return None
+    classes = u.get("classes")
+    if classes is None:
+        return None
+    return bool(classes)
 
 
 def _frontmatter_confidence(text: str | None) -> str | None:
-    """Confidence du frontmatter (head du document), ou None si absente."""
+    """Confidence du header (frontmatter/ligne), fallback commentaire provenance."""
     if not text:
         return None
     m = _CONF_RE.search(text[:2000])
+    if m:
+        return m.group(1).lower()
+    m = _CONF_COMMENT_RE.search(text[:2000])
     return m.group(1).lower() if m else None
 
 
@@ -93,7 +221,7 @@ def _resolve_feat(project: Path | None, unit: str | None, feat_path: Path | None
     name = next((k for k, v in names.items() if v == unit), None)
     if name is None:
         raise KeyError(f"_allocatedNames has no entry for {unit}")
-    feat = REPO_ROOT / "workspace" / "input" / "feats" / f"{n}-{name}.md"
+    feat = workspace_root(REPO_ROOT) / "feats" / f"{n}-{name}.md"
     return feat, str(n), name
 
 
@@ -180,13 +308,16 @@ def _parse_analysis_tasks(text: str) -> dict[str, bool]:
 
 def check(project: Path | None, unit: str | None, feat_path: Path | None) -> dict:
     feat, n, name = _resolve_feat(project, unit, feat_path)
-    feats_dir = REPO_ROOT / "workspace" / "input" / "feats"
-    us_dir = REPO_ROOT / "workspace" / "output" / "us"
-    plans_dir = REPO_ROOT / "workspace" / "output" / "plans"
+    feats_dir = workspace_root(REPO_ROOT) / "feats"
+    us_dir = workspace_root(REPO_ROOT) / "us"
+    plans_dir = workspace_root(REPO_ROOT) / "plans"
 
     feat_text = _read(feat) if feat else None
     analysis_text = _read(plans_dir / f"{n}-{name}.analysis.md")
-    us_files = sorted(us_dir.glob(f"{n}-*-{name}.md")) if us_dir.is_dir() else []
+    # US filenames carry per-capability {Name} (decision Tech Lead 2026-06-13) and
+    # no longer share the FEAT {Name} — match by the numeric {n}- prefix only
+    # (us_short is re-derived from each US `ID:` line in _parse_us_acs).
+    us_files = sorted(us_dir.glob(f"{n}-*.md")) if us_dir.is_dir() else []
 
     artifacts = {
         "feat": feat_text is not None,
@@ -254,6 +385,34 @@ def check(project: Path | None, unit: str | None, feat_path: Path | None) -> dic
     conf_analysis = _frontmatter_confidence(analysis_text)
     conf_feat = _frontmatter_confidence(feat_text)
     us_confs = [(f.name, _frontmatter_confidence(t)) for f, t in us_texts]
+
+    # Root cap enforcement (D1, rule §4) — audit fix 2026-06-12 (reverse-C2).
+    # Monotonicity above only guarantees US ≤ analysis ≤ … *relatively*; nothing
+    # checked that the analysis itself respects confidence_cap[language]. A 3a
+    # writing `high` on a `medium`-cap language (php-procedural, vbnet, …) used
+    # to pass every gate and unlock /sdd-full without review. Now flagged.
+    unit_language, unit_cap = _unit_cap(project, unit)
+    if conf_analysis and unit_cap and _CONF_ORDER[conf_analysis] > _CONF_ORDER[unit_cap]:
+        gaps.append(
+            f"confidence cap: analysis ({conf_analysis}) > cap[{unit_language}] "
+            f"({unit_cap}) — D1 rule §4 violated (downgrade analysis or fix language)"
+        )
+
+    # Extraction-depth signal (audit 2026-06-29) — a `high` confidence asserts
+    # reading-reliability, NOT extraction-depth. code_graph_builder is .NET-only;
+    # a non-.NET unit whose class graph is empty can be `high` (e.g. java-ee,
+    # spring-mvc, php-framework all carry cap=high in rule §4) yet structurally
+    # under-extracted. The REVERSE-GATE keys on `confidence==high`, conflating the
+    # two — surface it here so a shallow-but-readable FEAT is auditable before it
+    # auto-unlocks /sdd-full. Informational; never silently filled.
+    graph_built = _graph_built(project, unit)
+    if conf_analysis == "high" and graph_built is False:
+        gaps.append(
+            "extraction-depth: analysis confidence=high but the unit class graph "
+            "is empty (non-.NET deep extraction unavailable) — reading-reliable ≠ "
+            "extraction-deep; human review recommended before /sdd-full"
+        )
+
     if conf_analysis:
         for fname, c in us_confs:
             if c and _CONF_ORDER[c] > _CONF_ORDER[conf_analysis]:
@@ -275,6 +434,35 @@ def check(project: Path | None, unit: str | None, feat_path: Path | None) -> dic
                 f"— min-monotone Q3 violated"
             )
 
+    # Inter-rung staleness (audit 2026-06-29) — re-wires [REVERSE_LADDER_STALE],
+    # the ADR-documented risk whose emitter was purged as dead code (MA-7). A lower
+    # rung re-run after the upper rungs leaves them out of sync; the unit-grained
+    # extraction cache does NOT catch partial-rung regeneration. mtime-based, like
+    # [REVERSE_INVENTORY_STALE]/ADV-1 (established pattern in this module). 1s
+    # tolerance avoids false positives on near-simultaneous writes. Reported
+    # separately from `gaps` (orthogonal to traceability), informational only.
+    stale_findings: list[str] = []
+    try:
+        a_mtime = (plans_dir / f"{n}-{name}.analysis.md").stat().st_mtime
+        feat_mtime = feat.stat().st_mtime
+        us_mtimes = [f.stat().st_mtime for f in us_files]
+        newest_us = max(us_mtimes) if us_mtimes else None
+        if newest_us is not None and a_mtime > newest_us + 1:
+            stale_findings.append(
+                "3a analysis is newer than the 3b US — re-run /sdd-reverse-stories "
+                "then /sdd-reverse-feat (upper rungs stale)"
+            )
+        if a_mtime > feat_mtime + 1:
+            stale_findings.append(
+                "3a analysis is newer than the 3c FEAT — re-run /sdd-reverse-feat"
+            )
+        if newest_us is not None and newest_us > feat_mtime + 1:
+            stale_findings.append(
+                "3b US are newer than the 3c FEAT — re-run /sdd-reverse-feat"
+            )
+    except OSError:
+        pass
+
     verdict = "ladder-complete" if not gaps else ("partial" if len(gaps) <= 3 else "incomplete")
     return {
         "unit": unit, "n": n, "name": name, "artifacts": artifacts,
@@ -284,11 +472,18 @@ def check(project: Path | None, unit: str | None, feat_path: Path | None) -> dic
             "analysis": conf_analysis,
             "us": {fname: c for fname, c in us_confs},
             "feat": conf_feat,
+            "language": unit_language,
+            "language_cap": unit_cap,
         },
+        "extraction_depth": (
+            "deep" if graph_built else ("shallow" if graph_built is False else "unknown")
+        ),
         "verdict": verdict,
         "gap_count": len(gaps),
         "gaps": gaps,
         "class": "[REVERSE_LADDER_TRACEABILITY_GAP]" if gaps else None,
+        "stale_findings": stale_findings,
+        "stale_class": "[REVERSE_LADDER_STALE]" if stale_findings else None,
     }
 
 
@@ -325,6 +520,12 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"    • {g}")
             if report["gap_count"] > 20:
                 print(f"    … +{report['gap_count'] - 20} more")
+            stale = report.get("stale_findings", [])
+            if stale:
+                # Emitter for [REVERSE_LADDER_STALE] (informational, never blocking).
+                print(f"  CAUSE: [REVERSE_LADDER_STALE] {len(stale)} rung(s) out of sync")
+                for s in stale:
+                    print(f"    ⚠ {s}")
         else:
             print(f"  {report.get('message')}")
 

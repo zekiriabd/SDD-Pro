@@ -1,3 +1,11 @@
+---
+# TOK-C1 (audit 2026-06-12) : chargement paresseux (path-scoped rule). Référencée par
+# dev-backend/frontend dans leurs STEP 0–1.bis (Read explicite) ; auto-injection au contact
+# du code généré. Aucun autre agent ne la consomme.
+paths:
+  - "workspace/src/**"
+---
+
 # Règle — Dev-shared preflight (STEP 0/0.5/1/1.bis cross-agent, v7.0.0)
 
 > **v7.0.0 hoist** : les STEP 0 (preflight script-driven), STEP 0.5
@@ -81,7 +89,7 @@ post-build (STEP 11 de `dev-frontend.md`).
 
 Pattern partagé — appliquer `@.claude/rules/build-and-loop.md §1.bis`
 ligne `{agent-id}` de la matrice. Bloquant avant tout Write/Edit sous
-`workspace/output/src/`.
+`workspace/src/`.
 
 Violation → STOP + ERROR `[FILE_OWNERSHIP_NESTED]`.
 
@@ -96,7 +104,7 @@ Violation → STOP + ERROR `[FILE_OWNERSHIP_NESTED]`.
 | Glob mode From Plan | `*.back.md` | `*.front.md` |
 | Codes preflight extra | (aucun) | `HTML_AMBIGUOUS`, `UI_DS_NOT_SELECTED` (si `htmlPath != null` sans `ui-*` actif) |
 | Variables JSON extra | (aucune) | `htmlPath` (peut être `null`) |
-| Path safety (root autorisé) | `workspace/output/src/{BackendName}/` | `workspace/output/src/{AppName}/` |
+| Path safety (root autorisé) | `workspace/src/{BackendName}/` | `workspace/src/{AppName}/` |
 | Mode Normal post-1 | génération code + build | génération code + build + **fidelity check** |
 
 ---

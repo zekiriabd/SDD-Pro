@@ -26,7 +26,7 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sdd_lib.exit_codes import FAIL_FAST, SUCCESS  # noqa: E402
-from sdd_lib.paths import repo_root  # noqa: E402
+from sdd_lib.paths import workspace_root, repo_root  # noqa: E402
 from sdd_lib.project_config import read_stack_md_text, section_body  # noqa: E402
 
 
@@ -43,7 +43,7 @@ def parse_args() -> argparse.Namespace:
     # comme no-op signal explicit. Avant ce fix, `/sdd-full` STEP 4.7 invoquait
     # `/feat-validate {n} --json --post-dev` mais argparse rejetait `--post-dev`
     # (unrecognized arguments) → STEP 4.7 = dead branch. Le script auto-détecte
-    # déjà le mode post-dev via `find workspace/output/src` (STEP 4.5 logic) ;
+    # déjà le mode post-dev via `find workspace/src` (STEP 4.5 logic) ;
     # ce flag est donc un signal documentaire pour forcer le mode quand le code
     # est matérialisé. No-op interne — la détection reste basée sur la présence
     # disque de code matérialisé.
@@ -290,11 +290,11 @@ def detect_deepen_run(const_content: str) -> bool:
 def main() -> int:
     args = parse_args()
     root = repo_root()
-    feats_dir = root / "workspace" / "input" / "feats"
-    us_dir = root / "workspace" / "output" / "us"
-    ui_dir = root / "workspace" / "input" / "ui"
-    stack_path = root / "workspace" / "input" / "stack" / "stack.md"
-    const_path = root / "workspace" / "output" / ".sys" / ".context" / "constitution.md"
+    feats_dir = workspace_root(root) / "feats"
+    us_dir = workspace_root(root) / "us"
+    ui_dir = workspace_root(root) / "ui"
+    stack_path = workspace_root(root) / "stack" / "stack.md"
+    const_path = workspace_root(root) / ".sys" / ".context" / "constitution.md"
 
     rep = Report()
 
@@ -303,7 +303,7 @@ def main() -> int:
     if not all_feat_files:
         rep.add_err(
             "FEAT-MISSING",
-            f"Aucun fichier workspace/input/feats/{args.feat_number}-*.md trouve",
+            f"Aucun fichier workspace/feats/{args.feat_number}-*.md trouve",
             "Creer la FEAT via /feat-generate ou la deposer manuellement",
         )
     elif feat_file is None and len(all_feat_files) > 1:
@@ -329,7 +329,7 @@ def main() -> int:
                     rep.add_err(
                         f"{prefix}-SECTION",
                         f"Section ## {section} absente de la FEAT",
-                        f"Ajouter la section ## {section} dans workspace/input/feats/{feat_file.name}",
+                        f"Ajouter la section ## {section} dans workspace/feats/{feat_file.name}",
                     )
                 continue
             if r.get("empty"):
@@ -360,7 +360,7 @@ def main() -> int:
     if feat_file and not us_files:
         rep.add_err(
             "US-MISSING",
-            f"Aucune US trouvee (workspace/output/us/{args.feat_number}-*.md)",
+            f"Aucune US trouvee (workspace/us/{args.feat_number}-*.md)",
             f"Lancer /us-generate {args.feat_number}",
         )
     elif feat_file and us_files:
@@ -397,8 +397,8 @@ def main() -> int:
     if not stack_path.is_file():
         rep.add_err(
             "STACK-MISSING",
-            "workspace/input/stack/stack.md absent",
-            "Creer workspace/input/stack/stack.md avec sections Active Tech Specs / Project Config",
+            "workspace/stack/stack.md absent",
+            "Creer workspace/stack/stack.md avec sections Active Tech Specs / Project Config",
         )
     else:
         # v7.0.0-alpha (audit CRIT-2) : cached mtime-keyed read.
@@ -425,7 +425,7 @@ def main() -> int:
             rep.add_err(
                 "STACK-INCOHERENT",
                 f"{coherence_err['code']}: {coherence_err['message']}",
-                "Corriger workspace/input/stack/stack.md (un seul AppType actif : fullstack OU back+front OU mobile).",
+                "Corriger workspace/stack/stack.md (un seul AppType actif : fullstack OU back+front OU mobile).",
             )
         else:
             has_backend = stacks_dict["backend"] is not None
@@ -539,7 +539,7 @@ def main() -> int:
                 rep.add_err(
                     "DB-KEYS-MISSING",
                     f"Cles manquantes ou vides dans ## Active Database : {', '.join(missing_db)}",
-                    "Renseigner les valeurs dans workspace/input/stack/stack.md ## Active Database",
+                    "Renseigner les valeurs dans workspace/stack/stack.md ## Active Database",
                 )
             else:
                 rep.add_pass("DB-KEYS", "## Active Database complet (5 cles DB_* presentes)")
@@ -555,7 +555,7 @@ def main() -> int:
                 rep.add_err(
                     "AUTH-STACK-MISSING",
                     f"Stack auth refere dans ## Active Auth Specs introuvable : {auth_stack_rel}",
-                    f"Verifier le chemin dans workspace/input/stack/stack.md ## Active Auth Specs",
+                    f"Verifier le chemin dans workspace/stack/stack.md ## Active Auth Specs",
                 )
             else:
                 auth_stack_content = read_text_safe(auth_stack_path)
@@ -574,7 +574,7 @@ def main() -> int:
                             "AUTH-KEYS-MISSING",
                             f"Cles manquantes ou vides dans ## Active Auth Specs ({stack_id}) : "
                             f"{', '.join(missing_auth)}",
-                            f"Renseigner les valeurs dans workspace/input/stack/stack.md "
+                            f"Renseigner les valeurs dans workspace/stack/stack.md "
                             f"## Active Auth Specs (cles obligatoires declarees par {auth_stack_rel} : "
                             f"{', '.join(required_keys)})",
                         )
@@ -625,7 +625,7 @@ def main() -> int:
     # 1.5 Constitution
     const_content = ""
     if const_path.is_file():
-        rep.add_pass("CONST-EXISTS", "Constitution presente (workspace/output/.sys/.context/constitution.md)")
+        rep.add_pass("CONST-EXISTS", "Constitution presente (workspace/.sys/.context/constitution.md)")
         const_content = read_text_safe(const_path)
         if feat_file and feat_name:
             if re.search(re.escape(f"{args.feat_number}-{feat_name}"), const_content):
@@ -642,7 +642,7 @@ def main() -> int:
     else:
         rep.add_warn(
             "CONST-MISSING",
-            "Constitution absente (workspace/output/.sys/.context/constitution.md) - "
+            "Constitution absente (workspace/.sys/.context/constitution.md) - "
             "projet pre-v3 ou /feat-generate non utilise. Non bloquant.",
         )
 

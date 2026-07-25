@@ -46,7 +46,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from sdd_lib.paths import repo_root  # noqa: E402
+from sdd_lib.paths import workspace_root, repo_root  # noqa: E402
 from sdd_lib.stderr import error_block  # noqa: E402
 from sdd_lib.exit_codes import FAIL_FAST, SUCCESS  # noqa: E402
 
@@ -93,7 +93,7 @@ METADATA_BLOCK_RE = re.compile(
 def resolve_us_path(us_id: str) -> Path | None:
     if not US_ID_RE.match(us_id):
         return None
-    us_dir = repo_root() / "workspace" / "output" / "us"
+    us_dir = workspace_root(repo_root()) / "us"
     matches = sorted(us_dir.glob(f"{us_id}-*.md"))
     if len(matches) != 1:
         return None
@@ -227,7 +227,7 @@ def main() -> int:
     if us_path is None:
         error_block(
             f"compute_us_complexity — US {args.us} not found",
-            f"[US_NOT_FOUND] no unique match for workspace/output/us/{args.us}-*.md",
+            f"[US_NOT_FOUND] no unique match for workspace/us/{args.us}-*.md",
             "verify --us format ({n}-{m}) and that /us-generate has run",
         )
         return FAIL_FAST

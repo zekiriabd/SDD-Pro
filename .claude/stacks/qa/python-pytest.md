@@ -13,7 +13,7 @@ Scope: tests unitaires backend Python (FastAPI, Flask, Django)
 ## 1. Scope
 
 Tests unitaires pour backends Python (FastAPI, Flask, Django).
-S'applique aux projets `workspace/output/src/{BackendName}/` typés Python.
+S'applique aux projets `workspace/src/{BackendName}/` typés Python.
 
 ---
 
@@ -59,12 +59,12 @@ Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'U
 
 ## 3. Init Commands (idempotent)
 
-Si `workspace/output/src/{BackendName}/tests/` n'existe pas :
+Si `workspace/src/{BackendName}/tests/` n'existe pas :
 
 <!-- CORE_PACKAGES_START -->
 ```bash
 # Auto-genere depuis python-pytest.libs.json -- ne pas editer (utiliser sync_stack_md.py).
-uv add --project workspace/output/src/{BackendName} \
+uv add --project workspace/src/{BackendName} \
   pytest==8.3.4 \
   pytest-asyncio==0.25.0 \
   pytest-cov==6.0.0 \
@@ -78,13 +78,13 @@ uv add --project workspace/output/src/{BackendName} \
 ```bash
 # Auto-genere depuis python-pytest.libs.json (on-demand) -- installe par dev-* si l'US declenche un trigger.
 # capability: http-mock
-uv add --project workspace/output/src/{BackendName} respx==0.22.0
+uv add --project workspace/src/{BackendName} respx==0.22.0
 ```
 <!-- ONDEMAND_PACKAGES_END -->
 
 ```bash
-mkdir -p workspace/output/src/{BackendName}/tests
-touch workspace/output/src/{BackendName}/tests/__init__.py
+mkdir -p workspace/src/{BackendName}/tests
+touch workspace/src/{BackendName}/tests/__init__.py
 ```
 
 Configuration `pyproject.toml` (ou `pytest.ini`) — append :
@@ -109,7 +109,7 @@ show_missing = true
 ## 4. Project structure
 
 ```
-workspace/output/src/{BackendName}/
+workspace/src/{BackendName}/
 ├── app/                              # code production
 │   ├── services/
 │   │   └── auth_service.py
@@ -180,14 +180,14 @@ def test_post_login_with_invalid_credentials_returns_401(client):
 ### 6.1 Test command
 
 ```bash
-cd workspace/output/src/{BackendName}
+cd workspace/src/{BackendName}
 pytest --cov=app --cov-report=xml --cov-report=term
 ```
 
 ### 6.2 Linter
 
 ```bash
-cd workspace/output/src/{BackendName}
+cd workspace/src/{BackendName}
 ruff check app/ tests/
 # OU
 flake8 app/ tests/
@@ -204,7 +204,7 @@ mypy app/
 ## 7. Coverage output format
 
 Format : **coverage.xml** (Cobertura)
-Path : `workspace/output/src/{BackendName}/coverage.xml`
+Path : `workspace/src/{BackendName}/coverage.xml`
 
 Le script `parse_coverage.py` parse ce format via
 `Parse-CoberturaXml`.

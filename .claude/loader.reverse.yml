@@ -1,7 +1,7 @@
 # loader.reverse.yml — Reverse engineering manifest (D4 autonomous)
 #
 # Mirror format of loader.yml but isolated. Discovered via frontmatter
-# `loader: .claude/loader.reverse.yml` in the 3 reverse commands and the
+# `loader: .claude/loader.reverse.yml` in the 12 reverse commands and the
 # starting-a-reverse-eng skill. NEVER referenced by loader.yml.
 #
 # ADV-17 closure: reverse-tech-auditor.writes points to db-schema.enrichment.json
@@ -52,7 +52,7 @@ agents:
     # deps-graph.json is produced by deterministic script reverse_audit.py, not the agent.
 
   reverse-tech-analyst:
-    model: claude-opus-4-8
+    model: claude-opus-4-8       # DEFAULT (complex units). Routed to claude-sonnet-4-6 for `simple` units by /sdd-reverse-analyze (ADR governance-reverse-complexity-ladder, classifier sdd_reverse/code_unit_complexity.py). Structure unchanged — model-only routing.
     phase: 3a
     available_from: v0.7.0       # ADR governance-major-reverse-spec-ladder — barreau bas de l'escalier
     reads:
@@ -64,36 +64,36 @@ agents:
       - .claude/python/sdd_reverse/language_signatures.yml
       - .claude/python/sdd_reverse/analysis.reverse.template.md # isolated tech-analysis template (D5)
     writes:
-      - workspace/output/plans/{n}-{Name}.analysis.md           # tech-analysis output (distinct ext from forward .back/.front)
+      - workspace/plans/{n}-{Name}.analysis.md           # tech-analysis output (distinct ext from forward .back/.front)
       - workspace/old/{P}/.sys/modules/{Module}/extraction.md   # extraction log
       - workspace/old/{P}/.sys/inventory.json                   # _featAllocations + _allocatedNames (legacy mode only — 3a owns allocation)
 
   reverse-us-writer:
-    model: claude-opus-4-8
+    model: claude-sonnet-4-6     # 3b = altitude-lift sur l'analyse 3a (forbidden_reads sur le code legacy) → Sonnet suffit, -33% coût Opus reverse (audit 2026-06-11). 3a/3c restent Opus.
     phase: 3b
     available_from: v0.7.0       # ADR governance-major-reverse-spec-ladder — barreau moyen
     reads:
-      - workspace/output/plans/{n}-{Name}.analysis.md          # 3a tech-analysis (SOLE content source)
+      - workspace/plans/{n}-{Name}.analysis.md          # 3a tech-analysis (SOLE content source)
       - workspace/old/{P}/.sys/inventory.json                  # units[U-N] metadata (kind, roles, allocation) — NOT new content
       - .claude/python/sdd_reverse/us.reverse.template.md
     writes:
-      - workspace/output/us/{n}-{m}-{Name}.md                  # user stories (1 per capability)
+      - workspace/us/{n}-{m}-{Name}.md                  # user stories (1 per capability)
       - workspace/old/{P}/.sys/modules/{Module}/stories-3b.md  # decision log
     forbidden_reads:
       - workspace/old/{P}/{evidenceFiles}                      # 3b NEVER reads legacy code — only the 3a analysis
 
   reverse-feat-composer:
-    model: claude-opus-4-8
+    model: claude-opus-4-8       # DEFAULT (complex units). Routed to claude-sonnet-4-6 for `simple` units by /sdd-reverse-feat (ADR governance-reverse-complexity-ladder, same classifier as 3a → class stable across the ladder).
     phase: 3c
     available_from: v0.7.0       # ADR governance-major-reverse-spec-ladder — barreau haut (remplace reverse-functional-extractor, décommissionné D2)
     reads:
-      - workspace/output/us/{n}-{m}-{Name}.md                  # 3b user stories (SOLE content source)
-      - workspace/output/plans/{n}-{Name}.analysis.md          # 3a tech-analysis (evidence resolution + plumbing to demote)
+      - workspace/us/{n}-{m}-{Name}.md                  # 3b user stories (SOLE content source)
+      - workspace/plans/{n}-{Name}.analysis.md          # 3a tech-analysis (evidence resolution + plumbing to demote)
       - workspace/old/{P}/.sys/inventory.json                  # units[U-N] metadata (kind, dataAccess, allocation)
       - .claude/python/sdd_reverse/language_signatures.yml
       - .claude/python/sdd_reverse/feat.reverse.template.md    # ADV-9 isolated template (reused)
     writes:
-      - workspace/input/feats/{n}-{Name}.md                    # the FEAT output (business altitude, plumbing demoted)
+      - workspace/feats/{n}-{Name}.md                    # the FEAT output (business altitude, plumbing demoted)
       - workspace/old/{P}/.sys/modules/{Module}/feat-3c.md     # composition log
     forbidden_reads:
       - workspace/old/{P}/{evidenceFiles}                      # 3c NEVER reads legacy code — only US 3b + analysis 3a
@@ -105,7 +105,7 @@ agents:
     available_from: v0.5.0       # L5 — back-side completeness review (informational)
     reads:
       - workspace/old/{P}/.sys/inventory.json                   # units[U-N].classes + dataAccess
-      - workspace/input/feats/{n}-{Name}.md                     # the FEAT under review
+      - workspace/feats/{n}-{Name}.md                     # the FEAT under review
       - workspace/old/{P}/{evidenceFiles}                       # strict, to judge gaps
     writes:
       - workspace/old/{P}/.sys/modules/{Module}/completeness-review.md
@@ -121,9 +121,106 @@ agents:
     reads:
       - workspace/old/{P}/.sys/inventory.json
       - workspace/old/{P}/{templateFiles, cssFiles}             # selective, ≤ 15 files
-      - workspace/input/feats/{n}-{Name}.md                     # the FEAT produced Phase 3
+      - workspace/feats/{n}-{Name}.md                     # the FEAT produced Phase 3
     writes:
-      - workspace/input/ui/{n}-{m}-{Name}.html
+      - workspace/ui/{n}-{m}-{Name}.html
+
+  reverse-parity-inspector:
+    model: claude-sonnet-4-6
+    phase: "3.8"
+    optional: true
+    available_from: v0.9.0     # emprunt Reversa (Inspector) — audit comparatif 2026-06-12
+    reads:
+      - workspace/feats/{n}-{Name}.md                     # FEAT reverse (SOLE behavioral source)
+      - workspace/us/{n}-{m}-{Name}.md                   # US 3b (scenario granularity)
+      - workspace/plans/{n}-{Name}.analysis.md           # 3a (evidence resolution only)
+      - .claude/python/sdd_reverse/parity.reverse.template.feature
+    writes:
+      - workspace/parity/feat-{n}/{m}-{Slug}.feature
+      - workspace/parity/feat-{n}/parity-map.md
+    forbidden_reads:
+      - workspace/old/{P}/**                                    # NEVER reads legacy code (altitude FEAT/US)
+    delegated_to:
+      - .claude/python/sdd_reverse_scripts/validate_parity_features.py   # deterministic Gherkin gate
+
+  reverse-paradigm-advisor:
+    model: claude-sonnet-4-6
+    phase: "2.7"
+    optional: true
+    available_from: v0.9.0     # emprunt Reversa (Paradigm Advisor + Curator) — audit comparatif 2026-06-12
+    reads:
+      - workspace/old/{P}/.sys/inventory.json
+      - workspace/old/{P}/.sys/tech-audit.md                    # optional (Phase 2)
+      - workspace/old/{P}/.sys/deps-graph.json                  # optional (Phase 2) — orphan signal for DISCARD
+      - workspace/stack/stack.md                          # target stack paradigm
+      - .claude/python/sdd_reverse/language_signatures.yml
+      - workspace/old/{P}/{evidenceFiles}                       # ≤ 10 example files, file:line citations only
+    writes:
+      - workspace/old/{P}/.sys/paradigm-decision.md
+      - workspace/old/{P}/.sys/curation.md
+
+  reverse-clarifier:
+    model: claude-sonnet-4-6
+    phase: "3.9"
+    optional: true
+    available_from: v0.9.0     # emprunt Reversa (questions.md interactif) — audit comparatif 2026-06-12
+    reads:
+      - workspace/old/{P}/.sys/inventory.json
+      - workspace/old/{P}/.sys/modules/{Module}/completeness-review.md
+      - workspace/old/{P}/.sys/curation.md                      # optional (Phase 2.7)
+      - workspace/parity/feat-{n}/parity-map.md       # optional (Phase 3.8)
+      - workspace/feats/{n}-{Name}.md                     # items medium/low + ingest target
+      - workspace/old/{P}/.sys/questions.md                     # Q-N stability + answers (--ingest)
+      - .claude/python/sdd_reverse/questions.reverse.template.md
+    writes:
+      - workspace/old/{P}/.sys/questions.md
+      - workspace/feats/{n}-{Name}.md                     # --ingest ONLY (human-validated patching, §10 resync)
+    forbidden_reads:
+      - workspace/old/{P}/{evidenceFiles}                       # never re-reads legacy code — gaps come from reports
+    delegated_to:
+      - .claude/python/sdd_reverse_scripts/check_ladder_traceability.py   # gap collection (generate)
+      - .claude/python/sdd_reverse_scripts/validate_reverse_feat.py       # post-ingest revalidation
+
+  reverse-sql-analyst:
+    model: claude-opus-4-8
+    phase: "proc-1"
+    optional: true
+    available_from: v1.0.0       # stored-procedure reverse — DB live READ-ONLY → US (1 proc = 1 US)
+    reads:
+      - workspace/old/{P}/.sys/inventory.json                    # units = modules (source: proc-reverse)
+      - workspace/old/{P}/.sys/proc-snapshot/{schema}.{proc}.sql # READ-ONLY body snapshot (Phase 1)
+      - workspace/old/{P}/.sys/db-introspection.json             # deterministic signals (no secret)
+      - .claude/python/sdd_reverse/us.proc.reverse.template.md
+      - .claude/python/sdd_reverse/language_signatures.yml
+    writes:
+      - workspace/us/{n}-{m}-{Name}.md                    # 1 user story per stored procedure
+    delegated_to:
+      - .claude/python/sdd_reverse_scripts/reverse_proc_introspect.py  # Phase 1 read-only introspection
+    # READ-ONLY: the analyst NEVER connects to or executes against the live
+    # database — it reads only the .sys/proc-snapshot/*.sql bodies that Phase 1
+    # extracted via SELECT-only catalog queries (readonly_guard).
+
+  reverse-sql-feat-composer:
+    model: claude-opus-4-8
+    phase: "proc-2"
+    optional: true              # OPT-IN rung 2 (SDD_REVERSE_FEAT_LLM=1) — default = build_proc_feats.py (0 token)
+    available_from: v1.1.0      # 2026-07-24 — LLM module-FEAT composer, parity with code ladder 3c
+    reads:
+      - workspace/old/{P}/.sys/inventory.json                    # module metadata + _featAllocations
+      - workspace/us/{n}-{m}-{Name}.md                           # the module's SQL-object User Stories (only content source)
+      - workspace/old/{P}/.sys/proc-snapshot/{schema}.{proc}.sql # READ-ONLY, evidence resolution only
+      - .claude/python/sdd_reverse/feat.reverse.template.md
+      - .claude/python/sdd_reverse/language_signatures.yml
+    writes:
+      - workspace/feats/{n}-{Name}.md                            # the module business FEAT
+      - workspace/us/{n}-{m}-{Name}.md                           # Edit-augment back-fill (Covers/Status/hash) — pont /sdd-full
+    delegated_to:
+      - .claude/python/sdd_reverse_scripts/validate_reverse_feat.py    # deterministic gate (max 3 iters)
+    forbidden_reads:
+      - workspace/src/         # never the application code
+      # NB: reads .sys/proc-snapshot/*.sql for EVIDENCE resolution only — never
+      # re-analyses the body (altitude already lifted by reverse-sql-analyst) and
+      # NEVER connects to the live DB (it is disconnected by this phase).
 
 
 commands:
@@ -172,6 +269,30 @@ commands:
     phase: "3.6"
     spawns: [reverse-completeness-reviewer]
     available_from: v0.6.0   # audit M11 2026-06-10 — wrapper so /sdd-reverse-full stays no-spawn
+  sdd-reverse-synth:
+    phase: "3.7"
+    spawns: []                  # synthesis layer — deterministic, no agent (read-only over .sys artefacts)
+    available_from: v0.8.0   # reverse synthesis layer (C4 + ERD + soul) — additive, never touches the ladder/FEAT
+  sdd-reverse-paradigm:
+    phase: "2.7"
+    spawns: [reverse-paradigm-advisor]
+    available_from: v0.9.0   # emprunt Reversa — paradigm gap + curation (informational, never destructive)
+  sdd-reverse-parity:
+    phase: "3.8"
+    spawns: [reverse-parity-inspector]
+    available_from: v0.9.0   # emprunt Reversa — Gherkin behavioral parity specs (informational)
+  sdd-reverse-questions:
+    phase: "3.9"
+    spawns: [reverse-clarifier]
+    available_from: v0.9.0   # emprunt Reversa — structured human validation loop (generate / --ingest)
+  sdd-proc-reverse-full:
+    phase: "proc-reverse"
+    spawns: [reverse-sql-analyst]
+    available_from: v1.0.0   # stored-procedure reverse — all routines (read-only DB → US/FEAT)
+  sdd-proc-reverse:
+    phase: "proc-reverse"
+    spawns: [reverse-sql-analyst]
+    available_from: v1.0.0   # stored-procedure reverse — single routine
 
 
 scripts_v2:
@@ -214,6 +335,21 @@ scripts:
   update_extraction_cache:                     # C4 audit 2026-06-10 — L5 cache wiring (--check orchestrator / --save extractor)
     path: .claude/python/sdd_reverse_scripts/update_extraction_cache.py
     cli: python .claude/python/sdd_reverse_scripts/update_extraction_cache.py --project <PATH> --unit U-N (--check | --save --n N --name NAME) [--json]
+  reverse_synth:                               # Phase 3.7 — synthesis layer (C4 + ERD + soul), deterministic, read-only, writes .sys/synthesis/
+    path: .claude/python/sdd_reverse_scripts/reverse_synth.py
+    cli: python .claude/python/sdd_reverse_scripts/reverse_synth.py --project <PATH> [--doc-level essentiel|complet|detaille] [--only c4,erd,soul] [--json]
+  validate_parity_features:                    # Phase 3.8 — deterministic Gherkin parity gate (structure blocking-WARN, coverage informational)
+    path: .claude/python/sdd_reverse_scripts/validate_parity_features.py
+    cli: python .claude/python/sdd_reverse_scripts/validate_parity_features.py --feat-path <PATH> --parity-dir <DIR> [--json]
+  reverse_proc_introspect:                     # proc-reverse Phase 1 — live READ-ONLY introspection (SELECT-only, readonly_guard)
+    path: .claude/python/sdd_reverse_scripts/reverse_proc_introspect.py
+    cli: python .claude/python/sdd_reverse_scripts/reverse_proc_introspect.py (--full | --proc NAME | --from-introspection P) [--project DB] [--stack PATH] [--json]
+  build_proc_us:                               # proc-reverse routing — deterministic 0-token US for simple procs, needs_llm list for complex
+    path: .claude/python/sdd_reverse_scripts/build_proc_us.py
+    cli: python .claude/python/sdd_reverse_scripts/build_proc_us.py --project DB (--unit U-N | --all) [--dry-run] [--workspace DIR] [--json]
+  build_proc_feats:                            # proc-reverse rung 2 — deterministic module FEAT assembler (US → FEAT, no body re-read)
+    path: .claude/python/sdd_reverse_scripts/build_proc_feats.py
+    cli: python .claude/python/sdd_reverse_scripts/build_proc_feats.py --project DB (--unit U-N | --all) [--workspace DIR] [--json]
 
 
 # Invariants reverse (V2 — to be hoisted in INVARIANTS.reverse.yml)

@@ -165,6 +165,9 @@ def main(argv: list[str] | None = None) -> int:
             "from current sdd_lib/* hash, reverse helpers may need a refresh sync.",
         ),
         "snapshots": fresh,
+        # Audit 2026-06-11 (B3) : préserver _note (explication MA-9 de la
+        # non-parité API de file_locks_local) — la régénération la perdait.
+        **({"_note": existing["_note"]} if "_note" in existing else {}),
         "notes": existing.get(
             "notes",
             "Hashes computed against sdd_lib/* at the most recent deliberate sync. "
@@ -172,7 +175,9 @@ def main(argv: list[str] | None = None) -> int:
         ),
     }
 
-    # Preserve previous snapshots for git diff auditability
+    # Backup local transient du snapshot précédent (.prev.json est GITIGNORÉ —
+    # ce n'est PAS un artefact d'audit git, juste un filet de sécurité local ;
+    # audit 2026-06-11 B3, l'ancienne mention « git diff auditability » mentait).
     prev_path = snap_path.with_suffix(".prev.json")
     try:
         atomic_write_text(prev_path, json.dumps(existing, indent=2, ensure_ascii=False) + "\n")

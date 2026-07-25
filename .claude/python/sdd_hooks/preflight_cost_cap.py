@@ -37,7 +37,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from sdd_lib.ci import is_ci as _detect_ci  # noqa: E402  # SSoT audit 2026-06-07
 from sdd_lib.exit_codes import HOOK_ALLOW, HOOK_DENY  # noqa: E402
 from sdd_lib.hook_input import read_hook_input, get_subagent_type  # noqa: E402
-from sdd_lib.pricing import PRICING, FALLBACK_PRICING  # noqa: E402  # v7.0.1 SSoT
+from sdd_lib.pricing import get_pricing  # noqa: E402  # v7.0.1 SSoT (normalizes [1m] suffix — audit CR-1)
 from sdd_lib.run_id import get_or_create_run_id  # noqa: E402  # v7.0.1 stable scoping
 from sdd_lib.stderr import warn  # noqa: E402
 
@@ -96,9 +96,9 @@ def _check_telemetry_health() -> None:
     accumulated since last successful run, so the operator knows the cost
     cap is operating on incomplete data."""
     try:
-        from sdd_lib.paths import repo_root
+        from sdd_lib.paths import workspace_root, repo_root
         counter_path = (
-            repo_root() / "workspace" / "output" / ".sys" / ".audit"
+            workspace_root(repo_root()) / ".sys" / ".audit"
             / "token-telemetry-failure-count"
         )
         if not counter_path.is_file():
@@ -108,7 +108,7 @@ def _check_telemetry_health() -> None:
             warn(
                 f"WARN preflight-cost-cap : token telemetry has {n} failed "
                 f"insert(s) accumulated. Cost cap is operating on possibly "
-                f"stale data. See workspace/output/.sys/.audit/"
+                f"stale data. See workspace/.sys/.audit/"
                 f"token-telemetry-failures.log for details. Reset counter "
                 f"after fix : echo 0 > {counter_path.as_posix()}"
             )
@@ -121,6 +121,10 @@ def _check_telemetry_health() -> None:
 # Mitigates per-Agent-spawn SQL hit (audit finding C3 v7.0.0-alpha 2026-06-04).
 # TTL 30s : cap precision is $50 default with O(0.01$) telemetry resolution,
 # 30s window is fine grained enough vs Agent spawn cadence (~5-30s).
+# NOTE audit 2026-06-11 (info #12) : chaque hook tourne dans un process
+# `python -c` frais (durée de vie < 1 s) — ce cache module-level ne produit
+# JAMAIS de hit aujourd'hui. Conservé délibérément : coût nul, et il devient
+# effectif si le hook est un jour invoqué in-process (harness long-vie).
 _COST_CACHE: dict[str, tuple[float, float, int, str]] = {}  # run_id -> (ts, cost, count, scope)
 _COST_CACHE_TTL_SEC = 30.0
 
@@ -208,7 +212,7 @@ def _compute_run_cost() -> tuple[float, int, str]:
 
     total = 0.0
     for model, inp, outp, cc, cr in rows:
-        p = PRICING.get(model or "", FALLBACK_PRICING)
+        p = get_pricing(model)
         total += (inp or 0) * p["input"] / 1_000_000
         total += (outp or 0) * p["output"] / 1_000_000
         total += (cc or 0) * p["cache_creation"] / 1_000_000
@@ -278,7 +282,7 @@ def _compute_us_cost(feat_n: int, us_id: str) -> tuple[float, int, str]:
 
     total = 0.0
     for model, inp, outp, cc, cr in rows:
-        p = PRICING.get(model or "", FALLBACK_PRICING)
+        p = get_pricing(model)
         total += (inp or 0) * p["input"] / 1_000_000
         total += (outp or 0) * p["output"] / 1_000_000
         total += (cc or 0) * p["cache_creation"] / 1_000_000
@@ -408,8 +412,8 @@ def main() -> int:
                         warn(f"CAUSE: [BUILD_LOOP_COST_EXCEEDED] ${us_cost:.2f} >= "
                              f"${us_cap:.2f} ({us_calls} calls scope={us_scope}) "
                              f"— cost-pathological convergence on us={us_id}")
-                        warn(f"FIX: (a) inspecter workspace/output/qa/feat-{feat_n}/ "
-                             f"build.md pour comprendre la cause ; "
+                        warn(f"FIX: (a) inspecter la sortie build_loop (stderr/chat) "
+                             f"pour comprendre la cause ; "
                              f"(b) augmenter BuildLoopMaxCostUsd dans Project Config "
                              f"(decision tracee) ; "
                              f"(c) bypass one-shot : export SDD_DISABLE_COST_CAP=1")

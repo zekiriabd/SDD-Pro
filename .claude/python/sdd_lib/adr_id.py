@@ -118,7 +118,7 @@ def mint_adr_filename(
     -------
     str
         The filename (no leading directory). Caller writes to
-        ``workspace/output/.sys/.context/adrs/{filename}``.
+        ``workspace/.sys/.context/adrs/{filename}``.
     """
     ts_source = when if when is not None else datetime.now(timezone.utc)
     ts = ts_source.strftime("%Y%m%dT%H%M%S")

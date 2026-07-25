@@ -42,7 +42,7 @@ Output JSON (stdout si --json) :
 
 Audit trail :
     Exit ≥ 2 sans SDD_ALLOW_UNTESTED_COMBO=1 logue dans
-    workspace/output/.sys/.audit/untested-combo.log.
+    workspace/.sys/.audit/untested-combo.log.
 """
 from __future__ import annotations
 
@@ -62,7 +62,7 @@ from sdd_lib.combos import (  # noqa: E402
     get_level_priority,
     get_validated_combos,
 )
-from sdd_lib.paths import repo_root  # noqa: E402
+from sdd_lib.paths import workspace_root, repo_root  # noqa: E402
 from sdd_lib.project_config import read_stack_md_text, section_body, stack_md_path  # noqa: E402
 
 
@@ -188,7 +188,7 @@ def _build_signature(components: dict) -> str:
 
 def _audit_log(signature: str, status: str, bypass: bool) -> None:
     """Log untested combo attempts to audit trail."""
-    audit_dir = repo_root() / "workspace" / "output" / ".sys" / ".audit"
+    audit_dir = workspace_root(repo_root()) / ".sys" / ".audit"
     audit_dir.mkdir(parents=True, exist_ok=True)
     audit_file = audit_dir / "untested-combo.log"
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")

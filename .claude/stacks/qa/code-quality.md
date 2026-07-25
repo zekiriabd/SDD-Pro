@@ -18,7 +18,7 @@ qu'au moins un autre QA stack est listé.
 
 ## 2. Activation
 
-Dans `workspace/input/stack/stack.md` :
+Dans `workspace/stack/stack.md` :
 
 ```markdown
 ## Active QA Specs
@@ -95,7 +95,9 @@ exécutable (hors annotations, hors strings). Exclut les codes communs
 
 Trois sous-checks lancés par `quality_scan.py` selon le `buildSystem`
 détecté dans le catalogue stack actif. Tous trois écrivent leurs
-artefacts sous `workspace/output/qa/feat-{n}/supply-chain/`.
+artefacts sous `workspace/.sys/.sca/feat-{n}/` (2026-07-06 :
+plus de dossier `qa/` — ces artefacts SCA/SBOM sont des livrables
+bruts, hors télémétrie QA qui vit en `console.db`).
 
 #### 3.7.a CVE scan (errors si gravité ≥ moderate)
 
@@ -112,7 +114,7 @@ publique GitHub Advisory / NVD.
 
 **Sévérité** : `error` si CVSS ≥ 4.0 (moderate), `warning` si < 4.0.
 
-Sortie consolidée : `workspace/output/qa/feat-{n}/supply-chain/cve.json`
+Sortie consolidée : `workspace/.sys/.sca/feat-{n}/cve.json`
 schéma minimal :
 ```json
 {
@@ -139,7 +141,7 @@ SLSA niveau 1+.
 | `maven`/`gradle`    | plugin `org.cyclonedx:cyclonedx-maven-plugin` / `org.cyclonedx.bom` |
 | Universel (fallback) | `syft` (Anchore) — détecte automatiquement le buildSystem |
 
-Sortie : `workspace/output/qa/feat-{n}/supply-chain/sbom.cyclonedx.json`.
+Sortie : `workspace/.sys/.sca/feat-{n}/sbom.cyclonedx.json`.
 
 #### 3.7.c Licences (warnings sur licences non autorisées)
 
@@ -166,7 +168,7 @@ absentes/inconnues qui empêchent la distribution.
 - `error` : aucune licence détectée (package sans manifest licence —
   bloquant pour distribution)
 
-Sortie : `workspace/output/qa/feat-{n}/supply-chain/licenses.json`.
+Sortie : `workspace/.sys/.sca/feat-{n}/licenses.json`.
 
 #### 3.7.d Activation et bypass
 
@@ -205,7 +207,7 @@ Le quality scan s'applique **uniquement au code de production**.
 
 ## 5. Output
 
-Le script produit `workspace/output/qa/feat-{n}/quality.json` :
+Le script persiste dans `console.db` table `qa_quality` (2026-07-06 : plus de fichier `quality.json`). Schéma logique des lignes :
 
 ```json
 {
@@ -221,7 +223,7 @@ Le script produit `workspace/output/qa/feat-{n}/quality.json` :
     {
       "category": "todo",
       "severity": "error",
-      "file": "workspace/output/src/SIMBackend/Services/AuthService.cs",
+      "file": "workspace/src/SIMBackend/Services/AuthService.cs",
       "line": 42,
       "tag": "TODO",
       "message": "TODO: implement token refresh"

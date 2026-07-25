@@ -6,9 +6,9 @@
   "buildSystem": "gradle",
   "manifest": {
     "files": [
-      "workspace/output/src/{AppName}/build.gradle.kts",
-      "workspace/output/src/{AppName}/settings.gradle.kts",
-      "workspace/output/src/{AppName}/src/main/resources/application.yml"
+      "workspace/src/{AppName}/build.gradle.kts",
+      "workspace/src/{AppName}/settings.gradle.kts",
+      "workspace/src/{AppName}/src/main/resources/application.yml"
     ]
   },
   "metadata": {

@@ -14,7 +14,7 @@ Scope: tests E2E navigateur multi-browser (combler trou API Gate v7)
 
 ## 1. Activation
 
-Project Config (`workspace/input/stack/stack.md`) :
+Project Config (`workspace/stack/stack.md`) :
 
 ```yaml
 E2EMode: off    # off (default) | smoke | happy-paths | full
@@ -72,7 +72,7 @@ Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'U
 ## 3. Layout généré
 
 ```
-workspace/output/src/{AppName}/
+workspace/src/{AppName}/
 ├── e2e/
 │   ├── playwright.config.ts
 │   ├── fixtures/
@@ -103,8 +103,9 @@ Phase 5 (QA) — STEP 8.bis (nouveau, conditionnel) :
 2. Démarrer backend in-memory (réutilise WebApplicationFactory de la
    gate API) + serve build SPA (`vite preview` / `ng serve` / `dotnet run`)
 3. Exécuter `npx playwright test e2e/feat-{n}/` (filter par FEAT)
-4. Parser le résultat JSON Playwright → `workspace/output/qa/feat-{n}/e2e.json`
-5. Persist `console.db` table `qa_e2e` (migration v3 à créer)
+4. Parser le résultat JSON Playwright (natif Playwright, temporaire runner)
+5. Persist **uniquement** dans `console.db` table `qa_e2e` (2026-07-06 :
+   aucun fichier `e2e.json` écrit sous qa/)
 
 ## 6. Exemples concrets par mode
 

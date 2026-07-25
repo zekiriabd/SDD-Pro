@@ -1,4 +1,4 @@
-"""Detect orphan artifacts in workspace/output/ (read-only).
+"""Detect orphan artifacts in workspace/ (read-only).
 
 v7.0.0 (audit 2026-06-05) — première implémentation effective des
 scripts spec'd dans `docs/orphan-cleanup-policy.md`.
@@ -7,11 +7,12 @@ Un artefact est "orphan" quand sa source FEAT/US a été renommée ou
 supprimée mais que les dérivés (US md, plans, code généré) sont
 restés sur disque. Diff basenames `{n}-{m}-{Name}` entre :
 
-- Source  : workspace/input/feats/{n}-*.md   (FEATs Tech Lead-owned)
-- Source  : workspace/output/us/{n}-{m}-*.md (US PO-generated)
-- Dérivés : workspace/output/plans/{n}-{m}-*.{back,front}.md
-            workspace/output/qa/feat-{n}/
-            (code généré sous workspace/output/src/{App,Backend,Lib}Name/
+- Source  : workspace/feats/{n}-*.md   (FEATs Tech Lead-owned)
+- Source  : workspace/us/{n}-{m}-*.md (US PO-generated)
+- Dérivés : workspace/plans/{n}-{m}-*.{back,front}.md
+            (QA telemetry vit en console.db depuis 2026-07-06 — plus de
+             dossier qa/ à scanner ; cf. qa_orphans always-empty §3)
+            (code généré sous workspace/src/{App,Backend,Lib}Name/
              non couvert ici — détection cross-fichier difficile sans
              marqueur ` // generated-by-us: ` dans les sources, à câbler v7.1+)
 
@@ -37,6 +38,7 @@ if str(_HERE.parent) not in sys.path:
     sys.path.insert(0, str(_HERE.parent))
 
 from sdd_lib.exit_codes import FAIL_FAST, INFRA_BLOCKED, SUCCESS  # noqa: E402
+from sdd_lib.paths import workspace_root
 
 # Basename d'une US/plan/feat : `{n}-{m}-Name` ou `{n}-Name`.
 _US_BASENAME_RE = re.compile(r"^(\d+)-(\d+)-(.+)$")
@@ -53,8 +55,8 @@ def _safe_iterdir(p: Path) -> list[Path]:
 
 
 def list_feats(root: Path) -> set[int]:
-    """FEAT numbers présents sous workspace/input/feats/."""
-    feats_dir = root / "workspace" / "input" / "feats"
+    """FEAT numbers présents sous workspace/feats/."""
+    feats_dir = workspace_root(root) / "feats"
     out: set[int] = set()
     for f in _safe_iterdir(feats_dir):
         if not f.is_file() or f.suffix != ".md":
@@ -66,8 +68,8 @@ def list_feats(root: Path) -> set[int]:
 
 
 def list_us_keys(root: Path) -> set[tuple[int, int]]:
-    """Identités US `(n, m)` présentes sous workspace/output/us/."""
-    us_dir = root / "workspace" / "output" / "us"
+    """Identités US `(n, m)` présentes sous workspace/us/."""
+    us_dir = workspace_root(root) / "us"
     out: set[tuple[int, int]] = set()
     for f in _safe_iterdir(us_dir):
         if not f.is_file() or f.suffix != ".md":
@@ -105,7 +107,7 @@ def find_orphans(
         if feat_filter is not None and n != feat_filter:
             continue
         if n not in feats:
-            us_dir = root / "workspace" / "output" / "us"
+            us_dir = workspace_root(root) / "us"
             for f in _safe_iterdir(us_dir):
                 if f.stem.startswith(f"{n}-{m}-"):
                     orphans["us_orphans"].append(
@@ -113,7 +115,7 @@ def find_orphans(
                     )
 
     # 2) Plan orphan = plan sur disque sans US correspondant
-    plans_dir = root / "workspace" / "output" / "plans"
+    plans_dir = workspace_root(root) / "plans"
     for f in _safe_iterdir(plans_dir):
         if not f.is_file() or f.suffix != ".md":
             continue
@@ -132,21 +134,11 @@ def find_orphans(
                 {"path": str(f.relative_to(root)), "feat": n_int, "us": f"{n_int}-{m_int}"}
             )
 
-    # 3) QA orphan = workspace/output/qa/feat-N/ pour FEAT N inexistante
-    qa_dir = root / "workspace" / "output" / "qa"
-    for d in _safe_iterdir(qa_dir):
-        if not d.is_dir() or not d.name.startswith("feat-"):
-            continue
-        try:
-            n_int = int(d.name.removeprefix("feat-"))
-        except ValueError:
-            continue
-        if feat_filter is not None and n_int != feat_filter:
-            continue
-        if n_int not in feats:
-            orphans["qa_orphans"].append(
-                {"path": str(d.relative_to(root)), "feat": n_int}
-            )
+    # 3) QA orphan — 2026-07-06 : workspace/qa/ removed (QA telemetry is
+    #    SQLite-only). There is no per-FEAT QA directory to orphan anymore; stale
+    #    qa_* rows for a deleted FEAT are handled by console.db cleanup, not the
+    #    filesystem orphan scan. `qa_orphans` is kept (always empty) for a stable
+    #    return shape for downstream consumers (cleanup_orphans, tests).
 
     # 4) Direct orphan = FEAT supprimée → tout dérivé (us/plans/qa) est listé
     #    (déjà couvert ci-dessus, mais on agrège un compteur par feat-n absente)
@@ -188,7 +180,7 @@ def format_text_report(orphans: dict[str, list[dict]]) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Detect orphan artifacts (US/plans/qa) in workspace/output/"
+        description="Detect orphan artifacts (US/plans/qa) in workspace/"
     )
     parser.add_argument("--feat", type=int, default=None,
                         help="Restrict to FEAT N (default: scan all)")

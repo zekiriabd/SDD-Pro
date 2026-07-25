@@ -12,7 +12,7 @@ Mode resolved with explicit precedence (highest wins) :
 
 Modes:
     - "off"    : silent skip, exit 0 (v6.4.2 strict behaviour)
-    - "record" : insert row into workspace/output/db/console.db (token_usage)
+    - "record" : insert row into workspace/db/console.db (token_usage)
     - "debug"  : record + dump full payload to .audit/token-debug/
 
 v7.0.0 — config-aware mode resolution. Previous versions only read the env
@@ -36,7 +36,7 @@ Output schema (one JSON object per line in token-usage.jsonl):
       "subagent_type": "dev-backend" | null,
       "feat": 1 | null,
       "us_id": "1-2" | null,
-      "model": "claude-opus-4-7" | null,
+      "model": "claude-opus-4-8" | null,
       "input_tokens": 42153,
       "output_tokens": 8721,
       "cache_creation_input_tokens": 3210,
@@ -69,7 +69,7 @@ from sdd_lib.hook_input import (  # noqa: E402
     get_subagent_type,
     read_hook_input,
 )
-from sdd_lib.paths import iso_now_ms, repo_root  # noqa: E402
+from sdd_lib.paths import workspace_root, iso_now_ms, repo_root  # noqa: E402
 from sdd_lib.exit_codes import HOOK_ALLOW  # noqa: E402
 
 # Valid modes (lower-cased, env + config normalized to these)
@@ -163,7 +163,9 @@ def _find_model(payload: dict[str, Any]) -> str | None:
     for path in candidates:
         node = get_nested(payload, *path)
         if isinstance(node, str) and node.strip():
-            return node.strip()
+            # Strip a runtime context-window suffix like "[1m]" so the stored
+            # model id stays canonical and prices correctly (audit CR-1).
+            return node.strip().split("[", 1)[0].strip()
     return None
 
 
@@ -289,7 +291,7 @@ def main() -> int:
     if not payload:
         return HOOK_ALLOW
     root = repo_root()
-    audit_dir = root / "workspace" / "output" / ".sys" / ".audit"
+    audit_dir = workspace_root(root) / ".sys" / ".audit"
 
     if mode == "debug":
         try:

@@ -20,10 +20,16 @@ _PY_ROOT = Path(__file__).resolve().parent.parent
 if str(_PY_ROOT) not in sys.path:
     sys.path.insert(0, str(_PY_ROOT))
 
+# bootstrap.py vit à la racine du repo (canonique) OU dans .claude/ si le
+# framework y est regroupé — on résout une fois, réutilisé partout.
+_BOOTSTRAP = _REPO / "bootstrap.py"
+if not _BOOTSTRAP.is_file():
+    _BOOTSTRAP = _REPO / ".claude" / "bootstrap.py"
+
 
 def _load_bootstrap():
-    """Import bootstrap.py from the repo root (not on sys.path by default)."""
-    bootstrap_path = _REPO / "bootstrap.py"
+    """Import bootstrap.py (repo root or .claude/, not on sys.path by default)."""
+    bootstrap_path = _BOOTSTRAP
     spec = importlib.util.spec_from_file_location("bootstrap", bootstrap_path)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
@@ -288,14 +294,14 @@ class TestCliDryRun(unittest.TestCase):
 
     def test_dry_run_combo_c1_does_not_modify_stack_md(self):
         """Dry-run must NOT touch the existing stack.md."""
-        stack_md = _REPO / "workspace" / "input" / "stack" / "stack.md"
+        stack_md = _REPO / "workspace" / "stack" / "stack.md"
         before = stack_md.read_bytes() if stack_md.is_file() else None
 
         # Provide all answers via stdin : decline re-init prompt
         # Question 1 : "Continue (will OVERWRITE existing stack.md)? [y/N] : "
         # → 'n' to decline (safe — dry-run still works)
         result = subprocess.run(
-            [sys.executable, str(_REPO / "bootstrap.py"),
+            [sys.executable, str(_BOOTSTRAP),
              "--combo", "c1", "--dry-run", "--skip-install"],
             cwd=_REPO,
             input="n\n",  # decline re-init

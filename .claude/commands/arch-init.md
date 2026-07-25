@@ -21,21 +21,21 @@ incrémental.
 
 ## STEP 1 — Vérifier le stack
 
-Vérifier que `workspace/input/stack/stack.md` existe et contient au moins une
+Vérifier que `workspace/stack/stack.md` existe et contient au moins une
 entrée non commentée sous `## Active Tech Specs`.
 
 Si absent ou vide →
 ```
 ERROR: /arch-init — stack non sélectionné
-CAUSE: workspace/input/stack/stack.md manque ou ## Active Tech Specs vide
-FIX: créer workspace/input/stack/stack.md et activer au moins un backend ou frontend
+CAUSE: workspace/stack/stack.md manque ou ## Active Tech Specs vide
+FIX: créer workspace/stack/stack.md et activer au moins un backend ou frontend
 ```
 
 ---
 
 ## STEP 2 — Vérifier les blocs `## Active Database` + `## Active Auth Specs`
 
-Lire `workspace/input/stack/stack.md` → récupérer le bloc
+Lire `workspace/stack/stack.md` → récupérer le bloc
 `## Active Database` (depuis 2026-05-14, `DatabaseType` n'est plus
 dans `## Project Config`).
 
@@ -47,7 +47,7 @@ dans `## Project Config`).
   ```
   ERROR: /arch-init — clé(s) DB manquante(s) dans ## Active Database
   CAUSE: clés non définies : {liste}
-  FIX: renseigner les valeurs dans workspace/input/stack/stack.md ## Active Database
+  FIX: renseigner les valeurs dans workspace/stack/stack.md ## Active Database
   ```
 
 Si un stack auth est listé sous `## Active Auth Specs`, vérifier les
@@ -77,7 +77,7 @@ Attendre la fin de l'agent. Relayer sa sortie telle quelle.
 
 ## STEP 3.5 — Spawn `constitutioner` si sentinel posé (no-spawn fix, v7.0.0-alpha audit P0-workflow 2026-06-05)
 
-Lire le sentinel `workspace/output/.sys/.state/arch-ready-for-constitutioner.flag`.
+Lire le sentinel `workspace/.sys/.state/arch-ready-for-constitutioner.flag`.
 
 | Cas | Action |
 |---|---|
@@ -94,9 +94,9 @@ Agent: constitutioner
 Le sous-agent gère :
 - Création ADRs (numérotation atomique timestamp, idempotente) par
   dimension active (backend, frontend, UI, auth, database)
-- Update `workspace/output/.sys/.context/constitution.md` : §4 stack
+- Update `workspace/.sys/.context/constitution.md` : §4 stack
   retenu (Edit ligne), §6 index ADRs (append), §1 date
-- Régénération `workspace/output/.sys/.context/adrs/INDEX.md`
+- Régénération `workspace/.sys/.context/adrs/INDEX.md`
 - Validation read-back v5.0 (anti Edit silencieux)
 
 ### Cleanup sentinel
@@ -105,7 +105,7 @@ Après que `constitutioner` ait terminé (succès OU échec), supprimer le
 sentinel (idempotence du prochain run) :
 
 ```bash
-rm -f workspace/output/.sys/.state/arch-ready-for-constitutioner.flag
+rm -f workspace/.sys/.state/arch-ready-for-constitutioner.flag
 ```
 
 **Sortie attendue** :

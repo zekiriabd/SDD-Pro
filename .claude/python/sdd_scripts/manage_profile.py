@@ -29,6 +29,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sdd_lib.exit_codes import CORRECTIBLE, FAIL_FAST, SUCCESS  # noqa: E402
+from sdd_lib.console_safe import ensure_console_safe
 
 import argparse
 import os
@@ -185,6 +186,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    ensure_console_safe()  # cp1252 guard (audit 2026-06-11 M15)
     args = build_parser().parse_args(argv)
     try:
         if args.cmd == "export":

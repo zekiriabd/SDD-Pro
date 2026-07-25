@@ -39,7 +39,7 @@ This is the documentation hub. Every doc has a purpose and a target audience. Pi
 | **12 LLM agents + 1 rubric** | Role / Model / Inputs / Outputs / Verdicts | [agents-reference.md](agents-reference.md) |
 | **21 commands** | Args / Flags / Agents / Outputs | [commands-reference.md](commands-reference.md) |
 | **Project Config (58 keys)** | Layered config + defaults + ranges | [configuration-reference.md](configuration-reference.md) |
-| **Error classes** | Taxonomy (174 prefixes `[CLASS]`) | [../rules/error-classification.md](../rules/error-classification.md) |
+| **Error classes** | Taxonomy (188 prefixes `[CLASS]`) | [../rules/error-classification.md](../rules/error-classification.md) |
 | **Hooks + protections** | 17 Claude Code hooks wired | [hooks-and-protections.md](hooks-and-protections.md) |
 
 ---

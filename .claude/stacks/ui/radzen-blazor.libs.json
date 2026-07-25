@@ -5,7 +5,7 @@
   "schemaVersion": 1,
   "buildSystem": "dotnet",
   "manifest": {
-    "files": ["workspace/output/src/{AppName}/{AppName}.csproj"]
+    "files": ["workspace/src/{AppName}/{AppName}.csproj"]
   },
   "versions": {
     "radzen-blazor": "5.5.7"

@@ -29,7 +29,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from sdd_lib.paths import repo_root  # noqa: E402
+from sdd_lib.paths import workspace_root, repo_root  # noqa: E402
 from sdd_lib.stderr import error_block, warn  # noqa: E402
 from sdd_lib.exit_codes import FAIL_FAST  # noqa: E402
 
@@ -53,7 +53,7 @@ METADATA_SECTION_TEMPLATE = """
 def resolve_us_path(us_id: str) -> Path | None:
     if not US_ID_RE.match(us_id):
         return None
-    us_dir = repo_root() / "workspace" / "output" / "us"
+    us_dir = workspace_root(repo_root()) / "us"
     matches = sorted(us_dir.glob(f"{us_id}-*.md"))
     if len(matches) != 1:
         return None
@@ -61,7 +61,7 @@ def resolve_us_path(us_id: str) -> Path | None:
 
 
 def discover_all_us() -> list[Path]:
-    us_dir = repo_root() / "workspace" / "output" / "us"
+    us_dir = workspace_root(repo_root()) / "us"
     if not us_dir.is_dir():
         return []
     return sorted(p for p in us_dir.glob("*-*-*.md") if p.is_file())
@@ -136,7 +136,7 @@ def parse_args() -> argparse.Namespace:
     g = p.add_mutually_exclusive_group(required=True)
     g.add_argument("--us", help="US short id (e.g. 1-2) to migrate")
     g.add_argument("--all", action="store_true",
-                   help="Migrate every US under workspace/output/us/")
+                   help="Migrate every US under workspace/us/")
     p.add_argument("--dry-run", action="store_true",
                    help="Print would-be changes without writing")
     p.add_argument("--json", action="store_true",
@@ -153,7 +153,7 @@ def main() -> int:
         if not targets:
             error_block(
                 "migrate_us_v1_to_v2 — no US to migrate",
-                "[US_NOT_FOUND] workspace/output/us/ empty or absent",
+                "[US_NOT_FOUND] workspace/us/ empty or absent",
                 "run /us-generate {n} first",
             )
             return FAIL_FAST
@@ -162,7 +162,7 @@ def main() -> int:
         if path is None:
             error_block(
                 f"migrate_us_v1_to_v2 — US {args.us} not found",
-                f"[US_NOT_FOUND] no unique match for workspace/output/us/{args.us}-*.md",
+                f"[US_NOT_FOUND] no unique match for workspace/us/{args.us}-*.md",
                 "verify --us format ({n}-{m})",
             )
             return FAIL_FAST

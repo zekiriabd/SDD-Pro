@@ -9,11 +9,11 @@ Replaces ~70 lines of LLM prose with a deterministic script (~0 token).
 
 Usage:
     python detect_capabilities.py \\
-        --us-path workspace/output/us/1-2-Bebes.md \\
+        --us-path workspace/us/1-2-Bebes.md \\
         --stack-path .claude/stacks/backend/dotnet-minimalapi.md \\
-        --project-config workspace/input/stack/stack.md \\
-        [--html-path workspace/input/ui/1-2-Bebes.html] \\
-        [--project-file workspace/output/src/AppName/AppName.csproj]
+        --project-config workspace/stack/stack.md \\
+        [--html-path workspace/ui/1-2-Bebes.html] \\
+        [--project-file workspace/src/AppName/AppName.csproj]
 
 Migrated from .claude/scripts/detect-capabilities.ps1 (2026-05-13).
 """
@@ -66,7 +66,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--stack-path", required=True,
                    help="Path to .claude/stacks/backend/{id}.md OR {id}.libs.json")
     p.add_argument("--project-config", required=True,
-                   help="Path to workspace/input/stack/stack.md")
+                   help="Path to workspace/stack/stack.md")
     p.add_argument("--html-path", default="")
     p.add_argument("--project-file", default="",
                    help="csproj/package.json/etc. to check 'already-installed' libs")

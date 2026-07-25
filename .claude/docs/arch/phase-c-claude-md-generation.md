@@ -9,9 +9,9 @@ contexte isolé par famille) :
 
 | Fichier produit | Lu par | Contenu |
 |---|---|---|
-| `workspace/output/src/{BackendName}/CLAUDE.md` | dev-backend | architecture backend |
-| `workspace/output/src/{AppName}/CLAUDE.md` | dev-frontend | architecture frontend + UI |
-| `workspace/output/src/{LibName}/CLAUDE.md` (si défini) | dev-* (passif) | contrats partagés (DTOs / Models) |
+| `workspace/src/{BackendName}/CLAUDE.md` | dev-backend | architecture backend |
+| `workspace/src/{AppName}/CLAUDE.md` | dev-frontend | architecture frontend + UI |
+| `workspace/src/{LibName}/CLAUDE.md` (si défini) | dev-* (passif) | contrats partagés (DTOs / Models) |
 
 Bénéfice : -30-40 % tokens (pas de cross-mapping) + isolation cognitive
 dev-backend / dev-frontend.
@@ -78,7 +78,7 @@ Avant écrasement d'un CLAUDE.md existant :
 4. `## BREAKING CHANGES` non marquée RESOLVED → régénérer telle quelle
 
 **Archivage optionnel** : section supprimée → écrire
-`workspace/output/src/{Project}/.claude-archive/breaking-changes-{date}.md`
+`workspace/src/{Project}/.claude-archive/breaking-changes-{date}.md`
 (répertoire ignoré par dev-* en lecture).
 
 **Rationale** : sans purge, mode `create` réimprime sans marqueurs

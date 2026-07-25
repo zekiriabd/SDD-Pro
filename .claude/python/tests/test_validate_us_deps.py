@@ -35,7 +35,7 @@ x
 
 
 def _make_us(tmp: Path, fid: int, m: int, name: str, deps: list[str] | None) -> Path:
-    us_dir = tmp / "workspace" / "output" / "us"
+    us_dir = tmp / "workspace" / "us"
     us_dir.mkdir(parents=True, exist_ok=True)
     if deps is None or deps == []:
         deps_block = "- NONE"
@@ -103,7 +103,7 @@ class TestBuildGraph(unittest.TestCase):
             _make_us(tmp_p, 1, 1, "A", [])
             _make_us(tmp_p, 1, 2, "B", ["1-1"])
             _make_us(tmp_p, 1, 3, "C", ["1-2"])
-            us_files = sorted((tmp_p / "workspace" / "output" / "us").glob("*.md"))
+            us_files = sorted((tmp_p / "workspace" / "us").glob("*.md"))
             graph, mapping = vud.build_graph(us_files)
             self.assertEqual(graph["1-1"], set())
             self.assertEqual(graph["1-2"], {"1-1"})
@@ -116,7 +116,7 @@ class TestBuildGraph(unittest.TestCase):
             _make_us(tmp_p, 1, 2, "Left", ["1-1"])
             _make_us(tmp_p, 1, 3, "Right", ["1-1"])
             _make_us(tmp_p, 1, 4, "Tip", ["1-2", "1-3"])
-            us_files = sorted((tmp_p / "workspace" / "output" / "us").glob("*.md"))
+            us_files = sorted((tmp_p / "workspace" / "us").glob("*.md"))
             graph, _ = vud.build_graph(us_files)
             self.assertEqual(graph["1-4"], {"1-2", "1-3"})
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """SDD_Pro: deterministic back/front/shared routing for quality issues.
 
-Given a file path under `workspace/output/src/`, classifies it as belonging
+Given a file path under `workspace/src/`, classifies it as belonging
 to the backend project, frontend project, shared lib, or unknown. Used by
 `/sdd-review` to dispatch findings to the right agent (dev-backend vs
 dev-frontend) and to compute owner-level summaries in the consolidated
@@ -9,11 +9,11 @@ report.
 
 Pure deterministic — 0 LLM, 0 network, ~0 ms per call.
 
-Reads `## Project Config` of `workspace/input/stack/stack.md` to resolve
+Reads `## Project Config` of `workspace/stack/stack.md` to resolve
 `AppName` (frontend), `BackendName` (backend), `LibName` (shared, optional).
 
 Usage (CLI, mostly for debug/audit):
-    python triage_issues.py --path "workspace/output/src/CMSPrintFront/src/pages/LoginPage.tsx"
+    python triage_issues.py --path "workspace/src/CMSPrintFront/src/pages/LoginPage.tsx"
     python triage_issues.py --classify-batch issues.json
 """
 from __future__ import annotations
@@ -57,7 +57,7 @@ def _normalize(path: str) -> str:
     """Normalize OS-specific separators and leading repo-root if any."""
     p = path.replace("\\", "/").strip()
     # Strip leading absolute repo prefix if accidentally included.
-    marker = "workspace/output/src/"
+    marker = "workspace/src/"
     idx = p.find(marker)
     if idx > 0:
         p = p[idx:]
@@ -65,19 +65,19 @@ def _normalize(path: str) -> str:
 
 
 def classify_path(path: str, names: ProjectNames) -> Owner:
-    """Classify a file path under workspace/output/src/ as backend/frontend/shared.
+    """Classify a file path under workspace/src/ as backend/frontend/shared.
 
     Rules (ordered, first match wins):
-    - path startswith `workspace/output/src/{BackendName}/` → backend
-    - path startswith `workspace/output/src/{AppName}/`     → frontend
-    - path startswith `workspace/output/src/{LibName}/`     → shared
-    - any other location under workspace/output/src/        → unknown
+    - path startswith `workspace/src/{BackendName}/` → backend
+    - path startswith `workspace/src/{AppName}/`     → frontend
+    - path startswith `workspace/src/{LibName}/`     → shared
+    - any other location under workspace/src/        → unknown
     """
     p = _normalize(path)
-    if not p.startswith("workspace/output/src/"):
+    if not p.startswith("workspace/src/"):
         return "unknown"
 
-    tail = p[len("workspace/output/src/"):]
+    tail = p[len("workspace/src/"):]
     head = tail.split("/", 1)[0] if "/" in tail else tail
 
     if names.backend_name and head == names.backend_name:

@@ -43,26 +43,26 @@ via le projet `{LibName}` lorsque disponible.
 
 ### 1.3 Mapping couche → repertoire
 
-- Page → `workspace/output/src/{AppName}/pages/`
-- Component → `workspace/output/src/{AppName}/components/`
-- Layout → `workspace/output/src/{AppName}/layouts/`
-- Service → `workspace/output/src/{AppName}/services/`
-- HTTP Client → `workspace/output/src/{AppName}/api/`
-- Interceptor → `workspace/output/src/{AppName}/interceptors/`
-- Guard → `workspace/output/src/{AppName}/guards/`
-- State → `workspace/output/src/{AppName}/store/`
-- Models → `workspace/output/src/{AppName}/models/`
-- Pipes → `workspace/output/src/{AppName}/pipes/`
-- Directives → `workspace/output/src/{AppName}/directives/`
-- Auth → `workspace/output/src/{AppName}/auth/`
-- Utils → `workspace/output/src/{AppName}/utils/`
-- Ressources → `workspace/output/src/{AppName}/i18n/`
-- Assets → `workspace/output/src/{AppName}/assets/`
+- Page → `workspace/src/{AppName}/pages/`
+- Component → `workspace/src/{AppName}/components/`
+- Layout → `workspace/src/{AppName}/layouts/`
+- Service → `workspace/src/{AppName}/services/`
+- HTTP Client → `workspace/src/{AppName}/api/`
+- Interceptor → `workspace/src/{AppName}/interceptors/`
+- Guard → `workspace/src/{AppName}/guards/`
+- State → `workspace/src/{AppName}/store/`
+- Models → `workspace/src/{AppName}/models/`
+- Pipes → `workspace/src/{AppName}/pipes/`
+- Directives → `workspace/src/{AppName}/directives/`
+- Auth → `workspace/src/{AppName}/auth/`
+- Utils → `workspace/src/{AppName}/utils/`
+- Ressources → `workspace/src/{AppName}/i18n/`
+- Assets → `workspace/src/{AppName}/assets/`
 
-- Root → `workspace/output/src/{AppName}/main.ts`
-- App module → `workspace/output/src/{AppName}/app/app.module.ts`
-- Routing → `workspace/output/src/{AppName}/app/app-routing.module.ts`
-- Project → `workspace/output/src/{AppName}/package.json`
+- Root → `workspace/src/{AppName}/main.ts`
+- App module → `workspace/src/{AppName}/app/app.module.ts`
+- Routing → `workspace/src/{AppName}/app/app-routing.module.ts`
+- Project → `workspace/src/{AppName}/package.json`
 
 ---
 
@@ -100,7 +100,7 @@ via le projet `{LibName}` lorsque disponible.
 
 ### 2.2 Outils
 
-- **Project file** : `workspace/output/src/{AppName}/package.json`
+- **Project file** : `workspace/src/{AppName}/package.json`
 - **Build** :
 
 ```bash
@@ -129,8 +129,8 @@ test -f dist/index.html
 
 ```bash
 # Skip si package.json existe deja
-if [ ! -f "workspace/output/src/{AppName}/package.json" ]; then
-  ng new {AppName} --directory workspace/output/src/{AppName} \
+if [ ! -f "workspace/src/{AppName}/package.json" ]; then
+  ng new {AppName} --directory workspace/src/{AppName} \
     --routing --style=scss --skip-git --skip-tests --strict
 fi
 ```
@@ -138,7 +138,7 @@ fi
 <!-- CORE_PACKAGES_START -->
 ```bash
 # Auto-genere depuis angular.libs.json -- ne pas editer (utiliser sync_stack_md.py).
-(cd workspace/output/src/{AppName} && npm install \
+(cd workspace/src/{AppName} && npm install \
   @angular/core@19.0.5 \
   @angular/common@19.0.5 \
   @angular/router@19.0.5 \
@@ -172,16 +172,16 @@ fi
 ```bash
 # Auto-genere depuis angular.libs.json (on-demand) -- installe par dev-* si l'US declenche un trigger.
 # capability: auth-azure-ad
-(cd workspace/output/src/{AppName} && npm install @azure/msal-angular@3.1.0 @azure/msal-browser@3.27.0)
+(cd workspace/src/{AppName} && npm install @azure/msal-angular@3.1.0 @azure/msal-browser@3.27.0)
 
 # capability: date-utils
-(cd workspace/output/src/{AppName} && npm install dayjs@1.11.13)
+(cd workspace/src/{AppName} && npm install dayjs@1.11.13)
 
 # capability: uuid-gen
-(cd workspace/output/src/{AppName} && npm install uuid@11.0.5)
+(cd workspace/src/{AppName} && npm install uuid@11.0.5)
 
 # capability: css-classes
-(cd workspace/output/src/{AppName} && npm install clsx@2.1.1)
+(cd workspace/src/{AppName} && npm install clsx@2.1.1)
 ```
 <!-- ONDEMAND_PACKAGES_END -->
 
@@ -550,7 +550,7 @@ Meta Angular service.
 
 ## 15. Structure finale projet
 
-workspace/output/
+workspace/
 
 src/
 

@@ -34,7 +34,7 @@ SDD_APP_NAME=MyApp SDD_COMBO=c1 SDD_DB_TYPE=PostgreSql \
 
 ## ⏱️ Minute 2-5 — Secrets + premier FEAT
 
-Édit `workspace/input/stack/stack.md` (gitignored) — remplir au minimum :
+Édit `workspace/stack/stack.md` (gitignored) — remplir au minimum :
 
 ```yaml
 DB_PASSWORD: <secret>
@@ -47,7 +47,7 @@ Créer un FEAT :
 /feat-generate Auth
 ```
 3-6 questions (acteurs, besoins fonctionnels, AC). Fichier produit :
-`workspace/input/feats/1-Auth.md`.
+`workspace/feats/1-Auth.md`.
 
 ---
 
@@ -82,13 +82,13 @@ Ouvrir http://127.0.0.1:4000 (console web) et l'app sur le port frontend.
 | Préfixe `[CLASS]` | Sens | Fix rapide |
 |---|---|---|
 | `[STACK_MALFORMED]` | `stack.md` manque clé requise | Compléter `## Project Config` (CoverageMin, AppName, etc.) |
-| `[BUILD_LOOP_EXHAUSTED]` | 3/3 itérations de build échoué | Inspecter `workspace/output/qa/feat-1/build.md`, fix manuel |
+| `[BUILD_LOOP_EXHAUSTED]` | 3/3 itérations de build échoué | Inspecter la sortie build_loop (stderr/chat), fix manuel |
 | `[QA_COVERAGE_GAP]` | Couverture < seuil | Ajouter tests OU baisser `CoverageMin` dans Project Config |
 | `[FRONTEND_BACKEND_CONTRACT_GAP]` | Frontend appelle endpoint inexistant | Vérifier OpenAPI sync, regenerer client si codegen |
 | `[STACK_LIBRARY_MISSING]` | Lib hors §2.4 du stack | Ajouter dans `.libs.json`, `sync_stack_md.py`, relancer |
 | `[PLAN_STALE]` | US modifiée après génération du plan | Relancer `/dev-plan {n}` |
 | `[FEAT_HASH_MISMATCH]` | FEAT modifiée après US | Relancer `/us-generate {n}` (idempotent) |
-| `[API_GATE_RED]` | Tests API in-memory échouent | Voir `workspace/output/qa/feat-{n}/api-tests.md` |
+| `[API_GATE_RED]` | Tests API in-memory échouent | Voir `query_console_db.py api-gate --feat {n} --format md` |
 | `[SEC_SECRET_HARDCODED]` | Secret en code | Déplacer vers env var / appsettings.Development.json |
 | `[COST_CAP_EXCEEDED]` | Run dépasse $50 | `MaxCostPerRun: 0` dans Project Config (ou augmenter) |
 

@@ -1,6 +1,6 @@
 ---
 name: test-driven-development
-description: Use whenever the agent is about to write production code (a new function, class, endpoint, method, or component) to enforce the RED-GREEN-REFACTOR cycle (emprunt Superpowers v5.1). NO production code without a failing test first. Triggers on intentions to write code into workspace/output/src/, *.cs/*.ts/*.py/*.kt files, or any creation of a method/class/function/endpoint. If the agent realizes it has already written production code without a test, the skill mandates deleting that code and restarting with RED-GREEN-REFACTOR. Non-negotiable for SDDPro v7.0.0+ test-first contract.
+description: Use whenever the agent is about to write production code (a new function, class, endpoint, method, or component) to enforce the RED-GREEN-REFACTOR cycle (emprunt Superpowers v5.1). NO production code without a failing test first. Triggers on intentions to write code into workspace/src/, *.cs/*.ts/*.py/*.kt files, or any creation of a method/class/function/endpoint. If the agent realizes it has already written production code without a test, the skill mandates deleting that code and restarting with RED-GREEN-REFACTOR. Non-negotiable for SDDPro v7.0.0+ test-first contract.
 ---
 
 # Skill — Test-Driven Development (RED-GREEN-REFACTOR)
@@ -30,7 +30,7 @@ le code**, écrire le test, recommencer en RED.
 | "Écris une fonction qui …" | Skill bloque → "écris d'abord le test qui définit le contrat" |
 | "Ajoute un endpoint POST /api/foo" | Skill bloque → "écris d'abord le test d'intégration HTTP du happy path" |
 | "Crée une classe `UserService`" | Skill bloque → "écris d'abord 1 test du method principal" |
-| Création fichier `*.cs|*.ts|*.py|*.kt` sous `workspace/output/src/` sans test correspondant sous `*.Tests/` ou `__tests__/` | Skill flag → demande le test d'abord |
+| Création fichier `*.cs|*.ts|*.py|*.kt` sous `workspace/src/` sans test correspondant sous `*.Tests/` ou `__tests__/` | Skill flag → demande le test d'abord |
 | "Je vais refactor X" | Skill ALLOWS (refactor = test reste vert ; pas de nouveau contrat) |
 | "Je vais corriger un bug" | Skill **exige un test de régression rouge AVANT le fix** |
 
@@ -40,7 +40,7 @@ le code**, écrire le test, recommencer en RED.
 
 - Identifier l'unité minimale à tester (1 behavior, pas N)
 - Écrire le test dans le bon répertoire :
-  - .NET : `workspace/output/src/{BackendName}.Tests/Unit/`
+  - .NET : `workspace/src/{BackendName}.Tests/Unit/`
   - Node/TS : `__tests__/` ou `*.test.ts` à côté
   - Python : `tests/test_*.py`
   - Kotlin : `src/test/kotlin/`

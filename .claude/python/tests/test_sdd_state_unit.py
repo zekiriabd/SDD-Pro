@@ -38,7 +38,7 @@ def fake_repo(tmp_path, monkeypatch):
 
 @pytest.fixture()
 def db_path(fake_repo) -> Path:
-    return fake_repo / "workspace" / "output" / "db" / "console.db"
+    return fake_repo / "workspace" / "db" / "console.db"
 
 
 def _open_db(path: Path) -> sqlite3.Connection:
@@ -83,14 +83,14 @@ def test_get_feat_name_returns_none_when_feats_dir_missing(fake_repo):
 
 
 def test_get_feat_name_returns_name_when_single_match(fake_repo):
-    feats = fake_repo / "workspace" / "input" / "feats"
+    feats = fake_repo / "workspace" / "feats"
     feats.mkdir(parents=True)
     (feats / "1-Auth.md").write_text("# x", encoding="utf-8")
     assert sdd_state.get_feat_name(1) == "Auth"
 
 
 def test_get_feat_name_returns_none_when_multiple_matches(fake_repo):
-    feats = fake_repo / "workspace" / "input" / "feats"
+    feats = fake_repo / "workspace" / "feats"
     feats.mkdir(parents=True)
     (feats / "1-Auth.md").write_text("# x", encoding="utf-8")
     (feats / "1-Login.md").write_text("# y", encoding="utf-8")
@@ -98,14 +98,14 @@ def test_get_feat_name_returns_none_when_multiple_matches(fake_repo):
 
 
 def test_get_feat_name_returns_none_when_no_match(fake_repo):
-    feats = fake_repo / "workspace" / "input" / "feats"
+    feats = fake_repo / "workspace" / "feats"
     feats.mkdir(parents=True)
     (feats / "2-Other.md").write_text("# x", encoding="utf-8")
     assert sdd_state.get_feat_name(1) is None
 
 
 def test_get_feat_name_complex_name(fake_repo):
-    feats = fake_repo / "workspace" / "input" / "feats"
+    feats = fake_repo / "workspace" / "feats"
     feats.mkdir(parents=True)
     (feats / "12-Multi-Word-Name.md").write_text("# x", encoding="utf-8")
     assert sdd_state.get_feat_name(12) == "Multi-Word-Name"

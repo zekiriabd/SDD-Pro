@@ -184,7 +184,9 @@ languages:
       - { pattern: '\binterface\s*\n', weight: 0.6, description: "Pascal interface section" }
       - { pattern: '\bimplementation\s*\n', weight: 0.6, description: "Pascal implementation section" }
       - { pattern: '\bprocedure\s+T\w+\.', weight: 0.7, description: "Method definition" }
-    confidence_cap: high
+    # Downgrade high→medium (audit 2026-06-11 M14) : pas de graphe de
+    # classes hors .NET — extraction limitée à détection + data-access + UI.
+    confidence_cap: medium
     excluded_paths: [__history/, __recovery/, dcu/, exe/]
 
   # === JS/JQUERY ===
@@ -226,6 +228,18 @@ languages:
       - { pattern: '\bCREATE\s+PROCEDURE\b', weight: 1.0, description: "Stored procedure" }
       - { pattern: '\bGO\s*\n', weight: 0.7, description: "T-SQL batch separator" }
       - { pattern: '\bNVARCHAR\(', weight: 0.6, description: "T-SQL type" }
+    confidence_cap: high
+    excluded_paths: []
+
+  - id: plpgsql
+    label: PL/pgSQL (PostgreSQL)
+    family: sql
+    file_extensions: [.sql, .pgsql]
+    evidence_patterns:
+      - { pattern: '\bCREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\b', weight: 1.0, description: "PL/pgSQL function" }
+      - { pattern: '\bCREATE\s+(?:OR\s+REPLACE\s+)?PROCEDURE\b', weight: 1.0, description: "PG 11+ procedure" }
+      - { pattern: '\bLANGUAGE\s+plpgsql\b', weight: 1.0, description: "plpgsql language tag" }
+      - { pattern: '\bRETURNS\s+(?:SETOF\s+|TABLE)', weight: 0.7, description: "set-returning function" }
     confidence_cap: high
     excluded_paths: []
 

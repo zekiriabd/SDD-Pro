@@ -12,7 +12,7 @@ Scope: tests unitaires composants Blazor (Server + WebAssembly)
 ## 1. Scope
 
 Tests unitaires de composants Blazor (Server ou WebAssembly).
-S'applique aux projets `workspace/output/src/{AppName}/` typés Blazor.
+S'applique aux projets `workspace/src/{AppName}/` typés Blazor.
 
 Pour les services / handlers .NET côté frontend, utiliser xUnit
 classique au sein du même projet de test.
@@ -61,23 +61,23 @@ Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'U
 
 ## 3. Init Commands (idempotent)
 
-Si `workspace/output/src/{AppName}.Tests/` n'existe pas :
+Si `workspace/src/{AppName}.Tests/` n'existe pas :
 
 ```bash
-dotnet new bunit -o workspace/output/src/{AppName}.Tests
-dotnet sln workspace/output/src/{AppName}.sln add workspace/output/src/{AppName}.Tests/{AppName}.Tests.csproj
-dotnet add workspace/output/src/{AppName}.Tests/{AppName}.Tests.csproj reference workspace/output/src/{AppName}/{AppName}.csproj
+dotnet new bunit -o workspace/src/{AppName}.Tests
+dotnet sln workspace/src/{AppName}.sln add workspace/src/{AppName}.Tests/{AppName}.Tests.csproj
+dotnet add workspace/src/{AppName}.Tests/{AppName}.Tests.csproj reference workspace/src/{AppName}/{AppName}.csproj
 ```
 
 <!-- CORE_PACKAGES_START -->
 ```bash
 # Auto-genere depuis blazor-bunit.libs.json -- ne pas editer (utiliser sync_stack_md.py).
-dotnet add workspace/output/src/{AppName}.Tests/{AppName}.Tests.csproj package bunit.web --version 1.36.0
-dotnet add workspace/output/src/{AppName}.Tests/{AppName}.Tests.csproj package xunit --version 2.9.2
-dotnet add workspace/output/src/{AppName}.Tests/{AppName}.Tests.csproj package xunit.runner.visualstudio --version 3.0.0
-dotnet add workspace/output/src/{AppName}.Tests/{AppName}.Tests.csproj package Microsoft.NET.Test.Sdk --version 17.12.0
-dotnet add workspace/output/src/{AppName}.Tests/{AppName}.Tests.csproj package coverlet.collector --version 6.0.2
-dotnet add workspace/output/src/{AppName}.Tests/{AppName}.Tests.csproj package NSubstitute --version 5.3.0
+dotnet add workspace/src/{AppName}.Tests/{AppName}.Tests.csproj package bunit.web --version 1.36.0
+dotnet add workspace/src/{AppName}.Tests/{AppName}.Tests.csproj package xunit --version 2.9.2
+dotnet add workspace/src/{AppName}.Tests/{AppName}.Tests.csproj package xunit.runner.visualstudio --version 3.0.0
+dotnet add workspace/src/{AppName}.Tests/{AppName}.Tests.csproj package Microsoft.NET.Test.Sdk --version 17.12.0
+dotnet add workspace/src/{AppName}.Tests/{AppName}.Tests.csproj package coverlet.collector --version 6.0.2
+dotnet add workspace/src/{AppName}.Tests/{AppName}.Tests.csproj package NSubstitute --version 5.3.0
 ```
 <!-- CORE_PACKAGES_END -->
 
@@ -85,10 +85,10 @@ dotnet add workspace/output/src/{AppName}.Tests/{AppName}.Tests.csproj package N
 ```bash
 # Auto-genere depuis blazor-bunit.libs.json (on-demand) -- installe par dev-* si l'US declenche un trigger.
 # capability: mocking-alt
-# OU (alt mutuellement exclusif) : dotnet add workspace/output/src/{AppName}.Tests/{AppName}.Tests.csproj package Moq --version 4.20.72
+# OU (alt mutuellement exclusif) : dotnet add workspace/src/{AppName}.Tests/{AppName}.Tests.csproj package Moq --version 4.20.72
 
 # capability: fluent-assertions
-dotnet add workspace/output/src/{AppName}.Tests/{AppName}.Tests.csproj package FluentAssertions --version 7.0.0
+dotnet add workspace/src/{AppName}.Tests/{AppName}.Tests.csproj package FluentAssertions --version 7.0.0
 ```
 <!-- ONDEMAND_PACKAGES_END -->
 
@@ -100,7 +100,7 @@ dotnet add workspace/output/src/{AppName}.Tests/{AppName}.Tests.csproj package F
 ## 4. Project structure
 
 ```
-workspace/output/src/{AppName}.Tests/
+workspace/src/{AppName}.Tests/
 ├── {AppName}.Tests.csproj
 ├── Pages/
 │   └── LoginTests.cs                 # 1 fichier par Page
@@ -169,16 +169,16 @@ public async Task Login_OnSubmit_CallsAuthService()
 ### 6.1 Test command
 
 ```bash
-dotnet test workspace/output/src/{AppName}.Tests/{AppName}.Tests.csproj \
+dotnet test workspace/src/{AppName}.Tests/{AppName}.Tests.csproj \
   --collect:"XPlat Code Coverage" \
   --logger "trx;LogFileName=test-results.trx" \
-  --results-directory workspace/output/src/{AppName}.Tests/TestResults
+  --results-directory workspace/src/{AppName}.Tests/TestResults
 ```
 
 ### 6.2 Linter
 
 ```bash
-dotnet format workspace/output/src/{AppName}.Tests/{AppName}.Tests.csproj --verify-no-changes
+dotnet format workspace/src/{AppName}.Tests/{AppName}.Tests.csproj --verify-no-changes
 ```
 
 ---
@@ -186,7 +186,7 @@ dotnet format workspace/output/src/{AppName}.Tests/{AppName}.Tests.csproj --veri
 ## 7. Coverage output format
 
 Format : **Cobertura XML**
-Path : `workspace/output/src/{AppName}.Tests/TestResults/{guid}/coverage.cobertura.xml`
+Path : `workspace/src/{AppName}.Tests/TestResults/{guid}/coverage.cobertura.xml`
 
 ---
 

@@ -6,7 +6,7 @@ in Project Config AND the user is about to invoke `/sdd-full`, `/sdd-poc`,
 or `/dev-run`, this hook proactively runs `sdd_scripts/complexity_router.py`
 as a subprocess BEFORE the LLM starts the slash command.
 
-Outputs are persisted to `workspace/output/.sys/.routing/{n}-complexity.{json,md}`.
+Outputs are persisted to `workspace/.sys/.routing/{n}-complexity.{json,md}`.
 The slash command then reads these files for routing guidance.
 
 A.bis idempotent guard : skip subprocess if a fresh report (≤ 1h) already
@@ -37,7 +37,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sdd_lib.exit_codes import HOOK_ALLOW  # noqa: E402
 from sdd_lib.hook_input import get_nested, read_hook_input  # noqa: E402
-from sdd_lib.paths import repo_root  # noqa: E402
+from sdd_lib.paths import workspace_root, repo_root  # noqa: E402
 
 
 #: Slash commands that should trigger pre-routing
@@ -97,7 +97,7 @@ def _resolve_router_mode(root: Path) -> str:
 def _routing_report_fresh(feat_n: int, root: Path) -> bool:
     """A.bis idempotent guard — True if routing JSON < 1h fresh exists."""
     report = (
-        root / "workspace" / "output" / ".sys" / ".routing"
+        workspace_root(root) / ".sys" / ".routing"
         / f"{feat_n}-complexity.json"
     )
     if not report.is_file():
@@ -145,7 +145,7 @@ def main() -> int:
     if _routing_report_fresh(feat_n, root):
         sys.stderr.write(
             f"[AUTO_ROUTER_FRESH] routing report for FEAT {feat_n} is fresh "
-            f"(< 1h) — reusing existing workspace/output/.sys/.routing/"
+            f"(< 1h) — reusing existing workspace/.sys/.routing/"
             f"{feat_n}-complexity.json. To force re-run, delete it.\n"
         )
         return HOOK_ALLOW

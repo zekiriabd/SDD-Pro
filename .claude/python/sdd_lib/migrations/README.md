@@ -1,6 +1,6 @@
 # `sdd_lib/migrations/` — console.db schema migrations
 
-> Forward-only schema migrations for `workspace/output/db/console.db`.
+> Forward-only schema migrations for `workspace/db/console.db`.
 
 ## Convention
 

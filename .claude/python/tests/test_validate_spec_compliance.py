@@ -37,7 +37,7 @@ def _make_valid_report(
                 "class": "testable_strict",
                 "status": "verified",
                 "evidence": {
-                    "file": "workspace/output/src/Backend/Endpoints/AuthEndpoints.cs",
+                    "file": "workspace/src/Backend/Endpoints/AuthEndpoints.cs",
                     "lines": "42-58",
                     "snippet": "app.MapPost...",
                 },
@@ -48,7 +48,7 @@ def _make_valid_report(
                 "class": "testable_strict",
                 "status": "verified",
                 "evidence": {
-                    "file": "workspace/output/src/Backend/Services/AuthService.cs",
+                    "file": "workspace/src/Backend/Services/AuthService.cs",
                     "lines": "100-110",
                     "snippet": "TimeSpan.FromHours(8)",
                 },
@@ -109,7 +109,7 @@ class TestValidateReportRed(unittest.TestCase):
                 "class": "testable_strict",
                 "status": "verified",
                 "evidence": {
-                    "file": "workspace/output/src/Backend/Endpoints/AuthEndpoints.cs",
+                    "file": "workspace/src/Backend/Endpoints/AuthEndpoints.cs",
                     "lines": "42-58",
                 },
             },

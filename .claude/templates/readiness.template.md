@@ -34,17 +34,17 @@
 - [ ] Tous les AC-N couverts → {pass | fail | n/a}
 
 ### 1.3 Cohérence stack
-- [ ] `workspace/input/stack/stack.md` existe → {pass | fail}
+- [ ] `workspace/stack/stack.md` existe → {pass | fail}
 - [ ] Au moins 1 backend OU 1 frontend actif → {pass | fail}
 - [ ] `## Project Config` rempli (`AppName`, `BackendName` si backend actif) → {pass | fail}
 - [ ] `DatabaseType` cohérent (none ou type valide) → {pass | fail}
 
 ### 1.4 Cohérence US ↔ HTML mockups (v4)
-- [ ] Chaque mockup `workspace/input/ui/{n}-{m}-*.html` a une US `workspace/output/us/{n}-{m}-*.md` correspondante → {pass | fail: liste HTML orphelins}
+- [ ] Chaque mockup `workspace/ui/{n}-{m}-*.html` a une US `workspace/us/{n}-{m}-*.md` correspondante → {pass | fail: liste HTML orphelins}
 - [ ] Aucune US ne pointe vers un mockup HTML inexistant → {pass | fail | n/a}
 
 ### 1.5 Constitution (si SDD_Pro v3)
-- [ ] `workspace/output/.sys/.context/constitution.md` existe → {pass | fail | n/a (projet pre-v3)}
+- [ ] `workspace/.sys/.context/constitution.md` existe → {pass | fail | n/a (projet pre-v3)}
 - [ ] Acteurs de la FEAT tous présents en §3 → {pass | warn}
 
 ---

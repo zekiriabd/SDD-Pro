@@ -18,7 +18,7 @@ python bootstrap.py --dry-run      # preview sans écrire
 ```
 
 Le bootstrap génère un `stack.md` cohérent (43 clés Project Config avec
-defaults sûrs), crée la structure `workspace/output/.sys/`, installe les
+defaults sûrs), crée la structure `workspace/.sys/`, installe les
 dépendances Python, et propose l'install des deps console.
 
 Voir [README.md](../../README.md#-quickstart--nouveau-projet) pour le
@@ -29,7 +29,7 @@ Les sections 1-5 ci-dessous décrivent la **configuration manuelle**
 
 ## 1. Sélectionner le stack
 
-Éditer `workspace/input/stack/stack.md` : activer 1 backend, 1 frontend,
+Éditer `workspace/stack/stack.md` : activer 1 backend, 1 frontend,
 1 UI DS, et éventuellement 1 auth.
 
 Renseigner `## Project Config` :
@@ -75,17 +75,17 @@ AZ_FE_CALLBACKPATH: ...
 ```
 
 Répondre aux 3-6 questions interactives. Le fichier
-`workspace/input/feats/1-Auth.md` est créé + bootstrap
-`workspace/output/.sys/.context/constitution.md`.
+`workspace/feats/1-Auth.md` est créé + bootstrap
+`workspace/.sys/.context/constitution.md`.
 
 ## 4. (Optionnel) Déposer les mockups HTML
 
-Sous `workspace/input/ui/` avec la convention `{n}-{m}-{Name}.html`
+Sous `workspace/ui/` avec la convention `{n}-{m}-{Name}.html`
 (basenames identiques aux US à générer).
 
 ### 4.bis Assets design-system partagés (convention UX humaine)
 
-`workspace/input/ui/` peut aussi accueillir **deux fichiers spéciaux**
+`workspace/ui/` peut aussi accueillir **deux fichiers spéciaux**
 hors convention `{n}-{m}-*.html` :
 
 - `design-system.html` — palette de référence, primitives, états des composants
@@ -97,7 +97,7 @@ basenames `{n}-{m}-*.html`). Ils servent au **UX designer humain** pour
 maintenir la cohérence visuelle entre mockups successifs.
 
 Lors du scaffolding, `arch` peut copier `design-system.css` dans
-`workspace/output/src/{AppName}/src/index.css` comme socle de tokens
+`workspace/src/{AppName}/src/index.css` comme socle de tokens
 shadcn/vuetify/radzen (cf. `.claude/rules/quality.md` Partie B §B.2, ex-ui-tokens.md).
 
 **Non requis** : si vous n'avez pas de palette projet définie, omettre
@@ -140,7 +140,7 @@ entre les deux.
 
 ⚠️ **Ne pas déployer en prod** : aucun test, aucun review, aucune
 vérification contrat back↔front. Pour passer en mode strict après un
-POC : éditer manuellement `workspace/output/us/1-1-*.md` (la pseudo-US
+POC : éditer manuellement `workspace/us/1-1-*.md` (la pseudo-US
 agrégée) pour la découper en vraies US, puis relancer `/sdd-full 1`
 (idempotent).
 

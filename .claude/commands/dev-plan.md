@@ -7,7 +7,7 @@ Pour chaque US de la FEAT `{n}`, invoque les agents `dev-backend` et
 `dev-frontend` en **mode Plan Only** : ils lisent l'US (+ mockup HTML
 en lecture texte directe pour le front), planifient inline les
 fichiers à produire, **écrivent le plan dans
-`workspace/output/plans/{n}-{m}-{Name}.{back|front}.md`**, et s'arrêtent —
+`workspace/plans/{n}-{m}-{Name}.{back|front}.md`**, et s'arrêtent —
 **aucun fichier de code généré, aucun build**.
 
 L'humain peut relire et éditer ces fichiers de plan, puis lancer
@@ -45,12 +45,12 @@ FIX: relancer /dev-plan {n} (ex. /dev-plan 1)
 
 ## STEP 2 — Lister les US à planifier
 
-Glob `workspace/output/us/{n}-*.md` → liste `US_LIST` (basenames sans extension).
+Glob `workspace/us/{n}-*.md` → liste `US_LIST` (basenames sans extension).
 
 Si `US_LIST` est vide →
 ```
 ERROR: /dev-plan — aucune US à planifier
-CAUSE: aucun fichier workspace/output/us/{n}-*.md
+CAUSE: aucun fichier workspace/us/{n}-*.md
 FIX: lancer /us-generate {n} pour générer les US d'abord
 ```
 
@@ -63,7 +63,7 @@ FEAT {n} — {U} US à planifier (back + front en parallèle, mode Plan Only)
 
 ## STEP 3 — Vérifier les stacks actifs
 
-Lire `workspace/input/stack/stack.md`.
+Lire `workspace/stack/stack.md`.
 
 - Si aucun `## Active Tech Specs` `backend-*` ET aucun `frontend-*` →
   ERROR comme dans `/dev-run`.
@@ -90,11 +90,11 @@ Chaque agent en mode `:plan` :
 - Charge l'US, le mockup HTML (front, texte direct), les stacks
   actifs et le CLAUDE.md projet (s'il existe)
 - Construit le plan inline normal (STEPs 5/6 selon agent)
-- **Écrit le plan dans `workspace/output/plans/{n}-{m}-{Name}.{back|front}.md`**
+- **Écrit le plan dans `workspace/plans/{n}-{m}-{Name}.{back|front}.md`**
   au format défini (cf. `@.claude/rules/build-and-loop.md §7.4`)
 - Émet UNE ligne :
   ```
-  dev-backend {n}-{m}-{Name}: plan written → workspace/output/plans/{n}-{m}-{Name}.back.md (X fichiers)
+  dev-backend {n}-{m}-{Name}: plan written → workspace/plans/{n}-{m}-{Name}.back.md (X fichiers)
   ```
 - STOP — pas de génération de code, pas de build
 
@@ -103,19 +103,9 @@ Si l'US n'a pas de contrepartie pour la famille → exit silent
 
 ---
 
-## STEP 4.5 — Compactage des plans frontend (RETIRÉ 2026-05-22 ; script supprimé du disque)
+## STEP 4.5 — Compactage des plans frontend (RETIRÉ v7.0.0)
 
-> ⛔ **RETIRÉ** : le script `compact_front_plans.py` cassait le contrat
-> plan v2 (remplaçait `## Files` YAML structuré par une liste prose,
-> supprimait `## ACs Coverage Summary`, faisait échouer `validate_plan.py`
-> avec `[PLAN_FILES_SECTION_MISSING]`). Désactivé en 2026-05-22, **supprimé
-> du disque depuis** (audit CTO 2026-06-07 — confirmation `ls` négative).
->
-> Aucune réécriture prévue : les plans v2 actuels (~30 KB max) ne
-> justifient pas le risque de régression vs ~7K tokens économisés.
-> Toute mention historique dans la doc framework est conservée comme
-> trace d'audit (cf. `docs/hooks-and-protections.md §3.3`,
-> `python/README.md §migration`) avec annotation "retiré v7.0.0-alpha".
+> ⛔ Retiré v7.0.0 (script `compact_front_plans.py` supprimé du disque) — cf. CHANGELOG.
 
 ---
 
@@ -138,8 +128,8 @@ présente, AC coverage complète) :
 
 ```bash
 python .claude/python/sdd_scripts/validate_plan.py \
-  --plan-path "workspace/output/plans/{n}-{m}-{Name}.{back|front}.md" \
-  --us-path "workspace/output/us/{n}-{m}-{Name}.md" \
+  --plan-path "workspace/plans/{n}-{m}-{Name}.{back|front}.md" \
+  --us-path "workspace/us/{n}-{m}-{Name}.md" \
   --json
 ```
 
@@ -178,7 +168,7 @@ Pour chaque US dont un plan a été écrit avec succès (`.back.md` ou
 `.front.md`), flipper `Ready → InProgress`. Idempotent et non-bloquant.
 
 ```bash
-for plan_file in workspace/output/plans/{n}-*.{back,front}.md; do
+for plan_file in workspace/plans/{n}-*.{back,front}.md; do
   [ -f "$plan_file" ] || continue
   us_id=$(basename "$plan_file" | grep -oE '^[0-9]+-[0-9]+')
   python .claude/python/sdd_scripts/set_us_status.py \
@@ -193,7 +183,7 @@ Skip pour les US sans plan écrit (erreur isolée, cf. STEP 4).
 ## STEP 4.ter — Auto-ingest plans dans console.db (depuis 2026-05-21)
 
 Invoquer **systématiquement** le script déterministe `ingest_plans.py`
-pour populer la table `plans` de `workspace/output/db/console.db`
+pour populer la table `plans` de `workspace/db/console.db`
 (parsing frontmatter v2 + count entrées section `## Files`).
 
 ```bash
@@ -227,11 +217,11 @@ des plans. Les fichiers `.back.md` / `.front.md` sur disque restent la SSoT.
 ```
 ✅ FEAT {n} — plans techniques écrits
 
-Plans backend  : workspace/output/plans/{n}-*-*.back.md  ({Tb_ok} US, {Tb_skip} skipped)
-Plans frontend : workspace/output/plans/{n}-*-*.front.md ({Tf_ok} US, {Tf_skip} skipped)
+Plans backend  : workspace/plans/{n}-*-*.back.md  ({Tb_ok} US, {Tb_skip} skipped)
+Plans frontend : workspace/plans/{n}-*-*.front.md ({Tf_ok} US, {Tf_skip} skipped)
 
 Prochaine étape :
-  - relire et éditer si besoin workspace/output/plans/{n}-*-*.{back,front}.md
+  - relire et éditer si besoin workspace/plans/{n}-*-*.{back,front}.md
   - lancer /dev-run {n} (les plans seront détectés et consommés sans
     re-planification)
   - ou /dev-plan {n} pour régénérer les plans (idempotent)
@@ -239,7 +229,7 @@ Prochaine étape :
 
 Si tout passe sans accroc :
 ```
-✅ FEAT {n} — {Tb_ok} plans backend + {Tf_ok} plans frontend écrits dans workspace/output/plans/.
+✅ FEAT {n} — {Tb_ok} plans backend + {Tf_ok} plans frontend écrits dans workspace/plans/.
 ```
 
 ---

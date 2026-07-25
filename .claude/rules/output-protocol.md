@@ -4,8 +4,9 @@
 > Le Tech Lead voit la progression du pipeline SDD comme un **executive
 > dashboard** (1 ligne par étape, label `[AGENT]` + résumé + %), pas
 > comme une console terminal verbose. Les détails techniques restent
-> persistés sur disque (rapports `workspace/output/qa/...`,
-> `workspace/output/.sys/.audit/...`) pour debug/audit.
+> persistés en base (`console.db` tables `qa_*` / `validation_reports` —
+> rendu à la demande via `query_console_db.py ... --format md`) et sur
+> disque (`workspace/.sys/.audit/...`) pour debug/audit.
 >
 > **Load-bearing** : règle universelle chargée par les 12 agents LLM
 > (`po`, `arch`, `dev-backend`, `dev-frontend`, `qa`, `elicitor`,
@@ -19,7 +20,7 @@
 
 - §1 — Principe et périmètre (qui parle au chat)
 - §2 — Format canonique (1 ligne par update)
-- §3 — Mapping agent → label `[AGENT]` (16 labels)
+- §3 — Mapping agent → label `[AGENT]` (18 labels)
 - §4 — Plages de progression par phase (anti-régression)
 - §5 — Patterns interdits en chat (liste fermée)
 - §6 — Patterns autorisés (résumés exécutifs)
@@ -62,7 +63,7 @@ build_loop / hooks / dashboards).
 [AGENT] Action courte au gérondif... (PROGRESS%)
 ```
 
-- `[AGENT]` : un des 12 labels §3, entre crochets, majuscules
+- `[AGENT]` : un des 18 labels §3, entre crochets, majuscules
 - `Action courte` : 3-10 mots, verbe + objet métier (pas technique)
 - `gérondif` : "Découpage…", "Implémentation…", "Validation…"
 - `(PROGRESS%)` : entier 0-100, suffixe `%`, entre parenthèses
@@ -79,7 +80,7 @@ build_loop / hooks / dashboards).
 ```
 
 **Exemples invalides** : `[po] reading FEAT file...` (minuscule, anglais),
-`[PO] Read workspace/input/feats/1-Auth.md` (chemin interne),
+`[PO] Read workspace/feats/1-Auth.md` (chemin interne),
 `[PO] User Stories generated successfully!` (pas de %, pas de gérondif).
 
 ### 2.2 Update résultat (1 ligne, post-step)
@@ -108,7 +109,9 @@ après cette ligne sauf bloc ERROR si verdict 🔴 (cf. §7).
 
 ## 3. Mapping agent → label `[AGENT]`
 
-17 labels canoniques (depuis v7.0.0+ — ajout `[ROUTER]` pour le routeur de complexité).
+18 labels canoniques (depuis v7.0.0+ — ajout `[ROUTER]` pour le routeur de
+complexité ; audit 2026-06-11 : ajout `[REVERSE]` pour le module reverse, qui
+était utilisé par les 7 agents reverse sans figurer dans cette table fermée).
 **Aucun autre label admis** dans le chat.
 
 | Label chat | Agent / Commande source | Phase pipeline |
@@ -129,6 +132,7 @@ après cette ligne sauf bloc ERROR si verdict 🔴 (cf. §7).
 | `[SECURITY]` | agent `security-reviewer` | 5 |
 | `[ARCH-REVIEW]` | agent `arch-reviewer` | 5 |
 | `[ADV-REVIEW]` | agent `adversarial-reviewer` (opt-in `/sdd-review --adversarial`) | 5 |
+| `[REVERSE]` | les 10 agents `reverse-*` + 15 commandes `/sdd-reverse*` (module reverse — suffixes d'état et format : `rules/reverse-engineering.md §7`) | reverse 1-4 |
 | `[DONE]` | verdict final pipeline | 100% |
 
 > **Migration** : `[REVIEW]` (générique) supprimé v7.0.0-alpha — utilisé auparavant
@@ -200,7 +204,7 @@ Exception : `build_loop iter X/Y` autorisé **uniquement** dans `[…/FIXING]`.
 - **Updates de progression** : 1 ligne par STEP majeure, cible **3-6 updates/invocation** (plus = bruit)
 - **Compteurs métier** : `2 User Stories créées`, `5 endpoints livrés`, `47/47 tests passés`, `coverage 82%`, verdict `🟢/🟡/🔴`
 - **IDs métier** : `FEAT 1-Auth`, `US 1-1-Login`, `AC-3 non couverte`, classe d'erreur `[QA_COVERAGE_GAP]`
-- **Pointeurs disque** (debug Tech Lead) : 1 fichier max sans contenu, ex. `[QA/FAIL] Tests échec sur US 1-2 → workspace/output/qa/feat-1/report.md. (84%)`
+- **Pointeurs source** (debug Tech Lead) : 1 pointeur max sans contenu, ex. `[QA/FAIL] Tests échec sur US 1-2 → console.db qa_api_tests (query_console_db.py feat-stats --feat 1 --format md). (84%)`
 
 ---
 
@@ -221,9 +225,9 @@ Exception : `build_loop iter X/Y` autorisé **uniquement** dans `[…/FIXING]`.
 
 **Exemples** :
 ```
-🔴 [DEV-BACKEND/FAIL] Build US 1-2 — [BUILD_BLOCKING] cycle DI détecté → workspace/output/qa/feat-1/build.md. (48%)
-🔴 [QA/FAIL] Coverage US 1-1 — [QA_COVERAGE_GAP] 62% < seuil 80% → workspace/output/qa/feat-1/coverage.md. (84%)
-🔴 [VALIDATE/FAIL] FEAT 1 NO-GO — [READINESS_NO_GO] 2 ACs sans Given/When/Then → workspace/output/.sys/.validation/1-readiness.md. (15%)
+🔴 [DEV-BACKEND/FAIL] Build US 1-2 — [BUILD_BLOCKING] cycle DI détecté → stderr build_loop (voir chat). (48%)
+🔴 [QA/FAIL] Coverage US 1-1 — [QA_COVERAGE_GAP] 62% < seuil 80% → console.db qa_coverage (query_console_db.py coverage --feat 1 --format md). (84%)
+🔴 [VALIDATE/FAIL] FEAT 1 NO-GO — [READINESS_NO_GO] 2 ACs sans Given/When/Then → workspace/.sys/.validation/1-readiness.md. (15%)
 ```
 
 ### 7.3 Format ERROR sur disque (3 lignes, inchangé)
@@ -259,7 +263,7 @@ visible en chat (signal de coût). `%` ne progresse pas pendant retries
 
 **Échec terminal** :
 ```
-🔴 [DEV-BACKEND/FAIL] US 1-2 — [BUILD_LOOP_EXHAUSTED] 3/3 iters sans convergence → workspace/output/qa/feat-1/build-us1-2.md. (48%)
+🔴 [DEV-BACKEND/FAIL] US 1-2 — [BUILD_LOOP_EXHAUSTED] 3/3 iters sans convergence → stderr build_loop (voir chat). (48%)
 🔴 [DEV-BACKEND/FAIL] US 1-2 — [BUILD_LOOP_COST_EXCEEDED] $15.30 ≥ $15 cap → STOP. (48%)
 ```
 
@@ -270,8 +274,8 @@ visible en chat (signal de coût). `%` ne progresse pas pendant retries
 À la toute fin, **une seule ligne** :
 ```
 [DONE] FEAT 1-Auth livrée — 🟢 GREEN (2 US, 47 tests, coverage 82%, 0 issue critique). (100%)
-[DONE/WARN] FEAT 1-Auth livrée — 🟡 WARN (3 issues serious, voir workspace/output/qa/feat-1/sdd-review.md). (100%)
-[DONE/FAIL] FEAT 1-Auth — 🔴 RED, pipeline interrompu — voir workspace/output/qa/feat-1/sdd-review.md. (66%)
+[DONE/WARN] FEAT 1-Auth livrée — 🟡 WARN (3 issues serious, voir query_console_db.py review --feat 1 --format md). (100%)
+[DONE/FAIL] FEAT 1-Auth — 🔴 RED, pipeline interrompu — voir query_console_db.py review --feat 1 --format md. (66%)
 ```
 
 Après `[DONE]`, **aucune** ligne supplémentaire (pas de "next steps", "consider",
@@ -286,7 +290,7 @@ Après `[DONE]`, **aucune** ligne supplémentaire (pas de "next steps", "conside
 
 ---
 
-## 10.bis Mode minimal `SDD_CHAT_MINIMAL=1` (CI/CD opt-in, v7.0.2)
+## 10.bis Mode minimal `SDD_CHAT_MINIMAL=1` (CI/CD opt-in, v7.0.1-dev)
 
 `SDD_CHAT_MINIMAL=1` (export parent shell AVANT démarrage Claude Code) →
 **1 ligne par invocation** au lieu des 3-6 updates standard. Conçu pour

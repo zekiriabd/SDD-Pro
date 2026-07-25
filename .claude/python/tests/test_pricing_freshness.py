@@ -48,13 +48,50 @@ def test_check_pricing_freshness_edge_exact_max_age():
 
 def test_pricing_table_covers_active_models():
     """All models referenced by CLAUDE.md / loader.yml must price."""
-    required = ["claude-opus-4-7", "claude-sonnet-4-6", "claude-haiku-4-5"]
+    required = ["claude-opus-4-8", "claude-opus-4-7", "claude-sonnet-4-6", "claude-haiku-4-5"]
     for model in required:
         p = pricing.get_pricing(model)
         # Schema invariant: every entry has the 4 canonical keys.
         for key in ("input", "output", "cache_read", "cache_creation"):
             assert key in p, f"{model}: missing key {key}"
             assert p[key] > 0, f"{model}.{key}: must be positive USD/M"
+
+
+def test_every_agent_frontmatter_model_is_priced():
+    """Root-cause guard (audit CR-1, 2026-06-11).
+
+    The cost-cap hook (`preflight_cost_cap.py`) under-counts spend by 5x
+    whenever an agent declares a model absent from PRICING, because
+    get_pricing() silently falls back to Sonnet ($3/$15 vs Opus $15/$75).
+    This is exactly how `claude-opus-4-8` slipped through after the
+    frontmatter bump while pricing still knew only `-4-7`.
+
+    Therefore: every `model:` declared in any `.claude/agents/*.md`
+    frontmatter MUST have an EXACT key in PRICING (no fallback allowed).
+    """
+    import pathlib
+    import re
+
+    agents_dir = pathlib.Path(__file__).resolve().parents[2] / "agents"
+    if not agents_dir.is_dir():
+        return  # tolerate layout changes — covered by other suites
+
+    model_re = re.compile(r"^model:\s*([^\s#]+)\s*$", re.MULTILINE)
+    offenders: list[str] = []
+    for agent_md in sorted(agents_dir.glob("*.md")):
+        text = agent_md.read_text(encoding="utf-8")
+        for m in model_re.finditer(text):
+            model_id = m.group(1).strip().strip("'\"")
+            # strip a runtime context-window suffix like "[1m]" if present
+            base = model_id.split("[", 1)[0]
+            if base not in pricing.PRICING:
+                offenders.append(f"{agent_md.name}: model '{model_id}' not in PRICING")
+
+    assert not offenders, (
+        "Agent frontmatter declares model(s) with no exact pricing entry "
+        "(cost-cap would silently fall back to Sonnet and under-count Opus 5x):\n  "
+        + "\n  ".join(offenders)
+    )
 
 
 def test_pricing_fallback_for_unknown_model():

@@ -2,7 +2,7 @@
 """Deterministic triage gate — should we spawn LLM reviewers? (T2.8 audit 2026-06-08).
 
 Anthropic recommendation §3.4 : 5 LLM reviewers cost ~150k tokens per FEAT
-(~$10+ on Opus 4.7). Many FEATs ship code with obvious quality issues
+(~$10+ on Opus 4.8). Many FEATs ship code with obvious quality issues
 detectable by `quality_scan.py` (deterministic, 0-token). If the
 deterministic scan already produces enough RED findings to ensure the
 final verdict will be RED, spawning the LLM reviewers is wasted budget.
@@ -14,7 +14,8 @@ This script implements the triage :
        verdict will be RED anyway") + emit recommendation on stderr
     4. Else exit 0 (= "proceed with LLM reviewers, you might still hit GREEN")
 
-Usage (suggested in /sdd-full STEP 4.6 or /sdd-review STEP 2.5) :
+Usage (WIRED in /sdd-review STEP 2.5 depuis l'audit 2026-06-11 — plus un
+« suggested » orphelin) :
 
     python .claude/python/sdd_scripts/triage_quality.py \
         --feat-number 1 --fail-on serious --threshold 5
@@ -42,7 +43,7 @@ if str(_PY_ROOT) not in sys.path:
     sys.path.insert(0, str(_PY_ROOT))
 
 from sdd_lib.exit_codes import SUCCESS, FAIL_FAST, INFRA_BLOCKED  # noqa: E402
-from sdd_lib.paths import repo_root  # noqa: E402
+from sdd_lib.paths import workspace_root, repo_root  # noqa: E402
 
 SEVERITY_RANK = {
     "info": 0, "minor": 1, "moderate": 2, "serious": 3, "critical": 4,
@@ -68,7 +69,7 @@ def main() -> int:
     args = parse_args()
     feat_n = args.feat_number
 
-    db_path = repo_root() / "workspace" / "output" / "db" / "console.db"
+    db_path = workspace_root(repo_root()) / "db" / "console.db"
     if not db_path.is_file():
         print(f"INFRA_BLOCKED: console.db not found at {db_path}", file=sys.stderr)
         return INFRA_BLOCKED
@@ -124,7 +125,7 @@ def main() -> int:
             file=sys.stderr,
         )
         print(
-            f"COST SAVING: ~150k tokens (~$10-15 Opus 4.7) per skipped FEAT review.",
+            f"COST SAVING: ~150k tokens (~$10-15 Opus 4.8) per skipped FEAT review.",
             file=sys.stderr,
         )
         return FAIL_FAST  # exit 1 = "triage RED, downstream caller can decide"

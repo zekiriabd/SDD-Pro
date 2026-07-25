@@ -77,7 +77,7 @@ class TestProtectFrameworkWarnMode(unittest.TestCase):
         """Edit on user code → no warning, exit 0."""
         payload = {
             "tool_name": "Edit",
-            "tool_input": {"file_path": "workspace/output/src/MyApp/Pages/Login.tsx"},
+            "tool_input": {"file_path": "workspace/src/MyApp/Pages/Login.tsx"},
         }
         r = _run_hook(payload)
         self.assertEqual(r.returncode, 0)
@@ -132,7 +132,7 @@ class TestProtectFrameworkStrictMode(unittest.TestCase):
         """Strict mode does not block paths outside framework."""
         payload = {
             "tool_name": "Edit",
-            "tool_input": {"file_path": "workspace/output/src/MyBackend/Services/Foo.cs"},
+            "tool_input": {"file_path": "workspace/src/MyBackend/Services/Foo.cs"},
         }
         r = _run_hook(payload, {"SDD_PROTECT_FRAMEWORK_MODE": "strict"})
         self.assertEqual(r.returncode, 0)

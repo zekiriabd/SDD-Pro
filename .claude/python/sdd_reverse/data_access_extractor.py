@@ -28,12 +28,19 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from sdd_reverse.scan_legacy import decode_text, normalize_bytes
+from sdd_reverse.scan_legacy import decode_text, normalize_bytes, read_text_normalized as _read_text
 
 DATA_ACCESS_SCHEMA_VERSION = 1
 
 # Languages whose source can embed inline SQL strings.
-_CODE_EXTENSIONS = frozenset({".cs", ".vb", ".java", ".php", ".jsp"})
+# Audit 2026-06-11 M14 : ajout Delphi (.pas), Classic ASP (.asp), VB6
+# (.bas/.frm/.cls) — l'extraction SQL par regex sur strings fonctionne sur
+# tout texte ; sans ces extensions, ces legacy produisaient un dataAccess
+# vide en silence (reproduction du bug C7 corrigé pour VB.NET).
+_CODE_EXTENSIONS = frozenset({
+    ".cs", ".vb", ".java", ".php", ".jsp",
+    ".pas", ".asp", ".bas", ".frm", ".cls",
+})
 _SQL_FAMILY_EXTENSIONS = frozenset({".sql"})
 
 _SQL_VERBS = ("SELECT", "INSERT", "UPDATE", "DELETE", "MERGE", "WITH", "EXEC", "EXECUTE")
@@ -293,11 +300,7 @@ def parse_stored_procedure_defs(text: str, source: str) -> list[dict[str, Any]]:
     return defs
 
 
-def _read_text(path: Path) -> str:
-    try:
-        return decode_text(normalize_bytes(path.read_bytes()))
-    except OSError:
-        return ""
+# _read_text centralise dans scan_legacy (audit 2026-06-11 B5 — cap 5 Mo).
 
 
 # M3 : languages whose string literals are dominantly single-quoted.

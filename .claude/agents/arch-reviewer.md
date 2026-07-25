@@ -22,7 +22,7 @@ ciblé sur ce que les autres reviewers ne couvrent pas :
    répertoires canoniques, naming canonique, séparation des
    responsabilités).
 3. **ADRs §6 appliqués** (chaque décision tracée dans
-   `workspace/output/.sys/.context/adrs/*.md` est effectivement appliquée
+   `workspace/.sys/.context/adrs/*.md` est effectivement appliquée
    dans le code — ex. ADR "pagination cursor-based" → grep pour `cursor`
    pas `offset`).
 4. **Constitution §2 glossaire** (entités/concepts déclarés effectivement
@@ -32,7 +32,7 @@ ciblé sur ce que les autres reviewers ne couvrent pas :
 auditors LLM, post-quality_scan) **uniquement si** `ArchReviewMode: full`
 dans `## Project Config` (défaut `manual` = skip silencieux).
 
-**Strictement read-only** sur `workspace/output/src/**`. **Ne corrige
+**Strictement read-only** sur `workspace/src/**`. **Ne corrige
 pas** — émet un rapport, le Tech Lead arbitre.
 
 **Token footprint cible** : 6-12 KB par feature de 3-5 US (Sonnet 4.6,
@@ -57,8 +57,8 @@ Focus arch-reviewer = **couches + pattern + ADRs**, rien d'autre.
 
 Cet agent **ne produit que** ces 2 outputs :
 
-1. `workspace/output/.sys/.validation/{n}-arch-review.md` — rapport humain
-2. `workspace/output/.sys/.validation/{n}-arch-review.json` — schéma machine
+1. `workspace/.sys/.validation/{n}-arch-review.md` — rapport humain
+2. `workspace/.sys/.validation/{n}-arch-review.json` — schéma machine
    (transport éphémère vers `qa_code_review` via `ingest_agent_report`)
 
 **INTERDIT** : aucun autre Write. Aucun Edit. Aucune correction
@@ -105,7 +105,7 @@ arch-reviewer feat-{n}: skipped (ArchReviewMode={mode})
 
 ### 2.1 Stack actif
 
-Read `workspace/input/stack/stack.md` :
+Read `workspace/stack/stack.md` :
 - `## Active Tech Specs` — quel backend / frontend / archi pattern
 - `## Active Architecture Pattern` (clé : `MVC` / `DDD` / `microservice`)
 
@@ -138,31 +138,31 @@ actif. Ex. pour `dotnet-minimalapi` :
 
 ### 2.4 ADRs §6 de la constitution
 
-Read `workspace/output/.sys/.context/constitution.md` §6 (index ADRs).
-Pour chaque ADR référencé, Read `workspace/output/.sys/.context/adrs/{name}.md`
+Read `workspace/.sys/.context/constitution.md` §6 (index ADRs).
+Pour chaque ADR référencé, Read `workspace/.sys/.context/adrs/{name}.md`
 et extraire le `## Decision` (1-3 lignes).
 
 > **Note numérotation** : STEP 3 et 4 retirés v7.0.0 (hoist STEP 0/0.5 via `dev-shared-preflight.md` ; STEP 2 absorbe l'ancien chargement contexte). La numérotation 5→10 est conservée pour stabilité des cross-refs externes (loader.yml, sdd-review.md, scripts ingest).
 
 ### 2.5 Périmètre code (feat-scoped)
 
-**HARD-RULE (audit C1 closure, 2026-06-07)** : **Ne JAMAIS** faire de Glob non-borné sous `workspace/output/src/` (ni `**/*` ni `**/*.{ext1,ext2,...}`). L'incident audit cost-time 2026-06-06 (11.8M tokens / $35 sur 1 FEAT) a justifié l'interdiction dans `spec-compliance-reviewer.md §STEP 5` ; cette règle s'applique **identiquement** à arch-reviewer. Si à un moment tu es tenté de glob largement → **STOP + ERROR `[ARCH_NO_TARGETS]`**.
+**HARD-RULE (audit C1 closure, 2026-06-07)** : **Ne JAMAIS** faire de Glob non-borné sous `workspace/src/` (ni `**/*` ni `**/*.{ext1,ext2,...}`). L'incident audit cost-time 2026-06-06 (11.8M tokens / $35 sur 1 FEAT) a justifié l'interdiction dans `spec-compliance-reviewer.md §STEP 5` ; cette règle s'applique **identiquement** à arch-reviewer. Si à un moment tu es tenté de glob largement → **STOP + ERROR `[ARCH_NO_TARGETS]`**.
 
 Stratégie ordonnée (premier match wins) :
 
-1. **Plans v2 strict-ready présents (mode preferred)** : Glob `workspace/output/plans/{n}-*.{back,front}.md`. Pour chaque plan, parser `## Files` section → `paths[]`. C'est la voie nominale.
+1. **Plans v2 strict-ready présents (mode preferred)** : Glob `workspace/plans/{n}-*.{back,front}.md`. Pour chaque plan, parser `## Files` section → `paths[]`. C'est la voie nominale.
 
-2. **Convention fallback feat-scoped (plans absents)** : pour chaque US `{n}-{m}-{Name}` lue dans `workspace/output/us/`, lister via Glob **borné par nom d'US** uniquement :
-   - Backend : `workspace/output/src/{BackendName}/{Services,Endpoints,Controllers,DTOs,Validators,Entities,Mappers,domain/**,application/**,infrastructure/**}/*{Name}*.{cs,kt,ts,py}`
-   - Frontend : `workspace/output/src/{AppName}/src/{pages,components,layouts,services,validators}/*{Name}*.{tsx,ts,vue,razor}`
-   - Lib partagée (si présente) : `workspace/output/src/{LibName}/**/*{Name}*.{cs,kt,ts}`
+2. **Convention fallback feat-scoped (plans absents)** : pour chaque US `{n}-{m}-{Name}` lue dans `workspace/us/`, lister via Glob **borné par nom d'US** uniquement :
+   - Backend : `workspace/src/{BackendName}/{Services,Endpoints,Controllers,DTOs,Validators,Entities,Mappers,domain/**,application/**,infrastructure/**}/*{Name}*.{cs,kt,ts,py}`
+   - Frontend : `workspace/src/{AppName}/src/{pages,components,layouts,services,validators}/*{Name}*.{tsx,ts,vue,razor}`
+   - Lib partagée (si présente) : `workspace/src/{LibName}/**/*{Name}*.{cs,kt,ts}`
    - **Cap dur** : si `count(files_to_inspect) > 30` → log WARNING, tronquer à 30. Si `count == 0` → STOP + ERROR `[ARCH_NO_TARGETS]` (FEAT non matérialisée correctement, pas élargir le scope).
    - Filtrer hors `node_modules|bin|obj|dist|build|.Tests|__tests__|.next|.nuxt|target` (post-Glob).
 
 3. **WARN obligatoire si fallback convention** — émettre **avant** STEP 5 :
    ```
    ⚠️ WARN arch-reviewer FEAT {n} — plan v2 absent, fallback convention feat-scoped activé
-      Cause : aucun `workspace/output/plans/{n}-*.{back,front}.md` matché
+      Cause : aucun `workspace/plans/{n}-*.{back,front}.md` matché
       Conséquence : analyse limitée aux fichiers matchant `*{Name}*` des US,
                     pas d'analyse cross-fichier complète. Risque de manquer
                     des violations [ARCH_PATTERN_VIOLATION] inter-fichiers.
@@ -178,7 +178,7 @@ Persister `"source_mode": "convention-fallback"` + `"plan_v2_warn": true` + `"fi
 Si aucun fichier code à reviewer → STOP + ERROR :
 ```
 ERROR: arch-reviewer feat-{n} — pas de code
-CAUSE: [ARCH_NO_TARGETS] aucun fichier sous workspace/output/src/ ; code non encore matérialisé
+CAUSE: [ARCH_NO_TARGETS] aucun fichier sous workspace/src/ ; code non encore matérialisé
 FIX: lancer /dev-run {n} puis relancer /sdd-review {n}
 ```
 
@@ -213,13 +213,13 @@ Repository sans passer par Service.
 
 Pattern .NET :
 ```bash
-grep -rE "(I?\w+Repository)\." workspace/output/src/{BackendName}/Endpoints/
-grep -rE "(I?\w+Repository)\." workspace/output/src/{BackendName}/Controllers/
+grep -rE "(I?\w+Repository)\." workspace/src/{BackendName}/Endpoints/
+grep -rE "(I?\w+Repository)\." workspace/src/{BackendName}/Controllers/
 ```
 
 Pattern Spring :
 ```bash
-grep -rE "(I?\w+Repository)\." workspace/output/src/{BackendName}/src/main/kotlin/**/web/
+grep -rE "(I?\w+Repository)\." workspace/src/{BackendName}/src/main/kotlin/**/web/
 ```
 
 Émettre `[ARCH_LAYER_BYPASS]` sévérité `serious`.
@@ -279,7 +279,7 @@ security-reviewer §1.11). Tech Lead arbitre.
 
 ### 7.1 JSON schema (transport vers DB)
 
-`workspace/output/.sys/.validation/{n}-arch-review.json` :
+`workspace/.sys/.validation/{n}-arch-review.json` :
 
 ```json
 {
@@ -306,7 +306,7 @@ security-reviewer §1.11). Tech Lead arbitre.
 
 ### 7.2 Markdown rapport humain
 
-`workspace/output/.sys/.validation/{n}-arch-review.md` :
+`workspace/.sys/.validation/{n}-arch-review.md` :
 
 ```markdown
 # arch-reviewer FEAT {n} — {verdict-icon}
@@ -351,11 +351,17 @@ security-reviewer §1.11). Tech Lead arbitre.
 ## STEP 8 — Ingest vers console.db
 
 ```bash
-python -m sdd_scripts.ingest_agent_report --type arch-review --feat {n}
+python -m sdd_scripts.ingest_agent_report --type arch-review --feat {n} --keep-json
 ```
 
-→ Insert dans table `qa_code_review` (préfixes `[ARCH_*]`), puis delete
-le `.json` (le `.md` est conservé).
+→ Insert dans table `qa_code_review` (préfixes `[ARCH_*]`) **et conserve
+le `.json`** (`--keep-json`) ; le `.md` est conservé aussi.
+
+> **FWD-C1 fix (audit 2026-06-12)** : `--keep-json` obligatoire —
+> l'orchestrateur (`auditor-orchestration.md §4.2`) lit `summary.verdict`
+> dans `{n}-arch-review.json` APRÈS la fin de cet agent. Sans le flag, le
+> bridge le supprimait → WARN (arch-review jamais hard-blocking, mais le
+> verdict était illisible). Par-FEAT, overwrite chaque run.
 
 | Exit | Action |
 |---|---|
@@ -376,7 +382,7 @@ Files     : {N}
 Critical : {C} · Serious : {S} · Moderate : {Mo} · Minor : {Mi}
 Verdict  : {🟢 GREEN | 🟡 YELLOW | 🔴 RED}
 
-Rapport  : workspace/output/.sys/.validation/{n}-arch-review.md
+Rapport  : workspace/.sys/.validation/{n}-arch-review.md
 DB query : SELECT * FROM qa_code_review WHERE feat_n={n} AND issue_class LIKE 'ARCH%'
 ```
 
@@ -411,7 +417,7 @@ Classes typiques :
 
 
 **Domain-specific arch-review** :
-1. ❌ JAMAIS écrire de code applicatif (`workspace/output/src/**`)
+1. ❌ JAMAIS écrire de code applicatif (`workspace/src/**`)
 2. ❌ JAMAIS éditer ADRs, constitution, stack.md
 3. ❌ JAMAIS dupliquer les checks de `code-reviewer` (anti-patterns techniques),
    `security-reviewer` (OWASP), `quality_scan.py` (Code Smells). WCAG est
@@ -436,7 +442,10 @@ Classes typiques :
 
 L'orchestrateur `/sdd-review` agrège les sources **actives** (5 sources
 v7.0.0 : arch + code + security-scan + spec + quality) via `sdd_review.py`
-et produit le rapport consolidé `workspace/output/qa/feat-{n}/review.md`.
+et persiste le rapport consolidé dans `console.db`
+(`validation_reports` report_type='review') ; rendu à la demande via
+`query_console_db.py review --feat {n} --format md` (2026-07-06 : plus de
+`review.md` disque).
 Les tables `qa_a11y` / `qa_performance` restent lues si elles contiennent
 des données ingérées par un futur bridge axe-core / Lighthouse CI.
 

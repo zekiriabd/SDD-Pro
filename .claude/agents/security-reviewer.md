@@ -23,7 +23,7 @@ Sonnet du code généré contre **OWASP Top 10 2021** :
 
 Verdict : 🟢/🟡/🔴 selon `SecurityFailOn` + 5 classes **hard-blocking**.
 
-**Strictement read-only** sur `workspace/output/src/**`. Ne corrige pas — émet un
+**Strictement read-only** sur `workspace/src/**`. Ne corrige pas — émet un
 rapport, le Tech Lead arbitre.
 
 **Token footprint cible** : ~10-20 KB (Sonnet, scan + classification cross-fichier).
@@ -34,8 +34,8 @@ rapport, le Tech Lead arbitre.
 
 L'agent **ne produit que** ces outputs :
 
-- `workspace/output/.sys/.validation/{n}-security-scan.md`
-- `workspace/output/.sys/.validation/{n}-security-scan.json`
+- `workspace/.sys/.validation/{n}-security-scan.md`
+- `workspace/.sys/.validation/{n}-security-scan.json`
 
 **INTERDIT** : aucun autre Write. Aucun Edit. Aucune correction
 proactive. Aucun appel à un autre agent. Aucune modification de la
@@ -64,7 +64,7 @@ Si `{n}` manquant/non numérique → STOP + ERROR `[INVALID_ARG]`.
 
 ### 1.2 Project Config
 
-Lire `## Project Config` de `workspace/input/stack/stack.md` :
+Lire `## Project Config` de `workspace/stack/stack.md` :
 
 ```yaml
 ## Project Config
@@ -83,25 +83,29 @@ Validation classique (`[STACK_MALFORMED]` si hors range).
 
 ## STEP 2 — Préconditions
 
-Requis :
-- `workspace/input/feats/{n}-*.md` (1 fichier)
-- `workspace/output/us/{n}-*.md` (≥ 1 fichier)
-- `workspace/output/.sys/.context/constitution.md` (1 fichier)
+Requis (bloquant si absent) :
+- `workspace/feats/{n}-*.md` (1 fichier)
+- `workspace/us/{n}-*.md` (≥ 1 fichier)
 - Au moins 1 stack actif dans `## Active Tech Specs`
 - Code généré présent dans au moins un de :
-  - `workspace/output/src/{BackendName}/` (selon stack backend actif)
-  - `workspace/output/src/{AppName}/` (selon stack frontend actif)
+  - `workspace/src/{BackendName}/` (selon stack backend actif)
+  - `workspace/src/{AppName}/` (selon stack frontend actif)
 
-Absent → STOP + ERROR `[QA_PRECONDITION_FAILED]` : `code production absent, lancer /dev-run {n} d'abord`.
+Optionnel (lecture passive si présent, jamais bloquant) :
+- `workspace/.sys/.context/constitution.md` — fichier de contexte
+  facultatif partout ailleurs dans le pipeline ; ne doit PAS bloquer le seul
+  gate sécurité hard-blocking. L'agent ne le lit même pas en STEP 3.
+
+Précondition bloquante absente → STOP + ERROR `[QA_PRECONDITION_FAILED]` : `code production absent, lancer /dev-run {n} d'abord`.
 
 ---
 
 ## STEP 3 — Charger contexte minimal
 
-1. `.claude/rules/error-classification.md` §1.11 (taxonomie `[SEC_*]`)
-2. `workspace/input/feats/{n}-*.md` (FEAT parente)
-3. `workspace/output/us/{n}-*.md` (US — intent métier + ACs sécurité)
-4. `workspace/output/src/{BackendName|AppName}/CLAUDE.md` si présents
+1. `.claude/digests/error-classification.security-reviewer.md` §1.11 (taxonomie `[SEC_*]`)
+2. `workspace/feats/{n}-*.md` (FEAT parente)
+3. `workspace/us/{n}-*.md` (US — intent métier + ACs sécurité)
+4. `workspace/src/{BackendName|AppName}/CLAUDE.md` si présents
 5. `.claude/stacks/backend/{active}.md` §1.3 + §3 + §2.4 libs
 6. `.claude/stacks/frontend/{active}.md` §1.3 + §3
 7. `.claude/stacks/auth/{active}.md` **§2-§3 UNIQUEMENT** (offset/limit
@@ -129,7 +133,7 @@ Wrapper d'annonce — découpage opérationnel intégralement en §5.1-§5.10.
 **Méta-instructions pour toutes les sous-sections §5.x** :
 - Scans **déterministes** Grep regex + **raisonnement Sonnet** sur matches
   cross-fichier (légitimes vs vrais positifs)
-- Respecter budget STEP 0.5 — pas de Glob non-borné sous `workspace/output/src/`
+- Respecter budget STEP 0.5 — pas de Glob non-borné sous `workspace/src/`
 - Émettre classes `[SEC_*]` documentées `error-classification.md §1.11`
   (23 classes + 8 hard-blocking)
 - Doute (match ambigu) → préférer WARN qu'omettre (bias verification)
@@ -303,7 +307,7 @@ Toute occurrence de ces classes **force** 🔴 RED, quelque soit le seuil :
 
 ### 8.1 `security-scan.json`
 
-Localisation : `workspace/output/.sys/.validation/{n}-security-scan.json`
+Localisation : `workspace/.sys/.validation/{n}-security-scan.json`
 
 ```json
 {
@@ -352,12 +356,17 @@ Pour chaque fichier (`.json` puis `.md`) :
 
 ## STEP 9.5 — Ingest vers console.db (v6.10)
 
-Le `.json` est éphémère. Après Write, appeler le bridge Python qui parse
-le rapport, insère dans `qa_security` (console.db), puis supprime le
-`.json`. Le `.md` reste.
+Le `.json` est inséré dans `qa_security` (console.db) **et conservé sur
+le FS** (`--keep-json`). Le `.md` reste.
+
+> **FWD-C1 fix (audit 2026-06-12)** : `--keep-json` obligatoire —
+> l'orchestrateur two-stage (`auditor-orchestration.md §4.2`) lit
+> `summary.verdict` dans `{n}-security-scan.json` APRÈS la fin de cet
+> agent. Le bridge le supprimait par défaut → faux 🔴 RED
+> `[AUDITOR_RUNTIME_ERROR]`. Par-FEAT, overwrite chaque run.
 
 ```bash
-python -m sdd_scripts.ingest_agent_report --type security-scan --feat {n}
+python -m sdd_scripts.ingest_agent_report --type security-scan --feat {n} --keep-json
 ```
 
 | Exit | Action |
@@ -366,8 +375,8 @@ python -m sdd_scripts.ingest_agent_report --type security-scan --feat {n}
 | 1 | STOP + ERROR `[QA_PRECONDITION_FAILED]` |
 | 2 / 3 | STOP + ERROR `[QA_OUTPUT_INVALID]` |
 
-Aucun `.json` sur le FS à l'issue de ce STEP. Données interrogeables
-via `SELECT … FROM qa_security WHERE feat_n = {n}`.
+À l'issue de ce STEP : `.json` + `.md` présents sur le FS, ET données
+interrogeables via `SELECT … FROM qa_security WHERE feat_n = {n}`.
 
 ---
 
@@ -383,8 +392,8 @@ Files    : {N} fichiers
 Issues   : {C} critical · {S} serious · {M} moderate · {m} minor
 Verdict  : {🟢 GREEN | 🟡 WARN | 🔴 RED}{ (blocking: {blocking_class}) si applicable}
 
-Rapport  : workspace/output/.sys/.validation/{n}-security-scan.md
-Schéma   : workspace/output/.sys/.validation/{n}-security-scan.json
+Rapport  : workspace/.sys/.validation/{n}-security-scan.md
+Schéma   : workspace/.sys/.validation/{n}-security-scan.json
 ```
 
 Cas skip :
@@ -428,7 +437,7 @@ Applique `@.claude/rules/output-protocol.md` (label `[SECURITY]`, plage `94-96%`
 
 
 **Domain-specific security-review** :
-- ❌ Modifier le code de production sous `workspace/output/src/**` (read-only strict)
+- ❌ Modifier le code de production sous `workspace/src/**` (read-only strict)
 - ❌ Corriger automatiquement les findings (rapport seul)
 - ❌ Re-builder, exécuter les tests, lancer un linter
 - ❌ Étendre la table d'OWASP §5 en cours de scan (si pattern manque,
@@ -446,7 +455,7 @@ L'agent est strictement idempotent :
 - Les outputs sont overwritten (pas de merge)
 - Peut être ré-invoqué en parallèle de `code-reviewer`,
   `spec-compliance-reviewer`, `arch-reviewer` sans conflit (paths
-  distincts dans `workspace/output/.sys/.validation/`).
+  distincts dans `workspace/.sys/.validation/`).
 
 ---
 
@@ -464,5 +473,5 @@ Sonnet 4.6 — raisonnement contextuel sur matches Grep (nuance
 - Invocation auto : `/dev-run {n}` STEP 6.4 batch parallèle si
   `SecurityScanEnabled: true`. Verdict 🔴 RED → STOP + rapport.
 - Consommation rapports : `console.db` (table `qa_security`) +
-  `workspace/output/.sys/.validation/{n}-security-scan.json`. La
+  `workspace/.sys/.validation/{n}-security-scan.json`. La
   console web lit la DB pour rendu §Security.

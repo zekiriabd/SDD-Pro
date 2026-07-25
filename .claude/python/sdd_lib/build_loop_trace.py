@@ -36,11 +36,11 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-from sdd_lib.paths import repo_root
+from sdd_lib.paths import workspace_root, repo_root
 
 
 def _connect() -> sqlite3.Connection | None:
-    db_path = repo_root() / "workspace" / "output" / "db" / "console.db"
+    db_path = workspace_root(repo_root()) / "db" / "console.db"
     if not db_path.is_file():
         return None
     try:

@@ -4,7 +4,7 @@
 > Utilisateur final : préférer `/sdd-full` ou `/dev-run` (gèrent pré-conditions, idempotence, état).
 
 Invoque l'agent `dev-backend` pour matérialiser l'US
-`workspace/output/us/{n}-{m}-{Name}.md` en code serveur (services, endpoints,
+`workspace/us/{n}-{m}-{Name}.md` en code serveur (services, endpoints,
 DTOs, entities, mappers, Program.cs, middleware). L'agent planifie
 inline les fichiers à produire à partir de l'US + du stack actif.
 

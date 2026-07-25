@@ -5,7 +5,7 @@ Fires on `PreToolUse` (matcher=Skill). Filters internally to only run before
 `/sdd-full` and `/sdd-poc` skill invocations (other skills exit 0 silent).
 
 Calls sdd_scripts/validate_stack_combo.py to check if the active combo from
-workspace/input/stack/stack.md matches a PoC-validated combo (C1/C2/...).
+workspace/stack/stack.md matches a PoC-validated combo (C1/C2/...).
 
 Exit semantics (propagated to Claude Code hook decision):
     0  validated OR experimental w/ WARN OR non-applicable skill (continue silent)
@@ -105,7 +105,7 @@ def main() -> int:
         sys.stderr.write(
             f"ERROR: /{skill} blocked — combo non testé\n"
             f"CAUSE: [STACK_COMBO_UNTESTED] signature={signature} status={status} — au moins un composant 🔴\n"
-            f"FIX: vérifier workspace/input/stack/stack.md OU bypass via SDD_ALLOW_UNTESTED_COMBO=1\n"
+            f"FIX: vérifier workspace/stack/stack.md OU bypass via SDD_ALLOW_UNTESTED_COMBO=1\n"
         )
         return HOOK_DENY
     if code == 3:
@@ -113,7 +113,7 @@ def main() -> int:
         sys.stderr.write(
             f"ERROR: /{skill} blocked — combo invalide\n"
             f"CAUSE: [STACK_COMBO_INVALID] signature={signature}\n"
-            f"FIX: corriger workspace/input/stack/stack.md (cf. .claude/docs/validated-combos.md)\n"
+            f"FIX: corriger workspace/stack/stack.md (cf. .claude/docs/validated-combos.md)\n"
         )
         return HOOK_DENY
     if code == 4:

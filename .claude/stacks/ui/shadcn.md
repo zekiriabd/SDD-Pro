@@ -490,7 +490,7 @@ L’IA doit :
 ## 15. Mapping HTML → primitive shadcn (depuis SDD_Pro v4)
 
 Quand `dev-frontend` lit un mockup HTML statique
-(`workspace/input/ui/{n}-{m}-*.html`), il **traduit chaque primitive HTML brute
+(`workspace/ui/{n}-{m}-*.html`), il **traduit chaque primitive HTML brute
 vers son pendant shadcn/ui**.
 
 ### 15.1 Layout

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """SDD_Pro: validate User Story dependency graph (v6.8+).
 
-Parses the `## Dependencies` section of every US under workspace/output/us/
+Parses the `## Dependencies` section of every US under workspace/us/
 and reports:
   - cycles ([US_DEPS_CYCLE])      — blocking
   - missing references ([US_DEPS_MISSING]) — blocking
@@ -19,7 +19,7 @@ Usage:
     python validate_us_deps.py --feat 1 --json           # machine output
     python validate_us_deps.py --feat 1 --topo           # print topo order (one per line)
     python validate_us_deps.py --us-id 1-2               # report on single US
-    python validate_us_deps.py --all                     # all US in workspace/output/us/
+    python validate_us_deps.py --all                     # all US in workspace/us/
 
 Exit codes (granular — documented exception to sdd_lib/exit_codes.py convention) :
     0  Graph valid (no cycles, no missing refs); orphans only -> warn, exit 0
@@ -44,7 +44,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from sdd_lib.paths import repo_root  # noqa: E402
+from sdd_lib.paths import workspace_root, repo_root  # noqa: E402
 from sdd_lib.stderr import error_block, warn  # noqa: E402
 
 
@@ -57,7 +57,7 @@ DEPS_BULLET_RE = re.compile(r"(?m)^- (.+)$")
 
 
 def discover_us_files(feat: int | None) -> list[Path]:
-    us_dir = repo_root() / "workspace" / "output" / "us"
+    us_dir = workspace_root(repo_root()) / "us"
     if not us_dir.is_dir():
         return []
     if feat is None:
@@ -270,7 +270,7 @@ def parse_args() -> argparse.Namespace:
     g = p.add_mutually_exclusive_group(required=True)
     g.add_argument("--feat", type=int, help="FEAT number to scope analysis")
     g.add_argument("--us-id", help="Single US short id (e.g. 1-2)")
-    g.add_argument("--all", action="store_true", help="All US in workspace/output/us/")
+    g.add_argument("--all", action="store_true", help="All US in workspace/us/")
     p.add_argument("--json", action="store_true", help="Machine-readable output")
     p.add_argument("--topo", action="store_true",
                    help="Print topological order (one short id per line)")
@@ -294,7 +294,7 @@ def main() -> int:
                 "validate_us_deps.py --us-id 1-2",
             )
             return 2
-        us_dir = repo_root() / "workspace" / "output" / "us"
+        us_dir = workspace_root(repo_root()) / "us"
         matches = sorted(us_dir.glob(f"{args.us_id}-*.md"))
         if len(matches) != 1:
             error_block(
@@ -312,7 +312,7 @@ def main() -> int:
     if not us_files:
         error_block(
             "validate_us_deps — no US found",
-            "[US_NOT_FOUND] workspace/output/us/ empty for requested scope",
+            "[US_NOT_FOUND] workspace/us/ empty for requested scope",
             "run /us-generate {n} first",
         )
         return 1

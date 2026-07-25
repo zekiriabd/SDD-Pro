@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """SDD_Pro statusline — executive view of the active pipeline run.
 
-Reads `workspace/output/db/console.db` (table `runs`, optionally `run_phases`
+Reads `workspace/db/console.db` (table `runs`, optionally `run_phases`
 and `events`) and emits a single-line summary suitable for Claude Code's
 `statusLine` setting :
 
@@ -163,7 +163,7 @@ def find_repo_root(start: pathlib.Path) -> pathlib.Path | None:
     (ignoré désormais — `repo_root()` walk depuis CWD avec fallback
     via $SDD_REPO_ROOT et __file__).
     """
-    from sdd_lib.paths import repo_root
+    from sdd_lib.paths import workspace_root, repo_root
     _ = start  # backward-compat: argument no longer used
     try:
         return repo_root()
@@ -178,12 +178,12 @@ def resolve_db_path(arg: str | None) -> pathlib.Path | None:
         return p if p.is_file() else None
     env = os.environ.get("CLAUDE_PROJECT_DIR")
     if env:
-        candidate = pathlib.Path(env) / "workspace" / "output" / "db" / "console.db"
+        candidate = workspace_root(pathlib.Path(env)) / "db" / "console.db"
         if candidate.is_file():
             return candidate
     root = find_repo_root(pathlib.Path.cwd())
     if root:
-        candidate = root / "workspace" / "output" / "db" / "console.db"
+        candidate = workspace_root(root) / "db" / "console.db"
         if candidate.is_file():
             return candidate
     return None
@@ -327,7 +327,7 @@ def _cache_path() -> pathlib.Path | None:
                 break
     if not root:
         return None
-    return pathlib.Path(root) / "workspace" / "output" / ".sys" / ".cache" / "statusline.txt"
+    return workspace_root(pathlib.Path(root)) / ".sys" / ".cache" / "statusline.txt"
 
 
 def _try_serve_from_cache(no_emoji: bool) -> bool:

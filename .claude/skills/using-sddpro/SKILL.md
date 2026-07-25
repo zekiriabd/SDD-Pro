@@ -17,7 +17,7 @@ description: Use IMMEDIATELY at session start, before responding to any user mes
 | "Je veux ajouter une fonctionnalité X" | `/feat-generate X` (cadrage 3-6 questions) |
 | "Comment je fais Y ?" | `/sdd-help "Y"` (FAQ contextuelle) |
 | "Que fait ce projet ?" | `/sdd-status` (tree ASCII) |
-| "Ça plante" / "Mon build échoue" | `/sdd-help {n}` puis lire `workspace/output/qa/feat-{n}/` |
+| "Ça plante" / "Mon build échoue" | `/sdd-help {n}` puis `query_console_db.py feat-stats --feat {n} --format md` |
 | "Je veux refaire ce code" | Lire l'US source d'abord, jamais re-coder à l'aveugle |
 | "Audit le code" | `/sdd-review {n}` (two-stage : spec gate → quality batch) |
 
@@ -39,7 +39,7 @@ description: Use IMMEDIATELY at session start, before responding to any user mes
    ADRs). Pas de mémoire opaque dans le LLM.
 
 2. **File ownership matrix** (`@.claude/rules/ownership.md`) : un seul
-   owner par path. Avant tout Write/Edit sous `workspace/output/src/`,
+   owner par path. Avant tout Write/Edit sous `workspace/src/`,
    vérifier qui possède le path.
 
 3. **Two-stage auditor** (v7.0.0+) : `spec-compliance-reviewer` est

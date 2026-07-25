@@ -20,10 +20,10 @@ from sdd_admin import audit_orphans, cleanup_orphans  # noqa: E402
 def _make_fake_project(root: Path) -> None:
     """Create a minimal SDD_Pro layout under `root`."""
     (root / ".claude").mkdir()
-    (root / "workspace" / "input" / "feats").mkdir(parents=True)
-    (root / "workspace" / "output" / "us").mkdir(parents=True)
-    (root / "workspace" / "output" / "plans").mkdir(parents=True)
-    (root / "workspace" / "output" / "qa").mkdir(parents=True)
+    (root / "workspace" / "feats").mkdir(parents=True)
+    (root / "workspace" / "us").mkdir(parents=True)
+    (root / "workspace" / "plans").mkdir(parents=True)
+    (root / "workspace" / "qa").mkdir(parents=True)
 
 
 class TestAuditOrphans(unittest.TestCase):
@@ -31,9 +31,9 @@ class TestAuditOrphans(unittest.TestCase):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
             _make_fake_project(root)
-            (root / "workspace" / "input" / "feats" / "1-Auth.md").write_text("# FEAT")
-            (root / "workspace" / "output" / "us" / "1-1-Login.md").write_text("# US")
-            (root / "workspace" / "output" / "plans" / "1-1-Login.back.md").write_text("# Plan")
+            (root / "workspace" / "feats" / "1-Auth.md").write_text("# FEAT")
+            (root / "workspace" / "us" / "1-1-Login.md").write_text("# US")
+            (root / "workspace" / "plans" / "1-1-Login.back.md").write_text("# Plan")
             orphans = audit_orphans.find_orphans(root)
             self.assertEqual(sum(len(v) for v in orphans.values()), 0)
 
@@ -42,7 +42,7 @@ class TestAuditOrphans(unittest.TestCase):
             root = Path(tmp)
             _make_fake_project(root)
             # No FEAT, but US present
-            (root / "workspace" / "output" / "us" / "1-1-Login.md").write_text("# US")
+            (root / "workspace" / "us" / "1-1-Login.md").write_text("# US")
             orphans = audit_orphans.find_orphans(root)
             self.assertEqual(len(orphans["us_orphans"]), 1)
             self.assertEqual(orphans["us_orphans"][0]["us"], "1-1")
@@ -53,30 +53,32 @@ class TestAuditOrphans(unittest.TestCase):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
             _make_fake_project(root)
-            (root / "workspace" / "input" / "feats" / "1-Auth.md").write_text("# FEAT")
+            (root / "workspace" / "feats" / "1-Auth.md").write_text("# FEAT")
             # Plan exists but no US
-            (root / "workspace" / "output" / "plans" / "1-2-Reset.back.md").write_text("# Plan")
+            (root / "workspace" / "plans" / "1-2-Reset.back.md").write_text("# Plan")
             orphans = audit_orphans.find_orphans(root)
             self.assertEqual(len(orphans["plan_orphans"]), 1)
             self.assertEqual(orphans["plan_orphans"][0]["us"], "1-2")
 
-    def test_qa_orphan_detected_when_feat_deleted(self) -> None:
+    def test_qa_orphans_always_empty_no_qa_dir_scan(self) -> None:
+        # 2026-07-06 : workspace/qa/ removed (QA telemetry is SQLite-only).
+        # The orphan scanner no longer walks a per-FEAT QA directory, so
+        # `qa_orphans` is always empty even if a stray legacy dir is present.
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
             _make_fake_project(root)
-            qa_dir = root / "workspace" / "output" / "qa" / "feat-99"
-            qa_dir.mkdir()
-            (qa_dir / "report.md").write_text("# QA")
+            stray = root / "workspace" / "qa" / "feat-99"
+            stray.mkdir(parents=True)
+            (stray / "report.md").write_text("# legacy QA")
             orphans = audit_orphans.find_orphans(root)
-            self.assertEqual(len(orphans["qa_orphans"]), 1)
-            self.assertEqual(orphans["qa_orphans"][0]["feat"], 99)
+            self.assertEqual(orphans["qa_orphans"], [])
 
     def test_feat_filter_restricts_scope(self) -> None:
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
             _make_fake_project(root)
-            (root / "workspace" / "output" / "us" / "1-1-A.md").write_text("# US")
-            (root / "workspace" / "output" / "us" / "2-1-B.md").write_text("# US")
+            (root / "workspace" / "us" / "1-1-A.md").write_text("# US")
+            (root / "workspace" / "us" / "2-1-B.md").write_text("# US")
             orphans = audit_orphans.find_orphans(root, feat_filter=1)
             us_n_values = {o["feat"] for o in orphans["us_orphans"]}
             self.assertEqual(us_n_values, {1})
@@ -85,7 +87,7 @@ class TestAuditOrphans(unittest.TestCase):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
             _make_fake_project(root)
-            (root / "workspace" / "output" / "us" / "5-1-Orphan.md").write_text("# US")
+            (root / "workspace" / "us" / "5-1-Orphan.md").write_text("# US")
             exit_code = audit_orphans.main(["--root", str(root)])
             self.assertEqual(exit_code, 1)  # FAIL_FAST = orphans detected
 
@@ -100,7 +102,7 @@ class TestAuditOrphans(unittest.TestCase):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
             _make_fake_project(root)
-            (root / "workspace" / "output" / "us" / "3-1-X.md").write_text("# US")
+            (root / "workspace" / "us" / "3-1-X.md").write_text("# US")
             from io import StringIO
             buf = StringIO()
             with patch("sys.stdout", buf):
@@ -112,22 +114,21 @@ class TestAuditOrphans(unittest.TestCase):
 
 class TestCleanupOrphans(unittest.TestCase):
     def test_protected_path_detection(self) -> None:
-        self.assertTrue(cleanup_orphans._is_protected("workspace/input/feats/1-A.md"))
+        self.assertTrue(cleanup_orphans._is_protected("workspace/feats/1-A.md"))
         self.assertTrue(cleanup_orphans._is_protected("workspace/console/server.js"))
-        self.assertTrue(cleanup_orphans._is_protected("workspace/output/.sys/.context/constitution.md"))
-        self.assertTrue(cleanup_orphans._is_protected("workspace/output/db/console.db"))
-        self.assertTrue(cleanup_orphans._is_protected("workspace/output/.sys/.trash/old/file.md"))
+        self.assertTrue(cleanup_orphans._is_protected("workspace/.sys/.context/constitution.md"))
+        self.assertTrue(cleanup_orphans._is_protected("workspace/db/console.db"))
+        self.assertTrue(cleanup_orphans._is_protected("workspace/.sys/.trash/old/file.md"))
         self.assertTrue(cleanup_orphans._is_protected("../etc/passwd"))  # paranoid out-of-scope
         # Safe to delete (genuine orphan):
-        self.assertFalse(cleanup_orphans._is_protected("workspace/output/us/1-1-X.md"))
-        self.assertFalse(cleanup_orphans._is_protected("workspace/output/plans/1-2-Y.back.md"))
-        self.assertFalse(cleanup_orphans._is_protected("workspace/output/qa/feat-5/report.md"))
+        self.assertFalse(cleanup_orphans._is_protected("workspace/us/1-1-X.md"))
+        self.assertFalse(cleanup_orphans._is_protected("workspace/plans/1-2-Y.back.md"))
 
     def test_dry_run_does_not_modify_fs(self) -> None:
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
             _make_fake_project(root)
-            orphan = root / "workspace" / "output" / "us" / "7-1-Orphan.md"
+            orphan = root / "workspace" / "us" / "7-1-Orphan.md"
             orphan.write_text("# Orphan US")
             exit_code = cleanup_orphans.main(["--root", str(root), "--dry-run"])
             self.assertEqual(exit_code, 0)
@@ -135,8 +136,8 @@ class TestCleanupOrphans(unittest.TestCase):
 
     def test_collect_target_paths(self) -> None:
         orphans = {
-            "us_orphans": [{"path": "workspace/output/us/1-1-X.md", "feat": 1}],
-            "plan_orphans": [{"path": "workspace/output/plans/1-1-X.back.md", "feat": 1}],
+            "us_orphans": [{"path": "workspace/us/1-1-X.md", "feat": 1}],
+            "plan_orphans": [{"path": "workspace/plans/1-1-X.back.md", "feat": 1}],
             "qa_orphans": [],
             "direct_orphans": [{"feat": 1, "reason": "absent"}],  # no path key
         }

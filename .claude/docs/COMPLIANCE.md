@@ -13,7 +13,7 @@ le framework est constitué de :
 
 - Fichiers `.md` (agents, commandes, règles, stacks) — read by LLM
 - Scripts Python locaux (`sdd_scripts/`, `sdd_hooks/`, `sdd_admin/`) — déterministes
-- `console.db` SQLite local (`workspace/output/db/`) — télémétrie locale
+- `console.db` SQLite local (`workspace/db/`) — télémétrie locale
 
 **Le seul flux réseau** est celui de Claude Code vers l'API Anthropic (le LLM)
 sous le contrôle direct de l'utilisateur (clé API ou compte org Anthropic).
@@ -21,7 +21,7 @@ sous le contrôle direct de l'utilisateur (clé API ou compte org Anthropic).
 ```
 ┌──────────────────────┐       ┌──────────────────────┐
 │ Poste Dev / CI       │──────▶│ API Anthropic        │
-│ (Claude Code +       │◀──────│ (Claude Opus 4.7 /   │
+│ (Claude Code +       │◀──────│ (Claude Opus 4.8 /   │
 │  SDD_Pro framework)  │ HTTPS │  Sonnet 4.6)         │
 └──────────────────────┘       └──────────────────────┘
        │
@@ -43,10 +43,10 @@ sous le contrôle direct de l'utilisateur (clé API ou compte org Anthropic).
 Aucune. SDD_Pro est un framework de **génération de code** — il ne traite
 pas de données personnelles end-user. Les artefacts produits :
 
-- `workspace/input/feats/` — spécifications fonctionnelles (rédigées par le
+- `workspace/feats/` — spécifications fonctionnelles (rédigées par le
   Tech Lead, contenu sous contrôle du client).
-- `workspace/output/src/` — code source généré.
-- `workspace/output/db/console.db` — télémétrie technique (tokens, gates,
+- `workspace/src/` — code source généré.
+- `workspace/db/console.db` — télémétrie technique (tokens, gates,
   cost) — **aucune PII**.
 
 ### 2.2 Données envoyées à l'API Anthropic
@@ -70,9 +70,9 @@ des données synthétiques (Faker, Mockaroo). SDD_Pro génère du code de
 | Composant | Où sont les données ? |
 |---|---|
 | Framework SDD_Pro | 100% local (`.claude/`, `workspace/`) |
-| Code généré | 100% local (`workspace/output/src/`) |
+| Code généré | 100% local (`workspace/src/`) |
 | `console.db` télémétrie | 100% local |
-| Logs audit | 100% local (`workspace/output/.sys/.audit/`) |
+| Logs audit | 100% local (`workspace/.sys/.audit/`) |
 | Prompts LLM | Anthropic (datacenters US — cf. [Anthropic Trust Center](https://trust.anthropic.com/)) |
 
 **Pour clients européens stricts** : Anthropic propose un endpoint Vertex AI
@@ -136,14 +136,14 @@ dépendance externe.
 
 ### 5.2 ADRs versionnés
 
-`workspace/output/.sys/.context/adrs/ADR-{YYYYMMDDTHHmmss}-{rand4}-{slug}.md`
+`workspace/.sys/.context/adrs/ADR-{YYYYMMDDTHHmmss}-{rand4}-{slug}.md`
 tracent les décisions structurantes (stack choisi, pattern archi, DB
 strategy, exceptions runtime STS, etc.). Format Context / Decision /
 Consequences inspiré de Michael Nygard.
 
 ### 5.3 Logs audit-loggués
 
-`workspace/output/.sys/.audit/` :
+`workspace/.sys/.audit/` :
 - `legacy-parallel.log` — usage du mode legacy `GatedWorkflow: false`
 - bypass `SDD_ALLOW_*` env vars tracés
 - bypass `--force`/`--no-validate`/`--no-plan-on-warn` cumulés
@@ -176,7 +176,7 @@ existant (déjà certifié) plutôt que comme service externe.
 ### 7.1 Pattern B obligatoire (`stack.md` comme SSoT)
 
 Les secrets de configuration (DB password, JWT secret, Azure tenant…) sont
-déclarés en clair dans `workspace/input/stack/stack.md`, fichier
+déclarés en clair dans `workspace/stack/stack.md`, fichier
 **`.gitignored`** par défaut. L'agent `arch` les propage dans la config
 native du projet généré (`appsettings.json`, `application.yml`,
 `config.toml`, etc.).

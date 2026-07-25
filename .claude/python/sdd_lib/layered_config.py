@@ -6,7 +6,7 @@ allowing organizations to enforce policies cross-projects.
 Layering (lowest → highest precedence) :
     1. `.claude/config.base.yml`    (framework defaults, versionné SDD_Pro)
     2. `~/.sdd/config.team.yml`     (org/team policy, ~/.sdd/ ou %USERPROFILE%/.sdd/)
-    3. `## Project Config` block of `workspace/input/stack/stack.md` (per-project)
+    3. `## Project Config` block of `workspace/stack/stack.md` (per-project)
 
 Deep-merge semantics :
     - dicts: keys merged, child values resolved recursively
@@ -166,7 +166,12 @@ def _read_project_section(root: Path) -> dict[str, str]:
     auditors_kv = _parse_auditors_block(auditors_block) if auditors_block else {}
     # Legacy flat keys WIN over Auditors block (backward compat).
     merged = {**auditors_kv, **project_kv}
-    return normalize_project_aliases(merged)
+    normalized = normalize_project_aliases(merged)
+    # Expand ${VAR}/$VAR placeholders (ports, etc.) from .env + real env so the
+    # layered path (read_layered_config → validate_project_config) sees the same
+    # resolved values as read_project_config. Best-effort: misses stay literal.
+    from sdd_lib.env_placeholders import resolve_config
+    return resolve_config(normalized, root)
 
 
 # ---------------------------------------------------------------------------

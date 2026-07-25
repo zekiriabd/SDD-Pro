@@ -10,15 +10,16 @@ changelog:
   - v0.7.0 (2026-06-11) — **Escalier ascendant Phase 3 (ADR `governance-major-reverse-spec-ladder`)**.
       La Phase 3 mono-saut (agent `reverse-functional-extractor`, code→FEAT en un prompt — qui faisait
       baver l'altitude technique dans la FEAT métier) est **décomposée** en 3 barreaux ascendants :
-      **3a `reverse-tech-analyst`** (code → analyse technique fidèle, `output/plans/{n}-{Name}.analysis.md`),
-      **3b `reverse-us-writer`** (analyse → user stories par capability, `output/us/{n}-{m}-{Name}.md`),
-      **3c `reverse-feat-composer`** (US → FEAT métier propre, plomberie démotée, `input/feats/{n}-{Name}.md`).
+      **3a `reverse-tech-analyst`** (code → analyse technique fidèle, `plans/{n}-{Name}.analysis.md`),
+      **3b `reverse-us-writer`** (analyse → user stories par capability, `us/{n}-{m}-{Name}.md`),
+      **3c `reverse-feat-composer`** (US → FEAT métier propre, plomberie démotée, `feats/{n}-{Name}.md`).
       `reverse-functional-extractor` est **décommissionné** (D2 no-dead-code, gate `reverse_smoke.check_no_dangling_spawn`).
       `/sdd-reverse` devient un **séquenceur** de `/sdd-reverse-analyze` + `/sdd-reverse-stories` + `/sdd-reverse-feat`.
       Fil de traçabilité FEAT→US→task→evidence (`check_ladder_traceability.py`, D3), confidence min-monotone
       ascendante (3c ≤ 3b ≤ 3a). Intent A (documentation legacy) forward-compatible B (rebuild via /sdd-full).
-      **⚠️ Les §4.3 / §tableaux roster / mirror loader ci-dessous décrivant `reverse-functional-extractor`
-      comme agent vivant sont HISTORIQUES — l'autorité courante est l'ADR + les 3 agents 3a/3b/3c.**
+      (Audit 2026-06-11 : §4.3, roster modèles, mirror loader et exemples de lock
+      ont été réécrits pour refléter l'escalier — plus de section décrivant
+      `reverse-functional-extractor` comme agent vivant.)
   - v0.5.0 (2026-06-10) — **Refonte profondeur d'extraction (lots L0→L6)** suite audit CTO.
       L0 : code-graph symbole-level (`code_graph_builder.py` + `class_role_classifier.py`) —
         chaque classe classée par rôle (repository/service/dto/code-behind/controller/complex/…),
@@ -40,7 +41,7 @@ changelog:
         relâché §8.2), `reverse_cache.py` (skip unités inchangées), `check_feat_completeness.py` +
         agent `reverse-completeness-reviewer` (revue back informational).
       L6 : orchestrateur `/sdd-reverse-full` industrialisé (préalloc→parallèle→crosscut→review),
-        test round-trip de parité, INVARIANTS deepening_contracts. Isolation D4 préservée (smoke 11/11).
+        test round-trip de parité, INVARIANTS deepening_contracts. Isolation D4 préservée (smoke 13/13 — recompte audit 2026-06-11 MA-8, le registre `_ALL_CHECKS` a 13 checks).
   - v0.4.1 (2026-06-10) — Patch micro 4ème revue (ADV-23) : initialisation explicite `_allocatedNames: {}` + `_featAllocations: {}` à la création de `inventory.json` (§5.1) ; mode `--use-cache` (§4.1) doit vérifier `schemaVersion` ≥ 1 ET présence `_allocatedNames` sinon refresh forcé. Statement reviewer : **convergence stable, loop adversarial CLOS**.
   - v0.4.0 (2026-06-10) — Closure 3ème revue contradictoire (convergence). Patches micro :
       ADV-18 (§6 tableau inter-phases : `db-schema.json enrichi` stale → `db-schema.enrichment.json` + `db-schema.merged.json`) ;
@@ -77,15 +78,15 @@ changelog:
 
 # Reverse Engineering Workflow — Design Doc Maître
 
-> **Statut** : Draft v0.4.1 — **prêt pour impl MVP**. Convergence stable confirmée par 4 revues adversariales consécutives. **Loop adversarial CLOS** par décision reviewer (rendement marginal nul au-delà). À valider par le Tech Lead AVANT toute écriture de code applicatif (cf. master prompt §7.A).
+> **Statut** : **v0.7.0 — implémenté** (escalier 3a/3b/3c livré, ~200 tests verts, smoke 13/13). L'historique Draft v0.4.x (4 revues adversariales, loop CLOS) est conservé dans le changelog frontmatter ci-dessus.
 >
-> **v0.4.0** clôt la 3ème revue contradictoire (`workspace/output/.sys/.validation/reverse-design-doc-adversarial-v3.md`) — 4 patches micro (ADV-18, 19, 20, 22) + 1 V2 (ADV-21).
+> **v0.4.0** clôt la 3ème revue contradictoire (`workspace/.sys/.validation/reverse-design-doc-adversarial-v3.md`) — 4 patches micro (ADV-18, 19, 20, 22) + 1 V2 (ADV-21).
 >
-> **v0.3.0** intègre les 8 attaques de la 2ème revue adversariale (`workspace/output/.sys/.validation/reverse-design-doc-adversarial-v2.md`) — 2 bloquants levés (ADV-17, ADV-13), 4 issues importantes corrigées (ADV-10, 11, 14, 16), 1 mitigation légère (ADV-15), 1 V2 (ADV-12).
+> **v0.3.0** intègre les 8 attaques de la 2ème revue adversariale (`workspace/.sys/.validation/reverse-design-doc-adversarial-v2.md`) — 2 bloquants levés (ADV-17, ADV-13), 4 issues importantes corrigées (ADV-10, 11, 14, 16), 1 mitigation légère (ADV-15), 1 V2 (ADV-12).
 >
-> **v0.2.0** avait intégré les 9 attaques de la 1ère revue (`workspace/output/.sys/.validation/reverse-design-doc-adversarial.md`). Voir frontmatter `changelog` ci-dessus.
+> **v0.2.0** avait intégré les 9 attaques de la 1ère revue (`workspace/.sys/.validation/reverse-design-doc-adversarial.md`). Voir frontmatter `changelog` ci-dessus.
 >
-> **Référence prompt** : `.claude/docs/master-prompt-reverse-engineering.md` (à archiver séparément si souhaité).
+> **Référence prompts** : les agents `.claude/agents/reverse-*.md` + commandes `.claude/commands/sdd-reverse*.md` (le master prompt initial n'a jamais été archivé — pointeur retiré, audit 2026-06-11).
 >
 > **Principe directeur** : workflow reverse engineering pour SDD_Pro qui transforme un projet legacy déposé dans `workspace/old/{LegacyProject}/` en FEATs SDD_Pro standard consommables par `/sdd-full {n}` ou `/sdd-poc {n}` SANS modification du framework existant.
 
@@ -140,10 +141,10 @@ Phase 2 [optionnel] : /sdd-reverse-audit
                       → tech-audit.md (archi, anti-patterns, deps EOL)
                       → enrichit db-schema (relations dérivées, index, contraintes)
 Phase 3 [extract]   : /sdd-reverse {U-N}
-                      → workspace/input/feats/{n}-{Name}.md
+                      → workspace/feats/{n}-{Name}.md
                       (1 unité U-N → 1 FEAT, evidence file:line, confidence cap)
 Phase 4 [UI, V2]    : /sdd-reverse-ui {U-N}
-                      → workspace/input/ui/{n}-{m}-{Name}.html
+                      → workspace/ui/{n}-{m}-{Name}.html
                       (1 unité → 1+ écrans HTML sémantique)
 Phase 5 [humain]    : revue Tech Lead, ajustements designer optionnels
 Phase 6 [migration] : /sdd-full {n} OU /sdd-poc {n}
@@ -202,11 +203,11 @@ workspace/
 
 **Invariants arborescence** :
 - `.sys/` sous `workspace/old/{P}/` est **inscriptible uniquement** par les agents reverse + scripts `sdd_reverse_scripts/`.
-- `workspace/input/feats/` et `workspace/input/ui/` partagent le namespace avec `/feat-generate` standard ; les FEATs reverse sont distinguables :
+- `workspace/feats/` et `workspace/ui/` partagent le namespace avec `/feat-generate` standard ; les FEATs reverse sont distinguables :
   - **À l'écriture** : frontmatter `generated-by: sdd-reverse`
   - **À l'affichage** (`/sdd-status`, console web) : marker `[REV]` (FEAT reverse `high`) ou `[REV⚠️]` (FEAT reverse `medium`/`low`) — voir §6 contrat outils en aval
   - **Au lancement `/sdd-full`** : gate optionnelle (corrigé ADV-6) — voir §6
-- Aucun fichier n'est écrit en dehors de `workspace/old/{P}/.sys/` ou `workspace/input/{feats,ui}/`.
+- Aucun fichier n'est écrit en dehors de `workspace/old/{P}/.sys/` ou `workspace/{feats,ui}/`.
 
 **Artefacts `.sys/` (récap v0.2.0)** :
 | Fichier | Producteur | Phase | Note |
@@ -218,7 +219,7 @@ workspace/
 | `tech-audit.md` | `reverse-tech-auditor` | 2 (opt) | Informational |
 | `deps-graph.json` | `deps_graph_builder.py` | 2 (opt) | Audit |
 | `language-detected.json` | `scan_legacy.py` | 1 | Caps confidence appliqués |
-| `modules/{Mod}/extraction.md` | `reverse-functional-extractor` | 3 | Log d'extraction par unité |
+| `modules/{Mod}/extraction.md` | `reverse-feat-composer` (3c) | 3 | Log d'extraction par unité |
 
 ---
 
@@ -257,7 +258,7 @@ workspace/
   - Note : la normalisation EOL + BOM strip garantit qu'un dev Windows (Visual Studio + BOM + CRLF), un dev Linux (LF), et un dev macOS legacy (CR seul) clonant le même legacy obtiennent les mêmes fingerprints — invariant critique pour l'idempotence cross-machine.
 - Résolution `U-N` :
   - Match `full` exact → mapping conservé
-  - Sinon match `core` exact → mapping conservé + WARN `[REVERSE_UNIT_RENAMED]`
+  - Sinon match `core` exact → mapping conservé (la classe `[REVERSE_UNIT_RENAMED]` a été retirée — audit MA-7, aucun émetteur ; ré-ajouter classe + émetteur ENSEMBLE si ce WARN est câblé un jour)
   - Sinon → nouvelle unité, `N = max(existing) + 1`
 - Unité disparue (les deux fingerprints absents du nouveau scan) → marquée `status: "stale"` dans `_fingerprintMap`, ID jamais réutilisé.
 
@@ -271,7 +272,7 @@ workspace/
 ```
 /sdd-reverse U-3
     │
-    ├─ acquire lock workspace/input/feats/.alloc.lock (TTL 30s, voir §3.5)
+    ├─ acquire lock workspace/feats/.alloc.lock (TTL 30s, voir §3.5)
     │
     ├─ read inventory.json → units[id="U-3"]
     │     → { id: "U-3", label: "Liste utilisateurs", language: "aspx-webforms",
@@ -280,13 +281,13 @@ workspace/
     ├─ if _featAllocations[U-3] existe :
     │     n = _featAllocations[U-3]            # idempotence : même n à chaque re-run
     │  else :
-    │     n = next_free_feat_number(workspace/input/feats/)  # max({n} existants) + 1
+    │     n = next_free_feat_number(workspace/feats/)  # max({n} existants) + 1
     │
     ├─ Name_base = sanitize(suggested_name)    # PascalCase, no accents, hyphens
     │
     ├─ Name = resolve_name_collision(
     │           candidate=Name_base,
-    │           disk_paths=glob("workspace/input/feats/*.md"),
+    │           disk_paths=glob("workspace/feats/*.md"),
     │           in_flight_allocations=inventory.json._featAllocations,    # ADV-13
     │           in_flight_names=inventory.json._allocatedNames,           # ADV-13
     │           source_unit=U-3
@@ -303,7 +304,7 @@ workspace/
     │     # 3. Émettre INFO [REVERSE_NAME_COLLISION] avec champ `collision_source` ∈
     │     #    {"disk_human", "disk_reverse", "in_flight_intra_run"}.
     │
-    ├─ write workspace/input/feats/{n}-{Name}.md
+    ├─ write workspace/feats/{n}-{Name}.md
     │   frontmatter : source-unit: U-3, generated-by: sdd-reverse, confidence: ...
     │   body header : <!-- REVERSE-GATE: confidence={C} ; allow-sdd-full={true if C==high else false} -->
     │                 (ADV-15 — parseable par tout outil aval sans toucher /sdd-full)
@@ -342,14 +343,14 @@ workspace/
 
 - **Phase 3 : parallèle borné après pré-allocation (L5), séquentiel strict sinon** (M13 — doc alignée 2026-06-10 sur `rules/reverse-engineering.md §8`) : après `preallocate_feats.py` (STEP 2.5 de `/sdd-reverse-full`), chaque unité a son `(n, Name)` figé et écrit un fichier disjoint sans lock → invocations `/sdd-reverse {U-N}` parallèles-safe (borne `--max-parallel`, défaut 3). SANS pré-allocation, mode legacy séquentiel strict (ADV-2) : le second `/sdd-reverse` émet `[REVERSE_LOCK_HELD]` (TTL 1800 s).
 
-- **Lock élargi (couverture full transaction)** : le lock `workspace/input/feats/.alloc.lock` couvre **toute la transaction** (corrigé ADV-2) :
+- **Lock élargi (couverture full transaction)** : le lock `workspace/feats/.alloc.lock` couvre **toute la transaction** (corrigé ADV-2) :
   ```
   acquire lock (O_EXCL, contenu = {agent_id, pid, ts_unix})
     │
     ├─ READ inventory.json → _featAllocations + units
     ├─ COMPUTE n (idempotent ou next_free)
     ├─ COMPUTE Name (anti-collision §3.3)
-    ├─ WRITE workspace/input/feats/{n}-{Name}.md (atomic via .sddtmp + os.replace)
+    ├─ WRITE workspace/feats/{n}-{Name}.md (atomic via .sddtmp + os.replace)
     ├─ UPDATE inventory.json._featAllocations[U-N] = n (atomic write)
     │
   release lock
@@ -364,11 +365,11 @@ workspace/
 
 - **Atomic write `inventory.json`** : mise à jour via helper local `sdd_reverse/atomic_write_local.py` (`.sddtmp` + `fsync` + `os.replace`). Crash mid-write = pas de corruption (le fichier original reste intact).
 
-- **Idempotence** : `/sdd-reverse U-3` ré-exécuté écrase `workspace/input/feats/{n}-{Name}.md` ssi le mapping `U-3 → n` est connu dans `inventory.json._featAllocations[U-3]`. Le `Name` peut différer si le legacy a été retouché (warn `[REVERSE_INVENTORY_STALE]`).
+- **Idempotence** : `/sdd-reverse U-3` ré-exécuté écrase `workspace/feats/{n}-{Name}.md` ssi le mapping `U-3 → n` est connu dans `inventory.json._featAllocations[U-3]`. Le `Name` peut différer si le legacy a été retouché (warn `[REVERSE_INVENTORY_STALE]`).
 
 - **Format du lock file** :
   ```json
-  {"agent_id": "reverse-functional-extractor-U-3", "pid": 12345, "ts_unix": 1717987200, "host": "abc-laptop"}
+  {"agent_id": "reverse-tech-analyst-U-3", "pid": 12345, "ts_unix": 1717987200, "host": "abc-laptop"}
   ```
 - **Recovery stratégie (corrigé ADV-10)** :
   - **TTL 30s est la protection primaire et toujours active** (ne dépend d'aucune lib externe)
@@ -380,7 +381,7 @@ workspace/
     1. Le check inclut `host` : si lock vient d'un autre hôte (rare sur dev local, possible si workspace partagé), on tombe en TTL only
     2. Le pid check est borné : si "process actif" mais aucune activité fichier de notre lock depuis > 10s, on traite comme orphelin
     3. **Source de vérité reste TTL** : pid est secondaire, TTL est l'autorité finale
-  - **Cross-machine** : si `workspace/input/feats/` est partagé NFS/Dropbox et que deux machines lancent `/sdd-reverse` simultanément, les pid checks divergent — TTL reste l'arbitre. Recommandation : ne PAS lancer reverse en parallèle multi-machine (cf. §3.5 "Phase 3 séquentielle stricte").
+  - **Cross-machine** : si `workspace/feats/` est partagé NFS/Dropbox et que deux machines lancent `/sdd-reverse` simultanément, les pid checks divergent — TTL reste l'arbitre. Recommandation : ne PAS lancer reverse en parallèle multi-machine (cf. §3.5 "Phase 3 séquentielle stricte").
 
 ---
 
@@ -474,40 +475,46 @@ tools: Read, Write, Glob, Grep, Bash
 
 **Skippable** : oui via `--skip-audit` côté commande `/sdd-reverse-full`. La Phase 3 n'en dépend PAS (lit base seule si merge non fait).
 
-### 4.3 `reverse-functional-extractor`
+### 4.3 Phase 3 — escalier ascendant 3a → 3b → 3c (réécrit audit 2026-06-11, remplace l'ex-`reverse-functional-extractor`)
 
-**Frontmatter** (`.claude/agents/reverse-functional-extractor.md`) :
-```yaml
----
-name: reverse-functional-extractor
-description: Pour UNE unité U-N donnée, lit les fichiers evidence + db-schema, produit une FEAT SDD_Pro conforme avec evidence file:line, confidence, bias toward present. Itère max 3 fois sur /feat-validate avant escalade.
-model: claude-opus-4-8
-tools: Read, Write, Edit, Glob, Grep, Bash
----
-```
+> Section réécrite : l'agent mono-saut `reverse-functional-extractor` est
+> **décommissionné** (ADR `governance-major-reverse-spec-ladder`, D2
+> no-dead-code). La Phase 3 est un **escalier de 3 agents**, séquencé par
+> `/sdd-reverse {U-N}` (qui ne spawn rien lui-même — no-spawn §9) :
 
-**Inputs (Read)** :
-- `workspace/old/{P}/.sys/inventory.json` → `units[id={U-N}]`
-- `workspace/old/{P}/.sys/db-schema.merged.json` si présent, sinon `db-schema.json` (ADV-3, voir §4.2)
-- `workspace/old/{P}/.sys/tech-audit.md` (optionnel, si présent)
-- `workspace/old/{P}/{evidence_files}` (uniquement les fichiers listés dans `units[id={U-N}].evidenceFiles`, lecture sélective stricte)
-- `.claude/python/sdd_reverse/language_signatures.yml` (pour `confidence_cap`)
-- **Template** (résolution ADV-9, ordre de priorité) :
-  1. `.claude/python/sdd_reverse/feat.reverse.template.md` (copie locale isolée, source de vérité du module reverse)
-  2. Si absent → ERROR `[REVERSE_TEMPLATE_MISSING]` + STOP (pas de fallback inline silencieux, corrigé ADV-9)
-  - **Note** : `.claude/templates/feat.template.md` (template SDD_Pro standard) n'est **PAS** lu. Le template reverse est dupliqué localement pour découplage total (cf. principe d'isolation §3.1). Si SDD_Pro change le template standard, le template reverse reste inchangé jusqu'à mise à jour explicite.
+| Barreau | Agent (`.claude/agents/`) | Modèle | Input principal | Output |
+|---|---|---|---|---|
+| **3a** | `reverse-tech-analyst.md` | Opus 4.8 | `units[U-N].evidenceFiles` + db-schema (+ tech-audit opt.) | `workspace/plans/{n}-{Name}.analysis.md` (analyse technique fidèle, tasks T-N, evidence file:line) |
+| **3b** | `reverse-us-writer.md` | Sonnet 4.6 (downgrade audité 2026-06-11) | analyse 3a | `workspace/us/{n}-{m}-{Name}.md` (US par capability, AC → covers T-N, ligne header `Confidence:`) |
+| **3c** | `reverse-feat-composer.md` | Opus 4.8 | US 3b + analyse 3a | `workspace/feats/{n}-{Name}.md` (FEAT métier, plomberie démotée, REVERSE-GATE) |
+
+**Invariants de l'escalier** :
+- Confidence **min-monotone ascendante** : `conf(3c) ≤ min(conf(US 3b)) ≤ conf(3a)`
+  — enforced par `check_ladder_traceability.py` (frontmatter/ligne header +
+  fallback commentaire de provenance pour les US pré-fix M2).
+- Fil de traçabilité descendant D3 : FEAT → US#AC → tasks T-N → evidence
+  file:line (gaps = `[REVERSE_LADDER_TRACEABILITY_GAP]`, informational).
+- Templates locaux isolés ADV-9 (`analysis/us/feat.reverse.template.md` dans
+  `sdd_reverse/` — couverts par `reverse_smoke.check_template_isolated`).
+- Lecture sélective stricte : seul **3a** lit le code legacy
+  (`evidenceFiles`) ; 3b/3c ne relisent JAMAIS le legacy (forbidden_reads,
+  cf. `loader.reverse.yml`).
+
+**Détail prompts** : les frontmatters/steps exacts vivent dans les 3 fichiers
+agents (SSoT) — ce design doc ne les duplique plus.
 
 **Outputs (Write)** :
-- `workspace/input/feats/{n}-{Name}.md`
-- `workspace/old/{P}/.sys/modules/{ModuleName}/extraction.md` (log d'extraction, traces de décision)
+- 3a : `workspace/plans/{n}-{Name}.analysis.md`
+- 3b : `workspace/us/{n}-{m}-{Name}.md` (1..5 US)
+- 3c : `workspace/feats/{n}-{Name}.md` + `workspace/old/{P}/.sys/modules/{ModuleName}/extraction.md` (log d'extraction)
 
-**Itération validation (corrigé ADV-5)** : `validate_readiness.py` (SDD_Pro standard) checke `stack.md` actif, `Parent FEAT hash`, mockups — **absents en Phase 3** (le Tech Lead édite `stack.md` seulement Phase 5). L'utiliser ferait sortir 100% des FEATs reverse en `confidence: low` artificiel.
+**Itération validation — barreau 3c (corrigé ADV-5)** : `validate_readiness.py` (SDD_Pro standard) checke `stack.md` actif, `Parent FEAT hash`, mockups — **absents en Phase 3** (le Tech Lead édite `stack.md` seulement Phase 5). L'utiliser ferait sortir 100% des FEATs reverse en `confidence: low` artificiel.
 
 **Solution** : script déterministe dédié `sdd_reverse_scripts/validate_reverse_feat.py` qui valide UNIQUEMENT la structure FEAT (indépendant du pipeline standard) :
 
 ```bash
 python .claude/python/sdd_reverse_scripts/validate_reverse_feat.py \
-  --feat-path workspace/input/feats/{n}-{Name}.md \
+  --feat-path workspace/feats/{n}-{Name}.md \
   --json
 ```
 
@@ -551,10 +558,10 @@ tools: Read, Write, Edit, Glob, Grep, Bash
 **Inputs (Read)** :
 - `workspace/old/{P}/.sys/inventory.json` → `units[id={U-N}]`
 - `workspace/old/{P}/{template_files, css_files}` (sélectif)
-- `workspace/input/feats/{n}-{Name}.md` (résultat Phase 3, contrat sémantique)
+- `workspace/feats/{n}-{Name}.md` (résultat Phase 3, contrat sémantique)
 
 **Outputs (Write)** :
-- `workspace/input/ui/{n}-{m}-{Name}.html` (1..N fichiers, où `m` = index d'écran)
+- `workspace/ui/{n}-{m}-{Name}.html` (1..N fichiers, où `m` = index d'écran)
 
 **Délégation déterministe** :
 - `css_palette_extractor.py` (palette/fonts/spacings)
@@ -626,7 +633,9 @@ décompilation lui-même (palier V3, §13.3).
 |---|---|---|---|
 | `reverse-inventory` | Sonnet 4.6 | 1 | Synthèse + délégation scripts |
 | `reverse-tech-auditor` | Sonnet 4.6 | 2 (opt) | Audit, informational |
-| `reverse-functional-extractor` | Opus 4.8 | 3 | Génération FEAT, anti-hallucination strict |
+| `reverse-tech-analyst` (3a) | Opus 4.8 | 3 | Analyse technique fidèle, anti-hallucination strict |
+| `reverse-us-writer` (3b) | Sonnet 4.6 | 3 | Altitude-lift US (jamais de lecture code legacy) |
+| `reverse-feat-composer` (3c) | Opus 4.8 | 3 | Composition FEAT métier, plomberie démotée |
 | `reverse-ui-extractor` | Opus 4.8 | 4 (V2) | Génération HTML sémantique |
 
 ---
@@ -692,7 +701,7 @@ décompilation lui-même (palier V3, §13.3).
 **Notes schéma — champs L0 (V2, 2026-06-10)** :
 - `units[].seedEvidenceFiles` (L0) : evidence **seed** = `[page, code-behind]` détectée par `ui_unit_detector`. **Le fingerprint U-N est calculé sur ce seed**, jamais sur l'evidence enrichie — l'enrichissement par graphe ne déstabilise donc jamais les IDs U-N entre re-runs.
 - `units[].evidenceFiles` (enrichi L0) : seed **+** chaîne transitive `page→code-behind→service→repository→data-access` résolue par `code_graph_builder` (borné à `max_added_files=30`, profondeur `max_depth=3`). C'est la liste exhaustive que l'agent Phase 3 lit. **C'est le correctif structurel** au défaut « ne capture que la première interface ».
-- `units[].classes` (L0) : `[{name, role, file, lines, methodCount, touchesSql, touchesHttp}]` — toutes les classes atteintes depuis le seed, classées par rôle (`repository`/`service`/`dto`/`code-behind`/`controller`/`entity`/`complex`/`classic`/`static-helper`/`interface`/`enum`). Carte exploitée par l'agent pour structurer la FEAT (cf. `agents/reverse-functional-extractor.md §1.bis`).
+- `units[].classes` (L0) : `[{name, role, file, lines, methodCount, touchesSql, touchesHttp}]` — toutes les classes atteintes depuis le seed, classées par rôle (`repository`/`service`/`dto`/`code-behind`/`controller`/`entity`/`complex`/`classic`/`static-helper`/`interface`/`enum`). Carte exploitée par l'agent pour structurer la FEAT (cf. `agents/reverse-tech-analyst.md` — exploitation de la carte des rôles en 3a).
 - `units[].entities` : entités DB déduites (classes de rôle `entity` uniquement — un `repository` n'est PAS une entité).
 
 **Notes schéma v0.4.1** :
@@ -841,10 +850,10 @@ Ces 3 artefacts sont aussi synthétisés en lecture humaine dans `inventory.md`
 | Phase 2 | `tech-audit.md` (informational) | (humain) | Non consommé par Phase 3 |
 | Phase 2 | `db-schema.enrichment.json` (séparé, ADV-3) | `merge_db_schema.py` (V2) | Enrichissement append-only stocké dans fichier dédié |
 | Phase 2 → script | `db-schema.merged.json` (union déterministe) | Phase 3 (agent extractor) | Source de vérité enrichie si présente, sinon fallback `db-schema.json` base |
-| Phase 3 | `workspace/input/feats/{n}-{Name}.md` | Phase 4 (`/sdd-reverse-ui {U-N}`) | Cibles d'écrans dérivées du contenu FEAT |
+| Phase 3 | `workspace/feats/{n}-{Name}.md` | Phase 4 (`/sdd-reverse-ui {U-N}`) | Cibles d'écrans dérivées du contenu FEAT |
 | Phase 3 | `inventory.json` → `_featAllocations[U-N]` | Phase 4 (résolution `{n}`) | Mapping U-N → n |
-| Phase 4 | `workspace/input/ui/{n}-{m}-{Name}.html` | Phase 6 (`/sdd-full {n}`) | UX mockup standard SDD_Pro |
-| Phase 3 | `workspace/input/feats/{n}-{Name}.md` | Phase 6 (`/sdd-full {n}`) | FEAT standard SDD_Pro (D6 conformité) |
+| Phase 4 | `workspace/ui/{n}-{m}-{Name}.html` | Phase 6 (`/sdd-full {n}`) | UX mockup standard SDD_Pro |
+| Phase 3 | `workspace/feats/{n}-{Name}.md` | Phase 6 (`/sdd-full {n}`) | FEAT standard SDD_Pro (D6 conformité) |
 
 **Invariant `n` ↔ `U-N`** : une fois Phase 3 exécutée pour `U-N`, la valeur de `n` est figée dans `inventory.json._featAllocations[U-N]`. Toute re-exécution de Phase 3 sur `U-N` réécrit le même `{n}-{Name}.md`.
 
@@ -859,7 +868,7 @@ Comme `/sdd-full` est un fichier existant **intouchable** (Annexe B), la gate pr
 1. Script `sdd_reverse_scripts/check_reverse_feat_for_full.py` (nouveau, isolé) :
    ```bash
    python .claude/python/sdd_reverse_scripts/check_reverse_feat_for_full.py \
-     --feat-path workspace/input/feats/{n}-*.md \
+     --feat-path workspace/feats/{n}-*.md \
      [--allow-reverse-low]
    ```
    - Exit 0 : FEAT non-reverse OU FEAT reverse `confidence: high`
@@ -868,11 +877,11 @@ Comme `/sdd-full` est un fichier existant **intouchable** (Annexe B), la gate pr
 
 2. **Convention utilisateur** : avant `/sdd-full {n}`, lancer le check :
    ```bash
-   python .claude/python/sdd_reverse_scripts/check_reverse_feat_for_full.py --feat-path workspace/input/feats/7-*.md && /sdd-full 7
+   python .claude/python/sdd_reverse_scripts/check_reverse_feat_for_full.py --feat-path workspace/feats/7-*.md && /sdd-full 7
    ```
    Documenté dans la commande `/sdd-reverse-status` (V2).
 
-3. **Documentation transparente** : le cookbook reverse (V2) explique cette convention. La skill `starting-a-reverse-eng` rappelle ce check lors de la Phase 5 (revue humaine).
+3. **Documentation transparente** : le cookbook reverse (`docs/reverse-engineering-cookbook/` — `index.md` + 7 fiches : `_generic-monolith`, `dotnet-webforms`, `dotnet-mvc`, `java-jee`, `php-procedural`, `javascript-jquery`, `delphi`) explique cette convention. La skill `starting-a-reverse-eng` rappelle ce check lors de la Phase 5 (revue humaine).
 
 **Limitation assumée** : si le Tech Lead lance `/sdd-full {n}` directement sans passer par le check, la gate ne se déclenche pas (pas d'enforcement runtime sans toucher `/sdd-full`). Cette limitation est conséquence directe de la règle d'isolation §3.1. Mitigation V3 : proposer un PR officiel sur `/sdd-full` pour intégrer le check (décision Tech Lead seule, hors-scope reverse).
 
@@ -881,7 +890,7 @@ Comme `/sdd-full` est un fichier existant **intouchable** (Annexe B), la gate pr
 `/sdd-status` et la console web sont **intouchables**. Solution :
 
 - **Court terme MVP** : `sdd_reverse_scripts/reverse_status.py` (nouvelle commande `/sdd-reverse-status`, V2) liste les FEATs reverse avec leur confidence et signale celles non-`high` à reviewer manuellement.
-- **Documentation** : la skill et le cookbook recommandent `cat workspace/input/feats/*.md | head -20` ou `grep -l 'generated-by: sdd-reverse' workspace/input/feats/*.md` pour identifier les FEATs reverse.
+- **Documentation** : la skill et le cookbook recommandent `cat workspace/feats/*.md | head -20` ou `grep -l 'generated-by: sdd-reverse' workspace/feats/*.md` pour identifier les FEATs reverse.
 - **V3** : proposer enrichissement officiel `/sdd-status` (PR séparé, décision Tech Lead).
 
 ---
@@ -923,32 +932,47 @@ agents:
     # L'union base+enrichment est faite par le script déterministe sdd_reverse/merge_db_schema.py
     # qui écrit db-schema.merged.json. Voir §4.2.
 
-  reverse-functional-extractor:
+  # Escalier 3a/3b/3c (audit 2026-06-11 — remplace l'entrée reverse-functional-extractor ;
+  # SSoT machine = loader.reverse.yml, ceci n'est qu'un mirror illustratif)
+  reverse-tech-analyst:        # 3a
     reads:
       - workspace/old/{P}/.sys/inventory.json
       - workspace/old/{P}/.sys/db-schema.merged.json   # si présent (Phase 2 a tourné)
       - workspace/old/{P}/.sys/db-schema.json          # fallback base
       - workspace/old/{P}/.sys/tech-audit.md           # optionnel
-      - workspace/old/{P}/{evidenceFiles}
+      - workspace/old/{P}/{evidenceFiles}              # SEUL barreau à lire le code legacy
       - .claude/python/sdd_reverse/language_signatures.yml
+      - .claude/python/sdd_reverse/analysis.reverse.template.md
+    writes:
+      - workspace/plans/{n}-{Name}.analysis.md
+  reverse-us-writer:           # 3b (forbidden_reads: code legacy)
+    reads:
+      - workspace/plans/{n}-{Name}.analysis.md
+      - .claude/python/sdd_reverse/us.reverse.template.md
+    writes:
+      - workspace/us/{n}-{m}-{Name}.md
+  reverse-feat-composer:       # 3c (forbidden_reads: code legacy)
+    reads:
+      - workspace/us/{n}-{m}-{Name}.md
+      - workspace/plans/{n}-{Name}.analysis.md
       - .claude/python/sdd_reverse/feat.reverse.template.md   # template isolé (ADV-9)
     writes:
-      - workspace/input/feats/{n}-{Name}.md
+      - workspace/feats/{n}-{Name}.md
       - workspace/old/{P}/.sys/modules/{Module}/extraction.md
 
   reverse-ui-extractor:
     reads:
       - workspace/old/{P}/.sys/inventory.json
       - workspace/old/{P}/{templateFiles, cssFiles}
-      - workspace/input/feats/{n}-{Name}.md
+      - workspace/feats/{n}-{Name}.md
     writes:
-      - workspace/input/ui/{n}-{m}-{Name}.html
+      - workspace/ui/{n}-{m}-{Name}.html
 
 commands:
   sdd-reverse-init:        { phase: 0,   spawns: [] }
   sdd-reverse-inventory:   { phase: 1,   spawns: [reverse-inventory] }
   sdd-reverse-audit:       { phase: 2,   spawns: [reverse-tech-auditor] }
-  sdd-reverse:             { phase: 3,   spawns: [reverse-functional-extractor] }
+  sdd-reverse:             { phase: 3,   spawns: [] }   # séquenceur pur — analyze/stories/feat spawnent 3a/3b/3c
   sdd-reverse-ui:          { phase: 4,   spawns: [reverse-ui-extractor] }
   sdd-reverse-full:        { phase: 1-4, spawns: []   # séquence de commandes, pas d'agents }
   sdd-reverse-status:      { phase: any, spawns: [] }
@@ -980,7 +1004,7 @@ Chaque commande/skill lit `loader.reverse.yml` au démarrage pour résoudre path
 
 - `loader.yml` continue à servir les agents SDD_Pro existants (po, arch, dev-*, qa, *-reviewer).
 - `loader.reverse.yml` sert exclusivement les 4 nouveaux agents reverse.
-- Aucun overlap : les paths declared par l'un ne sont pas declared par l'autre (sauf `workspace/input/feats/` et `workspace/input/ui/` qui sont **lus** par les agents SDD_Pro et **écrits** par les agents reverse — séparation reader/writer claire).
+- Aucun overlap : les paths declared par l'un ne sont pas declared par l'autre (sauf `workspace/feats/` et `workspace/ui/` qui sont **lus** par les agents SDD_Pro et **écrits** par les agents reverse — séparation reader/writer claire).
 
 ---
 
@@ -1165,7 +1189,7 @@ Si `db-schema.json.entities` est vide ou ne couvre pas les entités référencé
   > ⚠️ DB schema non extrait — entités déduites du code. Confiance plafonnée à medium.
   > Source attendue : workspace/old/{P}/.sys/db-schema.json (absent ou vide).
   ```
-- Code d'erreur émis (informational) : `[REVERSE_DB_SCHEMA_DEGRADED]`
+- (La classe historique `[REVERSE_DB_SCHEMA_DEGRADED]` a été retirée de la taxonomie — audit MA-7 2026-06-11, aucun émetteur câblé. La dégradation est appliquée silencieusement via le cap, cf. rules/reverse-engineering.md §4.)
 
 ### 9.3 Items individuels
 
@@ -1181,15 +1205,11 @@ Hérite du format SDD_Pro `error-classification.md` (3 lignes disque, 1 ligne ch
 |---|---|---|
 | `[REVERSE_NO_SOURCE]` | **OUI** | `workspace/old/{P}/` vide ou inexistant → STOP |
 | `[REVERSE_BINARY_ONLY]` | **OUI** | Seuls des exécutables détectés, pas de source → STOP + escalade (§0 hors-scope) |
-| `[REVERSE_LANG_UNKNOWN]` | NON (WARN) | Aucun langage matché → fallback `id: unknown` + cap forcé `low` |
-| `[REVERSE_DB_SCHEMA_MISSING]` | NON (WARN) | `db-schema.json.entities` vide → entities déduites code, cap `medium` |
-| `[REVERSE_DB_SCHEMA_DEGRADED]` | NON (info) | Schema partiel, entities mixtes (DB + code) |
 | `[REVERSE_UNIT_NOT_FOUND]` | **OUI** | `/sdd-reverse U-N` où `U-N` absent de `inventory.json` |
 | `[REVERSE_FEAT_VALIDATE_FAILED]` | NON (WARN) | 3 itérations `/feat-validate` sans GO → FEAT marquée `low` + bannière + escalade |
 | `[REVERSE_EVIDENCE_MISSING]` | **OUI** au niveau item | AC/SFD/BR sans `<!-- evidence: ... -->` → item rejeté de la FEAT (l'agent itère, ne hard-fail pas la FEAT entière sauf si zéro item valide reste) |
 | `[REVERSE_ISOLATION_VIOLATION]` | **OUI** | Tentative d'écriture sur un path framework existant → STOP |
 | `[REVERSE_INVENTORY_STALE]` | NON (WARN) | `/sdd-reverse {U-N}` lancé alors que `mtime` legacy > `inventory.json.legacyMtimeMax` (ADV-1) |
-| `[REVERSE_UNIT_RENAMED]` | NON (info) | Fingerprint `core` match mais pas `full` → unité retrouvée par 3 fichiers distinctifs (ADV-1) |
 | `[REVERSE_LOCK_HELD]` | **OUI** | `.alloc.lock` détenu par autre `agent_id` < 30s → tentative de Phase 3 parallèle (ADV-2) |
 | `[REVERSE_NAME_COLLISION]` | NON (info) | `Name_base` déjà pris par une FEAT existante → suffixe `-Legacy` appliqué (ADV-4) |
 | `[REVERSE_ENRICHMENT_INVALID]` | **OUI** | `db-schema.enrichment.json` référence entity absente de base → merge refusé (ADV-3) |
@@ -1198,14 +1218,13 @@ Hérite du format SDD_Pro `error-classification.md` (3 lignes disque, 1 ligne ch
 | `[REVERSE_VALIDATOR_DRIFT]` | NON (WARN V2) | `reverse_smoke.py` détecte que `validate_readiness.py` standard a évolué et `validate_reverse_feat.py` n'a pas suivi (ADV-14) |
 | `[REVERSE_HELPER_DRIFT]` | NON (WARN V2) | `reverse_smoke.py` détecte que `sdd_lib/file_locks.py` ou `atomic_write.py` a changé alors que copies locales sont figées (ADV-16) |
 | `[REVERSE_GATE_DRIFT]` | **OUI** | Désync entre frontmatter `confidence` et commentaire `<!-- REVERSE-GATE -->` détectée par `validate_reverse_feat.py` (ADV-22) |
-| `[REVERSE_ALLOCATED_NAME_STALE]` | NON (WARN V2) | Entrée `_allocatedNames[Name] = U-N` orpheline (fichier supprimé du disque) — V2 only (ADV-21) |
 | `[REVERSE_INVENTORY_SCHEMA_STALE]` | NON (INFO) | `--use-cache` invoqué sur cache pre-v0.4.0 (manque `_allocatedNames` ou `schemaVersion`) → refresh forcé silencieux (ADV-23) |
 
 ### 10.1 Format ERROR exemple
 
 ```
 ERROR: reverse-inventory LegacyApp — aucun langage matché
-CAUSE: [REVERSE_LANG_UNKNOWN] 47 fichiers scannés, 0 evidence pattern matché dans language_signatures.yml
+CAUSE: [REVERSE_NO_SOURCE] workspace/old/MyLegacy/ vide ou inexistant
 FIX: ajouter une entrée pour le langage dans .claude/python/sdd_reverse/language_signatures.yml, OU déposer un échantillon plus représentatif sous workspace/old/{P}/
 ```
 
@@ -1296,7 +1315,7 @@ workspace/old/HelloWebForms/
 }
 ```
 
-### 11.4 Sortie Phase 3 — `workspace/input/feats/1-Login.md` (extrait)
+### 11.4 Sortie Phase 3 — `workspace/feats/1-Login.md` (extrait)
 
 ```markdown
 ---
@@ -1380,7 +1399,7 @@ Pour chaque FEAT générée dans une fixture de smoke (§11) :
 
 ### 12.4 Smoke isolation (anti-régression framework)
 
-`.claude/python/tests/test_sdd_reverse_isolation.py` :
+`.claude/python/tests/test_local_helpers_parity.py` + `tests/test_sdd_reverse_*.py` (le fichier historique `test_sdd_reverse_isolation.py` n'existe pas — pointeur corrigé audit 2026-06-11) :
 - Snapshot des hashes SHA256 de tous les fichiers existants dans `.claude/` (hors `sdd_reverse/`, hors `.sys/`, etc.)
 - Exécution complète du workflow reverse sur la fixture
 - Vérification : tous les hashes pré/post identiques (aucun fichier framework modifié)
@@ -1435,7 +1454,7 @@ laisser hors scope reverse, ou (c) faire évoluer la liste ci-dessous.
 |---|---|---|---|---|
 | `atomic_write` | Signature `atomic_write_text` | `atomic_write_text(path, content, *, encoding="utf-8", newline=None, tmp_suffix=".sddtmp")` | `atomic_write_text(path, content, encoding="utf-8")` | API minimale MVP — `newline` et `tmp_suffix` non requis Phase 1-4. Si Phase 5 (impl translator V3) en a besoin, étendre côté reverse en se synchronisant. |
 | `atomic_write` | Mitigation RUPT-5 | `_replace_with_retry` + `_backoff_with_jitter` (5 retries, 50 ms × jitter [0.8, 1.2]) | **Synced 2026-06-10** — mêmes constantes `_REPLACE_MAX_RETRIES=5`, `_REPLACE_BACKOFF_S=0.05` | Avant P0.1 closure, le local n'avait pas de retry. Test parité `test_atomic_write_local_byte_for_byte_against_lib_constants` enforce désormais l'égalité des constantes. |
-| `file_locks` | Format payload | **3-part text** : `AGENT_ID:PID:TS_MS` (lecture multi-format) OU **2-part** : `AGENT_ID:TS_S` | **JSON** : `{"agent_id", "pid", "ts_unix", "host"}` | Le payload JSON porte un champ supplémentaire `host` (anti-confusion cross-machine) qui n'a pas d'équivalent côté `sdd_lib`. Choix design Phase 3 (lock sur `workspace/input/feats/.alloc.lock`). **Conséquence** : un script du framework standard qui lirait ce lock par accident ne pourrait pas le parser — acceptable par design D4, jamais un caller croisé n'est censé apparaître. |
+| `file_locks` | Format payload | **3-part text** : `AGENT_ID:PID:TS_MS` (lecture multi-format) OU **2-part** : `AGENT_ID:TS_S` | **JSON** : `{"agent_id", "pid", "ts_unix", "host"}` | Le payload JSON porte un champ supplémentaire `host` (anti-confusion cross-machine) qui n'a pas d'équivalent côté `sdd_lib`. Choix design Phase 3 (lock sur `workspace/feats/.alloc.lock`). **Conséquence** : un script du framework standard qui lirait ce lock par accident ne pourrait pas le parser — acceptable par design D4, jamais un caller croisé n'est censé apparaître. |
 | `file_locks` | API publique | `try_create_exclusive(path, content) -> bool` + `acquire_with_retry(path, content, ttl_ms, backoff_ms)` | `acquire_lock(path, agent_id, ttl=30) -> int` + `release_lock(path, agent_id) -> int` + `read_lock(path) -> dict\|None` | Exit codes 0/1/2/3 (cf. `ownership.md §4` table standard SDD_Pro) au lieu de booléens. Re-entrant per `agent_id` côté reverse — pas côté standard. **Pas une perte de parité** : c'est l'API attendue par les agents reverse, et le contrat est plus riche (re-entrant + host check). |
 | `file_locks` | Dépendance `psutil` | absente (standard) | **optionnelle** (ADV-10) — fallback TTL-only si absente | Le check pid `_is_pid_alive` est utilisé pour court-circuiter le TTL quand on sait que l'agent crashé n'est plus là. Si `psutil` non installé, le lock attend toujours le TTL (30 s) — comportement strictement plus prudent. |
 | `_parity_snapshots.json` | Régénération | n/a (pas de snapshot côté standard) | manuelle pour l'instant (V0.4 : script `sync_parity_snapshots.py`) | Quand on synchronise volontairement une mitigation upstream (ex. P0.1 RUPT-5), les hashes restent inchangés (le standard est déjà à jour). Si on **diverge volontairement** côté local (ex. retirer un fix qu'on ne veut pas), il faudra capturer le nouveau hash pré-divergence ici. |
@@ -1444,7 +1463,7 @@ laisser hors scope reverse, ou (c) faire évoluer la liste ci-dessous.
 
 1. Ajouter une ligne dans le tableau ci-dessus avec la raison.
 2. Ajouter un test ciblé dans `tests/test_local_helpers_parity.py` qui asserte la divergence (et empêche un futur sync accidentel de la casser).
-3. Si la divergence touche une mitigation de sécurité (retry, fsync, lock), créer un ADR dans `workspace/output/.sys/.context/adrs/` documentant la décision.
+3. Si la divergence touche une mitigation de sécurité (retry, fsync, lock), créer un ADR dans `workspace/.sys/.context/adrs/` documentant la décision.
 
 **Symétriquement, règle pour résorber une divergence** :
 
@@ -1474,7 +1493,7 @@ laisser hors scope reverse, ou (c) faire évoluer la liste ci-dessous.
 12. `.claude/python/sdd_reverse_scripts/validate_reverse_feat.py` (validation FEAT reverse, ADV-5+14)
 13. `.claude/python/sdd_reverse_scripts/check_reverse_feat_for_full.py` (gate /sdd-full opt-in, ADV-6)
 14. `.claude/agents/reverse-inventory.md`
-15. `.claude/agents/reverse-functional-extractor.md`
+15. `.claude/agents/reverse-tech-analyst.md` + `reverse-us-writer.md` + `reverse-feat-composer.md` (escalier 3a/3b/3c — remplace l'ex-extractor)
 16. `.claude/commands/sdd-reverse-init.md`
 17. `.claude/commands/sdd-reverse-inventory.md`
 18. `.claude/commands/sdd-reverse.md`
@@ -1518,7 +1537,7 @@ Avant déclaration "MVP done" :
 - [ ] `python .claude/python/sdd_reverse_scripts/reverse_smoke.py` exit 0 (nouveau gate optionnel)
 - [ ] Tous les nouveaux fichiers UTF-8, line endings cohérents (LF préféré), frontmatter YAML valide
 - [ ] Design doc (CE fichier) validé Tech Lead AVANT toute écriture de code
-- [ ] Pour la fixture `legacy-webforms-minimal` : `validate_reverse_feat.py --feat-path workspace/input/feats/1-*.md --json` exit 0 (≤ 3 itérations) — **PAS** `/feat-validate` (corrigé ADV-5)
+- [ ] Pour la fixture `legacy-webforms-minimal` : `validate_reverse_feat.py --feat-path workspace/feats/1-*.md --json` exit 0 (≤ 3 itérations) — **PAS** `/feat-validate` (corrigé ADV-5)
 - [ ] Enum `confidence` ∈ {high, medium, low} dans toutes les sorties (grep négatif sur `medium-high`)
 - [ ] Items `low` flaggés en bannière dans la FEAT correspondante
 - [ ] Confidence caps lus depuis `language_signatures.yml` (grep négatif `confidence_cap` hardcodé dans `sdd_reverse/*.py`)
@@ -1615,11 +1634,11 @@ Les 2 attaques adversariales suivantes ne sont **pas** corrigées en MVP. Elles 
 
 ### 15.4 ADV-21 — Désync `_allocatedNames` ↔ disque (V2)
 
-**Problème** : `_allocatedNames` est un cache mémoire de Phase 3 persisté dans `inventory.json`. Si un Tech Lead supprime manuellement `workspace/input/feats/{n}-{Name}.md` sans nettoyer `inventory.json`, le prochain `/sdd-reverse {U-N}` voit `_allocatedNames[Name] = U-3` (stale) et applique un suffixe `-Legacy-U-N` injustifié.
+**Problème** : `_allocatedNames` est un cache mémoire de Phase 3 persisté dans `inventory.json`. Si un Tech Lead supprime manuellement `workspace/feats/{n}-{Name}.md` sans nettoyer `inventory.json`, le prochain `/sdd-reverse {U-N}` voit `_allocatedNames[Name] = U-3` (stale) et applique un suffixe `-Legacy-U-N` injustifié.
 
 **Mitigation V2** :
 1. `validate_reverse_feat.py --reconcile` : nouveau flag qui parcourt `_allocatedNames`, vérifie l'existence sur disque de chaque FEAT, et nettoie les entrées orphelines.
-2. Hook informationnel dans Phase 3 : avant résolution Name, vérifier `os.path.exists(workspace/input/feats/{n}-{Name}.md)` pour chaque entrée `_allocatedNames`. Si orphan détecté → WARN `[REVERSE_ALLOCATED_NAME_STALE]` + suggestion `--reconcile`.
+2. Hook informationnel dans Phase 3 : avant résolution Name, vérifier `os.path.exists(workspace/feats/{n}-{Name}.md)` pour chaque entrée `_allocatedNames`. Si orphan détecté → WARN + suggestion `--reconcile`. (Classe `[REVERSE_ALLOCATED_NAME_STALE]` retirée — audit MA-7 : si ce hook V2 est implémenté, ré-ajouter la classe en §6 de la règle EN MÊME TEMPS que l'émetteur.)
 3. Documentation : skill `starting-a-reverse-eng` rappelle que la suppression manuelle d'une FEAT reverse exige `--reconcile` avant le prochain `/sdd-reverse`.
 
 **Pourquoi V2 et pas MVP** : impact = suffixe `-Legacy` inutile (cosmétique, pas correctness). Le Tech Lead voit immédiatement la dérive et peut éditer `inventory.json` à la main si urgence MVP.
@@ -1639,7 +1658,7 @@ Issues à créer (V2 milestone) :
 
 ## Annexe A — Conformité SDD_Pro standard FEAT
 
-Toute FEAT produite par `reverse-functional-extractor` DOIT respecter :
+Toute FEAT produite par `reverse-feat-composer` (3c) DOIT respecter :
 
 1. **Frontmatter étendu reverse** :
    ```yaml
@@ -1718,6 +1737,69 @@ Toute tentative de modification d'un fichier listé déclenche `[REVERSE_ISOLATI
 | **Bias toward present** | Discipline anti-hallucination : ne pas inventer ; si non visible dans le code, non documenté. |
 | **`loader.reverse.yml`** | Manifeste reads/writes autonome pour les 4 agents reverse. Ne touche jamais `loader.yml`. |
 | **Phase atomique** | Phase reprenable, réexécutable, qui écrase son output (pas de merge). |
+
+---
+
+## §13 Couche de synthèse — Phase 3.7 (additive, non-cassante)
+
+> Ajout v0.8.0. Récupère de Reversa les **vues système** que l'escalier
+> `3a→3b→3c` ne produit pas (C4, ERD, synthèse exécutive), **sans toucher**
+> à l'escalier ni au contrat FEAT.
+
+### 13.1 Principe (pare-feu)
+
+La couche de synthèse est un **nouvel étage AU-DESSUS de 3c** : un consommateur
+**strictement en lecture seule** des artefacts déterministes Phase-1/2
+(`inventory.json`, `deps-graph.json`, `db-schema.merged.json`). Elle :
+
+- ne lit **jamais** le code legacy (l'isolation d'altitude est préservée — seul
+  3a lit le code) ;
+- n'altère **jamais** l'escalier `3a/3b/3c` ni les FEAT ;
+- écrit **uniquement** sous `workspace/old/{P}/.sys/synthesis/` — **jamais**
+  sous `workspace/feats/`, donc `/sdd-full` ne voit aucun de ces artefacts.
+
+Retirer la couche = le pipeline d'origine fonctionne à l'identique.
+
+### 13.2 Commande & script
+
+| Élément | Valeur |
+|---|---|
+| Commande | `/sdd-reverse-synth {P} [--doc-level essentiel\|complet\|detaille] [--only c4,erd,soul] [--json]` |
+| Spawns | `[]` — **no-spawn**, déterministe (0 token) |
+| Script | `.claude/python/sdd_reverse_scripts/reverse_synth.py` (CLI) + `sdd_reverse/synthesis.py` (lib pure) |
+| Sorties | `.sys/synthesis/{c4-context,c4-containers,c4-components,erd-complete,soul}.md` + `manifest.json` |
+
+`--doc-level` est le **bouton d'économie de contexte** (emprunt Reversa) :
+`essentiel` = C4-contexte + ERD + soul ; `complet` = + C4 conteneurs/composants ;
+`detaille` = + table de détail par composant.
+
+### 13.3 Sources → artefacts & confiance
+
+| Artefact | Source déterministe | Confiance |
+|---|---|---|
+| `c4-*.md` (Mermaid `graph TB`) | `deps-graph.json` (arêtes internes) + `inventory.json` (unités) | `high` (arêtes parsées) |
+| `erd-complete.md` (Mermaid `erDiagram`) | `db-schema.merged.json` (ou base) | `high` (DDL) ; `medium` si `deduced` |
+| `soul.md` (synthèse exécutive) | `inventory.json` + `db-schema` + `deps-graph` | objectif **inféré** `medium` ; entités rankées par degré FK ; contraintes EOL/cycles = faits observés |
+
+Confiance dans l'enum reverse strict `{high, medium, low}`. **Aucun git-mining,
+aucune décision « fondatrice » inventée** (lacune assumée et signalée dans `soul.md`).
+
+### 13.4 Mémoire / observabilité
+
+`manifest.json` est un **enregistrement dérivé** (régénéré à chaque run) : quels
+artefacts produits, depuis quelles sources, répartition de confiance. **Pas une
+SSoT mutable** — la vérité reste les artefacts sur disque, comme `reverse_status.py`
+qui dérive l'état des fichiers présents. Idempotence : chaque catégorie régénérée
+nettoie ses sorties périmées (un `--doc-level` inférieur ne laisse pas d'artefact
+de niveau supérieur).
+
+### 13.5 Hors périmètre (option ultérieure)
+
+Un agent narratif `reverse-soul` / `reverse-architect` (LLM) pourra enrichir
+`soul.md` et le C4 d'un texte explicatif. **Volontairement non inclus** dans le
+cœur déterministe pour préserver reproductibilité et coût zéro-token. Items de la
+liste Reversa **écartés** : extraction UI visuelle par screenshots (casse la
+discipline d'evidence `file:line` — pas d'evidence pour une image).
 
 ---
 

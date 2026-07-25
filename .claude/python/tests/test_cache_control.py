@@ -143,9 +143,9 @@ class TestValidateOrdering(unittest.TestCase):
         v = OrderingViolation(
             agent="dev-backend",
             line_num=42,
-            path="workspace/input/stack/stack.md",
+            path="workspace/stack/stack.md",
             layer="stable",
-            previous_path="workspace/output/us/{n}-{m}-*.md",
+            previous_path="workspace/us/{n}-{m}-*.md",
             previous_layer="volatile",
         )
         s = str(v)
@@ -159,7 +159,7 @@ class TestInlineQuotedPathRegression(unittest.TestCase):
     """Audit 2026-06-08 — regression test for the `_INLINE_READ_RE` bug.
 
     Before the fix, quoted paths containing `{` and `}`
-    (e.g. "workspace/output/us/{n}-{m}-*.md") were silently dropped
+    (e.g. "workspace/us/{n}-{m}-*.md") were silently dropped
     because the regex's path class `[^,\"}\\s]+` stopped at the first `}`.
     Result: dev-backend's 3 volatile reads (US, HTML mockup, back plan)
     were missing from the cache manifest.
@@ -169,9 +169,9 @@ class TestInlineQuotedPathRegression(unittest.TestCase):
         manifests = parse_loader_annotations()
         self.assertIn("dev-backend", manifests)
         volatile_paths = [r.path for r in manifests["dev-backend"].volatile]
-        self.assertIn("workspace/output/us/{n}-{m}-*.md", volatile_paths)
-        self.assertIn("workspace/input/ui/{n}-{m}-*.html", volatile_paths)
-        self.assertIn("workspace/output/plans/{n}-{m}-*.back.md", volatile_paths)
+        self.assertIn("workspace/us/{n}-{m}-*.md", volatile_paths)
+        self.assertIn("workspace/ui/{n}-{m}-*.html", volatile_paths)
+        self.assertIn("workspace/plans/{n}-{m}-*.back.md", volatile_paths)
 
     def test_quoted_path_with_braces_in_synthetic_loader(self):
         """Inline regression: parse a minimal synthetic loader.yml in-memory."""
@@ -182,9 +182,9 @@ updated: "2026-06-08"
 
 fake-agent:
   reads:
-    - { path: "workspace/output/us/{n}-{m}-*.md", cache_layer: volatile }
+    - { path: "workspace/us/{n}-{m}-*.md", cache_layer: volatile }
     - { path: ".claude/stacks/{cat}/{active}.md", cache_layer: stable }
-    - { path: workspace/output/db/schema.json, cache_layer: semi }
+    - { path: workspace/db/schema.json, cache_layer: semi }
 """
         with tempfile.TemporaryDirectory() as td:
             loader = Path(td) / "loader.yml"
@@ -195,9 +195,9 @@ fake-agent:
             volatile_paths = [r.path for r in m.volatile]
             stable_paths = [r.path for r in m.stable]
             semi_paths = [r.path for r in m.semi]
-            self.assertEqual(volatile_paths, ["workspace/output/us/{n}-{m}-*.md"])
+            self.assertEqual(volatile_paths, ["workspace/us/{n}-{m}-*.md"])
             self.assertEqual(stable_paths, [".claude/stacks/{cat}/{active}.md"])
-            self.assertEqual(semi_paths, ["workspace/output/db/schema.json"])
+            self.assertEqual(semi_paths, ["workspace/db/schema.json"])
 
 
 class TestManifestDataclass(unittest.TestCase):

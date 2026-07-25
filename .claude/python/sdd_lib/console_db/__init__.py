@@ -1,7 +1,7 @@
 """SDD_Pro Console DB — helper sub-package for SQLite access (v7.0.0-alpha CRIT-12).
 
 Source de vérité unique pour télémétrie/QA/runs.
-Localisation par défaut : workspace/output/db/console.db
+Localisation par défaut : workspace/db/console.db
 
 Usage minimal :
     from sdd_lib.console_db import connect, insert_event, upsert_run

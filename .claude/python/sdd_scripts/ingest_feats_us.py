@@ -19,15 +19,16 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
-DB_PATH = ROOT / "workspace" / "output" / "db" / "console.db"
-FEATS_DIR = ROOT / "workspace" / "input" / "feats"
-US_DIR = ROOT / "workspace" / "output" / "us"
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sdd_lib.markdown_io import section_body_stripped  # noqa: E402
 from sdd_lib.exit_codes import FAIL_FAST, SUCCESS  # noqa: E402
-from sdd_lib.paths import iso_now as now_iso  # noqa: E402  # consolidation audit CTO 2026-06-09
+from sdd_lib.paths import workspace_root, iso_now as now_iso  # noqa: E402  # consolidation audit CTO 2026-06-09
+
+DB_PATH = workspace_root(ROOT) / "db" / "console.db"
+FEATS_DIR = workspace_root(ROOT) / "feats"
+US_DIR = workspace_root(ROOT) / "us"
 
 
 @functools.lru_cache(maxsize=8)

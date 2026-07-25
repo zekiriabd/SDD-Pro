@@ -22,8 +22,8 @@ Exit codes (sdd_lib.exit_codes) :
     3 INFRA_BLOCKED : disk write failure
 
 Outputs:
-    workspace/output/.sys/.routing/{n}-complexity.json   (machine-readable)
-    workspace/output/.sys/.routing/{n}-complexity.md     (human report, 1 page)
+    workspace/.sys/.routing/{n}-complexity.json   (machine-readable)
+    workspace/.sys/.routing/{n}-complexity.md     (human report, 1 page)
 
 Bypass (force override) :
     SDD_FORCE_PIPELINE=poc|standard|full|critical  → ignore score, use forced value
@@ -41,6 +41,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sdd_lib.exit_codes import CORRECTIBLE, FAIL_FAST, SUCCESS  # noqa: E402
+from sdd_lib.paths import workspace_root
 
 INFRA_BLOCKED = 3  # local — not in canonical exit_codes set
 
@@ -400,10 +401,10 @@ def recommend_pipeline(complexity: str, feat_n: int) -> dict:
 # ---------------------------------------------------------------------------
 
 def find_feat_file(feat_n: int, root: Path) -> Path:
-    """Locate `workspace/input/feats/{n}-*.md`. Raises if absent or ambiguous."""
-    feats_dir = root / "workspace" / "input" / "feats"
+    """Locate `workspace/feats/{n}-*.md`. Raises if absent or ambiguous."""
+    feats_dir = workspace_root(root) / "feats"
     if not feats_dir.is_dir():
-        raise FileNotFoundError(f"workspace/input/feats/ not found at {feats_dir}")
+        raise FileNotFoundError(f"workspace/feats/ not found at {feats_dir}")
     matches = sorted(feats_dir.glob(f"{feat_n}-*.md"))
     if not matches:
         raise FileNotFoundError(f"no FEAT file matching {feat_n}-*.md in {feats_dir}")
@@ -413,7 +414,7 @@ def find_feat_file(feat_n: int, root: Path) -> Path:
 
 
 def render_markdown(report: dict) -> str:
-    """Render the 1-page human report (workspace/output/.sys/.routing/{n}-complexity.md)."""
+    """Render the 1-page human report (workspace/.sys/.routing/{n}-complexity.md)."""
     n = report["feat_number"]
     name = report["feat_name"]
     score = report["score"]
@@ -471,8 +472,8 @@ def render_markdown(report: dict) -> str:
 
 
 def write_outputs(report: dict, root: Path, dry_run: bool) -> tuple[Path, Path]:
-    """Persist JSON + Markdown to workspace/output/.sys/.routing/."""
-    out_dir = root / "workspace" / "output" / ".sys" / ".routing"
+    """Persist JSON + Markdown to workspace/.sys/.routing/."""
+    out_dir = workspace_root(root) / ".sys" / ".routing"
     out_dir.mkdir(parents=True, exist_ok=True)
     n = report["feat_number"]
     json_path = out_dir / f"{n}-complexity.json"
@@ -494,7 +495,7 @@ def parse_args() -> argparse.Namespace:
         description="Deterministic FEAT complexity routing (replaces LLM agent v7.0.0+).",
     )
     p.add_argument("--feat-number", "-n", type=int, required=True,
-                   help="FEAT number (e.g. 1 for workspace/input/feats/1-*.md)")
+                   help="FEAT number (e.g. 1 for workspace/feats/1-*.md)")
     p.add_argument("--json", action="store_true",
                    help="Emit full JSON to stdout (default: 1-line summary)")
     p.add_argument("--dry-run", action="store_true",
@@ -536,7 +537,7 @@ def main() -> int:
         cls = "[FEAT_AMBIGUOUS]" if "ambiguous" in msg.lower() else "[FEAT_NOT_FOUND]"
         print(f"ERROR: complexity_router — {msg}", file=sys.stderr)
         print(f"CAUSE: {cls} no unique FEAT for number {args.feat_number}", file=sys.stderr)
-        print(f"FIX: vérifier workspace/input/feats/{args.feat_number}-*.md", file=sys.stderr)
+        print(f"FIX: vérifier workspace/feats/{args.feat_number}-*.md", file=sys.stderr)
         return FAIL_FAST
 
     try:

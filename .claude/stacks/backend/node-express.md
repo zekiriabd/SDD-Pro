@@ -32,21 +32,21 @@ Pour `ArchiPattern: microservice` → voir `archi/microservice.md` (Polly equiva
 
 | Couche canonique (archi/mvc.md §3) | Path Node-specific |
 |---|---|
-| Route / Endpoint | `workspace/output/src/{BackendName}/routes/` (1 fichier par domain, `{domain}.routes.ts`) |
-| Controller | `workspace/output/src/{BackendName}/controllers/` |
-| Service Interface | `workspace/output/src/{BackendName}/services/interfaces/` (TypeScript `interface`) |
-| Service Implementation | `workspace/output/src/{BackendName}/services/` |
-| Repository | `workspace/output/src/{BackendName}/repositories/` |
-| Mapper | `workspace/output/src/{BackendName}/mappers/` |
-| Entity | `workspace/output/src/{BackendName}/entities/` (Prisma model dans `prisma/schema.prisma`) |
-| Database | `workspace/output/src/{BackendName}/database/` (Prisma client singleton) |
-| Middleware | `workspace/output/src/{BackendName}/middleware/` |
-| Logger | `workspace/output/src/{BackendName}/logger/` (Pino setup) |
-| Swagger | `workspace/output/src/{BackendName}/swagger/` (cf. §1.6, Express-specific) |
-| Input/Output/Model DTO | `workspace/output/src/{LibName}/{inputs,outputs,models}/` |
-| App / Server | `workspace/output/src/{BackendName}/{app.ts,server.ts}` |
-| Project (API) | `workspace/output/src/{BackendName}/package.json` |
-| Project (Lib) | `workspace/output/src/{LibName}/package.json` |
+| Route / Endpoint | `workspace/src/{BackendName}/routes/` (1 fichier par domain, `{domain}.routes.ts`) |
+| Controller | `workspace/src/{BackendName}/controllers/` |
+| Service Interface | `workspace/src/{BackendName}/services/interfaces/` (TypeScript `interface`) |
+| Service Implementation | `workspace/src/{BackendName}/services/` |
+| Repository | `workspace/src/{BackendName}/repositories/` |
+| Mapper | `workspace/src/{BackendName}/mappers/` |
+| Entity | `workspace/src/{BackendName}/entities/` (Prisma model dans `prisma/schema.prisma`) |
+| Database | `workspace/src/{BackendName}/database/` (Prisma client singleton) |
+| Middleware | `workspace/src/{BackendName}/middleware/` |
+| Logger | `workspace/src/{BackendName}/logger/` (Pino setup) |
+| Swagger | `workspace/src/{BackendName}/swagger/` (cf. §1.6, Express-specific) |
+| Input/Output/Model DTO | `workspace/src/{LibName}/{inputs,outputs,models}/` |
+| App / Server | `workspace/src/{BackendName}/{app.ts,server.ts}` |
+| Project (API) | `workspace/src/{BackendName}/package.json` |
+| Project (Lib) | `workspace/src/{LibName}/package.json` |
 
 ## 1.4 Override principes (Node-specific)
 
@@ -77,11 +77,11 @@ Tout autre layer ne déclenche pas le scan DB.
 Tout projet généré sur ce stack DOIT inclure la documentation Swagger sans demande explicite. Le Backend Agent l'ajoute automatiquement dans la première task qui crée `app.ts`.
 
 ### Fichiers obligatoires
-- `workspace/output/src/{BackendName}/swagger/swaggerConfig.ts` — exporte `swaggerSpec` (objet OpenAPI 3.0.3)
+- `workspace/src/{BackendName}/swagger/swaggerConfig.ts` — exporte `swaggerSpec` (objet OpenAPI 3.0.3)
   - `info.title` = `{AppName} API` (ou `{BackendName} API`)
   - `info.version` = `1.0.0`
   - `components.securitySchemes.bearerAuth` = `{ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }` (si auth-local active)
-  - `components.schemas` = inputs/outputs depuis `workspace/output/src/{LibName}` (mappés depuis les DTOs Zod)
+  - `components.schemas` = inputs/outputs depuis `workspace/src/{LibName}` (mappés depuis les DTOs Zod)
   - `paths` = endpoints documentés enrichis à chaque task qui ajoute un controller (chaque task déclare `swaggerConfig.ts` dans son `Files: augment` avec `preserves: [swaggerSpec]` + `adds: [path:/api/v1/...]`)
 
 ### app.ts mount obligatoire
@@ -177,14 +177,14 @@ Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'U
 
 ### 2.2 Outils
 
-- **Project file** : `workspace/output/src/{BackendName}/package.json`
-- **Build** : `npm --prefix workspace/output/src/{BackendName} run build`
-- **Dev** : `npm --prefix workspace/output/src/{BackendName} run dev`
+- **Project file** : `workspace/src/{BackendName}/package.json`
+- **Build** : `npm --prefix workspace/src/{BackendName} run build`
+- **Dev** : `npm --prefix workspace/src/{BackendName} run dev`
 - **Smoke Command** :
 
 ```bash
-npm --prefix workspace/output/src/{BackendName} run build
-test -f workspace/output/src/{BackendName}/dist/server.js
+npm --prefix workspace/src/{BackendName} run build
+test -f workspace/src/{BackendName}/dist/server.js
 ```
 
 - **Package manager** : npm
@@ -196,15 +196,15 @@ test -f workspace/output/src/{BackendName}/dist/server.js
 
 ```bash
 # Backend project init
-mkdir -p workspace/output/src/{BackendName}
-cd workspace/output/src/{BackendName}
+mkdir -p workspace/src/{BackendName}
+cd workspace/src/{BackendName}
 npm init -y
 ```
 
 <!-- CORE_PACKAGES_START -->
 ```bash
 # Auto-genere depuis node-express.libs.json -- ne pas editer (utiliser sync_stack_md.py).
-(cd workspace/output/src/{BackendName} && pnpm add \
+(cd workspace/src/{BackendName} && pnpm add \
   express@4.21.2 \
   prisma@6.1.0 \
   @prisma/client@6.1.0 \
@@ -233,15 +233,15 @@ npm init -y
 <!-- CORE_PACKAGES_END -->
 
 ```bash
-cd workspace/output/src/{BackendName}
+cd workspace/src/{BackendName}
 npx tsc --init --rootDir . --outDir ./dist --esModuleInterop true --resolveJsonModule true --module commonjs --target es2022 --strict true
 npx prisma init --datasource-provider sqlserver
 mkdir -p swagger
 cd ../../..
 
 # Shared library project init (manuel, hors catalog -- uses LibName project)
-mkdir -p workspace/output/src/{LibName}
-cd workspace/output/src/{LibName}
+mkdir -p workspace/src/{LibName}
+cd workspace/src/{LibName}
 npm init -y
 npm install zod class-transformer class-validator
 npm install --save-dev typescript @types/node
@@ -253,34 +253,34 @@ cd ../../..
 ```bash
 # Auto-genere depuis node-express.libs.json (on-demand) -- installe par dev-* si l'US declenche un trigger.
 # capability: uuid-gen
-(cd workspace/output/src/{BackendName} && pnpm add uuid@11.0.5 @types/uuid@10.0.0)
+(cd workspace/src/{BackendName} && pnpm add uuid@11.0.5 @types/uuid@10.0.0)
 
 # capability: date-utils
-(cd workspace/output/src/{BackendName} && pnpm add dayjs@1.11.13)
+(cd workspace/src/{BackendName} && pnpm add dayjs@1.11.13)
 
 # capability: auth-local
-(cd workspace/output/src/{BackendName} && pnpm add bcryptjs@2.4.3 @types/bcryptjs@2.4.6)
+(cd workspace/src/{BackendName} && pnpm add bcryptjs@2.4.3 @types/bcryptjs@2.4.6)
 
 # capability: jwt
-(cd workspace/output/src/{BackendName} && pnpm add jsonwebtoken@9.0.2 @types/jsonwebtoken@9.0.7)
+(cd workspace/src/{BackendName} && pnpm add jsonwebtoken@9.0.2 @types/jsonwebtoken@9.0.7)
 
 # capability: http-client
-(cd workspace/output/src/{BackendName} && pnpm add axios@1.7.9 axios-retry@4.5.0)
+(cd workspace/src/{BackendName} && pnpm add axios@1.7.9 axios-retry@4.5.0)
 
 # capability: excel
-(cd workspace/output/src/{BackendName} && pnpm add exceljs@4.4.0)
+(cd workspace/src/{BackendName} && pnpm add exceljs@4.4.0)
 
 # capability: pdf
-(cd workspace/output/src/{BackendName} && pnpm add pdfkit@0.15.2)
+(cd workspace/src/{BackendName} && pnpm add pdfkit@0.15.2)
 
 # capability: file-upload
-(cd workspace/output/src/{BackendName} && pnpm add multer@1.4.5-lts.1 @types/multer@1.4.12)
+(cd workspace/src/{BackendName} && pnpm add multer@1.4.5-lts.1 @types/multer@1.4.12)
 
 # capability: object-mapping
-(cd workspace/output/src/{BackendName} && pnpm add class-transformer@0.5.1)
+(cd workspace/src/{BackendName} && pnpm add class-transformer@0.5.1)
 
 # capability: decorator-validation
-# OU (alt) : (cd workspace/output/src/{BackendName} && pnpm add class-validator@0.14.1)
+# OU (alt) : (cd workspace/src/{BackendName} && pnpm add class-validator@0.14.1)
 ```
 <!-- ONDEMAND_PACKAGES_END -->
 
@@ -471,13 +471,13 @@ les requêtes.
 Arch Phase A lit `## Active Database: DatabaseType` puis installe le
 driver correspondant :
 ```bash
-cd workspace/output/src/{BackendName} && npm install <package>
+cd workspace/src/{BackendName} && npm install <package>
 ```
 
 ### 8.2 Connection String Pattern (lecture `config/default.json`, depuis 2026-05-14)
 
 **Source de vérité** : bloc `## Active Database` de
-`workspace/input/stack/stack.md`. L'agent `arch` Phase A — STEP 4.5
+`workspace/stack/stack.md`. L'agent `arch` Phase A — STEP 4.5
 sérialise les valeurs dans `config/default.json` (npm package `config`,
 déjà déclaré dans `node-express.libs.json` `core[]`).
 
@@ -536,7 +536,7 @@ Prisma). Alternative : `drizzle-kit introspect`.
 
 Pattern d'invocation par Arch Phase B (Prisma) :
 ```bash
-cd workspace/output/src/{BackendName}
+cd workspace/src/{BackendName}
 
 # Init Prisma si absent (idempotent)
 [ ! -f prisma/schema.prisma ] && npx prisma init --datasource-provider <provider>
@@ -547,7 +547,7 @@ export DATABASE_URL="<url composée à partir de config.db (cf. §8.2)>"
 
 # Introspection (schema.prisma rempli)
 npx prisma db pull \
-  --schema workspace/output/src/{BackendName}/prisma/schema.prisma \
+  --schema workspace/src/{BackendName}/prisma/schema.prisma \
   [--filter "T1,T2"]              # si DB Scaffolding Mode=list
 
 # Génère le client TypeScript

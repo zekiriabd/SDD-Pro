@@ -28,7 +28,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sdd_lib.exit_codes import FAIL_FAST, SUCCESS  # noqa: E402
 from sdd_lib.markdown_io import section_body  # noqa: E402
-from sdd_lib.paths import normalize, repo_root  # noqa: E402
+from sdd_lib.paths import workspace_root, normalize, repo_root  # noqa: E402
 from sdd_lib.project_config import read_stack_md_text  # noqa: E402
 
 
@@ -339,20 +339,20 @@ def _check_feat_hash(
 
     expected_hash = hash_match.group(1).lower()[:8]
 
-    # Locate FEAT file (glob workspace/input/feats/{n}-*.md)
-    feats_dir = root / "workspace" / "input" / "feats"
+    # Locate FEAT file (glob workspace/feats/{n}-*.md)
+    feats_dir = workspace_root(root) / "feats"
     feat_files = sorted(feats_dir.glob(f"{feat_number}-*.md")) if feats_dir.is_dir() else []
     if not feat_files:
         add_err(
             "FEAT_NOT_FOUND",
             f"FEAT {feat_number} reference par {us_path.name} mais aucun "
-            f"fichier workspace/input/feats/{feat_number}-*.md trouve.",
+            f"fichier workspace/feats/{feat_number}-*.md trouve.",
         )
         return
     if len(feat_files) > 1:
         add_err(
             "FEAT_AMBIGUOUS",
-            f"plusieurs fichiers workspace/input/feats/{feat_number}-*.md trouves",
+            f"plusieurs fichiers workspace/feats/{feat_number}-*.md trouves",
         )
         return
 
@@ -421,7 +421,7 @@ def main() -> int:
     result["planOnly"] = bool(m.group(3))
 
     # A2 — US file exists & unique
-    us_dir = root / "workspace" / "output" / "us"
+    us_dir = workspace_root(root) / "us"
     us_files: list[Path] = []
     if us_dir.is_dir():
         us_files = sorted(us_dir.glob(f"{result['n']}-{result['m']}-*.md"))
@@ -430,7 +430,7 @@ def main() -> int:
     elif len(us_files) > 1:
         add_err(
             "US_AMBIGUOUS",
-            f"plusieurs fichiers workspace/output/us/{result['n']}-{result['m']}-*.md trouves, "
+            f"plusieurs fichiers workspace/us/{result['n']}-{result['m']}-*.md trouves, "
             "n'en garder qu'un",
         )
     else:
@@ -455,11 +455,11 @@ def main() -> int:
         )
 
     # A3 — stack.md exists
-    stack_path = root / "workspace" / "input" / "stack" / "stack.md"
+    stack_path = workspace_root(root) / "stack" / "stack.md"
     if not stack_path.is_file():
         add_err(
             "STACK_MISSING",
-            "workspace/input/stack/stack.md absent — projet non initialise. "
+            "workspace/stack/stack.md absent — projet non initialise. "
             "FIX: lancer `python bootstrap.py` depuis la racine du repo "
             "(interactif, ~5 questions, ~30s). Cf. /sdd-bootstrap pour les options.",
         )
@@ -468,14 +468,14 @@ def main() -> int:
 
     # A4 — HTML mockup unique (frontend only)
     if args.family == "frontend":
-        ui_dir = root / "workspace" / "input" / "ui"
+        ui_dir = workspace_root(root) / "ui"
         html_files: list[Path] = []
         if ui_dir.is_dir():
             html_files = sorted(ui_dir.glob(f"{result['n']}-{result['m']}-*.html"))
         if len(html_files) > 1:
             add_err(
                 "HTML_AMBIGUOUS",
-                f"plusieurs fichiers workspace/input/ui/{result['n']}-{result['m']}-*.html, "
+                f"plusieurs fichiers workspace/ui/{result['n']}-{result['m']}-*.html, "
                 "n'en garder qu'un",
             )
         elif len(html_files) == 1:
@@ -495,7 +495,7 @@ def main() -> int:
     if "{{" in stack_content and re.search(r"\{\{[A-Za-z][A-Za-z0-9_]*\}\}", stack_content):
         add_err(
             "STACK_MALFORMED",
-            "workspace/input/stack/stack.md contient des placeholders `{{...}}` "
+            "workspace/stack/stack.md contient des placeholders `{{...}}` "
             "non substitues (template brut). "
             "FIX: lancer `python bootstrap.py` depuis la racine du repo pour "
             "rendre le template (interactif, ~5 questions). Cf. /sdd-bootstrap.",
@@ -668,7 +668,7 @@ def main() -> int:
     # B3 — Project CLAUDE.md present
     if result["appOrBackendName"]:
         proj_digest = (
-            root / "workspace" / "output" / "src"
+            workspace_root(root) / "src"
             / str(result["appOrBackendName"]) / "CLAUDE.md"
         )
         if not proj_digest.is_file():
@@ -682,7 +682,7 @@ def main() -> int:
 
     # B4 — project file (csproj/package.json/pyproject/build.gradle/angular.json)
     if result["appOrBackendName"]:
-        proj_dir = root / "workspace" / "output" / "src" / str(result["appOrBackendName"])
+        proj_dir = workspace_root(root) / "src" / str(result["appOrBackendName"])
         project_files: list[Path] = []
         if proj_dir.is_dir():
             for pat in ("*.csproj", "package.json", "pyproject.toml", "build.gradle.kts", "angular.json"):

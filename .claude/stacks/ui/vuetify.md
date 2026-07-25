@@ -292,7 +292,7 @@ L’IA doit :
 ## 15. Mapping HTML → composant Vuetify (depuis SDD_Pro v4)
 
 Quand `dev-frontend` lit un mockup HTML statique
-(`workspace/input/ui/{n}-{m}-*.html`), il **traduit chaque primitive HTML brute
+(`workspace/ui/{n}-{m}-*.html`), il **traduit chaque primitive HTML brute
 vers son pendant Vuetify**.
 
 ### 15.1 Layout

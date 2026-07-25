@@ -1,7 +1,7 @@
 """generate_crosscutting_feats.py — Emit the L3 cross-cutting reverse FEATs.
 
 Reads the deterministic Phase-1 artefacts of a legacy project and writes two
-standard reverse FEATs into workspace/input/feats/ :
+standard reverse FEATs into workspace/feats/ :
 
     {n}-Libraries.md   — libraries / DLLs to install on the target stack
     {n}-Database.md    — schema + stored procedures + connection strings
@@ -67,7 +67,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="generate_crosscutting_feats")
     parser.add_argument("--project", required=True, help="workspace/old/{P}/")
     parser.add_argument("--feats-dir", default=None,
-                        help="Override feats output dir (default workspace/input/feats)")
+                        help="Override feats output dir (default workspace/feats)")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
 
@@ -96,8 +96,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.feats_dir:
         feats_dir = Path(args.feats_dir).resolve()
     else:
-        # workspace/old/{P} → workspace/input/feats
-        feats_dir = project_root.parent.parent / "input" / "feats"
+        # workspace/old/{P} → workspace/feats
+        feats_dir = project_root.parent.parent / "feats"
     feats_dir.mkdir(parents=True, exist_ok=True)
 
     project_name = inventory.get("project") or project_root.name

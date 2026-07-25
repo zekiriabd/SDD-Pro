@@ -3,7 +3,7 @@
 > **Livrable humain** (introduit en v7.0.0). Remplace l'ancien mode
 > `security-reviewer --mode threat-model` (retiré). Instancier en phase
 > **pré-`/arch-init`** une fois la FEAT cadrée et les US générées, puis
-> joindre au dossier de la FEAT (suggéré : `workspace/output/.sys/.threat-models/{n}-threat-model.md`).
+> joindre au dossier de la FEAT (suggéré : `workspace/.sys/.threat-models/{n}-threat-model.md`).
 >
 > Le temps de remplissage cible est **15-30 min** pour une FEAT de
 > taille moyenne. Si > 1h, c'est probablement que la FEAT est trop
@@ -31,7 +31,7 @@
 
 | ID | Asset | Type | Classification | Propriétaire | Lieu de stockage |
 |---|---|---|---|---|---|
-| A-1 | _ex. : Liste des contacts_ | data | Sensitive (PII) | Métier RH | `workspace/output/db/console.db` table `contacts` |
+| A-1 | _ex. : Liste des contacts_ | data | Sensitive (PII) | Métier RH | `workspace/db/console.db` table `contacts` |
 | A-2 | _ex. : JWT signing key_ | secret | Critical | DevOps | env var `JWT_SECRET` (KeyVault) |
 | A-3 | _ex. : Session cookie_ | credential | Sensitive | Backend | HttpOnly cookie, SameSite=Lax |
 | A-4 | _ex. : Endpoint export Excel_ | capability | Standard | Backend | `POST /api/contacts/export` |

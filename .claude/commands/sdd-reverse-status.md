@@ -1,7 +1,7 @@
 ---
 command: sdd-reverse-status
 phase: diagnostic
-description: Diagnostic du workflow reverse engineering (pendant de /sdd-status). Liste les projets legacy sous workspace/old/ avec leur phase status, et les FEATs reverse dans workspace/input/feats/ avec marker [REV]/[REV⚠️] (ADV-6). Read-only, jamais bloquant. Script déterministe, aucun agent spawné.
+description: Diagnostic du workflow reverse engineering (pendant de /sdd-status). Liste les projets legacy sous workspace/old/ avec leur phase status, et les FEATs reverse dans workspace/feats/ avec marker [REV]/[REV⚠️] (ADV-6). Read-only, jamais bloquant. Script déterministe, aucun agent spawné.
 loader: .claude/loader.reverse.yml
 ---
 
@@ -34,7 +34,7 @@ Le script :
    - **audit** : `.sys/tech-audit.md` existe
    - **db_merged** : `.sys/db-schema.merged.json` existe
 3. Calcule pour chaque projet : `feats_extracted / units_total` (depuis `_featAllocations` vs `units[]`)
-4. Liste les FEATs `generated-by: sdd-reverse` dans `workspace/input/feats/` avec :
+4. Liste les FEATs `generated-by: sdd-reverse` dans `workspace/feats/` avec :
    - Marker `[REV]` (confidence=high) ou `[REV⚠️]` (medium/low)
    - `allow_sdd_full` depuis le commentaire `<!-- REVERSE-GATE -->`
    - source-unit, confidence, language-detected
@@ -55,7 +55,7 @@ Projets legacy : 2
       FEATs : 1/5 unités extraites (20%)
 
 
-FEATs reverse dans workspace/input/feats/ : 3
+FEATs reverse dans workspace/feats/ : 3
 
   [REV] 1-Login  (confidence=high, U=U-1)
         → /sdd-full OK

@@ -66,9 +66,9 @@ Next.js 15 (Node 22)
 
 ## 1.3 Mapping couche → repertoire
 
-Un seul projet sous `workspace/output/src/{AppName}/`. **Convention single-project — `{BackendName}` et `{LibName}` ne s'appliquent pas**. Arch leve WARNING `[STACK_MALFORMED]` si declares avec valeur non null.
+Un seul projet sous `workspace/src/{AppName}/`. **Convention single-project — `{BackendName}` et `{LibName}` ne s'appliquent pas**. Arch leve WARNING `[STACK_MALFORMED]` si declares avec valeur non null.
 
-**Code applicatif** (sous `workspace/output/src/{AppName}/`) :
+**Code applicatif** (sous `workspace/src/{AppName}/`) :
 
 | Layer | Path |
 |---|---|
@@ -94,12 +94,12 @@ Un seul projet sous `workspace/output/src/{AppName}/`. **Convention single-proje
 | Global CSS | `app/globals.css` (Tailwind v4 `@import "tailwindcss";`) |
 
 **Manifestes** :
-- Project file → `workspace/output/src/{AppName}/package.json`
-- Next config → `workspace/output/src/{AppName}/next.config.mjs`
-- TS config → `workspace/output/src/{AppName}/tsconfig.json`
+- Project file → `workspace/src/{AppName}/package.json`
+- Next config → `workspace/src/{AppName}/next.config.mjs`
+- TS config → `workspace/src/{AppName}/tsconfig.json`
 - Tailwind v4 → directement dans `globals.css` (`@theme` block)
-- shadcn manifest → `workspace/output/src/{AppName}/components.json`
-- ESLint → `workspace/output/src/{AppName}/eslint.config.mjs`
+- shadcn manifest → `workspace/src/{AppName}/components.json`
+- ESLint → `workspace/src/{AppName}/eslint.config.mjs`
 
 ---
 
@@ -167,15 +167,15 @@ Patterns reconnus (declenche `DB_REQUIRED` si `DatabaseType ≠ none`) : `Entity
 
 ## 2.2 Outils
 
-- **Project file** : `workspace/output/src/{AppName}/package.json`
-- **Build** : `(cd workspace/output/src/{AppName} && npm run build)` — invoque `next build` (RSC + bundling + type-check + lint)
-- **Dev** : `(cd workspace/output/src/{AppName} && npm run dev)` — Turbopack
-- **Start** : `(cd workspace/output/src/{AppName} && npm start)` — `next start`
+- **Project file** : `workspace/src/{AppName}/package.json`
+- **Build** : `(cd workspace/src/{AppName} && npm run build)` — invoque `next build` (RSC + bundling + type-check + lint)
+- **Dev** : `(cd workspace/src/{AppName} && npm run dev)` — Turbopack
+- **Start** : `(cd workspace/src/{AppName} && npm start)` — `next start`
 - **Smoke Command** :
 
 ```bash
-(cd workspace/output/src/{AppName} && npm install --silent && npm run build)
-test -d workspace/output/src/{AppName}/.next
+(cd workspace/src/{AppName} && npm install --silent && npm run build)
+test -d workspace/src/{AppName}/.next
 ```
 
 - **Smoke Timeout** : 180s (Next.js build inclut RSC compilation + bundling)
@@ -188,14 +188,14 @@ test -d workspace/output/src/{AppName}/.next
 ## 2.2.1 Init Commands
 
 ```bash
-if [ ! -f "workspace/output/src/{AppName}/package.json" ]; then
+if [ ! -f "workspace/src/{AppName}/package.json" ]; then
 
 # STEP 1 — Bootstrap Next.js 15 (App Router + TS + Tailwind v4 + ESLint + path alias)
-npx --yes create-next-app@15 workspace/output/src/{AppName} \
+npx --yes create-next-app@15 workspace/src/{AppName} \
   --ts --app --tailwind --eslint --src-dir false \
   --import-alias "@/*" --use-npm --no-turbopack --skip-install
 
-cd workspace/output/src/{AppName}
+cd workspace/src/{AppName}
 npm install --silent
 
 # STEP 2 — Installer shadcn/ui (style new-york) — reference .claude/stacks/ui/shadcn.md §2.2.1
@@ -432,7 +432,7 @@ Ce stack est optimise pour :
 ## 10. Notes pour l'agent `arch`
 
 1. **Detecter** `## Active Tech Specs` = `fullstack/next.md` → **ignorer** `BackendName` et `LibName` (WARNING `[STACK_MALFORMED]` si declares)
-2. **Creer** UN seul projet `workspace/output/src/{AppName}/` via `create-next-app` (cf. §2.2.1)
+2. **Creer** UN seul projet `workspace/src/{AppName}/` via `create-next-app` (cf. §2.2.1)
 3. **Composer** `lib/server/config.ts` depuis `## Active Database` + `## Active Auth Specs` :
    - `databaseUrl` (si Prisma) — format selon `DatabaseType`
    - `nextAuthSecret` (depuis `AUTH_JWT_SECRET`)
@@ -459,28 +459,28 @@ Ce stack est optimise pour :
 
 | Path | Owner |
 |---|---|
-| `workspace/output/src/{AppName}/app/{segment}/page.tsx` | `dev-frontend` |
-| `workspace/output/src/{AppName}/app/{segment}/layout.tsx` | `dev-frontend` |
-| `workspace/output/src/{AppName}/app/{segment}/{Component}.client.tsx` | `dev-frontend` |
-| `workspace/output/src/{AppName}/app/{segment}/loading.tsx` / `error.tsx` | `dev-frontend` |
-| `workspace/output/src/{AppName}/app/api/**` | `dev-backend` |
-| `workspace/output/src/{AppName}/app/actions/**` | `dev-backend` |
-| `workspace/output/src/{AppName}/lib/server/**` | `dev-backend` |
-| `workspace/output/src/{AppName}/lib/schemas/**` | `dev-backend` (Zod schemas, partages) |
-| `workspace/output/src/{AppName}/lib/utils.ts` | `dev-frontend` (cn, helpers UI) |
-| `workspace/output/src/{AppName}/middleware.ts` | `dev-backend` |
-| `workspace/output/src/{AppName}/components/**` | `dev-frontend` |
-| `workspace/output/src/{AppName}/app/globals.css` | `dev-frontend` |
-| `workspace/output/src/{AppName}/prisma/**` | `arch` (create) + `dev-backend` (consommation) |
-| `workspace/output/src/{AppName}/package.json` | `arch` (create) + `dev-backend` (augment deps) |
-| `workspace/output/src/{AppName}/lib/server/config.ts` | `arch` (create exclusif — secrets/config SDD) |
+| `workspace/src/{AppName}/app/{segment}/page.tsx` | `dev-frontend` |
+| `workspace/src/{AppName}/app/{segment}/layout.tsx` | `dev-frontend` |
+| `workspace/src/{AppName}/app/{segment}/{Component}.client.tsx` | `dev-frontend` |
+| `workspace/src/{AppName}/app/{segment}/loading.tsx` / `error.tsx` | `dev-frontend` |
+| `workspace/src/{AppName}/app/api/**` | `dev-backend` |
+| `workspace/src/{AppName}/app/actions/**` | `dev-backend` |
+| `workspace/src/{AppName}/lib/server/**` | `dev-backend` |
+| `workspace/src/{AppName}/lib/schemas/**` | `dev-backend` (Zod schemas, partages) |
+| `workspace/src/{AppName}/lib/utils.ts` | `dev-frontend` (cn, helpers UI) |
+| `workspace/src/{AppName}/middleware.ts` | `dev-backend` |
+| `workspace/src/{AppName}/components/**` | `dev-frontend` |
+| `workspace/src/{AppName}/app/globals.css` | `dev-frontend` |
+| `workspace/src/{AppName}/prisma/**` | `arch` (create) + `dev-backend` (consommation) |
+| `workspace/src/{AppName}/package.json` | `arch` (create) + `dev-backend` (augment deps) |
+| `workspace/src/{AppName}/lib/server/config.ts` | `arch` (create exclusif — secrets/config SDD) |
 
 ---
 
 ## 12. Smoke test attendu (post-init arch)
 
 ```bash
-cd workspace/output/src/{AppName}
+cd workspace/src/{AppName}
 npm install --silent
 npx --yes tsc --noEmit              # type-check sans build
 test -f next.config.mjs
@@ -491,3 +491,65 @@ echo "smoke OK"
 ```
 
 Smoke complet (~120s) : `npm run build` doit produire `.next/` sans erreur.
+
+---
+
+## 13. Règles de performance (Server + RSC)
+
+> Règles minées depuis **Vercel Engineering — react-best-practices** (MIT,
+> `github.com/vercel-labs/agent-skills`, snapshot 2026-07-22). Règles
+> client-side communes : `frontend/react.md §13` (adaptation Next : App Router
+> au lieu de TanStack Router, `useFormStatus` pour les pending states).
+> **Conventions déclarées du stack** — leur application n'est PAS de
+> l'`[OPTIMIZATION_PROACTIVE]`. IDs `[...]` = règle upstream.
+
+### 13.1 Server-side (HIGH)
+
+- Fetches indépendants d'un Server Component parallélisés (`Promise.all`) ;
+  restructurer les composants pour paralléliser plutôt que d'empiler des
+  `await` [server-parallel-fetching]
+- Fetches imbriqués par item chaînés DANS le `Promise.all` (par élément),
+  pas en seconde vague après [server-parallel-nested-fetching]
+- `React.cache()` pour dédupliquer les lectures par requête (`getUser()`,
+  session, config) [server-cache-react]
+- Cache LRU module-level pour le cross-request (données chères
+  quasi-statiques, avec TTL) [server-cache-lru]
+- I/O statique (fonts, logos, fichiers de config) hoisté au niveau module,
+  jamais relu par requête [server-hoist-static-io]
+- JAMAIS de state mutable module-level dans RSC/SSR — fuite entre requêtes
+  concurrentes [server-no-shared-module-state]
+- Minimiser les props sérialisées vers les Client Components : projeter les
+  champs nécessaires, jamais l'entité entière ; pas de données dupliquées
+  entre props [server-serialization, server-dedup-props]
+- `after()` pour le travail non bloquant post-réponse (logging, analytics,
+  invalidations) [server-after-nonblocking]
+- Server Actions authentifiées comme des routes API — jamais de confiance
+  implicite (renforce §1.4 Sécurité) [server-auth-actions]
+- Streaming : `<Suspense>` autour des sections lentes, `loading.tsx` par
+  segment — pas de page bloquée par son fetch le plus lent
+  [async-suspense-boundaries]
+- Route Handlers : démarrer les promises tôt, `await` tard
+  [async-api-routes]
+
+### 13.2 Bundle (CRITIQUE)
+
+- `next/dynamic` pour les Client Components lourds [bundle-dynamic-imports]
+- Imports directs sans barrel files internes [bundle-barrel-imports]
+- Third-party (analytics, widgets) différé post-hydration
+  [bundle-defer-third-party]
+- Chemins d'import statiquement analysables — pas de `import(variable)`
+  large [bundle-analyzable-paths]
+
+### 13.3 Hydration
+
+- Zéro mismatch d'hydration : le HTML serveur doit correspondre au premier
+  render client — pas de `Date.now()`, `Math.random()`, `window.*` dans le
+  render [rendering-hydration-no-flicker]
+- `suppressHydrationWarning` uniquement sur les mismatchs légitimes et
+  localisés (timestamps affichés) — jamais en global
+  [rendering-hydration-suppress-warning]
+
+### 13.4 Périmètre anti-derive
+
+Toute optimisation NON listée ici ni dans `frontend/react.md §13` reste
+`[OPTIMIZATION_PROACTIVE]` → passer par US/ADR.

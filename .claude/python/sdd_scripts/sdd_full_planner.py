@@ -33,9 +33,9 @@ Bash + jq pour décider quelles phases run/skip sans réinventer la
 logique inline dans chaque .md.
 
 Comportement (0 token LLM) :
-1. Vérifie que FEAT N existe (workspace/input/feats/N-*.md)
+1. Vérifie que FEAT N existe (workspace/feats/N-*.md)
 2. Lit Project Config (CoverageMin, MaxParallel, GatedWorkflow, etc.)
-3. Liste les US déjà générées (workspace/output/us/N-*-*.md)
+3. Liste les US déjà générées (workspace/us/N-*-*.md)
 4. Détecte si arch est stable (bootstrap idempotent skip)
 5. Construit le plan phase-par-phase avec un statut chaque :
    - `pending`  : à exécuter
@@ -67,14 +67,16 @@ from sdd_lib.project_config import (  # noqa: E402
     get_active_stack_paths,
     read_project_config,
 )
+from sdd_lib.console_safe import ensure_console_safe  # noqa: E402
+from sdd_lib.paths import workspace_root
 
 
 # --- Helpers déterministes -------------------------------------------------
 
 
 def _find_feat(root: Path, feat_n: int) -> Path | None:
-    """Locate workspace/input/feats/{n}-*.md."""
-    feats_dir = root / "workspace" / "input" / "feats"
+    """Locate workspace/feats/{n}-*.md."""
+    feats_dir = workspace_root(root) / "feats"
     if not feats_dir.is_dir():
         return None
     for f in feats_dir.iterdir():
@@ -84,8 +86,8 @@ def _find_feat(root: Path, feat_n: int) -> Path | None:
 
 
 def _list_us_files(root: Path, feat_n: int) -> list[Path]:
-    """List workspace/output/us/{n}-*-*.md (in basename order)."""
-    us_dir = root / "workspace" / "output" / "us"
+    """List workspace/us/{n}-*-*.md (in basename order)."""
+    us_dir = workspace_root(root) / "us"
     if not us_dir.is_dir():
         return []
     return sorted(
@@ -117,13 +119,13 @@ def _arch_seems_stable(root: Path, feat_n: int) -> bool:
     """Detect a stable bootstrap state (cf. dev-run.md STEP 4.bis).
 
     Heuristic v7.0.0-alpha : true iff
-      - `workspace/output/src/` contient au moins un projet bootstrapé
-      - `workspace/output/db/schema.json` présent (si DB attendu)
+      - `workspace/src/` contient au moins un projet bootstrapé
+      - `workspace/db/schema.json` présent (si DB attendu)
       - feat_n != 1 (pour FEAT 1, arch toujours requis pour bootstrap initial)
     """
     if feat_n == 1:
         return False
-    src_dir = root / "workspace" / "output" / "src"
+    src_dir = workspace_root(root) / "src"
     if not src_dir.is_dir():
         return False
     # Au moins un projet (un sous-dossier avec un manifest)
@@ -156,7 +158,7 @@ def build_plan(
         plan["errors"].append(
             {
                 "code": "FEAT_NOT_FOUND",
-                "message": f"workspace/input/feats/{feat_n}-*.md missing",
+                "message": f"workspace/feats/{feat_n}-*.md missing",
             }
         )
         return plan
@@ -590,7 +592,7 @@ def decide_next_action(plan: dict, state: dict) -> dict:
 #: File extensions considered "production code" by `_count_code_files`.
 #: Generated code, ADRs, plans, READMEs, and JSON catalogs are EXCLUDED
 #: to keep the heuristic noise-low — if any of these patterns is present
-#: under `workspace/output/src/{BackendName|AppName}/`, we trust that
+#: under `workspace/src/{BackendName|AppName}/`, we trust that
 #: real code was materialized.
 _PRODUCTION_CODE_EXTENSIONS: frozenset[str] = frozenset({
     ".cs", ".ts", ".tsx", ".js", ".jsx", ".py", ".kt", ".java",
@@ -599,7 +601,7 @@ _PRODUCTION_CODE_EXTENSIONS: frozenset[str] = frozenset({
 
 
 def _count_code_files(root: Path) -> int:
-    """Count production code files under workspace/output/src/.
+    """Count production code files under workspace/src/.
 
     Audit CTO 2026-06-07 — P0 defensive check : prevents `sdd_full_planner
     recap` from emitting `final_status: success` when agents marked phases
@@ -608,7 +610,7 @@ def _count_code_files(root: Path) -> int:
     surface this discrepancy as a WARN downgrade.
     """
     count = 0
-    src_dir = root / "workspace" / "output" / "src"
+    src_dir = workspace_root(root) / "src"
     if not src_dir.is_dir():
         return count  # not an exit code — file counter
     for path in src_dir.rglob("*"):
@@ -635,11 +637,11 @@ def build_recap(root: Path, run_id: str) -> dict:
 
     Audit CTO 2026-06-07 — P0 fix : adds `code_files_count` field and
     downgrades `final_status` from "success" → "partial" if no production
-    code is present under `workspace/output/src/` (defends against false
+    code is present under `workspace/src/` (defends against false
     positives where agents emit `set-phase pass` but never write code).
     """
     import sqlite3
-    db_path = root / "workspace" / "output" / "db" / "console.db"
+    db_path = workspace_root(root) / "db" / "console.db"
     recap: dict = {
         "run_id": run_id,
         "phases": [],
@@ -712,7 +714,7 @@ def build_recap(root: Path, run_id: str) -> dict:
 
     # P0 fix audit CTO 2026-06-07 — defensive code-on-disk check.
     # If recap claims success but no production code exists under
-    # `workspace/output/src/`, downgrade to "partial" with explicit warning.
+    # `workspace/src/`, downgrade to "partial" with explicit warning.
     # Skips the check if dev_run phase was skipped (pure-doc FEAT or POC).
     code_count = _count_code_files(root)
     recap["code_files_count"] = code_count
@@ -722,10 +724,10 @@ def build_recap(root: Path, run_id: str) -> dict:
         recap["final_status"] = "partial"
         recap["warnings"].append(
             "[FALSE_POSITIVE_COMPLETION] dev_run phase marked pass but no "
-            "production code files found under workspace/output/src/. "
+            "production code files found under workspace/src/. "
             "Possible causes: agent crashed mid-write, set-phase event emitted "
             "without writing, frontend-only US misclassified. Inspect "
-            "workspace/output/src/ manually before declaring delivery."
+            "workspace/src/ manually before declaring delivery."
         )
     return recap
 
@@ -760,7 +762,7 @@ def render_recap_markdown(recap: dict) -> str:
         lines.append(f"Tokens : in={t['input']} out={t['output']} "
                      f"cache_r={t['cache_read']} cache_w={t['cache_write']} "
                      f"(hit_rate={hit_rate:.1f}%)")
-        # Opus 4.7 1M context pricing
+        # Opus 4.8 1M context pricing
         cost = (t["input"] * 6 + t["output"] * 30
                 + t["cache_read"] * 0.30 + t["cache_write"] * 7.50) / 1_000_000
         lines.append(f"Cost   : ~${cost:.4f}")
@@ -780,6 +782,7 @@ def render_recap_markdown(recap: dict) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
+    ensure_console_safe()  # cp1252 guard (audit 2026-06-11 M15)
     parser = argparse.ArgumentParser(
         description="Deterministic execution planner for /sdd-full pipeline"
     )

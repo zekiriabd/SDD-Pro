@@ -84,12 +84,12 @@ Appliquer `@.claude/rules/build-and-loop.md §1` (Partie B) avec
 
 ## STEP 2 — Charger la FEAT
 
-Glob `workspace/input/feats/{n}-*.md`.
+Glob `workspace/feats/{n}-*.md`.
 
 - 0 fichier → ERROR :
   ```
   ERROR: agent elicitor — FEAT introuvable
-  CAUSE: aucun fichier workspace/input/feats/{n}-*.md
+  CAUSE: aucun fichier workspace/feats/{n}-*.md
   FIX: créer la FEAT via /feat-generate
   ```
 - > 1 fichier → ERROR (nommage invalide).
@@ -125,7 +125,7 @@ Read **uniquement** :
   (v7.0.0+ wired audit P2 M1 2026-06-08)**. Lecture sélective : §0 Quick
   Reference table + §"Workflow recommandé selon contexte" suffisent au
   STEP 3.5 ; détails de chaque technique chargés à la demande au STEP 5.
-- `workspace/output/.sys/.context/constitution.md` **si présent** (glossaire,
+- `workspace/.sys/.context/constitution.md` **si présent** (glossaire,
   acteurs cumulés, ADRs — utile pour hypothèses cross-FEAT)
 
 **Rules inline (économie tokens)** : substance opérationnelle bas de ce fichier.
@@ -255,7 +255,7 @@ une variable typée :
 
 ## STEP 9 — Écrire les sections enrichies dans la FEAT
 
-Read le contenu actuel de la FEAT (`workspace/input/feats/{n}-{FeatName}.md`).
+Read le contenu actuel de la FEAT (`workspace/feats/{n}-{FeatName}.md`).
 
 Append **une section par technique appliquée** en fin de fichier (après
 `## Out of Scope`), avec le mapping suivant entre technique et titre H2 :
@@ -304,7 +304,7 @@ les sections des techniques effectivement appliquées sont matérialisées.
 
 ## STEP 10 — Mettre à jour la constitution §7
 
-Skip silencieusement si `workspace/output/.sys/.context/constitution.md` n'existe
+Skip silencieusement si `workspace/.sys/.context/constitution.md` n'existe
 pas.
 
 Sinon, **append-only** sur §7 :
@@ -348,7 +348,7 @@ Sections ajoutées à la FEAT (1 par technique) :
 Constitution §7 : {étendue avec {R} risques + {A_open} hypothèses à valider | skipped (pas de constitution)}
 
 Prochaine étape :
-  1. Relire workspace/input/feats/{n}-{FeatName}.md (sections enrichies en bas)
+  1. Relire workspace/feats/{n}-{FeatName}.md (sections enrichies en bas)
   2. Pour chaque EDGE-N "à ajouter" : ajouter une AC à l'US concernée
   3. Pour chaque ASS-N "à valider" : confirmer ou ajuster avec le PO
   4. Relancer /us-generate {n} si la FEAT a été modifiée significativement
@@ -371,7 +371,7 @@ Prochaine étape :
 - Ne JAMAIS inventer des risques/hypothèses non déductibles de la
   FEAT ou non confirmés par l'utilisateur (en mode --quick, marquer
   comme "à valider" tout ce qui est inféré)
-- Ne JAMAIS lire `workspace/input/stack/`, `workspace/input/ui/`, `workspace/output/src/` (hors
+- Ne JAMAIS lire `workspace/stack/`, `workspace/ui/`, `workspace/src/` (hors
   périmètre élicitation)
 - En mode interactif, max **2 questions par technique** ; bornes
   globales : 4 questions max si 2 techniques sélectionnées, 6 max si 3,

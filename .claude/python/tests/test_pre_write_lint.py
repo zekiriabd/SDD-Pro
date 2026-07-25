@@ -51,7 +51,7 @@ class TestPreWriteLintBaseline(unittest.TestCase):
         payload = {
             "tool_name": "Write",
             "tool_input": {
-                "file_path": "workspace/output/src/MyApp/Service.kt",
+                "file_path": "workspace/src/MyApp/Service.kt",
                 "content": "val x = something!!",  # would match Kotlin !! pattern
             },
         }
@@ -59,7 +59,7 @@ class TestPreWriteLintBaseline(unittest.TestCase):
         self.assertEqual(r.returncode, 0)
 
     def test_non_src_path_allows(self):
-        """Files outside workspace/output/src/ are out of scope."""
+        """Files outside workspace/src/ are out of scope."""
         payload = {
             "tool_name": "Write",
             "tool_input": {
@@ -75,7 +75,7 @@ class TestPreWriteLintBaseline(unittest.TestCase):
         payload = {
             "tool_name": "Write",
             "tool_input": {
-                "file_path": "workspace/output/src/MyApp/__tests__/foo.test.ts",
+                "file_path": "workspace/src/MyApp/__tests__/foo.test.ts",
                 "content": "// TODO: more tests",
             },
         }
@@ -97,7 +97,7 @@ class TestPreWriteLintWarnMode(unittest.TestCase):
         payload = {
             "tool_name": "Write",
             "tool_input": {
-                "file_path": "workspace/output/src/MyApp/Service.kt",
+                "file_path": "workspace/src/MyApp/Service.kt",
                 "content": "fun get(): String = data!!  // unjustified force-unwrap",
             },
         }
@@ -116,7 +116,7 @@ class TestPreWriteLintStrictMode(unittest.TestCase):
         payload = {
             "tool_name": "Write",
             "tool_input": {
-                "file_path": "workspace/output/src/MyApp/__tests__/x.test.ts",
+                "file_path": "workspace/src/MyApp/__tests__/x.test.ts",
                 "content": "// TODO and console.log everywhere",
             },
         }

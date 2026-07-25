@@ -1,7 +1,7 @@
 # /sdd-discover-stack — Détection automatique du stack d'un repo existant
 
 Scanne un repo (brownfield ou nouveau) et produit
-`workspace/input/stack/stack.md.candidate` avec les stack-ids SDD_Pro
+`workspace/stack/stack.md.candidate` avec les stack-ids SDD_Pro
 candidats + une `## Project Config` pré-remplie. Le Tech Lead arbitre
 les ambiguïtés et renomme `.candidate` → `stack.md` quand validé.
 
@@ -22,7 +22,7 @@ les ambiguïtés et renomme `.candidate` → `stack.md` quand validé.
 | Arg | Défaut | Sens |
 |---|---|---|
 | `--scope <path>` | `.` | Répertoire à scanner (relatif au repo root) |
-| `--force` | absent | Autorise overwrite de `workspace/input/stack/stack.md` existant |
+| `--force` | absent | Autorise overwrite de `workspace/stack/stack.md` existant |
 
 Si l'arg `--scope` est absent → scan du repo root.
 
@@ -31,8 +31,8 @@ Si l'arg `--scope` est absent → scan du repo root.
 ## STEP 2 — Pré-check existence stack.md
 
 ```bash
-STACK_MD = workspace/input/stack/stack.md
-STACK_CANDIDATE = workspace/input/stack/stack.md.candidate
+STACK_MD = workspace/stack/stack.md
+STACK_CANDIDATE = workspace/stack/stack.md.candidate
 ```
 
 - Si `STACK_MD` existe ET `--force` absent → cible de sortie = `STACK_CANDIDATE`
@@ -52,7 +52,7 @@ Invoquer :
 ```bash
 python .claude/python/sdd_scripts/scan_repo.py \
   --scope {scope} \
-  --output workspace/output/.sys/.audit/scan-report.json \
+  --output workspace/.sys/.audit/scan-report.json \
   --quiet
 ```
 
@@ -70,8 +70,8 @@ Si exit ≠ 0 → STOP + ERROR `[DISCOVER_SCAN_FAILED]`.
 Invoquer :
 ```bash
 python .claude/python/sdd_scripts/match_stack_catalog.py \
-  --scan-report workspace/output/.sys/.audit/scan-report.json \
-  --output workspace/output/.sys/.audit/match-report.json
+  --scan-report workspace/.sys/.audit/scan-report.json \
+  --output workspace/.sys/.audit/match-report.json
 ```
 
 Le script écrit `match-report.json` avec :
@@ -84,7 +84,7 @@ Le script écrit `match-report.json` avec :
 
 ## STEP 5 — Lecture des résultats et décision
 
-Read `workspace/output/.sys/.audit/match-report.json`.
+Read `workspace/.sys/.audit/match-report.json`.
 
 ### 5.1 Cas DISCOVER_NO_MATCH
 
@@ -103,7 +103,7 @@ Indicateurs détectés (insuffisants pour matcher) :
 
 FIX: vérifier que le repo contient bien un manifest reconnu
      (csproj, package.json, pyproject.toml, build.gradle.kts, pom.xml)
-     OU compléter manuellement workspace/input/stack/stack.md
+     OU compléter manuellement workspace/stack/stack.md
 ```
 STOP + ERROR `[DISCOVER_NO_MATCH]`.
 
@@ -123,8 +123,8 @@ afficher les candidats avec leur score et demander au Tech Lead de choisir :
 Lequel utiliser ? (réponds par le numéro ou "both" pour générer un combo)
 ```
 
-Attendre la réponse. `both` n'est pas supporté en v6.6.1 → afficher message :
-"Combo backend non supporté en v6.6.1, choisis un seul."
+Attendre la réponse. `both` n'est pas supporté → afficher message :
+"Combo backend non supporté (multi-backend), choisis un seul."
 
 Idem pour frontend si ambiguïté.
 
@@ -162,7 +162,7 @@ Pour les modes auditors v7.0.0 : laisser commentés
 ```
 > ⚠️ `A11yMode`/`PerfMode` retirés v7.0.0 (agents `accessibility-auditor`
 > et `performance-auditor` supprimés — `governance-major-auditors-trim`).
-> Remplacement : ingest CI v7.2.0 via `ingest_axe.py` / `ingest_lighthouse.py`.
+> Remplacement : ingest CI v7.0.0 via `ingest_axe.py` / `ingest_lighthouse.py`.
 
 ---
 
@@ -175,7 +175,7 @@ Format du fichier généré :
 
 > ⚠️ Fichier candidat. Revoir les sections marquées `# TODO` avant de
 > renommer en `stack.md`. Toutes les valeurs détectées automatiquement
-> sont sourcées dans `workspace/output/.sys/.audit/match-report.json`.
+> sont sourcées dans `workspace/.sys/.audit/match-report.json`.
 
 ## Project Config
 AppName: <AppName>                # TODO ajuster (détecté : "{detected_name}")
@@ -259,27 +259,28 @@ l'attention du Tech Lead.
 ## STEP 9 — Anti-derive
 
 - Cette commande ne modifie **JAMAIS** :
-  - Le code de prod (`workspace/output/src/`)
-  - Les FEATs/US (`workspace/input/feats/`, `workspace/output/us/`)
-  - Les rapports (`workspace/output/qa/`, `.sys/.validation/`)
+  - Le code de prod (`workspace/src/`)
+  - Les FEATs/US (`workspace/feats/`, `workspace/us/`)
+  - Les rapports QA (`console.db`, `.sys/.validation/`)
   - Les agents, rules, stacks (`.claude/`)
 - Outputs uniquement :
-  - `workspace/output/.sys/.audit/scan-report.json` (forensic)
-  - `workspace/output/.sys/.audit/match-report.json` (forensic)
-  - `workspace/input/stack/stack.md.candidate` (ou `stack.md` si `--force`)
+  - `workspace/.sys/.audit/scan-report.json` (forensic)
+  - `workspace/.sys/.audit/match-report.json` (forensic)
+  - `workspace/stack/stack.md.candidate` (ou `stack.md` si `--force`)
 - Idempotente : re-invocation = ré-écrit les mêmes fichiers candidates.
 - Pas de network : tous les scans sont locaux.
 
 ---
 
-## STEP 10 — Limitations connues v6.6.1
+## STEP 10 — Limitations connues
 
 - **Pas de mode combo** : si 2 backends détectés (monorepo polyglot), il
-  faut choisir 1 seul. Combo multi-backend prévu v6.6.2+.
+  faut choisir 1 seul. Combo multi-backend non planifié.
 - **Pas de détection auto AppName/BackendName** : 90% des cas nécessitent
   un ajustement manuel post-génération.
-- **Stacks 🟡 expérimentaux non détectés** : seuls les 11 stacks 🟢
-  reference sont reconnus en v6.6.1.
+- **Couverture catalogue partielle** : le matcher reconnaît un sous-ensemble
+  des 35 stacks (les 🟢 reference les plus courants). Les stacks 🟡
+  expérimentaux ne sont pas détectés — couverture à réévaluer vs 35 stacks.
 - **Pas de détection des secrets** : `DB_PASSWORD`, `AUTH_JWT_SECRET`,
   etc. doivent être ajoutés manuellement (sécurité — on ne lit pas les
   `appsettings.json` pour ça).
@@ -305,7 +306,7 @@ l'attention du Tech Lead.
 
 **Verdict final** : 1 ligne avec compteur stacks détectés + pointeur
 fichier généré. Exemple : `[ANALYSIS] 1 combo backend×frontend×ui
-détecté → workspace/input/stack/stack.md.candidate. (100%)`. En cas
+détecté → workspace/stack/stack.md.candidate. (100%)`. En cas
 d'absence de match : `🟡 [ANALYSIS/WARN] Manifests présents mais
 [DISCOVER_NO_MATCH]. (100%)`.
 

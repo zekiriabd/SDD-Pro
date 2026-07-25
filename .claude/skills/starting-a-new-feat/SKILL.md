@@ -52,7 +52,7 @@ détecter si la demande est :
   ≥ 3 User Stories prévisibles → `/feat-generate <Nom>`
 - **US dans FEAT existante** : extension d'un domaine déjà cadré
   (ex. "ajouter le SSO" alors que FEAT Auth existe) → ajouter une US
-  manuellement dans `workspace/output/us/{n}-{m}-{Name}.md` puis
+  manuellement dans `workspace/us/{n}-{m}-{Name}.md` puis
   `/dev-run {n}` (ou compléter la FEAT puis `/us-generate {n}`)
 
 Si ambigu : demander au Tech Lead, ne pas trancher seul.
@@ -72,7 +72,7 @@ L'agent `po` pose 3-6 questions élicitor pour capturer :
 - Non-Functional Constraints (volume, SLA, GDPR, etc.)
 
 **Ne JAMAIS** :
-- Coder avant que `/feat-generate` ait produit `workspace/input/feats/{n}-*.md`
+- Coder avant que `/feat-generate` ait produit `workspace/feats/{n}-*.md`
 - Inventer des AC à la place de l'utilisateur
 - Skipper l'élicitor (`/feat-deepen` pour approfondir si besoin)
 

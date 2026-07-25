@@ -1,4 +1,12 @@
-# Règle — Auditor Coordination (matrice d'ownership des findings, v7.0.2)
+---
+# TOK-C1 (audit 2026-06-12) : chargement paresseux (path-scoped rule). Consommée par les
+# 5 reviewers + l'orchestrateur two-stage ; s'injecte au contact des rapports de validation.
+paths:
+  - "workspace/.sys/.validation/**"
+  - "workspace/db/**"
+---
+
+# Règle — Auditor Coordination (matrice d'ownership des findings, v7.0.1-dev)
 
 > **Créée 2026-06-11 (audit consolidé P1)** : la coordination entre les
 > 5 reviewers LLM + `quality_scan.py` + ingests CI était dispersée

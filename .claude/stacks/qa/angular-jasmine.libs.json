@@ -6,9 +6,9 @@
   "buildSystem": "npm",
   "manifest": {
     "files": [
-      "workspace/output/src/{AppName}/package.json",
-      "workspace/output/src/{AppName}/karma.conf.js",
-      "workspace/output/src/{AppName}/angular.json"
+      "workspace/src/{AppName}/package.json",
+      "workspace/src/{AppName}/karma.conf.js",
+      "workspace/src/{AppName}/angular.json"
     ]
   },
   "versions": {

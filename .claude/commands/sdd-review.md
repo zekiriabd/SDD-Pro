@@ -6,12 +6,12 @@
 **Phase A — rapport seul, 0 auto-fix.** Re-run du scan déterministe
 [`quality_scan.py`](.claude/python/sdd_scripts/quality_scan.py), agrégation
 des findings de tous les auditeurs déjà persistés dans
-[`console.db`](workspace/output/db/console.db) (qa_quality, qa_code_review,
+[`console.db`](workspace/db/console.db) (qa_quality, qa_code_review,
 qa_security, qa_a11y, qa_performance, qa_spec_compliance), **triage
 déterministe par owner** (backend / frontend / shared / unknown) basé sur
 le path, calcul du verdict 🟢/🟡/🔴 contre `ReviewFailOn`, persistance dans
-`validation_reports(report_type='review')` + rendu Markdown
-[`workspace/output/qa/feat-{n}/review.md`](workspace/output/qa/feat-).
+`validation_reports(report_type='review')`. Rendu Markdown **à la demande**
+(aucun fichier, 2026-07-06) : `query_console_db.py review --feat {n} --format md`.
 
 **Phase B (à venir v7.2)** : auto-fix loop (dispatcher `dispatch_fixes.py`
 écrit, non encore wired à une commande user-facing).
@@ -30,7 +30,7 @@ STEP 3.0. Cf. `agents/arch-reviewer.md`.
 /sdd-review {n} --ensure-scans        # v7.0.0 : exit 3 si une source QA obligatoire manque
 /sdd-review {n} --fail-on critical    # override seuil (info|minor|moderate|serious|critical)
 /sdd-review {n} --json                # sortie JSON pour CI/tooling
-/sdd-review {n} --adversarial         # v7.2.0 R1 : avocat du diable post-agrégation (informational, jamais bloquant)
+/sdd-review {n} --adversarial         # R1 (v7.0.0) : avocat du diable post-agrégation (informational, jamais bloquant)
 /sdd-review {n} --no-spec-gate        # v7.0.0+ : skip Stage A spec-compliance gate (legacy comportement parallèle)
 ```
 
@@ -72,10 +72,10 @@ CAUSE: [INVALID_ARG] "{argument}" n'est pas un entier
 FIX: relancer /sdd-review {n}
 ```
 
-Si FEAT inconnue (aucun fichier `workspace/input/feats/{n}-*.md`) →
+Si FEAT inconnue (aucun fichier `workspace/feats/{n}-*.md`) →
 ```
 ERROR: /sdd-review {n} — FEAT inconnue
-CAUSE: [FEAT_NOT_FOUND] aucun fichier workspace/input/feats/{n}-*.md
+CAUSE: [FEAT_NOT_FOUND] aucun fichier workspace/feats/{n}-*.md
 FIX: relancer /feat-generate ou utiliser un numéro existant
 ```
 
@@ -83,7 +83,7 @@ FIX: relancer /feat-generate ou utiliser un numéro existant
 
 ## STEP 2 — Lire la configuration (layered)
 
-Read `## Project Config` de [`workspace/input/stack/stack.md`](workspace/input/stack/stack.md)
+Read `## Project Config` de [`workspace/stack/stack.md`](workspace/stack/stack.md)
 via `read_layered_config()`. Clés relevantes (toutes optionnelles) :
 
 ```yaml
@@ -102,6 +102,26 @@ Si `AdversarialReviewMode: full` OU flag CLI `--adversarial` → spawn agent
 
 ---
 
+## STEP 2.5 — Triage déterministe pré-reviewers (0 token, audit 2026-06-11)
+
+Avant de spawner le moindre reviewer LLM, exécuter le triage déterministe
+(câblage prévu par T2.8 — resté « suggested » jusqu'à l'audit 2026-06-11) :
+
+```bash
+python .claude/python/sdd_scripts/triage_quality.py   --feat-number {n} --fail-on {ReviewFailOn} --threshold 5
+```
+
+| Exit | Sens | Action |
+|---|---|---|
+| `0` | triage GREEN/YELLOW — les reviewers LLM peuvent apporter un signal | continuer STEP 3.0.bis normalement |
+| `2` | triage RED — `quality_scan.py` a déjà ≥ 5 findings ≥ seuil : le verdict consolidé sera RED quoi qu'il arrive | **skip les reviewers LLM** (STEP 3.0.bis + Stage B), aller directement STEP 3 (agrégation sur findings déterministes). Émettre `🔴 [CODE-REVIEW/SKIP] Triage RED — reviewers LLM économisés (~150k tokens), corriger les findings quality_scan d'abord.` |
+| `3` | `[INFRA_BLOCKED]` DB inaccessible / quality_scan KO | WARN 1L + continuer (le triage est une optimisation, jamais un gate bloquant) |
+
+Anti-derive : le triage n'écrase aucun rapport — il évite seulement de payer
+~150k tokens de reviewers quand le verdict est déjà mécaniquement RED.
+
+---
+
 ## STEP 3.0.bis — `spec-compliance-reviewer` (gate two-stage)
 
 **Pattern v7.0.0+ (two-stage, emprunt superpowers)** : avant d'agréger les
@@ -109,7 +129,17 @@ findings code/security/arch, vérifier que la spec est respectée. Si le code
 n'implémente pas les ACs, agréger des findings code/security/arch est
 prématuré (le code sera réécrit, les findings deviennent obsolètes).
 
-Vérification rapide avant spawn (lecture déterministe DB) :
+**Producteur unique dans le flux `/sdd-full` (MA-1)** : si `SDD_RUN_ID` est
+présent (on est dans un run orchestré) ET que le rapport
+`workspace/.sys/.validation/{n}-spec-compliance.json` du run courant
+existe, alors `/sdd-review` est un **lecteur pur** : il lit le verdict et
+**skip le re-spawn** de `spec-compliance-reviewer`. Le producteur unique est
+`/dev-run §6.4.A` (Stage A) — re-spawner ici produirait un 2ᵉ/3ᵉ verdict
+redondant pour la même FEAT dans le même run. Aller directement à la lecture
+du verdict ci-dessous.
+
+Sinon (fallback standalone : `/sdd-review {n}` lancé seul, sans `SDD_RUN_ID`),
+vérification rapide avant spawn (lecture déterministe DB) :
 
 ```bash
 python .claude/python/sdd_scripts/query_console_db.py spec-compliance-present \
@@ -118,8 +148,8 @@ python .claude/python/sdd_scripts/query_console_db.py spec-compliance-present \
 # exit 1 = aucune entrée fraîche → spawn fallback ci-dessous
 ```
 
-Si exit 1 (aucune entrée spec-compliance fraîche dans `qa_spec_compliance`),
-spawner l'agent en fallback :
+Si exit 1 (aucune entrée spec-compliance fraîche dans `qa_spec_compliance`)
+ET pas de rapport du run courant, spawner l'agent en fallback :
 
 ```
 Agent: spec-compliance-reviewer
@@ -140,7 +170,7 @@ Lecture du verdict produit (`{n}-spec-compliance.json` → `summary.verdict`) :
 🔴 /sdd-review {n} — spec-compliance gate RED ({NV} ACs non vérifiées)
 
 Verdict spec-compliance : 🔴 RED ({V}/{T} ACs verified)
-Rapport : workspace/output/.sys/.validation/{n}-spec-compliance.md
+Rapport : workspace/.sys/.validation/{n}-spec-compliance.md
 
 ⊘ arch-reviewer + agrégation code/security/quality : skipped (gate failed)
    Rationale : agréger des findings sur du code qui ne respecte pas la spec
@@ -222,16 +252,17 @@ Le script effectue automatiquement :
    ≠ `verified`) où `feat_n = {n}`
 3. **STEP 3.3** — Pour chaque finding, classifier l'owner via
    `triage_issues.classify_path()` :
-   - `workspace/output/src/{BackendName}/**`  → backend
-   - `workspace/output/src/{AppName}/**`      → frontend
-   - `workspace/output/src/{LibName}/**`      → shared
+   - `workspace/src/{BackendName}/**`  → backend
+   - `workspace/src/{AppName}/**`      → frontend
+   - `workspace/src/{LibName}/**`      → shared
    - autre                                     → unknown
 4. **STEP 3.4** — Verdict :
    - 🔴 RED si ≥ 1 finding `critical`/`blocker` OU ≥ 1 ≥ `ReviewFailOn`
    - 🟡 YELLOW si findings sous le seuil mais non vides
    - 🟢 GREEN sinon
-5. **STEP 3.5** — Persister `validation_reports` (report_type=`review`) +
-   émettre [`workspace/output/qa/feat-{n}/review.md`](workspace/output/qa/feat-)
+5. **STEP 3.5** — Persister `validation_reports` (report_type=`review`).
+   Aucun fichier écrit ; rapport rendu à la demande via
+   `query_console_db.py review --feat {n} --format md`.
 
 ---
 
@@ -241,21 +272,21 @@ Le script effectue automatiquement :
 
 🟢 GREEN :
 ```
-🟢 /sdd-review FEAT {n}: 0 findings → GREEN (markdown: workspace/output/qa/feat-{n}/review.md)
+🟢 /sdd-review FEAT {n}: 0 findings → GREEN (rapport: query_console_db.py review --feat {n} --format md)
 ```
 
 🟡 YELLOW :
 ```
 🟡 /sdd-review FEAT {n}: {N} findings (0 ≥ {fail_on}) → YELLOW
    owner: {back:N, front:M} | source: {quality:X, code-review:Y, ...}
-   → workspace/output/qa/feat-{n}/review.md
+   → query_console_db.py review --feat {n} --format md
 ```
 
 🔴 RED :
 ```
 🔴 /sdd-review FEAT {n}: {N} findings ({T} ≥ {fail_on}) → RED
 CAUSE: [REVIEW_VERDICT_RED] {T} findings critical/serious à corriger
-FIX: lire workspace/output/qa/feat-{n}/review.md §"Findings déclenchants" puis dispatcher
+FIX: lire `query_console_db.py review --feat {n} --format md` §"Findings déclenchants" puis dispatcher
 ```
 
 ---
@@ -263,16 +294,16 @@ FIX: lire workspace/output/qa/feat-{n}/review.md §"Findings déclenchants" puis
 ## STEP 4.5 — Spawn `adversarial-reviewer` (opt-in, post-agrégation)
 
 Si `--adversarial` (CLI) OU `AdversarialReviewMode: full` (config),
-**et uniquement après** que le rapport consolidé
-[`workspace/output/qa/feat-{n}/review.md`](workspace/output/qa/feat-)
-est écrit (l'agent en a besoin comme précondition) :
+**et uniquement après** que le rapport consolidé est persisté en base
+(`validation_reports` report_type='review' ; l'agent le lit via
+`query_console_db.py review --feat {n}` comme précondition) :
 
 ```
 Agent: adversarial-reviewer
   prompt: "Audit FEAT {n} — avocat du diable post-/sdd-review (cf. agents/adversarial-reviewer.md)."
 ```
 
-- L'agent produit `workspace/output/qa/feat-{n}/adversarial.{md,json}`
+- L'agent produit `workspace/.sys/.validation/{n}-adversarial.json`
   puis appelle `ingest_agent_report --type adversarial` qui insère dans
   `validation_reports(report_type='adversarial', verdict='informational')`.
 - **Verdict consolidé inchangé** : les `[ADV_*]` ne sont PAS agrégés
@@ -282,7 +313,7 @@ Agent: adversarial-reviewer
   # Audit final 2026-06-07 (BROKEN-4 closure) : query_console_db.py n'expose
   # pas `--raw-sql` (subcommands explicites uniquement). Pour consulter le
   # canal adversarial, utiliser sqlite3 CLI directement :
-  sqlite3 workspace/output/db/console.db \
+  sqlite3 workspace/db/console.db \
     "SELECT feat_number, verdict, payload_json FROM validation_reports
      WHERE report_type='adversarial' AND feat_number={n}
      ORDER BY id DESC LIMIT 1"
@@ -294,12 +325,13 @@ Agent: adversarial-reviewer
 
 ---
 
-## STEP 5 — Suite manuelle (Phase B/C à venir)
+## STEP 5 — Suite manuelle (auto-fix Phase B à venir)
 
-Tant que Phase B (auto-fix dispatcher) et Phase C (arch review +
-auto-invoke `/sdd-full`) ne sont pas livrées, le Tech Lead arbitre :
+Phase C (arch-reviewer) est câblée via le two-stage gate (cf. §19). Tant que
+Phase B (auto-fix dispatcher `dispatch_fixes.py`, à venir v7.2) n'est pas
+livrée, le Tech Lead arbitre les findings :
 
-1. Consulter `workspace/output/qa/feat-{n}/review.md` — colonne **Owner**
+1. Consulter `query_console_db.py review --feat {n} --format md` — colonne **Owner**
    = quel agent dispatcher
 2. Pour **backend** issues : `/dev-backend {n}-{m}` (re-spawn idempotent)
    ou édit manuel
@@ -314,7 +346,7 @@ auto-invoke `/sdd-full`) ne sont pas livrées, le Tech Lead arbitre :
 # Defaults conservateurs
 ReviewMode:                 full        # full | scans-only | read-only
 ReviewFailOn:               serious     # info | minor | moderate | serious | critical
-AdversarialReviewMode:      manual      # off | manual | full (v7.2.0 R1)
+AdversarialReviewMode:      manual      # off | manual | full (R1, v7.0.0)
 AdversarialMinAttacks:      5
 AdversarialMaxAttacks:      10
 ```
@@ -332,7 +364,7 @@ AdversarialMaxAttacks:      10
 ## Lectures utiles
 
 - `query_console_db.py review --feat {n}` — JSON résumé du dernier run
-- `workspace/output/qa/feat-{n}/review.md` — rapport humain
+- `query_console_db.py review --feat {n} --format md` — rapport humain rendu à la demande
 - `validation_reports` table avec `report_type='review'`
 
 ---
@@ -340,7 +372,7 @@ AdversarialMaxAttacks:      10
 ## Anti-derive
 
 - ❌ JAMAIS d'auto-fix en Phase A (rapport seul)
-- ❌ JAMAIS de modification du code applicatif (`workspace/output/src/`)
+- ❌ JAMAIS de modification du code applicatif (`workspace/src/`)
 - ❌ JAMAIS de ré-écriture des findings dans qa_quality / qa_code_review /
   qa_security / etc. — l'orchestrateur LIT, AGRÈGE, mais ne TOUCHE PAS aux
   tables des auditeurs sources
@@ -354,8 +386,8 @@ AdversarialMaxAttacks:      10
 | Avant | `/sdd-review` | Après |
 |---|---|---|
 | `/qa-generate` | ⚠️ pas obligatoire mais recommandé (quality + coverage déjà à jour) | — |
-| `/dev-run` STEP 6.4 | déjà fait : code-reviewer + a11y + security-scan | — |
-| `/sdd-full` | tout fait : qa + auditors | **Phase C** : auto-invoke `/sdd-review --fix` |
+| `/dev-run` STEP 6.4 | déjà fait (two-stage gate) : spec-compliance (Stage A) + code-reviewer + security-scan + arch-reviewer (Stage B) | — |
+| `/sdd-full` | tout fait : qa + two-stage auditors | rapport consolidé déjà produit ; auto-fix (Phase B `--fix`) à venir v7.2 |
 
 `/sdd-review` est **idempotent** : re-runs lisent l'état actuel de la DB,
 overwrites la ligne `validation_reports` précédente (via
@@ -385,7 +417,7 @@ Sonar).
 
 **Verdict consolidé** : 1 ligne avec emoji style Sonar. Exemple :
 `[CODE-REVIEW] Verdict consolidé: 0 critical, 5 serious, 12 moderate — 🟡 WARN. (99%)`.
-En cas de RED bloquant : `🔴 [DONE/FAIL] FEAT {n} — [REVIEW_VERDICT_RED] → workspace/output/qa/feat-{n}/review.md. (99%)`.
+En cas de RED bloquant : `🔴 [DONE/FAIL] FEAT {n} — [REVIEW_VERDICT_RED] → query_console_db.py review --feat {n} --format md. (99%)`.
 
 **Verdict final** : 1 ligne `[DONE]` (🟢) / `[DONE/WARN]` (🟡) /
 `[DONE/FAIL]` (🔴) (cf. §9.1). Pas de "next steps" après (cf. §9.3).

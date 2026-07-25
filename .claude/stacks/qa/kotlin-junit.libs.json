@@ -6,8 +6,8 @@
   "buildSystem": "gradle",
   "manifest": {
     "files": [
-      "workspace/output/src/{BackendName}/build.gradle.kts",
-      "workspace/output/src/{BackendName}/gradle/libs.versions.toml"
+      "workspace/src/{BackendName}/build.gradle.kts",
+      "workspace/src/{BackendName}/gradle/libs.versions.toml"
     ],
     "versionCatalogPath": "gradle/libs.versions.toml"
   },

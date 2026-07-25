@@ -43,7 +43,7 @@ ou Vuetify natif (selon UI DS actif).
 ### 1.3 Mapping couche → répertoire
 
 ```
-workspace/output/src/{AppName}/
+workspace/src/{AppName}/
 ├── package.json
 ├── vite.config.ts
 ├── tsconfig.json
@@ -110,15 +110,15 @@ workspace/output/src/{AppName}/
 
 ### 2.2 Outils
 
-- **Project file** : `workspace/output/src/{AppName}/package.json`
-- **Build** : `cd workspace/output/src/{AppName} && npm run build`
-- **Dev** : `cd workspace/output/src/{AppName} && npm run dev`
-- **Preview** : `cd workspace/output/src/{AppName} && npm run preview`
-- **Type-check** : `cd workspace/output/src/{AppName} && npm run type-check`
-- **Lint** : `cd workspace/output/src/{AppName} && npm run lint`
+- **Project file** : `workspace/src/{AppName}/package.json`
+- **Build** : `cd workspace/src/{AppName} && npm run build`
+- **Dev** : `cd workspace/src/{AppName} && npm run dev`
+- **Preview** : `cd workspace/src/{AppName} && npm run preview`
+- **Type-check** : `cd workspace/src/{AppName} && npm run type-check`
+- **Lint** : `cd workspace/src/{AppName} && npm run lint`
 - **Smoke Command** :
   ```bash
-  cd workspace/output/src/{AppName}
+  cd workspace/src/{AppName}
   npm run build
   test -f dist/index.html && echo "build OK"
   ```
@@ -129,8 +129,8 @@ workspace/output/src/{AppName}/
 
 ```bash
 # Skip si package.json existe déjà
-if [ ! -f "workspace/output/src/{AppName}/package.json" ]; then
-  npm create vue@latest workspace/output/src/{AppName} -- \
+if [ ! -f "workspace/src/{AppName}/package.json" ]; then
+  npm create vue@latest workspace/src/{AppName} -- \
     --typescript --jsx --router --pinia --vitest --eslint-with-prettier --no-tests
 fi
 ```
@@ -138,7 +138,7 @@ fi
 <!-- CORE_PACKAGES_START -->
 ```bash
 # Auto-genere depuis vue.libs.json -- ne pas editer (utiliser sync_stack_md.py).
-(cd workspace/output/src/{AppName} && npm install \
+(cd workspace/src/{AppName} && npm install \
   vue@3.5.13 \
   vue-router@4.5.0 \
   pinia@2.3.0 \
@@ -166,16 +166,16 @@ fi
 ```bash
 # Auto-genere depuis vue.libs.json (on-demand) -- installe par dev-* si l'US declenche un trigger.
 # capability: auth-azure-ad
-(cd workspace/output/src/{AppName} && npm install @azure/msal-browser@3.27.0)
+(cd workspace/src/{AppName} && npm install @azure/msal-browser@3.27.0)
 
 # capability: date-utils
-(cd workspace/output/src/{AppName} && npm install date-fns@4.1.0)
+(cd workspace/src/{AppName} && npm install date-fns@4.1.0)
 
 # capability: excel-client
-(cd workspace/output/src/{AppName} && npm install xlsx@0.18.5)
+(cd workspace/src/{AppName} && npm install xlsx@0.18.5)
 
 # capability: pdf-client
-(cd workspace/output/src/{AppName} && npm install jspdf@2.5.2 jspdf-autotable@3.8.4)
+(cd workspace/src/{AppName} && npm install jspdf@2.5.2 jspdf-autotable@3.8.4)
 ```
 <!-- ONDEMAND_PACKAGES_END -->
 

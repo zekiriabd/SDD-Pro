@@ -229,7 +229,7 @@ class TestMainBehaviour(unittest.TestCase):
                         rc = mod.main()
                         self.assertEqual(rc, 0)
 
-                        db_path = tmp_root / "workspace" / "output" / "db" / "console.db"
+                        db_path = tmp_root / "workspace" / "db" / "console.db"
                         self.assertTrue(db_path.is_file(),
                                         f"console.db should exist at {db_path}")
                         conn = sqlite3.connect(str(db_path))
@@ -272,7 +272,7 @@ class TestMainBehaviour(unittest.TestCase):
                         rc = mod.main()
                         self.assertEqual(rc, 0)
 
-                        db_path = tmp_root / "workspace" / "output" / "db" / "console.db"
+                        db_path = tmp_root / "workspace" / "db" / "console.db"
                         self.assertTrue(db_path.is_file())
                         conn = sqlite3.connect(str(db_path))
                         conn.row_factory = sqlite3.Row

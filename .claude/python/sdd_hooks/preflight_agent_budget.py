@@ -220,7 +220,7 @@ def main() -> int:
                 f"(BUDGET_EXCEEDED ou UNBOUNDED_GLOB)"
             )
             warn(
-                "FIX: voir table `context_budget` dans workspace/output/db/console.db "
+                "FIX: voir table `context_budget` dans workspace/db/console.db "
                 "(query_console_db.py ou /api/audit) ; reduire reads/ du loader "
                 "OU exporter SDD_BUDGET_MODE=warn"
             )

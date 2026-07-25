@@ -53,7 +53,7 @@ Le script a écrit un squelette `workspace/old/{LegacyProject}/.sys/inventory.md
 1. **Résumé exécutif (3-5 lignes en tête)** : nature du legacy, complexité estimée (LOC totales, nombre de pages, dépendances DB), zones à risque (langage cap=`low/medium`, frameworks EOL probables).
 2. **Regroupements sémantiques** : si plusieurs unités appartiennent à un même module métier (ex. "Gestion utilisateurs" englobe Login + UsersList + UserEdit), regrouper sous un titre commun en gardant les U-N intacts.
 3. **Signalement zones suspectes** : code-behind orphelins (`.aspx.cs` sans `.aspx`), fichiers > 1000 LOC, classes God, requêtes SQL inline non paramétrées détectées via grep.
-4. **Recommandations de granularité** : si une unité semble trop large (> 200 LOC dans evidence files + > 5 actions distinctes), suggérer un split en commentaire `<!-- recommandation: split U-N -->` (l'agent functional-extractor décidera).
+4. **Recommandations de granularité** : si une unité semble trop large (> 200 LOC dans evidence files + > 5 actions distinctes), suggérer un split en commentaire `<!-- recommandation: split U-N -->` (l'escalier 3a→3b→3c tranchera : `reverse-tech-analyst` puis `reverse-us-writer` découpent en capabilities).
 
 Tu n'ajoutes JAMAIS d'unité fonctionnelle qui n'a pas été détectée par le script. Le script est la source de vérité U-N (ADV-1 stability).
 

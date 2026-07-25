@@ -26,14 +26,14 @@ def _make_project(
 ) -> None:
     """Create a minimal SDD_Pro layout."""
     (root / ".claude").mkdir()
-    (root / "workspace" / "input" / "feats").mkdir(parents=True)
-    (root / "workspace" / "input" / "stack").mkdir(parents=True)
-    (root / "workspace" / "output" / "us").mkdir(parents=True)
-    (root / "workspace" / "input" / "stack" / "stack.md").write_text(stack_md, encoding="utf-8")
+    (root / "workspace" / "feats").mkdir(parents=True)
+    (root / "workspace" / "stack").mkdir(parents=True)
+    (root / "workspace" / "us").mkdir(parents=True)
+    (root / "workspace" / "stack" / "stack.md").write_text(stack_md, encoding="utf-8")
     for f in feats or []:
-        (root / "workspace" / "input" / "feats" / f).write_text("# FEAT", encoding="utf-8")
+        (root / "workspace" / "feats" / f).write_text("# FEAT", encoding="utf-8")
     for u in us or []:
-        (root / "workspace" / "output" / "us" / u).write_text("# US", encoding="utf-8")
+        (root / "workspace" / "us" / u).write_text("# US", encoding="utf-8")
 
 
 _STACK_C1_MIN = """## Project Config
@@ -113,7 +113,7 @@ class TestSddFullPlanner(unittest.TestCase):
             root = Path(tmp)
             _make_project(root, stack_md=_STACK_C1_MIN, feats=["2-X.md"])
             # Simulate stable bootstrap : csproj présent
-            project_dir = root / "workspace" / "output" / "src" / "TestApi"
+            project_dir = root / "workspace" / "src" / "TestApi"
             project_dir.mkdir(parents=True)
             (project_dir / "TestApi.csproj").write_text("<Project />")
             plan = sdd_full_planner.build_plan(root, feat_n=2)
@@ -347,7 +347,7 @@ class TestBuildRecap(unittest.TestCase):
     def _setup_db(self, root: Path) -> Path:
         """Create a minimal console.db with one run and phases."""
         import sqlite3
-        db_path = root / "workspace" / "output" / "db" / "console.db"
+        db_path = root / "workspace" / "db" / "console.db"
         db_path.parent.mkdir(parents=True, exist_ok=True)
         conn = sqlite3.connect(db_path)
         conn.executescript("""
@@ -489,7 +489,7 @@ class TestRecapFalsePositiveDefense(unittest.TestCase):
                               runs_status: str = "success") -> None:
         """Setup console.db with a runs row + dev_run phase row."""
         import sqlite3
-        db_path = root / "workspace" / "output" / "db" / "console.db"
+        db_path = root / "workspace" / "db" / "console.db"
         db_path.parent.mkdir(parents=True, exist_ok=True)
         conn = sqlite3.connect(db_path)
         conn.executescript("""
@@ -527,7 +527,7 @@ class TestRecapFalsePositiveDefense(unittest.TestCase):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
             self._make_db_with_dev_run(root)
-            # No code files seeded under workspace/output/src/
+            # No code files seeded under workspace/src/
             recap = sdd_full_planner.build_recap(root, "trun")
             self.assertEqual(recap["final_status"], "partial",
                              "Should downgrade success → partial when dev_run pass but no code")
@@ -540,7 +540,7 @@ class TestRecapFalsePositiveDefense(unittest.TestCase):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
             self._make_db_with_dev_run(root)
-            src = root / "workspace" / "output" / "src" / "MyApp"
+            src = root / "workspace" / "src" / "MyApp"
             src.mkdir(parents=True)
             (src / "Service.cs").write_text("class Foo {}")
             (src / "Component.tsx").write_text("export const Foo = () => <div/>;")
@@ -563,7 +563,7 @@ class TestRecapFalsePositiveDefense(unittest.TestCase):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
             self._make_db_with_dev_run(root)
-            nm = root / "workspace" / "output" / "src" / "MyApp" / "node_modules" / "lodash"
+            nm = root / "workspace" / "src" / "MyApp" / "node_modules" / "lodash"
             nm.mkdir(parents=True)
             (nm / "index.js").write_text("module.exports = {};")
             recap = sdd_full_planner.build_recap(root, "trun")

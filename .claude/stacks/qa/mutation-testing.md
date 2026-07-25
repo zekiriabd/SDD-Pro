@@ -16,7 +16,7 @@ Scope: anti auto-confirmation bias (briser le co-écrit IA code+tests)
 
 ## 1. Activation
 
-Project Config (`workspace/input/stack/stack.md`) :
+Project Config (`workspace/stack/stack.md`) :
 
 ```yaml
 MutationTestingMode: off    # off (default) | minimal | full
@@ -83,9 +83,9 @@ Verdict aligné avec le pattern QA général :
 
 Phase 5 (QA) :
 - `qa-generate.md` STEP X (nouveau, conditionnel) — si `MutationTestingMode != off`,
-  invoque le tool runtime après les tests unitaires. Sortie persistée dans
-  `workspace/output/qa/feat-{n}/mutation.json` + table `qa_mutation` de
-  `console.db` (schema migration v8).
+  invoque le tool runtime après les tests unitaires. Sortie persistée
+  **uniquement** dans la table `qa_mutation` de `console.db` (2026-07-06 :
+  plus de fichier `mutation.json`).
 - `/sdd-review` agrège dans le verdict consolidé (nouvelle source `mutation`).
 
 ## 5. Exemples cross-runtime
@@ -109,14 +109,14 @@ Configuration `stryker-config.json` à la racine de `{BackendName}.Tests/` :
 
 Commande lancée par `qa.md` STEP 8.5 :
 ```bash
-cd workspace/output/src/{BackendName}.Tests
+cd workspace/src/{BackendName}.Tests
 dotnet stryker --threshold-break $MUTATION_SCORE_MIN \
                --timeout-ms $((MUTATION_TIMEOUT*1000)) \
                --output ../qa-mutation
 ```
 
 Sortie : `StrykerOutput/{timestamp}/reports/mutation-report.json` → parsé
-vers `workspace/output/qa/feat-{n}/mutation.json`.
+puis persisté dans `console.db` table `qa_mutation` (aucun fichier écrit).
 
 ### 5.2 StrykerJS (qa/node-vitest)
 

@@ -30,6 +30,7 @@ import datetime as _dt
 # Schema : { model_id : { "input", "output", "cache_read", "cache_creation" } }
 # Cache creation = 1.25x input, cache read = 0.10x input (Anthropic policy).
 PRICING: dict[str, dict[str, float]] = {
+    "claude-opus-4-8":    {"input": 15.00, "output": 75.00, "cache_read": 1.50, "cache_creation": 18.75},
     "claude-opus-4-7":    {"input": 15.00, "output": 75.00, "cache_read": 1.50, "cache_creation": 18.75},
     "claude-opus-4-6":    {"input": 15.00, "output": 75.00, "cache_read": 1.50, "cache_creation": 18.75},
     "claude-sonnet-4-6":  {"input":  3.00, "output": 15.00, "cache_read": 0.30, "cache_creation":  3.75},
@@ -41,13 +42,26 @@ PRICING: dict[str, dict[str, float]] = {
 FALLBACK_PRICING: dict[str, float] = PRICING["claude-sonnet-4-6"]
 
 
-def get_pricing(model_id: str) -> dict[str, float]:
+def base_model_id(model_id: str | None) -> str:
+    """Strip a runtime context-window suffix like ``[1m]`` from a model id.
+
+    Claude Code may report ``claude-opus-4-8[1m]`` at runtime while the
+    pricing table is keyed on the canonical ``claude-opus-4-8``. Without
+    this normalization the cost-cap would miss the table and fall back to
+    Sonnet, under-counting Opus spend 5x (audit CR-1, 2026-06-11).
+    """
+    return (model_id or "").split("[", 1)[0].strip()
+
+
+def get_pricing(model_id: str | None) -> dict[str, float]:
     """Return per-million-token pricing dict for a given model_id.
 
-    Falls back to Sonnet pricing if the model is unknown (defensive —
-    callers never break on a new model_id).
+    The id is normalized (``base_model_id``) before lookup so a runtime
+    ``[1m]`` suffix still resolves. Falls back to Sonnet pricing only if
+    the *base* model is genuinely unknown (defensive — callers never break
+    on a brand-new model id).
     """
-    return PRICING.get(model_id, FALLBACK_PRICING)
+    return PRICING.get(base_model_id(model_id), FALLBACK_PRICING)
 
 
 def as_tuple(model_id: str) -> tuple[float, float, float, float]:
@@ -65,7 +79,7 @@ def as_tuple(model_id: str) -> tuple[float, float, float, float]:
 #: ISO date of the last manual review against https://www.anthropic.com/pricing
 #: BUMP THIS each time you edit the PRICING table — `framework_smoke.py`
 #: checks staleness against `PricingFreshnessMaxAgeDays` (config.base.yml).
-PRICING_LAST_REVIEWED = "2026-05-21"
+PRICING_LAST_REVIEWED = "2026-06-11"
 
 
 def check_pricing_freshness(max_age_days: int = 90, today: _dt.date | None = None

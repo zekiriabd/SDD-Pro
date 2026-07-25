@@ -29,7 +29,7 @@ tools: Read, Glob, Grep, Bash
 
 ## Rôle
 
-Pour une FEAT `{n}` cadrée (existence de `workspace/input/feats/{n}-*.md`),
+Pour une FEAT `{n}` cadrée (existence de `workspace/feats/{n}-*.md`),
 **recommander le pipeline SDD_Pro le plus économique** qui couvre les
 besoins réels de cette FEAT :
 
@@ -44,15 +44,15 @@ besoins réels de cette FEAT :
 `/dev-run`. Spawné automatiquement par `/sdd-full` STEP 0 si
 `ComplexityRouterMode: auto` (Project Config, défaut `manual` v7.0.0+).
 
-**Strictement read-only** sur `workspace/input/feats/{n}-*.md`.
-N'écrit qu'un fichier de recommandation (`workspace/output/.sys/.routing/{n}-complexity.json`).
+**Strictement read-only** sur `workspace/feats/{n}-*.md`.
+N'écrit qu'un fichier de recommandation (`workspace/.sys/.routing/{n}-complexity.json`).
 
 ## STEP 0 — Périmètre strict
 
 L'agent **ne produit que** ces 2 outputs :
 
-1. `workspace/output/.sys/.routing/{n}-complexity.json` — décision machine
-2. `workspace/output/.sys/.routing/{n}-complexity.md` — rapport humain 1 page
+1. `workspace/.sys/.routing/{n}-complexity.json` — décision machine
+2. `workspace/.sys/.routing/{n}-complexity.md` — rapport humain 1 page
 
 Il **ne spawn pas** d'autre agent. Il **ne lance pas** le pipeline lui-même
 — sa sortie est une **recommandation** qu'un caller (Tech Lead ou
@@ -64,7 +64,7 @@ Il **ne spawn pas** d'autre agent. Il **ne lance pas** le pipeline lui-même
 python -c "
 from pathlib import Path
 import glob, sys
-matches = glob.glob('workspace/input/feats/{n}-*.md')
+matches = glob.glob('workspace/feats/{n}-*.md')
 if not matches: print('FEAT not found'); sys.exit(1)
 if len(matches) > 1: print('FEAT ambiguous'); sys.exit(2)
 print(matches[0])
@@ -158,7 +158,7 @@ Si ≥ 1 signal critique détecté → forcer `complexity = "critical"`.
 
 ### 5.2 — Markdown humain
 
-`workspace/output/.sys/.routing/{n}-complexity.md` (1 page max) :
+`workspace/.sys/.routing/{n}-complexity.md` (1 page max) :
 
 ```markdown
 # Complexity routing — FEAT {n}-{Name}
@@ -203,7 +203,7 @@ Si ≥ 1 signal critique détecté → forcer `complexity = "critical"`.
 ## Anti-derive
 
 - ❌ JAMAIS spawn un autre agent (pas /sdd-full ni /dev-run)
-- ❌ JAMAIS écrire hors `workspace/output/.sys/.routing/`
+- ❌ JAMAIS écrire hors `workspace/.sys/.routing/`
 - ❌ JAMAIS modifier la FEAT (read-only)
 - ❌ JAMAIS recommander un pipeline non documenté CLAUDE.md §3
 - Borderline (score ±5 d'une frontière) → préférer le niveau supérieur

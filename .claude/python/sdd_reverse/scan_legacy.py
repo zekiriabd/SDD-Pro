@@ -26,6 +26,7 @@ This guarantees cross-OS fingerprint stability.
 from __future__ import annotations
 
 import logging
+import pathlib
 import re
 import time
 from dataclasses import dataclass, field
@@ -513,3 +514,40 @@ def scan_project(
         files_skipped=files_skipped,
         duration_ms=duration_ms,
     )
+
+
+# --- Lecture texte centralisée (audit 2026-06-11 B5) -------------------------
+# Remplace les 7 copies locales de `_read_text()` qui vivaient dans
+# config_extractor / css_palette_extractor / data_access_extractor /
+# db_schema_extractor / dependency_inventory / deps_graph_builder /
+# ui_template_parser. Ajoute un cap de taille generique : un dump SQL de
+# production de plusieurs centaines de Mo partait integralement en RAM sans
+# garde-fou. Comportement au-dela du cap : lecture TRONQUEE head (le moins
+# destructeur — les CREATE TABLE/imports/usings vivent en tete de fichier),
+# jamais d'exception.
+DEFAULT_READ_CAP_BYTES = 5 * 1024 * 1024  # 5 Mo
+
+
+def read_text_normalized(path, max_bytes: int | None = DEFAULT_READ_CAP_BYTES) -> str:
+    """Read + normalize + decode a legacy file, with a size cap.
+
+    Returns "" on any I/O error (best-effort extractors). Files larger than
+    `max_bytes` are read head-truncated (pass max_bytes=None to disable).
+    Decoding via decode_text (utf-8 strict -> cp1252 -> replace) — unifie les
+    2 variantes historiques (certains modules perdaient le fallback cp1252).
+    """
+    p = pathlib.Path(path)
+    try:
+        if max_bytes is not None:
+            try:
+                too_big = p.stat().st_size > max_bytes
+            except OSError:
+                return ""
+            if too_big:
+                with open(p, "rb") as f:
+                    raw = f.read(max_bytes)
+                return decode_text(normalize_bytes(raw))
+        raw = p.read_bytes()
+    except OSError:
+        return ""
+    return decode_text(normalize_bytes(raw))

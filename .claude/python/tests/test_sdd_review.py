@@ -47,18 +47,18 @@ def _make_repo(tmp_path: Path) -> Path:
     """Minimal SDD_Pro skeleton + initialised console.db."""
     (tmp_path / ".claude" / "agents").mkdir(parents=True)
     (tmp_path / ".claude" / "commands").mkdir(parents=True)
-    (tmp_path / "workspace" / "input" / "feats").mkdir(parents=True)
-    (tmp_path / "workspace" / "input" / "stack").mkdir(parents=True)
-    (tmp_path / "workspace" / "output" / "src").mkdir(parents=True)
-    (tmp_path / "workspace" / "output" / "qa").mkdir(parents=True)
+    (tmp_path / "workspace" / "feats").mkdir(parents=True)
+    (tmp_path / "workspace" / "stack").mkdir(parents=True)
+    (tmp_path / "workspace" / "src").mkdir(parents=True)
+    (tmp_path / "workspace" / "qa").mkdir(parents=True)
 
     # Minimal stack.md (so resolve_fail_on doesn't crash on parse)
-    (tmp_path / "workspace" / "input" / "stack" / "stack.md").write_text(
+    (tmp_path / "workspace" / "stack" / "stack.md").write_text(
         "## Project Config\nAppName: Test\nBackendName: TestBack\nReviewFailOn: serious\n",
         encoding="utf-8",
     )
     # Minimal FEAT (so /sdd-review --feat-number 1 doesn't bail on missing FEAT)
-    (tmp_path / "workspace" / "input" / "feats" / "1-Test.md").write_text(
+    (tmp_path / "workspace" / "feats" / "1-Test.md").write_text(
         "# FEAT 1 — Test\n\n## Objectif\nTest.\n",
         encoding="utf-8",
     )
@@ -68,7 +68,7 @@ def _make_repo(tmp_path: Path) -> Path:
 def _init_db(repo: Path):
     """Initialise an empty console.db at the expected location."""
     from sdd_lib import console_db
-    db_path = repo / "workspace" / "output" / "db" / "console.db"
+    db_path = repo / "workspace" / "db" / "console.db"
     db_path.parent.mkdir(parents=True, exist_ok=True)
     os.environ["SDD_REPO_ROOT"] = str(repo)
     try:
@@ -80,12 +80,12 @@ def _init_db(repo: Path):
 def _seed_qa_quality(repo: Path, feat_n: int, severity: str, count: int = 1):
     """Insert qa_quality rows for the given FEAT at the given severity."""
     from sdd_lib import console_db
-    db_path = repo / "workspace" / "output" / "db" / "console.db"
+    db_path = repo / "workspace" / "db" / "console.db"
     os.environ["SDD_REPO_ROOT"] = str(repo)
     try:
         with console_db.connect(db_path) as conn:
             console_db.ensure_feat_row(conn, feat_n=feat_n, name=f"Test{feat_n}",
-                                       file_path="workspace/input/feats/1-Test.md")
+                                       file_path="workspace/feats/1-Test.md")
             for i in range(count):
                 conn.execute(
                     "INSERT INTO qa_quality(feat_n, extracted_at, severity, "
@@ -140,7 +140,7 @@ class TestResolveFailOn(unittest.TestCase):
 
     def test_default_serious_on_invalid_config(self):
         from sdd_scripts.sdd_review import resolve_fail_on
-        (self.repo / "workspace" / "input" / "stack" / "stack.md").write_text(
+        (self.repo / "workspace" / "stack" / "stack.md").write_text(
             "## Project Config\nReviewFailOn: garbage\n", encoding="utf-8",
         )
         os.environ["SDD_REPO_ROOT"] = str(self.repo)
@@ -165,7 +165,7 @@ class TestResolveArchRequired(unittest.TestCase):
 
     def test_arch_required_when_mode_full(self):
         from sdd_scripts.sdd_review import resolve_arch_required
-        (self.repo / "workspace" / "input" / "stack" / "stack.md").write_text(
+        (self.repo / "workspace" / "stack" / "stack.md").write_text(
             "## Project Config\nArchReviewMode: full\n", encoding="utf-8",
         )
         os.environ["SDD_REPO_ROOT"] = str(self.repo)
@@ -176,7 +176,7 @@ class TestResolveArchRequired(unittest.TestCase):
 
     def test_arch_not_required_when_mode_manual(self):
         from sdd_scripts.sdd_review import resolve_arch_required
-        (self.repo / "workspace" / "input" / "stack" / "stack.md").write_text(
+        (self.repo / "workspace" / "stack" / "stack.md").write_text(
             "## Project Config\nArchReviewMode: manual\n", encoding="utf-8",
         )
         os.environ["SDD_REPO_ROOT"] = str(self.repo)
@@ -187,7 +187,7 @@ class TestResolveArchRequired(unittest.TestCase):
 
     def test_arch_not_required_when_mode_missing(self):
         from sdd_scripts.sdd_review import resolve_arch_required
-        (self.repo / "workspace" / "input" / "stack" / "stack.md").write_text(
+        (self.repo / "workspace" / "stack" / "stack.md").write_text(
             "## Project Config\nAppName: Test\n", encoding="utf-8",
         )
         os.environ["SDD_REPO_ROOT"] = str(self.repo)
@@ -302,15 +302,28 @@ class TestOutputArtefacts(unittest.TestCase):
     def tearDown(self):
         self._tmp.cleanup()
 
-    def test_markdown_report_written(self):
+    def test_review_persisted_in_db_no_file_written(self):
+        # 2026-07-06 : /sdd-review no longer writes review.md. The report is
+        # persisted in console.db and rendered on-demand. Assert (a) no file is
+        # created under the removed qa/ tree, (b) a validation_reports
+        # row exists for the FEAT.
         r = _run("--feat-number", "1", "--skip-scans", repo=self.repo)
         self.assertEqual(r.returncode, 0)
-        md_path = (self.repo / "workspace" / "output" / "qa" / "feat-1"
-                   / "review.md")
-        self.assertTrue(md_path.is_file(),
-                        f"review.md not found at {md_path}")
-        content = md_path.read_text(encoding="utf-8")
-        self.assertIn("FEAT 1", content)
+        legacy_md = (self.repo / "workspace" / "qa" / "feat-1"
+                     / "review.md")
+        self.assertFalse(legacy_md.exists(),
+                         "review.md must NOT be written to disk (SQLite-only)")
+        import sqlite3
+        db = self.repo / "workspace" / "db" / "console.db"
+        conn = sqlite3.connect(db)
+        try:
+            n = conn.execute(
+                "SELECT COUNT(*) FROM validation_reports "
+                "WHERE feat_n=1 AND report_type='review'"
+            ).fetchone()[0]
+        finally:
+            conn.close()
+        self.assertGreaterEqual(n, 1, "review row not persisted in validation_reports")
 
     def test_json_output_well_formed(self):
         r = _run("--feat-number", "1", "--skip-scans", "--json", repo=self.repo)
@@ -319,7 +332,7 @@ class TestOutputArtefacts(unittest.TestCase):
         json_start = r.stdout.index("{")
         payload = json.loads(r.stdout[json_start:])
         for key in ("feat_n", "verdict", "fail_on", "total", "triggering",
-                    "counts", "markdown_path"):
+                    "counts", "source"):
             self.assertIn(key, payload, f"missing key {key} in JSON output")
 
 

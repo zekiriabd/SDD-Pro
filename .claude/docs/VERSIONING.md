@@ -14,6 +14,23 @@
 
 ---
 
+## 0. Registre des versions (audit 2026-06-11 — SSoT anti-labels fantômes)
+
+| Version | Date | Statut |
+|---|---|---|
+| v6.10.4 | 2026-05-17 | **LTS** (sécurité jusqu'au 2026-12-31) |
+| v7.0.0 | GA taguée **2026-06-07** (publication industrielle 2026-05-23) | **GA** — inclut R1 adversarial-reviewer + R7 ingest CI (livrés 2026-05-24 pré-GA, anciennement mal étiquetés « v7.2.0 ») |
+| v7.0.1-dev | 2026-06-05 → courant | ligne de dev active (audits post-GA) — sera taguée v7.0.1 PATCH ou v7.1.0 MINOR |
+| reverse-v0.x-dev | 2026-06-09 → courant | module reverse (versionné séparément, pré-intégration) |
+
+**Règle (audit 2026-06-11 M9)** : aucun label `vX.Y` ne doit apparaître dans
+une rule/doc/agent **sans entrée correspondante dans ce registre + CHANGELOG**.
+Les drafts de features futures référencent la roadmap (`roadmap-v7-v8.md`),
+jamais un numéro de version inventé. Le drift « v7.2.0 livrée 2026-05-24 »
+(antérieure à la GA !) est exactement ce que cette règle empêche.
+
+---
+
 ## 1. Constat motivant cette politique
 
 Entre **2026-05-06 (v6.0.0)** et **2026-05-17 (v6.9.0)**, 17 bumps de
@@ -27,25 +44,29 @@ de structure tous les 2 jours.** Cette politique gèle cette dérive.
 
 ---
 
-## 2. Version LTS désignée
+## 2. Version LTS désignée (HISTORIQUE — fenêtre de freeze pré-GA close)
+
+> **Statut au 2026-06-07** : la fenêtre de freeze décrite ci-dessous était
+> une mesure pré-GA. **Elle est close** : v7.0.0 GA a été tagué le 2026-06-07,
+> la branche `main` accepte désormais les bumps **MINOR + PATCH v7.x**
+> (cf. bannière haute + §3.2). Les sections §2 et §4 sont conservées comme
+> trace historique de la discipline qui a mené à la GA — elles ne décrivent
+> plus la politique active.
 
 | Champ | Valeur |
 |---|---|
 | Version LTS | **v6.10.4** |
 | Date de désignation | 2026-05-19 |
-| Tag git attendu | `v6.10.4-LTS` (tag annoté, signé) |
-| Branche stable | `main` (verrouillée PATCH-only) |
-| Branche expérimentale | `next` (toute MINOR/MAJOR y vit jusqu'au 2026-06-18) |
-| Fin de freeze | **2026-06-18 inclus** (30 jours pleins) |
+| Tag git réel | `SDD_Prov6_10_5` (tag existant sur la baseline LTS — le tag `v6.10.4-LTS` initialement *attendu* n'a jamais été créé ; correction audit 2026-06-12) |
+| Branche stable | `main` (v7.0.0 GA — freeze clos depuis le 2026-06-07) |
+| Branche expérimentale | `next` (dev post-GA, audits) |
+| Fin de freeze | **close (2026-06-07)** — v7.0.0 GA tagué `v7.0.0` |
 
-**Action de désignation** (Tech Lead, hors agents) :
-```bash
-git checkout main
-git tag -a v6.10.4-LTS -m "LTS designation — 30-day freeze through 2026-06-18"
-git push origin v6.10.4-LTS
-git branch next       # branche d'accueil pour MINOR/MAJOR en attente
-git push -u origin next
-```
+**Note tag (audit 2026-06-12)** : la baseline LTS v6.10.x est tagguée
+`SDD_Prov6_10_5` dans git (convention de nommage historique). Le tag
+`v6.10.4-LTS` n'a jamais été matérialisé — toute référence contractuelle
+(SLA.md) pointe désormais vers le tag réel `SDD_Prov6_10_5`. La GA v7.0.0
+porte le tag `v7.0.0`.
 
 ---
 
@@ -105,9 +126,14 @@ documenté.
 
 ---
 
-## 4. Fenêtre de freeze 2026-05-19 → 2026-06-18
+## 4. Fenêtre de freeze 2026-05-19 → 2026-06-18 (HISTORIQUE — close, GA atteinte)
 
-### 4.1 Règles pendant la fenêtre
+> **Close 2026-06-07** : la fenêtre de freeze pré-GA a rempli son objectif —
+> v7.0.0 GA tagué post-audit CTO. Les règles ci-dessous ne s'appliquent plus
+> sur `main` (qui accepte MINOR + PATCH v7.x, cf. §3.2 + bannière haute).
+> Conservées comme trace historique de la discipline appliquée jusqu'à la GA.
+
+### 4.1 Règles pendant la fenêtre (historique)
 
 | Type de change | Branche `main` | Branche `next` |
 |---|:---:|:---:|
@@ -162,7 +188,7 @@ MAJOR la même semaine. Bump MINOR ou MAJOR sans ADR.
 ## 6. RFC ADR — gabarit minimal pour MINOR/MAJOR
 
 Tout MINOR ou MAJOR exige un ADR sous
-`workspace/output/.sys/.context/adrs/ADR-{YYYYMMDDTHHmmss}-governance-{minor|major}-{slug}.md`
+`workspace/.sys/.context/adrs/ADR-{YYYYMMDDTHHmmss}-governance-{minor|major}-{slug}.md`
 contenant **au minimum** :
 
 ```markdown

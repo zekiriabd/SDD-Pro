@@ -6,9 +6,9 @@
   "buildSystem": "dotnet",
   "manifest": {
     "files": [
-      "workspace/output/src/{AppName}/{AppName}.csproj",
-      "workspace/output/src/{AppName}/Program.cs",
-      "workspace/output/src/{AppName}/appsettings.json"
+      "workspace/src/{AppName}/{AppName}.csproj",
+      "workspace/src/{AppName}/Program.cs",
+      "workspace/src/{AppName}/appsettings.json"
     ]
   },
   "metadata": {

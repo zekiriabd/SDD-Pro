@@ -58,7 +58,7 @@ Framework chargé. **13 commandes user-facing** + **12 agents LLM** + **1 rubric
 ## Pipeline canonique (strict, gated)
 
 ```
-Phase 0 (optionnel)  Discovery (vision, personas, KPIs)  → workspace/input/discovery/
+Phase 0 (optionnel)  Discovery (vision, personas, KPIs)  → workspace/discovery/
        ↓
 Phase 1-2            /feat-generate {Nom} → /us-generate {n} → /feat-validate {n}
        ↓

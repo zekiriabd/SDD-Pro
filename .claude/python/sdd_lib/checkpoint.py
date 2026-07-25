@@ -1,56 +1,70 @@
 """SDD_Pro checkpoint helpers — input-hash validated phase resumption.
 
-Layered on top of `sdd_scripts/sdd_state.py` (which already tracks phase
-status in `workspace/output/.sys/.state/run-{runId}.json`). This module
-adds **input-hash validation** so that `--resume` can detect when a
-phase's inputs (US, plan, stack, etc.) have been modified post-crash
-and must therefore be re-run rather than skipped.
+Layered on top of `sdd_scripts/sdd_state.py`, which tracks phase status in
+**console.db** (tables `runs` + `run_phases`) since v6.10. This module adds
+**input-hash validation** so that `--resume` can detect when a phase's inputs
+(US, plan, stack, etc.) have been modified post-crash and must therefore be
+re-run rather than skipped.
 
 Design rationale:
     - `sdd_state.py` answers "did phase X complete successfully ?"
     - `checkpoint.py` answers "is the phase X result still valid given
       the current inputs ?" (= same hash) → safe to skip on resume
 
-API (3 functions):
+API (4 functions):
     compute_input_hash(paths) -> str
         SHA-256 over concatenated bytes of the listed files (skips
         missing files, stable order). Deterministic.
 
     record_input_hash(run_id, phase, input_paths) -> str
-        Compute hash, store under state.json `phases.{phase}.payload.input_hash`.
-        Returns the computed hash. Called at phase start.
+        Compute hash, merge it into `run_phases.payload_json.input_hash`
+        for (run_id, phase). Returns the computed hash.
 
     is_phase_resumable(feat, phase, input_paths) -> tuple[bool, str]
-        Looks up the latest run for FEAT, checks:
-          1. phase.status == "pass" (completed successfully)
-          2. phase.payload.input_hash == compute_input_hash(input_paths)
-             (inputs unchanged)
+        Looks up the latest run for FEAT in console.db, checks:
+          1. phase.status in {pass, warn} (completed successfully)
+          2. payload.input_hash == compute_input_hash(input_paths)
         Returns (resumable, reason).
 
+    get_phase_payload(feat, phase) -> dict | None
+        Read-only access to the latest run's phase payload.
+
 Non-regression contract:
-    - This module **never** modifies state.json directly except through
-      sdd_state.py's public CLI (subprocess call) or by reading/writing
-      the same JSON schema atomically.
-    - If `sdd_state.py` is unavailable or state.json corrupted, the
-      functions return False/missing (= safe default: re-run the phase).
-    - Adoption in commands is **optional** — v6.6.2 ships the lib only.
-      Commands can integrate gradually.
+    - This module reads/writes **only** via the `sdd_lib.console_db` public
+      API (the same SSoT that `sdd_state.py` uses) — never a side file.
+    - If console.db is absent/unreadable/locked, the functions return
+      False/None (= safe default: re-run the phase). Never raises to the
+      pipeline except `record_input_hash` on a genuinely missing run_phase.
 
 Classes d'erreur :
     [CHECKPOINT_HASH_MISMATCH] — input_hash stocké ≠ recalculé → invalidé
     [CHECKPOINT_INPUT_MISSING] — un input_path déclaré n'existe pas
-    [CHECKPOINT_STATE_UNREADABLE] — state.json absent ou corrompu
+    [CHECKPOINT_STATE_UNREADABLE] — run/phase absent de console.db ou DB illisible
 
-v6.6.2 — additive, opt-in. Aucune command n'invoque ce lib en v6.6.2.
+v7.0.1 audit fix (2026-06-12) — REWRITTEN onto console.db. The previous
+implementation read/wrote `workspace/.sys/.state/run-{id}.json` files
+that `sdd_state.py` stopped producing at the v6.10 migration to console.db
+(and looked up `FeatNumber`, a key that never existed — the column is
+`feat_n`). Result: `is_phase_resumable()` always returned False and
+`record_input_hash()` always raised FileNotFoundError, so `CheckpointMode:
+resume` (wired in dev-run.md) was a silent no-op. Now backed by the live SSoT.
 """
 from __future__ import annotations
 
 import hashlib
 import json
+import sqlite3
 from pathlib import Path
 from typing import Any
 
-from sdd_lib.paths import repo_root
+from sdd_lib.console_db import (
+    connect,
+    connect_ro,
+    get_run_phases,
+    list_runs,
+    upsert_run_phase,
+)
+from sdd_lib.paths import workspace_root, repo_root
 
 
 def compute_input_hash(paths: list[Path | str], *, root: Path | None = None) -> str:
@@ -108,31 +122,42 @@ def _is_under(p: Path, root: Path) -> bool:
         return False
 
 
-def _state_dir(root: Path) -> Path:
-    return root / "workspace" / "output" / ".sys" / ".state"
+def _db_path(root: Path | None) -> Path:
+    """console.db path under the (optional) explicit root, else repo_root()."""
+    base = root if root is not None else repo_root()
+    return workspace_root(base) / "db" / "console.db"
 
 
-def _find_latest_state_for_feat(feat: int, *, root: Path | None = None) -> Path | None:
-    """Return path to the latest run-*.json for the given FEAT, or None."""
-    if root is None:
-        root = repo_root()
-    sd = _state_dir(root)
-    if not sd.is_dir():
+def _load_payload(row: sqlite3.Row) -> dict[str, Any]:
+    """Parse run_phases.payload_json → dict (empty on null/invalid)."""
+    raw = row["payload_json"] if "payload_json" in row.keys() else None
+    if not raw:
+        return {}
+    try:
+        data = json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _latest_phase_row(feat: int, phase: str, *, root: Path | None) -> sqlite3.Row | None:
+    """Latest run for FEAT → its run_phases row for `phase` (read-only, fail-safe).
+
+    Returns None if console.db is absent/unreadable/locked, no run exists for
+    the FEAT, or the phase is absent — all treated as "not resumable".
+    """
+    try:
+        with connect_ro(_db_path(root)) as conn:
+            runs = list_runs(conn, feat_n=feat, limit=1)
+            if not runs:
+                return None
+            run_id = runs[0]["run_id"]
+            for r in get_run_phases(conn, run_id):
+                if r["phase"] == phase:
+                    return r
+            return None
+    except (FileNotFoundError, sqlite3.Error):
         return None
-
-    candidates: list[tuple[float, Path]] = []
-    for f in sd.glob("run-*.json"):
-        try:
-            data = json.loads(f.read_text(encoding="utf-8"))
-            if int(data.get("FeatNumber", -1)) == feat:
-                mtime = f.stat().st_mtime
-                candidates.append((mtime, f))
-        except (OSError, json.JSONDecodeError, ValueError):
-            continue
-    if not candidates:
-        return None
-    candidates.sort(reverse=True)
-    return candidates[0][1]
 
 
 def record_input_hash(
@@ -142,47 +167,38 @@ def record_input_hash(
     *,
     root: Path | None = None,
 ) -> str:
-    """Compute input hash and store it under phases.{phase}.payload.input_hash.
+    """Compute the input hash and merge it into run_phases.payload_json.input_hash.
 
-    Returns the computed hash. If the state file is missing or unreadable,
-    raises FileNotFoundError or ValueError so the caller can decide.
-
-    Modifies state.json directly (atomic write via tempfile + rename).
-    The phase entry is created if it doesn't exist.
+    Returns the computed hash. The (run_id, phase) row MUST already exist
+    (record is called after the phase ran). If it doesn't, raises
+    FileNotFoundError [CHECKPOINT_STATE_UNREADABLE] so the caller can decide.
+    Preserves the phase's existing status and payload keys.
     """
     if root is None:
         root = repo_root()
-
-    sd = _state_dir(root)
-    state_path = sd / f"run-{run_id}.json"
-    if not state_path.is_file():
-        raise FileNotFoundError(
-            f"[CHECKPOINT_STATE_UNREADABLE] state file not found: {state_path}"
-        )
-
-    try:
-        state = json.loads(state_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as e:
-        raise ValueError(
-            f"[CHECKPOINT_STATE_UNREADABLE] cannot parse state file: {e}"
-        ) from e
-
     h = compute_input_hash(input_paths, root=root)
 
-    phases = state.setdefault("phases", {})
-    phase_entry = phases.setdefault(phase, {})
-    payload = phase_entry.setdefault("payload", {})
-    if not isinstance(payload, dict):
-        payload = {}
-        phase_entry["payload"] = payload
-    payload["input_hash"] = h
-    payload["input_paths"] = [str(p) for p in input_paths]
-
-    tmp = state_path.with_suffix(".tmp")
-    tmp.write_text(
-        json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
-    tmp.replace(state_path)
+    try:
+        with connect(_db_path(root)) as conn:
+            existing = {r["phase"]: r for r in get_run_phases(conn, run_id)}
+            row = existing.get(phase)
+            if row is None:
+                raise FileNotFoundError(
+                    f"[CHECKPOINT_STATE_UNREADABLE] no run_phase '{phase}' for "
+                    f"run '{run_id}' in console.db"
+                )
+            payload = _load_payload(row)
+            payload["input_hash"] = h
+            payload["input_paths"] = [str(p) for p in input_paths]
+            upsert_run_phase(
+                conn,
+                run_id=run_id,
+                phase=phase,
+                status=row["status"] or "pass",
+                payload=payload,
+            )
+    except sqlite3.Error as e:
+        raise ValueError(f"[CHECKPOINT_STATE_UNREADABLE] console.db error: {e}") from e
     return h
 
 
@@ -197,33 +213,26 @@ def is_phase_resumable(
     """Tell whether a phase can be safely skipped on /sdd-full --resume.
 
     Conditions (all required for resumable=True):
-        1. A run-{id}.json exists for this FEAT
-        2. phases.{phase}.status in {"pass", "warn" (if accept_warn)}
-        3. phases.{phase}.payload.input_hash == compute_input_hash(input_paths)
+        1. A run exists in console.db for this FEAT, with a row for `phase`
+        2. run_phases.status in {"pass", "warn" (if accept_warn)}
+        3. payload.input_hash == compute_input_hash(input_paths)
 
     Returns:
-        (resumable, reason). When resumable=False, `reason` explains why
-        and uses a `[CHECKPOINT_*]` prefix from error-classification §1.16
-        for machine consumption.
+        (resumable, reason). When resumable=False, `reason` uses a
+        `[CHECKPOINT_*]` prefix (error-classification §1.14) for machine
+        consumption. Fail-safe: any DB issue → (False, ...) (re-run the phase).
     """
     if root is None:
         root = repo_root()
 
-    state_path = _find_latest_state_for_feat(feat, root=root)
-    if state_path is None:
-        return False, "[CHECKPOINT_STATE_UNREADABLE] no run found for this FEAT"
+    row = _latest_phase_row(feat, phase, root=root)
+    if row is None:
+        return False, (
+            f"[CHECKPOINT_STATE_UNREADABLE] no run/phase '{phase}' for FEAT {feat} "
+            "in console.db"
+        )
 
-    try:
-        state = json.loads(state_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as e:
-        return False, f"[CHECKPOINT_STATE_UNREADABLE] {e}"
-
-    phases = state.get("phases", {})
-    phase_entry = phases.get(phase)
-    if not isinstance(phase_entry, dict):
-        return False, f"[CHECKPOINT_STATE_UNREADABLE] phase '{phase}' absent from state"
-
-    status = phase_entry.get("status")
+    status = row["status"]
     valid_statuses = {"pass"} | ({"warn"} if accept_warn else set())
     if status not in valid_statuses:
         return False, (
@@ -231,21 +240,17 @@ def is_phase_resumable(
             f"(must be one of {sorted(valid_statuses)})"
         )
 
-    payload = phase_entry.get("payload", {})
-    stored_hash = payload.get("input_hash") if isinstance(payload, dict) else None
+    stored_hash = _load_payload(row).get("input_hash")
     if not stored_hash:
         return False, (
             f"[CHECKPOINT_INPUT_MISSING] phase '{phase}' has no recorded "
             "input_hash (legacy run, can't validate)"
         )
 
-    # Check inputs exist
+    # Check declared inputs still exist
     missing = []
     for p in input_paths:
-        if isinstance(p, str):
-            pp = Path(p)
-        else:
-            pp = p
+        pp = Path(p) if isinstance(p, str) else p
         if not pp.is_absolute():
             pp = root / pp
         if not pp.is_file():
@@ -275,18 +280,11 @@ def get_phase_payload(
 
     Useful for commands that want to retrieve cached metadata from a
     previous run (e.g. plan_validate results) without re-computing.
+    Returns None if absent/unreadable.
     """
     if root is None:
         root = repo_root()
-    state_path = _find_latest_state_for_feat(feat, root=root)
-    if state_path is None:
+    row = _latest_phase_row(feat, phase, root=root)
+    if row is None:
         return None
-    try:
-        state = json.loads(state_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return None
-    phase_entry = state.get("phases", {}).get(phase)
-    if not isinstance(phase_entry, dict):
-        return None
-    payload = phase_entry.get("payload")
-    return payload if isinstance(payload, dict) else None
+    return _load_payload(row)

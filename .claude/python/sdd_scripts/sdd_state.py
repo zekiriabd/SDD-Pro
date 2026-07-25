@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """SDD_Pro v6.10: state machine + event log for /sdd-full, /dev-run, /qa-generate.
 
-Source de vérité : `workspace/output/db/console.db` (tables `runs`,
+Source de vérité : `workspace/db/console.db` (tables `runs`,
 `run_phases`, `events`). Plus aucun fichier state/run-*.json ni events.jsonl
 écrit sur le FS depuis v6.10.
 
@@ -44,7 +44,7 @@ from sdd_lib.console_db import (  # noqa: E402
     connect, ensure_initialized, get_run, get_run_phases, insert_event, list_runs,
     upsert_run, upsert_run_phase,
 )
-from sdd_lib.paths import iso_now_ms as iso_now, repo_root  # noqa: E402
+from sdd_lib.paths import workspace_root, iso_now_ms as iso_now, repo_root  # noqa: E402
 from sdd_lib.stderr import warn  # noqa: E402
 from sdd_lib.exit_codes import FAIL_FAST, SUCCESS  # noqa: E402
 
@@ -139,7 +139,7 @@ def parse_payload(text: str) -> Any:
 
 
 def get_feat_name(n: int) -> str | None:
-    feats_dir = repo_root() / "workspace" / "input" / "feats"
+    feats_dir = workspace_root(repo_root()) / "feats"
     if not feats_dir.is_dir():
         return None
     files = list(feats_dir.glob(f"{n}-*.md"))

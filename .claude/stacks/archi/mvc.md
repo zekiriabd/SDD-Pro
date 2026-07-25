@@ -68,23 +68,23 @@ Couches **transverses** (pas dans le flux mais obligatoires) :
 
 # 3. Mapping couche → répertoire (template)
 
-Placeholders : `{BackendName}` = projet API, `{LibName}` = librairie partagée DTOs (si `LibStrategy ≠ none`). Convention `workspace/output/src/{BackendName}/{layer}/`.
+Placeholders : `{BackendName}` = projet API, `{LibName}` = librairie partagée DTOs (si `LibStrategy ≠ none`). Convention `workspace/src/{BackendName}/{layer}/`.
 
 | Couche | Path canonique |
 |---|---|
-| Route / Endpoint | `workspace/output/src/{BackendName}/{endpoints\|controllers\|routes}/` (selon tech) |
-| Service interface | `workspace/output/src/{BackendName}/services/interfaces/` |
-| Service impl | `workspace/output/src/{BackendName}/services/` (ou `services/implementations/`) |
-| Repository | `workspace/output/src/{BackendName}/repositories/` |
-| Entity | `workspace/output/src/{BackendName}/entities/` (ou `data/entities/`) |
-| Mapper | `workspace/output/src/{BackendName}/mappers/` |
-| DbContext | `workspace/output/src/{BackendName}/{entities/dbcontext\|data/dbcontext\|database}/` |
-| Middleware | `workspace/output/src/{BackendName}/middleware/` |
-| Input DTO | `workspace/output/src/{LibName}/inputs/` (ou `{BackendName}/dto/inputs/` si pas de LibName) |
-| Output DTO | `workspace/output/src/{LibName}/outputs/` |
-| Model DTO | `workspace/output/src/{LibName}/models/` |
-| Schemas validation | `workspace/output/src/{BackendName}/schemas/` (Node Zod / Python Pydantic, intégré directement à l'Input DTO) |
-| App entry / bootstrap | `workspace/output/src/{BackendName}/{Program.cs\|main.py\|server.ts\|Application.kt}` |
+| Route / Endpoint | `workspace/src/{BackendName}/{endpoints\|controllers\|routes}/` (selon tech) |
+| Service interface | `workspace/src/{BackendName}/services/interfaces/` |
+| Service impl | `workspace/src/{BackendName}/services/` (ou `services/implementations/`) |
+| Repository | `workspace/src/{BackendName}/repositories/` |
+| Entity | `workspace/src/{BackendName}/entities/` (ou `data/entities/`) |
+| Mapper | `workspace/src/{BackendName}/mappers/` |
+| DbContext | `workspace/src/{BackendName}/{entities/dbcontext\|data/dbcontext\|database}/` |
+| Middleware | `workspace/src/{BackendName}/middleware/` |
+| Input DTO | `workspace/src/{LibName}/inputs/` (ou `{BackendName}/dto/inputs/` si pas de LibName) |
+| Output DTO | `workspace/src/{LibName}/outputs/` |
+| Model DTO | `workspace/src/{LibName}/models/` |
+| Schemas validation | `workspace/src/{BackendName}/schemas/` (Node Zod / Python Pydantic, intégré directement à l'Input DTO) |
+| App entry / bootstrap | `workspace/src/{BackendName}/{Program.cs\|main.py\|server.ts\|Application.kt}` |
 
 > Chaque stack `backend/*.md` peut **overrider** ce mapping dans son §1.3 si la convention du framework l'exige (e.g. .NET `Endpoints/` vs Node `routes/`). L'override est documenté localement, mais reste compatible avec ce squelette canonique.
 

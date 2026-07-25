@@ -28,7 +28,7 @@ evidence/confidence par item + AC Given/When/Then) — consommables par `/sdd-fu
 | Arg | Type | Description |
 |---|---|---|
 | `{LegacyProject}` | string requis | Sous-dossier de `workspace/old/` (Phase 1 préalable obligatoire) |
-| `--feats-dir DIR` | flag | Override du dossier de sortie (défaut `workspace/input/feats`) |
+| `--feats-dir DIR` | flag | Override du dossier de sortie (défaut `workspace/feats`) |
 | `--json` | flag | Émet le rapport en JSON |
 
 ## Pré-conditions

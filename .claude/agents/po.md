@@ -1,6 +1,6 @@
 ---
 name: po
-description: Agent Product Owner — découpe une FEAT fonctionnelle en User Stories structurées (min 1, cible 1-3, warn 7+, hard cap 10 — configurable). Lit workspace/input/feats/{n}-{Name}.md, écrit workspace/output/us/{n}-{m}-{Name}.md pour chaque US.
+description: Agent Product Owner — découpe une FEAT fonctionnelle en User Stories structurées (min 1, cible 1-3, warn 7+, hard cap 10 — configurable). Lit workspace/feats/{n}-{Name}.md, écrit workspace/us/{n}-{m}-{Name}.md pour chaque US.
 model: claude-sonnet-4-6
 tools: Read, Write, Edit, Glob, Grep, Bash
 ---
@@ -42,18 +42,18 @@ Appliquer `@.claude/rules/build-and-loop.md §1` (Partie B) avec
 
 ## STEP 2 — Localiser la FEAT
 
-Glob `workspace/input/feats/{n}-*.md`.
+Glob `workspace/feats/{n}-*.md`.
 - 0 fichier trouvé → ERROR :
   ```
   ERROR: agent po — FEAT introuvable
-  CAUSE: aucun fichier workspace/input/feats/{n}-*.md
+  CAUSE: aucun fichier workspace/feats/{n}-*.md
   FIX: créer la FEAT via /feat-generate ou déposer manuellement le fichier
   ```
 - 1 fichier trouvé → continuer avec son chemin
 - > 1 fichier → ERROR (nommage invalide, doublon de numéro) :
   ```
   ERROR: agent po — numérotation invalide
-  CAUSE: plusieurs fichiers commencent par {n}- dans workspace/input/feats/
+  CAUSE: plusieurs fichiers commencent par {n}- dans workspace/feats/
   FIX: renommer pour qu'un seul fichier ait le préfixe {n}-
   ```
 
@@ -65,7 +65,7 @@ Stocker le nom de FEAT (`{FeatName}` extrait du nom de fichier).
 
 Read **uniquement** :
 - `.claude/templates/us.template.md` (nécessaire pour STEP 8 Write)
-- `workspace/output/.sys/.context/constitution.md` **si présent** (acteurs et termes
+- `workspace/.sys/.context/constitution.md` **si présent** (acteurs et termes
   déjà connus du projet — évite les doublons en STEP 8.5)
 
 **Rules inline (depuis SDD_Pro v5.0 — économie tokens)** : les règles
@@ -81,7 +81,7 @@ Si un cas-limite nécessite le détail : Read `@.claude/rules/{nom}.md`
 
 ## STEP 4 — Lire la FEAT
 
-Read `workspace/input/feats/{n}-{FeatName}.md`. Extraire les 9 sections + 2 nouvelles (v7.0.0) :
+Read `workspace/feats/{n}-{FeatName}.md`. Extraire les 9 sections + 2 nouvelles (v7.0.0) :
 - Context
 - Objective
 - **Quantified Goal** (v7.0.0 — KPI mesurable, peut contenir `<à préciser>`)
@@ -168,7 +168,7 @@ UsGranularityWarnAt: 6            # WARN above this (heritage hard cap)
 `/us-generate {n} --allow-large-feat` :
 - Stocker dans une env var `SDD_ALLOW_LARGE_FEAT=1` (ce run uniquement).
 - Effet : `UsGranularityHardCap` est ignoré (cap effectif = 999).
-- Audit-log dans `workspace/output/.sys/.audit/force-bypass.log` : 1 ligne
+- Audit-log dans `workspace/.sys/.audit/force-bypass.log` : 1 ligne
   par usage du bypass.
 
 À utiliser **uniquement** pour FEATs métier légitimement très larges
@@ -197,14 +197,25 @@ Pour chaque US :
   + les SFD bullets couverts)
 - `Covers` = liste des IDs SFD/BR/AC/FD couverts
 
-**Propagation convention `{n}-{m}-{Name}` (audit CRIT-9, 2026-06-07)** :
+**Propagation convention `{n}-{m}-{Name}` (audit CRIT-9, 2026-06-07 ;
+nommage distinctif durci audit 2026-06-16)** :
 le `{Name}` choisi ici devient le basename identique propagé à travers
 les artefacts US/mockup/plan/code (cf. `CLAUDE.md §1`) :
-- US : `workspace/output/us/{n}-{m}-{Name}.md`
-- Mockup HTML (optionnel) : `workspace/input/ui/{n}-{m}-{Name}.html`
-- Plans : `workspace/output/plans/{n}-{m}-{Name}.{back|front}.md`
+- US : `workspace/us/{n}-{m}-{Name}.md`
+- Mockup HTML (optionnel) : `workspace/ui/{n}-{m}-{Name}.html`
+- Plans : `workspace/plans/{n}-{m}-{Name}.{back|front}.md`
 
-Si un mockup HTML pré-existant `workspace/input/ui/{n}-{m}-*.html` est
+⚠️ **`{Name}` est DISTINCTIF par US — JAMAIS le nom de la FEAT répété.**
+La FEAT lue est `{n}-{FeatName}.md` (ex. `1-Avoir`) ; chaque US doit porter
+un slug **capability** (verbe + objet, Capitale-initiale, sans accents,
+tirets) dérivé de son titre. Deux US d'une même FEAT ne partagent JAMAIS le
+même `{Name}`.
+- ✅ FEAT `1-Avoir` → `1-1-Consulter-Fiche-Avoir.md`, `1-2-Piloter-Acces-Actions.md`
+- ❌ `1-1-Avoir.md`, `1-2-Avoir.md` (nom de FEAT répété — arborescence illisible)
+La ligne `ID: {n}-{m}-{Name}` matche le basename ; `Parent FEAT: {n}-{FeatName}`
+pointe vers la FEAT.
+
+Si un mockup HTML pré-existant `workspace/ui/{n}-{m}-*.html` est
 détecté **avant** la génération US, **réutiliser exactement le `{Name}`**
 du fichier HTML pour éviter le drift (`{n}-{m}-Login.html` côté UX →
 `{n}-{m}-Login.md` côté PO, jamais `{n}-{m}-Connexion.md`). Ce drift
@@ -295,7 +306,7 @@ a été modifiée après génération des US (`Covers:` devient invalide).
 En cas de mismatch détecté en aval → ERROR `[FEAT_HASH_MISMATCH]`,
 Tech Lead doit re-run `/us-generate {n}` (idempotent).
 
-Write `workspace/output/us/{n}-{m}-{Name}.md` à partir de
+Write `workspace/us/{n}-{m}-{Name}.md` à partir de
 `.claude/templates/us.template.md`. Remplir tous les champs :
 - Titre, ID `{n}-{m}-{Name}`
 - Parent FEAT `{n}-{FeatName}`
@@ -306,7 +317,7 @@ Write `workspace/output/us/{n}-{m}-{Name}.md` à partir de
 - Covers (liste exhaustive des IDs FEAT couverts)
 - Dependencies (autre US-id ou NONE)
 
-Le fichier est créé en mode `create`. Si un fichier `workspace/output/us/{n}-{m}-*.md`
+Le fichier est créé en mode `create`. Si un fichier `workspace/us/{n}-{m}-*.md`
 existe déjà, l'écraser (régénération idempotente).
 
 ---
@@ -315,7 +326,7 @@ existe déjà, l'écraser (régénération idempotente).
 
 ### 8.5.0 Précondition + auto-bootstrap (durci 2026-05-21)
 
-Read `workspace/output/.sys/.context/constitution.md` :
+Read `workspace/.sys/.context/constitution.md` :
 - **Présent** → ce STEP devient **OBLIGATOIRE** (pas de skip silencieux).
 - **Absent** → **auto-bootstrap idempotent** (depuis 2026-05-21, no
   more silent skip — fixe le pattern `[CONST-MISSING]` chronique sur
@@ -324,17 +335,17 @@ Read `workspace/output/.sys/.context/constitution.md` :
   1. Read `.claude/templates/constitution.template.md`
   2. Substituer les placeholders :
      - `{ProjectName}` ← valeur `AppName` (ou `ProjectName`) du
-       `## Project Config` de `workspace/input/stack/stack.md`,
+       `## Project Config` de `workspace/stack/stack.md`,
        fallback `Unnamed-Project` si absent
      - `{YYYY-MM-DD}` ← date du jour (UTC)
-  3. Write `workspace/output/.sys/.context/constitution.md` (mkdir -p le parent)
+  3. Write `workspace/.sys/.context/constitution.md` (mkdir -p le parent)
   4. Logguer `constitution§1: bootstrapped (auto, FEAT {n} déclencheur)`
   5. Continuer la suite du STEP 8.5 normalement (le fichier est maintenant
      présent, les acteurs de la FEAT seront ajoutés en §3 via 8.5.1)
 
 > **Pourquoi auto-bootstrap** : `/feat-generate` est l'owner principal du
 > bootstrap (cf. `.claude/rules/ownership.md §B.1`), mais quand l'utilisateur
-> dépose des FEATs directement dans `workspace/input/feats/` sans passer
+> dépose des FEATs directement dans `workspace/feats/` sans passer
 > par `/feat-generate`, constitution.md n'est jamais créée et l'agent PO
 > est le 1er agent à pouvoir le faire (il a déjà la FEAT acteurs en mémoire).
 > Cette responsabilité secondaire est idempotente et ne casse pas le
@@ -405,14 +416,14 @@ Aucun autre champ §1 ne doit être modifié.
 
 **Obligatoire** après les writes 8.5.1-8.5.3 :
 
-1. Re-Read `workspace/output/.sys/.context/constitution.md`.
+1. Re-Read `workspace/.sys/.context/constitution.md`.
 2. Pour chaque acteur de `$expected_actors`, grep son nom exact en
    colonne 1 du tableau §3. Si **un seul** manque → STOP + ERROR :
    ```
    ERROR: agent po — extension constitution §3 incomplète
    CAUSE: acteur(s) {liste} attendu(s) absent(s) du tableau §3
           après le write (placeholder mal détecté ou Edit échoué)
-   FIX: vérifier le format du tableau §3 dans workspace/output/.sys/.context/constitution.md ;
+   FIX: vérifier le format du tableau §3 dans workspace/.sys/.context/constitution.md ;
         si l'agent a été modifié, vérifier le STEP 8.5.1 (gestion placeholder)
    ```
 3. Vérifier qu'il n'y a **plus** de ligne placeholder
@@ -468,7 +479,7 @@ Sync vérifiée 2026-06-09 (output-protocol.md §3 label `[PO]` + §4 plage `8-1
 
 - Ne JAMAIS inventer un SFD, BR, AC ou FD non présent dans la FEAT parente
 - Ne JAMAIS écrire de plan technique ni de code (réservé aux agents dev-*)
-- Ne JAMAIS lire `workspace/input/stack/` ou `workspace/input/ui/`
+- Ne JAMAIS lire `workspace/stack/` ou `workspace/ui/`
 - Ne JAMAIS modifier la FEAT parente
 - Ne JAMAIS poser de question à l'utilisateur pendant l'exécution
 - Si ambiguïté irrécupérable dans la FEAT → STOP + ERROR (pas de devinette)
@@ -484,3 +495,8 @@ en STEP 7, traçabilité en STEP 6, constitution append en STEP 8.5).
 - `@.claude/docs/principles/us-granularity.md` — découpage litigieux, > 6 US
 - `@.claude/rules/ownership.md §3` — détail procédure §3 acteurs
 - `@.claude/rules/ownership.md §2` — sérialisation constitution
+
+Sync vérifiée 2026-06-11 : l'édition `ownership.md` du jour (audit CR-2 —
+ré-attribution ADR + constitution §4/§6 d'`arch` vers `constitutioner`) ne
+touche PAS la procédure §3.bis acteurs append-only inlinée ici (STEP 8.5) ;
+le rôle de PO (writer constitution §2/§3) reste inchangé.

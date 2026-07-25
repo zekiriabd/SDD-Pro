@@ -6,12 +6,12 @@
   "buildSystem": "npm",
   "manifest": {
     "files": [
-      "workspace/output/src/{AppName}/package.json",
-      "workspace/output/src/{AppName}/app.json",
-      "workspace/output/src/{AppName}/tsconfig.json",
-      "workspace/output/src/{AppName}/babel.config.js",
-      "workspace/output/src/{AppName}/metro.config.js",
-      "workspace/output/src/{AppName}/tailwind.config.js"
+      "workspace/src/{AppName}/package.json",
+      "workspace/src/{AppName}/app.json",
+      "workspace/src/{AppName}/tsconfig.json",
+      "workspace/src/{AppName}/babel.config.js",
+      "workspace/src/{AppName}/metro.config.js",
+      "workspace/src/{AppName}/tailwind.config.js"
     ]
   },
   "metadata": {

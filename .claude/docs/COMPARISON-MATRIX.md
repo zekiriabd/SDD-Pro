@@ -70,7 +70,7 @@
 
 | # | Dimension | SDD_Pro | BMAD | Superpowers | Spec-Kit | AgentOS | Cursor | Aider |
 |---:|---|---|---|---|---|---|---|---|
-| 28 | Taxonomie d'erreurs | **174 classes `[CLASS]`** cross-agent | 0 | ⚠️ skills classes | 0 | 0 | 0 | 0 |
+| 28 | Taxonomie d'erreurs | **188 classes `[CLASS]`** cross-agent | 0 | ⚠️ skills classes | 0 | 0 | 0 | 0 |
 | 29 | Telemetry DB | SQLite WAL (`console.db`, cost+gates+audit) | ❌ | ❌ | ❌ | ❌ | ⚠️ proprietary | ❌ |
 | 30 | Verdict classification | 🟢/🟡/🔴 + 5 statuts API Gate (PASS/WARN/FAIL/SKIPPED/INFRA_BLOCKED) | ⚠️ story status | ⚠️ skills | ❌ | ❌ | ❌ | ❌ |
 | 31 | Forensic trail | ADRs + `.audit/` + state ledger + 220+ smoke tests | ⚠️ sharded MD | ❌ | ❌ | ❌ | ❌ | ⚠️ git log |
@@ -122,16 +122,16 @@
 **SDD_Pro gagne sur (créneau différenciant)** :
 - Déterminisme : 55 scripts 0-token + 17 hooks (personne d'autre n'en a)
 - Reviewers : 5 angles distincts vs 0-1 chez les autres
-- Taxonomie : 174 classes `[CLASS]` cross-agent vs 0
+- Taxonomie : 188 classes `[CLASS]` cross-agent vs 0
 - Anti-derive : matrix ownership stricte + STOP automatique (8 hard-blocking security)
 - Telemetry : SQLite WAL persisté (cost cap, audit trail, gates)
 - Stacks pré-validés : 34 + 13 combos SLA bench-validated
 - Governance : ADRs timestamp + INVARIANTS.yml + test anti-rot
 
 **SDD_Pro perd sur (limitations admises)** :
-- **Vendor lock-in** Claude Code (Anthropic) — mitigation : 55 scripts Python + 174 classes + 34 stacks restent portables si pivot
+- **Vendor lock-in** Claude Code (Anthropic) — mitigation : 55 scripts Python + 188 classes + 34 stacks restent portables si pivot
 - **Tokens absolus** consommés sur pipeline complet (150-300k/FEAT) — compensé par cache-warm ~50% économie et par évitement re-work
-- **Courbe d'apprentissage** : 13 commandes + 12 agents + 9 rules + 174 classes à internaliser
+- **Courbe d'apprentissage** : 13 commandes + 12 agents + 9 rules + 188 classes à internaliser
 - **Maturité** : v7.0.0 GA récent (2026-06-07) — vs Cursor/Aider matures depuis 2-3 ans
 - **Communauté** : interne SDD-Pro (OSS en cours d'arbitrage)
 

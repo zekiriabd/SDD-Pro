@@ -32,7 +32,7 @@ from sdd_scripts import gate_decide  # noqa: E402
 def isolated_repo(tmp_path, monkeypatch):
     """Tmp repo with .claude/ marker + SDD_REPO_ROOT override.
 
-    Makes console.db side effects atterrir dans tmp_path/workspace/output/db/.
+    Makes console.db side effects atterrir dans tmp_path/workspace/db/.
     """
     (tmp_path / ".claude").mkdir()
     monkeypatch.setenv("SDD_REPO_ROOT", str(tmp_path))

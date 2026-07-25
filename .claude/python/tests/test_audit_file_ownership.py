@@ -4,7 +4,7 @@ Tests both the OWNERSHIP_MATRIX patterns (static, in-process) and the full
 hook lifecycle (subprocess, tmp workspace, env-controlled cutoff).
 
 The hook is intentionally non-blocking (always exit 0) — it appends
-violations to workspace/output/.sys/.audit/ownership-violations.log and
+violations to workspace/.sys/.audit/ownership-violations.log and
 emits stderr WARN/ERROR depending on $SDD_AUDIT_OWNERSHIP_MODE.
 """
 from __future__ import annotations
@@ -68,7 +68,7 @@ def _run_hook(payload: dict, repo: Path, env_extra: dict[str, str] | None = None
 
 
 def _read_log(repo: Path) -> str:
-    log = repo / "workspace" / "output" / ".sys" / ".audit" / "ownership-violations.log"
+    log = repo / "workspace" / ".sys" / ".audit" / "ownership-violations.log"
     return log.read_text(encoding="utf-8") if log.is_file() else ""
 
 
@@ -87,22 +87,22 @@ class TestOwnershipMatrixPatterns(unittest.TestCase):
         self.assertNotIn("dashboard", OWNERSHIP_MATRIX)
 
     def test_po_writes_us_files(self):
-        """po: workspace/output/us/N-M-Name.md is owned."""
+        """po: workspace/us/N-M-Name.md is owned."""
         patterns = [re.compile(p) for p in OWNERSHIP_MATRIX["po"]]
-        self.assertTrue(any(p.match("workspace/output/us/1-2-Auth.md") for p in patterns))
+        self.assertTrue(any(p.match("workspace/us/1-2-Auth.md") for p in patterns))
 
     def test_po_does_not_own_src(self):
         """po never writes to src/."""
         patterns = [re.compile(p) for p in OWNERSHIP_MATRIX["po"]]
-        self.assertFalse(any(p.match("workspace/output/src/MyApp/Pages/Login.tsx") for p in patterns))
+        self.assertFalse(any(p.match("workspace/src/MyApp/Pages/Login.tsx") for p in patterns))
 
     def test_dev_backend_owns_services_endpoints_dtos(self):
         patterns = [re.compile(p) for p in OWNERSHIP_MATRIX["dev-backend"]]
         for path in (
-            "workspace/output/src/Backend/Services/AuthService.cs",
-            "workspace/output/src/Backend/Endpoints/AuthEndpoints.cs",
-            "workspace/output/src/Backend/DTOs/LoginDto.cs",
-            "workspace/output/src/Backend/Program.cs",
+            "workspace/src/Backend/Services/AuthService.cs",
+            "workspace/src/Backend/Endpoints/AuthEndpoints.cs",
+            "workspace/src/Backend/DTOs/LoginDto.cs",
+            "workspace/src/Backend/Program.cs",
         ):
             self.assertTrue(
                 any(p.match(path) for p in patterns),
@@ -113,17 +113,17 @@ class TestOwnershipMatrixPatterns(unittest.TestCase):
         """dev-backend never writes US or frontend Pages."""
         patterns = [re.compile(p) for p in OWNERSHIP_MATRIX["dev-backend"]]
         for path in (
-            "workspace/output/us/1-2-Auth.md",
-            "workspace/output/src/MyApp/Pages/Login.tsx",
+            "workspace/us/1-2-Auth.md",
+            "workspace/src/MyApp/Pages/Login.tsx",
         ):
             self.assertFalse(any(p.match(path) for p in patterns))
 
     def test_dev_frontend_owns_pages_components_layouts(self):
         patterns = [re.compile(p) for p in OWNERSHIP_MATRIX["dev-frontend"]]
         for path in (
-            "workspace/output/src/App/Pages/Login.razor",
-            "workspace/output/src/App/Components/UserMenu.razor",
-            "workspace/output/src/App/Layouts/MainLayout.razor",
+            "workspace/src/App/Pages/Login.razor",
+            "workspace/src/App/Components/UserMenu.razor",
+            "workspace/src/App/Layouts/MainLayout.razor",
         ):
             self.assertTrue(
                 any(p.match(path) for p in patterns),
@@ -133,9 +133,10 @@ class TestOwnershipMatrixPatterns(unittest.TestCase):
     def test_qa_owns_test_projects(self):
         patterns = [re.compile(p) for p in OWNERSHIP_MATRIX["qa"]]
         for path in (
-            "workspace/output/src/Backend.Tests/AuthServiceTests.cs",
-            "workspace/output/qa/feat-1/coverage.json",
-            "workspace/output/qa/feat-1/report.md",
+            "workspace/src/Backend.Tests/AuthServiceTests.cs",
+            # 2026-07-06 : QA telemetry is SQLite-only. The only file qa writes
+            # is the transient api-tests JSON under .sys/.validation/.
+            "workspace/.sys/.validation/1-api-tests.json",
         ):
             self.assertTrue(
                 any(p.match(path) for p in patterns),
@@ -144,9 +145,9 @@ class TestOwnershipMatrixPatterns(unittest.TestCase):
 
     def test_arch_owns_sln_and_csproj(self):
         patterns = [re.compile(p) for p in OWNERSHIP_MATRIX["arch"]]
-        self.assertTrue(any(p.match("workspace/output/src/MyApp.sln") for p in patterns))
+        self.assertTrue(any(p.match("workspace/src/MyApp.sln") for p in patterns))
         self.assertTrue(
-            any(p.match("workspace/output/src/Backend/Backend.csproj") for p in patterns)
+            any(p.match("workspace/src/Backend/Backend.csproj") for p in patterns)
         )
 
 
@@ -174,14 +175,14 @@ class TestHookLifecycle(unittest.TestCase):
 
     def test_no_subagent_in_payload_exits_silently(self):
         """Hook is a no-op if subagent_type is absent."""
-        self._write_modified_file("workspace/output/src/Backend/Services/X.cs")
+        self._write_modified_file("workspace/src/Backend/Services/X.cs")
         r = _run_hook({}, self.repo, dispatch_start="2020-01-01T00:00:00Z")
         self.assertEqual(r.returncode, 0)
         self.assertEqual(_read_log(self.repo), "")
 
     def test_unknown_subagent_exits_silently(self):
         """Custom agents not in matrix → silent skip (backward-compat)."""
-        self._write_modified_file("workspace/output/src/Backend/Services/X.cs")
+        self._write_modified_file("workspace/src/Backend/Services/X.cs")
         payload = {"tool_input": {"subagent_type": "custom-agent"}}
         r = _run_hook(payload, self.repo, dispatch_start="2020-01-01T00:00:00Z")
         self.assertEqual(r.returncode, 0)
@@ -189,15 +190,15 @@ class TestHookLifecycle(unittest.TestCase):
 
     def test_dev_backend_writing_in_scope_no_violation(self):
         """dev-backend writing in Services/ → no log line."""
-        self._write_modified_file("workspace/output/src/Backend/Services/AuthService.cs")
+        self._write_modified_file("workspace/src/Backend/Services/AuthService.cs")
         payload = {"tool_input": {"subagent_type": "dev-backend"}}
         r = _run_hook(payload, self.repo, dispatch_start="2020-01-01T00:00:00Z")
         self.assertEqual(r.returncode, 0)
         self.assertEqual(_read_log(self.repo), "")
 
     def test_dev_backend_writing_us_logs_violation(self):
-        """dev-backend writing in workspace/output/us/ → violation logged."""
-        self._write_modified_file("workspace/output/us/1-2-Auth.md")
+        """dev-backend writing in workspace/us/ → violation logged."""
+        self._write_modified_file("workspace/us/1-2-Auth.md")
         payload = {"tool_input": {"subagent_type": "dev-backend"}}
         r = _run_hook(payload, self.repo, dispatch_start="2020-01-01T00:00:00Z",
                       env_extra={"SDD_AUDIT_OWNERSHIP_MODE": "warn"})
@@ -205,11 +206,11 @@ class TestHookLifecycle(unittest.TestCase):
         log = _read_log(self.repo)
         self.assertIn("[FILE_OWNERSHIP]", log)
         self.assertIn("dev-backend", log)
-        self.assertIn("workspace/output/us/1-2-Auth.md", log)
+        self.assertIn("workspace/us/1-2-Auth.md", log)
 
     def test_off_mode_silences_stderr_but_log_still_written(self):
         """Off mode suppresses stderr emission; the audit log keeps tracking."""
-        self._write_modified_file("workspace/output/us/1-2-Auth.md")
+        self._write_modified_file("workspace/us/1-2-Auth.md")
         payload = {"tool_input": {"subagent_type": "dev-backend"}}
         r = _run_hook(payload, self.repo, dispatch_start="2020-01-01T00:00:00Z",
                       env_extra={"SDD_AUDIT_OWNERSHIP_MODE": "off"})
@@ -221,7 +222,7 @@ class TestHookLifecycle(unittest.TestCase):
 
     def test_strict_mode_emits_visible_error(self):
         """Strict mode (CI or explicit) → ERROR + FIX hints on stderr."""
-        self._write_modified_file("workspace/output/us/1-2-Auth.md")
+        self._write_modified_file("workspace/us/1-2-Auth.md")
         payload = {"tool_input": {"subagent_type": "dev-backend"}}
         r = _run_hook(payload, self.repo, dispatch_start="2020-01-01T00:00:00Z",
                       env_extra={"SDD_AUDIT_OWNERSHIP_MODE": "strict"})
@@ -232,7 +233,7 @@ class TestHookLifecycle(unittest.TestCase):
 
     def test_cutoff_filters_old_files(self):
         """File with mtime BEFORE cutoff is ignored — only fresh files audited."""
-        p = self._write_modified_file("workspace/output/us/1-2-Auth.md")
+        p = self._write_modified_file("workspace/us/1-2-Auth.md")
         # Force the file's mtime to 1970 (well before any cutoff)
         os.utime(p, (1, 1))
         payload = {"tool_input": {"subagent_type": "dev-backend"}}
@@ -246,11 +247,50 @@ class TestHookLifecycle(unittest.TestCase):
 
     def test_audit_directory_is_ignored(self):
         """Files written under .sys/.audit/ are not subject to ownership check."""
-        self._write_modified_file("workspace/output/.sys/.audit/some-trace.log")
+        self._write_modified_file("workspace/.sys/.audit/some-trace.log")
         payload = {"tool_input": {"subagent_type": "dev-backend"}}
         r = _run_hook(payload, self.repo, dispatch_start="2020-01-01T00:00:00Z")
         self.assertEqual(r.returncode, 0)
         self.assertNotIn("[FILE_OWNERSHIP]", _read_log(self.repo))
+
+    def test_violation_detected_in_git_repo_with_gitignored_workspace(self):
+        """Regression for the 2026-06-12 audit fix (C1).
+
+        The removed `git status` fast-path returned 0 files inside a real git
+        repo because agents write under `workspace/`, which is gitignored
+        by design — git never lists ignored files, so the ownership matrix was
+        silently disabled on the nominal (git-managed) workspace. This recreates
+        that exact scenario: git repo + `.gitignore` excluding workspace,
+        a dev-backend violation written there, and asserts it is STILL caught.
+        """
+        # Turn the tmp repo into a real git repo with workspace ignored.
+        (self.repo / ".gitignore").write_text("workspace/\n", encoding="utf-8")
+        env = _clean_env()
+        for cmd in (
+            ["git", "init", "-q"],
+            ["git", "config", "user.email", "t@t.t"],
+            ["git", "config", "user.name", "t"],
+            ["git", "add", "-A"],
+            ["git", "commit", "-qm", "init", "--no-gpg-sign"],
+        ):
+            res = subprocess.run(cmd, cwd=self.repo, env=env,
+                                 capture_output=True, text=True)
+            if res.returncode != 0 and cmd[1] == "init":
+                self.skipTest("git not available")
+        # Sanity: git status must NOT see the violation file (proves it's ignored).
+        self._write_modified_file("workspace/us/1-2-Auth.md")
+        gs = subprocess.run(["git", "status", "--porcelain", "--untracked-files=all"],
+                            cwd=self.repo, env=env, capture_output=True, text=True)
+        self.assertNotIn("1-2-Auth", gs.stdout,
+                         "precondition: the violation file must be gitignored")
+        # The hook (walk-based) must still detect the ownership violation.
+        payload = {"tool_input": {"subagent_type": "dev-backend"}}
+        r = _run_hook(payload, self.repo, dispatch_start="2020-01-01T00:00:00Z",
+                      env_extra={"SDD_AUDIT_OWNERSHIP_MODE": "warn"})
+        self.assertEqual(r.returncode, 0)
+        log = _read_log(self.repo)
+        self.assertIn("[FILE_OWNERSHIP]", log)
+        self.assertIn("workspace/us/1-2-Auth.md", log)
 
 
 if __name__ == "__main__":

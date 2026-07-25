@@ -6,8 +6,8 @@
   "buildSystem": "npm",
   "manifest": {
     "files": [
-      "workspace/output/src/{AppName}/package.json",
-      "workspace/output/src/{AppName}/eslint.config.js"
+      "workspace/src/{AppName}/package.json",
+      "workspace/src/{AppName}/eslint.config.js"
     ]
   },
   "metadata": {

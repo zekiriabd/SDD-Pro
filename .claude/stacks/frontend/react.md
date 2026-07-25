@@ -48,51 +48,51 @@ backend via un package `{LibName}` du monorepo lorsque disponible
 ### 1.3 Mapping couche → repertoire
 
 Convention Vite + pnpm workspaces 2026 : tout sous
-`workspace/output/src/{AppName}/apps/web/src/` sauf les fichiers de
+`workspace/src/{AppName}/apps/web/src/` sauf les fichiers de
 config racine du workspace et de l'app. Path aliases `@/*` → `./src/*`
 (vite.config.ts + tsconfig.json) imposes pour permettre les imports
 shadcn `@/components/ui/...`.
 
 **Code applicatif** (sous `apps/web/src/`) :
 
-- Route (file-based) → `workspace/output/src/{AppName}/apps/web/src/routes/`
-- Route tree genere → `workspace/output/src/{AppName}/apps/web/src/routeTree.gen.ts` (auto, jamais main-edit)
-- Page → `workspace/output/src/{AppName}/apps/web/src/pages/`
-- Component metier → `workspace/output/src/{AppName}/apps/web/src/components/`
-- **Component UI shadcn** → `workspace/output/src/{AppName}/apps/web/src/components/ui/` (genere par `npx shadcn@latest add <component>`, jamais main-edit)
-- Layout → `workspace/output/src/{AppName}/apps/web/src/layouts/`
-- Hook (TanStack Query wrappers) → `workspace/output/src/{AppName}/apps/web/src/hooks/`
-- API client → `workspace/output/src/{AppName}/apps/web/src/api/`
-- Schema Zod → `workspace/output/src/{AppName}/apps/web/src/schemas/`
-- Auth → `workspace/output/src/{AppName}/apps/web/src/auth/`
-- **Lib (shadcn helpers)** → `workspace/output/src/{AppName}/apps/web/src/lib/` (contient `utils.ts` avec `cn()`)
-- Utils metier → `workspace/output/src/{AppName}/apps/web/src/utils/`
-- i18n → `workspace/output/src/{AppName}/apps/web/src/i18n/` (`{lang}/translation.json` + `index.ts`)
-- Assets → `workspace/output/src/{AppName}/apps/web/src/assets/`
+- Route (file-based) → `workspace/src/{AppName}/apps/web/src/routes/`
+- Route tree genere → `workspace/src/{AppName}/apps/web/src/routeTree.gen.ts` (auto, jamais main-edit)
+- Page → `workspace/src/{AppName}/apps/web/src/pages/`
+- Component metier → `workspace/src/{AppName}/apps/web/src/components/`
+- **Component UI shadcn** → `workspace/src/{AppName}/apps/web/src/components/ui/` (genere par `npx shadcn@latest add <component>`, jamais main-edit)
+- Layout → `workspace/src/{AppName}/apps/web/src/layouts/`
+- Hook (TanStack Query wrappers) → `workspace/src/{AppName}/apps/web/src/hooks/`
+- API client → `workspace/src/{AppName}/apps/web/src/api/`
+- Schema Zod → `workspace/src/{AppName}/apps/web/src/schemas/`
+- Auth → `workspace/src/{AppName}/apps/web/src/auth/`
+- **Lib (shadcn helpers)** → `workspace/src/{AppName}/apps/web/src/lib/` (contient `utils.ts` avec `cn()`)
+- Utils metier → `workspace/src/{AppName}/apps/web/src/utils/`
+- i18n → `workspace/src/{AppName}/apps/web/src/i18n/` (`{lang}/translation.json` + `index.ts`)
+- Assets → `workspace/src/{AppName}/apps/web/src/assets/`
 
 **Entry points** :
 
-- Root → `workspace/output/src/{AppName}/apps/web/src/main.tsx`
-- App → `workspace/output/src/{AppName}/apps/web/src/App.tsx` (monte `RouterProvider` + `QueryClientProvider` + `I18nextProvider`)
-- Global CSS (Tailwind v4 `@theme` + tokens shadcn) → `workspace/output/src/{AppName}/apps/web/src/index.css`
+- Root → `workspace/src/{AppName}/apps/web/src/main.tsx`
+- App → `workspace/src/{AppName}/apps/web/src/App.tsx` (monte `RouterProvider` + `QueryClientProvider` + `I18nextProvider`)
+- Global CSS (Tailwind v4 `@theme` + tokens shadcn) → `workspace/src/{AppName}/apps/web/src/index.css`
 
 **Contrats partages cross-package** (monorepo) :
 
-- DTOs / contrats API → `workspace/output/src/{AppName}/packages/{LibName}/src/` (consomme par l'app via `import { ... } from '@{AppName}/{LibName}'`)
+- DTOs / contrats API → `workspace/src/{AppName}/packages/{LibName}/src/` (consomme par l'app via `import { ... } from '@{AppName}/{LibName}'`)
 
 **Config racine workspace** (jamais sous src/) :
 
-- pnpm workspace + version catalog → `workspace/output/src/{AppName}/pnpm-workspace.yaml`
-- Turbo task graph → `workspace/output/src/{AppName}/turbo.json`
-- Workspace root manifest → `workspace/output/src/{AppName}/package.json` (private, `"workspaces"` pnpm uniquement)
+- pnpm workspace + version catalog → `workspace/src/{AppName}/pnpm-workspace.yaml`
+- Turbo task graph → `workspace/src/{AppName}/turbo.json`
+- Workspace root manifest → `workspace/src/{AppName}/package.json` (private, `"workspaces"` pnpm uniquement)
 
 **Config app** (sous `apps/web/`) :
 
-- App manifest → `workspace/output/src/{AppName}/apps/web/package.json` (depend de `catalog:`)
-- Vite config → `workspace/output/src/{AppName}/apps/web/vite.config.ts` (plugins `@vitejs/plugin-react`, `@tailwindcss/vite`, `@tanstack/router-plugin`)
-- TS config → `workspace/output/src/{AppName}/apps/web/tsconfig.json` + `tsconfig.app.json`
+- App manifest → `workspace/src/{AppName}/apps/web/package.json` (depend de `catalog:`)
+- Vite config → `workspace/src/{AppName}/apps/web/vite.config.ts` (plugins `@vitejs/plugin-react`, `@tailwindcss/vite`, `@tanstack/router-plugin`)
+- TS config → `workspace/src/{AppName}/apps/web/tsconfig.json` + `tsconfig.app.json`
 - Tailwind v4 → directement dans `index.css` (`@import "tailwindcss"; @theme { ... }`) — plus de `tailwind.config.ts` ni `postcss.config.js`
-- shadcn manifest → `workspace/output/src/{AppName}/apps/web/components.json` (style: "new-york")
+- shadcn manifest → `workspace/src/{AppName}/apps/web/components.json` (style: "new-york")
 
 ---
 
@@ -129,15 +129,15 @@ shadcn `@/components/ui/...`.
 
 ### 2.2 Outils
 
-- **Project file** : `workspace/output/src/{AppName}/package.json`
-- **Build** : `npm --prefix workspace/output/src/{AppName} run build`
-- **Dev** : `npm --prefix workspace/output/src/{AppName} run dev`
-- **Preview** : `npm --prefix workspace/output/src/{AppName} run preview`
+- **Project file** : `workspace/src/{AppName}/package.json`
+- **Build** : `npm --prefix workspace/src/{AppName} run build`
+- **Dev** : `npm --prefix workspace/src/{AppName} run dev`
+- **Preview** : `npm --prefix workspace/src/{AppName} run preview`
 - **Smoke Command** :
 
 ```bash
-npm --prefix workspace/output/src/{AppName} run build
-test -f workspace/output/src/{AppName}/dist/index.html
+npm --prefix workspace/src/{AppName} run build
+test -f workspace/src/{AppName}/dist/index.html
 ```
 
 - **Package manager** : npm
@@ -154,8 +154,8 @@ Setup canonique React 19 + TypeScript + Vite + Tailwind v4 + shadcn/ui
 
 ```bash
 # 1. Vite + React TS scaffolding
-mkdir -p workspace/output/src
-cd workspace/output/src
+mkdir -p workspace/src
+cd workspace/src
 npm create vite@latest {AppName} -- --template react-ts
 cd {AppName}
 npm install
@@ -189,7 +189,7 @@ npx shadcn@latest add button card input label textarea select checkbox switch \
 <!-- CORE_PACKAGES_START -->
 ```bash
 # Auto-genere depuis react.libs.json -- ne pas editer (utiliser sync_stack_md.py).
-(cd workspace/output/src/{AppName} && pnpm add \
+(cd workspace/src/{AppName} && pnpm add \
   react@19.0.0 \
   react-dom@19.0.0 \
   @types/react@19.0.2 \
@@ -220,7 +220,7 @@ npx shadcn@latest add button card input label textarea select checkbox switch \
 
 ```bash
 # 8. Verification finale
-cd workspace/output/src/{AppName}
+cd workspace/src/{AppName}
 npm run build  # doit passer sans erreur de resolution d'import
 ```
 
@@ -228,22 +228,22 @@ npm run build  # doit passer sans erreur de resolution d'import
 ```bash
 # Auto-genere depuis react.libs.json (on-demand) -- installe par dev-* si l'US declenche un trigger.
 # capability: i18n-http-loading
-(cd workspace/output/src/{AppName} && pnpm add i18next-http-backend@3.0.1)
+(cd workspace/src/{AppName} && pnpm add i18next-http-backend@3.0.1)
 
 # capability: auth-azure-ad
-(cd workspace/output/src/{AppName} && pnpm add @azure/msal-browser@5.10.1 @azure/msal-react@5.4.1)
+(cd workspace/src/{AppName} && pnpm add @azure/msal-browser@5.10.1 @azure/msal-react@5.4.1)
 
 # capability: data-grid
-(cd workspace/output/src/{AppName} && pnpm add @tanstack/react-table@8.20.5)
+(cd workspace/src/{AppName} && pnpm add @tanstack/react-table@8.20.5)
 
 # capability: csv-client
-(cd workspace/output/src/{AppName} && pnpm add papaparse@5.4.1 @types/papaparse@5.3.15)
+(cd workspace/src/{AppName} && pnpm add papaparse@5.4.1 @types/papaparse@5.3.15)
 
 # capability: router-tanstack
-(cd workspace/output/src/{AppName} && pnpm add @tanstack/react-router@1.166.0 @tanstack/router-plugin@1.166.0)
+(cd workspace/src/{AppName} && pnpm add @tanstack/react-router@1.166.0 @tanstack/router-plugin@1.166.0)
 
 # capability: dev-https
-(cd workspace/output/src/{AppName} && pnpm add @vitejs/plugin-basic-ssl@2.0.0)
+(cd workspace/src/{AppName} && pnpm add @vitejs/plugin-basic-ssl@2.0.0)
 ```
 <!-- ONDEMAND_PACKAGES_END -->
 
@@ -461,7 +461,7 @@ un `{parent}.index.tsx` séparé pour la route exacte. Ne JAMAIS laisser
 ```bash
 # Pour chaque parent.tsx ayant un sibling parent.{child}.tsx :
 # verifier que parent.tsx contient bien `<Outlet`
-grep -L "<Outlet" workspace/output/src/{AppName}/src/routes/{parent}.tsx
+grep -L "<Outlet" workspace/src/{AppName}/src/routes/{parent}.tsx
 # → 0 ligne attendue (le fichier doit contenir Outlet)
 ```
 
@@ -560,7 +560,7 @@ data). Le storage navigateur sert uniquement aux preferences UI
   remonte sous forme d'exception typee.
 - **Client HTTP** : `fetch` natif via `apiFetch` (cf. §3.1) + TanStack
   Query (cf. §3.2). Pas d'Axios.
-- **Auth** : provider declare dans `workspace/input/stack/stack.md
+- **Auth** : provider declare dans `workspace/stack/stack.md
   ## Active Auth Specs` (ex. `auth-local`, `azure-ad`, `oauth2`). Le
   stack auth actif fournit le composant provider racine, le hook
   d'acces token consomme par `apiFetch`, et les flows login/logout.
@@ -639,7 +639,7 @@ stack backend §CORS).
 
 **Anti-pattern à grep en STEP build** (dev-frontend STEP 9) :
 ```bash
-grep -nE 'target:\s*"http://localhost:(5000|5099|8000|8080|3000)"' workspace/output/src/{AppName}/vite.config.ts && \
+grep -nE 'target:\s*"http://localhost:(5000|5099|8000|8080|3000)"' workspace/src/{AppName}/vite.config.ts && \
   echo "[STACK_DERIVE_VIOLATION] proxy target hors stack backend actif"
 ```
 
@@ -648,7 +648,7 @@ Format ERROR :
 ERROR: dev-frontend {n}-{m} — proxy Vite target invalide
 CAUSE: [DERIVE_VIOLATION] vite.config.ts proxy target "{XXX}" ne correspond pas au port backend dev du stack actif
        (dotnet-minimalapi : 5143 HTTP / 7239 HTTPS ; cf. launchSettings.json)
-FIX: 1. lire le port HTTP depuis workspace/output/src/{BackendName}/Properties/launchSettings.json (profil http.applicationUrl)
+FIX: 1. lire le port HTTP depuis workspace/src/{BackendName}/Properties/launchSettings.json (profil http.applicationUrl)
      2. mettre target: "http://localhost:{port}" dans vite.config.ts
      3. relancer le dev server Vite
 ```
@@ -736,7 +736,7 @@ Langue :
 ## 8. Authentification
 
 Pas de provider auth fixe dans ce stack. L'integration est decouplee :
-le stack auth actif declare dans `workspace/input/tech/stack.md ## Active Auth Specs`
+le stack auth actif declare dans `workspace/tech/stack.md ## Active Auth Specs`
 fournit le provider, les flows login/logout, et le wiring Bearer token.
 
 Patterns supportes (selon `## Active Auth Specs`) :
@@ -846,15 +846,78 @@ console.log
 
 ## 13. Performance
 
-Optimisations obligatoires :
+> Règles minées depuis **Vercel Engineering — react-best-practices** (MIT,
+> `github.com/vercel-labs/agent-skills`, snapshot 2026-07-22), adaptées au
+> profil SPA Vite de ce stack. Les règles server-side (RSC/streaming) vivent
+> dans `fullstack/next.md §13`. Ce sont des **conventions déclarées du stack** :
+> dev-frontend les applique dans le contrat anti-derive (ce n'est PAS de
+> l'`[OPTIMIZATION_PROACTIVE]`). IDs `[...]` = règle upstream pour traçabilité.
 
-- React.memo
-- useMemo
-- useCallback
+### 13.1 Waterfalls réseau (CRITIQUE)
 
-Lazy loading obligatoire :
+- `Promise.all()` pour tout groupe de fetchs indépendants — jamais d'`await`
+  séquentiels [async-parallel]
+- Conditions synchrones bon marché AVANT les `await` (early-exit sans I/O)
+  [async-cheap-condition-before-await]
+- Déplacer l'`await` dans la branche qui consomme réellement la valeur
+  [async-defer-await]
+- Données indépendantes d'une même page → queries TanStack parallèles
+  (`useQueries` ou hooks séparés), pas de `enabled:` en chaîne artificielle
+- `<Suspense>` par section pour streamer l'UI progressive — pas un spinner
+  global unique [async-suspense-boundaries]
 
-React.lazy
+### 13.2 Bundle (CRITIQUE)
+
+- Imports directs — JAMAIS de barrel file interne (`@/components/X`, pas
+  `@/components`) [bundle-barrel-imports]
+- Route-splitting TanStack Router (`*.lazy.tsx`, cf. §3.3) + `React.lazy`
+  pour composants lourds hors-route (charts, éditeurs riches)
+  [bundle-dynamic-imports]
+- Third-party non critique (analytics, logging) chargé après mount
+  [bundle-defer-third-party]
+- Module lourd d'une feature optionnelle chargé à l'activation
+  (`await import()` dans le handler) [bundle-conditional]
+- Preload au hover/focus des liens vers routes lourdes [bundle-preload]
+
+### 13.3 Re-renders (MEDIUM)
+
+- `React.memo` sur composants coûteux re-rendus par un parent fréquent ;
+  hoister les valeurs par défaut non-primitives des props
+  [rerender-memo, rerender-memo-with-default-value]
+- setState fonctionnel `setX(prev => …)` quand le nouveau state dérive de
+  l'ancien [rerender-functional-setstate]
+- Init lazy `useState(() => expensive())` [rerender-lazy-state-init]
+- State dérivé calculé au render (ou `useMemo`) — JAMAIS `useEffect` +
+  `setState` [rerender-derived-state-no-effect]
+- Aucun composant défini inline dans un render
+  [rerender-no-inline-components]
+- `useRef` pour valeurs transitoires qui ne pilotent pas le rendu
+  (position souris, timers, compteurs internes)
+  [rerender-use-ref-transient-values]
+- `useTransition` / `useDeferredValue` pour updates non urgentes
+  (filtres, recherche live) [rerender-transitions, rerender-use-deferred-value]
+- Ne pas s'abonner à un state uniquement lu dans un callback
+  [rerender-defer-reads]
+
+### 13.4 Rendering & JS (LOW-MEDIUM)
+
+- Render conditionnel `{cond && <X/>}` plutôt que masquage CSS d'un
+  sous-arbre lourd [rendering-conditional-render]
+- Hoister le JSX statique hors des maps/renders [rendering-hoist-jsx]
+- `content-visibility: auto` sur longues listes hors-viewport
+  [rendering-content-visibility]
+- Resource hints (`preconnect`, `dns-prefetch`) pour les origins API/CDN
+  [rendering-resource-hints]
+- Lookups par `Map`/`Set` — jamais `array.find` dans une boucle ; regex
+  hoistées hors des fonctions chaudes ; early-exit ; itérations combinées
+  en une passe [js-index-maps, js-set-map-lookups, js-hoist-regexp,
+  js-early-exit, js-combine-iterations]
+
+### 13.5 Périmètre anti-derive
+
+Ces règles étant déclarées ici, leur application est due. Toute optimisation
+NON listée (virtualisation, web worker, service worker cache…) reste
+`[OPTIMIZATION_PROACTIVE]` → passer par US/ADR.
 
 ---
 
@@ -869,7 +932,7 @@ React Helmet.
 ## 15. Structure finale projet (monorepo pnpm + Turborepo)
 
 ```
-workspace/output/
+workspace/
 └── src/
     └── {AppName}/                         # racine workspace (monorepo)
         ├── pnpm-workspace.yaml             # workspaces + catalog: versions
@@ -920,26 +983,26 @@ manuel (TanStack Router en file-based). Pas de `services/` Axios ni
 
 ## 16. Commandes runtime
 
-Toutes les commandes utilisent `--prefix workspace/output/src/{AppName}` pour respecter
+Toutes les commandes utilisent `--prefix workspace/src/{AppName}` pour respecter
 l'invariant SDD "Per-stack project-scoped build" — pas de `cd` requis, pas
 d'ambiguïté sur le `package.json` ciblé quand plusieurs stacks coexistent
-sous `workspace/output/src/`.
+sous `workspace/src/`.
 
 Dev :
 
-npm --prefix workspace/output/src/{AppName} run dev
+npm --prefix workspace/src/{AppName} run dev
 
 Build :
 
-npm --prefix workspace/output/src/{AppName} run build
+npm --prefix workspace/src/{AppName} run build
 
 Preview :
 
-npm --prefix workspace/output/src/{AppName} run preview
+npm --prefix workspace/src/{AppName} run preview
 
 Smoke :
 
-npm --prefix workspace/output/src/{AppName} run build
+npm --prefix workspace/src/{AppName} run build
 
 ---
 

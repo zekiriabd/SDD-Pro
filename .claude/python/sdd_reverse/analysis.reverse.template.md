@@ -3,17 +3,17 @@
   (barreau 3a de l'escalier reverse, ADR governance-major-reverse-spec-ladder).
 
   D5 : format « analyse technique legacy » DISTINCT du schéma plan forward
-  (output/plans/{n}-{m}.back.md, orienté pilotage-dev avec ## Files/operation/
+  (plans/{n}-{m}.back.md, orienté pilotage-dev avec ## Files/operation/
   layer/covers_acs). Ce document décrit ce que le code legacy FAIT (observé),
   pas ce qu'il faut CRÉER. Il n'est JAMAIS réexécuté par /sdd-full.
 
   Extension distincte : `.analysis.md` (≠ `.back.md`/`.front.md`) → pas de
-  collision avec les plans forward dans output/plans/.
+  collision avec les plans forward dans plans/.
 
   Rôle dans l'escalier :
     code source --[reverse-tech-analyst 3a]--> CE DOCUMENT
-                --[reverse-us-writer 3b]------> output/us/{n}-{m}-{Name}.md
-                --[reverse-feat-composer 3c]--> input/feats/{n}-{Name}.md
+                --[reverse-us-writer 3b]------> us/{n}-{m}-{Name}.md
+                --[reverse-feat-composer 3c]--> feats/{n}-{Name}.md
 
   Traçabilité (D3) : chaque task T-N porte une evidence file:line. C'est le
   BARREAU DU BAS du fil de traçabilité — les US (3b) pointeront vers les T-N,

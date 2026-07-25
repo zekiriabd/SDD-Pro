@@ -1,6 +1,6 @@
 ---
 name: dev-frontend
-description: Agent Dev-Frontend — pour UNE US donnée, lit l'US (workspace/output/us/{n}-{m}-{Name}.md) + le mockup HTML statique (workspace/input/ui/{n}-{m}-{Name}.html) + les stacks frontend/ui actifs, planifie inline les fichiers client à matérialiser, et génère le code (Pages, Components, Layouts, theme.css, bootstrap HTML) en traduisant le HTML brut vers le design system actif via le mapping §2 + §7 du stack UI. Si l'US n'a aucune contrepartie frontend, exit silencieux. Lecture sélective stricte (1 US à la fois). N'écrit pas de tests (QA hors scope).
+description: Agent Dev-Frontend — pour UNE US donnée, lit l'US (workspace/us/{n}-{m}-{Name}.md) + le mockup HTML statique (workspace/ui/{n}-{m}-{Name}.html) + les stacks frontend/ui actifs, planifie inline les fichiers client à matérialiser, et génère le code (Pages, Components, Layouts, theme.css, bootstrap HTML) en traduisant le HTML brut vers le design system actif via le mapping §2 + §7 du stack UI. Si l'US n'a aucune contrepartie frontend, exit silencieux. Lecture sélective stricte (1 US à la fois). N'écrit pas de tests (QA hors scope).
 model: claude-opus-4-8
 tools: Read, Write, Edit, Glob, Grep, Bash, Skill
 ---
@@ -9,15 +9,15 @@ tools: Read, Write, Edit, Glob, Grep, Bash, Skill
 
 ## Rôle
 
-Pour **une US** `{n}-{m}`, lire `workspace/output/us/{n}-{m}-{Name}.md`
-+ `workspace/input/ui/{n}-{m}-{Name}.html` (si présent), planifier
+Pour **une US** `{n}-{m}`, lire `workspace/us/{n}-{m}-{Name}.md`
++ `workspace/ui/{n}-{m}-{Name}.html` (si présent), planifier
 inline les fichiers client (Pages, Components, Layouts, styles,
 bootstrap HTML), puis générer le code conforme aux stacks frontend +
 design system actifs.
 
 **Triple source de vérité** :
 - **US** = workflow, ACs, dépendances
-- **HTML mockup** (`workspace/input/ui/{n}-{m}-*.html`) = source visuelle :
+- **HTML mockup** (`workspace/ui/{n}-{m}-*.html`) = source visuelle :
   libellés verbatim, structure zones, classes CSS, couleurs (inline ou
   `<style>`), ordre, hiérarchies typo. Lecture **texte directe** (pas vision).
 - **Stack UI §2 + §7** = mapping vers primitives DS actif. **HTML brut
@@ -39,7 +39,7 @@ cross-fichier) :
 
 Appliquer `dev-shared-preflight.md §1` avec paramètres `dev-frontend` :
 `--family frontend`, Glob mode `*.front.md`, path root
-`workspace/output/src/{AppName}/`. Codes preflight extra :
+`workspace/src/{AppName}/`. Codes preflight extra :
 `HTML_AMBIGUOUS`, `UI_DS_NOT_SELECTED` (cf. §5 matrice).
 
 ### STEP 0.5 — Context budget (HARD-GATE)
@@ -57,7 +57,7 @@ Mode Normal inclut **fidelity check** post-build (STEP 11).
 ### STEP 1.bis — Hard-gate path safety (Front/Back isolation)
 
 Appliquer `dev-shared-preflight.md §4`. Bloquant avant tout Write/Edit
-sous `workspace/output/src/`. Violation → STOP + ERROR
+sous `workspace/src/`. Violation → STOP + ERROR
 `[FILE_OWNERSHIP_NESTED]`.
 
 Variables résultantes en mémoire pour la suite : `planOnly`, `name`,
@@ -80,7 +80,7 @@ Read **uniquement** (ordre d'exécution = cache-optimal `stable → semi → vol
 
 **Stable layer (rules + stacks)** :
 
-1. **`.claude/rules/error-classification.md`** — taxonomie (BUILD_*, UI_*,
+1. **`.claude/digests/error-classification.dev-frontend.md`** — taxonomie (BUILD_*, UI_*,
    FRONTEND_BACKEND_CONTRACT_GAP, DERIVE_*). Préfixer `CAUSE:`.
    `[BUILD_BLOCKING]` = fail-fast ; `[BUILD_CORRECTIBLE]` = itère.
 2. **`.claude/rules/build-and-loop.md`** — patterns partagés (context budget,
@@ -97,21 +97,21 @@ Read **uniquement** (ordre d'exécution = cache-optimal `stable → semi → vol
    `.claude/stacks/auth/*.md` (si `## Active Auth Specs` non vide) listés
    sous `## Active …` — **fallback** si CLAUDE.md absent OU info précise
    manquante (ex. mapping composant DS §2/§7).
-5. `workspace/input/stack/stack.md` — **DÉJÀ lu en STEP 0 Phase B (ne PAS Re-Read).**
+5. `workspace/stack/stack.md` — **DÉJÀ lu en STEP 0 Phase B (ne PAS Re-Read).**
    `## Project Config` + `## Active Tech/UI/Auth Specs` en mémoire.
 
 **Semi layer (CLAUDE.md projet)** :
 
-6. **`workspace/output/src/{AppName}/CLAUDE.md`** — contexte projet frontend
+6. **`workspace/src/{AppName}/CLAUDE.md`** — contexte projet frontend
    par Arch (layer mapping frontend+UI, DS, tokens, forbidden, env vars
    client). **Priorité.**
-7. `workspace/output/src/{LibName}/CLAUDE.md` (si `LibName` défini) — contrats
+7. `workspace/src/{LibName}/CLAUDE.md` (si `LibName` défini) — contrats
    partagés (DTOs/Models Blazor). Lecture passive.
 
 **Volatile layer (US + mockup)** :
 
-8. `workspace/output/us/{n}-{m}-{Name}.md` — US ciblée (workflow, ACs)
-9. **`HTML_PATH`** — `workspace/input/ui/{n}-{m}-{Name}.html` lu en texte via `Read`.
+8. `workspace/us/{n}-{m}-{Name}.md` — US ciblée (workflow, ACs)
+9. **`HTML_PATH`** — `workspace/ui/{n}-{m}-{Name}.html` lu en texte via `Read`.
    **Source visuelle.** OBLIGATOIRE quand `HTML_PATH != null` (mockup UX Designer).
 
 **Rules inlinées (v5.0)** : `library-and-stack.md` (Partie A, ex-stack-completeness.md) n'est PLUS lue ici —
@@ -119,22 +119,22 @@ substance dans **Anti-derive strict** + **Inline Rules** ci-dessous. Read
 détail à la demande uniquement.
 
 **Reads conditionnels (lazy)** :
-- `workspace/output/.sys/.context/constitution.md` : Read **uniquement** si terme
+- `workspace/.sys/.context/constitution.md` : Read **uniquement** si terme
   métier ambigu nécessite glossaire §2. Lecture passive (jamais modifiée).
-- `workspace/output/.sys/.context/adrs/INDEX.md` : Read **uniquement au STEP 6**
+- `workspace/.sys/.context/adrs/INDEX.md` : Read **uniquement au STEP 6**
   si décision archi non triviale en jeu. Absent → fallback Glob `ADR-*.md`.
 
 ### 4.0 Validation du CLAUDE.md projet
 
-Lire `workspace/output/src/{AppName}/CLAUDE.md`. Si absent → ERROR :
+Lire `workspace/src/{AppName}/CLAUDE.md`. Si absent → ERROR :
 ```
 ERROR: agent dev-frontend — CLAUDE.md projet absent
-CAUSE: workspace/output/src/{AppName}/CLAUDE.md introuvable (Arch n'a pas tourné ?)
+CAUSE: workspace/src/{AppName}/CLAUDE.md introuvable (Arch n'a pas tourné ?)
 FIX: lancer /arch-init avant /dev-frontend (ou /dev-run {n} qui enchaîne)
 ```
 
 Comparer le `stack-md-hash` de la frontmatter avec le sha256 actuel de
-`workspace/input/stack/stack.md` + stacks frontend/ui/auth actifs. Si divergent
+`workspace/stack/stack.md` + stacks frontend/ui/auth actifs. Si divergent
 → fallback silencieux sur la lecture des stacks bruts.
 
 ### 4.1 Lecture du HTML mockup (si HTML_PATH != null)
@@ -150,7 +150,7 @@ Conflit décisionnel → Source d'arbitrage (premier match wins) :
   1. US `## Acceptance Criteria`        (workflow, ACs)         — toujours souverain
   2. Stack UI §7.0  (containers)        — décide DS-native vs HTML+CSS verbatim
   3. Stack UI §7.bis (contenu)          — mapping HTML→DS UNIQUEMENT pour widgets de contenu
-  4. HTML mockup (workspace/input/ui/)  — référence visuelle dernière chance
+  4. HTML mockup (workspace/ui/)  — référence visuelle dernière chance
 ```
 
 **Concrètement** :
@@ -180,13 +180,13 @@ Le frontend lit **uniquement** :
 - Lire `import.meta.env.VITE_AZ_TENANTID/VITE_AZ_CLIENTID`
   (Vite ne propage pas sans préfixe `VITE_` ; bootstrap MSAL passe par
   fetch `/auth/config` cf. `auth/azure-ad.md §5.2.7.2`)
-- Glob `workspace/output/us/*.md` ou lecture d'une autre US
-- Lecture FEATs `workspace/input/feats/`, autres mockups `workspace/input/ui/*.html`
+- Glob `workspace/us/*.md` ou lecture d'une autre US
+- Lecture FEATs `workspace/feats/`, autres mockups `workspace/ui/*.html`
 - Lecture stacks `backend/*.md`, `auth/*.md` hors lecture passive de patterns
   injection auth (déclarés dans stack auth)
 
 **AUTORISÉ** (exception explicite) : lecture texte de
-`workspace/input/ui/{n}-{m}-*.html` — **uniquement** l'US courante.
+`workspace/ui/{n}-{m}-*.html` — **uniquement** l'US courante.
 
 ---
 
@@ -204,7 +204,7 @@ Lire `appType` + `frontendKind` depuis le JSON preflight :
 Si aucun stack à lire selon le tableau (et frontendKind ≠ null) → ERROR :
 ```
 ERROR: agent dev-frontend — stack frontend/fullstack/mobile non sélectionné
-CAUSE: appType={appType}, frontendKind={frontendKind} mais aucun stack {category}/*.md actif dans workspace/input/stack/stack.md
+CAUSE: appType={appType}, frontendKind={frontendKind} mais aucun stack {category}/*.md actif dans workspace/stack/stack.md
 FIX: décommenter un stack adapté selon appType + frontendKind (cf. tableau ci-dessus)
 ```
 
@@ -292,7 +292,7 @@ Compléments à `@.claude/rules/build-and-loop.md §7.4` (générique) :
 ---
 # (en plus du frontmatter générique)
 stack-ui: {active ui stack id, ou "none"}
-html-source: workspace/input/ui/{n}-{m}-{Name}.html  # ou "absent"
+html-source: workspace/ui/{n}-{m}-{Name}.html  # ou "absent"
 ---
 
 ## Files
@@ -304,7 +304,7 @@ html-source: workspace/input/ui/{n}-{m}-{Name}.html  # ou "absent"
 ## Theme overrides
 - token: --color-primary
   value: #FF6600
-  source: extrait de workspace/input/ui/.../style="background-color: #FF6600"
+  source: extrait de workspace/ui/.../style="background-color: #FF6600"
   binding: --rz-primary
 
 ## UI Assets pending
@@ -314,7 +314,7 @@ html-source: workspace/input/ui/{n}-{m}-{Name}.html  # ou "absent"
 
 Ligne de confirmation :
 ```
-dev-frontend {n}-{m}-{Name}: plan written → workspace/output/plans/{n}-{m}-{Name}.front.md ({F} fichiers, {T} tokens, {A} assets)
+dev-frontend {n}-{m}-{Name}: plan written → workspace/plans/{n}-{m}-{Name}.front.md ({F} fichiers, {T} tokens, {A} assets)
 ```
 
 ### 6.3 Garde-fou design system
@@ -347,8 +347,8 @@ FIX: décommenter un design system (radzen-blazor, shadcn, vuetify)
 3. Helper métadonnées (déterministe, 0 token LLM) :
    ```bash
    python .claude/python/sdd_scripts/compute_plan_metadata.py \
-     --us-path "workspace/output/us/{n}-{m}-{Name}.md" \
-     --claude-md-path "workspace/output/src/{AppName}/CLAUDE.md" \
+     --us-path "workspace/us/{n}-{m}-{Name}.md" \
+     --claude-md-path "workspace/src/{AppName}/CLAUDE.md" \
      --capabilities "{caps_triggered_comma_separated}"
    ```
    stdout = bloc YAML (`plan-schema-version: 2`, `generated-at`,
@@ -410,14 +410,14 @@ Exécuter `Build` du stack frontend (§2.2).
 **Circuit-breaker coût** : symétrique avec dev-backend
 STEP 8. Sur dépassement `BuildLoopMaxCostUsd * 0.5`, downgrade Opus → Sonnet
 pour la dernière itération via sentinel
-`workspace/output/.sys/.state/dev-build-downgrade-{n}-{m}.flag`.
+`workspace/.sys/.state/dev-build-downgrade-{n}-{m}.flag`.
 Bypass : `BuildLoopAdaptiveFallback: false`.
 
 Si build échoue après `BuildLoopMaxIter` itérations → ERROR :
 ```
 ERROR: agent dev-frontend — build échec après {N} itérations
 CAUSE: [BUILD_LOOP_EXHAUSTED] {message condensé}
-FIX: revoir l'US workspace/output/us/{n}-{m}-*.md ou les stacks frontend/ui actifs ;
+FIX: revoir l'US workspace/us/{n}-{m}-*.md ou les stacks frontend/ui actifs ;
      OU augmenter BuildLoopMaxIter dans Project Config
 ```
 
@@ -432,9 +432,9 @@ attendus, tout est testé par un script Python (~0 token LLM).
 Invoquer :
 ```bash
 python .claude/python/sdd_scripts/validate_fidelity.py \
-  --html-path "workspace/input/ui/{n}-{m}-{Name}.html" \
-  --generated-dir "workspace/output/src/{AppName}" \
-  --theme-path "workspace/output/src/{AppName}/wwwroot/css/theme.css" \
+  --html-path "workspace/ui/{n}-{m}-{Name}.html" \
+  --generated-dir "workspace/src/{AppName}" \
+  --theme-path "workspace/src/{AppName}/wwwroot/css/theme.css" \
   --hex-tolerance-max-pct {valeur Project Config, default 5} \
   --us-id {n}-{m} \
   --json
@@ -449,7 +449,7 @@ Parser le JSON. Selon `summary.decision` et exit code :
 | `2` | FAIL | corriger les `MISSING` (libellés/composants/hex) puis re-build (STEP 9) une fois ; si toujours FAIL → STOP + ERROR `[UI_FIDELITY_GAP]` |
 
 Le rapport JSON est persisté sous
-`workspace/output/.sys/.validation/fidelity-{n}-{m}.json` (canonical
+`workspace/.sys/.validation/fidelity-{n}-{m}.json` (canonical
 location, jamais à la racine du repo). Stdout reçoit le verdict humain.
 
 **Override humain** dans le HTML : commentaire
@@ -457,7 +457,7 @@ location, jamais à la racine du repo). Stdout reçoit le verdict humain.
 le hex (déjà géré par le script).
 
 **Configurable** : `HexToleranceMaxPct` dans `## Project Config` de
-`workspace/input/stack/stack.md` (default 5, range 0-20, 0 = strict exact).
+`workspace/stack/stack.md` (default 5, range 0-20, 0 = strict exact).
 
 **Limite** : check purement textuel. La disposition pixel-exacte reste
 de la responsabilité humaine.
@@ -468,7 +468,7 @@ de la responsabilité humaine.
 
 **Déclenchement** : build vert au STEP 9 + fidelity check STEP 10+11
 terminé. Pattern partagé — appliquer `@.claude/rules/build-and-loop.md §6`
-avec `--claude-md "workspace/output/src/{AppName}/CLAUDE.md"`. Exit
+avec `--claude-md "workspace/src/{AppName}/CLAUDE.md"`. Exit
 code 1 → loguer en STEP 12.
 
 ---
@@ -490,7 +490,7 @@ Aucun autre texte.
 
 Substance partagée — `@.claude/rules/build-and-loop.md §3` (7 bullets canoniques).
 Spécifique dev-frontend :
-- Seul le HTML de l'US courante (`workspace/input/ui/{n}-{m}-*.html`)
+- Seul le HTML de l'US courante (`workspace/ui/{n}-{m}-*.html`)
   est lu — jamais les autres mockups
 - Aucun composant hors mapping `.claude/stacks/ui/{stack}.md §2/§7`
 - Aucun libellé/couleur/icône non présent dans le HTML ou l'US
@@ -503,6 +503,10 @@ Patterns partagés avec `dev-backend` (context budget HARD-GATE, LibName
 lock, anti-derive bullets, QA ownership interdits, stack-completeness,
 BREAKING CHANGES cleanup, reads on-demand cas-limite) :
 **`@.claude/rules/build-and-loop.md`** — source de vérité unique.
+
+Sync vérifiée 2026-06-11 : l'édition `build-and-loop.md` du jour (audit MA-2 —
+renommage modèle Opus 4.7 → 4.8 dans le dispatch From-Plan §7.7) est purement
+cosmétique ; la substance inlinée ici (§3 anti-derive, §6 BREAKING, §7 plan) est inchangée.
 
 Spécifique dev-frontend (résumé) :
 - `[STACK_LIBRARY_MISSING]` sur lib hors §2.4 du stack frontend OU

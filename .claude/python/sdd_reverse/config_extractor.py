@@ -24,7 +24,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from sdd_reverse.scan_legacy import normalize_bytes
+from sdd_reverse.scan_legacy import normalize_bytes, read_text_normalized as _read_text
 
 CONFIG_SCHEMA_VERSION = 1
 
@@ -130,11 +130,7 @@ def parse_appsettings_json(text: str, source: str) -> list[dict[str, Any]]:
     return out
 
 
-def _read_text(path: Path) -> str:
-    try:
-        return normalize_bytes(path.read_bytes()).decode("utf-8", errors="replace")
-    except OSError:
-        return ""
+# _read_text centralise dans scan_legacy (audit 2026-06-11 B5 — cap 5 Mo).
 
 
 def extract_config(project_root: str | Path, scan_result: Any) -> dict[str, Any]:

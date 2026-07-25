@@ -45,25 +45,25 @@ def _bootstrap(repo: Path, stack: str = STACK_OK, us: list[str] | None = None,
                html: list[str] | None = None,
                project_dirs: list[str] | None = None) -> None:
     """Create stack.md + optional US files + optional html files + optional projects."""
-    stack_dir = repo / "workspace" / "input" / "stack"
+    stack_dir = repo / "workspace" / "stack"
     stack_dir.mkdir(parents=True)
     (stack_dir / "stack.md").write_text(stack, encoding="utf-8")
 
     if us:
-        us_dir = repo / "workspace" / "output" / "us"
+        us_dir = repo / "workspace" / "us"
         us_dir.mkdir(parents=True)
         for filename in us:
             (us_dir / filename).write_text("# US", encoding="utf-8")
 
     if html:
-        ui_dir = repo / "workspace" / "input" / "ui"
+        ui_dir = repo / "workspace" / "ui"
         ui_dir.mkdir(parents=True)
         for filename in html:
             (ui_dir / filename).write_text("<!doctype html>", encoding="utf-8")
 
     if project_dirs:
         for name in project_dirs:
-            d = repo / "workspace" / "output" / "src" / name
+            d = repo / "workspace" / "src" / name
             d.mkdir(parents=True)
             (d / "CLAUDE.md").write_text("# proj", encoding="utf-8")
             (d / f"{name}.csproj").write_text("<Project/>", encoding="utf-8")
@@ -315,7 +315,7 @@ def test_main_project_claude_md_missing(fake_repo):
 def test_main_project_not_init_when_no_project_file(fake_repo):
     """ApiSrv dir exists with CLAUDE.md but no .csproj → PROJECT_NOT_INIT."""
     _bootstrap(fake_repo, us=["1-2-Foo.md"])
-    d = fake_repo / "workspace" / "output" / "src" / "ApiSrv"
+    d = fake_repo / "workspace" / "src" / "ApiSrv"
     d.mkdir(parents=True)
     (d / "CLAUDE.md").write_text("# proj", encoding="utf-8")
     # no project file

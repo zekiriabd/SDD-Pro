@@ -69,7 +69,7 @@ Nuxt 3 + Nitro (Node 22)
 
 ## 1.3 Mapping couche → repertoire
 
-Un seul projet sous `workspace/output/src/{AppName}/`. **Convention single-project — `{BackendName}` et `{LibName}` ne s'appliquent pas**. Arch leve WARNING `[STACK_MALFORMED]` si declares avec valeur non null.
+Un seul projet sous `workspace/src/{AppName}/`. **Convention single-project — `{BackendName}` et `{LibName}` ne s'appliquent pas**. Arch leve WARNING `[STACK_MALFORMED]` si declares avec valeur non null.
 
 | Layer | Path |
 |---|---|
@@ -95,11 +95,11 @@ Un seul projet sous `workspace/output/src/{AppName}/`. **Convention single-proje
 | Global CSS | `assets/css/main.css` |
 
 **Manifestes** :
-- Project file → `workspace/output/src/{AppName}/package.json`
-- Nuxt config → `workspace/output/src/{AppName}/nuxt.config.ts`
+- Project file → `workspace/src/{AppName}/package.json`
+- Nuxt config → `workspace/src/{AppName}/nuxt.config.ts`
 - TS config → genere automatiquement par Nuxt (`.nuxt/tsconfig.json`) + override dans `tsconfig.json` racine
-- ESLint → `workspace/output/src/{AppName}/eslint.config.mjs` (`@nuxt/eslint`)
-- App entry → `workspace/output/src/{AppName}/app.vue` (root component avec `<NuxtLayout>` + `<NuxtPage>`)
+- ESLint → `workspace/src/{AppName}/eslint.config.mjs` (`@nuxt/eslint`)
+- App entry → `workspace/src/{AppName}/app.vue` (root component avec `<NuxtLayout>` + `<NuxtPage>`)
 
 ---
 
@@ -152,15 +152,15 @@ Patterns reconnus : `Entity`, `Entities`, `Repository`, `Repositories`, `Migrati
 
 ## 2.2 Outils
 
-- **Project file** : `workspace/output/src/{AppName}/package.json`
-- **Build** : `(cd workspace/output/src/{AppName} && npm run build)` → `nuxt build`
-- **Dev** : `(cd workspace/output/src/{AppName} && npm run dev)` → `nuxt dev` (HMR Vite)
+- **Project file** : `workspace/src/{AppName}/package.json`
+- **Build** : `(cd workspace/src/{AppName} && npm run build)` → `nuxt build`
+- **Dev** : `(cd workspace/src/{AppName} && npm run dev)` → `nuxt dev` (HMR Vite)
 - **Generate** (SSG) : `npm run generate` → `nuxt generate` (output statique pour CDN)
 - **Smoke Command** :
 
 ```bash
-(cd workspace/output/src/{AppName} && npm install --silent && npm run build)
-test -d workspace/output/src/{AppName}/.output
+(cd workspace/src/{AppName} && npm install --silent && npm run build)
+test -d workspace/src/{AppName}/.output
 ```
 
 - **Smoke Timeout** : 180s
@@ -173,11 +173,11 @@ test -d workspace/output/src/{AppName}/.output
 ## 2.2.1 Init Commands
 
 ```bash
-if [ ! -f "workspace/output/src/{AppName}/package.json" ]; then
+if [ ! -f "workspace/src/{AppName}/package.json" ]; then
 
 # STEP 1 — Bootstrap Nuxt 3
-npx --yes nuxi@latest init workspace/output/src/{AppName} --packageManager npm --gitInit false --no-install
-cd workspace/output/src/{AppName}
+npx --yes nuxi@latest init workspace/src/{AppName} --packageManager npm --gitInit false --no-install
+cd workspace/src/{AppName}
 npm install --silent
 
 # STEP 2 — Installer Vuetify module (UI defaut) — cf. .claude/stacks/ui/vuetify.md §2.2.1
@@ -433,17 +433,17 @@ Ce stack est optimise pour :
 
 | Path | Owner |
 |---|---|
-| `workspace/output/src/{AppName}/pages/**` | `dev-frontend` |
-| `workspace/output/src/{AppName}/layouts/**` | `dev-frontend` |
-| `workspace/output/src/{AppName}/components/**` | `dev-frontend` |
-| `workspace/output/src/{AppName}/composables/**` | `dev-frontend` |
-| `workspace/output/src/{AppName}/plugins/**` | `dev-frontend` |
-| `workspace/output/src/{AppName}/app.vue` | `dev-frontend` |
-| `workspace/output/src/{AppName}/server/**` | `dev-backend` |
-| `workspace/output/src/{AppName}/shared/schemas/**` | `dev-backend` (Zod, partages) |
-| `workspace/output/src/{AppName}/nuxt.config.ts` | `arch` (create) + `dev-backend` (augment modules) + `dev-frontend` (augment css/components.dirs) |
-| `workspace/output/src/{AppName}/prisma/**` | `arch` (create) + `dev-backend` (consommation) |
-| `workspace/output/src/{AppName}/server/config/app-config.ts` | `arch` (create exclusif — secrets/config SDD) |
+| `workspace/src/{AppName}/pages/**` | `dev-frontend` |
+| `workspace/src/{AppName}/layouts/**` | `dev-frontend` |
+| `workspace/src/{AppName}/components/**` | `dev-frontend` |
+| `workspace/src/{AppName}/composables/**` | `dev-frontend` |
+| `workspace/src/{AppName}/plugins/**` | `dev-frontend` |
+| `workspace/src/{AppName}/app.vue` | `dev-frontend` |
+| `workspace/src/{AppName}/server/**` | `dev-backend` |
+| `workspace/src/{AppName}/shared/schemas/**` | `dev-backend` (Zod, partages) |
+| `workspace/src/{AppName}/nuxt.config.ts` | `arch` (create) + `dev-backend` (augment modules) + `dev-frontend` (augment css/components.dirs) |
+| `workspace/src/{AppName}/prisma/**` | `arch` (create) + `dev-backend` (consommation) |
+| `workspace/src/{AppName}/server/config/app-config.ts` | `arch` (create exclusif — secrets/config SDD) |
 
 **Cas frontiere `nuxt.config.ts`** : touche par les 2 agents (modules cote backend, css/components cote frontend). Utiliser **lock** equivalent LibName cf. `build-and-loop.md §2 (Partie B)`, ou serialiser dans le pipeline.
 
@@ -452,7 +452,7 @@ Ce stack est optimise pour :
 ## 12. Smoke test attendu (post-init arch)
 
 ```bash
-cd workspace/output/src/{AppName}
+cd workspace/src/{AppName}
 npm install --silent
 test -f nuxt.config.ts
 test -f app.vue

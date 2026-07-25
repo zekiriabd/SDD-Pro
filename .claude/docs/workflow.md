@@ -47,19 +47,19 @@ flowchart TD
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                   PHASE 1 — FEAT (humain)                       │
-│  /feat-generate   → workspace/input/feats/{n}-{Name}.md                   │
+│  /feat-generate   → workspace/feats/{n}-{Name}.md                   │
 │  [interactif, max 6 questions]                                  │
 └─────────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
 │                    PHASE 2 — US (agent PO)                      │
-│  /us-generate {n} → workspace/output/us/{n}-{m}-{Name}.md (1 à 6 fichiers)│
+│  /us-generate {n} → workspace/us/{n}-{m}-{Name}.md (1 à 6 fichiers)│
 │  [autonome, Sonnet 4.6]                                         │
 └─────────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
 │       PHASE 2.5 — HTML mockups (humain dépose, optionnel)       │
-│  Humain : déposer workspace/input/ui/{n}-{m}-{Name}.html                  │
+│  Humain : déposer workspace/ui/{n}-{m}-{Name}.html                  │
 │  [pas d'agent — l'HTML est lu directement par dev-frontend]     │
 └─────────────────────────────────────────────────────────────────┘
                               ↓
@@ -84,7 +84,7 @@ flowchart TD
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
 │              PHASE 5 — QA + Quality (agent QA, optionnel)       │
-│  /qa-generate {n}     → workspace/output/qa/feat-{n}/...        │
+│  /qa-generate {n}     → console.db qa_* (rendu à la demande)    │
 │  (tests unitaires + coverage + quality scan)                    │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -92,38 +92,38 @@ flowchart TD
 ## 2. Flux complet
 
 ```
-PHASE 1   /feat-generate {Nom}     → workspace/input/feats/{n}-{Name}.md
-                                    + bootstrap workspace/output/.sys/.context/constitution.md
+PHASE 1   /feat-generate {Nom}     → workspace/feats/{n}-{Name}.md
+                                    + bootstrap workspace/.sys/.context/constitution.md
    ↓
 PHASE 1.5 /feat-deepen {n}          → FEAT enrichie + constitution §7
           [--quick]                   agent: elicitor
    ↓
-PHASE 2   /us-generate {n}          → workspace/output/us/{n}-{m}-*.md
+PHASE 2   /us-generate {n}          → workspace/us/{n}-{m}-*.md
                                     + extension constitution §3
                                       agent: po
    ↓
-PHASE 2.5 [humain dépose HTML]      → workspace/input/ui/{n}-{m}-*.html  (optionnel)
+PHASE 2.5 [humain dépose HTML]      → workspace/ui/{n}-{m}-*.html  (optionnel)
                                       pas d'agent — lecture directe par dev-frontend
    ↓
-PHASE 2.6 /feat-validate {n}        → workspace/output/.sys/.validation/{n}-readiness.md
+PHASE 2.6 /feat-validate {n}        → workspace/.sys/.validation/{n}-readiness.md
                                       script: validate_readiness.py (déterministe)
                                       (v6.0 : 100% déterministe, plus d'agent)
                                       Décision: 🟢 GO / 🟡 WARN / 🔴 NO-GO
    ↓
-PHASE 2.7 /dev-plan {n}             → workspace/output/plans/{n}-{m}-*.{back,front}.md
+PHASE 2.7 /dev-plan {n}             → workspace/plans/{n}-{m}-*.{back,front}.md
           [si WARN/NO-GO + --force,   agents: dev-backend + dev-frontend (mode :plan)
            ou --plan, ou              checkpoint humain : ok | stop | retry
            PlanReviewDefault]
    ↓
-PHASE 3   /arch-init                → workspace/output/src/{Apps}/  + ADRs
+PHASE 3   /arch-init                → workspace/src/{Apps}/  + ADRs
                                       agent: arch (Phase A bootstrap, B DB, C CLAUDE.md, D ADRs)
    ↓
-PHASE 4   /dev-run {n} [--force]    → workspace/output/src/.../*.cs / *.razor / *.ts
+PHASE 4   /dev-run {n} [--force]    → workspace/src/.../*.cs / *.razor / *.ts
           (gated, depuis 2026-05-07)  4a arch+DB → 4b dev-backend ALL → 4c API Gate
                                       → 4d dev-frontend ALL (uniquement si 4c GREEN)
                                       agents: dev-backend, qa (api-tests), dev-frontend
 
-PHASE 5   /qa-generate {n} [--mode M]   → workspace/output/qa/feat-{n}/{report.md, coverage.json, quality.json}
+PHASE 5   /qa-generate {n} [--mode M]   → console.db (qa_quality, qa_coverage, qa_api_tests) — rendu à la demande
                                       agent: qa + scripts: quality_scan.py + parse_coverage.py
                                       (modes : full | tests-only | tests+coverage |
                                        quality-only | api-tests)
@@ -198,25 +198,25 @@ PHASE 5   /qa-generate {n} [--mode M]   → workspace/output/qa/feat-{n}/{report
   reads conditionnels.
 - **Détection capabilities externalisée** : `detect_capabilities.py`
   (workload déterministe, ~0 token LLM).
-- **Audit log `--force`** : `workspace/output/.sys/.audit/force-bypass.log`
+- **Audit log `--force`** : `workspace/.sys/.audit/force-bypass.log`
   trace tout bypass de readiness.
 
 ### v4.0.0 (depuis v3.2.0)
 - **Suppression de l'agent UI et de la phase 3 (UI)** : les maquettes
   ne sont plus des PNG analysées par un agent intermédiaire mais des
   **fichiers HTML statiques** déposés directement dans
-  `workspace/input/ui/{n}-{m}-{Name}.html`. L'agent `dev-frontend` lit l'HTML
+  `workspace/ui/{n}-{m}-{Name}.html`. L'agent `dev-frontend` lit l'HTML
   directement et le traduit vers le design system actif via le
   mapping §2 + §7 du stack UI.
-- **Suppression de `workspace/output/ui/`** : plus de markdown UI intermédiaire.
+- **Suppression de `workspace/ui/`** : plus de markdown UI intermédiaire.
 - **Suppression de `/ui-generate`** : la commande disparaît.
 - **Plus de fidelity pass multimodal** : la fidélité est garantie par
   lecture texte de l'HTML source (libellés, structure, classes,
   couleurs inline).
 
 ### Hérité v3
-- **Constitution + ADRs** (P2) : `workspace/output/.sys/.context/constitution.md` +
-  `workspace/output/.sys/.context/adrs/` partagés par tous les agents.
+- **Constitution + ADRs** (P2) : `workspace/.sys/.context/constitution.md` +
+  `workspace/.sys/.context/adrs/` partagés par tous les agents.
 - **Implementation Readiness Gate** (P1) : `/feat-validate {n}` bloque
   `/dev-run` en cas de FEAT trouée. Bypass via `--force`.
 - **Élicitation structurée** (P3, optionnelle) : `/feat-deepen {n}`

@@ -1,6 +1,6 @@
 ---
 name: reverse-ui-extractor
-description: Pour UNE unité U-N donnée (Phase 4 reverse), lit les templates legacy + CSS + le FEAT déjà produit par Phase 3, et synthétise 1 à N écrans HTML sémantiques préservant la structure visuelle legacy SANS clonage pixel-perfect. Délègue parsing à css_palette_extractor + ui_template_parser. Output workspace/input/ui/{n}-{m}-{Name}.html. Aucun spawn d'agent.
+description: Pour UNE unité U-N donnée (Phase 4 reverse), lit les templates legacy + CSS + le FEAT déjà produit par Phase 3, et synthétise 1 à N écrans HTML sémantiques préservant la structure visuelle legacy SANS clonage pixel-perfect. Délègue parsing à css_palette_extractor + ui_template_parser. Output workspace/ui/{n}-{m}-{Name}.html. Aucun spawn d'agent.
 model: claude-opus-4-8
 tools: Read, Write, Edit, Glob, Grep, Bash
 loader: .claude/loader.reverse.yml
@@ -21,7 +21,7 @@ Pour une unité fonctionnelle déjà extraite en FEAT (Phase 3), produire des mo
 Arguments requis : `{U-N}` (ex. `U-3`).
 
 1. `workspace/old/{P}/.sys/inventory.json` existe et contient `units[id={U-N}]`
-2. La FEAT correspondante existe : `workspace/input/feats/{n}-{Name}.md` (Phase 3 préalable)
+2. La FEAT correspondante existe : `workspace/feats/{n}-{Name}.md` (Phase 3 préalable)
 3. `inventory.json._featAllocations[{U-N}]` est renseigné (résolution `n` figée)
 
 Sinon → STOP + ERROR `[REVERSE_UNIT_NOT_FOUND]` ou `[REVERSE_NO_SOURCE]`.
@@ -30,7 +30,7 @@ Sinon → STOP + ERROR `[REVERSE_UNIT_NOT_FOUND]` ou `[REVERSE_NO_SOURCE]`.
 
 Read en mémoire :
 1. `workspace/old/{P}/.sys/inventory.json` → `units[id={U-N}]`
-2. `workspace/input/feats/{n}-{Name}.md` (le contrat sémantique de Phase 3)
+2. `workspace/feats/{n}-{Name}.md` (le contrat sémantique de Phase 3)
 3. **Tous les templates de l'unité** : fichiers de `units[U-N].evidenceFiles` dont extension ∈ {`.aspx`, `.ascx`, `.cshtml`, `.jsp`, `.blade.php`, `.html`, `.dfm`, `.frm`, `.xaml`} (`.xaml` ajouté 2026-06-10 — audit M12)
 4. **Sélectif CSS** : tous les `.css` du projet (limite : ≤ 10 fichiers, ≤ 200 KB total)
 
@@ -42,7 +42,12 @@ Délégation aux scripts déterministes (jamais émuler ce parsing en LLM) :
 
 ```bash
 # Palette globale (1 fois par projet)
+# NOTE: `import sys; sys.path.insert(0, '.claude/python')` est OBLIGATOIRE en
+# tête — .claude/python n'est pas sur le PYTHONPATH par défaut ; sans ce
+# bootstrap, `from sdd_reverse...` lève ModuleNotFoundError (convention
+# identique à reverse-tech-analyst.md). Invoquer depuis la racine du repo.
 python -c "
+import sys; sys.path.insert(0, '.claude/python')
 from sdd_reverse.scan_legacy import load_signatures, scan_project
 from sdd_reverse.css_palette_extractor import extract_palette
 import json
@@ -53,6 +58,7 @@ print(json.dumps(extract_palette('workspace/old/{P}', sr), indent=2))
 
 # Parsing template par fichier evidence UI
 python -c "
+import sys; sys.path.insert(0, '.claude/python')
 from sdd_reverse.ui_template_parser import parse_template
 import json
 print(json.dumps(parse_template('workspace/old/{P}/Login.aspx'), indent=2))
@@ -63,18 +69,43 @@ Récupérer :
 - `palette` : couleurs (top 20) + fonts (top 10) + spacings + radius
 - `parsed_templates[]` : pour chaque template evidence, structure normalisée (forms, elements, links, grids, title)
 
+**Garde-fou parseur manquant (audit C4)** : si `parse_template` renvoie
+`"error": "parser_unsupported"` (familles détectées mais sans parseur dédié —
+`delphi-dfm`, `vb6-form`), **NE PAS** générer une maquette (elle serait vide et
+trompeuse). Sauter ce template et émettre :
+
+```
+ERROR: reverse-ui-extractor U-{n} — template {chemin} non parsé
+CAUSE: [REVERSE_UI_PARSER_MISSING] famille '{parser_missing}' détectée sans parseur structurel (delphi-dfm/vb6-form)
+FIX: extraire l'écran manuellement OU attendre le parseur dédié (roadmap) ; ne pas produire de maquette vide
+```
+
+WARN non bloquant : si **tous** les templates d'une unité sont `parser_unsupported`,
+l'unité est skippée pour la Phase 4 (aucun `.html` écrit) et signalée — jamais
+un fichier vide.
+
 ## STEP 3 — Identification des écrans `{m}`
 
-Une unité fonctionnelle peut nécessiter **plusieurs écrans HTML** :
+Une unité fonctionnelle peut nécessiter **plusieurs écrans HTML**, un par US :
 - `{n}-1-{Name}.html` : écran principal (par défaut le template principal de l'unité)
 - `{n}-2-{Name}.html` : écran secondaire (ex. modale de confirmation associée, étape wizard 2)
 - ...
 
 Règle d'identification : par défaut **1 écran = 1 template** parmi les evidence files de l'unité. Pour wizard multi-step, créer un écran par step. Pour modale de confirmation associée à un grid, créer un 2nd écran. Limite : ≤ 5 écrans par unité (sinon split l'unité en V2+).
 
+> **Nommage `{Name}` = slug de l'US illustrée (audit nommage 2026-06-16)** :
+> le `{Name}` du mockup `{n}-{m}-{Name}.html` n'est PAS le nom d'unité répété —
+> il **doit matcher le basename de l'US correspondante** (`CLAUDE.md §1` : basename
+> identique à travers US/mockup/plan). Pour chaque écran `{m}`, Glob
+> `workspace/us/{n}-{m}-*.md` (Phase 3 a déjà produit les US) et **réutiliser
+> exactement le slug** du basename trouvé (ex. US `1-2-Piloter-Acces-Actions.md` →
+> mockup `1-2-Piloter-Acces-Actions.html`). Si l'écran ne correspond à aucune US
+> (écran secondaire sans US dédiée), dériver un slug distinctif du titre de l'écran
+> sous un `{m}` libre. Jamais `{n}-{m}-{FeatName}.html` répété.
+
 ## STEP 4 — Génération HTML sémantique
 
-Pour chaque écran identifié, produire un fichier HTML5 propre dans `workspace/input/ui/{n}-{m}-{Name}.html` :
+Pour chaque écran identifié, produire un fichier HTML5 propre dans `workspace/ui/{n}-{m}-{Name}.html` :
 
 ### Structure obligatoire
 
@@ -148,12 +179,12 @@ Une `<table>` de grid ne doit **jamais** être générée vide quand `columns[]`
 ## STEP 5 — Confirmation chat
 
 ```
-[REVERSE] {U-N} → {N} écran(s) UI workspace/input/ui/{n}-{m}-{Name}.html. (75%)
+[REVERSE] {U-N} → {N} écran(s) UI workspace/ui/{n}-{m}-{Name}.html. (75%)
 ```
 
 ## Anti-derive strict
 
-1. **Aucune écriture** hors `workspace/input/ui/{n}-{m}-{Name}.html`
+1. **Aucune écriture** hors `workspace/ui/{n}-{m}-{Name}.html`
 2. **Lecture bornée** : 15 fichiers Read max (templates + CSS sélectifs)
 3. **No-spawn** : aucun agent spawné
 4. **Pas de framework UI** dans le HTML généré (sémantique pur)

@@ -34,21 +34,21 @@ Pour `ArchiPattern: microservice` → voir `archi/microservice.md` (httpx + tena
 
 | Couche canonique (archi/mvc.md §3) | Path Python-specific |
 |---|---|
-| App entry | `workspace/output/src/{BackendName}/main.py` (FastAPI app + routers mount) |
-| Config | `workspace/output/src/{BackendName}/config.py` (Pydantic Settings, depuis 2026-05-14) |
-| Endpoint (APIRouter) | `workspace/output/src/{BackendName}/endpoints/` |
-| Service interface | `workspace/output/src/{BackendName}/services/interfaces/` (abc.ABC) |
-| Service impl | `workspace/output/src/{BackendName}/services/` |
-| Mapper | `workspace/output/src/{BackendName}/mappers/` (fonctions ou classes statiques) |
-| Entity (SQLAlchemy) | `workspace/output/src/{BackendName}/entities/` |
-| DB Session config | `workspace/output/src/{BackendName}/entities/db/` |
-| Middleware | `workspace/output/src/{BackendName}/middleware/` |
-| Resources i18n | `workspace/output/src/{BackendName}/resources/` (`.po`/`.mo`) |
-| Migrations Alembic | `workspace/output/src/{BackendName}/alembic/` |
-| Input DTO | `workspace/output/src/{LibName}/inputs/` (Pydantic) |
-| Output DTO | `workspace/output/src/{LibName}/outputs/` |
-| Model DTO | `workspace/output/src/{LibName}/models/` |
-| Project file | `workspace/output/src/{BackendName}/pyproject.toml` |
+| App entry | `workspace/src/{BackendName}/main.py` (FastAPI app + routers mount) |
+| Config | `workspace/src/{BackendName}/config.py` (Pydantic Settings, depuis 2026-05-14) |
+| Endpoint (APIRouter) | `workspace/src/{BackendName}/endpoints/` |
+| Service interface | `workspace/src/{BackendName}/services/interfaces/` (abc.ABC) |
+| Service impl | `workspace/src/{BackendName}/services/` |
+| Mapper | `workspace/src/{BackendName}/mappers/` (fonctions ou classes statiques) |
+| Entity (SQLAlchemy) | `workspace/src/{BackendName}/entities/` |
+| DB Session config | `workspace/src/{BackendName}/entities/db/` |
+| Middleware | `workspace/src/{BackendName}/middleware/` |
+| Resources i18n | `workspace/src/{BackendName}/resources/` (`.po`/`.mo`) |
+| Migrations Alembic | `workspace/src/{BackendName}/alembic/` |
+| Input DTO | `workspace/src/{LibName}/inputs/` (Pydantic) |
+| Output DTO | `workspace/src/{LibName}/outputs/` |
+| Model DTO | `workspace/src/{LibName}/models/` |
+| Project file | `workspace/src/{BackendName}/pyproject.toml` |
 
 ### 1.4 Override principes (Python-specific)
 
@@ -79,11 +79,11 @@ Hérités de `archi/mvc.md §4`. **Ajouts** Python :
 
 ### 2.2 Outils
 
-- **Project file** : `workspace/output/src/{BackendName}/pyproject.toml`
-- **Build** : `cd workspace/output/src/{BackendName} && pip install -e .` (mode dev)
+- **Project file** : `workspace/src/{BackendName}/pyproject.toml`
+- **Build** : `cd workspace/src/{BackendName} && pip install -e .` (mode dev)
 - **Smoke Command** :
   ```bash
-  cd workspace/output/src/{BackendName}
+  cd workspace/src/{BackendName}
   uvicorn main:app --host 0.0.0.0 --port 8000 &
   APP_PID=$!; sleep 5
   curl -sf http://localhost:8000/health -o /dev/null
@@ -100,9 +100,9 @@ Hérités de `archi/mvc.md §4`. **Ajouts** Python :
 
 ```bash
 # Skip si pyproject.toml existe déjà
-if [ ! -f "workspace/output/src/{BackendName}/pyproject.toml" ]; then
-  mkdir -p workspace/output/src/{BackendName}
-  cd workspace/output/src/{BackendName}
+if [ ! -f "workspace/src/{BackendName}/pyproject.toml" ]; then
+  mkdir -p workspace/src/{BackendName}
+  cd workspace/src/{BackendName}
 
   # Bootstrap pyproject.toml
   cat > pyproject.toml << 'EOF'
@@ -124,7 +124,7 @@ EOF
   python -m venv .venv
 fi
 
-cd workspace/output/src/{BackendName}
+cd workspace/src/{BackendName}
 source .venv/bin/activate 2>/dev/null || .venv\\Scripts\\activate
 
 # uv recommande (plus rapide que pip). Si vous restez sur pip, remplacer
@@ -134,7 +134,7 @@ source .venv/bin/activate 2>/dev/null || .venv\\Scripts\\activate
 <!-- CORE_PACKAGES_START -->
 ```bash
 # Auto-genere depuis python-fastapi.libs.json -- ne pas editer (utiliser sync_stack_md.py).
-uv add --project workspace/output/src/{BackendName} \
+uv add --project workspace/src/{BackendName} \
   fastapi==0.115.5 \
   uvicorn[standard]==0.32.1 \
   pydantic==2.10.3 \
@@ -159,22 +159,22 @@ uv add --project workspace/output/src/{BackendName} \
 ```bash
 # Auto-genere depuis python-fastapi.libs.json (on-demand) -- installe par dev-* si l'US declenche un trigger.
 # capability: auth-local
-uv add --project workspace/output/src/{BackendName} passlib[bcrypt]==1.7.4
+uv add --project workspace/src/{BackendName} passlib[bcrypt]==1.7.4
 
 # capability: jwt
-uv add --project workspace/output/src/{BackendName} python-jose[cryptography]==3.3.0
+uv add --project workspace/src/{BackendName} python-jose[cryptography]==3.3.0
 
 # capability: excel
-uv add --project workspace/output/src/{BackendName} openpyxl==3.1.5
+uv add --project workspace/src/{BackendName} openpyxl==3.1.5
 
 # capability: pdf
-uv add --project workspace/output/src/{BackendName} reportlab==4.2.5
+uv add --project workspace/src/{BackendName} reportlab==4.2.5
 ```
 <!-- ONDEMAND_PACKAGES_END -->
 
 ```bash
 # Driver DB selon DatabaseType (voir §4.1)
-# uv add --project workspace/output/src/{BackendName} asyncpg|aiomysql|aioodbc
+# uv add --project workspace/src/{BackendName} asyncpg|aiomysql|aioodbc
 
 # Créer arborescence
 mkdir -p endpoints services/interfaces services mappers entities/db
@@ -296,7 +296,7 @@ Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'U
 ### 3.1 Configuration via Pydantic Settings (peuplée par arch, depuis 2026-05-14)
 
 **Source de vérité** : blocs `## Active Database` et `## Active Auth
-Specs` de `workspace/input/stack/stack.md`. L'agent `arch` Phase A —
+Specs` de `workspace/stack/stack.md`. L'agent `arch` Phase A —
 STEP 4.5 écrit `app/config.py` avec les valeurs en **defaults Python**
 (plus de fichier `.env` requis ; pydantic permet quand même l'override
 par env var native si besoin runtime).
@@ -578,7 +578,7 @@ url = URL.create(drivername="sqlite+aiosqlite", database=db_settings.name)
 
 Init :
 ```bash
-cd workspace/output/src/{BackendName}
+cd workspace/src/{BackendName}
 alembic init alembic
 ```
 
@@ -649,17 +649,17 @@ schéma DB existant).
 ```bash
 # arch compose l'URL en RAM depuis ## Active Database de stack.md (cf. STEP 8)
 # et la passe en argument au sqlacodegen (jamais via env var persistante)
-uv add --dev --project workspace/output/src/{BackendName} sqlacodegen
-uv run --project workspace/output/src/{BackendName} sqlacodegen \
+uv add --dev --project workspace/src/{BackendName} sqlacodegen
+uv run --project workspace/src/{BackendName} sqlacodegen \
   "<URL composée par arch en RAM depuis db_config>" \
   --generator declarative \
-  --outfile workspace/output/src/{BackendName}/entities/db/models.py
+  --outfile workspace/src/{BackendName}/entities/db/models.py
 ```
 
 Pour `--generator` : `declarative` (recommandé, SQLAlchemy 2.x typed),
 `tables` (Core), ou `dataclasses` (style dataclass).
 
-**Output** : `workspace/output/src/{BackendName}/entities/db/models.py`
+**Output** : `workspace/src/{BackendName}/entities/db/models.py`
 (une classe `Base` + une classe par table).
 
 **Idempotence** : sqlacodegen écrase le fichier en entier. arch détecte

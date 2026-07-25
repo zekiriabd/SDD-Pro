@@ -25,20 +25,20 @@ family: backend
 
 ## Files
 
-- path: workspace/output/src/SimBackend/Services/AuthService.cs
+- path: workspace/src/SimBackend/Services/AuthService.cs
   operation: augment
   layer: Service
   preserves: [AUTH-LOGIN-V1, AUTH-SESSION]
   adds: [AUTH-REFRESH-V2]
   covers_acs: [AC-1, AC-3]
 
-- path: workspace/output/src/SimBackend/Endpoints/AuthEndpoints.cs
+- path: workspace/src/SimBackend/Endpoints/AuthEndpoints.cs
   operation: create
   layer: Endpoint
   adds: [AUTH-ENDPOINT-LOGIN]
   covers_acs: [AC-2]
 
-- path: workspace/output/src/SimBackend/DTOs/LoginDto.cs
+- path: workspace/src/SimBackend/DTOs/LoginDto.cs
   operation: create
   layer: DTO
   covers_acs: [AC-1]
@@ -49,7 +49,7 @@ class TestPathInPlan(unittest.TestCase):
     def test_full_path_match(self):
         self.assertTrue(_path_in_plan(
             PLAN_SAMPLE,
-            "workspace/output/src/SimBackend/Services/AuthService.cs",
+            "workspace/src/SimBackend/Services/AuthService.cs",
             "AuthService.cs",
         ))
 
@@ -64,7 +64,7 @@ class TestFindBlockForFile(unittest.TestCase):
     def test_finds_block_by_full_path(self):
         block = _find_block_for_file(
             PLAN_SAMPLE,
-            "workspace/output/src/SimBackend/Services/AuthService.cs",
+            "workspace/src/SimBackend/Services/AuthService.cs",
             "AuthService.cs",
         )
         self.assertIsNotNone(block)
@@ -87,7 +87,7 @@ class TestFindBlockForFile(unittest.TestCase):
     def test_isolates_block_at_eof(self):
         block = _find_block_for_file(
             PLAN_SAMPLE,
-            "workspace/output/src/SimBackend/DTOs/LoginDto.cs",
+            "workspace/src/SimBackend/DTOs/LoginDto.cs",
             "LoginDto.cs",
         )
         self.assertIsNotNone(block)

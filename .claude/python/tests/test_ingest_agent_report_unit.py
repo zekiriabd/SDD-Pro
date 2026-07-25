@@ -32,7 +32,7 @@ def fake_repo(tmp_path, monkeypatch):
 
 
 def _db(repo: Path) -> sqlite3.Connection:
-    conn = sqlite3.connect(str(repo / "workspace" / "output" / "db" / "console.db"))
+    conn = sqlite3.connect(str(repo / "workspace" / "db" / "console.db"))
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -49,9 +49,10 @@ def _write_report(repo: Path, report_type: str, feat: int, body: dict) -> Path:
 
 
 def test_default_path_a11y(tmp_path):
+    # 2026-07-06 : all transient reports live under .sys/.validation/ (no qa/)
     p = iar.default_path("a11y", 3, tmp_path)
-    assert p.name == "a11y-report.json"
-    assert "feat-3" in str(p)
+    assert p.name == "3-a11y-report.json"
+    assert ".validation" in str(p).replace("\\", "/")
 
 
 def test_default_path_code_review(tmp_path):
@@ -66,7 +67,8 @@ def test_default_path_threat_model(tmp_path):
 
 def test_default_path_api_tests(tmp_path):
     p = iar.default_path("api-tests", 2, tmp_path)
-    assert p.name == "api-tests.json"
+    assert p.name == "2-api-tests.json"
+    assert ".validation" in str(p).replace("\\", "/")
 
 
 # ---------- _flatten_issues ----------
@@ -342,8 +344,8 @@ def test_ingest_db_insert_failure_returns_3(monkeypatch, fake_repo, capsys):
 
 def test_default_path_adversarial(tmp_path):
     p = iar.default_path("adversarial", 4, tmp_path)
-    assert p.name == "adversarial.json"
-    assert "feat-4" in str(p)
+    assert p.name == "4-adversarial.json"
+    assert ".validation" in str(p).replace("\\", "/")
 
 
 def _make_adversarial(attacks: list[dict] | None = None,

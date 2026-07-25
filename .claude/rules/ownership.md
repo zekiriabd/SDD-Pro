@@ -1,3 +1,12 @@
+---
+# TOK-C1 (audit 2026-06-12) : chargement paresseux (path-scoped rule). Lue on-demand par
+# dev-*/arch/po/constitutioner ; auto-injection au contact des artefacts workspace (src, us,
+# feats, .sys/.context). Hors-périmètre (chat, maintenance pure) : 0 token.
+paths:
+  - "workspace/**"
+  - "workspace/feats/**"
+---
+
 # Règle — Ownership (File matrix + Constitution + ADRs, consolidated v7.0.0)
 
 > **v7.0.0 merge** : fusionne `file-ownership.md` (matrice path → owner
@@ -35,20 +44,21 @@ non déterministes.
 
 | Fichier / Répertoire | Owner exclusif | Mode | Phase |
 |---|---|---|---|
-| `workspace/output/src/{BackendName}/**` (Program.cs, Services, Endpoints, DTOs, Mappers, Validators, Entities augmentées) | `dev-backend` | Edit-augment exclusif | 5 |
-| `workspace/output/src/{AppName}/**` (Program.cs, Pages, Components, Layouts, theme.css, Auth, Services, Validators) | `dev-frontend` | Edit-augment exclusif | 5 |
-| `workspace/output/src/{AppName}.sln` | `arch` | Create + add-project | 4 |
-| `workspace/output/src/{LibName}/**` (DTOs, Models, Inputs, Outputs partagés) | `arch` (création) | First-write wins + lock (§4) | 4-5 |
-| `workspace/output/db/schema.{json,md,diff.md}` | `arch` | Create exclusif | 4 |
-| `workspace/output/src/{Project}/CLAUDE.md` (par projet) | `arch` (création/régénération) ; `dev-*` (marquage RESOLVED §6.bis) | Create + Edit hash exclusif (arch) ; Edit narrow (dev-*) | 4-5 |
-| `workspace/output/.sys/.context/constitution.md` | **séquentiel** : `/feat-generate` → `po` (§3) → `arch` (§4, §6) → `elicitor` (§7) | Append-only par section | 1, 2, 4, 1.5 |
-| `workspace/output/.sys/.context/adrs/ADR-*.md` | **multi-writers** | Numérotation atomique timestamp (§3) | 4, 5 |
-| `workspace/output/.sys/.context/adrs/INDEX.md` | `sdd_scripts/index_adrs.py` (depuis v7.0.0, ex-agent `dashboard` retiré) ; `arch` continue à pouvoir l'écrire | Create overwrite (idempotent) | fin pipeline / arch STEP 12.7 |
-| `workspace/output/us/{n}-{m}-*.md` | `po` | Create exclusif (1 fichier = 1 US) | 2 |
-| `workspace/input/ui/{n}-{m}-*.html` | UX Designer humain | Read-only stricte côté agents | 2.5 |
-| `workspace/output/plans/{n}-{m}-*.{back\|front}.md` | `dev-backend` (`.back`) / `dev-frontend` (`.front`) | Create exclusif (mode `:plan`) | 2.7 |
-| `workspace/output/.sys/.validation/{n}-readiness.md` | `/feat-validate` | Create exclusif | 2.6 |
-| `workspace/input/feats/{n}-*.md` | `/feat-generate` puis `elicitor` (append-only) | Sérialisé | 1, 1.5 |
+| `workspace/src/{BackendName}/**` (Program.cs, Services, Endpoints, DTOs, Mappers, Validators, Entities augmentées) | `dev-backend` | Edit-augment exclusif | 5 |
+| `workspace/src/{AppName}/**` (Program.cs, Pages, Components, Layouts, theme.css, Auth, Services, Validators) | `dev-frontend` | Edit-augment exclusif | 5 |
+| `workspace/src/{AppName}.sln` | `arch` | Create + add-project | 4 |
+| `workspace/src/{LibName}/**` (DTOs, Models, Inputs, Outputs partagés) | `arch` (création) | First-write wins + lock (§4) | 4-5 |
+| `workspace/db/schema.{json,md,diff.md}` | `arch` | Create exclusif | 4 |
+| `workspace/src/{Project}/CLAUDE.md` (par projet) | `arch` (création/régénération) ; `dev-*` (marquage RESOLVED §6.bis) | Create + Edit hash exclusif (arch) ; Edit narrow (dev-*) | 4-5 |
+| `workspace/.sys/.context/constitution.md` | **séquentiel** : `/feat-generate` (bootstrap §1-§3) → `po` (§3 acteurs) → `elicitor` (§7) → `constitutioner` (§1 date, §4 stack, §6 ADRs index) | Append-only par section | 1, 2, 1.5, 3.5 |
+| `workspace/.sys/.context/adrs/ADR-*.md` | `constitutioner` (owner EXCLUSIF depuis 2026-05-13) | Numérotation atomique timestamp (§3) | 3.5 |
+| `workspace/.sys/.context/adrs/INDEX.md` | `constitutioner` (régénère, owner) ; `sdd_scripts/index_adrs.py` (rebuild 0-token déterministe hors pipeline) | Create overwrite (idempotent) | 3.5 / fin pipeline |
+| `workspace/us/{n}-{m}-*.md` | `po` | Create exclusif (1 fichier = 1 US) | 2 |
+| `workspace/ui/{n}-{m}-*.html` | UX Designer humain | Read-only stricte côté agents | 2.5 |
+| `workspace/plans/{n}-{m}-*.{back\|front}.md` | `dev-backend` (`.back`) / `dev-frontend` (`.front`) | Create exclusif (mode `:plan`) | 2.7 |
+| `workspace/.sys/.validation/{n}-readiness.md` | `/feat-validate` | Create exclusif | 2.6 |
+| `workspace/.sys/.audit/` | hooks framework (`*.log`/`*.jsonl`, rotation `rotate_audit_logs.py`) **+** rapports d'audit code holistiques `AUDIT-*.md` (emplacement canonique, 2026-07-06 — ex-`output/audit/` ; `rotate_audit_logs` ne touche pas les `.md`) | Append (logs) / Create (audits) | hooks / ad-hoc |
+| `workspace/feats/{n}-*.md` | `/feat-generate` puis `elicitor` (append-only) | Sérialisé | 1, 1.5 |
 | `workspace/console/status.json` | console web + `/sdd-full` (via `gate_decide.py`) | **Atomic write + lock partagé** `.status.lock` (O_EXCL, TTL 10s, retry 5×) | LOT 2-3 |
 | `workspace/console/.status.lock` | console web OU `/sdd-full` (un seul à la fois) | Création atomique O_EXCL, supprimé après write | LOT 2-3 |
 | `workspace/console/{server.js,app.jsx,index.html,…}` | dev humain (Tech Lead) | Edit manuel — aucun agent SDD ne touche | hors pipeline |
@@ -66,12 +76,12 @@ non déterministes.
 **Bloquant** : un projet frontend ne doit **JAMAIS** être créé,
 scaffoldé ou écrit **à l'intérieur** du répertoire d'un projet backend
 (et symétriquement). Les projets vivent **au même niveau** sous
-`workspace/output/src/`.
+`workspace/src/`.
 
 ### Layout canonique
 
 ```
-workspace/output/src/
+workspace/src/
   ├── {BackendName}/        ← projet backend
   ├── {AppName}/            ← projet frontend
   ├── {LibName}/            ← projet lib partagé (si LibStrategy=shared)
@@ -89,10 +99,10 @@ workspace/output/src/
 ### Pré-check obligatoire (avant tout Write/Edit/mkdir)
 
 Path cible P doit matcher EXACTEMENT l'un de :
-- `workspace/output/src/{BackendName}/...` (owner = arch | dev-backend)
-- `workspace/output/src/{AppName}/...` (owner = arch | dev-frontend)
-- `workspace/output/src/{LibName}/...` (owner = arch | dev-* via lock)
-- `workspace/output/src/{*.sln}` (owner = arch)
+- `workspace/src/{BackendName}/...` (owner = arch | dev-backend)
+- `workspace/src/{AppName}/...` (owner = arch | dev-frontend)
+- `workspace/src/{LibName}/...` (owner = arch | dev-* via lock)
+- `workspace/src/{*.sln}` (owner = arch)
 
 `{AppName}`/`{BackendName}`/`{LibName}` = valeurs LITTÉRALES de
 `## Project Config`, pas un dérivé (`kotlin/{AppName}`, `/front`, `/web`).
@@ -111,7 +121,7 @@ STOP + ERROR `[FILE_OWNERSHIP_NESTED]` :
 ```
 ERROR: {agent} — projet front imbriqué dans le projet back
 CAUSE: [FILE_OWNERSHIP_NESTED] tentative d'écrire {path} (AppName={AppName} imbriqué sous BackendName={BackendName})
-FIX: créer/scaffolder sous workspace/output/src/{AppName}/ AU MÊME NIVEAU que {BackendName}/, jamais imbriqué
+FIX: créer/scaffolder sous workspace/src/{AppName}/ AU MÊME NIVEAU que {BackendName}/, jamais imbriqué
 ```
 
 ### Post-mortem CMS-Back 2026-05-11
@@ -122,7 +132,7 @@ monorepo impossible.
 
 ### Création répertoires output
 
-Tout agent qui écrit sous `workspace/output/...` doit créer le parent
+Tout agent qui écrit sous `workspace/...` doit créer le parent
 absent (`mkdir -p` implicite), **après** validation du pré-check. Aucun
 agent ne doit échouer sur `parent directory not found`.
 
@@ -136,17 +146,24 @@ agent ne doit échouer sur `parent directory not found`.
 PHASE 1   : /feat-generate    → §1 + §2 + §3 (création/extension)
 PHASE 1.5 : agent elicitor    → §7 (risques + hypothèses)
 PHASE 2   : agent po          → §3 (acteurs cumulés) — UN à la fois
-PHASE 4   : agent arch        → §4 (stack final) + §6 (ADRs index) — sérialisé
+PHASE 3.5 : agent constitutioner → §1 (date) + §4 (stack final) + §6 (ADRs index) — sérialisé
+PHASE 4   : agent arch        → ❌ pose seulement le sentinel disque, n'écrit PLUS §4/§6 (Phase D déléguée)
 PHASE 5   : agents dev-*      → ❌ INTERDITS d'écrire dans constitution.md
 ```
 
-**Pourquoi dev-\* exclus** : `/dev-run` lance dev-backend + dev-frontend
-en parallèle sur N US. 2×N éditions concurrentes de §6 = race garantie.
+**Pourquoi arch + dev-\* exclus** (CR-2, externalisation Phase D 2026-05-13) :
+les ADRs + constitution §1/§4/§6 + INDEX sont owned **exclusivement** par
+`constitutioner`, spawné par `/arch-init` STEP 3.5 après que `arch` ait posé
+le sentinel disque `workspace/.sys/.state/arch-ready-for-constitutioner.flag`
+(no-spawn préservé). `arch` ne fait plus la Phase D. `/dev-run` lance par ailleurs
+dev-backend + dev-frontend en parallèle sur N US → 2×N éditions concurrentes de §6
+seraient une race garantie.
 
-**Solution** : les dev-* créent uniquement des **fichiers ADR
-individuels** (numérotation atomique §3). L'index §6 est rebuild
-post-hoc par arch à la prochaine invocation. Source de vérité = `Glob
-workspace/output/.sys/.context/adrs/*.md`.
+**Solution** : `arch` et les dev-* créent au plus des **fichiers ADR
+individuels** (numérotation atomique §3) mais ne touchent JAMAIS §6 ;
+l'index §6 + INDEX.md sont (re)build par `constitutioner` (Phase 3.5) ou
+par `sdd_scripts/index_adrs.py` (déterministe, hors pipeline). Source de
+vérité = `Glob workspace/.sys/.context/adrs/*.md`.
 
 ---
 
@@ -204,25 +221,25 @@ squelette, dev-backend append `services.AddScoped<...>()`.
 
 ### Create exclusif
 1 fichier par invocation, pas de conflit (1 fichier = 1 entité). Ex.
-`workspace/output/us/{n}-{m}-*.md`, ADR par timestamp.
+`workspace/us/{n}-{m}-*.md`, ADR par timestamp.
 
 ### First-write wins + lock file (LibName, durci v5.0)
 
-`workspace/output/src/{LibName}/` peut être touché par dev-backend ET
+`workspace/src/{LibName}/` peut être touché par dev-backend ET
 dev-frontend (DTOs/Models partagés). **Verrou explicite par entité.**
 
 **Procédure** — avant tout Write/Edit sous `{LibName}/` :
 
 1. Tenter création atomique du lock (no-clobber) :
    ```bash
-   mkdir -p workspace/output/src/{LibName}/.locks
-   ( set -C; echo "$AGENT_ID:$(date -u +%s)" > "workspace/output/src/{LibName}/.locks/{Entity}.lock" ) 2>/dev/null
+   mkdir -p workspace/src/{LibName}/.locks
+   ( set -C; echo "$AGENT_ID:$(date -u +%s)" > "workspace/src/{LibName}/.locks/{Entity}.lock" ) 2>/dev/null
    ```
    - Succès (rc=0) → écrire `{Entity}.cs`
    - Échec (fichier existe) → lire le `.lock` :
      - Même `AGENT_ID` → idempotent, continuer
      - Autre `AGENT_ID` → STOP + ERROR `[LIBNAME_LOCK_HELD]`
-2. Après écriture : `rm -f "workspace/output/src/{LibName}/.locks/{Entity}.lock"`
+2. Après écriture : `rm -f "workspace/src/{LibName}/.locks/{Entity}.lock"`
 3. **Stale lock** : `.lock` > 30min (timestamp UNIX) → écraser (recovery
    crash agent / interruption).
 
@@ -312,12 +329,12 @@ mais CLAUDE.md indiquait "43 erreurs CS1061" résiduelles).
 
 ## Principe
 
-Le fichier `workspace/output/.sys/.context/constitution.md` est la **source de vérité
+Le fichier `workspace/.sys/.context/constitution.md` est la **source de vérité
 partagée** entre tous les agents SDD_Pro. Il garantit la cohérence
 sémantique cross-FEAT (glossaire, acteurs, conventions) et trace les
 décisions architecturales (ADRs).
 
-Chaque ADR (`workspace/output/.sys/.context/adrs/ADR-{nnn}-{slug}.md`) trace **une
+Chaque ADR (`workspace/.sys/.context/adrs/ADR-{nnn}-{slug}.md`) trace **une
 décision structurante** au format Context / Decision / Consequences.
 
 ---
@@ -326,7 +343,7 @@ décision structurante** au format Context / Decision / Consequences.
 
 `/feat-generate` (premier appel sur un projet) bootstrap la constitution
 avec :
-- §1 Identité (`ProjectName` = `AppName` du `workspace/input/stack/stack.md` si
+- §1 Identité (`ProjectName` = `AppName` du `workspace/stack/stack.md` si
   défini, sinon nom du dossier projet)
 - §2 Glossaire (vide initialement, étendu par les agents)
 - §3 Acteurs (extraits de la FEAT créée)
@@ -336,7 +353,7 @@ avec :
 - §7 Risques (vide tant que `/feat-deepen` n'a pas tourné)
 - §8 Index des écrivains (statique)
 
-**Idempotent** : si `workspace/output/.sys/.context/constitution.md` existe déjà, ne
+**Idempotent** : si `workspace/.sys/.context/constitution.md` existe déjà, ne
 JAMAIS l'écraser. Étendre seulement les acteurs (§3) et termes (§2)
 de la nouvelle FEAT.
 
@@ -364,13 +381,21 @@ sont :
 | `/feat-generate` | §1 (bootstrap), §2-3 (init) | Création ou extend | 1 |
 | Agent `elicitor` (`/feat-deepen`) | §7 (risques, hypothèses) | Append-only | 1.5 |
 | Agent `po` | §2 (nouveaux termes), §3 (nouveaux acteurs) | Append-only | 2 |
-| Agent `arch` | §4 (stack final + DatabaseType), §6 (ADRs index) | Update §4 / Append §6 | 4 |
+| Agent `constitutioner` | §1 (date), §4 (stack final + DatabaseType), §6 (ADRs index) + ADRs + INDEX.md | Update §1/§4 / Append §6 | 3.5 |
 
-**Modifié en v3.0.1** : les **agents `dev-*` sont désormais STRICTEMENT
-read-only** sur `constitution.md`. Ils créent leurs ADRs en fichiers
-indépendants (`workspace/output/.sys/.context/adrs/ADR-{timestamp}-{slug}.md` —
+**Modifié CR-2 (externalisation Phase D, 2026-05-13)** : l'agent `arch`
+**n'écrit PLUS** dans `constitution.md` (ni §4 ni §6) ni les ADRs. Il pose
+seulement le sentinel disque
+`workspace/.sys/.state/arch-ready-for-constitutioner.flag` en fin de
+Phase B ; `/arch-init` STEP 3.5 spawn alors `constitutioner` qui est **owner
+exclusif** de §1/§4/§6 + ADRs + INDEX (no-spawn préservé : le spawn vit dans
+la commande, pas dans l'agent arch).
+
+**Modifié en v3.0.1** : les **agents `dev-*` sont STRICTEMENT
+read-only** sur `constitution.md`. Ils créent au plus leurs ADRs en fichiers
+indépendants (`workspace/.sys/.context/adrs/ADR-{timestamp}-{slug}.md` —
 numérotation atomique, voir §4) **sans toucher §6**. L'index §6 est
-rebuild par le prochain `arch` ou ignoré (la source de vérité = les
+rebuild par `constitutioner` (Phase 3.5) ou ignoré (la source de vérité = les
 fichiers ADR eux-mêmes).
 
 **Pourquoi ?** `/dev-run` lance dev-backend + dev-frontend en
@@ -413,9 +438,10 @@ La v3.1.3 supprime cette possibilité de défaillance silencieuse.
 
 Un ADR est créé quand :
 
-- **Arch Phase C** : pour chaque décision majeure (choix backend,
-  frontend, UI DS, auth, DatabaseType, stratégie scaffolding). Au
-  moins 1 ADR par dimension active du stack.
+- **constitutioner (Phase 3.5)** : pour chaque décision majeure (choix
+  backend, frontend, UI DS, auth, DatabaseType, stratégie scaffolding). Au
+  moins 1 ADR par dimension active du stack. (arch pose le sentinel ; il
+  ne crée plus les ADRs lui-même — CR-2.)
 - **Dev-* en cours d'exécution** : si un choix d'implémentation
   important n'est pas couvert par un ADR existant ET ne découle pas
   directement du stack actif (ex. : choix d'une stratégie de
@@ -467,26 +493,26 @@ déjà prises, pas des propositions à débattre).
 
 ### 4.4 Index dans constitution.md §6
 
-⚠️ **Modifié v3.0.1** : seul l'agent `arch` (phase 4, séquentielle)
-peut écrire dans §6. Les agents `dev-*` (phase 5, parallèles) **ne
-touchent PAS** constitution.md — ils créent uniquement le fichier
-ADR.
+⚠️ **Modifié CR-2 (2026-05-13)** : seul l'agent `constitutioner`
+(phase 3.5, séquentielle) peut écrire dans §6 + INDEX.md. `arch` (Phase B)
+**ne touche PLUS** §6 — il pose le sentinel disque et délègue. Les agents
+`dev-*` (phase 5, parallèles) **ne touchent PAS** constitution.md — ils
+créent au plus le fichier ADR individuel.
 
 **Comportement par phase** :
-- **Arch (phase 4)** : après création de chaque ADR, append une ligne
-  dans le tableau §6 de `workspace/output/.sys/.context/constitution.md` :
+- **constitutioner (phase 3.5)** : après scan des ADRs sur disque, (re)build
+  intégralement le tableau §6 de `workspace/.sys/.context/constitution.md` :
   ```markdown
-  | ADR-{YYYYMMDDTHHmmss}-{rand4}-{slug} | <titre> | Accepted | 4-ARCH |
+  | ADR-{YYYYMMDDTHHmmss}-{rand4}-{slug} | <titre> | Accepted | 3.5-CONSTITUTION |
   ```
-- **Dev-* (phase 5)** : crée uniquement le fichier ADR. L'index §6
-  reste à jour seulement pour les ADRs phase 4. Pour les ADRs phase
-  5, la source de vérité = `Glob workspace/output/.sys/.context/adrs/*.md`.
+- **Dev-* (phase 5)** : crée uniquement le fichier ADR. Pour les ADRs phase
+  5, la source de vérité = `Glob workspace/.sys/.context/adrs/*.md`.
 
 Pour reconstruire l'index §6 manuellement après une session
-`/dev-run` qui aurait produit des ADRs : prochaine invocation `arch`
-(idempotente) re-scanne et reconstruit, OU régénération directe via
-`python .claude/python/sdd_scripts/index_adrs.py` (déterministe,
-0 token).
+`/dev-run` qui aurait produit des ADRs : prochaine invocation
+`constitutioner` (idempotente) re-scanne et reconstruit, OU régénération
+directe via `python .claude/python/sdd_scripts/index_adrs.py`
+(déterministe, 0 token).
 
 ---
 
@@ -526,7 +552,7 @@ Pour reconstruire l'index §6 manuellement après une session
 ## 7. Localisation des fichiers
 
 ```
-workspace/output/.sys/.context/
+workspace/.sys/.context/
 ├── constitution.md                    # 1 fichier projet, partagé
 └── adrs/
     ├── ADR-001-{slug}.md

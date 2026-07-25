@@ -52,6 +52,10 @@ from sdd_reverse.scan_legacy import decode_text, normalize_bytes
 CODE_GRAPH_SCHEMA_VERSION = 1
 
 # Extensions analyzed for the symbol-level graph (L0 = .NET object code).
+# LIMITE DOCUMENTÉE (audit 2026-06-11 M14) : le graphe classes/rôles est
+# .NET-ONLY. Java/PHP/Delphi/VB6/Classic ASP n'ont PAS de classes[] ni de
+# rôles — leur couverture passe par data_access_extractor (SQL inline) et
+# les seeds UI ci-dessous. Cf. rules/reverse-engineering.md §4.
 _ANALYZED_EXTENSIONS = frozenset({".cs", ".vb"})
 
 # --- declaration regexes (run over comment/string-masked text) ---------------
@@ -518,6 +522,7 @@ def build_code_graph(
 _MARKUP_SEED_EXTENSIONS = frozenset({
     ".xaml", ".aspx", ".ascx", ".master", ".cshtml", ".vbhtml",
     ".jsp", ".jspx", ".xhtml", ".php",
+    ".asp",  # Classic ASP (audit 2026-06-11 M14)
 })
 
 # View-class suffixes used by the MVVM naming-convention fallback

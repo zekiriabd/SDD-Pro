@@ -6,7 +6,7 @@ Invocation:
 Reports:
     - All legacy projects under workspace/old/
     - For each: phase status (init / inventory / audit / feat-extracted / ui-extracted)
-    - All reverse FEATs in workspace/input/feats/ with [REV] / [REV⚠️] markers (ADV-6)
+    - All reverse FEATs in workspace/feats/ with [REV] / [REV⚠️] markers (ADV-6)
 
 Exit codes:
     0  reported successfully (even if some phases incomplete — diagnostic, never blocking)
@@ -29,7 +29,28 @@ if __package__ in (None, ""):
 
 from sdd_reverse.console_safe import ensure_console_safe
 from sdd_reverse.feat_structure_spec import REVERSE_GATE_RE, parse_frontmatter
-from sdd_reverse.paths import repo_root
+from sdd_reverse.paths import workspace_root, repo_root
+
+
+def _read_synthesis(sys_dir: Path) -> dict[str, Any] | None:
+    """Read .sys/synthesis/manifest.json if the synthesis layer has run.
+
+    Derived/observability record (Phase 3.7) — surfaced read-only so the
+    diagnostic can report which system views exist. None when absent/corrupt.
+    """
+    manifest = sys_dir / "synthesis" / "manifest.json"
+    if not manifest.is_file():
+        return None
+    try:
+        data = json.loads(manifest.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return {
+        "docLevel": data.get("docLevel"),
+        "generatedAt": data.get("generatedAt"),
+        "artifacts": [a.get("name") for a in (data.get("artifacts") or []) if a.get("name")],
+        "confidenceRollup": data.get("confidenceRollup") or {},
+    }
 
 
 def _scan_legacy_projects(workspace_old: Path) -> list[dict[str, Any]]:
@@ -59,6 +80,7 @@ def _scan_legacy_projects(workspace_old: Path) -> list[dict[str, Any]]:
             "units_total": 0,
             "feats_extracted": 0,
             "ui_screens": 0,
+            "synthesis": _read_synthesis(sys_dir),
             "warnings": warnings,
         }
         if proj["phases"]["inventory"]:
@@ -159,13 +181,22 @@ def _render_human(
                 lines.append(f"      FEATs : {p['feats_extracted']}/{p['units_total']} unités extraites ({pct:.0f}%)")
                 if p.get("ui_screens"):
                     lines.append(f"      Mockups UI : {p['ui_screens']}")
+            # Phase 3.7 : surface synthesis layer (C4 / ERD / soul) if present
+            syn = p.get("synthesis")
+            if syn:
+                arts = ", ".join(syn.get("artifacts") or []) or "(aucun)"
+                r = syn.get("confidenceRollup") or {}
+                lines.append(
+                    f"      Synthèse ({syn.get('docLevel', '?')}) : {arts} "
+                    f"[high={r.get('high', 0)} medium={r.get('medium', 0)} low={r.get('low', 0)}]"
+                )
             # P2.11 : surface project-level warnings (corruption, IO)
             for w in p.get("warnings", []):
                 lines.append(f"      [!] {w}")
             lines.append("")
 
     lines.append("")
-    lines.append(f"FEATs reverse dans workspace/input/feats/ : {len(feats)}")
+    lines.append(f"FEATs reverse dans workspace/feats/ : {len(feats)}")
     if feats:
         lines.append("")
         for f in feats:
@@ -197,8 +228,8 @@ def main(argv: list[str] | None = None) -> int:
     import os
     override = os.environ.get("SDD_REVERSE_WORKSPACE_ROOT")
     root = Path(override).resolve() if override and Path(override).is_dir() else repo_root()
-    workspace_old = root / "workspace" / "old"
-    workspace_feats = root / "workspace" / "input" / "feats"
+    workspace_old = workspace_root(root) / "old"
+    workspace_feats = workspace_root(root) / "feats"
 
     if not workspace_old.is_dir():
         if args.json:
@@ -217,7 +248,7 @@ def main(argv: list[str] | None = None) -> int:
     # M9 closure : feats_extracted = FEAT files actually on disk whose
     # source-unit belongs to the project ; ui_screens = mockups whose leading
     # FEAT number is allocated to one of the project's units.
-    ui_dir = root / "workspace" / "input" / "ui"
+    ui_dir = workspace_root(root) / "ui"
     ui_numbers: list[int] = []
     if ui_dir.is_dir():
         for h in ui_dir.glob("*.html"):

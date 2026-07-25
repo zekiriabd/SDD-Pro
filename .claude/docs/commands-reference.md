@@ -1,6 +1,6 @@
 # 💻 Commands Reference
 
-21 slash commands : **13 user-facing** (the public API) + **8 internes [debug]** (low-level building blocks). Use the user-facing ones in everyday workflow ; the internal ones for debugging or surgical fixes.
+33 slash commands : **13 user-facing** (the public API) + **8 internes [debug]** (low-level building blocks) + **12 reverse** (legacy→FEAT module — see [reverse-engineering-workflow.md](reverse-engineering-workflow.md)). Use the user-facing ones in everyday workflow ; the internal ones for debugging or surgical fixes.
 
 | Quick legend |
 |---|
@@ -11,7 +11,7 @@
 
 ---
 
-## 🚀 User-facing (12)
+## 🚀 User-facing (13)
 
 The 4 macro-orchestrators (`sdd-bootstrap`, `sdd-full`, `sdd-poc`, `sdd-review`) cover 90% of daily use.
 
@@ -27,7 +27,7 @@ The 4 macro-orchestrators (`sdd-bootstrap`, `sdd-full`, `sdd-poc`, `sdd-review`)
 | **Idempotent** | ✅ (read-only détection état) |
 | **Outputs** | console (greenfield / partial / initialisé / template brut) |
 
-**One-liner** : Détecte l'état d'un projet vierge et guide l'utilisateur vers `python bootstrap.py` pour générer `workspace/input/stack/stack.md`.
+**One-liner** : Détecte l'état d'un projet vierge et guide l'utilisateur vers `python bootstrap.py` pour générer `workspace/stack/stack.md`.
 
 ```bash
 /sdd-bootstrap                  # détection + guide
@@ -48,7 +48,7 @@ The 4 macro-orchestrators (`sdd-bootstrap`, `sdd-full`, `sdd-poc`, `sdd-review`)
 | **Agents spawn** | aucun (Q/R interactif Claude) |
 | **Prerequisites** | `stack.md` rendu (pas de `{{Placeholder}}`) |
 | **Idempotent** | ❌ (incrémente `{n}`) |
-| **Outputs** | `workspace/input/feats/{n}-{Name}.md`, `constitution.md §1-§3` bootstrap |
+| **Outputs** | `workspace/feats/{n}-{Name}.md`, `constitution.md §1-§3` bootstrap |
 
 **One-liner** : Crée une FEAT pré-remplie via 2 séries de questions (besoin + cadrage) avec auto-numérotation `{n}`.
 
@@ -165,7 +165,7 @@ The 4 macro-orchestrators (`sdd-bootstrap`, `sdd-full`, `sdd-poc`, `sdd-review`)
 | **Agents spawn** | `qa` (Sonnet 4.6) |
 | **Prerequisites** | FEAT + US + code production matérialisé |
 | **Idempotent** | ✅ |
-| **Outputs** | `*.Tests/`, `qa/feat-{n}/{coverage,quality,report}.{json,md}` |
+| **Outputs** | `*.Tests/` ; télémétrie QA → `console.db` (`qa_coverage`/`qa_quality`/`qa_api_tests`) ; rapport à la demande `query_console_db.py feat-stats --feat {n} --format md` |
 
 **One-liner** : Génère tests unitaires (back + front), parse coverage (déterministe), exécute quality scan sonar-like ; verdict 🟢/🟡/🔴 vs seuil `CoverageMin`.
 
@@ -188,7 +188,7 @@ The 4 macro-orchestrators (`sdd-bootstrap`, `sdd-full`, `sdd-poc`, `sdd-review`)
 | **Agents spawn** | aucun direct (lit `console.db` + re-run `quality_scan.py`) ; `--adversarial` → `adversarial-reviewer` |
 | **Prerequisites** | findings auditeurs persistés dans `console.db` |
 | **Idempotent** | ✅ |
-| **Outputs** | `qa/feat-{n}/review.md`, entry `validation_reports`, exit `0/1/3` |
+| **Outputs** | entry `validation_reports` (`console.db`) ; rapport à la demande `query_console_db.py review --feat {n} --format md` ; exit `0/1/3` |
 
 **One-liner** : Audit qualité consolidé style Sonar — agrège tous les findings auditeurs, triage par owner (back/front/shared), verdict 🟢/🟡/🔴.
 
@@ -223,6 +223,30 @@ The 4 macro-orchestrators (`sdd-bootstrap`, `sdd-full`, `sdd-poc`, `sdd-review`)
 ```
 
 **Quand l'utiliser** : N'importe quand pour visualiser l'avancement sans risque (0 token, ~50 ms).
+
+---
+
+### `/sdd-help`
+
+| Field | Value |
+|---|---|
+| **Phase** | guidance |
+| **Args** | `[{n}\|"question"]` |
+| **Flags** | aucun |
+| **Agents spawn** | aucun |
+| **Prerequisites** | aucun |
+| **Idempotent** | ✅ (read-only strict) |
+| **Outputs** | console (guidance contextuelle "what's next") |
+
+**One-liner** : Aide contextuelle read-only — lit l'état du pipeline et suggère la prochaine commande (emprunt bmad-help).
+
+```bash
+/sdd-help                 # what's next (global)
+/sdd-help 1               # what's next pour la FEAT 1
+/sdd-help "comment relancer le backend ?"
+```
+
+**Quand l'utiliser** : Quand `/sdd-status` montre où on en est mais qu'on ne sait pas quelle commande lancer ensuite.
 
 ---
 
@@ -360,7 +384,7 @@ Building blocks invoked by the user-facing commands. Use these for **targeted de
 | **Phase** | 4 (dev) |
 | **Args** | `{n}-{m}` (1 US) |
 | **Flags** | aucun |
-| **Agents spawn** | `dev-backend` (**Opus 4.7**) |
+| **Agents spawn** | `dev-backend` (**Opus 4.8**) |
 | **Outputs** | `src/{BackendName}/`, `{LibName}/` (via lock) |
 
 ```bash
@@ -378,7 +402,7 @@ Building blocks invoked by the user-facing commands. Use these for **targeted de
 | **Phase** | 4 (dev) |
 | **Args** | `{n}-{m}` (1 US) |
 | **Flags** | aucun |
-| **Agents spawn** | `dev-frontend` (**Opus 4.7**) |
+| **Agents spawn** | `dev-frontend` (**Opus 4.8**) |
 | **Outputs** | `src/{AppName}/` (Pages, Components, theme.css) |
 
 ```bash

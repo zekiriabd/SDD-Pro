@@ -29,7 +29,7 @@ ASP.NET Core (.NET 10)
 ```
 
 **Difference vs combo `dotnet-minimalapi` × `react` × `shadcn`** :
-- Ici **un seul projet** (`workspace/output/src/{AppName}/`), pas de `{BackendName}` ni `{LibName}` ni `{AppName}/apps/web/`
+- Ici **un seul projet** (`workspace/src/{AppName}/`), pas de `{BackendName}` ni `{LibName}` ni `{AppName}/apps/web/`
 - **Pas de CORS** (meme processus, pas d'API publique)
 - **Pas de contract drift** front↔back (pas de DTO partage, pas d'openapi-codegen)
 - **Pas de bundler JS** (Vite/webpack interdits) — UI 100% rendue serveur, synchronisee via SignalR
@@ -50,22 +50,22 @@ Aucun acces direct BDD depuis l'UI. Aucun mapping manuel hors des Mappers AutoMa
 
 ### 1.4 Mapping couche → repertoire
 
-- Page → `workspace/output/src/{AppName}/Pages/`
-- Component → `workspace/output/src/{AppName}/Components/`
-- Layout → `workspace/output/src/{AppName}/Shared/`
-- Service (interface) → `workspace/output/src/{AppName}/Services/Interfaces/`
-- Service (implementation) → `workspace/output/src/{AppName}/Services/Implementations/`
-- Model → `workspace/output/src/{AppName}/Models/`
-- Entity → `workspace/output/src/{AppName}/Data/Entities/`
-- DbContext → `workspace/output/src/{AppName}/Data/DBcontext/`
-- Mapper → `workspace/output/src/{AppName}/Mappers/`
-- Middleware → `workspace/output/src/{AppName}/Middleware/`
-- Auth → `workspace/output/src/{AppName}/Auth/`
-- Config application → `workspace/output/src/{AppName}/Program.cs`
-- Racine Razor → `workspace/output/src/{AppName}/App.razor`, `workspace/output/src/{AppName}/_Imports.razor`
-- Ressources `.resx` → `workspace/output/src/{AppName}/Resources/`
-- Statique web → `workspace/output/src/{AppName}/wwwroot/`
-- Project file → `workspace/output/src/{AppName}/{AppName}.csproj`
+- Page → `workspace/src/{AppName}/Pages/`
+- Component → `workspace/src/{AppName}/Components/`
+- Layout → `workspace/src/{AppName}/Shared/`
+- Service (interface) → `workspace/src/{AppName}/Services/Interfaces/`
+- Service (implementation) → `workspace/src/{AppName}/Services/Implementations/`
+- Model → `workspace/src/{AppName}/Models/`
+- Entity → `workspace/src/{AppName}/Data/Entities/`
+- DbContext → `workspace/src/{AppName}/Data/DBcontext/`
+- Mapper → `workspace/src/{AppName}/Mappers/`
+- Middleware → `workspace/src/{AppName}/Middleware/`
+- Auth → `workspace/src/{AppName}/Auth/`
+- Config application → `workspace/src/{AppName}/Program.cs`
+- Racine Razor → `workspace/src/{AppName}/App.razor`, `workspace/src/{AppName}/_Imports.razor`
+- Ressources `.resx` → `workspace/src/{AppName}/Resources/`
+- Statique web → `workspace/src/{AppName}/wwwroot/`
+- Project file → `workspace/src/{AppName}/{AppName}.csproj`
 
 ### 1.5 Principes non negociables
 
@@ -107,9 +107,9 @@ Aucun acces direct BDD depuis l'UI. Aucun mapping manuel hors des Mappers AutoMa
 - **Namespace racine** : `{AppNamespace}`
 
 ### 2.2 Outils
-- **Project file** : `workspace/output/src/{AppName}/{AppName}.csproj`
-- **Build** : `dotnet build workspace/output/src/{AppName}/{AppName}.csproj --nologo` (project-scoped, jamais solution-wide ; autorise les builds paralleles entre stacks)
-- **Smoke Command** : `dotnet run --project workspace/output/src/{AppName}/{AppName}.csproj --no-build --urls http://localhost:5099 & APP_PID=$!; sleep 4; curl -sf http://localhost:5099/ -o /dev/null; RC=$?; kill $APP_PID 2>/dev/null; wait $APP_PID 2>/dev/null; exit $RC`
+- **Project file** : `workspace/src/{AppName}/{AppName}.csproj`
+- **Build** : `dotnet build workspace/src/{AppName}/{AppName}.csproj --nologo` (project-scoped, jamais solution-wide ; autorise les builds paralleles entre stacks)
+- **Smoke Command** : `dotnet run --project workspace/src/{AppName}/{AppName}.csproj --no-build --urls http://localhost:5099 & APP_PID=$!; sleep 4; curl -sf http://localhost:5099/ -o /dev/null; RC=$?; kill $APP_PID 2>/dev/null; wait $APP_PID 2>/dev/null; exit $RC`
 - **Smoke Timeout** : 60s
 - **Preserves identifier syntax** : `\b<id>\b` (mot entier, sensible a la casse)
 - **Lint / Format** : `dotnet format`
@@ -126,14 +126,14 @@ Aucun acces direct BDD depuis l'UI. Aucun mapping manuel hors des Mappers AutoMa
 # et augmente par les agents — re-executer STEPS 1-2c effacerait tout le code
 # genere. STEPS 3-6 (dotnet add package, mkdir -p, restore, build, audit) sont
 # nativement idempotents et restent hors du guard.
-if [ ! -f "workspace/output/src/{AppName}/{AppName}.csproj" ]; then
+if [ ! -f "workspace/src/{AppName}/{AppName}.csproj" ]; then
 
 # STEP 1 — Scaffold du projet Blazor Server
 # Note: le template blazorserver plafonne a net6.0 dans dotnet SDK 10.0.2xx. On scaffold en net6.0
 # puis on retarget le csproj vers net10.0 — l'architecture legacy Blazor Server (Razor Pages + SignalR
 # hub + _Host.cshtml) reste pleinement supportee en net10. Cette approche preserve les identifiants
 # Program.cs attendus (AddRazorPages, AddServerSideBlazor, MapBlazorHub, MapFallbackToPage).
-dotnet new blazorserver -n {AppName} -o workspace/output/src/{AppName} --framework net6.0 --no-restore --force
+dotnet new blazorserver -n {AppName} -o workspace/src/{AppName} --framework net6.0 --no-restore --force
 
 # STEP 1b/2/2b/2c — Cleanup template demo files + retarget net10.
 # IMPORTANT (v2.21.6) : ces edits NE SONT PAS faits via `sed -i` / `rm -rf` en bash.
@@ -143,18 +143,18 @@ dotnet new blazorserver -n {AppName} -o workspace/output/src/{AppName} --framewo
 # tools natifs Read + Edit + Write (atomiques, granulaires, prompt-able un par un)
 # et les suppressions via `rm` simples (un fichier par appel). La sequence requise :
 #
-#   a) Edit  workspace/output/src/{AppName}/{AppName}.csproj
+#   a) Edit  workspace/src/{AppName}/{AppName}.csproj
 #        old_string: <TargetFramework>net6.0</TargetFramework>
 #        new_string: <TargetFramework>net10.0</TargetFramework>
-#   b) Edit  workspace/output/src/{AppName}/Program.cs
+#   b) Edit  workspace/src/{AppName}/Program.cs
 #        retire `using {AppNamespace}.Data;`
 #        retire la ligne `builder.Services.AddSingleton<WeatherForecastService>();`
-#   c) Edit  workspace/output/src/{AppName}/Pages/Index.razor
+#   c) Edit  workspace/src/{AppName}/Pages/Index.razor
 #        retire la ligne `<SurveyPrompt Title="..." />`
-#   d) Bash  rm -f workspace/output/src/{AppName}/Pages/Counter.razor       (un appel)
-#   e) Bash  rm -f workspace/output/src/{AppName}/Pages/FetchData.razor     (un appel)
-#   f) Bash  rm -f workspace/output/src/{AppName}/Shared/SurveyPrompt.razor (un appel)
-#   g) Bash  rm workspace/output/src/{AppName}/Data/WeatherForecast.cs workspace/output/src/{AppName}/Data/WeatherForecastService.cs && rmdir workspace/output/src/{AppName}/Data
+#   d) Bash  rm -f workspace/src/{AppName}/Pages/Counter.razor       (un appel)
+#   e) Bash  rm -f workspace/src/{AppName}/Pages/FetchData.razor     (un appel)
+#   f) Bash  rm -f workspace/src/{AppName}/Shared/SurveyPrompt.razor (un appel)
+#   g) Bash  rm workspace/src/{AppName}/Data/WeatherForecast.cs workspace/src/{AppName}/Data/WeatherForecastService.cs && rmdir workspace/src/{AppName}/Data
 #
 # STEP 3+ ci-dessous (dotnet add package, mkdir, restore, build, audit) restent
 # nativement idempotents et tournent en bash sans probleme.
@@ -172,47 +172,47 @@ fi  # fin garde-fou idempotent (csproj absent)
 #   Ainsi le framework ne se periment pas et reste au-dessus des CVE connues.
 #   STEP 6 (audit vulnerabilites) valide apres coup qu'aucun NU1902 ne reste.
 
-dotnet add workspace/output/src/{AppName}/{AppName}.csproj package Microsoft.EntityFrameworkCore --version 10.0.6
-dotnet add workspace/output/src/{AppName}/{AppName}.csproj package Microsoft.EntityFrameworkCore.SqlServer --version 10.0.6
-dotnet add workspace/output/src/{AppName}/{AppName}.csproj package Microsoft.EntityFrameworkCore.Design --version 10.0.6
-dotnet add workspace/output/src/{AppName}/{AppName}.csproj package Microsoft.EntityFrameworkCore.Tools --version 10.0.6
-dotnet add workspace/output/src/{AppName}/{AppName}.csproj package AutoMapper --version 16.1.1
-dotnet add workspace/output/src/{AppName}/{AppName}.csproj package Serilog.AspNetCore --version 10.0.0
-dotnet add workspace/output/src/{AppName}/{AppName}.csproj package Serilog.Sinks.Console --version 6.1.1
+dotnet add workspace/src/{AppName}/{AppName}.csproj package Microsoft.EntityFrameworkCore --version 10.0.6
+dotnet add workspace/src/{AppName}/{AppName}.csproj package Microsoft.EntityFrameworkCore.SqlServer --version 10.0.6
+dotnet add workspace/src/{AppName}/{AppName}.csproj package Microsoft.EntityFrameworkCore.Design --version 10.0.6
+dotnet add workspace/src/{AppName}/{AppName}.csproj package Microsoft.EntityFrameworkCore.Tools --version 10.0.6
+dotnet add workspace/src/{AppName}/{AppName}.csproj package AutoMapper --version 16.1.1
+dotnet add workspace/src/{AppName}/{AppName}.csproj package Serilog.AspNetCore --version 10.0.0
+dotnet add workspace/src/{AppName}/{AppName}.csproj package Serilog.Sinks.Console --version 6.1.1
 
 # Microsoft.Identity.Web : NON PINNE — derniere version stable compatible net10.
 # Corrige automatiquement CVE GHSA-rpq8-q44m-2rpg (present dans 3.x) et toute
 # CVE future sans intervention manuelle sur le stack spec.
-dotnet add workspace/output/src/{AppName}/{AppName}.csproj package Microsoft.Identity.Web
-dotnet add workspace/output/src/{AppName}/{AppName}.csproj package Microsoft.Identity.Web.UI
+dotnet add workspace/src/{AppName}/{AppName}.csproj package Microsoft.Identity.Web
+dotnet add workspace/src/{AppName}/{AppName}.csproj package Microsoft.Identity.Web.UI
 
 # STEP 4 — Creer les repertoires de couches vides (evite les erreurs de chemin lors de la premiere generation)
-mkdir -p workspace/output/src/{AppName}/Services/Interfaces
-mkdir -p workspace/output/src/{AppName}/Services/Implementations
-mkdir -p workspace/output/src/{AppName}/Models
-mkdir -p workspace/output/src/{AppName}/Data/Entities
-mkdir -p workspace/output/src/{AppName}/Data/DBcontext
-mkdir -p workspace/output/src/{AppName}/Mappers
-mkdir -p workspace/output/src/{AppName}/Middleware
-mkdir -p workspace/output/src/{AppName}/Auth
-mkdir -p workspace/output/src/{AppName}/Resources
+mkdir -p workspace/src/{AppName}/Services/Interfaces
+mkdir -p workspace/src/{AppName}/Services/Implementations
+mkdir -p workspace/src/{AppName}/Models
+mkdir -p workspace/src/{AppName}/Data/Entities
+mkdir -p workspace/src/{AppName}/Data/DBcontext
+mkdir -p workspace/src/{AppName}/Mappers
+mkdir -p workspace/src/{AppName}/Middleware
+mkdir -p workspace/src/{AppName}/Auth
+mkdir -p workspace/src/{AppName}/Resources
 
 # STEP 5 — Restore + build de verification (doit etre vert avant toute generation)
-dotnet restore workspace/output/src/{AppName}/{AppName}.csproj
-dotnet build workspace/output/src/{AppName}/{AppName}.csproj --nologo
+dotnet restore workspace/src/{AppName}/{AppName}.csproj
+dotnet build workspace/src/{AppName}/{AppName}.csproj --nologo
 
 # STEP 6 — Audit vulnerabilites NuGet (library-and-stack.md §0 (Partie A) : 0 warning libs)
 # Si au moins une vulnerabilite subsiste malgre les non-pinnings (le registre NuGet
 # n'a pas encore publie de version corrigee), la faire remonter au Tech Lead sans
 # bloquer le build — il decidera d'un lockfile ou d'un package override.
-vuln_count=$(dotnet list workspace/output/src/{AppName}/{AppName}.csproj package --vulnerable --include-transitive 2>&1 | grep -c '>')
+vuln_count=$(dotnet list workspace/src/{AppName}/{AppName}.csproj package --vulnerable --include-transitive 2>&1 | grep -c '>')
 if [ "$vuln_count" -gt 0 ]; then
   echo "WARN: $vuln_count vulnerable package(s) apres install — voir dotnet list --vulnerable"
-  dotnet list workspace/output/src/{AppName}/{AppName}.csproj package --vulnerable --include-transitive
+  dotnet list workspace/src/{AppName}/{AppName}.csproj package --vulnerable --include-transitive
 fi
 ```
 
-**Contrat post-init :** `workspace/output/src/{AppName}/{AppName}.csproj` DOIT exister, le build DOIT etre vert.
+**Contrat post-init :** `workspace/src/{AppName}/{AppName}.csproj` DOIT exister, le build DOIT etre vert.
 Microsoft.Identity.Web + Microsoft.Identity.Web.UI sont installes en **version flottante latest
 stable compatible net10** (pas de `--version` pin) — resout automatiquement CVE GHSA-rpq8-q44m-2rpg
 et toute vulnerabilite future a la prochaine init. STEP 6 (audit `dotnet list --vulnerable
@@ -344,14 +344,14 @@ Les Components reutilisables vivent sous `Components/` (fichier unique `.razor` 
 - **Moteur** : Microsoft SQL Server
 - **Acces** : Entity Framework Core, approche Database-First, scaffolding incremental
 - **Migrations** : `dotnet ef dbcontext scaffold` en mode continuation (ne jamais regenerer depuis zero, ne jamais supprimer des entites existantes)
-- **DbContext** : `AppDbContext` dans `workspace/output/src/{AppName}/Data/DBcontext/`
+- **DbContext** : `AppDbContext` dans `workspace/src/{AppName}/Data/DBcontext/`
 - **Strategie de scaffolding** : verifier les entites existantes, generer uniquement les tables manquantes, etendre le DbContext avec les nouveaux `DbSet`, conserver les configurations existantes
 - **Tables initiales** : `point_vente` (liste incrementale)
-- **Source de configuration DB** : `appsettings.json` peuple par l'agent `arch` Phase A — STEP 4.5 a partir du bloc `## Active Database` de `workspace/input/stack/stack.md` (cles : `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`). Le code applicatif lit via `IConfiguration["ConnectionStrings:Default"]` ou via `IOptions<DbConfig>` lie a une section `Db`. **Plus de `Environment.GetEnvironmentVariable("DB_*")`** depuis 2026-05-14 — pattern aligne avec `node-express.md §8.2`.
+- **Source de configuration DB** : `appsettings.json` peuple par l'agent `arch` Phase A — STEP 4.5 a partir du bloc `## Active Database` de `workspace/stack/stack.md` (cles : `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`). Le code applicatif lit via `IConfiguration["ConnectionStrings:Default"]` ou via `IOptions<DbConfig>` lie a une section `Db`. **Plus de `Environment.GetEnvironmentVariable("DB_*")`** depuis 2026-05-14 — pattern aligne avec `node-express.md §8.2`.
 
 ### 4.1 Commandes de scaffolding EF Core
 
-Lire `DatabaseType` dans `workspace/input/stack/stack.md ## Project Config` et executer
+Lire `DatabaseType` dans `workspace/stack/stack.md ## Project Config` et executer
 la commande correspondante. **Toutes les valeurs de connexion proviennent
 du bloc `## Active Database` de `stack.md`, puis sont materialisees par
 `arch` dans `appsettings.json` / `ConnectionStrings:Default` — jamais via
@@ -368,7 +368,7 @@ CONN="Server=${DB_HOST},${DB_PORT};Database=${DB_NAME};User Id=${DB_USER};Passwo
 
 dotnet ef dbcontext scaffold "$CONN" \
   Microsoft.EntityFrameworkCore.SqlServer \
-  --project workspace/output/src/{AppName}/{AppName}.csproj \
+  --project workspace/src/{AppName}/{AppName}.csproj \
   --context AppDbContext \
   --context-dir Data/DBcontext \
   --output-dir Data/Entities \
@@ -383,14 +383,14 @@ dotnet ef dbcontext scaffold "$CONN" \
 
 ```bash
 # Prerequis : ajouter le package si absent
-dotnet add workspace/output/src/{AppName}/{AppName}.csproj \
+dotnet add workspace/src/{AppName}/{AppName}.csproj \
   package Npgsql.EntityFrameworkCore.PostgreSQL --version 9.0.4
 
 CONN="Host=${DB_HOST};Port=${DB_PORT};Database=${DB_NAME};Username=${DB_USER};Password=${DB_PASSWORD};"
 
 dotnet ef dbcontext scaffold "$CONN" \
   Npgsql.EntityFrameworkCore.PostgreSQL \
-  --project workspace/output/src/{AppName}/{AppName}.csproj \
+  --project workspace/src/{AppName}/{AppName}.csproj \
   --context AppDbContext \
   --context-dir Data/DBcontext \
   --output-dir Data/Entities \
@@ -405,14 +405,14 @@ dotnet ef dbcontext scaffold "$CONN" \
 
 ```bash
 # Prerequis : ajouter le package si absent
-dotnet add workspace/output/src/{AppName}/{AppName}.csproj \
+dotnet add workspace/src/{AppName}/{AppName}.csproj \
   package Pomelo.EntityFrameworkCore.MySql --version 9.0.0
 
 CONN="Server=${DB_HOST};Port=${DB_PORT};Database=${DB_NAME};Uid=${DB_USER};Pwd=${DB_PASSWORD};"
 
 dotnet ef dbcontext scaffold "$CONN" \
   Pomelo.EntityFrameworkCore.MySql \
-  --project workspace/output/src/{AppName}/{AppName}.csproj \
+  --project workspace/src/{AppName}/{AppName}.csproj \
   --context AppDbContext \
   --context-dir Data/DBcontext \
   --output-dir Data/Entities \
@@ -537,10 +537,10 @@ les libelles de l'application, **pas un fichier par composant**. Mauvaise
 pratique interdite (voir §5) : creer `PointVenteList.fr.resx`,
 `AppHeader.fr.resx`, `UserPopup.fr.resx` — un par composant.
 
-Structure correcte dans `workspace/output/src/{AppName}/Resources/` :
+Structure correcte dans `workspace/src/{AppName}/Resources/` :
 
 ```
-workspace/output/src/{AppName}/Resources/
+workspace/src/{AppName}/Resources/
 +-- Resource.cs          # classe marker vide
 +-- Resource.resx        # default (langue principale = francais)
 +-- Resource.fr.resx     # francais (facultatif si francais = default)
@@ -1046,7 +1046,7 @@ Ce stack est optimise pour :
 A l'init du projet (Phase A) :
 
 1. **Detecter** que `## Active Tech Specs` pointe sur `fullstack/blazor-server.md` — si OUI, **ignorer** `BackendName` et `LibName` de `## Project Config` (lever WARNING `[STACK_MALFORMED]` non bloquant si declares avec valeur non null)
-2. **Creer** UNE structure `workspace/output/src/{AppName}/` avec layout §1.4
+2. **Creer** UNE structure `workspace/src/{AppName}/` avec layout §1.4
 3. **Installer** §2.4.a CORE via §2.2.1 (garde-fou idempotent existant)
 4. **Composer** `appsettings.json` (§8.6) avec :
    - Section `ConnectionStrings:Default` depuis `## Active Database` (cf. §4.1 — connection string complete)
@@ -1074,20 +1074,20 @@ Phase C (ADRs) : creer `ADR-{ts}-stack-fullstack-blazor-server.md` documentant l
 
 | Path | Owner |
 |---|---|
-| `workspace/output/src/{AppName}/Program.cs` | `arch` (create) + `dev-backend` (augment services DI) |
-| `workspace/output/src/{AppName}/Services/**` | `dev-backend` |
-| `workspace/output/src/{AppName}/Data/**` | `arch` (scaffolding DB) + `dev-backend` (consommation Repository / Service) |
-| `workspace/output/src/{AppName}/Mappers/**` | `dev-backend` |
-| `workspace/output/src/{AppName}/Middleware/**` | `dev-backend` |
-| `workspace/output/src/{AppName}/Auth/**` | `dev-backend` (UserAd, policies) |
-| `workspace/output/src/{AppName}/Pages/**` | `dev-frontend` |
-| `workspace/output/src/{AppName}/Components/**` | `dev-frontend` |
-| `workspace/output/src/{AppName}/Shared/**` | `dev-frontend` |
-| `workspace/output/src/{AppName}/Resources/**` | `dev-frontend` (libelles UI multilingues) |
-| `workspace/output/src/{AppName}/wwwroot/**` | `dev-frontend` (CSS, JS interop, favicon) |
-| `workspace/output/src/{AppName}/App.razor` | `arch` (create) + `dev-frontend` (augment routes) |
-| `workspace/output/src/{AppName}/{AppName}.csproj` | `arch` (create) + `dev-backend` (augment packages on-demand) |
-| `workspace/output/src/{AppName}/appsettings*.json` | `arch` (create) + `dev-backend` (augment sections) |
+| `workspace/src/{AppName}/Program.cs` | `arch` (create) + `dev-backend` (augment services DI) |
+| `workspace/src/{AppName}/Services/**` | `dev-backend` |
+| `workspace/src/{AppName}/Data/**` | `arch` (scaffolding DB) + `dev-backend` (consommation Repository / Service) |
+| `workspace/src/{AppName}/Mappers/**` | `dev-backend` |
+| `workspace/src/{AppName}/Middleware/**` | `dev-backend` |
+| `workspace/src/{AppName}/Auth/**` | `dev-backend` (UserAd, policies) |
+| `workspace/src/{AppName}/Pages/**` | `dev-frontend` |
+| `workspace/src/{AppName}/Components/**` | `dev-frontend` |
+| `workspace/src/{AppName}/Shared/**` | `dev-frontend` |
+| `workspace/src/{AppName}/Resources/**` | `dev-frontend` (libelles UI multilingues) |
+| `workspace/src/{AppName}/wwwroot/**` | `dev-frontend` (CSS, JS interop, favicon) |
+| `workspace/src/{AppName}/App.razor` | `arch` (create) + `dev-frontend` (augment routes) |
+| `workspace/src/{AppName}/{AppName}.csproj` | `arch` (create) + `dev-backend` (augment packages on-demand) |
+| `workspace/src/{AppName}/appsettings*.json` | `arch` (create) + `dev-backend` (augment sections) |
 
 **Anti-patterns ownership** :
 - ❌ `dev-frontend` qui edite un `Service` ou un `Mapper` (logique metier hors scope frontend)
@@ -1099,7 +1099,7 @@ Phase C (ADRs) : creer `ADR-{ts}-stack-fullstack-blazor-server.md` documentant l
 ## 14. Smoke test attendu (post-init arch)
 
 ```bash
-cd workspace/output/src/{AppName}
+cd workspace/src/{AppName}
 dotnet restore {AppName}.csproj
 dotnet build {AppName}.csproj --nologo
 test -f Program.cs
@@ -1115,7 +1115,7 @@ Si toutes les verifications passent → arch Phase A 🟢 GREEN.
 
 Pour valider le runtime (smoke complet, ~60s) :
 ```bash
-dotnet run --project workspace/output/src/{AppName}/{AppName}.csproj --no-build --urls http://localhost:5099 &
+dotnet run --project workspace/src/{AppName}/{AppName}.csproj --no-build --urls http://localhost:5099 &
 APP_PID=$!
 sleep 4
 curl -sf http://localhost:5099/ -o /dev/null

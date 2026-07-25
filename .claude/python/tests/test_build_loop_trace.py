@@ -24,8 +24,8 @@ if str(_PY_ROOT) not in sys.path:
 
 
 def _make_temp_db_with_schema(tmpdir: Path) -> Path:
-    """Create workspace/output/db/console.db with migrations applied."""
-    db_dir = tmpdir / "workspace" / "output" / "db"
+    """Create workspace/db/console.db with migrations applied."""
+    db_dir = tmpdir / "workspace" / "db"
     db_dir.mkdir(parents=True)
     db_path = db_dir / "console.db"
 

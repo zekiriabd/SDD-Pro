@@ -107,7 +107,7 @@ class TestCoerceScalarString(unittest.TestCase):
         self.assertEqual(coerce_scalar("1.2.3"), "1.2.3")
 
     def test_path_unchanged(self):
-        self.assertEqual(coerce_scalar("workspace/output/foo"), "workspace/output/foo")
+        self.assertEqual(coerce_scalar("workspace/foo"), "workspace/foo")
 
     def test_empty_string_unchanged(self):
         self.assertEqual(coerce_scalar(""), "")
@@ -290,8 +290,8 @@ class TestReadProjectConfigCoerce(unittest.TestCase):
         # Minimal scaffolding for repo_root detection
         (self.repo / ".claude" / "agents").mkdir(parents=True)
         (self.repo / ".claude" / "commands").mkdir(parents=True)
-        (self.repo / "workspace" / "input" / "stack").mkdir(parents=True)
-        (self.repo / "workspace" / "input" / "stack" / "stack.md").write_text(
+        (self.repo / "workspace" / "stack").mkdir(parents=True)
+        (self.repo / "workspace" / "stack" / "stack.md").write_text(
             "## Project Config\n"
             "AppName: TestApp\n"
             "BackendName: TestBackend\n"
@@ -336,7 +336,7 @@ class TestReadLayeredConfigCoerce(unittest.TestCase):
         self.repo = Path(self._tmp.name)
         (self.repo / ".claude" / "agents").mkdir(parents=True)
         (self.repo / ".claude" / "commands").mkdir(parents=True)
-        (self.repo / "workspace" / "input" / "stack").mkdir(parents=True)
+        (self.repo / "workspace" / "stack").mkdir(parents=True)
         (self.repo / ".claude" / "config.base.yml").write_text(
             "CoverageMin: 80\n"
             "MaxParallel: 3\n"
@@ -344,7 +344,7 @@ class TestReadLayeredConfigCoerce(unittest.TestCase):
             "QAMode: manual\n",
             encoding="utf-8",
         )
-        (self.repo / "workspace" / "input" / "stack" / "stack.md").write_text(
+        (self.repo / "workspace" / "stack" / "stack.md").write_text(
             "## Project Config\n"
             "AppName: MyApp\n"
             "CoverageMin: 90\n"     # project overrides base

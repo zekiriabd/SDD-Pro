@@ -24,7 +24,7 @@ le humain doit gagner), pas pour le valoriser.
 ## 2. FEATs de référence figées
 
 3 FEATs canoniques, hash gelé dans le repo sous
-`workspace/input/feats/roi-poc/`. Chaque FEAT inclut :
+`workspace/feats/roi-poc/`. Chaque FEAT inclut :
 - Spec complète (sections Functional Needs, Business Rules, Acceptance Criteria, Functional Deliverables, Actors)
 - Mockup HTML statique (si applicable)
 - `stack.md` figé associé (~/.sdd/profiles/roi-poc.yml)
@@ -87,7 +87,7 @@ le humain doit gagner), pas pour le valoriser.
 
 | Métrique | Méthode |
 |---|---|
-| **Heures-homme** | Horodatage début/fin par US + journal des pauses (`workspace/input/feats/roi-poc/baseline-human-log.md`) |
+| **Heures-homme** | Horodatage début/fin par US + journal des pauses (`workspace/feats/roi-poc/baseline-human-log.md`) |
 | **Coût $** | heures × **150 $/h** (taux marché senior fullstack Europe Ouest 2026) |
 | **Coverage** | Run `dotnet test --collect:"XPlat Code Coverage"` + `vitest --coverage` |
 | **AC verified** | Run `spec-compliance-reviewer` sur le code humain (oui : on utilise SDD_Pro pour **mesurer** la baseline humaine — c'est asymétrique mais nécessaire) |
@@ -112,7 +112,7 @@ git checkout v6.10.4-LTS  # ou v7.0.0 selon cible PoC
 $env:SDD_TOKEN_USAGE_MODE = "record"
 
 # FEAT de référence figée
-cp workspace/input/feats/roi-poc/feat-S.md workspace/input/feats/1-Login.md
+cp workspace/feats/roi-poc/feat-S.md workspace/feats/1-Login.md
 # (idem pour M et L)
 ```
 
@@ -137,7 +137,7 @@ Wall-clock par phase remonte automatiquement dans `console.db` table `run_phases
 | **AC verified** | `qa_spec_compliance` table |
 | **Quality scan issues** | `qa_quality` table (count par sévérité) |
 | **Auditor verdicts** | `qa_a11y` + `qa_code_review` + `qa_security` + `qa_performance` |
-| **Cycles correctifs manuels** | log Tech Lead dans `workspace/output/.sys/.roi-poc/feat-{S\|M\|L}-corrections.md` |
+| **Cycles correctifs manuels** | log Tech Lead dans `workspace/.sys/.roi-poc/feat-{S\|M\|L}-corrections.md` |
 
 ### 4.4 Bench script (livré v7.0.0)
 
@@ -148,14 +148,14 @@ python bench_run.py --feat 1 --label "framework-v7.0.0" \
     --baseline-human-hours 12.5 --baseline-human-cost-per-hour 150
 ```
 
-Lit `console.db` + applique pricing + produit `workspace/output/qa/bench/BENCH-GLOBAL-REPORT.md`
+Lit `console.db` + applique pricing + produit `workspace/.sys/.bench/BENCH-GLOBAL-REPORT.md`
 table comparative auto-générée.
 
 ---
 
 ## 5. Métriques publiées (table comparative)
 
-Format normé pour `workspace/output/qa/bench/BENCH-GLOBAL-REPORT.md` :
+Format normé pour `workspace/.sys/.bench/BENCH-GLOBAL-REPORT.md` :
 
 ```markdown
 ## FEAT M — Comparaison humain vs framework v7.0.0
@@ -179,16 +179,16 @@ Format normé pour `workspace/output/qa/bench/BENCH-GLOBAL-REPORT.md` :
 
 ### 6.1 Fixé dans le repo
 
-- `workspace/input/feats/roi-poc/feat-{S|M|L}.md` — specs figées, hash SHA-256 dans `roi-poc/MANIFEST.json`
-- `workspace/input/stack/roi-poc-stack.md` — stack figé
-- `workspace/input/feats/roi-poc/baseline-human-log.md` — log baseline humaine
-- `workspace/output/qa/bench/BENCH-GLOBAL-REPORT.md` — résultats publiés (régénéré par `bench_run.py`)
+- `workspace/feats/roi-poc/feat-{S|M|L}.md` — specs figées, hash SHA-256 dans `roi-poc/MANIFEST.json`
+- `workspace/stack/roi-poc-stack.md` — stack figé
+- `workspace/feats/roi-poc/baseline-human-log.md` — log baseline humaine
+- `workspace/.sys/.bench/BENCH-GLOBAL-REPORT.md` — résultats publiés (régénéré par `bench_run.py`)
 
 ### 6.2 Reproductible par tout Tech Lead
 
 ```bash
 git checkout v7.0.0
-cp workspace/input/feats/roi-poc/feat-M.md workspace/input/feats/1-M.md
+cp workspace/feats/roi-poc/feat-M.md workspace/feats/1-M.md
 /sdd-full 1 --manual-gates
 python bench_run.py --feat 1 --label "framework-v7.0.0" \
     --baseline-human-hours 24.5 --baseline-human-cost-per-hour 150
@@ -199,7 +199,7 @@ Doit produire la table §5 à ±5 % (variance LLM acceptée).
 ### 6.3 Re-mesure semestrielle
 
 À chaque release MAJOR (v8.0, v9.0…), re-run les 3 FEATs → vérifier
-absence de régression. Publier dans `workspace/output/qa/bench/BENCH-GLOBAL-REPORT.md` avec un
+absence de régression. Publier dans `workspace/.sys/.bench/BENCH-GLOBAL-REPORT.md` avec un
 historique par version.
 
 ---
@@ -245,7 +245,7 @@ extrapolation en "gain produit total" est interdite — c'est précisément le
 piège que le risque R2 (claim ROI surévalué) cherche à éviter.
 
 Détail complet et phrases autorisées/interdites : callout "Périmètre de
-mesure (anti-R2)" en tête de `@.claude/workspace/output/qa/bench/BENCH-GLOBAL-REPORT.md`.
+mesure (anti-R2)" en tête de `@.claude/workspace/.sys/.bench/BENCH-GLOBAL-REPORT.md`.
 
 ---
 
@@ -274,5 +274,5 @@ Pour que v7.0.0 puisse être taguée (post-2026-06-19), le PoC doit avoir :
 - `@.claude/python/sdd_scripts/parse_coverage.py` — agrégation coverage
 - `@.claude/python/sdd_scripts/query_console_db.py` — read queries SQL
 - `@.claude/docs/CHANGELOG.md` lignes 489, 530, 600, 850 — promesses ROI non mesurées historiquement
-- `workspace/output/.sys/.context/adrs/ADR-20260519T193000-governance-roi-poc.md` — décision + plan
-- `workspace/output/qa/bench/BENCH-GLOBAL-REPORT.md` — résultats publiés (à créer post-exécution PoC)
+- `workspace/.sys/.context/adrs/ADR-20260519T193000-governance-roi-poc.md` — décision + plan
+- `workspace/.sys/.bench/BENCH-GLOBAL-REPORT.md` — résultats publiés (à créer post-exécution PoC)

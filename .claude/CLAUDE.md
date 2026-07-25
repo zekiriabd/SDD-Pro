@@ -1,7 +1,7 @@
 # SDD_Pro v7.0.0 GA — FEAT-Driven Development pour Claude Code
 
 > ✅ **v7.0.0 GA tagué 2026-06-07** (audit CTO closure : 20 Critical + 38 Major
-> fermés, taxonomie 174 classes, 13 combos SLA). v6.10.4-LTS conservée pour
+> fermés, taxonomie 188 classes, 13 combos SLA). v6.10.4-LTS conservée pour
 > projets legacy. Cf. `@.claude/docs/VERSIONING.md` + `@.claude/docs/CHANGELOG.md`.
 
 > Framework SDD strict : FEAT → User Stories → Code (back/front parallèle).
@@ -18,13 +18,38 @@ Basename `{n}-{m}-{Name}` identique à travers tous les artefacts :
 
 | Artefact | Chemin |
 |---|---|
-| Mockup HTML | `workspace/input/ui/{n}-{m}-{Name}.html` (optionnel) |
-| User Story | `workspace/output/us/{n}-{m}-{Name}.md` |
-| Code généré | `workspace/output/src/{AppName\|BackendName\|LibName}/...` |
-| Plan technique | `workspace/output/plans/{n}-{m}-{Name}.{back\|front}.md` |
+| FEAT | `workspace/feats/{n}-{FeatName}.md` |
+| Mockup HTML | `workspace/ui/{n}-{m}-{Name}.html` (optionnel) |
+| User Story | `workspace/us/{n}-{m}-{Name}.md` |
+| Code généré | `workspace/src/{AppName\|BackendName\|LibName}/...` |
+| Plan technique | `workspace/plans/{n}-{m}-{Name}.{back\|front}.md` |
 
 `{Name}` : Capitale initiale, pas d'accents, tirets pour espaces (`Auth`,
 `Reset-Password`). Alias `FrontendName` accepté pour `AppName`.
+
+> **`{FeatName}` ≠ `{Name}` (CRITIQUE — audit nommage 2026-06-16)** : la FEAT
+> `{n}-{FeatName}.md` porte le nom de la **famille** (ex. `1-Avoir`). Mais le
+> `{Name}` des artefacts à 3 segments (`{n}-{m}-{Name}` : US, mockup, plan)
+> est un **slug de capability DISTINCTIF par US** — verbe d'action + objet
+> métier dérivé du titre de l'US, jamais le nom de la FEAT répété. Deux US
+> d'une même FEAT ne partagent **JAMAIS** le même `{Name}`.
+> - ✅ `1-1-Consulter-Fiche-Avoir.md`, `1-2-Piloter-Acces-Actions.md` (distinctifs)
+> - ❌ `1-1-Avoir.md`, `1-2-Avoir.md` (nom de FEAT répété — anti-pattern, le
+>   sens distinctif ne doit PAS vivre uniquement dans le titre in-file)
+>
+> La ligne `ID: {n}-{m}-{Name}` à l'intérieur de l'US **doit** matcher le
+> basename ; la ligne `Parent FEAT: {n}-{FeatName}` pointe vers la FEAT
+> (nom de famille). La console (`workspace/console`) affiche le titre in-file
+> `# US-{m}: …` mais l'arborescence disque doit rester lisible **sans ouvrir
+> les fichiers** — d'où le slug distinctif obligatoire.
+
+> **FEAT de migration Flyway (`{FeatName}` contient « Flyway », 2026-06-30)** :
+> un nom de fichier FEAT matchant `(?i)flyway` (ex. `2-Flyway-Migration.md`)
+> déclenche, à **chaque** `/sdd-full` ou `/sdd-poc`, l'exécution de `flyway
+> migrate` PUIS le re-scaffolding DB par arch (Phase B STEP 8.5). C'est la
+> **seule** dérogation à `[DB_STRUCTURE_CHANGE_FORBIDDEN]` (mécanisme de
+> migration sanctionné, idempotent via `flyway_schema_history`). SSoT :
+> `@.claude/rules/library-and-stack.md §C.6`.
 
 ---
 
@@ -37,7 +62,7 @@ supprimer ligne ET régénérer les US. `Covers` réfèrent par valeur.
 
 ---
 
-## 3. Commandes (33 : 13 user-facing + 8 internes [debug] + 12 reverse)
+## 3. Commandes (38 : 13 user-facing + 8 internes [debug] + 17 reverse)
 
 **User-facing** (orchestrantes, gèrent pré-conditions et idempotence) :
 
@@ -59,24 +84,42 @@ supprimer ligne ET régénérer les US. `Covers` réfèrent par valeur.
 
 **Internes** (8, debug — préférer un orchestrateur) : `/us-generate`,
 `/arch-init`, `/dev-plan`, `/dev-backend`, `/dev-frontend`, `/doc-refresh`,
-`/feat-deepen`, `/sdd-profile`. Flags `/sdd-full` et `/dev-run` : `--force`,
-`--rebuild-arch`, `--resume`, `--manual-gates`, `--plan`, `--max-parallel N`.
-Détail : `@.claude/commands/*.md`.
+`/feat-deepen`, `/sdd-profile`. Flags `/sdd-full` : `--force`,
+`--rebuild-arch`, `--resume`, `--manual-gates`, `--no-manual-gates`,
+`--manual-gates=us,plan`, `--plan`, `--no-plan-on-warn`, `--no-validate`
+(le parallélisme se règle via `MaxParallel:` en Project Config — pas de flag
+`--max-parallel` sur `/sdd-full`, audit 2026-06-11 M8). Flags `/dev-run` : `--rebuild-arch`, `--resume`,
+`--max-parallel N`, `--unsequenced`, `--legacy-auditor-parallel`.
+⚠️ `--no-validate`, `--unsequenced`, `--legacy-auditor-parallel`
+**désactivent des protections** (bypass audit-loggués). Détail : `@.claude/commands/*.md`.
 
-**Reverse engineering** (12, module optionnel legacy→FEAT) : `/sdd-reverse-full`
-(orchestrateur), `/sdd-reverse {U-N}`, `/sdd-reverse-{init,inventory,audit,analyze,stories,feat,crosscut,review,ui,status}`. SSoT : `@.claude/docs/reverse-engineering-workflow.md` + `@.claude/rules/reverse-engineering.md`.
+**Reverse engineering** (15, module optionnel legacy→FEAT) : `/sdd-reverse-full`
+(orchestrateur), `/sdd-reverse {U-N}`, `/sdd-reverse-{init,inventory,audit,analyze,stories,feat,crosscut,review,ui,status}`,
++ 3 phases optionnelles emprunt Reversa (2026-06-12) : `/sdd-reverse-paradigm`
+(gap paradigme + curation), `/sdd-reverse-parity` (specs Gherkin de parité),
+`/sdd-reverse-questions` (boucle validation humaine, `--ingest`)
++ 2 proc-reverse (2026-06-29, **base de données → FEAT**, lecture seule via
+`stack.md ## Active Database`) : `/sdd-proc-reverse-full` (tous les objets SQL)
+et `/sdd-proc-reverse {objet}` (un objet) — **procédures + fonctions + vues +
+triggers** (+ packages Oracle), 1 objet SQL = 1 US, 1 module = 1 FEAT.
+4 moteurs (2026-07-24) : SQL Server + PostgreSQL (live-validés), Oracle + MySQL/
+MariaDB (scaffold-validés, runtime live pending). SSoT : `@.claude/docs/reverse-engineering-workflow.md`
++ `@.claude/docs/reverse-db-audit-2026-07.md`
++ `@.claude/docs/reverse-proc-engineering.audit.md` + `@.claude/rules/reverse-engineering.md`.
 
 ---
 
-## 4. Agents (19 : 12 LLM forward + 7 reverse, + 1 rubric déterministe)
+## 4. Agents (23 : 12 LLM forward + 11 reverse, + 1 rubric déterministe)
 
-**Cœur** : `po`, `arch` (Sonnet 4.6) ; `dev-backend`, `dev-frontend` (Opus 4.7).
+**Cœur** : `po`, `arch` (Sonnet 4.6) ; `dev-backend`, `dev-frontend` (Opus 4.8).
 **Support** : `elicitor`, `constitutioner`, `qa`.
 **Auditors** : `code-reviewer`, `security-reviewer`, `spec-compliance-reviewer`,
 `arch-reviewer`, `adversarial-reviewer` (opt-in, informational).
-**Reverse** (7, manifest autonome `loader.reverse.yml`) : `reverse-inventory`,
+**Reverse** (10, manifest autonome `loader.reverse.yml`) : `reverse-inventory`,
 `reverse-tech-auditor`, `reverse-tech-analyst`, `reverse-us-writer`,
-`reverse-feat-composer`, `reverse-ui-extractor`, `reverse-completeness-reviewer`.
+`reverse-feat-composer`, `reverse-ui-extractor`, `reverse-completeness-reviewer`,
+`reverse-paradigm-advisor`, `reverse-parity-inspector`, `reverse-clarifier`,
+`reverse-sql-analyst` (proc-reverse : corps de procédure stockée → User Story, lecture seule).
 **Scripts déterministes** (0 token) : `complexity_router.py` (rubric
 `docs/rubrics/complexity-router-scoring.md`), `phase_planner.py`.
 Détail modèles + retraits v7.0.0 (`a11y`/`perf`/`dashboard`/`*-strict`) :
@@ -100,19 +143,30 @@ Détail modèles + retraits v7.0.0 (`a11y`/`perf`/`dashboard`/`*-strict`) :
 **2 principes** : `.claude/docs/principles/{source-first,us-granularity}.md`.
 Templates : `@.claude/docs/conventions.md §14-§15`.
 
+> **Chargement paresseux (TOK-C1, audit 2026-06-12)** : 9 des 11 rules portent une
+> frontmatter `paths:` (path-scoped rules, mécanisme natif Claude Code) → elles ne
+> s'auto-injectent qu'au contact de fichiers de leur périmètre (`workspace/src`,
+> `workspace/old`, `.sys/.validation`, `.claude/stacks`…) au lieu de polluer **chaque**
+> session et **chaque** sous-agent. Seules `output-protocol.md` + `error-classification.md`
+> restent inconditionnelles (contrat universel : tout agent émet chat 1L + `[CLASS]`).
+> Les agents continuent de Read explicitement leurs rules en STEP contexte (la
+> frontmatter ne retire que la redondance de l'auto-load). **Vérification** : dans une
+> session fraîche, `/memory` liste les rules chargées ; hors-pipeline il ne doit rester
+> que les 2 inconditionnelles. Économie : ~150-200 KB de contexte en session hors-périmètre.
+
 ---
 
 ## 6. Stacks (35 actifs — SSoT = entête `Validation:` du `.md`)
 
-> **Recount 2026-06-11** (audit : ajout `fullstack/aspnet-mvc-razor` 2026-06-10) :
-> **29 🟢 (validated/bench-validated/scaffold-validated) + 5 🟡 experimental + 1 🟡 POC-only = 35 total**.
+> **Recount 2026-06-11** (audit : ajout `fullstack/aspnet-mvc-razor` 2026-06-10 ;
+> downgrade `mobiles/kotlin-android` 🟢→🟡 scaffold-validated, audit CTO 2026-06-07) :
+> **28 🟢 (validated/bench-validated) + 7 🟡 = 35 total**.
 > Validation auto : `python .claude/python/sdd_admin/framework_smoke.py` (gate `stacks-count`).
 
-**🟡 experimental (5)** : `archi/ddd`, `archi/microservice`, `qa/mutation-testing` (opt-in), `qa/playwright` (opt-in), `fullstack/aspnet-mvc-razor`.
-**🟡 POC-only (1)** : `fullstack/node-react` (console SDD interne — non destiné prod externe).
-**🟢 (29)** : tous les autres (cf. table détaillée + tiers `validated` / `bench-validated` / `scaffold-validated` dans `@.claude/docs/validated-combos.md §1-§2`).
+**🟡 (7)** : 5 experimental (`archi/ddd`, `archi/microservice`, `qa/mutation-testing` (opt-in), `qa/playwright` (opt-in), `fullstack/aspnet-mvc-razor`) + 1 POC-only (`fullstack/node-react` — console SDD interne, non destiné prod externe) + 1 scaffold-validated (`mobiles/kotlin-android` — APK runtime pending, SDK absent au bench).
+**🟢 (28)** : tous les autres (cf. table détaillée + tiers `validated` / `bench-validated` / `scaffold-validated` dans `@.claude/docs/validated-combos.md §1-§2`).
 
-**Engagement commercial — 13 combos SLA** : 2 `validated` end-to-end (C1, C2) + 11 `bench-validated runtime` (C3-C13). SSoT machine : `@.claude/templates/combos.json`. Marquage runtime via hook `preflight_stack_combo` (`SDD_ALLOW_UNTESTED_COMBO=1` = bypass audit-loggué). Stacks 🟡 explicitement exclus de tout SLA.
+**Engagement commercial — 13 combos SLA** : 2 `validated` end-to-end (C1, C2) + 11 `bench-validated runtime` (C3-C13). SSoT machine : `@.claude/templates/combos.json`. Marquage runtime via hook `preflight_stack_combo` (`SDD_ALLOW_UNTESTED_COMBO=1` = bypass audit-loggué). Les stacks 🟡 ne sont **jamais vendus en offre standalone** (pas de SLA sur la dimension isolée). **Exception documentée (GOV-C1, 2026-06-12)** : un *pattern* archi 🟡 peut apparaître **à l'intérieur d'un combo `validated`** dont le run `/sdd-full` bout-en-bout a été vérifié — cas unique **C2** (`archi/ddd`, validé sur workspace réel 2026-05-11 ; cf. `combos.json` C2 `notes`). Le SLA porte sur le **combo** vérifié, pas sur la dimension 🟡 isolée.
 
 Détail tiers, matrice dimensions, 23 combinaisons bench 2026-06-05, cible C3-prod, exceptions `.libs.json` : `@.claude/docs/validated-combos.md`.
 
@@ -133,9 +187,9 @@ Anti-derive, ERROR 3L disque, idempotence, lecture sélective, parallélisme bor
 ## 9. Démarrage rapide
 
 0. Greenfield : `python bootstrap.py [--combo c1|c2|c3|c4|c5|custom] [--dry-run|--auto-init]` (ou `/sdd-bootstrap` — détail `python bootstrap.py --help`). Brownfield : `/sdd-discover-stack`.
-0.bis **Phase 0 Discovery (facultatif, projets > 3 FEATs)** : copier `.claude/templates/product-brief.template.md` ou `prfaq.template.md` dans `workspace/input/discovery/` pour cadrer vision/personas/KPIs avant les FEATs. Anti-derive : si une FEAT proposée ne sert pas une promesse de la Discovery, c'est probablement du scope creep.
-1. Éditer `workspace/input/stack/stack.md` (SSoT unique — valeurs en clair `DB_PASSWORD`, `AUTH_JWT_SECRET`, `AZ_TENANTID`, ports ; fichier **gitignored**, arch propage en `appsettings.json` / `application.yml`).
-2. `/feat-generate Auth` (3-6 questions). Optionnel : mockups HTML dans `workspace/input/ui/`.
+0.bis **Phase 0 Discovery (facultatif, projets > 3 FEATs)** : copier `.claude/templates/product-brief.template.md` ou `prfaq.template.md` dans `workspace/discovery/` pour cadrer vision/personas/KPIs avant les FEATs. Anti-derive : si une FEAT proposée ne sert pas une promesse de la Discovery, c'est probablement du scope creep.
+1. Éditer `workspace/stack/stack.md` (SSoT unique — valeurs en clair `DB_PASSWORD`, `AUTH_JWT_SECRET`, `AZ_TENANTID`, ports ; fichier **gitignored**, arch propage en `appsettings.json` / `application.yml`).
+2. `/feat-generate Auth` (3-6 questions). Optionnel : mockups HTML dans `workspace/ui/`.
 3. `/sdd-full 1` → `/sdd-status [{n}]` (état brut) ou `/sdd-help [{n}]` (guidance "what's next"). **Cookbook 10 min : `@.claude/docs/cookbook.md`**. Variantes complètes : `@.claude/docs/quickstart.md`.
 
 ---
@@ -148,7 +202,7 @@ Anti-derive, ERROR 3L disque, idempotence, lecture sélective, parallélisme bor
 - **Gouvernance** : `@.claude/docs/{VERSIONING,CHANGELOG,MIGRATION,WORKING-AGREEMENT}.md`
 - **Commercial / DSI** : `@.claude/docs/{WHY-SDD-PRO,COMPLIANCE,SLA,KNOWN-LIMITATIONS}.md`
 - **ROI & roadmap** : `@.claude/docs/{poc-roi-methodology,roadmap-v7-v8,cache-strategy,validated-combos,orphan-cleanup-policy}.md`
-- **Règles** : `@.claude/rules/` (5 consolidées + 1 hoist + 1 protocole + 1 annexe)
+- **Règles** : `@.claude/rules/` (5 consolidées + 1 protocole + 1 hoist + 2 orchestration auditors + 1 annexe + 1 module reverse — cf. §5)
 - **Skills auto-triggered** (v7.0.0+ emprunt superpowers) : `@.claude/skills/` (`using-sddpro`, `starting-a-new-feat`, `debugging-failed-pipeline`, `test-driven-development`)
 - **Invariants manifest** (v7.0.0+ audit P3 E4) : `@.claude/INVARIANTS.yml` — 13 contrats load-bearing (two-stage gate, file ownership, cost cap, schema strict, TDD test-first, etc.) avec pointer vers chaque enforcer (hook/script/smoke test). Test `tests/test_invariants_manifest.py` vérifie que chaque enforcer existe sur disque. Anti-rot manifest : retirer un enforcer sans mettre à jour le manifest = FAIL au smoke.
 - **Python** : `@.claude/python/README.md`

@@ -6,8 +6,8 @@
   "buildSystem": "pnpm",
   "manifest": {
     "files": [
-      "workspace/output/src/{BackendName}/package.json",
-      "workspace/output/src/{BackendName}/tsconfig.json"
+      "workspace/src/{BackendName}/package.json",
+      "workspace/src/{BackendName}/tsconfig.json"
     ]
   },
   "versions": {

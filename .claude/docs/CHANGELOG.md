@@ -4,23 +4,22 @@ Format : [version] — date courte. Sections : `Breaking`, `Added`, `Changed`, `
 
 ---
 
-> ## ⛔ FREEZE WINDOW — 2026-05-19 → 2026-06-18
+> ## ✅ FREEZE WINDOW CLOSE — v7.0.0 GA atteinte (2026-06-07)
 >
-> **v6.10.4 désignée LTS** (tag `v6.10.4-LTS`). Pendant 30 jours, seules
-> les versions **PATCH** (typo, fix bug, CVE) sont autorisées sur `main`.
-> Toute proposition **MINOR ou MAJOR** est mise en attente sur la
-> branche `next` et exige un **RFC ADR `governance-{minor|major}-*`**
-> validé par 2 mainteneurs avant merge post-freeze.
+> La fenêtre de freeze pré-GA (2026-05-19 → 2026-06-18, **v6.10.4-LTS**,
+> tag `v6.10.4-LTS`) est **close** : v7.0.0 GA a été tagué le 2026-06-07
+> post-audit CTO. La branche `main` accepte désormais les bumps
+> **MINOR + PATCH v7.x** (cf. `@.claude/docs/VERSIONING.md` §3.2 + bannière haute).
+> v6.10.4-LTS conservée pour projets legacy (support sécurité → 2026-12-31).
 >
-> Politique complète : `@.claude/docs/VERSIONING.md`.
-> Décision motivée par 17 versions / 13 jours (v6.0.0 → v6.9.0) +
-> drift v6.10 non tracé dans ce CHANGELOG.
+> Historique : freeze motivé par 17 versions / 13 jours (v6.0.0 → v6.9.0) +
+> drift v6.10 non tracé. Discipline tenue jusqu'à la GA.
 
 ---
 
 ## [reverse-v0.7.0-dev] — 2026-06-11 (branche audit-2026-06-09-v3 — escalier ascendant Phase 3)
 
-> ADR `governance-major-reverse-spec-ladder` (RFC Proposed, branche `next`).
+> ADR `governance-major-reverse-spec-ladder` (Accepted — ADR créé, implémentation mergée).
 > Constat : les FEATs reverse « ressemblaient à des tâches techniques, pas à des
 > specs métier » — cause-racine = saut mono-prompt code→FEAT (l'evidence
 > hard-gated faisait baver l'altitude technique dans la FEAT). Intent A
@@ -28,8 +27,8 @@ Format : [version] — date courte. Sections : `Breaking`, `Added`, `Changed`, `
 
 ### Added
 - **Escalier ascendant Phase 3 (3 barreaux)** : agents `reverse-tech-analyst` (3a,
-  `output/plans/{n}-{Name}.analysis.md`), `reverse-us-writer` (3b, `output/us/`),
-  `reverse-feat-composer` (3c, `input/feats/`) + commandes `/sdd-reverse-analyze`,
+  `plans/{n}-{Name}.analysis.md`), `reverse-us-writer` (3b, `us/`),
+  `reverse-feat-composer` (3c, `feats/`) + commandes `/sdd-reverse-analyze`,
   `/sdd-reverse-stories`, `/sdd-reverse-feat`.
 - Templates isolés `analysis.reverse.template.md` + `us.reverse.template.md` (ADV-9).
 - `check_ladder_traceability.py` — enforceur déterministe D3 (fil FEAT→US→task→evidence,
@@ -140,6 +139,70 @@ Format : [version] — date courte. Sections : `Breaking`, `Added`, `Changed`, `
 
 > Renommage MN3 (audit hygiène 2026-06-07) : cette section couvre les fixes audit CTO post-v7.0.0 GA. Sera taguée v7.0.1 PATCH (audit closure) ou v7.1.0 MINOR (selon ampleur). L'ancien header `[Unreleased] — 2026-06-05` était antidaté par rapport à `[v7.0.0] — 2026-05-23` ci-dessous, ce qui prêtait à confusion.
 
+### Audit consolidé 2026-06-11 (branche audit-2026-06-09-v3) — fermeture 16 majors + ~30 minors
+
+Audit complet du framework (code Python, prompts/loader, docs/gouvernance,
+module reverse, orphelins) suivi de la fermeture de l'intégralité des findings.
+Points saillants :
+
+#### Fixed (enforcement réel ≠ doc — les 4 plus graves)
+
+- **Hook two-stage verdict-aware** : `enforce_two_stage_auditor.py` lit désormais
+  le verdict du rapport `{n}-spec-compliance.json` (source autoritaire,
+  auditor-orchestration §3) — un Stage A 🔴 RED bloque réellement le spawn des
+  reviewers Stage B (avant : seul l'EXISTENCE de rows DB était testée).
+- **Monotonie de confidence reverse (Q3) réellement enforced** : le template US 3b
+  porte une ligne header `Confidence:` lisible par `check_ladder_traceability.py`
+  (+ fallback commentaire de provenance pour les US legacy). Avant : les checks
+  « US ≤ analyse » et « FEAT ≤ min(US) » étaient silencieusement skippés.
+- **Locks** : `sdd_lib/file_locks.py` — un lock corrompu/vide redevient stale via
+  fallback mtime (avant : deadlock permanent) ; `sdd_reverse/file_locks_local.py` —
+  fenêtre de grâce 2 s avant recovery « corrupted » (avant : vol de lock frais,
+  2 détenteurs simultanés, test flaky) + takeover unlink+O_EXCL (avant : N
+  prétendants stale gagnaient tous).
+- **Guard cp1252 porté côté forward** : `sdd_lib/console_safe.py` + câblage dans
+  6 scripts (dev_run_args, manage_profile, parse_coverage, sdd_full_planner,
+  cleanup_orphans, validate_stack_md_headers) — 14 sites `print()` `→`/`🟢`
+  crashaient sur console Windows.
+
+#### Changed (réconciliation versions — décision M9)
+
+- Les features R1 (adversarial-reviewer) et R7 (ingest CI axe/lighthouse),
+  livrées 2026-05-24 **avant** le tag GA, étaient étiquetées « v7.2.0 » dans
+  les rules/roadmap sans entrée CHANGELOG ni VERSIONING. **Relabel → v7.0.0**
+  (elles font partie de la GA). Les labels « v7.0.2 » (auditor-coordination,
+  SDD_CHAT_MINIMAL) → « v7.0.1-dev » (ligne de dev courante).
+- Règle ajoutée à VERSIONING.md : aucun label vX.Y dans une rule/doc sans
+  entrée CHANGELOG correspondante.
+- `language_signatures.yml` : cap `delphi-source` high→medium (pas de graphe
+  de classes hors .NET) ; extensions `.pas/.asp/.bas/.frm/.cls` ajoutées à
+  `data_access_extractor`, `.asp` aux seeds UI.
+- `db_schema_extractor` : backticks MySQL / identifiants quotés PostgreSQL /
+  `IF NOT EXISTS` / schémas non-dbo + extraction des NOMS de vues/triggers
+  (corps non analysé, signalé en parseWarnings).
+- `triage_quality.py` câblé dans `/sdd-review` STEP 2.5 (était « suggested »
+  orphelin depuis T2.8) ; `loader.yml` : champs `model:` machine-lisibles pour
+  les 12 agents forward + `auditor-coordination.md` dans les reads des 5
+  reviewers + test `test_loader_model_parity.py`.
+- `output-protocol.md` : label `[REVERSE]` ajouté à la table fermée §3
+  (18 labels) ; CoverageMin « default 80 » purgé de qa.md/qa-generate.md
+  (OBLIGATOIRE sans défaut, quality.md §A.2 fait foi).
+- `.gitignore` : `workspace/` + `workspace/old/` ignorés (données
+  projets clients — ne jamais les committer dans le repo framework) ;
+  `.gitattributes` ajouté (normalisation EOL).
+
+#### Removed (rétro-traçage — suppressions de cette branche non changeloguées)
+
+- `sdd_scripts/run_dev_phase.py` + `tests/test_run_dev_phase.py` (logique
+  ré-internalisée dans /dev-run ; cf. commits branche audit).
+- `sdd_admin/reduce_markdown.py` (orphelin).
+- `sdd_admin/validate_stacks_count.py` + `tests/test_validate_stacks_count.py`
+  (remplacés par la gate `stacks-count` de `framework_smoke.py`).
+- 6 classes `[REVERSE_*]` sans émetteur câblé (audit MA-7) :
+  `LANG_UNKNOWN`, `DB_SCHEMA_MISSING`, `DB_SCHEMA_DEGRADED`, `UNIT_RENAMED`,
+  `ALLOCATED_NAME_STALE`, `LADDER_STALE` — retirées de la taxonomie §6.
+- `sdd_lib/project_config.clear_stack_md_cache()` (jamais appelée).
+
 ### Audit CTO multi-axes 2026-06-08 — tokens + perf + cohérence + code mort
 
 Audit livré par 4 sub-agents Claude en parallèle (axes : consommation tokens,
@@ -169,10 +232,10 @@ Synthèse → ~13 fixes appliqués sur `next`.
 
 - **`docs/combo-concentration-proposal.md`** : brouillon zéro-référence supprimé (168 L).
 - **`docs/po-guide.md` + `docs/ux-designer-guide.md`** : rattachés à CLAUDE.md §10 Onboarding (étaient orphans circulaires).
-- **`workspace/output/db/*.sql` + `schema.prev.json`** : 44 KB héritage migration ponctuelle supprimés.
-- **`workspace/output/.sys/.state/plan-28.json`** : fichier corrompu (WARN logs + JSON mélangés) supprimé (évite `[CHECKPOINT_STATE_UNREADABLE]`).
+- **`workspace/db/*.sql` + `schema.prev.json`** : 44 KB héritage migration ponctuelle supprimés.
+- **`workspace/.sys/.state/plan-28.json`** : fichier corrompu (WARN logs + JSON mélangés) supprimé (évite `[CHECKPOINT_STATE_UNREADABLE]`).
 - **`workspace/audit-sdd-pro-*.md` (4 fichiers)** : déletions formalisées via `git rm` (étaient deleted sans commit).
-- **`workspace/input/feats/*-Calc-*.md` (16 fichiers)** + `_examples/*` (4) + `qa/bench/BENCH-GLOBAL-REPORT.md` + `console/tests/structure.smoke.test.js` : 24 fichiers bench/legacy formalisés via git rm.
+- **`workspace/feats/*-Calc-*.md` (16 fichiers)** + `_examples/*` (4) + `qa/bench/BENCH-GLOBAL-REPORT.md` + `console/tests/structure.smoke.test.js` : 24 fichiers bench/legacy formalisés via git rm.
 
 ### Backlog v7.2.0 (identifiés cet audit, hors scope sprint)
 
@@ -220,7 +283,7 @@ stacks/templates/docs). Bilan : framework passé de **6.5/10 (non distribuable)*
 - **Hook `validate_acceptance_gate` bloquant (timeout 120s × N projets)** →
   extraction de la logique vers `sdd_scripts/validate_acceptance.py` invoqué
   par l'agent qa (STEP 9.bis ajouté). Le hook devient un lecteur léger
-  (< 100ms) du rapport `workspace/output/.sys/.acceptance/acceptance.json`.
+  (< 100ms) du rapport `workspace/.sys/.acceptance/acceptance.json`.
   Plus de blocage Claude Code.
 
 #### Workflow (3 CRITICAL — fermés)
@@ -235,7 +298,7 @@ stacks/templates/docs). Bilan : framework passé de **6.5/10 (non distribuable)*
   `record_token_usage.py`, `dev-run.md`) mises à jour.
 - **`arch.md` STEP 12.5 spawn `constitutioner`** violait
   `build-and-loop.md §3.bis` (no-spawn cross-agent) → `arch` écrit un sentinel
-  disque `workspace/output/.sys/.state/arch-ready-for-constitutioner.flag` et
+  disque `workspace/.sys/.state/arch-ready-for-constitutioner.flag` et
   termine. Le spawn vit désormais côté commande `/arch-init STEP 3.5` (où il
   est légitime). Mécanisme explicite, idempotent, testable sans LLM.
 - **`po.md` sentinel `sha256:COMPUTE_REQUIRED`** résolu uniquement par
@@ -257,7 +320,9 @@ stacks/templates/docs). Bilan : framework passé de **6.5/10 (non distribuable)*
 - **3 sources, 3 chiffres pour stacks count** (README=24, CLAUDE.md=34,
   filesystem=32) → CLAUDE.md §6 recompté contre FS, README aligné, script
   `sdd_admin/validate_stacks_count.py` créé pour validation automatique +
-  test pytest (7 cas).
+  test pytest (7 cas). *(Note corrective audit 2026-06-11 : script + test
+  remplacés depuis par la gate `stacks-count` de `framework_smoke.py` —
+  fichiers retirés du disque.)*
 
 #### SERIOUS (12 — tous fermés)
 
@@ -289,7 +354,7 @@ stacks/templates/docs). Bilan : framework passé de **6.5/10 (non distribuable)*
 
 #### MODERATE / MINOR (4 — fermés)
 
-- `feat-generate` STEP 7.5.1 : `mkdir -p workspace/output/.sys/.context/`
+- `feat-generate` STEP 7.5.1 : `mkdir -p workspace/.sys/.context/`
   ajouté avant le Write (sinon greenfield échoue sur env neuf)
 - Dérogations no-spawn explicitement annotées dans `build-and-loop.md §3.bis`
   (`elicitor` peut utiliser `AskUserQuestion` ; `arch → constitutioner` retiré
@@ -302,7 +367,7 @@ stacks/templates/docs). Bilan : framework passé de **6.5/10 (non distribuable)*
 - `test_validate_acceptance.py` (14 tests) — script + hook
 - `test_resolve_us_hash_sentinel.py` (10 tests) — script + hook
 - `test_block_env_bypass.py` (21 tests) — matrice complète des bypass patterns
-- `test_validate_stacks_count.py` (7 tests) — count + README drift + POC-only
+- `test_validate_stacks_count.py` (7 tests) — count + README drift + POC-only *(retiré depuis — gate `stacks-count` de framework_smoke, note audit 2026-06-11)*
 - `test_run_dev_phase.py` (28 tests) — chunking, plan detection, gate decision
 
 Suite totale : **1188 tests passants, 0 régression**.
@@ -354,7 +419,7 @@ L'intégration **Model Context Protocol (MCP)** (`mcp.json` + `docs/MCP-SERVER.m
 Audit CTO 2026-06-05 acte la priorisation du **3ᵉ combo validé** post-v7.0.0 GA :
 
 - **Cible C3-bis** : `fullstack/node-react + ui/shadcn (best-effort) + qa/node-vitest + auth/auth-local + Prisma + SqlServer|PostgreSQL` (`AppType=fullstack`, monolithe Babel-CDN zero-build)
-- **Justification** : reflet du PoC existant `workspace/output/src/Demo/` (27 FEATs ingérées, stack `fullstack/node-react`) + console SDD interne v0.4.0 déjà validée sur ce stack. Combo cohérent avec écosystème Node moderne sans cérémonie TS/bundler.
+- **Justification** : reflet du PoC existant `workspace/src/Demo/` (27 FEATs ingérées, stack `fullstack/node-react`) + console SDD interne v0.4.0 déjà validée sur ce stack. Combo cohérent avec écosystème Node moderne sans cérémonie TS/bundler.
 - **Pivot vs roadmap initial** : `C3` historique (`.NET+Blazor+Radzen`, cf. `docs/validated-combos.md §3`) **rétrogradé en C4**. Communauté Node + simplicité Babel-CDN priorisées.
 - **Statut PoC Demo** : partiel (2/27 FEATs touchées avec erreurs, `Status: Draft`). Workspace **gelé tel quel** (audit 2026-06-05) — pas de relance débloquage cette session. Trace de l'investissement v6.x conservée mais ne compte **pas** comme combo validé bout-en-bout.
 - **Critère validation C3-bis** : 1 FEAT M (3 US, fullstack, AC traçables) `/sdd-full` end-to-end + ROI publié (3 runs, σ ≤ 15 %) — non encore atteint.
@@ -572,18 +637,18 @@ signalisation sans complexité structurelle.
 
 ### Changed — Stack template déplacé vers framework templates dir
 
-- **`workspace/input/stack/stack.md.template`** → **`.claude/templates/stack.md.template`**.
+- **`workspace/stack/stack.md.template`** → **`.claude/templates/stack.md.template`**.
   Cohérence avec les autres templates framework (adr, feat, us, constitution,
   readiness, postmortem, ci-quality, etc.) tous regroupés dans
-  `.claude/templates/`. `workspace/input/` reste réservé aux **inputs
+  `.claude/templates/`. `workspace/` reste réservé aux **inputs
   utilisateur** (stack.md résolu, feats/, ui/), pas aux templates framework.
 - Callers patchés :
   - `bootstrap.py:62` — `STACK_TEMPLATE` pointe vers `.claude/templates/stack.md.template`
   - `.github/workflows/nightly-e2e.yml` — étapes E2E utilisent le template
     via le `cp -r .claude` recursive (cp explicite supprimé, redondant)
-  - `workspace/input/stack/stack.md` (header note) — pointer mis à jour
+  - `workspace/stack/stack.md` (header note) — pointer mis à jour
 - Aucun agent ou commande ne référençait directement le path templatisé
-  (tous utilisaient le résolu `workspace/input/stack/stack.md`).
+  (tous utilisaient le résolu `workspace/stack/stack.md`).
 
 ---
 
@@ -660,7 +725,7 @@ L'audit initial annonçait "31 scripts sans tests". Vérification précise :
 
 Avant : les 4 auditors (code-reviewer, security-reviewer,
 spec-compliance-reviewer, arch-reviewer) tombaient silencieusement en
-mode fallback convention quand `workspace/output/plans/{n}-*.{back,front}.md`
+mode fallback convention quand `workspace/plans/{n}-*.{back,front}.md`
 était absent. Conséquence : couverture dégradée (heuristique nom→path
 au lieu de plan v2 strict-ready) **sans signal opérateur**.
 
@@ -718,7 +783,7 @@ avec format normalisé :
 > mais sans la dette d'un binaire CLI à versionner.
 
 - **`bootstrap.py`** à la racine du repo (475 LOC, stdlib uniquement) :
-  - Détecte si le projet est déjà initialisé (`workspace/input/feats/`
+  - Détecte si le projet est déjà initialisé (`workspace/feats/`
     non vide OU `stack.md` existe) — refuse de l'écraser sans `--force`
   - 5 prompts interactifs max (AppName, BackendName, combo, DB type)
   - 2 combos validés présélectionnés (C1 : .NET+React+Azure ;
@@ -726,7 +791,7 @@ avec format normalisé :
   - Rendu de `stack.md.template` avec 13 placeholders substitués
     (AppName, ports, ArchiPattern, backend/frontend/UI/QA stacks,
     auth profile, DatabaseType + env lines)
-  - Création de `workspace/output/.sys/{audit,context,state,validation}`
+  - Création de `workspace/.sys/{audit,context,state,validation}`
   - `pip install -e .claude/python[dev]` (sauf `--skip-install`)
   - `npm install` dans `workspace/console/` (lazy, après confirmation)
   - Smoke check final + next steps actionnables
@@ -741,7 +806,7 @@ avec format normalisé :
   - Force UTF-8 console encoding (cp1252 par défaut casse les emojis)
   - Forward des flags vers `bootstrap.py` (parité fonctionnelle totale)
 
-- **`workspace/input/stack/stack.md.template`** : skeleton avec 13
+- **`workspace/stack/stack.md.template`** : skeleton avec 13
   placeholders (`{{AppName}}`, `{{ArchiPattern}}`, etc.) + defaults
   sûrs (QAMode tests+coverage, CoverageMin 80, MaxCostPerRun 50,
   SecurityScanEnabled true, MutationTestingMode off).
@@ -997,7 +1062,7 @@ le script reste tel quel.
 - `PerfMode: full` → **`"off"`** (agent retiré)
 - `SecurityThreatModelEnabled: true` → **`false`** (mode retiré)
 
-> Bypass : déclarer la clé explicitement dans `workspace/input/stack/stack.md
+> Bypass : déclarer la clé explicitement dans `workspace/stack/stack.md
 > ## Project Config` (project layer wins).
 
 ### Breaking — stacks en quarantaine

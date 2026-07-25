@@ -376,6 +376,35 @@ class TestValidatorIntegration(unittest.TestCase):
             err_codes = [e["code"] for e in payload["errors"]]  # type: ignore[index]
             self.assertIn("PLAN_STALE", err_codes)
 
+    def test_v2_plan_stale_us_hash_without_strict(self) -> None:
+        """Regression for the 2026-06-12 audit fix (M3).
+
+        The staleness check used to live only inside validate_strict(), so a
+        stale plan passed exit 0 on the `/dev-run` code path (which invokes the
+        validator WITHOUT --strict and expects exit 2 → [PLAN_STALE]). It must
+        now be caught regardless of --strict.
+        """
+        v2_plan = _v2_plan_with_us_hash(us_hash="0" * 64)
+        with _PlanFixture(v2_plan, us_content=_SAMPLE_US) as fix:
+            assert fix.plan_path and fix.us_path
+            code, payload = self._run(fix.plan_path, strict=False, us_path=fix.us_path)
+            self.assertEqual(code, 2, "stale plan must be exit 2 even without --strict")
+            err_codes = [e["code"] for e in payload["errors"]]  # type: ignore[index]
+            self.assertIn("PLAN_STALE", err_codes)
+            self.assertFalse(payload["us_hash_match"])
+
+    def test_v2_plan_fresh_us_hash_without_strict_not_stale(self) -> None:
+        """Counterpart: a plan whose us-hash matches must NOT be flagged stale."""
+        import hashlib
+        fresh = hashlib.sha256(_SAMPLE_US.encode("utf-8")).hexdigest()
+        v2_plan = _v2_plan_with_us_hash(us_hash=fresh)
+        with _PlanFixture(v2_plan, us_content=_SAMPLE_US) as fix:
+            assert fix.plan_path and fix.us_path
+            code, payload = self._run(fix.plan_path, strict=False, us_path=fix.us_path)
+            self.assertIn(code, (0, 1), "fresh plan must not be stale")
+            err_codes = [e["code"] for e in payload["errors"]]  # type: ignore[index]
+            self.assertNotIn("PLAN_STALE", err_codes)
+
     def test_plan_no_frontmatter(self) -> None:
         """Test 5: Plan without frontmatter → exit 2 invalid."""
         with _PlanFixture(PLAN_NO_FRONTMATTER) as fix:

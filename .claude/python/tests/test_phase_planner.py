@@ -38,35 +38,35 @@ def _make_workspace(
     v7.0.1 fix : `_looks_like_repo_root()` requires `.claude/agents/` +
     `.claude/commands/` + `workspace/` (strict check). Creating only
     `.claude/` made tests walk up to the real repo and pollute
-    workspace/output/db/console.db.
+    workspace/db/console.db.
     """
     workspace = tmp_path
     # Markers complets pour repo_root() detection (cf. sdd_lib/paths.py
     # _looks_like_repo_root strict check post-mortem 2026-05-21).
     (workspace / ".claude" / "agents").mkdir(parents=True, exist_ok=True)
     (workspace / ".claude" / "commands").mkdir(parents=True, exist_ok=True)
-    (workspace / "workspace" / "input" / "stack").mkdir(parents=True, exist_ok=True)
-    (workspace / "workspace" / "input" / "stack" / "stack.md").write_text(stack_md, encoding="utf-8")
+    (workspace / "workspace" / "stack").mkdir(parents=True, exist_ok=True)
+    (workspace / "workspace" / "stack" / "stack.md").write_text(stack_md, encoding="utf-8")
 
     if feat_content is not None:
-        feats_dir = workspace / "workspace" / "input" / "feats"
+        feats_dir = workspace / "workspace" / "feats"
         feats_dir.mkdir(parents=True, exist_ok=True)
         (feats_dir / "1-TestFeat.md").write_text(feat_content, encoding="utf-8")
 
     if us_contents:
-        us_dir = workspace / "workspace" / "output" / "us"
+        us_dir = workspace / "workspace" / "us"
         us_dir.mkdir(parents=True, exist_ok=True)
         for idx, content in enumerate(us_contents, start=1):
             (us_dir / f"1-{idx}-TestUS.md").write_text(content, encoding="utf-8")
 
     if backend_code_files:
-        be_dir = workspace / "workspace" / "output" / "src" / backend_name / "Services"
+        be_dir = workspace / "workspace" / "src" / backend_name / "Services"
         be_dir.mkdir(parents=True, exist_ok=True)
         for fn in backend_code_files:
             (be_dir / fn).write_text("// stub", encoding="utf-8")
 
     if frontend_code_files:
-        fe_dir = workspace / "workspace" / "output" / "src" / app_name / "src" / "components"
+        fe_dir = workspace / "workspace" / "src" / app_name / "src" / "components"
         fe_dir.mkdir(parents=True, exist_ok=True)
         for fn in frontend_code_files:
             (fe_dir / fn).write_text("// stub", encoding="utf-8")

@@ -1,7 +1,7 @@
 ---
 command: sdd-reverse
 phase: 3
-description: Phase 3 du workflow reverse — SÉQUENCEUR de l'escalier ascendant pour UNE unité U-N (3a analyse → 3b user stories → 3c FEAT). Ne spawn AUCUN agent directement (no-spawn §9) — enchaîne /sdd-reverse-analyze + /sdd-reverse-stories + /sdd-reverse-feat. Output final workspace/input/feats/{n}-{Name}.md consommable par /sdd-full.
+description: Phase 3 du workflow reverse — SÉQUENCEUR de l'escalier ascendant pour UNE unité U-N (3a analyse → 3b user stories → 3c FEAT). Ne spawn AUCUN agent directement (no-spawn §9) — enchaîne /sdd-reverse-analyze + /sdd-reverse-stories + /sdd-reverse-feat. Output final workspace/feats/{n}-{Name}.md consommable par /sdd-full.
 loader: .claude/loader.reverse.yml
 ---
 
@@ -16,9 +16,9 @@ agent directement, il enchaîne les 3 sous-commandes barreau par barreau :
 
 ```
 /sdd-reverse {U-N}
-  ├─ 3a  /sdd-reverse-analyze {U-N}   → output/plans/{n}-{Name}.analysis.md   (reverse-tech-analyst)
-  ├─ 3b  /sdd-reverse-stories {U-N}   → output/us/{n}-{m}-{Name}.md           (reverse-us-writer)
-  └─ 3c  /sdd-reverse-feat {U-N}      → input/feats/{n}-{Name}.md             (reverse-feat-composer)
+  ├─ 3a  /sdd-reverse-analyze {U-N}   → plans/{n}-{Name}.analysis.md   (reverse-tech-analyst)
+  ├─ 3b  /sdd-reverse-stories {U-N}   → us/{n}-{m}-{Name}.md           (reverse-us-writer)
+  └─ 3c  /sdd-reverse-feat {U-N}      → feats/{n}-{Name}.md             (reverse-feat-composer)
 ```
 
 > **Décommission (ADR reverse-spec-ladder D2)** : l'ancien `/sdd-reverse`
@@ -51,9 +51,9 @@ Sinon → ERROR remontée par le barreau concerné (`[REVERSE_*]`).
 ## Sortie
 
 ```
-workspace/output/plans/{n}-{Name}.analysis.md         (3a — analyse technique legacy)
-workspace/output/us/{n}-{m}-{Name}.md                 (3b — user stories)
-workspace/input/feats/{n}-{Name}.md                   (3c — FEAT métier, pont vers /sdd-full)
+workspace/plans/{n}-{Name}.analysis.md         (3a — analyse technique legacy)
+workspace/us/{n}-{m}-{Name}.md                 (3b — user stories)
+workspace/feats/{n}-{Name}.md                   (3c — FEAT métier, pont vers /sdd-full)
 workspace/old/{P}/.sys/modules/{Name}/{extraction,stories-3b,feat-3c}.md   (logs)
 ```
 
@@ -68,7 +68,7 @@ FEAT finale est `medium|low`, elle porte la bannière + REVERSE-GATE
 1. `/sdd-reverse-inventory MyLegacy` (Phase 1)
 2. `/sdd-reverse U-1` (escalier 3a→3b→3c complet) — ou les 3 sous-commandes séparément pour reprendre barreau par barreau
 3. Tech Lead revue Phase 5 (compléter `## Project Config` de la FEAT)
-4. `check_reverse_feat_for_full.py --feat-path workspace/input/feats/1-*.md`
+4. `check_reverse_feat_for_full.py --feat-path workspace/feats/1-*.md`
 5. `/sdd-full 1`
 
 ## Anti-derive

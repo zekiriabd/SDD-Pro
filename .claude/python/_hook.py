@@ -54,7 +54,7 @@ def _looks_like_repo_root(p: Path) -> bool:
     return (
         (p / ".claude" / "agents").is_dir()
         and (p / ".claude" / "commands").is_dir()
-        and (p / "workspace").is_dir()
+        and ((p / "workspace").is_dir() or (p.parent / "workspace").is_dir())
     )
 
 

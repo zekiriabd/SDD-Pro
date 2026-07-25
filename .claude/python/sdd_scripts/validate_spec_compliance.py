@@ -2,7 +2,7 @@
 """SDD_Pro spec-compliance report validator (déterministe, 0 token LLM).
 
 Validates the JSON output of agent `spec-compliance-reviewer`:
-    workspace/output/.sys/.validation/{n}-spec-compliance.json
+    workspace/.sys/.validation/{n}-spec-compliance.json
 
 Checks:
     1. JSON parseable
@@ -34,7 +34,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from sdd_lib.paths import repo_root  # noqa: E402
+from sdd_lib.paths import workspace_root, repo_root  # noqa: E402
 from sdd_lib.project_config import read_project_config  # noqa: E402  (legacy fallback)
 from sdd_lib.layered_config import read_layered_config  # noqa: E402  (v6.7.3)
 from sdd_lib.exit_codes import CORRECTIBLE  # noqa: E402
@@ -270,7 +270,7 @@ def validate_report(
 
 
 def _load_report_for_feat(root: Path, feat: int) -> tuple[Path, dict[str, Any]]:
-    path = root / "workspace" / "output" / ".sys" / ".validation" / f"{feat}-spec-compliance.json"
+    path = workspace_root(root) / ".sys" / ".validation" / f"{feat}-spec-compliance.json"
     if not path.is_file():
         raise FileNotFoundError(
             f"[QA_PRECONDITION_FAILED] rapport absent: {path}"

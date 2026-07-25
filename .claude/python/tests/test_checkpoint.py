@@ -1,18 +1,23 @@
-"""Tests for sdd_lib.checkpoint — input-hash validated phase resumption."""
+"""Tests for sdd_lib.checkpoint — input-hash validated phase resumption.
+
+v7.0.1 audit (2026-06-12) — rewritten to seed the SSoT **console.db** (tables
+runs + run_phases) instead of the removed `run-*.json` state files. The module
+under test was rewritten onto console.db (the old FS-state path was dead since
+the v6.10 migration); these tests now exercise the real persistence layer.
+"""
 from __future__ import annotations
 
-import json
 import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest import mock
 
 _PY_ROOT = Path(__file__).resolve().parent.parent
 if str(_PY_ROOT) not in sys.path:
     sys.path.insert(0, str(_PY_ROOT))
 
 from sdd_lib import checkpoint as cp
+from sdd_lib import console_db
 
 
 def _make_repo_with_state(
@@ -21,21 +26,26 @@ def _make_repo_with_state(
     feat: int = 1,
     run_id: str = "abc123def456",
     phases: dict | None = None,
+    started_at: str = "2026-06-12T10:00:00.000Z",
 ) -> Path:
-    """Create a minimal repo layout with a state.json for testing."""
-    (tmp / ".claude").mkdir()
-    state_dir = tmp / "workspace" / "output" / ".sys" / ".state"
-    state_dir.mkdir(parents=True)
-    state = {
-        "runId": run_id,
-        "FeatNumber": feat,
-        "FeatName": "TestFeat",
-        "command": "/sdd-full",
-        "phases": phases or {},
-    }
-    (state_dir / f"run-{run_id}.json").write_text(
-        json.dumps(state, indent=2), encoding="utf-8"
-    )
+    """Seed console.db at tmp/workspace/db/console.db with a run + phases.
+
+    `phases` mirrors the legacy shape: {phase: {"status": ..., "payload": {...}}}.
+    """
+    (tmp / ".claude").mkdir(exist_ok=True)
+    db = tmp / "workspace" / "db" / "console.db"
+    db.parent.mkdir(parents=True, exist_ok=True)
+    console_db.ensure_initialized(db)
+    with console_db.connect(db) as conn:
+        console_db.upsert_run(
+            conn, run_id=run_id, command="/sdd-full", feat_n=feat,
+            feat_name="TestFeat", status="running", started_at=started_at,
+        )
+        for phase, info in (phases or {}).items():
+            console_db.upsert_run_phase(
+                conn, run_id=run_id, phase=phase,
+                status=info["status"], payload=info.get("payload"),
+            )
     return tmp
 
 
@@ -110,40 +120,55 @@ class TestRecordInputHash(unittest.TestCase):
     def test_records_hash_in_state(self):
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
-            _make_repo_with_state(tmp_p, run_id="run-1")
+            _make_repo_with_state(
+                tmp_p, feat=1, run_id="run-1",
+                phases={"us-generate": {"status": "pass", "payload": {}}},
+            )
             (tmp_p / "feat-1.md").write_text("content", encoding="utf-8")
 
             h = cp.record_input_hash("run-1", "us-generate", ["feat-1.md"], root=tmp_p)
             self.assertEqual(len(h), 64)
 
-            state = json.loads((tmp_p / "workspace" / "output" / ".sys" / ".state" / "run-run-1.json").read_text(encoding="utf-8"))
-            self.assertEqual(state["phases"]["us-generate"]["payload"]["input_hash"], h)
+            payload = cp.get_phase_payload(1, "us-generate", root=tmp_p)
+            self.assertIsNotNone(payload)
+            self.assertEqual(payload["input_hash"], h)
 
-    def test_raises_when_state_missing(self):
+    def test_raises_when_phase_row_missing(self):
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
-            (tmp_p / ".claude").mkdir()
-            (tmp_p / "workspace" / "output" / ".sys" / ".state").mkdir(parents=True)
+            # Run exists but the target phase row does not → record must raise.
+            _make_repo_with_state(tmp_p, feat=1, run_id="missing-phase", phases={})
             with self.assertRaises(FileNotFoundError) as ctx:
-                cp.record_input_hash("missing-run", "phase", [], root=tmp_p)
+                cp.record_input_hash("missing-phase", "phase", [], root=tmp_p)
             self.assertIn("CHECKPOINT_STATE_UNREADABLE", str(ctx.exception))
 
     def test_preserves_existing_payload_fields(self):
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             _make_repo_with_state(
-                tmp_p,
-                run_id="run-2",
+                tmp_p, feat=1, run_id="run-2",
                 phases={"us-generate": {"status": "pass", "payload": {"existing_field": "kept"}}},
             )
             (tmp_p / "feat-1.md").write_text("content", encoding="utf-8")
 
             cp.record_input_hash("run-2", "us-generate", ["feat-1.md"], root=tmp_p)
-            state = json.loads(
-                (tmp_p / "workspace" / "output" / ".sys" / ".state" / "run-run-2.json").read_text(encoding="utf-8")
+            payload = cp.get_phase_payload(1, "us-generate", root=tmp_p)
+            self.assertEqual(payload["existing_field"], "kept")
+            self.assertIn("input_hash", payload)
+
+    def test_record_preserves_phase_status(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            tmp_p = Path(tmp)
+            _make_repo_with_state(
+                tmp_p, feat=1, run_id="run-3",
+                phases={"us-generate": {"status": "warn", "payload": {}}},
             )
-            self.assertEqual(state["phases"]["us-generate"]["payload"]["existing_field"], "kept")
-            self.assertIn("input_hash", state["phases"]["us-generate"]["payload"])
+            (tmp_p / "feat-1.md").write_text("content", encoding="utf-8")
+            cp.record_input_hash("run-3", "us-generate", ["feat-1.md"], root=tmp_p)
+            # status 'warn' must survive the payload merge → resumable with accept_warn
+            resumable, reason = cp.is_phase_resumable(
+                1, "us-generate", ["feat-1.md"], root=tmp_p)
+            self.assertTrue(resumable, reason)
 
 
 class TestIsPhaseResumable(unittest.TestCase):
@@ -252,7 +277,7 @@ class TestIsPhaseResumable(unittest.TestCase):
                 1, "us-generate", [], root=tmp_p
             )
             self.assertFalse(resumable)
-            self.assertIn("absent from state", reason)
+            self.assertIn("CHECKPOINT_STATE_UNREADABLE", reason)
 
     def test_not_resumable_when_no_input_hash_legacy(self):
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
@@ -293,28 +318,22 @@ class TestIsPhaseResumable(unittest.TestCase):
             (tmp_p / "feat-1.md").write_text("content", encoding="utf-8")
             h_match = cp.compute_input_hash([tmp_p / "feat-1.md"], root=tmp_p)
 
-            # Older run with mismatched hash
+            # Older run with mismatched hash (earlier started_at)
             _make_repo_with_state(
-                tmp_p,
-                feat=1,
-                run_id="old",
+                tmp_p, feat=1, run_id="old",
+                started_at="2026-06-12T09:00:00.000Z",
                 phases={"us-generate": {"status": "pass", "payload": {"input_hash": "deadbeef"}}},
             )
-            # Newer run with matching hash — should win
-            import time
-            time.sleep(0.05)
-            sd = tmp_p / "workspace" / "output" / ".sys" / ".state"
-            (sd / "run-newer.json").write_text(
-                json.dumps({
-                    "runId": "newer",
-                    "FeatNumber": 1,
-                    "phases": {"us-generate": {"status": "pass", "payload": {"input_hash": h_match}}},
-                }),
-                encoding="utf-8",
+            # Newer run with matching hash — list_runs orders by started_at DESC → wins
+            _make_repo_with_state(
+                tmp_p, feat=1, run_id="newer",
+                started_at="2026-06-12T11:00:00.000Z",
+                phases={"us-generate": {"status": "pass", "payload": {"input_hash": h_match}}},
             )
 
-            resumable, _ = cp.is_phase_resumable(1, "us-generate", ["feat-1.md"], root=tmp_p)
-            self.assertTrue(resumable)
+            resumable, reason = cp.is_phase_resumable(
+                1, "us-generate", ["feat-1.md"], root=tmp_p)
+            self.assertTrue(resumable, reason)
 
 
 class TestGetPhasePayload(unittest.TestCase):

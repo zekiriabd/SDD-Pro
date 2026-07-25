@@ -13,8 +13,8 @@ already read the US and CLAUDE.md). The agent then appends the emitted
 block to the plan's frontmatter.
 
 Usage:
-    compute_plan_metadata.py --us-path workspace/output/us/1-2-Login.md \
-                             --claude-md-path workspace/output/src/Backend/CLAUDE.md \
+    compute_plan_metadata.py --us-path workspace/us/1-2-Login.md \
+                             --claude-md-path workspace/src/Backend/CLAUDE.md \
                              [--capabilities auth-azure-ad,email] \
                              [--json]
 

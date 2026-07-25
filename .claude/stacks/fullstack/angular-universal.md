@@ -61,7 +61,7 @@ Node.js (Express bootstrappee par @angular/ssr)
 
 ## 1.3 Mapping couche → repertoire
 
-Un seul projet sous `workspace/output/src/{AppName}/`. **Convention single-project — `{BackendName}` et `{LibName}` ne s'appliquent pas**. Arch leve WARNING `[STACK_MALFORMED]` si declares avec valeur non null.
+Un seul projet sous `workspace/src/{AppName}/`. **Convention single-project — `{BackendName}` et `{LibName}` ne s'appliquent pas**. Arch leve WARNING `[STACK_MALFORMED]` si declares avec valeur non null.
 
 | Layer | Path |
 |---|---|
@@ -85,8 +85,8 @@ Un seul projet sous `workspace/output/src/{AppName}/`. **Convention single-proje
 | Prisma schema | `prisma/schema.prisma` |
 
 **Manifestes** :
-- Project file → `workspace/output/src/{AppName}/package.json`
-- Angular workspace → `workspace/output/src/{AppName}/angular.json`
+- Project file → `workspace/src/{AppName}/package.json`
+- Angular workspace → `workspace/src/{AppName}/angular.json`
 - TS config → `tsconfig.json` + `tsconfig.app.json` + `tsconfig.server.json`
 - ESLint → `eslint.config.js` (`@angular-eslint/builder`)
 
@@ -149,15 +149,15 @@ Si CSR-only suffit → preferer `.claude/stacks/frontend/angular.md` simple. Ce 
 
 ## 2.2 Outils
 
-- **Project file** : `workspace/output/src/{AppName}/package.json`
-- **Build** : `(cd workspace/output/src/{AppName} && npm run build)` — produit `dist/{AppName}/browser/` + `dist/{AppName}/server/`
-- **Dev** : `(cd workspace/output/src/{AppName} && npm run dev:ssr)` → `ng serve` avec SSR active
+- **Project file** : `workspace/src/{AppName}/package.json`
+- **Build** : `(cd workspace/src/{AppName} && npm run build)` — produit `dist/{AppName}/browser/` + `dist/{AppName}/server/`
+- **Dev** : `(cd workspace/src/{AppName} && npm run dev:ssr)` → `ng serve` avec SSR active
 - **Smoke Command** :
 
 ```bash
-(cd workspace/output/src/{AppName} && npm install --silent && npm run build)
-test -d workspace/output/src/{AppName}/dist
-test -f workspace/output/src/{AppName}/dist/{AppName}/server/server.mjs
+(cd workspace/src/{AppName} && npm install --silent && npm run build)
+test -d workspace/src/{AppName}/dist
+test -f workspace/src/{AppName}/dist/{AppName}/server/server.mjs
 ```
 
 - **Smoke Timeout** : 240s (Angular build SSR plus long que SPA)
@@ -170,16 +170,16 @@ test -f workspace/output/src/{AppName}/dist/{AppName}/server/server.mjs
 ## 2.2.1 Init Commands
 
 ```bash
-if [ ! -f "workspace/output/src/{AppName}/package.json" ]; then
+if [ ! -f "workspace/src/{AppName}/package.json" ]; then
 
 # STEP 1 — Bootstrap Angular 19 standalone + strict + SCSS
 npx --yes @angular/cli@19 new {AppName} \
-  --directory workspace/output/src/{AppName} \
+  --directory workspace/src/{AppName} \
   --routing --style scss --strict \
   --standalone --ssr --package-manager npm \
   --skip-git --skip-install
 
-cd workspace/output/src/{AppName}
+cd workspace/src/{AppName}
 npm install --silent
 
 # (Si --ssr a ete oublie, executer separement : ng add @angular/ssr)
@@ -448,16 +448,16 @@ Ce stack est optimise pour :
 
 | Path | Owner |
 |---|---|
-| `workspace/output/src/{AppName}/src/app/**` | `dev-frontend` |
-| `workspace/output/src/{AppName}/src/styles.scss` | `dev-frontend` |
-| `workspace/output/src/{AppName}/src/index.html` | `dev-frontend` |
-| `workspace/output/src/{AppName}/src/main.ts` / `main.server.ts` | `arch` (create) + `dev-frontend` (augment providers) |
-| `workspace/output/src/{AppName}/server.ts` | `arch` (create initial) + `dev-backend` (augment routes /api/*) |
-| `workspace/output/src/{AppName}/server/**` | `dev-backend` |
-| `workspace/output/src/{AppName}/src/app/schemas/**` | `dev-backend` (Zod, partages client + serveur) |
-| `workspace/output/src/{AppName}/angular.json` | `arch` exclusif |
-| `workspace/output/src/{AppName}/prisma/**` | `arch` (create) + `dev-backend` (consommation) |
-| `workspace/output/src/{AppName}/server/config/app-config.ts` | `arch` (create exclusif — secrets/config SDD) |
+| `workspace/src/{AppName}/src/app/**` | `dev-frontend` |
+| `workspace/src/{AppName}/src/styles.scss` | `dev-frontend` |
+| `workspace/src/{AppName}/src/index.html` | `dev-frontend` |
+| `workspace/src/{AppName}/src/main.ts` / `main.server.ts` | `arch` (create) + `dev-frontend` (augment providers) |
+| `workspace/src/{AppName}/server.ts` | `arch` (create initial) + `dev-backend` (augment routes /api/*) |
+| `workspace/src/{AppName}/server/**` | `dev-backend` |
+| `workspace/src/{AppName}/src/app/schemas/**` | `dev-backend` (Zod, partages client + serveur) |
+| `workspace/src/{AppName}/angular.json` | `arch` exclusif |
+| `workspace/src/{AppName}/prisma/**` | `arch` (create) + `dev-backend` (consommation) |
+| `workspace/src/{AppName}/server/config/app-config.ts` | `arch` (create exclusif — secrets/config SDD) |
 
 **Cas frontiere `server.ts`** : augmente par dev-backend (routes API). Utiliser lock LibName-equivalent cf. `build-and-loop.md §2 (Partie B)` quand plusieurs US ajoutent des routes en parallele.
 
@@ -466,7 +466,7 @@ Ce stack est optimise pour :
 ## 12. Smoke test attendu (post-init arch)
 
 ```bash
-cd workspace/output/src/{AppName}
+cd workspace/src/{AppName}
 npm install --silent
 test -f angular.json
 test -f server.ts

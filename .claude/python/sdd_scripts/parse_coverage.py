@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""SDD_Pro: parse multi-stack coverage outputs to normalized JSON.
+"""SDD_Pro: parse multi-stack coverage outputs into console.db.
 
-Reads native coverage outputs from various stacks and produces
-`workspace/output/qa/feat-{n}/coverage.json` following the schema in
-`rules/quality.md §2`.
+Reads native coverage outputs from various stacks and persists the
+normalized rows in `console.db` table `qa_coverage` following the schema
+in `rules/quality.md §2` (SQLite is the single source of truth ; no file
+is written — 2026-07-06, ex-`coverage.json`).
 
 Supported formats:
 - Cobertura XML  (`coverage.cobertura.xml`)  — .NET coverlet, Python coverage.py, JS
@@ -38,8 +39,9 @@ from sdd_lib.console_db import (  # noqa: E402
     connect, ensure_initialized, insert_qa_coverage, replace_qa_coverage_for_feat,
 )
 from sdd_lib.exit_codes import FAIL_FAST, SUCCESS  # noqa: E402
-from sdd_lib.paths import normalize, repo_root  # noqa: E402
+from sdd_lib.paths import workspace_root, normalize, repo_root  # noqa: E402
 from sdd_lib.stderr import warn  # noqa: E402
+from sdd_lib.console_safe import ensure_console_safe
 
 
 def parse_args() -> argparse.Namespace:
@@ -222,7 +224,7 @@ def detect_coverage_min(stack_md: Path, default: int) -> int:
     """Read CoverageMin from a stack.md file.
 
     v6.7.4: if `stack_md` matches the canonical workspace path
-    (`workspace/input/stack/stack.md`), prefer `read_layered_config()`
+    (`workspace/stack/stack.md`), prefer `read_layered_config()`
     (so team.yml policy is honored). Otherwise (tests / explicit
     paths), preserve v6.6.x behavior — read only the given file.
     """
@@ -267,11 +269,12 @@ def find_feat_name(feats_dir: Path, feat_number: int) -> str | None:
 
 
 def main() -> int:
+    ensure_console_safe()  # cp1252 guard (audit 2026-06-11 M15)
     args = parse_args()
     root = repo_root()
-    src_dir = root / "workspace" / "output" / "src"
-    stack_md = root / "workspace" / "input" / "stack" / "stack.md"
-    feats_dir = root / "workspace" / "input" / "feats"
+    src_dir = workspace_root(root) / "src"
+    stack_md = workspace_root(root) / "stack" / "stack.md"
+    feats_dir = workspace_root(root) / "feats"
 
     feat_name = find_feat_name(feats_dir, args.feat_number)
     coverage_min = detect_coverage_min(stack_md, args.coverage_min)

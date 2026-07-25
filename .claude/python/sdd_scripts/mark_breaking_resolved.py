@@ -9,7 +9,7 @@ checks coherence with files modified by the current US, marks it
 
 Usage:
     python mark_breaking_resolved.py \\
-        --claude-md workspace/output/src/AppName/CLAUDE.md \\
+        --claude-md workspace/src/AppName/CLAUDE.md \\
         --modified-files "Pages/Bebes.razor,Components/BebeForm.razor" \\
         --build-command "dotnet build" \\
         [--dry-run]

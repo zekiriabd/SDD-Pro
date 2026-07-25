@@ -62,12 +62,37 @@ dependencies = []
 #      (sprint 9.1, requires uv install in CI).
 #   3. Dependabot config `.github/dependabot.yml` pour bump auto + review.
 [project.optional-dependencies]
+# Reverse-engineering module deps (audit fix 2026-06-12) — `sdd_reverse`
+# imports PyYAML at module top-level (`scan_legacy.py`, language_signatures.yml
+# loading). Kept OUT of `dependencies` to preserve the zero-dep philosophy for
+# forward-only users (`pip install sdd-pro-tools` for greenfield scaffolding
+# does not need YAML). Reverse users + the test suite install it via the
+# `reverse` extra. Previously undeclared → suite non-reproducible in a clean
+# venv (collection errors + silent `pytest.skip("PyYAML not installed")` on the
+# load-bearing pattern-alignment tests).
+reverse = [
+    "PyYAML>=6.0,<7.0",
+]
+# Stored-procedure reverse (proc-reverse, 2026-06-29) — live READ-ONLY DB
+# introspection. Opt-in so forward-only AND source-file reverse users install
+# nothing extra. SQL Server MVP via pyodbc (needs ODBC Driver 18 on the OS).
+# Other engines plug in per-dialect (psycopg / oracledb / mysql-connector) as
+# they are implemented (roadmap V2/V3).
+reverse-db = [
+    "PyYAML>=6.0,<7.0",
+    "pyodbc>=5.0,<6.0",          # SQL Server (T-SQL) — ODBC Driver 18
+    "psycopg2-binary>=2.9,<3.0", # PostgreSQL (PL/pgSQL)
+    "oracledb>=2.0,<4.0",        # Oracle (PL/SQL) — thin mode, no Oracle client
+    "mysql-connector-python>=8.0,<10.0",  # MySQL / MariaDB (information_schema)
+]
 dev = [
     "pytest>=8.0,<9.0",          # 8.x stable, contain to MAJOR
     "pytest-cov>=5.0,<7.0",      # 5+ supports modern coverage, sub-7 cap
     # pytest-xdist : parallel test execution (audit P2 perf 2026-06-08).
     # 1479 tests in ~40 s serial → ~10-12 s with `-n auto` on 4-core CI.
     "pytest-xdist>=3.5,<4.0",
+    # Reverse module is exercised by the test suite → its deps must be present.
+    "PyYAML>=6.0,<7.0",
 ]
 # Distribution (Top-10 #7 starter, 2026-06-06) :
 # - Build : `python -m build` (requires `pip install build`)

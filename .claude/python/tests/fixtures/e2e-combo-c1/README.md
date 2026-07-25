@@ -49,5 +49,5 @@ RED. Tech Lead investigates :
 - regression in `arch` bootstrap → reproduce with `python bootstrap.py
   --combo c1 --skip-install` + manual `/sdd-full 1`
 - regression in dev-backend / dev-frontend → inspect generated code under
-  `workspace/output/src/HelloApp/`
-- regression in QA gate → inspect `workspace/output/qa/feat-1/report.md`
+  `workspace/src/HelloApp/`
+- regression in QA gate → inspect `query_console_db.py feat-stats --feat 1 --format md` (console.db)

@@ -11,8 +11,9 @@ Phase A scope (rapport seul, 0 auto-fix) :
 4. Compute verdict 🟢/🟡/🔴 against `ReviewFailOn` config (default `serious`).
 5. Persist a row in `validation_reports(report_type='review')` with full
    JSON payload (owner counts + issue class breakdown + sources).
-6. Emit a human-readable Markdown report at
-   `workspace/output/qa/feat-{n}/review.md`.
+6. Human-readable Markdown is rendered ON-DEMAND from console.db (no file
+   written — 2026-07-06, ex-`workspace/qa/feat-{n}/review.md`) :
+   `python query_console_db.py review --feat {n} --format md`.
 
 Usage :
     python sdd_review.py --feat-number 1
@@ -40,7 +41,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sdd_lib.exit_codes import FAIL_FAST, SUCCESS  # noqa: E402
-from sdd_lib.paths import repo_root  # noqa: E402
+from sdd_lib.paths import workspace_root, repo_root  # noqa: E402
 
 # Re-export internal helpers (backward-compat with tests/callers that
 # import from sdd_scripts.sdd_review).
@@ -169,7 +170,7 @@ def check_spec_gate(feat_n: int, no_spec_gate_flag: bool) -> tuple[bool, str]:
         return True, ""
 
     spec_json = (
-        repo_root() / "workspace" / "output" / ".sys" / ".validation"
+        workspace_root(repo_root()) / ".sys" / ".validation"
         / f"{feat_n}-spec-compliance.json"
     )
     if not spec_json.is_file():
@@ -181,7 +182,7 @@ def check_spec_gate(feat_n: int, no_spec_gate_flag: bool) -> tuple[bool, str]:
         # user should know — silent pass-through would mask false-negatives.
         sys.stderr.write(
             f"WARNING: [SPEC_GATE_NO_REPORT] two-stage mode active but "
-            f"workspace/output/.sys/.validation/{feat_n}-spec-compliance.json "
+            f"workspace/.sys/.validation/{feat_n}-spec-compliance.json "
             f"is missing. Gate falls through to legacy aggregation. To enforce "
             f"the gate, ensure /dev-run STEP 6.4.A ran first OR pass --ensure-scans.\n"
         )
@@ -207,7 +208,7 @@ def check_spec_gate(feat_n: int, no_spec_gate_flag: bool) -> tuple[bool, str]:
         f"🔴 /sdd-review FEAT {feat_n} — spec-compliance gate RED "
         f"({not_verified}/{total} ACs not-verified)",
         f"   ⊘ aggregation skipped (would be misleading on code about to be rewritten)",
-        f"   Rapport : workspace/output/.sys/.validation/{feat_n}-spec-compliance.md",
+        f"   Rapport : workspace/.sys/.validation/{feat_n}-spec-compliance.md",
         f"   FIX : corriger les ACs not-verified puis /dev-{{backend,frontend}} {feat_n}-{{m}}",
         f"   Bypass : /sdd-review {feat_n} --no-spec-gate (audit-loggué)",
     ]
@@ -246,9 +247,9 @@ def _auto_ingest_orphan_jsons(feat_n: int) -> list[str]:
     only from `qa_quality` and emits a false 🟢/🟡 verdict.
 
     This function scans the well-known JSON paths under
-    `workspace/output/qa/feat-{n}/` and triggers ingest for each report
-    type whose corresponding DB table is empty for this FEAT. Idempotent
-    (no-op when ingests already done).
+    `workspace/.sys/.validation/` (2026-07-06 : moved from the removed
+    qa/ dir) and triggers ingest for each report type whose corresponding
+    DB table is empty for this FEAT. Idempotent (no-op when ingests already done).
 
     Returns a list of human-readable log lines for `scans_run` (e.g.
     ["ingested code-review (3 rows)", ...]).
@@ -257,22 +258,23 @@ def _auto_ingest_orphan_jsons(feat_n: int) -> list[str]:
     import subprocess
     logs: list[str] = []
     root = repo_root()
-    qa_dir = root / "workspace" / "output" / "qa" / f"feat-{feat_n}"
-    if not qa_dir.is_dir():
+    val_dir = workspace_root(root) / ".sys" / ".validation"
+    if not val_dir.is_dir():
         return logs
 
-    db_path = root / "workspace" / "output" / "db" / "console.db"
+    db_path = workspace_root(root) / "db" / "console.db"
     if not db_path.is_file():
         return logs
 
-    # (json filename pattern, ingest --type value, DB table to test)
+    # (json filename pattern, ingest --type value, DB table to test) — filenames
+    # match ingest_agent_report.default_path : `{feat}-{type}.json`.
     candidates = [
-        ("code-review.json",     "code-review",     "qa_code_review"),
-        ("security-scan.json",   "security-scan",   "qa_security"),
-        ("spec-compliance.json", "spec-compliance", "qa_spec_compliance"),
-        ("a11y.json",            "a11y",            "qa_a11y"),
-        ("perf.json",            "perf",            "qa_performance"),
-        ("adversarial.json",     "adversarial",     "validation_reports"),  # special
+        (f"{feat_n}-code-review.json",     "code-review",     "qa_code_review"),
+        (f"{feat_n}-security-scan.json",   "security-scan",   "qa_security"),
+        (f"{feat_n}-spec-compliance.json", "spec-compliance", "qa_spec_compliance"),
+        (f"{feat_n}-a11y-report.json",     "a11y",            "qa_a11y"),
+        (f"{feat_n}-perf-report.json",     "performance",     "qa_performance"),
+        (f"{feat_n}-adversarial.json",     "adversarial",     "validation_reports"),  # special
     ]
     try:
         conn = sqlite3.connect(db_path)
@@ -280,7 +282,7 @@ def _auto_ingest_orphan_jsons(feat_n: int) -> list[str]:
         return logs
 
     for fname, type_arg, table in candidates:
-        path = qa_dir / fname
+        path = val_dir / fname
         if not path.is_file():
             continue
         try:
@@ -330,8 +332,8 @@ def _auto_ingest_orphan_jsons(feat_n: int) -> list[str]:
 def _detect_stale_reports(feat_n: int) -> list[str]:
     """Detect QA reports older than the materialized source code (CRIT-5, 2026-06-07).
 
-    Stale signal : any JSON under `workspace/output/qa/feat-{n}/` whose mtime
-    is older than ANY source file mtime under `workspace/output/src/{Project}/`
+    Stale signal : any JSON `workspace/.sys/.validation/{n}-*.json` whose
+    mtime is older than ANY source file mtime under `workspace/src/{Project}/`
     (excluding build artifacts, node_modules, bin/, obj/, dist/, .venv/, __pycache__).
 
     Rationale : an auditor JSON written before dev-* materialized the latest
@@ -343,12 +345,12 @@ def _detect_stale_reports(feat_n: int) -> list[str]:
     Returns a list of human-readable warning lines (empty if all fresh).
     """
     root = repo_root()
-    qa_dir = root / "workspace" / "output" / "qa" / f"feat-{feat_n}"
-    src_dir = root / "workspace" / "output" / "src"
-    if not qa_dir.is_dir() or not src_dir.is_dir():
+    val_dir = workspace_root(root) / ".sys" / ".validation"
+    src_dir = workspace_root(root) / "src"
+    if not val_dir.is_dir() or not src_dir.is_dir():
         return []
 
-    json_files = list(qa_dir.glob("*.json"))
+    json_files = list(val_dir.glob(f"{feat_n}-*.json"))
     if not json_files:
         return []
 
@@ -426,8 +428,8 @@ def main() -> int:
             scans_run.extend(ingest_logs)
 
     # STEP 3.6 — stale reports detection (CRIT-5, audit 2026-06-07)
-    # Warn (never block) if any JSON under qa/feat-{n}/ is older than the
-    # latest source file mtime under workspace/output/src/. A stale report
+    # Warn (never block) if any JSON under .sys/.validation/{n}-*.json is older
+    # than the latest source file mtime under workspace/src/. A stale report
     # can yield a false 🟢 verdict (reviewer saw pre-fix code).
     stale_warns = _detect_stale_reports(feat_n)
     if stale_warns:
@@ -513,14 +515,26 @@ def main() -> int:
     report = compute_report(feat_n, findings, missing, fail_on)
     report.scans_run = scans_run
 
-    # STEP 8 — Markdown emit (before persist so file_path is known)
-    md_dir = repo_root() / "workspace" / "output" / "qa" / f"feat-{feat_n}"
-    md_dir.mkdir(parents=True, exist_ok=True)
-    md_path = md_dir / "review.md"
-    md_path.write_text(render_markdown(report), encoding="utf-8")
+    # STEP 7 — Persist DB (SQLite is the single source of truth).
+    # 2026-07-06 : review.md is NO LONGER written to disk. The consolidated
+    # report is recomputed on-demand from console.db via
+    #   python .claude/python/sdd_scripts/query_console_db.py review --feat {n} --format md
+    persist_report(report, None)
 
-    # STEP 7 — Persist DB
-    persist_report(report, md_path)
+    # STEP 7.bis — Consolidated-review sentinel (FWD-C4 fix, audit 2026-06-12).
+    # `adversarial-reviewer` §2.5 refuses to run until this flag exists AND its
+    # mtime is ≥ all reviewer report mtimes (race-condition guard). The flag was
+    # documented (CHANGELOG MN6) and required by the agent, but no code ever
+    # wrote it → /sdd-review --adversarial was deterministically dead. Writing it
+    # here, last, guarantees mtime(flag) ≥ mtime(code-review|security|spec) since
+    # this runs after every scan has been sourced + persisted.
+    validation_dir = workspace_root(repo_root()) / ".sys" / ".validation"
+    validation_dir.mkdir(parents=True, exist_ok=True)
+    (validation_dir / f"{feat_n}-review-consolidated.flag").write_text(
+        f"verdict={report.verdict}\n"
+        f"source=console.db validation_reports feat_n={feat_n} report_type='review'\n",
+        encoding="utf-8",
+    )
 
     # Output
     if args.json:
@@ -535,7 +549,8 @@ def main() -> int:
                 "by_source":   report.counts_by_source,
                 "by_severity": report.counts_by_severity,
             },
-            "markdown_path": str(md_path.as_posix()),
+            "source": (f"console.db validation_reports feat_n={feat_n} "
+                       "report_type='review'"),
         }, indent=2))
     else:
         icon = VERDICT_ICON.get(report.verdict, "❓")
@@ -545,7 +560,8 @@ def main() -> int:
               f"{report.verdict.upper()}")
         print(f"   owner: {report.counts_by_owner}")
         print(f"   source: {report.counts_by_source}")
-        print(f"   markdown: {md_path.as_posix()}")
+        print(f"   report (on-demand): python .claude/python/sdd_scripts/"
+              f"query_console_db.py review --feat {feat_n} --format md")
 
     return FAIL_FAST if report.verdict == "red" else SUCCESS
 

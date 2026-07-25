@@ -12,7 +12,7 @@ Scope: tests unitaires backend .NET (ASP.NET Core, Minimal API)
 ## 1. Scope
 
 Tests unitaires pour backends .NET (ASP.NET Core, Minimal API, etc.).
-S'applique aux projets `workspace/output/src/{BackendName}/` typés .NET.
+S'applique aux projets `workspace/src/{BackendName}/` typés .NET.
 
 Pour les projets Blazor frontend, utiliser `qa/blazor-bunit.md`.
 
@@ -25,7 +25,7 @@ Pour les projets Blazor frontend, utiliser `qa/blazor-bunit.md`.
 
 ### 2.2 Coverage tool
 - **Coverlet** (`coverlet.collector`) — output Cobertura XML par défaut
-- Output natif : `workspace/output/src/{BackendName}.Tests/TestResults/{guid}/coverage.cobertura.xml`
+- Output natif : `workspace/src/{BackendName}.Tests/TestResults/{guid}/coverage.cobertura.xml`
 
 ### 2.3 Mock library
 - **NSubstitute** (recommandé) ou **Moq**
@@ -60,22 +60,22 @@ Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'U
 
 ## 3. Init Commands (idempotent)
 
-Si `workspace/output/src/{BackendName}.Tests/` n'existe pas :
+Si `workspace/src/{BackendName}.Tests/` n'existe pas :
 
 ```bash
-dotnet new xunit -o workspace/output/src/{BackendName}.Tests
-dotnet sln workspace/output/src/{AppName}.sln add workspace/output/src/{BackendName}.Tests/{BackendName}.Tests.csproj
-dotnet add workspace/output/src/{BackendName}.Tests/{BackendName}.Tests.csproj reference workspace/output/src/{BackendName}/{BackendName}.csproj
+dotnet new xunit -o workspace/src/{BackendName}.Tests
+dotnet sln workspace/src/{AppName}.sln add workspace/src/{BackendName}.Tests/{BackendName}.Tests.csproj
+dotnet add workspace/src/{BackendName}.Tests/{BackendName}.Tests.csproj reference workspace/src/{BackendName}/{BackendName}.csproj
 ```
 
 <!-- CORE_PACKAGES_START -->
 ```bash
 # Auto-genere depuis dotnet-xunit.libs.json -- ne pas editer (utiliser sync_stack_md.py).
-dotnet add workspace/output/src/{BackendName}.Tests/{BackendName}.Tests.csproj package xunit --version 2.9.2
-dotnet add workspace/output/src/{BackendName}.Tests/{BackendName}.Tests.csproj package xunit.runner.visualstudio --version 3.0.0
-dotnet add workspace/output/src/{BackendName}.Tests/{BackendName}.Tests.csproj package Microsoft.NET.Test.Sdk --version 17.12.0
-dotnet add workspace/output/src/{BackendName}.Tests/{BackendName}.Tests.csproj package coverlet.collector --version 6.0.2
-dotnet add workspace/output/src/{BackendName}.Tests/{BackendName}.Tests.csproj package NSubstitute --version 5.3.0
+dotnet add workspace/src/{BackendName}.Tests/{BackendName}.Tests.csproj package xunit --version 2.9.2
+dotnet add workspace/src/{BackendName}.Tests/{BackendName}.Tests.csproj package xunit.runner.visualstudio --version 3.0.0
+dotnet add workspace/src/{BackendName}.Tests/{BackendName}.Tests.csproj package Microsoft.NET.Test.Sdk --version 17.12.0
+dotnet add workspace/src/{BackendName}.Tests/{BackendName}.Tests.csproj package coverlet.collector --version 6.0.2
+dotnet add workspace/src/{BackendName}.Tests/{BackendName}.Tests.csproj package NSubstitute --version 5.3.0
 ```
 <!-- CORE_PACKAGES_END -->
 
@@ -83,14 +83,14 @@ dotnet add workspace/output/src/{BackendName}.Tests/{BackendName}.Tests.csproj p
 ```bash
 # Auto-genere depuis dotnet-xunit.libs.json (on-demand) -- installe par dev-* si l'US declenche un trigger.
 # capability: mocking-alt
-# OU (alt mutuellement exclusif) : dotnet add workspace/output/src/{BackendName}.Tests/{BackendName}.Tests.csproj package Moq --version 4.20.72
+# OU (alt mutuellement exclusif) : dotnet add workspace/src/{BackendName}.Tests/{BackendName}.Tests.csproj package Moq --version 4.20.72
 
 # capability: fluent-assertions
-dotnet add workspace/output/src/{BackendName}.Tests/{BackendName}.Tests.csproj package FluentAssertions --version 7.0.0
+dotnet add workspace/src/{BackendName}.Tests/{BackendName}.Tests.csproj package FluentAssertions --version 7.0.0
 
 # capability: api-tests
-dotnet add workspace/output/src/{BackendName}.Tests/{BackendName}.Tests.csproj package Microsoft.AspNetCore.Mvc.Testing --version 10.0.6
-dotnet add workspace/output/src/{BackendName}.Tests/{BackendName}.Tests.csproj package Microsoft.EntityFrameworkCore.InMemory --version 10.0.6
+dotnet add workspace/src/{BackendName}.Tests/{BackendName}.Tests.csproj package Microsoft.AspNetCore.Mvc.Testing --version 10.0.6
+dotnet add workspace/src/{BackendName}.Tests/{BackendName}.Tests.csproj package Microsoft.EntityFrameworkCore.InMemory --version 10.0.6
 ```
 <!-- ONDEMAND_PACKAGES_END -->
 
@@ -101,7 +101,7 @@ Skip si `{BackendName}.Tests.csproj` déjà présent (idempotence).
 ## 4. Project structure
 
 ```
-workspace/output/src/{BackendName}.Tests/
+workspace/src/{BackendName}.Tests/
 ├── {BackendName}.Tests.csproj
 ├── Services/
 │   └── AuthServiceTests.cs           # 1 fichier par service à tester
@@ -183,10 +183,10 @@ public class AuthEndpointsTests : IClassFixture<WebApplicationFactory<Program>>
 ### 6.1 Test command
 
 ```bash
-dotnet test workspace/output/src/{BackendName}.Tests/{BackendName}.Tests.csproj \
+dotnet test workspace/src/{BackendName}.Tests/{BackendName}.Tests.csproj \
   --collect:"XPlat Code Coverage" \
   --logger "trx;LogFileName=test-results.trx" \
-  --results-directory workspace/output/src/{BackendName}.Tests/TestResults
+  --results-directory workspace/src/{BackendName}.Tests/TestResults
 ```
 
 ### 6.2 Coverage command
@@ -197,7 +197,7 @@ Pas de commande séparée.
 ### 6.3 Linter (optionnel)
 
 ```bash
-dotnet format workspace/output/src/{BackendName}.Tests/{BackendName}.Tests.csproj --verify-no-changes
+dotnet format workspace/src/{BackendName}.Tests/{BackendName}.Tests.csproj --verify-no-changes
 ```
 
 ---
@@ -205,7 +205,7 @@ dotnet format workspace/output/src/{BackendName}.Tests/{BackendName}.Tests.cspro
 ## 7. Coverage output format
 
 Format : **Cobertura XML**
-Path : `workspace/output/src/{BackendName}.Tests/TestResults/{guid}/coverage.cobertura.xml`
+Path : `workspace/src/{BackendName}.Tests/TestResults/{guid}/coverage.cobertura.xml`
 
 Le script `parse_coverage.py` détecte automatiquement ce format et le
 parse vers le schéma normalisé.

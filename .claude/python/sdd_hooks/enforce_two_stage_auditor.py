@@ -9,7 +9,11 @@ When a slash command spawns `code-reviewer`, `security-reviewer`, or
 
   1. Is `AuditorBatchMode` set to `two-stage` in layered config ? (default yes)
   2. Has `spec-compliance-reviewer` already run AND produced a non-RED verdict
-     for this FEAT (rows in `qa_spec_compliance` table) ?
+     for this FEAT ? Source autoritaire (audit 2026-06-11 M1) :
+     `workspace/.sys/.validation/{n}-spec-compliance.json`
+     champ `summary.verdict` (cf. auditor-orchestration.md §3), fraîcheur 24 h.
+     Fallback si rapport absent : présence de rows fraîches dans
+     `qa_spec_compliance` (comportement historique, ne voit pas le verdict).
 
 If (1) AND NOT (2) → BLOCK with exit 2 + structured message :
 "Stage A (spec-compliance) must run BEFORE Stage B (code/security/arch).
@@ -42,7 +46,7 @@ from sdd_lib.hook_input import (  # noqa: E402
     get_subagent_type,
     read_hook_input,
 )
-from sdd_lib.paths import repo_root  # noqa: E402
+from sdd_lib.paths import workspace_root, repo_root  # noqa: E402
 
 
 #: Stage B reviewers — spawning any of these requires Stage A first
@@ -85,13 +89,61 @@ def _extract_feat_number_from_prompt(payload: dict) -> int | None:
     return None
 
 
+#: Fraîcheur max du rapport Stage A (alignée sur la fenêtre DB 24 h)
+_REPORT_FRESHNESS_SECONDS = 24 * 3600
+
+_PASS_TOKENS = ("green", "warn", "yellow", "\U0001f7e2", "\U0001f7e1")
+_RED_TOKENS = ("red", "\U0001f534")
+
+
+def _stage_a_verdict_from_report(feat_n: int, root: Path) -> str | None:
+    """Lit le verdict Stage A depuis le rapport JSON autoritaire.
+
+    Returns 'pass' (🟢/🟡), 'red' (🔴), ou None (rapport absent, stale > 24h,
+    corrompu, ou verdict non reconnu → le caller retombe sur le check DB).
+
+    Audit 2026-06-11 M1 : avant ce fix, le hook ne vérifiait que l'EXISTENCE
+    de rows qa_spec_compliance — un Stage A 🔴 RED laissait spawner les 3
+    reviewers Stage B, annulant l'économie promise par le two-stage gate.
+    """
+    import json
+    import time
+
+    report = (
+        workspace_root(root) / ".sys" / ".validation"
+        / f"{feat_n}-spec-compliance.json"
+    )
+    if not report.is_file():
+        return None
+    try:
+        if (time.time() - report.stat().st_mtime) > _REPORT_FRESHNESS_SECONDS:
+            return None
+        data = json.loads(report.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    summary = data.get("summary") if isinstance(data, dict) else None
+    raw = ""
+    if isinstance(summary, dict):
+        raw = str(summary.get("verdict") or "")
+    if not raw and isinstance(data, dict):
+        raw = str(data.get("verdict") or "")
+    v = raw.strip().lower()
+    if not v:
+        return None
+    if any(tok in v for tok in _RED_TOKENS):
+        return "red"
+    if any(tok in v for tok in _PASS_TOKENS):
+        return "pass"
+    return None
+
+
 def _stage_a_completed(feat_n: int, root: Path) -> bool:
     """True if spec-compliance has fresh (≤ 24h) rows in qa_spec_compliance.
 
     Mirrors the logic of query_spec_compliance_present() but inlined here
     to keep the hook lightweight (no subprocess).
     """
-    db_path = root / "workspace" / "output" / "db" / "console.db"
+    db_path = workspace_root(root) / "db" / "console.db"
     if not db_path.is_file():
         # No DB yet — can't enforce, fail-safe to allow
         return True
@@ -192,6 +244,26 @@ def main() -> int:
         )
         return HOOK_ALLOW
 
+    # Source autoritaire : verdict du rapport JSON Stage A (audit 2026-06-11 M1)
+    report_verdict = _stage_a_verdict_from_report(feat_n, root)
+    if report_verdict == "pass":
+        return HOOK_ALLOW
+    if report_verdict == "red":
+        sys.stderr.write(
+            f"ERROR: [TWO_STAGE_GATE_VIOLATION] Cannot spawn '{sub_type}' (Stage B) "
+            f"for FEAT {feat_n} — Stage A (spec-compliance) verdict is RED.\n"
+            f"CAUSE: reviewing code that fails its spec is wasteful — it will be "
+            f"rewritten (auditor-orchestration.md §3.2).\n"
+            f"FIX:\n"
+            f"  1. Read workspace/.sys/.validation/{feat_n}-spec-compliance.md "
+            f"(ACs not_verified + suggestions)\n"
+            f"  2. Fix the code, re-run spec-compliance-reviewer (Stage A)\n"
+            f"  3. OR set AuditorBatchMode: legacy-parallel / SDD_BYPASS_TWO_STAGE=1 "
+            f"(audit-logged)\n"
+        )
+        return HOOK_DENY
+
+    # Rapport absent/illisible → fallback historique : présence de rows fraîches
     if _stage_a_completed(feat_n, root):
         return HOOK_ALLOW
 

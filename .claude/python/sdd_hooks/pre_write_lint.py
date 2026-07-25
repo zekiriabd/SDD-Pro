@@ -6,7 +6,7 @@ time, not just audited post-hoc by code-reviewer.
 
 Reads the planned content (Write `content`, Edit `new_string`, MultiEdit
 `edits[].new_string`) and the target path. If the file lives under
-`workspace/output/src/<project>/` and the project's CLAUDE.md declares
+`workspace/src/<project>/` and the project's CLAUDE.md declares
 forbidden patterns, scan the new content for matches.
 
 A match returns exit 2 + ERROR `[FORBIDDEN_PATTERN]` 3-line block →
@@ -33,7 +33,7 @@ Universal (every stack) :
     but blocking pre-write avoids the iteration)
 
 Non-blocking by default — set `SDD_PRE_WRITE_LINT_STRICT=1` for strict mode.
-Default behavior : log to `workspace/output/.sys/.audit/pre-write-lint.log`
+Default behavior : log to `workspace/.sys/.audit/pre-write-lint.log`
 and emit WARN on stderr but allow the write.
 
 Exit 0 (allow) on : non-src paths, test files (QA ownership), no patterns
@@ -52,7 +52,7 @@ from sdd_lib.exit_codes import HOOK_ALLOW, HOOK_DENY  # noqa: E402
 from sdd_lib.hook_input import (  # noqa: E402
     get_file_path, get_nested, get_tool_name, read_hook_input,
 )
-from sdd_lib.paths import repo_root  # noqa: E402
+from sdd_lib.paths import workspace_root, repo_root  # noqa: E402
 from sdd_lib.stderr import error_block, warn  # noqa: E402
 
 
@@ -133,7 +133,7 @@ def _is_under_output_src(path: str, root: Path) -> bool:
     except (ValueError, OSError):
         return False
     parts = rel.parts
-    return len(parts) >= 4 and parts[0] == "workspace" and parts[1] == "output" and parts[2] == "src"
+    return len(parts) >= 3 and parts[0] == "workspace" and parts[1] == "src"
 
 
 def _strip_comments(content: str, ext: str) -> str:
@@ -226,7 +226,7 @@ def main() -> int:
         return HOOK_ALLOW
 
     # Log every violation
-    log_dir = root / "workspace" / "output" / ".sys" / ".audit"
+    log_dir = workspace_root(root) / ".sys" / ".audit"
     log_dir.mkdir(parents=True, exist_ok=True)
     log_path = log_dir / "pre-write-lint.log"
     from datetime import datetime, timezone

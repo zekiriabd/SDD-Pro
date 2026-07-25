@@ -195,7 +195,7 @@ class TestUpdateMetadataBlock(unittest.TestCase):
 class TestMainEndToEnd(unittest.TestCase):
     def _setup_repo(self, tmp_p: Path, content: str) -> Path:
         (tmp_p / ".claude").mkdir()
-        us_dir = tmp_p / "workspace" / "output" / "us"
+        us_dir = tmp_p / "workspace" / "us"
         us_dir.mkdir(parents=True)
         us_path = us_dir / "5-1-Probe.md"
         us_path.write_text(content, encoding="utf-8")

@@ -39,6 +39,15 @@ source-unit: {SourceUnit}
 # FEAT {n} — {Name}
 <!-- REVERSE-GATE: confidence={GateConfidence} ; allow-sdd-full={GateAllowSddFull} ; reason={GateReason} -->
 
+> ⚠️ **Angles morts runtime (audit 2026-06-11 B15)** : cette FEAT est issue
+> d'une extraction STATIQUE du code legacy. Elle ne voit PAS : les triggers et
+> vues DB (noms inventoriés, corps non analysés), le schéma live de la base,
+> les jobs planifiés externes (cron/Task Scheduler), la config serveur
+> (IIS/registre/GPO), le SQL dynamique, ni les règles métier encodées en
+> données de paramétrage. Une FEAT `confidence: high` est une **borne
+> inférieure fiable** du comportement legacy — jamais une preuve
+> d'équivalence. Revue humaine obligatoire avant refonte.
+
 {LowConfidenceBanner}
 
 ## Actors

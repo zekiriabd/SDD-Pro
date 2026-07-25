@@ -2,7 +2,7 @@
 """SDD_Pro PostToolUse hook — refuse stack.md multi-stack incoherent.
 
 Fires on PostToolUse (matcher=Edit|Write|MultiEdit). Filters internally to
-only edits touching `workspace/input/stack/stack.md`.
+only edits touching `workspace/stack/stack.md`.
 
 Detects incoherent states from bench multi-stack (2026-06-05 bench had 4
 backends + 2 fullstack + 4 SPA + 3 mobiles enabled together, combo signature
@@ -25,7 +25,7 @@ to multi-stack incoherent via bootstrap/console/manual edit".
 from __future__ import annotations
 
 from sdd_lib.exit_codes import HOOK_ALLOW, HOOK_DENY  # noqa: E402
-from sdd_lib.paths import project_root_for_hook as _resolve_project_root
+from sdd_lib.paths import workspace_root, project_root_for_hook as _resolve_project_root
 
 import json
 import os
@@ -58,7 +58,7 @@ def _extract_edited_path(payload: dict) -> str | None:
 def _is_stack_md(path: str | None) -> bool:
     if not path:
         return False
-    return path.endswith("/workspace/input/stack/stack.md")
+    return path.endswith("/workspace/stack/stack.md")
 
 
 def _parse_active_stacks(stack_md: Path) -> dict[str, list[str]]:
@@ -104,7 +104,7 @@ def main() -> int:
         sys.stderr.write("[stack-coherence] SDD_ALLOW_MULTISTACK=1 - bypass\n")
         return HOOK_ALLOW
     root = _resolve_project_root()
-    stack_md = root / "workspace" / "input" / "stack" / "stack.md"
+    stack_md = workspace_root(root) / "stack" / "stack.md"
     if not stack_md.is_file():
         return HOOK_ALLOW
     active = _parse_active_stacks(stack_md)
@@ -116,7 +116,7 @@ def main() -> int:
     sys.stderr.write("CAUSE: [STACK_MULTI_INCOHERENT] regles violees :\n")
     for err in errors:
         sys.stderr.write(f"  - {err}\n")
-    sys.stderr.write("FIX: commenter (#) les stacks excedentaires dans workspace/input/stack/stack.md ## Active *\n")
+    sys.stderr.write("FIX: commenter (#) les stacks excedentaires dans workspace/stack/stack.md ## Active *\n")
     sys.stderr.write("     OU bypass via env SDD_ALLOW_MULTISTACK=1 (bench / debug uniquement)\n")
     return HOOK_DENY
 if __name__ == "__main__":

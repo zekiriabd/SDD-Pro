@@ -1,5 +1,7 @@
 # Pourquoi SDD_Pro ? — Argumentaire CTO / DSI
 
+> 📊 **Comparatif détaillé vs 7 frameworks concurrents (51 dimensions)** : `docs/COMPARISON-MATRIX.md` (lien ajouté audit 2026-06-11 — le document était orphelin).
+
 > Document commercial v7.0.0 GA (2026-06-07). Compare SDD_Pro aux 6 frameworks
 > agentiques majeurs du marché (Cursor, Aider, Devin, BMAD, Superpowers, AgentOS).
 > Objectif : aider un Tech Lead, CTO ou DSI à arbitrer entre frameworks pour
@@ -20,7 +22,7 @@ remonter vers la spec.** Résultat :
 **SDD_Pro impose la trajectoire inverse** : FEAT (spec métier) → US (découpe)
 → Code (matérialisation gated). Chaque étape produit un artefact versionné,
 chaque gate est déterministe (Python, 0 token LLM), chaque écart est tracé
-par une classe d'erreur dans une taxonomie de 174 préfixes `[CLASS]`.
+par une classe d'erreur dans une taxonomie de 188 préfixes `[CLASS]`.
 
 ---
 
@@ -56,7 +58,7 @@ agents personas, pas des catalogues machine.
 fantaisie trouvée sur Stack Overflow par le LLM**. Le hook
 `preflight_stack_combo` refuse les combos non listés.
 
-### 2.3 Taxonomie d'erreurs structurée (174 classes `[CLASS]`)
+### 2.3 Taxonomie d'erreurs structurée (188 classes `[CLASS]`)
 
 Chaque erreur du pipeline porte un préfixe canonique
 (`[BUILD_CORRECTIBLE]`, `[QA_COVERAGE_GAP]`, `[SEC_SQL_INJECTION]`,
@@ -91,7 +93,7 @@ en prose libre.
 - **9 ADRs versionnés** documentent les décisions structurantes.
 - **`run_id` par exécution** : reproductibilité cross-machine.
 - **Hooks `SubagentStop`** : audit-loggué chaque sortie d'agent.
-- **`workspace/output/.sys/.audit/`** : trail forensique des bypass.
+- **`workspace/.sys/.audit/`** : trail forensique des bypass.
 
 Aucun concurrent ne fournit cette piste d'audit.
 
@@ -107,7 +109,7 @@ Aucun concurrent ne fournit cette piste d'audit.
 | Multi-IDE | ❌ Claude Code only | ✅ 7 harnesses | ✅ any LLM IDE | ✅ 4 IDEs | ✅ Cursor | ✅ CLI | ✅ web |
 | Stacks pré-validés | **34 (25 🟢 + 8 🟡)** | N/A | Via expansion packs | N/A | N/A | N/A | N/A |
 | Gates déterministes Python | **64 scripts/hooks** | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| Taxonomie d'erreurs | **174 classes** | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Taxonomie d'erreurs | **188 classes** | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | Idempotence + resume | ✅ `--resume` | ❌ | ⚠️ partiel | ❌ | ❌ | ❌ | ❌ |
 | Cost cap | ✅ par run + par US | ❌ | ❌ | ❌ | ❌ | ❌ | ⚠️ partiel |
 | Audit trail SQLite | ✅ `console.db` | ❌ | ❌ | ❌ | ❌ | ❌ | ⚠️ logs |

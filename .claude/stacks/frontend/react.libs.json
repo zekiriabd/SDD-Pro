@@ -6,10 +6,10 @@
   "buildSystem": "pnpm",
   "manifest": {
     "files": [
-      "workspace/output/src/{AppName}/pnpm-workspace.yaml",
-      "workspace/output/src/{AppName}/turbo.json",
-      "workspace/output/src/{AppName}/package.json",
-      "workspace/output/src/{AppName}/apps/web/package.json"
+      "workspace/src/{AppName}/pnpm-workspace.yaml",
+      "workspace/src/{AppName}/turbo.json",
+      "workspace/src/{AppName}/package.json",
+      "workspace/src/{AppName}/apps/web/package.json"
     ],
     "versionCatalogPath": "pnpm-workspace.yaml"
   },

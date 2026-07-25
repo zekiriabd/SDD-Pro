@@ -13,10 +13,10 @@ injectant `db_config` + `auth_config` (STEP 2.ter).
 
 | Stack backend | Fichier cible | Format |
 |---|---|---|
-| `dotnet-minimalapi`  | `workspace/output/src/{BackendName}/appsettings.json` | JSON |
-| `kotlin-spring-boot` | `workspace/output/src/{BackendName}/src/main/resources/application.yml` | YAML |
-| `node-express`       | `workspace/output/src/{BackendName}/config/default.json` | JSON |
-| `python-fastapi`     | `workspace/output/src/{BackendName}/app/config.py` | Python (pydantic-settings) |
+| `dotnet-minimalapi`  | `workspace/src/{BackendName}/appsettings.json` | JSON |
+| `kotlin-spring-boot` | `workspace/src/{BackendName}/src/main/resources/application.yml` | YAML |
+| `node-express`       | `workspace/src/{BackendName}/config/default.json` | JSON |
+| `python-fastapi`     | `workspace/src/{BackendName}/app/config.py` | Python (pydantic-settings) |
 
 Création si absent (`mkdir -p` implicite). Re-run : Edit narrow sur
 sections owned uniquement :

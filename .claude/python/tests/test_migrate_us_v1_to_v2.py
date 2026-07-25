@@ -133,7 +133,7 @@ class TestProcessOne(unittest.TestCase):
 class TestDiscoverAndMain(unittest.TestCase):
     def _setup_repo(self, tmp_p: Path, files: dict[str, str]) -> None:
         (tmp_p / ".claude").mkdir()
-        us_dir = tmp_p / "workspace" / "output" / "us"
+        us_dir = tmp_p / "workspace" / "us"
         us_dir.mkdir(parents=True)
         for name, content in files.items():
             (us_dir / name).write_text(content, encoding="utf-8")
@@ -167,7 +167,7 @@ class TestDiscoverAndMain(unittest.TestCase):
                 rc = mig.main()
             self.assertEqual(rc, 0)
             # Files unchanged
-            us_dir = tmp_p / "workspace" / "output" / "us"
+            us_dir = tmp_p / "workspace" / "us"
             self.assertEqual(
                 (us_dir / "1-1-Auth.md").read_text(encoding="utf-8"),
                 US_V1_NO_STATUS_NO_META,
@@ -184,7 +184,7 @@ class TestDiscoverAndMain(unittest.TestCase):
                                    ["migrate_us_v1_to_v2.py", "--all"]):
                 rc = mig.main()
             self.assertEqual(rc, 0)
-            content = (tmp_p / "workspace" / "output" / "us"
+            content = (tmp_p / "workspace" / "us"
                        / "1-1-Auth.md").read_text(encoding="utf-8")
             self.assertIn("## Metadata", content)
 
@@ -202,7 +202,7 @@ class TestDiscoverAndMain(unittest.TestCase):
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             (tmp_p / ".claude").mkdir()
-            (tmp_p / "workspace" / "output" / "us").mkdir(parents=True)
+            (tmp_p / "workspace" / "us").mkdir(parents=True)
             with mock.patch.object(mig, "repo_root", return_value=tmp_p), \
                  mock.patch.object(sys, "argv",
                                    ["migrate_us_v1_to_v2.py", "--us", "9-9"]):

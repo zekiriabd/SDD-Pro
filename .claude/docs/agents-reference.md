@@ -1,12 +1,12 @@
 # 🤖 Agents Reference
 
-12 specialized AI agents power the SDD_Pro pipeline. Each card lists the role, model, triggers, inputs/outputs, tools and verdicts. **Read this when you need to know "what does agent X do" or "what files does it touch"**.
+19 specialized AI agents power SDD_Pro: **12 forward** (cards below) + **7 reverse** (`reverse-inventory`, `reverse-tech-auditor`, `reverse-tech-analyst`, `reverse-us-writer`, `reverse-feat-composer`, `reverse-ui-extractor`, `reverse-completeness-reviewer` — documented in [reverse-engineering-workflow.md](reverse-engineering-workflow.md), manifest `loader.reverse.yml`). Each card below lists the role, model, triggers, inputs/outputs, tools and verdicts. **Read this when you need to know "what does agent X do" or "what files does it touch"**.
 
 | Quick legend |
 |---|
 | 🟢 GREEN / 🟡 WARN / 🔴 RED = canonical verdict palette |
 | `model: Sonnet 4.6` = cheaper, fast — used for orchestration + auditors |
-| `model: Opus 4.7` = stronger reasoning — used only for `dev-backend` + `dev-frontend` |
+| `model: Opus 4.8` = stronger reasoning — used only for `dev-backend` + `dev-frontend` |
 | **Hard-blocking** classes force 🔴 RED regardless of severity thresholds |
 
 ---
@@ -23,8 +23,8 @@ The agents that turn FEAT specs into running code.
 | **Model** | Sonnet 4.6 |
 | **Phase** | 2 (US generation) |
 | **Triggers** | `/us-generate {n}`, `/sdd-full {n}`, `/feat-generate` (pipeline) |
-| **Inputs (Reads)** | `workspace/input/feats/{n}-*.md`, `.claude/templates/us.template.md`, `constitution.md` |
-| **Outputs (Writes)** | `workspace/output/us/{n}-{m}-*.md` (1-6 fichiers), `constitution.md §2/§3` (append-only) |
+| **Inputs (Reads)** | `workspace/feats/{n}-*.md`, `.claude/templates/us.template.md`, `constitution.md` |
+| **Outputs (Writes)** | `workspace/us/{n}-{m}-*.md` (1-6 fichiers), `constitution.md §2/§3` (append-only) |
 | **Tools** | Read, Write, Edit, Glob, Grep |
 | **Verdicts** | ERROR-only — succès = US écrites + traçabilité 100% |
 | **Hard-blocking** | `[FEAT_NOT_FOUND]`, `[FEAT_AMBIGUOUS]`, `[GRANULARITY_VIOLATION]`, `[TRACEABILITY_GAP]` |
@@ -60,7 +60,7 @@ The agents that turn FEAT specs into running code.
 | Field | Value |
 |---|---|
 | **Role** | Pour UNE US, planifie + génère le code serveur (Services, DTOs, Endpoints, Mappers, Program.cs). |
-| **Model** | **Opus 4.7** |
+| **Model** | **Opus 4.8** |
 | **Phase** | 4 (génération code serveur, parallèle 1/US) |
 | **Triggers** | `/dev-backend {n}-{m}`, `/dev-run {n}`, `/sdd-full {n}` |
 | **Inputs (Reads)** | `us/{n}-{m}-*.md`, `ui/{n}-{m}-*.html` (passif), `src/{BackendName}/CLAUDE.md`, `stack.md`, stacks backend/auth |
@@ -80,7 +80,7 @@ The agents that turn FEAT specs into running code.
 | Field | Value |
 |---|---|
 | **Role** | Pour UNE US + mockup HTML, planifie + génère le code client (Pages, Components, theme.css) via mapping HTML→DS. |
-| **Model** | **Opus 4.7** |
+| **Model** | **Opus 4.8** |
 | **Phase** | 4 (génération code client, parallèle 1/US, post-API Gate) |
 | **Triggers** | `/dev-frontend {n}-{m}`, `/dev-run {n}`, `/sdd-full {n}` |
 | **Inputs (Reads)** | `us/{n}-{m}-*.md`, `ui/{n}-{m}-*.html`, `src/{AppName}/CLAUDE.md`, stacks frontend/ui/auth |
@@ -107,7 +107,7 @@ The agents that prepare the ground or enrich the spec.
 | **Model** | Sonnet 4.6 |
 | **Phase** | 1.5 (élicitation, optionnelle) |
 | **Triggers** | `/feat-deepen {n} [--quick]` |
-| **Inputs (Reads)** | `workspace/input/feats/{n}-*.md`, `.claude/templates/risks-assumptions.template.md`, `constitution.md` |
+| **Inputs (Reads)** | `workspace/feats/{n}-*.md`, `.claude/templates/risks-assumptions.template.md`, `constitution.md` |
 | **Outputs (Writes)** | FEAT (append 5 sections : Risques/Hypothèses/Cas Limites/RACI/Modes Défaillance), `constitution.md §7` |
 | **Tools** | Read, Write, Edit, Glob, Grep, **AskUserQuestion** (dérogation no-question §3.bis) |
 | **Verdicts** | ERROR-only — succès = FEAT enrichie |
@@ -148,7 +148,7 @@ The agents that prepare the ground or enrich the spec.
 | **Phase** | 5 (tests + coverage + quality) |
 | **Triggers** | `/qa-generate {n}`, `/sdd-full {n}` |
 | **Inputs (Reads)** | `us/{n}-*.md`, `src/{Backend,App,Lib}Name/**` (read-only), stacks QA, `db/schema.json` |
-| **Outputs (Writes)** | `*.Tests/`, `__tests__/`, `*.test.ts`, `qa/feat-{n}/{report.md,coverage.json,quality.json}` |
+| **Outputs (Writes)** | `*.Tests/`, `__tests__/`, `*.test.ts` ; télémétrie QA → `console.db` (`qa_quality`, `qa_coverage`, `qa_api_tests`), aucun fichier |
 | **Tools** | Read, Write, Edit, Glob, Grep, Bash |
 | **Verdicts** | 🟢 GREEN / 🟡 WARN / 🔴 RED selon `coverage_lines_pct >= CoverageMin` + tests passés (per-stack + global) |
 | **Hard-blocking** | `[QA_TEST_FAILED]`, `[QA_COVERAGE_GAP]`, `[QA_FRAMEWORK_MISSING]`, `[QA_OWNERSHIP_VIOLATION]`, `[QA_PRECONDITION_FAILED]` |
@@ -251,8 +251,8 @@ Cross-file post-dev reviewers — each with a distinct angle. **5 verdicts → c
 | **Model** | Sonnet 4.6 |
 | **Phase** | 99% (post-agrégation `/sdd-review`, opt-in `--adversarial`) |
 | **Triggers** | `/sdd-review {n} --adversarial` (manuel) ou auto si `AdversarialReviewMode: full` |
-| **Inputs (Reads)** | `stack.md`, FEAT+US, plans, `qa/feat-{n}/review.md` (précondition), headers des autres `*-review.md`, ≤3 fichiers code ciblés |
-| **Outputs (Writes)** | `qa/feat-{n}/adversarial.{md,json}` |
+| **Inputs (Reads)** | `stack.md`, FEAT+US, plans, verdict review via `query_console_db.py review` (précondition), headers des autres `*-review.md`, ≤3 fichiers code ciblés |
+| **Outputs (Writes)** | `.sys/.validation/{n}-adversarial.json` (ingéré puis supprimé → `console.db`) |
 | **Tools** | Read, Write, Glob, Grep, Bash |
 | **Verdicts** | **`informational` TOUJOURS** — jamais 🟢/🟡/🔴, jamais bloquant |
 | **Hard-blocking** | aucun par design ; émet `[ADV_EDGE_CASE]`, `[ADV_FRAGILE_ASSUMPTION]`, `[ADV_HIDDEN_TECH_DEBT]`, `[ADV_FAILURE_MODE]`, `[ADV_UX_CONFUSION]` ; précondition `[ADV_PRECONDITION_FAILED]` si `/sdd-review` pas tourné |
@@ -262,6 +262,15 @@ Cross-file post-dev reviewers — each with a distinct angle. **5 verdicts → c
 **Limitation** : strictement informationnel ; dé-duplique tout finding chevauchant un autre reviewer (§2.5).
 
 ---
+
+## Reverse agents (7 — module optionnel, renvoi)
+
+Le module reverse (legacy → FEAT) ajoute 7 agents non documentés en fiches ici :
+`reverse-inventory`, `reverse-tech-auditor` (Sonnet 4.6) ; `reverse-tech-analyst`
+(3a), `reverse-feat-composer` (3c), `reverse-ui-extractor` (Opus 4.8) ;
+`reverse-us-writer` (3b, Sonnet 4.6) ; `reverse-completeness-reviewer`
+(Sonnet 4.6). Manifest : `loader.reverse.yml`. Détail :
+`docs/reverse-engineering-workflow.md` + `rules/reverse-engineering.md`.
 
 ## 📊 Agent matrix at a glance
 

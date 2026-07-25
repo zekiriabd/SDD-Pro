@@ -17,7 +17,7 @@ layered config v6.7.1).
 - `/sdd-profile delete <name>` — supprime un profile
 
 **Garanties** :
-- Aucune modification de `workspace/input/stack/stack.md` (per-project)
+- Aucune modification de `workspace/stack/stack.md` (per-project)
 - Aucune modification du moteur SDD_Pro
 - N'a un effet que sur **futures exécutions** (la config layered est lue à chaque commande)
 - Backup automatique avant overwrite (`.bak`)
@@ -67,7 +67,7 @@ Tous les arguments sont passés tels quels. Le script retourne :
 ## STEP 3 — Anti-derive
 
 - Cette commande **ne modifie jamais** :
-  - `workspace/input/stack/stack.md` (ni les autres workspace/)
+  - `workspace/stack/stack.md` (ni les autres workspace/)
   - `.claude/config.base.yml`
   - Le code de prod, FEATs, US, rapports
 - Outputs uniquement :
@@ -108,7 +108,7 @@ AcceptanceGate: strict
 ```
 > ⚠️ `A11yFailOn`/`PerfMode`/`PerfFailOn` retirés v7.0.0 (agents
 > `accessibility-auditor`/`performance-auditor` supprimés). Remplacement :
-> ingest CI déterministe v7.2.0 (`ingest_axe.py`, `ingest_lighthouse.py`).
+> ingest CI déterministe v7.0.0 (`ingest_axe.py`, `ingest_lighthouse.py`).
 
 Validation :
 - Le profile doit être valide selon le schéma layered config (parseur

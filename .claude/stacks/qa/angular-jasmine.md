@@ -13,7 +13,7 @@ Scope: tests unitaires frontend Angular
 ## 1. Scope
 
 Tests unitaires pour frontends Angular.
-S'applique aux projets `workspace/output/src/{AppName}/` typés Angular.
+S'applique aux projets `workspace/src/{AppName}/` typés Angular.
 
 Jasmine + Karma sont les outils par défaut générés par `ng new`.
 Cette stack documente leur usage standard, sans migration vers Jest.
@@ -67,7 +67,7 @@ est utile uniquement si vous installez Jasmine/Karma sur un projet existant.
 <!-- CORE_PACKAGES_START -->
 ```bash
 # Auto-genere depuis angular-jasmine.libs.json -- ne pas editer (utiliser sync_stack_md.py).
-(cd workspace/output/src/{AppName} && npm install \
+(cd workspace/src/{AppName} && npm install \
   jasmine-core@5.5.0 \
   @types/jasmine@5.1.4 \
   karma@6.4.4 \
@@ -81,10 +81,10 @@ est utile uniquement si vous installez Jasmine/Karma sur un projet existant.
 ```bash
 # Auto-genere depuis angular-jasmine.libs.json (on-demand) -- installe par dev-* si l'US declenche un trigger.
 # capability: test-reporter-html
-(cd workspace/output/src/{AppName} && npm install karma-jasmine-html-reporter@2.1.0)
+(cd workspace/src/{AppName} && npm install karma-jasmine-html-reporter@2.1.0)
 
 # capability: ng-mocks
-(cd workspace/output/src/{AppName} && npm install ng-mocks@14.13.2)
+(cd workspace/src/{AppName} && npm install ng-mocks@14.13.2)
 ```
 <!-- ONDEMAND_PACKAGES_END -->
 
@@ -128,7 +128,7 @@ module.exports = function (config) {
 ## 4. Project structure
 
 ```
-workspace/output/src/{AppName}/
+workspace/src/{AppName}/
 ├── src/
 │   ├── app/
 │   │   ├── auth/
@@ -237,7 +237,7 @@ describe('LoginComponent', () => {
 ### 6.1 Test command + coverage
 
 ```bash
-cd workspace/output/src/{AppName}
+cd workspace/src/{AppName}
 ng test --code-coverage --watch=false --browsers=ChromeHeadless
 ```
 
@@ -247,7 +247,7 @@ ng test --code-coverage --watch=false --browsers=ChromeHeadless
 ### 6.2 Linter
 
 ```bash
-cd workspace/output/src/{AppName}
+cd workspace/src/{AppName}
 ng lint
 # OU
 npx eslint src/ --max-warnings 0
@@ -256,7 +256,7 @@ npx eslint src/ --max-warnings 0
 ### 6.3 Type checker
 
 ```bash
-cd workspace/output/src/{AppName}
+cd workspace/src/{AppName}
 npx tsc --noEmit
 ```
 
@@ -266,8 +266,8 @@ npx tsc --noEmit
 
 Format : **lcov.info** + **coverage-summary.json** (istanbul)
 Path :
-- `workspace/output/src/{AppName}/coverage/lcov.info`
-- `workspace/output/src/{AppName}/coverage/coverage-summary.json`
+- `workspace/src/{AppName}/coverage/lcov.info`
+- `workspace/src/{AppName}/coverage/coverage-summary.json`
 
 Le script `parse_coverage.py` parse les deux. Préférence pour
 lcov (plus stable cross-version).

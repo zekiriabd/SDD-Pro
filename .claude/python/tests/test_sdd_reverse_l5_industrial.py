@@ -107,7 +107,7 @@ def test_cache_hit_only_when_evidence_unchanged_and_feat_exists(tmp_path):
     (project / ".sys").mkdir(parents=True)
     src = project / "A.cs"
     src.write_text("class A {}", encoding="utf-8")
-    feats = tmp_path / "input" / "feats"
+    feats = tmp_path / "feats"
     feats.mkdir(parents=True)
 
     unit = {"id": "U-1", "evidenceFiles": ["A.cs"]}

@@ -1,7 +1,18 @@
 """file_locks_local.py — Cross-platform file lock (ADV-2 closure).
 
-Duplicate of sdd_lib/file_locks.py for module isolation (D4 strict).
-Parity tests against the original live in tests/test_local_helpers_parity.py.
+INDEPENDENT lock implementation for the reverse module (D4 strict isolation —
+sdd_reverse/* must never depend on the sdd_lib package). This is NOT a
+byte-for-byte copy of the sdd_lib file_locks helper : the contracts
+DELIBERATELY diverge. This module exposes a JSON-payload lock
+({agent_id, pid, ts_unix, host}), a 30s TTL, opportunistic psutil liveness,
+and the acquire_lock/release_lock/read_lock exit-code API below. The sdd_lib
+file_locks helper uses a different surface (try_create_exclusive / tuple
+returns) and is not reproduced here.
+
+Semantic tests (acquire/release cycle, stale recovery, foreign release, etc.)
+live in tests/test_local_helpers_parity.py. The "parity" tracked for this file
+is drift-AWARENESS only (informational hash watch in _parity_snapshots.json),
+NOT API equivalence — see that file's `_note`.
 
 Public API:
     acquire_lock(lock_path, agent_id, ttl=30) -> int  # exit code
@@ -32,6 +43,42 @@ from typing import Any
 from sdd_reverse.atomic_write_local import atomic_write_text
 
 DEFAULT_TTL_SECONDS = 30
+
+# Fenêtre de grâce avant de traiter un lock illisible comme « corrompu »
+# (audit 2026-06-11 M3) : un lock O_EXCL fraîchement créé est VIDE pendant
+# quelques ms (entre open et write). 2 s couvre largement ce write + les
+# pauses de scheduling, sans retarder significativement un vrai recovery.
+_CORRUPT_GRACE_SECONDS = 2.0
+
+
+def _takeover(p: Path, payload: str) -> int:
+    """Remplace un lock existant (stale TTL / pid mort / corrompu ancien).
+
+    Audit 2026-06-11 (race stale-takeover) : l'ancien chemin écrasait via
+    atomic_write_text → N prétendants détectant le même lock stale
+    retournaient TOUS exit 2 (N « détenteurs »). Ici : unlink + re-création
+    O_EXCL — un seul prétendant gagne, les autres reçoivent 1 (LOCK_HELD).
+    Fenêtre résiduelle théorique (unlink d'un lock recréé entre read et
+    unlink) bornée par la grâce mtime du caller — acceptable vs l'ancien
+    écrasement systématique.
+    """
+    try:
+        p.unlink()
+    except FileNotFoundError:
+        pass  # un autre prétendant a déjà unlinked — on tente la re-création
+    except OSError:
+        return 3
+    try:
+        fd = os.open(str(p), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    except FileExistsError:
+        return 1  # un autre prétendant a gagné le takeover
+    except OSError:
+        return 3
+    try:
+        os.write(fd, payload.encode("utf-8"))
+    finally:
+        os.close(fd)
+    return 2
 
 # psutil is optional (ADV-10) — keep dependency soft.
 try:
@@ -116,12 +163,19 @@ def acquire_lock(
 
     existing = read_lock(p)
     if existing is None:
-        # Present but unparseable → corrupted lock — overwrite (recovery).
+        # Present but unparseable. Two very different cases (audit 2026-06-11 M3) :
+        # (a) un GAGNANT entre son os.open(O_EXCL) et son os.write — le fichier
+        #     est frais et vide ; l'écraser ici = 2 détenteurs simultanés
+        #     (race prouvée par test_acquire_lock_concurrent_o_excl_race flaky) ;
+        # (b) crash mid-write ancien — lock réellement corrompu, recovery légitime.
+        # Discrimination par mtime : dans la fenêtre de grâce → HELD, pas de vol.
         try:
-            atomic_write_text(p, payload)
-            return 2
+            age_s = time.time() - p.stat().st_mtime
         except OSError:
-            return 3
+            return 1  # lock disparu/instatable entre-temps — ne jamais voler, retry caller
+        if age_s < _CORRUPT_GRACE_SECONDS:
+            return 1
+        return _takeover(p, payload)
 
     # Existing lock found — decide.
     existing_agent = existing.get("agent_id", "")
@@ -138,24 +192,16 @@ def acquire_lock(
         except OSError:
             return 3
 
-    # Stale by TTL : overwrite.
+    # Stale by TTL : takeover exclusif (un seul prétendant gagne).
     if age >= ttl:
-        try:
-            atomic_write_text(p, payload)
-            return 2
-        except OSError:
-            return 3
+        return _takeover(p, payload)
 
     # Within TTL but pid check : only if same host AND psutil available.
     if existing_host == host:
         alive = _is_pid_alive(existing_pid)
         if alive is False:
-            # Pid dead on same host — overwrite even before TTL.
-            try:
-                atomic_write_text(p, payload)
-                return 2
-            except OSError:
-                return 3
+            # Pid dead on same host — takeover even before TTL.
+            return _takeover(p, payload)
         # alive is True OR None (no psutil) → fall through to LOCK_HELD.
 
     return 1

@@ -28,7 +28,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from sdd_reverse.scan_legacy import normalize_bytes
+from sdd_reverse.scan_legacy import normalize_bytes, read_text_normalized as _read_text
 
 DEPENDENCY_SCHEMA_VERSION = 1
 
@@ -76,11 +76,7 @@ def _line_at(text: str, offset: int) -> int:
     return text.count("\n", 0, offset) + 1
 
 
-def _read_text(path: Path) -> str:
-    try:
-        return normalize_bytes(path.read_bytes()).decode("utf-8", errors="replace")
-    except OSError:
-        return ""
+# _read_text centralise dans scan_legacy (audit 2026-06-11 B5 — cap 5 Mo).
 
 
 def parse_csproj(text: str, source: str) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:

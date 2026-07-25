@@ -1,6 +1,6 @@
 ---
 name: reverse-tech-analyst
-description: Barreau 3a de l'escalier reverse (ADR reverse-spec-ladder). Pour UNE unité U-N, lit l'evidence + DB schema + tech-audit optionnel et produit une ANALYSE TECHNIQUE legacy (comportements observés, accès données, calculs, effets de bord) dans output/plans/{n}-{Name}.analysis.md. Photo fidèle du code, evidence file:line par task, confidence cap par langage, bias toward present. NE produit PAS de FEAT (c'est 3c). Aucun spawn d'agent.
+description: Barreau 3a de l'escalier reverse (ADR reverse-spec-ladder). Pour UNE unité U-N, lit l'evidence + DB schema + tech-audit optionnel et produit une ANALYSE TECHNIQUE legacy (comportements observés, accès données, calculs, effets de bord) dans plans/{n}-{Name}.analysis.md. Photo fidèle du code, evidence file:line par task, confidence cap par langage, bias toward present. NE produit PAS de FEAT (c'est 3c). Aucun spawn d'agent.
 model: claude-opus-4-8
 tools: Read, Write, Edit, Glob, Grep, Bash
 loader: .claude/loader.reverse.yml
@@ -120,15 +120,15 @@ aucun lock requis (condition du parallélisme borné §8.2).
 python -c "
 import sys; sys.path.insert(0, '.claude/python')
 from sdd_reverse.file_locks_local import acquire_lock
-sys.exit(acquire_lock('workspace/input/feats/.alloc.lock', 'reverse-tech-analyst-{U-N}', ttl=1800))
+sys.exit(acquire_lock('workspace/feats/.alloc.lock', 'reverse-tech-analyst-{U-N}', ttl=1800))
 "
 ```
 TTL **1800 s**. Exit `0`/`2` → continuer. Exit `1` → STOP + ERROR `[REVERSE_LOCK_HELD]`. Exit `3` → STOP + ERROR `[INFRA_BLOCKED]`.
 
 ### 3.2 Résolution
 
-1. `inventory.json._featAllocations[{U-N}]` présent → `n = _featAllocations[{U-N}]` (idempotence). Sinon → `n = max(numéros FEAT existants dans workspace/input/feats/) + 1`.
-2. `Name` via `_allocatedNames` + glob `workspace/input/feats/*.md` (collision sur `unit.suggestedName`) :
+1. `inventory.json._featAllocations[{U-N}]` présent → `n = _featAllocations[{U-N}]` (idempotence). Sinon → `n = max(numéros FEAT existants dans workspace/feats/) + 1`.
+2. `Name` via `_allocatedNames` + glob `workspace/feats/*.md` (collision sur `unit.suggestedName`) :
    - Pas de collision → `Name = unit.suggestedName`
    - Collision FEAT reverse même `source-unit` → réutiliser (idempotent)
    - Collision FEAT humaine / autre unité → `Name = {suggestedName}-Legacy` ; si pris → `{suggestedName}-Legacy-{U-N}`
@@ -149,6 +149,12 @@ TTL **1800 s**. Exit `0`/`2` → continuer. Exit `1` → STOP + ERROR `[REVERSE_
    mécanique observable. **Chaque task se termine par
    `<!-- evidence: path:Lstart-Lend --> <!-- confidence: ... -->`** — c'est le
    barreau bas du fil de traçabilité (D3). Décrire le *quoi* mécanique, pas le métier.
+   **Contrat de nommage de task (OBLIGATOIRE, décision Tech Lead 2026-06-13)** :
+   chaque task porte un **libellé court descriptif** dérivé de l'observable —
+   format `**T-N** : {Classe.Méthode|endpoint|handler} — {action mécanique 1L}`.
+   Le libellé permet de distinguer les tasks sans lire l'evidence.
+   - ✅ `**T-7** : SaisieCommentaire (endpoint) — stocke en session puis appelle Commentaire.UpdateCommentaires`
+   - ❌ `**T-7** : traitement` / `**T-7** : voir code` (générique, non distinctif)
 4. **`## Accès données`** : Requêtes SQL (tables), Procédures stockées (nom +
    contrat), Connexion & configuration (**toute la plomberie** : connstring,
    timeout, params applicatifs — DÉMOTÉE ici par design D6).
@@ -168,13 +174,13 @@ choisir « non documenté ». L'analyse fidèle minimaliste prime sur la richess
 ## STEP 5 — Path safety + écriture atomique
 
 Écriture **uniquement** sous :
-- `workspace/output/plans/{n}-{Name}.analysis.md` (l'analyse — extension `.analysis.md` distincte du forward)
+- `workspace/plans/{n}-{Name}.analysis.md` (l'analyse — extension `.analysis.md` distincte du forward)
 - `workspace/old/{P}/.sys/modules/{Name}/extraction.md` (log de décisions)
 
 Tout autre path → STOP + ERROR `[REVERSE_ISOLATION_VIOLATION]`.
 
 Écriture atomique (`.sddtmp` + `os.replace`) via `sdd_reverse.atomic_write_local`.
-Créer le parent `workspace/output/plans/` si absent (`mkdir -p` après pré-check).
+Créer le parent `workspace/plans/` si absent (`mkdir -p` après pré-check).
 
 ## STEP 6 — Mise à jour inventory + release lock
 
@@ -186,7 +192,7 @@ Créer le parent `workspace/output/plans/` si absent (`mkdir -p` après pré-che
    python -c "
    import sys; sys.path.insert(0, '.claude/python')
    from sdd_reverse.file_locks_local import release_lock
-   release_lock('workspace/input/feats/.alloc.lock', 'reverse-tech-analyst-{U-N}')
+   release_lock('workspace/feats/.alloc.lock', 'reverse-tech-analyst-{U-N}')
    "
    ```
 3. Écrire `extraction.md` (décisions, classes d'erreur émises, tasks rejetées, fichiers non lus si cap M16).
@@ -204,7 +210,7 @@ Créer le parent `workspace/output/plans/` si absent (`mkdir -p` après pré-che
 3. **No-spawn** : aucun agent spawné.
 4. **Pas d'invention** : evidence file:line obligatoire par task.
 5. **Pas de métier** : 3a décrit le mécanique observé ; l'intention métier est l'affaire de 3b/3c. Ne pas reformuler en « besoin utilisateur » ici.
-6. **Path safety** : écriture uniquement `workspace/output/plans/` et `workspace/old/{P}/.sys/modules/`.
+6. **Path safety** : écriture uniquement `workspace/plans/` et `workspace/old/{P}/.sys/modules/`.
 7. **Plomberie démotée** : connstring, timeouts, mécaniques d'accès → `## Accès données › Connexion`, JAMAIS présentées comme règles métier.
 
 Voir `.claude/docs/reverse-engineering-workflow.md` §Phase 3 + ADR `governance-major-reverse-spec-ladder`.

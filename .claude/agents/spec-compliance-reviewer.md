@@ -33,8 +33,8 @@ conditionnel via `phase_planner.py` selon `SpecComplianceMode`. Fallback
 legacy parallèle 4-batch disponible via `AuditorBatchMode: legacy-parallel`
 (Project Config) ou flag CLI `--legacy-auditor-parallel` sur `/dev-run`.
 
-**Strictement read-only** sur `workspace/output/src/**` et
-`workspace/output/us/**`. **Ne corrige pas, ne re-Read pas le rapport
+**Strictement read-only** sur `workspace/src/**` et
+`workspace/us/**`. **Ne corrige pas, ne re-Read pas le rapport
 des autres agents** — émet son rapport indépendant.
 
 **Token footprint cible** : 8-15 KB par FEAT de 3-5 US (Sonnet 4.6,
@@ -52,8 +52,8 @@ de `dev-*` que `build_loop` ne catch pas car le build est vert).
 
 Cet agent **ne produit que** ces 2 outputs :
 
-1. `workspace/output/.sys/.validation/{n}-spec-compliance.md` — rapport humain
-2. `workspace/output/.sys/.validation/{n}-spec-compliance.json` — schéma machine
+1. `workspace/.sys/.validation/{n}-spec-compliance.md` — rapport humain
+2. `workspace/.sys/.validation/{n}-spec-compliance.json` — schéma machine
 
 **INTERDIT** : aucun autre Write. Aucun Edit. Aucune correction
 proactive. Aucun appel à un autre agent. Aucun re-Read de rapports
@@ -83,7 +83,7 @@ FIX: relancer via /sdd-review {n} (auto-spawn spec-compliance-reviewer)
 
 ### 1.2 Project Config
 
-Lire `## Project Config` de `workspace/input/stack/stack.md` :
+Lire `## Project Config` de `workspace/stack/stack.md` :
 
 ```yaml
 ## Project Config
@@ -102,8 +102,8 @@ Validation :
 
 ### 2.1 FEAT + US existent
 
-Glob `workspace/input/feats/{n}-*.md` → 1 fichier attendu.
-Glob `workspace/output/us/{n}-*.md` → ≥ 1 fichier attendu.
+Glob `workspace/feats/{n}-*.md` → 1 fichier attendu.
+Glob `workspace/us/{n}-*.md` → ≥ 1 fichier attendu.
 
 Si absent → STOP + ERROR :
 ```
@@ -115,8 +115,8 @@ FIX: lancer /us-generate {n} puis /dev-run {n} d'abord
 ### 2.2 Code généré présent
 
 Au moins un de :
-- `workspace/output/src/{BackendName}/` (selon stack backend actif)
-- `workspace/output/src/{AppName}/` (selon stack frontend actif)
+- `workspace/src/{BackendName}/` (selon stack backend actif)
+- `workspace/src/{AppName}/` (selon stack frontend actif)
 
 Si rien → STOP + ERROR `[QA_PRECONDITION_FAILED]`.
 
@@ -131,10 +131,10 @@ warnings — le Tech Lead arbitre.
 
 Read **uniquement** :
 
-1. `.claude/rules/error-classification.md` §1.14 — taxonomie `[SPEC_*]`
-2. `workspace/input/feats/{n}-*.md` — FEAT parente (lecture passive,
+1. `.claude/digests/error-classification.spec-compliance-reviewer.md` §1.13 — taxonomie `[SPEC_*]`
+2. `workspace/feats/{n}-*.md` — FEAT parente (lecture passive,
    compréhension du périmètre fonctionnel global)
-3. `workspace/output/us/{n}-*.md` — **toutes** les US de la FEAT (lecture
+3. `workspace/us/{n}-*.md` — **toutes** les US de la FEAT (lecture
    active, source de vérité pour les ACs à vérifier)
 
 **Pas de** stack `.md` complet, **pas de** `CLAUDE.md` projet, **pas de**
@@ -175,8 +175,8 @@ Pour chaque AC, classifier en :
 
 ## STEP 5 — Sélection du code à inspecter
 
-**HARD-RULE (security audit 2026-06-06)** : **Ne JAMAIS** faire `Glob workspace/output/src/**/*`
-ni aucun glob non-borné sous `workspace/output/src/`. Incident mesuré
+**HARD-RULE (security audit 2026-06-06)** : **Ne JAMAIS** faire `Glob workspace/src/**/*`
+ni aucun glob non-borné sous `workspace/src/`. Incident mesuré
 (audit cost-time 2026-06-06) : un run a consommé **11.8M tokens / $35** sur
 1 FEAT en glob non-borné — 200× au-dessus du budget de 1M. Si à un moment
 quelconque tu es tenté de glob largement pour "voir tout le code", **STOP
@@ -188,7 +188,7 @@ Stratégie ordonnée (premier match wins) :
 
 ### 5.1 Si plans v2 strict-ready présents (mode preferred)
 
-Glob `workspace/output/plans/{n}-*.{back,front}.md`. Pour chaque plan,
+Glob `workspace/plans/{n}-*.{back,front}.md`. Pour chaque plan,
 parser la section `## Files` et collecter `paths[]` avec leur
 `covers_acs:` associé.
 
@@ -202,7 +202,7 @@ toute lecture de code :
 
 ```
 ⚠️ WARN spec-compliance-reviewer FEAT {n} — plan v2 absent, fallback convention
-   Cause : aucun `workspace/output/plans/{n}-*.{back,front}.md` matché
+   Cause : aucun `workspace/plans/{n}-*.{back,front}.md` matché
    Conséquence : mapping `us→files` (granularité US) au lieu de
                  `ac_id→files` (granularité AC du plan v2). Risque
                  accru de `[SPEC_AC_NOT_VERIFIED]` faux positifs.
@@ -213,9 +213,9 @@ Persister `"source_mode": "convention-fallback"` + `"plan_v2_warn": true`
 dans `{n}-spec-compliance.json`.
 
 Pour chaque US `{n}-{m}-{Name}` :
-- Backend : `workspace/output/src/{BackendName}/Services/*{Name}*`,
+- Backend : `workspace/src/{BackendName}/Services/*{Name}*`,
   `Endpoints/*{Name}*`, `DTOs/*{Name}*`, `Validators/*{Name}*`
-- Frontend : `workspace/output/src/{AppName}/Pages/*{Name}*`,
+- Frontend : `workspace/src/{AppName}/Pages/*{Name}*`,
   `Components/*{Name}*`, etc.
 
 Mapping fallback : `us → [files]` (granularité US, pas AC).
@@ -328,8 +328,8 @@ else:
 ### 7.3 Émission rapports
 
 Écrire :
-- `workspace/output/.sys/.validation/{n}-spec-compliance.md`
-- `workspace/output/.sys/.validation/{n}-spec-compliance.json`
+- `workspace/.sys/.validation/{n}-spec-compliance.md`
+- `workspace/.sys/.validation/{n}-spec-compliance.json`
 
 Schéma JSON (validé par `validate_spec_compliance.py`) :
 ```json
@@ -353,7 +353,7 @@ Schéma JSON (validé par `validate_spec_compliance.py`) :
           "class": "testable_strict",
           "status": "verified",
           "evidence": {
-            "file": "workspace/output/src/SIM.Backend/Endpoints/AuthEndpoints.cs",
+            "file": "workspace/src/SIM.Backend/Endpoints/AuthEndpoints.cs",
             "lines": "42-58",
             "snippet": "app.MapPost(\"/auth/login\", async (LoginDto dto) => {\n  ..."
           }
@@ -381,14 +381,14 @@ Schéma JSON (validé par `validate_spec_compliance.py`) :
 
 ```
 ✓ spec-compliance: 🟢 GREEN — 12/12 ACs vérifiés
-Rapport: workspace/output/.sys/.validation/1-spec-compliance.md
+Rapport: workspace/.sys/.validation/1-spec-compliance.md
 ```
 
 ### 8.2 Verdict 🟡 WARN
 
 ```
 ⚠ spec-compliance: 🟡 WARN — 11/12 ACs vérifiés (1 minor)
-Rapport: workspace/output/.sys/.validation/1-spec-compliance.md
+Rapport: workspace/.sys/.validation/1-spec-compliance.md
 ```
 
 ### 8.3 Verdict 🔴 RED (1 ou plusieurs ACs critical/serious non vérifiées)
@@ -402,7 +402,7 @@ ACs non vérifiées :
   - AC-5 (US 1-3): "POST /auth/refresh retourne nouveau JWT" → critical
     Endpoint /auth/refresh introuvable dans Endpoints/*.cs
 
-Rapport: workspace/output/.sys/.validation/1-spec-compliance.md
+Rapport: workspace/.sys/.validation/1-spec-compliance.md
 Pour débloquer :
   1. Lire le rapport (détail evidence + suggestion par AC)
   2. Implémenter l'AC manquante via /dev-backend ou /dev-frontend
@@ -417,7 +417,7 @@ Pour débloquer :
 2. Tous les ACs des US lus apparaissent dans `us[].acs[]`
 3. `summary.total_acs == sum(issues) + verified`
 4. Pour chaque `status: verified`, le champ `evidence.file` existe et le
-   path est plausible (matche un fichier sous `workspace/output/src/`)
+   path est plausible (matche un fichier sous `workspace/src/`)
 
 Si une violation détectée → STOP + ERROR `[QA_OUTPUT_INVALID]` (le
 fichier n'est pas écrit, exit 2).
@@ -443,10 +443,18 @@ python .claude/python/sdd_scripts/validate_spec_compliance.py --feat {n}
 
 Après validation réussie (STEP 10 exit 0 ou 1), appeler le bridge Python
 qui parse le `.json`, aplatit `us[].acs[]` en rows `qa_spec_compliance`
-(une row par AC) et supprime le `.json`. Le `.md` reste.
+(une row par AC) **et conserve le `.json`** (`--keep-json`). Le `.md` reste.
+
+> **FWD-C1 fix (audit 2026-06-12)** : `--keep-json` est obligatoire ici.
+> spec-compliance est le **gate Stage A** : l'orchestrateur
+> (`auditor-orchestration.md §3`) lit `summary.verdict` dans
+> `{n}-spec-compliance.json` pour décider 🟢/🟡 → Stage B vs 🔴 → STOP, et
+> `/feat-validate` STEP 4.5.3 **exige** ce fichier (sinon
+> `[SPEC_COMPLIANCE_REQUIRED]`). Le bridge le supprimait par défaut →
+> faux 🔴 RED systématique. Le `.json` est par-FEAT, overwrite chaque run.
 
 ```bash
-python -m sdd_scripts.ingest_agent_report --type spec-compliance --feat {n}
+python -m sdd_scripts.ingest_agent_report --type spec-compliance --feat {n} --keep-json
 ```
 
 | Exit | Action |
@@ -454,8 +462,8 @@ python -m sdd_scripts.ingest_agent_report --type spec-compliance --feat {n}
 | 0 | STOP succès final |
 | 1 / 2 / 3 | STOP + ERROR `[QA_OUTPUT_INVALID]` |
 
-Aucun `.json` sur le FS à l'issue de ce STEP. Données interrogeables
-via `SELECT … FROM qa_spec_compliance WHERE feat_n = {n}`.
+À l'issue de ce STEP : `.json` + `.md` présents sur le FS, ET données
+interrogeables via `SELECT … FROM qa_spec_compliance WHERE feat_n = {n}`.
 
 ---
 
@@ -485,6 +493,6 @@ Applique `@.claude/rules/output-protocol.md` (label `[SPEC-REVIEW]`, plage `91-9
 ## Idempotence
 
 Re-invocation `/spec-compliance {n}` → réécrit
-`workspace/output/.sys/.validation/{n}-spec-compliance.{md,json}` à
+`workspace/.sys/.validation/{n}-spec-compliance.{md,json}` à
 l'identique si code + US inchangés. Cf. `agents/code-reviewer.md
 §Idempotence` pour le pattern commun.

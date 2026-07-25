@@ -42,7 +42,7 @@ bootstrap arch + scaffolding DB sont idempotents par construction.
 
 ## 4. Lecture sélective
 
-Aucun agent ne fait de Glob `workspace/output/us/*.md` ou `workspace/input/ui/*.html`
+Aucun agent ne fait de Glob `workspace/us/*.md` ou `workspace/ui/*.html`
 quand il traite UNE US. Chaque agent ne lit que ses fichiers de
 travail.
 
@@ -64,7 +64,7 @@ Pour `U` US et `MaxParallel = K` :
 
 Les agents `dev-backend` et `dev-frontend` planifient eux-mêmes la
 liste des fichiers à produire à partir de l'US + (HTML mockup) +
-stacks actifs. **Pas de fichier `workspace/output/tasks/...`**, pas de
+stacks actifs. **Pas de fichier `workspace/tasks/...`**, pas de
 Lead-Dev.
 
 ## 7. Bootstrap unifié (pas d'agent DB séparé)
@@ -76,9 +76,9 @@ silencieusement skip. **Pas d'agent `db` séparé**.
 ## 8. CLAUDE.md par projet (digest, depuis v2.5)
 
 Arch produit en Phase C **un fichier CLAUDE.md par projet généré** :
-- `workspace/output/src/{BackendName}/CLAUDE.md` — architecture backend
-- `workspace/output/src/{AppName}/CLAUDE.md` — architecture frontend + UI
-- `workspace/output/src/{LibName}/CLAUDE.md` (si LibName défini) — contrats
+- `workspace/src/{BackendName}/CLAUDE.md` — architecture backend
+- `workspace/src/{AppName}/CLAUDE.md` — architecture frontend + UI
+- `workspace/src/{LibName}/CLAUDE.md` (si LibName défini) — contrats
   partagés
 
 Hash-validé (`stack-md-hash` en frontmatter, calculé sur stack.md +
@@ -88,7 +88,7 @@ bruts. Régénération au prochain `/arch-init`.
 ## 9. HTML mockup comme source de vérité visuelle (depuis v4)
 
 `dev-frontend` lit **directement** le fichier HTML statique
-`workspace/input/ui/{n}-{m}-{Name}.html` (texte, pas vision multimodale).
+`workspace/ui/{n}-{m}-{Name}.html` (texte, pas vision multimodale).
 
 Trois sources de vérité hiérarchisées :
 - **HTML mockup** = source de vérité visuelle : libellés exacts,
@@ -107,7 +107,7 @@ structures clés extraits du HTML source dans le markup généré.
 
 `/dev-plan {n}` invoque les agents dev-* en mode `:plan` : ils
 planifient inline puis écrivent le plan dans
-`workspace/output/plans/{n}-{m}-{Name}.{back|front}.md` **sans coder**.
+`workspace/plans/{n}-{m}-{Name}.{back|front}.md` **sans coder**.
 
 `/dev-run {n}` détecte automatiquement les plans existants et les
 **consomme** (mode From Plan).
@@ -194,7 +194,7 @@ script et consomme son JSON. Détail : `agents/dev-backend.md STEP 5.bis`.
   (référence sur échec `build_loop`) + Tech Lead humain.
 - **`ownership.md §1.bis`** (depuis 2026-05-12) — Front/Back
   isolation stricte : `{AppName}/` et `{BackendName}/` au même niveau
-  sous `workspace/output/src/`, jamais imbriqués. Hard-gate
+  sous `workspace/src/`, jamais imbriqués. Hard-gate
   `[FILE_OWNERSHIP_NESTED]` dans `arch`, `dev-backend`, `dev-frontend`.
 - **`build-and-loop.md (Partie B)`** — source de vérité unique pour les patterns
   strictement identiques `dev-backend`/`dev-frontend` (context budget
@@ -212,7 +212,6 @@ script et consomme son JSON. Détail : `agents/dev-backend.md STEP 5.bis`.
 | `adr.template.md`                  | agent `arch` + agents dev-* |
 | `readiness.template.md`            | `/feat-validate`         |
 | `risks-assumptions.template.md`    | agent `elicitor`         |
-| `qa-report.template.md`            | agent `qa`               |
 | `api-tests.template.json`          | schéma rapport API Gate (cf. `rules/build-and-loop.md (Partie A) §1.4`) — produit par `/qa-generate --mode api-tests` |
 | `claude-md-backend.template.md`    | agent `arch` STEP 12 — gabarit CLAUDE.md projet backend |
 | `claude-md-frontend.template.md`   | agent `arch` STEP 12 — gabarit CLAUDE.md projet frontend |

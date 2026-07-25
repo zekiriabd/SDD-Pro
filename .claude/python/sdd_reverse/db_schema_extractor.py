@@ -24,7 +24,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from sdd_reverse.scan_legacy import ScanResult, decode_text, normalize_bytes
+from sdd_reverse.scan_legacy import ScanResult, decode_text, normalize_bytes, read_text_normalized as _read_text
 
 DB_SCHEMA_VERSION = 1
 
@@ -32,8 +32,29 @@ DB_SCHEMA_VERSION = 1
 # === SQL DDL parsing ===
 
 # Match `CREATE TABLE name (` — body extracted via balanced-paren scan (see _find_table_body).
+# Audit 2026-06-11 (B4) : l'ancien header ne matchait que les identifiants nus
+# ou [bracketés] préfixés `dbo.` — les backticks MySQL (`` `users` ``), les
+# identifiants double-quotés PostgreSQL, `IF NOT EXISTS` et les schémas
+# non-dbo n'étaient pas parsés alors que _detect_db_type prétend reconnaître
+# MySQL/PostgreSQL.
 _RE_CREATE_TABLE_HEADER = re.compile(
-    r"CREATE\s+TABLE\s+(?:\[?dbo\]?\.)?\[?(\w+)\]?\s*\(",
+    r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?"
+    r"(?:[\[`\"]?\w+[\]`\"]?\s*\.\s*)?"          # optional schema prefix (dbo., `db`., "sch".)
+    r"[\[`\"]?(\w+)[\]`\"]?\s*\(",
+    re.IGNORECASE,
+)
+
+# B4 — vues et triggers : extraction des NOMS uniquement (leur corps n'est pas
+# analysé — la logique métier qu'ils portent reste invisible à l'escalier,
+# signalé via parseWarnings ; cf. KNOWN-LIMITATIONS « angles morts runtime »).
+_RE_CREATE_VIEW = re.compile(
+    r"CREATE\s+(?:OR\s+(?:REPLACE|ALTER)\s+)?VIEW\s+"
+    r"(?:[\[`\"]?\w+[\]`\"]?\s*\.\s*)?[\[`\"]?(\w+)[\]`\"]?",
+    re.IGNORECASE,
+)
+_RE_CREATE_TRIGGER = re.compile(
+    r"CREATE\s+(?:OR\s+(?:REPLACE|ALTER)\s+)?TRIGGER\s+"
+    r"(?:[\[`\"]?\w+[\]`\"]?\s*\.\s*)?[\[`\"]?(\w+)[\]`\"]?",
     re.IGNORECASE,
 )
 
@@ -134,12 +155,7 @@ def _class_property_registry(content: str) -> dict[str, list[dict[str, Any]]]:
     return registry
 
 
-def _read_text(path: Path) -> str:
-    try:
-        raw = path.read_bytes()
-    except OSError:
-        return ""
-    return decode_text(normalize_bytes(raw))
+# _read_text centralise dans scan_legacy (audit 2026-06-11 B5 — cap 5 Mo).
 
 
 def _split_top_level_commas(body: str) -> list[str]:
@@ -310,6 +326,8 @@ def extract_db_schema(
     root = Path(project_root).resolve()
     all_entities: dict[str, dict[str, Any]] = {}
     all_relations: list[dict[str, Any]] = []
+    all_views: list[dict[str, Any]] = []
+    all_triggers: list[dict[str, Any]] = []
     sources: list[str] = []
     content_samples: list[str] = []
     parse_warnings: list[str] = []   # C8 — surfaced, never silent
@@ -323,6 +341,28 @@ def extract_db_schema(
             content_samples.append(content[:500])
             rel = str(f.relative_to(root).as_posix())
             sources.append(rel)
+            # B4 — noms de vues/triggers (corps NON analysé, signalé).
+            seen_vt: set[str] = set()
+            for vm in _RE_CREATE_VIEW.finditer(content):
+                name = vm.group(1)
+                if ("v", name) in seen_vt:
+                    continue
+                seen_vt.add(("v", name))
+                line = content[: vm.start()].count("\n") + 1
+                all_views.append({"name": name, "evidence": f"{rel}:{line}"})
+            for tm in _RE_CREATE_TRIGGER.finditer(content):
+                name = tm.group(1)
+                if ("t", name) in seen_vt:
+                    continue
+                seen_vt.add(("t", name))
+                line = content[: tm.start()].count("\n") + 1
+                all_triggers.append({"name": name, "evidence": f"{rel}:{line}"})
+            if seen_vt:
+                parse_warnings.append(
+                    f"{rel}: {len(seen_vt)} view(s)/trigger(s) detected — names "
+                    "only, their body logic is NOT analyzed (blind spot for the "
+                    "extraction ladder, review manually)"
+                )
             ents, rels = _parse_sql_ddl(content, rel, parse_warnings)
             for e in ents:
                 if e["name"] not in all_entities:
@@ -370,6 +410,8 @@ def extract_db_schema(
         "databaseType": db_type,
         "entities": list(all_entities.values()),
         "relations": all_relations,
+        "views": all_views,         # B4 — noms seuls, corps non analysé
+        "triggers": all_triggers,   # B4 — noms seuls, corps non analysé
         "indexes": [],
         "parseWarnings": parse_warnings[:50],   # C8 — unparsed column lines
         "missingPartsHint": [] if all_entities else [

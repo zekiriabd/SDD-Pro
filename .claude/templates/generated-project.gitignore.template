@@ -1,6 +1,6 @@
 # SDD_Pro generated project ignores
 #
-# Copy to workspace/output/src/{ProjectName}/.gitignore during arch Phase A.
+# Copy to workspace/src/{ProjectName}/.gitignore during arch Phase A.
 # Generated config may contain local secrets copied from stack.md. Keep example
 # files versioned, keep real local config ignored.
 

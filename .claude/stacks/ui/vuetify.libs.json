@@ -5,7 +5,7 @@
   "schemaVersion": 1,
   "buildSystem": "npm",
   "manifest": {
-    "files": ["workspace/output/src/{AppName}/package.json"]
+    "files": ["workspace/src/{AppName}/package.json"]
   },
   "versions": {
     "vuetify": "3.7.4",

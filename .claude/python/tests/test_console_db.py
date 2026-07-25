@@ -314,5 +314,62 @@ class TestConnectRetryConfig(unittest.TestCase):
                                f"backoff[{i}] must be > backoff[{i-1}] (exponential)")
 
 
+class TestConnectContextManagerSemantics(unittest.TestCase):
+    """Regression for the 2026-06-12 audit fix (C2).
+
+    The previous `connect()` wrapped `yield conn` INSIDE the retry loop, so any
+    exception in the `with` body (or at commit) looped back to a second `yield`
+    → `RuntimeError("generator didn't stop after throw()")` instead of either a
+    retry or a clean propagation. The yield is now outside the retry loop.
+    """
+
+    def _db(self, tmp: str) -> Path:
+        return Path(tmp) / "t.db"
+
+    def test_commit_persists_on_success(self) -> None:
+        with TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            db = self._db(tmp)
+            with connect(db) as c:
+                c.execute("CREATE TABLE x(id INTEGER)")
+                c.execute("INSERT INTO x VALUES (1)")
+            with connect(db) as c:
+                self.assertEqual(c.execute("SELECT COUNT(*) FROM x").fetchone()[0], 1)
+
+    def test_body_exception_propagates_unchanged_not_runtimeerror(self) -> None:
+        with TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            db = self._db(tmp)
+            with connect(db) as c:
+                c.execute("CREATE TABLE x(id INTEGER)")
+            # The exact bug: a body exception must surface as itself.
+            with self.assertRaises(ValueError):
+                with connect(db) as c:
+                    c.execute("INSERT INTO x VALUES (2)")
+                    raise ValueError("boom")
+
+    def test_body_exception_rolls_back(self) -> None:
+        with TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            db = self._db(tmp)
+            with connect(db) as c:
+                c.execute("CREATE TABLE x(id INTEGER)")
+                c.execute("INSERT INTO x VALUES (1)")
+            try:
+                with connect(db) as c:
+                    c.execute("INSERT INTO x VALUES (2)")
+                    raise ValueError("boom")
+            except ValueError:
+                pass
+            with connect(db) as c:
+                self.assertEqual(c.execute("SELECT COUNT(*) FROM x").fetchone()[0], 1)
+
+    def test_operationalerror_in_body_propagates_not_runtimeerror(self) -> None:
+        with TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            db = self._db(tmp)
+            with connect(db) as c:
+                c.execute("CREATE TABLE x(id INTEGER)")
+            with self.assertRaises(sqlite3.OperationalError):
+                with connect(db) as c:
+                    c.execute("SELECT * FROM does_not_exist")
+
+
 if __name__ == "__main__":
     unittest.main()

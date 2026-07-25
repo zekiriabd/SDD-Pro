@@ -10,7 +10,7 @@
 
 CTO audit 2026-06-06 a identifié 14 items P0/P1/P2 (7 critical + 8 high
 + 5 info). Sprint 1 (5 items P0) exécuté et validé le 2026-06-06 (cf.
-`workspace/output/db/console.db` runs `20260606T*`).
+`workspace/db/console.db` runs `20260606T*`).
 
 User a demandé "fix all" sur Sprint 2 + Sprint 3 (9 items restants).
 Cet ADR documente :

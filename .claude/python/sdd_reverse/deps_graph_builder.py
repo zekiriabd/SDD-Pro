@@ -24,7 +24,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from sdd_reverse.scan_legacy import ScanResult, decode_text, normalize_bytes
+from sdd_reverse.scan_legacy import ScanResult, decode_text, normalize_bytes, read_text_normalized as _read_text
 
 # Naive EOL deadline map for common ecosystems (informational only)
 EOL_HINTS = {
@@ -59,12 +59,7 @@ _RE_JAVA_IMPORT = re.compile(r"^\s*import\s+([A-Za-z_][\w.]+);", re.MULTILINE)
 _RE_PHP_USE = re.compile(r"^\s*use\s+([A-Za-z_][\w\\]+);", re.MULTILINE)
 
 
-def _read_text(path: Path) -> str:
-    try:
-        raw = path.read_bytes()
-    except OSError:
-        return ""
-    return decode_text(normalize_bytes(raw))
+# _read_text centralise dans scan_legacy (audit 2026-06-11 B5 — cap 5 Mo).
 
 
 def _parse_packages_config(content: str) -> list[tuple[str, str]]:

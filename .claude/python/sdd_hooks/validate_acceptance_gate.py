@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """SDD_Pro SubagentStop hook — Acceptance Gate VERDICT READER (refactor 2026-06-05).
 
-Reads the report `workspace/output/.sys/.acceptance/acceptance.json` produced by
+Reads the report `workspace/.sys/.acceptance/acceptance.json` produced by
 `sdd_scripts/validate_acceptance.py` (invoked by the qa agent during its STEP).
 
 Why this hook does NOT run npm test / dotnet build / pytest itself anymore
@@ -54,7 +54,7 @@ from pathlib import Path
 
 from sdd_lib.ci import is_ci as _detect_ci  # noqa: E402  # SSoT audit 2026-06-07
 from sdd_lib.exit_codes import HOOK_ALLOW, HOOK_DENY  # noqa: E402
-from sdd_lib.paths import project_root_for_hook as _resolve_project_root
+from sdd_lib.paths import workspace_root, project_root_for_hook as _resolve_project_root
 
 
 def main() -> int:
@@ -63,7 +63,7 @@ def main() -> int:
         return HOOK_ALLOW
 
     root = _resolve_project_root()
-    report_path = root / "workspace" / "output" / ".sys" / ".acceptance" / "acceptance.json"
+    report_path = workspace_root(root) / ".sys" / ".acceptance" / "acceptance.json"
 
     if not report_path.is_file():
         # Audit 2026-06-06 D7 — strict mode in CI, soft mode interactive.

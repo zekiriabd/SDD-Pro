@@ -5,7 +5,7 @@
   "schemaVersion": 1,
   "buildSystem": "pnpm",
   "manifest": {
-    "files": ["workspace/output/src/{AppName}/package.json"]
+    "files": ["workspace/src/{AppName}/package.json"]
   },
   "versions": {
     "tailwindcss": "4.0.0",

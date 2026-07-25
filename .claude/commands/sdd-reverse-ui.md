@@ -1,7 +1,7 @@
 ---
 command: sdd-reverse-ui
 phase: 4
-description: Phase 4 du workflow reverse — extraction UI sémantique d'UNE unité U-N en mockup(s) HTML statique. Spawn agent reverse-ui-extractor (Opus 4.8). Output workspace/input/ui/{n}-{m}-{Name}.html consommable par dev-frontend lors de /sdd-full.
+description: Phase 4 du workflow reverse — extraction UI sémantique d'UNE unité U-N en mockup(s) HTML statique. Spawn agent reverse-ui-extractor (Opus 4.8). Output workspace/ui/{n}-{m}-{Name}.html consommable par dev-frontend lors de /sdd-full.
 loader: .claude/loader.reverse.yml
 ---
 
@@ -23,7 +23,7 @@ Lancer la **Phase 4** : traduire les templates legacy d'une unité U-N en mockup
 1. Phase 1 + Phase 3 préalables pour cette unité :
    - `workspace/old/{P}/.sys/inventory.json` contient `units[id={U-N}]`
    - `inventory.json._featAllocations[{U-N}]` renseigné → résolution `n` figée
-   - `workspace/input/feats/{n}-{Name}.md` existe (sinon → ERROR `[REVERSE_NO_SOURCE]`)
+   - `workspace/feats/{n}-{Name}.md` existe (sinon → ERROR `[REVERSE_NO_SOURCE]`)
 2. Les `units[U-N].evidenceFiles` contiennent au moins 1 fichier UI (`.aspx`, `.ascx`, `.cshtml`, `.jsp`, `.blade.php`, `.html`, `.dfm`, `.frm`, `.xaml`). Sinon → SKIP silencieux (unité backend-only sans UI). (`.xaml` ajouté 2026-06-10 — audit M12 : WPF supporté en Phase 1 mais SKIPpé en silence en Phase 4.)
 
 ## Actions
@@ -37,7 +37,7 @@ Lancer la **Phase 4** : traduire les templates legacy d'une unité U-N en mockup
 ## Sortie
 
 ```
-workspace/input/ui/
+workspace/ui/
 ├── {n}-1-{Name}.html             (écran principal)
 ├── {n}-2-{Name}.html             (modale / wizard step 2 / écran secondaire, si applicable)
 └── ...
@@ -51,7 +51,7 @@ Phase 4 est **optionnelle**. Elle s'invoque après Phase 3 :
 ```
 /sdd-reverse-inventory MyLegacy
 /sdd-reverse U-3              # Phase 3 → FEAT 7-Login.md
-/sdd-reverse-ui U-3           # Phase 4 → workspace/input/ui/7-1-Login.html
+/sdd-reverse-ui U-3           # Phase 4 → workspace/ui/7-1-Login.html
 ```
 
 Skip cohérent : si le Tech Lead préfère que `dev-frontend` regénère l'UI from scratch via le mapping FEAT-only (sans mockup HTML), ne pas lancer cette phase. La FEAT seule reste valide pour `/sdd-full`.

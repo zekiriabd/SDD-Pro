@@ -31,20 +31,47 @@ def normalize(path: str | os.PathLike[str]) -> str:
 
 def _looks_like_repo_root(p: Path) -> bool:
     """Strict check: a real SDD_Pro repo root contains `.claude/agents/`
-    AND `.claude/commands/` AND `workspace/`.
+    AND `.claude/commands/` AND a workspace root.
+
+    The workspace may be either nested under the repo root (`repo/workspace/`)
+    or located as a sibling directory (`repo/../workspace/`), which matches the
+    layout used after moving the workspace outside the repository folder.
 
     Post-mortem 2026-05-21 : un sous-dossier d'archive `.claude/.claude/`
     (legacy design docs superseded) faisait croire au walker que
     `.claude/` était le repo root → tous les paths Python dérivés
-    (`workspace/output/db/console.db`) résolvaient sous
+    (`workspace/db/console.db`) résolvaient sous
     `.claude/workspace/...` au lieu de `workspace/...`.
     Le check unique `(p / ".claude").is_dir()` est insuffisant.
     """
-    return (
+    has_claude_layout = (
         (p / ".claude" / "agents").is_dir()
         and (p / ".claude" / "commands").is_dir()
-        and (p / "workspace").is_dir()
     )
+    if not has_claude_layout:
+        return False
+
+    nested_workspace = p / "workspace"
+    sibling_workspace = p.parent / "workspace"
+    return nested_workspace.is_dir() or sibling_workspace.is_dir()
+
+
+def workspace_root(repo_root: Path | None = None) -> Path:
+    """Resolve the workspace root for a repo root.
+
+    Prefers a nested workspace directory when present; otherwise falls back to
+    a sibling workspace directory, which is used by split layouts.
+    """
+    root = Path(repo_root or Path.cwd()).resolve()
+    nested_workspace = root / "workspace"
+    if nested_workspace.is_dir():
+        return nested_workspace
+
+    sibling_workspace = root.parent / "workspace"
+    if sibling_workspace.is_dir():
+        return sibling_workspace
+
+    return nested_workspace
 
 
 def repo_root() -> Path:

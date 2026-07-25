@@ -18,7 +18,7 @@ Scope: authentification et autorisation Azure AD — independant de toute stack 
   - Backend : validation JWT (Bearer token)
   - Monolithe : OpenID Connect + session
 - **Config exclusive depuis `## Active Auth Specs` de
-  `workspace/input/stack/stack.md`**, propagée par `arch` Phase A STEP
+  `workspace/stack/stack.md`**, propagée par `arch` Phase A STEP
   4.5 vers les configs natives :
   - `appsettings.json` section `AzureAd` (.NET)
   - `application.yml` section `azure.ad` (Spring)
@@ -92,7 +92,7 @@ lit `IConfiguration` / `application.yml` / `config/default.json` /
   SSoT gitignored, `arch` propage en config native. Lecture directe
   `AZ_*`/`DB_*`/`AUTH_*`/`SMTP_*` via `process.env`/`os.environ`/
   `Environment.GetEnvironmentVariable`/`@Value("${AZ_*}")` = `[SEC_ENV_VAR_FORBIDDEN]`
-- Secrets jamais commités : `workspace/output/` gitignored, rotation prod
+- Secrets jamais commités : `workspace/` gitignored, rotation prod
   via secret manager hors repo
 
 ### §2.bis — Propagation stack.md → config native (load-bearing)
@@ -238,7 +238,7 @@ FIX: utiliser FE_CALLBACK_PATH front canonique, retirer redirectUri du DTO backe
 
 **Grep checklist (STEP build)** :
 ```bash
-grep -RE "cfg\.redirectUri|response.*redirectUri" workspace/output/src/{AppName}/src/
+grep -RE "cfg\.redirectUri|response.*redirectUri" workspace/src/{AppName}/src/
 # → 0 match attendu
 ```
 
@@ -719,7 +719,7 @@ Anti-patterns : `true` ou omis (= true par défaut) ; compter sur replay MSAL.
 Toute SPA avec `auth/azure-ad` actif **DOIT** définir :
 - Route `/login` : composant `LoginPage` rendu **sans** `MainLayout`
   (page autonome, branding centré, bouton "Se connecter avec Microsoft")
-- Mockup HTML `1-1-Connexion.html` présent dans `workspace/input/ui/`
+- Mockup HTML `1-1-Connexion.html` présent dans `workspace/ui/`
   → fait foi pour le visuel
 - Sinon → page minimaliste générique (logo + bouton) sans MainLayout
 

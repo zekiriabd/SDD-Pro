@@ -26,7 +26,7 @@ Scope: authentification et autorisation locale via login / password + JWT — in
   - Monolithe : session serveur ou JWT interne
 
 - **Toutes les configurations proviennent du bloc `## Active Auth Specs`
-  de `workspace/input/stack/stack.md`** (renseigne par le Tech Lead),
+  de `workspace/stack/stack.md`** (renseigne par le Tech Lead),
   propage par l'agent `arch` Phase A — STEP 4.5 vers les fichiers de
   configuration applicatifs natifs du framework backend (depuis
   2026-05-14) : `appsettings.json` section `Jwt` (.NET),
@@ -40,7 +40,7 @@ Scope: authentification et autorisation locale via login / password + JWT — in
 ## 2. Variables de configuration
 
 **Modele depuis 2026-05-14** : les valeurs sont declarees dans le bloc
-`## Active Auth Specs` de `workspace/input/stack/stack.md` (renseigne
+`## Active Auth Specs` de `workspace/stack/stack.md` (renseigne
 par le Tech Lead). L'agent `arch` Phase A — STEP 4.5 les propage dans
 les fichiers de configuration natifs du framework backend (et lit le
 fichier en runtime pour validation). L'application **n'utilise plus
@@ -99,10 +99,10 @@ npm, pydantic-settings).
 
 | Stack backend         | Fichier cible                                                            | Section / classe       |
 |-----------------------|--------------------------------------------------------------------------|------------------------|
-| `dotnet-minimalapi`   | `workspace/output/src/{BackendName}/appsettings.json`                    | `Jwt` (JSON object)    |
-| `kotlin-spring-boot`  | `workspace/output/src/{BackendName}/src/main/resources/application.yml`  | `auth.jwt` (YAML)      |
-| `node-express`        | `workspace/output/src/{BackendName}/config/default.json`                 | `jwt` (JSON object)    |
-| `python-fastapi`      | `workspace/output/src/{BackendName}/app/config.py`                       | `JwtSettings` (pydantic)|
+| `dotnet-minimalapi`   | `workspace/src/{BackendName}/appsettings.json`                    | `Jwt` (JSON object)    |
+| `kotlin-spring-boot`  | `workspace/src/{BackendName}/src/main/resources/application.yml`  | `auth.jwt` (YAML)      |
+| `node-express`        | `workspace/src/{BackendName}/config/default.json`                 | `jwt` (JSON object)    |
+| `python-fastapi`      | `workspace/src/{BackendName}/app/config.py`                       | `JwtSettings` (pydantic)|
 
 #### A. `dotnet-minimalapi` → `appsettings.json` section `Jwt`
 

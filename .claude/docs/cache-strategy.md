@@ -26,8 +26,8 @@ print(report())
 # Manifest programmatique pour un agent
 breakpoints = cache_breakpoints_for("dev-backend")
 # → [("stable", [".claude/rules/build-and-loop.md", ...]),
-#    ("semi", ["workspace/output/db/schema.json", ...]),
-#    ("volatile", ["workspace/output/us/{n}-{m}-*.md"])]
+#    ("semi", ["workspace/db/schema.json", ...]),
+#    ("volatile", ["workspace/us/{n}-{m}-*.md"])]
 ```
 
 ## 0.bis Phase 3 wiring (v7.1 — TODO harness)
@@ -45,7 +45,7 @@ Gain attendu post-wiring : `cache_read` (Anthropic `$0.30/MTok` Sonnet 4.6) au l
 
 ### 1.1 Mesure historique 2026-05-20 (roi-report FEAT 2)
 
-Source : `workspace/output/qa/roi-report-2026-05-20-FEAT2-postfix.json`.
+Source : `roi-report-2026-05-20-FEAT2-postfix.json` (snapshot historique ; `report_roi.py` émet désormais sur stdout, cf. 2026-07-06).
 
 | Métrique | Valeur |
 |---|---:|
@@ -73,7 +73,7 @@ Source : `console.db` table `token_usage`, agrégé sur la session.
 | **Total** | **7** | **8 261** | **862 751** | **6 717** |
 
 **Cache hit rate effectif** = `862 751 / (7 + 862 751 + 6 717)` = **99.2 %**.
-**Coût Opus 4.7 1M context** estimé : ~**$0.56 / FEAT M**.
+**Coût Opus 4.8 1M context** estimé : ~**$0.56 / FEAT M**.
 
 ### 1.3 Pourquoi l'écart 40.8% → 99.2%
 
@@ -141,7 +141,7 @@ avec TTL 5 min :
 
 - `CLAUDE.md` per-project (~5 KB) : invariant tant que `arch` n'a pas re-tourné.
 - Schema.json DB (~5-15 KB) : invariant entre US d'une même FEAT.
-  - **Levier 4 v7.0.x** : préférer `workspace/output/db/schema-slice-{n}-{m}.json`
+  - **Levier 4 v7.0.x** : préférer `workspace/db/schema-slice-{n}-{m}.json`
     (slice per-US, ~30-60 % de la taille du schema complet, contient les
     tables référencées par l'US + FK transitive). Généré par
     `python -m sdd_scripts.generate_schema_slice --us-path <us.md>` avant
@@ -196,5 +196,5 @@ mesuré 93.8 % sur 30 j (Opus 4.7 à 94.5 %). Monitoring continu via
 
 *Sources :*
 - *audit CTO 2026-05-20 §4.2*
-- *report_roi.py output (workspace/output/qa/roi-report-2026-05-20-FEAT2-postfix.json)*
+- *report_roi.py output (roi-report-2026-05-20-FEAT2-postfix.json, snapshot historique)*
 - *Anthropic prompt caching docs (TTL 5 min, max 4 breakpoints, 1.25× write / 0.1× read pricing)*

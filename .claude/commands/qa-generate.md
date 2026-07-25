@@ -50,9 +50,9 @@ comportement v6.6.2 strict) :
 from sdd_lib.checkpoint import is_phase_resumable
 
 inputs = [
-    f"workspace/input/feats/{n}-*.md",       # FEAT parent
-    f"workspace/output/us/{n}-*.md",         # toutes les US
-    "workspace/input/stack/stack.md",        # config + stacks actifs
+    f"workspace/feats/{n}-*.md",       # FEAT parent
+    f"workspace/us/{n}-*.md",         # toutes les US
+    "workspace/stack/stack.md",        # config + stacks actifs
 ]
 # Glob les patterns vers paths concrets avant l'appel
 resumable, reason = is_phase_resumable(
@@ -71,7 +71,7 @@ normalement.
 - `[CHECKPOINT_INPUT_MISSING]` → input absent, re-exécuter
 - `[CHECKPOINT_STATE_UNREADABLE]` → pas de state.json antérieur, première exécution
 
-Cf. `error-classification.md §1.16` + `sdd_lib/checkpoint.py`.
+Cf. `error-classification.md §1.14` + `sdd_lib/checkpoint.py`.
 
 ---
 
@@ -79,19 +79,19 @@ Cf. `error-classification.md §1.16` + `sdd_lib/checkpoint.py`.
 
 ### 2.1 FEAT existe
 
-Glob `workspace/input/feats/{n}-*.md`.
+Glob `workspace/feats/{n}-*.md`.
 
 - 0 fichier → ERROR :
   ```
   ERROR: /qa-generate — FEAT introuvable
-  CAUSE: aucun fichier workspace/input/feats/{n}-*.md
+  CAUSE: aucun fichier workspace/feats/{n}-*.md
   FIX: créer la FEAT via /feat-generate avant
   ```
 - > 1 fichier → ERROR (numérotation invalide).
 
 ### 2.2 US existent
 
-Glob `workspace/output/us/{n}-*.md`.
+Glob `workspace/us/{n}-*.md`.
 
 - 0 fichier → ERROR :
   ```
@@ -102,13 +102,13 @@ Glob `workspace/output/us/{n}-*.md`.
 
 ### 2.3 Code production existe
 
-Vérifier `workspace/output/src/{BackendName}/` et/ou `workspace/output/src/{AppName}/`
+Vérifier `workspace/src/{BackendName}/` et/ou `workspace/src/{AppName}/`
 existent (au moins un projet).
 
 - Aucun → ERROR :
   ```
   ERROR: /qa-generate — code production absent
-  CAUSE: [QA_PRECONDITION_FAILED] aucun code dans workspace/output/src/
+  CAUSE: [QA_PRECONDITION_FAILED] aucun code dans workspace/src/
   FIX: lancer /dev-run {n} d'abord
   ```
 
@@ -116,9 +116,9 @@ existent (au moins un projet).
 
 ## STEP 3 — Résolution du QAMode
 
-Lire `## Project Config` de `workspace/input/stack/stack.md` :
+Lire `## Project Config` de `workspace/stack/stack.md` :
 - `QAMode` (default `manual`)
-- `CoverageMin` (default `80`)
+- `CoverageMin` (**OBLIGATOIRE, pas de défaut** — absent → STOP `[STACK_MALFORMED]`, cf. `quality.md §A.2`)
 
 Résoudre le mode effectif :
 - Si `mode_override` (depuis l'argument `--mode`) → utiliser cette valeur
@@ -134,8 +134,9 @@ Modes valides :
 - `api-tests` (depuis 2026-05-07, cf. `rules/build-and-loop.md`) →
   génère et exécute UNIQUEMENT les tests d'intégration HTTP
   (style Postman) via `WebApplicationFactory<Program>` + DB
-  in-memory + auth handler mocké. Sortie :
-  `workspace/output/qa/feat-{n}/api-tests.{md,json}`. Pas de tests
+  in-memory + auth handler mocké. Sortie : JSON transitoire
+  `workspace/.sys/.validation/{n}-api-tests.json` (ingéré dans
+  `console.db` puis supprimé — aucun fichier persistant). Pas de tests
   unitaires, pas de coverage parsing, pas de quality scan. Mode
   invoqué automatiquement par `/dev-run` STEP 6.b (API Gate).
   Optionnel : `--filter {endpoint}` pour ne re-tester que les
@@ -155,7 +156,7 @@ Exécuter `quality_scan.py` (Python pur, cross-platform) :
 python .claude/python/sdd_scripts/quality_scan.py --feat-number {n}
 ```
 
-Sortie : `workspace/output/qa/feat-{n}/quality.json`.
+Sortie : `console.db` table `qa_quality` (aucun fichier — 2026-07-06).
 
 Capturer le code de retour (devrait être 0). Si ≠ 0 → WARNING (non
 bloquant).
@@ -188,12 +189,12 @@ fallback automatiquement sur le schema complet si aucun slice présent.
 ```
 for {n}-{m}-{Name} in US_LIST :
     python -m sdd_scripts.generate_schema_slice \
-        --us-path workspace/output/us/{n}-{m}-{Name}.md
+        --us-path workspace/us/{n}-{m}-{Name}.md
 ```
 
 | Exit | Sens | Action `/qa-generate` |
 |---|---|---|
-| `0` | slice écrit `workspace/output/db/schema-slice-{n}-{m}.json` | continue STEP 6 |
+| `0` | slice écrit `workspace/db/schema-slice-{n}-{m}.json` | continue STEP 6 |
 | `2` | CORRECTIBLE — pas de schema OU US ne référence aucune entité | continue STEP 6 (qa fallback) |
 | `1` | FAIL_FAST — US introuvable ou basename invalide | STOP + ERROR (problème US, pas slice) |
 | `3` | INFRA_BLOCKED — disk write failure | WARN, continue STEP 6 (qa fallback) |
@@ -284,7 +285,7 @@ else:                                              → GREEN
 `SubagentStop` matcher=qa déclenche `sdd_scripts/validate_acceptance.py`
 (détection auto Node/.NET/Kotlin/Python → exécute `test`+`lint`+`build`+
 `coverage`, et `smoke browser` + `E2E Playwright` pour les projets UI).
-Verdict écrit dans `workspace/output/.sys/.acceptance/acceptance.json`.
+Verdict écrit dans `workspace/.sys/.acceptance/acceptance.json`.
 Bloquant en mode `AcceptanceGate: strict` (default v7.0.0) — classe
 `[ACCEPTANCE_GATE_FAILED]`. Bypass : `SDD_ALLOW_ACCEPTANCE_BYPASS=1`
 (audit-loggué). Cf. `quality.md §C`.
@@ -300,13 +301,13 @@ Coverage       : {pct}% (seuil {CoverageMin}% — obligatoire) → {pass | gap}
 Quality scan   : {errors} errors / {warnings} warnings / {info} info
 Linter         : {linter_warnings} warnings
 
-Rapport        : workspace/output/qa/feat-{n}/report.md
-Données        : workspace/output/db/console.db (qa_coverage, qa_quality, qa_api_tests)
+Données        : workspace/db/console.db (qa_coverage, qa_quality, qa_api_tests)
+Rapport        : à la demande → query_console_db.py feat-stats --feat {n} --format md
 
 {Si RED ou YELLOW : section rappels}
 Prochaine étape :
   - 🟢 GREEN  : feature livrable, tests verts
-  - 🟡 YELLOW : review workspace/output/qa/feat-{n}/report.md (coverage gap ou quality errors)
+  - 🟡 YELLOW : rapport à la demande `query_console_db.py feat-stats --feat {n} --format md` (coverage gap ou quality errors)
   - 🔴 RED    : 1+ tests échoués → /dev-run {n} pour corriger ou ajuster les tests
 ```
 
@@ -331,7 +332,7 @@ Voir `/sdd-full` STEP 5 pour la logique d'invocation auto.
 
 - **Idempotente** : relancer `/qa-generate {n}` régénère les tests + rapports
 - **Read-only sur code production** : aucune modification dans
-  `workspace/output/src/{App|Backend|Lib}/**` hors patterns test
+  `workspace/src/{App|Backend|Lib}/**` hors patterns test
 - **Token-efficient** :
   - quality-only mode : ~3k tokens (juste le rapport, scan déterministe)
   - tests-only mode : ~17-27k tokens (génération tests Sonnet)
@@ -364,6 +365,6 @@ génération tests, run + coverage, quality scan, verdict).
 **Verdict final** : 1 ligne avec emoji + compteurs métier. Exemple :
 `[QA] 47/47 tests passés, coverage 82% ≥ 80%, verdict 🟢. (88%)`.
 En cas de RED : `🔴 [QA/FAIL] {feat} — [QA_TEST_FAILED] 3 tests échec →
-workspace/output/qa/feat-{n}/report.md. (84%)`.
+console.db qa_api_tests (rapport : query_console_db.py feat-stats --feat {n} --format md). (84%)`.
 
 **Bypass debug** : `SDD_CHAT_VERBOSE=1` → mode legacy verbose (§10).

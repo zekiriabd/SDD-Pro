@@ -90,9 +90,9 @@ updated: "2026-06-08"
 #     Référencée par les 12 agents (po, arch, dev-backend, dev-frontend,
 #     qa, elicitor, constitutioner, code-reviewer, security-reviewer,
 #     spec-compliance-reviewer, arch-reviewer, adversarial-reviewer) ET
-#     les 12 commandes user-facing (sdd-bootstrap, feat-generate,
+#     les 13 commandes user-facing (sdd-bootstrap, feat-generate,
 #     feat-validate, sdd-full, sdd-poc, dev-run, qa-generate,
-#     sdd-review, sdd-status, sdd-discover-stack, sdd-serve,
+#     sdd-review, sdd-status, sdd-help, sdd-discover-stack, sdd-serve,
 #     sdd-kill-server). Définit le protocole de sortie chat executive
 #     (1L `[AGENT] résumé (X%)`, anti-verbose, ERROR 3L disque préservé).
 #     Coût ~4-6 KB par invocation (substance dans la règle, agents/
@@ -102,7 +102,7 @@ updated: "2026-06-08"
 #       * Statusline `sdd_admin.statusline` (`.claude/python/sdd_admin/
 #         statusline.py`) — single-line bottom-of-screen view du run
 #         actif (`[AGENT] X% · FEAT N-Name · US m-Name · elapsed`).
-#         Lit `workspace/output/db/console.db` (table `runs` + `events`).
+#         Lit `workspace/db/console.db` (table `runs` + `events`).
 #         Câblé dans `.claude/settings.json` clé `statusLine`. Désactivable
 #         per-dev via `.claude/settings.local.json` (statusLine: null).
 #
@@ -128,27 +128,28 @@ updated: "2026-06-08"
 # Token footprint estimé: ~5-15 KB par invocation
 # -------------------------------------------------------------------------
 po:
+  model: claude-sonnet-4-6   # parité frontmatter agents/po.md — enforced par tests/test_loader_model_parity.py
   reads:
     # Order: stable → semi → volatile (cache_control canonical order, cf. sdd_lib/cache_control.py)
     - .claude/templates/us.template.md         # cache_layer: stable (template invariant)
-    - workspace/output/.sys/.context/constitution.md # v3 — si présent (lecture acteurs/glossaire) · cache_layer: semi
-    - workspace/input/feats/{n}-*.md           # FEAT parente (1 fichier) · cache_layer: volatile
+    - workspace/.sys/.context/constitution.md # v3 — si présent (lecture acteurs/glossaire) · cache_layer: semi
+    - workspace/feats/{n}-*.md           # FEAT parente (1 fichier) · cache_layer: volatile
     # v5.0 Inline Rules (dans agents/po.md, plus de Read mandatory) :
     #   - us-granularity.md §1-§4 (5 anti-patterns détaillés)
     #   - .claude/rules/ownership.md (procédure §3 inline en STEP 8.5)
     # v5.0 Économie : ~16-20k tokens/invocation
   writes:
-    - workspace/output/us/{n}-{m}-*.md         # 1 à 6 fichiers par FEAT (cible 1-3)
-    - workspace/output/.sys/.context/constitution.md # v3 — append-only §3 (acteurs), §2 (glossaire)
+    - workspace/us/{n}-{m}-*.md         # 1 à 6 fichiers par FEAT (cible 1-3)
+    - workspace/.sys/.context/constitution.md # v3 — append-only §3 (acteurs), §2 (glossaire)
   forbidden_reads:
-    - workspace/input/stack/                   # hors périmètre PO
-    - workspace/input/ui/                      # hors périmètre PO (mockups HTML)
-    - workspace/output/us/{m}-*.md             # autres FEATs
-    - workspace/output/src/                    # responsabilité dev-*
+    - workspace/stack/                   # hors périmètre PO
+    - workspace/ui/                      # hors périmètre PO (mockups HTML)
+    - workspace/us/{m}-*.md             # autres FEATs
+    - workspace/src/                    # responsabilité dev-*
 
 # -------------------------------------------------------------------------
 # Agent UI : SUPPRIMÉ en v4.0.0
-# Les mockups HTML déposés dans workspace/input/ui/ sont lus directement par
+# Les mockups HTML déposés dans workspace/ui/ sont lus directement par
 # dev-frontend (pas d'extraction PNG → markdown intermédiaire).
 # -------------------------------------------------------------------------
 
@@ -159,12 +160,13 @@ po:
 # Une seule invocation par projet (idempotent)
 # -------------------------------------------------------------------------
 arch:
+  model: claude-sonnet-4-6   # parité frontmatter agents/arch.md — enforced par tests/test_loader_model_parity.py
   reads:
     # Order: stable → semi → volatile (cache_control canonical order, cf. sdd_lib/cache_control.py)
     # v7.0.x audit 2026-06-08 — stack.md unified to `stable` across all 9 agents
     # (was `volatile` here only — incoherent. Tech Lead edits stack.md rarely
     # between sessions, not per-run; the 5min TTL absorbs the rare changes.)
-    - workspace/input/stack/stack.md     # cache_layer: stable (Project Config invariant intra-session)
+    - workspace/stack/stack.md     # cache_layer: stable (Project Config invariant intra-session)
     - .claude/stacks/{cat}/{active}.md   # tous stacks actifs (sélectif — backend, frontend, ui, auth, qa, fullstack, mobiles). · cache_layer: stable
     # NOTE MN4 (audit 2026-06-07) — Distinction stack vs combo :
     #   - Côté STACK atomique : fullstack/* et mobiles/* restent 🟡 « experimental » (jamais validés en isolation end-to-end).
@@ -172,8 +174,8 @@ arch:
     # Marquage runtime via `preflight_stack_combo` (combos.json) ; la doc d'un stack reste à son tier d'isolation.
     - .claude/stacks/archi/{ArchiPattern}.md  # MVC (défaut) / DDD / microservice (🟡 expérimental) — UNIQUEMENT si AppType=back-front (v6.7.6+). · cache_layer: stable
     - .claude/templates/adr.template.md  # v3 — nécessaire pour Phase D · cache_layer: stable
-    - workspace/output/.sys/.context/constitution.md     # v3 — si présent · cache_layer: semi
-    - workspace/output/.sys/.context/adrs/ADR-*.md       # v3 — index existants (idempotence) · cache_layer: semi
+    - workspace/.sys/.context/constitution.md     # v3 — si présent · cache_layer: semi
+    - workspace/.sys/.context/adrs/ADR-*.md       # v3 — index existants (idempotence) · cache_layer: semi
     # v5.0 Inline Rules (dans agents/arch.md, plus de Read mandatory) :
     #   - .claude/rules/ownership.md (writes par §, ADR atomique)
     #   - ownership.md §1 (matrice owner arch, was file-ownership.md)
@@ -182,20 +184,21 @@ arch:
     #   - .claude/rules/error-classification.md
     # v5.0 Économie : ~12-18k tokens/invocation
   writes:
-    - workspace/output/src/{AppName}.sln
-    - workspace/output/src/{AppName}/             # projet frontend vide
-    - workspace/output/src/{BackendName}/         # projet backend vide
-    - workspace/output/src/{LibName}/             # lib partagée si configurée
-    - workspace/output/db/schema.json             # si DatabaseType ≠ none
-    - workspace/output/db/schema.prev.json        # backup ancienne version
-    - workspace/output/db/schema.md               # si DatabaseType ≠ none
-    - workspace/output/db/schema.diff.md          # diff vs prev
-    - workspace/output/src/{BackendName}/Entities/ # scaffolding Database-First
-    - workspace/output/src/{BackendName}/CLAUDE.md # contexte projet backend
-    - workspace/output/src/{AppName}/CLAUDE.md    # contexte projet frontend
-    - workspace/output/src/{LibName}/CLAUDE.md    # contexte projet lib
-    - workspace/output/.sys/.context/adrs/ADR-{YYYYMMDDTHHmmss}-*.md # timestamp atomique
-    - workspace/output/.sys/.context/constitution.md    # update §4 stack + append §6 ADRs
+    - workspace/src/{AppName}.sln
+    - workspace/src/{AppName}/             # projet frontend vide
+    - workspace/src/{BackendName}/         # projet backend vide
+    - workspace/src/{LibName}/             # lib partagée si configurée
+    - workspace/db/schema.json             # si DatabaseType ≠ none
+    - workspace/db/schema.prev.json        # backup ancienne version
+    - workspace/db/schema.md               # si DatabaseType ≠ none
+    - workspace/db/schema.diff.md          # diff vs prev
+    - workspace/src/{BackendName}/Entities/ # scaffolding Database-First
+    - workspace/src/{BackendName}/CLAUDE.md # contexte projet backend
+    - workspace/src/{AppName}/CLAUDE.md    # contexte projet frontend
+    - workspace/src/{LibName}/CLAUDE.md    # contexte projet lib
+    - workspace/.sys/.state/arch-ready-for-constitutioner.flag # sentinel disque (Phase D déléguée à constitutioner, no-spawn préservé)
+    # NB (CR-2, 2026-05-13) : ADRs + constitution.md §1/§4/§6 + INDEX sont owned EXCLUSIVEMENT par constitutioner.
+    # arch ne fait PLUS la Phase D — il pose seulement le sentinel ci-dessus, /arch-init STEP 3.5 spawn constitutioner.
   reads_env:                            # uniquement si DatabaseType ≠ none
     - DB_HOST
     - DB_PORT
@@ -203,26 +206,27 @@ arch:
     - DB_USER
     - DB_PASSWORD
   forbidden_reads:
-    - workspace/input/feats/
-    - workspace/output/us/
-    - workspace/input/ui/                         # mockups HTML hors scope arch
+    - workspace/feats/
+    - workspace/us/
+    - workspace/ui/                         # mockups HTML hors scope arch
   forbidden_writes:
-    - workspace/output/src/**/*.cs                # code applicatif (sauf Entities)
-    - workspace/output/src/**/*.razor             # responsabilité dev-frontend
+    - workspace/src/**/*.cs                # code applicatif (sauf Entities)
+    - workspace/src/**/*.razor             # responsabilité dev-frontend
 
 # -------------------------------------------------------------------------
-# Agent: dev-backend (Opus 4.7 — depuis 2026-05-08, split modèles)
+# Agent: dev-backend (Opus 4.8 — depuis 2026-05-08, split modèles)
 # Phase: 4 (génération code serveur)
 # Token footprint estimé: ~3-7 KB par US (grâce à CLAUDE.md projet)
 # Invocations parallèles : 1 par US backend
 # -------------------------------------------------------------------------
 dev-backend:
+  model: claude-opus-4-8   # parité frontmatter agents/dev-backend.md — enforced par tests/test_loader_model_parity.py
   # cache_layer annotations v7.0.0 P2 #11 — gain estimé -50% coût Opus
   # après implémentation cache_control markers (v7.1).
   # Order: stable → semi → volatile (cache_control canonical order, cf. sdd_lib/cache_control.py)
   reads:
     # --- stable (invariant inter-FEAT, cachable 5 min TTL) ---
-    - { path: workspace/input/stack/stack.md, cache_layer: stable }                # Project Config
+    - { path: workspace/stack/stack.md, cache_layer: stable }                # Project Config
     - { path: ".claude/stacks/backend/{active}.md", cache_layer: stable }
     # fullstack/* chargeable mais 🟡 expérimental (aucun combo validé bout-en-bout) — n'utiliser que si AppType=fullstack.
     - { path: ".claude/stacks/fullstack/{active}.md", cache_layer: stable, status: experimental }
@@ -230,15 +234,15 @@ dev-backend:
     - { path: ".claude/stacks/auth/{active}.md", cache_layer: stable }
     - { path: .claude/rules/dev-shared-preflight.md, cache_layer: stable }   # v7.0.0 — STEP 0/0.5/1/1.bis hoist cross-agent
     - { path: .claude/rules/build-and-loop.md, cache_layer: stable }         # v7.0.0 — SSOT patterns dev-* (ex backend-first + dev-shared)
-    - { path: .claude/rules/error-classification.md, cache_layer: stable }   # v6.1 — taxonomie classes + pilotage build_loop
+    - { path: .claude/digests/error-classification.dev-backend.md, cache_layer: stable }   # v6.1 — taxonomie classes + pilotage build_loop
     # --- semi-stable (invariant intra-FEAT, invalidé par /arch-init) ---
-    - { path: "workspace/output/src/{Project}/CLAUDE.md", cache_layer: semi }        # CLAUDE.md projet
-    - workspace/output/db/schema-slice-{n}-{m}.json   # per-US slice Levier 4 (audit 2026-06-08), preferred · cache_layer: semi
-    - { path: workspace/output/db/schema.json, cache_layer: semi }                 # fallback if no slice present
+    - { path: "workspace/src/{Project}/CLAUDE.md", cache_layer: semi }        # CLAUDE.md projet
+    - workspace/db/schema-slice-{n}-{m}.json   # per-US slice Levier 4 (audit 2026-06-08), preferred · cache_layer: semi
+    - { path: workspace/db/schema.json, cache_layer: semi }                 # fallback if no slice present
     # --- volatile (per-US, jamais cachable) ---
-    - { path: "workspace/output/us/{n}-{m}-*.md", cache_layer: volatile }            # US ciblée (1 fichier)
-    - { path: "workspace/input/ui/{n}-{m}-*.html", cache_layer: volatile }           # HTML mockup passif
-    - { path: "workspace/output/plans/{n}-{m}-*.back.md", cache_layer: volatile }    # plan From Plan
+    - { path: "workspace/us/{n}-{m}-*.md", cache_layer: volatile }            # US ciblée (1 fichier)
+    - { path: "workspace/ui/{n}-{m}-*.html", cache_layer: volatile }           # HTML mockup passif
+    - { path: "workspace/plans/{n}-{m}-*.back.md", cache_layer: volatile }    # plan From Plan
     # v5.0 Inline Rules (dans agents/dev-backend.md, plus de Read mandatory) :
     #   - library-and-stack.md
     #   - ownership.md§1-§2
@@ -253,22 +257,22 @@ dev-backend:
     #     (preflight script-driven, context budget, mode From Plan, path safety
     #     Front/Back isolation) (listée ci-dessus)
     # v5.0 Reads conditionnels (lazy) :
-    #   - workspace/output/.sys/.context/constitution.md  # uniquement si terme ambigu
-    #   - workspace/output/.sys/.context/adrs/INDEX.md    # uniquement au STEP 5 avant création ADR
-    #   - workspace/output/.sys/.context/adrs/*.md        # fallback si INDEX.md absent
+    #   - workspace/.sys/.context/constitution.md  # uniquement si terme ambigu
+    #   - workspace/.sys/.context/adrs/INDEX.md    # uniquement au STEP 5 avant création ADR
+    #   - workspace/.sys/.context/adrs/*.md        # fallback si INDEX.md absent
     # v5.0 Économie : ~16-20k tokens/dispatch
   writes:
-    - workspace/output/src/{BackendName}/Services/
-    - workspace/output/.sys/.context/adrs/ADR-{YYYYMMDDTHHmmss}-*.md # timestamp atomique
-    - workspace/output/src/{BackendName}/Endpoints/
-    - workspace/output/src/{BackendName}/DTOs/
-    - workspace/output/src/{BackendName}/Mappers/
-    - workspace/output/src/{BackendName}/Program.cs  # augment
-    - workspace/output/plans/{n}-{m}-*.back.md    # mode :plan uniquement
+    - workspace/src/{BackendName}/Services/
+    - workspace/.sys/.context/adrs/ADR-{YYYYMMDDTHHmmss}-*.md # timestamp atomique
+    - workspace/src/{BackendName}/Endpoints/
+    - workspace/src/{BackendName}/DTOs/
+    - workspace/src/{BackendName}/Mappers/
+    - workspace/src/{BackendName}/Program.cs  # augment
+    - workspace/plans/{n}-{m}-*.back.md    # mode :plan uniquement
   forbidden_reads:
-    - workspace/output/us/{other}                 # autres US
-    - workspace/input/feats/
-    - workspace/input/ui/{other}.html             # mockups HTML d'autres US
+    - workspace/us/{other}                 # autres US
+    - workspace/feats/
+    - workspace/ui/{other}.html             # mockups HTML d'autres US
     - .claude/stacks/frontend/
     - .claude/stacks/ui/
   modes:
@@ -279,7 +283,7 @@ dev-backend:
     - "frontend-only US"                # skipped sans erreur
 
 # -------------------------------------------------------------------------
-# Agent: dev-frontend (Opus 4.7 — depuis 2026-05-08, split modèles)
+# Agent: dev-frontend (Opus 4.8 — depuis 2026-05-08, split modèles)
 # Phase: 4 (génération code client)
 # Token footprint estimé: ~5-10 KB par US (HTML + CLAUDE.md + stacks)
 # Invocations parallèles : 1 par US frontend
@@ -287,26 +291,27 @@ dev-backend:
 # Lecture directe du mockup HTML statique (texte).
 # -------------------------------------------------------------------------
 dev-frontend:
+  model: claude-opus-4-8   # parité frontmatter agents/dev-frontend.md — enforced par tests/test_loader_model_parity.py
   # cache_layer annotations v7.0.0 P2 #11 — symétrie avec dev-backend
   # Order: stable → semi → volatile (cache_control canonical order, cf. sdd_lib/cache_control.py)
   reads:
     # --- stable (invariant inter-FEAT, cachable 5 min TTL) ---
-    - workspace/input/stack/stack.md              # lu UNE FOIS en STEP 0 Phase B (v5.0) · cache_layer: stable
+    - workspace/stack/stack.md              # lu UNE FOIS en STEP 0 Phase B (v5.0) · cache_layer: stable
     - .claude/stacks/frontend/{active}.md  # fallback si CLAUDE.md insuffisant · cache_layer: stable
     - .claude/stacks/ui/{active}.md        # mapping composants DS (§2 + §7) · cache_layer: stable
     - .claude/stacks/auth/{active}.md      # patterns d'injection auth client · cache_layer: stable
     - .claude/rules/dev-shared-preflight.md   # v7.0.0 — STEP 0/0.5/1/1.bis hoist cross-agent · cache_layer: stable
     - .claude/rules/build-and-loop.md         # v7.0.0 — SSOT patterns dev-* (ex backend-first + dev-shared) · cache_layer: stable
-    - .claude/rules/error-classification.md   # v6.1 — taxonomie classes + pilotage build_loop · cache_layer: stable
+    - .claude/digests/error-classification.dev-frontend.md   # v6.1 — taxonomie classes + pilotage build_loop · cache_layer: stable
     # --- semi-stable (invariant intra-FEAT) ---
-    - workspace/output/src/{Project}/CLAUDE.md    # CLAUDE.md par projet · cache_layer: semi
+    - workspace/src/{Project}/CLAUDE.md    # CLAUDE.md par projet · cache_layer: semi
     # --- volatile (per-US, jamais cachable) ---
-    - workspace/output/us/{n}-{m}-*.md            # US ciblée (1 fichier) · cache_layer: volatile
-    - workspace/input/ui/{n}-{m}-*.html           # mockup HTML statique = source · cache_layer: volatile
+    - workspace/us/{n}-{m}-*.md            # US ciblée (1 fichier) · cache_layer: volatile
+    - workspace/ui/{n}-{m}-*.html           # mockup HTML statique = source · cache_layer: volatile
                                         # de vérité visuelle (libellés,
                                         # structure, classes, couleurs
                                         # inline). Lecture texte directe.
-    - workspace/output/plans/{n}-{m}-*.front.md   # plan existant si /dev-plan · cache_layer: volatile
+    - workspace/plans/{n}-{m}-*.front.md   # plan existant si /dev-plan · cache_layer: volatile
                                         # a tourné — mode From Plan
     # v5.0 Inline Rules (dans agents/dev-frontend.md, plus de Read mandatory) :
     #   - library-and-stack.md
@@ -318,23 +323,23 @@ dev-frontend:
     # v7.0.0 Read mandatory ajouté :
     #   - .claude/rules/dev-shared-preflight.md — substance hoistée des STEP 0/0.5/1/1.bis
     # v5.0 Reads conditionnels (lazy) :
-    #   - workspace/output/.sys/.context/constitution.md  # uniquement si terme ambigu
-    #   - workspace/output/.sys/.context/adrs/INDEX.md    # uniquement au STEP 6 avant création ADR
-    #   - workspace/output/.sys/.context/adrs/*.md        # fallback si INDEX.md absent
+    #   - workspace/.sys/.context/constitution.md  # uniquement si terme ambigu
+    #   - workspace/.sys/.context/adrs/INDEX.md    # uniquement au STEP 6 avant création ADR
+    #   - workspace/.sys/.context/adrs/*.md        # fallback si INDEX.md absent
     # v5.0 Économie : ~16-20k tokens/dispatch
   writes:
-    - workspace/output/src/{AppName}/Pages/
-    - workspace/output/.sys/.context/adrs/ADR-{YYYYMMDDTHHmmss}-*.md # timestamp atomique
-    - workspace/output/src/{AppName}/Components/
-    - workspace/output/src/{AppName}/Layouts/
-    - workspace/output/src/{AppName}/wwwroot/css/theme.css  # augment
+    - workspace/src/{AppName}/Pages/
+    - workspace/.sys/.context/adrs/ADR-{YYYYMMDDTHHmmss}-*.md # timestamp atomique
+    - workspace/src/{AppName}/Components/
+    - workspace/src/{AppName}/Layouts/
+    - workspace/src/{AppName}/wwwroot/css/theme.css  # augment
     - "**/*.razor.css"                  # CSS isolé adjacent
-    - workspace/output/src/{AppName}/Program.cs   # augment éventuel
-    - workspace/output/plans/{n}-{m}-*.front.md   # mode :plan uniquement
+    - workspace/src/{AppName}/Program.cs   # augment éventuel
+    - workspace/plans/{n}-{m}-*.front.md   # mode :plan uniquement
   forbidden_reads:
-    - workspace/output/us/{other}                 # autres US
-    - workspace/input/feats/
-    - workspace/input/ui/{other}.html             # mockups HTML des autres US
+    - workspace/us/{other}                 # autres US
+    - workspace/feats/
+    - workspace/ui/{other}.html             # mockups HTML des autres US
     - .claude/stacks/backend/           # hors auth
   exit_silent_when:
     - "backend-only US"                 # skipped sans erreur
@@ -360,21 +365,22 @@ dev-frontend:
 #   - --quick: ~5-8 KB (génération directe)
 # -------------------------------------------------------------------------
 elicitor:
+  model: claude-sonnet-4-6   # parité frontmatter agents/elicitor.md — enforced par tests/test_loader_model_parity.py
   reads:
     # Order: stable → semi → volatile (cache_control canonical order, cf. sdd_lib/cache_control.py)
     - .claude/templates/risks-assumptions.template.md  # cache_layer: stable
-    - workspace/output/.sys/.context/constitution.md   # si présent (acteurs cumulés) · cache_layer: semi
-    - workspace/input/feats/{n}-*.md             # FEAT ciblée · cache_layer: volatile
+    - workspace/.sys/.context/constitution.md   # si présent (acteurs cumulés) · cache_layer: semi
+    - workspace/feats/{n}-*.md             # FEAT ciblée · cache_layer: volatile
     # v5.0 Inline Rules : substance inlinée dans agents/elicitor.md, plus de Read mandatory
     # v5.0 Économie : ~6-8k tokens/invocation
   writes:
-    - workspace/input/feats/{n}-*.md             # APPEND-ONLY 5 sections enrichies
-    - workspace/output/.sys/.context/constitution.md   # APPEND-ONLY §7 (risques + hypothèses)
+    - workspace/feats/{n}-*.md             # APPEND-ONLY 5 sections enrichies
+    - workspace/.sys/.context/constitution.md   # APPEND-ONLY §7 (risques + hypothèses)
   forbidden_reads:
-    - workspace/input/stack/                     # hors scope élicitation
-    - workspace/input/ui/                        # hors scope élicitation
-    - workspace/output/us/                       # antérieur dans le pipeline
-    - workspace/output/src/                      # post-implementation
+    - workspace/stack/                     # hors scope élicitation
+    - workspace/ui/                        # hors scope élicitation
+    - workspace/us/                       # antérieur dans le pipeline
+    - workspace/src/                      # post-implementation
   techniques:                          # 5 techniques d'élicitation
     - 1_pre_mortem: "risques projet (3-5 risques classifiés)"
     - 2_first_principles: "hypothèses implicites (max 7)"
@@ -395,19 +401,20 @@ elicitor:
 #   - full: ~20-30 KB (recommandé)
 # -------------------------------------------------------------------------
 qa:
+  model: claude-sonnet-4-6   # parité frontmatter agents/qa.md — enforced par tests/test_loader_model_parity.py
   reads:
     # Order: stable → semi → volatile (cache_control canonical order, cf. sdd_lib/cache_control.py)
     - .claude/stacks/qa/{active}.md    # tous QA stacks actifs (sélectif) · cache_layer: stable
-    - workspace/output/src/{BackendName}/CLAUDE.md  # architecture backend (passif) · cache_layer: semi
-    - workspace/output/src/{AppName}/CLAUDE.md      # architecture frontend (passif) · cache_layer: semi
-    - workspace/output/db/schema-slice-{n}-*.json # per-US slices Levier 4 (preferred for fixtures) · cache_layer: semi
-    - workspace/output/db/schema.json            # fallback (full schema) si slices absents · cache_layer: semi
-    - workspace/output/src/{BackendName}/**/*    # code production (read-only sélectif) · cache_layer: semi
-    - workspace/output/src/{AppName}/**/*        # code production (read-only sélectif) · cache_layer: semi
-    - workspace/output/src/{LibName}/**/*        # contrats partagés · cache_layer: semi
-    - workspace/input/feats/{n}-*.md             # FEAT parente (passif, ACs) · cache_layer: volatile
-    - workspace/output/us/{n}-*.md               # US ciblées · cache_layer: volatile
-    - workspace/input/ui/{n}-*.html              # HTML mockups (passif, comportements UI) · cache_layer: volatile
+    - workspace/src/{BackendName}/CLAUDE.md  # architecture backend (passif) · cache_layer: semi
+    - workspace/src/{AppName}/CLAUDE.md      # architecture frontend (passif) · cache_layer: semi
+    - workspace/db/schema-slice-{n}-*.json # per-US slices Levier 4 (preferred for fixtures) · cache_layer: semi
+    - workspace/db/schema.json            # fallback (full schema) si slices absents · cache_layer: semi
+    - workspace/src/{BackendName}/**/*    # code production (read-only sélectif) · cache_layer: semi
+    - workspace/src/{AppName}/**/*        # code production (read-only sélectif) · cache_layer: semi
+    - workspace/src/{LibName}/**/*        # contrats partagés · cache_layer: semi
+    - workspace/feats/{n}-*.md             # FEAT parente (passif, ACs) · cache_layer: volatile
+    - workspace/us/{n}-*.md               # US ciblées · cache_layer: volatile
+    - workspace/ui/{n}-*.html              # HTML mockups (passif, comportements UI) · cache_layer: volatile
     # v5.0 Inline Rules (dans agents/qa.md, plus de Read mandatory) :
     #   - quality.md§2-§3
     #   - library-and-stack.md (scope étendu : tous stacks actifs §2.4)
@@ -415,27 +422,28 @@ qa:
     # v6.1 Read mandatory ajouté (depuis 2026-05-08) :
     #   - .claude/rules/error-classification.md (taxonomie QA §1.7)
     # v5.0 Reads conditionnels (lazy) :
-    #   - workspace/output/.sys/.context/constitution.md  # uniquement si terme ambigu
+    #   - workspace/.sys/.context/constitution.md  # uniquement si terme ambigu
     # v5.0 Économie : ~25-35k tokens/invocation
   writes:
-    - workspace/output/src/{BackendName}.Tests/**     # tests backend (xUnit/JUnit/pytest)
-    - workspace/output/src/{AppName}.Tests/**         # tests Blazor (bUnit) si applicable
-    - "workspace/output/src/**/__tests__/**"          # tests Node/React/Vue
-    - "workspace/output/src/**/*.FEAT.ts"             # tests Angular Jasmine
-    - "workspace/output/src/**/*.test.ts"             # tests Vitest adjacents
-    - "workspace/output/src/**/test_*.py"             # tests Python
-    - "workspace/output/src/**/*Test.kt"              # tests Kotlin JUnit
-    - workspace/output/qa/feat-{n}/report.md          # rapport consolidé
-    - workspace/output/qa/feat-{n}/coverage.json      # schéma normalisé (via parse_coverage.py)
-    - workspace/output/qa/feat-{n}/quality.json       # sonar-like (via quality_scan.py)
+    - workspace/src/{BackendName}.Tests/**     # tests backend (xUnit/JUnit/pytest)
+    - workspace/src/{AppName}.Tests/**         # tests Blazor (bUnit) si applicable
+    - "workspace/src/**/__tests__/**"          # tests Node/React/Vue
+    - "workspace/src/**/*.FEAT.ts"             # tests Angular Jasmine
+    - "workspace/src/**/*.test.ts"             # tests Vitest adjacents
+    - "workspace/src/**/test_*.py"             # tests Python
+    - "workspace/src/**/*Test.kt"              # tests Kotlin JUnit
+    # 2026-07-06 : QA telemetry SQLite-only (no qa/). quality/coverage
+    # are persisted directly to console.db by quality_scan.py/parse_coverage.py.
+    # The only file written is the transient api-tests JSON (ingested+deleted).
+    - workspace/.sys/.validation/{n}-api-tests.json  # transient (ingest_agent_report → console.db, then unlink)
   forbidden_reads:
-    - workspace/input/stack/                     # hors scope QA (lecture indirecte via QA stacks)
+    - workspace/stack/                     # hors scope QA (lecture indirecte via QA stacks)
   forbidden_writes:
-    - workspace/output/src/{BackendName}/Services/  # code production (read-only strict)
-    - workspace/output/src/{AppName}/Pages/         # code production (read-only strict)
-    - workspace/output/src/{LibName}/Models/        # code production (read-only strict)
-    - workspace/output/.sys/.context/constitution.md      # constitution read-only
-    - workspace/output/.sys/.context/adrs/                # ADRs read-only
+    - workspace/src/{BackendName}/Services/  # code production (read-only strict)
+    - workspace/src/{AppName}/Pages/         # code production (read-only strict)
+    - workspace/src/{LibName}/Models/        # code production (read-only strict)
+    - workspace/.sys/.context/constitution.md      # constitution read-only
+    - workspace/.sys/.context/adrs/                # ADRs read-only
   modes:                               # selon QAMode dans Project Config
     - off: "agent jamais invoqué"
     - quality-only: "skip génération tests + coverage, ne fait que quality scan + linter"
@@ -456,50 +464,50 @@ qa:
 # Skip silencieux si CodeReviewMode: off
 # -------------------------------------------------------------------------
 code-reviewer:
+  model: claude-sonnet-4-6   # parité frontmatter agents/code-reviewer.md — enforced par tests/test_loader_model_parity.py
   reads:
+    - .claude/rules/auditor-coordination.md    # matrice ownership findings 1 domaine = 1 owner (v7.0.1-dev, audit 2026-06-11 M7) · cache_layer: stable
     # Order: stable → semi → volatile (cache_control canonical order, cf. sdd_lib/cache_control.py)
-    - workspace/input/stack/stack.md             # Project Config (CodeReviewMode, CodeReviewFailOn) · cache_layer: stable
-    - .claude/rules/error-classification.md      # taxonomie [REVIEW_*] §1.10 + classes réutilisées §1.3/§1.6 · cache_layer: stable
+    - workspace/stack/stack.md             # Project Config (CodeReviewMode, CodeReviewFailOn) · cache_layer: stable
+    - .claude/digests/error-classification.code-reviewer.md      # taxonomie [REVIEW_*] §1.10 + classes réutilisées §1.3/§1.6 · cache_layer: stable
     - .claude/rules/build-and-loop.md            # Partie B : anti-derive bullets, plan structure, QA ownership (was dev-shared.md, consolidated v7.0.0) · cache_layer: stable
     - .claude/stacks/backend/{active}.md   # §1.3 layer mapping + §3 conventions + §2.4 libs · cache_layer: stable
     - .claude/stacks/frontend/{active}.md  # §1.3 + §3 (frontend uniquement) · cache_layer: stable
-    - workspace/output/src/{BackendName}/CLAUDE.md  # architecture backend · cache_layer: semi
-    - workspace/output/src/{AppName}/CLAUDE.md      # architecture frontend · cache_layer: semi
-    - workspace/output/src/{BackendName}/**       # code production (fallback convention si pas de plan) · cache_layer: semi
-    - workspace/output/src/{AppName}/**           # code production · cache_layer: semi
-    - workspace/output/src/{LibName}/**           # lib partagée si présente · cache_layer: semi
-    - workspace/input/feats/{n}-*.md             # FEAT parente (passif, intent métier) · cache_layer: volatile
-    - workspace/output/us/{n}-*.md               # toutes les US ciblées (passif) · cache_layer: volatile
-    - workspace/output/plans/{n}-*.{back,front}.md  # mode preferred : lecture sélective via plan · cache_layer: volatile
+    - workspace/src/{BackendName}/CLAUDE.md  # architecture backend · cache_layer: semi
+    - workspace/src/{AppName}/CLAUDE.md      # architecture frontend · cache_layer: semi
+    - workspace/src/{BackendName}/**       # code production (fallback convention si pas de plan) · cache_layer: semi
+    - workspace/src/{AppName}/**           # code production · cache_layer: semi
+    - workspace/src/{LibName}/**           # lib partagée si présente · cache_layer: semi
+    - workspace/feats/{n}-*.md             # FEAT parente (passif, intent métier) · cache_layer: volatile
+    - workspace/us/{n}-*.md               # toutes les US ciblées (passif) · cache_layer: volatile
+    - workspace/plans/{n}-*.{back,front}.md  # mode preferred : lecture sélective via plan · cache_layer: volatile
     # Budget cible : ≤ 15 KB par invocation (Sonnet 4.6)
-    # Anti-pattern strict : ne JAMAIS Glob workspace/output/src/**/* (lecture sélective via plans ou convention)
+    # Anti-pattern strict : ne JAMAIS Glob workspace/src/**/* (lecture sélective via plans ou convention)
   writes:
-    - workspace/output/.sys/.validation/{n}-code-review.md     # rapport humain
-    - workspace/output/.sys/.validation/{n}-code-review.json   # schéma machine
+    - workspace/.sys/.validation/{n}-code-review.md     # rapport humain
+    - workspace/.sys/.validation/{n}-code-review.json   # schéma machine
   forbidden_reads:
-    - workspace/output/us/{other-feat}            # autres FEATs
-    - workspace/input/feats/{other}.md            # autres FEATs
+    - workspace/us/{other-feat}            # autres FEATs
+    - workspace/feats/{other}.md            # autres FEATs
     - .claude/stacks/qa/                          # hors scope review (responsabilité qa)
     - .claude/stacks/auth/                        # hors scope (review focus code applicatif)
-    - .claude/stacks/ui/                          # hors scope (a11y-auditor s'en charge si actif)
-    - workspace/output/.sys/.context/             # constitution/ADRs hors scope
-    - workspace/output/db/                        # schema DB hors scope
-    - workspace/output/qa/feat-{n}/coverage.json  # responsabilité qa
-    - workspace/output/qa/feat-{n}/quality.json   # responsabilité qa
+    - .claude/stacks/ui/                          # hors scope (a11y → ingest axe-core CI depuis v7.0.0, agent retiré)
+    - workspace/.sys/.context/             # constitution/ADRs hors scope
+    - workspace/db/                        # console.db (qa_coverage/qa_quality = responsabilité qa, hors scope)
   forbidden_writes:
-    - workspace/output/src/                       # read-only strict (rapport seul, jamais patch)
-    - workspace/output/us/                        # responsabilité po
-    - workspace/output/qa/                        # responsabilité qa
-    # NOTE M14 (audit 2026-06-07) — la ligne `workspace/output/dashboard/`
+    - workspace/src/                       # read-only strict (rapport seul, jamais patch)
+    - workspace/us/                        # responsabilité po
+    - workspace/.sys/.validation/{n}-api-tests.json  # responsabilité qa (2026-07-06, ex-qa/)
+    # NOTE M14 (audit 2026-06-07) — la ligne `workspace/dashboard/`
     # ci-dessous est un GUARD-RAIL HISTORIQUE défensif (3 occurrences cumulées
     # pour les 3 reviewers : code-reviewer + security-reviewer +
     # spec-compliance-reviewer). L'agent `dashboard` a été retiré v7.0.0
     # mais l'entrée est conservée à dessein : empêche qu'une future ré-introduction
     # accidentelle d'un agent dashboard ne fasse Write dans ce chemin par
     # un auditor. Ne PAS retirer sans ADR `governance-cleanup-forbidden-dashboard`.
-    - workspace/output/dashboard/                 # legacy v6 guard-rail (agent dashboard retiré v7.0.0, cf. note M14 ci-dessus)
-    - workspace/output/.sys/.context/             # responsabilité po/arch/elicitor
-    - workspace/output/plans/                     # le reviewer ne planifie pas
+    - workspace/dashboard/                 # legacy v6 guard-rail (agent dashboard retiré v7.0.0, cf. note M14 ci-dessus)
+    - workspace/.sys/.context/             # responsabilité po/arch/elicitor
+    - workspace/plans/                     # le reviewer ne planifie pas
   modes:                                          # selon CodeReviewMode dans Project Config
     - off: "agent jamais invoqué (exit immédiat 'disabled')"
     - full: "review complet, verdict 🟢/🟡/🔴 selon CodeReviewFailOn"
@@ -525,41 +533,43 @@ code-reviewer:
 
 # -------------------------------------------------------------------------
 # Agent: arch-reviewer (Sonnet 4.6) — depuis v6.11.0
-# Phase: 4.8 (post-QA, post-dashboard, dans /sdd-review via /sdd-full STEP 4.8)
+# Phase: 4.8 (post-QA, dans /sdd-review via /sdd-full STEP 4.8)
 # Token footprint estimé: ~6-12 KB par feature de 3-5 US
 # Invocation: spawn par /sdd-review STEP 3.0 si ArchReviewMode=full
 # Skip silencieux si ArchReviewMode in (manual, off) — défaut "manual"
 # -------------------------------------------------------------------------
 arch-reviewer:
+  model: claude-sonnet-4-6   # parité frontmatter agents/arch-reviewer.md — enforced par tests/test_loader_model_parity.py
   reads:
+    - .claude/rules/auditor-coordination.md    # matrice ownership findings 1 domaine = 1 owner (v7.0.1-dev, audit 2026-06-11 M7) · cache_layer: stable
     # Order: stable → semi → volatile (cache_control canonical order, cf. sdd_lib/cache_control.py)
-    - workspace/input/stack/stack.md                # Project Config + Active Architecture Pattern + Active Tech Specs · cache_layer: stable
-    - .claude/rules/error-classification.md         # taxonomie [ARCH_*] §1.18 · cache_layer: stable
+    - workspace/stack/stack.md                # Project Config + Active Architecture Pattern + Active Tech Specs · cache_layer: stable
+    - .claude/digests/error-classification.arch-reviewer.md         # taxonomie [ARCH_*] §1.18 · cache_layer: stable
     - .claude/stacks/archi/{mvc|ddd|microservice}.md  # §2 couches + §3 principes + §4 naming canonique (microservice 🟡 expérimental) · cache_layer: stable
     - .claude/stacks/backend/{active}.md            # §1.3 layer mapping backend · cache_layer: stable
     - .claude/stacks/frontend/{active}.md           # §1.3 layer mapping frontend · cache_layer: stable
-    - workspace/output/.sys/.context/constitution.md  # §2 glossaire + §6 ADRs index · cache_layer: semi
-    - workspace/output/.sys/.context/adrs/ADR-*.md  # ADRs (## Decision pour drift check ; pattern whitelisté is_unbounded_glob) · cache_layer: semi
-    - workspace/output/src/{BackendName}/**         # code production (Glob via plan) · cache_layer: semi
-    - workspace/output/src/{AppName}/**             # code production · cache_layer: semi
-    - workspace/output/src/{LibName}/**             # lib partagée si présente · cache_layer: semi
-    - workspace/output/plans/{n}-*.{back,front}.md  # lecture sélective des fichiers à reviewer · cache_layer: volatile
+    - workspace/.sys/.context/constitution.md  # §2 glossaire + §6 ADRs index · cache_layer: semi
+    - workspace/.sys/.context/adrs/ADR-*.md  # ADRs (## Decision pour drift check ; pattern whitelisté is_unbounded_glob) · cache_layer: semi
+    - workspace/src/{BackendName}/**         # code production (Glob via plan) · cache_layer: semi
+    - workspace/src/{AppName}/**             # code production · cache_layer: semi
+    - workspace/src/{LibName}/**             # lib partagée si présente · cache_layer: semi
+    - workspace/plans/{n}-*.{back,front}.md  # lecture sélective des fichiers à reviewer · cache_layer: volatile
     # Budget cible : ≤ 12 KB par invocation (Sonnet 4.6)
   writes:
-    - workspace/output/.sys/.validation/{n}-arch-review.md     # rapport humain
-    - workspace/output/.sys/.validation/{n}-arch-review.json   # transport vers DB
+    - workspace/.sys/.validation/{n}-arch-review.md     # rapport humain
+    - workspace/.sys/.validation/{n}-arch-review.json   # transport vers DB
   forbidden_reads:
-    - workspace/output/us/{other-feat}              # autres FEATs
-    - workspace/input/feats/{other}.md              # autres FEATs
+    - workspace/us/{other-feat}              # autres FEATs
+    - workspace/feats/{other}.md              # autres FEATs
     - .claude/stacks/qa/                            # hors scope arch (responsabilité qa)
-    - workspace/output/qa/                          # rapports auditeurs hors scope (lecture via DB)
+    - workspace/db/                          # console.db (rapports auditeurs = lecture via DB)
   forbidden_writes:
-    - workspace/output/src/                         # read-only strict (rapport seul)
-    - workspace/output/us/                          # responsabilité po
-    - workspace/output/qa/                          # responsabilité qa
-    - workspace/output/.sys/.context/               # ADRs + constitution = responsabilité po/arch/elicitor
-    - workspace/output/plans/                       # ne planifie pas
-    - workspace/input/stack/                        # immutable côté agent
+    - workspace/src/                         # read-only strict (rapport seul)
+    - workspace/us/                          # responsabilité po
+    - workspace/db/                          # console.db = responsabilité qa/scripts (2026-07-06, ex-qa/)
+    - workspace/.sys/.context/               # ADRs + constitution = responsabilité po/arch/elicitor
+    - workspace/plans/                       # ne planifie pas
+    - workspace/stack/                        # immutable côté agent
   modes:                                            # selon ArchReviewMode dans Project Config
     - off: "agent jamais invoqué (exit immédiat 'disabled')"
     - manual: "skip auto-invoke ; lance via /sdd-review manuel ou demande directe (défaut)"
@@ -598,7 +608,7 @@ arch-reviewer:
 # -------------------------------------------------------------------------
 
 # -------------------------------------------------------------------------
-# Agent: adversarial-reviewer (Sonnet 4.6) — depuis v7.2.0 (R1 BMAD)
+# Agent: adversarial-reviewer (Sonnet 4.6) — depuis v7.0.0 (R1 BMAD, 2026-05-24)
 # Phase: 99% (post-agrégation `/sdd-review`, opt-in `--adversarial`)
 # Token footprint estimé: ~8-15 KB par FEAT
 # Invocation: spawn par /sdd-review --adversarial (manuel) OU auto si
@@ -607,37 +617,40 @@ arch-reviewer:
 #       n'auraient pas vues. Verdict informational (jamais bloquant).
 # -------------------------------------------------------------------------
 adversarial-reviewer:
+  model: claude-sonnet-4-6   # parité frontmatter agents/adversarial-reviewer.md — enforced par tests/test_loader_model_parity.py
   reads:
+    - .claude/rules/auditor-coordination.md    # matrice ownership findings 1 domaine = 1 owner (v7.0.1-dev, audit 2026-06-11 M7) · cache_layer: stable
     # Order: stable → semi → volatile (cache_control canonical order, cf. sdd_lib/cache_control.py)
-    - workspace/input/stack/stack.md                              # Project Config (AdversarialReviewMode, Min/Max) · cache_layer: stable
-    - .claude/rules/error-classification.md                       # taxonomie [ADV_*] §1.16 · cache_layer: stable
-    - workspace/output/src/{BackendName}/**                       # ≤ 3 fichiers ciblés via §2.3, jamais Glob récursif · cache_layer: semi
-    - workspace/output/src/{AppName}/**                           # idem · cache_layer: semi
-    - workspace/output/src/{LibName}/**                           # idem si présent · cache_layer: semi
-    - workspace/input/feats/{n}-*.md                              # FEAT (Functional Needs, Business Rules, ACs, §7 Risks) · cache_layer: volatile
-    - workspace/output/us/{n}-*.md                                # US (ACs) · cache_layer: volatile
-    - workspace/output/plans/{n}-*.{back,front}.md                # cartographie fichiers — sélection ≤ 5 chemins critiques · cache_layer: volatile
-    - workspace/output/qa/feat-{n}/review.md                      # verdict consolidé (précondition stricte) · cache_layer: volatile
-    - workspace/output/.sys/.validation/{n}-code-review.md        # résumé findings (header uniquement, anti-dup §2.5) · cache_layer: volatile
-    - workspace/output/.sys/.validation/{n}-security-scan.md      # idem · cache_layer: volatile
-    - workspace/output/.sys/.validation/{n}-spec-compliance.md    # idem · cache_layer: volatile
-    - workspace/output/.sys/.validation/{n}-arch-review.md        # idem (si ArchReviewMode=full) · cache_layer: volatile
-    # Anti-pattern strict : pas de Glob récursif workspace/output/src/** — lecture sélective via plan
+    - workspace/stack/stack.md                              # Project Config (AdversarialReviewMode, Min/Max) · cache_layer: stable
+    - .claude/digests/error-classification.adversarial-reviewer.md                       # taxonomie [ADV_*] §1.15 · cache_layer: stable
+    - workspace/src/{BackendName}/**                       # ≤ 3 fichiers ciblés via §2.3, jamais Glob récursif · cache_layer: semi
+    - workspace/src/{AppName}/**                           # idem · cache_layer: semi
+    - workspace/src/{LibName}/**                           # idem si présent · cache_layer: semi
+    - workspace/feats/{n}-*.md                              # FEAT (Functional Needs, Business Rules, ACs, §7 Risks) · cache_layer: volatile
+    - workspace/us/{n}-*.md                                # US (ACs) · cache_layer: volatile
+    - workspace/plans/{n}-*.{back,front}.md                # cartographie fichiers — sélection ≤ 5 chemins critiques · cache_layer: volatile
+    - workspace/db/console.db                             # verdict consolidé (précondition stricte, via query_console_db review) · cache_layer: volatile
+    - workspace/.sys/.validation/{n}-code-review.md        # résumé findings (header uniquement, anti-dup §2.5) · cache_layer: volatile
+    - workspace/.sys/.validation/{n}-security-scan.md      # idem · cache_layer: volatile
+    - workspace/.sys/.validation/{n}-spec-compliance.md    # idem · cache_layer: volatile
+    - workspace/.sys/.validation/{n}-arch-review.md        # idem (si ArchReviewMode=full) · cache_layer: volatile
+    # Anti-pattern strict : pas de Glob récursif workspace/src/** — lecture sélective via plan
   writes:
-    - workspace/output/qa/feat-{n}/adversarial.md                 # rapport humain (canal séparé Tech Lead)
-    - workspace/output/qa/feat-{n}/adversarial.json               # schéma machine (consommé par ingest_agent_report)
+    # 2026-07-06 : plus de qa/ ni de .md disque — un seul JSON transitoire,
+    # ingéré puis supprimé par ingest_agent_report (persisté en console.db).
+    - workspace/.sys/.validation/{n}-adversarial.json      # schéma machine (ingest_agent_report → console.db, puis unlink)
   forbidden_reads:
-    - workspace/output/us/{other-feat}                            # autres FEATs
-    - workspace/input/feats/{other}.md                            # autres FEATs
-    - workspace/output/.sys/.context/                             # hors scope direct
+    - workspace/us/{other-feat}                            # autres FEATs
+    - workspace/feats/{other}.md                            # autres FEATs
+    - workspace/.sys/.context/                             # hors scope direct
     - .claude/stacks/qa/                                          # hors scope
   forbidden_writes:
-    - workspace/output/src/                                       # read-only strict
-    - workspace/output/us/                                        # responsabilité po
-    - workspace/output/.sys/.context/                             # responsabilité po/arch/elicitor/constitutioner
-    - workspace/output/plans/                                     # ne planifie pas
-    - workspace/input/                                            # read-only
-    - workspace/output/.sys/.validation/                          # responsabilité auditors classiques
+    - workspace/src/                                       # read-only strict
+    - workspace/us/                                        # responsabilité po
+    - workspace/.sys/.context/                             # responsabilité po/arch/elicitor/constitutioner
+    - workspace/plans/                                     # ne planifie pas
+    - workspace/                                            # read-only
+    - workspace/.sys/.validation/                          # responsabilité auditors classiques
   config_flags:                                                   # dans Project Config
     - AdversarialReviewMode: "off | full | manual (défaut: manual)"
     - AdversarialMinAttacks: "entier ≥ 1 (défaut: 5)"
@@ -666,51 +679,45 @@ adversarial-reviewer:
 # mode threat-model — seul le mode scan reste actif.
 # -------------------------------------------------------------------------
 security-reviewer:
+  model: claude-sonnet-4-6   # parité frontmatter agents/security-reviewer.md — enforced par tests/test_loader_model_parity.py
   reads:
+    - .claude/rules/auditor-coordination.md    # matrice ownership findings 1 domaine = 1 owner (v7.0.1-dev, audit 2026-06-11 M7) · cache_layer: stable
     # Order: stable → semi → volatile (cache_control canonical order, cf. sdd_lib/cache_control.py)
-    - workspace/input/stack/stack.md                # Project Config (SecurityMode, SecurityFailOn, *Enabled) · cache_layer: stable
-    - .claude/rules/error-classification.md         # taxonomie [SEC_*] §1.11 · cache_layer: stable
+    - workspace/stack/stack.md                # Project Config (SecurityMode, SecurityFailOn, *Enabled) · cache_layer: stable
+    - .claude/digests/error-classification.security-reviewer.md         # taxonomie [SEC_*] §1.11 · cache_layer: stable
     - .claude/stacks/backend/{active}.md §1.3+§3+§2.4   # cache_layer: stable
     - .claude/stacks/frontend/{active}.md §1.3+§3       # cache_layer: stable
     - .claude/stacks/auth/{active}.md §2-§3         # patterns d'auth (lecture passive) · cache_layer: stable
-    - workspace/output/src/{BackendName}/CLAUDE.md  # architecture backend · cache_layer: semi
-    - workspace/output/src/{AppName}/CLAUDE.md      # architecture frontend · cache_layer: semi
-    - workspace/output/src/{BackendName}/**         # code production (fallback convention) · cache_layer: semi
-    - workspace/output/src/{AppName}/**             # code production · cache_layer: semi
-    - workspace/output/src/{LibName}/**             # lib partagée si présente · cache_layer: semi
-    - workspace/input/feats/{n}-*.md                # FEAT parente · cache_layer: volatile
-    - workspace/output/us/{n}-*.md                  # US ciblées (passif) · cache_layer: volatile
-    - workspace/output/plans/{n}-*.{back,front}.md  # mode preferred : lecture sélective via plan · cache_layer: volatile
-    - workspace/output/.sys/.validation/{n}-code-review.json  # dé-dup secrets avec code-reviewer (§6) · cache_layer: volatile
-    # Anti-pattern strict : ne JAMAIS Glob workspace/output/src/**/* (lecture sélective)
+    - workspace/src/{BackendName}/CLAUDE.md  # architecture backend · cache_layer: semi
+    - workspace/src/{AppName}/CLAUDE.md      # architecture frontend · cache_layer: semi
+    - workspace/src/{BackendName}/**         # code production (fallback convention) · cache_layer: semi
+    - workspace/src/{AppName}/**             # code production · cache_layer: semi
+    - workspace/src/{LibName}/**             # lib partagée si présente · cache_layer: semi
+    - workspace/feats/{n}-*.md                # FEAT parente · cache_layer: volatile
+    - workspace/us/{n}-*.md                  # US ciblées (passif) · cache_layer: volatile
+    - workspace/plans/{n}-*.{back,front}.md  # mode preferred : lecture sélective via plan · cache_layer: volatile
+    - workspace/.sys/.validation/{n}-code-review.json  # dé-dup secrets avec code-reviewer (§6) · cache_layer: volatile
+    # Anti-pattern strict : ne JAMAIS Glob workspace/src/**/* (lecture sélective)
   writes:
-    - workspace/output/.sys/.validation/{n}-security-scan.md
-    - workspace/output/.sys/.validation/{n}-security-scan.json
+    - workspace/.sys/.validation/{n}-security-scan.md
+    - workspace/.sys/.validation/{n}-security-scan.json
   forbidden_reads:
-    - workspace/output/us/{other-feat}            # autres FEATs
-    - workspace/input/feats/{other}.md            # autres FEATs
+    - workspace/us/{other-feat}            # autres FEATs
+    - workspace/feats/{other}.md            # autres FEATs
     - .claude/stacks/qa/                          # hors scope (responsabilité qa)
     - .claude/stacks/ui/                          # hors scope (responsabilité a11y/dev-frontend)
-    - workspace/output/db/                        # schema DB hors scope direct (mentionné via constitution §4)
-    - workspace/output/qa/feat-{n}/coverage.json  # responsabilité qa
-    - workspace/output/qa/feat-{n}/quality.json   # responsabilité qa
-    # a11y-report.json retiré v7.0.0 (agent accessibility-auditor supprimé,
-    # remplacé par axe-core CI). Entrée préservée pour cohérence path-prefix
-    # forbidden_reads — l'agent ne lit toujours pas le dossier /qa/ qui peut
-    # contenir des fichiers axe-core JSON si un éventuel pont d'ingest CI
-    # est câblé par le projet consommateur (out-of-scope SDD_Pro v7.0.0).
-    - workspace/output/qa/feat-{n}/a11y-report.json  # (legacy v6, agent retiré v7.0.0)
+    - workspace/db/                        # console.db (qa_coverage/qa_quality/qa_a11y = responsabilité qa, hors scope direct)
   forbidden_writes:
-    - workspace/output/src/                       # read-only strict (jamais de patch)
-    - workspace/output/us/                        # responsabilité po
-    - workspace/output/qa/                        # responsabilité qa
+    - workspace/src/                       # read-only strict (jamais de patch)
+    - workspace/us/                        # responsabilité po
+    - workspace/.sys/.validation/{n}-api-tests.json  # responsabilité qa (2026-07-06, ex-qa/)
     # dashboard/ retiré v7.0.0 (agent dashboard supprimé, INDEX ADRs via
     # sdd_scripts/index_adrs.py). Entrée préservée comme garde-fou.
-    - workspace/output/dashboard/                 # (legacy v6, agent retiré v7.0.0)
-    - workspace/output/.sys/.context/             # responsabilité po/arch/elicitor
-    - workspace/output/plans/                     # ne planifie pas
-    - workspace/output/.sys/.validation/{n}-code-review.*  # responsabilité code-reviewer
-    - workspace/output/.sys/.validation/{n}-readiness.md   # responsabilité /feat-validate
+    - workspace/dashboard/                 # (legacy v6, agent retiré v7.0.0)
+    - workspace/.sys/.context/             # responsabilité po/arch/elicitor
+    - workspace/plans/                     # ne planifie pas
+    - workspace/.sys/.validation/{n}-code-review.*  # responsabilité code-reviewer
+    - workspace/.sys/.validation/{n}-readiness.md   # responsabilité /feat-validate
   modes:                                          # mode `scan` uniquement depuis v7.0.0
     - scan: "post-dev — OWASP Top 10 2021 (A01,A02,A03,A05,A07,A08,A09,A10) + verdict 🟢/🟡/🔴"
   config_flags:                                   # dans Project Config
@@ -745,39 +752,41 @@ security-reviewer:
 # Activation: opt-in via SpecComplianceMode (défaut: manual = skip).
 # -------------------------------------------------------------------------
 spec-compliance-reviewer:
+  model: claude-sonnet-4-6   # parité frontmatter agents/spec-compliance-reviewer.md — enforced par tests/test_loader_model_parity.py
   reads:
+    - .claude/rules/auditor-coordination.md    # matrice ownership findings 1 domaine = 1 owner (v7.0.1-dev, audit 2026-06-11 M7) · cache_layer: stable
     # Order: stable → semi → volatile (cache_control canonical order, cf. sdd_lib/cache_control.py)
-    - workspace/input/stack/stack.md             # Project Config (SpecComplianceMode, SpecComplianceFailOn) · cache_layer: stable
-    - .claude/rules/error-classification.md      # taxonomie [SPEC_*] §1.13 · cache_layer: stable
-    - workspace/output/src/{BackendName}/**      # code production (fallback convention si pas de plan) · cache_layer: semi
-    - workspace/output/src/{AppName}/**          # code production · cache_layer: semi
-    - workspace/output/src/{LibName}/**          # lib partagée si présente · cache_layer: semi
-    - workspace/input/feats/{n}-*.md             # FEAT parente (passif, contexte) · cache_layer: volatile
-    - workspace/output/us/{n}-*.md               # toutes les US (source de vérité ACs) · cache_layer: volatile
-    - workspace/output/plans/{n}-*.{back,front}.md  # mode preferred : sélection fichiers par AC · cache_layer: volatile
-    # Anti-pattern strict : pas de Glob workspace/output/src/**/*
+    - workspace/stack/stack.md             # Project Config (SpecComplianceMode, SpecComplianceFailOn) · cache_layer: stable
+    - .claude/digests/error-classification.spec-compliance-reviewer.md      # taxonomie [SPEC_*] §1.13 · cache_layer: stable
+    - workspace/src/{BackendName}/**      # code production (fallback convention si pas de plan) · cache_layer: semi
+    - workspace/src/{AppName}/**          # code production · cache_layer: semi
+    - workspace/src/{LibName}/**          # lib partagée si présente · cache_layer: semi
+    - workspace/feats/{n}-*.md             # FEAT parente (passif, contexte) · cache_layer: volatile
+    - workspace/us/{n}-*.md               # toutes les US (source de vérité ACs) · cache_layer: volatile
+    - workspace/plans/{n}-*.{back,front}.md  # mode preferred : sélection fichiers par AC · cache_layer: volatile
+    # Anti-pattern strict : pas de Glob workspace/src/**/*
     # Anti-pattern par design : NE LIT PAS les rapports d'autres agents
     #   (cf. agent §STEP 0 "Périmètre strict")
   writes:
-    - workspace/output/.sys/.validation/{n}-spec-compliance.md       # rapport humain
-    - workspace/output/.sys/.validation/{n}-spec-compliance.json     # schéma machine validé par validate_spec_compliance.py
+    - workspace/.sys/.validation/{n}-spec-compliance.md       # rapport humain
+    - workspace/.sys/.validation/{n}-spec-compliance.json     # schéma machine validé par validate_spec_compliance.py
   forbidden_reads:
-    - workspace/output/us/{other-feat}            # autres FEATs
-    - workspace/input/feats/{other}.md            # autres FEATs
-    - workspace/output/.sys/.validation/{n}-code-review.*   # NEVER (bias toward not-trust-report)
-    - workspace/output/.sys/.validation/{n}-security-scan.* # NEVER
-    - workspace/output/qa/feat-{n}/a11y-report.*  # NEVER
+    - workspace/us/{other-feat}            # autres FEATs
+    - workspace/feats/{other}.md            # autres FEATs
+    - workspace/.sys/.validation/{n}-code-review.*   # NEVER (bias toward not-trust-report)
+    - workspace/.sys/.validation/{n}-security-scan.* # NEVER
+    - workspace/db/                        # console.db qa_* (rapports auditeurs = NEVER, bias not-trust-report)
     - .claude/stacks/qa/                          # hors scope
-    - workspace/output/.sys/.context/             # hors scope direct
+    - workspace/.sys/.context/             # hors scope direct
   forbidden_writes:
-    - workspace/output/src/                       # read-only strict (jamais de patch)
-    - workspace/output/us/                        # responsabilité po
-    - workspace/output/qa/                        # responsabilité qa
-    - workspace/output/dashboard/                 # legacy v6 (agent dashboard retiré v7.0.0)
-    - workspace/output/.sys/.context/             # responsabilité po/arch/elicitor
-    - workspace/output/plans/                     # ne planifie pas
-    - workspace/output/.sys/.validation/{n}-code-review.*  # responsabilité code-reviewer
-    - workspace/output/.sys/.validation/{n}-readiness.md   # responsabilité /feat-validate
+    - workspace/src/                       # read-only strict (jamais de patch)
+    - workspace/us/                        # responsabilité po
+    - workspace/db/                        # console.db = responsabilité qa/scripts (2026-07-06, ex-qa/)
+    - workspace/dashboard/                 # legacy v6 (agent dashboard retiré v7.0.0)
+    - workspace/.sys/.context/             # responsabilité po/arch/elicitor
+    - workspace/plans/                     # ne planifie pas
+    - workspace/.sys/.validation/{n}-code-review.*  # responsabilité code-reviewer
+    - workspace/.sys/.validation/{n}-readiness.md   # responsabilité /feat-validate
   config_flags:                                   # dans Project Config
     - SpecComplianceMode: "off | full | manual (défaut: manual)"
     - SpecComplianceFailOn: "critical | serious | moderate | minor (défaut: serious)"
@@ -790,42 +799,69 @@ spec-compliance-reviewer:
 # Agent constitutioner (Sonnet 4.6) — externalisé d'arch Phase D 2026-05-13
 # Rôle: ADRs (atomic timestamp) + §4/§6/§1 constitution.md + INDEX.md
 #       ADRs + read-back v5.0.
-# Invocation: arch STEP 12.5 (fin de Phase B).
+# Invocation: `/arch-init` STEP 3.5 après sentinel disque posé par arch (no-spawn préservé).
 # Token footprint estimé: ~5-10 KB (lecture stack.md + constitution.md +
 #       glob ADRs existants + template ADR).
 # -------------------------------------------------------------------------
 constitutioner:
+  model: claude-sonnet-4-6   # parité frontmatter agents/constitutioner.md — enforced par tests/test_loader_model_parity.py
   reads:
     # Order: stable → semi → volatile (cache_control canonical order, cf. sdd_lib/cache_control.py)
-    - workspace/input/stack/stack.md                   # cache_layer: stable
+    - workspace/stack/stack.md                   # cache_layer: stable
     - .claude/templates/adr.template.md                # cache_layer: stable
     - .claude/rules/ownership.md                       # Partie B §3 numérotation atomique ADR (was file-ownership.md, consolidated v7.0.0) · cache_layer: stable
-    - .claude/rules/error-classification.md            # cache_layer: stable
-    - workspace/output/.sys/.context/constitution.md   # cache_layer: semi
-    - workspace/output/.sys/.context/adrs/ADR-*.md     # idempotence par slug · cache_layer: semi
+    - .claude/digests/error-classification.constitutioner.md            # cache_layer: stable
+    - workspace/.sys/.context/constitution.md   # cache_layer: semi
+    - workspace/.sys/.context/adrs/ADR-*.md     # idempotence par slug · cache_layer: semi
   writes:
-    - workspace/output/.sys/.context/adrs/ADR-{YYYYMMDDTHHmmss}-{slug}.md
-    - workspace/output/.sys/.context/constitution.md   # Edit ligne par ligne §1/§4/§6
-    - workspace/output/.sys/.context/adrs/INDEX.md     # régénéré
+    - workspace/.sys/.context/adrs/ADR-{YYYYMMDDTHHmmss}-{slug}.md
+    - workspace/.sys/.context/constitution.md   # Edit ligne par ligne §1/§4/§6
+    - workspace/.sys/.context/adrs/INDEX.md     # régénéré
   forbidden_reads:
-    - workspace/input/feats/                # hors scope (décisions déjà actées)
-    - workspace/output/us/                  # hors scope
-    - workspace/input/ui/                   # hors scope
-    - workspace/output/src/                 # hors scope
+    - workspace/feats/                # hors scope (décisions déjà actées)
+    - workspace/us/                  # hors scope
+    - workspace/ui/                   # hors scope
+    - workspace/src/                 # hors scope
   forbidden_writes:
-    - workspace/output/src/                 # responsabilité dev-* / arch
-    - workspace/output/us/                  # responsabilité po
-    - workspace/input/                      # read-only
+    - workspace/src/                 # responsabilité dev-* / arch
+    - workspace/us/                  # responsabilité po
+    - workspace/                      # read-only
+  idempotent: true
+
+# -------------------------------------------------------------------------
+# specbook-writer (2026-07-24) — humaniseur du Cahier des charges (.docx)
+# -------------------------------------------------------------------------
+# Reformule UNE FEAT (forward OU reverse) en prose fonctionnelle simple pour
+# un lecteur non-IT, mise en cache par hash. Le rendu .docx final est
+# déterministe (sdd_scripts/generate_specbook.py, 0 token). Lecture seule sur
+# les FEATs/US ; n'écrit QUE la section en cache.
+specbook-writer:
+  model: claude-sonnet-4-6   # parité frontmatter agents/specbook-writer.md — enforced par tests/test_loader_model_parity.py
+  reads:
+    - .claude/rules/output-protocol.md                 # cache_layer: stable
+    - .claude/rules/error-classification.md             # cache_layer: stable
+    - workspace/feats/{n}-*.md                          # FEAT source · cache_layer: semi
+    - workspace/us/{n}-*-*.md                           # US filles (enrichissement optionnel) · cache_layer: volatile
+  writes:
+    - workspace/docs/.sys/sections/{feat-id}.md         # section humanisée en cache (unique write)
+  forbidden_reads:
+    - workspace/src/                 # jamais le code applicatif
+    - workspace/old/                 # jamais le legacy
+  forbidden_writes:
+    - workspace/feats/               # ne réécrit JAMAIS la FEAT source
+    - workspace/us/                  # responsabilité po / reverse-us-writer
+    - workspace/src/                 # responsabilité dev-* / arch
+    - workspace/docs/cahier-des-charges.docx  # rendu = script déterministe, pas l'agent
   idempotent: true
 
 # -------------------------------------------------------------------------
 # v4.0.0 — Suppression agent UI + bascule HTML direct
 # -------------------------------------------------------------------------
 # - Agent UI supprimé : plus d'extraction PNG → markdown
-# - Mockups HTML statiques dans workspace/input/ui/{n}-{m}-{Name}.html
+# - Mockups HTML statiques dans workspace/ui/{n}-{m}-{Name}.html
 # - dev-frontend lit l'HTML directement en texte (pas multimodal)
 # - Mapping HTML → composant DS dans stacks/ui/*.md §2 + §7
-# - Plus de workspace/output/ui/ (dossier supprimé)
+# - Plus de workspace/ui/ (dossier supprimé)
 # - Économie tokens : -10-25 KB/PNG (agent UI) + -3-5 KB/US (vision dev-frontend)
 # - Économie tokens totale : ~15-30 KB par US ayant un mockup
 # - Fidelity check devient text-based (grep libellés HTML vs markup généré)
@@ -854,8 +890,8 @@ constitutioner:
 # | Agent retiré              | Version | ADR / Raison                                     | Remplacement v7.0.0                              |
 # |---------------------------|---------|--------------------------------------------------|--------------------------------------------------|
 # | `validator`               | v6.0    | Coût ~1.4M tokens/run, faux positifs sémantiques | `feat-validate` 100% déterministe (Python)       |
-# | `dev-backend-strict`      | v7.0.0  | Maintenance double > ROI réel                    | `dev-backend` (Opus 4.7) — plan v2 conservé      |
-# | `dev-frontend-strict`     | v7.0.0  | idem                                             | `dev-frontend` (Opus 4.7) — plan v2 conservé     |
+# | `dev-backend-strict`      | v7.0.0  | Maintenance double > ROI réel                    | `dev-backend` (Opus 4.8) — plan v2 conservé      |
+# | `dev-frontend-strict`     | v7.0.0  | idem                                             | `dev-frontend` (Opus 4.8) — plan v2 conservé     |
 # | `dashboard`               | v7.0.0  | 100% mécanique, jamais raisonnement LLM          | `sdd_scripts/index_adrs.py` (0 token, ~50 ms)    |
 # | `accessibility-auditor`   | v7.0.0  | WCAG mieux couvert par tooling CI                | `axe-core` CI (mapping `[A11Y_*]` cf. legacy.md) |
 # | `performance-auditor`     | v7.0.0  | Core Web Vitals mieux mesurés par browser réel   | `Lighthouse CI` + `wrk/k6` (mapping `[PERF_*]`)  |

@@ -4,7 +4,7 @@
 > `DatabaseType ≠ none` (cf. `arch.md` STEP 7 décision DB).
 >
 > Contient STEP 8-11 : composition connection string en RAM, introspection
-> schema (READ-ONLY), écriture `workspace/output/db/schema.{json,md,diff.md}`,
+> schema (READ-ONLY), écriture `workspace/db/schema.{json,md,diff.md}`,
 > scaffolding Database-First cross-stack.
 >
 > Source de vérité : ce fichier. `arch.md` route ici sans dupliquer.
@@ -45,9 +45,64 @@ Arch :
 
 **Garde-fous absolus** :
 - Connection string composée → JAMAIS écrite hors STEP 4.5
-- JAMAIS dans `schema.json`/`schema.md`/`workspace/output/db/`
+- JAMAIS dans `schema.json`/`schema.md`/`workspace/db/`
 - JAMAIS logger `DB_PASSWORD` ni la chaîne complète
 - JAMAIS de concaténation strings — builder canonique uniquement
+
+---
+
+## STEP 8.5 — Migration Flyway sanctionnée (conditionnel)
+
+> **Seule dérogation à « DB READ-ONLY »** — `library-and-stack.md §C.6`.
+> Exécuté **uniquement** si l'orchestrateur (`/sdd-full`/`/sdd-poc`) a détecté
+> une FEAT dont le nom de fichier contient « Flyway » et posé le sentinel.
+
+### 8.5.1 Lire le sentinel
+
+```bash
+FLAG=workspace/.sys/.state/flyway-migrate-requested.flag
+```
+
+- Sentinel **absent** → skip STEP 8.5 (cas nominal, on passe à STEP 9).
+- Sentinel **présent** ET `DatabaseType = none` → ignorer + WARN (rien à migrer),
+  consommer le flag, passer à STEP 12 (pas de Phase B).
+- Sentinel **présent** ET `DatabaseType ≠ none` → exécuter 8.5.2.
+
+arch ne lit **jamais** la FEAT pour décider — il se fie au sentinel posé par
+l'orchestrateur (anti-derive « Jamais lire FEATs » préservé).
+
+### 8.5.2 Exécuter `flyway migrate`
+
+1. **Localiser le runner Flyway** du stack backend actif (section
+   `Scaffolding tool` / `Migration tool` du `.md` stack, ou `flyway` CLI / plugin
+   Gradle-Maven). Runner introuvable / non exécutable → STOP
+   `CAUSE: [INFRA_BLOCKED]` (« je n'ai pas pu exécuter », pas de fallback DDL).
+2. **Localiser les scripts** versionnés `V{version}__{desc}.sql` :
+   - Spring Boot : `src/main/resources/db/migration/`
+   - sinon : `workspace/db/migration/`
+   - Aucun script trouvé → WARN (rien à appliquer), consommer le flag, STEP 9.
+3. **Invoquer** `flyway migrate` via le bridge ad-hoc STEP 8.1 (connection string
+   en RAM, jamais persistée ni loggée). Flyway saute les versions déjà inscrites
+   dans `flyway_schema_history` (idempotence native).
+4. Exit ≠ 0 → STOP `CAUSE: [SCHEMA_MISMATCH]` : `flyway migrate exit {N} :
+   {message condensé}` (script invalide, conflit de version, base injoignable).
+   Aucune ré-écriture partielle masquée.
+
+### 8.5.3 Forçage re-scaffold + consommation du flag
+
+- Après migrate réussi, **forcer** STEP 9 (ré-introspection) + STEP 11 (re-scaffold
+  `--force` incrémental) **même si `schema.json` existe** — le schéma a changé,
+  les entities doivent refléter la base migrée (défait tout short-circuit arch).
+- **Consommer** le sentinel (`rm -f $FLAG`) après migrate réussi → per-run, une
+  FEAT Flyway re-déclenche le migrate au prochain `/sdd-full`/`/sdd-poc`
+  (sûr car idempotent).
+
+arch **n'écrit ni ne modifie** les scripts `V*__*.sql` — ce sont des artefacts de
+la FEAT (Tech Lead / dev-backend). arch **exécute** seulement le runner.
+
+```
+[ARCH] Migration Flyway appliquée ({k} versions), schéma re-scaffoldé. (28%)
+```
 
 ---
 
@@ -70,7 +125,7 @@ default, position), PK + FK, index (au moins les uniques).
 
 ---
 
-## STEP 10 — Écrire `workspace/output/db/schema.json` + `schema.md`
+## STEP 10 — Écrire `workspace/db/schema.json` + `schema.md`
 
 Format `schema.json` :
 ```json
@@ -103,7 +158,7 @@ Avant écrasement :
 2. Écrire nouveau `schema.json`
 3. Diff léger : tables added/removed, colonnes added/removed, types
    changés, FK added/removed
-4. Écrire `workspace/output/db/schema.diff.md` (frontmatter
+4. Écrire `workspace/db/schema.diff.md` (frontmatter
    `prev_extracted_at`/`curr_extracted_at` + sections "Tables added/
    removed/modified" avec détail colonnes + types + FK par table).
 
@@ -124,10 +179,10 @@ actif (numéro §-variable, grep `^### .* Scaffolding tool`). Introuvable
 
 | Stack backend | Outil canonique | Output entities |
 |---|---|---|
-| `dotnet-minimalapi`  | `dotnet ef dbcontext scaffold` | `workspace/output/src/{BackendName}/Entities/` |
-| `node-express`       | `prisma db pull` + `prisma generate` | `workspace/output/src/{BackendName}/prisma/schema.prisma` + client |
-| `python-fastapi`     | `sqlacodegen` (sync) / `sqlacodegen-v2` (async SQLAlchemy 2.x) | `workspace/output/src/{BackendName}/entities/db/models.py` |
-| `kotlin-spring-boot` | `hibernate-tools` / `jOOQ codegen` / `Flyway` + template Kotlin | `workspace/output/src/{BackendName}/src/main/kotlin/{pkg}/entities/` |
+| `dotnet-minimalapi`  | `dotnet ef dbcontext scaffold` | `workspace/src/{BackendName}/Entities/` |
+| `node-express`       | `prisma db pull` + `prisma generate` | `workspace/src/{BackendName}/prisma/schema.prisma` + client |
+| `python-fastapi`     | `sqlacodegen` (sync) / `sqlacodegen-v2` (async SQLAlchemy 2.x) | `workspace/src/{BackendName}/entities/db/models.py` |
+| `kotlin-spring-boot` | `hibernate-tools` / `jOOQ codegen` / `Flyway` + template Kotlin | `workspace/src/{BackendName}/src/main/kotlin/{pkg}/entities/` |
 
 Format §8.3 attendu dans chaque stack : `Outil` / `Output` / `Idempotence` /
 `Filtres` (support §11.1).

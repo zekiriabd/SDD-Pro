@@ -87,6 +87,25 @@ def repo_root() -> Path:
     return sdd_reverse_dir().resolve().parents[2]
 
 
+def workspace_root(repo_root_path: Path | None = None) -> Path:
+    """Resolve the workspace root: nested `repo/workspace`, else sibling.
+
+    Mirrors ``sdd_lib.paths.workspace_root`` but kept dependency-free — the
+    reverse module MUST NOT import from ``sdd_lib`` (isolation invariant,
+    cf. ``reverse_smoke.py``). Prefers a nested ``repo/workspace``; falls back
+    to a sibling ``repo/../workspace`` (split layout where the framework lives
+    in a sub-folder and the project workspace is external to it).
+    """
+    root = Path(repo_root_path or repo_root()).resolve()
+    nested = root / "workspace"
+    if nested.is_dir():
+        return nested
+    sibling = root.parent / "workspace"
+    if sibling.is_dir():
+        return sibling
+    return nested
+
+
 def language_signatures_path() -> Path:
     """Return the path to `language_signatures.yml` (source of D1).
 

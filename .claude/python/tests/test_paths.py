@@ -67,6 +67,27 @@ class TestLooksLikeRepoRoot(unittest.TestCase):
             (root / "workspace").mkdir()
             self.assertTrue(paths._looks_like_repo_root(root))
 
+    def test_strict_check_accepts_sibling_workspace(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp) / "repo"
+            root.mkdir()
+            (root / ".claude" / "agents").mkdir(parents=True)
+            (root / ".claude" / "commands").mkdir(parents=True)
+            (root.parent / "workspace").mkdir()
+            self.assertTrue(paths._looks_like_repo_root(root))
+
+
+class TestWorkspaceRoot(unittest.TestCase):
+    def test_workspace_root_prefers_sibling_workspace(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp) / "repo"
+            root.mkdir()
+            (root / ".claude" / "agents").mkdir(parents=True)
+            (root / ".claude" / "commands").mkdir(parents=True)
+            sibling_workspace = root.parent / "workspace"
+            sibling_workspace.mkdir()
+            self.assertEqual(paths.workspace_root(root), sibling_workspace)
+
 
 class TestRepoRoot(unittest.TestCase):
     def setUp(self) -> None:
@@ -100,11 +121,11 @@ class TestRelativeToRoot(unittest.TestCase):
     def test_inside_root_returns_relative(self) -> None:
         with TemporaryDirectory() as tmp:
             root = Path(tmp).resolve()
-            target = root / "workspace" / "output" / "foo.md"
+            target = root / "workspace" / "foo.md"
             target.parent.mkdir(parents=True)
             target.touch()
             rel = paths.relative_to_root(target, root=root)
-            self.assertEqual(rel, "workspace/output/foo.md")
+            self.assertEqual(rel, "workspace/foo.md")
 
     def test_outside_root_returns_absolute_normalized(self) -> None:
         """Path outside root falls back to absolute (normalized to forward slashes)."""

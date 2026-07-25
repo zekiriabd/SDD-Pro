@@ -79,11 +79,11 @@ Hérités de `archi/mvc.md §4`. **Ajouts** Kotlin :
 
 ### 2.2 Outils
 
-- **Project file** : `workspace/output/src/{BackendName}/build.gradle.kts`
-- **Build** : `cd workspace/output/src/{BackendName} && ./gradlew build -x test`
+- **Project file** : `workspace/src/{BackendName}/build.gradle.kts`
+- **Build** : `cd workspace/src/{BackendName} && ./gradlew build -x test`
 - **Smoke Command** :
   ```bash
-  cd workspace/output/src/{BackendName} && ./gradlew bootRun --args='--spring.profiles.active=dev' &
+  cd workspace/src/{BackendName} && ./gradlew bootRun --args='--spring.profiles.active=dev' &
   APP_PID=$!; sleep 30
   curl -sf http://localhost:8080/actuator/health -o /dev/null
   RC=$?; kill $APP_PID 2>/dev/null; wait $APP_PID 2>/dev/null; exit $RC
@@ -100,7 +100,7 @@ Hérités de `archi/mvc.md §4`. **Ajouts** Kotlin :
 ```bash
 # Idempotent : skip si build.gradle.kts existe déjà
 
-if [ ! -f "workspace/output/src/{BackendName}/build.gradle.kts" ]; then
+if [ ! -f "workspace/src/{BackendName}/build.gradle.kts" ]; then
   # Génération via Spring Initializr Kotlin
   curl -s https://start.spring.io/starter.zip \
     -d type=gradle-project-kotlin \
@@ -114,30 +114,30 @@ if [ ! -f "workspace/output/src/{BackendName}/build.gradle.kts" ]; then
     -d packaging=jar \
     -d javaVersion=21 \
     -d dependencies=web,data-jpa,validation,actuator,security,oauth2-resource-server,flyway-core \
-    -o workspace/output/src/{BackendName}.zip
+    -o workspace/src/{BackendName}.zip
 
-  unzip -q workspace/output/src/{BackendName}.zip -d workspace/output/src/
-  rm -f workspace/output/src/{BackendName}.zip
+  unzip -q workspace/src/{BackendName}.zip -d workspace/src/
+  rm -f workspace/src/{BackendName}.zip
 fi
 
 # Créer arborescence des couches
-mkdir -p workspace/output/src/{BackendName}/src/main/kotlin/{BackendNamespace}/controller
-mkdir -p workspace/output/src/{BackendName}/src/main/kotlin/{BackendNamespace}/service
-mkdir -p workspace/output/src/{BackendName}/src/main/kotlin/{BackendNamespace}/repository
-mkdir -p workspace/output/src/{BackendName}/src/main/kotlin/{BackendNamespace}/entity
-mkdir -p workspace/output/src/{BackendName}/src/main/kotlin/{BackendNamespace}/dto/input
-mkdir -p workspace/output/src/{BackendName}/src/main/kotlin/{BackendNamespace}/dto/output
-mkdir -p workspace/output/src/{BackendName}/src/main/kotlin/{BackendNamespace}/dto/model
-mkdir -p workspace/output/src/{BackendName}/src/main/kotlin/{BackendNamespace}/mapper
-mkdir -p workspace/output/src/{BackendName}/src/main/kotlin/{BackendNamespace}/config
-mkdir -p workspace/output/src/{BackendName}/src/main/kotlin/{BackendNamespace}/exception
-mkdir -p workspace/output/src/{BackendName}/src/main/kotlin/{BackendNamespace}/advice
-mkdir -p workspace/output/src/{BackendName}/src/main/kotlin/{BackendNamespace}/security
-mkdir -p workspace/output/src/{BackendName}/src/main/resources/db/migration
-mkdir -p workspace/output/src/{BackendName}/src/main/resources/messages
+mkdir -p workspace/src/{BackendName}/src/main/kotlin/{BackendNamespace}/controller
+mkdir -p workspace/src/{BackendName}/src/main/kotlin/{BackendNamespace}/service
+mkdir -p workspace/src/{BackendName}/src/main/kotlin/{BackendNamespace}/repository
+mkdir -p workspace/src/{BackendName}/src/main/kotlin/{BackendNamespace}/entity
+mkdir -p workspace/src/{BackendName}/src/main/kotlin/{BackendNamespace}/dto/input
+mkdir -p workspace/src/{BackendName}/src/main/kotlin/{BackendNamespace}/dto/output
+mkdir -p workspace/src/{BackendName}/src/main/kotlin/{BackendNamespace}/dto/model
+mkdir -p workspace/src/{BackendName}/src/main/kotlin/{BackendNamespace}/mapper
+mkdir -p workspace/src/{BackendName}/src/main/kotlin/{BackendNamespace}/config
+mkdir -p workspace/src/{BackendName}/src/main/kotlin/{BackendNamespace}/exception
+mkdir -p workspace/src/{BackendName}/src/main/kotlin/{BackendNamespace}/advice
+mkdir -p workspace/src/{BackendName}/src/main/kotlin/{BackendNamespace}/security
+mkdir -p workspace/src/{BackendName}/src/main/resources/db/migration
+mkdir -p workspace/src/{BackendName}/src/main/resources/messages
 
 # Build de validation
-cd workspace/output/src/{BackendName} && ./gradlew compileKotlin --no-daemon
+cd workspace/src/{BackendName} && ./gradlew compileKotlin --no-daemon
 ```
 
 **Contrat post-init** :
@@ -343,7 +343,7 @@ le Tech Lead corrige le plan/la FEAT manuellement.
 
 Avant d'écrire `@RequestMapping(...)` ou `MapGet/MapPost(...)`, l'agent
 dev-backend doit :
-1. Grep `workspace/output/src/{BackendName}/...` pour repérer les
+1. Grep `workspace/src/{BackendName}/...` pour repérer les
    endpoints **déjà existants** sur la même racine de ressource
 2. Si trouvé → réutiliser **strictement** le même pluriel et la même
    structure de nesting
@@ -565,7 +565,7 @@ class ExternalApiService(
 ### 4.2 Connection string (`application.yml` peuplé par arch, depuis 2026-05-14)
 
 **Source de vérité** : bloc `## Active Database` de
-`workspace/input/stack/stack.md` (clés `DatabaseType`, `DB_HOST`,
+`workspace/stack/stack.md` (clés `DatabaseType`, `DB_HOST`,
 `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`). L'agent `arch` Phase
 A — STEP 4.5 lit ces valeurs et écrit `application.yml` avec les
 **valeurs littérales** (plus d'interpolation `${DB_*}` env vars).
@@ -759,7 +759,7 @@ tasks.register("dbScaffold") {
 }
 ```
 
-**Output** : `workspace/output/src/{BackendName}/src/main/kotlin/{BackendNamespace}/entity/*.kt`
+**Output** : `workspace/src/{BackendName}/src/main/kotlin/{BackendNamespace}/entity/*.kt`
 (une data class JPA par table).
 
 **Idempotence** : la tâche écrase les fichiers existants. arch détecte

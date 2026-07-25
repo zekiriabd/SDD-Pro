@@ -30,7 +30,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from sdd_lib.paths import repo_root  # noqa: E402
+from sdd_lib.paths import workspace_root, repo_root  # noqa: E402
 from sdd_lib.project_config import (  # noqa: E402
     read_stack_md_text as _read_stack_md_text,
     section_body as _section_body,
@@ -191,10 +191,10 @@ def select_vocabulary(strictness: str) -> list[str]:
 def main() -> int:
     args = parse_args()
     root = repo_root()
-    feats_dir = root / "workspace" / "input" / "feats"
-    us_dir = root / "workspace" / "output" / "us"
-    src_dir = root / "workspace" / "output" / "src"
-    stack_path = root / "workspace" / "input" / "stack" / "stack.md"
+    feats_dir = workspace_root(root) / "feats"
+    us_dir = workspace_root(root) / "us"
+    src_dir = workspace_root(root) / "src"
+    stack_path = workspace_root(root) / "stack" / "stack.md"
 
     vague_terms = select_vocabulary(args.strictness)
     rep = Report()
@@ -224,7 +224,7 @@ def main() -> int:
         else:
             print("## 2. Validations semantiques (deterministes)")
             print()
-            print(f"**Skip** : FEAT introuvable (workspace/input/feats/{args.feat_number}-*.md)")
+            print(f"**Skip** : FEAT introuvable (workspace/feats/{args.feat_number}-*.md)")
         return SUCCESS
     feat_content = read_safe(feat_file)
     us_content = ""

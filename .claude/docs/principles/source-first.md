@@ -18,7 +18,7 @@ l'historique de chat ni les commits git du projet précédent.
 
 ## 1. Workflow obligatoire de correction
 
-Pour chaque bug constaté dans le code généré (`workspace/output/src/...`,
+Pour chaque bug constaté dans le code généré (`workspace/src/...`,
 tests, build, runtime) :
 
 ### Étape 1 — Identifier la (les) source(s) MD manquante(s)
@@ -27,9 +27,9 @@ Mapper le bug → quelle(s) source(s) aurait dû le prévenir :
 
 | Niveau de source | Quand patcher | Exemple |
 |---|---|---|
-| **FEAT fonctionnelle** (`workspace/input/feats/{n}-*.md`) | Le bug touche une règle métier ou un AC implicite | CORS manquant → ajouter BR-N : "API accessible depuis origin SPA" + AC-M : "preflight OPTIONS répond 200" |
-| **User Story** (`workspace/output/us/{n}-{m}-*.md`) | Le bug touche un comportement utilisateur observable | Erreur popup "Failed to fetch" → ajouter AC-X : "message d'erreur lisible si endpoint down" |
-| **Plan technique** (`workspace/output/plans/{n}-{m}-*.{back,front}.md`) | Le bug touche un fichier oublié ou mal scopé | `CorsConfig.kt` absent → ajouter en `create:` |
+| **FEAT fonctionnelle** (`workspace/feats/{n}-*.md`) | Le bug touche une règle métier ou un AC implicite | CORS manquant → ajouter BR-N : "API accessible depuis origin SPA" + AC-M : "preflight OPTIONS répond 200" |
+| **User Story** (`workspace/us/{n}-{m}-*.md`) | Le bug touche un comportement utilisateur observable | Erreur popup "Failed to fetch" → ajouter AC-X : "message d'erreur lisible si endpoint down" |
+| **Plan technique** (`workspace/plans/{n}-{m}-*.{back,front}.md`) | Le bug touche un fichier oublié ou mal scopé | `CorsConfig.kt` absent → ajouter en `create:` |
 | **Stack MD** (`.claude/stacks/{cat}/{stack}.md`) | Le bug touche un pattern réutilisable cross-projet | Pattern CORS Spring → §5.2.7 avec format ERROR + anti-récap grep |
 | **Agent MD** (`.claude/agents/{agent}.md`) | Le bug révèle un piège récurrent pour l'agent | Pattern à grep en STEP build, stratégie de récupération |
 | **Rule MD** (`.claude/rules/{rule}.md`) | Le bug viole une règle non encore formalisée | Étendre la matrice ownership, ajouter anti-pattern |
@@ -43,7 +43,7 @@ L'ordre est strict :
 2. Edit/Write la source : ajouter règle, AC, pattern, format ERROR
 3. (optionnel) régénérer les artefacts dérivés (US si FEAT patchée,
    plan si stack patché) via /us-generate, /dev-plan
-4. ENFIN, appliquer le fix au code (workspace/output/src/...)
+4. ENFIN, appliquer le fix au code (workspace/src/...)
 ```
 
 Patcher le code avant les MD est interdit : ça crée un drift
@@ -86,7 +86,7 @@ class CorsConfig { ... }
 
 **Anti-pattern à grep en STEP build** :
 ```
-grep -r "@CrossOrigin" workspace/output/src/{BackendName}/ && WARN
+grep -r "@CrossOrigin" workspace/src/{BackendName}/ && WARN
 ```
 
 **Format ERROR** :

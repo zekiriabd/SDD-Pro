@@ -48,7 +48,7 @@
 
 ## Liens
 
-- FEAT : `workspace/input/feats/{n}-{Name}.md` (si applicable)
-- US : `workspace/output/us/{n}-{m}-{Name}.md` (si applicable)
+- FEAT : `workspace/feats/{n}-{Name}.md` (si applicable)
+- US : `workspace/us/{n}-{m}-{Name}.md` (si applicable)
 - Stack : `.claude/stacks/{cat}/{stack}.md` (si applicable)
 - ADRs liés : ADR-XXX (si superseded ou dépendance)

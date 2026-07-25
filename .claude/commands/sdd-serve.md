@@ -26,7 +26,7 @@ sont accessibles via `BashOutput` / Monitor sur le shell parent.
 
 ## STEP 1 — Charger Project Config
 
-Read `workspace/input/stack/stack.md` § `## Project Config` :
+Read `workspace/stack/stack.md` § `## Project Config` :
 
 - `FrontendName` (ou alias `AppName`) → répertoire frontend
 - `BackendName` → répertoire backend
@@ -40,7 +40,7 @@ Read `## Active Tech Specs` pour identifier :
 Si `## Project Config` absent OU `FrontendName`/`BackendName` non lisibles :
 ```
 ERROR: /sdd-serve — Project Config incomplet
-CAUSE: [STACK_MALFORMED] FrontendName ou BackendName absent de workspace/input/stack/stack.md
+CAUSE: [STACK_MALFORMED] FrontendName ou BackendName absent de workspace/stack/stack.md
 FIX: renseigner FrontendName et BackendName dans ## Project Config
 ```
 
@@ -52,20 +52,20 @@ FIX: renseigner FrontendName et BackendName dans ## Project Config
 
 | Stack actif | Répertoire | Commande de run |
 |---|---|---|
-| `backend/kotlin-spring-boot` | `workspace/output/src/{BackendName}/` | `./gradlew bootRun` (PowerShell : `.\gradlew.bat bootRun`) |
-| `backend/dotnet-minimalapi` | `workspace/output/src/{BackendName}/` | `dotnet run --project {BackendName}.csproj` |
-| `backend/python-fastapi` | `workspace/output/src/{BackendName}/` | `uvicorn app.main:app --reload --port 8000` |
-| `backend/node-express` | `workspace/output/src/{BackendName}/` | `npm run dev` (fallback `npm start`) |
-| `fullstack/*` | `workspace/output/src/{BackendName}/` | suivre §1 du stack fullstack |
+| `backend/kotlin-spring-boot` | `workspace/src/{BackendName}/` | `./gradlew bootRun` (PowerShell : `.\gradlew.bat bootRun`) |
+| `backend/dotnet-minimalapi` | `workspace/src/{BackendName}/` | `dotnet run --project {BackendName}.csproj` |
+| `backend/python-fastapi` | `workspace/src/{BackendName}/` | `uvicorn app.main:app --reload --port 8000` |
+| `backend/node-express` | `workspace/src/{BackendName}/` | `npm run dev` (fallback `npm start`) |
+| `fullstack/*` | `workspace/src/{BackendName}/` | suivre §1 du stack fullstack |
 
 ### Frontend
 
 | Stack actif | Répertoire | Commande de run |
 |---|---|---|
-| `frontend/react` | `workspace/output/src/{FrontendName}/` | `npm run dev` (Vite) |
-| `frontend/vue` | `workspace/output/src/{FrontendName}/` | `npm run dev` (Vite) |
-| `frontend/angular` | `workspace/output/src/{FrontendName}/` | `npm start` (ng serve) |
-| `frontend/blazor-webassembly` | `workspace/output/src/{FrontendName}/` | `dotnet watch run` |
+| `frontend/react` | `workspace/src/{FrontendName}/` | `npm run dev` (Vite) |
+| `frontend/vue` | `workspace/src/{FrontendName}/` | `npm run dev` (Vite) |
+| `frontend/angular` | `workspace/src/{FrontendName}/` | `npm start` (ng serve) |
+| `frontend/blazor-webassembly` | `workspace/src/{FrontendName}/` | `dotnet watch run` |
 
 ### Console
 
@@ -82,7 +82,7 @@ Pour chaque cible activée :
 1. **Répertoire existe** : Glob du dossier cible. Absent → ERROR :
    ```
    ERROR: /sdd-serve — projet absent
-   CAUSE: [PROJECT_NOT_INIT] workspace/output/src/{Name}/ introuvable — arch n'a pas tourné
+   CAUSE: [PROJECT_NOT_INIT] workspace/src/{Name}/ introuvable — arch n'a pas tourné
    FIX: lancer /arch-init OU /dev-run {n} pour matérialiser le projet
    ```
 
@@ -108,10 +108,10 @@ multiples).
 
 ```bash
 # Backend
-cd workspace/output/src/CMSPrintBack && .\gradlew.bat bootRun
+cd workspace/src/CMSPrintBack && .\gradlew.bat bootRun
 
 # Frontend
-cd workspace/output/src/CMSPrintFront && npm run dev
+cd workspace/src/CMSPrintFront && npm run dev
 
 # Console (si node_modules présent)
 cd workspace/console && npm start
@@ -202,8 +202,8 @@ voit l'erreur via `BashOutput`. Pas de retry automatique.
 
 ## Règles de cette commande
 
-- **Read-only** sur `workspace/output/src/**`, `.claude/stacks/**`,
-  `workspace/input/stack/stack.md`. Aucun Write/Edit, aucun build,
+- **Read-only** sur `workspace/src/**`, `.claude/stacks/**`,
+  `workspace/stack/stack.md`. Aucun Write/Edit, aucun build,
   aucun agent.
 - **Pas de Q/R utilisateur.** Sortie déterministe en 1 passe.
 - **Run uniquement.** Pas d'install (sauf `npm install` console si

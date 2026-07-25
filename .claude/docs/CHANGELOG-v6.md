@@ -13,7 +13,7 @@
 ## [v6.10.5] — 2026-05-19 (PATCH bug-fix CRIT-1 / CRIT-2 / CRIT-3 / CRIT-4)
 
 ### Fixed
-- **CRIT-1 — auditors `code-reviewer` et `spec-compliance-reviewer` skippés silencieusement.** Defaults `phase_planner.py` (`CodeReviewMode=manual`, `SpecComplianceMode=manual`) faisaient skip sans signal. Fix scopé Project Config : `workspace/input/stack/stack.md` explicitement `CodeReviewMode/SpecComplianceMode/ArchReviewMode/A11yMode/PerfMode: full`. `arch-reviewer` reste invoqué uniquement par `/sdd-review` (bug framework à corriger post-freeze, cf. ADR `governance-major-auditors-trim`).
+- **CRIT-1 — auditors `code-reviewer` et `spec-compliance-reviewer` skippés silencieusement.** Defaults `phase_planner.py` (`CodeReviewMode=manual`, `SpecComplianceMode=manual`) faisaient skip sans signal. Fix scopé Project Config : `workspace/stack/stack.md` explicitement `CodeReviewMode/SpecComplianceMode/ArchReviewMode/A11yMode/PerfMode: full`. `arch-reviewer` reste invoqué uniquement par `/sdd-review` (bug framework à corriger post-freeze, cf. ADR `governance-major-auditors-trim`).
 - **CRIT-2 — `set_us_status.py` câblé au pipeline.** Le script existait depuis v6.8 (transitions validées, classes `[US_STATUS_*]` formalisées `error-classification.md §1.3`, tests + MCP tool exposés) mais **aucune commande ni agent du pipeline ne l'invoquait** → toutes les US restaient `Status: Draft` post-build, drift garanti entre état réel et état déclaratif, `/sdd-status` non fiable.
   - `commands/feat-validate.md` STEP 5.bis : GO/WARN → flip `Draft → Ready` pour toutes US de la FEAT
   - `commands/dev-plan.md` STEP 4.bis : plan écrit → flip `Ready → InProgress`
@@ -46,7 +46,7 @@
 - **`ADR-20260519T120000-governance-major-auditors-trim`** — 5 auditors LLM → 1 cœur (`spec-compliance-reviewer`) + 2 réduits (`code-reviewer`, `security-reviewer scan` scope réduit). Kill `accessibility-auditor`, `performance-auditor`, `security-reviewer threat-model`. Remplacement déterministe par `axe-core`, Lighthouse CI, `gitleaks`, `semgrep`. **−45 KB tokens/FEAT (−65 %)**.
 - **`ADR-20260519T133000-governance-major-config-ssot`** — pyramide SSoT 4 tiers, `stack.md` = source primaire projet. 7 suppressions BREAKING : `read_project_config` legacy, `ArchitecturePattern:` keyvalue, `## Active App Type`, `AppNamespace`/`BackendNamespace` explicites, `stack.md.candidate`, édition manuelle miroirs Tier 4, banners freeze dupliqués.
 - **`ADR-20260519T143000-governance-major-flags-trim`** — 30 keys → **10**, 13 flags CLI → **6**, 4 modes dev-* → **2** (Inline + From-Plan). Combinatoire ×15 plus petite.
-- **`ADR-20260519T153000-governance-major-prompts-trim`** — CLAUDE.md slim (519→169 lignes, exécuté), agents `.md` repli rules inlinées −45 %, `error-classification.md` 534 lignes → `sdd_lib/error_classes.py` dict Python. **−110 KB tokens/FEAT (−40 % budget cycle complet)**.
+- **`ADR-20260519T130000-governance-major-prompts-trim`** — CLAUDE.md slim (519→169 lignes, exécuté), agents `.md` repli rules inlinées −45 %. *(Note corrective audit 2026-06-11 : timestamp ADR corrigé 153000→130000 ; la migration `error-classification.md` → `sdd_lib/error_classes.py` annoncée ici n'a jamais été réalisée — la règle MD reste la SSoT.)* **−110 KB tokens/FEAT (−40 % budget cycle complet)**.
 - **`ADR-20260519T163000-governance-major-vocab-consolidation`** — glossaire canonique `docs/glossary.md` (~220 termes, exécuté). 16 alias dépréciés à éliminer en v7 (`derive`→`drift`, `FrontendName`→`AppName`, `reviewer`→`auditor`, etc.).
 - **`ADR-20260519T173000-governance-protection-tracing`** — trace ex-post de la migration v6.5+ PowerShell → Python (23 PS → 24 Python, **+1 hook net**, aucune protection nette supprimée). Règle future : toute modification de hook exige un ADR `governance-protection-{slug}`.
 - **`ADR-20260519T183000-governance-orphan-cleanup-tool`** — remplacement ciblé du `/sdd-clear` retiré v6.1. `audit_orphans.py` (read-only) + `cleanup_orphans.py` (dry-run + trash 7j + confirm). Slash command `/cleanup-orphans {n}`.
@@ -61,7 +61,7 @@
 - `.claude/docs/hooks-and-protections.md` — SSoT 5 hooks actifs + mapping 23 PS→Python
 - `.claude/docs/orphan-cleanup-policy.md` — politique nettoyage ciblé (jamais mass purge)
 - `.claude/docs/poc-roi-methodology.md` — méthodologie 3 FEATs + baseline humaine
-- `.claude/docs/roi-baseline.md` — squelette à remplir post-exécution PoC
+- `.claude/docs/roi-baseline.md` — squelette à remplir post-exécution PoC *(note corrective audit 2026-06-11 : fichier jamais matérialisé — la méthodologie vit dans `poc-roi-methodology.md`)*
 - 6 fichiers tests unitaires P0 (couverture orchestrateurs critiques 0 % → 90-99 %)
 
 ### Fixed (PATCH, post-audit 2026-05-19)
@@ -88,7 +88,7 @@ sont consultables comme référence dès maintenant.
 ### Breaking — v6.10.0 (console DB centralisée)
 
 - **Tous les outputs JSON/JSONL/log de télémétrie retirés du FS** et
-  centralisés dans `workspace/output/db/console.db` (SQLite, 24 tables,
+  centralisés dans `workspace/db/console.db` (SQLite, 24 tables,
   WAL mode). Cf. CLAUDE.md §10.novies pour la liste exhaustive des
   fichiers retirés (`coverage.json`, `quality.json`, `events.jsonl`,
   `token-usage.jsonl`, etc.).
@@ -156,7 +156,7 @@ sont consultables comme référence dès maintenant.
 - `sdd_full` (async, retourne `job_id`)
 - `get_sdd_full_status`, `cancel_sdd_full`, `list_sdd_full_jobs`
 
-Job state persisté sous `workspace/output/.sys/.mcp-jobs/` — multi-session
+Job state persisté sous `workspace/.sys/.mcp-jobs/` — multi-session
 visible, cross-platform PID liveness (POSIX `os.kill(pid, 0)` / Windows
 `OpenProcess`).
 
@@ -290,7 +290,7 @@ projet par projet.
 
 ### Modified
 - `sdd_scripts/parse_coverage.py::detect_coverage_min()` : si `stack_md`
-  argument == canonical path (`workspace/input/stack/stack.md`), lit
+  argument == canonical path (`workspace/stack/stack.md`), lit
   `CoverageMin` via `read_layered_config()` (= team policy honored).
   Sinon (tests / paths explicites), conserve le comportement v6.6.x
   (regex local sur le fichier passé).
@@ -398,10 +398,10 @@ quand un script découvre qu'il a besoin d'une clé sous gouvernance team).
   US-level reste source de vérité.
 
 ### Inputs hashés pour dev-run
-- `workspace/input/feats/{n}-*.md`            (FEAT parent)
-- `workspace/output/us/{n}-*.md`              (toutes les US)
-- `workspace/input/ui/{n}-*.html`             (mockups si présents)
-- `workspace/input/stack/stack.md`            (Project Config + stacks)
+- `workspace/feats/{n}-*.md`            (FEAT parent)
+- `workspace/us/{n}-*.md`              (toutes les US)
+- `workspace/ui/{n}-*.html`             (mockups si présents)
+- `workspace/stack/stack.md`            (Project Config + stacks)
 
 ### Émissions checkpoint
 - `[CHECKPOINT_HASH_MISMATCH]` → US/mockup modifié, re-exécute tout
@@ -429,8 +429,8 @@ quand un script découvre qu'il a besoin d'une clé sous gouvernance team).
   `CheckpointMode ∈ {record, resume}` ET agent PO a réussi).
 
 ### Inputs hashés pour us-generate
-- `workspace/input/feats/{n}-*.md`     (FEAT parent)
-- `workspace/input/stack/stack.md`     (Project Config + stacks actifs)
+- `workspace/feats/{n}-*.md`     (FEAT parent)
+- `workspace/stack/stack.md`     (Project Config + stacks actifs)
 
 ### Non-régression
 - Mode `off` (défaut) = STEPs skippés = byte-identical v6.6.3
@@ -674,7 +674,7 @@ fail-safe : doute = re-run).
 from sdd_lib.checkpoint import is_phase_resumable, record_input_hash
 
 # Au début de phase us-generate
-inputs = [f"workspace/input/feats/{feat}-{name}.md"]
+inputs = [f"workspace/feats/{feat}-{name}.md"]
 resumable, reason = is_phase_resumable(feat, "us-generate", inputs)
 if resumable:
     print(f"[skip] us-generate already done (hash matched)")
@@ -697,7 +697,7 @@ record_input_hash(run_id, "us-generate", inputs)
 
 > Première brique de la roadmap v6.6 : nouvelle commande
 > `/sdd-discover-stack` qui scanne un repo (brownfield ou nouveau) et
-> produit `workspace/input/stack/stack.md.candidate` avec les stack-ids
+> produit `workspace/stack/stack.md.candidate` avec les stack-ids
 > SDD_Pro candidats détectés automatiquement. Réduit l'onboarding de
 > 15-30 min de saisie manuelle à ~2 min. **100 % additif, isolé du
 > chemin critique** — la commande ne touche pas au moteur SDD_Pro
@@ -774,7 +774,7 @@ la main par le Tech Lead lors de l'onboarding d'un repo.
 ### Usage
 ```powershell
 /sdd-discover-stack --scope .
-# → workspace/input/stack/stack.md.candidate avec :
+# → workspace/stack/stack.md.candidate avec :
 #   - Active Tech Specs détectés
 #   - Project Config avec # TODO markers pour valeurs à valider
 #   - Active Database détectée (SqlServer/PostgreSql/MySql/Sqlite/MongoDb)
@@ -861,7 +861,7 @@ SpecComplianceFailOn: critical | serious | moderate | minor  # default: serious
   le tableau build_loop (toutes Itère: NON).
 
 ### Schema rapport
-- `workspace/output/.sys/.validation/{n}-spec-compliance.{md,json}` :
+- `workspace/.sys/.validation/{n}-spec-compliance.{md,json}` :
   schéma stable validé par `validate_spec_compliance.py`. Pour chaque
   AC : `ac_id`, `ac_text`, `class`, `status`, `severity` (si non vérifiée),
   `evidence.{file, lines, snippet}` (si vérifiée), `reason` (si pas vérifiée).
@@ -890,7 +890,7 @@ SpecComplianceFailOn: serious
 ```
 ```powershell
 /sdd-full 1
-# Rapport généré: workspace/output/.sys/.validation/1-spec-compliance.md
+# Rapport généré: workspace/.sys/.validation/1-spec-compliance.md
 python .claude/python/sdd_scripts/validate_spec_compliance.py --feat 1
 ```
 
@@ -922,7 +922,7 @@ python .claude/python/sdd_scripts/validate_spec_compliance.py --feat 1
   candidats, tag la source dans `usage_source_path` pour forensics.
   Mode contrôlé par env `$SDD_TOKEN_USAGE_MODE` (`off`/`record`/`debug`).
 - `sdd_scripts/report_token_usage.py` (~230 LOC) : agrégateur lisant
-  `workspace/output/.sys/.audit/token-usage.jsonl`. Output Markdown +
+  `workspace/.sys/.audit/token-usage.jsonl`. Output Markdown +
   JSON. Filtres `--feat`, `--agent`, `--since`, `--us`. Health check :
   WARN si > 50% des entrées n'ont pas de `raw_usage_found` (signal
   que Claude Code n'expose pas usage dans le payload).
@@ -944,7 +944,7 @@ python .claude/python/sdd_scripts/validate_spec_compliance.py --feat 1
   - `debug` : record + dump payload full dans `.audit/token-debug/`
 
 ### Schema
-- `workspace/output/.sys/.audit/token-usage.jsonl` : 1 entry JSON par
+- `workspace/.sys/.audit/token-usage.jsonl` : 1 entry JSON par
   ligne, atomic append via `acquire_with_retry` (réutilise
   `sdd_lib/file_locks.py`). Champs : `ts`, `hook_event`, `subagent_type`,
   `feat`, `us_id`, `model`, `input_tokens`, `output_tokens`,
@@ -974,7 +974,7 @@ $env:SDD_TOKEN_USAGE_MODE = "record"
 
 # Générer le rapport
 python .claude/python/sdd_scripts/report_token_usage.py --feat 1
-python .claude/python/sdd_scripts/report_token_usage.py --json --feat 1 --output workspace/output/.sys/.audit/token-report-feat-1.md
+python .claude/python/sdd_scripts/report_token_usage.py --json --feat 1 --output workspace/.sys/.audit/token-report-feat-1.md
 ```
 
 ### Limitations connues
@@ -1205,7 +1205,7 @@ python .claude/python/sdd_scripts/report_token_usage.py --json --feat 1 --output
   fin sur génération de code, `preserves:`/`adds:`, layer mapping,
   fidélité HTML). po/arch/elicitor/qa restent en Sonnet 4.6.
 - Nouvel agent `dashboard` (**Haiku 4.5**) : régénère
-  `workspace/output/dashboard/README.html`, `context/adrs/INDEX.md`,
+  `workspace/dashboard/README.html`, `context/adrs/INDEX.md`,
   `qa/feat-{n}/dashboard.html`. Auto en fin de `/sdd-full`,
   `/dev-run`, `/qa-generate` ; manuel via `/doc-refresh`.
 - `.claude/rules/error-classification.md` : taxonomie 8 classes
@@ -1216,7 +1216,7 @@ python .claude/python/sdd_scripts/report_token_usage.py --json --feat 1 --output
 
 ### Added — Short-circuit arch FEATs ≥ 2 (2026-05-10)
 - `commands/dev-run.md` STEP 4.bis : skip arch si bootstrap stable
-  (CLAUDE.md projet présents, `workspace/output/db/schema.json` présent
+  (CLAUDE.md projet présents, `workspace/db/schema.json` présent
   si DB, `stack.md` mtime ≤ mtime des CLAUDE.md). Émet 1 ligne
   `FEAT {n} — arch skip (bootstrap stable, …)`.
 - Flag `--rebuild-arch` sur `/dev-run` et `/sdd-full` pour forcer
@@ -1236,7 +1236,7 @@ python .claude/python/sdd_scripts/report_token_usage.py --json --feat 1 --output
 
 ### Added — Observabilité Phase 0 (v6.1)
 - `.claude/scripts/sdd-state.ps1` : émission `run-{id}.json` +
-  `events.jsonl` append-only dans `workspace/output/.sys/.state/`.
+  `events.jsonl` append-only dans `workspace/.sys/.state/`.
 - `commands/sdd-full.md` STEPs 1.quart, 3, 3.5, 4, 4.5, 4.7, 5 :
   `set-phase` aux bornes de phase. Pattern best-effort (non bloquant).
 - Read mandatory `error-classification.md` ajouté aux agents arch,
@@ -1324,12 +1324,12 @@ v6.1 consolide **3 axes complémentaires** :
 - Lock file procedure inlinée → invocation script `acquire-libname-lock.ps1`
 - `framework-smoke.ps1` : retrait `validator` de expectedAgents (7 → 6),
   ajout 3 scripts (8 → 11 scripts attendus)
-- `workspace/output/docs/presentation.html` :
+- `workspace/docs/presentation.html` :
   - Hero badge v5.0.0 → **v6.0.0 · Ultra-lean**
   - 7 agents → **6 agents** (4 cœur + 2 support)
   - Section role Validator supprimée
   - Step Readiness Gate : « 🤖 Validator » → « Script PS · 0 token »
-- `workspace/output/docs/readme.html` : footer v5.0.0 → v6.0.0, summary mis à jour
+- `workspace/docs/readme.html` : footer v5.0.0 → v6.0.0, summary mis à jour
 - `loader.yml` version : `5.0.0` → `6.0.0`
 
 ### Économie tokens cumulée v6.0
@@ -1450,7 +1450,7 @@ Corrigé `commands/sdd-status.md ligne 39` : `--feat {n}` → `--feat-number {n}
 
 ### Added — P2 Hook `validate_stack_consistency` PostToolUse(Edit|Write|MultiEdit)
 
-`sdd_hooks/validate_stack_consistency.py` + câblage settings.json. Détecte les états incohérents de `workspace/input/stack/stack.md` :
+`sdd_hooks/validate_stack_consistency.py` + câblage settings.json. Détecte les états incohérents de `workspace/stack/stack.md` :
 1. >1 backend actif → BLOCK
 2. >1 fullstack actif → BLOCK
 3. backend + fullstack simultanés → BLOCK

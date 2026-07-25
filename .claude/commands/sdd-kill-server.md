@@ -25,7 +25,7 @@ Arrête les 3 process runtime du projet généré :
 
 ## STEP 1 — Charger Project Config
 
-Read `workspace/input/stack/stack.md` `## Project Config` + `## Active Tech Specs`
+Read `workspace/stack/stack.md` `## Project Config` + `## Active Tech Specs`
 pour identifier :
 - **Backend stack** → port défaut canonique :
 
@@ -195,11 +195,11 @@ FRONT_PORT=${FRONT_PORT:-5185}
 CONSOLE_PORT=${CONSOLE_PORT:-4000}
 
 # Override depuis configs si disponibles
-[ -f workspace/output/src/*/src/main/resources/application.yml ] && \
-  BACK_PORT=$(grep -E "^\s*port:" workspace/output/src/*/src/main/resources/application.yml | head -1 | awk '{print $NF}')
+[ -f workspace/src/*/src/main/resources/application.yml ] && \
+  BACK_PORT=$(grep -E "^\s*port:" workspace/src/*/src/main/resources/application.yml | head -1 | awk '{print $NF}')
 
-[ -f workspace/output/src/*/vite.config.ts ] && \
-  FRONT_PORT=$(grep -oE "port:\s*[0-9]+" workspace/output/src/*/vite.config.ts | head -1 | awk -F: '{print $2}' | tr -d ' ')
+[ -f workspace/src/*/vite.config.ts ] && \
+  FRONT_PORT=$(grep -oE "port:\s*[0-9]+" workspace/src/*/vite.config.ts | head -1 | awk -F: '{print $2}' | tr -d ' ')
 
 # Kill function
 kill_port() {

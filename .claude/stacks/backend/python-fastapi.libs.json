@@ -6,8 +6,8 @@
   "buildSystem": "uv",
   "manifest": {
     "files": [
-      "workspace/output/src/{BackendName}/pyproject.toml",
-      "workspace/output/src/{BackendName}/uv.lock"
+      "workspace/src/{BackendName}/pyproject.toml",
+      "workspace/src/{BackendName}/uv.lock"
     ]
   },
   "versions": {

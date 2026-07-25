@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """SDD_Pro Plan validator — From-Plan Strict gate (v6.2).
 
-Validates `workspace/output/plans/{n}-{m}-{Name}.{back|front}.md` files
+Validates `workspace/plans/{n}-{m}-{Name}.{back|front}.md` files
 for structure, coherence, and staleness vs source US.
 
 Two layers of validation:
@@ -28,11 +28,11 @@ Usage:
 Output (default): human-readable summary on stdout.
 Output (`--json`): single line of structured JSON on stdout.
 
-Exit codes:
-    0 = plan is strict-ready (or valid v1 without --strict)
-        → callers can take the dev-*-strict (Sonnet 4.6) path
-    1 = plan is structurally valid but NOT strict-ready
-        → callers fallback to classic From-Plan (Opus 4.7)
+Exit codes (contrat v7.0.0 — les variants dev-*-strict ont été supprimés,
+`build-and-loop.md §7.6` : exit 0/1 mènent au MÊME agent dev-* Opus 4.8 ;
+le flag --strict reste accepté en no-op pour backward-compat) :
+    0 = plan valide AVEC `## Inline Digest` (plan v2)
+    1 = plan valide SANS digest (plan v1 legacy)
     2 = plan is invalid / corrupted / stale
         → callers must STOP + ERROR [PLAN_INVALID] or [PLAN_STALE]
 
@@ -314,9 +314,48 @@ def validate_structural(body: str, report: PlanReport) -> None:
                 )
 
 
+def validate_staleness(report: PlanReport, us_path: Path | None) -> None:
+    """Always-applied staleness gate: a plan whose declared `us-hash` no longer
+    matches its source US is STALE (exit 2 → `[PLAN_STALE]`), regardless of
+    `--strict`.
+
+    Audit fix 2026-06-12 (M3) — this check previously lived only inside
+    `validate_strict()` (run `if args.strict`), but `/dev-run` STEP 6.0.bis
+    invokes the validator WITHOUT `--strict` and its action table expects exit 2
+    on stale. Result: a plan edited after its US changed silently passed exit 0
+    and dev-* materialized against a stale plan. Backward-compatible: a v1 plan
+    with no `us-hash` field simply skips the check (no false positive).
+    """
+    us_hash_decl = report.frontmatter.get("us-hash", "")
+    if not us_hash_decl:
+        return  # v1 plan (no hash) → nothing to compare, not stale
+    if us_path is None or not us_path.is_file():
+        return  # no source to compare against
+    try:
+        us_content = us_path.read_text(encoding="utf-8")
+    except OSError as e:
+        report.add_warning("PLAN_US_READ_FAILED", f"lecture US impossible : {e}")
+        return
+    actual = sha256_hex(us_content)
+    declared = us_hash_decl.replace("sha256:", "").strip()
+    report.us_hash_match = (actual == declared)
+    if not report.us_hash_match:
+        report.add_error(
+            "PLAN_STALE",
+            f"us-hash mismatch (plan: {declared[:12]}..., US: {actual[:12]}...) "
+            "— regenerer via /dev-plan",
+        )
+
+
 def validate_strict(body: str, report: PlanReport, us_path: Path | None,
                     claude_md_path: Path | None) -> None:
-    """Apply strict-mode validations (exit 1 if not ready, exit 2 if stale)."""
+    """Apply strict-mode validations (exit 1 if not ready, exit 2 if stale).
+
+    Note: the `us-hash` staleness comparison moved to `validate_staleness`
+    (always-on, audit 2026-06-12). Strict mode no longer re-checks it here to
+    avoid a double `[PLAN_STALE]` report — `validate_staleness` runs first in
+    `main()` for both strict and non-strict invocations.
+    """
     schema_str = report.frontmatter.get("plan-schema-version", "1")
     try:
         report.schema_version = int(schema_str)
@@ -343,30 +382,13 @@ def validate_strict(body: str, report: PlanReport, us_path: Path | None,
             "section `## Inline Digest` absente ou vide (requise en strict mode)",
         )
 
-    us_hash_decl = report.frontmatter.get("us-hash", "")
-    if not us_hash_decl:
+    # us-hash presence is still required in strict mode (regen signal), but the
+    # actual staleness COMPARISON is done by validate_staleness() — always-on.
+    if not report.frontmatter.get("us-hash", ""):
         report.add_error(
             "PLAN_NOT_STRICT_READY",
             "frontmatter us-hash absent (requis en strict mode)",
         )
-    elif us_path is not None and us_path.is_file():
-        try:
-            us_content = us_path.read_text(encoding="utf-8")
-        except OSError as e:
-            report.add_warning(
-                "PLAN_US_READ_FAILED",
-                f"lecture US impossible : {e}",
-            )
-        else:
-            actual = sha256_hex(us_content)
-            declared = us_hash_decl.replace("sha256:", "").strip()
-            report.us_hash_match = (actual == declared)
-            if not report.us_hash_match:
-                report.add_error(
-                    "PLAN_STALE",
-                    f"us-hash mismatch (plan: {declared[:12]}..., US: {actual[:12]}...) "
-                    "— regenerer via /dev-plan",
-                )
 
     claude_md_hash_decl = report.frontmatter.get("claude-md-hash", "")
     if claude_md_hash_decl and claude_md_path is not None and claude_md_path.is_file():
@@ -459,6 +481,11 @@ def main() -> int:
     report.frontmatter, body = parsed
 
     validate_structural(body, report)
+
+    # Always-on staleness gate (audit fix M3 2026-06-12) — independent of
+    # --strict, so /dev-run (which calls without --strict) catches stale plans.
+    if report.exit_code < 2:
+        validate_staleness(report, us_path)
 
     if args.strict and report.exit_code < 2:
         validate_strict(body, report, us_path, claude_md_path)

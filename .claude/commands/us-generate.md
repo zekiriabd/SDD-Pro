@@ -7,7 +7,7 @@
 
 Invoque l'agent PO pour découper une FEAT fonctionnelle en User
 Stories structurées (cible 1-3, warn au-delà de `UsGranularityWarnAt`
-défaut 6, hard cap `UsGranularityHardCap` défaut 10) dans `workspace/output/`.
+défaut 6, hard cap `UsGranularityHardCap` défaut 10) dans `workspace/`.
 
 **Usage :** `/us-generate {n}` — où `{n}` est le numéro de la FEAT
 
@@ -21,11 +21,11 @@ Arguments :
   hard cap `UsGranularityHardCap` (default 10). À utiliser pour FEATs
   métier légitimement très larges (≥ 11 flux distincts). Effet : export
   `SDD_ALLOW_LARGE_FEAT=1` avant invocation agent `po`, audit-log dans
-  `workspace/output/.sys/.audit/force-bypass.log`. Préférer split FEAT.
+  `workspace/.sys/.audit/force-bypass.log`. Préférer split FEAT.
 
 Si `{n}` absent → demander :
 ```
-Quel est le numéro de la FEAT à découper ? (ex. : 1 pour workspace/input/feats/1-Auth.md)
+Quel est le numéro de la FEAT à découper ? (ex. : 1 pour workspace/feats/1-Auth.md)
 ```
 
 Si non numérique → ERROR :
@@ -40,9 +40,9 @@ FIX: relancer /us-generate {n} avec n entier (ex. /us-generate 1)
 ```bash
 if [[ "$@" == *--allow-large-feat* ]]; then
     export SDD_ALLOW_LARGE_FEAT=1
-    mkdir -p workspace/output/.sys/.audit
+    mkdir -p workspace/.sys/.audit
     echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) /us-generate {n} --allow-large-feat (bypass UsGranularityHardCap)" \
-      >> workspace/output/.sys/.audit/force-bypass.log
+      >> workspace/.sys/.audit/force-bypass.log
 fi
 ```
 
@@ -52,17 +52,17 @@ L'agent `po` (STEP 5) lit cette env var pour passer outre le hard cap.
 
 ## STEP 2 — Vérifier la FEAT existe
 
-Glob `workspace/input/feats/{n}-*.md`.
+Glob `workspace/feats/{n}-*.md`.
 - 0 fichier → ERROR :
   ```
   ERROR: /us-generate — FEAT introuvable
-  CAUSE: aucun fichier workspace/input/feats/{n}-*.md
+  CAUSE: aucun fichier workspace/feats/{n}-*.md
   FIX: créer la FEAT via /feat-generate ou la déposer manuellement
   ```
 - > 1 fichier → ERROR :
   ```
   ERROR: /us-generate — numérotation invalide
-  CAUSE: plusieurs fichiers commencent par {n}- dans workspace/input/feats/
+  CAUSE: plusieurs fichiers commencent par {n}- dans workspace/feats/
   FIX: renommer pour qu'un seul fichier ait le préfixe {n}-
   ```
 
@@ -77,8 +77,8 @@ comportement v6.6.3 strict) :
 from sdd_lib.checkpoint import is_phase_resumable
 
 inputs = [
-    f"workspace/input/feats/{n}-*.md",      # FEAT parent
-    "workspace/input/stack/stack.md",       # Project Config + stacks actifs
+    f"workspace/feats/{n}-*.md",      # FEAT parent
+    "workspace/stack/stack.md",       # Project Config + stacks actifs
 ]
 resumable, reason = is_phase_resumable(
     feat=n, phase="us-generate", input_paths=resolved_inputs,
@@ -91,7 +91,7 @@ if resumable:
 Si `CheckpointMode ∈ {off, record}` → skip ce STEP, continuer.
 
 Émissions possibles : `[CHECKPOINT_HASH_MISMATCH]`, `[CHECKPOINT_INPUT_MISSING]`,
-`[CHECKPOINT_STATE_UNREADABLE]`. Cf. `error-classification.md §1.16`.
+`[CHECKPOINT_STATE_UNREADABLE]`. Cf. `error-classification.md §1.14`.
 
 ---
 
@@ -99,7 +99,7 @@ Si `CheckpointMode ∈ {off, record}` → skip ce STEP, continuer.
 
 Lancer l'agent `po` (défini dans `.claude/agents/po.md`) avec le numéro
 `{n}` en argument. L'agent gère le découpage, la traçabilité et l'écriture
-des fichiers US dans `workspace/output/`.
+des fichiers US dans `workspace/`.
 
 Attendre la fin de l'agent. Relayer sa sortie telle quelle (ligne de succès
 ou bloc ERROR 3 lignes).
@@ -145,7 +145,7 @@ python .claude/python/sdd_scripts/resolve_us_hash_sentinel.py --feat-number {n}
 ```
 ERROR: /us-generate {n} — sentinel hash non résolu
 CAUSE: [PO_HASH_PLACEHOLDER] sha256:COMPUTE_REQUIRED persiste dans {N} fichier(s) US après patch
-FIX: vérifier permissions FS sur workspace/output/us/, relancer /us-generate {n} (idempotent)
+FIX: vérifier permissions FS sur workspace/us/, relancer /us-generate {n} (idempotent)
 ```
 
 ### STEP 3.bis — Checkpoint record (v6.6.4, opt-in)
@@ -170,7 +170,7 @@ Erreur silencieuse si state.json absent → WARN, non bloquant.
 
 Si l'agent PO a réussi (US écrites), invoquer **systématiquement** le script
 déterministe `ingest_feats_us.py` pour populer correctement les tables
-`feats` et `us` de `workspace/output/db/console.db` (cf. gap framework
+`feats` et `us` de `workspace/db/console.db` (cf. gap framework
 identifié 2026-05-21 — auparavant seules les colonnes skeleton `feat_n` +
 `feat-{n}` étaient remplies par les auditors via `ensure_feat_skeleton()`,
 laissant `name`, `actors_json`, `ac_count`, `sfd_count`, `br_count`,
@@ -200,9 +200,9 @@ la console web.
 
 ## STEP 4 — Inventaire des mockups HTML (depuis v4)
 
-Glob `workspace/input/ui/{n}-*.html` pour détecter les mockups déjà déposés.
+Glob `workspace/ui/{n}-*.html` pour détecter les mockups déjà déposés.
 
-Glob `workspace/output/us/{n}-*.md` pour récupérer les basenames d'US.
+Glob `workspace/us/{n}-*.md` pour récupérer les basenames d'US.
 
 Cross-check :
 - HTML dont basename matche une US → couvert
@@ -223,13 +223,13 @@ Si l'agent PO réussit, ajouter le récap final :
 ```
 ✅ FEAT {n}-{FeatName} — planification terminée
 
-US générées      : {U} fichiers dans workspace/output/us/
-Mockups HTML     : {H} fichiers dans workspace/input/ui/ (ou "aucun")
+US générées      : {U} fichiers dans workspace/us/
+Mockups HTML     : {H} fichiers dans workspace/ui/ (ou "aucun")
 HTML orphelins   : {O} (à corriger ou retirer)
 US sans mockup   : {U-H}
 
 Prochaine étape :
-  - (optionnel) déposer/réviser les mockups HTML (workspace/input/ui/{n}-{m}-{Name}.html)
+  - (optionnel) déposer/réviser les mockups HTML (workspace/ui/{n}-{m}-{Name}.html)
   - /dev-run {n} pour matérialiser le code (arch + db + back + front en parallèle)
   - ou /sdd-full {n} pour pipeline complet
 ```

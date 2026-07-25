@@ -29,7 +29,7 @@ from sdd_lib.stderr import warn  # noqa: E402
 
 # Framework-owned paths, relative to repo root. P1-5 fix 2026-06-07 :
 # was substring-matched via `any(p in normalized_path for p in ...)` which
-# could (a) false-positive on a project file like `workspace/output/src/X/.claude/rules/foo.md`,
+# could (a) false-positive on a project file like `workspace/src/X/.claude/rules/foo.md`,
 # (b) false-negative on `..\..\.claude\rules\x.md` paths after partial normalization.
 # Now we canonicalize via `Path.resolve()` + `relative_to(repo_root)` for
 # strict path-prefix matching.
@@ -54,7 +54,7 @@ FRAMEWORK_OWNED: tuple[str, ...] = (
 def _is_framework_path(file_path: str, repo: Path) -> bool:
     """Strict check : file_path resolves to a path inside one of FRAMEWORK_OWNED
     prefixes, RELATIVE to repo root. Defense against substring false-positives
-    (workspace/output/src/X/.claude/... no longer matches) and path-traversal
+    (workspace/src/X/.claude/... no longer matches) and path-traversal
     false-negatives (..\\..\\.claude\\... after resolve() lives outside repo
     and is filtered out).
 
@@ -62,8 +62,8 @@ def _is_framework_path(file_path: str, repo: Path) -> bool:
     `repo`, NOT against `Path.cwd()`. The previous implementation used
     `Path(file_path).resolve()` which silently anchors to CWD — if pytest /
     background agent / a `cd .claude/python` shell invoked the hook, a user
-    edit on `workspace/output/src/MyApp/x.tsx` would resolve to
-    `<repo>/.claude/python/workspace/output/src/MyApp/x.tsx`, whose
+    edit on `workspace/src/MyApp/x.tsx` would resolve to
+    `<repo>/.claude/python/workspace/src/MyApp/x.tsx`, whose
     `relative_to(repo)` starts with `.claude/python/` → false positive +
     [FRAMEWORK_PROTECTED] in strict mode → CI blocks ALL user edits.
     Reproduced by tests `test_user_file_*_in_strict` / `..._passes_silently`.

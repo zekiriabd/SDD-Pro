@@ -5,7 +5,7 @@
   "schemaVersion": 1,
   "buildSystem": "dotnet",
   "manifest": {
-    "files": ["workspace/output/src/{BackendName}.Tests/{BackendName}.Tests.csproj"]
+    "files": ["workspace/src/{BackendName}.Tests/{BackendName}.Tests.csproj"]
   },
   "versions": {
     "xunit": "2.9.2",

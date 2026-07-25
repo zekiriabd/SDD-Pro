@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """SDD_Pro PostToolUse hook (Edit|Write|MultiEdit).
 
-Verifies that after a code edit under workspace/output/src/, the
+Verifies that after a code edit under workspace/src/, the
 `preserves:` and `adds:` contracts declared in the matching plan
 file are respected (deterministic substring check, 0 token LLM).
 
-- If edited file is NOT under workspace/output/src/ -> exit 0 (skip)
+- If edited file is NOT under workspace/src/ -> exit 0 (skip)
 - If tool_name == 'Write' (file creation) -> exit 0 (contract only on Edit)
 - If file is a test file -> exit 0 (QA ownership)
 - If no plan matches -> exit 0 (inline mode, can't validate)
@@ -24,7 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sdd_lib.exit_codes import HOOK_ALLOW, HOOK_DENY  # noqa: E402
 from sdd_lib.hook_input import get_file_path, get_tool_name, read_hook_input  # noqa: E402
-from sdd_lib.paths import normalize, repo_root  # noqa: E402
+from sdd_lib.paths import workspace_root, normalize, repo_root  # noqa: E402
 from sdd_lib.stderr import error_block  # noqa: E402
 
 
@@ -43,7 +43,7 @@ TEST_PATTERNS: tuple[str, ...] = (
 
 # Plan cache (M5 fix v7.0.0-alpha 2026-06-05) — PostToolUse Edit fires very
 # often (~30-100×/run). Previously each fire re-read every plan file in
-# `workspace/output/plans/*.md` from disk + ran regex finditer. With 5-10
+# `workspace/plans/*.md` from disk + ran regex finditer. With 5-10
 # plans of 30-80 KB, that's ~5-15 MB I/O per Edit on the hot path.
 # Cache invalidation = file mtime change (any plan edit busts entry).
 _PLAN_CACHE: dict[str, tuple[float, str]] = {}  # path -> (mtime_ns, text)
@@ -75,7 +75,7 @@ def _find_block_for_file(plan_text: str, normalized_file: str, file_name: str) -
     """Extract the YAML-ish block dedicated to file_path inside the plan.
 
     Format:
-        - path: workspace/output/src/.../File.kt
+        - path: workspace/src/.../File.kt
           operation: augment
           preserves: [ID1, ID2]
           adds: [ID3]
@@ -117,7 +117,7 @@ def main() -> int:
     if not file_path:
         return HOOK_ALLOW
     norm = normalize(file_path)
-    if "workspace/output/src/" not in norm:
+    if "workspace/src/" not in norm:
         return HOOK_ALLOW
     tool_name = get_tool_name(payload)
     if tool_name == "Write":
@@ -138,7 +138,7 @@ def main() -> int:
         return HOOK_ALLOW
     if not content.strip():
         return HOOK_ALLOW
-    plans_dir = root / "workspace" / "output" / "plans"
+    plans_dir = workspace_root(root) / "plans"
     if not plans_dir.is_dir():
         return HOOK_ALLOW
     file_name = target.name

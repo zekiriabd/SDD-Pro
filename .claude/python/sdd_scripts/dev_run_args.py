@@ -11,7 +11,7 @@ This wrapper script :
   1. Receives the raw user input string (via stdin or `--input`)
   2. Parses CLI flags deterministically via argparse
   3. Writes a structured args file to
-     `workspace/output/.sys/.state/dev-run-{n}.args.json`
+     `workspace/.sys/.state/dev-run-{n}.args.json`
   4. Returns the parsed flags as JSON on stdout
 
 Slash command behavior in `.md` :
@@ -45,6 +45,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sdd_lib.exit_codes import CORRECTIBLE, FAIL_FAST, SUCCESS  # noqa: E402
+from sdd_lib.console_safe import ensure_console_safe
+from sdd_lib.paths import workspace_root
 
 INFRA_BLOCKED = 3
 
@@ -127,11 +129,11 @@ def parse_input_string(input_str: str) -> dict:
 
 
 def write_args_state(parsed: dict, root: Path) -> Path:
-    """Persist parsed args to workspace/output/.sys/.state/dev-run-{n}.args.json."""
+    """Persist parsed args to workspace/.sys/.state/dev-run-{n}.args.json."""
     n = parsed["feat_number"]
     if n is None:
         raise ValueError("feat_number is None — cannot write state file")
-    state_dir = root / "workspace" / "output" / ".sys" / ".state"
+    state_dir = workspace_root(root) / ".sys" / ".state"
     state_dir.mkdir(parents=True, exist_ok=True)
     out_path = state_dir / f"dev-run-{n}.args.json"
     out_path.write_text(json.dumps(parsed, indent=2, ensure_ascii=False), encoding="utf-8")
@@ -150,6 +152,7 @@ def _repo_root() -> Path:
 
 
 def main(argv: list[str] | None = None) -> int:
+    ensure_console_safe()  # cp1252 guard (audit 2026-06-11 M15)
     if sys.stdout.encoding and sys.stdout.encoding.lower() not in ("utf-8", "utf8"):
         try:
             sys.stdout.reconfigure(encoding="utf-8", errors="replace")

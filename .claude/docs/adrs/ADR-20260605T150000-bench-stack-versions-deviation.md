@@ -69,8 +69,8 @@ Documenter en **1 ADR consolidé** les 12 déviations stack-vs-runtime observée
 
 ## Liens
 
-- Bench rapport : `workspace/output/qa/bench/BENCH-GLOBAL-REPORT.md` (§31 matrice 14 FEATs × 22 combinaisons)
-- Tests unitaires rapport : `workspace/output/qa/bench/BACKEND-UNIT-TESTS-REPORT.md` (37/37 passed)
+- Bench rapport : `workspace/.sys/.bench/BENCH-GLOBAL-REPORT.md` (§31 matrice 14 FEATs × 22 combinaisons)
+- Tests unitaires rapport : `workspace/.sys/.bench/BACKEND-UNIT-TESTS-REPORT.md` (37/37 passed)
 - Rule : `.claude/rules/library-and-stack.md §0 (Runtime LTS)` + §7 (Pièges runtime documentés)
 - Script : `.claude/python/sdd_scripts/validate_stack_combo.py` (déterministe, désormais câblé hook PreToolUse — cf. C5)
 - Future ADR : `runtime-pydantic-py314-bump` (futur, si Python 3.14 devient LTS)

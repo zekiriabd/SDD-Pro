@@ -50,11 +50,11 @@ class TestValidateStackConsistency(unittest.TestCase):
         self.assertEqual(r.returncode, 0)
 
     def test_edit_outside_stack_md_allows(self):
-        """Hook filters internally to edits of workspace/input/stack/stack.md.
+        """Hook filters internally to edits of workspace/stack/stack.md.
         Other paths must not trigger the multi-stack consistency check."""
         payload = {
             "tool_name": "Edit",
-            "tool_input": {"file_path": "workspace/output/src/MyApp/Service.cs"},
+            "tool_input": {"file_path": "workspace/src/MyApp/Service.cs"},
         }
         r = _run_hook(payload)
         self.assertEqual(r.returncode, 0)
@@ -63,7 +63,7 @@ class TestValidateStackConsistency(unittest.TestCase):
         """SDD_ALLOW_MULTISTACK=1 disables the consistency gate."""
         payload = {
             "tool_name": "Edit",
-            "tool_input": {"file_path": "workspace/input/stack/stack.md"},
+            "tool_input": {"file_path": "workspace/stack/stack.md"},
         }
         r = _run_hook(payload, {"SDD_ALLOW_MULTISTACK": "1"})
         self.assertEqual(r.returncode, 0)

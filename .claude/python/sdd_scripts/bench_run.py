@@ -20,7 +20,7 @@ Usage:
         --feat-n 1 \\
         --output docs/benchmarks/runs/bench-s-dotnet-run-1.json
 
-Snapshots stocked sous workspace/output/.sys/.bench/snapshots/{bench_id}.json.
+Snapshots stocked sous workspace/.sys/.bench/snapshots/{bench_id}.json.
 
 Exit codes:
     0  success (snapshot ou rapport produit)
@@ -45,7 +45,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from sdd_lib.paths import repo_root  # noqa: E402
+from sdd_lib.paths import workspace_root, repo_root  # noqa: E402
 from sdd_lib.exit_codes import FAIL_FAST, INFRA_BLOCKED, SUCCESS  # noqa: E402
 from sdd_lib.atomic_write import atomic_write_text  # noqa: E402
 from sdd_lib.pricing import PRICING, get_pricing  # noqa: E402
@@ -60,18 +60,18 @@ from sdd_lib.pricing import PRICING, get_pricing  # noqa: E402
 
 
 def _console_db_path() -> Path:
-    """Console DB location (v6.10+ : workspace/output/db/console.db).
+    """Console DB location (v6.10+ : workspace/db/console.db).
 
     Fallback to legacy workspace/console/console.db for old projects.
     """
-    primary = repo_root() / "workspace" / "output" / "db" / "console.db"
+    primary = workspace_root(repo_root()) / "db" / "console.db"
     if primary.is_file():
         return primary
-    return repo_root() / "workspace" / "console" / "console.db"
+    return workspace_root(repo_root()) / "console" / "console.db"
 
 
 def _bench_dir() -> Path:
-    d = repo_root() / "workspace" / "output" / ".sys" / ".bench" / "snapshots"
+    d = workspace_root(repo_root()) / ".sys" / ".bench" / "snapshots"
     d.mkdir(parents=True, exist_ok=True)
     return d
 
@@ -203,7 +203,7 @@ def _query_context_budget(con: sqlite3.Connection) -> dict:
 
 def _read_sdd_state_runs() -> list[dict]:
     """List sdd_state.run-*.json files with basic metadata."""
-    state_dir = repo_root() / "workspace" / "output" / ".sys" / ".state"
+    state_dir = workspace_root(repo_root()) / ".sys" / ".state"
     if not state_dir.is_dir():
         return []
     runs = []
@@ -228,8 +228,8 @@ def _count_validation_reports(feat_n: int | None) -> dict:
     """Count auditor reports for a specific FEAT."""
     if feat_n is None:
         return {}
-    val_dir = repo_root() / "workspace" / "output" / ".sys" / ".validation"
-    qa_dir = repo_root() / "workspace" / "output" / "qa" / f"feat-{feat_n}"
+    val_dir = workspace_root(repo_root()) / ".sys" / ".validation"
+    qa_dir = workspace_root(repo_root()) / "qa" / f"feat-{feat_n}"
     out = {}
     if val_dir.is_dir():
         out["code_review"] = bool((val_dir / f"{feat_n}-code-review.json").is_file())
@@ -248,8 +248,8 @@ def _extract_verdicts(feat_n: int | None) -> dict:
     """Parse auditor JSON for verdicts (GREEN/WARN/RED)."""
     if feat_n is None:
         return {}
-    val_dir = repo_root() / "workspace" / "output" / ".sys" / ".validation"
-    qa_dir = repo_root() / "workspace" / "output" / "qa" / f"feat-{feat_n}"
+    val_dir = workspace_root(repo_root()) / ".sys" / ".validation"
+    qa_dir = workspace_root(repo_root()) / "qa" / f"feat-{feat_n}"
     out = {}
     files = {
         "code_review": val_dir / f"{feat_n}-code-review.json",

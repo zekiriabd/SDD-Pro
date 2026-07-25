@@ -32,7 +32,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from sdd_lib.exit_codes import HOOK_ALLOW, HOOK_DENY  # noqa: E402
-from sdd_lib.paths import project_root_for_hook  # noqa: E402
+from sdd_lib.paths import workspace_root, project_root_for_hook  # noqa: E402
 
 
 def _resolve_project_root() -> Path | None:
@@ -97,7 +97,7 @@ def _audit_log(match: str, cmd: str, bypass_set: bool) -> None:
 
     Non-blocking: any I/O failure here must NOT change the deny decision.
     Path is anchored to CLAUDE_PROJECT_DIR (fallback : walk-up looking for
-    `.claude/`) under workspace/output/.sys/.audit/env-bypass.jsonl.
+    `.claude/`) under workspace/.sys/.audit/env-bypass.jsonl.
 
     v7.0.1 audit P1 v2 (2026-06-08) — secret masking : `command_excerpt`
     is passed through `_mask_secrets()` before persistence to prevent
@@ -109,7 +109,7 @@ def _audit_log(match: str, cmd: str, bypass_set: bool) -> None:
         root = _resolve_project_root()
         if root is None:
             return  # no project — skip silently (e.g. pytest in isolated tmpdir)
-        audit_dir = root / "workspace" / "output" / ".sys" / ".audit"
+        audit_dir = workspace_root(root) / ".sys" / ".audit"
         audit_dir.mkdir(parents=True, exist_ok=True)
         masked_excerpt = _mask_secrets(cmd[:240])
         line = {
@@ -281,7 +281,7 @@ def main() -> int:
         "FIX: protected envvars (SDD_ALLOW_*, SDD_DISABLE_*) must be set in the\n"
         "     parent shell BEFORE starting Claude Code. Setting them mid-session\n"
         "     would bypass cost-cap / acceptance-gate / security guardrails.\n"
-        "AUDIT: persisted to workspace/output/.sys/.audit/env-bypass.jsonl\n"
+        "AUDIT: persisted to workspace/.sys/.audit/env-bypass.jsonl\n"
     )
     return HOOK_DENY
 

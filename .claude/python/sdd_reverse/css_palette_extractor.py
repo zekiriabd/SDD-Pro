@@ -25,7 +25,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
-from sdd_reverse.scan_legacy import ScanResult, normalize_bytes
+from sdd_reverse.scan_legacy import ScanResult, normalize_bytes, read_text_normalized as _read_text
 
 _RE_HEX = re.compile(r"#([0-9a-fA-F]{3,8})\b")
 _RE_RGB = re.compile(r"rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*[\d.]+)?\s*\)")
@@ -43,12 +43,7 @@ _SEMANTIC_HINTS = {
 }
 
 
-def _read_text(path: Path) -> str:
-    try:
-        raw = path.read_bytes()
-    except OSError:
-        return ""
-    return normalize_bytes(raw).decode("utf-8", errors="replace")
+# _read_text centralise dans scan_legacy (audit 2026-06-11 B5 — cap 5 Mo).
 
 
 def _normalize_hex(hex_str: str) -> str:

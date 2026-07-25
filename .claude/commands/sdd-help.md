@@ -31,7 +31,7 @@ pas les 13 commandes par cœur.
 
 Si argument numérique mais aucune FEAT `{n}-*.md` trouvée →
 ```
-Aucune FEAT {n} dans workspace/input/feats/.
+Aucune FEAT {n} dans workspace/feats/.
 Pour la créer : /feat-generate {NomDeLaFeature}
 ```
 
@@ -60,10 +60,10 @@ la commande `/sdd-status` et inviter Tech Lead à diagnostiquer.
 
 | Condition détectée | Recommandation (1L) |
 |---|---|
-| 0 FEAT dans `workspace/input/feats/` | `/feat-generate <Nom>` — démarrer la 1ʳᵉ FEAT (3-6 questions, ~2 min) |
+| 0 FEAT dans `workspace/feats/` | `/feat-generate <Nom>` — démarrer la 1ʳᵉ FEAT (3-6 questions, ~2 min) |
 | ≥ 1 FEAT, 0 US générée pour ≥ 1 FEAT | `/us-generate {n}` — découper la FEAT en User Stories testables |
-| ≥ 1 FEAT avec US, aucun rapport readiness `workspace/output/.sys/.validation/{n}-readiness.md` | `/feat-validate {n}` — vérifier la maturité avant de coder (gate GO/NO-GO) |
-| ≥ 1 FEAT validée, aucun projet sous `workspace/output/src/` | `/sdd-full {n}` — pipeline A→Z (arch + back + API gate + front + QA + review) |
+| ≥ 1 FEAT avec US, aucun rapport readiness `workspace/.sys/.validation/{n}-readiness.md` | `/feat-validate {n}` — vérifier la maturité avant de coder (gate GO/NO-GO) |
+| ≥ 1 FEAT validée, aucun projet sous `workspace/src/` | `/sdd-full {n}` — pipeline A→Z (arch + back + API gate + front + QA + review) |
 | Projet bootstrappé mais ≥ 1 FEAT avec US `Status: Ready` sans code | `/dev-run {n}` — matérialiser le code (back → API gate → front) |
 | Code généré, QA non exécutée (`coverage.json` absent) | `/qa-generate {n}` — générer tests + coverage + quality scan |
 | QA OK, pas de `/sdd-review` récent (> 24h ou absent) | `/sdd-review {n}` — audit consolidé style Sonar |
@@ -75,10 +75,10 @@ la commande `/sdd-status` et inviter Tech Lead à diagnostiquer.
 
 | État FEAT `{n}` | Recommandation |
 |---|---|
-| FEAT existe mais 0 US sous `workspace/output/us/{n}-*.md` | `/us-generate {n}` |
+| FEAT existe mais 0 US sous `workspace/us/{n}-*.md` | `/us-generate {n}` |
 | US présentes, readiness absent ou NO-GO | `/feat-validate {n}` (puis corriger §3 du rapport) |
 | Readiness GO/WARN mais aucun code | `/dev-run {n}` (ou `/sdd-full {n}` pour pipeline complet) |
-| Code OK, API Gate RED (`status: FAIL`) | Lire `workspace/output/qa/feat-{n}/api-tests.md` puis `/dev-backend {n}-{m}` sur l'US fautive |
+| Code OK, API Gate RED (`status: FAIL`) | Lire `query_console_db.py api-gate --feat {n} --format md` puis `/dev-backend {n}-{m}` sur l'US fautive |
 | Code OK, coverage < seuil | `/qa-generate {n}` + ajouter tests dans `*.Tests/Unit/` |
 | Code OK + QA 🟢, pas d'audit récent | `/sdd-review {n}` |
 | Spec-compliance RED (Stage A gate échouée) | Lire `{n}-spec-compliance.md` §Findings + `/dev-{backend|frontend} {n}-{m}` sur AC non vérifié |
@@ -92,8 +92,8 @@ sans argument.
 
 | Mots-clés | Réponse |
 |---|---|
-| `bootstrap`, `démarrer`, `commencer`, `nouveau projet`, `greenfield` | `python bootstrap.py` (interactif, 3-4 questions) ou `/sdd-bootstrap` depuis Claude Code. Crée `workspace/input/stack/stack.md` + arborescence complète. |
-| `phase 0`, `discovery`, `vision`, `brief`, `avant les feats` | Phase 0 facultative (projets > 3 FEATs) : copier `.claude/templates/product-brief.template.md` ou `prfaq.template.md` dans `workspace/input/discovery/`. Définir vision + personas + KPIs + hypothèses fortes AVANT `/feat-generate`. |
+| `bootstrap`, `démarrer`, `commencer`, `nouveau projet`, `greenfield` | `python bootstrap.py` (interactif, 3-4 questions) ou `/sdd-bootstrap` depuis Claude Code. Crée `workspace/stack/stack.md` + arborescence complète. |
+| `phase 0`, `discovery`, `vision`, `brief`, `avant les feats` | Phase 0 facultative (projets > 3 FEATs) : copier `.claude/templates/product-brief.template.md` ou `prfaq.template.md` dans `workspace/discovery/`. Définir vision + personas + KPIs + hypothèses fortes AVANT `/feat-generate`. |
 | `prfaq`, `pr/faq`, `working backwards`, `amazon` | `.claude/templates/prfaq.template.md` — format Amazon "imagine le communiqué de presse comme si le produit était lancé aujourd'hui". Force le focus client avant d'écrire du code. |
 | `product brief`, `personas`, `kpi business` | `.claude/templates/product-brief.template.md` — format classique 10 sections (vision, problème, personas, KPIs, hypothèses, risques). 1-3 pages max. |
 | `brownfield`, `repo existant`, `scan`, `découvrir` | `/sdd-discover-stack` — scanne le repo et génère `stack.md.candidate` que tu peux promouvoir en `stack.md`. |
@@ -136,7 +136,7 @@ SDDPro — FEAT 1 Auth : code généré, QA 🟢, jamais audité.
 ```
 SDDPro — FEAT 3 RetailAnalytics : spec-compliance gate RED (3 ACs non vérifiées).
 
-→ Lire workspace/output/.sys/.validation/3-spec-compliance.md §Findings
+→ Lire workspace/.sys/.validation/3-spec-compliance.md §Findings
 → /dev-backend 3-2           # corriger AC-2 (non implémenté côté API)
    (puis /dev-run 3 pour re-run two-stage)
 ```

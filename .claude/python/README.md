@@ -140,7 +140,7 @@ classification d'erreur fine — cf. docstring `exit_codes.py` §"Cas hors conve
 | `SDD_ALLOW_UNTESTED_COMBO` | `1`/`true` | (off) | Permet l'invocation d'un combo non listé dans les 13 SLA (audit-loggué) |
 | `SDD_ALLOW_ACCEPTANCE_BYPASS` | `1` | (off) | Skip acceptance gate finale (debug uniquement, audit-loggué) |
 | `SDD_DISABLE_COST_CAP` | `1` | (off) | Désactive le hard cap `MaxCostPerRun` (debug, audit-loggué) |
-| `SDD_FORCE_REASON` | texte libre | (vide) | Raison du bypass tracée dans `workspace/output/.sys/.audit/force-bypass.log` |
+| `SDD_FORCE_REASON` | texte libre | (vide) | Raison du bypass tracée dans `workspace/.sys/.audit/force-bypass.log` |
 
 ## Outils Tech Lead — `sdd_admin/` (15 scripts)
 
@@ -160,10 +160,10 @@ Outils opt-in humain, jamais invoqués par le pipeline. À utiliser sur
 | `verify_telemetry_health.py` | Diagnose `console.db` (intégrité, schéma, drift) | Si smoke émet `telemetry-health SUSPECT` |
 | `strip_bom.py` | Nettoie le BOM UTF-16/UTF-8 d'un fichier généré | Post-gen si drift encoding |
 | `rotate_audit_logs.py` | Rotate `force-bypass.log` / `legacy-parallel.log` | Maintenance ops (à wirer en `Stop` hook v7.1) |
-| `audit_orphans.py` | Détecte artefacts orphelins (US/plans/qa) sous `workspace/output/` | Audit nettoyage post-run |
+| `audit_orphans.py` | Détecte artefacts orphelins (US/plans/qa) sous `workspace/` | Audit nettoyage post-run |
 | `cleanup_orphans.py` | Supprime orphelins détectés avec backup `.trash/` | Suite de `audit_orphans` |
 | `cache_manifest.py` | Extrait/exporte JSON du manifest cache (forward-looking v7.1) | Audit cache strategy |
-| `migrate_exit_codes.py` | Refactor one-shot historique (migration achevée v7.0.0) | (archive) |
+| `migrate_exit_codes.py` | Gate anti-régression exit codes — importé par `framework_smoke.py` (PAS une archive, correction audit 2026-06-11) | actif (smoke) |
 
 ## Scripts agent-invoked — `sdd_scripts/` (55 scripts)
 
@@ -176,7 +176,7 @@ des plus critiques :
   `validate_fidelity.py`, `validate_acceptance.py`, `validate_spec_compliance.py`,
   `validate_us_deps.py`, `validate_stack_combo.py`, `validate_project_config.py`
 - **State / gates** : `sdd_state.py`, `gate_decide.py`, `record_gate_decision.py`
-- **Pipeline orchestration** : `sdd_full_planner.py`, `phase_planner.py`, `run_dev_phase.py`
+- **Pipeline orchestration** : `sdd_full_planner.py`, `phase_planner.py`
 - **Plans** : `compute_plan_metadata.py`, `dispatch_fixes.py` (dormant v7.2)
 - **Ingest** : `ingest_axe.py`, `ingest_lighthouse.py`, `ingest_agent_report.py`,
   `ingest_feats_us.py`, `ingest_plans.py`

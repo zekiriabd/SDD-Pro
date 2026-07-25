@@ -32,6 +32,7 @@ import secrets
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+from sdd_lib.paths import workspace_root
 
 from .atomic_write import atomic_write_text
 from .paths import repo_root
@@ -49,7 +50,7 @@ def _marker_path() -> Path:
     (eager import). `record_token_usage.py` masked the same bug with a
     try/except, leading to silent `run_id IS NULL` rows in the DB.
     """
-    return repo_root() / "workspace" / "output" / ".sys" / ".state" / "run-id.current"
+    return workspace_root(repo_root()) / ".sys" / ".state" / "run-id.current"
 
 
 def _generate_run_id() -> str:

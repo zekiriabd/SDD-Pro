@@ -21,22 +21,22 @@
 
 Conséquence : à chaque renommage ou suppression de US/FEAT, **les artefacts
 dérivés restent sur disque** et créent des divergences silencieuses entre
-la source (FEATs + US dans `workspace/input/`) et la génération (`workspace/output/`).
+la source (FEATs + US dans `workspace/`) et la génération (`workspace/`).
 
 ### 5 sources de drift identifiées
 
 | # | Cas | Artefacts orphelins |
 |---|---|---|
-| 1 | **US renommée** (`1-2-Login-Page` → `1-2-Auth-Login`) | `workspace/output/us/1-2-Login-Page.md`, `workspace/output/plans/1-2-Login-Page.{back\|front}.md`, fichiers code générés `*LoginPage*` dans `workspace/output/src/{Project}/...` et `*.Tests/` |
+| 1 | **US renommée** (`1-2-Login-Page` → `1-2-Auth-Login`) | `workspace/us/1-2-Login-Page.md`, `workspace/plans/1-2-Login-Page.{back\|front}.md`, fichiers code générés `*LoginPage*` dans `workspace/src/{Project}/...` et `*.Tests/` |
 | 2 | **US supprimée** (feature scrappée) | TOUS les artefacts dérivés (plans, services, components, endpoints, tests). `spec-compliance-reviewer` continue à scanner du code sans AC source. |
 | 3 | **FEAT renumérotée** (split 1 FEAT → 2 FEATs) | TOUS les artefacts dérivés (IDs n incrémentés cascade). Cas le plus brutal. |
-| 4 | **Plan partial dépassé** (US devient frontend-only mais `.back.md` reste) | `workspace/output/plans/{n}-{m}-{Name}.back.md` orphelin, sans contre-partie code (mais détection fragile : peut être intentionnel) |
+| 4 | **Plan partial dépassé** (US devient frontend-only mais `.back.md` reste) | `workspace/plans/{n}-{m}-{Name}.back.md` orphelin, sans contre-partie code (mais détection fragile : peut être intentionnel) |
 | 5 | **Capability triggered devenue inutile** (AC mentionnant `excel` retirée) | Lib EPPlus reste dans `.csproj` + `using OfficeOpenXml;` reste dans le code, mais plus aucun usage |
 
 ### Mesure sur le repo courant
 
-- US présents sous `workspace/output/us/` : **10 fichiers**
-- Plans sous `workspace/output/plans/` : **14 fichiers**
+- US présents sous `workspace/us/` : **10 fichiers**
+- Plans sous `workspace/plans/` : **14 fichiers**
 - US sans `.back.md` : `1-2`, `3-2`, `3-3`, `4-3` — légitimes ou orphelins ? Pas de méthode automatisée pour distinguer.
 
 ---
@@ -49,9 +49,9 @@ la source (FEATs + US dans `workspace/input/`) et la génération (`workspace/ou
 - ✅ Dry-run obligatoire avant toute suppression
 - ✅ Confirmation utilisateur explicite (Tech Lead) avant `rm`
 - ✅ Liste exhaustive des chemins à supprimer dans le rapport
-- ✅ Backup auto sous `workspace/output/.sys/.trash/{timestamp}/` avant suppression (recovery 7 jours)
+- ✅ Backup auto sous `workspace/.sys/.trash/{timestamp}/` avant suppression (recovery 7 jours)
 - ❌ Jamais de suppression silencieuse
-- ❌ Jamais de mass purge équivalent `rm -rf workspace/output/`
+- ❌ Jamais de mass purge équivalent `rm -rf workspace/`
 - ❌ Jamais d'auto-cleanup en CI sans `--yes` explicite
 
 ---
@@ -60,22 +60,22 @@ la source (FEATs + US dans `workspace/input/`) et la génération (`workspace/ou
 
 ### 3.1 Orphelin direct (basename mismatch)
 
-Un fichier sous `workspace/output/{us,plans}/` dont le basename
+Un fichier sous `workspace/{us,plans}/` dont le basename
 `{n}-{m}-{Name}` n'a **aucun match** dans les FEATs source
-`workspace/input/feats/{n}-*.md`.
+`workspace/feats/{n}-*.md`.
 
 Exemple : US `2-5-OldFeature.md` existe mais FEAT 2 ne mentionne plus
 SFD-5 (renumérotation). → orphelin direct.
 
 ### 3.2 Orphelin de plan (US absent)
 
-Un plan `workspace/output/plans/{n}-{m}-*.{back|front}.md` dont l'US
-correspondante `workspace/output/us/{n}-{m}-*.md` n'existe plus
+Un plan `workspace/plans/{n}-{m}-*.{back|front}.md` dont l'US
+correspondante `workspace/us/{n}-{m}-*.md` n'existe plus
 (ou a un `{Name}` différent).
 
 ### 3.3 Orphelin de code (plan absent)
 
-Un fichier sous `workspace/output/src/{Project}/...` dont le nom
+Un fichier sous `workspace/src/{Project}/...` dont le nom
 référence un `{n}-{m}-{Name}` non couvert par un plan actuel.
 
 > **Détection fragile** : les fichiers de code peuvent ne pas porter
@@ -105,7 +105,7 @@ Deux scripts complémentaires sous `.claude/python/sdd_admin/` (mainteneur-invoq
 python .claude/python/sdd_admin/audit_orphans.py [--feat N] [--json]
 ```
 
-- Scan `workspace/input/feats/` (source) + `workspace/output/{us,plans,src}/`
+- Scan `workspace/feats/` (source) + `workspace/{us,plans,src}/`
 - Diff basenames, applique les 4 règles §3
 - Sortie : table par catégorie (direct / plan / code / capability)
   avec compteurs + paths exhaustifs
@@ -123,24 +123,24 @@ python .claude/python/sdd_admin/cleanup_orphans.py [--feat N] [--dry-run] [--yes
 - `--yes` : exécute la suppression APRÈS demande confirmation interactive
   (sauf si stdin non-tty → refuse par défaut).
 - Pour chaque suppression :
-  1. `cp` vers `workspace/output/.sys/.trash/{ts}/{relative-path}`
+  1. `cp` vers `workspace/.sys/.trash/{ts}/{relative-path}`
   2. `rm` du fichier original
   3. Émet un événement `console.db` table `events` de type `orphan.deleted`
      avec le path + le ts trash + l'opérateur (`USERNAME` env var ou `cli`)
 - **Recovery 7 jours** : restauration manuelle depuis
-  `workspace/output/.sys/.trash/{ts}/` (commande standard `cp` ou `mv` —
+  `workspace/.sys/.trash/{ts}/` (commande standard `cp` ou `mv` —
   l'arborescence préserve les paths relatifs originaux). Pas de script
   d'auto-restore : la recovery reste un geste **explicite** du Tech Lead.
 
 ### 4.3 Suppression manuelle interdite
 
 Le Tech Lead ne doit **PAS** faire `rm` à la main sur les fichiers de
-`workspace/output/` car cela bypass :
+`workspace/` car cela bypass :
 - Le backup `.trash/`
 - L'événement `orphan.deleted` (audit historique)
 - Le check de cohérence (e.g., supprimer un plan dont le code dépend encore)
 
-Forme rejetée : `rm workspace/output/plans/2-5-*.md` direct.
+Forme rejetée : `rm workspace/plans/2-5-*.md` direct.
 Forme acceptée : `cleanup_orphans.py --feat 2 --yes`.
 
 ---
@@ -149,13 +149,13 @@ Forme acceptée : `cleanup_orphans.py --feat 2 --yes`.
 
 `cleanup_orphans.py` **refuse** de supprimer :
 
-- `workspace/input/` (sources Tech Lead, jamais touché)
-- `workspace/output/.sys/.context/constitution.md` (toujours conservé)
-- `workspace/output/.sys/.context/adrs/*.md` (append-only, jamais supprimé)
-- `workspace/output/db/console.db` (runtime SSoT)
+- `workspace/` (sources Tech Lead, jamais touché)
+- `workspace/.sys/.context/constitution.md` (toujours conservé)
+- `workspace/.sys/.context/adrs/*.md` (append-only, jamais supprimé)
+- `workspace/db/console.db` (runtime SSoT)
 - `workspace/console/` (UI status)
-- `workspace/output/.sys/.trash/` (trash lui-même, garde de cycle)
-- Tout fichier hors `workspace/output/` (sécurité absolue)
+- `workspace/.sys/.trash/` (trash lui-même, garde de cycle)
+- Tout fichier hors `workspace/` (sécurité absolue)
 
 ---
 
@@ -247,6 +247,6 @@ ou auditée par framework_smoke.
 
 - [`@.claude/docs/CHANGELOG.md`](./CHANGELOG.md) ligne 1208 — décision de retrait `/sdd-clear` v6.1
 - [`@.claude/CLAUDE.md §3`](../CLAUDE.md) — table des commandes (futur emplacement `/cleanup-orphans` post-v7)
-- `workspace/output/.sys/.context/adrs/ADR-20260519T183000-governance-orphan-cleanup-tool.md` — décision + plan v7.0.0
+- `workspace/.sys/.context/adrs/ADR-20260519T183000-governance-orphan-cleanup-tool.md` — décision + plan v7.0.0
 - [`@.claude/python/sdd_scripts/detect_capabilities.py`](.claude/python/sdd_scripts/detect_capabilities.py) — base pour §6 (détection capabilities orphelines)
 - [`@.claude/python/sdd_scripts/scan_repo.py`](.claude/python/sdd_scripts/scan_repo.py) — pattern de scan existant à réutiliser

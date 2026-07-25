@@ -34,7 +34,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from sdd_reverse.scan_legacy import normalize_bytes
+from sdd_reverse.scan_legacy import normalize_bytes, read_text_normalized as _read_text
 
 # === Template family detection ===
 _FAMILY_BY_EXT = {
@@ -55,6 +55,15 @@ _FAMILY_BY_EXT = {
     ".frm": "vb6-form",
     ".xaml": "wpf",  # WPF XAML (2026-06-10 — Windows desktop UI support)
 }
+
+#: Families we DETECT (a file of this kind exists) but have NO dedicated
+#: structural parser for yet. Their syntax is not HTML/XAML, so running the
+#: generic HTML regex path would silently return an EMPTY structure and the
+#: UI agent would emit a misleading blank mockup (audit C4, 2026-07-24).
+#: parse_template returns an explicit ``error: "parser_unsupported"`` for these
+#: so the caller (reverse-ui-extractor) skips + emits [REVERSE_UI_PARSER_MISSING]
+#: instead of pretending the screen has no controls.
+_UNSUPPORTED_FAMILIES = frozenset({"delphi-dfm", "vb6-form"})
 
 # === Common elements ===
 _RE_TITLE = re.compile(r"<title[^>]*>([^<]+)</title>", re.IGNORECASE | re.DOTALL)
@@ -186,12 +195,7 @@ _HTML5_BOOLEAN_ATTRS = frozenset({
 })
 
 
-def _read_text(path: Path) -> str:
-    try:
-        raw = path.read_bytes()
-    except OSError:
-        return ""
-    return normalize_bytes(raw).decode("utf-8", errors="replace")
+# _read_text centralise dans scan_legacy (audit 2026-06-11 B5 — cap 5 Mo).
 
 
 def _detect_family(file_path: Path) -> str:
@@ -473,6 +477,22 @@ def parse_template(file_path: str | Path) -> dict[str, Any]:
     """Parse a single template file."""
     p = Path(file_path)
     family = _detect_family(p)
+
+    # Detected-but-unsupported families: refuse to fake an HTML parse (audit C4).
+    if family in _UNSUPPORTED_FAMILIES:
+        return {
+            "schemaVersion": 1,
+            "source_path": str(p),
+            "template_family": family,
+            "title": None,
+            "forms": [],
+            "elements": [],
+            "links": [],
+            "grids": [],
+            "error": "parser_unsupported",
+            "parser_missing": family,
+        }
+
     content = _read_text(p)
     if not content:
         return {

@@ -8,7 +8,7 @@ one of the "Owner" patterns allowed for that agent.
 - Detect agent via input JSON (`tool_input.subagent_type`)
 - Glob files modified since env $SDD_DISPATCH_START_TS (ISO 8601),
   fallback to last 5 minutes
-- Append violations to workspace/output/.sys/.audit/ownership-violations.log
+- Append violations to workspace/.sys/.audit/ownership-violations.log
 - Silent on chat (minimal-verbosity), Tech Lead consults log post-batch
 - Non-blocking (always exit 0)
 
@@ -25,7 +25,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sdd_lib.hook_input import get_subagent_type, read_hook_input  # noqa: E402
-from sdd_lib.paths import normalize, repo_root  # noqa: E402
+from sdd_lib.paths import workspace_root, normalize, repo_root  # noqa: E402
 from sdd_lib.stderr import warn  # noqa: E402
 from sdd_lib.exit_codes import HOOK_ALLOW, HOOK_DENY  # noqa: E402
 
@@ -33,45 +33,48 @@ from sdd_lib.exit_codes import HOOK_ALLOW, HOOK_DENY  # noqa: E402
 # Matrix extracted from file-ownership.md §1 (must stay in sync)
 OWNERSHIP_MATRIX: dict[str, list[str]] = {
     "po": [
-        r"^workspace/output/us/.+\.md$",
-        r"^workspace/output/\.sys/\.context/constitution\.md$",  # append-only §3 §2
+        r"^workspace/us/.+\.md$",
+        r"^workspace/\.sys/\.context/constitution\.md$",  # append-only §3 §2
     ],
     "arch": [
-        r"^workspace/output/src/[^/]+\.sln$",
-        r"^workspace/output/src/[^/]+/(\w+\.csproj|package\.json|pyproject\.toml|build\.gradle.*)$",
-        r"^workspace/output/src/[^/]+/Entities/.+",
-        r"^workspace/output/src/[^/]+/CLAUDE\.md$",
-        r"^workspace/output/db/.+",
-        r"^workspace/output/\.sys/\.context/(constitution\.md|adrs/.+)$",
+        r"^workspace/src/[^/]+\.sln$",
+        r"^workspace/src/[^/]+/(\w+\.csproj|package\.json|pyproject\.toml|build\.gradle.*)$",
+        r"^workspace/src/[^/]+/Entities/.+",
+        r"^workspace/src/[^/]+/CLAUDE\.md$",
+        r"^workspace/db/.+",
+        r"^workspace/\.sys/\.context/(constitution\.md|adrs/.+)$",
     ],
     "dev-backend": [
-        r"^workspace/output/src/[^/]+/(Services|Endpoints|DTOs|Mappers|Validators|Controllers)/.+",
-        r"^workspace/output/src/[^/]+/Program\.cs$",
-        r"^workspace/output/src/[^/]+/Models/.+",
-        r"^workspace/output/plans/.+\.back\.md$",
-        r"^workspace/output/\.sys/\.context/adrs/ADR-.+\.md$",
+        r"^workspace/src/[^/]+/(Services|Endpoints|DTOs|Mappers|Validators|Controllers)/.+",
+        r"^workspace/src/[^/]+/Program\.cs$",
+        r"^workspace/src/[^/]+/Models/.+",
+        r"^workspace/plans/.+\.back\.md$",
+        r"^workspace/\.sys/\.context/adrs/ADR-.+\.md$",
     ],
     "dev-frontend": [
-        r"^workspace/output/src/[^/]+/(Pages|Components|Layouts|Auth)/.+",
-        r"^workspace/output/src/[^/]+/wwwroot/.+",
-        r"^workspace/output/src/[^/]+/Program\.cs$",
+        r"^workspace/src/[^/]+/(Pages|Components|Layouts|Auth)/.+",
+        r"^workspace/src/[^/]+/wwwroot/.+",
+        r"^workspace/src/[^/]+/Program\.cs$",
         r"^.+\.razor\.css$",
-        r"^workspace/output/plans/.+\.front\.md$",
-        r"^workspace/output/\.sys/\.context/adrs/ADR-.+\.md$",
+        r"^workspace/plans/.+\.front\.md$",
+        r"^workspace/\.sys/\.context/adrs/ADR-.+\.md$",
     ],
     "qa": [
-        r"^workspace/output/src/.+\.Tests/.+",
-        r"^workspace/output/src/.+/__tests__/.+",
-        r"^workspace/output/src/.+\.(FEAT|test)\.(ts|tsx|js|jsx)$",
-        r"^workspace/output/src/.+(Test|FEAT)\.kt$",
-        r"^workspace/output/src/.+test_.+\.py$",
-        r"^workspace/output/qa/feat-.+/(report\.md|coverage\.json|quality\.json|api-tests\.(json|md))$",
+        r"^workspace/src/.+\.Tests/.+",
+        r"^workspace/src/.+/__tests__/.+",
+        r"^workspace/src/.+\.(FEAT|test)\.(ts|tsx|js|jsx)$",
+        r"^workspace/src/.+(Test|FEAT)\.kt$",
+        r"^workspace/src/.+test_.+\.py$",
+        # 2026-07-06 : QA telemetry is SQLite-only (no qa/). The only file
+        # the qa agent still writes is the transient api-tests JSON under
+        # .sys/.validation/, which ingest_agent_report.py ingests then deletes.
+        r"^workspace/\.sys/\.validation/[0-9]+-api-tests\.json$",
     ],
     # `dashboard` retiré v7.0.0 (governance-major-auditors-trim) — remplacé par
     # script déterministe index_adrs.py. Aucune entrée matrice nécessaire.
     "elicitor": [
-        r"^workspace/input/feats/.+\.md$",  # append-only
-        r"^workspace/output/\.sys/\.context/constitution\.md$",  # append-only §7
+        r"^workspace/feats/.+\.md$",  # append-only
+        r"^workspace/\.sys/\.context/constitution\.md$",  # append-only §7
     ],
 }
 
@@ -130,87 +133,6 @@ _AUDIT_SKIP_DIRS: frozenset[str] = frozenset({
 })
 
 
-def _iter_modified_files_git(workspace: Path, cutoff: datetime) -> list[Path] | None:
-    """v7.0.1 audit REFACTOR-2 2026-06-08 — fast-path via `git diff`.
-
-    When the workspace is inside a git repository, prefer `git diff --name-only`
-    (~10-50ms regardless of project size) over `os.walk` (~100ms-3s scaling
-    with project size). The diff covers both staged + unstaged + untracked
-    files modified since the cutoff timestamp.
-
-    Returns :
-      - list[Path] of modified files (filtered by cutoff mtime) if git
-        invocation succeeds and yields meaningful results
-      - None if git is unavailable, workspace not a repo, or anything
-        else goes wrong → fallback to `_iter_modified_files_walk`.
-
-    Why use git diff vs --since :
-      `--since=<timestamp>` works only with `git log`, not `git diff`.
-      We list ALL diff entries then filter by mtime client-side. The
-      diff is bounded by the working-tree state, so size is independent
-      of history depth (orders of magnitude smaller than walk on a
-      project with node_modules).
-
-    Why fallback to walk :
-      User workspaces may not be git repos (some `/sdd-bootstrap` flows
-      generate output outside git tracking). Hook must remain functional
-      either way — git diff is a fast-path optimization, not a hard
-      dependency.
-    """
-    import subprocess
-    cutoff_ts = cutoff.timestamp()
-    try:
-        # Probe : is this a git repo ?
-        # --is-inside-work-tree is the canonical git command for this check.
-        probe = subprocess.run(
-            ["git", "rev-parse", "--is-inside-work-tree"],
-            cwd=str(workspace),
-            capture_output=True,
-            text=True,
-            timeout=2,
-        )
-        if probe.returncode != 0 or probe.stdout.strip() != "true":
-            return None
-        # Collect modified + staged + untracked files.
-        # --untracked-files=all surfaces files agents wrote without staging.
-        # --porcelain=v1 gives stable parseable output.
-        result = subprocess.run(
-            ["git", "status", "--porcelain=v1", "--untracked-files=all", "-z"],
-            cwd=str(workspace),
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
-        if result.returncode != 0:
-            return None
-    except (subprocess.TimeoutExpired, OSError, FileNotFoundError):
-        return None
-    # Parse `git status --porcelain -z` : each entry is
-    # `XY filename\0` (no trailing newline thanks to -z). XY = 2-char
-    # status code. Untracked files appear as `?? filename`.
-    repo_root_path = workspace
-    # Resolve repo root from probe response (we trust workspace is at/under it).
-    out: list[Path] = []
-    for entry in result.stdout.split("\0"):
-        if not entry:
-            continue
-        # Skip the 2-char status code + 1 space ; rename entries use a
-        # different format ("R src -> dst") but our subagents don't rename
-        # tracked files so we can ignore that subtlety.
-        if len(entry) < 4:
-            continue
-        rel = entry[3:]
-        full = (repo_root_path / rel).resolve()
-        try:
-            # Filter by cutoff : git status only tells us WHAT changed,
-            # not WHEN. We still mtime-check to scope to current dispatch.
-            if full.is_file() and full.stat().st_mtime > cutoff_ts:
-                out.append(full)
-        except OSError:
-            continue
-    return out
-
-
 def _iter_modified_files_walk(workspace: Path, cutoff: datetime) -> list[Path]:
     """Walk workspace/ and yield files modified after cutoff (fallback).
 
@@ -219,9 +141,15 @@ def _iter_modified_files_walk(workspace: Path, cutoff: datetime) -> list[Path]:
     real project with 50k+ files under node_modules, this changes the
     SubagentStop latency from seconds to ~100ms.
 
-    Renamed from `_iter_modified_files` (v7.0.1 audit REFACTOR-2) — the
-    public API is now `_iter_modified_files` which tries git first then
-    falls back to walk. Walk impl kept as fallback for non-git workspaces.
+    This is the sole implementation since the 2026-06-12 audit fix: the
+    `git status` fast-path (REFACTOR-2) was removed because it could NEVER
+    see the files this hook must audit. The agents write under
+    `workspace/`, which is **gitignored by design** — `git status`
+    (even with `--untracked-files=all`) does not list ignored files, so the
+    fast-path returned 0 files where the walk finds thousands, silently
+    disabling the ownership matrix (INVARIANTS.yml `file-ownership-matrix-
+    enforced`). The pruned walk (~100ms, vendor dirs skipped) is correct and
+    fast enough.
     """
     import os
     cutoff_ts = cutoff.timestamp()
@@ -240,15 +168,14 @@ def _iter_modified_files_walk(workspace: Path, cutoff: datetime) -> list[Path]:
 
 
 def _iter_modified_files(workspace: Path, cutoff: datetime) -> list[Path]:
-    """Yield files modified after cutoff. Tries git diff first, falls back to walk.
+    """Yield files modified after cutoff via a pruned walk of `workspace/`.
 
-    v7.0.1 audit REFACTOR-2 2026-06-08 — fast-path via `git status` reduces
-    SubagentStop latency from ~100-300ms (os.walk) to ~10-50ms (git status)
-    on git-managed workspaces. Saves ~2-3 s/pipeline (14 subagent stops).
+    v7.0.1 audit REFACTOR-2 (2026-06-08) introduced a `git status` fast-path;
+    the 2026-06-12 audit removed it (see `_iter_modified_files_walk` docstring)
+    — the audit targets are gitignored, so git could not see them. This
+    indirection is kept as the stable public entry-point in case a
+    git-ignored-aware fast-path is reintroduced later.
     """
-    git_result = _iter_modified_files_git(workspace, cutoff)
-    if git_result is not None:
-        return git_result
     return _iter_modified_files_walk(workspace, cutoff)
 
 
@@ -260,7 +187,7 @@ def main() -> int:
     allowed = _COMPILED_OWNERSHIP[subagent]  # M7 : reuse precompiled patterns
 
     root = repo_root()
-    workspace = root / "workspace"
+    workspace = workspace_root(root)
     if not workspace.is_dir():
         return HOOK_ALLOW
     cutoff = _parse_cutoff()
@@ -282,7 +209,7 @@ def main() -> int:
 
     if not violations:
         return HOOK_ALLOW
-    audit_dir = root / "workspace" / "output" / ".sys" / ".audit"
+    audit_dir = workspace_root(root) / ".sys" / ".audit"
     audit_dir.mkdir(parents=True, exist_ok=True)
     log_file = audit_dir / "ownership-violations.log"
 

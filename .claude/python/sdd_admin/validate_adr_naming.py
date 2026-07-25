@@ -17,7 +17,7 @@ Compat tolérance pre-2026-06-08 (cf. ownership.md Partie A §3) :
 
 Usage :
     python -m sdd_admin.validate_adr_naming                  # framework ADRs only
-    python -m sdd_admin.validate_adr_naming --include-projects  # + workspace/output/.sys/.context/adrs/
+    python -m sdd_admin.validate_adr_naming --include-projects  # + workspace/.sys/.context/adrs/
     python -m sdd_admin.validate_adr_naming --strict         # rand4 obligatoire (rejette legacy)
     python -m sdd_admin.validate_adr_naming --json           # output machine-readable
 
@@ -38,10 +38,24 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_ADRS_DIR = ROOT / ".claude" / "docs" / "adrs"
-PROJECT_ADRS_DIR = ROOT / "workspace" / "output" / ".sys" / ".context" / "adrs"
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from sdd_lib.exit_codes import SUCCESS, FAIL_FAST, INFRA_BLOCKED  # noqa: E402
+from sdd_lib.paths import workspace_root  # noqa: E402
+
+PROJECT_ADRS_DIR = workspace_root(ROOT) / ".sys" / ".context" / "adrs"
+
+
+def _rel(p: Path) -> str:
+    """Display path relative to the repo root; falls back to the project root
+    (parent of the workspace) for artifacts under an external/sibling workspace
+    (split layout where the framework lives in a sub-folder), else absolute."""
+    for base in (ROOT, workspace_root(ROOT).parent):
+        try:
+            return str(p.relative_to(base)).replace("\\", "/")
+        except ValueError:
+            continue
+    return str(p).replace("\\", "/")
 
 # Slug kebab-case strict : start/end alphanum, 1-40 chars total.
 # Refuse "---", "-foo", "foo-" (audit CTO 2026-06-09 Major #2 closure).
@@ -75,12 +89,12 @@ def scan(adrs_dir: Path) -> dict:
     canonical, legacy, invalid = [], [], []
     for fp in sorted(adrs_dir.glob("ADR-*.md")):
         verdict = classify(fp.name)
-        rel = str(fp.relative_to(ROOT)).replace("\\", "/")
+        rel = _rel(fp)
         {"canonical": canonical, "legacy": legacy, "invalid": invalid}[verdict].append(rel)
 
     return {
         "found": True,
-        "adrs_dir": str(adrs_dir.relative_to(ROOT)).replace("\\", "/"),
+        "adrs_dir": _rel(adrs_dir),
         "counts": {
             "canonical": len(canonical),
             "legacy": len(legacy),
@@ -96,10 +110,10 @@ def scan(adrs_dir: Path) -> dict:
 def main() -> int:
     ap = argparse.ArgumentParser(description="Validate ADR filename pattern v7.0.0")
     ap.add_argument("--adrs-dir", type=Path, default=DEFAULT_ADRS_DIR,
-                    help=f"Override ADRs dir (default: {DEFAULT_ADRS_DIR.relative_to(ROOT)})")
+                    help=f"Override ADRs dir (default: {_rel(DEFAULT_ADRS_DIR)})")
     ap.add_argument("--include-projects", action="store_true",
                     help=f"Also scan project ADRs under "
-                         f"{PROJECT_ADRS_DIR.relative_to(ROOT)} (absence non-fatal)")
+                         f"{_rel(PROJECT_ADRS_DIR)} (absence non-fatal)")
     ap.add_argument("--strict", action="store_true",
                     help="Reject legacy filenames (rand4 mandatory)")
     ap.add_argument("--json", action="store_true", help="Output machine-readable JSON")

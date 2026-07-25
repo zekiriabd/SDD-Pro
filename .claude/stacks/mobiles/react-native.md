@@ -77,7 +77,7 @@ Architecture cible (un seul projet Expo) :
 
 ## 1.3 Mapping couche → repertoire
 
-Un seul projet sous `workspace/output/src/{AppName}/`. **Convention single-project — `{BackendName}` et `{LibName}` ne s'appliquent pas a ce stack** (ils peuvent decrire le backend separe consomme par le mobile, mais pas la structure du projet RN). Arch leve WARNING `[STACK_MALFORMED]` si `LibStrategy` declare en mode `monorepo`.
+Un seul projet sous `workspace/src/{AppName}/`. **Convention single-project — `{BackendName}` et `{LibName}` ne s'appliquent pas a ce stack** (ils peuvent decrire le backend separe consomme par le mobile, mais pas la structure du projet RN). Arch leve WARNING `[STACK_MALFORMED]` si `LibStrategy` declare en mode `monorepo`.
 
 | Layer | Path |
 |---|---|
@@ -174,17 +174,17 @@ Ce stack est CLIENT mobile — la persistance "base de donnees" reelle vit cote 
 
 ## 2.2 Outils
 
-- **Project file** : `workspace/output/src/{AppName}/package.json`
-- **Run dev (Metro + simulator)** : `(cd workspace/output/src/{AppName} && npx expo start)`
-- **Run iOS** : `(cd workspace/output/src/{AppName} && npx expo run:ios)` — necessite Xcode (macOS uniquement)
-- **Run Android** : `(cd workspace/output/src/{AppName} && npx expo run:android)` — necessite Android Studio + JDK 17
-- **Build iOS / Android (cloud)** : `(cd workspace/output/src/{AppName} && eas build --platform [ios|android|all])` — EAS Build (cloud build farm Expo)
+- **Project file** : `workspace/src/{AppName}/package.json`
+- **Run dev (Metro + simulator)** : `(cd workspace/src/{AppName} && npx expo start)`
+- **Run iOS** : `(cd workspace/src/{AppName} && npx expo run:ios)` — necessite Xcode (macOS uniquement)
+- **Run Android** : `(cd workspace/src/{AppName} && npx expo run:android)` — necessite Android Studio + JDK 17
+- **Build iOS / Android (cloud)** : `(cd workspace/src/{AppName} && eas build --platform [ios|android|all])` — EAS Build (cloud build farm Expo)
 - **Smoke Command** :
 
 ```bash
-(cd workspace/output/src/{AppName} && npm install --silent && npx --yes tsc --noEmit)
-test -f workspace/output/src/{AppName}/app/_layout.tsx
-test -f workspace/output/src/{AppName}/app.json
+(cd workspace/src/{AppName} && npm install --silent && npx --yes tsc --noEmit)
+test -f workspace/src/{AppName}/app/_layout.tsx
+test -f workspace/src/{AppName}/app.json
 ```
 
 - **Smoke Timeout** : 180s (install + tsc)
@@ -197,13 +197,13 @@ test -f workspace/output/src/{AppName}/app.json
 ## 2.2.1 Init Commands
 
 ```bash
-if [ ! -f "workspace/output/src/{AppName}/package.json" ]; then
+if [ ! -f "workspace/src/{AppName}/package.json" ]; then
 
 # STEP 1 — Bootstrap Expo SDK 52 (template TypeScript + Expo Router)
-npx --yes create-expo-app@latest workspace/output/src/{AppName} \
+npx --yes create-expo-app@latest workspace/src/{AppName} \
   --template default --no-install
 
-cd workspace/output/src/{AppName}
+cd workspace/src/{AppName}
 npm install --silent
 
 # STEP 2 — Installer NativeWind 4 (Tailwind pour RN)
@@ -493,8 +493,8 @@ Ce stack est optimise pour :
 ## 10. Notes pour l'agent `arch`
 
 1. **Detecter** `## Active Tech Specs` contient `mobiles/react-native.md` → reconnaitre comme stack **mobile-only**, pas un frontend web standard
-2. **Le backend reste declare separement** dans `## Active Tech Specs` (par ex. `backend/node-express.md`) — les deux co-existent, projets distincts sous `workspace/output/src/`
-3. **Creer** `workspace/output/src/{AppName}/` via `create-expo-app` (cf. §2.2.1)
+2. **Le backend reste declare separement** dans `## Active Tech Specs` (par ex. `backend/node-express.md`) — les deux co-existent, projets distincts sous `workspace/src/`
+3. **Creer** `workspace/src/{AppName}/` via `create-expo-app` (cf. §2.2.1)
 4. **Injecter** `app.json.expo.extra.apiBaseUrl` depuis une nouvelle section `## Active Mobile Config` du `stack.md` (a creer si absente — convention `MOBILE_API_BASE_URL`)
 5. **`## Active UI Specs`** : aucun design system web n'est compatible. Stack utilise NativeWind (Tailwind) par defaut. Si `shadcn`/`vuetify`/`radzen-blazor` declare → WARNING bloquant `[STACK_INCOMPAT]`. Alternative mobile : `react-native-paper` (Material), `tamagui`, `gluestack-ui` (capabilities futures)
 6. **Phase B (DB)** : SKIP — pas de DB locale par defaut (sauf capability `offline-db` qui ne necessite pas le scan DB serveur)
@@ -513,23 +513,23 @@ Ce stack est optimise pour :
 
 | Path | Owner |
 |---|---|
-| `workspace/output/src/{AppName}/app/**` (routes Expo Router) | `dev-frontend` |
-| `workspace/output/src/{AppName}/src/**` | `dev-frontend` |
-| `workspace/output/src/{AppName}/assets/**` | `dev-frontend` |
-| `workspace/output/src/{AppName}/app.json` | `arch` (create) + `dev-frontend` (augment permissions, plugins, extra) |
-| `workspace/output/src/{AppName}/package.json` | `arch` (create) + `dev-frontend` (augment deps on-demand) |
-| `workspace/output/src/{AppName}/tsconfig.json` | `arch` exclusif |
-| `workspace/output/src/{AppName}/babel.config.js` / `metro.config.js` | `arch` exclusif |
-| `workspace/output/src/{AppName}/tailwind.config.js` | `arch` (create) + `dev-frontend` (augment theme tokens) |
+| `workspace/src/{AppName}/app/**` (routes Expo Router) | `dev-frontend` |
+| `workspace/src/{AppName}/src/**` | `dev-frontend` |
+| `workspace/src/{AppName}/assets/**` | `dev-frontend` |
+| `workspace/src/{AppName}/app.json` | `arch` (create) + `dev-frontend` (augment permissions, plugins, extra) |
+| `workspace/src/{AppName}/package.json` | `arch` (create) + `dev-frontend` (augment deps on-demand) |
+| `workspace/src/{AppName}/tsconfig.json` | `arch` exclusif |
+| `workspace/src/{AppName}/babel.config.js` / `metro.config.js` | `arch` exclusif |
+| `workspace/src/{AppName}/tailwind.config.js` | `arch` (create) + `dev-frontend` (augment theme tokens) |
 
-**Backend separe** : meme matrice ownership que pour son propre stack (`backend/node-express.md`, etc.). Les 2 projets co-existent sous `workspace/output/src/{BackendName}/` et `workspace/output/src/{AppName}/`.
+**Backend separe** : meme matrice ownership que pour son propre stack (`backend/node-express.md`, etc.). Les 2 projets co-existent sous `workspace/src/{BackendName}/` et `workspace/src/{AppName}/`.
 
 ---
 
 ## 12. Smoke test attendu (post-init arch)
 
 ```bash
-cd workspace/output/src/{AppName}
+cd workspace/src/{AppName}
 npm install --silent
 npx --yes tsc --noEmit
 test -f app/_layout.tsx

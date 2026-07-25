@@ -43,7 +43,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sdd_lib.exit_codes import FAIL_FAST, SUCCESS  # noqa: E402
-from sdd_lib.paths import normalize, repo_root  # noqa: E402
+from sdd_lib.paths import workspace_root, normalize, repo_root  # noqa: E402
 from sdd_lib.project_config import read_project_config, read_stack_md_text  # noqa: E402  (legacy fallback)
 from sdd_lib.layered_config import ConfigError, read_layered_config  # noqa: E402  (v6.7.3)
 
@@ -89,7 +89,7 @@ SECURITY_AC_HINTS = re.compile(
 
 def _read_feat_file(root: Path, feat_number: int) -> tuple[str | None, str | None]:
     """Lit la FEAT N. Retourne (FeatName, content) ou (None, None)."""
-    feats_dir = root / "workspace" / "input" / "feats"
+    feats_dir = workspace_root(root) / "feats"
     if not feats_dir.is_dir():
         return None, None
     matches = sorted(feats_dir.glob(f"{feat_number}-*.md"))
@@ -108,7 +108,7 @@ def _read_feat_file(root: Path, feat_number: int) -> tuple[str | None, str | Non
 
 def _read_us_files(root: Path, feat_number: int) -> list[str]:
     """Liste les contenus des US de la FEAT N."""
-    us_dir = root / "workspace" / "output" / "us"
+    us_dir = workspace_root(root) / "us"
     if not us_dir.is_dir():
         return []
     contents: list[str] = []
@@ -122,7 +122,7 @@ def _read_us_files(root: Path, feat_number: int) -> list[str]:
 
 def _count_us_files(root: Path, feat_number: int) -> int:
     """Count US files for a FEAT (used by LeanReviewersPreset heuristic v7.0.0 P2 #12)."""
-    us_dir = root / "workspace" / "output" / "us"
+    us_dir = workspace_root(root) / "us"
     if not us_dir.is_dir():
         return 0
     return len(list(us_dir.glob(f"{feat_number}-*.md")))
@@ -162,10 +162,10 @@ def _active_stacks(root: Path) -> dict[str, str | None]:
 
 
 def _project_has_frontend_code(root: Path, app_name: str | None) -> bool:
-    """Détecte si workspace/output/src/{AppName}/ existe avec du markup."""
+    """Détecte si workspace/src/{AppName}/ existe avec du markup."""
     if not app_name:
         return False
-    app_dir = root / "workspace" / "output" / "src" / app_name
+    app_dir = workspace_root(root) / "src" / app_name
     if not app_dir.is_dir():
         return False
     # Heuristique : présence de fichiers markup (.tsx, .vue, .razor, .html)
@@ -177,10 +177,10 @@ def _project_has_frontend_code(root: Path, app_name: str | None) -> bool:
 
 
 def _project_has_backend_code(root: Path, backend_name: str | None) -> bool:
-    """Détecte si workspace/output/src/{BackendName}/ existe avec du code."""
+    """Détecte si workspace/src/{BackendName}/ existe avec du code."""
     if not backend_name:
         return False
-    backend_dir = root / "workspace" / "output" / "src" / backend_name
+    backend_dir = workspace_root(root) / "src" / backend_name
     if not backend_dir.is_dir():
         return False
     extensions = ("*.cs", "*.kt", "*.py", "*.ts", "*.js")
@@ -281,7 +281,7 @@ def plan(feat_number: int) -> dict[str, object]:
     if not feat_name or not feat_content:
         return {
             "feat_number": feat_number,
-            "error": f"[FEAT_NOT_FOUND] aucun fichier workspace/input/feats/{feat_number}-*.md",
+            "error": f"[FEAT_NOT_FOUND] aucun fichier workspace/feats/{feat_number}-*.md",
             "phases": {},
         }
 

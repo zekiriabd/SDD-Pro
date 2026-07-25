@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""SDD_Pro v7.0.0+ — Bootstrap workspace/output/db/console.db (SQLite, WAL).
+"""SDD_Pro v7.0.0+ — Bootstrap workspace/db/console.db (SQLite, WAL).
 
 DB centralisée pour toute la télémétrie SDD_Pro. Schéma split en sub-modules
 depuis v7.0.0 (audit Sprint 2 2026-06-07) : `sdd_lib/console_db/{core,runs,qa}.py`
@@ -143,13 +143,13 @@ def init_db(db_path: Path, force_recreate: bool = False) -> dict:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="init_console_db",
-        description="Bootstrap workspace/output/db/console.db (SQLite, WAL).",
+        description="Bootstrap workspace/db/console.db (SQLite, WAL).",
     )
     default_path = default_db_path()
     parser.add_argument(
         "--db-path",
         default=str(default_path),
-        help=f"Path to console.db (default: <repo-root>/workspace/output/db/console.db)",
+        help=f"Path to console.db (default: <repo-root>/workspace/db/console.db)",
     )
     parser.add_argument(
         "--force-recreate",

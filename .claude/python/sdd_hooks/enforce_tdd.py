@@ -3,12 +3,12 @@
 
 Audit P3 TDD (2026-06-08) — enforce test-first discipline (emprunt Superpowers
 v5.1 `test-driven-development` skill). When the agent attempts to Write or
-Edit production code under `workspace/output/src/{BackendName,AppName}/` to
+Edit production code under `workspace/src/{BackendName,AppName}/` to
 ADD a new function/class/method/endpoint, this hook verifies that a
 corresponding test file exists OR is being created in the same tool batch.
 
 **Detection heuristics** (lightweight, fast) :
-  - File path under `workspace/output/src/*/` (production scope)
+  - File path under `workspace/src/*/` (production scope)
   - File extension in {.cs, .ts, .tsx, .js, .jsx, .py, .kt, .java}
   - NOT under `*.Tests/`, `__tests__/`, `tests/`, `src/test/` (test scope)
   - Content contains a NEW public function/class definition (regex per language)
@@ -23,7 +23,7 @@ corresponding test file exists OR is being created in the same tool batch.
   - `SDD_DISABLE_TDD=1` env var (one-shot, audit-logged)
   - Edit of EXISTING code (refactor, no new behavior) → allowed
   - Test file itself (`*.Tests/`, `__tests__/`, etc.) → allowed
-  - Non-production paths (`workspace/input/`, `.claude/`) → allowed
+  - Non-production paths (`workspace/`, `.claude/`) → allowed
 
 **Idempotent guard** : the hook is read-only on disk (Glob for companion
 test). No side effects beyond stderr audit logging.
@@ -69,9 +69,16 @@ _TEST_PATH_MARKERS = (
     "test_",        # test_filename.py
 )
 
-#: Path segments that are NOT production (skip TDD entirely)
+#: Path segments that are NOT production (skip TDD entirely).
+#: Flatten 2026-07-06 : ex-`workspace/input/` sources vivent directement sous
+#: workspace/ (feats, ui, stack, assets, discovery) — listées ici pour rester
+#: hors-scope TDD sans exclure workspace/src/ (le code production).
 _NON_PROD_PATH_MARKERS = (
-    "workspace/input/",
+    "workspace/feats/",
+    "workspace/ui/",
+    "workspace/stack/",
+    "workspace/assets/",
+    "workspace/discovery/",
     ".claude/",
     "node_modules/",
     "bin/", "obj/", "dist/", "build/",
@@ -136,8 +143,8 @@ def _resolve_mode() -> str:
 
 
 def _is_production_path(path_norm: str) -> bool:
-    """True if path is in workspace/output/src/ and not in a test sub-tree."""
-    if not path_norm.startswith("workspace/output/src/"):
+    """True if path is in workspace/src/ and not in a test sub-tree."""
+    if not path_norm.startswith("workspace/src/"):
         return False
     low = path_norm.lower()
     if any(marker in low for marker in _TEST_PATH_MARKERS):
@@ -176,14 +183,14 @@ def _has_companion_test(prod_path: Path, root: Path) -> bool:
 
     test_dirs = [
         # .NET
-        *root.glob("workspace/output/src/*.Tests"),
+        *root.glob("workspace/src/*.Tests"),
         # Node/TS
-        *root.glob("workspace/output/src/*/src/__tests__"),
-        *root.glob("workspace/output/src/*/__tests__"),
+        *root.glob("workspace/src/*/src/__tests__"),
+        *root.glob("workspace/src/*/__tests__"),
         # Python
-        *root.glob("workspace/output/src/*/tests"),
+        *root.glob("workspace/src/*/tests"),
         # Kotlin/Java Gradle
-        *root.glob("workspace/output/src/*/src/test"),
+        *root.glob("workspace/src/*/src/test"),
     ]
 
     test_filename_patterns = [
@@ -240,7 +247,7 @@ def main() -> int:
         return HOOK_ALLOW
     path_norm = normalize(file_path)
     # Make path relative to repo_root for consistent matching against
-    # `workspace/output/src/` prefix (handles both absolute and relative inputs).
+    # `workspace/src/` prefix (handles both absolute and relative inputs).
     try:
         if Path(path_norm).is_absolute():
             path_norm = str(Path(path_norm).relative_to(root)).replace("\\", "/")

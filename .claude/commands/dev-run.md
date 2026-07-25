@@ -40,7 +40,7 @@ Mode **autonome** : pas de Q/R utilisateur.
 **Usage :** `/dev-run {n}` (`{n}` = numéro FEAT).
 
 **Hors scope :** `/us-generate` doit avoir tourné avant. Consomme
-`workspace/output/us/` (US) et `workspace/input/ui/` (mockups HTML optionnels).
+`workspace/us/` (US) et `workspace/ui/` (mockups HTML optionnels).
 
 ---
 
@@ -51,7 +51,7 @@ invoquer le wrapper déterministe :
 
 ```bash
 echo "{raw user input string}" | python -m sdd_scripts.dev_run_args
-# Sortie : workspace/output/.sys/.state/dev-run-{n}.args.json
+# Sortie : workspace/.sys/.state/dev-run-{n}.args.json
 # stdout : JSON parsé (feat_number, force, max_parallel, rebuild_arch, resume, unsequenced, legacy_auditor_parallel)
 ```
 
@@ -77,7 +77,7 @@ déterministe opt-in** pour les sessions où la précision est critique.
 ## STEP 1 — Valider l'argument
 
 > Si STEP 0.7 a été exécuté, les valeurs des flags viennent de
-> `workspace/output/.sys/.state/dev-run-{n}.args.json` (déterministe).
+> `workspace/.sys/.state/dev-run-{n}.args.json` (déterministe).
 > Sinon, parsing LLM legacy.
 
 Arguments :
@@ -85,7 +85,7 @@ Arguments :
 - `--force` (optionnel) — bypass un rapport readiness NO-GO existant.
 - `--max-parallel N` (optionnel) — nombre max d'US simultanées (1 US =
   jusqu'à 2 invocations dev-*). Default : `MaxParallel` dans `## Project
-  Config` de `workspace/input/stack/stack.md`, sinon **3**. Range 1-12.
+  Config` de `workspace/stack/stack.md`, sinon **3**. Range 1-12.
   Hors range → ERROR.
 
   Exemples :
@@ -114,7 +114,7 @@ Arguments :
 - `--unsequenced` (optionnel) — désactive la **gate API back→front**, lance
   dev-backend + dev-frontend en parallèle (mode legacy v6.x). Équivalent
   à `GatedWorkflow: false` dans Project Config. Audit-loggué dans
-  `workspace/output/.sys/.audit/legacy-parallel.log`. **N'impacte PAS** le
+  `workspace/.sys/.audit/legacy-parallel.log`. **N'impacte PAS** le
   pattern two-stage auditor (cf. `--legacy-auditor-parallel` ci-dessous).
   Déconseillé.
 
@@ -122,7 +122,7 @@ Arguments :
   **two-stage auditor** (Stage A spec gate → Stage B 3 reviewers parallèles)
   et restaure le batch v6.x à 4 reviewers parallèles. Équivalent à
   `AuditorBatchMode: legacy-parallel` dans Project Config. Audit-loggué dans
-  `workspace/output/.sys/.audit/legacy-auditor-parallel.log`. **N'impacte PAS**
+  `workspace/.sys/.audit/legacy-auditor-parallel.log`. **N'impacte PAS**
   la gate API back→front (cf. `--unsequenced` ci-dessus). Déconseillé.
 
   > **Distinction load-bearing v7.0.0+** : ces 2 flags adressent 2 patterns
@@ -150,7 +150,7 @@ FIX: relancer /dev-run {n} (ex. /dev-run 1)
 
 ## STEP 1.5 — Vérification du rapport readiness
 
-Read `workspace/output/.sys/.validation/{n}-readiness.md` **si présent**.
+Read `workspace/.sys/.validation/{n}-readiness.md` **si présent**.
 
 - Fichier absent → continuer (gate non exécutée, cas `/dev-run` direct
   sans `/sdd-full`). WARNING informationnel :
@@ -166,12 +166,12 @@ Read `workspace/output/.sys/.validation/{n}-readiness.md` **si présent**.
   - Si `--force` fourni → continuer + émettre :
     ```
     WARNING: /dev-run — bypass NO-GO via --force
-    Rapport : workspace/output/.sys/.validation/{n}-readiness.md (consulter §3)
+    Rapport : workspace/.sys/.validation/{n}-readiness.md (consulter §3)
     ```
   - Sinon → STOP :
     ```
     🔴 /dev-run {n} — bloqué par rapport readiness (NO-GO)
-    Rapport : workspace/output/.sys/.validation/{n}-readiness.md
+    Rapport : workspace/.sys/.validation/{n}-readiness.md
     FIX :
       1. corriger les erreurs §3 du rapport
       2. relancer /feat-validate {n}
@@ -190,10 +190,10 @@ comportement v6.6.4 strict) :
 from sdd_lib.checkpoint import is_phase_resumable
 
 inputs = [
-    f"workspace/input/feats/{n}-*.md",        # FEAT parent
-    *glob(f"workspace/output/us/{n}-*.md"),   # toutes les US
-    *glob(f"workspace/input/ui/{n}-*.html"),  # mockups HTML (si présents)
-    "workspace/input/stack/stack.md",         # Project Config + stacks
+    f"workspace/feats/{n}-*.md",        # FEAT parent
+    *glob(f"workspace/us/{n}-*.md"),   # toutes les US
+    *glob(f"workspace/ui/{n}-*.html"),  # mockups HTML (si présents)
+    "workspace/stack/stack.md",         # Project Config + stacks
 ]
 resumable, reason = is_phase_resumable(
     feat=n, phase="dev-run", input_paths=resolved_inputs,
@@ -218,12 +218,12 @@ Done` US-level suffit (cf. `ownership.md §6`, was file-ownership.md §6).
 
 ## STEP 2 — Lister les US à matérialiser
 
-Glob `workspace/output/us/{n}-*.md` → liste `US_LIST` (basenames sans extension).
+Glob `workspace/us/{n}-*.md` → liste `US_LIST` (basenames sans extension).
 
 Si `US_LIST` est vide →
 ```
 ERROR: /dev-run — aucune US à matérialiser
-CAUSE: aucun fichier workspace/output/us/{n}-*.md
+CAUSE: aucun fichier workspace/us/{n}-*.md
 FIX: lancer /us-generate {n} pour générer les US d'abord
 ```
 
@@ -280,7 +280,7 @@ Le diamant `A→B, A→C, B→D, C→D` → 3 layers : `{A}`, `{B, C}`, `{D}`.
 
 ## STEP 3 — Vérifier les stacks actifs
 
-Lire `workspace/input/stack/stack.md`.
+Lire `workspace/stack/stack.md`.
 
 - Si aucun `## Active Tech Specs` `backend-*` ET aucun `frontend-*` →
   ```
@@ -311,7 +311,7 @@ valeurs. Si ≥ 1 clé absente/vide →
 ```
 ERROR: /dev-run — clé(s) manquante(s) dans stack.md
 CAUSE: clés non définies : {liste exacte} dans {## Active Database | ## Active Auth Specs}
-FIX: renseigner les valeurs dans workspace/input/stack/stack.md (bloc concerné)
+FIX: renseigner les valeurs dans workspace/stack/stack.md (bloc concerné)
 ```
 
 **STOP**. Aucun agent invoqué tant que prérequis absents.
@@ -351,9 +351,57 @@ Sinon, invoquer agent `arch` (équivalent `/arch-init`). L'agent gère :
 - introspection DB et scaffolding Database-First si `DatabaseType ≠ none`
   (skip silencieux sinon)
 
-- `arch` OK → STEP 5.5
+- `arch` OK → STEP 5.bis
 - `arch` échoue → propager ERROR et **STOP** (dev-* ne peut tourner
   sans projet initialisé / entities scaffold si DB requise)
+
+---
+
+## STEP 5.bis — Spawn `constitutioner` si sentinel posé (FWD-C2 fix, audit 2026-06-12)
+
+> **Pourquoi ici** : `arch` (STEP 5) finit sa Phase B en posant le sentinel
+> disque `workspace/.sys/.state/arch-ready-for-constitutioner.flag`
+> (no-spawn préservé — cf. `ownership.md` Partie B §3). Jusqu'à cet audit, seul
+> `/arch-init` STEP 3.5 lisait ce sentinel ; `/dev-run` (et donc `/sdd-full`)
+> l'ignorait → dans le pipeline nominal **aucun ADR n'était créé**, la
+> constitution §1/§4/§6 n'était jamais mise à jour, et la phase `[CONSTITUTION]`
+> (32-36 %) était morte. Ce STEP réplique le STEP 3.5 d'`arch-init` (DRY : même
+> contrat, même agent owner exclusif §1/§4/§6 + ADRs + INDEX).
+
+**Conditionnel** : si `$arch_required == false` (STEP 4.bis, arch skippé) →
+skip ce STEP (aucun sentinel posé). Sinon, lire le sentinel :
+
+| Cas | Action |
+|---|---|
+| Sentinel absent | skip silencieusement (arch n'a pas eu besoin de Phase D, ex. projet sans `constitution.md`) |
+| Sentinel présent + parseable | spawn `Agent: constitutioner` |
+| Sentinel présent + corrompu | WARN 1 ligne `[CHAT]`, skip (non-bloquant) |
+
+```
+Agent: constitutioner
+```
+
+Le sous-agent gère : création ADRs (numérotation atomique timestamp,
+idempotente) par dimension active (backend, frontend, UI, auth, database) ;
+update `constitution.md` §1 (date) + §4 (stack retenu) + §6 (index ADRs) ;
+régénération `adrs/INDEX.md` ; validation read-back v5.0.
+
+**Cleanup sentinel** (après terminaison, succès OU échec — idempotence du
+prochain run) :
+
+```bash
+rm -f workspace/.sys/.state/arch-ready-for-constitutioner.flag
+```
+
+- `constitutioner` OK → émettre `[CONSTITUTION] {K} ADRs, §4/§6/INDEX OK (34%)` → STEP 5.5
+- `constitutioner` échoue → propager ERROR + **STOP** (l'INDEX ADRs serait
+  incohérent en aval ; même contrat qu'`arch-init` STEP 3.5).
+
+> **Idempotence** : STEP 6.5 (refresh INDEX déterministe via `index_adrs.py`)
+> reste en place comme filet — il rebuild §6/INDEX depuis les ADRs sur disque
+> même si ce STEP a été skippé (sentinel absent). Les deux ne se contredisent
+> pas : `constitutioner` crée les ADRs + §1/§4, `index_adrs.py` ne fait que
+> ré-indexer.
 
 ---
 
@@ -366,26 +414,26 @@ Atomic write (`.tmp.{PID}` + fsync + rename) anti-corruption mid-write
 (post-mortem : JSON tronqué = décision auditor corrompue silencieusement).
 
 ```bash
-mkdir -p workspace/output/.sys/.state
-TMP=workspace/output/.sys/.state/phase-plan-{n}.json.tmp.$$
+mkdir -p workspace/.sys/.state
+TMP=workspace/.sys/.state/phase-plan-{n}.json.tmp.$$
 python .claude/python/sdd_scripts/phase_planner.py --feat-number {n} --json > "$TMP"
 PP_EXIT=$?
 if [ "$PP_EXIT" -ne 0 ]; then
   rm -f "$TMP"
   echo "ERROR: [PHASE_PLAN_INIT_FAILED] phase_planner.py exit $PP_EXIT (FEAT {n})"
-  echo "FIX: vérifier workspace/input/feats/{n}-*.md + Project Config + /sdd-status {n}"
+  echo "FIX: vérifier workspace/feats/{n}-*.md + Project Config + /sdd-status {n}"
   exit 2
 fi
 sync "$TMP" 2>/dev/null || true
-mv "$TMP" workspace/output/.sys/.state/phase-plan-{n}.json
-PHASE_PLAN=$(cat workspace/output/.sys/.state/phase-plan-{n}.json)
+mv "$TMP" workspace/.sys/.state/phase-plan-{n}.json
+PHASE_PLAN=$(cat workspace/.sys/.state/phase-plan-{n}.json)
 ```
 
 `phase_planner.py` : Python pur, 0 LLM, ~50 ms. JSON persisté disque +
 `state.json.phases.planning.payload` (via `sdd_state.py set-phase`) pour
 récap `/sdd-full §5`.
 
-**Lecture STEP 6.4** (cross-tool-call) : `cat workspace/output/.sys/.state/phase-plan-{n}.json`
+**Lecture STEP 6.4** (cross-tool-call) : `cat workspace/.sys/.state/phase-plan-{n}.json`
 (la bash var $PHASE_PLAN ne survit pas aux tool-call boundaries).
 
 ## STEP 6 — Workflow gated séquentiel (cf. `.claude/rules/build-and-loop.md`)
@@ -407,13 +455,13 @@ Détail sémantique + critère arithmétique : `.claude/rules/build-and-loop.md 
 
 Lire `## Project Config` :
 - `GatedWorkflow` (default `true`) : si `false`, fallback legacy parallèle
-  (log `workspace/output/.sys/.audit/legacy-parallel.log`). Déconseillé.
+  (log `workspace/.sys/.audit/legacy-parallel.log`). Déconseillé.
 - `ApiGateRequired` (default `true`) : si `false` ET `GatedWorkflow: false`,
   status devient `SKIPPED` (gate désactivée).
 
 ### 6.0 Détection automatique du mode From Plan
 
-Avant invocation, Glob `workspace/output/plans/{n}-*-*.{back,front}.md`.
+Avant invocation, Glob `workspace/plans/{n}-*-*.{back,front}.md`.
 Chaque dev-* détecte son plan au démarrage et bascule en mode From Plan.
 
 Émettre 1 ligne :
@@ -428,8 +476,8 @@ Pour chaque plan détecté en 6.0, vérifier non-stale via `validate_plan.py`
 
 ```bash
 python .claude/python/sdd_scripts/validate_plan.py \
-  --plan-path "workspace/output/plans/{n}-{m}-{Name}.{back|front}.md" \
-  --us-path "workspace/output/us/{n}-{m}-{Name}.md" --json
+  --plan-path "workspace/plans/{n}-{m}-{Name}.{back|front}.md" \
+  --us-path "workspace/us/{n}-{m}-{Name}.md" --json
 ```
 
 | Exit | Action |
@@ -448,12 +496,12 @@ fallback sur le schema complet si slice absent.
 ```
 for {n}-{m}-{Name} in US_LIST :
     python -m sdd_scripts.generate_schema_slice \
-        --us-path workspace/output/us/{n}-{m}-{Name}.md
+        --us-path workspace/us/{n}-{m}-{Name}.md
 ```
 
 | Exit | Sens | Action `/dev-run` |
 |---|---|---|
-| `0` | slice écrit `workspace/output/db/schema-slice-{n}-{m}.json` | continue 6.a |
+| `0` | slice écrit `workspace/db/schema-slice-{n}-{m}.json` | continue 6.a |
 | `2` | CORRECTIBLE — pas de schema OU US ne référence aucune entité | continue 6.a (agent fallback) |
 | `1` | FAIL_FAST — US introuvable ou basename invalide | STOP + ERROR (problème US, pas slice) |
 | `3` | INFRA_BLOCKED — disk write failure | WARN, continue 6.a (agent fallback) |
@@ -471,7 +519,7 @@ $batches = chunk(US_LIST, size = $max_parallel)
 for batch in $batches:
     invoquer en parallèle :
       pour chaque US dans batch :
-        Agent(dev-backend, args="{n}-{m}")         # Opus 4.7
+        Agent(dev-backend, args="{n}-{m}")         # Opus 4.8
     attendre fin du batch
 ```
 
@@ -508,9 +556,10 @@ Contenu :
   **in-memory DB** ou mocks selon stack QA actif
 - Couverture min `ApiGateMinPerEndpoint` (default 2 — 1 happy + 1 négatif)
 - Auth mockée (test handler), jamais Azure AD réel
-- Rapport humain : `workspace/output/qa/feat-{n}/api-tests.md`
-- Données interrogeables : `workspace/output/db/console.db`
+- Données interrogeables : `workspace/db/console.db`
   (tables `qa_api_tests` + `qa_api_endpoints`, depuis v6.10)
+- Rapport humain : à la demande `query_console_db.py api-gate --feat {n} --format md`
+  (2026-07-06 : plus de fichier `api-tests.md`)
 
 Lire le verdict consolidé depuis la DB (`.json` éphémère ingéré et supprimé
 par `qa-generate` STEP 6.bis) :
@@ -551,7 +600,7 @@ Décision (canonique v7.0.0, cf. `build-and-loop.md §1.3`) :
 ```
 🔴 /dev-run {n} — API Gate RED ({F_api} test(s) échoué(s) sur {T_api})
 
-Rapport : workspace/output/qa/feat-{n}/api-tests.md
+Rapport : query_console_db.py api-gate --feat {n} --format md
 Endpoints en échec :
   - {VERB} {route} : {N_failed}/{N_total} cases ko
     cause : {message condensé du 1er échec}
@@ -560,7 +609,7 @@ Endpoints en échec :
 Frontend NON généré pour cette session.
 
 Pour débloquer :
-  1. corriger le code backend (workspace/output/src/{BackendName}/...) OU
+  1. corriger le code backend (workspace/src/{BackendName}/...) OU
      régénérer une US backend cassée : /dev-backend {n}-{m}
   2. re-tester (rapide) : /qa-generate {n} --mode api-tests --filter {endpoint}
   3. quand 🟢 GREEN → relancer /dev-run {n} (la phase 6a saute,
@@ -577,7 +626,7 @@ $batches = chunk(US_LIST, size = $max_parallel)
 for batch in $batches:
     invoquer en parallèle :
       pour chaque US dans batch :
-        Agent(dev-frontend, args="{n}-{m}")         # Opus 4.7
+        Agent(dev-frontend, args="{n}-{m}")         # Opus 4.8
     attendre fin du batch
 ```
 
@@ -611,7 +660,7 @@ Skip 6a+6b si `GATE_STATUS in {PASS, WARN}` ET `GATE_TS > mtime(backend)`.
 ### Mode legacy parallèle (`GatedWorkflow: false`)
 
 Fallback workflow v3.x (back+front parallèles même batch). Logger
-`workspace/output/.sys/.audit/legacy-parallel.log`, WARN au récap STEP 7.
+`workspace/.sys/.audit/legacy-parallel.log`, WARN au récap STEP 7.
 Réservé projets simples sans contrat backend fragile.
 
 ---
@@ -629,7 +678,7 @@ Sonnet 4.6 (~9-15 KB context chacune).
 > **Quand garder l'ancien comportement parallèle 4-batch** : flag
 > `--legacy-auditor-parallel` (CLI) ou `AuditorBatchMode: legacy-parallel`
 > (Project Config). Audit-loggué dans
-> `workspace/output/.sys/.audit/legacy-auditor-parallel.log`.
+> `workspace/.sys/.audit/legacy-auditor-parallel.log`.
 > Distinct de `--unsequenced` (qui adresse la gate API back/front).
 
 **Pourquoi pas pré-déclenché en parallèle avec 6.c (dev-frontend)** : les 4
@@ -647,11 +696,16 @@ optimale.
 
 **Procédure synthétique** (substance complète : `@.claude/rules/auditor-orchestration.md`) :
 
-1. **STEP 6.4.0** — Re-Read `workspace/output/.sys/.state/phase-plan-{n}.json`
+1. **STEP 6.4.0** — Re-Read `workspace/.sys/.state/phase-plan-{n}.json`
    (subshell-safe). Si fichier manquant OU `phases` malformé →
    STOP `[PHASE_PLAN_INIT_FAILED]`. Lire `ArchReviewMode` + `AuditorBatchMode`.
    Si toutes phases disabled ET `arch_review_mode != "full"` → skip 6.4.
-2. **STEP 6.4.A — Stage 1 : spec-compliance gate (SEUL)**
+2. **STEP 6.4.A — Stage 1 : spec-compliance gate (SEUL — PRODUCTEUR UNIQUE)**
+   - **MA-1 : c'est l'UNIQUE point qui spawn `spec-compliance-reviewer` dans
+     le flux `/sdd-full`.** Le JSON `{n}-spec-compliance.json` qu'il produit
+     est ensuite relu (jamais re-spawné) par `/feat-validate --post-dev`
+     (sdd-full STEP 4.7) et par `/sdd-review` STEP 3.0.bis (lecteurs purs
+     conditionnés à `SDD_RUN_ID`).
    - Skip si phase disabled OU `auditor_batch_mode == "legacy-parallel"`.
    - Sinon spawn `spec-compliance-reviewer` (1 agent, in solo).
    - Verdict 🔴 → STOP avec bloc 6.4.A.STOP (économie 3 inv. Sonnet).
@@ -659,7 +713,7 @@ optimale.
 3. **STEP 6.4.B — Stage 2 : quality batch parallèle**
    - Build `BATCH` : code-reviewer + security-reviewer + arch-reviewer (si full).
    - Dispatch **en parallèle dans un seul message** (paths disjoints `ownership.md §1`).
-   - Verdicts via `workspace/output/.sys/.validation/{n}-*.json`.
+   - Verdicts via `workspace/.sys/.validation/{n}-*.json`.
    - Verdict consolidé `max_severity(spec, batch)` — 🟢/🟡 → STEP 6.5 ; 🔴 → STOP.
 4. **STEP 6.4.5** — State tracking via `sdd_state.py set-phase --phase auditor_batch ...`.
 5. **STEP 6.4.6** — Anti-derive : agents idempotents, pas de fallback 🔴, pas de
@@ -677,7 +731,7 @@ optimale.
 
 **Bypass legacy-parallel** : `--legacy-auditor-parallel` (CLI) ou
 `AuditorBatchMode: legacy-parallel` (Project Config). Audit-loggué dans
-`workspace/output/.sys/.audit/legacy-auditor-parallel.log`. Distinct de
+`workspace/.sys/.audit/legacy-auditor-parallel.log`. Distinct de
 `--unsequenced` (gate API back/front).
 
 ---
@@ -685,7 +739,7 @@ optimale.
 ## STEP 6.5 — Refresh INDEX ADRs (déterministe)
 
 Exécuter **systématiquement** après le gated workflow pour régénérer
-`workspace/output/.sys/.context/adrs/INDEX.md` (dev-* ont peut-être créé
+`workspace/.sys/.context/adrs/INDEX.md` (dev-* ont peut-être créé
 des ADRs phase 5 que `arch` n'a pas indexés) :
 
 ```bash
@@ -733,7 +787,7 @@ ont été skippés sans erreur — US frontend-only ou backend-only), flipper
 (US reste `InProgress`, signalant le besoin de correction).
 
 ```bash
-for us_file in workspace/output/us/{n}-*.md; do
+for us_file in workspace/us/{n}-*.md; do
   us_id=$(basename "$us_file" .md | grep -oE '^[0-9]+-[0-9]+')
   # Flip uniquement si la phase dev n'a pas échoué pour cette US
   # (Tb_ok + Tf_ok inclut cette US OU elle est skipped sans erreur)
@@ -770,7 +824,7 @@ Notation `Bootstrap + DB` :
 
 Cas succès complet :
 ```
-✅ /dev-run {n} — {U} US · gated GREEN · code dans workspace/output/src/
+✅ /dev-run {n} — {U} US · gated GREEN · code dans workspace/src/
 ```
 
 Cas API Gate RED → format §6.b.STOP (seul rapport affiché).

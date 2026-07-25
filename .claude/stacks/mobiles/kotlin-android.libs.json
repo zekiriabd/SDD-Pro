@@ -6,9 +6,9 @@
   "buildSystem": "gradle",
   "manifest": {
     "files": [
-      "workspace/output/src/{AppName}/build.gradle.kts",
-      "workspace/output/src/{AppName}/gradle/libs.versions.toml",
-      "workspace/output/src/{AppName}/settings.gradle.kts"
+      "workspace/src/{AppName}/build.gradle.kts",
+      "workspace/src/{AppName}/gradle/libs.versions.toml",
+      "workspace/src/{AppName}/settings.gradle.kts"
     ],
     "versionCatalogPath": "gradle/libs.versions.toml"
   },
@@ -264,6 +264,6 @@
     "lastUpdated": "2026-05-24",
     "format": "compact (v2)",
     "maintainer": "SDD_Pro Framework",
-    "notes": "Kotlin Android native stack cible API 24-36 (Android 7.0-14). Jetpack Compose declarative UI, Hilt DI, Retrofit+OkHttp, Room+Datastore, Coroutines+Flow. Clean Architecture (Domain-Data-Presentation). Mono-projet {AppName}/ sous workspace/output/src/."
+    "notes": "Kotlin Android native stack cible API 24-36 (Android 7.0-14). Jetpack Compose declarative UI, Hilt DI, Retrofit+OkHttp, Room+Datastore, Coroutines+Flow. Clean Architecture (Domain-Data-Presentation). Mono-projet {AppName}/ sous workspace/src/."
   }
 }

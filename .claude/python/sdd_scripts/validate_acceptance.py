@@ -9,8 +9,8 @@ hooks must be < 5s, this could take 10+ minutes blocking the pipeline.
 
 New design:
   1. Agent qa invokes this script as a SHELL command during its STEP X (acceptance check).
-  2. Script walks workspace/output/src/*, runs the checks, writes a verdict report
-     to workspace/output/.sys/.acceptance/acceptance.json.
+  2. Script walks workspace/src/*, runs the checks, writes a verdict report
+     to workspace/.sys/.acceptance/acceptance.json.
   3. The remaining SubagentStop hook only READS the verdict JSON (fast, < 100ms)
      and decides BLOCK or ALLOW.
 
@@ -26,6 +26,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -36,7 +37,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sdd_lib.atomic_write import atomic_write_text  # noqa: E402
 from sdd_lib.exit_codes import FAIL_FAST, INFRA_BLOCKED, SUCCESS  # noqa: E402
-from sdd_lib.paths import project_root_for_hook as _resolve_project_root
+from sdd_lib.paths import workspace_root, project_root_for_hook as _resolve_project_root
 
 PROJECT_TYPE_MARKERS = {
     "node": ["package.json"],
@@ -49,25 +50,71 @@ DEFAULT_TIMEOUT = 120  # seconds per check (security audit 2026-06-06 — was 30
 DEFAULT_MAX_PROJECTS = 8  # safety cap : scan > 8 projets = symptôme de mauvais scoping
 
 
+#: AcceptanceGate keys sourced via layered config (base.yml ← team.yml ← stack.md).
+#: Defaults match `quality.md §C.3` : strict / true / 10s / 80%.
+_ACCEPTANCE_KEYS = (
+    "AcceptanceGate",
+    "AcceptanceGate.RequireE2E",
+    "AcceptanceGate.SmokeTimeout",
+    "AcceptanceGate.MinCoverage",
+)
+
+
 def _read_acceptance_config(root: Path) -> dict[str, str]:
-    stack_md = root / "workspace" / "input" / "stack" / "stack.md"
+    """Resolve AcceptanceGate config via the layered config hierarchy.
+
+    MA-4 fix (audit 2026-06-09) — previously read `AcceptanceGate*` keys via a
+    raw regex on `stack.md`, which bypassed `~/.sdd/config.team.yml` org policy
+    and `config.base.yml` framework defaults. We now route the sourcing through
+    `read_layered_config` (same pattern as `sdd_review.py`), so a team that
+    pins `AcceptanceGate: strict` cannot be silently relaxed by a project that
+    omits the key.
+
+    Returns a dict of stringified values (same public shape consumed by
+    `main()` and the `validate_acceptance_gate.py` hook). Defaults when a key
+    is absent at every layer (cf. `quality.md §C.3`) :
+        mode=strict, require_e2e=true, smoke_timeout=10, min_coverage=80.
+
+    A missing `stack.md` (no project yet) degrades the gate to `off` so a
+    fresh repo is never blocked.
+    """
+    stack_md = workspace_root(root) / "stack" / "stack.md"
     if not stack_md.is_file():
-        return {"mode": "off", "require_e2e": "false"}
+        return {
+            "mode": "off",
+            "require_e2e": "false",
+            "smoke_timeout": "10",
+            "min_coverage": "80",
+        }
+
     try:
-        content = stack_md.read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError):
-        return {"mode": "off", "require_e2e": "false"}
+        from sdd_lib.layered_config import read_layered_config
+        cfg = read_layered_config(root=root, keys=_ACCEPTANCE_KEYS)
+    except Exception:
+        # Fail-safe : never crash the gate on a malformed config layer.
+        cfg = {}
 
-    mode = "strict"
-    require_e2e = True
-    m = re.search(r"^AcceptanceGate:\s*(\w+)", content, re.MULTILINE)
-    if m:
-        mode = m.group(1).lower()
-    m = re.search(r"^AcceptanceGate\.RequireE2E:\s*(\w+)", content, re.MULTILINE)
-    if m:
-        require_e2e = m.group(1).lower() in ("true", "yes", "1")
+    raw_mode = cfg.get("AcceptanceGate")
+    mode = str(raw_mode).strip().lower() if raw_mode not in (None, "") else "strict"
 
-    return {"mode": mode, "require_e2e": str(require_e2e).lower()}
+    raw_e2e = cfg.get("AcceptanceGate.RequireE2E")
+    if raw_e2e in (None, ""):
+        require_e2e = True
+    else:
+        require_e2e = str(raw_e2e).strip().lower() in ("true", "yes", "1", "on")
+
+    raw_timeout = cfg.get("AcceptanceGate.SmokeTimeout")
+    smoke_timeout = str(raw_timeout).strip() if raw_timeout not in (None, "") else "10"
+
+    raw_cov = cfg.get("AcceptanceGate.MinCoverage")
+    min_coverage = str(raw_cov).strip() if raw_cov not in (None, "") else "80"
+
+    return {
+        "mode": mode,
+        "require_e2e": str(require_e2e).lower(),
+        "smoke_timeout": smoke_timeout,
+        "min_coverage": min_coverage,
+    }
 
 
 def _detect_project_type(project_dir: Path) -> str | None:
@@ -82,7 +129,7 @@ def _detect_project_type(project_dir: Path) -> str | None:
 
 
 # Audit 2026-06-06 MA-9 — whitelist project directory name to neutralize
-# the case where `workspace/output/src/` contains a directory whose name
+# the case where `workspace/src/` contains a directory whose name
 # starts with `-` (interpreted as a flag by npm/dotnet/etc). Defensive
 # even though we trust internal globs — paths from arch scaffolding could
 # theoretically inherit a malformed name from a malicious FEAT.
@@ -93,9 +140,30 @@ def _is_safe_project_dir(project_dir: Path) -> bool:
     return bool(_SAFE_PROJECT_NAME.match(project_dir.name))
 
 
+def _resolve_exe(name: str) -> str:
+    """Resolve a command name to a runnable path, cross-platform.
+
+    PY-C1 fix (audit 2026-06-12) — on Windows, Node tooling ships as batch
+    wrappers (`npm.cmd`, `npx.cmd`, `pnpm.cmd`, `yarn.cmd`). `subprocess.run`
+    without `shell=True` uses `CreateProcess`, which does NOT consult `PATHEXT`,
+    so a bare `["npm", ...]` raises `FileNotFoundError` even when npm is on PATH
+    → every Node AcceptanceGate check returned a false RED on Windows.
+
+    `shutil.which` DOES consult `PATHEXT` (resolves `npm` → `…\npm.cmd`) and is
+    a harmless no-op on POSIX (returns the absolute path of the binary, or the
+    same value when already an absolute/relative path that exists). When the
+    command cannot be resolved at all we return it unchanged so the existing
+    `FileNotFoundError → "command not found"` branch still reports usefully.
+    """
+    resolved = shutil.which(name)
+    return resolved if resolved else name
+
+
 def _run_check(project_dir: Path, cmd: list[str]) -> tuple[bool, str]:
     if not _is_safe_project_dir(project_dir):
         return False, f"unsafe project dir name: {project_dir.name!r} (must match ^[A-Za-z][A-Za-z0-9._-]*$)"
+    if cmd:
+        cmd = [_resolve_exe(cmd[0]), *cmd[1:]]
     try:
         result = subprocess.run(
             cmd,
@@ -243,7 +311,7 @@ def _parse_args(argv: list[str] | None = None):
         "--projects",
         default=None,
         help="Comma-separated list of project names to scope the gate to "
-             "(default: tous les projets sous workspace/output/src/, capped at "
+             "(default: tous les projets sous workspace/src/, capped at "
              f"{DEFAULT_MAX_PROJECTS}). Recommandé en CI pour éviter de scanner "
              "des projets non modifiés.",
     )
@@ -313,7 +381,7 @@ def main(argv: list[str] | None = None) -> int:
         scope_projects = {p.strip() for p in args.projects.split(",") if p.strip()}
 
     root = _resolve_project_root()
-    report_path = root / "workspace" / "output" / ".sys" / ".acceptance" / "acceptance.json"
+    report_path = workspace_root(root) / ".sys" / ".acceptance" / "acceptance.json"
 
     if os.environ.get("SDD_ALLOW_ACCEPTANCE_BYPASS", "").lower() in ("1", "true", "yes"):
         sys.stderr.write("[acceptance] SDD_ALLOW_ACCEPTANCE_BYPASS=1 — bypass\n")
@@ -339,12 +407,12 @@ def main(argv: list[str] | None = None) -> int:
         })
         return SUCCESS
 
-    src_dir = root / "workspace" / "output" / "src"
+    src_dir = workspace_root(root) / "src"
     if not src_dir.is_dir():
         _write_report(report_path, {
             "verdict": "skipped",
             "mode": mode,
-            "reason": "no workspace/output/src/ yet",
+            "reason": "no workspace/src/ yet",
             "extractedAt": datetime.now(timezone.utc).isoformat(),
             "projects": {},
             "failures": [],
@@ -385,7 +453,7 @@ def main(argv: list[str] | None = None) -> int:
         _write_report(report_path, {
             "verdict": "skipped",
             "mode": mode,
-            "reason": "no projects under workspace/output/src/",
+            "reason": "no projects under workspace/src/",
             "extractedAt": datetime.now(timezone.utc).isoformat(),
             "projects": {},
             "failures": [],

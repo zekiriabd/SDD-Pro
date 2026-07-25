@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""SDD_Pro v6.10 — Read-only queries against workspace/output/db/console.db.
+"""SDD_Pro v6.10 — Read-only queries against workspace/db/console.db.
 
 Thin CLI on top of common questions slash commands ask the DB (gate
 decision, run status, feat overview, perf verdict, …). Output is JSON
@@ -15,6 +15,15 @@ Subcommands:
     a11y        --feat N            → {verdict, critical, serious, moderate, minor}
     run-latest  --feat N            → {run_id, status, current_phase, started_at}
     feat-stats  --feat N            → consolidated overview across all qa_*
+
+Output format:
+    --format json (default)   → machine-readable JSON on stdout
+    --format md               → human-readable Markdown (on-demand render;
+                                 no file is ever written to disk). For
+                                 `review` the full consolidated report is
+                                 recomputed live from the qa_* tables — this
+                                 replaces the former workspace/qa/
+                                 feat-{n}/review.md file (removed 2026-07-06).
 
 Exit codes:
     0 = data present (query succeeded, even if empty result)
@@ -381,6 +390,61 @@ DISPATCH = {
 _PREDICATE_SUBCOMMANDS = {"arch-review-present", "spec-compliance-present"}
 
 
+def _render_review_md(feat: int, result: dict) -> str:
+    """Recompute the consolidated /sdd-review report live from qa_* tables and
+    render it as Markdown. Replaces the former review.md disk file (2026-07-06)."""
+    from sdd_scripts._review_fetch import fetch_findings
+    from sdd_scripts._review_report import compute_report, render_markdown
+    findings, missing = fetch_findings(feat)
+    fail_on = (result.get("fail_on") or "serious")
+    report = compute_report(feat, findings, missing, fail_on)
+    return render_markdown(report)
+
+
+def _render_generic_md(subcommand: str, feat: int, result: dict) -> str:
+    """Fallback Markdown for the flat per-dimension queries (quality, coverage,
+    security, spec, api-gate, perf, a11y, feat-stats)."""
+    lines = [f"# console.db — `{subcommand}` — FEAT {feat}", ""]
+
+    def _kv_table(title: str, d: dict) -> None:
+        lines.append(f"## {title}")
+        lines.append("")
+        lines.append("| Champ | Valeur |")
+        lines.append("|---|---|")
+        for k, v in d.items():
+            if isinstance(v, (dict, list)):
+                v = json.dumps(v, ensure_ascii=False)
+            lines.append(f"| `{k}` | {str(v).replace(chr(124), chr(92) + chr(124))} |")
+        lines.append("")
+
+    if subcommand == "feat-stats":
+        for dim, payload in result.items():
+            if isinstance(payload, dict):
+                _kv_table(dim, payload)
+            else:
+                lines.append(f"- **{dim}** : {payload}")
+        lines.append("")
+    else:
+        _kv_table(subcommand, result)
+
+    lines.append("---")
+    lines.append(f"Source de vérité : `console.db` (rendu à la demande, "
+                 f"aucun fichier écrit). Re-run : "
+                 f"`query_console_db.py {subcommand} --feat {feat} --format md`")
+    return "\n".join(lines) + "\n"
+
+
+def render_markdown_output(subcommand: str, feat: int, result: dict) -> str:
+    # `review` is recomputed live from the qa_* tables — always render it even
+    # when no consolidated validation_reports row was persisted yet.
+    if subcommand == "review":
+        return _render_review_md(feat, result)
+    if not result.get("present", True):
+        return (f"# console.db — `{subcommand}` — FEAT {feat}\n\n"
+                f"_Aucune donnée en base pour cette FEAT._\n")
+    return _render_generic_md(subcommand, feat, result)
+
+
 def main(argv: list[str] | None = None) -> int:
     if sys.stdout.encoding and sys.stdout.encoding.lower() not in ("utf-8", "utf8"):
         try:
@@ -393,6 +457,9 @@ def main(argv: list[str] | None = None) -> int:
                                      description=__doc__.splitlines()[0])
     parser.add_argument("subcommand", choices=sorted(DISPATCH.keys()))
     parser.add_argument("--feat", type=int, required=True)
+    parser.add_argument("--format", choices=("json", "md"), default="json",
+                        help="Output format. `md` renders a human-readable report "
+                             "on-demand from console.db (no file written).")
     parser.add_argument("--max-age-hours", type=int, default=24,
                         help="(arch-review-present only, v7.0.1 audit C4) TTL filter for "
                              "freshness check ; 0 disables. Default 24h.")
@@ -411,8 +478,16 @@ def main(argv: list[str] | None = None) -> int:
     except Exception as exc:
         sys.stderr.write(f"ERROR: query_console_db: {exc}\n")
         return FAIL_FAST
-    sys.stdout.write(json.dumps(result, indent=2, ensure_ascii=False, default=str))
-    sys.stdout.write("\n")
+
+    if args.format == "md" and args.subcommand not in _PREDICATE_SUBCOMMANDS:
+        try:
+            sys.stdout.write(render_markdown_output(args.subcommand, args.feat, result))
+        except Exception as exc:
+            sys.stderr.write(f"ERROR: query_console_db: markdown render failed: {exc}\n")
+            return FAIL_FAST
+    else:
+        sys.stdout.write(json.dumps(result, indent=2, ensure_ascii=False, default=str))
+        sys.stdout.write("\n")
     if args.subcommand in _PREDICATE_SUBCOMMANDS:
         return int(result.get("_exit_code", 0))
     return SUCCESS

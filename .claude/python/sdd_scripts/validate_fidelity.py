@@ -9,15 +9,15 @@ Deterministic, 0 token LLM. Replaces ~80 lines of LLM prose.
 
 Usage:
     python validate_fidelity.py \\
-        --html-path workspace/input/ui/1-2-Bebes.html \\
-        --generated-dir workspace/output/src/AppName \\
-        [--theme-path workspace/output/src/AppName/wwwroot/css/theme.css] \\
+        --html-path workspace/ui/1-2-Bebes.html \\
+        --generated-dir workspace/src/AppName \\
+        [--theme-path workspace/src/AppName/wwwroot/css/theme.css] \\
         [--hex-tolerance-max-pct 5] \\
         [--us-id 1-2] \\
         [--json]
 
 When `--us-id {n}-{m}` is provided together with `--json`, the JSON report
-is persisted to `workspace/output/.sys/.validation/fidelity-{n}-{m}.json`
+is persisted to `workspace/.sys/.validation/fidelity-{n}-{m}.json`
 (canonical location, never the repo root). Stdout receives the human
 verdict in that mode. Without `--us-id`, `--json` keeps legacy stdout
 behaviour (backward-compat for tests / ad-hoc runs).
@@ -57,7 +57,7 @@ def parse_args() -> argparse.Namespace:
         "--us-id",
         default="",
         help="US identifier `{n}-{m}` — when set with --json, persists report "
-             "to workspace/output/.sys/.validation/fidelity-{n}-{m}.json",
+             "to workspace/.sys/.validation/fidelity-{n}-{m}.json",
     )
     return p.parse_args()
 

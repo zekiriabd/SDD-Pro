@@ -79,7 +79,7 @@ plusieurs micro-services dans un même monorepo, il faut **un workspace
 par service**. Pattern microservice (stack 🟡 experimental) est plus une
 intention qu'une garantie.
 
-**Workaround** : `workspace/output/src/{BackendName}` + `{AppName}` +
+**Workaround** : `workspace/src/{BackendName}` + `{AppName}` +
 `{LibName}` permettent une isolation back/front/shared dans le même
 workspace, mais pas N backends.
 
@@ -113,7 +113,7 @@ métriques ROI agrégées requièrent une consolidation manuelle.
 Si Anthropic indisponible (panne API, modification policy, retrait
 modèle), SDD_Pro est inutilisable. Cf. `COMPLIANCE.md §8 Q2`.
 
-### 4.2 Variance qualité Opus 4.7 / Sonnet 4.6
+### 4.2 Variance qualité Opus 4.8 / Sonnet 4.6
 
 Les LLM ne sont pas déterministes. Sur 2 runs identiques de `/sdd-full`,
 le code généré peut différer (naming variables, ordering d'imports,
@@ -126,7 +126,7 @@ comportement observable identique même si le code intern diffère.
 
 ### 4.3 Limite de contexte
 
-Claude Opus 4.7 supporte 1M tokens. Le framework limite le **context
+Claude Opus 4.8 supporte 1M tokens. Le framework limite le **context
 budget par agent** (ledger `console.db` table `context_budget`) pour
 éviter l'explosion. Une FEAT trop grosse (> 10 US, > 50k LOC code
 existant à lire) peut hitter la limite.
@@ -169,6 +169,34 @@ maintenues.
 
 ---
 
+### 5.4 Cost cap fail-open sur console.db corrompue (audit 2026-06-11)
+
+Le hook `preflight_cost_cap.py` retourne ALLOW sur toute erreur DB/import
+(design assumé : un hook doit rester < 5 s et ne jamais bloquer le pipeline
+sur sa propre infra). Conséquence : une `console.db` corrompue **désactive
+silencieusement** le plafond `MaxCostPerRun` ($50 défaut). Mitigation : le
+smoke framework vérifie l'intégrité de la DB ; surveiller les WARN
+`[TWO_STAGE_PAYLOAD_INVALID]`/cost-cap dans les logs CI.
+
+### 5.5 Reverse engineering = extraction statique (borne inférieure)
+
+L'extraction reverse ne voit PAS : les corps de triggers/vues DB (noms
+inventoriés seulement depuis l'audit 2026-06-11), le schéma live de la base,
+les jobs planifiés externes (cron/Task Scheduler), la config serveur
+(IIS/registre/GPO), le SQL dynamique au nom de table variable, ni les règles
+métier encodées en **données de paramétrage** (tables `Param`). Une FEAT
+reverse `confidence: high` est une **borne inférieure fiable** du comportement
+legacy — jamais une preuve d'équivalence. La bannière du template FEAT reverse
+le rappelle ; revue humaine obligatoire avant refonte.
+
+### 5.6 Profondeur d'extraction reverse par langage
+
+Le graphe de classes/rôles (`code_graph_builder.py`) est **.NET-only**
+(`.cs`/`.vb`). Pour Java/PHP/Delphi/VB6/Classic ASP, l'extraction couvre
+détection d'unités + data-access SQL inline + seeds UI — pas de `classes[]`
+ni de rôles. Caps de confidence ajustés en conséquence
+(`language_signatures.yml`, delphi downgradé `medium` audit 2026-06-11).
+
 ## 6. Limites du modèle commercial
 
 ### 6.1 Pas de SaaS
@@ -178,7 +206,7 @@ Chaque équipe doit installer le framework localement.
 
 ### 6.2 Pricing dépendant d'Anthropic
 
-Le coût USD par FEAT dépend du pricing Claude API (Opus 4.7 + Sonnet 4.6 +
+Le coût USD par FEAT dépend du pricing Claude API (Opus 4.8 + Sonnet 4.6 +
 cache hit rate). Si Anthropic change ses tarifs, le ROI varie. Voir
 `cache-strategy.md` pour les optimisations cache.
 

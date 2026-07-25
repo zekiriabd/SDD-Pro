@@ -19,10 +19,10 @@ aucune invocation d'agent.
 ## STEP 1 — Détection de la portée
 
 Si argument `{n}` fourni → mode mono-FEAT. Sinon → mode multi (toutes
-les FEATs sous `workspace/input/feats/`). Si aucune FEAT trouvée :
+les FEATs sous `workspace/feats/`). Si aucune FEAT trouvée :
 
 ```
-Aucune FEAT dans workspace/input/feats/. Lancer /feat-generate pour démarrer.
+Aucune FEAT dans workspace/feats/. Lancer /feat-generate pour démarrer.
 ```
 
 STOP.
@@ -56,11 +56,11 @@ Parser le JSON et rendre en tree ASCII :
 
 ```
 État global :
-  [ARCH ✗]  aucun projet initialisé dans workspace/output/src/ — lancer /arch-init
-  [DB ✗]    DatabaseType=SqlServer mais workspace/output/db/schema.json absent
-  [CONTEXT ✗] aucun CLAUDE.md projet sous workspace/output/src/*/
+  [ARCH ✗]  aucun projet initialisé dans workspace/src/ — lancer /arch-init
+  [DB ✗]    DatabaseType=SqlServer mais workspace/db/schema.json absent
+  [CONTEXT ✗] aucun CLAUDE.md projet sous workspace/src/*/
 
-FEAT 1-Auth (workspace/input/feats/1-Auth.md)
+FEAT 1-Auth (workspace/feats/1-Auth.md)
 ├─ US (2) :
 │  ├─ 1-1-Login           [US ✓] [HTML ✓]
 │  └─ 1-2-Reset-Password  [US ✓] [HTML —]
@@ -70,7 +70,7 @@ FEAT 1-Auth (workspace/input/feats/1-Auth.md)
 │  ├─ Coverage    : 82.3% (seuil 80%) ✓
 │  ├─ Quality     : 0 errors / 5 warnings / 12 info
 │  └─ Décision    : 🟢 GREEN
-└─ À faire : pipeline complet (inspecter workspace/output/src/)
+└─ À faire : pipeline complet (inspecter workspace/src/)
 ```
 
 Cas d'incohérence à flagger explicitement (`⚠️`) :
@@ -95,7 +95,7 @@ Pour matérialiser une FEAT : /dev-run {n} (arch + db + code) ou /sdd-full {n}.
 
 Sinon :
 ```
-Pipeline complet. Inspecter workspace/output/src/ pour le code généré.
+Pipeline complet. Inspecter workspace/src/ pour le code généré.
 ```
 
 ---

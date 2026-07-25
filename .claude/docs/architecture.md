@@ -10,8 +10,8 @@
 ```mermaid
 graph TB
     subgraph Human["👤 Inputs humains"]
-        FEAT[FEAT specs<br/>workspace/input/feats/]
-        UI[HTML mockups<br/>workspace/input/ui/]
+        FEAT[FEAT specs<br/>workspace/feats/]
+        UI[HTML mockups<br/>workspace/ui/]
         STACK[stack.md<br/>Project Config]
     end
 
@@ -30,10 +30,10 @@ graph TB
     end
 
     subgraph Output["📦 Outputs"]
-        US[User Stories<br/>workspace/output/us/]
-        CODE[Code généré<br/>workspace/output/src/]
-        REVIEW[Reports<br/>workspace/output/qa/]
-        ADRS[ADRs<br/>workspace/output/.sys/.context/adrs/]
+        US[User Stories<br/>workspace/us/]
+        CODE[Code généré<br/>workspace/src/]
+        REVIEW[QA telemetry<br/>console.db qa_*]
+        ADRS[ADRs<br/>workspace/.sys/.context/adrs/]
     end
 
     FEAT --> Agents
@@ -137,8 +137,8 @@ graph LR
 ## 1. Vision
 
 Le PO humain rédige une FEAT fonctionnelle. L'UX Designer (humain) dépose
-des **mockups HTML statiques** dans `workspace/input/ui/`. Une chaîne de
-**12 agents LLM + 1 rubric déterministe** (4 cœur LLM : PO, Arch, Dev-Backend,
+des **mockups HTML statiques** dans `workspace/ui/`. Une chaîne de
+**12 agents LLM forward + 1 rubric déterministe** (+ 7 agents reverse, module optionnel — cf. §1.bis) (4 cœur LLM : PO, Arch, Dev-Backend,
 Dev-Frontend ; 3 support LLM : Elicitor, Constitutioner, QA ; 5 auditors LLM :
 Code-Reviewer, Security-Reviewer, Spec-Compliance-Reviewer, Arch-Reviewer,
 Adversarial-Reviewer ; 1 rubric Python `complexity-router` opt-in v7.0.0+,
@@ -154,14 +154,34 @@ Adversarial-Reviewer ; 1 rubric Python `complexity-router` opt-in v7.0.0+,
 Le bootstrap + scaffolding DB est exécuté UNE FOIS par projet. Le code
 est ensuite généré en parallèle par Dev-Backend et Dev-Frontend.
 
+## 1.bis Agents reverse (module optionnel, 7 agents — audit 2026-06-11)
+
+Le module reverse engineering (legacy → FEAT) ajoute **7 agents** au roster,
+déclarés dans le manifest autonome `loader.reverse.yml` (jamais référencé par
+`loader.yml` — isolation D4). CLAUDE.md §4 annonce donc **19 agents** au total
+(12 forward documentés ici + 7 reverse) :
+
+| Agent | Modèle | Phase reverse |
+|---|---|---|
+| `reverse-inventory` | Sonnet 4.6 | 1 (cartographie) |
+| `reverse-tech-auditor` | Sonnet 4.6 | 2 (audit informational) |
+| `reverse-tech-analyst` | Opus 4.8 | 3a (analyse technique) |
+| `reverse-us-writer` | Sonnet 4.6 | 3b (user stories) |
+| `reverse-feat-composer` | Opus 4.8 | 3c (FEAT métier) |
+| `reverse-ui-extractor` | Opus 4.8 | 4 (mockups HTML) |
+| `reverse-completeness-reviewer` | Sonnet 4.6 | L5 (revue back) |
+
+SSoT : `docs/reverse-engineering-workflow.md` + `rules/reverse-engineering.md`
++ `loader.reverse.yml`. Ce document ne détaille que les 12 agents forward.
+
 ## 2. Modèles assignés par agent
 
 | Agent          | Modèle              | Justification                                       |
 |----------------|---------------------|-----------------------------------------------------|
 | `po`           | `claude-sonnet-4-6` | Découpage logique, traçabilité — pas de multimodal  |
 | `arch`         | `claude-sonnet-4-6` | Init solution + projets vides + introspection DB + scaffolding |
-| `dev-backend`  | **`claude-opus-4-7`** | Raisonnement fin sur génération code serveur, `preserves:`/`adds:`, layer mapping |
-| `dev-frontend` | **`claude-opus-4-7`** | Raisonnement fin sur génération code client + fidélité HTML→DS |
+| `dev-backend`  | **`claude-opus-4-8`** | Raisonnement fin sur génération code serveur, `preserves:`/`adds:`, layer mapping |
+| `dev-frontend` | **`claude-opus-4-8`** | Raisonnement fin sur génération code client + fidélité HTML→DS |
 | ~~`dev-backend-strict` (v6.2)~~ | — | **RETIRÉ v7.0.0** (governance-major-prompts-trim) — variants strict supprimés, plus de routing différencié |
 | ~~`dev-frontend-strict` (v6.2)~~ | — | **RETIRÉ v7.0.0** (idem) |
 | `elicitor`     | `claude-sonnet-4-6` | Élicitation structurée 5 techniques                 |
@@ -173,7 +193,7 @@ est ensuite généré en parallèle par Dev-Backend et Dev-Frontend.
 | `security-reviewer` (v6.3.2) | `claude-sonnet-4-6` | Mode `scan` (post-dev OWASP Top 10 2021, 21 classes `[SEC_*]`, 8 hard-blocking). Mode `threat-model` retiré v7.0.0 (→ template humain `templates/threat-model.template.md`) |
 | ~~`performance-auditor` (v6.4.0)~~ | — | **RETIRÉ v7.0.0** (governance-major-auditors-trim) → remplacé par Lighthouse CI + wrk/k6 au CI du projet généré ; schéma `[PERF_*]` archivé dans `error-classification-legacy.md §2` |
 
-> **Split modèles (v7.0.0)** : Opus 4.7 sur les agents qui génèrent du
+> **Split modèles (v7.0.0)** : Opus 4.8 sur les agents qui génèrent du
 > code applicatif (`dev-backend`, `dev-frontend`) — la qualité du code
 > généré justifie le coût supplémentaire (preserves/adds contractuels,
 > layer mapping strict, fidélité libellés HTML). Sonnet 4.6 sur les
@@ -189,7 +209,7 @@ est ensuite généré en parallèle par Dev-Backend et Dev-Frontend.
 > Lighthouse CI + wrk/k6 ; `dashboard` → `index_adrs.py` + console web ;
 > `dev-*-strict` (forks Sonnet v6.2) supprimés — flag `PlanCacheStrict`
 > est désormais DEPRECATED no-op. Le routing `/dev-run` STEP 6.0.bis
-> spawn `dev-*` Opus 4.7 que le plan soit v1 ou v2. Design historique
+> spawn `dev-*` Opus 4.8 que le plan soit v1 ou v2. Design historique
 > consultable via `git log -- docs/DESIGN-FROMPLAN-STRICT.md` (fichier
 > retiré au sweep v7.0.0-alpha 2026-05-20).
 
@@ -197,16 +217,16 @@ est ensuite généré en parallèle par Dev-Backend et Dev-Frontend.
 
 | Agent          | Lit                                                                  | Écrit                                       |
 |----------------|----------------------------------------------------------------------|---------------------------------------------|
-| `po`           | `workspace/input/feats/{n}-*.md`, rules, templates                             | `workspace/output/us/{n}-{m}-*.md`                    |
-| `arch`         | `workspace/input/stack/stack.md`, stacks actifs (Init Commands §2.2.1, scaffolding §3-§4, connection string §5.1), env vars `DB_*` | `workspace/output/src/...` (projets vides + .sln) ; (si DB) `workspace/output/db/schema.json` + `.md`, entities scaffoldées |
-| `dev-backend`  | `workspace/output/us/{n}-{m}-*.md`, `workspace/input/ui/{n}-{m}-*.html` (passif), `workspace/output/src/{BackendName}/CLAUDE.md`, stacks `backend/auth` actifs, `workspace/output/db/schema.json` | `workspace/output/src/{BackendName}/...` (code applicatif) |
-| `dev-frontend` | `workspace/output/us/{n}-{m}-*.md`, `workspace/input/ui/{n}-{m}-*.html` (texte direct, source de vérité visuelle), `workspace/output/src/{AppName}/CLAUDE.md`, stacks `frontend/ui` actifs | `workspace/output/src/{AppName}/...` (code applicatif) |
-| `qa`           | US + code production (read-only) + ACs                               | `workspace/output/qa/feat-{n}/{report.md, coverage.json, quality.json}` + tests unitaires |
-| `constitutioner` | ADRs existants + section §6 constitution.md                        | `workspace/output/.sys/.context/constitution.md` (§1/§4/§6) + `workspace/output/.sys/.context/adrs/INDEX.md` |
+| `po`           | `workspace/feats/{n}-*.md`, rules, templates                             | `workspace/us/{n}-{m}-*.md`                    |
+| `arch`         | `workspace/stack/stack.md`, stacks actifs (Init Commands §2.2.1, scaffolding §3-§4, connection string §5.1), env vars `DB_*` | `workspace/src/...` (projets vides + .sln) ; (si DB) `workspace/db/schema.json` + `.md`, entities scaffoldées |
+| `dev-backend`  | `workspace/us/{n}-{m}-*.md`, `workspace/ui/{n}-{m}-*.html` (passif), `workspace/src/{BackendName}/CLAUDE.md`, stacks `backend/auth` actifs, `workspace/db/schema.json` | `workspace/src/{BackendName}/...` (code applicatif) |
+| `dev-frontend` | `workspace/us/{n}-{m}-*.md`, `workspace/ui/{n}-{m}-*.html` (texte direct, source de vérité visuelle), `workspace/src/{AppName}/CLAUDE.md`, stacks `frontend/ui` actifs | `workspace/src/{AppName}/...` (code applicatif) |
+| `qa`           | US + code production (read-only) + ACs                               | `console.db` (`qa_quality`, `qa_coverage`, `qa_api_tests`) + tests unitaires ; rapport rendu à la demande (aucun fichier) |
+| `constitutioner` | ADRs existants + section §6 constitution.md                        | `workspace/.sys/.context/constitution.md` (§1/§4/§6) + `workspace/.sys/.context/adrs/INDEX.md` |
 | ~~`dashboard`~~ | — | **RETIRÉ v7.0.0** → INDEX.md généré par `index_adrs.py` (déterministe), métriques rendues par console web Fastify |
 | ~~`accessibility-auditor` (v6.3.0)~~ | — | **RETIRÉ v7.0.0** → axe-core au CI projet. Schéma `[A11Y_*]` archivé `error-classification-legacy.md §1` |
-| `code-reviewer` (v6.3.1) | plan v2 ou fallback convention → code production `src/{BackendName|AppName|LibName}/**` + US passif + Project Config (`CodeReviewMode/FailOn`) + stacks §1.3+§3 actifs + error-classification.md + build-and-loop.md | `workspace/output/.sys/.validation/{n}-code-review.{md,json}` |
-| `security-reviewer` (v6.3.2) | mode `scan` uniquement : code production + CLAUDE.md projets + stacks §1.3+§3+§2.4 + plan v2 + `{n}-code-review.json` (dé-dup secrets). Mode `threat-model` retiré v7.0.0 (→ `templates/threat-model.template.md`) | `workspace/output/.sys/.validation/{n}-security-scan.{md,json}` |
+| `code-reviewer` (v6.3.1) | plan v2 ou fallback convention → code production `src/{BackendName|AppName|LibName}/**` + US passif + Project Config (`CodeReviewMode/FailOn`) + stacks §1.3+§3 actifs + error-classification.md + build-and-loop.md | `workspace/.sys/.validation/{n}-code-review.{md,json}` |
+| `security-reviewer` (v6.3.2) | mode `scan` uniquement : code production + CLAUDE.md projets + stacks §1.3+§3+§2.4 + plan v2 + `{n}-code-review.json` (dé-dup secrets). Mode `threat-model` retiré v7.0.0 (→ `templates/threat-model.template.md`) | `workspace/.sys/.validation/{n}-security-scan.{md,json}` |
 | ~~`performance-auditor` (v6.4.0)~~ | — | **RETIRÉ v7.0.0** → Lighthouse CI + wrk/k6 au CI projet. Schéma `[PERF_*]` archivé `error-classification-legacy.md §2` |
 
 **Isolation par famille** : `dev-backend` ne lit jamais les stacks
@@ -227,7 +247,7 @@ l'introspection des métadonnées.
 
 ## 4. Stacks supportés
 
-Sélectionnés par l'humain dans `workspace/input/stack/stack.md` (sections
+Sélectionnés par l'humain dans `workspace/stack/stack.md` (sections
 `## Active …` + `## Active App Type` v6.7.5+).
 
 ### 4.0 Active App Type (v6.7.5+)
@@ -303,7 +323,7 @@ validé bout-en-bout. Mobile cross-platform avec backend distant séparé :
 - Phase 1 (FEAT) — interactive, 6 questions max + bootstrap constitution
 - Phase 1.5 (élicitation) — `/feat-deepen` agent `elicitor`, 5 techniques
 - Phase 2 (US) — découpage 1 à 6 (cible 1-3, warning 4-6) + traçabilité 100%
-- Phase 2.5 (HTML mockups) — humain dépose `workspace/input/ui/*.html`
+- Phase 2.5 (HTML mockups) — humain dépose `workspace/ui/*.html`
 - Phase 2.6 (readiness gate) — `/feat-validate {n}` 🟢 GO / 🟡 WARN / 🔴 NO-GO
 - Phase 3 (ARCH + DB) — bootstrap idempotent + scaffolding Database-First + ADRs
 - Phase 4 (CODE) — Dev-Backend + Dev-Frontend, plan inline, build loop max 3
@@ -314,7 +334,7 @@ validé bout-en-bout. Mobile cross-platform avec backend distant séparé :
 - Phase 7 (Performance Audit, v6.4.0 → retirée v7.0.0) — `performance-auditor` (Sonnet) supprimé via ADR `governance-major-auditors-trim`. Remplacement v7.2.0 : ingest CI déterministe `sdd_scripts/ingest_lighthouse.py` (Lighthouse JSON → `qa_performance`), verdict selon `PerfFailOn`. SLO API backend (wrk/k6) prévu v7.3+. Cf. `rules/error-classification-legacy.md §2`.
 - Templates ops (v6.4.0) — `templates/{runbook,postmortem,slo-sli}.template.md` à instancier par le Tech Lead lors de la mise en prod du projet généré.
 - Phase planner (v6.4.1) — script Python déterministe `phase_planner.py` qui décide quelles phases auditor sont enabled/skipped selon Project Config + stacks actifs + état runtime + mentions perf/sec dans ACs. Invoqué par `/sdd-full` STEP 1.quart (récap unifié au démarrage, non bloquant ; renommé depuis 1.tiers lors de l'audit P0-workflow 2026-06-05). Détection automatique override pour ACs explicites (`LCP < 2s` force perf-audit même en mode manual).
-- Auto-invoke chain (v6.4.2) — branchement effectif des 5 agents auditor dans le pipeline. `/dev-run` STEP 5.5 (threat-model post-arch) + STEP 6.4 (3 agents en parallèle pré-dashboard : code-review + a11y + security-scan). `/qa-generate` STEP 6.4 (perf-audit post-coverage). Verdict 🔴 RED de code-reviewer/a11y/security-scan → STOP avec rapport et procédure de déblocage.
+- Auto-invoke chain (v6.4.2, mis à jour v7.0.0 two-stage gate) — branchement effectif des auditors dans le pipeline. `/dev-run` STEP 5.5 (threat-model post-arch) + STEP 6.4 two-stage : **Stage A** `spec-compliance-reviewer` seul (gate) → si 🟢/🟡 **Stage B** parallèle `code-reviewer` + `security-reviewer` + `arch-reviewer` (si `ArchReviewMode: full`). a11y/perf retirés v7.0.0 (→ ingest CI). Verdict 🔴 RED d'un auditor → STOP avec rapport et procédure de déblocage. Cf. `rules/auditor-orchestration.md`.
 
 ❌ **Hors scope** :
 - DevOps / CI / déploiement (templates ops fournis mais pas d'auto-gen pipeline)

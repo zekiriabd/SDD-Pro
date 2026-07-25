@@ -4,7 +4,7 @@
 Détecte le cumul de bypass-flags **AVANT** que le pipeline n'engage le
 moindre coût LLM ou compute. Avant CRIT-10, ce check vivait à `sdd-full.md
 STEP 3.6.quart` — c-à-d après que STEP 3.5 / STEP 3.6 ait déjà déclenché
-la génération de plans techniques (jusqu'à ~30-60 KB tokens Opus 4.7 par
+la génération de plans techniques (jusqu'à ~30-60 KB tokens Opus 4.8 par
 plan × N US). Si `BYPASS_COUNT >= 2` sans `SDD_ALLOW_FORCE=1`, ces plans
 étaient générés pour rien.
 

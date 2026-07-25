@@ -31,7 +31,7 @@ afin de z
 
 
 def _make_us(tmp: Path, fid: int, m: int, name: str, status: str = "Draft") -> Path:
-    us_dir = tmp / "workspace" / "output" / "us"
+    us_dir = tmp / "workspace" / "us"
     us_dir.mkdir(parents=True, exist_ok=True)
     path = us_dir / f"{fid}-{m}-{name}.md"
     path.write_text(
@@ -123,7 +123,7 @@ class TestResolveUSPathEndToEnd(unittest.TestCase):
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)
             (tmp_p / ".claude").mkdir()
-            (tmp_p / "workspace" / "output" / "us").mkdir(parents=True)
+            (tmp_p / "workspace" / "us").mkdir(parents=True)
             with mock.patch.object(sus, "repo_root", return_value=tmp_p):
                 self.assertIsNone(sus.resolve_us_path("9-9"))
 

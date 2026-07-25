@@ -8,14 +8,14 @@ emis par les hooks/scripts SDD_Pro (avant : seulement 2 sur 7+). Plus :
 ajout de rotation age-based (mtime > MAX_AGE_DAYS) en plus du size-based.
 
 Couverture cumulée :
-  - workspace/output/.sys/.audit/force-bypass.log       (legacy bypass)
-  - workspace/output/.sys/.audit/legacy-parallel.log    (legacy parallel)
-  - workspace/output/.sys/.audit/env-bypass.jsonl       (block_env_bypass)
-  - workspace/output/.sys/.audit/glob-scope.jsonl       (glob-scope hook)
-  - workspace/output/.sys/.audit/pre-write-lint.log     (pre-write linter)
-  - workspace/output/.sys/.audit/untested-combo.log     (preflight stack combo)
-  - workspace/output/.sys/.audit/arch-bootstrap-*.log   (arch bootstrap traces)
-  - workspace/output/.sys/.audit/ownership-violations.log (audit_file_ownership)
+  - workspace/.sys/.audit/force-bypass.log       (legacy bypass)
+  - workspace/.sys/.audit/legacy-parallel.log    (legacy parallel)
+  - workspace/.sys/.audit/env-bypass.jsonl       (block_env_bypass)
+  - workspace/.sys/.audit/glob-scope.jsonl       (glob-scope hook)
+  - workspace/.sys/.audit/pre-write-lint.log     (pre-write linter)
+  - workspace/.sys/.audit/untested-combo.log     (preflight stack combo)
+  - workspace/.sys/.audit/arch-bootstrap-*.log   (arch bootstrap traces)
+  - workspace/.sys/.audit/ownership-violations.log (audit_file_ownership)
 
 Strategy : when a log file exceeds `MAX_BYTES` (default 1 MiB) OR
 `MAX_LINES` (default 5000) OR mtime older than `MAX_AGE_DAYS` (default 30),
@@ -39,7 +39,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from sdd_lib.paths import repo_root  # noqa: E402
+from sdd_lib.paths import workspace_root, repo_root  # noqa: E402
 from sdd_lib.exit_codes import SUCCESS  # noqa: E402
 
 DEFAULT_MAX_BYTES = 1 * 1024 * 1024   # 1 MiB
@@ -168,7 +168,7 @@ def rotate_if_due(throttle_hours: int = 24) -> bool:
     best-effort housekeeping task, not a security gate).
     """
     try:
-        audit_dir = repo_root() / "workspace" / "output" / ".sys" / ".audit"
+        audit_dir = workspace_root(repo_root()) / ".sys" / ".audit"
         if not audit_dir.is_dir():
             return False
         marker = audit_dir / ".last-rotation"
@@ -207,7 +207,7 @@ def main() -> int:
                    help="Suppress per-file 'skip' lines (only show actions).")
     args = p.parse_args()
 
-    audit_dir = repo_root() / "workspace" / "output" / ".sys" / ".audit"
+    audit_dir = workspace_root(repo_root()) / ".sys" / ".audit"
     if not audit_dir.is_dir():
         if not args.quiet:
             print(f"audit dir absent ({audit_dir}) — nothing to rotate")

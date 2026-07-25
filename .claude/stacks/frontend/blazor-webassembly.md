@@ -28,17 +28,17 @@ Les modeles de donnees (DTO, `ApiResponse<T>`) sont partages avec le backend
 via le projet `{LibName}` (voir `tech-minimalapi.md`).
 
 ### 1.3 Mapping couche → repertoire
-- Page → `workspace/output/src/{AppName}/Pages/`
-- Component → `workspace/output/src/{AppName}/Components/`
-- Layout → `workspace/output/src/{AppName}/Layouts/`
-- Service client (Refit) → `workspace/output/src/{AppName}/Services/`
-- Auth / MSAL config → `workspace/output/src/{AppName}/Auth/`
-- Shared (RedirectToLogin etc.) → `workspace/output/src/{AppName}/Shared/`
-- Ressources `.resx` → `workspace/output/src/{AppName}/Resources/`
-- Racine statique → `workspace/output/src/{AppName}/wwwroot/`
-- Project → `workspace/output/src/{AppName}/{AppName}.csproj`
-- Config app → `workspace/output/src/{AppName}/Program.cs`
-- Config Razor globale → `workspace/output/src/{AppName}/_Imports.razor`, `workspace/output/src/{AppName}/App.razor`
+- Page → `workspace/src/{AppName}/Pages/`
+- Component → `workspace/src/{AppName}/Components/`
+- Layout → `workspace/src/{AppName}/Layouts/`
+- Service client (Refit) → `workspace/src/{AppName}/Services/`
+- Auth / MSAL config → `workspace/src/{AppName}/Auth/`
+- Shared (RedirectToLogin etc.) → `workspace/src/{AppName}/Shared/`
+- Ressources `.resx` → `workspace/src/{AppName}/Resources/`
+- Racine statique → `workspace/src/{AppName}/wwwroot/`
+- Project → `workspace/src/{AppName}/{AppName}.csproj`
+- Config app → `workspace/src/{AppName}/Program.cs`
+- Config Razor globale → `workspace/src/{AppName}/_Imports.razor`, `workspace/src/{AppName}/App.razor`
 
 ### 1.4 Principes non negociables
 - Aucune logique metier dans les composants au-dela de l'orchestration UI.
@@ -59,9 +59,9 @@ via le projet `{LibName}` (voir `tech-minimalapi.md`).
 - **Namespace racine** : `{AppNamespace}`
 
 ### 2.2 Outils
-- **Project file** : `workspace/output/src/{AppName}/{AppName}.csproj`
-- **Build** : `dotnet build workspace/output/src/{AppName}/{AppName}.csproj --nologo` (project-scoped, not solution-wide; allows parallel builds across stacks)
-- **Smoke Command** : `dotnet publish workspace/output/src/{AppName}/{AppName}.csproj -c Debug --no-build --nologo -o /tmp/sim-fe-smoke && test -f /tmp/sim-fe-smoke/wwwroot/_framework/blazor.boot.json`
+- **Project file** : `workspace/src/{AppName}/{AppName}.csproj`
+- **Build** : `dotnet build workspace/src/{AppName}/{AppName}.csproj --nologo` (project-scoped, not solution-wide; allows parallel builds across stacks)
+- **Smoke Command** : `dotnet publish workspace/src/{AppName}/{AppName}.csproj -c Debug --no-build --nologo -o /tmp/sim-fe-smoke && test -f /tmp/sim-fe-smoke/wwwroot/_framework/blazor.boot.json`
 - **Smoke Timeout** : 90s
 - **Preserves identifier syntax** : `\b<id>\b` (mot entier, sensible à la casse)
 - **Lint / Format** : `dotnet format`
@@ -78,31 +78,31 @@ via le projet `{LibName}` (voir `tech-minimalapi.md`).
 # le projet a ete scaffolde et augmente par les agents — re-executer STEPS 1-3b
 # effacerait tout le code genere. STEPS 4-8 (dotnet add reference/package, mkdir -p,
 # restore, build, audit) sont nativement idempotents et restent hors du guard.
-if [ ! -f "workspace/output/src/{AppName}/{AppName}.csproj" ]; then
+if [ ! -f "workspace/src/{AppName}/{AppName}.csproj" ]; then
 
 # STEP 1 — Scaffold du projet Blazor WebAssembly
 # Le template `blazorwasm` supporte directement net10.0 dans le SDK dotnet 10
 # (contrairement a `blazorserver` plafonne a net7.0). Pas de retarget.
-dotnet new blazorwasm -n {AppName} -o workspace/output/src/{AppName} --framework net10.0 --no-restore --force
+dotnet new blazorwasm -n {AppName} -o workspace/src/{AppName} --framework net10.0 --no-restore --force
 
 # STEP 2 — Aligner la convention de repertoires sur §1.3 du stack
 # Le template cree `Layout/` mais §1.3 declare `Layouts/` (au pluriel).
 # Renomme pour que les agents generant des fichiers Layout tombent au bon endroit.
-mv "workspace/output/src/{AppName}/Layout" "workspace/output/src/{AppName}/Layouts"
+mv "workspace/src/{AppName}/Layout" "workspace/src/{AppName}/Layouts"
 
 # STEP 3 — Supprimer le boilerplate demo
 # Counter et Weather sont les exemples par defaut du template ; sample-data/ contient
 # le payload JSON de demo. Tout cela serait genant pour les agents (CS0234,
 # RZ10012, conflit de routes) et ne doit pas survivre a l'init.
-rm -f "workspace/output/src/{AppName}/Pages/Counter.razor"
-rm -f "workspace/output/src/{AppName}/Pages/Weather.razor"
-rm -rf "workspace/output/src/{AppName}/wwwroot/sample-data"
+rm -f "workspace/src/{AppName}/Pages/Counter.razor"
+rm -f "workspace/src/{AppName}/Pages/Weather.razor"
+rm -rf "workspace/src/{AppName}/wwwroot/sample-data"
 
 # STEP 3b — Nettoyer NavMenu.razor : retirer les liens vers Counter et Weather
 # (restent les liens vers Home et eventuellement les routes ajoutees par les features).
 # Substitution multi-ligne simple : on supprime les <div class="nav-item"> qui referencent counter/weather.
-sed -i '/href="counter"/,/<\/div>/d' "workspace/output/src/{AppName}/Layouts/NavMenu.razor"
-sed -i '/href="weather"/,/<\/div>/d'  "workspace/output/src/{AppName}/Layouts/NavMenu.razor"
+sed -i '/href="counter"/,/<\/div>/d' "workspace/src/{AppName}/Layouts/NavMenu.razor"
+sed -i '/href="weather"/,/<\/div>/d'  "workspace/src/{AppName}/Layouts/NavMenu.razor"
 
 # STEP 3c — Injecter le script MSAL dans wwwroot/index.html (post-mortem 2026-05-03)
 # Le package Microsoft.Authentication.WebAssembly.Msal expose
@@ -112,14 +112,14 @@ sed -i '/href="weather"/,/<\/div>/d'  "workspace/output/src/{AppName}/Layouts/Na
 # `Could not find 'AuthenticationService.init'`. Le template `dotnet new blazorwasm`
 # ne l'injecte pas (seul `blazorwasm-msal` le fait, mais on ne l'utilise pas ici).
 sed -i 's|^\(\s*\)\(<script src="_framework/blazor\.webassembly#\)|\1<script src="_content/Microsoft.Authentication.WebAssembly.Msal/AuthenticationService.js"></script>\n\1\2|' \
-  "workspace/output/src/{AppName}/wwwroot/index.html"
+  "workspace/src/{AppName}/wwwroot/index.html"
 
 # STEP 3d — Creer wwwroot/appsettings.json avec Api:BaseAddress (post-mortem 2026-05-03)
 # Sans ce fichier, la SPA appelle des endpoints sur sa propre URL d'hebergement au
 # lieu du Backend (cf. agent-frontend.instructions.md STEP 4.6). Aucun secret ici,
 # uniquement l'URL de base de l'API. Surcharge ulterieure par feature si besoin.
-if [ ! -f "workspace/output/src/{AppName}/wwwroot/appsettings.json" ]; then
-cat > "workspace/output/src/{AppName}/wwwroot/appsettings.json" <<'EOF'
+if [ ! -f "workspace/src/{AppName}/wwwroot/appsettings.json" ]; then
+cat > "workspace/src/{AppName}/wwwroot/appsettings.json" <<'EOF'
 {
   "Api": {
     "BaseAddress": "https://localhost:7238/"
@@ -135,24 +135,24 @@ fi
 # - Radzen : `Could not find 'Radzen.preventArrows'` au premier render
 # - MudBlazor : `Could not find 'mudPopover'` au runtime
 # - etc.
-# On grep `workspace/input/tech/stack.md ## Active UI Specs` (lignes non commentees) et on
+# On grep `workspace/tech/stack.md ## Active UI Specs` (lignes non commentees) et on
 # injecte les shims correspondants. Reference par stack : §4.1 du fichier UI.
-ACTIVE_UI=$(grep -E '^- \.claude/stacks/ui/' workspace/input/tech/stack.md 2>/dev/null | grep -v '^#' || true)
+ACTIVE_UI=$(grep -E '^- \.claude/stacks/ui/' workspace/tech/stack.md 2>/dev/null | grep -v '^#' || true)
 
 if echo "$ACTIVE_UI" | grep -q 'radzen-blazor.md'; then
   # Radzen.Blazor.js avant blazor.webassembly.js
   sed -i 's|^\(\s*\)\(<script src="_framework/blazor\.webassembly#\)|\1<script src="_content/Radzen.Blazor/Radzen.Blazor.js"></script>\n\1\2|' \
-    "workspace/output/src/{AppName}/wwwroot/index.html"
+    "workspace/src/{AppName}/wwwroot/index.html"
   # CSS theme Radzen dans <head> (default = material-base ; le projet peut
   # surcharger en augmentant index.html via une feature ulterieure)
   sed -i 's|^\(\s*\)\(<link href="{AppName}\.styles\.css"\)|\1<link rel="stylesheet" href="_content/Radzen.Blazor/css/material-base.css" />\n\1\2|' \
-    "workspace/output/src/{AppName}/wwwroot/index.html"
+    "workspace/src/{AppName}/wwwroot/index.html"
 fi
 
 # Pattern repliquable pour MudBlazor (si jamais utilise) :
 # if echo "$ACTIVE_UI" | grep -q 'mudblazor.md'; then
 #   sed -i 's|^\(\s*\)\(<script src="_framework/blazor\.webassembly#\)|\1<script src="_content/MudBlazor/MudBlazor.min.js"></script>\n\1\2|' \
-#     "workspace/output/src/{AppName}/wwwroot/index.html"
+#     "workspace/src/{AppName}/wwwroot/index.html"
 # fi
 
 # STEP 3f — Bootstrap auth Azure AD (si auth/azure-ad actif) [post-mortem 2026-05-XX]
@@ -174,15 +174,15 @@ fi
 # par dev-frontend selon son plan inline et doivent suivre les patterns canoniques
 # de auth/azure-ad.md §5.2 Pieges 4-5.
 
-ACTIVE_AUTH=$(grep -E '^- \.claude/stacks/auth/' workspace/input/stack/stack.md 2>/dev/null | grep -v '^#' || true)
+ACTIVE_AUTH=$(grep -E '^- \.claude/stacks/auth/' workspace/stack/stack.md 2>/dev/null | grep -v '^#' || true)
 
 if echo "$ACTIVE_AUTH" | grep -q 'azure-ad.md'; then
 
 # 3f.1 — Pages/Authentication.razor (handler des callbacks MSAL)
 # Route /authentication/{action} ou {action} ∈ {login, login-callback, logout, logout-callback}.
 # OBLIGATOIRE [AllowAnonymous] sinon boucle infinie de redirection.
-if [ ! -f "workspace/output/src/{AppName}/Pages/Authentication.razor" ]; then
-cat > "workspace/output/src/{AppName}/Pages/Authentication.razor" <<'EOF'
+if [ ! -f "workspace/src/{AppName}/Pages/Authentication.razor" ]; then
+cat > "workspace/src/{AppName}/Pages/Authentication.razor" <<'EOF'
 @page "/authentication/{action}"
 @attribute [Microsoft.AspNetCore.Authorization.AllowAnonymous]
 @using Microsoft.AspNetCore.Components.WebAssembly.Authentication
@@ -197,8 +197,8 @@ fi
 
 # 3f.2 — Shared/RedirectToLogin.razor (declenche MSAL pour les pages [Authorize])
 # Compose avec <NotAuthorized><RedirectToLogin/></NotAuthorized> dans App.razor.
-if [ ! -f "workspace/output/src/{AppName}/Shared/RedirectToLogin.razor" ]; then
-cat > "workspace/output/src/{AppName}/Shared/RedirectToLogin.razor" <<'EOF'
+if [ ! -f "workspace/src/{AppName}/Shared/RedirectToLogin.razor" ]; then
+cat > "workspace/src/{AppName}/Shared/RedirectToLogin.razor" <<'EOF'
 @using Microsoft.AspNetCore.Components.WebAssembly.Authentication
 @inject NavigationManager Navigation
 
@@ -211,7 +211,7 @@ fi
 
 # 3f.3 — _Imports.razor : auth globale + using Authorization
 # Idempotent : on n'ajoute la ligne que si absente.
-IMPORTS_FILE="workspace/output/src/{AppName}/_Imports.razor"
+IMPORTS_FILE="workspace/src/{AppName}/_Imports.razor"
 if [ -f "$IMPORTS_FILE" ]; then
   grep -q 'Microsoft.AspNetCore.Authorization' "$IMPORTS_FILE" || \
     echo "@using Microsoft.AspNetCore.Authorization" >> "$IMPORTS_FILE"
@@ -225,7 +225,7 @@ fi  # fin garde-fou idempotent (csproj absent)
 
 # STEP 4 — Reference le projet partage {LibName} (DTOs, ApiResponse<T>)
 # Le projet {LibName} doit etre deja scaffolde (assure par dotnet-minimalapi STEP 1).
-dotnet add workspace/output/src/{AppName}/{AppName}.csproj reference workspace/output/src/{LibName}/{LibName}.csproj
+dotnet add workspace/src/{AppName}/{AppName}.csproj reference workspace/src/{LibName}/{LibName}.csproj
 
 # STEP 5 — Ajouter les packages declares en §2.4 (au-dela du template blazorwasm de base)
 #
@@ -242,22 +242,22 @@ dotnet add workspace/output/src/{AppName}/{AppName}.csproj reference workspace/o
 <!-- CORE_PACKAGES_START -->
 ```bash
 # Auto-genere depuis blazor-webassembly.libs.json -- ne pas editer (utiliser sync_stack_md.py).
-dotnet add workspace/output/src/{AppName}/{AppName}.csproj package Microsoft.AspNetCore.Components.WebAssembly --version 10.0.6
-dotnet add workspace/output/src/{AppName}/{AppName}.csproj package Microsoft.AspNetCore.Components.WebAssembly.DevServer --version 10.0.6
-dotnet add workspace/output/src/{AppName}/{AppName}.csproj package Microsoft.AspNetCore.Components.WebAssembly.Authentication --version 10.0.6
-dotnet add workspace/output/src/{AppName}/{AppName}.csproj package Radzen.Blazor --version 10.2.3
-dotnet add workspace/output/src/{AppName}/{AppName}.csproj package Refit --version 10.1.6
-dotnet add workspace/output/src/{AppName}/{AppName}.csproj package Refit.HttpClientFactory --version 10.1.6
-dotnet add workspace/output/src/{AppName}/{AppName}.csproj package Polly.Core --version 8.6.6
-dotnet add workspace/output/src/{AppName}/{AppName}.csproj package Microsoft.Extensions.Http.Polly --version 10.0.6
-dotnet add workspace/output/src/{AppName}/{AppName}.csproj package Serilog --version 4.3.1
-dotnet add workspace/output/src/{AppName}/{AppName}.csproj package Serilog.Sinks.BrowserConsole --version 8.0.0
-dotnet add workspace/output/src/{AppName}/{AppName}.csproj package Blazored.LocalStorage --version 4.5.0
-dotnet add workspace/output/src/{AppName}/{AppName}.csproj package Blazored.SessionStorage --version 2.4.0
-dotnet add workspace/output/src/{AppName}/{AppName}.csproj package Blazored.Toast --version 4.2.1
-dotnet add workspace/output/src/{AppName}/{AppName}.csproj package Blazored.Modal --version 7.3.1
-dotnet add workspace/output/src/{AppName}/{AppName}.csproj package FluentValidation --version 11.11.0
-dotnet add workspace/output/src/{AppName}/{AppName}.csproj package Microsoft.Extensions.Localization --version 10.0.6
+dotnet add workspace/src/{AppName}/{AppName}.csproj package Microsoft.AspNetCore.Components.WebAssembly --version 10.0.6
+dotnet add workspace/src/{AppName}/{AppName}.csproj package Microsoft.AspNetCore.Components.WebAssembly.DevServer --version 10.0.6
+dotnet add workspace/src/{AppName}/{AppName}.csproj package Microsoft.AspNetCore.Components.WebAssembly.Authentication --version 10.0.6
+dotnet add workspace/src/{AppName}/{AppName}.csproj package Radzen.Blazor --version 10.2.3
+dotnet add workspace/src/{AppName}/{AppName}.csproj package Refit --version 10.1.6
+dotnet add workspace/src/{AppName}/{AppName}.csproj package Refit.HttpClientFactory --version 10.1.6
+dotnet add workspace/src/{AppName}/{AppName}.csproj package Polly.Core --version 8.6.6
+dotnet add workspace/src/{AppName}/{AppName}.csproj package Microsoft.Extensions.Http.Polly --version 10.0.6
+dotnet add workspace/src/{AppName}/{AppName}.csproj package Serilog --version 4.3.1
+dotnet add workspace/src/{AppName}/{AppName}.csproj package Serilog.Sinks.BrowserConsole --version 8.0.0
+dotnet add workspace/src/{AppName}/{AppName}.csproj package Blazored.LocalStorage --version 4.5.0
+dotnet add workspace/src/{AppName}/{AppName}.csproj package Blazored.SessionStorage --version 2.4.0
+dotnet add workspace/src/{AppName}/{AppName}.csproj package Blazored.Toast --version 4.2.1
+dotnet add workspace/src/{AppName}/{AppName}.csproj package Blazored.Modal --version 7.3.1
+dotnet add workspace/src/{AppName}/{AppName}.csproj package FluentValidation --version 11.11.0
+dotnet add workspace/src/{AppName}/{AppName}.csproj package Microsoft.Extensions.Localization --version 10.0.6
 ```
 <!-- CORE_PACKAGES_END -->
 
@@ -266,34 +266,34 @@ dotnet add workspace/output/src/{AppName}/{AppName}.csproj package Microsoft.Ext
 # compatible net10. Suit les patches de securite MSAL sans intervention manuelle
 # sur le stack FEAT. Equivalent SPA de Microsoft.Identity.Web cote serveur.
 # (volontairement hors .libs.json -- pas de --version pour suivre les patches CVE.)
-dotnet add workspace/output/src/{AppName}/{AppName}.csproj package Microsoft.Authentication.WebAssembly.Msal
+dotnet add workspace/src/{AppName}/{AppName}.csproj package Microsoft.Authentication.WebAssembly.Msal
 
 # STEP 6 — Creer les repertoires de couches vides declares en §1.3
 # (evite les erreurs de chemin lors de la premiere generation par les agents)
-mkdir -p workspace/output/src/{AppName}/Pages
-mkdir -p workspace/output/src/{AppName}/Components
-mkdir -p workspace/output/src/{AppName}/Layouts
-mkdir -p workspace/output/src/{AppName}/Services
-mkdir -p workspace/output/src/{AppName}/Auth
-mkdir -p workspace/output/src/{AppName}/Shared
-mkdir -p workspace/output/src/{AppName}/Resources
+mkdir -p workspace/src/{AppName}/Pages
+mkdir -p workspace/src/{AppName}/Components
+mkdir -p workspace/src/{AppName}/Layouts
+mkdir -p workspace/src/{AppName}/Services
+mkdir -p workspace/src/{AppName}/Auth
+mkdir -p workspace/src/{AppName}/Shared
+mkdir -p workspace/src/{AppName}/Resources
 
 # STEP 7 — Restore + build de verification (doit etre vert avant toute generation)
-dotnet restore workspace/output/src/{AppName}/{AppName}.csproj
-dotnet build workspace/output/src/{AppName}/{AppName}.csproj --nologo
+dotnet restore workspace/src/{AppName}/{AppName}.csproj
+dotnet build workspace/src/{AppName}/{AppName}.csproj --nologo
 
 # STEP 8 — Audit vulnerabilites NuGet (cf. politique inlined dans agents/arch.md : 0 warning libs)
 # Si au moins une vulnerabilite subsiste malgre les non-pinnings (le registre NuGet
 # n'a pas encore publie de version corrigee), la faire remonter au Tech Lead sans
 # bloquer le build.
-vuln_count=$(dotnet list workspace/output/src/{AppName}/{AppName}.csproj package --vulnerable --include-transitive 2>&1 | grep -c '>')
+vuln_count=$(dotnet list workspace/src/{AppName}/{AppName}.csproj package --vulnerable --include-transitive 2>&1 | grep -c '>')
 if [ "$vuln_count" -gt 0 ]; then
   echo "WARN: $vuln_count vulnerable package(s) apres install — voir dotnet list --vulnerable"
-  dotnet list workspace/output/src/{AppName}/{AppName}.csproj package --vulnerable --include-transitive
+  dotnet list workspace/src/{AppName}/{AppName}.csproj package --vulnerable --include-transitive
 fi
 ```
 
-**Contrat post-init :** `workspace/output/src/{AppName}/{AppName}.csproj` DOIT exister, le build DOIT etre vert.
+**Contrat post-init :** `workspace/src/{AppName}/{AppName}.csproj` DOIT exister, le build DOIT etre vert.
 Microsoft.Authentication.WebAssembly.Msal est installe en **version flottante latest stable
 compatible net10** (pas de `--version` pin) — suit automatiquement les patches CVE MSAL a
 chaque init. STEP 8 (audit `dotnet list --vulnerable --include-transitive`) emet un WARN si

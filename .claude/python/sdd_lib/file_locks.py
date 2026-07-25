@@ -127,6 +127,16 @@ def acquire_with_retry(
                 ts = int(ts_str) if ts_str.isdigit() else 0
             except (OSError, ValueError):
                 ts = 0
+            if not ts:
+                # Audit 2026-06-11 M4 — payload vide/corrompu (crash mid-write,
+                # disque plein) : sans fallback, `ts=0` rendait la staleness
+                # toujours fausse → deadlock permanent jusqu'à suppression
+                # manuelle du lock. On retombe sur le mtime du fichier pour
+                # que la TTL reste applicable même sur lock illisible.
+                try:
+                    ts = int(lock_path.stat().st_mtime * 1000)
+                except OSError:
+                    ts = 0  # lock disparu entre EEXIST et stat → retry simple
             now = _now_ms()
             if ts and (now - ts) > ttl_ms:
                 try:

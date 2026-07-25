@@ -6,7 +6,7 @@
 > "quoi" (FEATs). Source d'inspiration : BMad `product-brief`.
 >
 > **Owner** : Tech Lead + Product Owner (humains, pas agent).
-> **Localisation** : `workspace/input/discovery/product-brief.md`
+> **Localisation** : `workspace/discovery/product-brief.md`
 > (créer le dossier si absent — gitignored par défaut, ajouter
 > au repo si validation client requise).
 > **Mode d'écriture** : Markdown libre, 1-3 pages max. Pas

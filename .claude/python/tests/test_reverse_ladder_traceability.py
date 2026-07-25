@@ -16,9 +16,9 @@ mod = importlib.import_module("sdd_reverse_scripts.check_ladder_traceability")
 
 def _scaffold(root: Path, *, feat_body: str, us_body: str, analysis_body: str,
               n: str = "3", name: str = "Login") -> Path:
-    feats = root / "workspace" / "input" / "feats"
-    us = root / "workspace" / "output" / "us"
-    plans = root / "workspace" / "output" / "plans"
+    feats = root / "workspace" / "feats"
+    us = root / "workspace" / "us"
+    plans = root / "workspace" / "plans"
     for d in (feats, us, plans):
         d.mkdir(parents=True, exist_ok=True)
     feat = feats / f"{n}-{name}.md"
@@ -145,10 +145,204 @@ def test_ladder_confidence_absent_is_tolerated(tmp_path, monkeypatch):
 
 def test_ladder_missing_artifacts_is_informational(tmp_path, monkeypatch):
     monkeypatch.setattr(mod, "REPO_ROOT", tmp_path)
-    feats = tmp_path / "workspace" / "input" / "feats"
+    feats = tmp_path / "workspace" / "feats"
     feats.mkdir(parents=True, exist_ok=True)
     feat = feats / "3-Login.md"
     feat.write_text(_FEAT_OK, encoding="utf-8")
     report = mod.check(None, None, feat)  # no US / analysis
     assert report["ran"] is False
     assert report["verdict"] == "ladder-incomplete-artifacts"
+
+
+def _scaffold_with_inventory(root: Path, *, language: str, estimate: str,
+                             analysis_conf: str, n: str = "3", name: str = "Login") -> Path:
+    """Scaffold a 3-rung ladder + a legacy project inventory for --project --unit mode."""
+    _scaffold(
+        root,
+        feat_body=_FEAT_OK.replace("confidence: high", f"confidence: {analysis_conf}"),
+        us_body=("---\nconfidence: %s\n---\n" % analysis_conf) + _US_OK,
+        analysis_body=("---\nconfidence: %s\n---\n" % analysis_conf) + _ANALYSIS_OK,
+        n=n, name=name,
+    )
+    project = root / "workspace" / "old" / "Proj"
+    (project / ".sys").mkdir(parents=True, exist_ok=True)
+    import json
+    (project / ".sys" / "inventory.json").write_text(json.dumps({
+        "_featAllocations": {"U-1": n},
+        "_allocatedNames": {name: "U-1"},
+        "units": [{"id": "U-1", "language": language, "confidenceEstimate": estimate}],
+    }), encoding="utf-8")
+    return project
+
+
+def test_ladder_confidence_cap_violation_flagged(tmp_path, monkeypatch):
+    """Regression for the 2026-06-12 audit fix (reverse-C2).
+
+    A 3a analysis declaring `high` confidence on a `medium`-cap language
+    (php-procedural) must be flagged: nothing previously checked the analysis
+    against confidence_cap[language] — only relative monotonicity.
+    """
+    monkeypatch.setattr(mod, "REPO_ROOT", tmp_path)
+    mod._LANG_CAP_CACHE = None  # force reload against the real signatures file
+    project = _scaffold_with_inventory(
+        tmp_path, language="php-procedural", estimate="high", analysis_conf="high")
+    report = mod.check(project, "U-1", None)
+    assert report["ran"] is True
+    assert any("confidence cap" in g and "php-procedural" in g for g in report["gaps"]), report["gaps"]
+    assert report["confidence"]["language"] == "php-procedural"
+    assert report["confidence"]["language_cap"] == "medium"
+
+
+def test_ladder_confidence_cap_respected_no_gap(tmp_path, monkeypatch):
+    """Analysis at `high` on a `high`-cap language (csharp) → no cap gap."""
+    monkeypatch.setattr(mod, "REPO_ROOT", tmp_path)
+    mod._LANG_CAP_CACHE = None
+    project = _scaffold_with_inventory(
+        tmp_path, language="csharp", estimate="high", analysis_conf="high")
+    report = mod.check(project, "U-1", None)
+    assert report["ran"] is True
+    assert not any("confidence cap" in g for g in report["gaps"]), report["gaps"]
+    assert report["confidence"]["language_cap"] == "high"
+
+
+def _scaffold_with_unit_fields(root: Path, *, unit_fields: dict, analysis_conf: str,
+                               db_schema: dict | None = None,
+                               n: str = "3", name: str = "Login") -> Path:
+    """Scaffold a 3-rung ladder + inventory whose units[0] carries arbitrary fields
+    (entities, classes, …) for the cap_db / extraction-depth checks."""
+    import json
+    _scaffold(
+        root,
+        feat_body=_FEAT_OK.replace("confidence: high", f"confidence: {analysis_conf}"),
+        us_body=("---\nconfidence: %s\n---\n" % analysis_conf) + _US_OK,
+        analysis_body=("---\nconfidence: %s\n---\n" % analysis_conf) + _ANALYSIS_OK,
+        n=n, name=name,
+    )
+    project = root / "workspace" / "old" / "Proj"
+    (project / ".sys").mkdir(parents=True, exist_ok=True)
+    unit = {"id": "U-1", **unit_fields}
+    (project / ".sys" / "inventory.json").write_text(json.dumps({
+        "_featAllocations": {"U-1": n},
+        "_allocatedNames": {name: "U-1"},
+        "units": [unit],
+    }), encoding="utf-8")
+    if db_schema is not None:
+        (project / ".sys" / "db-schema.json").write_text(
+            json.dumps(db_schema), encoding="utf-8")
+    return project
+
+
+def test_ladder_cap_db_degraded_when_entities_not_ddl_backed(tmp_path, monkeypatch):
+    """A1 (audit 2026-06-29): a csharp unit (lang cap=high) whose declared entity
+    is NOT present in db-schema → cap_db tightens to medium → a `high` analysis
+    is flagged. Closes the 'cap_db prompt-only' gap (rule §4)."""
+    monkeypatch.setattr(mod, "REPO_ROOT", tmp_path)
+    mod._LANG_CAP_CACHE = None
+    project = _scaffold_with_unit_fields(
+        tmp_path,
+        unit_fields={"language": "csharp", "confidenceEstimate": "high",
+                     "entities": ["Ghost"]},
+        analysis_conf="high",
+        db_schema={"entities": [{"name": "Other"}]},  # 'Ghost' absent → deduced
+    )
+    report = mod.check(project, "U-1", None)
+    assert report["ran"] is True
+    assert report["confidence"]["language_cap"] == "medium", report["confidence"]
+    assert any("confidence cap" in g for g in report["gaps"]), report["gaps"]
+
+
+def test_ladder_cap_db_not_degraded_when_entity_backed(tmp_path, monkeypatch):
+    """Entity present in db-schema → no db degradation → cap stays high."""
+    monkeypatch.setattr(mod, "REPO_ROOT", tmp_path)
+    mod._LANG_CAP_CACHE = None
+    project = _scaffold_with_unit_fields(
+        tmp_path,
+        unit_fields={"language": "csharp", "confidenceEstimate": "high",
+                     "entities": ["User"]},
+        analysis_conf="high",
+        db_schema={"entities": [{"name": "User"}]},
+    )
+    report = mod.check(project, "U-1", None)
+    assert report["confidence"]["language_cap"] == "high", report["confidence"]
+    assert not any("confidence cap" in g for g in report["gaps"]), report["gaps"]
+
+
+def test_ladder_extraction_depth_shallow_flagged(tmp_path, monkeypatch):
+    """A2 (audit 2026-06-29): a non-.NET unit (java-ee, cap=high) with an empty
+    class graph + confidence=high is flagged as shallow — reading-reliable ≠
+    extraction-deep. No cap gap (java-ee cap is high), only an extraction-depth gap."""
+    monkeypatch.setattr(mod, "REPO_ROOT", tmp_path)
+    mod._LANG_CAP_CACHE = None
+    project = _scaffold_with_unit_fields(
+        tmp_path,
+        unit_fields={"language": "java-ee", "confidenceEstimate": "high",
+                     "classes": []},  # graph ran, empty (non-.NET)
+        analysis_conf="high",
+    )
+    report = mod.check(project, "U-1", None)
+    assert report["ran"] is True
+    assert report["extraction_depth"] == "shallow"
+    assert any("extraction-depth" in g for g in report["gaps"]), report["gaps"]
+
+
+def test_ladder_extraction_depth_deep_no_flag(tmp_path, monkeypatch):
+    """A .NET unit with a non-empty class graph → deep, no extraction-depth gap."""
+    monkeypatch.setattr(mod, "REPO_ROOT", tmp_path)
+    mod._LANG_CAP_CACHE = None
+    project = _scaffold_with_unit_fields(
+        tmp_path,
+        unit_fields={"language": "csharp", "confidenceEstimate": "high",
+                     "classes": [{"name": "AuthService", "role": "service"}]},
+        analysis_conf="high",
+    )
+    report = mod.check(project, "U-1", None)
+    assert report["extraction_depth"] == "deep"
+    assert not any("extraction-depth" in g for g in report["gaps"]), report["gaps"]
+
+
+def test_ladder_staleness_detected(tmp_path, monkeypatch):
+    """A3 (audit 2026-06-29): 3a analysis newer than 3b US / 3c FEAT → stale
+    findings ([REVERSE_LADDER_STALE]), separate from traceability gaps."""
+    import os
+    monkeypatch.setattr(mod, "REPO_ROOT", tmp_path)
+    feat = _scaffold(tmp_path, feat_body=_FEAT_OK, us_body=_US_OK, analysis_body=_ANALYSIS_OK)
+    analysis = tmp_path / "workspace" / "plans" / "3-Login.analysis.md"
+    us = tmp_path / "workspace" / "us" / "3-1-Login.md"
+    # Make analysis clearly newer than US and FEAT (>1s tolerance).
+    old = 1_700_000_000
+    os.utime(feat, (old, old))
+    os.utime(us, (old, old))
+    os.utime(analysis, (old + 100, old + 100))
+    report = mod.check(None, None, feat)
+    assert report["ran"] is True
+    assert report["stale_findings"], "expected staleness findings"
+    assert report["stale_class"] == "[REVERSE_LADDER_STALE]"
+
+
+def test_ladder_no_staleness_when_synchronised(tmp_path, monkeypatch):
+    """Near-simultaneous writes (sub-second) → no false-positive staleness."""
+    monkeypatch.setattr(mod, "REPO_ROOT", tmp_path)
+    feat = _scaffold(tmp_path, feat_body=_FEAT_OK, us_body=_US_OK, analysis_body=_ANALYSIS_OK)
+    report = mod.check(None, None, feat)
+    assert report["ran"] is True
+    assert not report["stale_findings"], report["stale_findings"]
+
+
+def test_us_template_header_confidence_matches_conf_re():
+    """Audit 2026-06-11 M2 : le template US 3b DOIT porter une ligne header
+    Confidence: lisible par _CONF_RE, sinon la monotonie Q3 (US <= analyse,
+    FEAT <= min(US)) est silencieusement skippee pour toutes les US."""
+    template = Path(__file__).resolve().parent.parent / "sdd_reverse" / "us.reverse.template.md"
+    text = template.read_text(encoding="utf-8").replace("{Confidence}", "medium")
+    assert mod._frontmatter_confidence(text) == "medium"
+
+
+def test_legacy_us_comment_confidence_fallback():
+    """US 3b generees AVANT le fix M2 : confidence lisible via le commentaire
+    de provenance (fallback _CONF_COMMENT_RE)."""
+    legacy = (
+        "# US-1: Login\n\nID: 1-1-Login\nStatus: Draft\n\n"
+        "<!-- generated-by: sdd-reverse ; artifact: user-story ; source-unit: U-1 ; "
+        "confidence: low ; extraction-date: 2026-06-01 -->\n"
+    )
+    assert mod._frontmatter_confidence(legacy) == "low"

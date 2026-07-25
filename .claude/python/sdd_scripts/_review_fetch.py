@@ -216,7 +216,7 @@ def _normalize_path(p: str | None) -> str:
     """v7.0.0 audit §6.R3 — normalize finding file paths for cross-source dedup.
 
     Auditors emit paths in different formats :
-      - `code-reviewer` may emit `workspace/output/src/X/Auth.cs` (full repo-relative)
+      - `code-reviewer` may emit `workspace/src/X/Auth.cs` (full repo-relative)
       - `security-reviewer` may emit `src/X/Auth.cs` (project-relative)
       - `arch-reviewer` may emit `X/Auth.cs` (module-relative)
       - Some use backslashes on Windows, others forward slashes
@@ -224,7 +224,7 @@ def _normalize_path(p: str | None) -> str:
     Without normalization, `(file_path, line)` keys diverge → dedup rate
     silently → verdict consolidated inflated. This function returns a
     canonical form : lowercased, forward-slashes, leading-stripped of
-    common prefixes (`workspace/output/`, `./`, project root segments).
+    common prefixes (`workspace/`, `./`, project root segments).
 
     Idempotent. Empty input → empty string.
     """
@@ -236,9 +236,7 @@ def _normalize_path(p: str | None) -> str:
         s = s.replace("//", "/")
     # Strip well-known repo prefixes so paths from different scopes converge
     PREFIXES = (
-        "workspace/output/src/",
-        "workspace/output/",
-        "workspace/input/",
+        "workspace/src/",
         "workspace/",
         "src/",
     )

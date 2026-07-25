@@ -12,7 +12,7 @@ Scope: tests unitaires backend Kotlin (Spring Boot, Ktor)
 ## 1. Scope
 
 Tests unitaires pour backends Kotlin (Spring Boot, Ktor, etc.).
-S'applique aux projets `workspace/output/src/{BackendName}/` typés Kotlin.
+S'applique aux projets `workspace/src/{BackendName}/` typés Kotlin.
 
 > **Prérequis** : projet Kotlin avec Gradle (Kotlin DSL `build.gradle.kts`
 > recommandé). Les commandes Maven sont possibles mais non documentées
@@ -151,7 +151,7 @@ tasks.jacocoTestCoverageVerification {
 Création du dossier test (idempotent) :
 
 ```bash
-mkdir -p workspace/output/src/{BackendName}/src/test/kotlin
+mkdir -p workspace/src/{BackendName}/src/test/kotlin
 ```
 
 ---
@@ -159,7 +159,7 @@ mkdir -p workspace/output/src/{BackendName}/src/test/kotlin
 ## 4. Project structure
 
 ```
-workspace/output/src/{BackendName}/
+workspace/src/{BackendName}/
 ├── build.gradle.kts
 ├── src/
 │   ├── main/kotlin/
@@ -242,21 +242,21 @@ class AuthControllerIntegrationTest {
 ### 6.1 Test command
 
 ```bash
-cd workspace/output/src/{BackendName}
+cd workspace/src/{BackendName}
 ./gradlew test
 ```
 
 ### 6.2 Coverage command
 
 ```bash
-cd workspace/output/src/{BackendName}
+cd workspace/src/{BackendName}
 ./gradlew test jacocoTestReport
 ```
 
 ### 6.3 Linter
 
 ```bash
-cd workspace/output/src/{BackendName}
+cd workspace/src/{BackendName}
 ./gradlew ktlintCheck
 # OU
 ./gradlew detekt
@@ -267,7 +267,7 @@ cd workspace/output/src/{BackendName}
 ## 7. Coverage output format
 
 Format : **JaCoCo XML**
-Path : `workspace/output/src/{BackendName}/build/reports/jacoco/test/jacocoTestReport.xml`
+Path : `workspace/src/{BackendName}/build/reports/jacoco/test/jacocoTestReport.xml`
 
 Le script `parse_coverage.py` parse ce format via `Parse-JaCoCoXml`.
 

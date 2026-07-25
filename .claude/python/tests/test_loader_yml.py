@@ -41,21 +41,21 @@ class TestLoaderYmlScalar(unittest.TestCase):
             _write_loader(root, """\
                 po:
                   reads:
-                    - workspace/input/feats/{n}-*.md
+                    - workspace/feats/{n}-*.md
                     - .claude/templates/us.template.md
                   writes:
-                    - workspace/output/us/{n}-{m}-*.md
+                    - workspace/us/{n}-{m}-*.md
             """)
             self.assertEqual(
                 parse_agent_section("po", "reads", root=root),
                 [
-                    "workspace/input/feats/{n}-*.md",
+                    "workspace/feats/{n}-*.md",
                     ".claude/templates/us.template.md",
                 ],
             )
             self.assertEqual(
                 parse_agent_section("po", "writes", root=root),
-                ["workspace/output/us/{n}-{m}-*.md"],
+                ["workspace/us/{n}-{m}-*.md"],
             )
 
     def test_scalar_with_trailing_comment(self) -> None:
@@ -64,13 +64,13 @@ class TestLoaderYmlScalar(unittest.TestCase):
             _write_loader(root, """\
                 arch:
                   reads:
-                    - workspace/input/stack/stack.md           # mandatory
+                    - workspace/stack/stack.md           # mandatory
                     - .claude/templates/adr.template.md  # v3 — nécessaire
             """)
             self.assertEqual(
                 parse_agent_section("arch", "reads", root=root),
                 [
-                    "workspace/input/stack/stack.md",
+                    "workspace/stack/stack.md",
                     ".claude/templates/adr.template.md",
                 ],
             )
@@ -81,13 +81,13 @@ class TestLoaderYmlScalar(unittest.TestCase):
             _write_loader(root, """\
                 po:
                   reads:
-                    - "workspace/input/feats/{n}-*.md"
+                    - "workspace/feats/{n}-*.md"
                     - 'path/with/quotes.md'
             """)
             self.assertEqual(
                 parse_agent_section("po", "reads", root=root),
                 [
-                    "workspace/input/feats/{n}-*.md",
+                    "workspace/feats/{n}-*.md",
                     "path/with/quotes.md",
                 ],
             )
@@ -102,16 +102,16 @@ class TestLoaderYmlDictForm(unittest.TestCase):
             _write_loader(root, """\
                 dev-backend:
                   reads:
-                    - { path: workspace/output/us/{n}-{m}-*.md, cache_layer: volatile }
-                    - { path: workspace/input/ui/{n}-{m}-*.html, cache_layer: volatile }
-                    - { path: workspace/output/src/{Project}/CLAUDE.md, cache_layer: semi }
+                    - { path: workspace/us/{n}-{m}-*.md, cache_layer: volatile }
+                    - { path: workspace/ui/{n}-{m}-*.html, cache_layer: volatile }
+                    - { path: workspace/src/{Project}/CLAUDE.md, cache_layer: semi }
             """)
             self.assertEqual(
                 parse_agent_section("dev-backend", "reads", root=root),
                 [
-                    "workspace/output/us/{n}-{m}-*.md",
-                    "workspace/input/ui/{n}-{m}-*.html",
-                    "workspace/output/src/{Project}/CLAUDE.md",
+                    "workspace/us/{n}-{m}-*.md",
+                    "workspace/ui/{n}-{m}-*.html",
+                    "workspace/src/{Project}/CLAUDE.md",
                 ],
             )
 
@@ -122,20 +122,20 @@ class TestLoaderYmlDictForm(unittest.TestCase):
             _write_loader(root, """\
                 code-reviewer:
                   reads:
-                    - workspace/input/stack/stack.md
+                    - workspace/stack/stack.md
                     - { path: .claude/rules/error-classification.md, cache_layer: stable }
                     - .claude/rules/build-and-loop.md
-                    - { path: workspace/output/us/{n}-*.md, cache_layer: volatile }
-                    - workspace/input/feats/{n}-*.md
+                    - { path: workspace/us/{n}-*.md, cache_layer: volatile }
+                    - workspace/feats/{n}-*.md
             """)
             self.assertEqual(
                 parse_agent_section("code-reviewer", "reads", root=root),
                 [
-                    "workspace/input/stack/stack.md",
+                    "workspace/stack/stack.md",
                     ".claude/rules/error-classification.md",
                     ".claude/rules/build-and-loop.md",
-                    "workspace/output/us/{n}-*.md",
-                    "workspace/input/feats/{n}-*.md",
+                    "workspace/us/{n}-*.md",
+                    "workspace/feats/{n}-*.md",
                 ],
             )
 
@@ -145,14 +145,14 @@ class TestLoaderYmlDictForm(unittest.TestCase):
             _write_loader(root, """\
                 dev-backend:
                   reads:
-                    - { path: "workspace/output/us/{n}-{m}-*.md", cache_layer: volatile }
-                    - { path: 'workspace/input/ui/{n}-{m}-*.html', cache_layer: volatile }
+                    - { path: "workspace/us/{n}-{m}-*.md", cache_layer: volatile }
+                    - { path: 'workspace/ui/{n}-{m}-*.html', cache_layer: volatile }
             """)
             self.assertEqual(
                 parse_agent_section("dev-backend", "reads", root=root),
                 [
-                    "workspace/output/us/{n}-{m}-*.md",
-                    "workspace/input/ui/{n}-{m}-*.html",
+                    "workspace/us/{n}-{m}-*.md",
+                    "workspace/ui/{n}-{m}-*.html",
                 ],
             )
 
@@ -163,11 +163,11 @@ class TestLoaderYmlDictForm(unittest.TestCase):
             _write_loader(root, """\
                 arch:
                   reads:
-                    - { path: workspace/input/stack/stack.md }
+                    - { path: workspace/stack/stack.md }
             """)
             self.assertEqual(
                 parse_agent_section("arch", "reads", root=root),
-                ["workspace/input/stack/stack.md"],
+                ["workspace/stack/stack.md"],
             )
 
     def test_malformed_dict_skipped_silently(self) -> None:
@@ -178,12 +178,12 @@ class TestLoaderYmlDictForm(unittest.TestCase):
                 po:
                   reads:
                     - { not_a_path: foo, cache_layer: stable }
-                    - workspace/input/feats/{n}-*.md
+                    - workspace/feats/{n}-*.md
             """)
             # Malformed dict dropped; valid scalar survives.
             self.assertEqual(
                 parse_agent_section("po", "reads", root=root),
-                ["workspace/input/feats/{n}-*.md"],
+                ["workspace/feats/{n}-*.md"],
             )
 
 
@@ -194,20 +194,20 @@ class TestLoaderYmlAgentScoping(unittest.TestCase):
             _write_loader(root, """\
                 po:
                   reads:
-                    - workspace/input/feats/{n}-*.md
+                    - workspace/feats/{n}-*.md
                 arch:
                   reads:
-                    - workspace/input/stack/stack.md
+                    - workspace/stack/stack.md
                     - { path: .claude/templates/adr.template.md, cache_layer: stable }
             """)
             self.assertEqual(
                 parse_agent_section("po", "reads", root=root),
-                ["workspace/input/feats/{n}-*.md"],
+                ["workspace/feats/{n}-*.md"],
             )
             self.assertEqual(
                 parse_agent_section("arch", "reads", root=root),
                 [
-                    "workspace/input/stack/stack.md",
+                    "workspace/stack/stack.md",
                     ".claude/templates/adr.template.md",
                 ],
             )
@@ -218,7 +218,7 @@ class TestLoaderYmlAgentScoping(unittest.TestCase):
             _write_loader(root, """\
                 po:
                   reads:
-                    - workspace/input/feats/{n}-*.md
+                    - workspace/feats/{n}-*.md
             """)
             self.assertEqual(
                 parse_agent_section("nonexistent-agent", "reads", root=root),
@@ -231,7 +231,7 @@ class TestLoaderYmlAgentScoping(unittest.TestCase):
             _write_loader(root, """\
                 po:
                   reads:
-                    - workspace/input/feats/{n}-*.md
+                    - workspace/feats/{n}-*.md
             """)
             self.assertEqual(
                 parse_agent_section("po", "writes", root=root),
@@ -255,14 +255,14 @@ class TestLoaderYmlEdgeCases(unittest.TestCase):
             _write_loader(root, """\
                 arch:
                   reads:
-                    - workspace/input/stack/stack.md
+                    - workspace/stack/stack.md
                   forbidden_reads:
-                    - workspace/input/feats/
-                    - workspace/output/us/
+                    - workspace/feats/
+                    - workspace/us/
             """)
             self.assertEqual(
                 parse_agent_section("arch", "forbidden_reads", root=root),
-                ["workspace/input/feats/", "workspace/output/us/"],
+                ["workspace/feats/", "workspace/us/"],
             )
 
     def test_six_space_indent_dropped_documents_known_limit(self) -> None:
@@ -278,13 +278,13 @@ class TestLoaderYmlEdgeCases(unittest.TestCase):
             _write_loader(root, """\
                 arch:
                   reads:
-                    - workspace/input/stack/stack.md
+                    - workspace/stack/stack.md
                       - nested_at_6_spaces.md
             """)
             # Only the 4-space entry is captured; the 6-space line is dropped.
             self.assertEqual(
                 parse_agent_section("arch", "reads", root=root),
-                ["workspace/input/stack/stack.md"],
+                ["workspace/stack/stack.md"],
             )
 
     def test_blank_lines_between_items(self) -> None:
@@ -293,14 +293,14 @@ class TestLoaderYmlEdgeCases(unittest.TestCase):
             _write_loader(root, """\
                 po:
                   reads:
-                    - workspace/input/feats/{n}-*.md
+                    - workspace/feats/{n}-*.md
 
                     - .claude/templates/us.template.md
             """)
             self.assertEqual(
                 parse_agent_section("po", "reads", root=root),
                 [
-                    "workspace/input/feats/{n}-*.md",
+                    "workspace/feats/{n}-*.md",
                     ".claude/templates/us.template.md",
                 ],
             )

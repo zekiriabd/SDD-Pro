@@ -96,7 +96,7 @@ class AgentCacheManifest:
 
 
 # Matches lines like:
-#   - workspace/input/feats/{n}-*.md   # FEAT parente · cache_layer: volatile
+#   - workspace/feats/{n}-*.md   # FEAT parente · cache_layer: volatile
 #   - .claude/rules/build-and-loop.md  # cache_layer: stable
 _READ_LINE_RE = re.compile(
     r"^\s*-\s*"                            # YAML list dash
@@ -111,7 +111,7 @@ _READ_LINE_RE = re.compile(
 #   - { path: X, cache_layer: semi, status: experimental }   # comment
 #
 # Two alternatives so that quoted paths can contain `{` and `}` (e.g.
-# "workspace/output/us/{n}-{m}-*.md") — the previous regex stopped at
+# "workspace/us/{n}-{m}-*.md") — the previous regex stopped at
 # the first `}` and silently dropped 3 volatile reads of dev-backend.
 # Audit 2026-06-08: bug fix + regression test.
 _INLINE_READ_RE = re.compile(
@@ -372,8 +372,8 @@ def cache_breakpoints_for(agent_name: str, loader_path: Path | None = None
         >>> cache_breakpoints_for("dev-backend")
         [
             ("stable", [".claude/rules/build-and-loop.md", ...]),
-            ("semi",   ["workspace/output/db/schema.json", ...]),
-            ("volatile", ["workspace/output/us/{n}-{m}-*.md"]),
+            ("semi",   ["workspace/db/schema.json", ...]),
+            ("volatile", ["workspace/us/{n}-{m}-*.md"]),
         ]
     """
     manifests = parse_loader_annotations(loader_path)

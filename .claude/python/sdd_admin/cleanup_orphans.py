@@ -1,4 +1,4 @@
-"""Remove orphan artifacts from workspace/output/ (with .trash/ backup).
+"""Remove orphan artifacts from workspace/ (with .trash/ backup).
 
 v7.0.0 (audit 2026-06-05) — implémentation effective des scripts
 spec'd dans `docs/orphan-cleanup-policy.md §4.2`.
@@ -8,7 +8,7 @@ Workflow :
 2. Affiche le plan
 3. Si `--yes` (et stdin tty), demande confirmation
 4. Pour chaque fichier orphan :
-   - cp vers `workspace/output/.sys/.trash/{ts}/{relative-path}`
+   - cp vers `workspace/.sys/.trash/{ts}/{relative-path}`
    - rm du fichier original
    - log dans `console.db.events` (best-effort, non-bloquant)
 
@@ -21,13 +21,13 @@ Exit codes :
     3 = INFRA_BLOCKED (workspace inaccessible)
 
 Périmètre PROTÉGÉ — never delete (cf. policy §5) :
-    - workspace/input/ (sources Tech Lead)
-    - workspace/output/.sys/.context/constitution.md
-    - workspace/output/.sys/.context/adrs/*
-    - workspace/output/db/console.db*
+    - workspace/{feats,ui,stack,assets,discovery}/ (sources Tech Lead, ex-input/)
+    - workspace/.sys/.context/constitution.md
+    - workspace/.sys/.context/adrs/*
+    - workspace/db/console.db*
     - workspace/console/
-    - workspace/output/.sys/.trash/ (lui-même)
-    - tout fichier hors workspace/output/
+    - workspace/.sys/.trash/ (lui-même)
+    - tout fichier hors workspace/
 """
 from __future__ import annotations
 
@@ -42,25 +42,35 @@ if str(_HERE.parent) not in sys.path:
     sys.path.insert(0, str(_HERE.parent))
 
 from sdd_lib.exit_codes import FAIL_FAST, INFRA_BLOCKED, SUCCESS  # noqa: E402
+from sdd_lib.console_safe import ensure_console_safe
 from sdd_admin.audit_orphans import find_orphans  # noqa: E402
+from sdd_lib.paths import workspace_root
 
 
 # Périmètres absolument protégés (substring match sur paths relatifs au root).
+# Depuis le flatten workspace/ (2026-07-06) : les ex-`workspace/input/` sources
+# Tech Lead vivent directement sous workspace/ (feats, ui, stack, assets,
+# discovery) et restent protégées ; seuls les dérivés us/ + plans/ sont
+# éligibles au cleanup (find_orphans ne retourne qu'eux).
 _PROTECTED_PATHS = (
-    "workspace/input/",
-    "workspace/output/.sys/.context/constitution.md",
-    "workspace/output/.sys/.context/adrs/",
-    "workspace/output/db/",
+    "workspace/feats/",
+    "workspace/ui/",
+    "workspace/stack/",
+    "workspace/assets/",
+    "workspace/discovery/",
+    "workspace/.sys/.context/constitution.md",
+    "workspace/.sys/.context/adrs/",
+    "workspace/db/",
     "workspace/console/",
-    "workspace/output/.sys/.trash/",
+    "workspace/.sys/.trash/",
 )
 
 
 def _is_protected(rel_path: str) -> bool:
     """Check whether a given relative path is in the protected zone."""
     norm = rel_path.replace("\\", "/")
-    if not norm.startswith("workspace/output/"):
-        return True  # paranoid : never touch outside workspace/output
+    if not norm.startswith("workspace/"):
+        return True  # paranoid : never touch outside workspace/
     return any(norm.startswith(p) for p in _PROTECTED_PATHS)
 
 
@@ -97,7 +107,7 @@ def _trash_one(root: Path, rel_path: str, trash_dir: Path, dry_run: bool) -> boo
 
 def _record_event(root: Path, action: str, paths: list[str]) -> None:
     """Best-effort log to console.db `events` table (non-blocking)."""
-    db_path = root / "workspace" / "output" / "db" / "console.db"
+    db_path = workspace_root(root) / "db" / "console.db"
     if not db_path.exists():
         return
     try:
@@ -124,6 +134,7 @@ def _record_event(root: Path, action: str, paths: list[str]) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
+    ensure_console_safe()  # cp1252 guard (audit 2026-06-11 M15)
     parser = argparse.ArgumentParser(
         description="Remove orphan artifacts (with .trash/ backup, 7-day recovery)"
     )
@@ -190,7 +201,7 @@ def main(argv: list[str] | None = None) -> int:
 
     # Move to trash
     ts = _dt.datetime.now(_dt.timezone.utc).strftime("%Y%m%dT%H%M%S")
-    trash_dir = root / "workspace" / "output" / ".sys" / ".trash" / ts
+    trash_dir = workspace_root(root) / ".sys" / ".trash" / ts
     moved: list[str] = []
     for t in safe_targets:
         if _trash_one(root, t, trash_dir, dry_run=False):

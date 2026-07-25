@@ -6,7 +6,7 @@ When commands are renamed, files moved, or templates retired, the FAQ
 silently rots. This smoke test parses the FAQ table and verifies that :
 
 1. Every relative path referenced (`.claude/templates/*`, `workspace/...`)
-   either exists OR is documented as a target/output (workspace/output paths
+   either exists OR is documented as a target/output (workspace paths
    are runtime-created, so absence is OK).
 2. Every slash command referenced (`/sdd-XXX`) corresponds to a real
    command file under `.claude/commands/`.
@@ -39,10 +39,10 @@ def _faq_text() -> str:
 # outputs (created on demand by agents/scripts) or expected to be empty
 # folders that user populates.
 _RUNTIME_PATH_PREFIXES = (
-    "workspace/output/",
-    "workspace/input/discovery/",  # may be empty until Tech Lead populates
-    "workspace/input/ui/",          # may be empty (mockups optional)
-    "workspace/input/assets/",
+    "workspace/",
+    "workspace/discovery/",  # may be empty until Tech Lead populates
+    "workspace/ui/",          # may be empty (mockups optional)
+    "workspace/assets/",
 )
 
 

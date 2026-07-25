@@ -32,11 +32,11 @@
 ### Étape 1.1 — Copier le template FEAT M
 
 ```powershell
-# Choisir un numéro de FEAT libre dans workspace/input/feats/
+# Choisir un numéro de FEAT libre dans workspace/feats/
 # Exemple : la FEAT N+1 (si dernière FEAT existante = 4, alors N=5)
 $N = 5  # adapter
 cp .claude/templates/bench-feats/feat-m.template.md `
-   workspace/input/feats/$N-BenchM.md
+   workspace/feats/$N-BenchM.md
 ```
 
 ### Étape 1.2 — Copier le mockup HTML existant + créer les 2 manquants
@@ -44,7 +44,7 @@ cp .claude/templates/bench-feats/feat-m.template.md `
 ```powershell
 # US-1 : liste — mockup fourni, juste à copier
 cp .claude/templates/bench-feats/mockups/feat-m-1-orders-list.html `
-   workspace/input/ui/$N-1-Orders-List.html
+   workspace/ui/$N-1-Orders-List.html
 
 # US-2 : formulaire création (à créer manuellement, ~20 min)
 # Inspiration : un seul écran avec
@@ -110,9 +110,9 @@ ne doit pas être modifié) :
 
 ```powershell
 # Sauvegarde
-cp workspace/input/stack/stack.md workspace/input/stack/stack.md.cmsprint-backup
+cp workspace/stack/stack.md workspace/stack/stack.md.cmsprint-backup
 
-# Éditer workspace/input/stack/stack.md :
+# Éditer workspace/stack/stack.md :
 #   BackendName: BenchOrdersBack
 #   FrontendName: BenchOrdersFront
 #   BackendLocalPort: 44329  (différent du CMSPrint)
@@ -168,9 +168,9 @@ Heure fin     : ____________
 Wall-clock    : ___ h ___ min
 ```
 
-Comptes-rendus à noter dans `workspace/output/.sys/.bench/snapshots/baseline-humaine.md` :
+Comptes-rendus à noter dans `workspace/.sys/.bench/snapshots/baseline-humaine.md` :
 
-- Lignes de code écrites (`cloc workspace/output/src/BenchOrders*/` ou équivalent)
+- Lignes de code écrites (`cloc workspace/src/BenchOrders*/` ou équivalent)
 - Tests écrits + coverage atteint
 - Bugs rencontrés pendant codage (qui auraient été des `[BUILD_CORRECTIBLE]` côté framework)
 - AC couvertes (sur les 10 AC totales)
@@ -190,9 +190,9 @@ docker exec bench-postgres psql -U bench -d bench_orders -c `
   "DROP TABLE IF EXISTS order_lines CASCADE; DROP TABLE IF EXISTS orders CASCADE;"
 
 # Reset workspace output
-rm -rf workspace/output/src/BenchOrders*
-rm -rf workspace/output/.sys/.state/run-*.json
-# (Conserver workspace/output/.sys/.bench/ et adrs/ — pas du run précédent)
+rm -rf workspace/src/BenchOrders*
+rm -rf workspace/.sys/.state/run-*.json
+# (Conserver workspace/.sys/.bench/ et adrs/ — pas du run précédent)
 
 # Réinitialiser console.db pour mesure propre (OPTIONNEL — si déjà bench déjà fait, garde le delta)
 # python .claude/python/sdd_scripts/init_console_db.py --reset
@@ -253,11 +253,11 @@ Pour chaque run, noter :
 ### Étape 3.4 — AC verified ratio
 
 Pour chaque run, ouvrir
-`workspace/output/.sys/.validation/5-spec-compliance.json` :
+`workspace/.sys/.validation/5-spec-compliance.json` :
 
 ```powershell
 $specs = Get-Content `
-  workspace/output/.sys/.validation/5-spec-compliance.json | ConvertFrom-Json
+  workspace/.sys/.validation/5-spec-compliance.json | ConvertFrom-Json
 $verified = ($specs.acs | Where-Object { $_.status -eq 'verified' }).Count
 $total = $specs.acs.Count
 "AC verified: $verified / $total = $([math]::Round($verified*100/$total, 1))%"
@@ -272,7 +272,7 @@ $total = $specs.acs.Count
 Idéalement par un collègue qui n'a pas vu le code généré. À défaut, toi
 avec une grille structurée.
 
-Grille (par run, sur le code généré dans `workspace/output/src/BenchOrdersBack/`) :
+Grille (par run, sur le code généré dans `workspace/src/BenchOrdersBack/`) :
 
 - [ ] Validation BR-2 (total mismatch) effectivement codée côté serveur ?
 - [ ] Transitions de statut BR-1 effectivement appliquées (pas juste DTO) ?
@@ -390,17 +390,17 @@ git tag v7.0.0-rc1 -m "Release candidate 1 — FEAT M Kotlin ROI mesuré (3 runs
 
 ```powershell
 # Restaurer stack.md original (CMSPrint)
-mv workspace/input/stack/stack.md.cmsprint-backup workspace/input/stack/stack.md
+mv workspace/stack/stack.md.cmsprint-backup workspace/stack/stack.md
 
 # Stopper container postgres bench (optionnel)
 docker stop bench-postgres
 docker rm bench-postgres
 
 # Conserver :
-# - workspace/output/.sys/.bench/snapshots/*.json (forensique)
+# - workspace/.sys/.bench/snapshots/*.json (forensique)
 # - .claude/docs/benchmarks/runs/*.json (rapports)
 # - .claude/docs/benchmarks/feat-m-kotlin.md (synthèse)
-# - workspace/output/src/BenchOrders*/ (code généré pour review post-tag)
+# - workspace/src/BenchOrders*/ (code généré pour review post-tag)
 ```
 
 ---

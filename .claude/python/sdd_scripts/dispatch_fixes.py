@@ -236,7 +236,7 @@ def fetch_fixable(feat_n: int) -> tuple[list[FixableFinding], int, int]:
 # STEP 2 — Triage by owner + write per-owner issue-lists
 # ---------------------------------------------------------------------------
 
-FIXLIST_DIR = "workspace/output/.sys/.fixlist"
+FIXLIST_DIR = "workspace/.sys/.fixlist"
 
 
 def build_plan(feat_n: int, dry_run: bool = False) -> DispatchPlan:

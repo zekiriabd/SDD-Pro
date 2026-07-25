@@ -190,7 +190,7 @@ def test_status_json_output_includes_warnings_total(tmp_path: Path) -> None:
     sys_dir = proj / ".sys"
     sys_dir.mkdir(parents=True)
     (sys_dir / "inventory.json").write_text("not json", encoding="utf-8")
-    feats_dir = tmp_path / "workspace" / "input" / "feats"
+    feats_dir = tmp_path / "workspace" / "feats"
     feats_dir.mkdir(parents=True)
 
     payload = _run_status_cli(tmp_path)

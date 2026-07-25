@@ -75,7 +75,7 @@ def _seed_token_usage(repo: Path, run_id: str, input_tokens: int, output_tokens:
     # Lazy import (ensures sys.path is set by conftest first)
     from sdd_lib import console_db
 
-    db_path = repo / "workspace" / "output" / "db" / "console.db"
+    db_path = repo / "workspace" / "db" / "console.db"
     db_path.parent.mkdir(parents=True, exist_ok=True)
     os.environ["SDD_REPO_ROOT"] = str(repo)
     try:

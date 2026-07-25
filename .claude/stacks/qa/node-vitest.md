@@ -71,7 +71,7 @@ Si Vitest n'est pas dans `package.json` :
 <!-- CORE_PACKAGES_START -->
 ```bash
 # Auto-genere depuis node-vitest.libs.json -- ne pas editer (utiliser sync_stack_md.py).
-(cd workspace/output/src/{BackendName} && pnpm add \
+(cd workspace/src/{BackendName} && pnpm add \
   vitest@2.1.8 \
   @vitest/coverage-v8@2.1.8)
 ```
@@ -81,20 +81,20 @@ Si Vitest n'est pas dans `package.json` :
 ```bash
 # Auto-genere depuis node-vitest.libs.json (on-demand) -- installe par dev-* si l'US declenche un trigger.
 # capability: dom-env
-(cd workspace/output/src/{BackendName} && pnpm add happy-dom@16.0.1)
-# OU (alt) : (cd workspace/output/src/{BackendName} && pnpm add jsdom@25.0.1)
+(cd workspace/src/{BackendName} && pnpm add happy-dom@16.0.1)
+# OU (alt) : (cd workspace/src/{BackendName} && pnpm add jsdom@25.0.1)
 
 # capability: test-react
-(cd workspace/output/src/{BackendName} && pnpm add @testing-library/react@16.1.0 @testing-library/jest-dom@6.6.3 @testing-library/user-event@14.5.2)
+(cd workspace/src/{BackendName} && pnpm add @testing-library/react@16.1.0 @testing-library/jest-dom@6.6.3 @testing-library/user-event@14.5.2)
 
 # capability: test-vue
-(cd workspace/output/src/{BackendName} && pnpm add @vue/test-utils@2.4.6)
+(cd workspace/src/{BackendName} && pnpm add @vue/test-utils@2.4.6)
 
 # capability: api-tests
-(cd workspace/output/src/{BackendName} && pnpm add supertest@7.0.0 @types/supertest@6.0.2)
+(cd workspace/src/{BackendName} && pnpm add supertest@7.0.0 @types/supertest@6.0.2)
 
 # capability: http-mock
-(cd workspace/output/src/{BackendName} && pnpm add msw@2.7.0)
+(cd workspace/src/{BackendName} && pnpm add msw@2.7.0)
 ```
 <!-- ONDEMAND_PACKAGES_END -->
 
@@ -129,7 +129,7 @@ Ajouter au `package.json` :
 ## 4. Project structure
 
 ```
-workspace/output/src/{AppName}/
+workspace/src/{AppName}/
 ├── src/
 │   ├── components/
 │   │   └── Login.tsx
@@ -231,21 +231,21 @@ describe('Login.vue', () => {
 ### 6.1 Test command
 
 ```bash
-cd workspace/output/src/{AppName}
+cd workspace/src/{AppName}
 npm test
 ```
 
 ### 6.2 Coverage command
 
 ```bash
-cd workspace/output/src/{AppName}
+cd workspace/src/{AppName}
 npm run test:coverage
 ```
 
 ### 6.3 Linter
 
 ```bash
-cd workspace/output/src/{AppName}
+cd workspace/src/{AppName}
 npx eslint . --max-warnings 0
 ```
 
@@ -255,8 +255,8 @@ npx eslint . --max-warnings 0
 
 Format : **lcov.info** + **coverage-summary.json**
 Path :
-- `workspace/output/src/{AppName}/coverage/lcov.info`
-- `workspace/output/src/{AppName}/coverage/coverage-summary.json`
+- `workspace/src/{AppName}/coverage/lcov.info`
+- `workspace/src/{AppName}/coverage/coverage-summary.json`
 
 Le script `parse_coverage.py` détecte les deux et utilise lcov par
 défaut (plus stable cross-tool).

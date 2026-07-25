@@ -15,12 +15,14 @@ Pour une FEAT `{n}` dont le code a été généré (`/dev-run` Done), produire :
    `Vitest`, `JUnit 5`, …)
 2. **Tests unitaires frontend** selon le QA stack actif (`bUnit`,
    `Vitest + RTL`, `Jasmine + Karma`, …)
-3. **Coverage parsée** au format normalisé (`workspace/output/qa/feat-{n}/coverage.json`)
+3. **Coverage parsée** persistée en base (`console.db` table `qa_coverage`)
 4. **Quality scan** (sonar-like) : TODO/FIXME, magic numbers, console.log,
    méthodes longues, dead code, naming violations
-5. **Rapport consolidé** (`workspace/output/qa/feat-{n}/report.md`)
+5. **Rapport consolidé** — plus aucun fichier écrit (SQLite = source unique).
+   Rendu à la demande : `python .claude/python/sdd_scripts/query_console_db.py
+   feat-stats --feat {n} --format md`
 
-**Strictement read-only** sur `workspace/output/src/{App|Backend|Lib}/**` (code de
+**Strictement read-only** sur `workspace/src/{App|Backend|Lib}/**` (code de
 production). Tout test généré l'est dans des dossiers adjacents
 (`*.Tests/`, `__tests__/`, etc.) — propriété QA exclusive (substance
 inlinée plus bas, §Ownership).
@@ -61,8 +63,8 @@ Appliquer `@.claude/rules/build-and-loop.md §1` (Partie B) avec
 
 ### 2.1 FEAT + US existent
 
-Glob `workspace/input/feats/{n}-*.md` → 1 fichier attendu.
-Glob `workspace/output/us/{n}-*.md` → ≥1 fichier attendu.
+Glob `workspace/feats/{n}-*.md` → 1 fichier attendu.
+Glob `workspace/us/{n}-*.md` → ≥1 fichier attendu.
 
 Si absent → ERROR :
 ```
@@ -73,21 +75,21 @@ FIX: lancer /us-generate {n} d'abord pour générer les US
 
 ### 2.2 Code généré
 
-Vérifier que `workspace/output/src/{BackendName}/` et/ou `workspace/output/src/{AppName}/`
+Vérifier que `workspace/src/{BackendName}/` et/ou `workspace/src/{AppName}/`
 existent (au moins un projet selon les stacks actifs).
 
 Si rien → ERROR :
 ```
 ERROR: agent qa — code production absent
-CAUSE: [QA_PRECONDITION_FAILED] aucun code dans workspace/output/src/ — /dev-run pas encore lancé
+CAUSE: [QA_PRECONDITION_FAILED] aucun code dans workspace/src/ — /dev-run pas encore lancé
 FIX: lancer /dev-run {n} d'abord
 ```
 
 ### 2.3 QAMode
 
-Lire `## Project Config` de `workspace/input/stack/stack.md`. Récupérer :
+Lire `## Project Config` de `workspace/stack/stack.md`. Récupérer :
 - `QAMode` (default `manual`)
-- `CoverageMin` (default `80`)
+- `CoverageMin` (**OBLIGATOIRE, pas de défaut** — absent/hors range → STOP `[STACK_MALFORMED]`, durcissement v6.10.1, cf. `quality.md §A.2`)
 
 Si `QAMode: off` → exit silencieux :
 ```
@@ -98,13 +100,13 @@ Stocker `QAMode` pour la suite (détermine les STEP à exécuter).
 
 ### 2.4 QA stacks actifs
 
-Lire les sections `## Active QA Specs` de `workspace/input/stack/stack.md`.
+Lire les sections `## Active QA Specs` de `workspace/stack/stack.md`.
 
 - Si vide ET `QAMode ≠ off` → ERROR :
   ```
   ERROR: agent qa — QA stacks non définis
   CAUSE: [QA_FRAMEWORK_MISSING] ## Active QA Specs vide
-  FIX: ajouter au moins un .claude/stacks/qa/*.md dans workspace/input/stack/stack.md
+  FIX: ajouter au moins un .claude/stacks/qa/*.md dans workspace/stack/stack.md
   ```
 
 - Sinon, charger chaque stack QA actif. **Structure varie selon le type de stack** (audit M16 closure 2026-06-07) :
@@ -128,22 +130,22 @@ Lire les sections `## Active QA Specs` de `workspace/input/stack/stack.md`.
 
 Read **uniquement** :
 
-1. `workspace/input/feats/{n}-*.md` (FEAT parente, lecture passive pour ACs)
-2. `workspace/output/us/{n}-*.md` (toutes les US de la FEAT, sélectif sur `{n}-*`)
-3. `workspace/input/ui/{n}-*.html` si présent (passif, pour comprendre les comportements UI à tester)
-4. **`workspace/output/src/{BackendName}/CLAUDE.md`** si présent (architecture backend)
-5. **`workspace/output/src/{AppName}/CLAUDE.md`** si présent (architecture frontend)
+1. `workspace/feats/{n}-*.md` (FEAT parente, lecture passive pour ACs)
+2. `workspace/us/{n}-*.md` (toutes les US de la FEAT, sélectif sur `{n}-*`)
+3. `workspace/ui/{n}-*.html` si présent (passif, pour comprendre les comportements UI à tester)
+4. **`workspace/src/{BackendName}/CLAUDE.md`** si présent (architecture backend)
+5. **`workspace/src/{AppName}/CLAUDE.md`** si présent (architecture frontend)
 6. **Schema DB pour fixtures** — **Levier 4 v7.0.x** : pour chaque US `{n}-{m}`
-   de la FEAT, préférer `workspace/output/db/schema-slice-{n}-{m}.json` s'il
+   de la FEAT, préférer `workspace/db/schema-slice-{n}-{m}.json` s'il
    existe (slice par US généré par `python -m sdd_scripts.generate_schema_slice`).
-   Fallback `workspace/output/db/schema.json` (complet) si aucun slice présent.
+   Fallback `workspace/db/schema.json` (complet) si aucun slice présent.
    Les slices contiennent les tables référencées par l'US + FK transitive,
    suffisant pour fixtures in-memory.
-7. **Code production** sous `workspace/output/src/{BackendName}|{AppName}|{LibName}/` :
+7. **Code production** sous `workspace/src/{BackendName}|{AppName}|{LibName}/` :
    lecture sélective des fichiers nommément référencés par les US ciblées
    (services, endpoints, components, validators)
 8. Les stacks QA actifs (chargement déjà fait en STEP 2.4)
-9. **`.claude/rules/error-classification.md`** — taxonomie complète QA :
+9. **`.claude/digests/error-classification.qa.md`** — taxonomie complète QA :
    `[QA_TEST_FAILED]`, `[QA_COVERAGE_GAP]`, `[QA_FRAMEWORK_MISSING]`,
    `[QA_INIT_FAILED]`, `[QA_TEST_INVALID]`, `[QA_OUTPUT_INVALID]`,
    `[QA_PRECONDITION_FAILED]`, `[QA_OWNERSHIP_VIOLATION]`,
@@ -162,10 +164,10 @@ fichier. Si cas-limite (ex. format précis schema coverage.json,
 edge-case ownership) : Read `@.claude/rules/{nom}.md` à la demande.
 
 **Read conditionnel (lazy)** :
-- `workspace/output/.sys/.context/constitution.md` : à Read **uniquement** si un terme
+- `workspace/.sys/.context/constitution.md` : à Read **uniquement** si un terme
   ambigu nécessite désambiguïsation via le glossaire.
 
-**Lecture sélective stricte** : ne JAMAIS faire `Glob workspace/output/src/**/*.cs`
+**Lecture sélective stricte** : ne JAMAIS faire `Glob workspace/src/**/*.cs`
 ou équivalent. Lire uniquement les fichiers correspondant aux US ciblées
 (via convention `{n}-{m}-{Name}` et plan de chaque US).
 
@@ -191,8 +193,9 @@ python .claude/python/sdd_scripts/quality_scan.py --feat-number {n}
 ```
 
 Sortie :
-- `workspace/output/qa/feat-{n}/quality.json` (machine-readable)
-- Section §3 du rapport final (humain)
+- `console.db` table `qa_quality` (source unique — le script n'écrit AUCUN
+  fichier ; 2026-07-06, ex-`quality.json`)
+- Section §3 du rapport rendu à la demande (humain)
 
 Résultats agrégés en 3 niveaux :
 - **errors** : violations bloquantes (bug potentiel) → comptés mais
@@ -257,12 +260,12 @@ stack actif :
 
 | Stack | Init typique |
 |---|---|
-| dotnet-xunit | `dotnet new xunit -o workspace/output/src/{BackendName}.Tests && dotnet sln add ...` |
+| dotnet-xunit | `dotnet new xunit -o workspace/src/{BackendName}.Tests && dotnet sln add ...` |
 | node-vitest | `npm install --save-dev vitest @testing-library/react c8` |
 | python-pytest | `pip install pytest pytest-cov && mkdir tests` |
 | kotlin-junit | edit `build.gradle.kts` (deps JUnit 5 + MockK + JaCoCo) |
 | angular-jasmine | dependencies déjà présentes via `ng new` |
-| blazor-bunit | `dotnet new bunit -o workspace/output/src/{AppName}.Tests` |
+| blazor-bunit | `dotnet new bunit -o workspace/src/{AppName}.Tests` |
 
 Sur erreur d'init → STOP + ERROR `[QA_INIT_FAILED]`.
 
@@ -273,11 +276,11 @@ patterns du QA stack actif (cf. §Ownership inline plus bas) :
 
 | Convention | Exemples |
 |---|---|
-| `*.Tests/*.cs` | `workspace/output/src/{BackendName}.Tests/AuthServiceTests.cs` |
-| `__tests__/*.test.ts` | `workspace/output/src/{AppName}/__tests__/Login.test.tsx` |
-| `*.FEAT.ts` (Jasmine) | `workspace/output/src/{AppName}/src/app/auth/login.component.FEAT.ts` |
-| `test_*.py` | `workspace/output/src/{BackendName}/tests/test_auth_service.py` |
-| `*Test.kt` | `workspace/output/src/{BackendName}/src/test/kotlin/AuthServiceTest.kt` |
+| `*.Tests/*.cs` | `workspace/src/{BackendName}.Tests/AuthServiceTests.cs` |
+| `__tests__/*.test.ts` | `workspace/src/{AppName}/__tests__/Login.test.tsx` |
+| `*.FEAT.ts` (Jasmine) | `workspace/src/{AppName}/src/app/auth/login.component.FEAT.ts` |
+| `test_*.py` | `workspace/src/{BackendName}/tests/test_auth_service.py` |
+| `*Test.kt` | `workspace/src/{BackendName}/src/test/kotlin/AuthServiceTest.kt` |
 
 **Idempotence** : Si un fichier de test existe déjà avec le même nom
 de test, écraser (régénération).
@@ -316,23 +319,23 @@ flaggué dans le rapport).
 Skip si `QAMode: tests-only`.
 
 Exécuter `parse_coverage.py` qui consomme les outputs natifs des
-test runners (cobertura XML, lcov.info, coverage.json) et produit le
-schéma normalisé `workspace/output/qa/feat-{n}/coverage.json` (cf.
-`rules/quality.md §2` pour le format).
+test runners (cobertura XML, lcov.info, coverage.json) et persiste le
+schéma normalisé dans `console.db` table `qa_coverage` (cf.
+`rules/quality.md §2` pour le format). Aucun fichier n'est écrit.
 
 ```bash
 python .claude/python/sdd_scripts/parse_coverage.py --feat-number {n}
 ```
 
 Le script :
-- Glob les fichiers coverage natifs sous `workspace/output/src/**/coverage*` et
-  `workspace/output/src/**/TestResults/**`
+- Glob les fichiers coverage natifs sous `workspace/src/**/coverage*` et
+  `workspace/src/**/TestResults/**`
 - Parse chaque format selon §7 du QA stack
 - Calcule la moyenne pondérée par LOC totales
-- Écrit `coverage.json` au schéma normalisé
+- Persiste les lignes normalisées dans `console.db` (`qa_coverage`)
 - Détermine `coverage_passed = (coverage_lines_pct >= CoverageMin)`
 
-**CoverageMin: 80** par défaut (modifiable via `## Project Config`).
+**CoverageMin est OBLIGATOIRE** dans `## Project Config` — il n'existe AUCUN défaut framework (durcissement v6.10.1, `quality.md §A.2`). Absent ou hors range 0-100 → STOP `[STACK_MALFORMED]` dès la lecture du stack.md. `CoverageMin: 0` = bypass explicite tracé (jamais un oubli).
 
 Si `coverage_passed = false` → flag `[QA_COVERAGE_GAP]` **bloquant**
 (décision globale RED, depuis v6.1 hardening). Pour autoriser une FEAT
@@ -349,7 +352,7 @@ Skip si `MutationTestingMode: off` (défaut). Substance opérationnelle
 
 Verdict canonique `PASS/WARN/FAIL/SKIPPED/INFRA_BLOCKED` selon
 `MutationScoreMin` (défaut 60) avec tolérance 0.8×. Persiste
-`workspace/output/qa/feat-{n}/mutation.json` + console.db `qa_mutation`.
+**uniquement** dans `console.db` table `qa_mutation` (aucun fichier `.json`).
 
 Anti-derive : ne pas bloquer sur `INFRA_BLOCKED` (WARN seulement) ;
 respecter `MutationTestingTimeoutSec` (kill -9). Exit silencieux par
@@ -366,47 +369,40 @@ per stack, verdict canonique, anti-derive sleeps/HAR) : **Read on-demand
 
 Verdict canonique `PASS/WARN/FAIL/SKIPPED/INFRA_BLOCKED` selon
 `E2EMinPerUs` (défaut 1) et `E2ETimeoutSec` (défaut 300). Persiste
-`workspace/output/qa/feat-{n}/e2e.json` + console.db `qa_e2e`.
+**uniquement** dans `console.db` table `qa_e2e` (aucun fichier `.json`).
 
 Skip silencieux si aucun frontend stack actif OU aucune US avec UI ACs.
 
 ---
 
-## STEP 9 — Génération du rapport consolidé
+## STEP 9 — Rapport consolidé (SQLite-only, aucun fichier)
 
-Read `.claude/templates/qa-report.template.md`.
+**2026-07-06 — plus de `report.md` sur disque.** Toutes les données QA
+sont déjà persistées en base par les STEPs précédents (`qa_quality`,
+`qa_coverage`, `qa_api_tests`, `qa_mutation`, `qa_e2e`). L'agent
+**n'écrit AUCUN fichier de rapport** et ne lit AUCUN template.
 
-Composer le rapport `workspace/output/qa/feat-{n}/report.md` :
+Le rapport lisible par un humain est **rendu à la demande** depuis
+`console.db`, sans jamais toucher le disque :
 
-### Sections
+```bash
+python .claude/python/sdd_scripts/query_console_db.py feat-stats --feat {n} --format md
+```
 
-1. **Résumé exécutif** : tests passés/échoués, coverage %, quality
-   errors/warnings, décision globale (GREEN / YELLOW / RED)
-2. **Tests unitaires** : par stack, par US, statut
-3. **Quality scan** : par catégorie (TODO, magic numbers, etc.) avec
-   nombre + 3-5 exemples
-4. **Linter** : warnings stack-native
-5. **Coverage** : tableau par stack + global
-6. **Échecs détaillés** : si tests rouges, premier échec par stack avec
-   stack trace synthétique (max 3 lignes)
-7. **Recommandations** : actions concrètes (ne PAS auto-corriger — c'est
-   du Tech Lead arbitrage)
-
-### Règle d'écriture
-
-Pas de prose verbeuse. Style "checklist" + tables.
-
-Mode `Edit` impossible (le fichier est créé en mode `create`, écrase
-si existe).
+Le rendu reprend les mêmes sections qu'auparavant (résumé exécutif,
+tests, quality scan, linter, coverage, échecs, recommandations) mais
+reconstruites à la volée depuis les tables `qa_*`. Rien à générer ici :
+il suffit de s'assurer que les STEPs 4/8/8.5/8.bis ont bien persisté
+leurs lignes en base.
 
 ---
 
 ## STEP 9.bis — Acceptance Gate (déterministe, hoisted from hook)
 
 Invoquer le runner Acceptance Gate **avant la confirmation finale**. Il
-parcourt `workspace/output/src/*`, détecte le type (Node / .NET / Kotlin /
+parcourt `workspace/src/*`, détecte le type (Node / .NET / Kotlin /
 Python) et exécute `test` + `lint` + `build` par projet, puis écrit
-`workspace/output/.sys/.acceptance/acceptance.json` (verdict consommé par
+`workspace/.sys/.acceptance/acceptance.json` (verdict consommé par
 le hook `SubagentStop` matcher=qa, désormais simple lecteur < 100ms).
 
 ```bash
@@ -440,9 +436,8 @@ Coverage       : {pct}% (seuil {CoverageMin}%) → {pass | fail}
 Quality scan   : {errors} errors / {warnings} warnings / {info} info
 Linter         : {linter_warnings} warnings
 
-Rapport        : workspace/output/qa/feat-{n}/report.md
-Coverage       : workspace/output/qa/feat-{n}/coverage.json
-Quality        : workspace/output/qa/feat-{n}/quality.json
+Données        : console.db (qa_quality, qa_coverage, qa_api_tests)
+Rapport        : à la demande → query_console_db.py feat-stats --feat {n} --format md
 ```
 
 Décision (5 statuts canoniques v7.0.0 — cf. `build-and-loop.md §A.1.3`) :
@@ -461,8 +456,12 @@ Décision (5 statuts canoniques v7.0.0 — cf. `build-and-loop.md §A.1.3`) :
 gate_passed = (status in {"PASS", "WARN", "SKIPPED"})
 ```
 
-Le rapport `api-tests.json` et `coverage.json` doivent émettre **les deux** :
-`status` canonique (v7.0.0+) ET `verdict` legacy (backward-compat).
+Le JSON transitoire `api-tests` (écrit sous
+`workspace/.sys/.validation/{n}-api-tests.json` puis ingéré et
+supprimé par `ingest_agent_report.py`) doit émettre **les deux** dans son
+`summary` : `status` canonique (v7.0.0+) ET `verdict` legacy
+(backward-compat). La coverage est persistée directement en base
+(`qa_coverage`), sans fichier.
 
 **Cas particulier — Régression cross-FEAT par refactoring** : si
 `compileTestKotlin`/`tsc`/`pytest --collect-only` échoue sur des
@@ -514,7 +513,7 @@ clôture).
 
 ```bash
 if [ "$VERDICT" = "GREEN" ]; then
-  for us_file in workspace/output/us/{n}-*.md; do
+  for us_file in workspace/us/{n}-*.md; do
     us_id=$(basename "$us_file" .md | grep -oE '^[0-9]+-[0-9]+')
     python .claude/python/sdd_scripts/set_us_status.py \
       --us "$us_id" --status Done 2>/dev/null || true
@@ -529,10 +528,12 @@ Idempotent et non-bloquant. Transition `Review → Done` valide sans `--force`.
 ## Inline Rules — Anti-derive strict
 
 **Universels** : `@.claude/rules/build-and-loop.md §3.bis` (autonomous, ambiguïté → STOP, no-spawn).
+Sync vérifiée 2026-06-11 : l'édition `build-and-loop.md` du jour (audit MA-2 — renommage
+modèle Opus 4.7 → 4.8, §7.7 From-Plan) est cosmétique ; la substance inlinée (§3.bis, §A API Gate) est inchangée.
 
 **Domain-specific QA** :
 - Ne JAMAIS modifier le code de production sous
-  `workspace/output/src/{App|Backend|Frontend|*Lib}/**` (read-only strict)
+  `workspace/src/{App|Backend|Frontend|*Lib}/**` (read-only strict)
 - **Périmètre QA** :
   - ✅ Tests **unitaires** (STEP 5, obligatoire selon `QAMode`)
   - ✅ Tests **mutation** (STEP 8, opt-in `MutationTestingMode != off`, stack `qa/mutation-testing`)
@@ -543,7 +544,7 @@ Idempotent et non-bloquant. Transition `Review → Done` valide sans `--force`.
 - Ne JAMAIS auto-corriger un test failure (rapporter, ne pas patcher)
 - Ne JAMAIS auto-installer un package non listé dans le QA stack actif
 - Ne JAMAIS modifier les FEATs, US, mockups HTML (read-only)
-- Ne JAMAIS modifier `workspace/output/.sys/.context/constitution.md` ni les ADRs
+- Ne JAMAIS modifier `workspace/.sys/.context/constitution.md` ni les ADRs
   (read-only)
 
 ---
@@ -555,9 +556,9 @@ Idempotent et non-bloquant. Transition `Review → Done` valide sans `--force`.
 `**/*.test.{ts,tsx,js,jsx}`, `**/*Tests.cs`, `**/test_*.py`, `**/*_test.py`,
 `**/*Test.kt`, `**/*FEAT.kt`, `**/src/test/kotlin/**`.
 
-**Read-only strict** : `workspace/output/src/{App|Backend|Frontend|*Lib}/**`
-(hors patterns ci-dessus), `workspace/input/feats/`, `workspace/output/us/`,
-`workspace/input/ui/`, `workspace/output/.sys/.context/`, `workspace/output/db/`.
+**Read-only strict** : `workspace/src/{App|Backend|Frontend|*Lib}/**`
+(hors patterns ci-dessus), `workspace/feats/`, `workspace/us/`,
+`workspace/ui/`, `workspace/.sys/.context/`, `workspace/db/`.
 
 **Stack-completeness** : chaque `using`/`import` dans un test doit figurer
 en §2.4 d'un stack actif (qa, backend, frontend, ui, auth). Lib absente

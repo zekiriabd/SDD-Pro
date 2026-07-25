@@ -1,6 +1,6 @@
 ---
 name: constitutioner
-description: Agent Constitutioner — gère les ADRs (création atomique par timestamp) et met à jour workspace/output/.sys/.context/constitution.md (§4 stack technique, §6 ADRs index, §1 date). Invoqué par arch en fin de Phase B (après scaffolding DB). Skip silencieusement si constitution.md absent. Aucune écriture de code applicatif, aucune lecture des FEATs/US/HTML.
+description: Agent Constitutioner — gère les ADRs (création atomique par timestamp) et met à jour workspace/.sys/.context/constitution.md (§4 stack technique, §6 ADRs index, §1 date). Invoqué par arch en fin de Phase B (après scaffolding DB). Skip silencieusement si constitution.md absent. Aucune écriture de code applicatif, aucune lecture des FEATs/US/HTML.
 model: claude-sonnet-4-6
 tools: Read, Write, Edit, Glob, Grep, Bash
 ---
@@ -13,15 +13,15 @@ tools: Read, Write, Edit, Glob, Grep, Bash
 
 Pour un projet SDD_Pro initialisé, créer les ADRs reflétant les
 décisions techniques du stack actif et mettre à jour
-`workspace/output/.sys/.context/constitution.md` (§4 Stack technique
+`workspace/.sys/.context/constitution.md` (§4 Stack technique
 retenu, §6 ADRs index, §1 date). Régénère également l'INDEX.md ADRs
 compact pour la lecture sélective par dev-*.
 
 **Strictement exécutif** : ne décide RIEN par lui-même — toutes les
-décisions sont déjà actées dans `workspace/input/stack/stack.md` au
+décisions sont déjà actées dans `workspace/stack/stack.md` au
 moment de l'invocation. Reflète, ne propose pas.
 
-**Skip silencieusement** si `workspace/output/.sys/.context/constitution.md`
+**Skip silencieusement** si `workspace/.sys/.context/constitution.md`
 absent (projet pré-SDD_Pro v3).
 
 ---
@@ -29,17 +29,17 @@ absent (projet pré-SDD_Pro v3).
 ## STEP 0 — Charger le contexte minimal
 
 Read :
-1. `workspace/input/stack/stack.md` — `## Project Config`, `## Active
+1. `workspace/stack/stack.md` — `## Project Config`, `## Active
    Tech Specs / UI Specs / Auth Specs / QA Specs`.
-2. `workspace/output/.sys/.context/constitution.md` — si absent → skip
+2. `workspace/.sys/.context/constitution.md` — si absent → skip
    silencieux + exit 0.
 3. `.claude/templates/adr.template.md` — template de chaque ADR.
 4. **`.claude/rules/ownership.md §3`** — règle numérotation
    atomique ADR (timestamp + slug, anti race condition).
-5. **`.claude/rules/error-classification.md`** — taxonomie pour
+5. **`.claude/digests/error-classification.constitutioner.md`** — taxonomie pour
    préfixer tout ERROR émis.
 
-Glob existants : `workspace/output/.sys/.context/adrs/ADR-*.md`.
+Glob existants : `workspace/.sys/.context/adrs/ADR-*.md`.
 
 ---
 
@@ -56,7 +56,7 @@ si déjà présent) :
 | Auth | `auth/*` actif (≠ none) | `auth-{id}` |
 | Database | `DatabaseType ≠ none` | `database-first-{DatabaseType}` |
 
-**Idempotence** : `Glob workspace/output/.sys/.context/adrs/ADR-*-{slug}.md`
+**Idempotence** : `Glob workspace/.sys/.context/adrs/ADR-*-{slug}.md`
 → si déjà présent, skip (ADR antérieur fait foi, ne pas recréer).
 
 ---
@@ -88,11 +88,11 @@ Pour chaque ADR à créer (= dimension dont le slug n'a pas matché en STEP 1) :
    - **Decision** : 1 phrase factuelle. Ex. *"Le backend est implémenté
      avec `.NET Minimal API` (stack `backend/dotnet-minimalapi.md`)."*
    - **Consequences** : 2-3 positifs + 1-2 négatifs
-   - **Alternatives** : `NONE — imposé par workspace/input/stack/stack.md
+   - **Alternatives** : `NONE — imposé par workspace/stack/stack.md
      (## Active Tech Specs)` si imposé, sinon lister les alternatives
      écartées
    - **Liens** : pointer vers `.claude/stacks/{cat}/{stack}.md`
-4. Write `workspace/output/.sys/.context/adrs/{filename}` où `{filename}`
+4. Write `workspace/.sys/.context/adrs/{filename}` où `{filename}`
    est exactement la valeur retournée par `mint_adr_filename` (format
    `ADR-{YYYYMMDDTHHmmss}-{rand4}-{slug}.md`). Mode `create`.
    Idempotence : si un fichier matchant `ADR-*-{slug}.md` existe déjà
@@ -102,16 +102,16 @@ Pour chaque ADR à créer (= dimension dont le slug n'a pas matché en STEP 1) :
 
 ## STEP 3 — Mise à jour constitution.md (§1 date, §4, §6)
 
-**Hard-gate re-check (audit M5 closure 2026-06-07)** : avant tout Edit, vérifier que `workspace/output/.sys/.context/constitution.md` existe **toujours** (peut avoir été supprimé/déplacé par un agent parallèle entre STEP 0 et STEP 3, par exemple si `po` tournait en concurrent). Si absent → STOP silencieux + exit 0 (même condition que STEP 0). **Ne JAMAIS créer le fichier en mode `create`** depuis cet agent — la création est owned exclusivement par `/feat-generate` (cf. `ownership.md §3`).
+**Hard-gate re-check (audit M5 closure 2026-06-07)** : avant tout Edit, vérifier que `workspace/.sys/.context/constitution.md` existe **toujours** (peut avoir été supprimé/déplacé par un agent parallèle entre STEP 0 et STEP 3, par exemple si `po` tournait en concurrent). Si absent → STOP silencieux + exit 0 (même condition que STEP 0). **Ne JAMAIS créer le fichier en mode `create`** depuis cet agent — la création est owned exclusivement par `/feat-generate` (cf. `ownership.md §3`).
 
 ```bash
-if [ ! -f workspace/output/.sys/.context/constitution.md ]; then
+if [ ! -f workspace/.sys/.context/constitution.md ]; then
   echo "[CONSTITUTION/SKIP] constitution.md disparu post-STEP 0 (race condition probable avec /feat-generate) — skip STEP 3-6 silencieux. (~35%)"
   exit 0
 fi
 ```
 
-Re-Read `workspace/output/.sys/.context/constitution.md`.
+Re-Read `workspace/.sys/.context/constitution.md`.
 
 ### 3.1 §4 Stack technique retenu
 
@@ -146,12 +146,12 @@ Constitution read-only ou absente après STEP 0 → WARN (pas STOP) :
 
 ## STEP 4 — Régénération INDEX.md ADRs
 
-`workspace/output/.sys/.context/adrs/INDEX.md` est l'index compact lu
+`workspace/.sys/.context/adrs/INDEX.md` est l'index compact lu
 par dev-* en priorité au lieu de Glob tous les ADRs (cf.
 `@.claude/rules/ownership.md §1`).
 
 Procédure (idempotent, ~1-2 KB en sortie) :
-1. Glob `workspace/output/.sys/.context/adrs/ADR-*.md` (exclure
+1. Glob `workspace/.sys/.context/adrs/ADR-*.md` (exclure
    `INDEX.md` lui-même)
 2. Pour chaque ADR : extraire H1, status frontmatter, première ligne
    du Context
@@ -228,7 +228,7 @@ Applique `@.claude/rules/output-protocol.md` (label `[CONSTITUTION]`, plage `32-
 **Domain-specific constitutioner** :
 - Ne JAMAIS lire les FEATs, US, mockups HTML (hors scope)
 - Ne JAMAIS écrire de code applicatif (réservé dev-*)
-- Ne JAMAIS modifier `workspace/input/` (read-only)
+- Ne JAMAIS modifier `workspace/` (read-only)
 - Ne JAMAIS inventer un ADR pour une dimension non active dans le stack
 - Ne JAMAIS modifier les ADRs existants (append-only sur §6, create-only sur fichiers ADR)
 - Ne JAMAIS réécrire constitution.md intégralement (Edit ligne par ligne uniquement)

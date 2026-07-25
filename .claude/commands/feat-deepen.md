@@ -3,7 +3,8 @@
 <!-- @llm-only-flags-file : tous les flags CLI de cette commande slash sont interprétés par Claude (pas par un argparse Python). -->
 
 > ⚠️ **Commande interne v7.0.0** — invocation manuelle ou via `/feat-generate --deepen`.
-> Sera fusionné dans `/feat-generate` post-v7.0.0. Préférer `/sdd-full` ou `/dev-run` en usage normal.
+> Préférer `/sdd-full` ou `/dev-run` en usage normal.
+> (Fusion dans `/feat-generate` envisagée — cf. roadmap, non planifiée.)
 
 Enrichit une FEAT fonctionnelle existante via une **bibliothèque de
 15 techniques d'élicitation** (`@.claude/docs/brainstorming-techniques.md`,
@@ -40,7 +41,7 @@ le wrapper déterministe qui valide les 15 noms de techniques canoniques :
 
 ```bash
 echo "{raw user input string}" | python -m sdd_scripts.elicitor_args
-# Sortie : workspace/output/.sys/.state/elicitor-{n}.args.json
+# Sortie : workspace/.sys/.state/elicitor-{n}.args.json
 # stdout : JSON parsé avec techniques résolues (mode + liste finale)
 ```
 
@@ -67,7 +68,7 @@ parse les flags lui-même via interprétation LLM (cf. marqueur
 ## STEP 1 — Valider l'argument
 
 > Si STEP 0.7 a été exécuté, les valeurs des flags viennent de
-> `workspace/output/.sys/.state/elicitor-{n}.args.json` (déterministe).
+> `workspace/.sys/.state/elicitor-{n}.args.json` (déterministe).
 > Sinon, parsing LLM legacy.
 
 Argument **obligatoire** : `{n}` (entier ≥ 1).
@@ -90,12 +91,12 @@ Détecter le flag `--quick` dans les arguments. Stocker `quick = true|false`.
 
 ## STEP 2 — Vérifier la FEAT
 
-Glob `workspace/input/feats/{n}-*.md`.
+Glob `workspace/feats/{n}-*.md`.
 
 - 0 fichier → ERROR :
   ```
   ERROR: /feat-deepen — FEAT introuvable
-  CAUSE: aucun fichier workspace/input/feats/{n}-*.md
+  CAUSE: aucun fichier workspace/feats/{n}-*.md
   FIX: créer la FEAT via /feat-generate avant
   ```
 - > 1 fichier → ERROR (numérotation invalide).
@@ -139,7 +140,7 @@ Invoquer l'agent `elicitor` avec :
 L'agent gère :
 - Les 5 techniques (interactive ou one-shot)
 - L'écriture des 5 sections en fin de FEAT
-- La mise à jour de `workspace/output/.sys/.context/constitution.md` §7
+- La mise à jour de `workspace/.sys/.context/constitution.md` §7
 
 L'agent émet son propre récap à la fin (STEP 11 de l'agent).
 

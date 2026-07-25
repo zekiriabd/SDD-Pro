@@ -66,7 +66,7 @@ class TestConnectRoUriPortability(unittest.TestCase):
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
         self.repo = _make_repo(Path(self._tmp.name))
-        self.db = self.repo / "workspace" / "output" / "db" / "console.db"
+        self.db = self.repo / "workspace" / "db" / "console.db"
 
     def tearDown(self):
         self._tmp.cleanup()
@@ -141,7 +141,7 @@ class TestComputeRunCostScopes(unittest.TestCase):
         os.environ["SDD_REPO_ROOT"] = str(self.repo)
         try:
             # Create a "DB" file that's actually garbage
-            db_path = self.repo / "workspace" / "output" / "db" / "console.db"
+            db_path = self.repo / "workspace" / "db" / "console.db"
             db_path.parent.mkdir(parents=True, exist_ok=True)
             db_path.write_bytes(b"this is not a sqlite database, surprise!")
 
@@ -166,7 +166,7 @@ class TestCostCapHookBehaviourOnDbError(unittest.TestCase):
         self._tmp = tempfile.TemporaryDirectory()
         self.repo = _make_repo(Path(self._tmp.name))
         # Plant a corrupt DB
-        db_path = self.repo / "workspace" / "output" / "db" / "console.db"
+        db_path = self.repo / "workspace" / "db" / "console.db"
         db_path.parent.mkdir(parents=True, exist_ok=True)
         db_path.write_bytes(b"corrupt content " * 50)
 
@@ -269,7 +269,7 @@ class TestVerifyTelemetryHealth(unittest.TestCase):
         import json
         os.environ["SDD_REPO_ROOT"] = str(self.repo)
         try:
-            db_path = self.repo / "workspace" / "output" / "db" / "console.db"
+            db_path = self.repo / "workspace" / "db" / "console.db"
             console_db.ensure_initialized(db_path)
         finally:
             os.environ.pop("SDD_REPO_ROOT", None)
@@ -294,7 +294,7 @@ class TestVerifyTelemetryHealth(unittest.TestCase):
         import json
         os.environ["SDD_REPO_ROOT"] = str(self.repo)
         try:
-            db_path = self.repo / "workspace" / "output" / "db" / "console.db"
+            db_path = self.repo / "workspace" / "db" / "console.db"
             console_db.ensure_initialized(db_path)
         finally:
             os.environ.pop("SDD_REPO_ROOT", None)
@@ -317,7 +317,7 @@ class TestVerifyTelemetryHealth(unittest.TestCase):
     def test_corrupt_db_verdict_unreadable(self):
         """New verdict UNREADABLE (v7.0.0-alpha) when DB exists but cannot be opened."""
         import json
-        db_path = self.repo / "workspace" / "output" / "db" / "console.db"
+        db_path = self.repo / "workspace" / "db" / "console.db"
         db_path.parent.mkdir(parents=True, exist_ok=True)
         db_path.write_bytes(b"garbage")
         r = subprocess.run(

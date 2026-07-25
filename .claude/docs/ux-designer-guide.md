@@ -18,7 +18,7 @@ L'agent `dev-frontend` lit le mockup comme **donnée passive** :
 Avantages vs Figma :
 - **Inline dans le repo** (traçable, versionable, git diff)
 - **Lecture LLM directe** (pas d'API Figma, pas de connecteur tiers)
-- **Validation visuelle facile** (`open workspace/input/ui/1-1-Login.html`)
+- **Validation visuelle facile** (`open workspace/ui/1-1-Login.html`)
 - **Pas de licence** (HTML/CSS = standard ouvert)
 
 Limite : pas d'animations, pas d'interactions. Le code généré
@@ -28,7 +28,7 @@ matérialise interactions selon les ACs de l'US.
 
 ## 2. Convention de nommage
 
-Path strict : `workspace/input/ui/{n}-{m}-{Name}.html`
+Path strict : `workspace/ui/{n}-{m}-{Name}.html`
 
 | Élément | Règle | Exemple |
 |---|---|---|
@@ -38,9 +38,9 @@ Path strict : `workspace/input/ui/{n}-{m}-{Name}.html`
 | Extension | `.html` (pas `.htm`) | — |
 
 **Exemples valides** :
-- `workspace/input/ui/1-1-Login.html`
-- `workspace/input/ui/1-2-Reset-Password.html`
-- `workspace/input/ui/3-1-Liste-Commandes.html`
+- `workspace/ui/1-1-Login.html`
+- `workspace/ui/1-2-Reset-Password.html`
+- `workspace/ui/3-1-Liste-Commandes.html`
 
 **Invalides** :
 - `Login.html` (manque `{n}-{m}-`)
@@ -50,7 +50,7 @@ Path strict : `workspace/input/ui/{n}-{m}-{Name}.html`
 
 > **Propagation `{Name}`** : si vous nommez votre mockup `1-2-Login.html`,
 > l'agent `po` réutilisera exactement `Login` comme `{Name}` de l'US
-> `workspace/output/us/1-2-Login.md` (cf. po-guide §6 — convention CRIT-9
+> `workspace/us/1-2-Login.md` (cf. po-guide §6 — convention CRIT-9
 > audit 2026-06-07).
 
 ---
@@ -212,7 +212,7 @@ indiquant au Tech Lead qu'il doit fournir le fichier dans
 
 ## 7. Exemples canoniques
 
-Voir `workspace/input/ui/_examples/` (à créer lors de l'onboarding).
+Voir `workspace/ui/_examples/` (à créer lors de l'onboarding).
 3 exemples typiques :
 1. `_examples/login-simple.html` — form auth basique (le squelette §3.1)
 2. `_examples/dashboard-cards.html` — layout grid de cards métriques
@@ -227,7 +227,7 @@ Ces exemples sont copyables comme point de départ.
 
 1. **Brouillon papier** (3-5 min) — wireframe sur post-it
 2. **HTML statique** (15-30 min selon complexité) — copier le squelette §3.1
-3. **Validation visuelle** (`open workspace/input/ui/{n}-{m}-{Name}.html`
+3. **Validation visuelle** (`open workspace/ui/{n}-{m}-{Name}.html`
    dans navigateur) — vérifier rendu sur mobile (Chrome DevTools responsive)
 4. **`/feat-validate {n}`** — vérifier que le mockup matche le `{Name}` US
 5. **`/sdd-full {n}`** — laisse l'agent matérialiser

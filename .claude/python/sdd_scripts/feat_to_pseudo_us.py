@@ -5,7 +5,7 @@ Used by the `/sdd-poc {n}` command to bypass `/us-generate` and produce
 **one** pseudo-User-Story per FEAT (`{n}-1-{FeatName}`) that aggregates
 all SFD/BR/AC/FD ids of the parent FEAT. The pseudo-US lets the rest of
 the pipeline (arch + dev-backend + dev-frontend) run unchanged — they
-read a regular US file at `workspace/output/us/{n}-1-*.md` without
+read a regular US file at `workspace/us/{n}-1-*.md` without
 knowing it was auto-generated.
 
 The pseudo-US is **marked explicitly** in its frontmatter via :
@@ -17,8 +17,8 @@ replace it with real granular US, and so that the rest of SDD_Pro can
 distinguish POC mode from full mode in dashboards.
 
 Mockup HTML handling :
-  - if `workspace/input/ui/{n}-1-{FeatName}.html` already exists → OK
-  - elif `workspace/input/ui/{n}-{FeatName}.html` exists (POC user
+  - if `workspace/ui/{n}-1-{FeatName}.html` already exists → OK
+  - elif `workspace/ui/{n}-{FeatName}.html` exists (POC user
     convention) → COPY to `{n}-1-{FeatName}.html` (Windows-safe ;
     symlink fragile)
   - else → no mockup, dev-frontend works without HTML reference
@@ -48,7 +48,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from sdd_lib.atomic_write import atomic_write_text  # noqa: E402
 from sdd_lib.exit_codes import FAIL_FAST, INFRA_BLOCKED, SUCCESS  # noqa: E402
-from sdd_lib.paths import iso_now, repo_root  # noqa: E402
+from sdd_lib.paths import workspace_root, iso_now, repo_root  # noqa: E402
 from sdd_lib.stderr import error_block, warn  # noqa: E402
 
 # Stable IDs in the FEAT (cf. CLAUDE.md §2)
@@ -90,12 +90,12 @@ def feat_name_to_us_name(feat_basename: str) -> str:
 
 
 def find_feat_file(root: Path, feat_number: int) -> tuple[Path | None, str | None]:
-    """Locate the FEAT file `workspace/input/feats/{N}-*.md`.
+    """Locate the FEAT file `workspace/feats/{N}-*.md`.
 
     Returns (path, error_code). On success : (Path, None). On error :
     (None, code) where code is FEAT_NOT_FOUND or FEAT_AMBIGUOUS.
     """
-    feats_dir = root / "workspace" / "input" / "feats"
+    feats_dir = workspace_root(root) / "feats"
     if not feats_dir.is_dir():
         return None, "FEAT_NOT_FOUND"
     matches = sorted(feats_dir.glob(f"{feat_number}-*.md"))
@@ -143,8 +143,8 @@ def extract_feat_data(content: str) -> dict:
 
 
 def existing_us_files(root: Path, feat_number: int) -> list[Path]:
-    """All `{N}-*-*.md` files under workspace/output/us/."""
-    us_dir = root / "workspace" / "output" / "us"
+    """All `{N}-*-*.md` files under workspace/us/."""
+    us_dir = workspace_root(root) / "us"
     if not us_dir.is_dir():
         return []
     return sorted(us_dir.glob(f"{feat_number}-*.md"))
@@ -285,13 +285,13 @@ def handle_html_mockup(
     """Detect or copy the optional HTML mockup.
 
     Conventions :
-      - canonical : workspace/input/ui/{n}-1-{us_name}.html
-      - POC user shortcut : workspace/input/ui/{n}-{feat_basename}.html
+      - canonical : workspace/ui/{n}-1-{us_name}.html
+      - POC user shortcut : workspace/ui/{n}-{feat_basename}.html
 
     Returns dict {"action": <none|already|copied|none-available>,
                   "src": <path|null>, "dst": <path|null>}.
     """
-    ui_dir = root / "workspace" / "input" / "ui"
+    ui_dir = workspace_root(root) / "ui"
     if not ui_dir.is_dir():
         return {"action": "none-available", "src": None, "dst": None}
 
@@ -361,14 +361,14 @@ def main() -> int:
     if err == "FEAT_NOT_FOUND":
         error_block(
             f"feat_to_pseudo_us — FEAT {args.feat_number} not found",
-            f"[FEAT_NOT_FOUND] no file matching workspace/input/feats/{args.feat_number}-*.md",
-            "verify FEAT number (ls workspace/input/feats/) or create one via /feat-generate",
+            f"[FEAT_NOT_FOUND] no file matching workspace/feats/{args.feat_number}-*.md",
+            "verify FEAT number (ls workspace/feats/) or create one via /feat-generate",
         )
         return FAIL_FAST
     if err == "FEAT_AMBIGUOUS":
         error_block(
             f"feat_to_pseudo_us — FEAT {args.feat_number} ambiguous",
-            f"[FEAT_AMBIGUOUS] multiple files match workspace/input/feats/{args.feat_number}-*.md",
+            f"[FEAT_AMBIGUOUS] multiple files match workspace/feats/{args.feat_number}-*.md",
             "rename duplicate FEATs so only one matches the number",
         )
         return FAIL_FAST
@@ -385,7 +385,7 @@ def main() -> int:
 
     # 2. Check existing US files for this FEAT
     existing = existing_us_files(root, args.feat_number)
-    target_path = root / "workspace" / "output" / "us" / f"{args.feat_number}-1-{us_name}.md"
+    target_path = workspace_root(root) / "us" / f"{args.feat_number}-1-{us_name}.md"
 
     if existing:
         pseudo_match = [p for p in existing if is_pseudo_us(p)]

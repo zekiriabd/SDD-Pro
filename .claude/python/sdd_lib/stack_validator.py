@@ -47,7 +47,7 @@ def validate_active_stacks_coherence(stacks: dict[str, Any]) -> dict[str, str] |
         return {
             "code": "STACK_MALFORMED",
             "message": (
-                "aucun stack actif dans workspace/input/stack/stack.md — "
+                "aucun stack actif dans workspace/stack/stack.md — "
                 "décommenter au moins un stack backend/frontend/fullstack/mobiles "
                 "dans `## Active Tech Specs`."
             ),

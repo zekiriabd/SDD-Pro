@@ -21,7 +21,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterator
 
-from sdd_lib.paths import iso_now_ms, repo_root
+from sdd_lib.paths import workspace_root, iso_now_ms, repo_root
 
 SCHEMA_VERSION = 6  # v7.0.0+ : v2 +qa_mutation, v3 +qa_e2e, v4 +auditor_runs (C3 fix), v5 +qa_api_tests.status (P3), v6 +build_loop_traces (audit CTO 2026-06-09 Bug #16 — migration 0006 stranded)
 # BASE_SCHEMA_VERSION is the version represented by ``console_db_schema.sql``
@@ -43,8 +43,8 @@ AUDITOR_IDS = ("quality", "code-review", "security", "spec", "arch", "a11y", "pe
 
 
 def default_db_path() -> Path:
-    """Resolve workspace/output/db/console.db relative to the repo root."""
-    return repo_root() / "workspace" / "output" / "db" / "console.db"
+    """Resolve workspace/db/console.db relative to the repo root."""
+    return workspace_root(repo_root()) / "db" / "console.db"
 
 
 DEFAULT_DB_PATH = default_db_path()
@@ -78,44 +78,60 @@ def _apply_pragmas_ro(conn: sqlite3.Connection) -> None:
 def connect(db_path: Path | str | None = None) -> Iterator[sqlite3.Connection]:
     """Open a connection with pragmas applied, commit on success, rollback on exception.
 
-    Retries up to 3× with exponential backoff on `database is locked`. Final
-    failure raises the underlying OperationalError so callers can decide
+    Retries up to 3× with exponential backoff on `database is locked` **during
+    the open + pragma phase only** — the phase where parallel preflight hooks
+    contend on the initial WAL setup. Once the connection is yielded, the
+    `with` body and `commit()` are NOT retried (retrying a body with side
+    effects would be unsafe, and a second `yield` from a `@contextmanager`
+    generator raises `RuntimeError: generator didn't stop`). Commit-time lock
+    contention is absorbed by `PRAGMA busy_timeout = 30s` (see `_apply_pragmas`).
+    Final failure raises the underlying OperationalError so callers can decide
     (skip telemetry vs abort run).
+
+    v7.0.1 audit fix (2026-06-12) — the previous implementation wrapped
+    `yield conn` inside the retry loop, so any lock at commit/body time looped
+    back to a second `yield` → `RuntimeError("generator didn't stop after
+    throw()")` instead of a retry. The yield is now OUTSIDE the retry loop.
     """
     import time
     db_path = Path(db_path) if db_path is not None else default_db_path()
     db_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Phase 1 — open + pragmas, retried on transient "database is locked".
+    conn: sqlite3.Connection | None = None
     for attempt in range(_CONNECT_MAX_RETRY):
-        conn = sqlite3.connect(str(db_path))
-        conn.row_factory = sqlite3.Row
         try:
+            conn = sqlite3.connect(str(db_path))
+            conn.row_factory = sqlite3.Row
             _apply_pragmas(conn)
-            yield conn
-            conn.commit()
-            return  # finally still runs → conn.close()
+            break  # opened successfully → leave the retry loop
         except sqlite3.OperationalError as e:
-            try:
-                conn.rollback()
-            except sqlite3.Error:
-                pass
-            if "database is locked" not in str(e).lower():
+            if conn is not None:
+                try:
+                    conn.close()
+                except sqlite3.Error:
+                    pass
+                conn = None
+            if "database is locked" not in str(e).lower() or attempt >= _CONNECT_MAX_RETRY - 1:
                 raise
-            if attempt >= _CONNECT_MAX_RETRY - 1:
-                raise
-            # Retry : close current conn (finally) puis sleep avant nouvelle tentative
-        except Exception:
-            try:
-                conn.rollback()
-            except sqlite3.Error:
-                pass
-            raise
-        finally:
-            try:
-                conn.close()
-            except sqlite3.Error:
-                pass
-        # On arrive ici uniquement après OperationalError "locked" et retry restant
-        time.sleep(_CONNECT_RETRY_BACKOFF[attempt])
+            time.sleep(_CONNECT_RETRY_BACKOFF[attempt])
+    assert conn is not None  # loop either breaks with a live conn or raises
+
+    # Phase 2 — single use; commit on success, rollback on any exception.
+    try:
+        yield conn
+        conn.commit()
+    except Exception:
+        try:
+            conn.rollback()
+        except sqlite3.Error:
+            pass
+        raise
+    finally:
+        try:
+            conn.close()
+        except sqlite3.Error:
+            pass
 
 
 @contextmanager

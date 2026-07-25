@@ -1,3 +1,11 @@
+---
+# TOK-C1 (audit 2026-06-12) : chargement paresseux (path-scoped rule). Chargée par qa (STEP 3)
+# + dev-frontend (UI tokens) ; auto-injection au contact du code généré / des rapports QA.
+paths:
+  - "workspace/src/**"
+  - "workspace/.sys/.validation/**"
+---
+
 # Règle — Quality (Coverage + UI Tokens consolidée, v7.0.0)
 
 > **v7.0.0 merge** : fusionne `qa-coverage.md` (QA test coverage seuil 80 %)
@@ -20,7 +28,7 @@
 ## A.1 Principe
 
 L'agent QA mesure la couverture de tests de chaque feature livrée
-contre un seuil déclaré dans `## Project Config` de `workspace/input/stack/stack.md`.
+contre un seuil déclaré dans `## Project Config` de `workspace/stack/stack.md`.
 La métrique principale est le **pourcentage de lignes couvertes** sur
 le périmètre de la feature courante.
 
@@ -34,13 +42,13 @@ se fait au niveau du schéma `coverage.json`.
 ```markdown
 ## Project Config
 QAMode: full              # off | quality-only | tests-only | tests+coverage | full | manual
-CoverageMin: 80           # OBLIGATOIRE, entier 0-100 — pas de défaut
+CoverageMin: 80           # entier 0-100 ; défaut framework 80 (config.base.yml)
 ```
 
-| Clé | Obligatoire | Défaut | Range | Hors range / Absent |
+| Clé | Obligatoire | Défaut | Range | Hors range |
 |---|---|---|---|---|
 | `QAMode` | non | `manual` | `off | quality-only | tests-only | tests+coverage | full | manual` | ERROR `[STACK_MALFORMED]` |
-| `CoverageMin` | **OUI** | — (pas de défaut) | `0-100` | ERROR `[STACK_MALFORMED]` (absent OU hors range) |
+| `CoverageMin` | non (défaut base) | `80` (`config.base.yml`) | `0-100` | ERROR `[STACK_MALFORMED]` (valeur **invalide** : non-entier OU hors `0-100`) |
 
 `CoverageMin: 0` est valide (= seuil désactivé, métrique reportée mais
 non bloquante même en WARNING) — c'est une **décision explicite** du
@@ -52,13 +60,19 @@ antérieure v3.1.0 (WARN non bloquant) est révoquée — atteindre la
 couverture est désormais une condition d'acceptation, pas un
 "nice-to-have".
 
-**Durcissement v6.10.1 (présence obligatoire)** : `CoverageMin` doit
-figurer **explicitement** dans `## Project Config` (ou la couche
-team/base si layered config activée). Absent → STOP + ERROR
-`[STACK_MALFORMED]` dès la lecture du stack.md par `read_layered_config`.
-Aucun défaut framework — l'omission ne peut plus passer pour un
-"j'ai oublié, donc 80 par défaut". Le Tech Lead **décide et trace**
-la valeur (y compris `0` pour bypass).
+**Défaut framework + durcissement (GOV-C2 align, audit 2026-06-12)** :
+`CoverageMin` a un **défaut framework de `80`** fourni par la couche base
+(`config.base.yml`, cf. hiérarchie layered config §0). C'est un **plancher
+sûr** (couverture élevée par défaut), pas un "j'ai oublié". `read_layered_config`
+merge base ← team ← project, donc la clé est **toujours présente** au niveau
+mergé — il n'y a pas d'erreur sur omission projet (la v6.10.1 prétendait le
+contraire ; corrigé ici). `[STACK_MALFORMED]` n'est émis que si une couche
+fournit une **valeur invalide** (non-entier ou hors `0-100`). Le Tech Lead
+**décide et trace** toute valeur autre que le plancher (y compris `0` pour
+bypass) dans `stack.md ## Project Config` ou `~/.sdd/config.team.yml`.
+
+> Protection security-down (`config.base.yml §0`) : un projet **ne peut pas
+> abaisser** un `CoverageMin` pinné par la couche team (`[CONFIG_SECURITY_DOWNGRADE]`).
 
 **Bypass explicite** :
 - baisser `CoverageMin` dans `## Project Config` (décision tracée en git blame)
@@ -71,9 +85,11 @@ Précédence (cf. `error-classification.md §1.7`) :
 [QA_TEST_FAILED] > [QA_COVERAGE_GAP]    (les deux RED, tests d'abord)
 ```
 
-## A.3 Format `coverage.json`
+## A.3 Format coverage (schéma normalisé)
 
-L'agent QA écrit `workspace/output/qa/feat-{n}/coverage.json` :
+`parse_coverage.py` persiste ces données dans `console.db` table
+`qa_coverage` (2026-07-06 : plus de fichier `coverage.json`). Schéma
+logique (une entrée par stack) :
 
 ```json
 {
@@ -90,7 +106,7 @@ L'agent QA écrit `workspace/output/qa/feat-{n}/coverage.json` :
         "branches": { "covered": 100,  "total": 150,  "percent": 66.67 }
       },
       "files": [
-        { "path": "workspace/output/src/SIMBackend/Services/AuthService.cs", "lines_pct": 90.00 }
+        { "path": "workspace/src/SIMBackend/Services/AuthService.cs", "lines_pct": 90.00 }
       ]
     }
   ],
@@ -181,8 +197,8 @@ Les autres classes (`[QA_TEST_FAILED]`) peuvent toujours flagger.
 ```
 ERROR: feat 1-Auth — coverage gap
 CAUSE: [QA_COVERAGE_GAP] lines coverage 62.45% below threshold 80% (8 files measured)
-FIX: ajouter des tests dans workspace/output/src/SIMBackend.Tests/Services/ ciblant AuthService.RefreshToken
-     OU baisser CoverageMin dans workspace/input/stack/stack.md ## Project Config (décision tracée)
+FIX: ajouter des tests dans workspace/src/SIMBackend.Tests/Services/ ciblant AuthService.RefreshToken
+     OU baisser CoverageMin dans workspace/stack/stack.md ## Project Config (décision tracée)
 ```
 
 ### `[QA_TEST_FAILED]` (rouge)
@@ -190,7 +206,7 @@ FIX: ajouter des tests dans workspace/output/src/SIMBackend.Tests/Services/ cibl
 ```
 ERROR: feat 1-Auth — tests failed
 CAUSE: [QA_TEST_FAILED] 3 tests failed of 47 total — first failure at AuthServiceTests.cs:84 (Assert.Equal expected:200 actual:401)
-FIX: inspect workspace/output/qa/feat-1/report.md, fix code via /dev-run 1 ou ajuster les tests
+FIX: inspect `query_console_db.py feat-stats --feat 1 --format md`, fix code via /dev-run 1 ou ajuster les tests
 ```
 
 ### `[QA_FRAMEWORK_MISSING]` (rouge)
@@ -349,12 +365,12 @@ Exemple `src/index.css` (combo react+shadcn) :
 
 ```bash
 # Cherche hex hardcode dans composants (hors fichier tokens)
-grep -rE '#[0-9a-fA-F]{6}\b' workspace/output/src/{AppName}/src/components/ workspace/output/src/{AppName}/src/pages/ \
+grep -rE '#[0-9a-fA-F]{6}\b' workspace/src/{AppName}/src/components/ workspace/src/{AppName}/src/pages/ \
   | grep -v 'src/index.css\|src/styles/theme\|src/styles.css' \
   && ERROR [UI_TOKEN_VIOLATION]
 
 # Cherche arbitrary values Tailwind avec hex
-grep -rE 'bg-\[#|text-\[#|border-\[#' workspace/output/src/{AppName}/src/ \
+grep -rE 'bg-\[#|text-\[#|border-\[#' workspace/src/{AppName}/src/ \
   && ERROR [UI_TOKEN_VIOLATION]
 ```
 
@@ -389,7 +405,7 @@ avec des hex différents → violation §B.5.
 
 ## C.1 Principe
 
-Tout projet généré (`workspace/output/src/{AppName|BackendName}`) **DOIT** respecter une **acceptance gate** finale avant tag "FEAT delivered". Cette gate est :
+Tout projet généré (`workspace/src/{AppName|BackendName}`) **DOIT** respecter une **acceptance gate** finale avant tag "FEAT delivered". Cette gate est :
 
 - **Bloquante** : si un check échoue, le verdict global passe 🔴 RED et la FEAT n'est pas validée.
 - **Belt + braces** : (a) règle documentée ci-dessous (lecture humaine, prompt agents) + (b) hook enforcement (`SubagentStop` matcher `qa`) automatique.
@@ -438,7 +454,7 @@ FIX: corriger le check fail listé, OU baisser AcceptanceGate strict→warn dans
 
 ## C.5 Hook enforcement (`SubagentStop` matcher `qa`)
 
-Le script `.claude/python/sdd_hooks/validate_acceptance_gate.py` (créé audit P5) tourne automatiquement après l'agent `qa`. Lit `stack.md` Project Config, parcourt tous les projets sous `workspace/output/src/*`, applique les checks par type détecté (`package.json` → Node, `*.csproj` → .NET, `build.gradle.kts` → Kotlin, `pyproject.toml` ou `requirements.txt` → Python).
+Le script `.claude/python/sdd_hooks/validate_acceptance_gate.py` (créé audit P5) tourne automatiquement après l'agent `qa`. Lit `stack.md` Project Config, parcourt tous les projets sous `workspace/src/*`, applique les checks par type détecté (`package.json` → Node, `*.csproj` → .NET, `build.gradle.kts` → Kotlin, `pyproject.toml` ou `requirements.txt` → Python).
 
 Bypass : `SDD_ALLOW_ACCEPTANCE_BYPASS=1` (debug uniquement, audit-loggué).
 

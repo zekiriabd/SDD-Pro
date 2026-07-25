@@ -3,17 +3,17 @@
 
 Externalises the lock file procedure (L2, file-ownership.md §4) used by
 dev-backend and dev-frontend when writing under
-`workspace/output/src/{LibName}/`.
+`workspace/src/{LibName}/`.
 
 Usage (acquire):
     python acquire_libname_lock.py \\
-        --lib-path workspace/output/src/Shared \\
+        --lib-path workspace/src/Shared \\
         --entity BebeDto \\
         --agent-id "dev-backend-1-2"
 
 Usage (release):
     python acquire_libname_lock.py \\
-        --lib-path workspace/output/src/Shared \\
+        --lib-path workspace/src/Shared \\
         --entity BebeDto \\
         --agent-id "dev-backend-1-2" \\
         --release
@@ -39,7 +39,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sdd_lib.file_locks import (  # noqa: E402
-    overwrite_lock,  # legacy, kept for backward-compat but no longer used (D8)
     read_lock,
     try_create_exclusive,
 )

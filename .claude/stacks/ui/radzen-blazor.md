@@ -198,7 +198,7 @@ Interdiction :
 
 ### 3.5 Layout (révisé 2026-05-22 — voir §7.0)
 
-- **Si mockup HTML présent** (`workspace/input/ui/{n}-{m}-*.html`) :
+- **Si mockup HTML présent** (`workspace/ui/{n}-{m}-*.html`) :
   layout = **HTML verbatim du mockup** + CSS porté dans `.razor.css`
   ou `MainLayout.razor.css`. **PAS** de `RadzenLayout`/`RadzenHeader`/
   `RadzenSidebar`/`RadzenFooter` qui écraseraient la structure du mockup
@@ -409,7 +409,7 @@ Cette stratégie a un coût :
 > grille, dialog) inside les containers.
 
 Quand `dev-frontend` lit un mockup HTML statique
-(`workspace/input/ui/{n}-{m}-*.html`), il **traduit chaque primitive HTML brute
+(`workspace/ui/{n}-{m}-*.html`), il **traduit chaque primitive HTML brute
 vers son pendant Radzen** selon la table ci-dessous. Le HTML brut
 n'est jamais conservé tel quel dans le markup généré (sauf wrappers
 de layout neutres autorisés explicitement).

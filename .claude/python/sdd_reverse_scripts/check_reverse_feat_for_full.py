@@ -3,7 +3,7 @@
 Since /sdd-full is intouchable (design doc §3.1), this check is invoked
 manually by the Tech Lead as :
     python -m sdd_reverse_scripts.check_reverse_feat_for_full \
-        --feat-path workspace/input/feats/{n}-*.md \
+        --feat-path workspace/feats/{n}-*.md \
         [--allow-reverse-low]
 
 Exit codes:
@@ -103,7 +103,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--feat-path", required=True,
-        help="Path or glob to FEAT (e.g. workspace/input/feats/7-*.md)",
+        help="Path or glob to FEAT (e.g. workspace/feats/7-*.md)",
     )
     parser.add_argument(
         "--allow-reverse-low", action="store_true",

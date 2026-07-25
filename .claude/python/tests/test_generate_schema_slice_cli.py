@@ -76,33 +76,33 @@ def _make_schema_dict() -> dict:
 
 
 class TestDeriveSlicePath(unittest.TestCase):
-    """Internal helper: derive workspace/output/db/schema-slice-{n}-{m}.json
+    """Internal helper: derive workspace/db/schema-slice-{n}-{m}.json
     from the US filename."""
 
     def test_simple_basename(self):
-        us = Path("workspace/output/us/1-2-Login.md")
-        out = _derive_slice_path(us, Path("workspace/output/db"))
+        us = Path("workspace/us/1-2-Login.md")
+        out = _derive_slice_path(us, Path("workspace/db"))
         self.assertEqual(out.name, "schema-slice-1-2.json")
 
     def test_long_name_with_dashes(self):
-        us = Path("workspace/output/us/3-1-Reset-Password.md")
-        out = _derive_slice_path(us, Path("workspace/output/db"))
+        us = Path("workspace/us/3-1-Reset-Password.md")
+        out = _derive_slice_path(us, Path("workspace/db"))
         self.assertEqual(out.name, "schema-slice-3-1.json")
 
     def test_invalid_basename_returns_none(self):
-        us = Path("workspace/output/us/not-a-valid-us.md")
-        self.assertIsNone(_derive_slice_path(us, Path("workspace/output/db")))
+        us = Path("workspace/us/not-a-valid-us.md")
+        self.assertIsNone(_derive_slice_path(us, Path("workspace/db")))
 
 
 class TestCliEndToEnd(unittest.TestCase):
     """Real subprocess invocation to validate exit codes and file output."""
 
     def _setup_workspace(self, td: Path, us_content: str) -> tuple[Path, Path]:
-        (td / "workspace" / "output" / "db").mkdir(parents=True)
-        (td / "workspace" / "output" / "us").mkdir(parents=True)
-        schema = td / "workspace" / "output" / "db" / "schema.json"
+        (td / "workspace" / "db").mkdir(parents=True)
+        (td / "workspace" / "us").mkdir(parents=True)
+        schema = td / "workspace" / "db" / "schema.json"
         schema.write_text(json.dumps(_make_schema_dict()), encoding="utf-8")
-        us = td / "workspace" / "output" / "us" / "1-1-Login.md"
+        us = td / "workspace" / "us" / "1-1-Login.md"
         us.write_text(us_content, encoding="utf-8")
         return schema, us
 
@@ -122,7 +122,7 @@ class TestCliEndToEnd(unittest.TestCase):
             self.assertEqual(payload["tables_in_source"], 3)
             self.assertEqual(sorted(payload["seed_entities"]), ["Session", "User"])
             # The slice file must actually exist
-            slice_path = td / "workspace" / "output" / "db" / "schema-slice-1-1.json"
+            slice_path = td / "workspace" / "db" / "schema-slice-1-1.json"
             self.assertTrue(slice_path.is_file())
             sliced = json.loads(slice_path.read_text(encoding="utf-8"))
             self.assertEqual(len(sliced["tables"]), 2)
@@ -141,14 +141,14 @@ class TestCliEndToEnd(unittest.TestCase):
             self.assertEqual(result.returncode, 2, msg=result.stderr)
             self.assertIn("no entity from schema referenced", result.stderr)
             # And no slice file written
-            slice_path = td / "workspace" / "output" / "db" / "schema-slice-1-1.json"
+            slice_path = td / "workspace" / "db" / "schema-slice-1-1.json"
             self.assertFalse(slice_path.exists())
 
     def test_missing_schema_exits_correctible(self):
         with tempfile.TemporaryDirectory() as raw_td:
             td = Path(raw_td)
-            (td / "workspace" / "output" / "us").mkdir(parents=True)
-            us = td / "workspace" / "output" / "us" / "1-1-X.md"
+            (td / "workspace" / "us").mkdir(parents=True)
+            us = td / "workspace" / "us" / "1-1-X.md"
             us.write_text("test", encoding="utf-8")
             result = _run_cli(
                 ["--us-path", str(us), "--schema-path", str(td / "missing.json")],
@@ -161,8 +161,8 @@ class TestCliEndToEnd(unittest.TestCase):
     def test_missing_us_exits_fail_fast(self):
         with tempfile.TemporaryDirectory() as raw_td:
             td = Path(raw_td)
-            (td / "workspace" / "output" / "db").mkdir(parents=True)
-            schema = td / "workspace" / "output" / "db" / "schema.json"
+            (td / "workspace" / "db").mkdir(parents=True)
+            schema = td / "workspace" / "db" / "schema.json"
             schema.write_text(json.dumps(_make_schema_dict()), encoding="utf-8")
             result = _run_cli(
                 ["--us-path", str(td / "no-such-us.md"),
@@ -176,11 +176,11 @@ class TestCliEndToEnd(unittest.TestCase):
     def test_invalid_us_basename_exits_fail_fast(self):
         with tempfile.TemporaryDirectory() as raw_td:
             td = Path(raw_td)
-            (td / "workspace" / "output" / "db").mkdir(parents=True)
-            (td / "workspace" / "output" / "us").mkdir(parents=True)
-            schema = td / "workspace" / "output" / "db" / "schema.json"
+            (td / "workspace" / "db").mkdir(parents=True)
+            (td / "workspace" / "us").mkdir(parents=True)
+            schema = td / "workspace" / "db" / "schema.json"
             schema.write_text(json.dumps(_make_schema_dict()), encoding="utf-8")
-            us = td / "workspace" / "output" / "us" / "bad-name.md"
+            us = td / "workspace" / "us" / "bad-name.md"
             us.write_text("# US\n\nMentions User and Session.", encoding="utf-8")
             result = _run_cli(
                 ["--us-path", str(us), "--schema-path", str(schema)],
@@ -223,7 +223,7 @@ class TestCliEndToEnd(unittest.TestCase):
             self.assertEqual(result.returncode, 0, msg=result.stderr)
             self.assertTrue(custom_out.is_file())
             # And the default-path slice was NOT created
-            default = td / "workspace" / "output" / "db" / "schema-slice-1-1.json"
+            default = td / "workspace" / "db" / "schema-slice-1-1.json"
             self.assertFalse(default.exists())
 
 

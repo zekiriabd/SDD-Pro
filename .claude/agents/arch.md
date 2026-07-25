@@ -26,8 +26,8 @@ Préparer l'**ossature complète du projet** avant les agents dev-* :
 - composer la connection string en RAM depuis `## Active Database`
   (`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`)
 - introspecter le schéma (READ-ONLY)
-- écrire `workspace/output/db/schema.{json,md}`
-- scaffolder entities + DbContext dans `workspace/output/src/{BackendName}/Entities/`
+- écrire `workspace/db/schema.{json,md}`
+- scaffolder entities + DbContext dans `workspace/src/{BackendName}/Entities/`
 
 **Strictement exécutif** : commandes du stack uniquement, jamais de
 code applicatif (Pages, Components, Endpoints, Services, DTOs, Mappers
@@ -63,16 +63,16 @@ Appliquer `@.claude/rules/build-and-loop.md §1` (Partie B) avec
 
 Read **uniquement** :
 
-1. `workspace/input/stack/stack.md` — sélecteur de stack + Project Config
+1. `workspace/stack/stack.md` — sélecteur de stack + Project Config
    + blocs `## Active Database` et `## Active Auth Specs` (si présents)
 2. Les fichiers `.claude/stacks/**/*.md` listés sous `## Active …` du
    `stack.md` (sélectif). Pour le stack backend actif, récupérer :
    §2.2 (Build / project_file), §2.2.1 (Init Commands), §3-§4 (scaffolding DB),
    §5.1 (config file structure), §8.2 (connection string pattern).
-3. `workspace/output/.sys/.context/constitution.md` — **si présent** (créé par
+3. `workspace/.sys/.context/constitution.md` — **si présent** (créé par
    `/feat-generate`). Acteurs, glossaire, ADRs tracés. Absent →
    continuer sans blocage (projet pré-SDD_Pro v3).
-4. **`.claude/rules/error-classification.md`** — taxonomie 8 classes.
+4. **`.claude/digests/error-classification.arch.md`** — taxonomie 8 classes.
    Émission principale par arch : `[STACK_MALFORMED]`, `[SCHEMA_MISMATCH]`,
    `[NETWORK]`, `[AUTH]`, `[PERMISSION]`, `[ENV_MISSING]`, `[DEP_MISSING]`,
    `[STACK_LIBRARY_VULNERABLE]`, `[NOT_FOUND]`. Préfixer tout `CAUSE:`.
@@ -94,7 +94,7 @@ Commands CVE par registre, runtime LTS, bypass : `@.claude/rules/library-and-sta
 
 **INTERDIT** :
 - Lecture FEATs, US, mockups HTML
-- Glob global sur `workspace/output/src/` (ciblé uniquement :
+- Glob global sur `workspace/src/` (ciblé uniquement :
   `**/*.csproj`, `**/package.json`, `**/pyproject.toml`)
 
 ---
@@ -102,11 +102,11 @@ Commands CVE par registre, runtime LTS, bypass : `@.claude/rules/library-and-sta
 ## STEP 2 — Vérifier les stacks actifs, l'App Type et le Project Config
 
 Parser `## Active Tech Specs`, `## Active UI Specs`, `## Active Auth Specs`
-de `workspace/input/stack/stack.md`. Si `## Active Tech Specs` vide → ERROR :
+de `workspace/stack/stack.md`. Si `## Active Tech Specs` vide → ERROR :
 
 ```
 ERROR: agent arch — aucun stack actif
-CAUSE: ## Active Tech Specs vide dans workspace/input/stack/stack.md
+CAUSE: ## Active Tech Specs vide dans workspace/stack/stack.md
 FIX: décommenter au moins un stack (backend/frontend/fullstack/mobiles)
 ```
 
@@ -179,11 +179,11 @@ Vérifs après lecture du `## Project Config` :
 
 1. `AppName ≠ BackendName` (case-sensitive) → sinon ERROR `[STACK_MALFORMED]`
 2. Aucun nom préfixe/sous-chemin de l'autre (anti-imbrication) → sinon ERROR
-3. Layout cible **`workspace/output/src/{Name}/`** au premier niveau,
+3. Layout cible **`workspace/src/{Name}/`** au premier niveau,
    pas de variante runtime imbriquée (`Kotlin/{AppName}/`, `frontend/`,
    `{BackendName}/web/`…)
 4. Avant chaque `mkdir`/`new`/`init` (STEP 4), valider path cible contre :
-   `workspace/output/src/{AppName|BackendName|LibName}/...` ou `workspace/output/src/*.sln`.
+   `workspace/src/{AppName|BackendName|LibName}/...` ou `workspace/src/*.sln`.
    Autre → STOP + ERROR `[FILE_OWNERSHIP_NESTED]`.
 5. `mkdir -p` implicite AVANT toute écriture si parent absent.
 
@@ -194,7 +194,7 @@ Vérifs après lecture du `## Project Config` :
 ## STEP 3 — Détection d'idempotence (bootstrap)
 
 Pour chaque stack actif, déterminer le `project_file` attendu (§2.2 du
-stack — ex. `workspace/output/src/{BackendName}/{BackendName}.csproj`).
+stack — ex. `workspace/src/{BackendName}/{BackendName}.csproj`).
 
 Glob ce fichier. Présent → stack `INITIALIZED`, skip Init Commands.
 Absent → `TO_INIT`.
@@ -286,9 +286,9 @@ Clé absente → STOP + ERROR `[STACK_MALFORMED]`. Fallback legacy :
 §8.1 du `.md` ; aucun des deux → WARNING.
 
 Install par stack (substituer `<module>` + `<version>` depuis JSON) :
-- .NET : `dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj package <module> --version <version>`
+- .NET : `dotnet add workspace/src/{BackendName}/{BackendName}.csproj package <module> --version <version>`
 - Node : `pnpm --filter {BackendName} add <module>@<version>`
-- Python : `uv add --project workspace/output/src/{BackendName} <module>=={version}`
+- Python : `uv add --project workspace/src/{BackendName} <module>=={version}`
 - Gradle : `runtimeOnly("<module>:<version>")` dans `build.gradle.kts`
 
 **Précautions** : `dotnet new --force` DESTRUCTIF (STEP 3 protège,
@@ -355,7 +355,7 @@ injectant `db_config` + `auth_config` (STEP 2.ter).
    `appsettings.json` / `application.yml` / `config/default.json` générés
    doivent figurer dans `.gitignore` du projet généré.
    Copier `@.claude/templates/generated-project.gitignore.template` vers
-   `workspace/output/src/{ProjectName}/.gitignore` a la creation de chaque
+   `workspace/src/{ProjectName}/.gitignore` a la creation de chaque
    projet (backend, frontend, fullstack, mobile) puis adapter seulement si le
    stack documente une exception explicite.
 
@@ -405,10 +405,10 @@ injectant `db_config` + `auth_config` (STEP 2.ter).
 
 Si tous les stacks initialisés sont `.NET` :
 
-- Vérifier `workspace/output/src/{AppName}.sln` (Glob)
-- Absent → `dotnet new sln -n {AppName} -o workspace/output/src/`
-- Pour chaque `.csproj` créé en STEP 4 → `dotnet sln workspace/output/src/{AppName}.sln add <chemin .csproj>`
-- Backend dépend de la lib → `dotnet add workspace/output/src/{BackendName}/{BackendName}.csproj reference workspace/output/src/{LibName}/{LibName}.csproj`
+- Vérifier `workspace/src/{AppName}.sln` (Glob)
+- Absent → `dotnet new sln -n {AppName} -o workspace/src/`
+- Pour chaque `.csproj` créé en STEP 4 → `dotnet sln workspace/src/{AppName}.sln add <chemin .csproj>`
+- Backend dépend de la lib → `dotnet add workspace/src/{BackendName}/{BackendName}.csproj reference workspace/src/{LibName}/{LibName}.csproj`
 
 Stacks Node/Python : pas de fichier solution agrégé.
 
@@ -450,8 +450,13 @@ Read @.claude/docs/arch/phase-b-db-scaffolding.md
 
 Le sous-doc contient :
 - STEP 8  : composition connection string en RAM (cross-stack, jamais persistée)
+- STEP 8.5 : **migration Flyway sanctionnée** (conditionnel) — si le sentinel
+  `workspace/.sys/.state/flyway-migrate-requested.flag` posé par
+  l'orchestrateur (FEAT nommée « Flyway ») est présent, exécuter `flyway
+  migrate` PUIS forcer ré-introspection + re-scaffold. Seule dérogation à
+  « DB READ-ONLY » — `library-and-stack.md §C.6`
 - STEP 9  : introspection schéma READ-ONLY (information_schema)
-- STEP 10 : écriture `workspace/output/db/{schema.json, schema.md, schema.diff.md}` + versioning diff léger
+- STEP 10 : écriture `workspace/db/{schema.json, schema.md, schema.diff.md}` + versioning diff léger
 - STEP 11 : scaffolding Database-First via outil canonique du stack backend (EF Core / Prisma / sqlacodegen / hibernate-tools), filtres tables, préservation customs, erreurs
 
 À l'issue de la Phase B, mémoriser `DB_RESULT = { tables: N, columns: N,
@@ -502,8 +507,8 @@ vit côté `/arch-init` STEP 3.5 (no-spawn, cf.
 universelle, plus de dérogation pour arch depuis v7.0.0-alpha).
 
 ```bash
-mkdir -p workspace/output/.sys/.state
-cat > workspace/output/.sys/.state/arch-ready-for-constitutioner.flag <<EOF
+mkdir -p workspace/.sys/.state
+cat > workspace/.sys/.state/arch-ready-for-constitutioner.flag <<EOF
 {"feat":null,"ts":"$(date -u +%Y-%m-%dT%H:%M:%SZ)","reason":"phase-D-ready","triggering_command":"arch-init"}
 EOF
 ```
@@ -514,7 +519,7 @@ EOF
 [ARCH] Phase A-C OK — sentinel constitutioner posé. (28%)
 ```
 
-Skip silencieux si `workspace/output/.sys/.context/constitution.md` absent.
+Skip silencieux si `workspace/.sys/.context/constitution.md` absent.
 
 ---
 
@@ -525,13 +530,12 @@ Skip silencieux si `workspace/output/.sys/.context/constitution.md` absent.
 ```
 arch: bootstrap + DB + CLAUDE.md par projet terminé
   ├─ Bootstrap : {N_init} stacks initialisés ({liste}), {N_skip} skipped
-  ├─ Solution  : workspace/output/src/{AppName}.sln (ou "non applicable")
+  ├─ Solution  : workspace/src/{AppName}.sln (ou "non applicable")
   ├─ Build     : exit 0
-  ├─ DB        : {tables} tables, {entities} entities → workspace/output/db/schema.json (ou "skipped — DatabaseType=none")
+  ├─ DB        : {tables} tables, {entities} entities → workspace/db/schema.json (ou "skipped — DatabaseType=none")
   ├─ Diff DB   : {résumé schema.diff.md ou "first run"}
   ├─ CLAUDE.md : {C} fichiers ({BackendName}, {AppName}, {LibName}? ; hash {hash[:8]})
-  ├─ ADRs      : {A} créés ({ADR-XXX..ADR-YYY}) ou "skipped — pas de constitution"
-  └─ Constitution read-back : ✅ §4 + §6 cohérents (ou "skipped — pas de constitution")
+  └─ Constitution/ADRs : délégués à constitutioner (sentinel posé STEP 12.5)
 ```
 
 Sur erreur, bloc ERROR 3 lignes (CAUSE / FIX) et STOP. Aucun autre texte.
@@ -557,7 +561,21 @@ Applique `@.claude/rules/output-protocol.md` (label `[ARCH]`, plage `22-32%`).
   (pas de `npm install <pkg>`, `dotnet add package <pkg>` arbitraires)
 - Jamais supprimer fichier existant (idempotence stricte)
 - **DB READ-ONLY** : aucun `INSERT/UPDATE/DELETE/CREATE/ALTER/DROP/
-  TRUNCATE/EXECUTE`
+  TRUNCATE/EXECUTE` (introspection métadonnées seule). Sur base
+  **existante**, toute modification de structure est interdite —
+  `library-and-stack.md §C`. Besoin structurel détecté → écrire le DDL
+  dans `workspace/db/migration-pending.sql` (jamais exécuté) +
+  STOP `CAUSE: [DB_STRUCTURE_CHANGE_FORBIDDEN]`, escalade Tech Lead. La
+  création du schéma initial d'un projet **greenfield** (base vide)
+  reste permise (scaffolding Database-First read-only).
+  - **Exception unique — migration Flyway (`library-and-stack.md §C.6`)** :
+    si le sentinel `workspace/.sys/.state/flyway-migrate-requested.flag`
+    est présent (posé par `/sdd-full`/`/sdd-poc` sur une FEAT nommée « Flyway »),
+    arch exécute `flyway migrate` en Phase B STEP 8.5 (mécanisme sanctionné,
+    idempotent) puis re-scaffolde. C'est le **seul** cas où arch applique une
+    migration. arch n'écrit jamais les scripts `V*__*.sql` (artefacts FEAT) —
+    il invoque le runner. Runner absent → `[INFRA_BLOCKED]` ; migrate KO →
+    `[SCHEMA_MISMATCH]`.
 - Jamais écrire la connection string dans un fichier du repo
 - Jamais supprimer manuellement entité scaffoldée (`--force` incrémental)
 

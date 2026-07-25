@@ -10,16 +10,16 @@ Common errors, their root cause, and the **exact fix**. SDD_Pro uses a strict er
 
 **Symptom** : `/sdd-full 1` or `/us-generate 1` rejects the FEAT.
 
-**Cause** : either no file matches `workspace/input/feats/{n}-*.md`, or multiple files do.
+**Cause** : either no file matches `workspace/feats/{n}-*.md`, or multiple files do.
 
 **Fix** :
 ```bash
 # 1. Check what exists
-ls workspace/input/feats/
+ls workspace/feats/
 # 2. Either create the missing FEAT
 /feat-generate Auth   # creates 1-Auth.md
 # 3. Or remove the duplicate(s)
-mv workspace/input/feats/1-AuthOld.md workspace/input/feats/_archive/
+mv workspace/feats/1-AuthOld.md workspace/feats/_archive/
 ```
 
 ---
@@ -28,14 +28,14 @@ mv workspace/input/feats/1-AuthOld.md workspace/input/feats/_archive/
 
 **Symptom** : `/arch-init` or `/sdd-full` STOPs early citing `[STACK_MALFORMED]`.
 
-**Cause** : `workspace/input/stack/stack.md` is missing required sections OR contains placeholders like `{{AppName}}` that weren't rendered.
+**Cause** : `workspace/stack/stack.md` is missing required sections OR contains placeholders like `{{AppName}}` that weren't rendered.
 
 **Fix** :
 ```bash
 # Re-run bootstrap
 python bootstrap.py             # interactive
 # OR check the rendered stack.md
-grep "{{" workspace/input/stack/stack.md   # should return nothing
+grep "{{" workspace/stack/stack.md   # should return nothing
 ```
 
 Required sections : `## Active Tech Specs`, `## Active Database` (if `DatabaseType ≠ none`), `## Active Auth Specs` (if auth needed), `## Project Config`.
@@ -52,8 +52,7 @@ Required sections : `## Active Tech Specs`, `## Active Database` (if `DatabaseTy
 
 **Fix** :
 ```bash
-# 1. Inspect the build log
-cat workspace/output/qa/feat-1/build-us-1-2.md
+# 1. Inspect the build log (stderr build_loop, visible in chat)
 # 2. Fix manually OR refine the US
 # 3. Re-run the targeted agent
 /dev-backend 1-2     # rebuild this US only
@@ -72,7 +71,7 @@ cat workspace/output/qa/feat-1/build-us-1-2.md
 **Fix** :
 ```bash
 # Option A : raise the cap (decision tracked in git blame)
-# Edit workspace/input/stack/stack.md ## Project Config
+# Edit workspace/stack/stack.md ## Project Config
 #   BuildLoopMaxCostUsd: 25.00
 # Option B : split the US into smaller pieces
 # Option C : one-shot bypass (audit-logged in shell history)
@@ -91,7 +90,7 @@ export SDD_DISABLE_COST_CAP=1
 **Fix** :
 ```bash
 # Option A : raise the cap
-# Edit workspace/input/stack/stack.md ## Project Config
+# Edit workspace/stack/stack.md ## Project Config
 #   MaxCostPerRun: 100.00
 # Option B : let the current run finish, then start fresh
 /sdd-status 1                  # check what's done
@@ -110,11 +109,11 @@ export SDD_DISABLE_COST_CAP=1
 
 **Fix** :
 ```bash
-# 1. Inspect which stack is failing
-cat workspace/output/qa/feat-1/coverage.json | grep -A 5 stack
+# 1. Inspect which stack is failing (rendered on-demand from console.db)
+python .claude/python/sdd_scripts/query_console_db.py coverage --feat 1 --format md
 # 2. Either add tests in the failing stack's .Tests/ project
 # 3. OR lower the threshold (tracked decision)
-# Edit workspace/input/stack/stack.md ## Project Config
+# Edit workspace/stack/stack.md ## Project Config
 #   CoverageMin: 70
 # 4. OR disable entirely
 #   CoverageMin: 0
@@ -130,8 +129,8 @@ cat workspace/output/qa/feat-1/coverage.json | grep -A 5 stack
 
 **Fix** :
 ```bash
-# Inspect failing tests
-cat workspace/output/qa/feat-1/report.md
+# Inspect failing tests (rendered on-demand from console.db)
+python .claude/python/sdd_scripts/query_console_db.py feat-stats --feat 1 --format md
 # Re-run the tests in your IDE to see the assertion details
 # Decide : (a) fix the production code OR (b) fix the test
 # Then re-run
@@ -167,7 +166,7 @@ which dotnet              # or npm, pytest, gradle, etc.
 
 **Fix** : This is a framework bug if it happens — open an issue. The audit log gives you the exact path :
 ```bash
-cat workspace/output/.sys/.audit/ownership-violations.log
+cat workspace/.sys/.audit/ownership-violations.log
 ```
 
 ---
@@ -245,9 +244,9 @@ python .claude/python/sdd_scripts/resolve_us_hash_sentinel.py --auto-detect
 
 **Cause** : Detected pattern matching OWASP Top 10 categories.
 
-**Fix** : **Never bypass.** Read the report :
+**Fix** : **Never bypass.** Read the report (rendered on-demand from console.db) :
 ```bash
-cat workspace/output/qa/feat-1/security-scan.md
+python .claude/python/sdd_scripts/query_console_db.py security --feat 1 --format md
 ```
 Each finding lists `file:line` + suggested mitigation. Fix the code, then re-run `/sdd-review 1`.
 
@@ -266,7 +265,7 @@ If you believe it's a false positive : open an issue with the file path + findin
 # Either accept re-execution (no --resume)
 /sdd-full 1
 # OR reset the checkpoint
-rm workspace/output/.sys/.state/state-*.json
+rm workspace/.sys/.state/state-*.json
 /sdd-full 1 --resume
 ```
 
@@ -324,20 +323,20 @@ The agent **exits silently** if the US is backend-only (no UI ACs, no HTML mocku
 
 Confirm with :
 ```bash
-cat workspace/output/us/1-2-Auth.md | grep -A 3 "## Acceptance Criteria"
+cat workspace/us/1-2-Auth.md | grep -A 3 "## Acceptance Criteria"
 ```
 
-If you expect frontend work, ensure the US has UI-related ACs or a mockup HTML at `workspace/input/ui/1-2-Auth.html`.
+If you expect frontend work, ensure the US has UI-related ACs or a mockup HTML at `workspace/ui/1-2-Auth.html`.
 
 ---
 
 ### Where does the cost cap data come from ?
 
-From `workspace/output/db/console.db` table `token_usage`. Each agent's actual token consumption is captured by the `record_token_usage` hook (PostToolUse Agent + SubagentStop). If the cap seems wrong, inspect :
+From `workspace/db/console.db` table `token_usage`. Each agent's actual token consumption is captured by the `record_token_usage` hook (PostToolUse Agent + SubagentStop). If the cap seems wrong, inspect :
 
 ```bash
 python .claude/python/sdd_admin/verify_telemetry_health.py
-sqlite3 workspace/output/db/console.db "SELECT agent, SUM(input_tokens), SUM(output_tokens) FROM token_usage GROUP BY agent;"
+sqlite3 workspace/db/console.db "SELECT agent, SUM(input_tokens), SUM(output_tokens) FROM token_usage GROUP BY agent;"
 ```
 
 ---
@@ -415,11 +414,11 @@ python .claude/python/sdd_admin/sync_stack_md.py --stack-id your-stack
 
 Either :
 - You haven't run `/sdd-full` / `/dev-run` yet on this FEAT.
-- The `console.db` was reset (check `workspace/output/db/console.db` exists).
+- The `console.db` was reset (check `workspace/db/console.db` exists).
 - `sdd_state.py new-run` failed silently (check stderr from your last run).
 
 ```bash
-ls workspace/output/db/console.db    # should exist
+ls workspace/db/console.db    # should exist
 python .claude/python/sdd_scripts/sdd_state.py list-runs --limit 5
 ```
 
@@ -453,7 +452,7 @@ instead of `1-1`).
 **Cause** : a `*.back.md` plan already exists for this US — re-running
 in `:plan` mode is forbidden (use without `:plan` to consume the
 existing plan, or delete it first).
-**Fix** : `rm workspace/output/plans/1-1-*.back.md` then retry.
+**Fix** : `rm workspace/plans/1-1-*.back.md` then retry.
 
 ### `[PROJECT_NOT_INIT]`
 **Symptom** : `dev-backend` STOPs : "no .csproj / package.json / pyproject.toml found".
@@ -483,7 +482,7 @@ and that at least one AC references it. Adjust FEAT, re-run.
 **Symptom** : `/feat-validate 1` exits NO-GO.
 **Cause** : ≥ 1 blocking finding (ACs without Given/When/Then, missing
 stacks, etc.).
-**Fix** : read the readiness report at `workspace/output/.sys/.validation/1-readiness.md`,
+**Fix** : read the readiness report at `workspace/.sys/.validation/1-readiness.md`,
 correct each blocking finding listed. **Don't pass --force unless you
 know what you're doing** — readiness gate is your safety net.
 
@@ -528,7 +527,7 @@ syntax if needed, re-run `/dev-run {n}` (idempotent).
 **Symptom** : `/dev-run` STOPs after backend with RED API Gate.
 **Cause** : in-memory API tests detected contract mismatch (404 on
 documented endpoint, 401 instead of 200, etc.).
-**Fix** : open `workspace/output/qa/feat-{n}/api-tests.md`, read which
+**Fix** : run `query_console_db.py api-gate --feat {n} --format md`, read which
 endpoint failed, fix the backend (re-run `/dev-backend {n}-{m}`).
 
 ### `[QA_OWNERSHIP_VIOLATION]`
@@ -578,7 +577,7 @@ slipped, edit the file manually : declare `--primary: ...` in
 
 ### `[UI_FIDELITY_GAP]`
 **Symptom** : frontend renders but diverges visibly from mockup.
-**Cause** : labels/structure not matching `workspace/input/ui/{n}-{m}-*.html`.
+**Cause** : labels/structure not matching `workspace/ui/{n}-{m}-*.html`.
 **Fix** : adjust the mockup OR adjust the generated component, then
 re-run `/dev-frontend {n}-{m}` (idempotent).
 
@@ -600,7 +599,7 @@ output for errors before retrying QA.
 
 ### `[QA_PRECONDITION_FAILED]`
 **Symptom** : `/qa-generate 1` STOPs : "no production code under
-workspace/output/src".
+workspace/src".
 **Cause** : you tried QA before any dev-* matérialisation.
 **Fix** : run `/dev-run 1` first.
 
@@ -640,7 +639,7 @@ only).
 
 ## 📞 When in doubt
 
-- **The audit report** : `workspace/output/.sys/.audit/` has structured logs for every hook.
+- **The audit report** : `workspace/.sys/.audit/` has structured logs for every hook.
 - **Framework smoke** : `python .claude/python/sdd_admin/framework_smoke.py` — quick health check.
 - **Open an issue** with : your error class `[XXX]`, the relevant audit log, and your `stack.md` config (redact secrets).
 

@@ -38,7 +38,7 @@ def fake_repo(tmp_path, monkeypatch):
 
 
 def _db(repo: Path) -> sqlite3.Connection:
-    conn = sqlite3.connect(str(repo / "workspace" / "output" / "db" / "console.db"))
+    conn = sqlite3.connect(str(repo / "workspace" / "db" / "console.db"))
     conn.row_factory = sqlite3.Row
     return conn
 

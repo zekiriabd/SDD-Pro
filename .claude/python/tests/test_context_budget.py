@@ -37,92 +37,92 @@ from sdd_scripts.context_budget import (  # noqa: E402
 
 class TestIsUnboundedGlob(unittest.TestCase):
     def test_pattern_without_wildcard_is_bounded(self) -> None:
-        self.assertFalse(is_unbounded_glob("workspace/input/stack/stack.md"))
+        self.assertFalse(is_unbounded_glob("workspace/stack/stack.md"))
 
     def test_wildcard_with_feat_marker_is_bounded(self) -> None:
-        self.assertFalse(is_unbounded_glob("workspace/output/us/{n}-*.md"))
+        self.assertFalse(is_unbounded_glob("workspace/us/{n}-*.md"))
 
     def test_wildcard_with_us_marker_is_bounded(self) -> None:
-        self.assertFalse(is_unbounded_glob("workspace/output/us/{n}-{m}-*.md"))
+        self.assertFalse(is_unbounded_glob("workspace/us/{n}-{m}-*.md"))
 
     def test_wildcard_with_appname_marker_is_bounded(self) -> None:
-        self.assertFalse(is_unbounded_glob("workspace/output/src/{AppName}/**/*.cs"))
+        self.assertFalse(is_unbounded_glob("workspace/src/{AppName}/**/*.cs"))
 
     def test_wildcard_with_project_marker_is_bounded(self) -> None:
-        self.assertFalse(is_unbounded_glob("workspace/output/src/{Project}/**/*.md"))
+        self.assertFalse(is_unbounded_glob("workspace/src/{Project}/**/*.md"))
 
     def test_adr_whitelist_is_bounded(self) -> None:
         self.assertFalse(
-            is_unbounded_glob("workspace/output/.sys/.context/adrs/ADR-*.md")
+            is_unbounded_glob("workspace/.sys/.context/adrs/ADR-*.md")
         )
 
     def test_naked_wildcard_is_unbounded(self) -> None:
-        self.assertTrue(is_unbounded_glob("workspace/output/**/*.md"))
+        self.assertTrue(is_unbounded_glob("workspace/**/*.md"))
 
     def test_naked_glob_in_src_is_unbounded(self) -> None:
-        self.assertTrue(is_unbounded_glob("workspace/output/src/**/*.cs"))
+        self.assertTrue(is_unbounded_glob("workspace/src/**/*.cs"))
 
 
 class TestIsExcluded(unittest.TestCase):
     def test_node_modules_excluded(self) -> None:
-        self.assertTrue(is_excluded("workspace/output/src/app/node_modules/foo.js"))
+        self.assertTrue(is_excluded("workspace/src/app/node_modules/foo.js"))
 
     def test_bin_excluded(self) -> None:
-        self.assertTrue(is_excluded("workspace/output/src/Backend/bin/Debug/foo.dll"))
+        self.assertTrue(is_excluded("workspace/src/Backend/bin/Debug/foo.dll"))
 
     def test_obj_excluded(self) -> None:
-        self.assertTrue(is_excluded("workspace/output/src/Backend/obj/project.assets.json"))
+        self.assertTrue(is_excluded("workspace/src/Backend/obj/project.assets.json"))
 
     def test_dll_extension_excluded(self) -> None:
-        self.assertTrue(is_excluded("workspace/output/foo.dll"))
+        self.assertTrue(is_excluded("workspace/foo.dll"))
 
     def test_png_extension_excluded(self) -> None:
-        self.assertTrue(is_excluded("workspace/input/ui/logo.png"))
+        self.assertTrue(is_excluded("workspace/ui/logo.png"))
 
     def test_source_md_not_excluded(self) -> None:
-        self.assertFalse(is_excluded("workspace/output/us/1-1-Auth.md"))
+        self.assertFalse(is_excluded("workspace/us/1-1-Auth.md"))
 
     def test_source_cs_not_excluded(self) -> None:
-        self.assertFalse(is_excluded("workspace/output/src/Backend/Program.cs"))
+        self.assertFalse(is_excluded("workspace/src/Backend/Program.cs"))
 
 
 class TestResolvePattern(unittest.TestCase):
     def test_substitute_feat_number(self) -> None:
         result = resolve_pattern(
-            "workspace/output/us/{n}-1-Foo.md",
+            "workspace/us/{n}-1-Foo.md",
             config={}, us_id="", feat_number=3, root=REPO_ROOT,
         )
-        self.assertEqual(result, ["workspace/output/us/3-1-Foo.md"])
+        self.assertEqual(result, ["workspace/us/3-1-Foo.md"])
 
     def test_substitute_us_id(self) -> None:
         result = resolve_pattern(
-            "workspace/output/us/{n}-{m}-Auth.md",
+            "workspace/us/{n}-{m}-Auth.md",
             config={}, us_id="1-2", feat_number=0, root=REPO_ROOT,
         )
-        self.assertEqual(result, ["workspace/output/us/1-2-Auth.md"])
+        self.assertEqual(result, ["workspace/us/1-2-Auth.md"])
 
     def test_substitute_appname(self) -> None:
         result = resolve_pattern(
-            "workspace/output/src/{AppName}/CLAUDE.md",
+            "workspace/src/{AppName}/CLAUDE.md",
             config={"AppName": "MyFront"}, us_id="", feat_number=0, root=REPO_ROOT,
         )
-        self.assertEqual(result, ["workspace/output/src/MyFront/CLAUDE.md"])
+        self.assertEqual(result, ["workspace/src/MyFront/CLAUDE.md"])
 
     def test_substitute_project_expands_multiple(self) -> None:
         result = resolve_pattern(
-            "workspace/output/src/{Project}/CLAUDE.md",
+            "workspace/src/{Project}/CLAUDE.md",
             config={"AppName": "Front", "BackendName": "Back", "LibName": "Lib"},
             us_id="", feat_number=0, root=REPO_ROOT,
         )
         self.assertEqual(set(result), {
-            "workspace/output/src/Front/CLAUDE.md",
-            "workspace/output/src/Back/CLAUDE.md",
-            "workspace/output/src/Lib/CLAUDE.md",
+            "workspace/src/Front/CLAUDE.md",
+            "workspace/src/Back/CLAUDE.md",
+            "workspace/src/Lib/CLAUDE.md",
         })
 
     def test_unresolved_placeholder_returns_empty(self) -> None:
         result = resolve_pattern(
-            "workspace/output/src/{UnknownVar}/foo.md",
+            "workspace/src/{UnknownVar}/foo.md",
             config={}, us_id="", feat_number=0, root=REPO_ROOT,
         )
         self.assertEqual(result, [])
@@ -173,7 +173,7 @@ def _setup_fake_repo(root: Path, agent: str, reads_patterns: list[str]) -> None:
         encoding="utf-8",
     )
     # stack.md minimal avec Project Config (lu par read_project_config)
-    stack_dir = root / "workspace" / "input" / "stack"
+    stack_dir = root / "workspace" / "stack"
     stack_dir.mkdir(parents=True)
     (stack_dir / "stack.md").write_text(
         "## Project Config\n"
@@ -201,7 +201,7 @@ class TestIntegration(unittest.TestCase):
 
     def test_pass_within_budget(self) -> None:
         """Agent avec reads bornés et fichiers petits → exit 0 + ledger écrit."""
-        _setup_fake_repo(self.fake_repo, "po", ["workspace/input/stack/stack.md"])
+        _setup_fake_repo(self.fake_repo, "po", ["workspace/stack/stack.md"])
         out_file = self.fake_repo / "ledger.jsonl"
         result = _run_budget(
             [
@@ -223,7 +223,7 @@ class TestIntegration(unittest.TestCase):
 
     def test_unbounded_glob_rejected(self) -> None:
         """Loader avec glob sans borne FEAT → exit 1 + UNBOUNDED_GLOB."""
-        _setup_fake_repo(self.fake_repo, "po", ["workspace/output/**/*.md"])
+        _setup_fake_repo(self.fake_repo, "po", ["workspace/**/*.md"])
         out_file = self.fake_repo / "ledger.jsonl"
         result = _run_budget(
             [
@@ -241,7 +241,7 @@ class TestIntegration(unittest.TestCase):
 
     def test_allow_unbounded_globs_flag_bypasses(self) -> None:
         """--allow-unbounded-globs bypass le check UNBOUNDED_GLOB."""
-        _setup_fake_repo(self.fake_repo, "po", ["workspace/output/**/*.md"])
+        _setup_fake_repo(self.fake_repo, "po", ["workspace/**/*.md"])
         out_file = self.fake_repo / "ledger.jsonl"
         result = _run_budget(
             [
@@ -259,9 +259,9 @@ class TestIntegration(unittest.TestCase):
     def test_budget_exceeded(self) -> None:
         """Fichier énorme dans reads → exit 1 + BUDGET_EXCEEDED."""
         # Patch DEFAULT_BUDGETS via env n'est pas supporté ; on génère un fichier > 60_000 bytes (budget po)
-        _setup_fake_repo(self.fake_repo, "po", ["workspace/input/stack/stack.md"])
+        _setup_fake_repo(self.fake_repo, "po", ["workspace/stack/stack.md"])
         huge = "X" * 80_000
-        (self.fake_repo / "workspace" / "input" / "stack" / "stack.md").write_text(
+        (self.fake_repo / "workspace" / "stack" / "stack.md").write_text(
             "## Project Config\nAppName: T\nBackendName: B\nAppNamespace: T\n\n"
             "## Active Tech Specs\n\n" + huge,
             encoding="utf-8",

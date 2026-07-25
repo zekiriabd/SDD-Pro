@@ -66,9 +66,9 @@ Spring Boot 3.x (Kotlin, JVM 21)
 
 ## 1.3 Mapping couche → repertoire
 
-Un seul projet sous `workspace/output/src/{AppName}/`. **Convention single-project — `{BackendName}` et `{LibName}` ne s'appliquent pas**. Arch leve WARNING `[STACK_MALFORMED]` si declares avec valeur non null.
+Un seul projet sous `workspace/src/{AppName}/`. **Convention single-project — `{BackendName}` et `{LibName}` ne s'appliquent pas**. Arch leve WARNING `[STACK_MALFORMED]` si declares avec valeur non null.
 
-**Code Kotlin** (sous `workspace/output/src/{AppName}/src/main/kotlin/{AppNamespace}/`) :
+**Code Kotlin** (sous `workspace/src/{AppName}/src/main/kotlin/{AppNamespace}/`) :
 
 | Layer | Path |
 |---|---|
@@ -85,7 +85,7 @@ Un seul projet sous `workspace/output/src/{AppName}/`. **Convention single-proje
 | Exception handler global | `config/GlobalExceptionHandler.kt` (annoté `@ControllerAdvice`) |
 | Validators custom | `validators/{Name}Validator.kt` |
 
-**Resources** (sous `workspace/output/src/{AppName}/src/main/resources/`) :
+**Resources** (sous `workspace/src/{AppName}/src/main/resources/`) :
 
 | Layer | Path |
 |---|---|
@@ -100,9 +100,9 @@ Un seul projet sous `workspace/output/src/{AppName}/`. **Convention single-proje
 | Hibernate DDL (Database-First) | `db/migration/` (Flyway si capability `flyway`) |
 
 **Manifestes** :
-- Project file → `workspace/output/src/{AppName}/build.gradle.kts`
-- Settings → `workspace/output/src/{AppName}/settings.gradle.kts`
-- Gradle wrapper → `workspace/output/src/{AppName}/gradlew` + `gradle/wrapper/`
+- Project file → `workspace/src/{AppName}/build.gradle.kts`
+- Settings → `workspace/src/{AppName}/settings.gradle.kts`
+- Gradle wrapper → `workspace/src/{AppName}/gradlew` + `gradle/wrapper/`
 
 ---
 
@@ -170,15 +170,15 @@ Quand est-ce qu'on a besoin de plus que du HTML statique render serveur ?
 
 ## 2.2 Outils
 
-- **Project file** : `workspace/output/src/{AppName}/build.gradle.kts`
-- **Build** : `(cd workspace/output/src/{AppName} && ./gradlew build -x test --quiet)`
-- **Run** : `(cd workspace/output/src/{AppName} && ./gradlew bootRun)`
-- **JAR executable** : `(cd workspace/output/src/{AppName} && ./gradlew bootJar)` → `build/libs/{AppName}-{version}.jar`
+- **Project file** : `workspace/src/{AppName}/build.gradle.kts`
+- **Build** : `(cd workspace/src/{AppName} && ./gradlew build -x test --quiet)`
+- **Run** : `(cd workspace/src/{AppName} && ./gradlew bootRun)`
+- **JAR executable** : `(cd workspace/src/{AppName} && ./gradlew bootJar)` → `build/libs/{AppName}-{version}.jar`
 - **Smoke Command** :
 
 ```bash
-(cd workspace/output/src/{AppName} && ./gradlew compileKotlin --quiet)
-test -d workspace/output/src/{AppName}/build/classes
+(cd workspace/src/{AppName} && ./gradlew compileKotlin --quiet)
+test -d workspace/src/{AppName}/build/classes
 ```
 
 - **Smoke Timeout** : 180s (Gradle premiere build ~60s, build incremental ~5-15s)
@@ -191,12 +191,12 @@ test -d workspace/output/src/{AppName}/build/classes
 ## 2.2.1 Init Commands
 
 ```bash
-if [ ! -f "workspace/output/src/{AppName}/build.gradle.kts" ]; then
+if [ ! -f "workspace/src/{AppName}/build.gradle.kts" ]; then
 
 # STEP 1 — Bootstrap via Spring Initializr CLI
 # (alternative : appel HTTPS curl https://start.spring.io)
-mkdir -p workspace/output/src/{AppName}
-cd workspace/output/src/{AppName}
+mkdir -p workspace/src/{AppName}
+cd workspace/src/{AppName}
 
 curl -s https://start.spring.io/starter.zip \
   -d type=gradle-project-kotlin \
@@ -527,14 +527,14 @@ Ce stack est optimise pour :
 
 | Path | Owner |
 |---|---|
-| `workspace/output/src/{AppName}/src/main/kotlin/**` | `dev-backend` |
-| `workspace/output/src/{AppName}/src/main/resources/templates/**` | `dev-frontend` |
-| `workspace/output/src/{AppName}/src/main/resources/static/**` | `dev-frontend` |
-| `workspace/output/src/{AppName}/src/main/resources/messages*.properties` | `dev-frontend` (libelles UI multilingues) |
-| `workspace/output/src/{AppName}/src/main/resources/application.yml` | `arch` (create) + `dev-backend` (augment sections) |
-| `workspace/output/src/{AppName}/src/main/resources/db/migration/**` | `arch` (Phase B scaffolding) + `dev-backend` (migrations Flyway si capability) |
-| `workspace/output/src/{AppName}/build.gradle.kts` | `arch` (create) + `dev-backend` (augment dependencies on-demand) |
-| `workspace/output/src/{AppName}/src/main/resources/application.yml` | `arch` (create exclusif config initiale) + `dev-backend` (augment sections non secretes) |
+| `workspace/src/{AppName}/src/main/kotlin/**` | `dev-backend` |
+| `workspace/src/{AppName}/src/main/resources/templates/**` | `dev-frontend` |
+| `workspace/src/{AppName}/src/main/resources/static/**` | `dev-frontend` |
+| `workspace/src/{AppName}/src/main/resources/messages*.properties` | `dev-frontend` (libelles UI multilingues) |
+| `workspace/src/{AppName}/src/main/resources/application.yml` | `arch` (create) + `dev-backend` (augment sections) |
+| `workspace/src/{AppName}/src/main/resources/db/migration/**` | `arch` (Phase B scaffolding) + `dev-backend` (migrations Flyway si capability) |
+| `workspace/src/{AppName}/build.gradle.kts` | `arch` (create) + `dev-backend` (augment dependencies on-demand) |
+| `workspace/src/{AppName}/src/main/resources/application.yml` | `arch` (create exclusif config initiale) + `dev-backend` (augment sections non secretes) |
 
 **Cas frontiere — modeles passes aux templates** : un Controller MVC dans `dev-backend` cree un Model (DTO data class Kotlin) puis appelle `model.addAttribute("users", users)` + return `"users/list"`. Le template `templates/users/list.mustache` cote `dev-frontend` consomme `{{#users}}{{name}}{{/users}}`. **Contrat partage** : nom de la cle (`"users"`) + structure du Model. Toute modification d'un cote DOIT etre synchronisee de l'autre — equivalent du "frontend-backend contract" mais intra-projet.
 
@@ -543,7 +543,7 @@ Ce stack est optimise pour :
 ## 12. Smoke test attendu (post-init arch)
 
 ```bash
-cd workspace/output/src/{AppName}
+cd workspace/src/{AppName}
 ./gradlew compileKotlin --quiet
 test -f build.gradle.kts
 test -f src/main/resources/application.yml

@@ -27,7 +27,7 @@ Usage :
     python -m sdd_scripts.report_roi --feat 1
     python -m sdd_scripts.report_roi --all
     python -m sdd_scripts.report_roi --feat 1 --json
-    python -m sdd_scripts.report_roi --all --markdown > workspace/output/qa/roi-report.md
+    python -m sdd_scripts.report_roi --all --markdown   # stdout (rediriger où voulu, hors workspace/qa/ supprimé 2026-07-06)
 
 Exit codes :
     0 = OK
@@ -464,7 +464,7 @@ def render_markdown(payloads: list[dict[str, Any]]) -> str:
         lines.append(
             f"FEATs without per-call token records : `{no_token_feats}`. "
             "Real cost cannot be computed. Set `TokenUsageMode: record` in "
-            "`workspace/input/stack/stack.md` `## Project Config` (or env "
+            "`workspace/stack/stack.md` `## Project Config` (or env "
             "var `SDD_TOKEN_USAGE_MODE=record`) before running `/sdd-full` "
             "to enable per-invocation accounting via the PostToolUse.Agent hook."
         )

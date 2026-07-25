@@ -21,7 +21,7 @@ depuis le cwd.
 | Trigger Claude Code | `PreToolUse` matcher `Edit\|Write\|MultiEdit` |
 | Script | [`.claude/python/sdd_hooks/protect_framework.py`](.claude/python/sdd_hooks/protect_framework.py) |
 | LOC | ~50 |
-| Rôle | Refuse les écritures dans `.claude/` (sauf top-level whitelist) et dans `workspace/output/.sys/.context/` non-ADR. Garde-fou contre les modifs framework involontaires. |
+| Rôle | Refuse les écritures dans `.claude/` (sauf top-level whitelist) et dans `workspace/.sys/.context/` non-ADR. Garde-fou contre les modifs framework involontaires. |
 | Exit codes | 0 = allow, 1 = deny avec message stderr |
 | Bypassable ? | NON (hook bloquant), sauf si chemin matche whitelist |
 
@@ -127,7 +127,7 @@ depuis le cwd.
 | Trigger Claude Code | `SubagentStop` matcher `qa` |
 | Script | [`.claude/python/sdd_hooks/validate_acceptance_gate.py`](.claude/python/sdd_hooks/validate_acceptance_gate.py) |
 | LOC | ~250 |
-| Rôle | Après chaque arrêt de l'agent `qa`, exécute l'acceptance gate sur tous les projets sous `workspace/output/src/*` (cf. `rules/quality.md Partie C`) : `test`, `lint`, `build`, `coverage ≥ seuil`, + smoke browser + E2E Playwright pour projets UI. Émet `[ACCEPTANCE_GATE_FAILED]` si échec. Bypass : `SDD_ALLOW_ACCEPTANCE_BYPASS=1` (audit-loggué). |
+| Rôle | Après chaque arrêt de l'agent `qa`, exécute l'acceptance gate sur tous les projets sous `workspace/src/*` (cf. `rules/quality.md Partie C`) : `test`, `lint`, `build`, `coverage ≥ seuil`, + smoke browser + E2E Playwright pour projets UI. Émet `[ACCEPTANCE_GATE_FAILED]` si échec. Bypass : `SDD_ALLOW_ACCEPTANCE_BYPASS=1` (audit-loggué). |
 | Exit codes | 0 = pass, 1 = gate failed |
 | Ajouté | v7.0.0-alpha audit P5 |
 
@@ -138,7 +138,7 @@ depuis le cwd.
 | Trigger Claude Code | `PreToolUse` matcher `Edit\|Write\|MultiEdit` (chaîné après `protect_framework`) |
 | Script | [`.claude/python/sdd_hooks/pre_write_lint.py`](.claude/python/sdd_hooks/pre_write_lint.py) |
 | LOC | ~200 |
-| Rôle | Enforce les forbidden patterns documentés dans `stack/{cat}/{id}.md` (§Forbidden ou CLAUDE.md projet) **avant** que l'écriture atteigne le disque. Détecte par regex sur le `new_string` / `content` payload : Kotlin `!!` (NPE assertions), Vue `<input type="text">` brut sans validation, console.log/print debug, hex hardcode (`#fff`, `rgba(...)` au lieu de tokens CSS), magic numbers > 100, etc. Skip silencieusement les test paths (`**/test_*.py`, `**/*.test.ts`, `**/*Test.kt`) et les fichiers hors `workspace/output/src/`. |
+| Rôle | Enforce les forbidden patterns documentés dans `stack/{cat}/{id}.md` (§Forbidden ou CLAUDE.md projet) **avant** que l'écriture atteigne le disque. Détecte par regex sur le `new_string` / `content` payload : Kotlin `!!` (NPE assertions), Vue `<input type="text">` brut sans validation, console.log/print debug, hex hardcode (`#fff`, `rgba(...)` au lieu de tokens CSS), magic numbers > 100, etc. Skip silencieusement les test paths (`**/test_*.py`, `**/*.test.ts`, `**/*Test.kt`) et les fichiers hors `workspace/src/`. |
 | Modes | `warn` (défaut — exit 0 + audit log) ; `strict` via `SDD_PRE_WRITE_LINT_STRICT=1` (exit 2 = bloquant) |
 | Bypass | `SDD_DISABLE_PRE_WRITE_LINT=1` (audit-loggué, narrow per-session) |
 | Exit codes | 0 = allow (warn ou bypass), 2 = deny (strict + violation) |
@@ -151,11 +151,11 @@ depuis le cwd.
 | Trigger Claude Code | `PreToolUse` matcher `Glob` |
 | Script | [`.claude/python/sdd_hooks/preflight_glob_scope.py`](.claude/python/sdd_hooks/preflight_glob_scope.py) |
 | LOC | ~120 |
-| Rôle | Defense-in-depth anti-token-explosion : refuse les patterns Glob non-bornés (`workspace/output/src/**/*`, `**/*`, `**`) sans contrainte d'extension. Le post-mortem documenté dans `agents/spec-compliance-reviewer.md` (~ligne 178) a tracé un Glob isolé qui a déclenché 1.8M tokens / $35 sur un seul agent reviewer. Le prompt anti-pattern n'a pas suffit à arrêter Sonnet 4.6 — d'où ce garde runtime. Globs scopés (avec sous-dossier ou extension) et globs hors `workspace/output/src/` sont autorisés silencieusement. |
+| Rôle | Defense-in-depth anti-token-explosion : refuse les patterns Glob non-bornés (`workspace/src/**/*`, `**/*`, `**`) sans contrainte d'extension. Le post-mortem documenté dans `agents/spec-compliance-reviewer.md` (~ligne 178) a tracé un Glob isolé qui a déclenché 1.8M tokens / $35 sur un seul agent reviewer. Le prompt anti-pattern n'a pas suffit à arrêter Sonnet 4.6 — d'où ce garde runtime. Globs scopés (avec sous-dossier ou extension) et globs hors `workspace/src/` sont autorisés silencieusement. |
 | Modes | `warn` (défaut — exit 0 + audit log + WARN stderr) ; `strict` via `SDD_GLOB_SCOPE_STRICT=1` (exit 2) |
 | Bypass | `SDD_DISABLE_GLOB_SCOPE=1` (audit-loggué) |
 | Exit codes | 0 = allow (warn ou bypass), 2 = deny (strict + broad) |
-| Audit log | `workspace/output/.sys/.audit/glob-scope.jsonl` |
+| Audit log | `workspace/.sys/.audit/glob-scope.jsonl` |
 | Ajouté | v7.0.0-alpha audit CTO (2026-06-07) — Sprint 4 #18 |
 
 ### 1.14 `session_start` — SessionStart startup|resume|clear|compact
@@ -191,7 +191,7 @@ depuis le cwd.
 | Trigger Claude Code | `PreToolUse` matcher `Skill` (filtre commandes `sdd-full`/`sdd-poc`/`dev-run`) |
 | Script | [`.claude/python/sdd_hooks/auto_invoke_complexity_router.py`](.claude/python/sdd_hooks/auto_invoke_complexity_router.py) |
 | LOC | ~180 |
-| Rôle | Si `ComplexityRouterMode: auto` ET pas de rapport routing < 1h fresh, lance `sdd_scripts/complexity_router.py` en subprocess AVANT que le slash command démarre. Outputs sous `workspace/output/.sys/.routing/{n}-complexity.{json,md}`. **Additif uniquement** : ne bloque jamais. |
+| Rôle | Si `ComplexityRouterMode: auto` ET pas de rapport routing < 1h fresh, lance `sdd_scripts/complexity_router.py` en subprocess AVANT que le slash command démarre. Outputs sous `workspace/.sys/.routing/{n}-complexity.{json,md}`. **Additif uniquement** : ne bloque jamais. |
 | Modes | `auto` (script invoqué) ; `manual` (défaut, no-op) ; `off` (no-op) via Project Config `ComplexityRouterMode` |
 | Bypass | `SDD_DISABLE_AUTO_ROUTER=1` ; `ComplexityRouterMode: off\|manual` |
 | Exit codes | 0 toujours (additive, n'échoue jamais un slash command) |
@@ -376,4 +376,4 @@ ADR `governance-protection-{slug}` + 2 approbations.
 - [`.claude/python/_hook.py`](.claude/python/_hook.py) — wrapper d'invocation
 - [`.claude/docs/MIGRATION.md`](./MIGRATION.md) — guide migration entre versions majeures
 - [`.claude/docs/VERSIONING.md`](./VERSIONING.md) — politique SemVer + freeze
-- `workspace/output/.sys/.context/adrs/ADR-20260519T173000-governance-protection-tracing.md` — ADR ex-post de la migration v6.5+
+- `workspace/.sys/.context/adrs/ADR-20260519T173000-governance-protection-tracing.md` — ADR ex-post de la migration v6.5+

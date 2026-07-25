@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """SDD_Pro telemetry aggregator — reads token-usage.jsonl and reports.
 
-Reads `workspace/output/.sys/.audit/token-usage.jsonl` produced by the
+Reads `workspace/.sys/.audit/token-usage.jsonl` produced by the
 `sdd_hooks.record_token_usage` hook, then aggregates token consumption
 by agent, by FEAT, and globally.
 

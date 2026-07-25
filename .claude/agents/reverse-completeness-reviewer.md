@@ -101,7 +101,7 @@ verdict, liste des gaps confirmés (file:line), gaps écartés + raison.
 2. **No-spawn** : aucun agent spawné.
 3. **Déterministe d'abord** : le verdict s'appuie sur `check_feat_completeness.py`.
 4. **Jamais bloquant** : verdict informational, le Tech Lead arbitre.
-5. **Pas de réécriture** de la FEAT (read-only sur `workspace/input/feats/`).
+5. **Pas de réécriture** de la FEAT (read-only sur `workspace/feats/`).
 
 > Note : la **fidélité front** (UI) est vérifiée en aval par le mécanisme
 > standard SDD_Pro `dev-frontend` STEP 11 (fidelity check) quand `/sdd-full`

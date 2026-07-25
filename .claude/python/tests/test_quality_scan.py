@@ -52,34 +52,56 @@ class TestIsExcluded(unittest.TestCase):
     """Exclude bin/obj/node_modules + test patterns."""
 
     def test_bin_directory_excluded(self):
-        self.assertTrue(is_excluded("workspace/output/src/App/bin/Debug/App.dll"))
+        self.assertTrue(is_excluded("workspace/src/App/bin/Debug/App.dll"))
 
     def test_node_modules_excluded(self):
-        self.assertTrue(is_excluded("workspace/output/src/App/node_modules/react/index.js"))
+        self.assertTrue(is_excluded("workspace/src/App/node_modules/react/index.js"))
 
     def test_obj_directory_excluded(self):
-        self.assertTrue(is_excluded("workspace/output/src/Backend/obj/Debug/Foo.obj"))
+        self.assertTrue(is_excluded("workspace/src/Backend/obj/Debug/Foo.obj"))
 
     def test_tests_subdir_excluded(self):
         """*.Tests/ is QA territory — quality_scan only scans prod code."""
-        self.assertTrue(is_excluded("workspace/output/src/Backend.Tests/Services/AuthServiceTests.cs"))
+        self.assertTrue(is_excluded("workspace/src/Backend.Tests/Services/AuthServiceTests.cs"))
 
     def test_jest_tests_excluded(self):
-        self.assertTrue(is_excluded("workspace/output/src/App/__tests__/Login.test.tsx"))
+        self.assertTrue(is_excluded("workspace/src/App/__tests__/Login.test.tsx"))
 
     def test_python_test_files_excluded(self):
-        self.assertTrue(is_excluded("workspace/output/src/api/test_auth.py"))
-        self.assertTrue(is_excluded("workspace/output/src/api/auth_test.py"))
+        self.assertTrue(is_excluded("workspace/src/api/test_auth.py"))
+        self.assertTrue(is_excluded("workspace/src/api/auth_test.py"))
 
     def test_kotlin_test_files_excluded(self):
-        self.assertTrue(is_excluded("workspace/output/src/Backend/AuthServiceTest.kt"))
+        self.assertTrue(is_excluded("workspace/src/Backend/AuthServiceTest.kt"))
 
     def test_normal_source_not_excluded(self):
-        self.assertFalse(is_excluded("workspace/output/src/Backend/Services/AuthService.cs"))
-        self.assertFalse(is_excluded("workspace/output/src/App/Pages/Login.tsx"))
+        self.assertFalse(is_excluded("workspace/src/Backend/Services/AuthService.cs"))
+        self.assertFalse(is_excluded("workspace/src/App/Pages/Login.tsx"))
 
     def test_dist_excluded(self):
-        self.assertTrue(is_excluded("workspace/output/src/App/dist/bundle.js"))
+        self.assertTrue(is_excluded("workspace/src/App/dist/bundle.js"))
+
+    def test_substring_false_positives_are_scanned(self):
+        """Regression for the 2026-06-12 audit fix (M1).
+
+        The previous `re.search(escape(d), rel_path)` matched excluded
+        fragments ANYWHERE in the path, silently dropping production files
+        from the quality scan. Exclusion is now segment/basename anchored.
+        """
+        for prod in (
+            "workspace/src/Backend/robin.cs",          # "bin"
+            "workspace/src/Backend/object_mapper.py",  # "obj"
+            "workspace/src/App/distribution.ts",       # "dist"
+            "workspace/src/api/latest_news.py",        # "test_"
+            "workspace/src/Backend/buildings.py",      # "build"
+            "workspace/src/Backend/coverages.cs",      # "coverage"
+            "workspace/src/Backend/MyTests.cs",        # not a *.Tests dir
+        ):
+            self.assertFalse(is_excluded(prod), f"{prod} must be scanned, not excluded")
+
+    def test_windows_separators_normalized(self):
+        self.assertTrue(is_excluded(r"workspace\src\App\bin\Debug\App.dll"))
+        self.assertFalse(is_excluded(r"workspace\src\Backend\robin.cs"))
 
 
 class TestMagicNumberSkipList(unittest.TestCase):
@@ -207,35 +229,35 @@ class TestScanFileForbiddenSddEnv(unittest.TestCase):
     def test_detects_dotnet_sdd_env_read(self):
         r = self._scan(
             'var password = Environment.GetEnvironmentVariable("DB_PASSWORD");',
-            "workspace/output/src/Backend/Program.cs",
+            "workspace/src/Backend/Program.cs",
         )
         self.assertTrue(any(e["category"] == "forbidden-sdd-env" for e in r["errors"]))
 
     def test_detects_node_sdd_env_read(self):
         r = self._scan(
             "const secret = process.env.AUTH_JWT_SECRET;",
-            "workspace/output/src/App/server.ts",
+            "workspace/src/App/server.ts",
         )
         self.assertTrue(any(e["tag"] == "node-sdd-env-read" for e in r["errors"]))
 
     def test_detects_python_sdd_env_read(self):
         r = self._scan(
             'tenant = os.environ.get("AZ_TENANTID")',
-            "workspace/output/src/Api/app/config.py",
+            "workspace/src/Api/app/config.py",
         )
         self.assertTrue(any(e["tag"] == "py-sdd-env-read" for e in r["errors"]))
 
     def test_detects_spring_direct_env_placeholder(self):
         r = self._scan(
             '@Value("${DB_PASSWORD:}") lateinit var password: String',
-            "workspace/output/src/Backend/AuthConfig.kt",
+            "workspace/src/Backend/AuthConfig.kt",
         )
         self.assertTrue(any(e["tag"] == "spring-sdd-env-placeholder" for e in r["errors"]))
 
     def test_allows_runtime_profile_env(self):
         r = self._scan(
             "if (process.env.NODE_ENV !== 'production') console.warn('dev');",
-            "workspace/output/src/App/server.ts",
+            "workspace/src/App/server.ts",
         )
         self.assertFalse(any(e["category"] == "forbidden-sdd-env" for e in r["errors"]))
 

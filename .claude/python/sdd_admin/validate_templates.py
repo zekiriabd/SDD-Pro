@@ -15,7 +15,6 @@ Checks per template :
   * adr.template.md        : Statut/Date/Context/Decision/Consequences/Alt.
   * constitution.template.md: §1..§8 numbered.
   * claude-md-*.template.md : H1 + Architecture + Forbidden patterns.
-  * qa-report.template.md  : metrics summary + per-stack section.
   * readiness.template.md  : GO/NO-GO verdict + checklist.
 
 Exit codes :
@@ -94,10 +93,8 @@ SPECS: list[TemplateSpec] = [
         filename="claude-md-shared-lib.template.md",
         must_contain=["{LibName}"],  # template is for shared lib context
     ),
-    TemplateSpec(
-        filename="qa-report.template.md",
-        must_contain=["Coverage", "Tests"],
-    ),
+    # qa-report.template.md supprimé 2026-07-06 : le rapport QA est rendu à la
+    # demande depuis console.db (query_console_db.py --format md), plus de fichier.
     TemplateSpec(
         filename="readiness.template.md",
         must_contain=["GO", "NO-GO"],

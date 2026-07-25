@@ -23,7 +23,7 @@ vert), produire un rapport de review ciblé sur ce que le build ne catch pas :
    `quality_scan.py` ne catch pas
 5. **Secrets hardcoded** (compléments à `quality_scan.py`)
 
-**Strictement read-only** sur `workspace/output/src/**`. Ne corrige pas —
+**Strictement read-only** sur `workspace/src/**`. Ne corrige pas —
 émet un rapport, Tech Lead arbitre. Position : entre `/dev-run` STEP 6.c
 et 6.5. Auto-invoke en **Stage B** du two-stage auditor (v7.0.0+, cf.
 `commands/dev-run.md §6.4.B`) — tourne en parallèle avec `security-reviewer`
@@ -41,8 +41,8 @@ magic numbers, console.log, naming triviaux). Focus cross-fichier.
 
 Cet agent **ne produit que** ces 2 outputs :
 
-1. `workspace/output/.sys/.validation/{n}-code-review.md` — rapport humain
-2. `workspace/output/.sys/.validation/{n}-code-review.json` — schéma machine
+1. `workspace/.sys/.validation/{n}-code-review.md` — rapport humain
+2. `workspace/.sys/.validation/{n}-code-review.json` — schéma machine
 
 **INTERDIT** : aucun autre Write. Aucun Edit. Aucune correction
 proactive. Aucun appel à un autre agent — le patch est du ressort
@@ -73,7 +73,7 @@ FIX: relancer via /sdd-review {n} (auto-spawn code-reviewer)
 
 ### 1.2 Project Config
 
-Lire `## Project Config` de `workspace/input/stack/stack.md` :
+Lire `## Project Config` de `workspace/stack/stack.md` :
 
 ```yaml
 ## Project Config
@@ -93,8 +93,8 @@ Validation :
 
 ### 2.1 FEAT + US existent
 
-Glob `workspace/input/feats/{n}-*.md` → 1 fichier attendu.
-Glob `workspace/output/us/{n}-*.md` → ≥ 1 fichier attendu.
+Glob `workspace/feats/{n}-*.md` → 1 fichier attendu.
+Glob `workspace/us/{n}-*.md` → ≥ 1 fichier attendu.
 
 Si absent → STOP + ERROR :
 ```
@@ -106,8 +106,8 @@ FIX: lancer /us-generate {n} puis /dev-run {n} d'abord
 ### 2.2 Code généré présent
 
 Au moins un de :
-- `workspace/output/src/{BackendName}/` (selon stack backend actif)
-- `workspace/output/src/{AppName}/` (selon stack frontend actif)
+- `workspace/src/{BackendName}/` (selon stack backend actif)
+- `workspace/src/{AppName}/` (selon stack frontend actif)
 
 Si rien → STOP + ERROR `[QA_PRECONDITION_FAILED]` (cf. message qa
 équivalent).
@@ -125,11 +125,11 @@ mais émis quand même.
 
 Read **uniquement** :
 
-1. `.claude/rules/error-classification.md` — taxonomie `[REVIEW_*]` §1.11 +
+1. `.claude/digests/error-classification.code-reviewer.md` — taxonomie `[REVIEW_*]` §1.10 +
    classes réutilisées (`[LAYER_VIOLATION]`, `[FRONTEND_BACKEND_CONTRACT_GAP]`)
 2. `.claude/rules/build-and-loop.md` — anti-patterns dev-backend/dev-frontend
-3. `workspace/input/feats/{n}-*.md` + `workspace/output/us/{n}-*.md` (intent métier)
-4. `workspace/output/src/{BackendName|AppName}/CLAUDE.md` si présents
+3. `workspace/feats/{n}-*.md` + `workspace/us/{n}-*.md` (intent métier)
+4. `workspace/src/{BackendName|AppName}/CLAUDE.md` si présents
 5. **Stacks actifs sélectifs** — depuis `## Active Tech Specs` du stack.md :
    - `.claude/stacks/backend/{active}.md` §1.3 (layer mapping) + §3 + §2.4
    - `.claude/stacks/frontend/{active}.md` §1.3 + §3
@@ -139,11 +139,11 @@ Read **uniquement** :
 
 ## STEP 4 — Sélection code (lecture sélective stricte)
 
-**JAMAIS** `Glob workspace/output/src/**/*` (anti-pattern explosion budget).
+**JAMAIS** `Glob workspace/src/**/*` (anti-pattern explosion budget).
 
 ### 4.1 Plans v2 strict-ready (mode preferred)
 
-Glob `workspace/output/plans/{n}-*.{back,front}.md`. Parser `## Files`,
+Glob `workspace/plans/{n}-*.{back,front}.md`. Parser `## Files`,
 lire **uniquement** ces paths. Déterministe + traçable.
 
 ### 4.2 Fallback convention (WARN obligatoire)
@@ -301,7 +301,7 @@ Chaque `item` :
 ```json
 {
   "class": "[REVIEW_ANTI_PATTERN_N_PLUS_ONE]",
-  "file": "workspace/output/src/{BackendName}/Services/BebeService.cs",
+  "file": "workspace/src/{BackendName}/Services/BebeService.cs",
   "line": 42,
   "us": "4-1",
   "snippet": "bebes.Where(b => b.IsActive).ToList(); foreach (var b in bebes) { /* lazy load */ }",
@@ -339,7 +339,7 @@ Documenter dans le rapport : `"blocking_class": "[FRONTEND_BACKEND_CONTRACT_GAP]
 
 ## STEP 8 — Render `code-review.json`
 
-Localisation : `workspace/output/.sys/.validation/{n}-code-review.json`
+Localisation : `workspace/.sys/.validation/{n}-code-review.json`
 
 ```json
 {
@@ -388,7 +388,7 @@ Violation → STOP + ERROR `[QA_OUTPUT_INVALID]`. Le fichier n'est pas
 
 ## STEP 9 — Render `code-review.md`
 
-Localisation : `workspace/output/.sys/.validation/{n}-code-review.md`
+Localisation : `workspace/.sys/.validation/{n}-code-review.md`
 
 Structure :
 
@@ -434,7 +434,7 @@ Structure :
 
 `CodeReviewMode: {mode}` · `CodeReviewFailOn: {fail-on}`
 
-Pour ajuster : éditer `## Project Config` dans `workspace/input/stack/stack.md`.
+Pour ajuster : éditer `## Project Config` dans `workspace/stack/stack.md`.
 
 ## Next steps
 
@@ -466,12 +466,21 @@ Pour chaque fichier (`.json` puis `.md`) :
 
 ## STEP 10.5 — Ingest vers console.db (v6.10)
 
-Le `.json` est éphémère — transport entre l'agent et la DB. Après Write,
-appeler le bridge Python qui parse, insère dans `qa_code_review`
-(console.db), puis supprime le `.json`. Le `.md` est conservé.
+Le `.json` est inséré dans `qa_code_review` (console.db, consommé par
+`/sdd-review`) **et conservé sur le FS** (`--keep-json`). Le `.md` est
+conservé aussi.
+
+> **FWD-C1 fix (audit 2026-06-12)** : `--keep-json` est obligatoire. Le
+> bridge supprimait le `.json` par défaut, mais DEUX consommateurs le
+> lisent APRÈS la fin de cet agent : (a) l'orchestrateur two-stage
+> (`auditor-orchestration.md §4.2`) lit `summary.verdict` dans
+> `{n}-code-review.json`, et (b) `/feat-validate` STEP 4.5.x. Sans
+> `--keep-json`, ils lisaient un fichier déjà supprimé → faux 🔴 RED
+> `[AUDITOR_RUNTIME_ERROR]` systématique. Le `.json` est par-FEAT,
+> overwrite à chaque run (STEP 10 atomic), donc pas d'accumulation.
 
 ```bash
-python -m sdd_scripts.ingest_agent_report --type code-review --feat {n}
+python -m sdd_scripts.ingest_agent_report --type code-review --feat {n} --keep-json
 ```
 
 | Exit | Action |
@@ -480,8 +489,8 @@ python -m sdd_scripts.ingest_agent_report --type code-review --feat {n}
 | 1 | STOP + ERROR `[QA_PRECONDITION_FAILED]` |
 | 2 / 3 | STOP + ERROR `[QA_OUTPUT_INVALID]` |
 
-Aucun `.json` sur le FS à l'issue de ce STEP. Données interrogeables
-via `SELECT … FROM qa_code_review WHERE feat_n = {n}`.
+À l'issue de ce STEP : `.json` + `.md` présents sur le FS, ET données
+interrogeables via `SELECT … FROM qa_code_review WHERE feat_n = {n}`.
 
 ---
 
@@ -496,8 +505,8 @@ Files reviewed : {N} ({source})
 Critical : {C} · Serious : {S} · Moderate : {M} · Minor : {m}
 Verdict  : {🟢 GREEN | 🟡 WARN | 🔴 RED}{ (blocking: {blocking_class}) si applicable}
 
-Rapport  : workspace/output/.sys/.validation/{n}-code-review.md
-Schéma   : workspace/output/.sys/.validation/{n}-code-review.json
+Rapport  : workspace/.sys/.validation/{n}-code-review.md
+Schéma   : workspace/.sys/.validation/{n}-code-review.json
 ```
 
 Cas skip (CodeReviewMode: off) :
@@ -539,16 +548,16 @@ Applique `@.claude/rules/output-protocol.md` (label `[CODE-REVIEW]`, plage `88-9
 
 
 **Domain-specific code-review** :
-- ❌ Modifier le code de production sous `workspace/output/src/**` (read-only strict)
+- ❌ Modifier le code de production sous `workspace/src/**` (read-only strict)
 - ❌ Corriger automatiquement les issues (rapport seul, pas patch)
 - ❌ Re-builder le projet, exécuter les tests, lancer un linter
   (responsabilités `qa` + build_loop de dev-*)
 - ❌ Dupliquer les checks de `quality_scan.py` (cf. §6)
-- ❌ Étendre la table d'anti-patterns §5.1.bis en cours de scan (si un
+- ❌ Étendre la table d'anti-patterns §5.1 en cours de scan (si un
   pattern manque, émettre `[UNKNOWN]` et logger ; étendre la table dans
   un commit séparé via discipline `source-first.md`)
 - ❌ Lire les FEATs/US d'autres FEATs (`{n+1}`, `{n-1}`)
-- ❌ Lire `workspace/input/stack/`, `.claude/stacks/qa/`, `auth/`, `ui/`
+- ❌ Lire `workspace/stack/`, `.claude/stacks/qa/`, `auth/`, `ui/`
   (hors scope)
 
 ---
@@ -559,9 +568,9 @@ L'agent est strictement idempotent :
 - Aucun état conservé entre runs
 - Les 2 outputs sont overwritten (pas de merge avec versions précédentes)
 - Peut être ré-invoqué en parallèle de `qa`, `security-reviewer`,
-  `spec-compliance-reviewer`, `arch-reviewer` sans conflit (paths
-  distincts dans `workspace/output/.sys/.validation/` vs
-  `workspace/output/qa/`).
+  `spec-compliance-reviewer`, `arch-reviewer` sans conflit (JSON
+  transitoires distincts sous `workspace/.sys/.validation/`,
+  ingérés puis supprimés ; données consolidées en `console.db`).
 
 ---
 
@@ -582,4 +591,4 @@ par similarité, error handling contextuel). Coût cible 8-15 KB / feature.
 - Verdict 🟡 WARN → continue + log WARN
 - Verdict 🟢 GREEN → continue silencieusement
 - Consommation rapports : `console.db` (table `qa_code_review`) +
-  `workspace/output/.sys/.validation/{n}-code-review.json`
+  `workspace/.sys/.validation/{n}-code-review.json`

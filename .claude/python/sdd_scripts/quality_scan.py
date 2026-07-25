@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """SDD_Pro: sonar-like quality scan (deterministic, 0 token).
 
-Scans `workspace/output/src/{App|Backend|Lib}/` for:
+Scans `workspace/src/{App|Backend|Lib}/` for:
 - TODO / FIXME / XXX / HACK markers (errors)
 - console.log / Console.WriteLine / print debug calls (warnings)
 - Hex hardcoded outside theme.css (warnings)
@@ -9,7 +9,8 @@ Scans `workspace/output/src/{App|Backend|Lib}/` for:
 - Commented-out code blocks > 5 lines (info)
 - Magic numbers (info, heuristic)
 
-Produces `workspace/output/qa/feat-{n}/quality.json`.
+Persists results in `console.db` table `qa_quality` (SQLite is the single
+source of truth ; no file is written — 2026-07-06, ex-`quality.json`).
 
 Usage:
     python quality_scan.py --feat-number 1
@@ -32,7 +33,7 @@ from sdd_lib.console_db import (  # noqa: E402
     replace_qa_quality_for_feat,
 )
 from sdd_lib.exit_codes import SUCCESS  # noqa: E402
-from sdd_lib.paths import normalize, repo_root  # noqa: E402
+from sdd_lib.paths import workspace_root, normalize, repo_root  # noqa: E402
 
 
 SOURCE_EXTENSIONS: tuple[str, ...] = (
@@ -99,12 +100,47 @@ def parse_args() -> argparse.Namespace:
 
 
 def is_excluded(rel_path: str) -> bool:
+    """True if the file is a build artifact or a test file (out of quality scope).
+
+    Audit fix 2026-06-12 — the previous impl used `re.search(escape(d), rel_path)`,
+    a SUBSTRING match anywhere in the path. That silently excluded production
+    files whose name merely *contained* an excluded fragment: `robin.cs` ("bin"),
+    `object_mapper.py` ("obj"), `distribution.ts` ("dist"), `latest_news.py`
+    ("test_"). Those files escaped `qa_quality` entirely. The exclusion is now
+    anchored to path SEGMENTS (directories) and BASENAME patterns (test files).
+    """
+    norm = rel_path.replace("\\", "/")
+    padded = f"/{norm}/"
+
+    # Build-artifact directories: match a whole path segment, never a substring.
+    # `/{d}/` in the padded path means `d` is a real directory component.
     for d in EXCLUDE_DIRS:
-        if re.search(re.escape(d), rel_path):
+        if f"/{d}/" in padded:
             return True
+
+    # Test files. Segment-style patterns (contain `/`) stay path-anchored;
+    # filename patterns are anchored to the basename to avoid false positives.
+    segments = norm.split("/")
+    basename = segments[-1]
     for p in TEST_PATTERNS:
-        if re.search(re.escape(p), rel_path):
-            return True
+        if p.endswith("/"):
+            # Directory/segment pattern: a segment that equals or ends with the
+            # stem, e.g. "App.Tests" (".Tests/") or "__tests__" ("__tests__/").
+            stem = p[:-1]
+            if any(seg == stem or seg.endswith(stem) for seg in segments):
+                return True
+        elif p.startswith("test_"):
+            # Prefix pattern: only a basename starting with "test_" is a test.
+            if basename.startswith(p):
+                return True
+        elif p.endswith(".kt"):
+            # Suffix pattern: "Test.kt" / "FEAT.kt".
+            if basename.endswith(p):
+                return True
+        else:
+            # Infix pattern on the basename: ".test.", ".FEAT.", "_test.".
+            if p in basename:
+                return True
     return False
 
 
@@ -256,7 +292,7 @@ def scan_file(path: Path, rel_path: str, results: dict[str, list]) -> None:
 def main() -> int:
     args = parse_args()
     root = repo_root()
-    src_dir = root / "workspace" / "output" / "src"
+    src_dir = workspace_root(root) / "src"
 
     if not src_dir.is_dir():
         print(f"Source directory not found: {src_dir}")

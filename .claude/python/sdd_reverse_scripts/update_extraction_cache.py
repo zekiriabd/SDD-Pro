@@ -64,7 +64,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--n", type=int, default=None, help="FEAT number (required with --save)")
     parser.add_argument("--name", default=None, help="FEAT Name (required with --save)")
     parser.add_argument("--feats-dir", default=None,
-        help="FEATs directory (default: workspace/input/feats relative to repo)")
+        help="FEATs directory (default: workspace/feats relative to repo)")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
 
@@ -80,7 +80,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     feats_dir = Path(args.feats_dir).resolve() if args.feats_dir else (
-        project_root.parent.parent / "input" / "feats"
+        project_root.parent.parent / "feats"
     )
 
     if args.check:

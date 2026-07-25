@@ -31,8 +31,8 @@ class TestResolveUsHashSentinel(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.root = Path(self.tmp.name)
         (self.root / ".claude").mkdir()
-        (self.root / "workspace" / "input" / "feats").mkdir(parents=True)
-        (self.root / "workspace" / "output" / "us").mkdir(parents=True)
+        (self.root / "workspace" / "feats").mkdir(parents=True)
+        (self.root / "workspace" / "us").mkdir(parents=True)
         self.env_patch = patch.dict(os.environ, {"CLAUDE_PROJECT_DIR": str(self.root)})
         self.env_patch.start()
 
@@ -43,7 +43,7 @@ class TestResolveUsHashSentinel(unittest.TestCase):
     def _write_feat(self, n: int, name: str = "Auth", content: str = "# Auth FEAT\n") -> str:
         # write_bytes to preserve LF (write_text converts to CRLF on Windows,
         # which would mismatch the hash the script computes from raw bytes).
-        p = self.root / "workspace" / "input" / "feats" / f"{n}-{name}.md"
+        p = self.root / "workspace" / "feats" / f"{n}-{name}.md"
         raw = content.encode("utf-8")
         p.write_bytes(raw)
         return hashlib.sha256(raw).hexdigest()[:8]
@@ -52,7 +52,7 @@ class TestResolveUsHashSentinel(unittest.TestCase):
         body = f"# US {n}-{m}-{name}\n"
         if with_sentinel:
             body += f"\n{SENTINEL_LINE}\n"
-        p = self.root / "workspace" / "output" / "us" / f"{n}-{m}-{name}.md"
+        p = self.root / "workspace" / "us" / f"{n}-{m}-{name}.md"
         p.write_bytes(body.encode("utf-8"))
         return p
 
@@ -162,8 +162,8 @@ class TestE2EPoToValidateReadiness(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.root = Path(self.tmp.name)
-        (self.root / "workspace" / "input" / "feats").mkdir(parents=True)
-        (self.root / "workspace" / "output" / "us").mkdir(parents=True)
+        (self.root / "workspace" / "feats").mkdir(parents=True)
+        (self.root / "workspace" / "us").mkdir(parents=True)
         self.env_patch = patch.dict(os.environ, {"CLAUDE_PROJECT_DIR": str(self.root)})
         self.env_patch.start()
 
@@ -172,14 +172,14 @@ class TestE2EPoToValidateReadiness(unittest.TestCase):
         self.tmp.cleanup()
 
     def _write_feat(self, n=1, content="# Auth FEAT\nAC-1 login\n"):
-        p = self.root / "workspace" / "input" / "feats" / f"{n}-Auth.md"
+        p = self.root / "workspace" / "feats" / f"{n}-Auth.md"
         raw = content.encode("utf-8")
         p.write_bytes(raw)
         return hashlib.sha256(raw).hexdigest()[:8]
 
     def _write_us(self, n, m, label="Parent FEAT hash"):
         body = f"# US {n}-{m}-Login\n\n{label}: sha256:COMPUTE_REQUIRED\n\nCovers: AC-1\n"
-        p = self.root / "workspace" / "output" / "us" / f"{n}-{m}-Login.md"
+        p = self.root / "workspace" / "us" / f"{n}-{m}-Login.md"
         p.write_bytes(body.encode("utf-8"))
         return p
 
@@ -221,7 +221,7 @@ class TestE2EPoToValidateReadiness(unittest.TestCase):
         expected = self._write_feat(1)
         # Write US with already-resolved hash but uppercase H in label (simulates typo)
         body = f"# US 1-1-Login\n\nParent FEAT Hash: sha256:{expected}\n\nCovers: AC-1\n"
-        us_path = self.root / "workspace" / "output" / "us" / "1-1-Login.md"
+        us_path = self.root / "workspace" / "us" / "1-1-Login.md"
         us_path.write_bytes(body.encode("utf-8"))
 
         from sdd_scripts.preflight import _check_feat_hash

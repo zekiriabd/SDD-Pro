@@ -1,15 +1,15 @@
 # /sdd-bootstrap — Initialisation d'un projet SDD_Pro (greenfield)
 
 Bootstrap interactif d'un nouveau projet SDD_Pro : génère
-`workspace/input/stack/stack.md` à partir du template, crée le squelette
-`workspace/` (`feats/`, `ui/`, `output/.sys/`, etc.), installe les
+`workspace/stack/stack.md` à partir du template, crée le squelette
+`workspace/` (`feats/`, `ui/`, `.sys/`, etc.), installe les
 dépendances Python du framework, et lance un smoke check final.
 
 **Usage :** `/sdd-bootstrap [--combo c1|c2|custom] [--dry-run] [--skip-install] [--force]`
 
 **Quand l'utiliser** :
 - **Greenfield** : repo cloné depuis GitHub Template SDD_Pro, aucun
-  `workspace/input/stack/stack.md` encore généré.
+  `workspace/stack/stack.md` encore généré.
 - **Re-init** : repo déjà initialisé mais on souhaite repartir de zéro
   (passe `--force` après confirmation).
 
@@ -43,7 +43,7 @@ FIX: cloner le repo depuis GitHub Template SDD_Pro (intact), verifier Python 3.1
 
 ## STEP 2 — Détection état projet
 
-Glob `workspace/input/feats/*.md` et test `workspace/input/stack/stack.md` :
+Glob `workspace/feats/*.md` et test `workspace/stack/stack.md` :
 
 | État | Conditions | Action |
 |---|---|---|
@@ -69,14 +69,14 @@ Glob `workspace/input/feats/*.md` et test `workspace/input/stack/stack.md` :
     --combo c1|c2|custom   skip la question stack (preset)
     --dry-run              affiche actions sans ecrire
     --skip-install         passe pip/npm install (CI)
-    --force                overwrite workspace/input/ existant
+    --force                overwrite workspace/ existant
 
   Apres bootstrap : /feat-generate {Name} puis /sdd-full 1
 ```
 
 **Cas initialisé** :
 ```
-[BOOTSTRAP] Projet deja initialise (workspace/input/stack/stack.md present).
+[BOOTSTRAP] Projet deja initialise (workspace/stack/stack.md present).
 Prochaine etape : /feat-generate {Name}
 Pour repartir de zero : python bootstrap.py --force
 ```
@@ -95,7 +95,7 @@ Lancer : python bootstrap.py --force
 - Cette commande **ne lance jamais** `bootstrap.py` directement (pas de
   `Bash python bootstrap.py`) — il est interactif et nécessite l'input
   terminal de l'utilisateur, pas du sub-agent.
-- Cette commande **ne touche jamais** à `workspace/input/stack/stack.md`
+- Cette commande **ne touche jamais** à `workspace/stack/stack.md`
   ni au reste du `workspace/`. C'est `bootstrap.py` (lancé par
   l'utilisateur depuis son terminal) qui écrit.
 - Read-only stricte côté framework.

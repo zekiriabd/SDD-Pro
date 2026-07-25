@@ -23,8 +23,11 @@ PHASE 5 — Frontend code    (agent dev-frontend sur {n}-1, SANS API Gate)
 PHASE 6 — Verdict POC      (bannière "ne pas déployer en prod")
 ```
 
-**Délégation pure** : aucun agent invoqué directement (chaîne
+**Délégation minimaliste** : `/sdd-poc` invoque **directement 2 agents
+dev-*** (`dev-backend` puis `dev-frontend` sur la pseudo-US `{n}-1`),
+encadrés par des scripts/commandes déterministes (chaîne
 `feat_to_pseudo_us.py` → `/arch-init` → `dev-backend` → `dev-frontend`).
+Cohérent avec son rôle minimaliste : pas d'orchestration auditor/QA.
 
 **Migration POC → standard** : `/us-generate {n} --replace-pseudo` puis
 `/sdd-full {n}` (idempotent : skip arch, augmente, ajoute QA + review).
@@ -42,8 +45,8 @@ PHASE 6 — Verdict POC      (bannière "ne pas déployer en prod")
 Flags combinables. Si tu veux strict prod-ready → `/sdd-full {n}`.
 
 > `/arch-init` est idempotent par construction (skip silencieux si stable).
-> Pour forcer un re-bootstrap, supprimer manuellement `workspace/output/src/`
-> + `workspace/output/db/` puis relancer `/sdd-poc {n}`.
+> Pour forcer un re-bootstrap, supprimer manuellement `workspace/src/`
+> + `workspace/db/` puis relancer `/sdd-poc {n}`.
 
 ---
 
@@ -60,18 +63,18 @@ Stocker `$force`, `$with_plans` (booléens, présence des flags).
 
 ### 2.1 FEAT existence
 
-Glob `workspace/input/feats/{n}-*.md` :
+Glob `workspace/feats/{n}-*.md` :
 - 0 → ERROR `[FEAT_NOT_FOUND]` (créer via `/feat-generate`)
 - > 1 → ERROR `[FEAT_AMBIGUOUS]` (renommer)
 - 1 → OK, stocker `{FeatName}`
 
 ### 2.2 US réelles existantes — guard anti-écrasement (audit M8 closure 2026-06-07)
 
-Avant d'invoquer `feat_to_pseudo_us.py`, détecter si des US **réelles** (générées par `po` via `/us-generate` ou `/sdd-full`) existent déjà sous `workspace/output/us/{n}-*.md`. Distinguer pseudo-US vs réelles par le frontmatter `Status: Pseudo` (ajouté par `feat_to_pseudo_us.py`) :
+Avant d'invoquer `feat_to_pseudo_us.py`, détecter si des US **réelles** (générées par `po` via `/us-generate` ou `/sdd-full`) existent déjà sous `workspace/us/{n}-*.md`. Distinguer pseudo-US vs réelles par le frontmatter `Status: Pseudo` (ajouté par `feat_to_pseudo_us.py`) :
 
 ```bash
-REAL_US=$(grep -L "Status: Pseudo" workspace/output/us/{n}-*.md 2>/dev/null | head -5)
-PSEUDO_US=$(grep -l "Status: Pseudo" workspace/output/us/{n}-*.md 2>/dev/null | head -5)
+REAL_US=$(grep -L "Status: Pseudo" workspace/us/{n}-*.md 2>/dev/null | head -5)
+PSEUDO_US=$(grep -l "Status: Pseudo" workspace/us/{n}-*.md 2>/dev/null | head -5)
 
 if [ -n "$REAL_US" ] && [ "$force" != "true" ]; then
   cat <<EOF >&2
@@ -81,14 +84,14 @@ CAUSE: [POC_OVERWRITE_REAL_US] $REAL_US a été généré par /us-generate (po a
 FIX: 1. Lancer /sdd-full {n} (pipeline complet avec ces US réelles)
      2. OU déplacer/archiver les US réelles puis relancer /sdd-poc
      3. OU passer --force EN CONNAISSANCE DE CAUSE (US réelles archivées
-        en workspace/output/.sys/.archive/us-{TS}/ avant écrasement)
+        en workspace/.sys/.archive/us-{TS}/ avant écrasement)
 EOF
   exit 1
 fi
 
 # Si --force ET REAL_US présents : archiver avant écrasement
 if [ -n "$REAL_US" ] && [ "$force" = "true" ]; then
-  ARCHIVE_DIR="workspace/output/.sys/.archive/us-$(date -u +%Y%m%dT%H%M%S)"
+  ARCHIVE_DIR="workspace/.sys/.archive/us-$(date -u +%Y%m%dT%H%M%S)"
   mkdir -p "$ARCHIVE_DIR"
   echo "$REAL_US" | xargs -I{} mv {} "$ARCHIVE_DIR/"
   echo "[POC/WARN] {n} — $(echo "$REAL_US" | wc -l) US réelles archivées en $ARCHIVE_DIR avant écrasement. (3%)" >&2
@@ -98,6 +101,25 @@ fi
 Symétrie : `feat_to_pseudo_us.py --force` archive maintenant **aussi** côté script (defense-in-depth). Le bloc shell ci-dessus s'exécute **avant** l'invocation script, le script protège **a posteriori**.
 
 Émettre : `[ANALYSIS] FEAT {n}-{FeatName} — pipeline POC démarré. (2%)`
+
+### 2.3 Détection FEAT de migration Flyway (`library-and-stack.md §C.6`)
+
+Si le **basename** de la FEAT matche `(?i)flyway` → poser le sentinel qu'arch
+Phase B consomme (STEP 8.5) et forcer la Phase B DB (pas de skip idempotent) :
+
+```bash
+if printf '%s' "{n}-{FeatName}" | grep -qiE 'flyway'; then
+  mkdir -p workspace/.sys/.state
+  printf 'feat=%s\nrequested_at=%s\n' "{n}-{FeatName}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    > workspace/.sys/.state/flyway-migrate-requested.flag
+  FLYWAY_FEAT=true
+  echo "[ARCH] FEAT de migration Flyway détectée — flyway migrate + re-scaffold forcés. (8%)"
+fi
+```
+
+> arch exécute `flyway migrate` PUIS re-scaffolde (Phase B STEP 8.5), puis
+> consomme le flag. Idempotent (`flyway_schema_history`). Seule dérogation à
+> `[DB_STRUCTURE_CHANGE_FORBIDDEN]`.
 
 ---
 
@@ -136,14 +158,14 @@ Stocker `$us_name`, `$us_id = "{n}-1"`. Émettre :
 **Skip silencieux** si `$with_plans = false`.
 
 Sinon, exécuter `/dev-plan {n}` (mode `:plan`, PLAN_ONLY=true) — produit
-`workspace/output/plans/{n}-1-{us_name}.{back|front}.md` puis STOP avant
+`workspace/plans/{n}-1-{us_name}.{back|front}.md` puis STOP avant
 génération code. **Pas de checkpoint humain** (contrairement à
 `/sdd-full --plan`). Cf. `commands/dev-plan.md` pour le détail.
 
 Les agents dev-* en STEP 6/7 détectent automatiquement les plans
 (cf. `dev-shared-preflight.md §3` mode From Plan).
 
-Émettre : `[PLAN] Plans écrits → workspace/output/plans/. (18%)`
+Émettre : `[PLAN] Plans écrits → workspace/plans/. (18%)`
 
 ---
 
@@ -151,6 +173,12 @@ Les agents dev-* en STEP 6/7 détectent automatiquement les plans
 
 Exécuter intégralement `/arch-init` (idempotent — skip silencieux si
 projets + DB déjà à jour). Détail : `@.claude/commands/arch-init.md`.
+
+> **FEAT Flyway (`$FLYWAY_FEAT = true`)** : le sentinel
+> `flyway-migrate-requested.flag` posé en STEP 2.3 **force la Phase B** d'arch
+> (introspection + `flyway migrate` STEP 8.5 + re-scaffold) même si le bootstrap
+> Phase A est stable — le skip idempotent ne s'applique pas à la Phase B tant
+> que le sentinel est présent. Cf. `library-and-stack.md §C.6`.
 
 Émettre selon résultat :
 - Succès : `[ARCH] Bootstrap projets + DB terminés. (32%)`
@@ -214,7 +242,7 @@ Pour passer en granularité fine :
   2. /sdd-full {n}                       (pipeline standard avec QA + review)
 
 Pour explorer le code :
-  - workspace/output/src/                (backend + frontend générés)
+  - workspace/src/                (backend + frontend générés)
   - /sdd-serve                           (lance backend + frontend + console)
 ```
 
@@ -242,7 +270,9 @@ avec préfixe `[CLASS]` préservé (cf. `error-classification.md §1`).
 
 ## Règles de cette commande
 
-- **Délégation pure** : aucun agent invoqué directement.
+- **Délégation minimaliste** : invoque directement 2 agents dev-*
+  (`dev-backend`, `dev-frontend`) sur la pseudo-US `{n}-1` — pas
+  d'orchestration auditor/QA (rôle minimaliste assumé).
 - **Idempotente** : relancer écrase la pseudo-US (si auto-générée) et
   re-lance dev-* (idempotents par contrat agent).
 - **Pas de Q/R utilisateur** après STEP 1.

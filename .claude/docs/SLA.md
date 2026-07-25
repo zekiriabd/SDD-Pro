@@ -19,15 +19,16 @@ Voir `@.claude/docs/validated-combos.md §1.2` pour la liste détaillée.
 **Tier 2 — Bench-validated runtime (11 combos SLA — sélection au sein du matrix bench 2026-06-05)** :
 - Sélection de 11 combos `bench-validated` parmi les **23 combinaisons** testées au bench du 2026-06-05 (cf. `validated-combos.md §1.3`).
 - Liste exacte : 13 combos `combos.json` (C1, C2 = Tier 1 ci-dessus + 11 combos C3-C13 = Tier 2).
-- Source machine-readable : [`.claude/templates/combos.json`](../templates/combos.json) ; rapport humain : [`workspace/output/qa/bench/BENCH-GLOBAL-REPORT.md`](../../workspace/output/qa/bench/BENCH-GLOBAL-REPORT.md).
+- Source machine-readable : [`.claude/templates/combos.json`](../templates/combos.json) ; rapport humain : [`workspace/.sys/.bench/BENCH-GLOBAL-REPORT.md`](../../workspace/.sys/.bench/BENCH-GLOBAL-REPORT.md).
 - ⚠️ Pour ces 11 combos, le scaffolding `/sdd-full` a été **partiellement manuel** côté mainteneur lors du bench (Gap 1 — `docs/benchmarks/known-gaps.md`). SLO Tier 2 best-effort, pas Tier 1 (cf. §2.2).
 
 ### 1.2 Hors périmètre SLA
 
-- ⚠️ Les **8 stacks 🟡 experimental** (vuetify, ddd, microservice, auth-local,
-  mutation-testing, angular-jasmine, python-pytest, playwright) — community
-  preview, aucun SLA.
-- ⚠️ Le stack **🟡 POC-only `node-react`** — usage interne SDD uniquement.
+- ⚠️ Les **6 stacks 🟡 non-validated** : 5 experimental (`archi/ddd`,
+  `archi/microservice`, `fullstack/aspnet-mvc-razor`, `qa/mutation-testing`,
+  `qa/playwright`) + 1 scaffold-validated (`mobiles/kotlin-android`, APK runtime
+  pending) — community preview, aucun SLA. (cf. split canonique CLAUDE.md §6 : 28 🟢 + 7 🟡.)
+- ⚠️ Le stack **🟡 POC-only `node-react`** — usage interne SDD uniquement (7ᵉ 🟡).
 - ❌ Les combos non listés (run via `SDD_ALLOW_UNTESTED_COMBO=1` bypass).
 
 ---
@@ -89,7 +90,7 @@ Voir `@.claude/docs/validated-combos.md §1.2` pour la liste détaillée.
 
 **Non couvert** :
 - Bugs du code généré (sortie du LLM) — relèvent du Tech Lead client.
-- Performance LLM (latence Anthropic, qualité Opus 4.7) — relève Anthropic.
+- Performance LLM (latence Anthropic, qualité Opus 4.8) — relève Anthropic.
 - Bugs dans les libs externes utilisées par le code généré (EF Core, Spring,
   Prisma, etc.) — relèvent du vendor de la lib.
 - Sécurité applicative au-delà du scan `security-reviewer`.
@@ -103,9 +104,11 @@ Voir `@.claude/docs/validated-combos.md §1.2` pour la liste détaillée.
 
 Cf. `@.claude/docs/VERSIONING.md` (SSoT).
 
-- **v7.x LTS** : support sécurité **12 mois** à partir du tag GA (2026-06-07
-  → 2027-06-07).
-- **v6.10.4 LTS** : conservée jusqu'au **2026-12-31** pour migration douce.
+- **v7.x LTS** : support sécurité **12 mois** à partir du tag GA `v7.0.0`
+  (2026-06-07 → 2027-06-07).
+- **v6.10.x LTS** : conservée jusqu'au **2026-12-31** pour migration douce —
+  tag git réel **`SDD_Prov6_10_5`** (le tag `v6.10.4-LTS` n'a jamais été créé ;
+  correction audit 2026-06-12, cf. `VERSIONING.md`).
 - **PATCH** (v7.0.x) : tous les ~2 semaines (bug fixes).
 - **MINOR** (v7.x) : tous les 2-3 mois (features non-breaking).
 - **MAJOR** (v8) : ≥ 12 mois (breaking changes, MIGRATION.md fourni).

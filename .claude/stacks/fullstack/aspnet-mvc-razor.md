@@ -60,29 +60,29 @@ ASP.NET Core MVC (.NET 10)
 
 ## 1.3 Mapping couche → repertoire
 
-Un seul projet sous `workspace/output/src/{AppName}/`. **Convention single-project — `{BackendName}` et `{LibName}` ne s'appliquent pas**. Arch leve WARNING `[STACK_MALFORMED]` si declares avec valeur non null.
+Un seul projet sous `workspace/src/{AppName}/`. **Convention single-project — `{BackendName}` et `{LibName}` ne s'appliquent pas**. Arch leve WARNING `[STACK_MALFORMED]` si declares avec valeur non null.
 
 | Layer | Path |
 |---|---|
-| Application entry | `workspace/output/src/{AppName}/Program.cs` |
-| Controllers MVC | `workspace/output/src/{AppName}/Controllers/{Domain}Controller.cs` |
-| Controllers DataApi | `workspace/output/src/{AppName}/Controllers/Api/{Domain}DataController.cs` |
-| Service interface | `workspace/output/src/{AppName}/Services/Interfaces/I{Domain}Service.cs` |
-| Service impl | `workspace/output/src/{AppName}/Services/Implementations/{Domain}Service.cs` |
-| ViewModel | `workspace/output/src/{AppName}/Models/{Domain}{Action}ViewModel.cs` |
-| Entity | `workspace/output/src/{AppName}/Data/Entities/{Domain}.cs` |
-| DbContext | `workspace/output/src/{AppName}/Data/AppDbContext.cs` |
-| Mapper (Profile) | `workspace/output/src/{AppName}/Mappers/{Domain}Profile.cs` |
-| Validator | `workspace/output/src/{AppName}/Validators/{Domain}{Action}Validator.cs` |
-| Auth config | `workspace/output/src/{AppName}/Auth/AuthExtensions.cs` |
-| Middleware | `workspace/output/src/{AppName}/Middleware/{Name}Middleware.cs` |
-| Razor View | `workspace/output/src/{AppName}/Views/{Domain}/{Action}.cshtml` |
-| Razor partial | `workspace/output/src/{AppName}/Views/Shared/_{Name}.cshtml` |
-| Layout | `workspace/output/src/{AppName}/Views/Shared/_Layout.cshtml` |
-| ViewImports | `workspace/output/src/{AppName}/Views/_ViewImports.cshtml` |
-| Static wwwroot | `workspace/output/src/{AppName}/wwwroot/` |
-| appsettings | `workspace/output/src/{AppName}/appsettings.json` (peuple par arch depuis stack.md) |
-| Project file | `workspace/output/src/{AppName}/{AppName}.csproj` |
+| Application entry | `workspace/src/{AppName}/Program.cs` |
+| Controllers MVC | `workspace/src/{AppName}/Controllers/{Domain}Controller.cs` |
+| Controllers DataApi | `workspace/src/{AppName}/Controllers/Api/{Domain}DataController.cs` |
+| Service interface | `workspace/src/{AppName}/Services/Interfaces/I{Domain}Service.cs` |
+| Service impl | `workspace/src/{AppName}/Services/Implementations/{Domain}Service.cs` |
+| ViewModel | `workspace/src/{AppName}/Models/{Domain}{Action}ViewModel.cs` |
+| Entity | `workspace/src/{AppName}/Data/Entities/{Domain}.cs` |
+| DbContext | `workspace/src/{AppName}/Data/AppDbContext.cs` |
+| Mapper (Profile) | `workspace/src/{AppName}/Mappers/{Domain}Profile.cs` |
+| Validator | `workspace/src/{AppName}/Validators/{Domain}{Action}Validator.cs` |
+| Auth config | `workspace/src/{AppName}/Auth/AuthExtensions.cs` |
+| Middleware | `workspace/src/{AppName}/Middleware/{Name}Middleware.cs` |
+| Razor View | `workspace/src/{AppName}/Views/{Domain}/{Action}.cshtml` |
+| Razor partial | `workspace/src/{AppName}/Views/Shared/_{Name}.cshtml` |
+| Layout | `workspace/src/{AppName}/Views/Shared/_Layout.cshtml` |
+| ViewImports | `workspace/src/{AppName}/Views/_ViewImports.cshtml` |
+| Static wwwroot | `workspace/src/{AppName}/wwwroot/` |
+| appsettings | `workspace/src/{AppName}/appsettings.json` (peuple par arch depuis stack.md) |
+| Project file | `workspace/src/{AppName}/{AppName}.csproj` |
 
 ## 1.4 Principes non negociables
 
@@ -182,10 +182,10 @@ Les fichiers `dx.light.css` + `dx.all.js` sont servis depuis `wwwroot/lib/devext
 
 ## 2.2 Outils
 
-- **Project file** : `workspace/output/src/{AppName}/{AppName}.csproj`
-- **Build** : `dotnet build workspace/output/src/{AppName}/{AppName}.csproj --nologo` (project-scoped)
-- **Run** : `dotnet run --project workspace/output/src/{AppName}/{AppName}.csproj --urls http://localhost:5099`
-- **Smoke Command** : `dotnet run --project workspace/output/src/{AppName}/{AppName}.csproj --no-build --urls http://localhost:5099 & APP_PID=$!; sleep 5; curl -sf http://localhost:5099/ -o /dev/null; RC=$?; kill $APP_PID 2>/dev/null; wait $APP_PID 2>/dev/null; exit $RC`
+- **Project file** : `workspace/src/{AppName}/{AppName}.csproj`
+- **Build** : `dotnet build workspace/src/{AppName}/{AppName}.csproj --nologo` (project-scoped)
+- **Run** : `dotnet run --project workspace/src/{AppName}/{AppName}.csproj --urls http://localhost:5099`
+- **Smoke Command** : `dotnet run --project workspace/src/{AppName}/{AppName}.csproj --no-build --urls http://localhost:5099 & APP_PID=$!; sleep 5; curl -sf http://localhost:5099/ -o /dev/null; RC=$?; kill $APP_PID 2>/dev/null; wait $APP_PID 2>/dev/null; exit $RC`
 - **Smoke Timeout** : 60s
 - **Preserves identifier syntax** : `\b<id>\b` (mot entier, sensible a la casse)
 - **Lint / Format** : `dotnet format`
@@ -196,17 +196,17 @@ Les fichiers `dx.light.css` + `dx.all.js` sont servis depuis `wwwroot/lib/devext
 ## 2.2.1 Init Commands (executees par l'agent `arch` Phase A si `project_file` absent)
 
 ```bash
-if [ ! -f "workspace/output/src/{AppName}/{AppName}.csproj" ]; then
+if [ ! -f "workspace/src/{AppName}/{AppName}.csproj" ]; then
 
 # STEP 1 — Scaffold du projet ASP.NET Core MVC
 # Note: template `mvc` ASP.NET Core est mature et stable, supporte directement net10.0.
-dotnet new mvc -n {AppName} -o workspace/output/src/{AppName} --framework net10.0 --no-restore --auth None --force
+dotnet new mvc -n {AppName} -o workspace/src/{AppName} --framework net10.0 --no-restore --auth None --force
 
 # STEP 1b — Cleanup template demo files (Home/Privacy controllers + views demo)
 # Suppression via `rm` simples (pas de sed chained — harness Claude Code refuse les
 # commandes destructives composees, cf. blazor-server.md STEP 1b/2/2b/2c).
 # L'agent `arch` execute (1 appel par fichier) :
-#   rm -f workspace/output/src/{AppName}/Views/Home/Privacy.cshtml
+#   rm -f workspace/src/{AppName}/Views/Home/Privacy.cshtml
 #   (Home/Index.cshtml est conserve mais sera remplace par le Layout final.)
 
 fi  # fin garde-fou idempotent
@@ -217,32 +217,32 @@ fi  # fin garde-fou idempotent
 # - Packages a compatibilite validee : pinnes (versions ci-dessous)
 # - Microsoft.Identity.Web : NON PINNE (CVE cycle frequent, capability azure-ad)
 
-dotnet add workspace/output/src/{AppName}/{AppName}.csproj package Microsoft.AspNetCore.Mvc.Razor.RuntimeCompilation --version 10.0.6
-dotnet add workspace/output/src/{AppName}/{AppName}.csproj package Microsoft.EntityFrameworkCore --version 10.0.6
-dotnet add workspace/output/src/{AppName}/{AppName}.csproj package Microsoft.EntityFrameworkCore.SqlServer --version 10.0.6
-dotnet add workspace/output/src/{AppName}/{AppName}.csproj package Microsoft.EntityFrameworkCore.Design --version 10.0.6
-dotnet add workspace/output/src/{AppName}/{AppName}.csproj package Microsoft.EntityFrameworkCore.Tools --version 10.0.6
-dotnet add workspace/output/src/{AppName}/{AppName}.csproj package AutoMapper --version 16.1.1
-dotnet add workspace/output/src/{AppName}/{AppName}.csproj package FluentValidation.AspNetCore --version 11.10.0
-dotnet add workspace/output/src/{AppName}/{AppName}.csproj package Serilog.AspNetCore --version 10.0.0
-dotnet add workspace/output/src/{AppName}/{AppName}.csproj package Serilog.Sinks.Console --version 6.1.1
+dotnet add workspace/src/{AppName}/{AppName}.csproj package Microsoft.AspNetCore.Mvc.Razor.RuntimeCompilation --version 10.0.6
+dotnet add workspace/src/{AppName}/{AppName}.csproj package Microsoft.EntityFrameworkCore --version 10.0.6
+dotnet add workspace/src/{AppName}/{AppName}.csproj package Microsoft.EntityFrameworkCore.SqlServer --version 10.0.6
+dotnet add workspace/src/{AppName}/{AppName}.csproj package Microsoft.EntityFrameworkCore.Design --version 10.0.6
+dotnet add workspace/src/{AppName}/{AppName}.csproj package Microsoft.EntityFrameworkCore.Tools --version 10.0.6
+dotnet add workspace/src/{AppName}/{AppName}.csproj package AutoMapper --version 16.1.1
+dotnet add workspace/src/{AppName}/{AppName}.csproj package FluentValidation.AspNetCore --version 11.10.0
+dotnet add workspace/src/{AppName}/{AppName}.csproj package Serilog.AspNetCore --version 10.0.0
+dotnet add workspace/src/{AppName}/{AppName}.csproj package Serilog.Sinks.Console --version 6.1.1
 
 # DevExtreme — server-side data + HtmlHelpers Razor
-dotnet add workspace/output/src/{AppName}/{AppName}.csproj package DevExtreme.AspNet.Data --version 5.0.0
-dotnet add workspace/output/src/{AppName}/{AppName}.csproj package DevExtreme.AspNet.Mvc --version 25.1.5
+dotnet add workspace/src/{AppName}/{AppName}.csproj package DevExtreme.AspNet.Data --version 5.0.0
+dotnet add workspace/src/{AppName}/{AppName}.csproj package DevExtreme.AspNet.Mvc --version 25.1.5
 
 # STEP 3 — Creer arborescence applicative
-mkdir -p workspace/output/src/{AppName}/Controllers/Api
-mkdir -p workspace/output/src/{AppName}/Services/Interfaces
-mkdir -p workspace/output/src/{AppName}/Services/Implementations
-mkdir -p workspace/output/src/{AppName}/Models
-mkdir -p workspace/output/src/{AppName}/Data/Entities
-mkdir -p workspace/output/src/{AppName}/Mappers
-mkdir -p workspace/output/src/{AppName}/Validators
-mkdir -p workspace/output/src/{AppName}/Auth
-mkdir -p workspace/output/src/{AppName}/Middleware
-mkdir -p workspace/output/src/{AppName}/wwwroot/lib/devextreme/css
-mkdir -p workspace/output/src/{AppName}/wwwroot/lib/devextreme/js
+mkdir -p workspace/src/{AppName}/Controllers/Api
+mkdir -p workspace/src/{AppName}/Services/Interfaces
+mkdir -p workspace/src/{AppName}/Services/Implementations
+mkdir -p workspace/src/{AppName}/Models
+mkdir -p workspace/src/{AppName}/Data/Entities
+mkdir -p workspace/src/{AppName}/Mappers
+mkdir -p workspace/src/{AppName}/Validators
+mkdir -p workspace/src/{AppName}/Auth
+mkdir -p workspace/src/{AppName}/Middleware
+mkdir -p workspace/src/{AppName}/wwwroot/lib/devextreme/css
+mkdir -p workspace/src/{AppName}/wwwroot/lib/devextreme/js
 
 # STEP 4 — Bootstrap _ViewImports.cshtml (enregistrement HtmlHelpers DevExtreme)
 # L'agent `arch` ecrit via Write/Edit (un seul fichier atomique) :
@@ -267,14 +267,14 @@ mkdir -p workspace/output/src/{AppName}/wwwroot/lib/devextreme/js
 #   - app.UseSerilogRequestLogging();
 
 # STEP 6 — Restore + build de verification
-dotnet restore workspace/output/src/{AppName}/{AppName}.csproj
-dotnet build workspace/output/src/{AppName}/{AppName}.csproj --nologo
+dotnet restore workspace/src/{AppName}/{AppName}.csproj
+dotnet build workspace/src/{AppName}/{AppName}.csproj --nologo
 
 # STEP 7 — Audit vulnerabilites NuGet (library-and-stack.md §0)
-vuln_count=$(dotnet list workspace/output/src/{AppName}/{AppName}.csproj package --vulnerable --include-transitive 2>&1 | grep -c '>')
+vuln_count=$(dotnet list workspace/src/{AppName}/{AppName}.csproj package --vulnerable --include-transitive 2>&1 | grep -c '>')
 if [ "$vuln_count" -gt 0 ]; then
   echo "WARN: $vuln_count vulnerable package(s) apres install — voir dotnet list --vulnerable"
-  dotnet list workspace/output/src/{AppName}/{AppName}.csproj package --vulnerable --include-transitive
+  dotnet list workspace/src/{AppName}/{AppName}.csproj package --vulnerable --include-transitive
 fi
 
 # STEP 8 — Provisionner assets DevExtreme client (CDN OU libman OU npm — choix DevOps)
@@ -515,17 +515,17 @@ Ce stack est optimise pour :
 
 | Path | Owner |
 |---|---|
-| `workspace/output/src/{AppName}/Controllers/**` | `dev-backend` |
-| `workspace/output/src/{AppName}/Services/**` | `dev-backend` |
-| `workspace/output/src/{AppName}/Data/**` | `dev-backend` (Entities scaffoldees par arch en Phase B, augment par dev-backend) |
-| `workspace/output/src/{AppName}/Models/**` | `dev-backend` (ViewModels) |
-| `workspace/output/src/{AppName}/Mappers/**` | `dev-backend` |
-| `workspace/output/src/{AppName}/Validators/**` | `dev-backend` |
-| `workspace/output/src/{AppName}/Views/**/*.cshtml` | `dev-frontend` |
-| `workspace/output/src/{AppName}/wwwroot/**` | `dev-frontend` |
-| `workspace/output/src/{AppName}/Program.cs` | `arch` (create) + `dev-backend` (augment) |
-| `workspace/output/src/{AppName}/appsettings.json` | `arch` (create exclusif) |
-| `workspace/output/src/{AppName}/{AppName}.csproj` | `arch` (create) + `dev-backend` (augment deps on-demand) |
+| `workspace/src/{AppName}/Controllers/**` | `dev-backend` |
+| `workspace/src/{AppName}/Services/**` | `dev-backend` |
+| `workspace/src/{AppName}/Data/**` | `dev-backend` (Entities scaffoldees par arch en Phase B, augment par dev-backend) |
+| `workspace/src/{AppName}/Models/**` | `dev-backend` (ViewModels) |
+| `workspace/src/{AppName}/Mappers/**` | `dev-backend` |
+| `workspace/src/{AppName}/Validators/**` | `dev-backend` |
+| `workspace/src/{AppName}/Views/**/*.cshtml` | `dev-frontend` |
+| `workspace/src/{AppName}/wwwroot/**` | `dev-frontend` |
+| `workspace/src/{AppName}/Program.cs` | `arch` (create) + `dev-backend` (augment) |
+| `workspace/src/{AppName}/appsettings.json` | `arch` (create exclusif) |
+| `workspace/src/{AppName}/{AppName}.csproj` | `arch` (create) + `dev-backend` (augment deps on-demand) |
 
 **Cas frontiere — ViewModel passe a la vue** : un Controller MVC dans `dev-backend` cree un ViewModel + appelle `return View(viewModel)`. La vue `Views/{Domain}/{Action}.cshtml` cote `dev-frontend` declare `@model {AppNamespace}.Models.{Domain}{Action}ViewModel` et consomme `@Model.PropName`. **Contrat partage** : nom et type du ViewModel + ses proprietes. Toute modification d'un cote DOIT etre synchronisee (equivalent `[FRONTEND_BACKEND_CONTRACT_GAP]`).
 
@@ -540,7 +540,7 @@ Ce stack est optimise pour :
 ## 12. Smoke test attendu (post-init arch)
 
 ```bash
-cd workspace/output/src/{AppName}
+cd workspace/src/{AppName}
 dotnet build {AppName}.csproj --nologo
 test -f {AppName}.csproj
 test -f Program.cs

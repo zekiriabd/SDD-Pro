@@ -36,7 +36,7 @@ The key innovation : **deterministic Python orchestration** (55 scripts, 0-cost)
 | Post-code reviewers | **5 distinct angles** | 1 | 0 |
 | Anti-derive enforcement | strict (ownership matrix + STOP) | partial | ❌ |
 | Stack catalog | `.libs.json` machine-readable + CVE + LTS check | ❌ | ❌ |
-| Error taxonomy | **174 classes `[CLASS]`** cross-agent | ❌ | ❌ |
+| Error taxonomy | **188 classes `[CLASS]`** cross-agent | ❌ | ❌ |
 | Telemetry | SQLite (cost cap, audit trail, gates) | ❌ | ❌ |
 | Determinism | 55 Python scripts (0 token) | ❌ | ❌ |
 | Idempotence / resume | checkpoint mode | ❌ | ❌ |
@@ -132,8 +132,8 @@ python bootstrap.py --combo c1
 ```
 
 What happens :
-- ✅ `workspace/input/stack/stack.md` generated (43 Project Config keys)
-- ✅ `workspace/output/.sys/` structure created
+- ✅ `workspace/stack/stack.md` generated (43 Project Config keys)
+- ✅ `workspace/.sys/` structure created
 - ✅ Python deps installed (`pip install -e .claude/python[dev]`)
 - ✅ Console deps optionally installed (`workspace/console/`)
 - ✅ Smoke check passes
@@ -144,7 +144,7 @@ After this, your repo is **initialized** but contains no FEAT yet.
 
 ### Step 3 — Edit secrets (1 min)
 
-Open `workspace/input/stack/stack.md` (already opened by bootstrap on most editors) and replace placeholders :
+Open `workspace/stack/stack.md` (already opened by bootstrap on most editors) and replace placeholders :
 
 ```yaml
 ## Active Database
@@ -179,9 +179,9 @@ You'll be asked 3-6 questions :
 - Business rules?
 - Acceptance criteria?
 
-The agent produces `workspace/input/feats/1-Auth.md` with structured sections : `## Functional Needs`, `## Functional Deliverables`, `## Business Rules`, `## Acceptance Criteria`, each with stable IDs `SFD-N`, `FD-N`, `BR-N`, `AC-N`.
+The agent produces `workspace/feats/1-Auth.md` with structured sections : `## Functional Needs`, `## Functional Deliverables`, `## Business Rules`, `## Acceptance Criteria`, each with stable IDs `SFD-N`, `FD-N`, `BR-N`, `AC-N`.
 
-**Optional** : drop a mockup HTML at `workspace/input/ui/1-2-Login.html` for visual fidelity.
+**Optional** : drop a mockup HTML at `workspace/ui/1-2-Login.html` for visual fidelity.
 
 ---
 
@@ -228,11 +228,11 @@ Expected cost : **$15-30 USD** for a typical 2-3 US FEAT on combo C1.
 /sdd-status 1
 
 # Look at the generated code
-ls workspace/output/src/MyAppBack/
-ls workspace/output/src/MyAppFront/
+ls workspace/src/MyAppBack/
+ls workspace/src/MyAppFront/
 
-# See the consolidated review
-cat workspace/output/qa/feat-1/review.md
+# See the consolidated review (rendered on-demand from console.db)
+python .claude/python/sdd_scripts/query_console_db.py review --feat 1 --format md
 ```
 
 ---
@@ -295,7 +295,7 @@ Lines of code generated : **~1000-3000 LOC** (varies by FEAT).
 
 ### "Will SDD_Pro modify my existing code?"
 
-No. SDD_Pro writes **only under `workspace/output/src/`** (its own sandbox). Your existing repo source code is never touched.
+No. SDD_Pro writes **only under `workspace/src/`** (its own sandbox). Your existing repo source code is never touched.
 
 ### "What if my FEAT is too vague?"
 
@@ -319,7 +319,7 @@ This pauses after each major phase, letting you inspect + approve in the web con
 
 ### "Is my data secure?"
 
-- `workspace/input/stack/stack.md` (secrets) is gitignored.
+- `workspace/stack/stack.md` (secrets) is gitignored.
 - `workspace/console/.certs/` (HTTPS keys) is gitignored.
 - No telemetry leaves your machine (SQLite is local).
 - Anthropic API calls follow Claude Code's policy.

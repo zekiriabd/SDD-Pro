@@ -60,7 +60,7 @@ def _seed_feat(conn, feat_n: int, name: str = "test-feat") -> None:
     conn.execute(
         "INSERT OR IGNORE INTO feats(feat_n, name, file_path, "
         "status, ingested_at) VALUES(?,?,?,?,?)",
-        (feat_n, name, f"workspace/input/feats/{feat_n}-{name}.md",
+        (feat_n, name, f"workspace/feats/{feat_n}-{name}.md",
          "Validated", "2026-05-20T00:00:00.000Z"),
     )
 

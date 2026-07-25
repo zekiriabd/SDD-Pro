@@ -19,7 +19,7 @@ l'index.
 
 | Fichier | Description |
 |---|---|
-| `workspace/output/.sys/.context/adrs/INDEX.md` | Index ADRs (rebuild depuis `Glob workspace/output/.sys/.context/adrs/ADR-*.md`) |
+| `workspace/.sys/.context/adrs/INDEX.md` | Index ADRs (rebuild depuis `Glob workspace/.sys/.context/adrs/ADR-*.md`) |
 
 ## Quand l'utiliser
 
@@ -36,14 +36,14 @@ Ou avec arguments explicites :
 
 ```bash
 python .claude/python/sdd_scripts/index_adrs.py \
-  --adrs-dir workspace/output/.sys/.context/adrs \
-  --output workspace/output/.sys/.context/adrs/INDEX.md \
+  --adrs-dir workspace/.sys/.context/adrs \
+  --output workspace/.sys/.context/adrs/INDEX.md \
   --template .claude/templates/adrs-index.template.md
 ```
 
 Le script :
 1. Lit `.claude/templates/adrs-index.template.md`
-2. Glob `workspace/output/.sys/.context/adrs/ADR-*.md`
+2. Glob `workspace/.sys/.context/adrs/ADR-*.md`
 3. Parse pour chaque ADR : filename (timestamp ISO + slug), H1 titre,
    `Status:` body field (défaut `Accepted`), `Phase:` body field
    (heuristique slug si absent)

@@ -5,7 +5,7 @@
   "schemaVersion": 1,
   "buildSystem": "uv",
   "manifest": {
-    "files": ["workspace/output/src/{BackendName}/pyproject.toml"]
+    "files": ["workspace/src/{BackendName}/pyproject.toml"]
   },
   "versions": {
     "pytest": "8.3.4",

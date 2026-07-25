@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import pathlib
 import re
 import sys
 from dataclasses import dataclass, field
@@ -31,6 +32,7 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from sdd_reverse.console_safe import ensure_console_safe
+from sdd_reverse.paths import workspace_root
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
@@ -92,8 +94,15 @@ def check_loader_autonomous() -> CheckResult:
 
 
 def check_inventory_schema_v1() -> CheckResult:
-    """All inventory.json under workspace/old/*/.sys/ MUST be schemaVersion==1 with required keys."""
-    workspace_old = REPO_ROOT / "workspace" / "old"
+    """All inventory.json under workspace/old/*/.sys/ SHOULD be schemaVersion==1 with required keys.
+
+    Severity: WARN, NOT FAIL (audit 2026-06-11 MA-8). The class
+    [REVERSE_INVENTORY_SCHEMA_STALE] is INFO/WARN in rules/reverse-engineering.md §6
+    (a pre-v0.4.0 cache triggers a forced refresh, it is not a hard contract
+    breach). The code is the authority — INVARIANTS.reverse.yml is aligned to
+    WARN, not the other way around (do not harden an untested runtime path).
+    """
+    workspace_old = workspace_root(REPO_ROOT) / "old"
     if not workspace_old.is_dir():
         return CheckResult("reverse-inventory-schema-v1", "OK", "(no workspace/old/ found)")
     violations: list[str] = []
@@ -121,7 +130,7 @@ def check_inventory_schema_v1() -> CheckResult:
 
 def check_db_schema_enrichment_separate() -> CheckResult:
     """Verify db-schema.enrichment.json exists separately when audit ran (no merge directly into base)."""
-    workspace_old = REPO_ROOT / "workspace" / "old"
+    workspace_old = workspace_root(REPO_ROOT) / "old"
     if not workspace_old.is_dir():
         return CheckResult("reverse-db-schema-enrichment-separate", "OK", "(no workspace/old/ found)")
     issues: list[str] = []
@@ -144,19 +153,31 @@ def check_db_schema_enrichment_separate() -> CheckResult:
 
 
 def check_template_isolated() -> CheckResult:
-    """feat.reverse.template.md must exist in sdd_reverse/, not be a symlink to .claude/templates/."""
-    try:
-        from sdd_reverse.paths import feat_reverse_template_path
-        template = feat_reverse_template_path()
-    except FileNotFoundError:
+    """The 3 reverse templates must exist in sdd_reverse/ and not be symlinks.
+
+    Audit 2026-06-11 (B7) : INVARIANTS.reverse.yml étend explicitement ADV-9
+    aux templates 3a/3b (`analysis.reverse.template.md`, `us.reverse.template.md`)
+    mais ce check ne couvrait que `feat.reverse.template.md` — supprimer un des
+    deux autres ne faisait pas FAIL le smoke.
+    """
+    import sdd_reverse
+    base = pathlib.Path(sdd_reverse.__file__).resolve().parent
+    names = (
+        "feat.reverse.template.md",
+        "analysis.reverse.template.md",
+        "us.reverse.template.md",
+    )
+    problems: list[str] = []
+    for name in names:
+        t = base / name
+        if not t.is_file():
+            problems.append(f"{name} missing — ADV-9 violation (no fallback inline allowed)")
+        elif t.is_symlink():
+            problems.append(f"{name} is a symlink — ADV-9 requires a deliberate local copy")
+    if problems:
         return CheckResult(
             "reverse-template-isolated", "FAIL",
-            "feat.reverse.template.md missing — ADV-9 violation (no fallback inline allowed)",
-        )
-    if template.is_symlink():
-        return CheckResult(
-            "reverse-template-isolated", "FAIL",
-            "feat.reverse.template.md is a symlink — ADV-9 requires a deliberate local copy",
+            "; ".join(problems),
         )
     return CheckResult("reverse-template-isolated", "OK")
 
@@ -183,6 +204,24 @@ def check_no_spawn_of_agents() -> CheckResult:
         for line_no, line in enumerate(text.splitlines(), start=1):
             if spawn_re.search(line) and "no-spawn" not in line.lower():
                 violations.append(f"{p.name}:{line_no}: {line.strip()[:80]}")
+    # Audit 2026-06-11 (B8) : le motif littéral `Agent(reverse-` n'apparaît
+    # dans aucune formulation réelle de spawn — check renforcé DÉTERMINISTE :
+    # aucun agent reverse ne doit déclarer le tool `Agent`/`Task` dans son
+    # frontmatter `tools:` (c'est le seul canal de spawn réel du harness).
+    for p in sorted(agents_dir.glob("reverse-*.md")):
+        try:
+            head = p.read_text(encoding="utf-8", errors="replace")[:2000]
+        except OSError:
+            continue
+        for line in head.splitlines():
+            if line.lower().startswith("tools:"):
+                declared = {t.strip().lower() for t in line.split(":", 1)[1].split(",")}
+                forbidden = declared & {"agent", "task"}
+                if forbidden:
+                    violations.append(
+                        f"{p.name}: frontmatter tools declares {sorted(forbidden)} (spawn channel)"
+                    )
+                break
     full_cmd = REPO_ROOT / ".claude" / "commands" / "sdd-reverse-full.md"
     if full_cmd.is_file():
         text = full_cmd.read_text(encoding="utf-8", errors="replace")
@@ -323,8 +362,8 @@ _ITEM_ID_RE = re.compile(r"^\s*-?\s*\*?\*?(SFD|FD|BR|AC)-\d+", re.MULTILINE)
 
 
 def _iter_reverse_feats() -> list[Path]:
-    """Return FEAT files under workspace/input/feats/ that look reverse-generated."""
-    feats_dir = REPO_ROOT / "workspace" / "input" / "feats"
+    """Return FEAT files under workspace/feats/ that look reverse-generated."""
+    feats_dir = workspace_root(REPO_ROOT) / "feats"
     if not feats_dir.is_dir():
         return []
     out: list[Path] = []
@@ -500,7 +539,7 @@ def check_validator_parity_drift() -> CheckResult:
 
 def check_lock_format() -> CheckResult:
     """If .alloc.lock exists, validate its JSON shape (informational)."""
-    lock = REPO_ROOT / "workspace" / "input" / "feats" / ".alloc.lock"
+    lock = workspace_root(REPO_ROOT) / "feats" / ".alloc.lock"
     if not lock.is_file():
         return CheckResult("reverse-lock-format-valid", "OK", "(no active lock)")
     try:
@@ -520,23 +559,35 @@ def check_lock_format() -> CheckResult:
     return CheckResult("reverse-lock-format-valid", "OK")
 
 
+# Smoke check registry — 13 deterministic checks (audit 2026-06-11 MA-8 :
+# the doc/manifest historically said "11" but the registry has grown to 13
+# after the P1.6 closure added 4 direct-enforcement checks while one was
+# folded in elsewhere). The authoritative count is `len(_ALL_CHECKS)` ; the
+# anti-rot test `tests/test_reverse_smoke_selfcheck.py` pins it to 13 and
+# cross-maps every INVARIANTS.reverse.yml id to a check here.
+_EXPECTED_CHECK_COUNT = 13
 _ALL_CHECKS = [
-    check_isolation_no_cross_imports,
-    check_loader_autonomous,
-    check_inventory_schema_v1,
-    check_db_schema_enrichment_separate,
-    check_template_isolated,
-    check_no_spawn_of_agents,
-    check_no_dangling_spawn,
-    check_helper_parity_drift,
-    check_lock_format,
+    check_isolation_no_cross_imports,       # reverse-isolation-no-cross-imports
+    check_loader_autonomous,                # reverse-loader-autonomous
+    check_inventory_schema_v1,              # reverse-inventory-schema-v1 (WARN — see check)
+    check_db_schema_enrichment_separate,    # reverse-db-schema-enrichment-separate
+    check_template_isolated,                # reverse-template-isolated
+    check_no_spawn_of_agents,               # reverse-no-spawn-of-agents
+    check_no_dangling_spawn,                # reverse-no-dead-code
+    check_helper_parity_drift,              # helper-parity-drift (drift_check)
+    check_lock_format,                      # reverse-lock-format-valid
     # P1.6 closure (2026-06-10) — direct enforcement of invariants
     # previously delegated to validate_reverse_feat.py
-    check_reverse_evidence_required,
-    check_reverse_confidence_enum_strict,
-    check_reverse_gate_comment_sync,
-    check_validator_parity_drift,
+    check_reverse_evidence_required,        # reverse-evidence-required
+    check_reverse_confidence_enum_strict,   # reverse-confidence-enum-strict
+    check_reverse_gate_comment_sync,        # reverse-gate-comment-sync
+    check_validator_parity_drift,           # validator-parity-drift (drift_check)
 ]
+assert len(_ALL_CHECKS) == _EXPECTED_CHECK_COUNT, (
+    f"reverse_smoke registry drift: {len(_ALL_CHECKS)} checks "
+    f"!= expected {_EXPECTED_CHECK_COUNT} (update _EXPECTED_CHECK_COUNT "
+    "and tests/test_reverse_smoke_selfcheck.py together)"
+)
 
 
 def main(argv: list[str] | None = None) -> int:

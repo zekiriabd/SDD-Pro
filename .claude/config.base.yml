@@ -4,7 +4,7 @@
 # This file is the **base layer** of the 3-level config hierarchy:
 #   1. .claude/config.base.yml          (this file — framework defaults)
 #   2. ~/.sdd/config.team.yml           (org/team policy, override)
-#   3. workspace/input/stack/stack.md   (per-project ## Project Config, final override)
+#   3. workspace/stack/stack.md   (per-project ## Project Config, final override)
 #
 # Behavior: each layer merges into the next (project > team > base).
 # Deep-merge semantics: scalars replaced, lists replaced (no concat).
@@ -188,7 +188,7 @@ TokenUsageMode: "record"
 # emitted by sdd_state.py at /sdd-full start.
 MaxCostPerRun: 50.00          # USD ; 0 = disabled
 
-# Max simultaneous Opus 4.7 invocations (dev-backend + dev-frontend × parallel).
+# Max simultaneous Opus 4.8 invocations (dev-backend + dev-frontend × parallel).
 # Default MaxParallel=3 → up to 6 Opus calls in flight at peak. Setting this
 # to 6 cap protects against accidental --max-parallel 6 burst (~$30 instant)
 # while still allowing 3-US fullstack standard runs. Hard ceiling 12.
@@ -216,7 +216,7 @@ BuildLoopMaxCostUsd: 15.00
 # --- Build loop adaptive fallback (v7.0.0-alpha audit M4, 2026-06-06) ---
 # Quand un build_loop dev-backend / dev-frontend a déjà consommé
 # BuildLoopMaxCostUsd * 0.5 ET qu'il reste UNE seule itération autorisée,
-# le runtime peut downgrade Opus 4.7 → Sonnet 4.6 pour la dernière tentative.
+# le runtime peut downgrade Opus 4.8 → Sonnet 4.6 pour la dernière tentative.
 # Justification : 2 retries Opus identiques convergent rarement sur la 3ᵉ ;
 # un changement de modèle apporte une perspective différente pour ~5× moins
 # cher. Sentinel file utilisé par /dev-run pour re-spawn avec --fallback-model.

@@ -12,11 +12,11 @@ Coverage:
 - Persistance entre invocations (round-trip)
 
 v6.10 BREAKING : plus de fichiers run-*.json ni events.jsonl — tout
-vit dans `workspace/output/db/console.db` (SQLite, WAL).
+vit dans `workspace/db/console.db` (SQLite, WAL).
 
 Stratégie : repo_root() détecte `.claude/` en remontant depuis CWD.
 On crée un fake repo (avec `.claude/` factice) et lance le script avec
-`cwd=fake_repo` → la DB atterrit dans `fake_repo/workspace/output/db/console.db`.
+`cwd=fake_repo` → la DB atterrit dans `fake_repo/workspace/db/console.db`.
 """
 from __future__ import annotations
 
@@ -40,7 +40,7 @@ def _run(args: list[str], cwd: Path) -> subprocess.CompletedProcess:
     v7.0.1 fix : pass SDD_REPO_ROOT=cwd explicitly to the subprocess. Without
     this, repo_root() falls back to CWD walk and finds the REAL repo above
     %TEMP% (Windows : %TEMP% is under C:\\Users\\…\\AppData), polluting the
-    real workspace/output/db/console.db with test data. Combined with the
+    real workspace/db/console.db with test data. Combined with the
     paths.py fix (honor override unconditionally), this gives proper test
     isolation.
     """
@@ -65,7 +65,7 @@ class TestSddState(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
         self.fake = Path(self.tmp.name)
         _setup_fake_repo(self.fake)
-        self.db_path = self.fake / "workspace" / "output" / "db" / "console.db"
+        self.db_path = self.fake / "workspace" / "db" / "console.db"
 
     def tearDown(self) -> None:
         self.tmp.cleanup()

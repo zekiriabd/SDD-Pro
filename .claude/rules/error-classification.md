@@ -11,17 +11,18 @@ dans `library-and-stack.md`, `ownership.md`, `quality.md`
 et inlinés dans les agents (po, dev-*, qa).
 
 > **Note granularité (Sprint 2.4 audit 2026-06-07 ; recount CTO audit
-> 2026-06-07 ; clarification méthodologique audit consolidé 2026-06-07)** : **174 classes** recensées dans ce fichier (172 actives + 2 dépréciées).
+> 2026-06-07 ; clarification méthodologique audit consolidé 2026-06-07 ;
+réciprocité émetteurs↔taxonomie audit 2026-06-12 ; ajout `[DB_STRUCTURE_CHANGE_FORBIDDEN]` audit 2026-06-13)** : **189 classes** recensées dans ce fichier (187 actives + 2 dépréciées).
 >
 > **Source de vérité** : somme déterministe de la colonne "Classes" du
-> quick-ref §0 ci-dessous (`8+25+13+5+7+3+10+3+11+12+23+16+9+22+6+1 = 174`).
+> quick-ref §0 ci-dessous (`9+27+14+5+7+3+11+3+11+12+23+16+9+32+6+1 = 189`).
 > Ce nombre est utilisé dans toute communication commerciale (CLAUDE.md,
 > WHY-SDD-PRO.md, getting-started.md, README.md) et enforcé par le test
 > `tests/test_error_classification_count.py` (gate CI : tout drift entre
 > intro et somme = FAIL).
 >
 > **Méthodologie de comptage** :
-> - Le chiffre 174 compte les **familles déclarées** par section §1.X
+> - Le chiffre 189 compte les **familles déclarées** par section §1.X
 >   (chaque entrée de quick-ref agrège plusieurs préfixes apparentés
 >   sous une étiquette canonique).
 > - Un `grep -oE '\[[A-Z_]+\]'` unique sur ce fichier retourne ~152
@@ -30,8 +31,8 @@ et inlinés dans les agents (po, dev-*, qa).
 >   `_NO_FRONTMATTER`, etc. — cf. §1.2 fusion 2026-06-07).
 > - L'annexe `error-classification-legacy.md` ajoute 27 préfixes
 >   héritage (11 `[A11Y_*]` + 16 `[PERF_*]`), réactivés via ingest CI
->   v7.2.0 (`ingest_axe.py`, `ingest_lighthouse.py`). Ces 27 préfixes
->   **ne sont pas comptés** dans le 174 du fichier principal — ils
+>   v7.0.0 (ingest CI 2026-05-24 pré-GA — `ingest_axe.py`, `ingest_lighthouse.py`). Ces 27 préfixes
+>   **ne sont pas comptés** dans le 189 du fichier principal — ils
 >   sont émis par des scripts d'ingest CI, pas par des agents SDD_Pro.
 > - Le test `tests/test_error_classification_count.py` enforce
 >   l'alignement intro ↔ quick-ref §0 ↔ titre `## 0`.
@@ -58,24 +59,24 @@ et inlinés dans les agents (po, dev-*, qa).
 
 ---
 
-## 0. Quick reference — 16 familles (174 classes)
+## 0. Quick reference — 16 familles (189 classes)
 
 | # | Famille | Classes | Émetteur principal | Comportement build_loop |
 |---|---|---:|---|---|
-| §1.1 | **Runtime** (`[NETWORK]`/`[AUTH]`/`[PERMISSION]`/`[NOT_FOUND]`/`[TIMEOUT]`/`[DISK]`/`[ENV_*]`) | 8 | tous | STOP |
-| §1.2 | **Pipeline** (`[STACK_MALFORMED]`/`[FEAT_*]`/`[PLAN_*]`/`[READINESS_*]`/`[INVALID_*]`/...) | 25 | po, arch, validate_plan.py | STOP |
-| §1.3 | **Contrat ownership** (`[PRESERVES_VIOLATED]`/`[ADDS_VIOLATED]`/`[LAYER_VIOLATION]`/`[FILE_*]`/`[US_*]`) | 13 | dev-*, set_us_status.py | STOP |
+| §1.1 | **Runtime** (`[NETWORK]`/`[AUTH]`/`[PERMISSION]`/`[NOT_FOUND]`/`[TIMEOUT]`/`[DISK]`/`[ENV_*]`/`[INFRA_BLOCKED]`) | 9 | tous | STOP |
+| §1.2 | **Pipeline** (`[STACK_MALFORMED]`/`[FEAT_*]`/`[PLAN_*]`/`[READINESS_*]`/`[INVALID_*]`/`[POC_*]`/`[PO_HASH_*]`/...) | 27 | po, arch, validate_plan.py | STOP |
+| §1.3 | **Contrat ownership** (`[PRESERVES_VIOLATED]`/`[ADDS_VIOLATED]`/`[LAYER_VIOLATION]`/`[FILE_*]`/`[US_*]`/`[DB_STRUCTURE_CHANGE_FORBIDDEN]`) | 14 | dev-*, arch, set_us_status.py | STOP |
 | §1.4 | **Build** (`[BUILD_*]`/`[DEP_MISSING]`/`[CIRCULAR_DEP]`) | 5 | dev-* | **ITÈRE** sur `[BUILD_CORRECTIBLE]` uniquement |
 | §1.5 | **Anti-derive** (`[DERIVE_VIOLATION]`/`[STACK_LIBRARY_*]`/`[REFACTOR_HORS_SCOPE]`/...) | 7 | dev-* | STOP |
 | §1.6 | **UI fidelity** (`[UI_FIDELITY_GAP]`/`[UI_TOKEN_VIOLATION]`/`[FRONTEND_BACKEND_CONTRACT_GAP]`) | 3 | dev-frontend | STOP/retry |
-| §1.7 | **QA** (`[QA_TEST_FAILED]`/`[QA_COVERAGE_GAP]`/`[QA_OWNERSHIP_*]`/`[ACCEPTANCE_GATE_FAILED]`/...) | 10 | qa | STOP (RED bloquant) |
+| §1.7 | **QA** (`[QA_TEST_FAILED]`/`[QA_COVERAGE_GAP]`/`[QA_OWNERSHIP_*]`/`[ACCEPTANCE_GATE_FAILED]`/`[ACCEPTANCE_REPORT_MISSING]`/...) | 11 | qa | STOP (RED bloquant) |
 | §1.8 | **Parallélisme** (`[LIBNAME_LOCK_HELD]`/`[LOCK_HELD]`/`[LIBNAME_SIGNATURE_CONFLICT]`) | 3 | dev-* | STOP |
 | §1.9 | **A11Y** (`[A11Y_*]`) — héritage, réactivé via `ingest_axe.py` | 11 | CI ingest (Lighthouse/axe) | report only |
 | §1.10 | **Code Review** (`[REVIEW_*]`) — `code-reviewer` agent | 12 | code-reviewer | report only (verdict 🟢/🟡/🔴) |
 | §1.11 | **Security** (`[SEC_*]`) — OWASP Top 10 2021 | 23 | security-reviewer | report only + 8 hard-blocking |
 | §1.12 | **Perf** (`[PERF_*]`) — héritage, réactivé via `ingest_lighthouse.py` | 16 | CI ingest | report only |
 | §1.13 | **Spec Compliance** (`[SPEC_*]`) — AC-by-AC verification | 9 | spec-compliance-reviewer | report only |
-| §1.14 | **Tooling/Governance** (`[SCAN_*]`/`[DISCOVER_*]`/`[CHECKPOINT_*]`/`[CONFIG_*]`/`[PROFILE_*]`/`[DRIFT_*]`/`[ARCH_*]`/`[REVIEW_*]`) | 22 | scripts mono-shot | mostly info, 2 bloquantes |
+| §1.14 | **Tooling/Governance** (`[SCAN_*]`/`[DISCOVER_*]`/`[CHECKPOINT_*]`/`[CONFIG_*]`/`[PROFILE_*]`/`[DRIFT_*]`/`[ARCH_*]`/`[REVIEW_*]`/`[STACK_COMBO_*]`/`[FRAMEWORK_PROTECTED]`/`[ENV_BYPASS_BLOCKED]`/hooks préflight) | 32 | scripts mono-shot + hooks | mostly info, qq. bloquantes |
 | §1.15 | **Adversarial** (`[ADV_*]`) — opt-in `/sdd-review --adversarial` | 6 | adversarial-reviewer | informational |
 | §1.16 | **Inconnue** (`[UNKNOWN]`) | 1 | fallback | report only |
 
@@ -99,6 +100,7 @@ le tableau d'actions par famille.
 | `[DISK]` | No space left, disk full, FS error | File write |
 | `[ENV_MISSING]` | Env var requise absente | DB env vars, secrets |
 | `[ENV_PROPAGATION_FAILED]` | Env vars shell parent invisibles dans sub-agent Bash | arch Phase B via tool `Agent` |
+| `[INFRA_BLOCKED]` | Échec d'infrastructure générique (test runner absent, env de test cassé, disk, sentinel illisible) — distinct d'une régression code : « je n'ai pas pu exécuter », pas « le code est cassé ». Émis transversalement (`complexity_router.py`, `protect_framework.py`, `validate_acceptance.py`, `resolve_us_hash_sentinel.py`, `/sdd-bootstrap`). | tous (mono-shot) |
 
 > **Post-mortem `[ENV_PROPAGATION_FAILED]` (2026-05-11)** : sub-agent
 > Bash peut ne pas hériter des env vars du shell parent. Stratégies de
@@ -116,8 +118,8 @@ le tableau d'actions par famille.
 | `[STACK_MALFORMED]` | `stack.md` invalide, section manquante | arch STEP 1 |
 | `[SCHEMA_MISMATCH]` | Table/colonne absente de `schema.json` | dev-backend STEP 4.5 |
 | `[FEAT_REJECTED]` | FEAT ne respecte pas le format | po STEP 2 |
-| `[FEAT_NOT_FOUND]` | Aucun fichier `workspace/input/feats/{n}-*.md` matché | feat-validate, sdd-full STEP 1 |
-| `[FEAT_AMBIGUOUS]` | Plusieurs fichiers `workspace/input/feats/{n}-*.md` matchent | feat-validate, sdd-full STEP 1 |
+| `[FEAT_NOT_FOUND]` | Aucun fichier `workspace/feats/{n}-*.md` matché | feat-validate, sdd-full STEP 1 |
+| `[FEAT_AMBIGUOUS]` | Plusieurs fichiers `workspace/feats/{n}-*.md` matchent | feat-validate, sdd-full STEP 1 |
 | `[GRANULARITY_VIOLATION]` | > 6 US, anti-pattern détecté | po STEP 5/7 |
 | `[TRACEABILITY_GAP]` | SFD/AC/BR/FD non couvert par une US | po STEP 6 |
 | `[READINESS_NO_GO]` | `/feat-validate` NO-GO sans `--force` | feat-validate |
@@ -128,7 +130,7 @@ le tableau d'actions par famille.
 | `[FEAT_HASH_MISMATCH]` | Hash sha256 de la FEAT parente diffère de celui inscrit dans une US (`Parent FEAT hash: sha256:...`). FEAT modifiée après génération US → `Covers:` potentiellement obsolète. Fix : re-run `/us-generate {n}` (idempotent). | dev-*, validate_readiness, auditors (v7.0.0 audit §6 P1-11) |
 | `[ELICITOR_GAP]` | FEAT contient sections élicitor (FAIL-N, EDGE-N, Red Team) mais ≥ 1 item n'est mappé sur aucune AC d'aucune US. WARN par défaut (`ElicitorGapMode: warn`), `strict` = NO-GO. | po STEP 4 (v7.0.0 audit §6.11 — boucle elicitor) |
 | `[PHASE_PLAN_INIT_FAILED]` | `/dev-run` standalone : `phase_planner.py` exit ≠ 0 (FEAT inexistante / Project Config malformé). Bloquant STEP 5.5.1 — sans `$PHASE_PLAN`, STEP 6.4 (auditor batch) ne peut décider quels reviewers spawner. | dev-run STEP 5.5.1 (v7.0.0 audit P2) |
-| `[PLAN_NOT_FOUND]` | Plan attendu absent (Glob 0 match dans `workspace/output/plans/`) | validate_plan.py |
+| `[PLAN_NOT_FOUND]` | Plan attendu absent (Glob 0 match dans `workspace/plans/`) | validate_plan.py |
 | `[PLAN_INVALID]` | Plan structurellement invalide. **Englobe 7 sous-cas** (v7.0.0-alpha Sprint 2.4 — fusion documentaire 2026-06-07) : `_UNREADABLE` I/O error, `_NO_FRONTMATTER` YAML missing, `_FRONTMATTER_INVALID` field type/value, `_MISSING_REQUIRED_FIELD` `us`/`family` absent, `_FILES_SECTION_MISSING` `## Files` empty, `_FILE_ENTRY_INVALID` path/operation/layer missing, `_AUGMENT_CONTRACT_MISSING` augment sans preserves/adds. Le message ERROR détaillera le sous-cas. | validate_plan.py |
 | `[PLAN_AC_COVERAGE_GAP]` | ACs de l'US absents de `## ACs Coverage Summary` du plan | validate_plan.py (strict) |
 | `[PLAN_STALE]` | us-hash mismatch — US modifiée post-plan, re-`/dev-plan` requis | validate_plan.py (strict) → STOP |
@@ -139,6 +141,8 @@ le tableau d'actions par famille.
 | `[PROJECT_NOT_INIT]` | Fichier projet absent (`.csproj`/`package.json`/`pyproject.toml`/`build.gradle.kts`/`angular.json`) — arch n'a pas tourné | preflight.py B4, dev-*-strict STEP 4 |
 | `[PLAN_REVIEW_GATE_SKIPPED]` | Plan-then-review gate bypassé (WARN informationnel) | sdd-full STEP 3.6 |
 | `[STACK_SCAFFOLDING_MISSING]` | Arch n'a pas scaffoldé les entities attendues (DB→entities cohérence cassée) | arch Phase B, dev-backend STEP 4.5 |
+| `[POC_OVERWRITE_REAL_US]` | `/sdd-poc` refuse d'écraser des US réelles pré-existantes par des pseudo-US POC (garde anti-perte) | sdd-poc.md STEP US |
+| `[PO_HASH_PLACEHOLDER]` | Placeholder `Parent FEAT hash: sha256:PENDING` non résolu dans une US après génération (sentinel à résoudre par `resolve_po_hash_sentinel`/`resolve_us_hash_sentinel`) | po.md, us-generate.md, hook `SubagentStop` matcher=po |
 
 ### 1.3 Contrat (preserves/adds, layers, ownership)
 
@@ -153,11 +157,12 @@ le tableau d'actions par famille.
 | `[US_STATUS_INVALID]` | Valeur de status hors 7 valides v6.8 (`Draft\|Ready\|InProgress\|Review\|Done\|Deferred\|Cancelled`) | `set_us_status.py` |
 | `[US_STATUS_TRANSITION_INVALID]` | Transition rejetée par le graphe ou sortie d'état terminal sans `--force` | `set_us_status.py` |
 | `[US_STATUS_PARSE_ERROR]` | Ligne `Status: {value}` absente/illisible du frontmatter US | `set_us_status.py` |
-| `[US_NOT_FOUND]` | Aucun fichier `workspace/output/us/{n}-{m}-*.md` matché (ou ambigu) | `set_us_status.py`, `validate_us_deps.py` et futurs scripts US |
+| `[US_NOT_FOUND]` | Aucun fichier `workspace/us/{n}-{m}-*.md` matché (ou ambigu) | `set_us_status.py`, `validate_us_deps.py` et futurs scripts US |
 | `[US_DEPS_CYCLE]` | Cycle détecté dans le graphe `## Dependencies` (Tarjan SCC ≥ 2) — bloquant | `validate_us_deps.py` exit 3 |
 | `[US_DEPS_MISSING]` | Référence `## Dependencies` vers une US inexistante dans le scope FEAT/repo — bloquant | `validate_us_deps.py` exit 4 |
 | `[US_DEPS_ORPHAN]` | US sans dépendant (no incoming edge) — informational (peut être death-code) | `validate_us_deps.py` (exit 0) |
 | `[BREAKING_CLEANUP_FAILED]` | `mark_breaking_resolved.py` exit 3 (erreur fichier CLAUDE.md) | dev-* STEP 8.5 / 11.5 |
+| `[DB_STRUCTURE_CHANGE_FORBIDDEN]` | Tentative (par un agent) de **modifier la structure d'une base de données existante** : DDL `DROP`/`ALTER`/`TRUNCATE`/`CREATE TABLE` sur base déjà provisionnée, `DELETE` de masse (sans `WHERE` ciblé), application de migration (`dotnet ef database update`, `Migrate()`, `EnsureCreated()` au runtime contre une base existante), ou tout SQL destructif. **STOP + escalade Tech Lead humain** — l'agent émet le DDL souhaité dans `workspace/db/migration-pending.sql` (jamais exécuté) et s'arrête. La création du **schéma initial d'un projet greenfield** (base neuve vide) reste permise via le scaffolding Database-First READ-ONLY d'arch ; ce qui est interdit, c'est de toucher la **structure d'une base existante**. DML classique (`SELECT`/`INSERT`/`UPDATE`) autorisé. **Exception unique (2026-06-30)** : une FEAT dont le nom de fichier contient « Flyway » autorise `flyway migrate` orchestré par `/sdd-full`/`/sdd-poc` (mécanisme de migration sanctionné, idempotent via `flyway_schema_history`) — cf. `library-and-stack.md §C.6`. Échec runner Flyway → `[INFRA_BLOCKED]` ; échec migrate → `[SCHEMA_MISMATCH]`. Cf. `library-and-stack.md §C`. | arch (Phase B), dev-* (migrations / code de démarrage) |
 
 ### 1.4 Build (compile / lint / type) — pilote `build_loop`
 
@@ -210,6 +215,7 @@ convergence.
 | `[QA_OWNERSHIP_VIOLATION]` | dev-* écrit test OU qa écrit code prod | dev-*, qa |
 | `[API_GATE_RED]` | API Gate (cf. `build-and-loop.md §A`) RED, frontend bloqué | dev-run phase 4c |
 | `[ACCEPTANCE_GATE_FAILED]` | Acceptance Gate (`validate_acceptance.py`) fail en mode `strict` (`test`/`lint`/`build`/`coverage`/`smoke`/`E2E` KO). Bypass : `SDD_ALLOW_ACCEPTANCE_BYPASS=1`. Cf. `quality.md §C`. | qa STEP 9.bis + hook `SubagentStop` matcher=qa |
+| `[ACCEPTANCE_REPORT_MISSING]` | Hook acceptance gate (`validate_acceptance_gate.py`) ne trouve pas le rapport attendu produit par l'agent qa (gate ne peut pas statuer) | hook `SubagentStop` matcher=qa |
 
 Priorité d'émission : `[QA_TEST_FAILED] > [QA_COVERAGE_GAP]` ;
 `[API_GATE_RED] > tout autre QA_*`.
@@ -222,14 +228,14 @@ Priorité d'émission : `[QA_TEST_FAILED] > [QA_COVERAGE_GAP]` ;
 | `[LIBNAME_SIGNATURE_CONFLICT]` | DTO/Model partagé, signatures divergentes |
 | `[LOCK_HELD]` | Lock générique cross-language (sdd_lib/file_locks.py) — `workspace/console/.status.lock`, etc. Alias générique de `[LIBNAME_LOCK_HELD]` pour contextes non-LibName |
 
-### 1.9 A11Y — agent retiré v7.0.0, classes réactivées via ingest CI v7.2.0
+### 1.9 A11Y — agent LLM retiré v7.0.0, classes réactivées via ingest CI (2026-05-24, inclus dans v7.0.0 GA)
 
 Classes `[A11Y_*]` (11 préfixes canoniques, WCAG 2.2 + fallback
 `A11Y_RULE_*` pour les règles axe-core non mappées). Émises par
 `accessibility-auditor` (LLM) v6.3.0-v6.10, **agent retiré v7.0.0**
 (`governance-major-auditors-trim`).
 
-**Réactivation v7.2.0 (Option B — ingest déterministe)** :
+**Réactivation Option B — ingest déterministe (2026-05-24, v7.0.0)** :
 `sdd_scripts/ingest_axe.py` consomme le JSON produit par axe-core CLI
 au CI du projet généré (`.github/workflows/quality.yml`), mappe chaque
 violation vers un préfixe `[A11Y_*]` via `AXE_RULE_MAP`, calcule le
@@ -339,13 +345,13 @@ existe — évite double-rapport sur les mêmes file+line.
 Chaque threat porte une catégorie STRIDE (`Spoofing`/`Tampering`/
 `Repudiation`/`InfoDisclosure`/`DoS`/`Elevation`) + control recommandé.
 
-### 1.12 Performance — agent retiré v7.0.0, classes réactivées via ingest CI v7.2.0
+### 1.12 Performance — agent LLM retiré v7.0.0, classes réactivées via ingest CI (2026-05-24, inclus dans v7.0.0 GA)
 
 Classes `[PERF_*]` (16 préfixes, Core Web Vitals + SLO API) émises par
 `performance-auditor` (LLM) v6.4.0-v6.10, **agent retiré v7.0.0**
 (`governance-major-auditors-trim`).
 
-**Réactivation v7.2.0 (Option B — ingest déterministe)** :
+**Réactivation Option B — ingest déterministe (2026-05-24, v7.0.0)** :
 `sdd_scripts/ingest_lighthouse.py` consomme la sortie de Lighthouse
 CI (`.lighthouseci/lhr-*.json`) au CI du projet généré, sélectionne
 la run médiane (recommandation lhci), compare les Core Web Vitals
@@ -355,7 +361,7 @@ défauts depuis legacy §2), émet les `[PERF_*]` matchants et persiste
 dans `qa_performance` + `auditor_runs(auditor='perf')`. **Pas de
 coût LLM**. Préfixes SLO API backend (`[PERF_TTFB_*]`, `[PERF_API_P95_*]`,
 `[PERF_DB_QUERY_*]`) restent disponibles pour un ingest wrk/k6 futur
-(out-of-scope v7.2.0, schéma `qa_performance.metric` déjà en place).
+(out-of-scope v7.0.0 — ingest wrk/k6 en roadmap, schéma `qa_performance.metric` déjà en place).
 
 Le schéma complet (16 préfixes × métrique × seuil × sévérité) reste
 dans `@.claude/rules/error-classification-legacy.md §2` (source de
@@ -456,10 +462,29 @@ Substance : `agents/arch-reviewer.md §5`.
 | `[REVIEW_VERDICT_RED]` | Verdict consolidé RED post-agrégation | OUI (exit 1) |
 | `[REVIEW_DB_UNREACHABLE]` | `console.db` introuvable / non-lisible | OUI (exit 2) |
 | `[REVIEW_SCAN_FAILED]` | `quality_scan.py` re-run échoué | WARN (continue sur DB stale) |
+| `[REVIEW_SOURCES_MISSING]` | Sources de review absentes (code matérialisé / rapports auditors introuvables au démarrage de `/sdd-review`) | WARN |
+
+**Hooks préflight & gates runtime** (PreToolUse/SubagentStop — déclarés ici
+pour la réciprocité émetteurs↔taxonomie, audit 2026-06-12) :
+
+| Préfixe | Sens | Bloquant |
+|---|---|:---:|
+| `[STACK_COMBO_INVALID]` | Combo stack (back+front+ui+auth) invalide | OUI (`validate_stack_combo.py` exit 3, hook `preflight_stack_combo`) |
+| `[STACK_COMBO_UNTESTED]` | Combo non testé sans `SDD_ALLOW_UNTESTED_COMBO=1` | OUI (hook `preflight_stack_combo`) |
+| `[STACK_MULTI_INCOHERENT]` | Stacks multiples incohérents détectés post-write | WARN (`validate_stack_consistency.py`) |
+| `[FRAMEWORK_PROTECTED]` | Tentative d'écriture sur un fichier framework protégé (`.claude/**`) | OUI (hook `protect_framework`) |
+| `[ENV_BYPASS_BLOCKED]` | Tentative de bypass d'une protection via env var interdite | OUI (hook `block_env_bypass`) |
+| `[GLOB_SCOPE_TOO_BROAD]` | Glob non borné (token explosion) | WARN (strict via `SDD_GLOB_SCOPE_STRICT=1`, hook `preflight_glob_scope`) |
+| `[TELEMETRY_UNAVAILABLE]` | `console.db` télémétrie indisponible au precheck coût | info, fail-open (hook `preflight_cost_cap`) |
+| `[AGENT_REMOVED_V7]` | Spawn d'un agent retiré en v7.0.0 (a11y/perf/dashboard/*-strict) | OUI (hook `preflight_agent_budget`) |
+| `[BUDGET_PRECHECK_TIMEOUT]` | Timeout du precheck budget agent | info, fail-open (hook `preflight_agent_budget`) |
+
+> Réciprocité enforced par `tests/test_error_classification_reciprocity.py` :
+> toute classe émise en `CAUSE: [X]` DOIT figurer dans cette taxonomie.
 
 ---
 
-### 1.15 Adversarial Review (avocat du diable, depuis v7.2.0 R1)
+### 1.15 Adversarial Review (avocat du diable, R1 — 2026-05-24, v7.0.0)
 
 Émises par l'agent `adversarial-reviewer` (Sonnet 4.6) invoqué par
 `/sdd-review --adversarial` (opt-in). **Aucune classe n'est bloquante
@@ -502,7 +527,7 @@ est strictement complémentaire, jamais redondant.
 CAUSE: [{CLASS}] {détail 1L} → {pointer fichier rapport}
 ```
 
-**Rapport** (3 lignes, dans `workspace/output/qa/...`, `validation/...`) :
+**Rapport** (3 lignes, persisté en base `console.db` ou stderr ; ex-`workspace/qa/...`, `.sys/.validation/...`) :
 ```
 ERROR: {feat/us/task or pipeline-step} failed
 CAUSE: [{CLASS}] {détail 1L}
@@ -547,7 +572,7 @@ Une seule classe déclenche une itération `build_loop` :
 | `[PLAN_STALE]` / `[PLAN_INVALID]` | STOP, relancer `/dev-plan {n}` |
 | `[US_DEPS_CYCLE]` / `[US_DEPS_MISSING]` | STOP, corriger `## Dependencies` puis relancer (idempotent) |
 | `[UI_FIDELITY_GAP]` | 1 retry après revue plan, sinon WARN ou STOP selon score |
-| `[US_DEPS_ORPHAN]` / `[US_STATUS_*]` / `[CHECKPOINT_*]` / `[DRIFT_SUSPECTED]` / `[ADV_*]` (v7.2.0) | Informational, jamais bloquant |
+| `[US_DEPS_ORPHAN]` / `[US_STATUS_*]` / `[CHECKPOINT_*]` / `[DRIFT_SUSPECTED]` / `[ADV_*]` (v7.0.0) | Informational, jamais bloquant |
 | `[CONFIG_SECURITY_DOWNGRADE]` | **Bloquant** au moment du `read_layered_config()` |
 | Auditors : `[REVIEW_*]` / `[SEC_*]` / `[SPEC_*]` / `[ARCH_*]` / `[A11Y_*]` (héritage) / `[PERF_*]` (héritage) | Rapport seul (`{n}-{kind}.{md,json}`) ; verdict 🟢/🟡/🔴 selon `{Kind}FailOn` du Project Config ; aucun build_loop ; hard-blocking selon table de la sous-section (§1.10-§1.13) ; Tech Lead arbitre |
 | `[DISCOVER_*]` / `[SCAN_*]` / `[PROFILE_*]` | Mono-shot, hors pipeline. Bloquant ou info selon classe — cf. §1.14 |
@@ -560,7 +585,7 @@ Une seule classe déclenche une itération `build_loop` :
 - **Agents** retenus en v7.0.0+ (po, arch, dev-backend, dev-frontend,
   qa, elicitor, constitutioner, code-reviewer, security-reviewer,
   spec-compliance-reviewer, arch-reviewer, **adversarial-reviewer**
-  (R1 v7.2.0)) chargent cette règle en STEP contexte. Voir
+  (R1 v7.0.0)) chargent cette règle en STEP contexte. Voir
   `@.claude/loader.yml` pour le mapping détaillé.
   Retirés v7.0.0 (`accessibility-auditor`, `performance-auditor`,
   `dashboard`, `dev-*-strict`) — classes héritage conservées pour ingest

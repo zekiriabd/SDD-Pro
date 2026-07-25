@@ -7,7 +7,7 @@
     1. Project Config (stack.md) lisible et fournit BackendName/AppName
     2. CLAUDE.md projet présents pour chaque famille active (back, front,
        lib si LibName)
-    3. workspace/output/db/schema.json présent si DatabaseType ≠ none
+    3. workspace/db/schema.json présent si DatabaseType ≠ none
     4. mtime de stack.md ≤ mtime du plus ancien CLAUDE.md projet
        (= aucun CLAUDE.md plus vieux que stack.md)
 
@@ -34,7 +34,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from sdd_lib.paths import normalize, repo_root  # noqa: E402
+from sdd_lib.paths import workspace_root, normalize, repo_root  # noqa: E402
 from sdd_lib.project_config import read_project_config  # noqa: E402  (legacy fallback)
 from sdd_lib.layered_config import read_layered_config  # noqa: E402  (v6.7.3)
 from sdd_lib.exit_codes import CORRECTIBLE, FAIL_FAST, SUCCESS  # noqa: E402
@@ -45,7 +45,7 @@ PROJECT_CONFIG_KEYS = ("AppName", "BackendName", "LibName", "DatabaseType")
 
 def detect(feat_number: int | None = None) -> dict[str, object]:
     root = repo_root()
-    stack_md = root / "workspace" / "input" / "stack" / "stack.md"
+    stack_md = workspace_root(root) / "stack" / "stack.md"
 
     if not stack_md.is_file():
         return {
@@ -80,11 +80,11 @@ def detect(feat_number: int | None = None) -> dict[str, object]:
 
     claude_md_paths: list[Path] = []
     if backend_name:
-        claude_md_paths.append(root / "workspace" / "output" / "src" / backend_name / "CLAUDE.md")
+        claude_md_paths.append(workspace_root(root) / "src" / backend_name / "CLAUDE.md")
     if app_name:
-        claude_md_paths.append(root / "workspace" / "output" / "src" / app_name / "CLAUDE.md")
+        claude_md_paths.append(workspace_root(root) / "src" / app_name / "CLAUDE.md")
     if lib_name:
-        claude_md_paths.append(root / "workspace" / "output" / "src" / lib_name / "CLAUDE.md")
+        claude_md_paths.append(workspace_root(root) / "src" / lib_name / "CLAUDE.md")
 
     missing_claude = [p for p in claude_md_paths if not p.is_file()]
     if missing_claude:
@@ -102,12 +102,12 @@ def detect(feat_number: int | None = None) -> dict[str, object]:
     ]
 
     if db_type != "none":
-        schema_json = root / "workspace" / "output" / "db" / "schema.json"
+        schema_json = workspace_root(root) / "db" / "schema.json"
         checks["schemaJsonPresent"] = schema_json.is_file()
         if not schema_json.is_file():
             return {
                 "required": True,
-                "reason": f"DatabaseType={db_type} mais workspace/output/db/schema.json absent",
+                "reason": f"DatabaseType={db_type} mais workspace/db/schema.json absent",
                 "checks": checks,
             }
         # v7.0.0 audit P0 R2 — schema.json présent mais potentiellement corrompu.
@@ -128,7 +128,7 @@ def detect(feat_number: int | None = None) -> dict[str, object]:
             return {
                 "required": True,
                 "reason": (
-                    f"[CHECKPOINT_STATE_UNREADABLE] workspace/output/db/schema.json "
+                    f"[CHECKPOINT_STATE_UNREADABLE] workspace/db/schema.json "
                     f"présent mais corrompu/invalide : {e}"
                 ),
                 "error_class": "CHECKPOINT_STATE_UNREADABLE",
@@ -174,7 +174,7 @@ def main() -> int:
     except OSError as e:
         sys.stderr.write(f"ERROR: detect_arch_shortcircuit — I/O failure\n")
         sys.stderr.write(f"CAUSE: [PERMISSION] {e}\n")
-        sys.stderr.write(f"FIX: vérifier droits lecture workspace/input/stack/stack.md\n")
+        sys.stderr.write(f"FIX: vérifier droits lecture workspace/stack/stack.md\n")
         return FAIL_FAST
     except Exception as e:
         sys.stderr.write(f"ERROR: detect_arch_shortcircuit — failure\n")

@@ -99,8 +99,8 @@ class TestHappyPath(unittest.TestCase):
             env = os.environ.copy()
             env["SDD_REPO_ROOT"] = td
             (root / ".claude").mkdir()
-            feats_dir = root / "workspace" / "input" / "feats"
-            us_dir = root / "workspace" / "output" / "us"
+            feats_dir = root / "workspace" / "feats"
+            us_dir = root / "workspace" / "us"
             feats_dir.mkdir(parents=True)
             us_dir.mkdir(parents=True)
             (feats_dir / "1-Auth.md").write_text(SAMPLE_FEAT, encoding="utf-8")

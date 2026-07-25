@@ -26,7 +26,7 @@ Output schema (per agent)::
     {
       "agent": "dev-backend",
       "reads": [
-        {"path": "workspace/output/us/{n}-{m}-*.md", "cache_layer": "volatile"},
+        {"path": "workspace/us/{n}-{m}-*.md", "cache_layer": "volatile"},
         {"path": ".claude/stacks/backend/{active}.md", "cache_layer": "stable"},
         ...
       ],

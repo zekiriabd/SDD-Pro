@@ -21,7 +21,7 @@ spec-compliance reviewer but on the reverse "did we capture enough?" axis.
 
 Invocation:
     python -m sdd_reverse_scripts.check_feat_completeness --project workspace/old/{P} --unit U-3 [--json]
-    python -m sdd_reverse_scripts.check_feat_completeness --feat-path workspace/input/feats/3-X.md --project workspace/old/{P} [--json]
+    python -m sdd_reverse_scripts.check_feat_completeness --feat-path workspace/feats/3-X.md --project workspace/old/{P} [--json]
 
 Exit: 0 (always — informational) ; 1 bad args ; 2 unit/feat not found
 """
@@ -172,7 +172,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if not feat_text:
         feats_dir = Path(args.feats_dir).resolve() if args.feats_dir else (
-            project_root.parent.parent / "input" / "feats"
+            project_root.parent.parent / "feats"
         )
         n = (inventory.get("_featAllocations") or {}).get(unit["id"])
         fp = _find_feat_for_unit(feats_dir, n, unit["id"])

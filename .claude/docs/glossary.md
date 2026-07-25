@@ -3,7 +3,7 @@
 > **Source de vérité unique** du vocabulaire SDD_Pro (2026-05-19).
 > Toute documentation framework (agents, rules, commands, docs/) doit
 > utiliser les termes canoniques de ce glossaire. Les **alias dépréciés**
-> seront retirés en v7.0.0 (cf. `ADR-20260519T163000-governance-major-vocab-consolidation`).
+> seront retirés en v7.0.0 (cf. `ADR-20260519T160000-governance-major-vocab-consolidation`).
 >
 > Convention de langue : identifiants techniques en **anglais** (US, AC,
 > SFD, FD, BR, ADR, classes d'erreur `[CATEGORY_*]`) ; documentation
@@ -15,16 +15,16 @@
 
 | Terme canonique | Définition | Source | Aliases dépréciés |
 |---|---|---|---|
-| **FEAT** | Spécification fonctionnelle d'une feature, fichier `workspace/input/feats/{n}-{Name}.md`. Porte les sections Functional Needs, Business Rules, Acceptance Criteria, Functional Deliverables, Actors, etc. | `templates/feat.template.md` | `feature`, `spec` |
-| **US** (User Story) | Découpe d'une FEAT en flux utilisateur. `workspace/output/us/{n}-{m}-{Name}.md`. 1-6 par FEAT max (cf. `docs/principles/us-granularity.md`). | `templates/us.template.md` | `story`, `user-story` |
+| **FEAT** | Spécification fonctionnelle d'une feature, fichier `workspace/feats/{n}-{Name}.md`. Porte les sections Functional Needs, Business Rules, Acceptance Criteria, Functional Deliverables, Actors, etc. | `templates/feat.template.md` | `feature`, `spec` |
+| **US** (User Story) | Découpe d'une FEAT en flux utilisateur. `workspace/us/{n}-{m}-{Name}.md`. 1-6 par FEAT max (cf. `docs/principles/us-granularity.md`). | `templates/us.template.md` | `story`, `user-story` |
 | **SFD-N** | *Specifiable Functional Deliverable* — ID stable d'une ligne `## Functional Needs` dans une FEAT. | `rules/ownership.md (Partie B §2)` | `Need-N`, `FN-N` |
 | **FD-N** | *Functional Deliverable* — ID stable d'une ligne `## Functional Deliverables` dans une FEAT. | idem | `Deliverable-N` |
 | **BR-N** | *Business Rule* — ID stable d'une ligne `## Business Rules` dans une FEAT. | idem | `Rule-N` |
 | **AC-N** | *Acceptance Criterion* — ID stable d'une ligne `## Acceptance Criteria` dans une FEAT ou une US. | idem | `Criterion-N`, `Test-N` |
 | **AC-UI-N** | AC spécifique à l'interface utilisateur (Given/When/Then orienté écran). | `agents/dev-frontend.md` | — |
-| **ADR** | *Architecture Decision Record* — fichier atomique `workspace/output/.sys/.context/adrs/ADR-{ts}-{slug}.md` traçant 1 décision structurante. | `rules/ownership.md (Partie B §4)` | `decision-record` |
-| **Mockup** | Maquette HTML statique déposée manuellement par UX Designer sous `workspace/input/ui/{n}-{m}-{Name}.html`. Lecture passive uniquement. | `CLAUDE.md §1` | `wireframe`, `HTML UI` |
-| **Plan technique** | Frontmatter YAML + section `## Files` listant les fichiers à matérialiser pour 1 US. `workspace/output/plans/{n}-{m}-{Name}.{back\|front}.md`. | `rules/build-and-loop.md §7` | `tech-plan` |
+| **ADR** | *Architecture Decision Record* — fichier atomique `workspace/.sys/.context/adrs/ADR-{ts}-{slug}.md` traçant 1 décision structurante. | `rules/ownership.md (Partie B §4)` | `decision-record` |
+| **Mockup** | Maquette HTML statique déposée manuellement par UX Designer sous `workspace/ui/{n}-{m}-{Name}.html`. Lecture passive uniquement. | `CLAUDE.md §1` | `wireframe`, `HTML UI` |
+| **Plan technique** | Frontmatter YAML + section `## Files` listant les fichiers à matérialiser pour 1 US. `workspace/plans/{n}-{m}-{Name}.{back\|front}.md`. | `rules/build-and-loop.md §7` | `tech-plan` |
 | **Covers** | Champ d'une US qui référence les SFD/BR/AC/FD couverts dans la FEAT parente. | `docs/principles/us-granularity.md §5` | — |
 
 ---
@@ -45,8 +45,8 @@
 
 | Terme canonique | Définition | v7.0.0 |
 |---|---|---|
-| **Inline** | Mode dev-* par défaut : agent planifie inline + matérialise dans la même invocation. Modèle Opus 4.7. | conservé |
-| **From-Plan** | Mode dev-* déclenché par présence d'un plan v1 ou v2 dans `workspace/output/plans/`. Modèle Opus 4.7 (les variants `dev-*-strict` Sonnet ont été supprimés v7.0.0, cf. `architecture.md §2-3` et `governance-major-auditors-trim`). | conservé (devient default si plan présent) |
+| **Inline** | Mode dev-* par défaut : agent planifie inline + matérialise dans la même invocation. Modèle Opus 4.8. | conservé |
+| **From-Plan** | Mode dev-* déclenché par présence d'un plan v1 ou v2 dans `workspace/plans/`. Modèle Opus 4.8 (les variants `dev-*-strict` Sonnet ont été supprimés v7.0.0, cf. `architecture.md §2-3` et `governance-major-auditors-trim`). | conservé (devient default si plan présent) |
 | **Plan Only** | Génère uniquement le plan, ne matérialise pas le code. Invoqué par `/dev-plan {n}` (préféré) ou `:plan` suffix (déprécié v7). | `:plan` suffix retiré |
 | **From-Plan Classic** | Variante Opus 4.7 de From-Plan (legacy v6). | **supprimé v7** |
 | **Plan Only** vs **`:plan` suffix** | 2 façons d'invoquer la même chose. | suffix supprimé |
@@ -115,8 +115,8 @@ Forme rejetée : `gate` (générique) sans qualificatif → toujours préfixer.
 |---|---|---|---|
 | `po` (Product Owner) | Sonnet 4.6 | FEAT → User Stories | 2 |
 | `arch` (Architect) | Sonnet 4.6 | Bootstrap arch + DB + scaffolding | 3 |
-| `dev-backend` | Opus 4.7 | Code serveur 1 US | 4 |
-| `dev-frontend` | Opus 4.7 | Code client 1 US | 4 |
+| `dev-backend` | Opus 4.8 | Code serveur 1 US | 4 |
+| `dev-frontend` | Opus 4.8 | Code client 1 US | 4 |
 | `qa` | Sonnet 4.6 | Tests + coverage + quality scan | 5 |
 | `elicitor` | Sonnet 4.6 | Élicitation FEAT (Pre-mortem, Red Team, etc.) | 1.5 |
 | `constitutioner` | Sonnet 4.6 | Maintien `constitution.md` post-arch | 4 |
@@ -154,7 +154,7 @@ Forme rejetée : `gate` (générique) sans qualificatif → toujours préfixer.
 | **Idempotence** | Une commande relancée 2× avec mêmes inputs produit le même résultat sans effet de bord cumulé. | `docs/conventions.md §2` |
 | **Selective read** | Lecture sélective : un agent ne lit que les artefacts strictement nécessaires à son US (1 fichier US, pas la FEAT entière). | `CLAUDE.md §1` |
 | **Strict mode** | (retiré v7.0.0) Variant Sonnet 4.6 des dev-* qui consommait un plan v2 strict-ready. Tous les plans (v1 et v2) sont désormais matérialisés par les agents canoniques Opus 4.7. | `archive/v7-design-superseded/DESIGN-FROMPLAN-STRICT.md` |
-| **Constitution** | Fichier `workspace/output/.sys/.context/constitution.md` partagé entre agents pour cohérence sémantique cross-FEAT (glossaire local, acteurs, ADRs index). | `rules/ownership.md (Partie B)` |
+| **Constitution** | Fichier `workspace/.sys/.context/constitution.md` partagé entre agents pour cohérence sémantique cross-FEAT (glossaire local, acteurs, ADRs index). | `rules/ownership.md (Partie B)` |
 | **Checkpoint** | Mécanisme de reprise post-crash via hashing input des phases. | v6.6.2+ |
 
 ---
@@ -166,7 +166,7 @@ Forme rejetée : `gate` (générique) sans qualificatif → toujours préfixer.
 | **Token telemetry** | Capture post-call des tokens consommés par sub-agent. | `console.db` table `token_usage` |
 | **Context budget** | Estimation pré-call de la taille (KB) lue par un agent. Comparée à `DEFAULT_BUDGETS` par `context_budget.py`. | `console.db` table `context_budget` |
 | **Ledger** | Historique append-only (utilisé pour event log + token usage avant v6.10). | retiré v6.10 (tout en DB) |
-| **console.db** | SQLite WAL central, 24 tables, source de vérité runtime depuis v6.10. | `workspace/output/db/console.db` |
+| **console.db** | SQLite WAL central, 24 tables, source de vérité runtime depuis v6.10. | `workspace/db/console.db` |
 | **status.json** | Fichier `workspace/console/status.json` (gates UI). Reste un dual-write avec `console.db` table `gates`. | console UI |
 
 ---
@@ -191,7 +191,7 @@ Formes rejetées (à éliminer v7) : `status` (ambigu — `Status:` est un champ
 
 Format canonique : `[CATEGORY_SUBCATEGORY]` (UPPER_SNAKE_CASE).
 
-**~110 classes** définies dans `rules/error-classification.md`. Catégories principales :
+**188 classes** définies dans `rules/error-classification.md` (SSoT — réciprocité émetteurs↔taxonomie enforced par `tests/test_error_classification_reciprocity.py`). Catégories principales :
 
 | Préfixe | Domaine | Exemples |
 |---|---|---|
@@ -206,12 +206,12 @@ Format canonique : `[CATEGORY_SUBCATEGORY]` (UPPER_SNAKE_CASE).
 | `[SPEC_*]` | Spec compliance | `SPEC_AC_NOT_VERIFIED`, `SPEC_AC_PARTIAL` |
 | `[FILE_*]` | File ownership | `FILE_OWNERSHIP`, `FILE_OWNERSHIP_NESTED` |
 | `[US_*]` | User Story state | `US_STATUS_INVALID`, `US_DEPS_CYCLE`, `US_DEPS_MISSING` |
-| `[PLAN_*]` | Plan validation | `PLAN_STALE`, `PLAN_INVALID`, `PLAN_NOT_STRICT_READY` |
+| `[PLAN_*]` | Plan validation | `PLAN_STALE`, `PLAN_INVALID`, `PLAN_AC_COVERAGE_GAP` |
 | `[CONFIG_*]` | Config layered | `CONFIG_SECURITY_DOWNGRADE` |
 | `[NETWORK]`, `[AUTH]`, `[PERMISSION]`, `[NOT_FOUND]`, `[TIMEOUT]`, `[DISK]`, `[ENV_MISSING]` | Runtime/infra | génériques |
 | `[UNKNOWN]` | Erreur non classifiable | fallback |
 
-> v7.0.0 : `rules/error-classification.md` → `sdd_lib/error_classes.py` (dict Python). Cf. `ADR-20260519T153000-governance-major-prompts-trim §3`.
+> v7.0.0 : `rules/error-classification.md` reste la **SSoT vivante** des 188 classes (la migration vers un dict Python `sdd_lib/error_classes.py` envisagée par l'ADR prompts-trim n'a JAMAIS été réalisée — correction audit 2026-06-11). Cf. `ADR-20260519T130000-governance-major-prompts-trim`.
 
 ---
 
@@ -219,17 +219,18 @@ Format canonique : `[CATEGORY_SUBCATEGORY]` (UPPER_SNAKE_CASE).
 
 | Path | Rôle | Hand-edited ? |
 |---|---|---|
-| `workspace/input/feats/{n}-*.md` | FEATs (entrée Tech Lead) | ✅ |
-| `workspace/input/ui/{n}-{m}-*.html` | Mockups UX | ✅ (UX) |
-| `workspace/input/stack/stack.md` | **SSoT primaire projet** (v7) | ✅ |
-| `workspace/output/us/*.md` | User Stories générées | ❌ (agent po) |
-| `workspace/output/plans/*.md` | Plans techniques | ❌ (agent dev-*) |
-| `workspace/output/src/{Project}/...` | Code applicatif généré | ❌ (agent dev-*) |
-| `workspace/output/db/console.db` | SQLite runtime SSoT | ❌ (machine) |
-| `workspace/output/.sys/.context/constitution.md` | Glossaire projet + ADRs index | ❌ (agents) |
-| `workspace/output/.sys/.context/adrs/*.md` | ADRs atomiques | ❌ (agents append) |
-| `workspace/output/.sys/.validation/{n}-*.{md,json}` | Rapports validation/auditors | ❌ (auditors) |
-| `workspace/output/qa/feat-{n}/*` | Reports QA (markdown lisible humain) | ❌ (qa + auditors) |
+| `workspace/feats/{n}-*.md` | FEATs (entrée Tech Lead) | ✅ |
+| `workspace/ui/{n}-{m}-*.html` | Mockups UX | ✅ (UX) |
+| `workspace/stack/stack.md` | **SSoT primaire projet** (v7) | ✅ |
+| `workspace/us/*.md` | User Stories générées | ❌ (agent po) |
+| `workspace/plans/*.md` | Plans techniques | ❌ (agent dev-*) |
+| `workspace/src/{Project}/...` | Code applicatif généré | ❌ (agent dev-*) |
+| `workspace/db/console.db` | SQLite runtime SSoT | ❌ (machine) |
+| `workspace/.sys/.context/constitution.md` | Glossaire projet + ADRs index | ❌ (agents) |
+| `workspace/.sys/.context/adrs/*.md` | ADRs atomiques | ❌ (agents append) |
+| `workspace/.sys/.validation/{n}-*.{md,json}` | Rapports validation/auditors | ❌ (auditors) |
+| `workspace/.sys/.audit/` | Logs de protection framework (`*.log`/`*.jsonl`, rotation auto) **ET** rapports d'audit code holistiques `AUDIT-*.md` (emplacement canonique — 2026-07-06, ex-`output/audit/`) | ❌ (hooks) / ✅ (audits humains/agents) |
+| `console.db` (`qa_*`, `validation_reports`) | Télémétrie QA + rapports (rendu MD à la demande via `query_console_db.py --format md`, 2026-07-06 : plus de `qa/`) | ❌ (qa + auditors + scripts) |
 | `workspace/console/` | UI status + index | dev humain |
 
 ---
@@ -300,13 +301,13 @@ Liste des termes à éliminer en v7.0.0 — préférer la forme canonique de la 
 - `@.claude/docs/workflow.md` — détail phases
 - `@.claude/docs/conventions.md` — anti-derive, idempotence, parallélisme
 - `@.claude/docs/CHANGELOG.md` — notes par version (consolidé 2026-06-06)
-- `@.claude/rules/` — 9 règles opérationnelles
+- `@.claude/rules/` — 11 règles opérationnelles
 - `@.claude/docs/VERSIONING.md` — politique SemVer + freeze
 - `ADR-20260519T120000-governance-major-auditors-trim.md`
-- `ADR-20260519T133000-governance-major-config-ssot.md`
-- `ADR-20260519T143000-governance-major-flags-trim.md`
-- `ADR-20260519T153000-governance-major-prompts-trim.md`
-- `ADR-20260519T163000-governance-major-vocab-consolidation.md` *(à écrire ci-après)*
+- `ADR-20260519T140000-governance-major-config-ssot.md`
+- `ADR-20260519T150000-governance-major-flags-trim.md`
+- `ADR-20260519T130000-governance-major-prompts-trim.md`
+- `ADR-20260519T160000-governance-major-vocab-consolidation.md`
 
 ---
 

@@ -110,20 +110,20 @@ class TestMiniFeatPipeline(unittest.TestCase):
         # Strict layout for repo_root() to honor SDD_REPO_ROOT
         (cls.root / ".claude" / "agents").mkdir(parents=True)
         (cls.root / ".claude" / "commands").mkdir(parents=True)
-        (cls.root / "workspace" / "input" / "feats").mkdir(parents=True)
-        (cls.root / "workspace" / "input" / "stack").mkdir(parents=True)
-        (cls.root / "workspace" / "input" / "ui").mkdir(parents=True)
-        (cls.root / "workspace" / "output" / "src").mkdir(parents=True)
-        (cls.root / "workspace" / "output" / "us").mkdir(parents=True)
-        (cls.root / "workspace" / "output" / "qa").mkdir(parents=True)
-        (cls.root / "workspace" / "output" / "db").mkdir(parents=True)
-        (cls.root / "workspace" / "output" / ".sys" / ".validation").mkdir(parents=True)
+        (cls.root / "workspace" / "feats").mkdir(parents=True)
+        (cls.root / "workspace" / "stack").mkdir(parents=True)
+        (cls.root / "workspace" / "ui").mkdir(parents=True)
+        (cls.root / "workspace" / "src").mkdir(parents=True)
+        (cls.root / "workspace" / "us").mkdir(parents=True)
+        (cls.root / "workspace" / "qa").mkdir(parents=True)
+        (cls.root / "workspace" / "db").mkdir(parents=True)
+        (cls.root / "workspace" / ".sys" / ".validation").mkdir(parents=True)
 
         # Write minimal FEAT + stack
-        (cls.root / "workspace" / "input" / "feats" / "1-MiniFeat-Pilot.md").write_text(
+        (cls.root / "workspace" / "feats" / "1-MiniFeat-Pilot.md").write_text(
             MINIMAL_FEAT, encoding="utf-8"
         )
-        (cls.root / "workspace" / "input" / "stack" / "stack.md").write_text(
+        (cls.root / "workspace" / "stack" / "stack.md").write_text(
             MINIMAL_STACK, encoding="utf-8"
         )
 
@@ -168,7 +168,7 @@ class TestMiniFeatPipeline(unittest.TestCase):
     def test_02_quality_scan_runs_clean(self):
         """quality_scan.py on empty src/ should exit 0 (no findings)."""
         # quality_scan needs a project under src/. Create stub csproj so it has a target.
-        proj_dir = self.root / "workspace" / "output" / "src" / "MiniFeatBack"
+        proj_dir = self.root / "workspace" / "src" / "MiniFeatBack"
         proj_dir.mkdir(parents=True, exist_ok=True)
         (proj_dir / "MiniFeatBack.csproj").write_text(
             "<Project Sdk=\"Microsoft.NET.Sdk\"></Project>\n", encoding="utf-8"

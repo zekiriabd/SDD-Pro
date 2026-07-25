@@ -6,7 +6,7 @@
 > template `feat-m-v2.template.md` si évolution).
 >
 > **Usage** : `cp .claude/templates/bench-feats/feat-m.template.md
-> workspace/input/feats/{n}-BenchM.md` (renommer `{n}` selon
+> workspace/feats/{n}-BenchM.md` (renommer `{n}` selon
 > numérotation projet).
 >
 > **Cible** : workflow métier representative — 3 US, 3 entités liées,
@@ -142,7 +142,7 @@ pour bench). Pré-requis runtime : schéma DB initialisé avec table
     validation cross-field) → AC-1, AC-2, AC-8, AC-UI-3
   - US-3 : Workflow statut (`confirm`, `cancel`, validation BR-2/BR-6/BR-7)
     → AC-3, AC-4, AC-5, AC-6, AC-UI-2
-- **Mockups HTML** : 3 fichiers à déposer dans `workspace/input/ui/`
+- **Mockups HTML** : 3 fichiers à déposer dans `workspace/ui/`
   selon US (un par US). Voir `.claude/templates/bench-feats/mockups/`.
 - **Sketch DB** : 3 tables `orders`, `order_lines`, `products`,
   + 2 tables seed `customers` (référence externe). Foreign keys

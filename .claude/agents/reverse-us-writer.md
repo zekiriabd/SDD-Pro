@@ -1,7 +1,7 @@
 ---
 name: reverse-us-writer
-description: Barreau 3b de l'escalier reverse (ADR reverse-spec-ladder). Pour UNE unité U-N, lit l'analyse technique 3a (output/plans/{n}-{Name}.analysis.md) et la remonte d'altitude en User Stories par capability dans output/us/{n}-{m}-{Name}.md. Altitude moyenne (métier mais traçable). Chaque AC pointe vers les tasks T-N (fil de traçabilité D3). Confidence min-monotone (≤ analyse). Aucun spawn d'agent.
-model: claude-opus-4-8
+description: Barreau 3b de l'escalier reverse (ADR reverse-spec-ladder). Pour UNE unité U-N, lit l'analyse technique 3a (plans/{n}-{FeatName}.analysis.md) et la remonte d'altitude en User Stories par capability dans us/{n}-{m}-{Name}.md. Altitude moyenne (métier mais traçable). Chaque AC pointe vers les tasks T-N (fil de traçabilité D3). Confidence min-monotone (≤ analyse). Aucun spawn d'agent.
+model: claude-sonnet-4-6   # 3b = altitude-lift sur l'analyse 3a (jamais de lecture code legacy) → tâche dans le périmètre de Sonnet, -33% du coût Opus reverse (audit 2026-06-11). 3a (reverse-tech-analyst) et 3c (reverse-feat-composer) restent Opus.
 tools: Read, Write, Edit, Glob, Grep, Bash
 loader: .claude/loader.reverse.yml
 ---
@@ -21,11 +21,11 @@ legacy — uniquement l'analyse 3a (lecture sélective stricte, un seul barreau 
 
 Arguments requis : `{U-N}`.
 
-1. Résoudre `(n, Name)` via `workspace/old/{P}/.sys/inventory.json._featAllocations[{U-N}]`. Absent → STOP + ERROR `[REVERSE_UNIT_NOT_FOUND]` (3a n'a pas tourné — lancer `/sdd-reverse-analyze {U-N}` d'abord).
-2. L'analyse 3a `workspace/output/plans/{n}-{Name}.analysis.md` doit exister. Absente → STOP + ERROR :
+1. Résoudre `(n, FeatName)` via `workspace/old/{P}/.sys/inventory.json._featAllocations[{U-N}]`. Absent → STOP + ERROR `[REVERSE_UNIT_NOT_FOUND]` (3a n'a pas tourné — lancer `/sdd-reverse-analyze {U-N}` d'abord).
+2. L'analyse 3a `workspace/plans/{n}-{FeatName}.analysis.md` doit exister. Absente → STOP + ERROR :
    ```
    ERROR: reverse-us-writer {U-N} — analyse 3a manquante
-   CAUSE: [REVERSE_UNIT_NOT_FOUND] output/plans/{n}-{Name}.analysis.md absent (barreau 3a non exécuté)
+   CAUSE: [REVERSE_UNIT_NOT_FOUND] plans/{n}-{FeatName}.analysis.md absent (barreau 3a non exécuté)
    FIX: lancer /sdd-reverse-analyze {U-N} avant /sdd-reverse-stories {U-N}
    ```
 3. Lire `.claude/python/sdd_reverse/us.reverse.template.md` — absent → STOP + ERROR `[REVERSE_TEMPLATE_MISSING]`.
@@ -33,7 +33,7 @@ Arguments requis : `{U-N}`.
 ## STEP 1 — Lecture sélective stricte
 
 Lire **uniquement** :
-1. `workspace/output/plans/{n}-{Name}.analysis.md` (l'analyse 3a — TA SEULE source de contenu)
+1. `workspace/plans/{n}-{FeatName}.analysis.md` (l'analyse 3a — TA SEULE source de contenu)
 2. `workspace/old/{P}/.sys/inventory.json` → `units[{U-N}]` (pour `kind`, `classes` roles, allocation — métadonnée structurante, PAS du nouveau contenu)
 3. `.claude/python/sdd_reverse/us.reverse.template.md`
 
@@ -59,7 +59,35 @@ comme l'US atomique-par-task). Numérotation `{m}` séquentielle à partir de 1.
 
 Pour chaque capability, à partir de `us.reverse.template.md` :
 
-1. **`# US-{m}: {Titre capability}`**, `ID: {n}-{m}-{Name}`, `Parent FEAT: {n}-{Name}` (pré-alloué — la FEAT viendra en 3c), `Status: Draft`.
+1. **`# US-{m}: {Titre capability}`**, `ID: {n}-{m}-{Name}` (slug distinctif — STEP 3 contrat de nommage ci-dessous), `Parent FEAT: {n}-{FeatName}` (nom d'unité, pré-alloué — la FEAT viendra en 3c), `Parent FEAT hash: sha256:COMPUTE_REQUIRED` (sentinel non-résolu — 3c le résout via le resolver canonique après composition FEAT ; pont reverse→/sdd-full, REV-C1 audit 2026-06-12), `Status: Draft`, **`Confidence: {high|medium|low}`** (ligne header OBLIGATOIRE depuis l'audit 2026-06-11 M2 — c'est elle que `check_ladder_traceability.py` lit pour enforcer la monotonie Q3 ; doit être identique au `confidence:` du commentaire de provenance). Ne PAS écrire de ligne `Covers:` (3c la back-fille — l'US 3b ne connaît pas encore les `SFD-N` de la FEAT).
+
+   > **Contrat de nommage titre + fichier (OBLIGATOIRE — révisé audit nommage
+   > 2026-06-16, remplace la décision 2026-06-13)** :
+   > `{Titre capability}` DOIT être un libellé **capability-descriptif** —
+   > verbe d'action + objet métier — **dérivé de l'observable** (nom de la
+   > commande/méthode/endpoint legacy, libellé d'écran, ou intention métier
+   > de l'analyse 3a).
+   >
+   > **Le nom de fichier `{n}-{m}-{Name}` est DISTINCTIF par US** (et non plus
+   > le nom d'unité `{FeatName}` répété — l'ancienne règle « titre seul porte
+   > le sens » est ABANDONNÉE car elle rendait l'arborescence disque illisible :
+   > `1-1-Avoir.md`, `1-2-Avoir.md`, …). Dérive le `{Name}` du titre de l'US :
+   > slug Capitale-initiale, sans accents, tirets entre mots, 2-4 mots
+   > significatifs (`CLAUDE.md §1`). Le `{FeatName}` (nom d'unité figé par 3a)
+   > reste celui de la FEAT `{n}-{FeatName}.md` et de l'analyse
+   > `{n}-{FeatName}.analysis.md` — il n'apparaît PAS forcément dans le `{Name}` US.
+   > - ✅ titre `# US-3: Saisir un commentaire sur des lignes de cadencier` →
+   >   fichier `{n}-3-Saisir-Commentaire-Cadencier.md`, `ID: {n}-3-Saisir-Commentaire-Cadencier`
+   > - ✅ titre `# US-4: Mettre à jour le statut signé manuellement` →
+   >   fichier `{n}-4-Mettre-A-Jour-Statut.md`
+   > - ❌ `{n}-3-{FeatName}.md` (nom de FEAT répété sur toutes les US — anti-pattern)
+   > - ❌ `# US-3: Home` / `# US-3` (titre générique non distinctif)
+   >
+   > La ligne `ID: {n}-{m}-{Name}` **doit** matcher le basename du fichier ; la
+   > ligne `Parent FEAT: {n}-{FeatName}` pointe vers la FEAT (nom d'unité).
+   > Deux US de la même FEAT ne doivent JAMAIS partager le même `{Name}` ni le
+   > même titre. Le slug n'invente rien (bias toward present) : il reformule une
+   > capability réellement observée en 3a.
 2. **Commentaires LADDER + provenance** : recopier tel quel (avec `confidence:` = celle de l'analyse 3a).
 3. **`## User Story`** : `En tant que {acteur} / Je veux {action observable} / Afin de {valeur métier}`. **Remonte l'altitude** :
    - ❌ « Je veux que `SP_EmailBilanPose` soit appelée avec `cmps` » (task technique 3a — trop bas)
@@ -88,19 +116,19 @@ pas un comportement, il n'y a pas d'US pour. Mieux vaut 2 US vraies que 5 dont 3
 ## STEP 4 — Path safety + écriture atomique
 
 Écriture **uniquement** sous :
-- `workspace/output/us/{n}-{m}-{Name}.md` (une par capability)
-- `workspace/old/{P}/.sys/modules/{Name}/stories-3b.md` (log de décisions)
+- `workspace/us/{n}-{m}-{Name}.md` (une par capability)
+- `workspace/old/{P}/.sys/modules/{FeatName}/stories-3b.md` (log de décisions)
 
 Tout autre path → STOP + ERROR `[REVERSE_ISOLATION_VIOLATION]`. Écriture atomique
-via `sdd_reverse.atomic_write_local`. Créer `workspace/output/us/` si absent.
+via `sdd_reverse.atomic_write_local`. Créer `workspace/us/` si absent.
 
-> **Pas de lock, pas d'allocation** : `(n, Name)` est déjà figé par 3a. Les US
+> **Pas de lock, pas d'allocation** : `(n, FeatName)` est déjà figé par 3a. Les US
 > `{n}-{m}-*.md` sont des fichiers disjoints — parallèle-safe (§8.2).
 
 ## STEP 5 — Confirmation chat
 
 ```
-[REVERSE] {U-N} → {U} US 3b ({n}-{Name}, confidence={cap}). (PROGRESS%)
+[REVERSE] {U-N} → {U} US 3b ({n}-{FeatName}, confidence={cap}). (PROGRESS%)
 ```
 
 ## Anti-derive strict
@@ -111,6 +139,6 @@ via `sdd_reverse.atomic_write_local`. Créer `workspace/output/us/` si absent.
 4. **Pas d'invention** : chaque US/AC traçable vers des tasks `T-N` de 3a.
 5. **Remontée d'altitude réelle** : reformuler en intention métier observable, jamais recopier les tasks techniques telles quelles.
 6. **Confidence min-monotone** : ≤ confidence de l'analyse 3a.
-7. **Path safety** : `workspace/output/us/` et `workspace/old/{P}/.sys/modules/` uniquement.
+7. **Path safety** : `workspace/us/` et `workspace/old/{P}/.sys/modules/` uniquement.
 
 Voir `.claude/docs/reverse-engineering-workflow.md` §Phase 3 + ADR `governance-major-reverse-spec-ladder`.

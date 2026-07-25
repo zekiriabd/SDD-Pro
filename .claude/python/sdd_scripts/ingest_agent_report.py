@@ -7,16 +7,21 @@ the SQLite source-of-truth. After the agent finishes, this script:
     2. inserts the parsed entries into the appropriate qa_* table
     3. deletes the JSON file (no stats/logs persist on FS)
 
-Supported report types:
-    - a11y           → qa_a11y                (workspace/output/qa/feat-{n}/a11y-report.json)
-    - code-review    → qa_code_review         (workspace/output/.sys/.validation/{n}-code-review.json)
-    - security-scan  → qa_security (mode=scan)         (workspace/output/.sys/.validation/{n}-security-scan.json)
-    - threat-model   → qa_security (mode=threat-model) (workspace/output/.sys/.validation/{n}-threat-model.json)
-    - performance    → qa_performance         (workspace/output/qa/feat-{n}/perf-report.json)
-    - spec-compliance→ qa_spec_compliance     (workspace/output/.sys/.validation/{n}-spec-compliance.json)
-    - api-tests      → qa_api_tests (+ qa_api_endpoints)  (workspace/output/qa/feat-{n}/api-tests.json)
+All transient agent JSON reports live under workspace/.sys/.validation/
+and are DELETED after ingest — no report file ever persists under
+workspace/qa/ (removed 2026-07-06 : QA telemetry is SQLite-only,
+human-readable rendering is on-demand via query_console_db.py --format md).
+
+Supported report types (all paths under workspace/.sys/.validation/) :
+    - a11y           → qa_a11y                ({n}-a11y-report.json)
+    - code-review    → qa_code_review         ({n}-code-review.json)
+    - security-scan  → qa_security (mode=scan)         ({n}-security-scan.json)
+    - threat-model   → qa_security (mode=threat-model) ({n}-threat-model.json)
+    - performance    → qa_performance         ({n}-perf-report.json)
+    - spec-compliance→ qa_spec_compliance     ({n}-spec-compliance.json)
+    - api-tests      → qa_api_tests (+ qa_api_endpoints)  ({n}-api-tests.json)
     - adversarial    → validation_reports(report_type='adversarial')
-                       (workspace/output/qa/feat-{n}/adversarial.json) — v7.2.0 R1 BMAD
+                       ({n}-adversarial.json) — v7.2.0 R1 BMAD
 
 Usage:
     python -m sdd_scripts.ingest_agent_report --type a11y --feat 1
@@ -52,7 +57,7 @@ from sdd_lib.console_db import (  # noqa: E402
     record_auditor_run,
     replace_qa_auditor_for_feat, replace_qa_api_tests_for_feat,
 )
-from sdd_lib.paths import repo_root  # noqa: E402
+from sdd_lib.paths import workspace_root, repo_root  # noqa: E402
 from sdd_lib.stderr import warn  # noqa: E402
 from sdd_lib.exit_codes import FAIL_FAST, INFRA_BLOCKED, SUCCESS  # noqa: E402
 
@@ -65,19 +70,23 @@ REPORT_TYPES = (
 
 
 def default_path(report_type: str, feat: int, root: Path) -> Path:
-    """Canonical path per report type (matches the conventions the agents use)."""
-    qa = root / "workspace" / "output" / "qa" / f"feat-{feat}"
-    val = root / "workspace" / "output" / ".sys" / ".validation"
+    """Canonical path per report type — all transient JSON under .sys/.validation/.
+
+    2026-07-06 : qa/ removed. a11y/perf/api-tests/adversarial JSON, which
+    formerly landed under qa/feat-{n}/, now share the .validation/ dir
+    with the other auditor reports. They are ingested then unlinked, so nothing
+    persists on disk (SQLite is the source of truth)."""
+    val = workspace_root(root) / ".sys" / ".validation"
     mapping = {
-        "a11y":            qa / "a11y-report.json",
+        "a11y":            val / f"{feat}-a11y-report.json",
         "code-review":     val / f"{feat}-code-review.json",
         "security-scan":   val / f"{feat}-security-scan.json",
         "threat-model":    val / f"{feat}-threat-model.json",
-        "performance":     qa / "perf-report.json",
+        "performance":     val / f"{feat}-perf-report.json",
         "spec-compliance": val / f"{feat}-spec-compliance.json",
-        "api-tests":       qa / "api-tests.json",
+        "api-tests":       val / f"{feat}-api-tests.json",
         "arch-review":     val / f"{feat}-arch-review.json",
-        "adversarial":     qa / "adversarial.json",
+        "adversarial":     val / f"{feat}-adversarial.json",
     }
     return mapping[report_type]
 

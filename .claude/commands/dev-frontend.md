@@ -4,8 +4,8 @@
 > Utilisateur final : préférer `/sdd-full` ou `/dev-run` (gèrent pré-conditions, idempotence, état).
 
 Invoque l'agent `dev-frontend` pour matérialiser l'US
-`workspace/output/us/{n}-{m}-{Name}.md` + le mockup HTML éventuel
-`workspace/input/ui/{n}-{m}-{Name}.html` en code client (Pages, Components,
+`workspace/us/{n}-{m}-{Name}.md` + le mockup HTML éventuel
+`workspace/ui/{n}-{m}-{Name}.html` en code client (Pages, Components,
 Layouts, theme.css, bootstrap HTML). L'agent planifie inline les
 fichiers à produire à partir de l'US + du mockup HTML + des stacks
 frontend/ui actifs.

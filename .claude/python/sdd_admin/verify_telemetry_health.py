@@ -31,7 +31,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from sdd_lib.console_db import connect_ro  # noqa: E402  (v7.0.0-alpha — WAL-safe RO)
 from sdd_lib.exit_codes import OK, INFRA_BLOCKED  # noqa: E402
-from sdd_lib.paths import repo_root  # noqa: E402
+from sdd_lib.paths import workspace_root, repo_root  # noqa: E402
 
 
 # Heuristics : commands that should NEVER appear in production console.db
@@ -250,7 +250,7 @@ def main() -> int:
         description="Verify console.db telemetry health (anti test pollution)"
     )
     p.add_argument("--db", default=None,
-                   help="DB path (default: workspace/output/db/console.db)")
+                   help="DB path (default: workspace/db/console.db)")
     p.add_argument("--json", action="store_true", help="JSON output")
     p.add_argument("--fail-on", choices=("polluted", "suspect"), default="polluted",
                    help="Exit non-zero if verdict matches (default: polluted)")
@@ -262,7 +262,7 @@ def main() -> int:
     args = p.parse_args()
 
     db_path = Path(args.db) if args.db else \
-        repo_root() / "workspace" / "output" / "db" / "console.db"
+        workspace_root(repo_root()) / "db" / "console.db"
 
     # Mode --clean-suspects : delete and exit
     if args.clean_suspects:

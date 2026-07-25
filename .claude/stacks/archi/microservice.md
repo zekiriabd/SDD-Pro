@@ -111,7 +111,7 @@ Reprend l'organisation interne **DDD-lite** (cf. `archi/ddd.md`) + ajoute les co
 Placeholders : `{BackendName}` = ce service. `{Module}` = bounded context interne (souvent **UN seul module** si le service est focalisé).
 
 ```
-workspace/output/src/{BackendName}/
+workspace/src/{BackendName}/
 ├── Domain/{Module}/                        ← cf. archi/ddd.md §3 (Aggregates, VOs, Events, Repositories interfaces)
 ├── Application/{Module}/                   ← cf. archi/ddd.md §3 (UseCases, Validators, Application DTOs)
 ├── Infrastructure/

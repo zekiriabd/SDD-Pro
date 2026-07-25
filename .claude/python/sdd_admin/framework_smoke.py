@@ -34,7 +34,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from sdd_lib.paths import repo_root  # noqa: E402
+from sdd_lib.paths import workspace_root, repo_root  # noqa: E402
 from sdd_lib.exit_codes import FAIL_FAST, SUCCESS  # noqa: E402
 
 
@@ -213,7 +213,8 @@ EXPECTED_PRINCIPLES = (
 EXPECTED_TEMPLATES = (
     "feat.template.md", "us.template.md", "constitution.template.md",
     "adr.template.md", "readiness.template.md", "risks-assumptions.template.md",
-    "qa-report.template.md", "api-tests.template.json",
+    # qa-report.template.md retiré 2026-07-06 (rapport QA rendu à la demande depuis console.db)
+    "api-tests.template.json",
     "claude-md-backend.template.md", "claude-md-frontend.template.md",
     "claude-md-shared-lib.template.md",
     "adrs-index.template.md",
@@ -346,7 +347,7 @@ def _check_telemetry_health(claude_root: Path, checks: "Checks") -> None:
             checks.add("telemetry-health", "WARN",
                        "console.db verdict=POLLUTED (test artifacts) — "
                        "cost-cap + ROI on stale data. Clean : delete "
-                       "workspace/output/db/console.db (will be recreated)")
+                       "workspace/db/console.db (will be recreated)")
         else:
             checks.add("telemetry-health", "WARN", f"unknown verdict={verdict}")
     except (OSError, subprocess.TimeoutExpired) as e:
@@ -784,7 +785,7 @@ def main() -> int:
                    "migrate_exit_codes module not importable")
 
     # 10. Console lock cross-langage symétrique (anti-régression risque #2)
-    node_lock = root / "workspace" / "console" / "lib" / "atomic-write.js"
+    node_lock = workspace_root(root) / "console" / "lib" / "atomic-write.js"
     py_lock = claude_root / "python" / "sdd_scripts" / "gate_decide.py"
     if node_lock.is_file() and py_lock.is_file():
         node_src = node_lock.read_text(encoding="utf-8", errors="replace")

@@ -25,11 +25,11 @@ from sdd_hooks import validate_acceptance_gate as vag  # noqa: E402
 class TestValidateAcceptanceScript(unittest.TestCase):
     def setUp(self):
         import tempfile
-        self.tmp = tempfile.TemporaryDirectory()
+        self.tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)  # WinError 145 flaky (audit 2026-06-11)
         self.root = Path(self.tmp.name)
         (self.root / ".claude").mkdir()
-        (self.root / "workspace" / "input" / "stack").mkdir(parents=True)
-        (self.root / "workspace" / "output" / "src").mkdir(parents=True)
+        (self.root / "workspace" / "stack").mkdir(parents=True)
+        (self.root / "workspace" / "src").mkdir(parents=True)
         self.env_patch = patch.dict(os.environ, {"CLAUDE_PROJECT_DIR": str(self.root)})
         self.env_patch.start()
 
@@ -38,12 +38,12 @@ class TestValidateAcceptanceScript(unittest.TestCase):
         self.tmp.cleanup()
 
     def _write_stack(self, mode: str = "strict"):
-        (self.root / "workspace" / "input" / "stack" / "stack.md").write_text(
+        (self.root / "workspace" / "stack" / "stack.md").write_text(
             f"# Stack\n\n## Project Config\nAcceptanceGate: {mode}\n", encoding="utf-8"
         )
 
     def _report_path(self) -> Path:
-        return self.root / "workspace" / "output" / ".sys" / ".acceptance" / "acceptance.json"
+        return self.root / "workspace" / ".sys" / ".acceptance" / "acceptance.json"
 
     def test_no_stack_md_skipped(self):
         # No stack.md → mode=off → skipped, exit 0
@@ -73,7 +73,7 @@ class TestValidateAcceptanceScript(unittest.TestCase):
     def test_bypass_envvar(self):
         self._write_stack("strict")
         # Make a dummy node project that would fail otherwise
-        proj = self.root / "workspace" / "output" / "src" / "demo"
+        proj = self.root / "workspace" / "src" / "demo"
         proj.mkdir()
         (proj / "package.json").write_text('{"scripts":{}}', encoding="utf-8")  # missing test
         with patch.dict(os.environ, {"SDD_ALLOW_ACCEPTANCE_BYPASS": "1"}):
@@ -84,17 +84,17 @@ class TestValidateAcceptanceScript(unittest.TestCase):
         self.assertEqual(report["verdict"], "bypass")
 
     def test_project_detection(self):
-        proj_node = self.root / "workspace" / "output" / "src" / "MyApp"
+        proj_node = self.root / "workspace" / "src" / "MyApp"
         proj_node.mkdir()
         (proj_node / "package.json").write_text('{"scripts":{"test":"jest"}}', encoding="utf-8")
         self.assertEqual(va._detect_project_type(proj_node), "node")
 
-        proj_py = self.root / "workspace" / "output" / "src" / "PyApp"
+        proj_py = self.root / "workspace" / "src" / "PyApp"
         proj_py.mkdir()
         (proj_py / "pyproject.toml").write_text("[tool.poetry]\n", encoding="utf-8")
         self.assertEqual(va._detect_project_type(proj_py), "python")
 
-        proj_unknown = self.root / "workspace" / "output" / "src" / "Mystery"
+        proj_unknown = self.root / "workspace" / "src" / "Mystery"
         proj_unknown.mkdir()
         self.assertIsNone(va._detect_project_type(proj_unknown))
 
@@ -102,10 +102,10 @@ class TestValidateAcceptanceScript(unittest.TestCase):
 class TestAcceptanceGateHook(unittest.TestCase):
     def setUp(self):
         import tempfile
-        self.tmp = tempfile.TemporaryDirectory()
+        self.tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)  # WinError 145 flaky (audit 2026-06-11)
         self.root = Path(self.tmp.name)
         (self.root / ".claude").mkdir()
-        self.report_dir = self.root / "workspace" / "output" / ".sys" / ".acceptance"
+        self.report_dir = self.root / "workspace" / ".sys" / ".acceptance"
         self.report_dir.mkdir(parents=True)
         self.env_patch = patch.dict(os.environ, {"CLAUDE_PROJECT_DIR": str(self.root)})
         self.env_patch.start()

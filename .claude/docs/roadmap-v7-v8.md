@@ -56,8 +56,8 @@
 | 20 | Mémoire Claude scoped Tech Lead | Cf. discussion ouverte 2026-05-18. Sans casser source-first invariant. Implementation server-side. | 1 semaine |
 | 21 | Console web packagée | Embarquer `workspace/console/` dans framework (template + serveur Node minimal). Actuellement couplage soft. | 3-5 jours |
 | ~~22~~ | ~~Sweep stubs backward-compat~~ | ✅ **DONE v7.0.0-alpha post-audit 2026-05-20** : 8 stubs supprimés + 2 principes relocés à `docs/principles/`. 45+11+7 refs migrées dans agents/commands/python/stacks. Banners des 4 rules consolidées mis à jour. 0 ref orpheline (vérifié grep). |
-| ~~R7~~ | ~~Réactivation a11y/perf via ingest CI déterministe~~ | ✅ **DONE v7.2.0 (2026-05-24)** : Option B livrée. `sdd_scripts/ingest_axe.py` (axe-core JSON → `qa_a11y`, 53 assertions) + `sdd_scripts/ingest_lighthouse.py` (Lighthouse → `qa_performance`). Template CI `templates/ci-quality.github-actions.yml.template` instrumenté (steps Python + dérivation FEAT depuis branche). `error-classification.md §1.9/§1.12` MAJ. Pas de coût LLM. `/sdd-review` lit déjà `qa_a11y`/`qa_performance` (aggrégation inchangée). |
-| ~~R1~~ | ~~Adversarial review mode (BMAD pattern)~~ | ✅ **DONE v7.2.0 (2026-05-24)** : agent `adversarial-reviewer` (Sonnet 4.6, 240L, joue l'avocat du diable) + flag `/sdd-review --adversarial` + classe `[ADV_*]` (§1.15 — 5 angles : edge_case, fragile_assumption, hidden_tech_debt, failure_mode, ux_confusion). Verdict **purement informational** (jamais bloquant — pas mixé dans verdict consolidé). Persistance dans `validation_reports(report_type='adversarial')` via `ingest_agent_report --type adversarial` (7 nouveaux tests unit). Anti-duplication §2.5 stricte : drop des findings déjà émis par autres reviewers. 12ᵉ agent au framework. |
+| ~~R7~~ | ~~Réactivation a11y/perf via ingest CI déterministe~~ | ✅ **DONE 2026-05-24 (pré-GA, inclus dans v7.0.0)** : Option B livrée. `sdd_scripts/ingest_axe.py` (axe-core JSON → `qa_a11y`, 53 assertions) + `sdd_scripts/ingest_lighthouse.py` (Lighthouse → `qa_performance`). Template CI `templates/ci-quality.github-actions.yml.template` instrumenté (steps Python + dérivation FEAT depuis branche). `error-classification.md §1.9/§1.12` MAJ. Pas de coût LLM. `/sdd-review` lit déjà `qa_a11y`/`qa_performance` (aggrégation inchangée). |
+| ~~R1~~ | ~~Adversarial review mode (BMAD pattern)~~ | ✅ **DONE 2026-05-24 (pré-GA, inclus dans v7.0.0)** : agent `adversarial-reviewer` (Sonnet 4.6, 240L, joue l'avocat du diable) + flag `/sdd-review --adversarial` + classe `[ADV_*]` (§1.15 — 5 angles : edge_case, fragile_assumption, hidden_tech_debt, failure_mode, ux_confusion). Verdict **purement informational** (jamais bloquant — pas mixé dans verdict consolidé). Persistance dans `validation_reports(report_type='adversarial')` via `ingest_agent_report --type adversarial` (7 nouveaux tests unit). Anti-duplication §2.5 stricte : drop des findings déjà émis par autres reviewers. 12ᵉ agent au framework. |
 | 23 | Refactor 5 gros stacks `.md` > 800 L | `dotnet-minimalapi` (1016), `kotlin-spring-boot` (982), `react` (933), `python-fastapi` (849), `azure-ad` (795). Migrer §2.4 vers `.libs.json` (déjà partiellement fait via `sync_stack_md.py`), §3 conventions vers `docs/stacks/{id}-conventions.md`, garder `.md` à ~400 L (overview + layer mapping + scope). | 5× 1.5h = ~8h |
 
 **Décision M4 audit v7.0.0-alpha (2026-05-21)** : item 23 deferred v7.1.
@@ -120,8 +120,8 @@ signalés `[debug]` dans la table. Évolutions futures envisagées :
 | Décision | Statut | Raison | Reversibilité |
 |---|---|---|---|
 | **MCP integration** (`mcp.json`, `docs/MCP-SERVER.md`) | ❌ Abandonné v7.0.0 | Pas de consommateur production identifié, intégration jamais validée bout-en-bout. Coût maintenance > valeur démontrée. | Restauration v8+ possible si demande utilisateur (ADR `governance-major-mcp-reintroduction` requis). Récupération code : `git checkout main -- .claude/mcp.json .claude/docs/MCP-SERVER.md` (v6.10.4-LTS). |
-| **`accessibility-auditor` (agent LLM)** | ❌ Retiré v7.0.0 | Coût LLM élevé pour bénéfice marginal (axe-core CI fait le même check en 0 token). | Remplacé par `ingest_axe.py` (Option B, v7.2.0). |
-| **`performance-auditor` (agent LLM)** | ❌ Retiré v7.0.0 | Idem accessibility — Lighthouse CI fait le même check déterministe. | Remplacé par `ingest_lighthouse.py` (Option B, v7.2.0). |
+| **`accessibility-auditor` (agent LLM)** | ❌ Retiré v7.0.0 | Coût LLM élevé pour bénéfice marginal (axe-core CI fait le même check en 0 token). | Remplacé par `ingest_axe.py` (Option B, v7.0.0). |
+| **`performance-auditor` (agent LLM)** | ❌ Retiré v7.0.0 | Idem accessibility — Lighthouse CI fait le même check déterministe. | Remplacé par `ingest_lighthouse.py` (Option B, v7.0.0). |
 | **`dashboard` (agent LLM)** | ❌ Retiré v7.0.0 | Génération HTML statique remplacée par console web React (`workspace/console/`). | console web restaurée v7.0.0-alpha (2026-06-05). |
 | **`dev-*-strict` (variants Sonnet 4.6)** | ❌ Retirés v7.0.0 | Plans v2 + Inline Digest pas livrés bénéfice token attendu vs complexité. | Clé `PlanCacheStrict` tolérée no-op pour backward-compat. |
 
@@ -140,3 +140,9 @@ signalés `[debug]` dans la table. Évolutions futures envisagées :
 ---
 
 *Maintenu par Tech Lead, mis à jour à chaque release MAJOR/MINOR.*
+
+## Backlog audit 2026-06-11 (report explicite)
+
+| Item | Détail | Statut |
+|---|---|---|
+| Hoist `dev-run.md` (34,7 KB) + `sdd-full.md` (32,5 KB) sous le seuil 30 KB | Les 2 orchestrateurs dépassent le smell-threshold que le framework s'impose. Refactor RISQUÉ (prompts load-bearing) — exige un sprint dédié avec bench pipeline complet avant/après, PAS un fix d'audit à l'aveugle. Candidats : STEP 6.a-6.c de dev-run + gates LOT 3 de sdd-full vers des rules dédiées (pattern REFACTOR-4). | ⏳ reporté (seul finding de l'audit 2026-06-11 non fermé, décision tracée) |

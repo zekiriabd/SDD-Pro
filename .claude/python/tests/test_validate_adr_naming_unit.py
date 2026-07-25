@@ -130,7 +130,7 @@ def test_main_exits_zero_on_real_repo(capsys):
 
 def test_main_include_projects_no_fatal_when_missing(capsys):
     """Audit CTO 2026-06-09 #22 closure : --include-projects ne plante pas
-    quand `workspace/output/.sys/.context/adrs/` n'existe pas (greenfield repo).
+    quand `workspace/.sys/.context/adrs/` n'existe pas (greenfield repo).
     Le scan framework reste autoritaire, projects = optionnel."""
     saved_argv = sys.argv[:]
     sys.argv = ["validate_adr_naming.py", "--include-projects", "--json"]

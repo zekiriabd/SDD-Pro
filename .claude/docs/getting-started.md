@@ -36,7 +36,7 @@ L'innovation clé : **orchestration Python déterministe** (55 scripts, 0-coût)
 | Reviewers post-code | **5 angles distincts** | 1 | 0 |
 | Anti-derive strict | strict (matrice ownership + STOP) | partiel | ❌ |
 | Catalogue stacks | `.libs.json` machine + CVE + LTS check | ❌ | ❌ |
-| Taxonomie d'erreurs | **174 classes `[CLASS]`** cross-agent | ❌ | ❌ |
+| Taxonomie d'erreurs | **188 classes `[CLASS]`** cross-agent | ❌ | ❌ |
 | Télémétrie | SQLite (cost cap, audit, gates) | ❌ | ❌ |
 | Déterminisme | 55 scripts Python (0 token) | ❌ | ❌ |
 | Idempotence / resume | mode checkpoint | ❌ | ❌ |
@@ -132,8 +132,8 @@ python bootstrap.py --combo c1
 ```
 
 Ce qui se passe :
-- ✅ `workspace/input/stack/stack.md` généré (43 clés Project Config)
-- ✅ Structure `workspace/output/.sys/` créée
+- ✅ `workspace/stack/stack.md` généré (43 clés Project Config)
+- ✅ Structure `workspace/.sys/` créée
 - ✅ Deps Python installées (`pip install -e .claude/python[dev]`)
 - ✅ Deps console installées optionnellement (`workspace/console/`)
 - ✅ Smoke check passe
@@ -144,7 +144,7 @@ Après ça, ton repo est **initialisé** mais ne contient pas encore de FEAT.
 
 ### Étape 3 — Éditer les secrets (1 min)
 
-Ouvre `workspace/input/stack/stack.md` (déjà ouvert par bootstrap dans la plupart des éditeurs) et remplace les placeholders :
+Ouvre `workspace/stack/stack.md` (déjà ouvert par bootstrap dans la plupart des éditeurs) et remplace les placeholders :
 
 ```yaml
 ## Active Database
@@ -179,9 +179,9 @@ On va te poser 3-6 questions :
 - Règles métier ?
 - Critères d'acceptation ?
 
-L'agent produit `workspace/input/feats/1-Auth.md` avec des sections structurées : `## Functional Needs`, `## Functional Deliverables`, `## Business Rules`, `## Acceptance Criteria`, chacune avec des IDs stables `SFD-N`, `FD-N`, `BR-N`, `AC-N`.
+L'agent produit `workspace/feats/1-Auth.md` avec des sections structurées : `## Functional Needs`, `## Functional Deliverables`, `## Business Rules`, `## Acceptance Criteria`, chacune avec des IDs stables `SFD-N`, `FD-N`, `BR-N`, `AC-N`.
 
-**Optionnel** : dépose un mockup HTML à `workspace/input/ui/1-2-Login.html` pour la fidélité visuelle.
+**Optionnel** : dépose un mockup HTML à `workspace/ui/1-2-Login.html` pour la fidélité visuelle.
 
 ---
 
@@ -228,11 +228,11 @@ Coût attendu : **$15-30 USD** pour une FEAT typique de 2-3 US sur le combo C1.
 /sdd-status 1
 
 # Voir le code généré
-ls workspace/output/src/MonAppBack/
-ls workspace/output/src/MonAppFront/
+ls workspace/src/MonAppBack/
+ls workspace/src/MonAppFront/
 
-# Voir la review consolidée
-cat workspace/output/qa/feat-1/review.md
+# Voir la review consolidée (rendue à la demande depuis console.db)
+python .claude/python/sdd_scripts/query_console_db.py review --feat 1 --format md
 ```
 
 ---
@@ -295,7 +295,7 @@ Lignes de code générées : **~1000-3000 LOC** (varie selon FEAT).
 
 ### "SDD_Pro va-t-il modifier mon code existant ?"
 
-Non. SDD_Pro écrit **uniquement sous `workspace/output/src/`** (son propre sandbox). Le code source existant de ton repo n'est jamais touché.
+Non. SDD_Pro écrit **uniquement sous `workspace/src/`** (son propre sandbox). Le code source existant de ton repo n'est jamais touché.
 
 ### "Et si ma FEAT est trop vague ?"
 
@@ -319,7 +319,7 @@ La logique de resume utilise `sdd_state.py resume-target` pour sauter les phases
 
 ### "Mes données sont-elles sécurisées ?"
 
-- `workspace/input/stack/stack.md` (secrets) est gitignored.
+- `workspace/stack/stack.md` (secrets) est gitignored.
 - `workspace/console/.certs/` (clés HTTPS) est gitignored.
 - Aucune télémétrie ne quitte ta machine (SQLite est local).
 - Les appels API Anthropic suivent la politique Claude Code.

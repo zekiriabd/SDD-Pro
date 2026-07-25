@@ -74,7 +74,7 @@ class TestGetOrCreateRunId(unittest.TestCase):
             try:
                 rid = run_id.get_or_create_run_id()
                 self.assertRegex(rid, _RUN_ID_RE)
-                marker = root / "workspace" / "output" / ".sys" / ".state" / "run-id.current"
+                marker = root / "workspace" / ".sys" / ".state" / "run-id.current"
                 self.assertTrue(marker.exists())
                 self.assertEqual(marker.read_text(encoding="utf-8").strip(), rid)
             finally:
@@ -119,7 +119,7 @@ class TestGetOrCreateRunId(unittest.TestCase):
             try:
                 run_id.get_or_create_run_id()  # populate marker
                 forced = run_id.get_or_create_run_id(force_new=True)
-                marker = root / "workspace" / "output" / ".sys" / ".state" / "run-id.current"
+                marker = root / "workspace" / ".sys" / ".state" / "run-id.current"
                 self.assertEqual(marker.read_text(encoding="utf-8").strip(), forced)
             finally:
                 os.environ.pop("SDD_REPO_ROOT", None)

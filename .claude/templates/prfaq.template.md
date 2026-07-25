@@ -7,7 +7,7 @@
 > final avant de commencer le développement.
 >
 > **Owner** : Product Owner (humain). **Localisation** :
-> `workspace/input/discovery/prfaq.md` (créer dossier si absent).
+> `workspace/discovery/prfaq.md` (créer dossier si absent).
 > **Taille cible** : PR ≤ 1 page, FAQ ≤ 2 pages. Si plus long, le
 > produit est trop vague.
 

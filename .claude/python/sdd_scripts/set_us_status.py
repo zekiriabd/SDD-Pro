@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """SDD_Pro: set User Story Status with transition validation (v6.8+).
 
-Updates the `Status: {value}` line of workspace/output/us/{n}-{m}-*.md
+Updates the `Status: {value}` line of workspace/us/{n}-{m}-*.md
 after validating that the requested transition is allowed.
 
 Usage:
@@ -49,7 +49,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from sdd_lib.paths import repo_root  # noqa: E402
+from sdd_lib.paths import workspace_root, repo_root  # noqa: E402
 from sdd_lib.stderr import error_block, warn  # noqa: E402
 from sdd_lib.atomic_write import atomic_write_text  # noqa: E402
 
@@ -90,7 +90,7 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument(
         "--us",
-        help="US short id, e.g. '1-2' (will be matched against workspace/output/us/1-2-*.md)",
+        help="US short id, e.g. '1-2' (will be matched against workspace/us/1-2-*.md)",
     )
     p.add_argument(
         "--status",
@@ -116,13 +116,13 @@ def parse_args() -> argparse.Namespace:
 
 
 def resolve_us_path(us_id: str) -> Path | None:
-    """Resolve workspace/output/us/{us_id}-*.md from short id.
+    """Resolve workspace/us/{us_id}-*.md from short id.
 
     Returns the matched path, or None if absent / ambiguous.
     """
     if not US_ID_RE.match(us_id):
         return None
-    us_dir = repo_root() / "workspace" / "output" / "us"
+    us_dir = workspace_root(repo_root()) / "us"
     matches = sorted(us_dir.glob(f"{us_id}-*.md"))
     if len(matches) != 1:
         return None
@@ -177,7 +177,7 @@ def main() -> int:
     if us_path is None:
         error_block(
             f"set_us_status — US {args.us} not found",
-            f"[US_NOT_FOUND] no unique match for workspace/output/us/{args.us}-*.md",
+            f"[US_NOT_FOUND] no unique match for workspace/us/{args.us}-*.md",
             "verify --us format ({n}-{m}) and that /us-generate has run",
         )
         return 1

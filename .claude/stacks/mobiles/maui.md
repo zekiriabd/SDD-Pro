@@ -76,29 +76,29 @@ Architecture cible (un seul `.csproj`) :
 
 ## 1.3 Mapping couche → repertoire
 
-Un seul projet sous `workspace/output/src/{AppName}/`. **Convention single-project — `{BackendName}` et `{LibName}` ne s'appliquent pas a ce stack**. Arch leve WARNING `[STACK_MALFORMED]` si declares avec valeur non null.
+Un seul projet sous `workspace/src/{AppName}/`. **Convention single-project — `{BackendName}` et `{LibName}` ne s'appliquent pas a ce stack**. Arch leve WARNING `[STACK_MALFORMED]` si declares avec valeur non null.
 
 | Layer | Path |
 |---|---|
-| Project file | `workspace/output/src/{AppName}/{AppName}.csproj` |
-| App entry | `workspace/output/src/{AppName}/MauiProgram.cs` |
-| Application | `workspace/output/src/{AppName}/App.xaml` + `App.xaml.cs` |
-| Shell | `workspace/output/src/{AppName}/AppShell.xaml` + `AppShell.xaml.cs` |
-| Page | `workspace/output/src/{AppName}/Pages/{Domain}/{Name}Page.xaml` + `.xaml.cs` |
-| Custom Control | `workspace/output/src/{AppName}/Controls/{Name}.xaml` + `.xaml.cs` |
-| ViewModel | `workspace/output/src/{AppName}/ViewModels/{Domain}/{Name}ViewModel.cs` |
-| Service interface | `workspace/output/src/{AppName}/Services/Interfaces/I{Domain}Service.cs` |
-| Service impl | `workspace/output/src/{AppName}/Services/{Domain}Service.cs` |
-| Repository | `workspace/output/src/{AppName}/Repositories/{Domain}Repository.cs` |
-| Model / DTO | `workspace/output/src/{AppName}/Models/{Name}.cs` |
-| Converter | `workspace/output/src/{AppName}/Converters/{Name}Converter.cs` |
-| Behavior | `workspace/output/src/{AppName}/Behaviors/{Name}Behavior.cs` |
-| Resources Styles | `workspace/output/src/{AppName}/Resources/Styles/Colors.xaml`, `Styles.xaml` |
-| Images / Fonts | `workspace/output/src/{AppName}/Resources/Images/`, `Resources/Fonts/` |
-| Localization (.resx) | `workspace/output/src/{AppName}/Resources/Strings/AppResources.{lang}.resx` |
-| Platform Android | `workspace/output/src/{AppName}/Platforms/Android/` (`MainActivity.cs`, `AndroidManifest.xml`) |
-| Platform iOS | `workspace/output/src/{AppName}/Platforms/iOS/` (`AppDelegate.cs`, `Info.plist`) |
-| Config app | `workspace/output/src/{AppName}/appsettings.json` (peuple par arch — backend URL, JWT issuer, etc.) |
+| Project file | `workspace/src/{AppName}/{AppName}.csproj` |
+| App entry | `workspace/src/{AppName}/MauiProgram.cs` |
+| Application | `workspace/src/{AppName}/App.xaml` + `App.xaml.cs` |
+| Shell | `workspace/src/{AppName}/AppShell.xaml` + `AppShell.xaml.cs` |
+| Page | `workspace/src/{AppName}/Pages/{Domain}/{Name}Page.xaml` + `.xaml.cs` |
+| Custom Control | `workspace/src/{AppName}/Controls/{Name}.xaml` + `.xaml.cs` |
+| ViewModel | `workspace/src/{AppName}/ViewModels/{Domain}/{Name}ViewModel.cs` |
+| Service interface | `workspace/src/{AppName}/Services/Interfaces/I{Domain}Service.cs` |
+| Service impl | `workspace/src/{AppName}/Services/{Domain}Service.cs` |
+| Repository | `workspace/src/{AppName}/Repositories/{Domain}Repository.cs` |
+| Model / DTO | `workspace/src/{AppName}/Models/{Name}.cs` |
+| Converter | `workspace/src/{AppName}/Converters/{Name}Converter.cs` |
+| Behavior | `workspace/src/{AppName}/Behaviors/{Name}Behavior.cs` |
+| Resources Styles | `workspace/src/{AppName}/Resources/Styles/Colors.xaml`, `Styles.xaml` |
+| Images / Fonts | `workspace/src/{AppName}/Resources/Images/`, `Resources/Fonts/` |
+| Localization (.resx) | `workspace/src/{AppName}/Resources/Strings/AppResources.{lang}.resx` |
+| Platform Android | `workspace/src/{AppName}/Platforms/Android/` (`MainActivity.cs`, `AndroidManifest.xml`) |
+| Platform iOS | `workspace/src/{AppName}/Platforms/iOS/` (`AppDelegate.cs`, `Info.plist`) |
+| Config app | `workspace/src/{AppName}/appsettings.json` (peuple par arch — backend URL, JWT issuer, etc.) |
 
 ---
 
@@ -178,18 +178,18 @@ Single-target Android-only ou iOS-only → utiliser **Xamarin classic-style** = 
 
 ## 2.2 Outils
 
-- **Project file** : `workspace/output/src/{AppName}/{AppName}.csproj`
-- **Build** : `dotnet build workspace/output/src/{AppName}/{AppName}.csproj -f net9.0-android --nologo` (build per-TargetFramework — sur Mac requis pour iOS)
-- **Run Android (emulateur ouvert)** : `dotnet build -t:Run -f net9.0-android workspace/output/src/{AppName}/{AppName}.csproj`
-- **Run iOS (simulateur — macOS uniquement)** : `dotnet build -t:Run -f net9.0-ios workspace/output/src/{AppName}/{AppName}.csproj`
+- **Project file** : `workspace/src/{AppName}/{AppName}.csproj`
+- **Build** : `dotnet build workspace/src/{AppName}/{AppName}.csproj -f net9.0-android --nologo` (build per-TargetFramework — sur Mac requis pour iOS)
+- **Run Android (emulateur ouvert)** : `dotnet build -t:Run -f net9.0-android workspace/src/{AppName}/{AppName}.csproj`
+- **Run iOS (simulateur — macOS uniquement)** : `dotnet build -t:Run -f net9.0-ios workspace/src/{AppName}/{AppName}.csproj`
 - **Publish Android APK/AAB** : `dotnet publish -f net9.0-android -c Release -p:AndroidPackageFormat=apk` (ou `aab` pour Play Store)
 - **Publish iOS IPA** : `dotnet publish -f net9.0-ios -c Release -p:ArchiveOnBuild=true` (macOS + Apple Developer certificate)
 - **Smoke Command** :
 
 ```bash
-dotnet restore workspace/output/src/{AppName}/{AppName}.csproj
-dotnet build workspace/output/src/{AppName}/{AppName}.csproj -f net9.0-android --nologo --no-restore
-test -d workspace/output/src/{AppName}/bin/Debug/net9.0-android
+dotnet restore workspace/src/{AppName}/{AppName}.csproj
+dotnet build workspace/src/{AppName}/{AppName}.csproj -f net9.0-android --nologo --no-restore
+test -d workspace/src/{AppName}/bin/Debug/net9.0-android
 ```
 
 - **Smoke Timeout** : 300s (premiere build MAUI ~3-4min, incrementale ~30s)
@@ -202,21 +202,21 @@ test -d workspace/output/src/{AppName}/bin/Debug/net9.0-android
 ## 2.2.1 Init Commands
 
 ```bash
-if [ ! -f "workspace/output/src/{AppName}/{AppName}.csproj" ]; then
+if [ ! -f "workspace/src/{AppName}/{AppName}.csproj" ]; then
 
 # Pre-requis (verifies par arch en STEP 0) :
 # - dotnet workload list | grep -q maui  (sinon : dotnet workload install maui)
 
 # STEP 1 — Scaffold projet MAUI
-mkdir -p workspace/output/src/{AppName}
-dotnet new maui -n {AppName} -o workspace/output/src/{AppName} --framework net9.0 --force
+mkdir -p workspace/src/{AppName}
+dotnet new maui -n {AppName} -o workspace/src/{AppName} --framework net9.0 --force
 
 # STEP 2 — Retarget TargetFrameworks (par defaut maui template inclut Windows + Mac que SDD_Pro skip)
 # Edit {AppName}.csproj : <TargetFrameworks>net9.0-android;net9.0-ios</TargetFrameworks> (retirer maccatalyst + windows si non desires)
 # Cet edit passe par Read+Edit du csproj (pattern Blazor Server §2.2.1) — pas via sed/rm bash.
 
 # STEP 3 — Ajouter packages CORE (cf. §2.4)
-cd workspace/output/src/{AppName}
+cd workspace/src/{AppName}
 
 dotnet add package CommunityToolkit.Mvvm --version 8.4.0
 dotnet add package CommunityToolkit.Maui --version 11.0.0
@@ -460,9 +460,9 @@ Ce stack est optimise pour :
 ## 10. Notes pour l'agent `arch`
 
 1. **Detecter** `## Active Tech Specs` contient `mobiles/maui.md` → reconnaitre comme stack **mobile-only**
-2. **Le backend reste declare separement** dans `## Active Tech Specs` (ex. `backend/dotnet-minimalapi.md`) — co-existent sous `workspace/output/src/`
+2. **Le backend reste declare separement** dans `## Active Tech Specs` (ex. `backend/dotnet-minimalapi.md`) — co-existent sous `workspace/src/`
 3. **Pre-requis** : verifier `dotnet workload list` contient `maui`. Sinon : `dotnet workload install maui` (peut prendre 5-10min). Sur macOS : XCode + Apple Developer (free pour simulateur, payant pour TestFlight/App Store). Sur Linux : iOS impossible (build iOS exige Mac).
-4. **Creer** `workspace/output/src/{AppName}/` via `dotnet new maui` (cf. §2.2.1)
+4. **Creer** `workspace/src/{AppName}/` via `dotnet new maui` (cf. §2.2.1)
 5. **Composer** `appsettings.json` (MauiAsset) depuis `## Active Mobile Config` (`MOBILE_API_BASE_URL`) + `## Active Auth Specs`. **JAMAIS** ecrire les secrets en clair — utiliser plutot SecureStorage runtime + injection a la premiere connexion.
 6. **`## Active UI Specs`** : aucun design system web n'est compatible (`shadcn`/`vuetify`/`radzen-blazor` → WARNING bloquant). MAUI utilise son propre theming via `Resources/Styles/`. Alternative : capability `syncfusion-maui` (suite Syncfusion commerciale).
 7. **Phase B (DB)** : SKIP — pas de DB serveur. Si `ef-sqlite` capability → tables EF Core locale generees au premier run via `db.EnsureCreatedAsync()`.
@@ -481,29 +481,29 @@ Ce stack est optimise pour :
 
 | Path | Owner |
 |---|---|
-| `workspace/output/src/{AppName}/Pages/**` | `dev-frontend` |
-| `workspace/output/src/{AppName}/ViewModels/**` | `dev-frontend` |
-| `workspace/output/src/{AppName}/Services/**` | `dev-frontend` (toute la logique vit dans le projet MAUI) |
-| `workspace/output/src/{AppName}/Repositories/**` | `dev-frontend` (DB locale) |
-| `workspace/output/src/{AppName}/Models/**` | `dev-frontend` |
-| `workspace/output/src/{AppName}/Converters/**` | `dev-frontend` |
-| `workspace/output/src/{AppName}/Behaviors/**` | `dev-frontend` |
-| `workspace/output/src/{AppName}/Controls/**` | `dev-frontend` |
-| `workspace/output/src/{AppName}/Resources/**` | `dev-frontend` |
-| `workspace/output/src/{AppName}/Platforms/**` | `arch` (create) + `dev-frontend` (augment permissions / manifest entries) |
-| `workspace/output/src/{AppName}/MauiProgram.cs` | `arch` (create) + `dev-frontend` (augment services DI) |
-| `workspace/output/src/{AppName}/App.xaml(.cs)` / `AppShell.xaml(.cs)` | `arch` (create) + `dev-frontend` (augment routes Shell) |
-| `workspace/output/src/{AppName}/{AppName}.csproj` | `arch` (create) + `dev-frontend` (augment NuGet packages on-demand) |
-| `workspace/output/src/{AppName}/appsettings.json` | `arch` (create exclusif — config) |
+| `workspace/src/{AppName}/Pages/**` | `dev-frontend` |
+| `workspace/src/{AppName}/ViewModels/**` | `dev-frontend` |
+| `workspace/src/{AppName}/Services/**` | `dev-frontend` (toute la logique vit dans le projet MAUI) |
+| `workspace/src/{AppName}/Repositories/**` | `dev-frontend` (DB locale) |
+| `workspace/src/{AppName}/Models/**` | `dev-frontend` |
+| `workspace/src/{AppName}/Converters/**` | `dev-frontend` |
+| `workspace/src/{AppName}/Behaviors/**` | `dev-frontend` |
+| `workspace/src/{AppName}/Controls/**` | `dev-frontend` |
+| `workspace/src/{AppName}/Resources/**` | `dev-frontend` |
+| `workspace/src/{AppName}/Platforms/**` | `arch` (create) + `dev-frontend` (augment permissions / manifest entries) |
+| `workspace/src/{AppName}/MauiProgram.cs` | `arch` (create) + `dev-frontend` (augment services DI) |
+| `workspace/src/{AppName}/App.xaml(.cs)` / `AppShell.xaml(.cs)` | `arch` (create) + `dev-frontend` (augment routes Shell) |
+| `workspace/src/{AppName}/{AppName}.csproj` | `arch` (create) + `dev-frontend` (augment NuGet packages on-demand) |
+| `workspace/src/{AppName}/appsettings.json` | `arch` (create exclusif — config) |
 
-**Backend separe** : meme matrice ownership que pour son propre stack. Les 2 projets co-existent sous `workspace/output/src/{BackendName}/` et `workspace/output/src/{AppName}/`.
+**Backend separe** : meme matrice ownership que pour son propre stack. Les 2 projets co-existent sous `workspace/src/{BackendName}/` et `workspace/src/{AppName}/`.
 
 ---
 
 ## 12. Smoke test attendu (post-init arch)
 
 ```bash
-cd workspace/output/src/{AppName}
+cd workspace/src/{AppName}
 dotnet restore {AppName}.csproj
 dotnet build {AppName}.csproj -f net9.0-android --nologo --no-restore
 test -f MauiProgram.cs

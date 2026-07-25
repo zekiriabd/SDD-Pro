@@ -33,7 +33,7 @@
 ### 1.3 Combos « bench-validated runtime » — bench 2026-06-05 (23 combinaisons)
 
 Bench session 2026-06-05T10:13Z → 12:03Z (~4h cumulé), poste Windows mainteneur. Rapport
-consolidé : [`workspace/output/qa/bench/BENCH-GLOBAL-REPORT.md`](../../workspace/output/qa/bench/BENCH-GLOBAL-REPORT.md).
+consolidé : [`workspace/.sys/.bench/BENCH-GLOBAL-REPORT.md`](../../workspace/.sys/.bench/BENCH-GLOBAL-REPORT.md).
 
 #### 1.3.a Cross-origin REST (16 combinaisons : 4 backends × 4 SPA fronts)
 
@@ -117,9 +117,9 @@ mapping HTML→DS, capabilities on-demand, conventions stack-specific).
 | **DB** | PostgreSQL | — | SqlServer (combos non bench) | MySql, MariaDb, Sqlite, Oracle, MongoDb |
 | **Archi pattern** | `mvc` | — | `ddd` (combos C2 exercé, PoC formel pending), `microservice` (quarantaine v7) | — |
 | **Fullstack** | — | `angular-universal`, `blazor-server`, `kotlin-mustache`, `next`, `nuxt` | `aspnet-mvc-razor` (ajouté 2026-06-10, jamais bench) | `node-react` (🟡 **POC-only** : console SDD interne, hors prod externe) |
-| **Mobiles** | — | `maui` (Win desktop), `react-native` (Expo Web) | — | `kotlin-android` (scaffold seul, SDK absent) |
+| **Mobiles** | — | `maui` (Win desktop), `react-native` (Expo Web) | `kotlin-android` (scaffold-validated, APK runtime pending — SDK absent au bench) | — |
 
-**Recount canonique 2026-06-11** : 29 🟢 (4 backend + 4 frontend + 3 UI + 7 QA + 2 auth + 1 archi + 5 fullstack + 3 mobiles) + 5 🟡 experimental (dont `fullstack/aspnet-mvc-razor`, ajouté 2026-06-10) + 1 🟡 POC-only = **35 total** (cf. gate `framework_smoke.py` constante `expected_total = 35`).
+**Recount canonique 2026-06-11** : 28 🟢 (4 backend + 4 frontend + 3 UI + 7 QA + 2 auth + 1 archi + 5 fullstack + 2 mobiles) + 7 🟡 (5 experimental dont `fullstack/aspnet-mvc-razor` ajouté 2026-06-10 + 1 POC-only `fullstack/node-react` + 1 scaffold-validated `mobiles/kotlin-android`, downgradé 🟢→🟡 audit CTO 2026-06-07) = **35 total** (cf. gate `framework_smoke.py` constante `expected_total = 35`).
 
 > Lecture : un stack 🟡 experimental est conforme techniquement (entête
 > `Validation:`, `.libs.json` valide, tests stack-level OK) mais **n'a jamais
@@ -183,7 +183,7 @@ sur écosystème JS).
 | **C6** | Stack Python | `python-fastapi` | `angular` | (custom Material 3) | `python-pytest` + `angular-jasmine` | `azure-ad` | PostgreSQL | 4-5 j | non démarré |
 
 **Méthodologie** : suivre `docs/poc-roi-methodology.md` — bench S/M/L,
-mesurer wall-clock + coût + coverage, publier dans `workspace/output/qa/bench/BENCH-GLOBAL-REPORT.md`.
+mesurer wall-clock + coût + coverage, publier dans `workspace/.sys/.bench/BENCH-GLOBAL-REPORT.md`.
 
 **Critères d'acceptation combo** :
 - ≥ 1 FEAT M (3 US, back+front, AC traçables) bout-en-bout sans bypass
@@ -199,7 +199,7 @@ mesurer wall-clock + coût + coverage, publier dans `workspace/output/qa/bench/B
 
 ### 4.1 Méthode manuelle (10 secondes)
 
-1. Ouvrir `workspace/input/stack/stack.md`
+1. Ouvrir `workspace/stack/stack.md`
 2. Lire les blocs `## Active *`
 3. Comparer avec §1 ci-dessus :
    - **Tous** les composants (Backend + Frontend + UI + QA + Auth + DB)

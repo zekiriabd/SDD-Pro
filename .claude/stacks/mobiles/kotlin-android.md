@@ -5,7 +5,7 @@
 Status: Stable
 Validation: 🟡 scaffold-validated (Android 14+ LTS, Kotlin 2.0.21 LTS-aligned via Java 21, Jetpack Compose stable) — bench 2026-06-05 : scaffold OK, runtime non testé end-to-end (SDK Android absent CI). Downgrade depuis 🟢 reference (audit CTO 2026-06-07 : version Kotlin antérieurement annoncée inexistante au registre Maven → pin corrigé sur 2.0.21 dans `.libs.json`)
 Tech FEAT ID: tech-kotlin-android
-Scope: **application mobile native Android** — application Kotlin Jetpack Compose cible Android 7+ (API 24-36). Un seul projet `{AppName}/` sous `workspace/output/src/`. UI Compose + state + navigation + acces APIs natives vivent dans le même projet Kotlin. Pas de séparation `{BackendName}` / `{LibName}`.
+Scope: **application mobile native Android** — application Kotlin Jetpack Compose cible Android 7+ (API 24-36). Un seul projet `{AppName}/` sous `workspace/src/`. UI Compose + state + navigation + acces APIs natives vivent dans le même projet Kotlin. Pas de séparation `{BackendName}` / `{LibName}`.
 
 > **Backend séparé** : ce stack est PUREMENT client mobile native Android. Il consomme une API backend distincte déclarée en `## Active Tech Specs` (ex. `backend/kotlin-spring-boot.md`, `backend/dotnet-minimalapi.md`). Pour un app simple sans backend distinct → utiliser un Backend-as-a-Service (Firebase, Supabase, Appwrite) configuré via env vars.
 
@@ -196,14 +196,14 @@ Dépendances : Domain ← Data, Domain ← Presentation, Presentation → Domain
 
 ## 2.2 Outils
 
-- **Project file** : `workspace/output/src/{AppName}/build.gradle.kts`
-- **Build APK debug** : `cd workspace/output/src/{AppName} && ./gradlew assembleDebug`
-- **Build APK release** : `cd workspace/output/src/{AppName} && ./gradlew assembleRelease`
+- **Project file** : `workspace/src/{AppName}/build.gradle.kts`
+- **Build APK debug** : `cd workspace/src/{AppName} && ./gradlew assembleDebug`
+- **Build APK release** : `cd workspace/src/{AppName} && ./gradlew assembleRelease`
 - **Unit tests** : `./gradlew testDebugUnitTest`
 - **Instrumented tests (Emulator)** : `./gradlew connectedDebugAndroidTest`
 - **Smoke Command** (build seulement) :
   ```bash
-  cd workspace/output/src/{AppName} && ./gradlew clean assembleDebug --no-daemon
+  cd workspace/src/{AppName} && ./gradlew clean assembleDebug --no-daemon
   RC=$?; exit $RC
   ```
 - **Smoke Timeout** : 120s (Gradle warmup + build resources)
@@ -218,34 +218,34 @@ Dépendances : Domain ← Data, Domain ← Presentation, Presentation → Domain
 ```bash
 # Idempotent : skip si build.gradle.kts existe déjà
 
-if [ ! -f "workspace/output/src/{AppName}/build.gradle.kts" ]; then
+if [ ! -f "workspace/src/{AppName}/build.gradle.kts" ]; then
   # Génération via Android Studio template (ou créé manuellement)
-  mkdir -p workspace/output/src/{AppName}/app/src/main/kotlin/{AppNamespace}
-  mkdir -p workspace/output/src/{AppName}/app/src/main/res/values
-  mkdir -p workspace/output/src/{AppName}/app/src/main/res/drawable
-  mkdir -p workspace/output/src/{AppName}/app/src/main/res/mipmap
+  mkdir -p workspace/src/{AppName}/app/src/main/kotlin/{AppNamespace}
+  mkdir -p workspace/src/{AppName}/app/src/main/res/values
+  mkdir -p workspace/src/{AppName}/app/src/main/res/drawable
+  mkdir -p workspace/src/{AppName}/app/src/main/res/mipmap
   
   # Créer l'arborescence des couches
-  mkdir -p "workspace/output/src/{AppName}/app/src/main/kotlin/{AppNamespace}/presentation/screen"
-  mkdir -p "workspace/output/src/{AppName}/app/src/main/kotlin/{AppNamespace}/presentation/component"
-  mkdir -p "workspace/output/src/{AppName}/app/src/main/kotlin/{AppNamespace}/presentation/viewmodel"
-  mkdir -p "workspace/output/src/{AppName}/app/src/main/kotlin/{AppNamespace}/presentation/navigation"
-  mkdir -p "workspace/output/src/{AppName}/app/src/main/kotlin/{AppNamespace}/presentation/theme"
-  mkdir -p "workspace/output/src/{AppName}/app/src/main/kotlin/{AppNamespace}/domain/model"
-  mkdir -p "workspace/output/src/{AppName}/app/src/main/kotlin/{AppNamespace}/domain/repository"
-  mkdir -p "workspace/output/src/{AppName}/app/src/main/kotlin/{AppNamespace}/domain/usecase"
-  mkdir -p "workspace/output/src/{AppName}/app/src/main/kotlin/{AppNamespace}/data/remote/api"
-  mkdir -p "workspace/output/src/{AppName}/app/src/main/kotlin/{AppNamespace}/data/remote/interceptor"
-  mkdir -p "workspace/output/src/{AppName}/app/src/main/kotlin/{AppNamespace}/data/local/dao"
-  mkdir -p "workspace/output/src/{AppName}/app/src/main/kotlin/{AppNamespace}/data/local/entity"
-  mkdir -p "workspace/output/src/{AppName}/app/src/main/kotlin/{AppNamespace}/data/local/database"
-  mkdir -p "workspace/output/src/{AppName}/app/src/main/kotlin/{AppNamespace}/data/local/preferences"
-  mkdir -p "workspace/output/src/{AppName}/app/src/main/kotlin/{AppNamespace}/data/repository"
-  mkdir -p "workspace/output/src/{AppName}/app/src/main/kotlin/{AppNamespace}/di"
-  mkdir -p "workspace/output/src/{AppName}/app/src/main/kotlin/{AppNamespace}/util"
+  mkdir -p "workspace/src/{AppName}/app/src/main/kotlin/{AppNamespace}/presentation/screen"
+  mkdir -p "workspace/src/{AppName}/app/src/main/kotlin/{AppNamespace}/presentation/component"
+  mkdir -p "workspace/src/{AppName}/app/src/main/kotlin/{AppNamespace}/presentation/viewmodel"
+  mkdir -p "workspace/src/{AppName}/app/src/main/kotlin/{AppNamespace}/presentation/navigation"
+  mkdir -p "workspace/src/{AppName}/app/src/main/kotlin/{AppNamespace}/presentation/theme"
+  mkdir -p "workspace/src/{AppName}/app/src/main/kotlin/{AppNamespace}/domain/model"
+  mkdir -p "workspace/src/{AppName}/app/src/main/kotlin/{AppNamespace}/domain/repository"
+  mkdir -p "workspace/src/{AppName}/app/src/main/kotlin/{AppNamespace}/domain/usecase"
+  mkdir -p "workspace/src/{AppName}/app/src/main/kotlin/{AppNamespace}/data/remote/api"
+  mkdir -p "workspace/src/{AppName}/app/src/main/kotlin/{AppNamespace}/data/remote/interceptor"
+  mkdir -p "workspace/src/{AppName}/app/src/main/kotlin/{AppNamespace}/data/local/dao"
+  mkdir -p "workspace/src/{AppName}/app/src/main/kotlin/{AppNamespace}/data/local/entity"
+  mkdir -p "workspace/src/{AppName}/app/src/main/kotlin/{AppNamespace}/data/local/database"
+  mkdir -p "workspace/src/{AppName}/app/src/main/kotlin/{AppNamespace}/data/local/preferences"
+  mkdir -p "workspace/src/{AppName}/app/src/main/kotlin/{AppNamespace}/data/repository"
+  mkdir -p "workspace/src/{AppName}/app/src/main/kotlin/{AppNamespace}/di"
+  mkdir -p "workspace/src/{AppName}/app/src/main/kotlin/{AppNamespace}/util"
   
   # Créer les fichiers build (scaffolding minimal)
-  cat > workspace/output/src/{AppName}/build.gradle.kts << 'EOF'
+  cat > workspace/src/{AppName}/build.gradle.kts << 'EOF'
 plugins {
     alias(libs.plugins.kotlin.gradle)
     alias(libs.plugins.android.app)
@@ -320,7 +320,7 @@ fi
 # (script déterministe auto-généré par arch)
 
 # Build validation
-cd workspace/output/src/{AppName} && ./gradlew compileDebugKotlin --no-daemon
+cd workspace/src/{AppName} && ./gradlew compileDebugKotlin --no-daemon
 ```
 
 **Contrat post-init** :

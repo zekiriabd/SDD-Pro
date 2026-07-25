@@ -1,3 +1,12 @@
+---
+# TOK-C1 (audit 2026-06-12) : chargement paresseux (path-scoped rule). Lue on-demand par
+# dev-*/arch/qa ; auto-injection au contact du code généré ou des stacks. Économie en
+# session forward sans matérialisation et en maintenance framework.
+paths:
+  - "workspace/src/**"
+  - ".claude/stacks/**"
+---
+
 # Règle — Library & Stack (consolidated v7.0.0)
 
 > **v7.0.0 merge** : fusionne `stack-completeness.md` (libs anti-derive,
@@ -151,9 +160,9 @@ Project Config).
 |---|---|
 | Backend | `dotnet-minimalapi`, `kotlin-spring-boot`, `python-fastapi`, `node-express` |
 | Frontend | `blazor-webassembly`, `react`, `vue`, `angular` |
-| QA | `dotnet-xunit`, `blazor-bunit`, `node-vitest`, `python-pytest`, `kotlin-junit`, `angular-jasmine` |
+| QA | `dotnet-xunit`, `blazor-bunit`, `node-vitest`, `python-pytest`, `kotlin-junit`, `angular-jasmine`, `mutation-testing`, `playwright` |
 | UI DS | `radzen-blazor`, `shadcn` (7 core + 15 onDemand Radix), `vuetify` |
-| Fullstack | `next`, `nuxt`, `angular-universal`, `blazor-server`, `kotlin-mustache`, `node-react` |
+| Fullstack | `next`, `nuxt`, `angular-universal`, `blazor-server`, `kotlin-mustache`, `node-react`, `aspnet-mvc-razor` |
 | Mobiles | `kotlin-android`, `maui`, `react-native` |
 
 **Hors périmètre `.libs.json`** (par design) : `auth/*` (protocoles
@@ -364,7 +373,7 @@ construction. Non systématisé v7.0.0.
 
 Jackson préserve camelCase (`val fkAnnonceur` → `fkAnnonceur`). Frontend
 TS DOIT utiliser mêmes clés. Tout renommage DTO backend exige grep front
-(`grep -rn "field.X" workspace/output/src/{AppName}/`).
+(`grep -rn "field.X" workspace/src/{AppName}/`).
 
 **Anti-pattern** : champ `libelle` back mappé `nom` front → Jackson rejette
 POST (400 `@NotBlank` sur `nom` absent), lecture retourne `undefined`.
@@ -456,7 +465,7 @@ avant les handlers). **Load-bearing** pour `appType: back-front`.
 | `blazor-webassembly` | 5097 | `http://localhost:5097` |
 
 **Override** dans `## Project Config` : `Cors:AllowedOrigins: "..."` (User-set
-wins). Détail : `agents/arch.md §4.5.6`.
+wins). Détail : `docs/arch/phase-a-config-propagation.md §4.5.6` (substance hoistée hors d'arch.md).
 
 ---
 
@@ -586,16 +595,16 @@ même si proxy actif en dev — sinon dérive prod garantie.
 
 ```bash
 # Backend Spring (Kotlin)
-grep -r "@CrossOrigin" workspace/output/src/{BackendName}/ && WARN
+grep -r "@CrossOrigin" workspace/src/{BackendName}/ && WARN
 
 # Backend .NET
-grep -r "AddCors\|UseCors" workspace/output/src/{BackendName}/ || ERROR (manquant)
+grep -r "AddCors\|UseCors" workspace/src/{BackendName}/ || ERROR (manquant)
 
 # FastAPI
-grep -r "CORSMiddleware" workspace/output/src/{BackendName}/ || ERROR
+grep -r "CORSMiddleware" workspace/src/{BackendName}/ || ERROR
 
 # Node Express
-grep -r "cors()" workspace/output/src/{BackendName}/ || ERROR
+grep -r "cors()" workspace/src/{BackendName}/ || ERROR
 ```
 
 ### Format ERROR
@@ -658,3 +667,158 @@ Convention extraite du post-mortem CMS-Back 2026-05-11 (cf.
 `source-first.md §1`) où CORS oublié sur Spring Boot avait causé
 3 jours de debug sur projet client. Pattern canonique inliné aussi dans
 `stacks/auth/azure-ad.md §5.2.7.9`.
+
+---
+
+# Partie C — Database structural safety (base existante protégée)
+
+> **Nouveau (décision Tech Lead 2026-06-13)** : règle dure inter-agent.
+> Périmètre retenu : **« existant protégé, création greenfield OK »**.
+> Émet `[DB_STRUCTURE_CHANGE_FORBIDDEN]` (`error-classification.md §1.3`).
+
+## C.1 Principe
+
+**Aucun agent SDD_Pro (arch, dev-backend, dev-frontend, qa) ne modifie
+JAMAIS la structure d'une base de données *existante* ni n'exécute
+d'action destructive.** La base de données d'un projet déjà provisionné
+(brownfield, reverse, prod, base partagée) est traitée comme une
+**ressource en lecture / DML uniquement** :
+
+| Catégorie SQL | Autorisé pour un agent ? |
+|---|:---:|
+| `SELECT` (lecture) | ✅ oui |
+| `INSERT` / `UPDATE` ciblés (DML, avec `WHERE` pour update) | ✅ oui |
+| Introspection métadonnées (`information_schema`, `INFORMATION_SCHEMA`) READ-ONLY | ✅ oui (arch Phase B) |
+| `CREATE TABLE` du **schéma initial d'un projet greenfield** (base neuve, vide) | ✅ oui (scaffolding ; cf. C.3) |
+| `DROP` (table/colonne/index/contrainte/base) | ❌ **INTERDIT** |
+| `ALTER` de structure sur une **base existante** (add/drop/rename column, change type, contrainte) | ❌ **INTERDIT** |
+| `TRUNCATE` | ❌ **INTERDIT** |
+| `DELETE` de masse (sans `WHERE` ciblé, ou ciblant la structure logique) | ❌ **INTERDIT** |
+| Application de migration contre une base existante (`dotnet ef database update`, `db.Database.Migrate()`, `EnsureCreated()` au runtime, `prisma migrate deploy`, `alembic upgrade`, `flyway migrate`) | ❌ **INTERDIT** (sauf exception FEAT de migration Flyway — cf. §C.6) |
+| Tout SQL destructif / DDL non listé ci-dessus | ❌ **INTERDIT** |
+
+## C.2 Comportement obligatoire face à un besoin de changement structurel
+
+Si une US/FEAT exige une modification de structure d'une base existante
+(nouvelle colonne, nouvel index, table d'association, contrainte) :
+
+1. L'agent **NE l'exécute PAS** et **NE l'applique PAS**.
+2. Il **écrit le DDL souhaité** (jamais exécuté) dans
+   `workspace/db/migration-pending.sql` (append-only, daté, avec
+   le contexte US/FEAT en commentaire SQL).
+3. Il **émet** `[DB_STRUCTURE_CHANGE_FORBIDDEN]` (ERROR 3L disque + chat 1L)
+   et **s'arrête** sur le scope concerné (STOP, pas de build_loop).
+4. Le **Tech Lead humain** applique la migration à la main après revue,
+   puis relance le pipeline.
+
+```
+ERROR: dev-backend 5-4 — changement de structure DB requis
+CAUSE: [DB_STRUCTURE_CHANGE_FORBIDDEN] US 5-4 nécessite ALTER TABLE Cadenciers_DataImport ADD COLUMN Signer_manuellement — base existante, interdit à l'agent
+FIX: DDL écrit dans workspace/db/migration-pending.sql ; Tech Lead applique manuellement puis relance
+```
+
+## C.3 Exception unique — création greenfield
+
+La **création du schéma initial d'un projet neuf** (base vide, première
+matérialisation) reste permise :
+- via le scaffolding **Database-First READ-ONLY** d'arch (introspection
+  seule, jamais d'écriture sur la base — `arch.md` anti-derive « DB READ-ONLY ») ;
+- ou via une migration **initiale** générée en fichier (`migrations/`,
+  `*.sql`) que le Tech Lead applique sur la **base neuve**.
+
+Ce qui distingue l'exception : la base est **vide / inexistante**, il n'y
+a **aucune donnée ni structure à préserver**. Dès qu'une base contient
+des tables ou des données (existant, reverse, prod), C.1 s'applique sans
+exception. **En cas de doute « base neuve vs existante » → traiter comme
+existante** (fail-safe, escalade C.2).
+
+## C.4 Code de démarrage généré (anti-auto-migrate)
+
+Le code applicatif généré par dev-backend **ne doit jamais** auto-appliquer
+de migration / auto-créer le schéma au runtime contre une base existante :
+- ❌ `context.Database.Migrate()` au startup
+- ❌ `context.Database.EnsureCreated()` en environnement non-greenfield
+- ❌ `synchronize: true` (TypeORM), `ddl-auto: update|create-drop` (Hibernate/JPA)
+  sur base existante
+- ✅ `ddl-auto: validate` (ou `none`) : valide le mapping sans modifier la structure
+
+Si le stack impose un `ddl-auto`/équivalent, la valeur par défaut sûre est
+`validate`/`none` ; tout autre choix sur base existante = `[DB_STRUCTURE_CHANGE_FORBIDDEN]`.
+
+## C.5 Lien avec autres règles
+
+- `error-classification.md §1.3` : classe `[DB_STRUCTURE_CHANGE_FORBIDDEN]` (STOP).
+- `agents/arch.md` (anti-derive « DB READ-ONLY ») : arch n'écrit jamais sur la base.
+- `agents/dev-backend.md` (anti-derive) : pas de migration appliquée, pas d'auto-migrate.
+- `ownership.md §1` : `workspace/db/migration-pending.sql` (escalade) co-owné arch/dev-backend.
+
+## C.6 Exception sanctionnée — FEAT de migration Flyway
+
+> **Nouveau (décision Tech Lead 2026-06-30)** : seule dérogation explicite à
+> C.1. Flyway devient le **mécanisme de migration sanctionné** (versionné,
+> idempotent via `flyway_schema_history`). Toute autre voie d'altération de
+> structure (DDL ad-hoc, `Migrate()`/`EnsureCreated()` runtime, `prisma migrate
+> deploy`, `alembic upgrade`) **reste interdite** (C.1 inchangé).
+
+### C.6.1 Déclencheur — nom de fichier FEAT contient « Flyway »
+
+Une **FEAT de migration** est une FEAT dont le **basename** matche
+`(?i)flyway` (substring case-insensitive), p.ex.
+`workspace/feats/2-Flyway-Migration.md`, `5-Flyway-Add-Audit-Cols.md`.
+
+La détection vit **dans l'orchestrateur** (`/sdd-full` STEP 2, `/sdd-poc`
+STEP 2.1) — **jamais dans arch** (qui ne lit jamais les FEATs, anti-derive).
+L'orchestrateur, sur match :
+1. écrit le sentinel `workspace/.sys/.state/flyway-migrate-requested.flag`
+   (contenu : `feat={n}-{FeatName}` + `requested_at={ISO-8601}`) ;
+2. force le comportement `--rebuild-arch` pour la phase DB (défait le
+   short-circuit arch — le scaffolding **doit** être refait à chaque run).
+
+### C.6.2 Comportement — `flyway migrate` PUIS re-scaffolding
+
+À chaque `/sdd-full {n}` ou `/sdd-poc {n}` sur une FEAT de migration, arch
+(Phase B, STEP 8.5 — cf. `docs/arch/phase-b-db-scaffolding.md`) :
+
+1. compose la connection string en RAM (STEP 8 existant, jamais persistée) ;
+2. exécute **`flyway migrate`** contre la base, scripts versionnés
+   `V{version}__{desc}.sql` lus depuis l'emplacement conventionnel du stack
+   (Spring Boot : `src/main/resources/db/migration/` ; sinon
+   `workspace/db/migration/`) ;
+3. ré-introspecte le schéma (STEP 9, **forcé** même si `schema.json` existe) ;
+4. re-scaffolde les entities (STEP 11, `--force` incrémental) pour refléter
+   le schéma migré ;
+5. **consomme** (supprime) le sentinel après migrate réussi (per-run).
+
+**Idempotence** : `flyway migrate` ne ré-applique jamais une version déjà
+inscrite dans `flyway_schema_history` → relancer le pipeline est sûr.
+
+### C.6.3 Garde-fous (l'exception reste étroite)
+
+- **Périmètre** : seules les commandes `/sdd-full` et `/sdd-poc` honorent le
+  sentinel. `/dev-run`, `/arch-init` hors pipeline et les agents dev-* ne
+  déclenchent **jamais** `flyway migrate`.
+- **Runner absent** : si le stack backend actif ne fournit pas de runner
+  Flyway exécutable → STOP `CAUSE: [INFRA_BLOCKED]` (« je n'ai pas pu
+  exécuter »), pas de fallback DDL silencieux.
+- **Migrate en échec** : exit ≠ 0 → STOP `CAUSE: [SCHEMA_MISMATCH]` (script
+  invalide, conflit de version, base injoignable) ; aucune ré-écriture
+  partielle masquée.
+- **arch n'écrit pas les scripts** : les `V*__*.sql` sont des artefacts de la
+  FEAT (Tech Lead / dev-backend), arch **exécute** seulement le runner — il
+  ne génère ni ne modifie le DDL (toujours pas de code applicatif).
+- **C.4 inchangé** : le code applicatif généré ne doit **toujours pas**
+  auto-migrer au runtime (`Migrate()`/`EnsureCreated()`/`ddl-auto: update` au
+  startup restent `[DB_STRUCTURE_CHANGE_FORBIDDEN]`). §C.6 est une **phase de
+  pipeline explicite et opt-in**, pas du code de démarrage.
+- **Hors FEAT Flyway** : un besoin structurel détecté sur une FEAT *non*
+  nommée Flyway suit C.2 (DDL écrit dans `migration-pending.sql`, STOP,
+  escalade Tech Lead) — aucune migration auto.
+
+### C.6.4 Lien avec autres règles
+
+- `error-classification.md §1.3` : note d'exception sur
+  `[DB_STRUCTURE_CHANGE_FORBIDDEN]`.
+- `docs/arch/phase-b-db-scaffolding.md §8.5` : substance opérationnelle
+  (lecture sentinel, invocation runner, consommation flag).
+- `commands/{sdd-full,sdd-poc}.md` : détection basename + écriture sentinel +
+  forçage `--rebuild-arch`.

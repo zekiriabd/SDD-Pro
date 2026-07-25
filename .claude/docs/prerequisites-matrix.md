@@ -219,7 +219,7 @@ axe-core + Lighthouse + sqlite3 ingest. Prérequis runner :
 - **Azure DevOps** : `windows-latest` (combos .NET) ou `ubuntu-latest`
 
 Le template CI est lisible et ajustable — voir `arch.md §STEP 4.7` pour
-le placement (`workspace/output/src/{Project}/.github/workflows/quality.yml`).
+le placement (`workspace/src/{Project}/.github/workflows/quality.yml`).
 
 ---
 

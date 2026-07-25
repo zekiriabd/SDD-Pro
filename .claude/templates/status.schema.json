@@ -19,7 +19,7 @@
     },
     "FEATs": {
       "type": "object",
-      "description": "Cle = basename FEAT sans extension (ex: '1-FEAT-connexion'). Une entree par fichier workspace/input/feats/{n}-{name}.md.",
+      "description": "Cle = basename FEAT sans extension (ex: '1-FEAT-connexion'). Une entree par fichier workspace/feats/{n}-{name}.md.",
       "additionalProperties": {
         "type": "object",
         "required": ["humanStatus"],
@@ -31,7 +31,7 @@
           "comment": { "type": "string", "description": "Commentaire libre du validateur." },
           "us": {
             "type": "object",
-            "description": "Cle = basename US (ex: '1-1-Connexion'). Une entree par fichier workspace/output/us/{n}-{m}-{Name}.md.",
+            "description": "Cle = basename US (ex: '1-1-Connexion'). Une entree par fichier workspace/us/{n}-{m}-{Name}.md.",
             "additionalProperties": {
               "type": "object",
               "required": ["humanStatus"],

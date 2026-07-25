@@ -5,7 +5,7 @@ checks stack/hash/mockups — absent at Phase 3 of reverse pipeline.
 
 Invocation:
     python -m sdd_reverse_scripts.validate_reverse_feat \
-        --feat-path workspace/input/feats/{n}-{Name}.md \
+        --feat-path workspace/feats/{n}-{Name}.md \
         [--json]
     python -m sdd_reverse_scripts.validate_reverse_feat \
         --reconcile [--project workspace/old/{P}/] [--json]
@@ -79,13 +79,24 @@ def _check_items_have_evidence_and_confidence(
             next_section_start = idx
     section_body = content[section_start:next_section_start] if next_section_start != -1 else content[section_start:]
 
-    # Each ID-line should have evidence+confidence comments within the same paragraph
-    # (the same line + next 2 lines).
-    for m in pat.finditer(section_body):
+    # Audit 2026-06-11 (B2) : découpage par BLOC D'ITEM (début de l'item N →
+    # début de la ligne de l'item N+1, ou fin de section) au lieu d'une fenêtre
+    # fixe de 600 chars. L'ancienne fenêtre produisait (a) des faux négatifs —
+    # un item sans evidence « couvert » par les commentaires de l'item suivant
+    # quand les lignes étaient courtes — et (b) des faux
+    # [REVERSE_EVIDENCE_MISSING] sur les items légitimes > 600 chars.
+    matches = list(pat.finditer(section_body))
+    for i, m in enumerate(matches):
         item_id = m.group(0).strip("-*: ")
         line_start = section_body.rfind("\n", 0, m.start()) + 1
-        # Read up to 3 lines after the ID line (covers inline comments + wrapped)
-        lookahead = section_body[line_start: line_start + 600]
+        if i + 1 < len(matches):
+            nxt_start = matches[i + 1].start()
+            block_end = section_body.rfind("\n", 0, nxt_start) + 1
+            if block_end <= line_start:
+                block_end = nxt_start
+        else:
+            block_end = len(section_body)
+        lookahead = section_body[line_start:block_end]
         has_evidence = bool(EVIDENCE_COMMENT_RE.search(lookahead))
         has_confidence = bool(CONFIDENCE_COMMENT_RE.search(lookahead))
         if not has_evidence:
@@ -201,13 +212,13 @@ def reconcile_inventories(project_filter: str | None = None) -> dict:
     import os
 
     from sdd_reverse.atomic_write_local import atomic_write_text
-    from sdd_reverse.paths import repo_root
+    from sdd_reverse.paths import workspace_root, repo_root
     from sdd_reverse_scripts.preallocate_feats import _sanitize_name
 
     override = os.environ.get("SDD_REVERSE_WORKSPACE_ROOT")
     root = Path(override).resolve() if override and Path(override).is_dir() else repo_root()
-    workspace_old = root / "workspace" / "old"
-    workspace_feats = root / "workspace" / "input" / "feats"
+    workspace_old = workspace_root(root) / "old"
+    workspace_feats = workspace_root(root) / "feats"
     if not workspace_old.is_dir():
         return {"ok": False, "error": "workspace/old/ not found", "reconciled": []}
 

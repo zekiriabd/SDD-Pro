@@ -46,12 +46,12 @@ class TestPreflightGlobScopeWarn(unittest.TestCase):
     """Default WARN mode : emit stderr but allow."""
 
     def test_broad_pattern_warns_but_allows(self):
-        r = _run_hook(_glob_payload("workspace/output/src/**/*"))
+        r = _run_hook(_glob_payload("workspace/src/**/*"))
         self.assertEqual(r.returncode, 0)
         self.assertIn("WARN", r.stderr)
 
     def test_scoped_pattern_silent(self):
-        r = _run_hook(_glob_payload("workspace/output/src/MyApp/Services/**/*.cs"))
+        r = _run_hook(_glob_payload("workspace/src/MyApp/Services/**/*.cs"))
         self.assertEqual(r.returncode, 0)
         self.assertNotIn("WARN", r.stderr)
 
@@ -68,18 +68,18 @@ class TestPreflightGlobScopeStrict(unittest.TestCase):
     """SDD_GLOB_SCOPE_STRICT=1 → exit 2 on broad pattern."""
 
     def test_strict_blocks_broad(self):
-        r = _run_hook(_glob_payload("workspace/output/src/**/*"),
+        r = _run_hook(_glob_payload("workspace/src/**/*"),
                       {"SDD_GLOB_SCOPE_STRICT": "1"})
         self.assertEqual(r.returncode, 2)
         self.assertIn("GLOB_SCOPE_TOO_BROAD", r.stderr)
 
     def test_strict_allows_scoped(self):
-        r = _run_hook(_glob_payload("workspace/output/src/MyApp/**/*.ts"),
+        r = _run_hook(_glob_payload("workspace/src/MyApp/**/*.ts"),
                       {"SDD_GLOB_SCOPE_STRICT": "1"})
-        # Wait — this pattern matches `workspace/output/src/**/*.ts` which is
+        # Wait — this pattern matches `workspace/src/**/*.ts` which is
         # NOT in the broad list (we only ban naked `**/*` without extension).
         # But the regex matches the LITERAL pattern, not its semantic. Let me
-        # verify : "workspace/output/src/MyApp/**/*.ts" has extension → allowed.
+        # verify : "workspace/src/MyApp/**/*.ts" has extension → allowed.
         self.assertEqual(r.returncode, 0)
 
     def test_strict_blocks_naked_double_star(self):
@@ -88,7 +88,7 @@ class TestPreflightGlobScopeStrict(unittest.TestCase):
         self.assertEqual(r.returncode, 2)
 
     def test_bypass_env_overrides_strict(self):
-        r = _run_hook(_glob_payload("workspace/output/src/**/*"),
+        r = _run_hook(_glob_payload("workspace/src/**/*"),
                       {"SDD_GLOB_SCOPE_STRICT": "1",
                        "SDD_DISABLE_GLOB_SCOPE": "1"})
         self.assertEqual(r.returncode, 0)

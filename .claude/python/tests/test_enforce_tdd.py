@@ -46,15 +46,15 @@ def test_mode_default_strict_in_ci(monkeypatch):
 # ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize("path,expected", [
-    ("workspace/output/src/Backend/Services/AuthService.cs", True),
-    ("workspace/output/src/App/src/pages/Login.tsx", True),
-    ("workspace/output/src/Backend.Tests/AuthServiceTests.cs", False),
-    ("workspace/output/src/App/src/__tests__/Login.test.tsx", False),
-    ("workspace/output/src/Api/tests/test_main.py", False),
-    ("workspace/output/src/Kt/src/test/kotlin/FooTest.kt", False),
-    ("workspace/input/feats/1-Auth.md", False),
+    ("workspace/src/Backend/Services/AuthService.cs", True),
+    ("workspace/src/App/src/pages/Login.tsx", True),
+    ("workspace/src/Backend.Tests/AuthServiceTests.cs", False),
+    ("workspace/src/App/src/__tests__/Login.test.tsx", False),
+    ("workspace/src/Api/tests/test_main.py", False),
+    ("workspace/src/Kt/src/test/kotlin/FooTest.kt", False),
+    ("workspace/feats/1-Auth.md", False),
     (".claude/python/sdd_lib/paths.py", False),
-    ("workspace/output/src/App/node_modules/x/index.js", False),
+    ("workspace/src/App/node_modules/x/index.js", False),
 ])
 def test_is_production_path(path, expected):
     assert mod._is_production_path(path) is expected
@@ -80,17 +80,17 @@ def test_content_introduces_new_symbol(ext, content, expected):
 # main() end-to-end (payload + repo monkeypatchés)
 # ---------------------------------------------------------------------------
 
-PROD_REL = "workspace/output/src/Backend/Services/AuthService.cs"
+PROD_REL = "workspace/src/Backend/Services/AuthService.cs"
 NEW_SYMBOL = "public class AuthService { public void Login() {} }"
 
 
 def _run_main(monkeypatch, tmp_path: Path, *, payload: dict, mode: str = "strict",
               companion_test: bool = False) -> int:
     (tmp_path / ".claude").mkdir(exist_ok=True)
-    (tmp_path / "workspace" / "output" / "src" / "Backend" / "Services").mkdir(
+    (tmp_path / "workspace" / "src" / "Backend" / "Services").mkdir(
         parents=True, exist_ok=True)
     if companion_test:
-        tests_dir = tmp_path / "workspace" / "output" / "src" / "Backend.Tests"
+        tests_dir = tmp_path / "workspace" / "src" / "Backend.Tests"
         tests_dir.mkdir(parents=True, exist_ok=True)
         (tests_dir / "AuthServiceTests.cs").write_text(
             "public class AuthServiceTests {}", encoding="utf-8")
@@ -125,7 +125,7 @@ def test_companion_test_allows(monkeypatch, tmp_path):
 
 def test_test_file_itself_is_allowed(monkeypatch, tmp_path):
     payload = _write_payload(
-        path="workspace/output/src/Backend.Tests/AuthServiceTests.cs")
+        path="workspace/src/Backend.Tests/AuthServiceTests.cs")
     rc = _run_main(monkeypatch, tmp_path, payload=payload)
     assert rc == HOOK_ALLOW
 

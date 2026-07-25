@@ -1,7 +1,7 @@
 # SDD_Pro — Known gaps from bench 2026-06-05
 
 > **Statut** : tracking ouvert v7.0.0-alpha
-> **Source** : section §13 du rapport [`workspace/output/qa/bench/BENCH-GLOBAL-REPORT.md`](../../../workspace/output/qa/bench/BENCH-GLOBAL-REPORT.md)
+> **Source** : section §13 du rapport [`workspace/.sys/.bench/BENCH-GLOBAL-REPORT.md`](../../../workspace/.sys/.bench/BENCH-GLOBAL-REPORT.md)
 > **Distinction-clé** : ces gaps **n'invalident pas** la qualité du code généré (23 combinaisons runtime 🟢 prouvent que les stack patterns sont conformes). Ils invalident la **promesse "pipeline automatisé end-to-end"** sur les 10 stacks `bench-validated runtime` — pour les promouvoir en `validated` (au sens C1/C2), il faut combler ces gaps.
 
 ---

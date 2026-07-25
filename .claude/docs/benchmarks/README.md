@@ -2,6 +2,11 @@
 
 > Résout la critique audit v7.0.0-alpha §4.1 :
 > *« 100 % des cellules `<TBD>` dans `roi-baseline.md` — la valeur business n'est pas quantifiée. »*
+
+> ⚠️ **Note audit 2026-06-11** : `docs/roi-baseline.md` n'existe PAS encore sur
+> disque — c'est un **livrable à créer** lors de l'exécution du bench (étape 11
+> ci-dessous), à partir de la méthodologie `docs/poc-roi-methodology.md`. Toute
+> référence `roi-baseline.md §X` dans ce dossier désigne ce futur livrable.
 >
 > Objectif : remplir `docs/roi-baseline.md` avec des **mesures réelles**
 > issues de runs `/sdd-full` reproductibles. **6 runs minimum avant tag GA v7.0.0** :
@@ -20,7 +25,7 @@
 | `bench-m-kotlin` | C2 kotlin/react/shadcn | M — workflow métier | idem `bench-m-dotnet` | `<TBD>` |
 | `bench-l-kotlin` | C2 kotlin/react/shadcn | L — auth+upload+intégration | idem `bench-l-dotnet` | `<TBD>` |
 
-**Identité FEAT inter-stacks** : la même FEAT (`workspace/input/feats/{n}-*.md`)
+**Identité FEAT inter-stacks** : la même FEAT (`workspace/feats/{n}-*.md`)
 est exécutée sur les 2 stacks. Compare l'effort framework × stack à US/AC
 constants.
 
@@ -47,10 +52,10 @@ Total : **18 runs `/sdd-full`** pour publier le baseline complet.
 
 ```powershell
 # 1. Préparer la FEAT (idempotent — réutiliser l'identique cross-stack)
-cp templates/bench-feats/feat-{size}.md workspace/input/feats/1-Bench{Size}.md
+cp templates/bench-feats/feat-{size}.md workspace/feats/1-Bench{Size}.md
 
 # 2. Configurer le stack cible
-# Éditer workspace/input/stack/stack.md pour activer le combo C1 ou C2
+# Éditer workspace/stack/stack.md pour activer le combo C1 ou C2
 
 # 3. Snapshot avant run
 python .claude/python/sdd_scripts/bench_run.py --snapshot-before --bench-id bench-{size}-{combo}-run-{n}
@@ -85,7 +90,7 @@ python .claude/python/sdd_scripts/bench_run.py \
 - Coût `build_loop` (retries [BUILD_CORRECTIBLE])
 - Coût `BuildLoopMaxCostUsd` consommé
 
-**Qualité** (depuis rapports auditors `.sys/.validation/`, `qa/feat-{n}/`) :
+**Qualité** (depuis `console.db` tables `qa_*` + rapports auditors `.sys/.validation/`) :
 - AC validés % (spec-compliance `[SPEC_AC_VERIFIED]` / total ACs)
 - Retries build (compteur build_loop)
 - Retries QA (re-runs `/qa-generate --filter`)
@@ -239,4 +244,4 @@ Cf. `.claude/python/sdd_scripts/bench_run.py` (cf. §10 ci-dessous pour spec).
 - `@.claude/python/sdd_scripts/bench_run.py` — script d'agrégation
 - `@.claude/python/sdd_scripts/report_token_usage.py` — agrégation tokens existante (réutilisée par bench_run)
 - `@.claude/python/sdd_scripts/query_console_db.py` — read queries SQL
-- `@workspace/output/.sys/.context/adrs/ADR-20260519T193000-governance-roi-poc.md` — ADR décision + critères release
+- `@workspace/.sys/.context/adrs/ADR-20260519T193000-governance-roi-poc.md` — ADR décision + critères release

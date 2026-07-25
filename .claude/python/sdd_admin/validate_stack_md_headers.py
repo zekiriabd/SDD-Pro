@@ -49,10 +49,22 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sdd_lib.exit_codes import SUCCESS, FAIL_FAST, INFRA_BLOCKED  # noqa: E402
 from sdd_lib.paths import repo_root  # noqa: E402
+from sdd_lib.console_safe import ensure_console_safe
 
 
 # Validation badges allowed in v7.0.0 — drift detector for typos
 VALID_BADGES = ("🟢", "🟡", "🔴")
+
+# MA-10 gate (audit 2026-06-09) — expected SPLIT of the 35 active stacks by
+# Validation badge. The total (35) was already gated ; this adds the split so
+# that silently flipping a stack 🟢→🟡 (or vice-versa) is caught.
+#   🟢 = validated / bench-validated / scaffold-validated  → 28 stacks
+#   🟡 = experimental / POC-only                           → 7 stacks
+# SSoT : CLAUDE.md §6 + each stack's `Validation:` header. Bump these two
+# constants (keeping their sum == 35) whenever a stack is intentionally
+# promoted or demoted.
+EXPECTED_GREEN = 28  # 🟢 stacks
+EXPECTED_YELLOW = 7  # 🟡 stacks
 
 # v7.0.0-alpha (audit MIN-10, 2026-06-04) — `Validation:` header has 3
 # coexisting syntaxes observed in the wild :
@@ -114,6 +126,7 @@ def audit_file(path: Path) -> dict:
 
 
 def main() -> int:
+    ensure_console_safe()  # cp1252 guard (audit 2026-06-11 M15)
     p = argparse.ArgumentParser(
         description="Validate Status: + Validation: headers on stack .md files."
     )
@@ -133,6 +146,8 @@ def main() -> int:
     missing_validation = 0
     blockquoted_only = 0
     invalid_badge = 0
+    green_count = 0
+    yellow_count = 0
 
     for path in files:
         r = audit_file(path)
@@ -150,6 +165,14 @@ def main() -> int:
             invalid_badge += 1
         elif r["badge"] == "INVALID":
             invalid_badge += 1
+        if r["badge"] == "🟢":
+            green_count += 1
+        elif r["badge"] == "🟡":
+            yellow_count += 1
+
+    # MA-10 gate — compare the observed 🟢/🟡 split to the expected 28/7.
+    split_mismatch = (green_count != EXPECTED_GREEN
+                      or yellow_count != EXPECTED_YELLOW)
 
     report = {
         "scanned_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -159,6 +182,11 @@ def main() -> int:
             "missing_validation": missing_validation,
             "blockquoted_only": blockquoted_only,
             "invalid_badge": invalid_badge,
+            "green_count": green_count,
+            "yellow_count": yellow_count,
+            "expected_green": EXPECTED_GREEN,
+            "expected_yellow": EXPECTED_YELLOW,
+            "split_mismatch": split_mismatch,
             "ok": sum(
                 1 for f in findings
                 if "error" not in f
@@ -182,6 +210,12 @@ def main() -> int:
         print(f"Missing Validation: {s['missing_validation']}")
         print(f"Blockquoted only  : {s['blockquoted_only']} (legacy v6 format — must be top-level)")
         print(f"Invalid badge     : {s['invalid_badge']} (not 🟢/🟡/🔴)")
+        print(f"Badge split       : 🟢 {s['green_count']} / 🟡 {s['yellow_count']} "
+              f"(expected 🟢 {EXPECTED_GREEN} / 🟡 {EXPECTED_YELLOW})")
+        if s["split_mismatch"]:
+            print(f"  [SPLIT MISMATCH] observed 🟢 {s['green_count']}/🟡 {s['yellow_count']} "
+                  f"!= expected 🟢 {EXPECTED_GREEN}/🟡 {EXPECTED_YELLOW} — a stack was "
+                  f"promoted/demoted without updating EXPECTED_GREEN/EXPECTED_YELLOW.")
         bad = [f for f in findings
                if "error" not in f
                and (not f["has_status"]
@@ -205,6 +239,20 @@ def main() -> int:
         else:
             print()
             print("[OK] All stacks have valid headers.")
+
+    # MA-10 : the badge split (28 🟢 / 7 🟡) is a structural invariant of the
+    # stack catalog, like the total count — enforce it in BOTH modes so a
+    # silent 🟢→🟡 flip fails CI even without --strict.
+    if split_mismatch:
+        sys.stderr.write(
+            f"ERROR: stack badge split mismatch\n"
+            f"CAUSE: [STACK_MALFORMED] observed 🟢 {green_count}/🟡 {yellow_count}, "
+            f"expected 🟢 {EXPECTED_GREEN}/🟡 {EXPECTED_YELLOW} (sum 35)\n"
+            f"FIX: if the promotion/demotion is intentional, bump EXPECTED_GREEN/"
+            f"EXPECTED_YELLOW in validate_stack_md_headers.py (keep sum == total) "
+            f"AND CLAUDE.md §6 ; otherwise restore the stack's Validation: badge\n"
+        )
+        return FAIL_FAST
 
     has_problems = (missing_status + missing_validation
                     + blockquoted_only + invalid_badge) > 0

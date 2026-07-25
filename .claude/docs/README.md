@@ -39,7 +39,7 @@ C'est le hub de documentation. Chaque doc a un objectif et une audience cible. C
 | **12 agents LLM + 1 rubric** | Rôle / Modèle / Entrées / Sorties / Verdicts | [agents-reference.md](agents-reference.md) |
 | **21 commandes** | Args / Flags / Agents / Sorties | [commands-reference.md](commands-reference.md) |
 | **Project Config (58 clés)** | Config layered + defaults + plages | [configuration-reference.md](configuration-reference.md) |
-| **Classes d'erreur** | Taxonomie (174 préfixes `[CLASS]`) | [../rules/error-classification.md](../rules/error-classification.md) |
+| **Classes d'erreur** | Taxonomie (188 préfixes `[CLASS]`) | [../rules/error-classification.md](../rules/error-classification.md) |
 | **Hooks + protections** | 17 hooks Claude Code câblés | [hooks-and-protections.md](hooks-and-protections.md) |
 
 ---

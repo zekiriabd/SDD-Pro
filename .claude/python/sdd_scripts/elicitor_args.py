@@ -6,7 +6,7 @@ Audit P3 D (2026-06-08) — sibling of `dev_run_args.py`. The elicitor agent
 but they're LLM-interpreted. This wrapper makes them deterministic.
 
 Outputs structured args + the resolved technique list to
-`workspace/output/.sys/.state/elicitor-{n}.args.json` so the elicitor
+`workspace/.sys/.state/elicitor-{n}.args.json` so the elicitor
 agent can read instead of parsing.
 
 The wrapper validates `--techniques` against the canonical 15 names from
@@ -37,6 +37,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sdd_lib.exit_codes import CORRECTIBLE, FAIL_FAST, SUCCESS  # noqa: E402
+from sdd_lib.paths import workspace_root
 
 INFRA_BLOCKED = 3
 
@@ -181,7 +182,7 @@ def write_args_state(parsed: dict, root: Path) -> Path:
     n = parsed["feat_number"]
     if n is None:
         raise ValueError("feat_number is None — cannot write state file")
-    state_dir = root / "workspace" / "output" / ".sys" / ".state"
+    state_dir = workspace_root(root) / ".sys" / ".state"
     state_dir.mkdir(parents=True, exist_ok=True)
     out_path = state_dir / f"elicitor-{n}.args.json"
     out_path.write_text(json.dumps(parsed, indent=2, ensure_ascii=False), encoding="utf-8")

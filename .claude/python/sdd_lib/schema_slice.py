@@ -1,4 +1,4 @@
-"""Schema slicing — extract a per-US subset of `workspace/output/db/schema.json`.
+"""Schema slicing — extract a per-US subset of `workspace/db/schema.json`.
 
 Levier 4 (audit 2026-06-08) : QA Phase 5 reads the full schema.json
 (50-200 KB on real projects) for fixture setup. Most US touch 1-3 tables

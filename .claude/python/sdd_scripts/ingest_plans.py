@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Quick ingest of technical plans into console.db `plans` table.
 
-Parses `workspace/output/plans/*.{back,front}.md` and upserts metadata :
+Parses `workspace/plans/*.{back,front}.md` and upserts metadata :
 us_id, family, file_path, schema_version (1|2), strict_ready, us_hash,
 capabilities_json, file_count (count of entries in `## Files` section),
 generated_at.
@@ -20,14 +20,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
-DB_PATH = ROOT / "workspace" / "output" / "db" / "console.db"
-PLANS_DIR = ROOT / "workspace" / "output" / "plans"
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sdd_lib.markdown_io import parse_frontmatter as _parse_frontmatter_pair  # noqa: E402
 from sdd_lib.exit_codes import FAIL_FAST, SUCCESS  # noqa: E402
-from sdd_lib.paths import iso_now as now_iso  # noqa: E402  # consolidation audit CTO 2026-06-09
+from sdd_lib.paths import workspace_root, iso_now as now_iso  # noqa: E402  # consolidation audit CTO 2026-06-09
+
+DB_PATH = workspace_root(ROOT) / "db" / "console.db"
+PLANS_DIR = workspace_root(ROOT) / "plans"
 
 
 def parse_frontmatter(text: str) -> dict:

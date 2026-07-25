@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """SDD_Pro per-US schema slice generator (Levier 4, audit 2026-06-08).
 
-Reads `workspace/output/db/schema.json` and a target US, extracts the
+Reads `workspace/db/schema.json` and a target US, extracts the
 tables mentioned in the US (+ FK transitive closure), and writes
-`workspace/output/db/schema-slice-{n}-{m}.json`. The dev-backend and
+`workspace/db/schema-slice-{n}-{m}.json`. The dev-backend and
 qa agents prefer the slice over the full schema when both exist.
 
 Invoked by orchestrating commands (`/dev-run`, `/qa-generate`) before
@@ -13,9 +13,9 @@ slice deterministically.
 Usage::
 
     python -m sdd_scripts.generate_schema_slice \\
-        --us-path workspace/output/us/1-2-Login.md \\
-        [--schema-path workspace/output/db/schema.json] \\
-        [--out workspace/output/db/schema-slice-1-2.json] \\
+        --us-path workspace/us/1-2-Login.md \\
+        [--schema-path workspace/db/schema.json] \\
+        [--out workspace/db/schema-slice-1-2.json] \\
         [--json]
 
 Exit codes (aligned with sdd_lib.exit_codes):
@@ -48,7 +48,7 @@ from sdd_lib.exit_codes import (  # noqa: E402
     INFRA_BLOCKED,
     SUCCESS,
 )
-from sdd_lib.paths import repo_root  # noqa: E402
+from sdd_lib.paths import workspace_root, repo_root  # noqa: E402
 from sdd_lib.schema_slice import slice_for_us  # noqa: E402
 
 
@@ -56,7 +56,7 @@ _US_BASENAME_RE = re.compile(r"^(?P<n>\d+)-(?P<m>\d+)(?:-.*)?(?:\.md)?$")
 
 
 def _derive_slice_path(us_path: Path, schema_dir: Path) -> Path | None:
-    """Compute workspace/output/db/schema-slice-{n}-{m}.json from US filename."""
+    """Compute workspace/db/schema-slice-{n}-{m}.json from US filename."""
     m = _US_BASENAME_RE.match(us_path.stem)
     if not m:
         return None
@@ -80,7 +80,7 @@ def main() -> int:
     if not us_path.is_absolute():
         us_path = repo / us_path
 
-    schema_path = Path(args.schema_path) if args.schema_path else repo / "workspace" / "output" / "db" / "schema.json"
+    schema_path = Path(args.schema_path) if args.schema_path else workspace_root(repo) / "db" / "schema.json"
     if not schema_path.is_absolute():
         schema_path = repo / schema_path
 

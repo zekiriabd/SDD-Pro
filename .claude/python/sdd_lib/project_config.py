@@ -1,4 +1,4 @@
-"""Parse `workspace/input/stack/stack.md` to extract Project Config + active stacks.
+"""Parse `workspace/stack/stack.md` to extract Project Config + active stacks.
 
 SSOT for all Project Config readers (cf. audit 2026-05-14 — 10 ad-hoc
 re-implementations consolidated).
@@ -18,7 +18,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from sdd_lib.paths import repo_root
+from sdd_lib.paths import workspace_root, repo_root
 
 _KV_RE = re.compile(r"^[-*]?\s*([A-Za-z][A-Za-z0-9_]*)\s*:\s*(.+?)\s*$")
 _ACTIVE_STACK_RE = re.compile(r"^\s*-\s*(\.claude/stacks/[^\s]+\.md)\s*$")
@@ -113,7 +113,7 @@ def coerce_config_types(raw: dict[str, str]) -> dict[str, Any]:
 
 
 def stack_md_path(root: Path | None = None) -> Path:
-    return (root or repo_root()) / "workspace" / "input" / "stack" / "stack.md"
+    return workspace_root((root or repo_root())) / "stack" / "stack.md"
 
 
 # ---------------------------------------------------------------------------
@@ -163,15 +163,6 @@ def read_stack_md_text(root: Path | None = None) -> str | None:
         # File vanished between stat() and read() — treat as absent.
         return None
 
-
-def clear_stack_md_cache() -> None:
-    """Drop the cached stack.md content.
-
-    Useful for long-running processes (tests) that need to force a
-    reread without relying on mtime change. No-op safe when the cache
-    is empty.
-    """
-    _read_text_cached.cache_clear()
 
 
 def section_body(text: str, heading: str) -> str | None:
@@ -266,6 +257,11 @@ def read_project_config(
         return {}
     raw = parse_kv_block(block)
     normalized = normalize_project_aliases(raw)
+    # Expand ${VAR}/$VAR placeholders (e.g. FrontendLocalPort: ${FrontendLocalPort})
+    # from .env + real env. Best-effort: unresolved placeholders stay literal.
+    # Done before keys-filter/coerce so a resolved "5187" coerces to int 5187.
+    from sdd_lib.env_placeholders import resolve_config
+    normalized = resolve_config(normalized, root or repo_root())
     if keys is not None:
         normalized = {k: v for k, v in normalized.items() if k in keys}
     if coerce:

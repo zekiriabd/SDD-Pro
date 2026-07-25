@@ -1,4 +1,4 @@
-"""SDD_Pro : regenerate workspace/output/.sys/.context/adrs/INDEX.md.
+"""SDD_Pro : regenerate workspace/.sys/.context/adrs/INDEX.md.
 
 Deterministic replacement for the ``dashboard`` agent (Haiku 4.5) which
 was retired in v7.0.0 — its sole remaining output (the ADRs index) is
@@ -34,7 +34,7 @@ _PY_ROOT = Path(__file__).resolve().parent.parent
 if str(_PY_ROOT) not in sys.path:
     sys.path.insert(0, str(_PY_ROOT))
 
-from sdd_lib.paths import repo_root  # noqa: E402
+from sdd_lib.paths import workspace_root, repo_root  # noqa: E402
 from sdd_lib.exit_codes import CORRECTIBLE, FAIL_FAST, SUCCESS  # noqa: E402
 from sdd_lib.atomic_write import atomic_write_text  # noqa: E402
 
@@ -154,7 +154,7 @@ def main(argv: list[str] | None = None) -> int:
     args = p.parse_args(argv)
 
     root = repo_root()
-    adrs_dir = args.adrs_dir or (root / "workspace" / "output" / ".sys" / ".context" / "adrs")
+    adrs_dir = args.adrs_dir or (workspace_root(root) / ".sys" / ".context" / "adrs")
     output = args.output or (adrs_dir / "INDEX.md")
     project_name = args.project_name or root.name
 

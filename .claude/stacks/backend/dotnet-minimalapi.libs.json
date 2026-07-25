@@ -5,7 +5,7 @@
   "schemaVersion": 1,
   "buildSystem": "dotnet",
   "manifest": {
-    "files": ["workspace/output/src/{BackendName}/{BackendName}.csproj"]
+    "files": ["workspace/src/{BackendName}/{BackendName}.csproj"]
   },
   "versions": {
     "ef-core": "9.0.4",
