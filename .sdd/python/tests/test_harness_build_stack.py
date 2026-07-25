@@ -98,17 +98,16 @@ def test_missing_stack_file_is_rc1(build_dir, capsys):
     assert "[INVALID_ARG]" in capsys.readouterr().err
 
 
-def test_stack_harness_without_adapter_is_rc2(build_dir, capsys):
-    """antigravity = harnais valide (ADR D1) mais sans adaptateur build -> rc2 clair."""
+def test_stack_antigravity_harness_succeeds(build_dir, capsys):
+    """antigravity = harnais avec adaptateur build -> régénère GEMINI.md avec succès (rc0)."""
     stack = _write_stack("## Active Harness\nHarness: antigravity\n")
     try:
         rc = main(["--stack", stack, "--memory-only", "--out", str(build_dir)])
     finally:
         Path(stack).unlink(missing_ok=True)
-    assert rc == 2
-    err = capsys.readouterr().err
-    assert "antigravity" in err
-    assert "adaptateur" in err
+    assert rc == 0
+    assert (build_dir / "GEMINI.md").is_file()
+
 
 
 def test_stack_without_new_sections_defaults_to_claude_anthropic(build_dir, capsys):

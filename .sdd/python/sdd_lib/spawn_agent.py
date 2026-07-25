@@ -46,7 +46,7 @@ __all__ = [
 ]
 
 #: Harnais dont le spawn de sous-agent est émulé par ce wrapper.
-HARNESSES: tuple[str, ...] = ("codex", "gemini-cli", "claude-code")
+HARNESSES: tuple[str, ...] = ("codex", "gemini-cli", "antigravity", "claude-code")
 
 DEFAULT_TIMEOUT_S = 180.0
 DEFAULT_MAX_PARALLEL = 3
@@ -93,7 +93,7 @@ class SpawnConfig:
         if self.harness == "codex":
             # Avoid the unsigned npm PowerShell shim on managed Windows hosts.
             return "codex.cmd" if os.name == "nt" else "codex"
-        return {"gemini-cli": "gemini", "claude-code": "claude"}[self.harness]
+        return {"gemini-cli": "gemini", "antigravity": "gemini", "claude-code": "claude"}[self.harness]
 
 
 @dataclass
@@ -121,7 +121,7 @@ def _build_argv(cfg: SpawnConfig, prompt: str) -> list[str]:
         argv += list(cfg.extra_args)
         argv.append(prompt)
         return argv
-    if cfg.harness == "gemini-cli":
+    if cfg.harness in ("gemini-cli", "antigravity"):
         argv = [b, "-p", prompt]
         if cfg.model:
             argv += ["-m", cfg.model]
@@ -132,6 +132,7 @@ def _build_argv(cfg: SpawnConfig, prompt: str) -> list[str]:
     if cfg.model:
         argv += ["--model", cfg.model]
     return argv + list(cfg.extra_args)
+
 
 
 def _default_runner(argv: list[str], timeout_s: float, cwd: Optional[str]) -> RunResult:

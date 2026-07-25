@@ -74,10 +74,12 @@ __all__ = [
     "ClaudeAdapter",
     "CodexAdapter",
     "GeminiAdapter",
+    "AntigravityAdapter",
     "EmitResult",
     "BuildSafetyError",
     "main",
 ]
+
 
 
 class BuildSafetyError(RuntimeError):
@@ -728,11 +730,60 @@ class GeminiAdapter(_MemoryVariantAdapter):
         return target
 
 
+class AntigravityAdapter(_MemoryVariantAdapter):
+    """Adaptateur Antigravity — `GEMINI.md` + commandes `.gemini/commands/*.toml` + settings.json.
+
+    Support du harnais Antigravity IDE (Google Antigravity) avec intégration
+    native des commandes TOML et de la configuration de sécurité/modèle.
+    """
+
+    matrix_key = "antigravity"
+    memory_filename = "GEMINI.md"
+    commands_subdir = "commands"
+    command_ext = ".toml"
+
+    def _render_command(self, name: str, description: str, body: str) -> str:
+        prompt = (
+            f"<!-- GENERATED FROM .sdd/ (commande /{name}) — DO NOT EDIT. "
+            "Sous-agents SDD = émulés par spawn_agent.py (wrapper Antigravity). -->\n"
+            "Arguments: {{args}}\n\n" + body
+        )
+        return (
+            "# GENERATED FROM .sdd/ — DO NOT EDIT\n"
+            f"description = {_toml_basic_string(description)}\n"
+            f"prompt = {_toml_multiline_string(prompt)}\n"
+        )
+
+    def emit_config(self, out_dir: Path) -> Path:
+        safe_out = _ensure_under_build(Path(out_dir), self._sdd_home)
+        desc = self._provider_descriptor()
+        tier_map = desc.get("tier_map") or {}
+        model = tier_map.get("balanced") or tier_map.get("deep") or "gemini-2.5-flash"
+        auth_env = desc.get("auth_env", "GEMINI_API_KEY")
+        settings = {
+            "_generated": "FROM .sdd/ — DO NOT EDIT — Antigravity IDE config",
+            "harness": "antigravity",
+            "provider": self._provider,
+            "model": {"name": str(model)},
+            "security": {"auth": {"env": str(auth_env)}},
+        }
+        safe_out.mkdir(parents=True, exist_ok=True)
+        target = safe_out / "settings.json"
+        target.write_text(
+            json.dumps(settings, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+            newline="\n",
+        )
+        return target
+
+
 _ADAPTERS = {
     "claude-code": ClaudeAdapter,
     "codex": CodexAdapter,
     "gemini-cli": GeminiAdapter,
+    "antigravity": AntigravityAdapter,
 }
+
 
 
 def main(argv: list[str] | None = None) -> int:
