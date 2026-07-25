@@ -7,7 +7,7 @@ une clé peut rester documentée alors que plus aucun consommateur ne la lit
 Ce test parse la table de référence et vérifie que chaque clé apparaît dans
 au moins UN consommateur réel :
   - code Python (`.sdd/python/sdd_{lib,scripts,admin,hooks}/`), OU
-  - un prompt commande/agent/règle (`.claude/{commands,agents,rules}/*.md`)
+  - un prompt commande/agent/règle (`.sdd/{commands,agents,rules}/*.md`)
     — les clés lues par `read_layered_config()` au fil d'un flow LLM sont
     des consommateurs légitimes dans ce framework, OU
   - le schéma machine (`templates/project-config.schema.json`).
@@ -22,7 +22,7 @@ from pathlib import Path
 
 import pytest
 
-from sdd_lib.paths import repo_root
+from sdd_lib.paths import repo_root, sdd_home
 
 pytestmark = pytest.mark.smoke
 
@@ -45,8 +45,14 @@ def _reference_keys() -> list[str]:
 
 
 def _consumer_corpus() -> str:
-    """Concatène tous les consommateurs potentiels (Python + prompts + schéma)."""
-    root = repo_root() / ".claude"
+    """Concatène tous les consommateurs potentiels (Python + prompts + schéma).
+
+    Le foyer neutre `.sdd/` est SSoT depuis v7.0.2 (migration
+    `refactor/sdd-move-common`). `.claude/` reste scanné en fallback
+    transitionnel pour capter les artefacts régénérés (façades) qui
+    peuvent contenir des mentions de clés côté harnais Claude.
+    """
+    home = sdd_home()
     chunks: list[str] = []
     for pattern in (
         "python/sdd_lib/**/*.py",
@@ -60,7 +66,7 @@ def _consumer_corpus() -> str:
         "templates/*.template.md",
         "config.base.yml",
     ):
-        for f in root.glob(pattern):
+        for f in home.glob(pattern):
             try:
                 chunks.append(f.read_text(encoding="utf-8", errors="replace"))
             except OSError:

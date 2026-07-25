@@ -33,9 +33,9 @@ import sdd_lib  # noqa: E402
 
 pytestmark = pytest.mark.smoke
 
-_REPO = _PY_ROOT.parent.parent  # .sdd/python/ → .claude/ → repo
+_REPO = _PY_ROOT.parent.parent  # .sdd/python/ → .sdd/ → repo
 _PYPROJECT = _PY_ROOT / "pyproject.toml"
-_LOADER_YML = _REPO / ".claude" / "loader.yml"
+_LOADER_YML = _REPO / ".sdd" / "loader.yml"
 
 
 def _read_pyproject_version() -> str:

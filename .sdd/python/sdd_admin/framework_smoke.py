@@ -55,15 +55,18 @@ def _scan_dir(args: tuple[Path, Path]) -> list[tuple[str, int]]:
     enable parallel I/O via concurrent.futures. Each call is independent
     (no shared mutable state), making it safe for thread pool.
     """
-    r, claude_root = args
+    r, repo_root = args
     out: list[tuple[str, int]] = []
     if not r.is_dir():
         return out
     for f in r.rglob("*"):
         if f.is_file() and f.suffix in _FINGERPRINT_EXTS:
             try:
+                # Le fingerprint mixte .claude/ + .sdd/ : on relative_to le
+                # repo_root (parent commun), pas la façade Claude — sinon
+                # `.sdd/rules/*.md` échoue à `relative_to(.claude/)`.
                 out.append((
-                    str(f.relative_to(claude_root)).replace("\\", "/"),
+                    str(f.relative_to(repo_root)).replace("\\", "/"),
                     f.stat().st_mtime_ns,
                 ))
             except OSError:
@@ -101,17 +104,27 @@ def _fingerprint(claude_root: Path) -> str:
         sdd_root / "stacks",
     )
     entries: list[tuple[str, int]] = []
+    repo_root = claude_root.parent
     # Parallel scan : 9 roots → 9 threads (I/O bound, no GIL contention on stat).
     from concurrent.futures import ThreadPoolExecutor
     with ThreadPoolExecutor(max_workers=min(9, len(roots))) as ex:
-        for partial in ex.map(_scan_dir, [(r, claude_root) for r in roots]):
+        for partial in ex.map(_scan_dir, [(r, repo_root) for r in roots]):
             entries.extend(partial)
     # Singleton top-level files (cheap — no parallel needed).
-    for p in ("CLAUDE.md", "loader.yml", "settings.json", "WORKING-AGREEMENT.md"):
-        f = claude_root / p
+    # Fichiers d'entrée par harnais (bi-root) : `.claude/CLAUDE.md`,
+    # `.claude/settings.json`, `.sdd/loader.yml`, `.sdd/WORKING-AGREEMENT.md`.
+    for base, p in (
+        (claude_root, "CLAUDE.md"),
+        (claude_root, "settings.json"),
+        (sdd_root, "loader.yml"),
+        (sdd_root, "WORKING-AGREEMENT.md"),
+    ):
+        f = base / p
         if f.is_file():
             try:
-                entries.append((p, f.stat().st_mtime_ns))
+                entries.append(
+                    (str(f.relative_to(repo_root)).replace("\\", "/"), f.stat().st_mtime_ns)
+                )
             except OSError:
                 pass
     entries.sort()
@@ -459,7 +472,7 @@ def _check_stack_md_headers(claude_root: Path, checks: "Checks") -> None:
                     + s.get("blockquoted_only", 0)
                     + s.get("invalid_badge", 0))
         n_stacks = payload.get("stacks_count", 0)
-        expected_total = 35  # CLAUDE.md §6 recount 2026-06-11 : 29 🟢 + 5 🟡 exp + 1 🟡 POC
+        expected_total = 36  # CLAUDE.md §6 recount 2026-07-25 : 28 🟢 + 8 🟡 (ajout delphi-fmx 2026-06-21)
         if res.returncode == 0 and problems == 0:
             if n_stacks == expected_total:
                 checks.add("stack-md-headers", "OK",

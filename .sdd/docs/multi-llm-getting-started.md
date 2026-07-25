@@ -250,7 +250,7 @@ travaille sur une copie temp (garantie d'isolation).
 |---|---|:---:|
 | `[CONFORMANCE_PASS]` | Combo validé (config + adapter + dispatch OK) | 0 |
 | `[CONFORMANCE_DRIFT]` | Divergence vs baseline en mode `--live` — voir `report.md` | 2 (WARN, ou 1 avec `--strict`) |
-| `[CONFORMANCE_INFRA_BLOCKED]` | CLI absent, API key manquante, provider YAML KO, spawn non câblé | 3 |
+| `[INFRA_BLOCKED]` | CLI absent, API key manquante, provider YAML KO, spawn non câblé | 3 |
 
 Exit code SDD_Pro (SSoT `sdd_lib/exit_codes.py`) :
 `SUCCESS=0`, `FAIL_FAST=1`, `CORRECTIBLE=2` (utilisé ici pour WARN),
@@ -260,7 +260,7 @@ Exit code SDD_Pro (SSoT `sdd_lib/exit_codes.py`) :
 
 - Combos non-référence (`codex × *`, `gemini-cli × *`) : `sdd_lib/spawn_agent.py`
   n'est pas encore branché au pipeline `/sdd-full`. Le script émet
-  `[CONFORMANCE_INFRA_BLOCKED]` explicite avec pointer vers
+  `[INFRA_BLOCKED]` explicite avec pointer vers
   `.sdd/docs/harness-codex.md` / `.sdd/docs/harness-gemini.md`. C'est la
   Phase 3+ du plan de migration.
 - Combo référence : le run `/sdd-full` end-to-end reste un exercice interactif

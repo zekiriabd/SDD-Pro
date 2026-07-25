@@ -19,7 +19,7 @@ Deux modes d'exécution (mutuellement exclusifs) :
     * adapter présent (``harness_build.py`` sait générer la façade du harnais) ;
     * FEAT fixture existe (``.sdd/experiments/conformance/`` ou chemin
       utilisateur).
-  Émet ``[CONFORMANCE_INFRA_BLOCKED]`` sur infra manquante ; sinon
+  Émet ``[INFRA_BLOCKED]`` sur infra manquante ; sinon
   ``[CONFORMANCE_PASS]`` par combo validé. Sans réseau ni token.
 
 - ``--live`` : **exécute réellement** le pipeline. Nécessite les API keys
@@ -78,7 +78,7 @@ Statut opérationnel (2026-07-25) :
 - ``--live`` : fonctionnel UNIQUEMENT pour ``claude-code × anthropic``. Les
   autres combos exigent que ``sdd_lib.spawn_agent`` soit câblé au pipeline
   (Phase 3+ du plan de migration). En attendant, ``--live`` sur un combo
-  non-référence émet ``[CONFORMANCE_INFRA_BLOCKED]`` avec pointer vers
+  non-référence émet ``[INFRA_BLOCKED]`` avec pointer vers
   ``docs/harness-codex.md`` / ``docs/harness-gemini.md``.
 """
 from __future__ import annotations
@@ -167,7 +167,7 @@ class ComboResult:
     harness: str
     provider: str
     verdict: str  # "PASS" | "DRIFT" | "INFRA_BLOCKED" | "FAIL"
-    class_code: str  # [CONFORMANCE_PASS] / [CONFORMANCE_DRIFT] / [CONFORMANCE_INFRA_BLOCKED]
+    class_code: str  # [CONFORMANCE_PASS] / [CONFORMANCE_DRIFT] / [INFRA_BLOCKED]
     duration_s: float = 0.0
     is_reference: bool = False
     checks: list[dict[str, Any]] = field(default_factory=list)
@@ -429,7 +429,7 @@ def _validate_combo_dry(
             harness=harness,
             provider=provider,
             verdict="INFRA_BLOCKED",
-            class_code="[CONFORMANCE_INFRA_BLOCKED]",
+            class_code="[INFRA_BLOCKED]",
             duration_s=time.monotonic() - start,
             is_reference=is_ref,
             checks=checks,
@@ -445,7 +445,7 @@ def _validate_combo_dry(
             harness=harness,
             provider=provider,
             verdict="FAIL",
-            class_code="[CONFORMANCE_INFRA_BLOCKED]",
+            class_code="[INFRA_BLOCKED]",
             duration_s=time.monotonic() - start,
             is_reference=is_ref,
             checks=checks,
@@ -461,7 +461,7 @@ def _validate_combo_dry(
             harness=harness,
             provider=provider,
             verdict="INFRA_BLOCKED",
-            class_code="[CONFORMANCE_INFRA_BLOCKED]",
+            class_code="[INFRA_BLOCKED]",
             duration_s=time.monotonic() - start,
             is_reference=is_ref,
             checks=checks,
@@ -476,7 +476,7 @@ def _validate_combo_dry(
             harness=harness,
             provider=provider,
             verdict="FAIL",
-            class_code="[CONFORMANCE_INFRA_BLOCKED]",
+            class_code="[INFRA_BLOCKED]",
             duration_s=time.monotonic() - start,
             is_reference=is_ref,
             checks=checks,
@@ -524,7 +524,7 @@ def _validate_combo_live(
     Statut opérationnel v7.0.0 (2026-07-25) : la seule cible fonctionnelle
     est le combo de référence (claude-code × anthropic). Les autres combos
     exigent le câblage ``sdd_lib.spawn_agent`` au pipeline (Phase 3+ du plan
-    de migration multi-harness). On émet un ``[CONFORMANCE_INFRA_BLOCKED]``
+    de migration multi-harness). On émet un ``[INFRA_BLOCKED]``
     explicite plutôt qu'un faux positif.
     """
     start = time.monotonic()
@@ -548,7 +548,7 @@ def _validate_combo_live(
             harness=harness,
             provider=provider,
             verdict="INFRA_BLOCKED",
-            class_code="[CONFORMANCE_INFRA_BLOCKED]",
+            class_code="[INFRA_BLOCKED]",
             duration_s=time.monotonic() - start,
             is_reference=is_ref,
             checks=checks,
@@ -565,7 +565,7 @@ def _validate_combo_live(
             harness=harness,
             provider=provider,
             verdict="INFRA_BLOCKED",
-            class_code="[CONFORMANCE_INFRA_BLOCKED]",
+            class_code="[INFRA_BLOCKED]",
             duration_s=time.monotonic() - start,
             is_reference=is_ref,
             checks=checks,
@@ -588,7 +588,7 @@ def _validate_combo_live(
             harness=harness,
             provider=provider,
             verdict="INFRA_BLOCKED",
-            class_code="[CONFORMANCE_INFRA_BLOCKED]",
+            class_code="[INFRA_BLOCKED]",
             duration_s=time.monotonic() - start,
             is_reference=is_ref,
             checks=checks,
@@ -608,7 +608,7 @@ def _validate_combo_live(
             harness=harness,
             provider=provider,
             verdict="FAIL",
-            class_code="[CONFORMANCE_INFRA_BLOCKED]",
+            class_code="[INFRA_BLOCKED]",
             duration_s=time.monotonic() - start,
             is_reference=is_ref,
             checks=checks,
@@ -878,7 +878,7 @@ def main(argv: list[str] | None = None) -> int:
         root = repo_root()
     except Exception as exc:
         print(f"ERROR: repo_root() failed", file=sys.stderr)
-        print(f"CAUSE: [CONFORMANCE_INFRA_BLOCKED] {exc}", file=sys.stderr)
+        print(f"CAUSE: [INFRA_BLOCKED] {exc}", file=sys.stderr)
         print(f"FIX: run from within an SDD_Pro repo (or set SDD_REPO_ROOT)", file=sys.stderr)
         return INFRA_BLOCKED
 
