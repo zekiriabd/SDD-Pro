@@ -102,7 +102,6 @@ _LEGITIMATE_CLAUDE_SUBPATHS: tuple[str, ...] = (
     ".claude/loader.reverse.yml",  # OPERATIONAL — Batch C migration pending
     ".claude/settings.json",       # harness config (tracked)
     ".claude/settings.local.json", # user local (untracked)
-    ".claude/python/",             # shim _hook.py + local scratch
     ".claude/projects/",           # user home path (measure_cache scripts)
 )
 

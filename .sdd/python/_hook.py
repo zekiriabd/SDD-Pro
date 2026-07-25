@@ -39,11 +39,15 @@ from pathlib import Path
 def _looks_like_repo_root(p: Path) -> bool:
     """Strict repo-root check — mirror of `sdd_lib.paths._looks_like_repo_root`.
 
+    Post-migration 2026-07-25 : the SSoT anchors under `.sdd/` (`.sdd/agents/`
+    + `.sdd/commands/` = tracked, always present after clone). The
+    `.claude/agents/` / `.claude/commands/` are now transient façade
+    regenerated at session_start — using them as anchor would fail on
+    fresh clones before the first rebuild.
+
     Post-mortem 2026-05-21 : un sous-dossier d'archive `.claude/.claude/`
-    faisait croire au walker que `.claude/` était le repo root → tous
-    les paths Python dérivés résolvaient sous `.claude/workspace/...`
-    au lieu de `workspace/...`. Le check unique `(p / ".claude").is_dir()`
-    est insuffisant.
+    faisait croire au walker que `.claude/` était le repo root → mêmes
+    précautions ici avec `.sdd/.sdd/` (triple marker required).
 
     Bootstrap-safe duplicate de `sdd_lib.paths._looks_like_repo_root` :
     ce fichier doit fonctionner AVANT que `sys.path` connaisse `sdd_lib`,
@@ -52,8 +56,8 @@ def _looks_like_repo_root(p: Path) -> bool:
     (paths.py + _hook.py). Garde-fou : `test_paths.py` vérifie l'alignement.
     """
     return (
-        (p / ".claude" / "agents").is_dir()
-        and (p / ".claude" / "commands").is_dir()
+        (p / ".sdd" / "agents").is_dir()
+        and (p / ".sdd" / "commands").is_dir()
         and ((p / "workspace").is_dir() or (p.parent / "workspace").is_dir())
     )
 
