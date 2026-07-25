@@ -26,7 +26,7 @@ Timeout policy (audit mineur #5 v7.0.0-alpha 2026-06-05) :
   on context_budget.py, see audit M6).
 
 Usage (from settings.json):
-    python -c "import os,sys,pathlib; r=os.environ.get('CLAUDE_PROJECT_DIR') or next((str(p) for p in [pathlib.Path.cwd()]+list(pathlib.Path.cwd().parents) if (p/'.claude').is_dir()),'.'); sys.path.insert(0,r+'/.claude/python'); import _hook; _hook.run('sdd_hooks.protect_framework')"
+    python -c "import os,sys,pathlib; r=os.environ.get('CLAUDE_PROJECT_DIR') or next((str(p) for p in [pathlib.Path.cwd()]+list(pathlib.Path.cwd().parents) if (p/'.sdd').is_dir()),'.'); sys.path.insert(0,r+'/.sdd/python'); import _hook; _hook.run('sdd_hooks.protect_framework')"
 """
 from __future__ import annotations
 

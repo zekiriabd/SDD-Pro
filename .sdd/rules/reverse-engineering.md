@@ -179,7 +179,7 @@ Format ERROR 3-lignes disque, 1 ligne chat (cf. `error-classification.md §2` qu
 | `[REVERSE_QUESTIONS_PENDING]` | NON (informational, Phase 3.9) | `reverse-clarifier` : ≥ 1 bloc `Q-N` de `questions.md` sans `Réponse:` remplie. La boucle de validation humaine reste ouverte. |
 | `[REVERSE_ANSWER_INGEST_FAILED]` | NON (WARN, Phase 3.9) | `reverse-clarifier --ingest` : réponse `Q-N` inexploitable (ambiguë, hors sujet) — le bloc reste ouvert, aucun item FEAT édité pour ce Q-N. **Jamais comblé par interprétation**. |
 | `[REVERSE_DB_CONFIG_MISSING]` | **OUI** | proc-reverse : section `## Active Database` de `stack.md` absente/incomplète, OU `DatabaseType` non supporté par un dialecte implémenté. Émis par `stack_db_config.py` + `dialects.get_dialect`. |
-| `[REVERSE_DB_UNREACHABLE]` | **OUI** | proc-reverse : base injoignable (timeout/firewall) OU driver lecture seule absent (`pip install -e .claude/python[reverse-db]`). Émis par `db_introspect.connect`. |
+| `[REVERSE_DB_UNREACHABLE]` | **OUI** | proc-reverse : base injoignable (timeout/firewall) OU driver lecture seule absent (`pip install -e .sdd/python[reverse-db]`). Émis par `db_introspect.connect`. |
 | `[REVERSE_DB_AUTH_FAILED]` | **OUI** | proc-reverse : authentification refusée / droits insuffisants à la connexion lecture seule. Émis par `db_introspect.connect`. |
 | `[REVERSE_PROC_NOT_FOUND]` | **OUI** | proc-reverse : `/sdd-proc-reverse {nom}` sur une procédure absente du catalogue. Émis par `db_introspect.introspect` + `reverse_proc_introspect.py`. |
 | `[REVERSE_PROC_ENCRYPTED]` | NON (info) | proc-reverse : procédure `WITH ENCRYPTION` (corps `OBJECT_DEFINITION` NULL) — US `low` + bannière, jamais devinée. Émis par `db_introspect.build_introspection`. |

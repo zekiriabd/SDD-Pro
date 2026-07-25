@@ -250,7 +250,7 @@ python .sdd/python/sdd_scripts/validate_project_config.py --resolve
 
 # Show one specific key
 python -c "
-import sys; sys.path.insert(0, '.claude/python')
+import sys; sys.path.insert(0, '.sdd/python')
 from sdd_lib.layered_config import read_layered_config
 cfg = read_layered_config()
 print('CoverageMin:', cfg.get('CoverageMin'))

@@ -206,7 +206,7 @@ Phase 5/6          : revue Tech Lead → /sdd-full {n}  (INCHANGÉ, via REVERSE-
 
 > **Reco** : `pyodbc` extra opt-in par défaut (cohérent avec la philosophie
 > zéro-dep : un user forward n'installe rien ; un user proc-reverse fait
-> `pip install -e .claude/python[reverse-db]`), fallback `Invoke-Sqlcmd`.
+> `pip install -e .sdd/python[reverse-db]`), fallback `Invoke-Sqlcmd`.
 
 ---
 

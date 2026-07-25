@@ -50,7 +50,7 @@ cd sdd-pro-dev
 git remote add upstream <upstream-url>
 
 # Install Python dev deps
-pip install -e .claude/python[dev]
+pip install -e .sdd/python[dev]
 
 # Optional : install console deps
 cd workspace/console && npm install && cd ../..
@@ -235,7 +235,7 @@ For changes that affect the public API or load-bearing behavior, create an ADR u
 ```bash
 # Generate the filename via the helper (collision-safe)
 python -c "
-import sys; sys.path.insert(0, '.claude/python')
+import sys; sys.path.insert(0, '.sdd/python')
 from sdd_lib.adr_id import mint_adr_filename
 print(mint_adr_filename('your-decision-slug'))
 "

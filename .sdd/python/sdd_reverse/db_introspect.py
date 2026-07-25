@@ -136,7 +136,7 @@ def _connect_pyodbc(conn_str: str):  # noqa: ANN202
     except ImportError as exc:
         raise ReverseDbError(
             "[REVERSE_DB_UNREACHABLE] pyodbc not installed — "
-            "`pip install -e .claude/python[reverse-db]` (needs ODBC Driver 18)",
+            "`pip install -e .sdd/python[reverse-db]` (needs ODBC Driver 18)",
             "[REVERSE_DB_UNREACHABLE]",
         ) from exc
     try:
@@ -161,7 +161,7 @@ def _connect_psycopg(conn_str: str):  # noqa: ANN202
         except ImportError as exc:
             raise ReverseDbError(
                 "[REVERSE_DB_UNREACHABLE] psycopg2/psycopg not installed — "
-                "`pip install -e .claude/python[reverse-db]`",
+                "`pip install -e .sdd/python[reverse-db]`",
                 "[REVERSE_DB_UNREACHABLE]",
             ) from exc
     try:
@@ -184,7 +184,7 @@ def _connect_oracledb(conn_str: str):  # noqa: ANN202
     except ImportError as exc:
         raise ReverseDbError(
             "[REVERSE_DB_UNREACHABLE] python-oracledb not installed — "
-            "`pip install -e .claude/python[reverse-db]`",
+            "`pip install -e .sdd/python[reverse-db]`",
             "[REVERSE_DB_UNREACHABLE]",
         ) from exc
     try:
@@ -219,7 +219,7 @@ def _connect_mysql(conn_str: str):  # noqa: ANN202
         except ImportError as exc:
             raise ReverseDbError(
                 "[REVERSE_DB_UNREACHABLE] mysql-connector-python / PyMySQL not installed — "
-                "`pip install -e .claude/python[reverse-db]`",
+                "`pip install -e .sdd/python[reverse-db]`",
                 "[REVERSE_DB_UNREACHABLE]",
             ) from exc
     try:

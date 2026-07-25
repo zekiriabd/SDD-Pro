@@ -27,7 +27,7 @@ cross-package, et coûtait quelques ms par invocation.
 
 ```bash
 # Depuis la racine du repo SDD_Pro
-pip install -e .claude/python
+pip install -e .sdd/python
 ```
 
 Cela rend les packages `sdd_lib`, `sdd_scripts`, `sdd_hooks`, `sdd_admin`

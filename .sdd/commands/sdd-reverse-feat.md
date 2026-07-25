@@ -37,7 +37,7 @@ Remplace l'ex-`/sdd-reverse` mono-saut (extracteur décommissionné, ADR reverse
 1. **Résoudre le projet legacy** via `inventory.json._featAllocations`.
 2. **Routage de modèle (déterministe, ADR `governance-reverse-complexity-ladder`)** :
    ```bash
-   python -c "import sys,json; sys.path.insert(0,'.claude/python'); from sdd_reverse.code_unit_complexity import model_for; inv=json.load(open([p for p in __import__('glob').glob('workspace/old/*/.sys/inventory.json')][0],encoding='utf-8')); u=next(x for x in inv['units'] if x['id']=='{U-N}'); print(model_for(u,'3c'))"
+   python -c "import sys,json; sys.path.insert(0,'.sdd/python'); from sdd_reverse.code_unit_complexity import model_for; inv=json.load(open([p for p in __import__('glob').glob('workspace/old/*/.sys/inventory.json')][0],encoding='utf-8')); u=next(x for x in inv['units'] if x['id']=='{U-N}'); print(model_for(u,'3c'))"
    ```
    → `claude-sonnet-4-6` si `simple`, `claude-opus-4-8` si `complex` (même classifieur
    que 3a → la classe est stable sur tout l'escalier ; rubrique

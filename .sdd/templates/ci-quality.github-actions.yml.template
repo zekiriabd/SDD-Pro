@@ -67,7 +67,7 @@ jobs:
           echo "n=${N:-0}" >> "$GITHUB_OUTPUT"
       - name: Ingest axe-core → console.db
         run: |
-          python .claude/python/sdd_scripts/ingest_axe.py \
+          python .sdd/python/sdd_scripts/ingest_axe.py \
             --report {{AppName}}/axe-report.json \
             --feat ${{ steps.feat.outputs.n }} \
             --threshold serious
@@ -116,7 +116,7 @@ jobs:
           echo "n=${N:-0}" >> "$GITHUB_OUTPUT"
       - name: Ingest Lighthouse → console.db
         run: |
-          python .claude/python/sdd_scripts/ingest_lighthouse.py \
+          python .sdd/python/sdd_scripts/ingest_lighthouse.py \
             --report {{AppName}}/.lighthouseci/ \
             --feat ${{ steps.feat.outputs.n }} \
             --threshold serious

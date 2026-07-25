@@ -11,7 +11,7 @@
 
 Exécution :
 ```bash
-cd .claude/python && python -m sdd_lib.cache_control
+cd .sdd/python && python -m sdd_lib.cache_control
 ```
 
 Sortie attendue : 12 agents × ~3-13 reads annotés, distribution ~37% stable / 35% semi / 28% volatile (cf. Phase 2 ci-dessus).
@@ -92,7 +92,7 @@ Source : `console.db` table `token_usage`, agrégé sur la session.
 Script de mesure runtime contre les logs JSONL Claude Code :
 
 ```bash
-cd .claude/python && python -m sdd_admin.measure_cache_hit_rate --days 7
+cd .sdd/python && python -m sdd_admin.measure_cache_hit_rate --days 7
 # or for CI / dashboards:
 python -m sdd_admin.measure_cache_hit_rate --days 30 --json
 ```

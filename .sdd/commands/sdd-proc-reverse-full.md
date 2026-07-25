@@ -38,7 +38,7 @@ Recommandation DBA : login dédié `GRANT VIEW DEFINITION` + `db_datareader` (d�
 
 1. `stack.md` contient `## Active Database` complet (`DatabaseType`, `DB_HOST`,
    `DB_NAME`, +`DB_PORT/DB_USER/DB_PASSWORD`). Sinon → `[REVERSE_DB_CONFIG_MISSING]`.
-2. Driver lecture seule disponible (`pip install -e .claude/python[reverse-db]`,
+2. Driver lecture seule disponible (`pip install -e .sdd/python[reverse-db]`,
    ODBC Driver 18 pour SQL Server). Sinon → `[REVERSE_DB_UNREACHABLE]`.
 3. `DatabaseType` supporté (MVP : SQL Server ; Postgres/Oracle/MySQL = roadmap).
 

@@ -44,7 +44,7 @@ sans pré-allocation, séquentiel strict (ADV-2 §8.1). 3a possède l'allocation
 1. **Résoudre le projet legacy** : lire `workspace/old/*/.sys/inventory.json` pour trouver lequel contient `units[id={U-N}]`. Plusieurs matchs → ERROR ambiguïté, demander `--project {P}`.
 2. **Routage de modèle (déterministe, ADR `governance-reverse-complexity-ladder`)** :
    ```bash
-   python -c "import sys,json; sys.path.insert(0,'.claude/python'); from sdd_reverse.code_unit_complexity import model_for; inv=json.load(open([p for p in __import__('glob').glob('workspace/old/*/.sys/inventory.json')][0],encoding='utf-8')); u=next(x for x in inv['units'] if x['id']=='{U-N}'); print(model_for(u,'3a'))"
+   python -c "import sys,json; sys.path.insert(0,'.sdd/python'); from sdd_reverse.code_unit_complexity import model_for; inv=json.load(open([p for p in __import__('glob').glob('workspace/old/*/.sys/inventory.json')][0],encoding='utf-8')); u=next(x for x in inv['units'] if x['id']=='{U-N}'); print(model_for(u,'3a'))"
    ```
    → `claude-sonnet-4-6` si l'unité est `simple`, `claude-opus-4-8` si `complex`
    (rubrique `docs/rubrics/reverse-complexity-routing.md`, fail-safe : doute → Opus).

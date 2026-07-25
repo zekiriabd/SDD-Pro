@@ -21,7 +21,7 @@ python bootstrap.py --combo c1
 ```
 
 Réponses interactives : `AppName=MyApp`, `DatabaseType=PostgreSql`, ports
-par défaut. Le script installe Python deps (`pip install -e .claude/python[dev]`)
+par défaut. Le script installe Python deps (`pip install -e .sdd/python[dev]`)
 et console web Node (~50 MB).
 
 **CI mode** :

@@ -119,7 +119,7 @@ aucun lock requis (condition du parallélisme borné §8.2).
 **Mode legacy seulement** :
 ```bash
 python -c "
-import sys; sys.path.insert(0, '.claude/python')
+import sys; sys.path.insert(0, '.sdd/python')
 from sdd_reverse.file_locks_local import acquire_lock
 sys.exit(acquire_lock('workspace/feats/.alloc.lock', 'reverse-tech-analyst-{U-N}', ttl=1800))
 "
@@ -191,7 +191,7 @@ Créer le parent `workspace/plans/` si absent (`mkdir -p` après pré-check).
 2. Release lock — **uniquement si STEP 3.1 l'a acquis** :
    ```bash
    python -c "
-   import sys; sys.path.insert(0, '.claude/python')
+   import sys; sys.path.insert(0, '.sdd/python')
    from sdd_reverse.file_locks_local import release_lock
    release_lock('workspace/feats/.alloc.lock', 'reverse-tech-analyst-{U-N}')
    "

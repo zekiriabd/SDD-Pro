@@ -134,7 +134,7 @@ python bootstrap.py --combo c1
 Ce qui se passe :
 - ✅ `workspace/stack/stack.md` généré (43 clés Project Config)
 - ✅ Structure `workspace/.sys/` créée
-- ✅ Deps Python installées (`pip install -e .claude/python[dev]`)
+- ✅ Deps Python installées (`pip install -e .sdd/python[dev]`)
 - ✅ Deps console installées optionnellement (`workspace/console/`)
 - ✅ Smoke check passe
 

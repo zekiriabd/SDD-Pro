@@ -17,7 +17,7 @@ What it does
   3. Generate `workspace/stack/stack.md` from the .template
   4. Create `workspace/feats/`, `workspace/ui/` (empty)
   5. Create `workspace/.sys/` skeleton (gitignored)
-  6. Run `pip install -e .claude/python[dev]`
+  6. Run `pip install -e .sdd/python[dev]`
   7. Run `npm install` in `workspace/console/` (lazy, on user confirmation)
   8. Run framework smoke as final check
 
@@ -756,14 +756,14 @@ def build_harness_facades(dry_run: bool, harness: str = "claude-code", provider:
 
 
 def install_python_deps(dry_run: bool) -> bool:
-    """Run `pip install -e .claude/python[dev]`. Returns True on success."""
+    """Run `pip install -e .sdd/python[dev]`. Returns True on success."""
     if dry_run:
         _print_info(f"(dry-run) would run : pip install -e {PYTHON_DIR.relative_to(REPO_ROOT)}[dev]")
         return True
     if not (PYTHON_DIR / "pyproject.toml").is_file():
         _print_warn(f"No pyproject.toml at {PYTHON_DIR} — skipping Python deps install")
         return False
-    _print_info("Installing Python deps (pip install -e .claude/python[dev]) ...")
+    _print_info("Installing Python deps (pip install -e .sdd/python[dev]) ...")
     try:
         result = subprocess.run(
             [sys.executable, "-m", "pip", "install", "-e", f"{PYTHON_DIR}[dev]"],

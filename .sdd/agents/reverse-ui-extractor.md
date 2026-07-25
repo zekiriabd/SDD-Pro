@@ -43,12 +43,12 @@ Délégation aux scripts déterministes (jamais émuler ce parsing en LLM) :
 
 ```bash
 # Palette globale (1 fois par projet)
-# NOTE: `import sys; sys.path.insert(0, '.claude/python')` est OBLIGATOIRE en
-# tête — .claude/python n'est pas sur le PYTHONPATH par défaut ; sans ce
+# NOTE: `import sys; sys.path.insert(0, '.sdd/python')` est OBLIGATOIRE en
+# tête — .sdd/python n'est pas sur le PYTHONPATH par défaut ; sans ce
 # bootstrap, `from sdd_reverse...` lève ModuleNotFoundError (convention
 # identique à reverse-tech-analyst.md). Invoquer depuis la racine du repo.
 python -c "
-import sys; sys.path.insert(0, '.claude/python')
+import sys; sys.path.insert(0, '.sdd/python')
 from sdd_reverse.scan_legacy import load_signatures, scan_project
 from sdd_reverse.css_palette_extractor import extract_palette
 import json
@@ -59,7 +59,7 @@ print(json.dumps(extract_palette('workspace/old/{P}', sr), indent=2))
 
 # Parsing template par fichier evidence UI
 python -c "
-import sys; sys.path.insert(0, '.claude/python')
+import sys; sys.path.insert(0, '.sdd/python')
 from sdd_reverse.ui_template_parser import parse_template
 import json
 print(json.dumps(parse_template('workspace/old/{P}/Login.aspx'), indent=2))

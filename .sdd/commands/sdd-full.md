@@ -667,7 +667,7 @@ gate (le STEP 3.5 pré-dev la skippe car `HAS_CODE=null`).
 
 ```bash
 SPEC_REQ=$(python -c "
-import sys; sys.path.insert(0, '.claude/python')
+import sys; sys.path.insert(0, '.sdd/python')
 from sdd_lib.layered_config import read_layered_config
 print(str(read_layered_config().get('SpecComplianceRequiredForFeatValidate', 'true')).lower())
 " 2>/dev/null || echo 'true')

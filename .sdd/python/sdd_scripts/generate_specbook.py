@@ -44,7 +44,7 @@ from pathlib import Path
 
 # --- sys.path bootstrap so the script runs via `python .sdd/python/...` ---
 _HERE = Path(__file__).resolve()
-_PYROOT = _HERE.parent.parent  # .claude/python
+_PYROOT = _HERE.parent.parent  # .sdd/python
 if str(_PYROOT) not in sys.path:
     sys.path.insert(0, str(_PYROOT))
 
