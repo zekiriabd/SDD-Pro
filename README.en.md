@@ -1,6 +1,6 @@
 # SDD_Pro
 
-FEAT-driven development framework for Claude Code — `next` branch: **v7.0.0 GA tagged 2026-06-07** (see [.claude/docs/VERSIONING.md](.claude/docs/VERSIONING.md)). `main` branch: v6.10.4-LTS (freeze active until 2026-06-18).
+FEAT-driven development framework for Claude Code — **v7.0.0 GA tagged 2026-06-07** (`main`, pre-GA freeze closed; see [.claude/docs/VERSIONING.md](.claude/docs/VERSIONING.md)). LTS baseline v6.10.x (tag `SDD_Prov6_10_5`) kept until 2026-12-31 for smooth migration.
 
 > ⚠ **This English page is a summary, not a translation.** It covers Quickstart + Console essentials only (~10 sections vs ~17 in the French canonical README). For exhaustive docs (architecture, agents, rules, stacks, governance, ROI, roadmap), use the French source.
 >
@@ -25,8 +25,8 @@ python bootstrap.py --combo c1 --skip-install
 
 The bootstrap:
 - Asks the project name + 3-4 questions (stack, DB, auth)
-- Generates `workspace/input/stack/stack.md` (43 Project Config keys, safe defaults)
-- Creates the full `workspace/output/.sys/` directory structure
+- Generates `workspace/stack/stack.md` (43 Project Config keys, safe defaults)
+- Creates the full `workspace/.sys/` directory structure
 - Installs Python deps (`pip install -e .claude/python[dev]`)
 - Offers to install the console deps (`npm install` in `workspace/console/`)
 - Runs a final smoke check
@@ -40,9 +40,9 @@ Validated end-to-end combos:
 
 ## After bootstrap
 
-1. Edit secrets in [workspace/input/stack/stack.md](workspace/input/stack/stack.md) (DB password, Azure AD client ID, etc.) — this file is gitignored.
+1. Edit secrets in [workspace/stack/stack.md](workspace/stack/stack.md) (DB password, Azure AD client ID, etc.) — this file is gitignored.
 2. In Claude Code: `/feat-generate <Name>` — answer the 3-6 elicitation questions.
-3. *(Optional)* drop HTML mockups under `workspace/input/ui/{n}-{m}-{Name}.html`.
+3. *(Optional)* drop HTML mockups under `workspace/ui/{n}-{m}-{Name}.html`.
 4. `/sdd-full {n}` — full pipeline (PO → arch → dev-back → API gate → dev-front → QA → reviewers).
 5. `/sdd-status [{n}]` — diagnostic.
 
@@ -50,7 +50,7 @@ Validated end-to-end combos:
 
 ## Web Console — validation cockpit
 
-Since **v6.10**, a React + Fastify web console centralises all project telemetry (QA, security, coverage, runs, gates) by reading the SQLite `workspace/output/db/console.db`. No `.json` or `.jsonl` stat file remains on the FS — the DB is the single source of truth.
+Since **v6.10**, a React + Fastify web console centralises all project telemetry (QA, security, coverage, runs, gates) by reading the SQLite `workspace/db/console.db`. No `.json` or `.jsonl` stat file remains on the FS — the DB is the single source of truth.
 
 ### Launch the console
 
@@ -100,7 +100,7 @@ Prereqs: Node.js ≥ 20 and Python ≥ 3.8 on PATH (used to query `console.db` v
 
 ## Architecture in one paragraph
 
-SDD_Pro orchestrates **12 Claude Code agents** (PO, arch, dev-backend, dev-frontend, QA, 5 reviewers, elicitor, constitutioner) around a **strict file ownership matrix**, a **layered Project Config** (43 keys, JSON-schema validated), a **deterministic Python tooling layer** (~20 KLOC, 1072 tests, framework smoke), and an **opt-in cost/budget cap** ($50/run by default, hard-blocking past threshold). The framework is **source-first**: every decision lives in `.md` files (FEATs, US, plans, ADRs) versioned with the code — no hidden state in the LLM context. The pipeline is **gated backend-first** (dev-backend ALL US → API Gate → dev-frontend ALL US) to avoid silent contract drift between front and back.
+SDD_Pro orchestrates **19 Claude Code agents** — 12 forward (PO, arch, dev-backend, dev-frontend, QA, 5 reviewers, elicitor, constitutioner) plus 7 reverse-engineering agents (optional legacy→spec module) — around a **strict file ownership matrix**, a **layered Project Config** (43 keys, JSON-schema validated), a **deterministic Python tooling layer** (~20 KLOC, 1700+ tests, framework smoke), and an **opt-in cost/budget cap** ($50/run by default, hard-blocking past threshold). The framework is **source-first**: every decision lives in `.md` files (FEATs, US, plans, ADRs) versioned with the code — no hidden state in the LLM context. The pipeline is **gated backend-first** (dev-backend ALL US → API Gate → dev-frontend ALL US) to avoid silent contract drift between front and back.
 
 ---
 

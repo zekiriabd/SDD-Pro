@@ -1,6 +1,6 @@
 # SDD_Pro
 
-Framework FEAT-driven development pour Claude Code — branche `next` : **v7.0.0 GA tagué 2026-06-07** (cf. [.claude/docs/VERSIONING.md](.claude/docs/VERSIONING.md)). Branche `main` : v6.10.4-LTS (freeze actif jusqu'au 2026-06-18).
+Framework FEAT-driven development pour Claude Code — **v7.0.0 GA tagué 2026-06-07** (`main`, freeze pré-GA clos ; cf. [.claude/docs/VERSIONING.md](.claude/docs/VERSIONING.md)). Baseline LTS v6.10.x (tag `SDD_Prov6_10_5`) conservée jusqu'au 2026-12-31 pour migration douce.
 
 > 🌍 [English README](README.en.md) — quickstart + console essentials (les docs FR restent canoniques).
 
@@ -25,8 +25,8 @@ python bootstrap.py --combo c1 --skip-install
 
 Le bootstrap :
 - Demande le nom du projet + 3-4 questions (stack, DB, auth)
-- Génère `workspace/input/stack/stack.md` (43 clés Project Config, defaults sûrs)
-- Crée la structure `workspace/output/.sys/` complète
+- Génère `workspace/stack/stack.md` (43 clés Project Config, defaults sûrs)
+- Crée la structure `workspace/.sys/` complète
 - Installe les dépendances Python (`pip install -e .claude/python[dev]`)
 - Propose l'install des deps console (`npm install` dans `workspace/console/`)
 - Lance un smoke check final
@@ -54,7 +54,7 @@ SDD_APP_NAME=MyApp SDD_COMBO=c1 python bootstrap.py --auto-init
 | Reviewers post-code (angles distincts) | **5** (code, security, spec, arch, adversarial) | 1 | 0 | 1 |
 | Anti-derive strict (ownership + STOP) | ✅ | partial | ❌ | partial |
 | Catalogues machines (`.libs.json` + CVE + LTS) | ✅ | ❌ | ❌ | ❌ |
-| Error classification cross-agent (174 préfixes `[CLASS]`) | ✅ | ❌ | ❌ | ❌ |
+| Error classification cross-agent (188 préfixes `[CLASS]`) | ✅ | ❌ | ❌ | ❌ |
 | Telemetry SQLite (cost cap, audit trail) | ✅ | ❌ | ❌ | partial |
 | Idempotence / resume (checkpoint mode) | ✅ | ❌ | ❌ | partial |
 | Determinisme (scripts 0-coût LLM) | **55 scripts** | ❌ | ❌ | partial |
@@ -67,9 +67,9 @@ pipeline LLM. Voir [cookbook 10 min](.claude/docs/cookbook.md) pour démarrer.
 
 ## Démarrage rapide (après bootstrap)
 
-1. Éditer les secrets dans [workspace/input/stack/stack.md](workspace/input/stack/stack.md) (DB password, Azure AD client ID, etc.) — fichier gitignored.
+1. Éditer les secrets dans [workspace/stack/stack.md](workspace/stack/stack.md) (DB password, Azure AD client ID, etc.) — fichier gitignored.
 2. Dans Claude Code : `/feat-generate <Nom>` — répondre aux 3-6 questions.
-3. (Optionnel) déposer mockups HTML sous `workspace/input/ui/{n}-{m}-{Name}.html`.
+3. (Optionnel) déposer mockups HTML sous `workspace/ui/{n}-{m}-{Name}.html`.
 4. `/sdd-full {n}` — pipeline complet de A à Z.
 5. `/sdd-status [{n}]` — vérifier l'état.
 
@@ -77,7 +77,7 @@ pipeline LLM. Voir [cookbook 10 min](.claude/docs/cookbook.md) pour démarrer.
 
 ## Console web — cockpit de validation
 
-Depuis **v6.10**, une console web React + Fastify centralise toute la télémétrie du projet (QA, sécurité, coverage, runs, gates) en lisant la base SQLite `workspace/output/db/console.db`. Aucun fichier `.json` ni `.jsonl` de stats ne subsiste sur le FS — la DB est la source de vérité unique.
+Depuis **v6.10**, une console web React + Fastify centralise toute la télémétrie du projet (QA, sécurité, coverage, runs, gates) en lisant la base SQLite `workspace/db/console.db`. Aucun fichier `.json` ni `.jsonl` de stats ne subsiste sur le FS — la DB est la source de vérité unique.
 
 ### Lancer la console
 
@@ -127,7 +127,7 @@ Pré-requis : Node.js ≥ 20 et Python ≥ 3.8 sur le PATH (utilisé pour requê
 | `POST /api/validate` | Enregistre la décision PO/Tech Lead sur une US/Task |
 | `POST /api/gate-decide` | Résout un gate `afterUS/afterReadiness/...` |
 | `GET /api/events` | Server-Sent Events (broadcast modifs FS + gates) |
-| `GET /ui/*` | Sert directement `workspace/input/ui/` (mockups HTML avec leur CSS relatif `design-system.css`) |
+| `GET /ui/*` | Sert directement `workspace/ui/` (mockups HTML avec leur CSS relatif `design-system.css`) |
 
 ---
 
@@ -182,7 +182,7 @@ Hub navigation : [.claude/docs/README.md](.claude/docs/README.md) — explorer l
 
 ## Stack technique
 
-Framework écrit en **Python** (stdlib pure pour le moteur, pytest pour les tests — suite > 1000 tests couvrant `sdd_lib/`, `sdd_scripts/`, `sdd_hooks/`, `sdd_admin/`). **Console web** : Node.js 22.5+ (Fastify 5 + React 18 via CDN, pas de build step). **SQLite** (WAL mode) pour la télémétrie centralisée (`workspace/output/db/console.db`).
+Framework écrit en **Python** (stdlib pure pour le moteur, pytest pour les tests — suite > 1000 tests couvrant `sdd_lib/`, `sdd_scripts/`, `sdd_hooks/`, `sdd_admin/`). **Console web** : Node.js 22.5+ (Fastify 5 + React 18 via CDN, pas de build step). **SQLite** (WAL mode) pour la télémétrie centralisée (`workspace/db/console.db`).
 
 Compte vérifiable localement :
 ```bash
@@ -196,12 +196,10 @@ Aucun runtime applicatif imposé sur le code généré — SDD_Pro produit du co
 
 | Statut | Définition | Compte réel |
 |:---:|---|:---:|
-| 🟢 **validé** | Combo `/sdd-full` testé bout-en-bout sur ≥ 1 FEAT M (3 US, back+front), pipeline complet sans intervention humaine | **2 combos** ([.claude/docs/validated-combos.md](.claude/docs/validated-combos.md)) |
-| 🟢 **reference** | Stack avec entête `Validation: 🟢 reference` (composant d'un combo validé OU pattern de référence) | **14 stacks** |
-| 🟡 **experimental** | Stack avec entête `Validation: 🟡 experimental` — chargeable mais sans PoC formel bout-en-bout | **20 stacks** |
-| 🟡 **POC-only** | Stack `Validation: 🟡 POC-only` — usage interne SDD_Pro uniquement, non destiné prod externe (ex: `fullstack/node-react` pour la console) | **1 stack** |
+| 🟢 **(validated / bench-validated / scaffold-validated)** | Stack avec entête `Validation: 🟢` — composant d'un combo validé bout-en-bout, bench-validé runtime, ou scaffold-validé. Inclut les 2 combos `validated` end-to-end (C1, C2) | **28 stacks** ([.claude/docs/validated-combos.md](.claude/docs/validated-combos.md)) |
+| 🟡 **experimental / POC-only** | Stack avec entête `Validation: 🟡` — chargeable mais sans validation bout-en-bout (5 experimental : `archi/ddd`, `archi/microservice`, `qa/mutation-testing`, `qa/playwright`, `fullstack/aspnet-mvc-razor` ; 1 POC-only : `fullstack/node-react` ; 1 scaffold-validated pending : `mobiles/kotlin-android`) | **7 stacks** |
 
-**Total actif : 35 stacks** répartis : Backend (4), Frontend (4), UI DS (3), QA (9 dont 2 opt-in `mutation-testing` + `playwright`), Auth (2), Archi (3 patterns `mvc`/`ddd`/`microservice`), Fullstack (7 dont `aspnet-mvc-razor` expérimental), Mobiles (3). Détail : [.claude/CLAUDE.md §6](.claude/CLAUDE.md).
+**Total actif : 35 stacks (28 🟢 + 7 🟡)** répartis : Backend (4), Frontend (4), UI DS (3), QA (9 dont 2 opt-in `mutation-testing` + `playwright`), Auth (2), Archi (3 patterns `mvc`/`ddd`/`microservice`), Fullstack (7 dont `aspnet-mvc-razor` expérimental), Mobiles (3). SSoT = entête `Validation:` du `.md`. Détail : [.claude/CLAUDE.md §6](.claude/CLAUDE.md).
 
 > ℹ️ **v7.0.0 GA audit P0-doc 2026-06-05** : la ligne "⏸️ draft (quarantaine)" et le dossier `_drafts/` ont été retirés (rollback `governance-stacks-quarantine-rollback` du 2026-05-24 ; cf. CHANGELOG). Aucun stack n'est en quarantaine — les stacks expérimentaux restent chargeables avec l'avertissement runtime.
 

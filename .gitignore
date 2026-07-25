@@ -13,59 +13,53 @@
 # Build local + déploiement manuel sur Azure / intranet, jamais committé.
 /site/
 
-# Workspace généré par le pipeline SDD (artefacts non-versionnés)
-workspace/output/
-workspace/console/status.json
-workspace/console/.status.lock
-
 # Framework smoke cache (fast-path Stop hook)
 .claude/.cache/
 
-# Local dev secrets — stack.md contient DB_PASSWORD, AUTH_JWT_SECRET,
-# SMTP_PASSWORD etc. en clair pour le dev local. Ne JAMAIS committer.
-# Versionner stack.md.example (placeholders) à la place.
-workspace/input/stack/stack.md
+# Cache de build du transpileur multi-harnais (.sdd/.build/ = jetable, régénéré
+# par harness_build.py). Les façades déployées .codex/ et .gemini/ sont, elles,
+# des produits de build versionnables (garde CI anti-drift prévue Phase 2.4).
+.sdd/.build/
 
-# HTTPS dev cert/key auto-signés (security audit 2026-06-06 — keypair privé
-# ne JAMAIS commiter, même en dev). Régénérer via `npm run gen-cert` ou
-# fallback HTTP automatique si absent (cf. server.js:57).
-#
-# `.certs.disabled/` = bypass HTTPS *strictement dev-local* (audit CTO 2026-06-09).
-# Convention dev : `mv .certs .certs.disabled` pour relancer en HTTP plain
-# sans toucher au code. Impact prod NUL — `existsSync(.certs/)` reste l'unique
-# gate dans server.js:63 et NODE_ENV=production refuse de booter sans certs
-# (server.js:66). Si le besoin se présente en CI, préférer `NODE_ENV=development`
-# explicite plutôt que ce rename (audit-trail meilleur). Ne JAMAIS commiter
-# de clé privée même renommée.
-workspace/console/.certs/
-workspace/console/.certs.disabled/
+# Workspace runtime SDD (scaffolding, secrets, projets générés) — jamais commité.
+# stack.md porte DB_PASSWORD / AUTH_JWT_SECRET en clair (CLAUDE.md §9), les
+# projets sous src/ portent .env / appsettings / config runtime. `workspace/`
+# couvre déjà tout ; les entrées granulaires ci-dessous sont explicites pour
+# les fichiers porteurs de secrets (garde anti-fuite, test_generated_project_gitignore_template).
+workspace/
+workspace/db/
+workspace/console/
+workspace/stack/
+workspace/src/*/.env
+workspace/src/*/appsettings*.json
+workspace/src/*/config/default.json
 
-# Layered config team-level (peut contenir des secrets/policy org)
-.sdd/
-~/.sdd/
+# Sauvegardes de config pré-audit (nettoyage hooks 2026-07-25, ADR governance-protection-hooks-wiring)
+.claude/settings*.pre-hooks-audit.bak
 
 # Pytest coverage artefact (run-local)
 .coverage
 htmlcov/
 .pytest_cache/
 
-# Console Fastify deps (lourdes, ~27MB, restituables via npm install)
-workspace/console/node_modules/
+# Ruff linter cache (transient, run-local)
+.ruff_cache/
+**/.ruff_cache/
+
+# setuptools editable install metadata (régénéré par `pip install -e`)
+*.egg-info/
+**/*.egg-info/
+
+# Python virtualenv (local, restituable via python -m venv + pip install -e)
+.venv/
+**/.venv/
 
 # v7.0.0 cleanup 2026-05-20 — node_modules orphelins (pas de package.json
-# racine ni dans workspace/output/src/*). Ignore tout node_modules récursif
-# par sécurité (le projet généré dans workspace/output/src/ a son propre
+# racine ni dans workspace/src/*). Ignore tout node_modules récursif
+# par sécurité (le projet généré dans workspace/src/ a son propre
 # node_modules quand frontend Node — toujours ignoré).
 node_modules/
 **/node_modules/
-
-# Console DB (SQLite local — généré par init_console_db.py, contient stats run-locale)
-workspace/output/db/*.db
-workspace/output/db/*.db-shm
-workspace/output/db/*.db-wal
-workspace/console/*.db
-workspace/console/*.db-shm
-workspace/console/*.db-wal
 
 # Runtime transient — scheduler lock (regénéré, ne pas committer)
 .claude/scheduled_tasks.lock
@@ -106,10 +100,6 @@ Thumbs.db
 # Les tests copient les fixtures en tmp_path (tests/fixture_utils.py) — un
 # .sys/ local sous fixtures/ est un résidu, jamais une baseline (audit 2026-06-11).
 .claude/python/tests/fixtures/*/.sys/
-
-# Reverse engineering: workspace/old/ contient les projets legacy à reverse-engineerer.
-# Souvent code client confidentiel — jamais commité dans ce framework.
-workspace/old/
 
 # Backup transient de sync_parity_snapshots (régénéré à chaque sync — le
 # fichier autoritatif _parity_snapshots.json reste versionné)
