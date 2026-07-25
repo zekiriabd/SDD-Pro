@@ -1,0 +1,13 @@
+{
+  "_generated": "FROM .sdd/ — DO NOT EDIT — IDs à valider (providers/*.yaml)",
+  "harness": "gemini-cli",
+  "provider": "anthropic",
+  "model": {
+    "name": "claude-sonnet-4-6"
+  },
+  "security": {
+    "auth": {
+      "env": "ANTHROPIC_API_KEY"
+    }
+  }
+}
