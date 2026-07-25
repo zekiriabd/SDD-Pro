@@ -471,20 +471,17 @@ class _MemoryVariantAdapter(Adapter):
     # ------------------------------------------------------------------ #
 
     def _command_pivots(self) -> list[Path]:
-        return sorted((self._sdd_home / "commands").glob("*.cmd.yaml"))
+        # Format consolidé 2026-07-25 : un seul fichier `.md` par commande sous
+        # `.sdd/commands/`. Aligné avec `ClaudeAdapter._command_pivot_paths()`.
+        return sorted((self._sdd_home / "commands").glob("*.md"))
 
     def _load_command(self, pivot_path: Path) -> tuple[str, str, str]:
         """(name, description, body) — body normalisé + @-includes réécrits."""
-        pivot = load_yaml(pivot_path)
-        name = str(pivot.get("name") or pivot_path.name.removesuffix(".cmd.yaml"))
-        description = " ".join(str(pivot.get("description") or name).split("\n")).strip()
-        body_rel = pivot.get("body_source")
-        if not body_rel:
-            raise ConfigError(f"pivot commande sans 'body_source': {pivot_path}")
-        body_path = (self._repo_root / body_rel).resolve()
-        if not body_path.is_file():
-            raise ConfigError(f"body_source introuvable: {body_path}")
-        _fm, body = _split_optional_frontmatter(body_path.read_text(encoding="utf-8-sig"))
+        source_text = pivot_path.read_text(encoding="utf-8-sig")
+        fields, body = _split_optional_frontmatter(source_text)
+        fields = fields or {}
+        name = str(fields.get("name") or pivot_path.stem)
+        description = " ".join(str(fields.get("description") or name).split("\n")).strip()
         return name, description, self._rewrite_at_includes(_normalize_body_text(body))
 
     def _render_command(self, name: str, description: str, body: str) -> str:
@@ -502,7 +499,7 @@ class _MemoryVariantAdapter(Adapter):
         cmd_out.mkdir(parents=True, exist_ok=True)
         results: list[EmitResult] = []
         for pivot_path in self._command_pivots():
-            name = pivot_path.name.removesuffix(".cmd.yaml")
+            name = pivot_path.stem
             try:
                 cmd_name, description, body = self._load_command(pivot_path)
                 content = self._render_command(cmd_name, description, body)
@@ -551,25 +548,42 @@ class _MemoryVariantAdapter(Adapter):
         RÉELLEMENT matérialisé sous `.sdd/` :
 
         - si `.sdd/<path>` existe → `@.claude/<path>` OU `@.sdd/<path>` -> `.sdd/<path>` ;
-        - sinon → `.claude/<path>` (résolvable — `.claude/` est co-présent —
-          au lieu d'un `.sdd/<path>` fantôme).
+        - pour les refs brace-expansion (`{a,b}.md`) qui échouent au test
+          d'existence, on expanse et on vérifie au moins un membre — si au
+          moins un fichier réel matche sous `.sdd/`, cible `.sdd/` ;
+        - sinon fallback `.sdd/<path>` (le foyer neutre est la SSoT ; le
+          répertoire `.claude/` peut ne pas exister sous Codex/Gemini).
 
         Les mentions littérales `.claude/...` SANS `@` (chemins descriptifs
         d'invocation Python) sont conservées telles quelles.
         """
+        def _any_brace_member_exists(rel: str) -> bool:
+            """Vrai si `rel` contient `{a,b}` et qu'au moins une expansion
+            matche un fichier réel sous `.sdd/`."""
+            if "{" not in rel or "}" not in rel:
+                return False
+            prefix, rest = rel.split("{", 1)
+            group, suffix = rest.split("}", 1)
+            for member in group.split(","):
+                if (self._sdd_home / f"{prefix}{member.strip()}{suffix}").exists():
+                    return True
+            return False
+
         def _repl(m: "re.Match[str]") -> str:
             rel = m.group(1)
-            return f".sdd/{rel}" if (self._sdd_home / rel).exists() else f".claude/{rel}"
+            if (self._sdd_home / rel).exists() or _any_brace_member_exists(rel):
+                return f".sdd/{rel}"
+            # Foyer neutre est SSoT — jamais de fallback `.claude/` (ce
+            # répertoire n'existe pas forcément sous Codex/Gemini).
+            return f".sdd/{rel}"
 
         # Token de chemin : caractères usuels de chemin + accolades/virgules
-        # pour les refs brace-expansion (`{a,b}.md`) — l'existence échoue alors
-        # et on retombe proprement sur `.claude/`.
+        # pour les refs brace-expansion (`{a,b}.md`).
         rewritten = re.sub(r"@\.claude/([A-Za-z0-9_./{},-]+)", _repl, body)
-        # Idem pour `@.sdd/...` (le `@` doit toujours être retiré ; la cible
-        # reste `.sdd/` si elle existe, sinon fallback `.claude/`).
+        # Idem pour `@.sdd/...` (le `@` doit toujours être retiré).
         rewritten = re.sub(r"@\.sdd/([A-Za-z0-9_./{},-]+)", _repl, rewritten)
-        # `@.claude` / `@.sdd` nus (sans slash) — dégrade en littéral.
-        return rewritten.replace("@.claude", ".claude").replace("@.sdd", ".sdd")
+        # `@.claude` / `@.sdd` nus (sans slash) — dégrade en littéral `.sdd`.
+        return rewritten.replace("@.claude", ".sdd").replace("@.sdd", ".sdd")
 
     def emit_memory_file(self, out_dir: Path) -> Path:
         safe_out = _ensure_under_build(Path(out_dir), self._sdd_home)
@@ -890,7 +904,23 @@ def main(argv: list[str] | None = None) -> int:
     # Provider pour l'émission (façade) + rapport : base `Provider:` du stack.
     # Le mixage cross-provider par tier (stack_cfg.provider_for_tier) relève du
     # résolveur runtime dynamique (Phase 3+), pas de l'émission statique ici.
-    provider = args.provider or (stack_cfg.provider if stack_cfg else None) or "anthropic"
+    #
+    # Défaut par harnais (audit 2026-07-25) : codex → openai, gemini-cli/
+    # antigravity → google, claude-code → anthropic. Un combo cross-harness
+    # (ex. codex × anthropic) reste possible via --provider explicite, mais
+    # ne doit pas être imposé par défaut — Anthropic n'expose pas d'endpoint
+    # OpenAI-compat officiel, Codex sur Anthropic était non-fonctionnel.
+    _DEFAULT_PROVIDER_BY_HARNESS = {
+        "claude-code": "anthropic",
+        "codex": "openai",
+        "gemini-cli": "google",
+        "antigravity": "google",
+    }
+    provider = (
+        args.provider
+        or (stack_cfg.provider if stack_cfg else None)
+        or _DEFAULT_PROVIDER_BY_HARNESS.get(harness, "anthropic")
+    )
 
     adapter = _ADAPTERS[harness](provider=provider)
     results: list[EmitResult] = []
