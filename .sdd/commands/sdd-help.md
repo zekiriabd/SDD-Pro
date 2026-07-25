@@ -172,6 +172,6 @@ Erreurs : 1L `🔴 [ANALYSIS/FAIL] résumé`. Bypass `SDD_CHAT_VERBOSE=1`.
 ## Pointeurs
 
 - `/sdd-status [{n}]` — pour le tree ASCII complet (diagnostic brut)
-- `@.claude/CLAUDE.md §3` — liste exhaustive des 13 commandes user-facing
+- `@.sdd/entrypoint-body.md §3` — liste exhaustive des 13 commandes user-facing (SSoT neutre — miroir dans CLAUDE.md/AGENTS.md/GEMINI.md selon harness)
 - `@.sdd/docs/quickstart.md` — onboarding 10 min
 - `@.sdd/docs/cookbook.md` — recettes pratiques

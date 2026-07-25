@@ -1,6 +1,6 @@
 # SDD_Pro
 
-FEAT-driven development framework for Claude Code — **v7.0.0 GA tagged 2026-06-07** (`main`, pre-GA freeze closed; see [.claude/docs/VERSIONING.md](.claude/docs/VERSIONING.md)). LTS baseline v6.10.x (tag `SDD_Prov6_10_5`) kept until 2026-12-31 for smooth migration.
+FEAT-driven development framework for Claude Code — **v7.0.0 GA tagged 2026-06-07** (`main`, pre-GA freeze closed; see [.sdd/docs/VERSIONING.md](.sdd/docs/VERSIONING.md)). LTS baseline v6.10.x (tag `SDD_Prov6_10_5`) kept until 2026-12-31 for smooth migration.
 
 > ⚠ **This English page is a summary, not a translation.** It covers Quickstart + Console essentials only (~10 sections vs ~17 in the French canonical README). For exhaustive docs (architecture, agents, rules, stacks, governance, ROI, roadmap), use the French source.
 >
@@ -107,10 +107,10 @@ SDD_Pro orchestrates **19 Claude Code agents** — 12 forward (PO, arch, dev-bac
 ## Key resources
 
 - [.claude/CLAUDE.md](.claude/CLAUDE.md) — framework overview (FR, ~150 lines)
-- [.claude/docs/quickstart.md](.claude/docs/quickstart.md) — full quickstart (FR)
-- [.claude/docs/getting-started.en.md](.claude/docs/getting-started.en.md) — full getting started (EN, this English mirror)
-- [.claude/docs/architecture.md](.claude/docs/architecture.md) — architecture (FR)
-- [.claude/docs/validated-combos.md](.claude/docs/validated-combos.md) — validated stack combinations
-- [.claude/docs/VERSIONING.md](.claude/docs/VERSIONING.md) — versioning policy
-- [.claude/docs/CHANGELOG.md](.claude/docs/CHANGELOG.md) — release notes
-- [.claude/docs/MIGRATION.md](.claude/docs/MIGRATION.md) — migration guides
+- [.sdd/docs/quickstart.md](.sdd/docs/quickstart.md) — full quickstart (FR)
+- [.sdd/docs/getting-started.en.md](.sdd/docs/getting-started.en.md) — full getting started (EN, this English mirror)
+- [.sdd/docs/architecture.md](.sdd/docs/architecture.md) — architecture (FR)
+- [.sdd/docs/validated-combos.md](.sdd/docs/validated-combos.md) — validated stack combinations
+- [.sdd/docs/VERSIONING.md](.sdd/docs/VERSIONING.md) — versioning policy
+- [.sdd/docs/CHANGELOG.md](.sdd/docs/CHANGELOG.md) — release notes
+- [.sdd/docs/MIGRATION.md](.sdd/docs/MIGRATION.md) — migration guides

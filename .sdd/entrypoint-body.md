@@ -1,7 +1,7 @@
 # SDD_Pro v7.0.0 GA — FEAT-Driven Development pour Claude Code
 
 > ✅ **v7.0.0 GA tagué 2026-06-07** (audit CTO closure : 20 Critical + 38 Major
-> fermés, taxonomie 188 classes, 13 combos SLA). v6.10.4-LTS conservée pour
+> fermés, taxonomie 189 classes, 13 combos SLA). v6.10.4-LTS conservée pour
 > projets legacy. Cf. `@.sdd/docs/VERSIONING.md` + `@.sdd/docs/CHANGELOG.md`.
 
 > Framework SDD strict : FEAT → User Stories → Code (back/front parallèle).
@@ -62,7 +62,7 @@ supprimer ligne ET régénérer les US. `Covers` réfèrent par valeur.
 
 ---
 
-## 3. Commandes (38 : 13 user-facing + 8 internes [debug] + 17 reverse)
+## 3. Commandes (40 : 13 user-facing + 9 internes [debug] + 18 reverse)
 
 **User-facing** (orchestrantes, gèrent pré-conditions et idempotence) :
 
@@ -82,19 +82,19 @@ supprimer ligne ET régénérer les US. `Covers` réfèrent par valeur.
 | `/sdd-serve` | runtime | Backend + front + console parallèle (ex-`/sdd-run`) |
 | `/sdd-kill-server` | runtime | Arrête backend + front + console (pendant de `/sdd-serve`) |
 
-**Internes** (8, debug — préférer un orchestrateur) : `/us-generate`,
+**Internes** (9, debug — préférer un orchestrateur) : `/us-generate`,
 `/arch-init`, `/dev-plan`, `/dev-backend`, `/dev-frontend`, `/doc-refresh`,
-`/feat-deepen`, `/sdd-profile`. Flags `/sdd-full` : `--force`,
+`/feat-deepen`, `/sdd-profile`, `/spec-book`. Flags `/sdd-full` : `--force`,
 `--rebuild-arch`, `--resume`, `--manual-gates`, `--no-manual-gates`,
 `--manual-gates=us,plan`, `--plan`, `--no-plan-on-warn`, `--no-validate`
 (le parallélisme se règle via `MaxParallel:` en Project Config — pas de flag
 `--max-parallel` sur `/sdd-full`, audit 2026-06-11 M8). Flags `/dev-run` : `--rebuild-arch`, `--resume`,
 `--max-parallel N`, `--unsequenced`, `--legacy-auditor-parallel`.
 ⚠️ `--no-validate`, `--unsequenced`, `--legacy-auditor-parallel`
-**désactivent des protections** (bypass audit-loggués). Détail : `@.claude/commands/*.md`.
+**désactivent des protections** (bypass audit-loggués). Détail : `@.sdd/commands/*.md`.
 
-**Reverse engineering** (15, module optionnel legacy→FEAT) : `/sdd-reverse-full`
-(orchestrateur), `/sdd-reverse {U-N}`, `/sdd-reverse-{init,inventory,audit,analyze,stories,feat,crosscut,review,ui,status}`,
+**Reverse engineering** (18, module optionnel legacy→FEAT) : `/sdd-reverse-full`
+(orchestrateur), `/sdd-reverse {U-N}`, `/sdd-reverse-{init,inventory,audit,analyze,stories,feat,crosscut,review,ui,status,synth}`,
 + 3 phases optionnelles emprunt Reversa (2026-06-12) : `/sdd-reverse-paradigm`
 (gap paradigme + curation), `/sdd-reverse-parity` (specs Gherkin de parité),
 `/sdd-reverse-questions` (boucle validation humaine, `--ingest`)
@@ -109,17 +109,20 @@ MariaDB (scaffold-validés, runtime live pending). SSoT : `@.sdd/docs/reverse-en
 
 ---
 
-## 4. Agents (23 : 12 LLM forward + 11 reverse, + 1 rubric déterministe)
+## 4. Agents (25 : 13 LLM forward + 12 reverse, + 1 rubric déterministe)
 
 **Cœur** : `po`, `arch` (Sonnet 4.6) ; `dev-backend`, `dev-frontend` (Opus 4.8).
-**Support** : `elicitor`, `constitutioner`, `qa`.
+**Support** : `elicitor`, `constitutioner`, `qa`, `specbook-writer` (vulgarise
+FEAT en langage humain, cache `workspace/docs/.sys/sections/`).
 **Auditors** : `code-reviewer`, `security-reviewer`, `spec-compliance-reviewer`,
 `arch-reviewer`, `adversarial-reviewer` (opt-in, informational).
-**Reverse** (10, manifest autonome `loader.reverse.yml`) : `reverse-inventory`,
+**Reverse** (12, manifest autonome `loader.reverse.yml`) : `reverse-inventory`,
 `reverse-tech-auditor`, `reverse-tech-analyst`, `reverse-us-writer`,
 `reverse-feat-composer`, `reverse-ui-extractor`, `reverse-completeness-reviewer`,
 `reverse-paradigm-advisor`, `reverse-parity-inspector`, `reverse-clarifier`,
-`reverse-sql-analyst` (proc-reverse : corps de procédure stockée → User Story, lecture seule).
+`reverse-sql-analyst` (proc-reverse : corps d'objet SQL → User Story, lecture seule),
+`reverse-sql-feat-composer` (opt-in `SDD_REVERSE_FEAT_LLM=1` : compose la FEAT
+métier d'un module SQL).
 **Scripts déterministes** (0 token) : `complexity_router.py` (rubric
 `docs/rubrics/complexity-router-scoring.md`), `phase_planner.py`.
 Détail modèles + retraits v7.0.0 (`a11y`/`perf`/`dashboard`/`*-strict`) :
@@ -156,14 +159,15 @@ Templates : `@.sdd/docs/conventions.md §14-§15`.
 
 ---
 
-## 6. Stacks (35 actifs — SSoT = entête `Validation:` du `.md`)
+## 6. Stacks (36 actifs — SSoT = entête `Validation:` du `.md`)
 
-> **Recount 2026-06-11** (audit : ajout `fullstack/aspnet-mvc-razor` 2026-06-10 ;
+> **Recount 2026-07-25** (audit : ajout `mobiles/delphi-fmx` 2026-06-21 🟡
+> scaffold-validated ; ajout `fullstack/aspnet-mvc-razor` 2026-06-10 ;
 > downgrade `mobiles/kotlin-android` 🟢→🟡 scaffold-validated, audit CTO 2026-06-07) :
-> **28 🟢 (validated/bench-validated) + 7 🟡 = 35 total**.
+> **28 🟢 (validated/bench-validated) + 8 🟡 = 36 total**.
 > Validation auto : `python .sdd/python/sdd_admin/framework_smoke.py` (gate `stacks-count`).
 
-**🟡 (7)** : 5 experimental (`archi/ddd`, `archi/microservice`, `qa/mutation-testing` (opt-in), `qa/playwright` (opt-in), `fullstack/aspnet-mvc-razor`) + 1 POC-only (`fullstack/node-react` — console SDD interne, non destiné prod externe) + 1 scaffold-validated (`mobiles/kotlin-android` — APK runtime pending, SDK absent au bench).
+**🟡 (8)** : 5 experimental (`archi/ddd`, `archi/microservice`, `qa/mutation-testing` (opt-in), `qa/playwright` (opt-in), `fullstack/aspnet-mvc-razor`) + 1 POC-only (`fullstack/node-react` — console SDD interne, non destiné prod externe) + 2 scaffold-validated (`mobiles/kotlin-android` — APK runtime pending, SDK absent au bench ; `mobiles/delphi-fmx` — Delphi FMX mobile, runtime live pending).
 **🟢 (28)** : tous les autres (cf. table détaillée + tiers `validated` / `bench-validated` / `scaffold-validated` dans `@.sdd/docs/validated-combos.md §1-§2`).
 
 **Engagement commercial — 13 combos SLA** : 2 `validated` end-to-end (C1, C2) + 11 `bench-validated runtime` (C3-C13). SSoT machine : `@.sdd/templates/combos.json`. Marquage runtime via hook `preflight_stack_combo` (`SDD_ALLOW_UNTESTED_COMBO=1` = bypass audit-loggué). Les stacks 🟡 ne sont **jamais vendus en offre standalone** (pas de SLA sur la dimension isolée). **Exception documentée (GOV-C1, 2026-06-12)** : un *pattern* archi 🟡 peut apparaître **à l'intérieur d'un combo `validated`** dont le run `/sdd-full` bout-en-bout a été vérifié — cas unique **C2** (`archi/ddd`, validé sur workspace réel 2026-05-11 ; cf. `combos.json` C2 `notes`). Le SLA porte sur le **combo** vérifié, pas sur la dimension 🟡 isolée.
@@ -180,7 +184,7 @@ Anti-derive, ERROR 3L disque, idempotence, lecture sélective, parallélisme bor
 
 ## 8. Loader manifest
 
-`@.claude/loader.yml` = miroir reads/writes par agent (SSoT, ADR `governance-major-config-ssot`).
+`@.sdd/loader.yml` = miroir reads/writes par agent (SSoT, ADR `governance-major-config-ssot`).
 
 ---
 
@@ -203,6 +207,6 @@ Anti-derive, ERROR 3L disque, idempotence, lecture sélective, parallélisme bor
 - **Commercial / DSI** : `@.sdd/docs/{WHY-SDD-PRO,COMPLIANCE,SLA,KNOWN-LIMITATIONS}.md`
 - **ROI & roadmap** : `@.sdd/docs/{poc-roi-methodology,roadmap-v7-v8,cache-strategy,validated-combos,orphan-cleanup-policy}.md`
 - **Règles** : `@.sdd/rules/` (5 consolidées + 1 protocole + 1 hoist + 2 orchestration auditors + 1 annexe + 1 module reverse — cf. §5)
-- **Skills auto-triggered** (v7.0.0+ emprunt superpowers) : `@.sdd/skills/` (`using-sddpro`, `starting-a-new-feat`, `debugging-failed-pipeline`, `test-driven-development`)
-- **Invariants manifest** (v7.0.0+ audit P3 E4) : `@.claude/INVARIANTS.yml` — 13 contrats load-bearing (two-stage gate, file ownership, cost cap, schema strict, TDD test-first, etc.) avec pointer vers chaque enforcer (hook/script/smoke test). Test `tests/test_invariants_manifest.py` vérifie que chaque enforcer existe sur disque. Anti-rot manifest : retirer un enforcer sans mettre à jour le manifest = FAIL au smoke.
+- **Skills auto-triggered** (v7.0.0+ emprunt superpowers) : `@.sdd/skills/` — 13 skills (`using-sddpro`, `starting-a-new-feat`, `starting-a-reverse-eng`, `debugging-failed-pipeline`, `test-driven-development`, `frontend-design`, `webapp-testing`, `a11y-local`, `sarif-parsing`, `semgrep`, `codeql`, `insecure-defaults`, `c4-model`) — inventaire complet dans `@.sdd/skills-manifest.yaml`.
+- **Invariants manifest** (v7.0.0+ audit P3 E4) : `@.sdd/INVARIANTS.yml` — 13 contrats load-bearing (two-stage gate, file ownership, cost cap, schema strict, TDD test-first, etc.) avec pointer vers chaque enforcer (hook/script/smoke test). Test `tests/test_invariants_manifest.py` vérifie que chaque enforcer existe sur disque. Anti-rot manifest : retirer un enforcer sans mettre à jour le manifest = FAIL au smoke.
 - **Python** : `@.sdd/python/README.md`
