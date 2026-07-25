@@ -7,11 +7,12 @@ auth_env: OPENAI_API_KEY
 endpoints:
   openai: https://api.openai.com/v1
 tier_map:
-  # Resolver OpenAI (2026-07-25): current model = gpt-5.6-sol.
-  # SDD tier quality and cost remain subject to conformance qualification.
-  deep: gpt-5.6-sol
-  balanced: gpt-5.6-sol
-  fast: gpt-5-mini
+  # Resolver OpenAI (2026-07-25) : modèles publics stables. Le mapping tier ↔
+  # modèle sera confirmé au 1er conformance run (§10). gpt-4o = balanced par
+  # défaut ; o1 pour reasoning « deep » ; gpt-4o-mini pour fast.
+  deep: o1
+  balanced: gpt-4o
+  fast: gpt-4o-mini
 context_window:
   deep: 400000                   # à confirmer
   balanced: 400000               # à confirmer
