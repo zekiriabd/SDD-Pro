@@ -62,8 +62,9 @@ python .claude/python/sdd_admin/framework_smoke.py
 
 ### Branch model
 
-- `main` = `v6.10.4-LTS` (freeze until 2026-06-18, only critical patches)
-- `next` = `v7.0.0-alpha` (active development)
+- `main` = `v7.0.0` GA (pre-GA freeze closed 2026-06-07 ; PATCH/MINOR per VERSIONING.md)
+- `next` = active development (post-GA audits, MINOR/MAJOR candidates)
+- LTS baseline v6.10.x is tagged `SDD_Prov6_10_5` (kept until 2026-12-31)
 - Your work : branch from `next` with prefix :
   - `feat/<scope>-<short-desc>` (new feature)
   - `fix/<scope>-<short-desc>` (bug fix)
@@ -116,7 +117,7 @@ Modifying an agent `.md` ? Run a real FEAT through it :
 # In Claude Code (a sandbox repo)
 /feat-generate TestAuth
 /sdd-full 1 --plan
-# Inspect workspace/output/qa/feat-1/review.md
+# Inspect workspace/qa/feat-1/review.md
 ```
 
 If it works on combo C1 (.NET + React) AND C2 (Kotlin + React), your change is safe.
@@ -160,7 +161,7 @@ Before opening a PR :
 - [ ] All tests pass : `python -m pytest .claude/python/tests/ -q`
 - [ ] Framework smoke passes : `python .claude/python/sdd_admin/framework_smoke.py`
 - [ ] If you touched a rule / hook / agent → ADR added under `.claude/docs/adrs/`
-- [ ] CHANGELOG.md updated (under `[Unreleased — v7.0.0-alpha]`)
+- [ ] CHANGELOG.md updated (add/extend the top-most dated dev section, e.g. `## [v7.0.1-dev] — YYYY-MM-DD` — there is no `[Unreleased]` section)
 - [ ] No secret committed (`stack.md` is gitignored — verify with `git status`)
 - [ ] No `print()` left in production scripts (use `sys.stderr.write` or `logging`)
 - [ ] No `eval`, `exec`, `shell=True`, `os.system` (security policy)
@@ -196,7 +197,7 @@ If `block_env_bypass` or any hook fails on your commit, **read its message** and
 
 Pattern B (canonized 2026-06-06) : `stack.md` is the secrets SSoT. `arch` propagates to native configs (`appsettings.json` etc.). Agents read native configs, never env vars directly. Class `[SEC_ENV_VAR_FORBIDDEN]` enforces this.
 
-### ❌ Don't create files under `workspace/output/` outside agents' ownership
+### ❌ Don't create files under `workspace/` outside agents' ownership
 
 Read [`.claude/rules/ownership.md §1`](.claude/rules/ownership.md). Each agent has a strict write path. The `audit_file_ownership` hook will catch you.
 

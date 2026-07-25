@@ -12,7 +12,7 @@
     All real logic lives in bootstrap.py to keep a single source of truth.
 
 .PARAMETER Combo
-    Skip the stack-choice prompt. Valid values: c1, c2, custom.
+    Skip the stack-choice prompt. Valid values: c1..c13, custom (SSoT: combos.json).
 
 .PARAMETER DryRun
     Show actions without writing files / installing.
@@ -21,7 +21,7 @@
     Skip pip / npm install (CI use).
 
 .PARAMETER Force
-    Overwrite existing workspace/input/ without confirmation.
+    Overwrite existing workspace/ without confirmation.
 
 .EXAMPLE
     .\bootstrap.ps1
@@ -38,8 +38,9 @@
 
 [CmdletBinding()]
 param(
-    # Audit P0-doc 2026-06-05 — synced with bootstrap.py CLI (c1..c5 + custom)
-    [ValidateSet('c1', 'c2', 'c3', 'c4', 'c5', 'custom')]
+    # MI-6 fix (audit 2026-06-09) — SSoT is combos.json (C1..C13). Was stale
+    # at c1..c5. Aligned with .claude/templates/combos.json + bootstrap.py.
+    [ValidateSet('c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9', 'c10', 'c11', 'c12', 'c13', 'custom')]
     [string]$Combo,
 
     [switch]$DryRun,

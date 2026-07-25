@@ -6,7 +6,7 @@ Zero external dependencies (stdlib only).
 
 What it does
 ============
-  1. Detect if `workspace/input/feats/` already has content
+  1. Detect if `workspace/feats/` already has content
      → if yes, prompt "re-init from scratch ?" (refuse by default = safe)
   2. Interactive prompts (5 questions max) :
      - Application name (used for AppName + BackendName + AppNamespace)
@@ -14,9 +14,9 @@ What it does
      - Database type
      - Auth profile (azure-ad / auth-local / none)
      - Frontend / backend dev ports
-  3. Generate `workspace/input/stack/stack.md` from the .template
-  4. Create `workspace/input/feats/`, `workspace/input/ui/` (empty)
-  5. Create `workspace/output/.sys/` skeleton (gitignored)
+  3. Generate `workspace/stack/stack.md` from the .template
+  4. Create `workspace/feats/`, `workspace/ui/` (empty)
+  5. Create `workspace/.sys/` skeleton (gitignored)
   6. Run `pip install -e .claude/python[dev]`
   7. Run `npm install` in `workspace/console/` (lazy, on user confirmation)
   8. Run framework smoke as final check
@@ -30,7 +30,7 @@ Usage
     python bootstrap.py --combo c7     # tout combo SLA c1-c13 (SSoT combos.json)
     python bootstrap.py --combo custom # full interactive
     python bootstrap.py --skip-install # skip pip/npm install (CI use)
-    python bootstrap.py --force        # overwrite existing workspace/input/
+    python bootstrap.py --force        # overwrite existing workspace/
     python bootstrap.py --auto-init    # non-interactive CI mode (reads env vars)
 
 Auto-init env vars (when --auto-init)
@@ -73,12 +73,18 @@ for _stream in (sys.stdout, sys.stderr):
         pass
 
 
+# Repo root = où vivent `.claude/` et `workspace/`. bootstrap.py peut être
+# distribué soit à la racine du repo (canonique), soit dans `.claude/` (layout
+# où tout le framework est regroupé sous `.claude/`) — on remonte d'un cran
+# dans ce dernier cas pour que `.claude/` et `workspace/` résolvent juste.
 REPO_ROOT = Path(__file__).resolve().parent
+if REPO_ROOT.name == ".claude":
+    REPO_ROOT = REPO_ROOT.parent
 STACK_TEMPLATE = REPO_ROOT / ".claude" / "templates" / "stack.md.template"
-STACK_TARGET = REPO_ROOT / "workspace" / "input" / "stack" / "stack.md"
-FEATS_DIR = REPO_ROOT / "workspace" / "input" / "feats"
-UI_DIR = REPO_ROOT / "workspace" / "input" / "ui"
-SYS_DIR = REPO_ROOT / "workspace" / "output" / ".sys"
+STACK_TARGET = REPO_ROOT / "workspace" / "stack" / "stack.md"
+FEATS_DIR = REPO_ROOT / "workspace" / "feats"
+UI_DIR = REPO_ROOT / "workspace" / "ui"
+SYS_DIR = REPO_ROOT / "workspace" / ".sys"
 PYTHON_DIR = REPO_ROOT / ".claude" / "python"
 CONSOLE_DIR = REPO_ROOT / "workspace" / "console"
 SMOKE_SCRIPT = REPO_ROOT / ".claude" / "python" / "sdd_admin" / "framework_smoke.py"
@@ -280,7 +286,7 @@ def _validate_app_name(name: str) -> str | None:
 # ---------------------------------------------------------------------------
 
 def detect_existing_project() -> bool:
-    """True if workspace/input/feats/ has FEAT files (project already initialised)."""
+    """True if workspace/feats/ has FEAT files (project already initialised)."""
     if not FEATS_DIR.is_dir():
         return False
     feats = [f for f in FEATS_DIR.glob("*.md") if not f.name.startswith(".")]
@@ -645,21 +651,21 @@ def create_workspace_skeleton(dry_run: bool) -> None:
     init can be repaired by simply re-running `python bootstrap.py`.
     """
     targets = [
-        REPO_ROOT / "workspace" / "input" / "feats",
-        REPO_ROOT / "workspace" / "input" / "ui",
-        REPO_ROOT / "workspace" / "input" / "assets",
-        REPO_ROOT / "workspace" / "input" / "discovery",  # v7.0.0+ Phase 0 templates (PRFAQ, Product Brief)
-        REPO_ROOT / "workspace" / "output" / ".sys" / ".audit",
-        REPO_ROOT / "workspace" / "output" / ".sys" / ".cache",
-        REPO_ROOT / "workspace" / "output" / ".sys" / ".context" / "adrs",
-        REPO_ROOT / "workspace" / "output" / ".sys" / ".routing",  # v7.0.0+ complexity-router output
-        REPO_ROOT / "workspace" / "output" / ".sys" / ".state",
-        REPO_ROOT / "workspace" / "output" / ".sys" / ".validation",
-        REPO_ROOT / "workspace" / "output" / "src",
-        REPO_ROOT / "workspace" / "output" / "us",
-        REPO_ROOT / "workspace" / "output" / "plans",
-        REPO_ROOT / "workspace" / "output" / "db",
-        REPO_ROOT / "workspace" / "output" / "qa",
+        REPO_ROOT / "workspace" / "feats",
+        REPO_ROOT / "workspace" / "ui",
+        REPO_ROOT / "workspace" / "assets",
+        REPO_ROOT / "workspace" / "discovery",  # v7.0.0+ Phase 0 templates (PRFAQ, Product Brief)
+        REPO_ROOT / "workspace" / ".sys" / ".audit",
+        REPO_ROOT / "workspace" / ".sys" / ".cache",
+        REPO_ROOT / "workspace" / ".sys" / ".context" / "adrs",
+        REPO_ROOT / "workspace" / ".sys" / ".routing",  # v7.0.0+ complexity-router output
+        REPO_ROOT / "workspace" / ".sys" / ".state",
+        REPO_ROOT / "workspace" / ".sys" / ".validation",
+        REPO_ROOT / "workspace" / "src",
+        REPO_ROOT / "workspace" / "us",
+        REPO_ROOT / "workspace" / "plans",
+        REPO_ROOT / "workspace" / "db",
+        REPO_ROOT / "workspace" / "qa",
     ]
     for p in targets:
         if dry_run:
@@ -765,7 +771,7 @@ def run_smoke_check(dry_run: bool) -> bool:
 def print_next_steps(info: dict) -> None:
     _print_header("Next steps")
     msg = textwrap.dedent(f"""\
-      1. **Edit secrets** in workspace/input/stack/stack.md :
+      1. **Edit secrets** in workspace/stack/stack.md :
          - {info['db_type']} credentials (DB_PASSWORD, DB_USER, ...)
          - Auth credentials (Azure AD tenant/client, or AUTH_JWT_SECRET)
          - SMTP if needed
@@ -894,7 +900,7 @@ def main() -> int:
     parser.add_argument("--skip-install", action="store_true",
                         help="Skip pip/npm install (CI use).")
     parser.add_argument("--force", action="store_true",
-                        help="Overwrite existing workspace/input/ without confirmation.")
+                        help="Overwrite existing workspace/ without confirmation.")
     parser.add_argument("--auto-init", action="store_true",
                         help="Non-interactive CI mode — reads SDD_* env vars, no prompts.")
     parser.add_argument("--check-prereqs", action="store_true",
@@ -936,9 +942,9 @@ def main() -> int:
         _print_warn("This project appears to be ALREADY initialized :")
         if detect_existing_project():
             n = len(list(FEATS_DIR.glob("*.md")))
-            _print_warn(f"  workspace/input/feats/ has {n} FEAT(s)")
+            _print_warn(f"  workspace/feats/ has {n} FEAT(s)")
         if detect_stack_md():
-            _print_warn(f"  workspace/input/stack/stack.md exists")
+            _print_warn(f"  workspace/stack/stack.md exists")
         print()
         if not _ask_yn("Continue (will OVERWRITE existing stack.md) ?", default=False):
             _print_info("Aborted — your existing workspace is untouched.")

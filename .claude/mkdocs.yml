@@ -25,11 +25,16 @@ nav:
       - Cookbook (10 min recipes): cookbook.md
       - Quickstart (brownfield): quickstart.md
       - Glossary: glossary.md
+      - PO guide: po-guide.md
+      - UX designer guide: ux-designer-guide.md
+      - Brainstorming techniques: brainstorming-techniques.md
   - Reference:
-      - Agents (12 cards): agents-reference.md
-      - Commands (20 cards): commands-reference.md
+      - Agents (19 cards): agents-reference.md
+      - Commands (33 cards): commands-reference.md
       - Configuration (43 keys): configuration-reference.md
       - Hooks & Protections: hooks-and-protections.md
+      - Gates map: gates-map.md
+      - Runtime pitfalls: runtime-pitfalls.md
   - Architecture:
       - Component model: architecture.md
       - Pipeline workflow: workflow.md
@@ -49,6 +54,22 @@ nav:
       - Migration v6→v7: MIGRATION.md
       - Roadmap v7→v8: roadmap-v7-v8.md
       - PoC ROI methodology: poc-roi-methodology.md
+  - Commercial:
+      - Why SDD_Pro: WHY-SDD-PRO.md
+      - Comparison matrix (7 frameworks): COMPARISON-MATRIX.md
+      - Known limitations: KNOWN-LIMITATIONS.md
+      - SLA: SLA.md
+      - Compliance: COMPLIANCE.md
+  - Reverse Engineering:
+      - Workflow (design doc): reverse-engineering-workflow.md
+      - Cookbook — index: reverse-engineering-cookbook/index.md
+      - Cookbook — monolithe générique: reverse-engineering-cookbook/_generic-monolith.md
+      - Cookbook — .NET WebForms: reverse-engineering-cookbook/dotnet-webforms.md
+      - Cookbook — .NET MVC: reverse-engineering-cookbook/dotnet-mvc.md
+      - Cookbook — Java JEE: reverse-engineering-cookbook/java-jee.md
+      - Cookbook — PHP procédural: reverse-engineering-cookbook/php-procedural.md
+      - Cookbook — JS/jQuery: reverse-engineering-cookbook/javascript-jquery.md
+      - Cookbook — Delphi: reverse-engineering-cookbook/delphi.md
   - Subsystems:
       - Arch — Phase A (config propagation): arch/phase-a-config-propagation.md
       - Arch — Phase B (DB scaffolding): arch/phase-b-db-scaffolding.md
@@ -60,8 +81,8 @@ nav:
 theme:
   name: material
   language: fr   # primary language (FR docs canonical) ; EN via i18n plugin
-  logo: assets/logo.svg     # optional — place at .claude/docs/assets/logo.svg
-  favicon: assets/favicon.ico
+  # logo: assets/logo.svg     # à réactiver quand les assets existent (.claude/docs/assets/ absent)
+  # favicon: assets/favicon.ico   # à réactiver quand les assets existent
 
   # Color palette : dark + light toggle (matches our console web theme)
   palette:
@@ -144,8 +165,8 @@ plugins:
             Cookbook (10 min recipes): Cookbook (10 min recipes)
             Quickstart (brownfield): Quickstart (brownfield)
             Glossary: Glossary
-            Agents (12 cards): Agents (12 cards)
-            Commands (20 cards): Commands (20 cards)
+            Agents (19 cards): Agents (19 cards)
+            Commands (33 cards): Commands (33 cards)
             Configuration (43 keys): Configuration (43 keys)
             Hooks & Protections: Hooks & Protections
             Component model: Component model
