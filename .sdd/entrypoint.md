@@ -2,7 +2,7 @@
 schema: sdd.memory/v1
 name: entrypoint
 description: Pivot neutre du fichier-mémoire (entry point) SDD_Pro — régénéré par harness_build.py (emit_memory_file)
-body_source: .claude/CLAUDE.md
+body_source: .sdd/entrypoint-body.md
 at_includes_total: 30
 at_includes_unique: 27
 ---

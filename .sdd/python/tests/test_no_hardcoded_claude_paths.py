@@ -90,23 +90,20 @@ _ALLOWED_FILES: frozenset[str] = frozenset({
 
 
 # Paths still legitimately living under .claude/ (façade of Claude Code).
+# Post-cleanup 2026-07-25 : agents/commands/rules/CLAUDE.md sont générés
+# à la demande par rebuild_claude_facade.py — plus permanents sur disque.
+# Restent : settings.json (harness config), python/ (shim + backup), projects/ (~home).
 _LEGITIMATE_CLAUDE_SUBPATHS: tuple[str, ...] = (
-    ".claude/agents/",         # generated facade
-    ".claude/commands/",       # generated facade
-    ".claude/CLAUDE.md",       # generated memory file
-    ".claude/loader.yml",      # operational (not migrated yet — .sdd/ has scaffolding version)
-    ".claude/loader.reverse.yml",
-    ".claude/settings.json",
-    ".claude/settings.local.json",
-    ".claude/config.base.yml",
-    ".claude/INVARIANTS.yml",
-    ".claude/INVARIANTS.reverse.yml",
-    ".claude/digests/",
-    ".claude/bootstrap.py",
-    ".claude/mkdocs.yml",
-    ".claude/requirements-docs.txt",
-    ".claude/CONTRIBUTING.md",
-    ".claude/projects/",       # user home path (measure_cache scripts)
+    ".claude/agents/",             # regenerated facade (transient)
+    ".claude/commands/",           # regenerated facade (transient)
+    ".claude/rules/",              # regenerated facade (transient)
+    ".claude/CLAUDE.md",           # regenerated memory file (transient)
+    ".claude/loader.yml",          # OPERATIONAL — Batch C migration pending
+    ".claude/loader.reverse.yml",  # OPERATIONAL — Batch C migration pending
+    ".claude/settings.json",       # harness config (tracked)
+    ".claude/settings.local.json", # user local (untracked)
+    ".claude/python/",             # shim _hook.py + local scratch
+    ".claude/projects/",           # user home path (measure_cache scripts)
 )
 
 

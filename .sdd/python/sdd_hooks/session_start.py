@@ -138,6 +138,24 @@ def _rotate_audit_logs_best_effort() -> None:
         pass
 
 
+def _rebuild_claude_facade_best_effort() -> None:
+    """Auto-regenerate `.claude/{agents,commands,rules,CLAUDE.md}` from `.sdd/`
+    if missing. Cheap no-op when the façade is already present (< 5 ms).
+
+    Post-migration 2026-07-25 : `.claude/` is a transient façade for the
+    Claude Code harness ; the SSoT lives under `.sdd/`. This best-effort
+    rebuild ensures the harness always finds its slash commands + agents
+    at session start, even after a `git clean` or manual deletion.
+
+    Non-blocking : any failure is logged to stderr, session continues.
+    """
+    try:
+        from sdd_admin.rebuild_claude_facade import rebuild
+        rebuild(force=False, verbose=False)
+    except Exception as exc:  # noqa: BLE001 — best-effort by design
+        sys.stderr.write(f"[SDDPro session_start] facade rebuild skipped: {exc}\n")
+
+
 def main() -> int:
     """Entry point. Always exit 0 — never fail the session over a hook error.
 
@@ -148,6 +166,9 @@ def main() -> int:
     v7.0.1 audit P1 v2 (2026-06-08) — appel best-effort à rotate_audit_logs
     pour housekeeping périodique (throttled 24h via marker file).
     """
+    # Best-effort .claude/ facade rebuild BEFORE emit() so it survives
+    # a Windows charmap encoding error on the banner emit path.
+    _rebuild_claude_facade_best_effort()
     try:
         result = emit()
         sys.stdout.write(json.dumps(result, ensure_ascii=False, sort_keys=True))

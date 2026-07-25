@@ -28,9 +28,9 @@ if str(_PYTHON_ROOT) not in sys.path:
 # Repo root = the directory containing both .claude/ and workspace/
 _REPO_ROOT = _PYTHON_ROOT.parent.parent
 
-CONFIG_BASE = _REPO_ROOT / ".claude" / "config.base.yml"
-PO_MD = _REPO_ROOT / ".claude" / "agents" / "po.md"
-US_GENERATE_MD = _REPO_ROOT / ".claude" / "commands" / "us-generate.md"
+CONFIG_BASE = _REPO_ROOT / ".sdd" / "config.base.yml"
+PO_MD = _REPO_ROOT / ".sdd" / "agents" / "po.md"
+US_GENERATE_MD = _REPO_ROOT / ".sdd" / "commands" / "us-generate.md"
 
 
 def test_config_base_declares_hardcap_10() -> None:

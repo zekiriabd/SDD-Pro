@@ -141,7 +141,7 @@ class TestProtectFrameworkStrictMode(unittest.TestCase):
         """CI=true env var → auto-strict (no need for SDD_PROTECT_FRAMEWORK_MODE)."""
         payload = {
             "tool_name": "Edit",
-            "tool_input": {"file_path": ".claude/stacks/backend/dotnet-minimalapi.md"},
+            "tool_input": {"file_path": ".sdd/stacks/backend/dotnet-minimalapi.md"},
         }
         r = _run_hook(payload, {"CI": "true"})
         self.assertEqual(r.returncode, 2)
@@ -196,10 +196,10 @@ class TestProtectFrameworkEdgeCases(unittest.TestCase):
         self.assertEqual(r.returncode, 2)
 
     def test_templates_subdir_is_protected(self):
-        """All .claude/templates/ files are framework-owned."""
+        """All .sdd/templates/ files are framework-owned (post-migration 2026-07-25)."""
         payload = {
             "tool_name": "Write",
-            "tool_input": {"file_path": ".claude/templates/us.template.md"},
+            "tool_input": {"file_path": ".sdd/templates/us.template.md"},
         }
         r = _run_hook(payload, {"SDD_PROTECT_FRAMEWORK_MODE": "strict"})
         self.assertEqual(r.returncode, 2)

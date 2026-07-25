@@ -41,7 +41,7 @@ if str(_REPO_ROOT / ".sdd" / "python") not in sys.path:
 from sdd_lib.exit_codes import FAIL_FAST, SUCCESS  # noqa: E402
 from sdd_lib.paths import rules_dir  # noqa: E402
 _SRC = rules_dir(_REPO_ROOT) / "error-classification.md"
-_OUT_DIR = _REPO_ROOT / ".claude" / "digests"
+_OUT_DIR = _REPO_ROOT / ".sdd" / "digests"
 
 # agent_id -> list of §1.X family keys to inline (besides the always-included
 # §0 quick-ref + §1.1 runtime + §2/§3/§5 universal sections). Source of the

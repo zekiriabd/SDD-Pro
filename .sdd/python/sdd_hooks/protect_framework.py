@@ -44,21 +44,17 @@ from sdd_lib.stderr import warn  # noqa: E402
 # racines ; seul `.sdd/harness_build.py` peut écrire dans `.claude/`,
 # `.codex/`, `.gemini/`.
 FRAMEWORK_OWNED: tuple[str, ...] = (
-    # .claude/ facade (Claude Code harness — generated post-Phase 2)
+    # .claude/ facade (Claude Code harness — regenerated on demand by
+    # rebuild_claude_facade.py, so protection is transient but active)
     ".claude/rules/",
-    ".claude/stacks/",
     ".claude/agents/",
-    ".claude/templates/",
     ".claude/commands/",
-    ".claude/skills/",
     ".claude/python/",
-    ".claude/loader.yml",
+    ".claude/loader.yml",       # operational until Batch C migration
+    ".claude/loader.reverse.yml",
     ".claude/CLAUDE.md",
-    ".claude/docs/MIGRATION.md",
-    ".claude/docs/CHANGELOG.md",
     ".claude/settings.json",
     ".claude/settings.local.json",
-    ".claude/config.base.yml",
     # .sdd/ neutral core (SSoT versionné — foyer neutre édité à la main)
     ".sdd/rules/",
     ".sdd/stacks/",
@@ -67,6 +63,7 @@ FRAMEWORK_OWNED: tuple[str, ...] = (
     ".sdd/commands/",
     ".sdd/skills/",
     ".sdd/python/",
+    ".sdd/digests/",
     ".sdd/loader.yml",
     ".sdd/loader.reverse.yml",
     ".sdd/providers/",
@@ -77,6 +74,9 @@ FRAMEWORK_OWNED: tuple[str, ...] = (
     ".sdd/rules-manifest.yaml",
     ".sdd/skills-manifest.yaml",
     ".sdd/agent-bounds.yaml",
+    ".sdd/config.base.yml",
+    ".sdd/INVARIANTS.yml",
+    ".sdd/INVARIANTS.reverse.yml",
     # .codex/ facade (Codex harness — generated post-Phase 2)
     ".codex/AGENTS.md",
     ".codex/prompts/",

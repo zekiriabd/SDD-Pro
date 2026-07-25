@@ -4,7 +4,7 @@ Extends `sdd_lib/project_config.py` with a 3-level merge hierarchy
 allowing organizations to enforce policies cross-projects.
 
 Layering (lowest → highest precedence) :
-    1. `.claude/config.base.yml`    (framework defaults, versionné SDD_Pro)
+    1. `.sdd/config.base.yml`      (framework defaults, versionné SDD_Pro)
     2. `~/.sdd/config.team.yml`     (org/team policy, ~/.sdd/ ou %USERPROFILE%/.sdd/)
     3. `## Project Config` block of `workspace/stack/stack.md` (per-project)
 
@@ -78,7 +78,7 @@ class ConfigError(Exception):
 
 
 def base_config_path(root: Path | None = None) -> Path:
-    return (root or repo_root()) / ".claude" / "config.base.yml"
+    return (root or repo_root()) / ".sdd" / "config.base.yml"
 
 
 def team_config_path() -> Path:
@@ -523,7 +523,7 @@ def dump_effective_config(
 
     lines = [
         f"# Effective layered config — generated {iso_now()}",
-        "# Source per key: base (.claude/config.base.yml) | team (~/.sdd/config.team.yml) | project (## Project Config in stack.md)",
+        "# Source per key: base (.sdd/config.base.yml) | team (~/.sdd/config.team.yml) | project (## Project Config in stack.md)",
         "",
     ]
     for key in sorted(config.keys()):

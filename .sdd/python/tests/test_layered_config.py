@@ -22,12 +22,12 @@ from sdd_lib.layered_config import (
 
 
 def _make_repo(tmp: Path, *, stack_md: str | None = None, base_yml: str | None = None) -> Path:
-    (tmp / ".claude").mkdir()
+    (tmp / ".sdd").mkdir()
     (tmp / "workspace" / "stack").mkdir(parents=True)
     if stack_md is not None:
         (tmp / "workspace" / "stack" / "stack.md").write_text(stack_md, encoding="utf-8")
     if base_yml is not None:
-        (tmp / ".claude" / "config.base.yml").write_text(base_yml, encoding="utf-8")
+        (tmp / ".sdd" / "config.base.yml").write_text(base_yml, encoding="utf-8")
     return tmp
 
 

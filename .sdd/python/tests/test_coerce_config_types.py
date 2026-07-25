@@ -336,8 +336,9 @@ class TestReadLayeredConfigCoerce(unittest.TestCase):
         self.repo = Path(self._tmp.name)
         (self.repo / ".claude" / "agents").mkdir(parents=True)
         (self.repo / ".claude" / "commands").mkdir(parents=True)
+        (self.repo / ".sdd").mkdir(parents=True)
         (self.repo / "workspace" / "stack").mkdir(parents=True)
-        (self.repo / ".claude" / "config.base.yml").write_text(
+        (self.repo / ".sdd" / "config.base.yml").write_text(
             "CoverageMin: 80\n"
             "MaxParallel: 3\n"
             "GatedWorkflow: true\n"

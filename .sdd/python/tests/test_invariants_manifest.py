@@ -1,4 +1,4 @@
-"""Smoke test : every enforcer file listed in .claude/INVARIANTS.yml must exist.
+"""Smoke test : every enforcer file listed in .sdd/INVARIANTS.yml must exist.
 
 Audit P3 E4 (2026-06-08) — anti-rot enforcement for the invariants manifest.
 The manifest declares which file enforces each load-bearing contract. If
@@ -38,7 +38,7 @@ def _load_invariants() -> list[dict]:
     can parse with a minimal hand-rolled parser to avoid adding a runtime
     dependency on PyYAML.
     """
-    manifest_path = _repo_root() / ".claude" / "INVARIANTS.yml"
+    manifest_path = _repo_root() / ".sdd" / "INVARIANTS.yml"
     if not manifest_path.is_file():
         raise FileNotFoundError(f"INVARIANTS.yml not found at {manifest_path}")
 
@@ -85,7 +85,7 @@ def _load_invariants() -> list[dict]:
 class TestInvariantsManifest(unittest.TestCase):
 
     def test_manifest_exists(self):
-        manifest = _repo_root() / ".claude" / "INVARIANTS.yml"
+        manifest = _repo_root() / ".sdd" / "INVARIANTS.yml"
         self.assertTrue(manifest.is_file(), f"INVARIANTS.yml missing at {manifest}")
 
     def test_invariants_parseable(self):

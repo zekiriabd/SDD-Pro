@@ -41,7 +41,7 @@ _EXPECTED_CHECK_COUNT = 13
 
 # `.sdd/python/tests/` → parents[3] == repo root
 _REPO_ROOT = Path(__file__).resolve().parents[3]
-_MANIFEST = _REPO_ROOT / ".claude" / "INVARIANTS.reverse.yml"
+_MANIFEST = _REPO_ROOT / ".sdd" / "INVARIANTS.reverse.yml"
 _SMOKE_ENFORCER_SUFFIX = "reverse_smoke.py"
 
 

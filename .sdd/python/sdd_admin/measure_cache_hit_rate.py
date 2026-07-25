@@ -95,11 +95,19 @@ class CacheStats:
 def encode_path_for_claude_logs(path: Path) -> str:
     """Mirror Claude Code's filesystem-safe encoding of project paths.
 
-    Examples (Windows):
-        C:\\DEV\\SDD-Pro       → c--DEV-SDD-Pro
-        C:\\DEV\\compart\\SDD_Pro → c--DEV-compart-SDD_Pro
+    Uses `os.path.abspath` (not `Path.resolve`) so the CASE of the input is
+    preserved on Windows. `Path.resolve` consults the filesystem via
+    `_getfinalpathname` which normalizes the case to whatever the volume
+    stores (post-mortem 2026-07-25 : le repo réel `c:/DEV/sdd-pro`
+    lowercase faisait retourner `c--DEV-sdd-pro` alors que le test attend
+    `c--DEV-SDD-Pro` — mismatch de casse silencieux sur Windows).
+
+    Examples:
+        C:\\\\DEV\\\\SDD-Pro       -> c--DEV-SDD-Pro
+        C:\\\\DEV\\\\compart\\\\SDD_Pro -> c--DEV-compart-SDD_Pro
     """
-    s = str(path.resolve())
+    import os
+    s = os.path.abspath(str(path))
     if not s:
         return s
     s = s[0].lower() + s[1:]
