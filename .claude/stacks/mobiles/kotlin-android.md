@@ -191,7 +191,7 @@ Dépendances : Domain ← Data, Domain ← Presentation, Presentation → Domain
 - **Runtime** : Android SDK Min 24 (Android 7.0), Target 36 (Android 14)
 - **Framework principal** : Jetpack Compose UI + Android Gradle Plugin 8.6.1
 - **Build tool** : **Gradle 8.10** avec **Kotlin DSL** (`build.gradle.kts`)
-- **Package racine** : `{AppNamespace}` (ex. `com.demo.mobile`)
+- **Package racine** : `{AppNamespace}` (ex. `com.example.mobile`)
 - **IDE** : Android Studio 2024.2.1+
 
 ## 2.2 Outils

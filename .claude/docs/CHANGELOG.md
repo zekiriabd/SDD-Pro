@@ -1217,11 +1217,11 @@ CLAUDE.md §7 réconcilié avec les entêtes `Validation:` réels des stacks :
 ## Historique v6.x (archive)
 
 Pour les entrées antérieures à v7.0.0 (v6.0.0 → v6.10.5, 2026-02-01 →
-2026-05-19), voir **`@.claude/docs/CHANGELOG-v6.md`** (archive, ~1490
-lignes). Le présent CHANGELOG ne couvre que **v7.0.0+** (depuis le tag
-GA 2026-06-07) — segmentation décidée par l'audit consolidé Sprint 3-5
-(2026-06-07) pour réduire la surcharge cognitive du fichier principal
-(était 2479 lignes, désormais ~990 lignes).
+2026-05-19), consulter l'historique git (`git log --oneline
+--before=2026-05-20`). Le présent CHANGELOG ne couvre que **v7.0.0+**
+(depuis le tag GA 2026-06-07) — segmentation décidée par l'audit
+consolidé Sprint 3-5 (2026-06-07) pour réduire la surcharge cognitive
+du fichier principal (était 2479 lignes, désormais ~990 lignes).
 
 Convention : à chaque MAJOR (v8, v9...), créer `CHANGELOG-v{N-1}.md`
 avec les entrées de la MAJOR précédente, et redémarrer ce fichier.

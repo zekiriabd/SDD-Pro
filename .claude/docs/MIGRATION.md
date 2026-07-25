@@ -127,16 +127,14 @@ CiTemplatesGeneration: true
 
 ## Migrations v6.x → v6.y (historique)
 
-Pour migrer un projet plus ancien (v5.x, v6.0-v6.10), suivre la chaîne
-des migrations successives via :
+Pour migrer un projet plus ancien (v5.x, v6.0-v6.10), consulter l'historique
+git pour reconstruire les migrations successives :
 
-- `docs/CHANGELOG-v6.md` (archive 2026-02 → 2026-05, 1504 L) — chaque
-  entrée release indique les fichiers à toucher + actions Tech Lead
 - `git log --oneline -- .claude/docs/MIGRATION.md` pour récupérer les
   procédures détaillées historiques (v6.5→v6.6, v6.6→v6.7, etc.)
 - v3→v4 (HTML direct) et v4→v5 (Inline Rules) : `archive/MIGRATION-legacy.md`
   (archivé 2026-05-13)
 
 Le saut le plus large supporté est **v6.10 → v7.0.0 GA**. Pour les sauts
-plus larges (v6.5 → v7.0), passer par v6.10 intermédiaire en suivant
-`CHANGELOG-v6.md` release par release.
+plus larges (v6.5 → v7.0), passer par v6.10 intermédiaire via l'historique
+git release par release.

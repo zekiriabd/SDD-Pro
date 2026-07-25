@@ -1,9 +1,7 @@
 # Pourquoi SDD_Pro ? — Argumentaire CTO / DSI
 
-> 📊 **Comparatif détaillé vs 7 frameworks concurrents (51 dimensions)** : `docs/COMPARISON-MATRIX.md` (lien ajouté audit 2026-06-11 — le document était orphelin).
-
-> Document commercial v7.0.0 GA (2026-06-07). Compare SDD_Pro aux 6 frameworks
-> agentiques majeurs du marché (Cursor, Aider, Devin, BMAD, Superpowers, AgentOS).
+> Document commercial v7.0.0 GA (2026-06-07). Présente la valeur de SDD_Pro
+> pour les équipes tech (CTO / DSI / Tech Lead).
 > Objectif : aider un Tech Lead, CTO ou DSI à arbitrer entre frameworks pour
 > son organisation.
 

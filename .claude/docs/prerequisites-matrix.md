@@ -232,4 +232,4 @@ Si votre DSI bloque certains downloads (proxies, listes blanches), pré-warmer :
 3. **Cache CI** : utiliser `actions/cache@v4` ou équivalent pour les
    répertoires `~/.nuget/packages`, `~/.gradle/caches`, `node_modules`
 
-Contact framework : Demo SDD_Pro maintenance team (interne).
+Contact framework : SDD_Pro maintenance team (interne).

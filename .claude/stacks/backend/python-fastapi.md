@@ -320,7 +320,7 @@ class DBSettings(BaseSettings):
 class AzureADSettings(BaseSettings):
     tenant_id: str = "<AZ_TENANTID>"        # depuis AZ_TENANTID
     client_id: str = "<AZ_CLIENTID>"        # depuis AZ_CLIENTID
-    domain: str = "demo.com"             # depuis AZ_DOMAIN
+    domain: str = "example.com"             # depuis AZ_DOMAIN
     audiences: List[str] = ["<AZ_CLIENTID>", "<AUDIENCE_ID>"]  # split/strip de AZ_AUDIENCES
     backend_callback_path: str = "/signin-oidc"
     frontend_callback_path: str = "/login-callback"

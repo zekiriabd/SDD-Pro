@@ -309,7 +309,7 @@ html-source: workspace/ui/{n}-{m}-{Name}.html  # ou "absent"
 
 ## UI Assets pending
 - role: logo-company
-  alt: Logo Demo
+  alt: Logo Brand
 ```
 
 Ligne de confirmation :

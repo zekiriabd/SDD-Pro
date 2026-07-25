@@ -1,7 +1,7 @@
 # PO Guide — Rédiger une bonne FEAT pour SDD_Pro
 
 > Audience : Product Owners externes (équipes adoptant SDD_Pro sans
-> accompagnement Demo). Cible : passer de zéro à une FEAT validée par
+> accompagnement interne). Cible : passer de zéro à une FEAT validée par
 > `/feat-validate` GO en < 30 minutes.
 
 ---
@@ -217,4 +217,4 @@ montre une FEAT canonique de 80-200 lignes, lisible en < 5 minutes.
 - **Troubleshooting** : `@docs/troubleshooting.md` (40+ erreurs classées)
 - **UX/Designer companion** : `@docs/ux-designer-guide.md`
 - **Issues** : https://github.com/anthropics/claude-code/issues (framework
-  Claude Code) — SDD_Pro est un projet privé Demo
+  Claude Code) — SDD_Pro est un projet privé interne

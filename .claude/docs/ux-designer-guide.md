@@ -197,7 +197,7 @@ ref Vue, signal Angular) qui bascule entre ces états selon les ACs.
 
 ### Acceptable : `data-ui-asset` placeholder
 ```html
-<img data-ui-asset="logo-demo" alt="Logo Demo" class="h-8">
+<img data-ui-asset="logo-brand" alt="Logo Brand" class="h-8">
 ```
 L'agent dev-frontend conserve le `data-ui-asset` et insère un commentaire
 indiquant au Tech Lead qu'il doit fournir le fichier dans

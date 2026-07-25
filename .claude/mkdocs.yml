@@ -56,7 +56,6 @@ nav:
       - PoC ROI methodology: poc-roi-methodology.md
   - Commercial:
       - Why SDD_Pro: WHY-SDD-PRO.md
-      - Comparison matrix (7 frameworks): COMPARISON-MATRIX.md
       - Known limitations: KNOWN-LIMITATIONS.md
       - SLA: SLA.md
       - Compliance: COMPLIANCE.md

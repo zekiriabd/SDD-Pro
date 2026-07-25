@@ -59,7 +59,7 @@
 {rollback-command, ex. "kubectl rollout undo deployment/demoapp-back"}
 
 # Step 2 — vérifier que le service repart
-curl -fsS https://demoapp.fr/health || echo "FAIL"
+curl -fsS https://example.com/health || echo "FAIL"
 
 # Step 3 — notifier
 slack #ops "rollback executed by $USER at $(date -u +%FT%TZ)"
