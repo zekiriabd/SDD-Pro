@@ -21,3 +21,11 @@ capabilities:
   structured_output_fidelity: unknown   # verdict au 1er conformance run (§10)
   tool_calling: openai-native
   prompt_caching: implicit
+pricing:                 # USD per million tokens — public OpenAI list price (2026-07-26)
+  # Placeholders documentés — à valider au 1er conformance run (§10). OpenAI
+  # publie ses tarifs sur https://openai.com/pricing. cache_read/cache_creation
+  # non-applicables (pricing OpenAI n'a pas cette structure natively — set to
+  # `input` pour compat schema, telemetry cost-cap n'utilisera que input/output).
+  o1:          {input: 15.00, output: 60.00, cache_read: 7.50, cache_creation: 15.00}
+  gpt-4o:      {input:  2.50, output: 10.00, cache_read: 1.25, cache_creation:  2.50}
+  gpt-4o-mini: {input:  0.15, output:  0.60, cache_read: 0.075, cache_creation:  0.15}

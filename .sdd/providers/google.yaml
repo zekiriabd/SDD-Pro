@@ -16,4 +16,12 @@ capabilities:
   structured_output_fidelity: high        # validé via JSONSchema enforcement dans spawn_agent.py
   tool_calling: google-native
   prompt_caching: context-caching       # API différente — appliqué si provider=google
+pricing:                 # USD per million tokens — Google Gemini public pricing (2026-07-26)
+  # Placeholders — à valider au 1er conformance run (§10). Tarifs Google
+  # publiés sur https://ai.google.dev/pricing. cache_read/cache_creation
+  # placeholders (Gemini context-caching a une structure différente ; le
+  # cost-cap runtime utilise input/output uniquement).
+  gemini-2.5-pro:        {input: 1.25, output:  5.00, cache_read: 0.3125, cache_creation: 1.25}
+  gemini-2.5-flash:      {input: 0.075, output: 0.30, cache_read: 0.01875, cache_creation: 0.075}
+  gemini-2.5-flash-lite: {input: 0.0375, output: 0.15, cache_read: 0.009375, cache_creation: 0.0375}
 

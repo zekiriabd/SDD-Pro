@@ -21,4 +21,10 @@ capabilities:
   structured_output_fidelity: unknown   # à mesurer au conformance run (§10) avant tout SLA
   tool_calling: anthropic-compat
   prompt_caching: none
-# pricing absent → tout run cost-cappé émettra [TELEMETRY_UNAVAILABLE] (fail-open loggué)
+pricing:                 # USD per million tokens — défauts retenus 2026-07-26, valider au conformance run (§10)
+  # Placeholders (Kimi K3 nouveau, tarifs officiels à re-vérifier au
+  # câblage). Cache non-supporté (`prompt_caching: none`) — cache_read/
+  # cache_creation valorisés = input (compat schema, pas de saving réel).
+  kimi-k3:       {input: 0.60, output: 2.50, cache_read: 0.60, cache_creation: 0.60}
+  kimi-k2.7-code: {input: 0.15, output: 2.00, cache_read: 0.15, cache_creation: 0.15}
+  kimi-k2.5:     {input: 0.10, output: 0.50, cache_read: 0.10, cache_creation: 0.10}
