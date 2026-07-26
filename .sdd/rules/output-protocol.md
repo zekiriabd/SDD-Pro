@@ -8,9 +8,9 @@
 > rendu à la demande via `query_console_db.py ... --format md`) et sur
 > disque (`workspace/.sys/.audit/...`) pour debug/audit.
 >
-> **Load-bearing** : règle universelle chargée par les 12 agents LLM
+> **Load-bearing** : règle universelle chargée par les 13 agents LLM
 > (`po`, `arch`, `dev-backend`, `dev-frontend`, `qa`, `elicitor`,
-> `constitutioner`, `code-reviewer`, `security-reviewer`,
+> `constitutioner`, `specbook-writer`, `code-reviewer`, `security-reviewer`,
 > `spec-compliance-reviewer`, `arch-reviewer`, `adversarial-reviewer`)
 > et les 13 commandes user-facing. Le rubric `complexity-router` (script
 > Python déterministe, 0 token) n'est PAS un agent LLM et ne charge pas
@@ -20,7 +20,7 @@
 
 - §1 — Principe et périmètre (qui parle au chat)
 - §2 — Format canonique (1 ligne par update)
-- §3 — Mapping agent → label `[AGENT]` (18 labels)
+- §3 — Mapping agent → label `[AGENT]` (19 labels)
 - §4 — Plages de progression par phase (anti-régression)
 - §5 — Patterns interdits en chat (liste fermée)
 - §6 — Patterns autorisés (résumés exécutifs)
@@ -63,7 +63,7 @@ build_loop / hooks / dashboards).
 [AGENT] Action courte au gérondif... (PROGRESS%)
 ```
 
-- `[AGENT]` : un des 18 labels §3, entre crochets, majuscules
+- `[AGENT]` : un des 19 labels §3, entre crochets, majuscules
 - `Action courte` : 3-10 mots, verbe + objet métier (pas technique)
 - `gérondif` : "Découpage…", "Implémentation…", "Validation…"
 - `(PROGRESS%)` : entier 0-100, suffixe `%`, entre parenthèses
@@ -109,9 +109,11 @@ après cette ligne sauf bloc ERROR si verdict 🔴 (cf. §7).
 
 ## 3. Mapping agent → label `[AGENT]`
 
-18 labels canoniques (depuis v7.0.0+ — ajout `[ROUTER]` pour le routeur de
+19 labels canoniques (depuis v7.0.0+ — ajout `[ROUTER]` pour le routeur de
 complexité ; audit 2026-06-11 : ajout `[REVERSE]` pour le module reverse, qui
-était utilisé par les 7 agents reverse sans figurer dans cette table fermée).
+était utilisé par les 7 agents reverse sans figurer dans cette table fermée ;
+audit 2026-07-25 : ajout `[SPECBOOK]` pour l'agent `specbook-writer` invoqué
+par `/spec-book`, précédemment sans label déclaré).
 **Aucun autre label admis** dans le chat.
 
 | Label chat | Agent / Commande source | Phase pipeline |
@@ -132,7 +134,8 @@ complexité ; audit 2026-06-11 : ajout `[REVERSE]` pour le module reverse, qui
 | `[SECURITY]` | agent `security-reviewer` | 5 |
 | `[ARCH-REVIEW]` | agent `arch-reviewer` | 5 |
 | `[ADV-REVIEW]` | agent `adversarial-reviewer` (opt-in `/sdd-review --adversarial`) | 5 |
-| `[REVERSE]` | les 10 agents `reverse-*` + 15 commandes `/sdd-reverse*` (module reverse — suffixes d'état et format : `rules/reverse-engineering.md §7`) | reverse 1-4 |
+| `[REVERSE]` | les 12 agents `reverse-*` + 18 commandes `/sdd-reverse*` + `/sdd-proc-reverse*` (module reverse — suffixes d'état et format : `rules/reverse-engineering.md §7`) | reverse 1-4 |
+| `[SPECBOOK]` | agent `specbook-writer` (invoqué par `/spec-book` — vulgarise FEAT en langage humain, cache `workspace/docs/.sys/sections/`) | 5 (post-livraison) |
 | `[DONE]` | verdict final pipeline | 100% |
 
 > **Migration** : `[REVIEW]` (générique) supprimé v7.0.0-alpha — utilisé auparavant
@@ -357,11 +360,11 @@ l'env var aux sub-agents (héritée par défaut via subprocess).
 
 ## 11. Enforcement et anti-derive
 
-**Périmètre** : les 12 agents LLM (po, arch, dev-backend, dev-frontend, qa, elicitor,
-constitutioner, code-reviewer, security-reviewer, spec-compliance-reviewer,
+**Périmètre** : les 13 agents LLM (po, arch, dev-backend, dev-frontend, qa, elicitor,
+constitutioner, specbook-writer, code-reviewer, security-reviewer, spec-compliance-reviewer,
 arch-reviewer, adversarial-reviewer) + 1 script déterministe `complexity_router.py`
 (label `[ROUTER]`), les 13 commandes user-facing (cf.
-`CLAUDE.md §3`), et Claude orchestrateur.
+`entrypoint-body.md §3`), et Claude orchestrateur.
 
 **Anti-derive — NE JAMAIS** :
 - Réécrire ce protocole inline (Read par référence au STEP contexte)

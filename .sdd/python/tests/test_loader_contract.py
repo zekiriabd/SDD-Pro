@@ -6,9 +6,9 @@ level so any future drift is surfaced :
 
   1. Every documented agent has a non-empty `reads:` block.
   2. Every agent declared in `loader.yml` has a corresponding
-     `.claude/agents/{name}.md` prompt file on disk.
+     `.sdd/agents/{name}.md` prompt file on disk (SSoT depuis Phase 2 identity).
   3. Every agent prompt on disk has a `loader.yml` entry (no orphan agents).
-  4. The 12 "alive" agents v7.0.0 are all present and accounted for.
+  4. The 13 "alive" agents v7.0.0+ are all present and accounted for.
 
 These are STATIC contract tests — they don't intercept runtime, but they
 ensure the SSoT relationship `prompts ↔ loader.yml` cannot silently drift.
@@ -26,18 +26,21 @@ if str(_PY_ROOT) not in sys.path:
     sys.path.insert(0, str(_PY_ROOT))
 
 from sdd_lib.loader_yml import parse_agent_section  # noqa: E402
-from sdd_lib.paths import repo_root  # noqa: E402
+from sdd_lib.paths import repo_root, sdd_home  # noqa: E402
 
 pytestmark = pytest.mark.smoke
 
-#: 12 alive agents per CLAUDE.md §4 (v7.0.0+ post-cleanup C2 2026-06-08).
+#: 13 alive agents per entrypoint-body.md §4 (v7.0.0 + specbook-writer 2026-07-25).
 #: Static — must stay in sync with agents/*.md and framework_smoke.EXPECTED_AGENTS.
+#: `specbook-writer` est spawné par `/spec-book` (commands/spec-book.md), déclaré
+#: dans `.sdd/loader.yml` — recount audit 2026-07-25.
 ALIVE_AGENTS_V7 = frozenset({
     "po", "arch", "dev-backend", "dev-frontend",
     "elicitor", "qa", "constitutioner",
     "code-reviewer", "security-reviewer",
     "spec-compliance-reviewer", "arch-reviewer",
     "adversarial-reviewer",
+    "specbook-writer",
 })
 
 #: Documentation-only agents : .md exists on disk as a rubric/spec reference
@@ -66,9 +69,9 @@ RETIRED_AGENTS_V7 = frozenset({
 
 #: Reverse engineering agents (v7.0.0+ workflow) — managed by the AUTONOMOUS
 #: loader.reverse.yml (D4 strict isolation, design doc §3.1 + §7). They have
-#: .md files on disk in .claude/agents/ (so Claude Code can invoke them) but
-#: are intentionally NOT in loader.yml — that would violate the design
-#: contract. The orphan check exempts them via this set.
+#: .md files on disk in .sdd/agents/ (SSoT — so tous les harnais peuvent les
+#: transpiler / spawner) but are intentionally NOT in loader.yml — that would
+#: violate the design contract. The orphan check exempts them via this set.
 #:
 #: SSoT for the reverse workflow: .sdd/loader.reverse.yml +
 #: .sdd/docs/reverse-engineering-workflow.md
@@ -99,7 +102,9 @@ REVERSE_AGENTS_V7 = frozenset({
 
 
 def _agents_dir() -> Path:
-    return repo_root() / ".claude" / "agents"
+    # SSoT depuis migration Phase 2 identity : `.sdd/agents/` (pivots neutres).
+    # `.claude/agents/` est façade générée + gitignorée.
+    return sdd_home() / "agents"
 
 
 class TestLoaderAgentCoverage(unittest.TestCase):
@@ -109,12 +114,12 @@ class TestLoaderAgentCoverage(unittest.TestCase):
     so we use the `reads` list non-emptiness as a proxy for "agent declared".
     """
 
-    def test_all_12_alive_agents_have_loader_reads(self):
+    def test_all_alive_agents_have_loader_reads(self):
         missing = [name for name in sorted(ALIVE_AGENTS_V7)
                    if not parse_agent_section(name, "reads")]
         self.assertFalse(missing, f"agents missing from loader.yml `reads:`: {missing}")
 
-    def test_all_12_alive_agents_have_prompt_files(self):
+    def test_all_alive_agents_have_prompt_files(self):
         agents_dir = _agents_dir()
         missing = [name for name in ALIVE_AGENTS_V7
                    if not (agents_dir / f"{name}.md").is_file()]

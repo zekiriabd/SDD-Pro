@@ -27,7 +27,7 @@
 
 schema_version: 1
 generated_at: 2026-06-08
-total: 13
+total: 14
 
 invariants:
 
@@ -194,7 +194,7 @@ invariants:
     name: SDDPro context injected at every SessionStart via static banner
     description: |
       session_start hook emits a byte-identical banner (cache-friendly v7.0.0+)
-      at startup|resume|clear|compact, declaring 13 commands + 12 LLM agents
+      at startup|resume|clear|compact, declaring 13 commands + 13 LLM agents
       + 1 deterministic rubric (complexity-router script) + pipeline canonique.
       Prompt cache prefix hit cross-session.
     severity: minor
@@ -248,3 +248,36 @@ invariants:
       - "Env: SDD_DISABLE_TDD=1 (one-shot, audit-logged)"
     added: 2026-06-08
     audit_ref: P3-TDD (emprunt Superpowers v5.1)
+
+  - id: harness-parity
+    name: Façades .claude/, .codex/, .gemini/ = régénérations byte-identiques de .sdd/ HEAD
+    description: |
+      Le foyer neutre `.sdd/` est SSoT unique. Les façades (`.claude/agents+
+      commands+rules+CLAUDE.md`, `.codex/prompts+AGENTS.md+config.toml`,
+      `.gemini/commands+GEMINI.md+settings.json`) sont des artefacts
+      régénérables par `.sdd/harness_build.py` — jamais édités à la main.
+      Tout drift entre pivots `.sdd/` et sortie de `harness_build` sur HEAD
+      = perte de contrôle multi-harness (une façade éditée directement
+      dérive silencieusement du SSoT).
+
+      Le golden test `test_harness_identity{,_commands}.py` compare
+      sémantiquement la régénération à la façade vivante (post-normalisation
+      BOM/CRLF). Un test dédié `test_harness_codex_gemini.py` vérifie que
+      les 40 commandes transpilées ne contiennent aucun dead-link `.sdd/<x>`.
+
+      Enforcement runtime : les 4 façades sont gitignorées (.gitignore),
+      donc le SSoT ne peut PAS drifter via commit direct sur une façade.
+      Enforcement CI : les 82 tests harness (test_harness_*.py) doivent
+      passer avant merge — un pivot édité SANS régénération correspondante
+      casse la parité et bloque le CI.
+    severity: critical
+    enforcers:
+      - .sdd/python/tests/test_harness_identity.py  # golden agents pivots ↔ façades
+      - .sdd/python/tests/test_harness_identity_commands.py  # golden commands
+      - .sdd/python/tests/test_harness_codex_gemini.py  # zero dead-link + escape rules
+      - .sdd/harness_build.py  # transpileur idempotent, garde `_ensure_under_build`
+      - .gitignore  # façades .claude/{agents,commands,rules,CLAUDE.md}, .codex/, .gemini/
+    bypasses:
+      - "Env: SDD_ALLOW_UNTESTED_HARNESS=1 (audit-log, réservé bootstrap deploy)"
+    added: 2026-07-26
+    audit_ref: audit-2026-07-25 R12 (post-migration multi-harness gap closure)
