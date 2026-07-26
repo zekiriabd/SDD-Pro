@@ -49,25 +49,29 @@ Le retrait des 69 `sys.path.insert` + 215 `noqa: E402` est planifié
 La double-compat est assurée : ces hacks deviennent no-op quand le
 package est déjà sur `sys.path` via `pip install -e .`.
 
-## Layout (refresh 2026-06-07 audit consolidé Sprint 2)
+## Layout (refresh 2026-07-26 audit E.4 — post-migration `.claude/` → `.sdd/`)
 
 ```
 .sdd/python/
-├── sdd_lib/              # 23 modules helpers partagés (paths, exit_codes,
+├── sdd_lib/              # 33 modules helpers partagés (paths, exit_codes,
 │                         #   atomic_write, file_locks, project_config,
-│                         #   layered_config, console_db/, migrations/...)
-├── sdd_hooks/            # 17 hooks Claude Code (cf. tableau ci-dessous)
-├── sdd_scripts/          # 55 scripts agent-invoked / CLI pipeline
-├── sdd_admin/            # 19 outils Tech Lead (smoke, sync, validateurs)
-├── tests/                # 103 fichiers test pytest (1500+ tests)
+│                         #   layered_config, console_db/, migrations/,
+│                         #   spawn_agent, model_resolver, harness_diff...)
+├── sdd_hooks/            # 18 hooks Claude Code (cf. tableau ci-dessous)
+├── sdd_scripts/          # 56 scripts agent-invoked / CLI pipeline
+├── sdd_admin/            # 20 outils Tech Lead (smoke, sync, validateurs)
+├── sdd_reverse/          # module autonome reverse engineering (D4 isolation)
+├── sdd_reverse_scripts/  # scripts CLI reverse (introspection, ladder 3a/3b/3c)
+├── tests/                # 159 fichiers test pytest (~2100 tests)
 ├── _hook.py              # Bootstrap loader cwd-independent pour settings.json
 ├── sitecustomize.py      # Auto-import de .sdd/python/ sur sys.path
 └── pyproject.toml        # Config pytest + ruff + mypy + coverage
 ```
 
-**Compteurs réels au 2026-06-09** (audit CTO Bug #20 — reconcil doc theater drift) :
-55 scripts + 17 hooks + 19 admin + 23 lib = **114 modules `.py` actifs** + 103 tests.
-Pour vérifier en live :
+**Compteurs réels au 2026-07-26** (audit E.4 — recount post-migration Batch A/B/C) :
+56 scripts + 18 hooks + 20 admin + 33 lib = **127 modules `.py` actifs** (hors
+`sdd_reverse/` + `sdd_reverse_scripts/` du module reverse isolé) + 159 fichiers
+tests (~2100 tests collectés). Pour vérifier en live :
 
 ```bash
 echo "scripts: $(ls .sdd/python/sdd_scripts/*.py | grep -v __init__ | wc -l)"
@@ -196,7 +200,7 @@ des plus critiques :
 
 Liste détaillée par script : `git ls-files .sdd/python/sdd_scripts/*.py`.
 
-## Tests (88 fichiers pytest)
+## Tests (159 fichiers pytest, ~2100 tests collectés)
 
 ```bash
 # Suite complète

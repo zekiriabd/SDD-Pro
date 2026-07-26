@@ -79,7 +79,7 @@ def as_tuple(model_id: str) -> tuple[float, float, float, float]:
 #: ISO date of the last manual review against https://www.anthropic.com/pricing
 #: BUMP THIS each time you edit the PRICING table — `framework_smoke.py`
 #: checks staleness against `PricingFreshnessMaxAgeDays` (config.base.yml).
-PRICING_LAST_REVIEWED = "2026-06-11"
+PRICING_LAST_REVIEWED = "2026-07-26"
 
 
 def check_pricing_freshness(max_age_days: int = 90, today: _dt.date | None = None
