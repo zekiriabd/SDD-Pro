@@ -51,6 +51,10 @@ from sdd_lib.console_db import (  # noqa: E402
     insert_qa_a11y_batch, record_auditor_run,
     replace_qa_auditor_for_feat,
 )
+from sdd_lib.ingest_common import (  # noqa: E402
+    DEFAULT_THRESHOLD, SEVERITY_RANK,
+    compute_verdict, emit_error_block as _err,
+)
 from sdd_lib.paths import repo_root  # noqa: E402
 from sdd_lib.exit_codes import SUCCESS  # noqa: E402
 
@@ -122,12 +126,10 @@ AXE_RULE_MAP: dict[str, tuple[str, str, str]] = {
     "target-size":               ("A11Y_TARGET_TOO_SMALL",  "moderate", "2.5.5"),
 }
 
-# Severity ordinal — sort highest first; threshold compares >=.
-SEVERITY_RANK: dict[str, int] = {
-    "critical": 4, "serious": 3, "moderate": 2, "minor": 1,
-}
-
-DEFAULT_THRESHOLD = "serious"   # matches legacy A11yFailOn default
+# SEVERITY_RANK, DEFAULT_THRESHOLD, _err, compute_verdict :
+# imported from sdd_lib.ingest_common (audit S3 2026-07-26, DRY across
+# ingest_axe + ingest_lighthouse). Local aliases kept for readability
+# — do not redefine here (SSoT is ingest_common.py).
 
 # WCAG SC tag : `wcag<P><G><C[C]>` where P=principle (1..4), G=guideline
 # (single digit — WCAG 2.x has ≤9 guidelines per principle), C=criterion
@@ -135,11 +137,6 @@ DEFAULT_THRESHOLD = "serious"   # matches legacy A11yFailOn default
 # `wcag2510` → 2.5.10. Version tags like `wcag22aa` deliberately don't
 # match (extra non-digit suffix); they describe conformance level, not SC.
 WCAG_TAG_RE = re.compile(r"^wcag(\d)(\d)(\d{1,2})?$")
-
-
-def _err(error: str, cause: str, fix: str, code: int) -> int:
-    sys.stderr.write(f"ERROR: {error}\nCAUSE: {cause}\nFIX: {fix}\n")
-    return code
 
 
 def _infer_wcag_from_tags(tags: list[str]) -> str | None:
@@ -254,18 +251,6 @@ def parse_axe_report(report: Any) -> list[dict[str, Any]]:
                     "message":     " — ".join(msg_parts),
                 })
     return issues
-
-
-def compute_verdict(issues: list[dict[str, Any]], threshold: str) -> str:
-    """Return 'green' | 'warn' | 'red' for the issue set vs threshold."""
-    if not issues:
-        return "green"
-    thr_rank = SEVERITY_RANK.get(threshold.lower(), SEVERITY_RANK[DEFAULT_THRESHOLD])
-    for it in issues:
-        sev = (it.get("severity") or "moderate").lower()
-        if SEVERITY_RANK.get(sev, 0) >= thr_rank:
-            return "red"
-    return "warn"
 
 
 def main(argv: list[str] | None = None) -> int:

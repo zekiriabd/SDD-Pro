@@ -59,6 +59,10 @@ from sdd_lib.console_db import (  # noqa: E402
     insert_qa_performance_batch, record_auditor_run,
     replace_qa_auditor_for_feat,
 )
+from sdd_lib.ingest_common import (  # noqa: E402
+    DEFAULT_THRESHOLD, SEVERITY_RANK,
+    compute_verdict, emit_error_block as _err,
+)
 from sdd_lib.paths import repo_root  # noqa: E402
 from sdd_lib.exit_codes import SUCCESS  # noqa: E402
 
@@ -75,16 +79,10 @@ DEFAULTS = {
     "bundle_kb_moderate":  500.0,   # raw 500-1500 KB → moderate
 }
 
-SEVERITY_RANK: dict[str, int] = {
-    "critical": 4, "serious": 3, "moderate": 2, "minor": 1,
-}
-
-DEFAULT_THRESHOLD = "serious"
-
-
-def _err(error: str, cause: str, fix: str, code: int) -> int:
-    sys.stderr.write(f"ERROR: {error}\nCAUSE: {cause}\nFIX: {fix}\n")
-    return code
+# SEVERITY_RANK, DEFAULT_THRESHOLD, _err, compute_verdict :
+# imported from sdd_lib.ingest_common (audit S3 2026-07-26, DRY across
+# ingest_axe + ingest_lighthouse). Local aliases kept for readability
+# — do not redefine here (SSoT is ingest_common.py).
 
 
 # ============================================================
@@ -265,18 +263,6 @@ def extract_issues(lhr: dict[str, Any], thresholds: dict[str, float]) -> list[di
         })
 
     return issues
-
-
-def compute_verdict(issues: list[dict[str, Any]], threshold: str) -> str:
-    """Return 'green' | 'warn' | 'red' against severity threshold."""
-    if not issues:
-        return "green"
-    thr_rank = SEVERITY_RANK.get(threshold.lower(), SEVERITY_RANK[DEFAULT_THRESHOLD])
-    for it in issues:
-        sev = (it.get("severity") or "moderate").lower()
-        if SEVERITY_RANK.get(sev, 0) >= thr_rank:
-            return "red"
-    return "warn"
 
 
 # ============================================================
