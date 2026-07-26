@@ -1,0 +1,20 @@
+{
+  "name": "sdd-pro",
+  "version": "7.0.0",
+  "description": "FEAT-driven enterprise delivery framework — spec, arch, dev, audit in one pipeline",
+  "type": "project-template",
+  "author": "SDD-Pro maintainer",
+  "license": "SEE LICENSE",
+  "contextFiles": [
+    ".claude/AGENTS.md"
+  ],
+  "commands": ".claude/commands",
+  "skills": ".sdd/skills",
+  "agents": ".claude/agents",
+  "install": {
+    "script": "python bootstrap.py",
+    "requirements": ["python>=3.11"]
+  },
+  "keywords": ["feat-driven", "enterprise", "audit", "security", "reverse-engineering", "claude-code"],
+  "repository": "https://github.com/your-org/sdd-pro"
+}

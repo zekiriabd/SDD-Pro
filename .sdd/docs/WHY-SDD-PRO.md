@@ -1,9 +1,9 @@
 # Pourquoi SDD_Pro ? — Argumentaire CTO / DSI
 
-> Document commercial v7.0.0 GA (2026-06-07). Présente la valeur de SDD_Pro
+> Document commercial v7.0.3-dev (2026-07-26). Présente la valeur de SDD_Pro
 > pour les équipes tech (CTO / DSI / Tech Lead).
 > Objectif : aider un Tech Lead, CTO ou DSI à arbitrer entre frameworks pour
-> son organisation.
+> son organisation. Base GA : v7.0.0 (2026-06-07).
 
 ---
 
@@ -56,7 +56,7 @@ agents personas, pas des catalogues machine.
 fantaisie trouvée sur Stack Overflow par le LLM**. Le hook
 `preflight_stack_combo` refuse les combos non listés.
 
-### 2.3 Taxonomie d'erreurs structurée (188 classes `[CLASS]`)
+### 2.3 Taxonomie d'erreurs structurée (189 classes `[CLASS]`)
 
 Chaque erreur du pipeline porte un préfixe canonique
 (`[BUILD_CORRECTIBLE]`, `[QA_COVERAGE_GAP]`, `[SEC_SQL_INJECTION]`,
@@ -83,17 +83,20 @@ en prose libre.
 | Security review OWASP | ✅ `security-reviewer` | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | Spec compliance AC-by-AC | ✅ `spec-compliance-reviewer` | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | Architecture review | ✅ `arch-reviewer` | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| Adversarial review (opt-in) | ✅ `adversarial-reviewer` | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Adversarial review (**opt-out, actif par défaut**) | ✅ `adversarial-reviewer` | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 
-### 2.5 Auditabilité industrielle
+### 2.5 Auditabilité industrielle + visibilité IDE
 
 - **`console.db` SQLite** : chaque run trace tokens, cost, gates, verdicts.
+- **Statusline IDE** : phase courante + coût cumulé + tokens visibles en temps réel
+  dans la barre de statut (VSCode, JetBrains, web). Format : `SDD F2:ARCH 💰$3.2 🔢18K`.
+  Fail-open, compatible tout harness.
 - **9 ADRs versionnés** documentent les décisions structurantes.
 - **`run_id` par exécution** : reproductibilité cross-machine.
 - **Hooks `SubagentStop`** : audit-loggué chaque sortie d'agent.
 - **`workspace/.sys/.audit/`** : trail forensique des bypass.
 
-Aucun concurrent ne fournit cette piste d'audit.
+Aucun concurrent ne fournit cette piste d'audit ni cette visibilité IDE en temps réel.
 
 ---
 
@@ -104,10 +107,12 @@ Aucun concurrent ne fournit cette piste d'audit.
 | ⭐ GitHub | (nouveau) | 93k-150k | 48k | < 5k | (closed) | 25k | (closed) |
 | Méthodologie | FEAT-driven SDLC complet | TDD RED-GREEN-REFACTOR | Personas SDLC | Standards injection | Pair programming | Pair programming | Autonomous |
 | Agents | 12 spécialisés + 5 reviewers | 13 skills composables | 6 personas nommés | N/A | 1 (LLM) | 1 (LLM) | 1 (LLM) |
-| Multi-IDE | ❌ Claude Code only | ✅ 7 harnesses | ✅ any LLM IDE | ✅ 4 IDEs | ✅ Cursor | ✅ CLI | ✅ web |
-| Stacks pré-validés | **34 (25 🟢 + 8 🟡)** | N/A | Via expansion packs | N/A | N/A | N/A | N/A |
-| Gates déterministes Python | **64 scripts/hooks** | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| Taxonomie d'erreurs | **188 classes** | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Multi-harness | ✅ **Claude Code + Codex + Gemini CLI + Antigravity** | ✅ 7 harnesses | ✅ any LLM IDE | ✅ 4 IDEs | ✅ Cursor | ✅ CLI | ✅ web |
+| Stacks pré-validés | **36 (28 🟢 + 8 🟡)** | N/A | Via expansion packs | N/A | N/A | N/A | N/A |
+| Gates déterministes Python | **55 scripts + hooks** | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Taxonomie d'erreurs | **189 classes** | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Statusline IDE (phase + coût + tokens) | ✅ hook natif | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Plugin marketplace (discovery IDE natif) | ✅ `plugin.json` | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | Idempotence + resume | ✅ `--resume` | ❌ | ⚠️ partiel | ❌ | ❌ | ❌ | ❌ |
 | Cost cap | ✅ par run + par US | ❌ | ❌ | ❌ | ❌ | ❌ | ⚠️ partiel |
 | Audit trail SQLite | ✅ `console.db` | ❌ | ❌ | ❌ | ❌ | ❌ | ⚠️ logs |
@@ -127,14 +132,17 @@ Aucun concurrent ne fournit cette piste d'audit.
   reproductibilité).
 - ✅ Vous travaillez sur **.NET / Node / Python / Kotlin** (les 4 backends
   supportés).
-- ✅ Vous utilisez **Claude Code** (mono-IDE assumé).
+- ✅ Vous utilisez **Claude Code, Codex, Gemini CLI ou Antigravity** — le pipeline
+  est identique sur chaque harness (multi-harness natif depuis v7.0.2).
 - ✅ Vous valorisez **les gates bloquants** plus que la vitesse brute.
 - ✅ Vous générez sur des stacks **pré-validés** (combos C1/C2 + 11 runtime).
+- ✅ Vous voulez **voir la phase et le coût en temps réel** dans la barre de statut
+  IDE sans quitter votre éditeur.
 
 ### Choisir Superpowers si :
-- ⚠️ Vous voulez du **TDD strict** RED-GREEN-REFACTOR.
-- ⚠️ Vous voulez du **multi-IDE** (Codex, Gemini, Cursor, Copilot…).
+- ⚠️ Vous voulez du **TDD strict** RED-GREEN-REFACTOR sans pipeline FEAT/US.
 - ⚠️ Vous n'avez **pas besoin de SDLC complet** — juste de l'aide au code.
+- ⚠️ Votre équipe préfère les **skills composables** plutôt que les commandes orchestratrices.
 
 ### Choisir BMAD si :
 - ⚠️ Vous voulez des **personas humanisées** pour la démo CEO (Mary la BA,

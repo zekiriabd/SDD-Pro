@@ -4,7 +4,7 @@ description: /sdd-review — Audit qualité consolidé par FEAT (style Sonar)
 ---
 # /sdd-review — Audit qualité consolidé par FEAT (style Sonar)
 
-<!-- @llm-only-flags-file : la plupart des flags CLI de cette commande slash sont interprétés par Claude. Exception : `--no-spec-gate` ET `--feat-number/--skip-scans/--ensure-scans/--fail-on/--json/--adversarial` (selon contexte) sont parsés par sdd_review.py argparse. Le test smoke vérifie l'union (Python OR @llm-only). -->
+<!-- @llm-only-flags-file : la plupart des flags CLI de cette commande slash sont interprétés par Claude. Exception : `--no-spec-gate` ET `--feat-number/--skip-scans/--ensure-scans/--fail-on/--json/--no-adversarial` (selon contexte) sont parsés par sdd_review.py argparse. Le test smoke vérifie l'union (Python OR @llm-only). -->
 
 
 **Phase A — rapport seul, 0 auto-fix.** Re-run du scan déterministe
@@ -34,7 +34,7 @@ STEP 3.0. Cf. `agents/arch-reviewer.md`.
 /sdd-review {n} --ensure-scans        # v7.0.0 : exit 3 si une source QA obligatoire manque
 /sdd-review {n} --fail-on critical    # override seuil (info|minor|moderate|serious|critical)
 /sdd-review {n} --json                # sortie JSON pour CI/tooling
-/sdd-review {n} --adversarial         # R1 (v7.0.0) : avocat du diable post-agrégation (informational, jamais bloquant)
+/sdd-review {n} --no-adversarial      # v7.1 : skip adversarial-reviewer (actif par défaut)
 /sdd-review {n} --no-spec-gate        # v7.0.0+ : skip Stage A spec-compliance gate (legacy comportement parallèle)
 ```
 
@@ -101,8 +101,8 @@ Si `ReviewMode: read-only` → forcer `--skip-scans` (pas de re-run quality_scan
 
 Si `ArchReviewMode: full` → spawn agent `arch-reviewer` au STEP 3.5 ci-dessous.
 
-Si `AdversarialReviewMode: full` OU flag CLI `--adversarial` → spawn agent
-`adversarial-reviewer` au STEP 6 (post-agrégation, opt-in, jamais bloquant).
+Sauf `AdversarialReviewMode: off` OU flag CLI `--no-adversarial` → spawn agent
+`adversarial-reviewer` au STEP 4.5 (post-agrégation, opt-out, jamais bloquant).
 
 ---
 
@@ -196,38 +196,69 @@ ou baisser SpecComplianceFailOn en Project Config.
 
 ---
 
-## STEP 3.0 — `arch-reviewer` (fallback standalone uniquement)
+## STEP 3.0 — Reviewers LLM en parallèle (fallback standalone)
 
-**Fallback standalone** (`/sdd-review {n}` invoqué directement, hors
-`/sdd-full`) : si `ArchReviewMode: full` ET aucune entrée `[ARCH_*]`
-trouvée pour la FEAT `{n}` dans `qa_code_review` (signal que dev-run
-n'a pas tourné dans la session courante), spawner l'agent en
-fallback :
+**Fallback standalone uniquement** (`/sdd-review {n}` invoqué directement, hors
+`/sdd-full`). Après que le gate spec-compliance est 🟢/🟡 (STEP 3.0.bis),
+vérifier quels reviewers sont absents ou stale dans `console.db` (TTL 24h)
+et les spawner **simultanément** en un seul message multi-`Agent`.
 
-```
-Agent: arch-reviewer
-  prompt: "Audit FEAT {n} — Pattern + Layers + ADRs (cf. agents/arch-reviewer.md). FailOn={ArchReviewFailOn}"
-```
+> **Principe** : `/dev-run §6.4.B` fait déjà ce batch en parallèle lors du
+> pipeline complet (cf. `@.sdd/rules/auditor-orchestration.md §4`). Le fallback
+> standalone ici reproduit exactement le même comportement pour les appels
+> `/sdd-review` isolés (sans run préalable). Si toutes les sources sont fraîches
+> en DB, ce step est un no-op pur (0 token — vérifications déterministes seules).
 
-Vérification rapide avant spawn (lecture déterministe DB) :
+### Vérifications fraîcheur (0 token, avant tout spawn)
+
 ```bash
-python .sdd/python/sdd_scripts/query_console_db.py arch-review-present --feat {n} [--max-age-hours 24]
-# exit 0 = entrées FRAÎCHES présentes (< 24h, défaut) → SKIP fallback (déjà fait par dev-run)
-# exit 1 = aucune entrée fraîche → spawn fallback ci-dessus
+python .sdd/python/sdd_scripts/query_console_db.py code-review-present  --feat {n} [--max-age-hours 24]
+python .sdd/python/sdd_scripts/query_console_db.py security-present      --feat {n} [--max-age-hours 24]
+python .sdd/python/sdd_scripts/query_console_db.py arch-review-present   --feat {n} [--max-age-hours 24]
+# exit 0 = entrée FRAÎCHE présente (< 24h) → SKIP
+# exit 1 = absente ou stale            → à spawner
 ```
 
-> **TTL 24h par défaut (audit C4 closure 2026-06-07)** : si le dernier
-> `[ARCH_*]` finding est plus vieux que 24h, le code a probablement
-> changé entre-temps. Le fallback re-spawne l'agent pour obtenir une
-> review à jour. Override : `--max-age-hours 0` (no TTL, legacy v7.0.0)
-> ou valeur custom selon contexte CI/CD.
+> **TTL 24h (audit C4 closure 2026-06-07)** : au-delà, le code a probablement
+> changé. Override : `--max-age-hours 0` (no TTL) ou valeur custom.
 
-Sur skip (`ArchReviewMode in (manual, off)`) → continuer STEP 3 directement,
-les findings `[ARCH_*]` ne seront simplement pas présents dans l'agrégation.
+### Batch parallèle (un seul message, appels Agent simultanés)
 
-Échec arch-reviewer (timeout, erreur infra) → WARN dans le récap final,
-continuer STEP 3 (rapport partiel mais non bloquant — la review consolidée
-reste utile).
+Construire `BATCH` = liste des reviewers dont la check renvoie exit 1 :
+
+| Condition | Agent ajouté au BATCH |
+|---|---|
+| `code-review-present` exit 1 | `code-reviewer` |
+| `security-present` exit 1 | `security-reviewer` |
+| `arch-review-present` exit 1 ET `ArchReviewMode: full` | `arch-reviewer` |
+
+Si `BATCH == []` → aucun spawn (toutes sources fraîches), passer directement à STEP 3.
+
+Sinon dispatcher **tous les agents du BATCH en parallèle** (un seul message
+multi-`Agent`, paths d'écriture disjoints, même pattern que §4.1 `auditor-orchestration.md`) :
+
+```
+Agent (parallèle): code-reviewer
+  prompt: "Audit FEAT {n} — code patterns + anti-patterns (cf. agents/code-reviewer.md).
+           Mode standalone /sdd-review. FailOn={CodeReviewFailOn}"
+
+Agent (parallèle): security-reviewer
+  prompt: "Audit FEAT {n} — OWASP Top 10, mode scan (cf. agents/security-reviewer.md).
+           Mode standalone /sdd-review. FailOn={SecurityFailOn}"
+
+Agent (parallèle): arch-reviewer  [si dans BATCH]
+  prompt: "Audit FEAT {n} — Pattern + Layers + ADRs (cf. agents/arch-reviewer.md).
+           FailOn={ArchReviewFailOn}"
+```
+
+Attendre la fin de TOUS les agents avant de continuer.
+
+Sur skip (`ArchReviewMode in (manual, off)`) → `arch-reviewer` absent du BATCH,
+les findings `[ARCH_*]` ne seront pas présents dans l'agrégation.
+
+Échec d'un agent (timeout, erreur infra) → WARN dans le récap final,
+continuer STEP 3 (rapport partiel non bloquant). `arch-reviewer` n'est
+jamais bloquant par design.
 
 ---
 
@@ -295,9 +326,9 @@ FIX: lire `query_console_db.py review --feat {n} --format md` §"Findings décle
 
 ---
 
-## STEP 4.5 — Spawn `adversarial-reviewer` (opt-in, post-agrégation)
+## STEP 4.5 — Spawn `adversarial-reviewer` (opt-out, post-agrégation)
 
-Si `--adversarial` (CLI) OU `AdversarialReviewMode: full` (config),
+Sauf `--no-adversarial` (CLI) OU `AdversarialReviewMode: off` (config),
 **et uniquement après** que le rapport consolidé est persisté en base
 (`validation_reports` report_type='review' ; l'agent le lit via
 `query_console_db.py review --feat {n}` comme précondition) :
@@ -324,8 +355,8 @@ Agent: adversarial-reviewer
   ```
 - Échec adversarial-reviewer (timeout, erreur infra) → WARN dans le
   récap final, ne bloque jamais (par design).
-- Skip légitime si `AdversarialReviewMode: off` OU absence du flag —
-  message court `adversarial-reviewer feat-{n}: skipped`.
+- Skip légitime via `--no-adversarial` (CLI) OU `AdversarialReviewMode: off` (config) —
+  message court `adversarial-reviewer feat-{n}: skipped (opt-out)`.
 
 ---
 
@@ -350,7 +381,7 @@ livrée, le Tech Lead arbitre les findings :
 # Defaults conservateurs
 ReviewMode:                 full        # full | scans-only | read-only
 ReviewFailOn:               serious     # info | minor | moderate | serious | critical
-AdversarialReviewMode:      manual      # off | manual | full (R1, v7.0.0)
+AdversarialReviewMode:      full        # off | full (R1, v7.1) — opt-out via --no-adversarial
 AdversarialMinAttacks:      5
 AdversarialMaxAttacks:      10
 ```
@@ -359,7 +390,7 @@ AdversarialMaxAttacks:      10
 |---|---|---|
 | `ReviewMode` | `full` | `full` = re-scan + read DB ; `scans-only` = re-scan + skip DB read ; `read-only` = pas de re-scan |
 | `ReviewFailOn` | `serious` | Seuil de bascule 🟡 → 🔴. `critical` = très permissif, `info` = très strict |
-| `AdversarialReviewMode` | `manual` | `off` = jamais ; `manual` = uniquement si `--adversarial` ; `full` = auto-invoke à chaque `/sdd-review` |
+| `AdversarialReviewMode` | `full` | `off` = jamais ; `full` = auto-invoke à chaque `/sdd-review` (défaut) ; bypass : `--no-adversarial` CLI |
 | `AdversarialMinAttacks` | `5` | Plancher cible (warn `coverage_warning: true` si moins) |
 | `AdversarialMaxAttacks` | `10` | Plafond strict (verdict toujours informational) |
 

@@ -4,6 +4,50 @@ Format : [version] — date courte. Sections : `Breaking`, `Added`, `Changed`, `
 
 ---
 
+## [v7.0.3-dev] — 2026-07-26 (audit comparatif + 5 améliorations produit)
+
+> Audit comparatif SDD_Pro vs 4 concurrents (BMAD-METHOD, Agent-OS, GSD-Core-Next,
+> Superpowers). 5 améliorations non-breaking ajoutant une valeur différentielle réelle :
+> revue en parallèle, statusline IDE, Haiku pour agents mécaniques, manifeste plugin,
+> adversarial par défaut.
+
+### Added
+
+- **Statusline IDE** (`sdd_hooks/statusline.py`) — La phase en cours, le coût cumulé et
+  les tokens apparaissent **en temps réel dans la barre de statut** VSCode, JetBrains, ou
+  tout IDE supportant Claude Code. Format : `SDD F2:ARCH 💰$3.2 🔢18K`. Lit `console.db`
+  en read-only, fail-open (exit 0 silencieux si DB absente). Câblé en premier hook `Stop`
+  dans `.claude/settings.json`. Compatible tout harness (Claude Code, Codex, Gemini CLI, Antigravity).
+
+- **`plugin.json`** — Manifeste marketplace Claude Code. Permet la découverte de SDD_Pro
+  comme plugin projet directement dans l'IDE : commandes, skills, agents, point d'entrée
+  AGENTS.md. Champ `install.script: python bootstrap.py`, `requirements: python>=3.11`.
+  SSoT pour les métadonnées de distribution multi-harness.
+
+### Changed
+
+- **Adversarial reviewer — opt-out** (était opt-in `--adversarial`) : `AdversarialReviewMode`
+  passe à `full` par défaut. L'agent `adversarial-reviewer` s'exécute automatiquement à
+  chaque `/sdd-review`. Pour désactiver ponctuellement : `--no-adversarial`. Pour
+  désactiver en config : `AdversarialReviewMode: off`. Rationale : l'analyse adversariale
+  (edge cases, dettes cachées, modes de défaillance) est trop précieuse pour être opt-in —
+  elle doit être la norme, pas l'exception.
+
+- **Reviewers parallèles dans `/sdd-review` STEP 3.0** — `code-reviewer` + `security-reviewer`
+  + `arch-reviewer` sont désormais dispatchés **en parallèle** (un seul message multi-`Agent`).
+  Auparavant : seul `arch-reviewer` était spawné en fallback standalone ; `code-reviewer` et
+  `security-reviewer` devaient déjà être dans la DB. Gain estimé : **−40 à 60 % de temps
+  d'audit** quand les sources sont stale ou absentes.
+
+- **Haiku pour `constitutioner` + `elicitor`** — `model_tier: balanced` → `model_tier: fast`
+  (`claude-haiku-4-5` / équivalent par harness). Ces agents sont purement mécaniques :
+  `constitutioner` transcrit des décisions de `stack.md` en ADRs structurés ; `elicitor`
+  guide le brainstorming via des templates. Sonnet n'apportait aucune valeur différentielle.
+  Économie estimée : **30-50 % sur ces phases**. Compatible multi-harness (tier `fast`
+  résolu par `providers/{harness}.yaml`).
+
+---
+
 ## [v7.0.2-dev] — 2026-07-26 (branche `refactor/sdd-move-common` — post-migration audit)
 
 > Audit consolidé 8 rounds / 19 commits atomiques sur `main` (fast-forward

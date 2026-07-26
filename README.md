@@ -1,6 +1,6 @@
 # SDD_Pro
 
-Framework FEAT-driven development pour Claude Code — **v7.0.0 GA tagué 2026-06-07** (`main`, freeze pré-GA clos ; cf. [.sdd/docs/VERSIONING.md](.sdd/docs/VERSIONING.md)). Baseline LTS v6.10.x (tag `SDD_Prov6_10_5`) conservée jusqu'au 2026-12-31 pour migration douce.
+Framework FEAT-driven development **multi-harness** (Claude Code, Codex, Gemini CLI, Antigravity) — **v7.0.3-dev** (base v7.0.0 GA 2026-06-07). Baseline LTS v6.10.x conservée jusqu'au 2026-12-31. Cf. [.sdd/docs/VERSIONING.md](.sdd/docs/VERSIONING.md) · [CHANGELOG](.sdd/docs/CHANGELOG.md).
 
 > 🌍 [English README](README.en.md) — quickstart + console essentials (les docs FR restent canoniques).
 
@@ -46,22 +46,25 @@ SDD_APP_NAME=MyApp SDD_COMBO=c1 python bootstrap.py --auto-init
 
 ---
 
-## 🆚 Pourquoi SDD_Pro vs BMAD / Spec-Kit / AgentOS ?
+## 🆚 Pourquoi SDD_Pro vs BMAD / GSD / AgentOS / Superpowers ?
 
-| Critère | SDD_Pro | BMAD | Spec-Kit | AgentOS |
-|---|:---:|:---:|:---:|:---:|
-| Multi-agents spécialisés | **12** | ~6 | 1 | 4 |
-| Reviewers post-code (angles distincts) | **5** (code, security, spec, arch, adversarial) | 1 | 0 | 1 |
-| Anti-derive strict (ownership + STOP) | ✅ | partial | ❌ | partial |
-| Catalogues machines (`.libs.json` + CVE + LTS) | ✅ | ❌ | ❌ | ❌ |
-| Error classification cross-agent (188 préfixes `[CLASS]`) | ✅ | ❌ | ❌ | ❌ |
-| Telemetry SQLite (cost cap, audit trail) | ✅ | ❌ | ❌ | partial |
-| Idempotence / resume (checkpoint mode) | ✅ | ❌ | ❌ | partial |
-| Determinisme (scripts 0-coût LLM) | **55 scripts** | ❌ | ❌ | partial |
+| Critère | SDD_Pro | BMAD | GSD | AgentOS | Superpowers |
+|---|:---:|:---:|:---:|:---:|:---:|
+| Multi-harness (Claude + Codex + Gemini…) | ✅ **natif** | ❌ | ❌ | ❌ | ❌ |
+| Multi-agents spécialisés | **25** | ~6 | ~5 | 4 | 8 |
+| Reviewers post-code (5 angles, adversarial par défaut) | **5** ✅ | 1 | 1 | 1 | 2 |
+| Anti-derive strict (ownership matrix + STOP bloquant) | ✅ | partiel | ❌ | partiel | partiel |
+| Catalogues machine-readable (`.libs.json` + CVE + LTS) | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Error classification cross-agent (189 préfixes `[CLASS]`) | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Telemetry SQLite + statusline IDE (coût, phase, tokens) | ✅ | ❌ | partiel | partiel | ❌ |
+| Idempotence / resume (checkpoint mode) | ✅ | ❌ | ❌ | partiel | ❌ |
+| Scripts déterministes 0-token LLM | **55 scripts** | ❌ | ❌ | partiel | partiel |
+| Plugin marketplace (discovery IDE natif) | ✅ `plugin.json` | ❌ | ❌ | ❌ | ❌ |
 
-**Créneau différenciant** : SDD_Pro **industrialise la qualité** (5 reviewers, telemetry,
-anti-derive strict). C'est l'équivalent **Sonar + Snyk + ADR governance** appliqué au
-pipeline LLM. Voir [cookbook 10 min](.sdd/docs/cookbook.md) pour démarrer.
+**Créneau différenciant** : SDD_Pro **industrialise la qualité** (5 reviewers dont adversarial
+par défaut, telemetry, anti-derive strict, gates déterministes) **sur n'importe quel harness LLM**.
+C'est l'équivalent **Sonar + Snyk + ADR governance** appliqué au pipeline multi-agent.
+Voir [cookbook 10 min](.sdd/docs/cookbook.md) pour démarrer.
 
 ---
 

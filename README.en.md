@@ -1,6 +1,11 @@
 # SDD_Pro
 
-FEAT-driven development framework for Claude Code — **v7.0.0 GA tagged 2026-06-07** (`main`, pre-GA freeze closed; see [.sdd/docs/VERSIONING.md](.sdd/docs/VERSIONING.md)). LTS baseline v6.10.x (tag `SDD_Prov6_10_5`) kept until 2026-12-31 for smooth migration.
+FEAT-driven development framework — **multi-harness** (Claude Code, OpenAI Codex, Gemini CLI, Antigravity) — **v7.0.3-dev** (base v7.0.0 GA 2026-06-07). LTS baseline v6.10.x kept until 2026-12-31. See [VERSIONING](.sdd/docs/VERSIONING.md) · [CHANGELOG](.sdd/docs/CHANGELOG.md).
+
+> **New in v7.0.3-dev**: parallel audit (code + security + arch reviewers run simultaneously),
+> adversarial reviewer active by default (use `--no-adversarial` to skip), IDE statusline showing
+> current phase + cost + tokens, `plugin.json` marketplace manifest, Haiku tier for mechanical
+> agents (constitutioner, elicitor).
 
 > ⚠ **This English page is a summary, not a translation.** It covers Quickstart + Console essentials only (~10 sections vs ~17 in the French canonical README). For exhaustive docs (architecture, agents, rules, stacks, governance, ROI, roadmap), use the French source.
 >
@@ -100,7 +105,7 @@ Prereqs: Node.js ≥ 20 and Python ≥ 3.8 on PATH (used to query `console.db` v
 
 ## Architecture in one paragraph
 
-SDD_Pro orchestrates **19 Claude Code agents** — 12 forward (PO, arch, dev-backend, dev-frontend, QA, 5 reviewers, elicitor, constitutioner) plus 7 reverse-engineering agents (optional legacy→spec module) — around a **strict file ownership matrix**, a **layered Project Config** (43 keys, JSON-schema validated), a **deterministic Python tooling layer** (~20 KLOC, 1700+ tests, framework smoke), and an **opt-in cost/budget cap** ($50/run by default, hard-blocking past threshold). The framework is **source-first**: every decision lives in `.md` files (FEATs, US, plans, ADRs) versioned with the code — no hidden state in the LLM context. The pipeline is **gated backend-first** (dev-backend ALL US → API Gate → dev-frontend ALL US) to avoid silent contract drift between front and back.
+SDD_Pro orchestrates **25 agents** — 13 forward-pipeline (PO, arch, dev-backend, dev-frontend, QA, 5 reviewers, elicitor, constitutioner, specbook-writer) plus 12 reverse-engineering agents (optional legacy→spec module) — around a **strict file ownership matrix**, a **layered Project Config** (43 keys, JSON-schema validated), a **deterministic Python tooling layer** (~20 KLOC, 1700+ tests, framework smoke), and a **hard cost/budget cap** ($50/run by default). The framework is **source-first**: every decision lives in `.md` files (FEATs, US, plans, ADRs) versioned with the code — no hidden state in the LLM context. The pipeline is **gated backend-first** (dev-backend ALL US → API Gate → dev-frontend ALL US) to avoid silent contract drift between front and back. Harness-agnostic: the `.sdd/` source layer is compiled to per-harness facades by `harness_build.py` — same pipeline logic whether you run Claude Code, Codex, or Gemini CLI.
 
 ---
 
