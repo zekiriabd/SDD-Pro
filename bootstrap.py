@@ -728,6 +728,20 @@ def build_harness_facades(dry_run: bool, harness: str = "claude-code", provider:
     _print_info(f"Building harness façade {harness} ({provider}) ...")
     try:
         env = os.environ.copy()
+        # audit 2026-07-26 R2 — SDD_ALLOW_UNTESTED_HARNESS is legitimate at
+        # bootstrap time (this IS the "reserved for bootstrap deploy" scope
+        # mentioned in INVARIANTS.yml `harness-parity`), but its usage must
+        # be VISIBLE : the user needs to know the resulting façade is not
+        # conformance-tested and must not be trusted in prod without a
+        # `conformance_run.py --live` first.
+        if harness != "claude-code":
+            _print_warn(
+                f"Bootstrap deploys {harness}/{provider} with "
+                f"SDD_ALLOW_UNTESTED_HARNESS=1 — combo NOT conformance-tested. "
+                f"Run `python .sdd/python/sdd_scripts/conformance_run.py --live "
+                f"--combo {harness}:{provider}` before any production usage. "
+                f"See INVARIANTS.yml invariant 14 (`harness-parity`)."
+            )
         env["SDD_ALLOW_UNTESTED_HARNESS"] = "1"  # codex/gemini pas encore conformance-tested
         result = subprocess.run(cmd, cwd=REPO_ROOT, capture_output=True, text=True, check=False, env=env)
         if result.returncode != 0:

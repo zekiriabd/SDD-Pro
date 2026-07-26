@@ -79,6 +79,59 @@ class TestAsTuple(unittest.TestCase):
         self.assertEqual(t, (3.00, 15.00, 3.75, 0.30))
 
 
+class TestMultiProviderPricing(unittest.TestCase):
+    """Audit R2 (2026-07-26) — pricing.py must expose provider YAML pricing.
+
+    Before v7.0.2 the cost-cap silently under-counted premium non-Anthropic
+    models (o1, gemini-2.5-pro, kimi-k3) at Sonnet FALLBACK_PRICING rates
+    → up to 5× under-estimation. Fix : load `.sdd/providers/*.yaml` lazily.
+    """
+
+    def setUp(self) -> None:
+        # Force a fresh load per test — the cache is module-global and could
+        # be polluted by prior tests that patched paths.
+        pricing._PROVIDER_PRICING_CACHE = None
+
+    def test_openai_o1_pricing_from_yaml(self) -> None:
+        """OpenAI o1 must resolve to real openai.yaml rates, not Sonnet fallback."""
+        p = pricing.get_pricing("o1")
+        self.assertEqual(p["input"], 15.00)   # o1 input price
+        self.assertEqual(p["output"], 60.00)  # o1 output price (not Sonnet's 75)
+
+    def test_gemini_pro_pricing_from_yaml(self) -> None:
+        """Gemini 2.5 Pro must resolve to real google.yaml rates."""
+        p = pricing.get_pricing("gemini-2.5-pro")
+        self.assertEqual(p["input"], 1.25)
+        self.assertEqual(p["output"], 5.00)
+
+    def test_kimi_k3_pricing_from_yaml(self) -> None:
+        """Kimi K3 must resolve to real moonshot.yaml rates."""
+        p = pricing.get_pricing("kimi-k3")
+        self.assertEqual(p["input"], 0.60)
+        self.assertEqual(p["output"], 2.50)
+
+    def test_has_known_pricing_true_for_canonical(self) -> None:
+        self.assertTrue(pricing.has_known_pricing("claude-opus-4-8"))
+
+    def test_has_known_pricing_true_for_provider_yaml(self) -> None:
+        for m in ("o1", "gpt-4o", "gemini-2.5-pro", "gemini-2.5-flash",
+                  "kimi-k3", "kimi-k2.5"):
+            self.assertTrue(pricing.has_known_pricing(m), f"{m} should be known")
+
+    def test_has_known_pricing_false_for_truly_unknown(self) -> None:
+        self.assertFalse(pricing.has_known_pricing("bogus-model-xyz"))
+        self.assertFalse(pricing.has_known_pricing(None))
+        self.assertFalse(pricing.has_known_pricing(""))
+
+    def test_canonical_wins_on_collision(self) -> None:
+        """If a provider YAML re-declares an Anthropic model, canonical wins."""
+        # anthropic.yaml lists claude-opus-4-8 identically to PRICING.
+        # Verify get_pricing returns the canonical entry (dict identity via ==).
+        canonical = pricing.PRICING["claude-opus-4-8"]
+        resolved = pricing.get_pricing("claude-opus-4-8")
+        self.assertEqual(resolved, canonical)
+
+
 class TestCheckPricingFreshness(unittest.TestCase):
     def test_fresh_returns_true(self) -> None:
         """Within max_age_days → is_fresh=True."""

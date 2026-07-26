@@ -37,7 +37,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from sdd_lib.ci import is_ci as _detect_ci  # noqa: E402  # SSoT audit 2026-06-07
 from sdd_lib.exit_codes import HOOK_ALLOW, HOOK_DENY  # noqa: E402
 from sdd_lib.hook_input import read_hook_input, get_subagent_type  # noqa: E402
-from sdd_lib.pricing import get_pricing  # noqa: E402  # v7.0.1 SSoT (normalizes [1m] suffix — audit CR-1)
+from sdd_lib.pricing import get_pricing, has_known_pricing  # noqa: E402  # v7.0.1 SSoT (normalizes [1m] suffix — audit CR-1); has_known_pricing added v7.0.2 audit R2 (fail-closed non-Anthropic)
 from sdd_lib.run_id import get_or_create_run_id  # noqa: E402  # v7.0.1 stable scoping
 from sdd_lib.stderr import warn  # noqa: E402
 
@@ -125,11 +125,13 @@ def _check_telemetry_health() -> None:
 # `python -c` frais (durée de vie < 1 s) — ce cache module-level ne produit
 # JAMAIS de hit aujourd'hui. Conservé délibérément : coût nul, et il devient
 # effectif si le hook est un jour invoqué in-process (harness long-vie).
-_COST_CACHE: dict[str, tuple[float, float, int, str]] = {}  # run_id -> (ts, cost, count, scope)
+# Extended v7.0.2 (audit R2) : tuple now carries `unknown_models` list so
+# fail-closed detection survives the cache hit.
+_COST_CACHE: dict[str, tuple[float, float, int, str, tuple[str, ...]]] = {}
 _COST_CACHE_TTL_SEC = 30.0
 
 
-def _compute_run_cost() -> tuple[float, int, str]:
+def _compute_run_cost() -> tuple[float, int, str, tuple[str, ...]]:
     """Aggregate USD spent so far in the current run.
 
     Run scoping (precedence v7.0.0 audit fix 2026-05-20) :
@@ -169,12 +171,12 @@ def _compute_run_cost() -> tuple[float, int, str]:
     try:
         from sdd_lib.console_db import connect_ro, default_db_path
     except Exception as e:
-        return 0.0, 0, f"db error: import failed: {e}"
+        return 0.0, 0, f"db error: import failed: {e}", ()
 
     # Distinguish absent (legit fresh state) from unreadable (suspect).
     try:
         if not default_db_path().exists():
-            return 0.0, 0, "db absent"
+            return 0.0, 0, "db absent", ()
     except Exception:
         # repo_root() failure is itself a problem — surface it.
         pass
@@ -188,9 +190,9 @@ def _compute_run_cost() -> tuple[float, int, str]:
     now = time.monotonic()
     cached = _COST_CACHE.get(run_id)
     if cached is not None:
-        cached_ts, cached_cost, cached_count, cached_scope = cached
+        cached_ts, cached_cost, cached_count, cached_scope, cached_unknown = cached
         if (now - cached_ts) < _COST_CACHE_TTL_SEC:
-            return cached_cost, cached_count, cached_scope
+            return cached_cost, cached_count, cached_scope, cached_unknown
 
     try:
         with connect_ro() as conn:
@@ -203,24 +205,28 @@ def _compute_run_cost() -> tuple[float, int, str]:
             )
             rows = cur.fetchall()
             if not rows:
-                return 0.0, 0, f"run={run_id[:8]} (no rows yet)"
+                return 0.0, 0, f"run={run_id[:8]} (no rows yet)", ()
             scope = f"run={run_id[:8]}"
     except Exception as e:
         # SCOPE = "db error: ..." signals the caller that 0.0 is NOT a
         # legitimate "no cost yet" but a "cap unenforceable" condition.
-        return 0.0, 0, f"db error: {e}"
+        return 0.0, 0, f"db error: {e}", ()
 
     total = 0.0
+    unknown: list[str] = []  # audit R2 : models with no known pricing (Sonnet fallback = under-count)
     for model, inp, outp, cc, cr in rows:
+        if model and not has_known_pricing(model) and model not in unknown:
+            unknown.append(model)
         p = get_pricing(model)
         total += (inp or 0) * p["input"] / 1_000_000
         total += (outp or 0) * p["output"] / 1_000_000
         total += (cc or 0) * p["cache_creation"] / 1_000_000
         total += (cr or 0) * p["cache_read"] / 1_000_000
 
+    unknown_tuple = tuple(unknown)
     # Cache write (C3 fix) — TTL expiry on next read past 30s.
-    _COST_CACHE[run_id] = (now, total, len(rows), scope)
-    return total, len(rows), scope
+    _COST_CACHE[run_id] = (now, total, len(rows), scope, unknown_tuple)
+    return total, len(rows), scope, unknown_tuple
 
 
 # Module-level cache (process-local) for per-US cost queries (RUPT-2).
@@ -334,7 +340,7 @@ def main() -> int:
     subagent = get_subagent_type(payload)
     if not subagent:
         return HOOK_ALLOW
-    cost, calls, scope = _compute_run_cost()
+    cost, calls, scope, unknown_models = _compute_run_cost()
     pct = (cost / cap * 100) if cap > 0 else 0
 
     # v7.0.0 audit fix — emit visible alert if record_token_usage.py is
@@ -368,6 +374,31 @@ def main() -> int:
              "verify_telemetry_health.py` to diagnose ; allowing this "
              "invocation but cap is OFF for the run")
         return HOOK_ALLOW
+
+    # v7.0.2 audit R2 — unknown-pricing detection (multi-provider fail-closed).
+    # If any consumed model is neither in canonical PRICING nor in a provider
+    # YAML, cost was estimated with Sonnet FALLBACK_PRICING → under-count risk
+    # up to 5× for premium models (OpenAI o1, Gemini Pro, Kimi K3).
+    # Policy :
+    #   - CI (auto strict)                              → DENY [PRICING_UNKNOWN]
+    #   - Interactive (or SDD_ALLOW_UNKNOWN_PRICING=1)  → visible WARN + ALLOW
+    #   - Bypass one-shot                               : SDD_ALLOW_UNKNOWN_PRICING=1
+    #   - Bypass hard (cost cap globally off)           : SDD_DISABLE_COST_CAP=1
+    if unknown_models:
+        is_ci = _detect_ci()
+        bypass = (os.environ.get("SDD_ALLOW_UNKNOWN_PRICING", "").strip().lower()
+                  in ("1", "true", "yes"))
+        warn("ERROR preflight-cost-cap : unknown pricing for model(s) "
+             f"{list(unknown_models)!r} — cost cap unreliable")
+        warn(f"CAUSE: [PRICING_UNKNOWN] cost estimated with FALLBACK_PRICING "
+             f"(Sonnet rates) — 5× under-count risk on premium models")
+        warn(f"FIX: (a) add pricing to `.sdd/providers/{{provider}}.yaml` "
+             f"and bump `PRICING_LAST_REVIEWED` in `sdd_lib/pricing.py` ; "
+             f"(b) bypass one-shot : export SDD_ALLOW_UNKNOWN_PRICING=1")
+        if is_ci and not bypass:
+            return HOOK_DENY
+        # interactive OR bypass → visible WARN + continue (cap still enforced
+        # on the known-model subset, just under-counted for unknown ones)
 
     # 80%-100% : WARN (let the operator know early, do not block — head-up only)
     if cap * 0.8 <= cost < cap:

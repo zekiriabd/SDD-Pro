@@ -12,17 +12,17 @@ et inlinés dans les agents (po, dev-*, qa).
 
 > **Note granularité (Sprint 2.4 audit 2026-06-07 ; recount CTO audit
 > 2026-06-07 ; clarification méthodologique audit consolidé 2026-06-07 ;
-réciprocité émetteurs↔taxonomie audit 2026-06-12 ; ajout `[DB_STRUCTURE_CHANGE_FORBIDDEN]` audit 2026-06-13)** : **189 classes** recensées dans ce fichier (187 actives + 2 dépréciées).
+réciprocité émetteurs↔taxonomie audit 2026-06-12 ; ajout `[DB_STRUCTURE_CHANGE_FORBIDDEN]` audit 2026-06-13 ; ajout `[PRICING_UNKNOWN]` + `[SECRET_PROVIDER_LEAK_RISK]` audit R2/R5 2026-07-26)** : **191 classes** recensées dans ce fichier (189 actives + 2 dépréciées).
 >
 > **Source de vérité** : somme déterministe de la colonne "Classes" du
-> quick-ref §0 ci-dessous (`9+27+14+5+7+3+11+3+11+12+23+16+9+32+6+1 = 189`).
+> quick-ref §0 ci-dessous (`9+27+14+5+7+3+11+3+11+12+23+16+9+34+6+1 = 191`).
 > Ce nombre est utilisé dans toute communication commerciale (CLAUDE.md,
 > WHY-SDD-PRO.md, getting-started.md, README.md) et enforcé par le test
 > `tests/test_error_classification_count.py` (gate CI : tout drift entre
 > intro et somme = FAIL).
 >
 > **Méthodologie de comptage** :
-> - Le chiffre 189 compte les **familles déclarées** par section §1.X
+> - Le chiffre 191 compte les **familles déclarées** par section §1.X
 >   (chaque entrée de quick-ref agrège plusieurs préfixes apparentés
 >   sous une étiquette canonique).
 > - Un `grep -oE '\[[A-Z_]+\]'` unique sur ce fichier retourne ~152
@@ -32,7 +32,7 @@ réciprocité émetteurs↔taxonomie audit 2026-06-12 ; ajout `[DB_STRUCTURE_CHA
 > - L'annexe `error-classification-legacy.md` ajoute 27 préfixes
 >   héritage (11 `[A11Y_*]` + 16 `[PERF_*]`), réactivés via ingest CI
 >   v7.0.0 (ingest CI 2026-05-24 pré-GA — `ingest_axe.py`, `ingest_lighthouse.py`). Ces 27 préfixes
->   **ne sont pas comptés** dans le 189 du fichier principal — ils
+>   **ne sont pas comptés** dans le 191 du fichier principal — ils
 >   sont émis par des scripts d'ingest CI, pas par des agents SDD_Pro.
 > - Le test `tests/test_error_classification_count.py` enforce
 >   l'alignement intro ↔ quick-ref §0 ↔ titre `## 0`.
@@ -59,7 +59,7 @@ réciprocité émetteurs↔taxonomie audit 2026-06-12 ; ajout `[DB_STRUCTURE_CHA
 
 ---
 
-## 0. Quick reference — 16 familles (189 classes)
+## 0. Quick reference — 16 familles (191 classes)
 
 | # | Famille | Classes | Émetteur principal | Comportement build_loop |
 |---|---|---:|---|---|
@@ -76,7 +76,7 @@ réciprocité émetteurs↔taxonomie audit 2026-06-12 ; ajout `[DB_STRUCTURE_CHA
 | §1.11 | **Security** (`[SEC_*]`) — OWASP Top 10 2021 | 23 | security-reviewer | report only + 8 hard-blocking |
 | §1.12 | **Perf** (`[PERF_*]`) — héritage, réactivé via `ingest_lighthouse.py` | 16 | CI ingest | report only |
 | §1.13 | **Spec Compliance** (`[SPEC_*]`) — AC-by-AC verification | 9 | spec-compliance-reviewer | report only |
-| §1.14 | **Tooling/Governance** (`[SCAN_*]`/`[DISCOVER_*]`/`[CHECKPOINT_*]`/`[CONFIG_*]`/`[PROFILE_*]`/`[DRIFT_*]`/`[ARCH_*]`/`[REVIEW_*]`/`[STACK_COMBO_*]`/`[FRAMEWORK_PROTECTED]`/`[ENV_BYPASS_BLOCKED]`/hooks préflight) | 32 | scripts mono-shot + hooks | mostly info, qq. bloquantes |
+| §1.14 | **Tooling/Governance** (`[SCAN_*]`/`[DISCOVER_*]`/`[CHECKPOINT_*]`/`[CONFIG_*]`/`[PROFILE_*]`/`[DRIFT_*]`/`[ARCH_*]`/`[REVIEW_*]`/`[STACK_COMBO_*]`/`[FRAMEWORK_PROTECTED]`/`[ENV_BYPASS_BLOCKED]`/`[PRICING_UNKNOWN]`/`[SECRET_PROVIDER_LEAK_RISK]`/hooks préflight) | 34 | scripts mono-shot + hooks | mostly info, qq. bloquantes |
 | §1.15 | **Adversarial** (`[ADV_*]`) — opt-in `/sdd-review --adversarial` | 6 | adversarial-reviewer | informational |
 | §1.16 | **Inconnue** (`[UNKNOWN]`) | 1 | fallback | report only |
 
@@ -476,6 +476,8 @@ pour la réciprocité émetteurs↔taxonomie, audit 2026-06-12) :
 | `[ENV_BYPASS_BLOCKED]` | Tentative de bypass d'une protection via env var interdite | OUI (hook `block_env_bypass`) |
 | `[GLOB_SCOPE_TOO_BROAD]` | Glob non borné (token explosion) | WARN (strict via `SDD_GLOB_SCOPE_STRICT=1`, hook `preflight_glob_scope`) |
 | `[TELEMETRY_UNAVAILABLE]` | `console.db` télémétrie indisponible au precheck coût | info, fail-open (hook `preflight_cost_cap`) |
+| `[PRICING_UNKNOWN]` | Modèle sans pricing connu (ni canonical `pricing.py` ni provider YAML) — coût cappé sur `FALLBACK_PRICING` Sonnet, risque under-count 5× | OUI en CI, WARN interactif (hook `preflight_cost_cap`, audit R2 2026-07-26). Bypass : `SDD_ALLOW_UNKNOWN_PRICING=1` |
+| `[SECRET_PROVIDER_LEAK_RISK]` | Secrets détectés dans `workspace/stack/stack.md` alors que provider actif est non-Anthropic (retention par défaut : OpenAI 30j, Google 55j, Moonshot inconnu) | WARN (jamais bloquant — hook `preflight_secret_scan`, audit R5 2026-07-26). Bypass : `SDD_ALLOW_SECRET_TO_PROVIDER=1` |
 | `[AGENT_REMOVED_V7]` | Spawn d'un agent retiré en v7.0.0 (a11y/perf/dashboard/*-strict) | OUI (hook `preflight_agent_budget`) |
 | `[BUDGET_PRECHECK_TIMEOUT]` | Timeout du precheck budget agent | info, fail-open (hook `preflight_agent_budget`) |
 

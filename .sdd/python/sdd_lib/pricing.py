@@ -42,6 +42,98 @@ PRICING: dict[str, dict[str, float]] = {
 FALLBACK_PRICING: dict[str, float] = PRICING["claude-sonnet-4-6"]
 
 
+# ---------------------------------------------------------------------------
+# Multi-provider pricing (audit 2026-07-26 R2 — fail-closed under non-Anthropic)
+# ---------------------------------------------------------------------------
+# Provider YAMLs under `.sdd/providers/*.yaml` declare their own `pricing:`
+# blocks (OpenAI, Google, Moonshot). Before v7.0.1 the cost-cap only knew
+# Anthropic models and silently under-counted OpenAI o1 / Gemini Pro / Kimi
+# K3 at Sonnet rates → up to 5× underestimation. Now pricing.py lazy-loads
+# every provider YAML and exposes `has_known_pricing()` so callers
+# (preflight_cost_cap) can fail-closed on truly-unknown models.
+#
+# Lazy import : hooks are short-lived subprocesses; the yaml cost (~50 ms) is
+# paid once and only when the run has non-Anthropic activity.
+_PROVIDER_PRICING_CACHE: dict[str, dict[str, float]] | None = None
+
+
+def _load_provider_pricing() -> dict[str, dict[str, float]]:
+    """Load pricing tables from every `.sdd/providers/*.yaml`, cached.
+
+    Never raises : provider YAMLs are treated as best-effort augmentation
+    of the canonical Anthropic table. Any parse error or missing key is
+    silently skipped (caller falls back to `FALLBACK_PRICING`).
+    """
+    global _PROVIDER_PRICING_CACHE
+    if _PROVIDER_PRICING_CACHE is not None:
+        return _PROVIDER_PRICING_CACHE
+    result: dict[str, dict[str, float]] = {}
+    try:
+        from .paths import providers_dir  # local import — avoid circular
+        pdir = providers_dir()
+    except Exception:
+        _PROVIDER_PRICING_CACHE = result
+        return result
+    if not pdir.is_dir():
+        _PROVIDER_PRICING_CACHE = result
+        return result
+    try:
+        import yaml  # local import — hooks pay only when needed
+    except Exception:
+        _PROVIDER_PRICING_CACHE = result
+        return result
+    for ypath in sorted(pdir.glob("*.yaml")):
+        try:
+            data = yaml.safe_load(ypath.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        if not isinstance(data, dict):
+            continue
+        pricing = data.get("pricing")
+        if not isinstance(pricing, dict):
+            continue
+        for model_id, tariffs in pricing.items():
+            if not isinstance(tariffs, dict):
+                continue
+            inp = tariffs.get("input")
+            outp = tariffs.get("output")
+            if inp is None or outp is None:
+                continue
+            try:
+                inp_f = float(inp)
+                outp_f = float(outp)
+                cr = float(tariffs.get("cache_read", inp))
+                cc = float(tariffs.get("cache_creation", inp))
+            except (TypeError, ValueError):
+                continue
+            # Canonical PRICING wins on collision (Anthropic SSoT).
+            if str(model_id) in PRICING:
+                continue
+            result[str(model_id)] = {
+                "input": inp_f,
+                "output": outp_f,
+                "cache_read": cr,
+                "cache_creation": cc,
+            }
+    _PROVIDER_PRICING_CACHE = result
+    return result
+
+
+def has_known_pricing(model_id: str | None) -> bool:
+    """Return True iff pricing for `model_id` is known (canonical OR provider YAML).
+
+    Used by `preflight_cost_cap` to detect models that would silently fall
+    back to Sonnet rates. Callers can then fail-closed with
+    ``[PRICING_UNKNOWN]`` instead of continuing on stale/wrong data.
+    """
+    base = base_model_id(model_id)
+    if not base:
+        return False
+    if base in PRICING:
+        return True
+    return base in _load_provider_pricing()
+
+
 def base_model_id(model_id: str | None) -> str:
     """Strip a runtime context-window suffix like ``[1m]`` from a model id.
 
@@ -56,12 +148,24 @@ def base_model_id(model_id: str | None) -> str:
 def get_pricing(model_id: str | None) -> dict[str, float]:
     """Return per-million-token pricing dict for a given model_id.
 
+    Lookup order (audit 2026-07-26 R2) :
+      1. Canonical Anthropic ``PRICING`` (SSoT).
+      2. ``.sdd/providers/*.yaml`` ``pricing:`` blocks (OpenAI, Google, Moonshot).
+      3. ``FALLBACK_PRICING`` (Sonnet rates — used only for truly unknown ids).
+
     The id is normalized (``base_model_id``) before lookup so a runtime
-    ``[1m]`` suffix still resolves. Falls back to Sonnet pricing only if
-    the *base* model is genuinely unknown (defensive — callers never break
-    on a brand-new model id).
+    ``[1m]`` suffix still resolves. Callers that need to reject unknown
+    models (fail-closed cost cap) should first check
+    :func:`has_known_pricing` — this function is defensive by design and
+    never raises, so silent fallback would otherwise mask misconfiguration.
     """
-    return PRICING.get(base_model_id(model_id), FALLBACK_PRICING)
+    base = base_model_id(model_id)
+    if base in PRICING:
+        return PRICING[base]
+    provider_pricing = _load_provider_pricing()
+    if base in provider_pricing:
+        return provider_pricing[base]
+    return FALLBACK_PRICING
 
 
 def as_tuple(model_id: str) -> tuple[float, float, float, float]:

@@ -6,6 +6,16 @@
 > à Gemini CLI (ou Antigravity, qui partage la même façade). SSoT machine
 > = `.sdd/capability-matrix.yml`. Ce fichier en est la lecture Tech Lead.
 
+> **Décision produit 2026-07-26 (audit R6)** — Antigravity est **alias
+> non-natif** de Gemini CLI dans SDD_Pro : la même façade `.gemini/` est
+> déployée, la même stratégie d'émulation `spawn_agent_cli.py` est
+> utilisée. Le mode agents natif d'Antigravity (sessions persistantes,
+> tool integration IDE) **n'est pas exploité** — investissement retenu
+> par le Tech Lead comme non prioritaire tant que le combo Gemini CLI
+> × Google n'est pas lui-même conformance-validé. Toute évolution vers
+> un adapter Antigravity distinct doit ré-ouvrir l'ADR
+> `harness-and-provider-abstraction` (D1).
+
 ## 1. Statut (2026-07-25)
 
 | Dimension | Valeur |

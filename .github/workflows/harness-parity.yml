@@ -1,0 +1,160 @@
+name: harness-parity
+
+# SDD_Pro — CI gate for the multi-harness / multi-provider invariants.
+#
+# Enforces the "harness-parity" invariant declared in .sdd/INVARIANTS.yml
+# (see invariant #14) and the pricing / cost-cap guarantees documented in
+# .sdd/rules/error-classification.md §1.14 (TELEMETRY_UNAVAILABLE,
+# PRICING_UNKNOWN, STACK_COMBO_*).
+#
+# Signals a failure ONLY on genuine framework drift or broken invariants;
+# individual reverse-only extras (pyodbc, oracledb) are installed on best
+# effort so a missing native library never masks a real regression.
+
+on:
+  push:
+    branches: [main, master, refactor/**, release/**]
+    paths:
+      - ".sdd/**"
+      - ".claude/**"
+      - ".codex/**"
+      - ".gemini/**"
+      - "bootstrap.py"
+      - ".github/workflows/harness-parity.yml"
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+concurrency:
+  group: harness-parity-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: framework smoke (${{ matrix.os }} / py${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ["3.11"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+
+      - name: Install framework Python deps (dev extras)
+        # Reverse-db extras (pyodbc, oracledb, psycopg2) are best-effort:
+        # the harness-parity tests do NOT need them. Install only [dev].
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .sdd/python[dev,reverse]
+
+      - name: Framework smoke (strict)
+        # Verifies invariants manifest, gates map, agent references,
+        # stacks count, pricing freshness, etc. Enforced strict = any WARN
+        # becomes a FAIL.
+        run: |
+          python .sdd/python/sdd_admin/framework_smoke.py --strict
+
+      - name: Harness identity — agents (golden test)
+        # test_harness_identity.py compares .sdd/agents/* to .claude/agents/*
+        # after re-transpilation. Any drift = FAIL.
+        run: |
+          python -m pytest .sdd/python/tests/test_harness_identity.py -v --tb=short
+
+      - name: Harness identity — commands (golden test)
+        run: |
+          python -m pytest .sdd/python/tests/test_harness_identity_commands.py -v --tb=short
+
+      - name: Harness codex + gemini (dead-link + escape rules)
+        run: |
+          python -m pytest .sdd/python/tests/test_harness_codex_gemini.py .sdd/python/tests/test_harness_antigravity.py -v --tb=short
+
+      - name: Invariants manifest smoke
+        run: |
+          python -m pytest .sdd/python/tests/test_invariants_manifest.py -v --tb=short
+
+      - name: Pricing multi-provider (audit R2)
+        # Verifies .sdd/providers/*.yaml pricing tables are loaded and that
+        # non-Anthropic models (o1, gemini-2.5-pro, kimi-k3) resolve to real
+        # rates instead of Sonnet fallback. Adds fail-closed cost-cap gate.
+        run: |
+          python -m pytest .sdd/python/tests/test_pricing.py .sdd/python/tests/test_preflight_cost_cap.py .sdd/python/tests/test_telemetry_trust.py -v --tb=short
+
+      - name: Conformance dry-run (all combos)
+        # Static verification of every combo declared in combos.json against
+        # its provider YAML + capability-matrix.yml. No API keys, no network.
+        run: |
+          python .sdd/python/sdd_scripts/conformance_run.py --dry-run
+
+  full-test-suite:
+    name: full pytest (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    needs: smoke
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        python: ["3.11"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+
+      - name: Install (dev extras only — no reverse-db native libs)
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .sdd/python[dev,reverse]
+
+      - name: Run whole test suite (excluding e2e pipeline)
+        # test_pipeline_end_to_end.py is opt-in (requires live Claude Code).
+        # Everything else must pass.
+        run: |
+          python -m pytest .sdd/python/tests \
+            --ignore=.sdd/python/tests/test_pipeline_end_to_end.py \
+            -q --tb=short --maxfail=25
+
+  hardcoded-paths-guard:
+    name: no hardcoded .claude paths in .sdd
+    runs-on: ubuntu-latest
+    needs: smoke
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install -e .sdd/python[dev,reverse]
+      # Guards that .sdd/ (the SSoT) never hard-codes paths under .claude/ —
+      # any such reference would break the harness-parity contract when
+      # transpiling for codex / gemini / antigravity.
+      - run: python -m pytest .sdd/python/tests/test_no_hardcoded_claude_paths.py -v --tb=short
+
+  facade-write-guard:
+    name: façades not committed (invariant harness-parity)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Any of these paths tracked in git = drift : the façades MUST be
+      # gitignored + regenerated by harness_build.py. See INVARIANTS.yml
+      # invariant #14 and .gitignore lines 44-45.
+      - name: Assert façades are NOT tracked
+        run: |
+          set -e
+          tracked=$(git ls-files .claude/agents .claude/commands .claude/rules .claude/CLAUDE.md .codex .gemini | wc -l)
+          if [ "$tracked" -ne 0 ]; then
+            echo "::error::Façades committed! Files under .claude/{agents,commands,rules,CLAUDE.md} or .codex/ or .gemini/ must be gitignored + regenerated via harness_build.py."
+            git ls-files .claude/agents .claude/commands .claude/rules .claude/CLAUDE.md .codex .gemini
+            exit 1
+          fi
+          echo "OK — façades are gitignored (regenerated at build time)."

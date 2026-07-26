@@ -1,7 +1,7 @@
 # SDD_Pro v7.0.0 GA — FEAT-Driven Development pour Claude Code
 
 > ✅ **v7.0.0 GA tagué 2026-06-07** (audit CTO closure : 20 Critical + 38 Major
-> fermés, taxonomie 189 classes, 13 combos SLA). v6.10.4-LTS conservée pour
+> fermés, taxonomie 191 classes, 13 combos SLA). v6.10.4-LTS conservée pour
 > projets legacy. Cf. `@.sdd/docs/VERSIONING.md` + `@.sdd/docs/CHANGELOG.md`.
 
 > Framework SDD strict : FEAT → User Stories → Code (back/front parallèle).

@@ -21,6 +21,14 @@ capabilities:
   structured_output_fidelity: unknown   # verdict au 1er conformance run (§10)
   tool_calling: openai-native
   prompt_caching: implicit
+telemetry:
+  # Audit R5 2026-07-26 — OpenAI retains API prompts up to 30 days for abuse
+  # review on consumer accounts. Zero Data Retention available on Enterprise.
+  # Consumed by preflight_secret_scan hook.
+  default_retention_days: 30           # OpenAI consumer/team default
+  optout_available: true               # Enterprise ZDR contract
+  optout_mechanism: "OpenAI Enterprise account with ZDR clause (contract signature required)"
+  reference_url: "https://openai.com/enterprise-privacy"
 pricing:                 # USD per million tokens — public OpenAI list price (2026-07-26)
   # Placeholders documentés — à valider au 1er conformance run (§10). OpenAI
   # publie ses tarifs sur https://openai.com/pricing. cache_read/cache_creation

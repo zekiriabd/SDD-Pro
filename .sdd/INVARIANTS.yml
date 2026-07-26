@@ -166,14 +166,43 @@ invariants:
       env vars to weaken hooks at runtime. PreToolUse hook block_env_bypass
       filters these patterns (export, inline VAR=val, PowerShell $env:, setx).
       Bypass requires editing settings.local.json (Tech Lead, gitignored).
+
+      Registered bypass env vars (recount audit R2 2026-07-26 — the list
+      below MUST cover every bypass documented across the framework so the
+      `block_env_bypass` regex `SDD_(ALLOW|DISABLE|FORCE|BYPASS|TDD)_*`
+      catches all of them, and any newly introduced bypass is added here
+      alongside its enforcer entry).
     severity: critical
     enforcers:
       - .sdd/python/sdd_hooks/block_env_bypass.py
       - .claude/settings.json  # deny patterns
     bypasses:
       - "Tech Lead edits .claude/settings.local.json (per-dev override, gitignored)"
+      - "Env: SDD_ALLOW_ENV_BYPASS=1 (self-bypass — parent shell only, audit-logged)"
+      # -- Runtime protection bypasses (framework write + safety hooks) --
+      - "Env: SDD_PROTECT_FRAMEWORK_FAIL_OPEN=1 (audit 2026-07-26 R2 : if the framework-write hook itself errors, allow the write ; use only for hook debugging)"
+      - "Env: SDD_DISABLE_PRE_WRITE_LINT=1 (skip lint gate on Edit/Write)"
+      - "Env: SDD_DISABLE_GLOB_SCOPE=1 (skip token-explosion glob guard)"
+      - "Env: SDD_GLOB_SCOPE_STRICT=1 (opposite : turn glob WARN into DENY)"
+      # -- Config / stack precondition bypasses --
+      - "Env: SDD_ALLOW_MULTISTACK=1 (accept incoherent multi-stack detection)"
+      - "Env: SDD_ALLOW_LARGE_FEAT=1 (accept > MaxAcsPerFeat AC count)"
+      - "Env: SDD_ALLOW_REVERSE_LOW=1 (accept reverse-eng confidence < gate)"
+      - "Env: SDD_ALLOW_UNTESTED_COMBO=1 (accept a stack combo not in combos.json)"
+      - "Env: SDD_ALLOW_UNTESTED_HARNESS=1 (accept a harness×provider combo not conformance-tested)"
+      - "Env: SDD_ALLOW_UNKNOWN_PRICING=1 (audit 2026-07-26 R2 : accept a run touching models with no known pricing, per preflight_cost_cap)"
+      - "Env: SDD_DISABLE_DEPRECATED_CONFIG_WARN=1 (silence deprecation WARNs)"
+      - "Env: SDD_DISABLE_UNKNOWN_KEY_WARN=1 (silence unknown Project Config keys)"
+      # -- Governance bypasses (documented elsewhere but part of the family) --
+      - "Env: SDD_BYPASS_TWO_STAGE=1 (see spec-gate-before-quality-batch invariant)"
+      - "Env: SDD_FORCE_CUMUL_OK=1 (audit 2026-07-26 R2 : allow cumulative --force + --no-plan-on-warn + --no-validate CLI bypasses)"
+      - "Env: SDD_FORCE_PIPELINE=poc|standard|full|critical (see complexity-routing-deterministic-not-llm invariant)"
+      - "Env: SDD_DISABLE_AUTO_ROUTER=1 (see complexity-routing invariant)"
+      - "Env: SDD_DISABLE_COST_CAP=1 (see cost-cap-per-run invariant)"
+      - "Env: SDD_TDD_MODE=off | SDD_DISABLE_TDD=1 (see tdd-test-first invariant)"
+      - "Env: SDD_DISABLE_SESSION_START=1 (see skills-loaded-at-session-start invariant)"
     added: 2026-06-05
-    audit_ref: v7.0.0-P0-security
+    audit_ref: v7.0.0-P0-security, audit-2026-07-26 R2 (bypass registry completeness)
 
   - id: feat-hash-consistency
     name: Parent FEAT hash in US frontmatter must match current FEAT file
@@ -259,6 +288,19 @@ invariants:
       Tout drift entre pivots `.sdd/` et sortie de `harness_build` sur HEAD
       = perte de contrôle multi-harness (une façade éditée directement
       dérive silencieusement du SSoT).
+
+      Périmètre couvert par la parité byte-identique (recount audit R5/m3
+      2026-07-26) : agents (25), commandes (40), rules (11), CLAUDE.md +
+      variantes memory par harnais (AGENTS.md / GEMINI.md). Les skills
+      (`.sdd/skills/`, 13 SKILL.md) ne sont PAS transpilés par
+      `harness_build.py` — sous Claude Code ils sont chargés directement
+      depuis `.sdd/skills/` (dépendance auto-découverte par le harnais) ;
+      sous Codex / Gemini / Antigravity ils sont **absents runtime** et
+      leur substance doit être inlinée via prompts si l'agent en dépend.
+      Cette omission de la parité byte-identique est intentionnelle
+      (skills = enrichissement optionnel, non load-bearing pour le pipeline
+      forward). Toute évolution vers une injection statique dans
+      `AGENTS.md`/`GEMINI.md` doit ré-ouvrir cette invariant.
 
       Le golden test `test_harness_identity{,_commands}.py` compare
       sémantiquement la régénération à la façade vivante (post-normalisation

@@ -16,6 +16,13 @@ capabilities:
   structured_output_fidelity: unknown   # référence de facto — à formaliser au 1er conformance run (§10)
   tool_calling: native
   prompt_caching: anthropic-ephemeral
+telemetry:
+  # Audit R5 2026-07-26 — track how prompts (which may contain stack.md
+  # secrets) are handled by the provider. Consumed by preflight_secret_scan.
+  default_retention_days: 30           # Anthropic consumer/enterprise default (Trust Center 2026)
+  optout_available: true               # Zero Data Retention (enterprise + special API keys)
+  optout_mechanism: "Anthropic ZDR flag (enterprise / trust-center request)"
+  reference_url: "https://trust.anthropic.com/"
 pricing:                 # USD per million tokens — aligned with sdd_lib/pricing.py PRICING (2026-07-26)
   # SSoT machine : sdd_lib/pricing.py. Ce bloc miroir permet à
   # impact_report.py de valider `pricing_present=True` (évite le warning

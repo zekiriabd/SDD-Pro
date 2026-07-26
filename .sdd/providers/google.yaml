@@ -16,6 +16,15 @@ capabilities:
   structured_output_fidelity: high        # validé via JSONSchema enforcement dans spawn_agent.py
   tool_calling: google-native
   prompt_caching: context-caching       # API différente — appliqué si provider=google
+telemetry:
+  # Audit R5 2026-07-26 — Google Gemini API retains prompts up to 55 days by
+  # default on consumer projects. Vertex AI (Google Cloud) supports data-
+  # residency + no-logging via project-level config. Consumed by
+  # preflight_secret_scan hook.
+  default_retention_days: 55           # Gemini API consumer default (2026-07)
+  optout_available: true               # Vertex AI no-log flag OR consumer opt-out
+  optout_mechanism: "Vertex AI project with `--no-training` OR consumer form ai.google.dev/data-controls"
+  reference_url: "https://ai.google.dev/gemini-api/terms"
 pricing:                 # USD per million tokens — Google Gemini public pricing (2026-07-26)
   # Placeholders — à valider au 1er conformance run (§10). Tarifs Google
   # publiés sur https://ai.google.dev/pricing. cache_read/cache_creation

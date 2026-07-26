@@ -697,14 +697,22 @@ class CodexAdapter(_MemoryVariantAdapter):
             "<!-- Toute mention `Task tool (subagent_type=X)`, `Agent(X)`, ou    -->\n"
             "<!-- « spawn agent X » dans le corps ci-dessous est une INSTRUCTION -->\n"
             "<!-- Claude-Code-native. Sous Codex/Gemini, ces spawns ne sont PAS  -->\n"
-            "<!-- des tools disponibles ; ils seront émulés par le wrapper       -->\n"
-            "<!-- `python .sdd/python/sdd_lib/spawn_agent.py --agent X --...`    -->\n"
-            "<!-- (Phase 3+ du plan MIGRATION-PLAN, non encore câblé au          -->\n"
-            "<!-- pipeline). Traiter ces instructions comme un CONTRAT à         -->\n"
-            "<!-- HONORER (suivre la logique de l'agent nommé) plutôt que        -->\n"
-            "<!-- comme un appel de tool mécanique — sinon comportement          -->\n"
-            "<!-- erratique. Sub-agents intra-session Claude = 0 tokens ;        -->\n"
-            "<!-- ici = tokens du LLM cible directement.                         -->\n"
+            "<!-- des tools disponibles ; l'émulation passe par la CLI wrapper : -->\n"
+            "<!--                                                                -->\n"
+            "<!--   python .sdd/python/sdd_scripts/spawn_agent_cli.py \\         -->\n"
+            "<!--       --agent <name>                                           -->\n"
+            "<!--       --task-file <path>   (ou --task \"...\")                 -->\n"
+            "<!--       [--harness codex|gemini-cli|claude-code]                 -->\n"
+            "<!--       [--provider openai|google|anthropic|moonshot]            -->\n"
+            "<!--       [--tier deep|balanced|fast]                              -->\n"
+            "<!--       [--schema-file <path.json>]                              -->\n"
+            "<!--                                                                -->\n"
+            "<!-- Le wrapper renvoie du JSON canonique sur stdout : { ok,        -->\n"
+            "<!-- parsed, raw, error_class, schema_errors, attempts, ... }.      -->\n"
+            "<!-- Voir .sdd/python/sdd_lib/spawn_agent.py (isolation cwd,        -->\n"
+            "<!-- parallélisme borné à MaxParallel, retry-on-schema-fail).       -->\n"
+            "<!-- Sub-agents intra-session Claude = 0 tokens ; ici = tokens du   -->\n"
+            "<!-- LLM cible directement + coût réseau.                           -->\n"
             "<!-- ============================================================ -->\n"
             "<!-- Arguments SDD passés via $ARGUMENTS (ex. numéro de FEAT). -->\n\n"
             "Arguments: $ARGUMENTS\n\n"
@@ -721,6 +729,11 @@ class CodexAdapter(_MemoryVariantAdapter):
         auth_env = desc.get("auth_env", "OPENAI_API_KEY")
         tier_map = desc.get("tier_map") or {}
         model = tier_map.get("balanced") or tier_map.get("deep") or "<modèle — à valider>"
+        # audit 2026-07-26 R5/m2 — restrict `sandbox_workspace_write` writable
+        # roots so `workspace/stack/stack.md` (secrets in clear text) is
+        # effectively read-only to Codex sub-agents. Without this, the sandbox
+        # `workspace-write` mode allowed writes to every path under workspace/
+        # including the credentials file.
         content = (
             "# GENERATED FROM .sdd/ — DO NOT EDIT\n"
             f"# Combo harnais=codex x provider={self._provider}. IDs/endpoints "
@@ -729,6 +742,24 @@ class CodexAdapter(_MemoryVariantAdapter):
             f"model_provider = {_toml_basic_string(self._provider)}\n"
             'approval_policy = "on-failure"\n'
             'sandbox_mode = "workspace-write"\n'
+            "\n"
+            "# Restrict writable roots to code + spec output paths only.\n"
+            "# `workspace/stack/` (secrets), `.sdd/`, `.claude/`, `.codex/`,\n"
+            "# `.gemini/` (framework façades) are intentionally NOT listed →\n"
+            "# reads allowed, writes denied by the sandbox. Audit R5/m2 2026-07-26.\n"
+            "[sandbox_workspace_write]\n"
+            "writable_roots = [\n"
+            '  "workspace/src",\n'
+            '  "workspace/feats",\n'
+            '  "workspace/us",\n'
+            '  "workspace/plans",\n'
+            '  "workspace/qa",\n'
+            '  "workspace/docs",\n'
+            '  "workspace/ui",\n'
+            '  "workspace/.sys",\n'
+            '  "workspace/discovery",\n'
+            "]\n"
+            "network_access = false\n"
             "\n"
             f"[model_providers.{self._provider}]\n"
             f"name = {_toml_basic_string(self._provider)}\n"
@@ -762,11 +793,16 @@ class GeminiAdapter(_MemoryVariantAdapter):
         prompt = (
             f"<!-- GENERATED FROM .sdd/ (commande /{name}) — DO NOT EDIT. -->\n"
             "<!-- IMPORTANT — Les instructions `Task(subagent_type=X)` / `Agent(X)` -->\n"
-            "<!-- du corps sont Claude-Code-native. Sous Gemini CLI, elles seront -->\n"
-            "<!-- émulées par `python .sdd/python/sdd_lib/spawn_agent.py --agent X` -->\n"
-            "<!-- (Phase 3+ du plan MIGRATION). En attendant : traiter comme un -->\n"
-            "<!-- CONTRAT à honorer par le LLM (suivre la logique de l'agent nommé) -->\n"
-            "<!-- plutôt que comme un appel de tool mécanique. -->\n"
+            "<!-- du corps sont Claude-Code-native. Sous Gemini CLI, l'émulation   -->\n"
+            "<!-- passe par la CLI wrapper (audit R4 2026-07-26) :                 -->\n"
+            "<!--                                                                  -->\n"
+            "<!--   python .sdd/python/sdd_scripts/spawn_agent_cli.py \\           -->\n"
+            "<!--       --agent <name> --task-file <path>                          -->\n"
+            "<!--       [--harness gemini-cli] [--provider google]                 -->\n"
+            "<!--                                                                  -->\n"
+            "<!-- Le wrapper renvoie du JSON canonique sur stdout (ok, parsed,     -->\n"
+            "<!-- raw, error_class, attempts, ...). Voir spawn_agent.py pour       -->\n"
+            "<!-- isolation cwd, parallélisme borné, retry-on-schema-fail.         -->\n"
             "Arguments: {{args}}\n\n" + body
         )
         return (

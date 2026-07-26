@@ -21,6 +21,15 @@ capabilities:
   structured_output_fidelity: unknown   # à mesurer au conformance run (§10) avant tout SLA
   tool_calling: anthropic-compat
   prompt_caching: none
+telemetry:
+  # Audit R5 2026-07-26 — Moonshot (Kimi) retention policy is not publicly
+  # documented at the time of writing. Absence of a no-log contract must
+  # be treated as "unknown = assume retained". Consumed by
+  # preflight_secret_scan (moonshot is flagged as leak-risk provider).
+  default_retention_days: unknown
+  optout_available: unknown
+  optout_mechanism: "Undocumented — request from Moonshot support before sending secrets"
+  reference_url: "https://platform.moonshot.ai/"
 pricing:                 # USD per million tokens — défauts retenus 2026-07-26, valider au conformance run (§10)
   # Placeholders (Kimi K3 nouveau, tarifs officiels à re-vérifier au
   # câblage). Cache non-supporté (`prompt_caching: none`) — cache_read/

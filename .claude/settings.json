@@ -62,8 +62,6 @@
       "Bash(python .sdd/harness_build.py --harness codex --provider anthropic --out .sdd/.build/codex --agents-only --commands-only --memory-only --rules-only)",
       "Bash(python .sdd/harness_build.py --harness codex --provider anthropic --out .sdd/.build/codex --commands-only --memory-only)",
       "Bash(python .sdd/harness_build.py --harness gemini-cli --provider anthropic --out .sdd/.build/gemini --commands-only --memory-only)",
-      "Bash(SDD_ALLOW_UNTESTED_HARNESS=1 python .sdd/harness_build.py --harness codex --provider anthropic --out .sdd/.build/codex --commands-only --memory-only --deploy)",
-      "Bash(SDD_ALLOW_UNTESTED_HARNESS=1 python .sdd/harness_build.py --harness gemini-cli --provider anthropic --out .sdd/.build/gemini --commands-only --memory-only --deploy)",
       "Bash(python -m pytest tests/test_no_hardcoded_claude_paths.py --tb=short)",
       "Bash(python .sdd/python/sdd_admin/framework_smoke.py)",
       "Bash(python .sdd/harness_build.py --harness claude-code --provider anthropic --out .sdd/.build/claude --agents-only --commands-only)",
@@ -125,6 +123,10 @@
           {
             "type": "command",
             "command": "python -c \"import os,sys,pathlib; r=os.environ.get('CLAUDE_PROJECT_DIR') or next((str(p) for p in [pathlib.Path.cwd()]+list(pathlib.Path.cwd().parents) if (p/'.claude').is_dir()),'.'); sys.path.insert(0,r+'/.sdd/python'); import _hook; _hook.run('sdd_hooks.preflight_cost_cap')\""
+          },
+          {
+            "type": "command",
+            "command": "python -c \"import os,sys,pathlib; r=os.environ.get('CLAUDE_PROJECT_DIR') or next((str(p) for p in [pathlib.Path.cwd()]+list(pathlib.Path.cwd().parents) if (p/'.claude').is_dir()),'.'); sys.path.insert(0,r+'/.sdd/python'); import _hook; _hook.run('sdd_hooks.preflight_secret_scan')\""
           },
           {
             "type": "command",

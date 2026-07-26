@@ -2,7 +2,7 @@
 > **GENERATED — do not edit.** Slice of `@.claude/rules/error-classification.md` for the `arch-reviewer` agent (audit 2026-06-12, block 5). Regenerate via `python .sdd/python/sdd_admin/sync_error_class_digests.py`.
 >
 > Contains the §0 quick-ref (full 16-family map) + this agent's families + the universal format/loop sections. For a class OUTSIDE this slice, §0 names its family — Read the full file on-demand (rule `build-and-loop.md §8`).
-## 0. Quick reference — 16 familles (189 classes)
+## 0. Quick reference — 16 familles (191 classes)
 
 | # | Famille | Classes | Émetteur principal | Comportement build_loop |
 |---|---|---:|---|---|
@@ -19,7 +19,7 @@
 | §1.11 | **Security** (`[SEC_*]`) — OWASP Top 10 2021 | 23 | security-reviewer | report only + 8 hard-blocking |
 | §1.12 | **Perf** (`[PERF_*]`) — héritage, réactivé via `ingest_lighthouse.py` | 16 | CI ingest | report only |
 | §1.13 | **Spec Compliance** (`[SPEC_*]`) — AC-by-AC verification | 9 | spec-compliance-reviewer | report only |
-| §1.14 | **Tooling/Governance** (`[SCAN_*]`/`[DISCOVER_*]`/`[CHECKPOINT_*]`/`[CONFIG_*]`/`[PROFILE_*]`/`[DRIFT_*]`/`[ARCH_*]`/`[REVIEW_*]`/`[STACK_COMBO_*]`/`[FRAMEWORK_PROTECTED]`/`[ENV_BYPASS_BLOCKED]`/hooks préflight) | 32 | scripts mono-shot + hooks | mostly info, qq. bloquantes |
+| §1.14 | **Tooling/Governance** (`[SCAN_*]`/`[DISCOVER_*]`/`[CHECKPOINT_*]`/`[CONFIG_*]`/`[PROFILE_*]`/`[DRIFT_*]`/`[ARCH_*]`/`[REVIEW_*]`/`[STACK_COMBO_*]`/`[FRAMEWORK_PROTECTED]`/`[ENV_BYPASS_BLOCKED]`/`[PRICING_UNKNOWN]`/`[SECRET_PROVIDER_LEAK_RISK]`/hooks préflight) | 34 | scripts mono-shot + hooks | mostly info, qq. bloquantes |
 | §1.15 | **Adversarial** (`[ADV_*]`) — opt-in `/sdd-review --adversarial` | 6 | adversarial-reviewer | informational |
 | §1.16 | **Inconnue** (`[UNKNOWN]`) | 1 | fallback | report only |
 
@@ -124,6 +124,8 @@ pour la réciprocité émetteurs↔taxonomie, audit 2026-06-12) :
 | `[ENV_BYPASS_BLOCKED]` | Tentative de bypass d'une protection via env var interdite | OUI (hook `block_env_bypass`) |
 | `[GLOB_SCOPE_TOO_BROAD]` | Glob non borné (token explosion) | WARN (strict via `SDD_GLOB_SCOPE_STRICT=1`, hook `preflight_glob_scope`) |
 | `[TELEMETRY_UNAVAILABLE]` | `console.db` télémétrie indisponible au precheck coût | info, fail-open (hook `preflight_cost_cap`) |
+| `[PRICING_UNKNOWN]` | Modèle sans pricing connu (ni canonical `pricing.py` ni provider YAML) — coût cappé sur `FALLBACK_PRICING` Sonnet, risque under-count 5× | OUI en CI, WARN interactif (hook `preflight_cost_cap`, audit R2 2026-07-26). Bypass : `SDD_ALLOW_UNKNOWN_PRICING=1` |
+| `[SECRET_PROVIDER_LEAK_RISK]` | Secrets détectés dans `workspace/stack/stack.md` alors que provider actif est non-Anthropic (retention par défaut : OpenAI 30j, Google 55j, Moonshot inconnu) | WARN (jamais bloquant — hook `preflight_secret_scan`, audit R5 2026-07-26). Bypass : `SDD_ALLOW_SECRET_TO_PROVIDER=1` |
 | `[AGENT_REMOVED_V7]` | Spawn d'un agent retiré en v7.0.0 (a11y/perf/dashboard/*-strict) | OUI (hook `preflight_agent_budget`) |
 | `[BUDGET_PRECHECK_TIMEOUT]` | Timeout du precheck budget agent | info, fail-open (hook `preflight_agent_budget`) |
 
