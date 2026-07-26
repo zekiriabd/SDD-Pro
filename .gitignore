@@ -41,8 +41,9 @@
 .claude/commands/
 .claude/rules/
 .claude/CLAUDE.md
-.codex/
-.gemini/
+# .codex/ et .gemini/ sont COMMITÉS — façades multi-harness versionnées pour
+# que Codex et Gemini CLI fonctionnent out-of-the-box après git clone.
+# Seul .claude/ reste gitignored (régénéré par session_start hook Claude Code).
 
 # Workspace runtime SDD (scaffolding, secrets, projets générés) — jamais commité.
 # stack.md porte DB_PASSWORD / AUTH_JWT_SECRET en clair (CLAUDE.md §9), les

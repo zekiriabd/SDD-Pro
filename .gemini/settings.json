@@ -1,0 +1,13 @@
+{
+  "_generated": "FROM .sdd/ — DO NOT EDIT — IDs à valider (providers/*.yaml)",
+  "harness": "gemini-cli",
+  "provider": "google",
+  "model": {
+    "name": "gemini-2.5-flash"
+  },
+  "security": {
+    "auth": {
+      "env": "GEMINI_API_KEY"
+    }
+  }
+}

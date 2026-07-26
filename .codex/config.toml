@@ -1,0 +1,29 @@
+# GENERATED FROM .sdd/ — DO NOT EDIT
+# Combo harnais=codex x provider=anthropic. IDs/endpoints « à valider » (providers/*.yaml) ; conformance run requis avant SLA.
+model = "claude-sonnet-4-6"
+model_provider = "anthropic"
+approval_policy = "on-failure"
+sandbox_mode = "workspace-write"
+
+# Restrict writable roots to code + spec output paths only.
+# `workspace/stack/` (secrets), `.sdd/`, `.claude/`, `.codex/`,
+# `.gemini/` (framework façades) are intentionally NOT listed →
+# reads allowed, writes denied by the sandbox. Audit R5/m2 2026-07-26.
+[sandbox_workspace_write]
+writable_roots = [
+  "workspace/src",
+  "workspace/feats",
+  "workspace/us",
+  "workspace/plans",
+  "workspace/qa",
+  "workspace/docs",
+  "workspace/ui",
+  "workspace/.sys",
+  "workspace/discovery",
+]
+network_access = false
+
+[model_providers.anthropic]
+name = "anthropic"
+base_url = "<base_url OpenAI-compat — à renseigner>"
+env_key = "ANTHROPIC_API_KEY"
