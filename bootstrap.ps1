@@ -39,7 +39,7 @@
 [CmdletBinding()]
 param(
     # MI-6 fix (audit 2026-06-09) — SSoT is combos.json (C1..C13). Was stale
-    # at c1..c5. Aligned with .claude/templates/combos.json + bootstrap.py.
+    # at c1..c5. Aligned with .sdd/templates/combos.json + bootstrap.py.
     [ValidateSet('c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9', 'c10', 'c11', 'c12', 'c13', 'custom')]
     [string]$Combo,
 

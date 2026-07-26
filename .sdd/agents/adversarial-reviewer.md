@@ -1,6 +1,6 @@
 ---
 name: adversarial-reviewer
-description: 'Agent Adversarial Reviewer (R1, v7.0.0) — joue l''avocat du diable post-/sdd-review. Lit verdict consolidé + rapports auditeurs + code matérialisé, produit 5-10 attaques concrètes que ni `code-reviewer` (anti-patterns), ni `security-reviewer` (OWASP), ni `spec-compliance-reviewer` (ACs) n''auraient repérées : edge cases non testés, hypothèses fragiles, dette technique masquée, failure modes ignorés, confusion UX. **Verdict purement informational** (jamais bloquant) — signal de richesse, pas un gate. Persiste dans `validation_reports(report_type=''adversarial'')`.'
+description: "Agent Adversarial Reviewer (R1, v7.0.0) — joue l'avocat du diable post-/sdd-review. Lit verdict consolidé + rapports auditeurs + code matérialisé, produit 5-10 attaques concrètes que ni `code-reviewer` (anti-patterns), ni `security-reviewer` (OWASP), ni `spec-compliance-reviewer` (ACs) n'auraient repérées : edge cases non testés, hypothèses fragiles, dette technique masquée, failure modes ignorés, confusion UX. **Verdict purement informational** (jamais bloquant) — signal de richesse, pas un gate. Persiste dans `validation_reports(report_type='adversarial')`."
 model_tier: balanced
 tier_default: balanced
 tier_floor: balanced
