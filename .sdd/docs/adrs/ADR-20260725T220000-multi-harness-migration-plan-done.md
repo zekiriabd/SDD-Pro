@@ -1,10 +1,35 @@
-# PLAN DE MIGRATION — SDD-Pro multi-harnais & multi-provider
+# ADR — Multi-harness & multi-provider migration (PLAN ARCHIVED / DONE)
 
-> **Statut** : PLAN (aucune implémentation). Rédigé le 2026-07-24.
-> **Périmètre** : framework SDD-Pro v7.0.0 GA (`g:/Developement/Transfo/sdd-pro`).
-> **Baseline de non-régression** : bench CalcABC — 21 déclinaisons sous
-> `G:/Developement/IA/SDD/SDD-Pro/workspace/output/src/` (.NET, Node,
-> Python, Blazor, Angular, Nuxt, Next.js, Vue, React Native, MAUI, Android…).
+> **Statut** : ✅ **COMPLETED 2026-07-26** (archivé depuis
+> `MIGRATION-PLAN-multi-harness-multi-provider.md` racine).
+>
+> **Ce document est conservé comme trace historique du plan initial** —
+> ne pas éditer pour spécifier de nouvelles décisions. Pour toute évolution
+> multi-harness/multi-provider, créer un NOUVEL ADR sous
+> `.sdd/docs/adrs/ADR-{timestamp}-{decision}.md`.
+>
+> ## Statut de réalisation par item du plan
+> - ✅ Foyer neutre `.sdd/` en place (agents/, commands/, rules/, docs/, python/, providers/, stacks/, templates/).
+> - ✅ Façades jetables `.claude/`, `.codex/`, `.gemini/` régénérables via `.sdd/harness_build.py`.
+> - ✅ Abstraction `model_tier: deep|balanced|fast` déployée sur les 25 pivots agents.
+> - ✅ 4 providers YAML (`anthropic`, `openai`, `google`, `moonshot`).
+> - ✅ Bi-root paths (`sdd_lib/paths.py::sdd_home()`).
+> - ✅ Suppression du shim `.claude/python/` (commit `44a6509`).
+> - ✅ 5 fixes d'audit post-migration (commits `ca4b015..38f5401`) : bug
+>   `_MemoryVariantAdapter._command_pivots` `.cmd.yaml→.md`, purge
+>   `.claude/python` résiduels dans 21 fichiers, alignement chiffres
+>   entrypoint-body.md (188→189 err, 38→40 cmd, 23→25 agents, 35→36 stacks),
+>   `_rewrite_at_includes` brace-safe, config-keys test bi-root.
+>
+> ## Statut backlog (non couvert par la migration initiale)
+> - ⏳ Câblage `spawn_agent.py` aux prompts Codex/Gemini (Phase 3+).
+> - ⏳ Gate CI byte-strict harness-parity (invariant #14 — voir `.sdd/INVARIANTS.yml`).
+> - ⏳ Fixture FEAT `1-CalcABC.md` sous `.sdd/experiments/conformance/feats/`.
+> - ⏳ Tests unitaires `conformance_run.py` (0 test à date).
+>
+> **Périmètre initial** : framework SDD-Pro v7.0.0 GA.
+> **Baseline de non-régression** : bench CalcABC — 21 déclinaisons.
+> **Plan rédigé** : 2026-07-24. **Migration close** : 2026-07-26.
 
 ---
 
