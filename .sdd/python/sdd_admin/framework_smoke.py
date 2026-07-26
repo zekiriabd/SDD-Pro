@@ -568,7 +568,10 @@ def _check_harness_parity(claude_root: Path, checks: "Checks") -> None:
         ("gemini-cli", "google", 40, None),
     ]
 
-    with tempfile.TemporaryDirectory(prefix="sdd-harness-smoke-", dir=str(sdd_root / ".build")) as tmp:
+    build_dir = sdd_root / ".build"
+    build_dir.mkdir(parents=True, exist_ok=True)
+
+    with tempfile.TemporaryDirectory(prefix="sdd-harness-smoke-", dir=str(build_dir)) as tmp:
         tmp_root = Path(tmp)
         failures: list[str] = []
         for harness, provider, min_cmds, min_agents in harnesses:
