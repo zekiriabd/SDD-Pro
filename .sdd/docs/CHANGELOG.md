@@ -4,6 +4,117 @@ Format : [version] — date courte. Sections : `Breaking`, `Added`, `Changed`, `
 
 ---
 
+## [v7.0.2-dev] — 2026-07-26 (branche `refactor/sdd-move-common` — post-migration audit)
+
+> Audit consolidé 8 rounds / 19 commits atomiques sur `main` (fast-forward
+> `275c571..f30cfd1`). Périmètre : fermer la dette accumulée après la
+> migration `.claude/` → `.sdd/` (Phase 2 identity + Batch A/B/C, commits
+> `d17b280..46726e3`) et **rendre honnête** la promesse multi-harness/
+> multi-provider apportée par `feat(multi-llm) conformance_run.py` (`659f9aa`).
+
+### Fixed (Bloquants)
+- **R1** — `_MemoryVariantAdapter._command_pivots()` cherchait `*.cmd.yaml`
+  obsolète → `*.md` consolidé. Débloque toute régénération Codex/Gemini
+  (`test_harness_codex_gemini` : 6 fail → 24 OK).
+- **R2** — 7 snippets `python -c "sys.path.insert(0, '.claude/python')"`
+  live dans agents/commands + 14 docs → `.sdd/python`. Retire crash
+  silencieux `/sdd-full` + `/sdd-reverse-*` post-suppression du shim.
+- **R7** — `_rewrite_at_includes` : brace-expansion `{a,b,c}.md` cassait
+  le check `Path.exists()` → fallback silencieux `.claude/docs/` (dead
+  répertoire). Fix : expansion des braces + fallback foyer neutre `.sdd/`
+  jamais `.claude/`.
+- **C4** — Mapping provider par défaut par harnais (codex→openai,
+  gemini-cli→google, antigravity→google). Anthropic n'expose pas
+  d'endpoint OpenAI-compat → défaut `codex×anthropic` générait
+  `config.toml` non-démarrable.
+
+### Fixed (Tests smoke rouges)
+- **R4** — `[CONFORMANCE_INFRA_BLOCKED]` (classe orpheline) → `[INFRA_BLOCKED]`
+  (existante taxonomie §1.1). Ferme `test_error_classification_reciprocity`.
+- **R5** — `test_config_all_keys_consumed` scannait `.claude/` (vide
+  post-migration) → `sdd_home()` bi-root. Débloque 6 « orphan keys »
+  faussement positives.
+- **framework_smoke** — `_fingerprint()` bug bi-root (`Path.relative_to`
+  échouait sur `.sdd/rules/*` vs `.claude/agents/`) → repo_root parent
+  commun. `validate_stack_md_headers._check_stack_md_headers` bug shadowing
+  local `stacks_dir` → UnboundLocalError. `expected_yellow` 7→8 (recount
+  delphi-fmx). `expected_total` 35→36.
+
+### Added
+- **`sdd_lib/ingest_common.py`** (S3 scopé) — 4 helpers extraits (SEVERITY_RANK,
+  DEFAULT_THRESHOLD, `emit_error_block`, `compute_verdict`) partagés entre
+  `ingest_axe` + `ingest_lighthouse`. Scope explicitement limité au Group B
+  (JSON tool → qa_*) — Group A (markdown → DB) et Group C (agent reports)
+  restent isolés (patterns différents, éviter leaky abstraction).
+- **Invariant #14 `harness-parity`** (INVARIANTS.yml) — façades = régénérations
+  byte-identiques de `.sdd/` HEAD. Triple-enforced : `.gitignore`
+  (façades non-versionnables) + 82 tests pytest `test_harness_*` + check
+  #20 `_check_harness_parity` de `framework_smoke.py` (S2).
+- **Fixture CalcABC** (`.sdd/experiments/conformance/feats/1-CalcABC.md`
+  + `stack.md.fixture`) — baseline non-régression pour `conformance_run.py`.
+  Calculette web minimale, 4 opérateurs, 7 AC testables, combo C1.
+- **`pricing:` sections** dans les 4 providers YAML (anthropic miroir
+  `pricing.py`, openai/google/moonshot placeholders à valider §10). Retire
+  warning `[TELEMETRY_UNAVAILABLE]` fail-open à chaque harness_build.
+- **Tests unitaires** : `test_conformance_run_unit.py` (M7 audit — **38
+  tests** couvrant constantes SSoT, parsing CLI, verdict, dispatch,
+  adapter, dataclasses, main E2E dry-run) + `test_ingest_common_unit.py`
+  (15 tests) + 3 tests nouveaux dans `test_harness_codex_gemini.py`
+  (filter tools per harness, R9).
+- **`preflight_reverse_gate.py`** câblé dans `.claude/settings.json`
+  matcher Skill (R13 — hook testé mais non-wiré depuis audit M1-reverse
+  2026-06-12 ; désormais opérant runtime).
+- **`specbook-writer` + `[SPECBOOK]` label** ajoutés à ALIVE_AGENTS_V7 +
+  INVARIANTS.yml + output-protocol.md §3/§11 (R15 — réconciliation
+  3 SSoT divergents sur count 12→13 LLM agents).
+
+### Changed
+- **`.sdd/entrypoint-body.md`** aligné sur la réalité disque (R3+M5) :
+  40 commandes (13+9+18), 25 agents (13+12), 189 erreurs, 36 stacks
+  (28🟢+8🟡), 13 skills. Refs `@.claude/loader.yml` +
+  `@.claude/INVARIANTS.yml` → `@.sdd/…`. Propage vers CLAUDE.md/AGENTS.md/
+  GEMINI.md via harness_build.
+- **`_MemoryVariantAdapter._filter_tools_for_harness`** (R9) — filtre les
+  tools Claude-Code-only (`Skill`, `AskUserQuestion`) au niveau adapter
+  quand émission agents-file Phase 3+ activée. `ClaudeAdapter` inchangé
+  (no-op no-regression).
+- **Codex/Gemini/Antigravity `_render_command`** (R10-lite) — header d'avertissement
+  explicite (12 lignes) sur les instructions `Task(subagent_type=X)`/
+  `Agent(X)` du corps qui sont Claude-Code-native. Traiter comme contrat
+  à honorer par le LLM cible, pas comme appel de tool mécanique.
+
+### Removed / Archived
+- **`MIGRATION-PLAN-multi-harness-multi-provider.md` racine** (55 KB) →
+  archivé sous `.sdd/docs/adrs/ADR-20260725T220000-multi-harness-migration-plan-done.md`
+  avec préambule COMPLETED 2026-07-26 + statut détaillé (7 items ✅,
+  4 items backlog ⏳).
+- **6 permissions mortes** `.claude/settings.json` référençant
+  `.claude/python/` post-suppression du shim.
+- **4 entrées `.gitignore`** pointant `.claude/python/**` → `.sdd/python/**`.
+
+### Providers
+- **`openai.yaml`** — modèle halluciné `gpt-5.6-sol` → réels
+  (`o1` deep / `gpt-4o` balanced / `gpt-4o-mini` fast).
+- **4 providers** enrichis de sections `pricing:` (voir Added).
+
+### Progression tests
+- pytest smoke : 236 OK / 3 FAIL → **292 OK / 0 FAIL** (+68 nouveaux tests
+  couvrant conformance_run + ingest_common + harness filter).
+- framework_smoke.py : 95 OK / 3 WARN / 1 FAIL → **98 OK / 2 WARN / 0 FAIL**
+  (100 checks totaux, +1 nouveau `harness-parity`).
+- Invariants manifest : 13 → **14** entrées (ajout `harness-parity`).
+
+### Items backlog (non-couverts par cet audit — décisions produit requises)
+- **S1** — Câblage effectif `spawn_agent.py` au pipeline Codex/Gemini
+  (chantier ≥ 1 jour, Phase 3+ MIGRATION-PLAN, impact architectural).
+- **S4** — Décision structurelle `.claude/settings.json` (façade jetable
+  OU enforcer versionné — requiert Tech Lead call).
+- **m1** — `AGENTS.md` racine stub (générer OU supprimer — cosmétique).
+- **m2** — 6 descriptions agents > 500 chars (compression opt-in, faible ROI).
+- **m4** — `agent-bounds.yaml scaffolding-phase-0` (lié à S1).
+
+---
+
 > ## ✅ FREEZE WINDOW CLOSE — v7.0.0 GA atteinte (2026-06-07)
 >
 > La fenêtre de freeze pré-GA (2026-05-19 → 2026-06-18, **v6.10.4-LTS**,
