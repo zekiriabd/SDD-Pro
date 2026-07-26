@@ -55,16 +55,19 @@ from sdd_lib.console_safe import ensure_console_safe
 # Validation badges allowed in v7.0.0 — drift detector for typos
 VALID_BADGES = ("🟢", "🟡", "🔴")
 
-# MA-10 gate (audit 2026-06-09) — expected SPLIT of the 35 active stacks by
-# Validation badge. The total (35) was already gated ; this adds the split so
-# that silently flipping a stack 🟢→🟡 (or vice-versa) is caught.
+# MA-10 gate (audit 2026-06-09, recount 2026-07-25) — expected SPLIT of the
+# 36 active stacks by Validation badge. Le total (36) est gaté par
+# `framework_smoke.py::_check_stack_md_headers::expected_total` ; ce split
+# ajoute la vérif catégorielle pour que tout flip silencieux 🟢→🟡 (ou
+# vice-versa) soit détecté.
 #   🟢 = validated / bench-validated / scaffold-validated  → 28 stacks
-#   🟡 = experimental / POC-only                           → 7 stacks
-# SSoT : CLAUDE.md §6 + each stack's `Validation:` header. Bump these two
-# constants (keeping their sum == 35) whenever a stack is intentionally
-# promoted or demoted.
+#   🟡 = experimental / POC-only / scaffold-validated       → 8 stacks
+#        (dont mobiles/delphi-fmx 2026-06-21 + mobiles/kotlin-android downgrade)
+# SSoT : entrypoint-body.md §6 + each stack's `Validation:` header. Bump
+# these two constants (keeping their sum aligned avec `expected_total` de
+# framework_smoke.py) whenever a stack is intentionally promoted or demoted.
 EXPECTED_GREEN = 28  # 🟢 stacks
-EXPECTED_YELLOW = 7  # 🟡 stacks
+EXPECTED_YELLOW = 8  # 🟡 stacks (recount 2026-07-25 : ajout delphi-fmx)
 
 # v7.0.0-alpha (audit MIN-10, 2026-06-04) — `Validation:` header has 3
 # coexisting syntaxes observed in the wild :
@@ -85,12 +88,14 @@ def find_stack_files(repo: Path) -> list[Path]:
     subdirectories are considered active since the v7.0.0+ rollback of
     the _drafts/ quarantine mechanism.
     """
-    stacks_dir = stacks_dir(repo)
-    if not stacks_dir.is_dir():
+    # NOTE : renommer la variable locale pour ne pas shadow l'import
+    # `sdd_lib.paths.stacks_dir` (UnboundLocalError sinon — bug 2026-06-11).
+    root = stacks_dir(repo)
+    if not root.is_dir():
         return []
     out: list[Path] = []
-    for p in sorted(stacks_dir.glob("**/*.md")):
-        if p.parent == stacks_dir:
+    for p in sorted(root.glob("**/*.md")):
+        if p.parent == root:
             continue
         out.append(p)
     return out
