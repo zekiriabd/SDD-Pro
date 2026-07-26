@@ -538,6 +538,99 @@ def _check_adr_naming(claude_root: Path, checks: "Checks") -> None:
                    f"validate_adr_naming invocation failed: {e}")
 
 
+def _check_harness_parity(claude_root: Path, checks: "Checks") -> None:
+    """#20 harness-parity smoke (invariant #14, audit S2 2026-07-26).
+
+    Régénère les 3 harnesses (claude-code, codex, gemini-cli) dans un tempdir
+    et vérifie :
+      - `harness_build.py --harness X` exit 0 pour X ∈ {claude-code, codex, gemini-cli} ;
+      - Chaque façade émise contient bien le nombre attendu de commandes
+        (40) et, pour Claude, d'agents (25) ;
+      - Aucun dead-ref `.claude/docs/` dans le fichier mémoire régénéré
+        (contre-régression pour le bug `_rewrite_at_includes` fixé R7).
+
+    Coût typique : ~2-3s (transpilation pure, aucun réseau). Fail-open sur
+    erreurs infra (harness_build absent, tempdir illisible) — cette check
+    est utile pour attraper le drift, pas pour bloquer un dev en local.
+    """
+    import tempfile
+
+    from sdd_lib.paths import sdd_home as _sdd_home
+    sdd_root = _sdd_home(claude_root.parent)
+    harness_build = sdd_root / "harness_build.py"
+    if not harness_build.is_file():
+        return  # module absent → noop silencieux
+
+    harnesses = [
+        # (nom, provider_par_défaut, min_commandes, min_agents_ou_None)
+        ("claude-code", "anthropic", 40, 25),
+        ("codex", "openai", 40, None),
+        ("gemini-cli", "google", 40, None),
+    ]
+
+    with tempfile.TemporaryDirectory(prefix="sdd-harness-smoke-", dir=str(sdd_root / ".build")) as tmp:
+        tmp_root = Path(tmp)
+        failures: list[str] = []
+        for harness, provider, min_cmds, min_agents in harnesses:
+            out_dir = tmp_root / harness
+            args = [
+                sys.executable, str(harness_build),
+                "--harness", harness,
+                "--provider", provider,
+                "--commands-only", "--memory-only",
+                "--out", str(out_dir),
+            ]
+            if min_agents is not None:
+                args.insert(-2, "--agents-only")
+            try:
+                res = subprocess.run(
+                    args, cwd=str(claude_root.parent),
+                    capture_output=True, text=True, encoding="utf-8",
+                    errors="replace", timeout=30,
+                )
+            except (OSError, subprocess.TimeoutExpired) as exc:
+                failures.append(f"{harness}: invocation error {exc}")
+                continue
+            if res.returncode != 0:
+                stderr = (res.stderr or "").strip().splitlines()
+                last = stderr[-1] if stderr else "no stderr"
+                failures.append(f"{harness}: exit {res.returncode} ({last[:100]})")
+                continue
+
+            # Count emitted commands (subdir varies : Claude=commands, Codex=prompts, Gemini=commands).
+            cmd_subdir = {"claude-code": "commands", "codex": "prompts", "gemini-cli": "commands"}[harness]
+            cmd_ext = {"claude-code": "*.md", "codex": "*.md", "gemini-cli": "*.toml"}[harness]
+            n_cmds = len(list((out_dir / cmd_subdir).glob(cmd_ext))) if (out_dir / cmd_subdir).is_dir() else 0
+            if n_cmds < min_cmds:
+                failures.append(f"{harness}: only {n_cmds}/{min_cmds} commands emitted")
+                continue
+
+            if min_agents is not None:
+                n_agents = len(list((out_dir / "agents").glob("*.md"))) if (out_dir / "agents").is_dir() else 0
+                if n_agents < min_agents:
+                    failures.append(f"{harness}: only {n_agents}/{min_agents} agents emitted")
+                    continue
+
+            # Dead-ref anti-regression : `.claude/docs/` must NEVER appear in memory files.
+            memory_name = {"claude-code": "CLAUDE.md", "codex": "AGENTS.md", "gemini-cli": "GEMINI.md"}[harness]
+            memory_file = out_dir / memory_name
+            if memory_file.is_file():
+                text = memory_file.read_text(encoding="utf-8", errors="replace")
+                if ".claude/docs/" in text:
+                    failures.append(f"{harness}: dead ref `.claude/docs/` in {memory_name}")
+
+        if not failures:
+            checks.add("harness-parity", "OK",
+                       "3 harnesses regenerate cleanly (claude-code + codex + gemini-cli, "
+                       "40 cmd each, 25 agents on Claude, no dead .claude/docs/ refs)")
+        else:
+            detail = "; ".join(failures[:3])
+            more = f" (+ {len(failures) - 3} more)" if len(failures) > 3 else ""
+            checks.add("harness-parity", "FAIL",
+                       f"harness_build regression: {detail}{more}. "
+                       f"Run `python .sdd/harness_build.py --harness <X>` to reproduce.")
+
+
 def _compute_timing(t_start: float, skip_heavy: bool, checks: "Checks") -> None:
     """#11 Self-timing — seuil dépendant du mode (hook Stop strict vs full)."""
     elapsed_ms = (time.perf_counter() - t_start) * 1000
@@ -898,6 +991,7 @@ def main() -> int:
         _check_pytest_smoke(pytests_dir, claude_root, checks)
         _check_stack_md_headers(claude_root, checks)
         _check_adr_naming(claude_root, checks)
+        _check_harness_parity(claude_root, checks)
 
     _compute_timing(t_start, skip_heavy, checks)
     return _emit_report(checks, args, claude_root)
