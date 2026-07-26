@@ -237,3 +237,29 @@ def test_no_dead_sdd_refs_in_emitted_commands(build_dir):
             if not (SDD_HOME / rel).exists():
                 dead.append(f"{md.name}: .sdd/{rel}")
     assert not dead, f"refs .sdd/ mortes émises : {sorted(set(dead))}"
+
+
+@pytest.mark.parametrize("adapter_cls", [CodexAdapter, GeminiAdapter])
+def test_memory_variant_filters_claude_only_tools(adapter_cls):
+    """R9 audit — MemoryVariantAdapter retire les tools Claude-Code-only.
+
+    Sous Codex/Gemini, `Skill` et `AskUserQuestion` n'existent pas au runtime.
+    Un agent qui les référence dans son frontmatter lèverait `ToolNotFoundError`
+    au spawn. La base Adapter les garde (Claude) ; MemoryVariantAdapter les
+    filtre. Vérifié à l'émission Phase 3+ (`emit_agents`) mais le filtre est
+    déjà en place sur la base class."""
+    adapter = adapter_cls(repo_root=REPO_ROOT, provider="moonshot")
+    filtered = adapter._filter_tools_for_harness(
+        ["Read", "Write", "Edit", "Skill", "AskUserQuestion", "Bash"]
+    )
+    assert "Skill" not in filtered
+    assert "AskUserQuestion" not in filtered
+    assert filtered == ["Read", "Write", "Edit", "Bash"]
+
+
+def test_claude_adapter_keeps_all_tools():
+    """R9 audit — ClaudeAdapter garde tools=Skill,AskUserQuestion (natifs)."""
+    from harness_build import ClaudeAdapter  # local import (test-only)
+    adapter = ClaudeAdapter(repo_root=REPO_ROOT, provider="anthropic")
+    tools = ["Read", "Write", "Skill", "AskUserQuestion", "Bash"]
+    assert adapter._filter_tools_for_harness(tools) == tools

@@ -151,6 +151,19 @@ def _split_optional_frontmatter(text: str) -> tuple[dict | None, str]:
         return None, text
 
 
+#: Tools spéciaux natifs Claude Code uniquement — absents des runtimes Codex
+#: et Gemini CLI. Un agent qui les référence sous ces harnais lèverait
+#: `ToolNotFoundError` au runtime. Le pivot `.sdd/agents/*.md` les liste
+#: parce que le harnais historique était Claude ; l'émission MemoryVariant
+#: (Codex/Gemini, future Phase 3+) les filtre via `_filter_tools_for_harness`.
+#:
+#: SSoT décisionnelle : le pivot `.sdd/agents/*.md` reste Claude-annoté ;
+#: la traduction se fait à l'émission par harnais. Étendre au besoin
+#: (`WebSearch`, `WebFetch`, `NotebookEdit`, `ExitPlanMode`, `TodoWrite`
+#: sont aussi Claude-Code-only mais non utilisés par les 25 pivots SDD).
+_CLAUDE_ONLY_TOOLS = frozenset({"Skill", "AskUserQuestion"})
+
+
 class Adapter(ABC):
     """Interface d'un adaptateur harness (cible d'émission du transpileur)."""
 
@@ -158,6 +171,17 @@ class Adapter(ABC):
     @abstractmethod
     def name(self) -> str:
         """Identifiant du harness cible (ex. 'claude-code')."""
+
+    def _filter_tools_for_harness(self, tools: list[str]) -> list[str]:
+        """Filtre les tools Claude-Code-only pour un harnais non-Claude.
+
+        Défaut (base class) : ne filtre rien — override en sous-classe non-Claude.
+        Utilisé par `ClaudeAdapter._emit_one` (no-op, garde tout) et par les
+        futurs `_MemoryVariantAdapter.emit_agents` (Phase 3+) qui filtreront.
+        Anti-régression : un agent qui référence `Skill` sous Codex/Gemini
+        lèverait `ToolNotFoundError` au spawn.
+        """
+        return list(tools)
 
     @abstractmethod
     def emit_agents(self, out_dir: Path) -> list[EmitResult]:
@@ -237,6 +261,9 @@ class ClaudeAdapter(Adapter):
                 f"du provider {self._provider!r}",
             )
 
+        # Filtre les tools selon les capabilities du harnais (audit R9 2026-07-26).
+        # Claude-code garde tout ; Codex/Gemini (Phase 3+) filtrent Skill/AskUserQuestion.
+        tools_list = self._filter_tools_for_harness(tools_list)
         tools_line = ", ".join(tools_list) if tools_list else ""
         frontmatter = compose_frontmatter(
             {
@@ -452,6 +479,11 @@ class _MemoryVariantAdapter(Adapter):
     @property
     def name(self) -> str:
         return self.matrix_key
+
+    def _filter_tools_for_harness(self, tools: list[str]) -> list[str]:
+        """Retire les tools Claude-Code-only (Skill, AskUserQuestion) pour
+        les harnais non-Claude (Codex, Gemini CLI). Émission agents Phase 3+."""
+        return [t for t in tools if t not in _CLAUDE_ONLY_TOOLS]
 
     def emit_agents(self, out_dir: Path) -> list[EmitResult]:
         raise NotImplementedError(
