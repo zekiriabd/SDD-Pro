@@ -683,11 +683,30 @@ class CodexAdapter(_MemoryVariantAdapter):
     command_ext = ".md"
 
     def _render_command(self, name: str, description: str, body: str) -> str:
+        # Codex n'a pas d'équivalent natif à `Task(subagent_type=X)` ni à
+        # `Agent(X)` de Claude Code. Le corps est copié verbatim ; les
+        # instructions de spawn sous-agent qui apparaîtront ci-dessous
+        # doivent être interprétées comme de la GUIDANCE textuelle, pas comme
+        # des appels de tool réels — le wrapper `spawn_agent.py` (Phase 3+)
+        # matérialisera l'invocation quand il sera câblé au pipeline.
         header = (
             f"<!-- GENERATED FROM .sdd/ (commande /{name}) — DO NOT EDIT -->\n"
             f"<!-- {description} -->\n"
-            "<!-- Arguments SDD passés via $ARGUMENTS (ex. numéro de FEAT). "
-            "Sous-agents SDD = émulés par spawn_agent.py (wrapper Codex, Phase 3+). -->\n\n"
+            "<!-- ============================================================ -->\n"
+            "<!-- IMPORTANT — SPAWN SEMANTICS UNDER CODEX (audit R10 2026-07-26) -->\n"
+            "<!-- Toute mention `Task tool (subagent_type=X)`, `Agent(X)`, ou    -->\n"
+            "<!-- « spawn agent X » dans le corps ci-dessous est une INSTRUCTION -->\n"
+            "<!-- Claude-Code-native. Sous Codex/Gemini, ces spawns ne sont PAS  -->\n"
+            "<!-- des tools disponibles ; ils seront émulés par le wrapper       -->\n"
+            "<!-- `python .sdd/python/sdd_lib/spawn_agent.py --agent X --...`    -->\n"
+            "<!-- (Phase 3+ du plan MIGRATION-PLAN, non encore câblé au          -->\n"
+            "<!-- pipeline). Traiter ces instructions comme un CONTRAT à         -->\n"
+            "<!-- HONORER (suivre la logique de l'agent nommé) plutôt que        -->\n"
+            "<!-- comme un appel de tool mécanique — sinon comportement          -->\n"
+            "<!-- erratique. Sub-agents intra-session Claude = 0 tokens ;        -->\n"
+            "<!-- ici = tokens du LLM cible directement.                         -->\n"
+            "<!-- ============================================================ -->\n"
+            "<!-- Arguments SDD passés via $ARGUMENTS (ex. numéro de FEAT). -->\n\n"
             "Arguments: $ARGUMENTS\n\n"
         )
         # Échappe les $1..$9 incidents du corps (awk, caps de coût) — le
@@ -736,9 +755,18 @@ class GeminiAdapter(_MemoryVariantAdapter):
     command_ext = ".toml"
 
     def _render_command(self, name: str, description: str, body: str) -> str:
+        # Gemini CLI n'a pas d'équivalent natif au Task tool Claude Code.
+        # Contrat identique à CodexAdapter : les spawns sous-agent apparaissant
+        # dans le corps sont de la guidance, non des appels de tool réels
+        # (audit R10 2026-07-26 — voir CodexAdapter._render_command).
         prompt = (
-            f"<!-- GENERATED FROM .sdd/ (commande /{name}) — DO NOT EDIT. "
-            "Sous-agents SDD = émulés par spawn_agent.py (wrapper Gemini, Phase 3+). -->\n"
+            f"<!-- GENERATED FROM .sdd/ (commande /{name}) — DO NOT EDIT. -->\n"
+            "<!-- IMPORTANT — Les instructions `Task(subagent_type=X)` / `Agent(X)` -->\n"
+            "<!-- du corps sont Claude-Code-native. Sous Gemini CLI, elles seront -->\n"
+            "<!-- émulées par `python .sdd/python/sdd_lib/spawn_agent.py --agent X` -->\n"
+            "<!-- (Phase 3+ du plan MIGRATION). En attendant : traiter comme un -->\n"
+            "<!-- CONTRAT à honorer par le LLM (suivre la logique de l'agent nommé) -->\n"
+            "<!-- plutôt que comme un appel de tool mécanique. -->\n"
             "Arguments: {{args}}\n\n" + body
         )
         return (
@@ -784,9 +812,15 @@ class AntigravityAdapter(_MemoryVariantAdapter):
     command_ext = ".toml"
 
     def _render_command(self, name: str, description: str, body: str) -> str:
+        # Antigravity : même contrat que Gemini CLI (audit R10 2026-07-26).
         prompt = (
-            f"<!-- GENERATED FROM .sdd/ (commande /{name}) — DO NOT EDIT. "
-            "Sous-agents SDD = émulés par spawn_agent.py (wrapper Antigravity). -->\n"
+            f"<!-- GENERATED FROM .sdd/ (commande /{name}) — DO NOT EDIT. -->\n"
+            "<!-- IMPORTANT — Les instructions `Task(subagent_type=X)` / `Agent(X)` -->\n"
+            "<!-- du corps sont Claude-Code-native. Sous Antigravity, elles seront -->\n"
+            "<!-- émulées par `python .sdd/python/sdd_lib/spawn_agent.py --agent X` -->\n"
+            "<!-- (Phase 3+ du plan MIGRATION). En attendant : traiter comme un -->\n"
+            "<!-- CONTRAT à honorer par le LLM (suivre la logique de l'agent nommé) -->\n"
+            "<!-- plutôt que comme un appel de tool mécanique. -->\n"
             "Arguments: {{args}}\n\n" + body
         )
         return (
