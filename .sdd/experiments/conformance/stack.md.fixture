@@ -1,0 +1,65 @@
+# Project Stack — CalcABC fixture (conformance run baseline)
+#
+# Fixture minimale utilisée par `.sdd/python/sdd_scripts/conformance_run.py`
+# pour valider un combo `harnais × provider` sans dépendre d'un projet
+# utilisateur. Correspond au combo de référence **C1** (validated
+# end-to-end 2026-05-11) : Claude Code × Anthropic × .NET/Vue/Vuetify/xUnit.
+#
+# NE PAS mettre de vrais secrets ici — c'est un artefact versionné qui ne
+# sera JAMAIS déployé. Les placeholders `TEST-*` sont conçus pour rester
+# apparents dans les logs (jamais confondus avec un vrai secret).
+
+## Active Harness
+Harness: claude-code
+
+## Active Model Provider
+Provider: anthropic
+Endpoint: default
+ModelTierMap:
+  deep: anthropic
+  balanced: anthropic
+  fast: anthropic
+
+## Model Selection
+Mode: static
+
+## Project Config
+AppName: CalcABC
+FrontendName: CalcABC
+FrontendLocalPort: 5173
+BackendName: CalcABCBackend
+BackendLocalPort: 5000
+LibStrategy: pinned
+PlanReviewDefault: true
+
+# QA mode : coverage seuil 80% (défaut framework)
+CoverageMin: 80
+QaSpecs: dotnet-xunit, node-vitest
+
+## Active Stacks
+# Combo C1 (validated end-to-end 2026-05-11)
+BackendStack: backend/dotnet-minimalapi
+FrontendStack: frontend/vue
+UiStack: ui/vuetify
+QaStack: qa/dotnet-xunit
+AuthStack: none
+ArchiPattern: archi/mvc
+
+## Active Database
+# CalcABC = opération pure, aucune persistance. `none` explicite (pas de scaffolding DB).
+DatabaseType: none
+
+## Active Auth Specs
+# CalcABC = endpoint public. Auth désactivée pour la fixture.
+AuthMode: none
+
+## Active SMTP Server
+# n/a — pas de mail dans la fixture.
+SmtpEnabled: false
+
+## Notes
+# Fixture créée 2026-07-26 (audit R11). Consommée par conformance_run.py.
+# Le combo peut être overridé au runtime via `--harness` / `--provider` : le
+# script substitue les 2 premières sections (Active Harness, Active Model
+# Provider) puis exécute la même FEAT 1-CalcABC.md pour comparer les
+# sorties sémantiquement à la baseline Claude Code × Anthropic.
