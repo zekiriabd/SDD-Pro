@@ -31,20 +31,17 @@
 
 ### Étape 1.1 — Copier le template FEAT M
 
-```powershell
+```bash
 # Choisir un numéro de FEAT libre dans workspace/feats/
 # Exemple : la FEAT N+1 (si dernière FEAT existante = 4, alors N=5)
-$N = 5  # adapter
-cp .sdd/templates/bench-feats/feat-m.template.md `
-   workspace/feats/$N-BenchM.md
+python -c "import shutil; N=5; shutil.copy2(r'.sdd/templates/bench-feats/feat-m.template.md', rf'workspace/feats/{N}-BenchM.md')"  # adapter N
 ```
 
 ### Étape 1.2 — Copier le mockup HTML existant + créer les 2 manquants
 
-```powershell
+```bash
 # US-1 : liste — mockup fourni, juste à copier
-cp .sdd/templates/bench-feats/mockups/feat-m-1-orders-list.html `
-   workspace/ui/$N-1-Orders-List.html
+python -c "import shutil; N=5; shutil.copy2(r'.sdd/templates/bench-feats/mockups/feat-m-1-orders-list.html', rf'workspace/ui/{N}-1-Orders-List.html')"  # adapter N
 
 # US-2 : formulaire création (à créer manuellement, ~20 min)
 # Inspiration : un seul écran avec
@@ -66,15 +63,10 @@ cp .sdd/templates/bench-feats/mockups/feat-m-1-orders-list.html `
 
 ### Étape 1.3 — Préparer DB de test
 
-```powershell
+```bash
 # DB postgres locale isolée du workspace actif (sinon contamine CMSPrint)
 # Suggestion : container Docker dédié
-docker run -d --name bench-postgres `
-  -p 5433:5432 `
-  -e POSTGRES_USER=bench `
-  -e POSTGRES_PASSWORD=bench `
-  -e POSTGRES_DB=bench_orders `
-  postgres:16
+docker run -d --name bench-postgres -p 5433:5432 -e POSTGRES_USER=bench -e POSTGRES_PASSWORD=bench -e POSTGRES_DB=bench_orders postgres:16
 
 # Créer tables seed customers + products
 # (DDL minimal, à exécuter via psql ou DBeaver)
@@ -108,9 +100,9 @@ INSERT INTO products (sku, name, current_price) VALUES
 Créer un **fork temporaire** du `stack.md` actuel (le workspace CMSPrint
 ne doit pas être modifié) :
 
-```powershell
+```bash
 # Sauvegarde
-cp workspace/stack/stack.md workspace/stack/stack.md.cmsprint-backup
+python -c "import shutil; shutil.copy2(r'workspace/stack/stack.md', r'workspace/stack/stack.md.cmsprint-backup')"
 
 # Éditer workspace/stack/stack.md :
 #   BackendName: BenchOrdersBack
@@ -183,15 +175,13 @@ Comptes-rendus à noter dans `workspace/.sys/.bench/snapshots/baseline-humaine.m
 
 **IMPORTANT** : entre chaque run, **reset complet** :
 
-```powershell
+```bash
 # Drop tables order_lines, orders dans postgres bench
 # (products + customers restent — seed inchangé)
-docker exec bench-postgres psql -U bench -d bench_orders -c `
-  "DROP TABLE IF EXISTS order_lines CASCADE; DROP TABLE IF EXISTS orders CASCADE;"
+docker exec bench-postgres psql -U bench -d bench_orders -c "DROP TABLE IF EXISTS order_lines CASCADE; DROP TABLE IF EXISTS orders CASCADE;"
 
 # Reset workspace output
-rm -rf workspace/src/BenchOrders*
-rm -rf workspace/.sys/.state/run-*.json
+python -c "from pathlib import Path; import glob, shutil; [shutil.rmtree(p, ignore_errors=True) for p in glob.glob('workspace/src/BenchOrders*')]; [Path(p).unlink(missing_ok=True) for p in glob.glob('workspace/.sys/.state/run-*.json')]"
 # (Conserver workspace/.sys/.bench/ et adrs/ — pas du run précédent)
 
 # Réinitialiser console.db pour mesure propre (OPTIONNEL — si déjà bench déjà fait, garde le delta)
@@ -200,14 +190,12 @@ rm -rf workspace/.sys/.state/run-*.json
 
 ### Étape 3.1 — Run 1
 
-```powershell
+```bash
 # Snapshot avant
-python .sdd/python/sdd_scripts/bench_run.py --snapshot-before `
-  --bench-id bench-m-kotlin-run-1
+python .sdd/python/sdd_scripts/bench_run.py --snapshot-before --bench-id bench-m-kotlin-run-1
 
-# Chrono manuel — note l'heure
-$start = Get-Date
-Write-Host "Start: $start"
+# Chrono manuel — timestamp Python cross-platform
+python -c "from pathlib import Path; import time; p=Path('.sdd/.tmp'); p.mkdir(parents=True, exist_ok=True); (p / 'bench-run-1-start.txt').write_text(str(time.time()), encoding='utf-8')"
 
 # Lancer le pipeline (interactif — répondre aux 3-6 questions /feat-generate
 # uniquement si la FEAT n'existe pas encore ; sinon /sdd-full direct)
@@ -215,14 +203,13 @@ Write-Host "Start: $start"
 /sdd-full 5
 
 # À la fin (succès ou échec) — chrono fin
-$end = Get-Date
-$wallclock = ($end - $start).TotalMinutes
-Write-Host "Wallclock: $wallclock min"
+$wallclock=$(python -c "from pathlib import Path; import time; start=float((Path('.sdd/.tmp') / 'bench-run-1-start.txt').read_text(encoding='utf-8')); print((time.time()-start)/60)")
+echo "Wallclock: $wallclock min"
 
 # Snapshot après + génération rapport
-python .sdd/python/sdd_scripts/bench_run.py --snapshot-after `
-  --bench-id bench-m-kotlin-run-1 `
-  --wallclock-min $wallclock `
+python .sdd/python/sdd_scripts/bench_run.py --snapshot-after \
+  --bench-id bench-m-kotlin-run-1 \
+  --wallclock-min $wallclock \
   --feat-n 5 `
   --output .sdd/docs/benchmarks/runs/bench-m-kotlin-run-1.json
 ```
@@ -255,12 +242,8 @@ Pour chaque run, noter :
 Pour chaque run, ouvrir
 `workspace/.sys/.validation/5-spec-compliance.json` :
 
-```powershell
-$specs = Get-Content `
-  workspace/.sys/.validation/5-spec-compliance.json | ConvertFrom-Json
-$verified = ($specs.acs | Where-Object { $_.status -eq 'verified' }).Count
-$total = $specs.acs.Count
-"AC verified: $verified / $total = $([math]::Round($verified*100/$total, 1))%"
+```bash
+python -c "import json; from pathlib import Path; specs=json.loads(Path('workspace/.sys/.validation/5-spec-compliance.json').read_text(encoding='utf-8')); verified=sum(1 for ac in specs['acs'] if ac['status']=='verified'); total=len(specs['acs']); print(f'AC verified: {verified} / {total} = {round(verified*100/total, 1)}%')"
 ```
 
 ---
@@ -377,7 +360,7 @@ Remplir **uniquement** la cellule FEAT M C2 :
 
 ### Étape 4.5 — Tag `v7.0.0-rc1`
 
-```powershell
+```bash
 git add -A
 git commit -m "feat(v7.0.0-rc1): bench M Kotlin mesuré, ROI publié"
 git tag v7.0.0-rc1 -m "Release candidate 1 — FEAT M Kotlin ROI mesuré (3 runs)"
@@ -388,9 +371,9 @@ git tag v7.0.0-rc1 -m "Release candidate 1 — FEAT M Kotlin ROI mesuré (3 runs
 
 ## Cleanup post-bench
 
-```powershell
+```bash
 # Restaurer stack.md original (CMSPrint)
-mv workspace/stack/stack.md.cmsprint-backup workspace/stack/stack.md
+python -c "from pathlib import Path; Path('workspace/stack/stack.md.cmsprint-backup').replace('workspace/stack/stack.md')"
 
 # Stopper container postgres bench (optionnel)
 docker stop bench-postgres

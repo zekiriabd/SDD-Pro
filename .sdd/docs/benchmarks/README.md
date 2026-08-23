@@ -50,9 +50,9 @@ Total : **18 runs `/sdd-full`** pour publier le baseline complet.
 
 ### 2.2 Séquence par run
 
-```powershell
+```bash
 # 1. Préparer la FEAT (idempotent — réutiliser l'identique cross-stack)
-cp templates/bench-feats/feat-{size}.md workspace/feats/1-Bench{Size}.md
+python -c "import shutil; shutil.copy2(r'templates/bench-feats/feat-{size}.md', r'workspace/feats/1-Bench{Size}.md')"
 
 # 2. Configurer le stack cible
 # Éditer workspace/stack/stack.md pour activer le combo C1 ou C2
@@ -61,10 +61,9 @@ cp templates/bench-feats/feat-{size}.md workspace/feats/1-Bench{Size}.md
 python .sdd/python/sdd_scripts/bench_run.py --snapshot-before --bench-id bench-{size}-{combo}-run-{n}
 
 # 4. Exécution chronométrée
-$start = Get-Date
+python -c "from pathlib import Path; import time; p=Path('.sdd/.tmp'); p.mkdir(parents=True, exist_ok=True); (p / 'bench-start.txt').write_text(str(time.time()), encoding='utf-8')"
 /sdd-full 1
-$end = Get-Date
-$wallclock_min = ($end - $start).TotalMinutes
+$wallclock_min=$(python -c "from pathlib import Path; import time; start=float((Path('.sdd/.tmp') / 'bench-start.txt').read_text(encoding='utf-8')); print((time.time()-start)/60)")
 
 # 5. Snapshot après run + agrégation
 python .sdd/python/sdd_scripts/bench_run.py \
@@ -80,7 +79,7 @@ python .sdd/python/sdd_scripts/bench_run.py \
 ### 2.3 Métriques capturées (par `bench_run.py`)
 
 **Temps** (depuis `sdd_state.run-*.json` + console.db) :
-- Wall-clock total (Get-Date diff)
+- Wall-clock total (mesuré via timestamp Python)
 - Durée par phase (us-gen, dev-plan, arch, dev-back, api-gate, dev-front, qa, reviewers)
 - Temps Tech Lead actif (humain) vs IA (estimé par durée Agent invocation)
 

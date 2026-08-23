@@ -209,7 +209,7 @@ mesurer wall-clock + coût + coverage, publier dans `workspace/.sys/.bench/BENCH
 
 ### 4.2 Méthode automatisée (script déterministe)
 
-```powershell
+```bash
 python .sdd/python/sdd_scripts/validate_stack_combo.py --json
 ```
 

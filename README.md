@@ -16,8 +16,8 @@ Documentation principale : [.claude/CLAUDE.md](.claude/CLAUDE.md)
 # macOS / Linux
 python3 bootstrap.py
 
-# Windows (PowerShell)
-.\bootstrap.ps1
+# Windows (PowerShell or cmd)
+python bootstrap.py
 
 # Non-interactive (CI / scripted) — uses validated combo C1
 python bootstrap.py --combo c1 --skip-install
@@ -27,7 +27,7 @@ Le bootstrap :
 - Demande le nom du projet + 3-4 questions (stack, DB, auth)
 - Génère `workspace/stack/stack.md` (43 clés Project Config, defaults sûrs)
 - Crée la structure `workspace/.sys/` complète
-- Installe les dépendances Python (`pip install -e .claude/python[dev]`)
+- Installe les dépendances Python (`pip install -e .sdd/python[dev]`)
 - Propose l'install des deps console (`npm install` dans `workspace/console/`)
 - Lance un smoke check final
 

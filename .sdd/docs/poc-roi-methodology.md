@@ -106,19 +106,19 @@ le humain doit gagner), pas pour le valoriser.
 
 ### 4.1 Setup
 
-```powershell
+```bash
 # Setup propre, repo cloné fresh
 git checkout v6.10.4-LTS  # ou v7.0.0 selon cible PoC
-$env:SDD_TOKEN_USAGE_MODE = "record"
+export SDD_TOKEN_USAGE_MODE=record
 
 # FEAT de référence figée
-cp workspace/feats/roi-poc/feat-S.md workspace/feats/1-Login.md
+python -c "import shutil; shutil.copy2(r'workspace/feats/roi-poc/feat-S.md', r'workspace/feats/1-Login.md')"
 # (idem pour M et L)
 ```
 
 ### 4.2 Pipeline
 
-```powershell
+```bash
 # Pipeline complet, mesures activées
 /sdd-full 1 --manual-gates  # capture wall-clock par phase
 ```

@@ -20,8 +20,10 @@
 | **VSCode** (recommandé) | 1.85+ | `code --version` | https://code.visualstudio.com |
 | **sqlite3 CLI** | 3.40+ | `sqlite3 --version` | inclus macOS/Linux ; Windows : https://sqlite.org/download.html |
 
-> **Note Windows** : PowerShell 5.1+ requis (préinstallé). WSL2 fortement
-> recommandé pour les combos backend Node/Python (compatibilité paths).
+> **Note Windows** : PowerShell 5.1+ peut rester utile pour certains exemples
+> ou workflows locaux, mais le framework lui-même s'initialise via Python.
+> WSL2 reste fortement recommandé pour les combos backend Node/Python
+> (compatibilité paths).
 
 ---
 

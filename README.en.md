@@ -21,8 +21,8 @@ FEAT-driven development framework — **multi-harness** (Claude Code, OpenAI Cod
 # macOS / Linux
 python3 bootstrap.py
 
-# Windows (PowerShell)
-.\bootstrap.ps1
+# Windows (PowerShell or cmd)
+python bootstrap.py
 
 # Non-interactive (CI / scripted) — uses validated combo C1
 python bootstrap.py --combo c1 --skip-install
@@ -32,7 +32,7 @@ The bootstrap:
 - Asks the project name + 3-4 questions (stack, DB, auth)
 - Generates `workspace/stack/stack.md` (43 Project Config keys, safe defaults)
 - Creates the full `workspace/.sys/` directory structure
-- Installs Python deps (`pip install -e .claude/python[dev]`)
+- Installs Python deps (`pip install -e .sdd/python[dev]`)
 - Offers to install the console deps (`npm install` in `workspace/console/`)
 - Runs a final smoke check
 

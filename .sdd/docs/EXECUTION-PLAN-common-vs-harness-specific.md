@@ -34,7 +34,7 @@ Gemini — seul le mécanisme d'orchestration change.
 | **Loader manifests** (`loader.yml` 62 KB + `loader.reverse.yml` 22 KB) | 84 KB | contrats reads/writes par agent (SSoT ADR governance-major-config-ssot) | `.sdd/loader{,.reverse}.yml` |
 | **INVARIANTS** (`INVARIANTS.yml` + `INVARIANTS.reverse.yml`) | ~23 KB | 13 + N contrats load-bearing avec pointeurs enforcer | `.sdd/INVARIANTS{,.reverse}.yml` |
 | **Config base** (`config.base.yml`) | 16 KB | valeurs par défaut framework | `.sdd/config.base.yml` |
-| **Bootstrap** (`bootstrap.py` 42 KB + `bootstrap.ps1` 4 KB) | 46 KB | init projet greenfield | `.sdd/bootstrap.{py,ps1}` |
+| **Bootstrap** (`bootstrap.py`) | ~42 KB | init projet greenfield | `.sdd/bootstrap.py` |
 | **Skills bodies** (SKILL.md corps) | 596 KB (arborescences) | descriptions des skills SDD-owned + tiers vendorés | `.sdd/skills/**` |
 | **Docs infra** (`mkdocs.yml` 11 KB, `requirements-docs.txt`, `CONTRIBUTING.md` 11 KB) | ~22 KB | site docs, guide contrib | `.sdd/` (racine) |
 | **Digests** (176 KB — extraits pré-générés d'error-classification) | 176 KB | pré-calculs pour agents | `.sdd/digests/` |
@@ -154,7 +154,7 @@ Les agents et commandes portent **deux couches** :
 ├── INVARIANTS.yml                 # + INVARIANTS.reverse.yml
 ├── config.base.yml
 ├── capability-matrix.yml          # + agent-bounds.yaml + rules-manifest.yaml + skills-manifest.yaml
-├── bootstrap.py                   # + bootstrap.ps1
+├── bootstrap.py
 ├── mkdocs.yml                     # + CONTRIBUTING.md + requirements-docs.txt
 ├── harness_build.py               # transpileur (déjà en place)
 └── entrypoint.md                  # entry point neutre
@@ -280,7 +280,7 @@ SDD-owned critiques dans `AGENTS.md`/`GEMINI.md` (déjà en place Phase 3.1/4.1)
 | `INVARIANTS.yml` (11 KB) | `.claude/INVARIANTS.yml` | `.sdd/INVARIANTS.yml` | ✅ byte-copy |
 | `INVARIANTS.reverse.yml` (11 KB) | `.claude/INVARIANTS.reverse.yml` | `.sdd/INVARIANTS.reverse.yml` | ✅ byte-copy |
 | `config.base.yml` (16 KB) | `.claude/config.base.yml` | `.sdd/config.base.yml` | ✅ byte-copy |
-| `bootstrap.py` (42 KB) + `bootstrap.ps1` (4 KB) | `.claude/` | `.sdd/` | ⚠️ byte-copy — voir action 2 |
+| `bootstrap.py` (~42 KB) | `.claude/` | `.sdd/` | ⚠️ byte-copy — voir action 2 |
 
 **Actions** :
 1. `git mv` + byte-copies
