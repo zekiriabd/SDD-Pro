@@ -134,7 +134,7 @@ python .sdd/python/sdd_scripts/resolve_us_hash_sentinel.py --feat-number {n}
 ```
 
 **Garanties** (préservées vs implémentation inline) :
-- Aucune dépendance externe (`sed`/`pwsh`/Git Bash) — Python stdlib seulement
+- Aucune dépendance externe (`sed`/`python`/Git Bash) — Python stdlib seulement
 - UTF-8 sans BOM (compatible parser frontmatter YAML cross-OS)
 - Line endings préservés (`newline=''` → conserve LF original, pas de CRLF Windows)
 - Idempotent : re-exécution sur US déjà patchées → 0 patch
