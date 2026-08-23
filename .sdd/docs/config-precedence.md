@@ -429,13 +429,9 @@ JAMAIS éditer manuellement `build.gradle.kts`/`package.json` — éditer
 
 À reproduire à chaque investigation runtime (≤ 30 sec) :
 
-```powershell
+```bash
 # 1. Dump config effective avec sources
-python -c @"
-from sdd_lib.layered_config import dump_effective_config
-from pathlib import Path
-dump_effective_config(Path('workspace/.sys/config-effective.yml'))
-"@
+python -c "from pathlib import Path; from sdd_lib.layered_config import dump_effective_config; dump_effective_config(Path('workspace/.sys/config-effective.yml'))"
 
 # 2. Phase planner status
 python .sdd/python/sdd_scripts/phase_planner.py --feat-number 1 --json > workspace/.sys/phase-plan.json
