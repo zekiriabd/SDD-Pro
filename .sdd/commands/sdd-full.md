@@ -11,7 +11,7 @@ Enchaîne **toutes les phases** du pipeline SDD pour la FEAT `{n}` :
 ```
 PHASE 2    — US generation         (agent po, via /us-generate)
 PHASE 2.5  — HTML mockups          (humain — workspace/ui/, pas d'agent)
-PHASE 2.6  — Readiness gate        (PowerShell déterministe v6, via /feat-validate)
+PHASE 2.6  — Readiness gate        (Python déterministe v6, via /feat-validate)
 PHASE 2.7  — Plan-then-review gate (mode :plan, via /dev-plan, conditionnel)
 PHASE 3    — ARCH + DB             (agent arch, via /dev-run)
 PHASE 4    — CODE back+front       (agents dev-*, via /dev-run, parallèle)

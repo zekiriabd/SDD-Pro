@@ -19,7 +19,7 @@
 
 ---
 
-## 1. Validations déterministes (PowerShell, 0 token)
+## 1. Validations déterministes (Python, 0 token)
 
 ### 1.1 Cohérence numérotation IDs FEAT
 - [ ] SFD-N : continuité, pas de doublons → {pass | fail: liste}

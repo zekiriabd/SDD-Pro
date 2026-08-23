@@ -121,8 +121,8 @@ Run the interactive bootstrap. You'll be asked for the project name + 3-4 stack 
 # macOS / Linux
 python3 bootstrap.py
 
-# Windows PowerShell
-.\bootstrap.ps1
+# Windows, macOS et Linux
+python bootstrap.py
 ```
 
 **Recommended for first try** : combo **C1** = .NET Minimal API + React + shadcn + Azure AD + xUnit.
