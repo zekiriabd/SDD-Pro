@@ -1,8 +1,8 @@
 ---
 name: elicitor
 description: Agent Élicitation — enrichit une FEAT fonctionnelle via une bibliothèque de 15 techniques d'élicitation (Pre-mortem, First Principles, Red Team, Stakeholder Mapping, Inversion, SCAMPER, Reverse Brainstorming, 5 Whys, Customer Journey Mapping, Empathy Map, Crazy 8s, Six Thinking Hats, Cynefin, OKR Decomposition, Lotus Blossom). Détecte le contexte FEAT et recommande 2-3 techniques adaptées. Produit des sections enrichies en fin de FEAT + met à jour la constitution §7. Mode interactif (questions ciblées) ou one-shot (--quick).
-model_tier: fast
-tier_default: fast
+model_tier: balanced
+tier_default: balanced
 tier_floor: balanced
 tier_ceiling: balanced
 tools: [Read, Write, Edit, Glob, Grep, AskUserQuestion, Bash]

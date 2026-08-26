@@ -14,6 +14,19 @@ Both are emitted as standard reverse FEATs (frontmatter + REVERSE-GATE + the six
 ordered sections + per-item evidence/confidence + Given/When/Then ACs) so they
 pass `validate_reverse_feat.py` and are first-class inputs to `/sdd-full`.
 
+Stable-ID bullet format (audit F-04, 2026-08-25) — every SFD/FD/BR/AC item MUST
+be written as::
+
+    - SFD-1: texte
+
+This is the convention of `templates/feat.template.md` and of the LLM composer
+`reverse-feat-composer`, and the one `sdd_scripts/validate_readiness.py` counts
+(`- SFD-N:` at line start). This generator used to emit `**SFD-1** — texte`,
+which the readiness gate scored as *zero* IDs: the reverse→forward handoff
+(`/sdd-reverse-full` → `/sdd-full`) then ran every FD/SFD-keyed coverage check
+against an empty set and passed trivially, so the advertised traceability was
+structurally absent on the cross-cutting FEATs. Do not reintroduce bold IDs.
+
 Public API:
     build_libraries_feat(dependencies, *, n, name, project, language) -> str
     build_database_feat(db_schema, data_access, config, *, n, name, project, language) -> str
@@ -101,7 +114,7 @@ def build_libraries_feat(
     lines.append("## Functional Needs")
     lines.append("")
     lines.append(
-        f"**SFD-1** — Le stack cible doit fournir un équivalent fonctionnel de "
+        f"- SFD-1: Le stack cible doit fournir un équivalent fonctionnel de "
         f"chaque dépendance externe du legacy ({len(packages)} paquet(s), "
         f"{len(asm_refs)} référence(s) d'assembly, {len(binaries)} binaire(s) bin/). "
         + _ev(sources[0] if sources else None)
@@ -115,7 +128,7 @@ def build_libraries_feat(
     for p in truncated:
         ver = p.get("version") or "version non figée"
         lines.append(
-            f"**FD-{fd}** — Dépendance `{p['name']}` ({ver}, {p['ecosystem']}, "
+            f"- FD-{fd}: Dépendance `{p['name']}` ({ver}, {p['ecosystem']}, "
             f"source: {p.get('source', '?')}). {_ev(p.get('evidence'))}"
         )
         fd += 1
@@ -123,7 +136,7 @@ def build_libraries_feat(
         hp = r.get("hintPath")
         loc = f"DLL locale `{hp}`" if hp else "GAC/SDK"
         lines.append(
-            f"**FD-{fd}** — Référence d'assembly `{r['name']}` ({loc}). "
+            f"- FD-{fd}: Référence d'assembly `{r['name']}` ({loc}). "
             f"{_ev(r.get('evidence'))}"
         )
         fd += 1
@@ -137,14 +150,14 @@ def build_libraries_feat(
     lines.append("## Business Rules")
     lines.append("")
     lines.append(
-        f"**BR-1** — Les versions exactes du legacy sont documentées comme point "
+        f"- BR-1: Les versions exactes du legacy sont documentées comme point "
         f"de départ ; le stack cible peut imposer des versions LTS plus récentes "
         f"(cf. politique runtime SDD_Pro). {_ev(sources[0] if sources else None)}"
     )
     eol = [p for p in packages if p.get("name", "").lower() in ("log4net",)]
     if eol:
         lines.append(
-            f"**BR-2** — Dépendances potentiellement obsolètes à auditer (CVE/EOL) "
+            f"- BR-2: Dépendances potentiellement obsolètes à auditer (CVE/EOL) "
             f"avant reprise : {', '.join(p['name'] for p in eol)}. "
             + _ev(eol[0].get("evidence"))
         )
@@ -153,7 +166,7 @@ def build_libraries_feat(
     lines.append("## Acceptance Criteria")
     lines.append("")
     lines.append(
-        f"**AC-1** — Given le stack cible provisionné, when le projet est buildé, "
+        f"- AC-1: Given le stack cible provisionné, when le projet est buildé, "
         f"then chaque capacité couverte par les {len(packages)} dépendance(s) "
         f"legacy a un équivalent résolu (ou une décision de retrait tracée). "
         + _ev(sources[0] if sources else None)
@@ -239,21 +252,21 @@ def build_database_feat(
     lines.append("## Functional Needs")
     lines.append("")
     lines.append(
-        f"**SFD-1** — La cible doit persister les mêmes entités métier que le "
+        f"- SFD-1: La cible doit persister les mêmes entités métier que le "
         f"legacy ({len(entities)} table(s)) avec des contraintes équivalentes. "
         + _ev(sources[0] if sources else None)
     )
     sfd = 2
     if procs:
         lines.append(
-            f"**SFD-{sfd}** — La logique encapsulée dans {len(procs)} procédure(s) "
+            f"- SFD-{sfd}: La logique encapsulée dans {len(procs)} procédure(s) "
             f"stockée(s) doit être reproduite (procédure cible OU service applicatif "
             f"équivalent). {_ev(_fileline(procs[0]))}"
         )
         sfd += 1
     if called_procs:
         lines.append(
-            f"**SFD-{sfd}** — {len(called_procs)} procédure(s) stockée(s) sont "
+            f"- SFD-{sfd}: {len(called_procs)} procédure(s) stockée(s) sont "
             f"APPELÉES par le code sans DDL dans les sources : récupérer leur "
             f"définition en base (scripting) AVANT migration — contrat d'interface "
             f"DB obligatoire. {_ev(_fileline(called_procs[0]))}"
@@ -268,7 +281,7 @@ def build_database_feat(
         cols = ", ".join(f"{f['name']}:{f['type']}" for f in e.get("fields", [])[:12]) or "(colonnes non extraites)"
         ev = (e.get("evidence") or ["unknown:1"])[0]
         lines.append(
-            f"**FD-{fd}** — Entité `{e['name']}` (table `{e.get('table', e['name'])}`) "
+            f"- FD-{fd}: Entité `{e['name']}` (table `{e.get('table', e['name'])}`) "
             f"— champs : {cols}. {_ev(ev)}"
         )
         fd += 1
@@ -278,14 +291,14 @@ def build_database_feat(
             for x in p.get("params", [])
         ) or "(aucun paramètre)"
         lines.append(
-            f"**FD-{fd}** — Procédure stockée `{p['name']}`({params}). "
+            f"- FD-{fd}: Procédure stockée `{p['name']}`({params}). "
             f"{_ev(_fileline(p))}"
         )
         fd += 1
     for c in called_procs[:_MAX_ITEMS]:
         params = ", ".join(c.get("params", [])) or "(paramètres au call-site)"
         lines.append(
-            f"**FD-{fd}** — Procédure stockée APPELÉE `{c['name']}` ({params}) "
+            f"- FD-{fd}: Procédure stockée APPELÉE `{c['name']}` ({params}) "
             f"— DDL absent des sources, à scripter depuis la base. "
             f"{_ev(_fileline(c))}"
         )
@@ -293,14 +306,14 @@ def build_database_feat(
     for t in inline_table_list[:_MAX_ITEMS]:
         t_ev = "{}:{}".format(t["file"], t["line"])
         lines.append(
-            f"**FD-{fd}** — Table `{t['name']}` référencée par les requêtes SQL "
+            f"- FD-{fd}: Table `{t['name']}` référencée par les requêtes SQL "
             f"inline mais absente du schéma extrait — récupérer son DDL. "
             f"{_ev(t_ev)}"
         )
         fd += 1
     for c in conn[:_MAX_ITEMS]:
         lines.append(
-            f"**FD-{fd}** — Connection string `{c['name']}` → provider "
+            f"- FD-{fd}: Connection string `{c['name']}` → provider "
             f"`{c.get('provider') or '?'}`, server `{c.get('server') or '?'}`, "
             f"db `{c.get('database') or '?'}` (secrets masqués). "
             f"{_ev(_fileline(c))}"
@@ -313,7 +326,7 @@ def build_database_feat(
     br = 1
     for r in relations[:_MAX_ITEMS]:
         lines.append(
-            f"**BR-{br}** — Relation `{r.get('name', 'FK')}` : "
+            f"- BR-{br}: Relation `{r.get('name', 'FK')}` : "
             f"{r['from']['entity']}.{r['from']['field']} → "
             f"{r['to']['entity']}.{r['to']['field']} ({r.get('type', 'fk')}). "
             f"{_ev(r.get('evidence'))}"
@@ -321,7 +334,7 @@ def build_database_feat(
         br += 1
     if not relations:
         lines.append(
-            f"**BR-1** — Aucune relation FK explicite extraite ; vérifier "
+            f"- BR-1: Aucune relation FK explicite extraite ; vérifier "
             f"l'intégrité référentielle à la reprise. "
             + _ev(sources[0] if sources else None)
         )
@@ -333,7 +346,7 @@ def build_database_feat(
     if entities:
         e0 = entities[0]
         lines.append(
-            f"**AC-{ac}** — Given le schéma cible migré, when on inspecte la table "
+            f"- AC-{ac}: Given le schéma cible migré, when on inspecte la table "
             f"`{e0.get('table', e0['name'])}`, then ses colonnes correspondent à "
             f"celles du legacy. {_ev((e0.get('evidence') or ['unknown:1'])[0])}"
         )
@@ -341,14 +354,14 @@ def build_database_feat(
     if procs:
         p0 = procs[0]
         lines.append(
-            f"**AC-{ac}** — Given la cible, when on appelle l'équivalent de "
+            f"- AC-{ac}: Given la cible, when on appelle l'équivalent de "
             f"`{p0['name']}` avec ses paramètres, then le comportement legacy est "
             f"reproduit. {_ev(_fileline(p0))}"
         )
         ac += 1
     if ac == 1:  # no entities, no procs → still need ≥1 AC
         lines.append(
-            f"**AC-1** — Given la cible, when la couche données est en place, then "
+            f"- AC-1: Given la cible, when la couche données est en place, then "
             f"elle expose les mêmes capacités d'accès que le legacy. "
             + _ev(sources[0] if sources else None)
         )

@@ -44,7 +44,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sdd_lib.exit_codes import FAIL_FAST, SUCCESS  # noqa: E402
 from sdd_lib.paths import workspace_root, normalize, repo_root  # noqa: E402
-from sdd_lib.project_config import read_project_config, read_stack_md_text  # noqa: E402  (legacy fallback)
+from sdd_lib.project_config import (  # noqa: E402  (legacy fallback)
+    parse_active_stack_ids,
+    read_project_config,
+    read_stack_md_text,
+)
 from sdd_lib.layered_config import ConfigError, read_layered_config  # noqa: E402  (v6.7.3)
 
 
@@ -139,25 +143,19 @@ def _active_stacks(root: Path) -> dict[str, str | None]:
 
     # v6.7.5 — categories etendues: + fullstack + mobiles
     # v6.7.7 — respect `#` commented lines (skip them)
+    # audit 2026-08-25 — parsing délégué au SSoT bi-racine
+    # `project_config.parse_active_stack_ids` : la regex locale n'acceptait
+    # que la racine `.sdd`, donc un stack.md legacy (racine `.claude`)
+    # renvoyait 0 stack actif ici alors que `sdd_full_planner` en voyait 8.
     stacks: dict[str, str | None] = {
         "backend": None, "frontend": None, "ui": None, "auth": None,
         "fullstack": None, "mobiles": None,
     }
-    pattern = re.compile(
-        r"\.sdd/stacks/(backend|frontend|ui|auth|fullstack|mobiles)/([\w-]+)\.md",
-        re.IGNORECASE,
-    )
-    for line in text.splitlines():
-        stripped = line.lstrip()
-        if stripped.startswith("#"):
-            continue
-        m = pattern.search(line)
-        if not m:
-            continue
-        category = m.group(1).lower()
-        stack_id = m.group(2)
-        if stacks.get(category) is None:
-            stacks[category] = stack_id
+    parsed = parse_active_stack_ids(text, first_only=True)
+    for category in stacks:
+        ids = parsed.get(category)
+        if ids:
+            stacks[category] = ids[0]
     return stacks
 
 

@@ -73,7 +73,7 @@ dependencies = []
 reverse = [
     "PyYAML>=6.0,<7.0",
 ]
-# Stored-procedure reverse (proc-reverse, 2026-06-29) — live READ-ONLY DB
+# Stored-procedure reverse (db-reverse, 2026-06-29) — live READ-ONLY DB
 # introspection. Opt-in so forward-only AND source-file reverse users install
 # nothing extra. SQL Server MVP via pyodbc (needs ODBC Driver 18 on the OS).
 # Other engines plug in per-dialect (psycopg / oracledb / mysql-connector) as

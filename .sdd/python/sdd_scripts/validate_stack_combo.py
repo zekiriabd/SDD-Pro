@@ -63,7 +63,12 @@ from sdd_lib.combos import (  # noqa: E402
     get_validated_combos,
 )
 from sdd_lib.paths import workspace_root, repo_root  # noqa: E402
-from sdd_lib.project_config import read_stack_md_text, section_body, stack_md_path  # noqa: E402
+from sdd_lib.project_config import (  # noqa: E402
+    parse_active_stack_ids,
+    read_stack_md_text,
+    section_body,
+    stack_md_path,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -108,19 +113,19 @@ LEVEL_PRIORITY: dict[str, int] = _level_priority()
 # Parsing helpers
 # ---------------------------------------------------------------------------
 
-_ACTIVE_STACK_RE = re.compile(r"^\s*-\s*\.sdd/stacks/([^/]+)/([^/\s]+)\.md\s*$")
 _DB_TYPE_RE = re.compile(r"^\s*-?\s*DatabaseType\s*:\s*([A-Za-z]+)\s*$", re.MULTILINE)
 
 
 def _parse_active_stacks(block: str | None, category: str) -> list[str]:
+    """Ids actifs d'une catégorie, via le SSoT bi-racine (audit 2026-08-25).
+
+    La regex locale n'acceptait que la racine `.sdd` : un `stack.md` legacy
+    resté sur la racine `.claude` faisait tomber le combo à `none/none`
+    (donc `[STACK_COMBO_INVALID]`) alors que la FEAT était valide.
+    """
     if block is None:
         return []
-    ids: list[str] = []
-    for line in block.splitlines():
-        m = _ACTIVE_STACK_RE.match(line)
-        if m and m.group(1) == category:
-            ids.append(m.group(2))
-    return ids
+    return parse_active_stack_ids(block, category).get(category, [])
 
 
 def _parse_database_type(text: str) -> str:

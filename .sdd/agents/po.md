@@ -1,6 +1,6 @@
 ---
 name: po
-description: Agent Product Owner — découpe une FEAT fonctionnelle en User Stories structurées (min 1, cible 1-3, warn 7+, hard cap 10 — configurable). Lit workspace/feats/{n}-{Name}.md, écrit workspace/us/{n}-{m}-{Name}.md pour chaque US.
+description: Agent Product Owner — découpe une FEAT fonctionnelle en User Stories structurées (min 1, cible `UsGranularityTarget` (defaut 3), warn au-dela de `UsGranularityWarnAt` (defaut 6), hard cap `UsGranularityHardCap` (defaut 10) — configurables). Lit workspace/feats/{n}-{Name}.md, écrit workspace/us/{n}-{m}-{Name}.md pour chaque US.
 model_tier: balanced
 tier_default: balanced
 tier_floor: balanced
@@ -12,8 +12,9 @@ tools: [Read, Write, Edit, Glob, Grep, Bash]
 ## Rôle
 
 Découper une FEAT fonctionnelle en User Stories structurées (cible
-1-3, warning au-delà de `UsGranularityWarnAt` (défaut 6), hard cap
-`UsGranularityHardCap` (défaut 10) — voir `us-granularity.md §1`),
+`UsGranularityTarget` (défaut 3), warning au-delà de
+`UsGranularityWarnAt` (défaut 6), hard cap `UsGranularityHardCap`
+(défaut 10) — voir `us-granularity.md §1`),
 avec traçabilité 100% des SFD bullets, Business Rules, Acceptance
 Criteria et Functional Deliverables vers les ACs des US générées.
 
@@ -146,7 +147,7 @@ FIX: préfixer chaque bullet par SFD-1:, SFD-2:, … (IDs stables et explicites)
 
 ---
 
-## STEP 5 — Découper en User Stories (cible 1-3, hard cap configurable v7.0.0)
+## STEP 5 — Découper en User Stories (cible `UsGranularityTarget`, seuils configurables v7.0.0)
 
 Pour chaque SFD bullet, classifier (cf. `docs/principles/us-granularity.md §2`) :
 1. **Action utilisateur distincte** → candidat US
@@ -162,9 +163,17 @@ warn, bloquant au-delà du hard cap.
 Lire `## Project Config` :
 
 ```yaml
-UsGranularityHardCap: 10          # default v7.0.0 (was 6 strict v6.x)
+UsGranularityTarget: 3            # CIBLE souple — nombre d'US visé
 UsGranularityWarnAt: 6            # WARN above this (heritage hard cap)
+UsGranularityHardCap: 10          # default v7.0.0 (was 6 strict v6.x)
 ```
+
+`UsGranularityTarget` est la **cible de découpage** : à qualité de
+traçabilité égale, préférer le découpage dont le nombre d'US est le plus
+proche de cette valeur. Elle n'est **jamais** un motif de rejet — la
+traçabilité 100% des SFD/BR/AC/FD primes toujours, et ce sont
+`UsGranularityWarnAt` / `UsGranularityHardCap` qui arbitrent. Lire la
+valeur effective (base.yml ← team.yml ← stack.md) ; à défaut, 3.
 
 **Bypass exceptionnel** via flag CLI `--allow-large-feat` propagé par
 `/us-generate {n} --allow-large-feat` :
@@ -180,6 +189,7 @@ préférer un split FEAT sinon.
 ### Comportement selon le nombre `N` d'US générées
 
 - `N ∈ [1 .. UsGranularityWarnAt]` (default `[1..6]`) → génération normale
+  (dans cette plage, viser `UsGranularityTarget` — cf. seuils ci-dessus)
 - `N ∈ [UsGranularityWarnAt+1 .. UsGranularityHardCap]` (default `[7..10]`)
   → génération + **WARNING émis dans la ligne de succès finale** (non bloquant) :
   ```

@@ -41,6 +41,7 @@ from sdd_lib.console_db import connect, ensure_initialized, insert_context_budge
 from sdd_lib.loader_yml import parse_agent_section  # noqa: E402
 from sdd_lib.paths import normalize, repo_root  # noqa: E402
 from sdd_lib.project_config import (  # noqa: E402  (legacy fallback)
+    CANONICAL_STACK_ROOT,
     get_active_stack_paths,
     read_project_config,
 )
@@ -175,10 +176,15 @@ def resolve_pattern(
     if "{cat}/{active}" in pattern:
         return get_active_stack_paths(root)
 
-    m = re.match(r"^\.sdd/stacks/([^/]+)/\{active\}\.md$", pattern)
+    m = re.match(rf"^{re.escape(CANONICAL_STACK_ROOT)}/stacks/([^/]+)/\{{active\}}\.md$", pattern)
     if m:
         cat = m.group(1)
-        return [p for p in get_active_stack_paths(root) if p.startswith(f".sdd/stacks/{cat}/")]
+        # `get_active_stack_paths` normalise vers `.sdd/` (SSoT bi-racine,
+        # audit 2026-08-25) — le prefix test ci-dessous est donc valide même
+        # pour un stack.md legacy déclarant la racine `.claude` (voir
+        # `project_config.normalize_stack_path`).
+        prefix = f"{CANONICAL_STACK_ROOT}/stacks/{cat}/"
+        return [p for p in get_active_stack_paths(root) if p.startswith(prefix)]
 
     out = pattern
     if us_id:

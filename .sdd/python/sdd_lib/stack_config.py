@@ -10,10 +10,10 @@ Ce module est la GLU entre le `stack.md` (choix Tech Lead) et :
 - ``model_resolver.resolve_model`` (mode static|dynamic + provider par tier) ;
 - ``impact_report.build_impact_report`` (harnais + provider actifs).
 
-Discipline (cf. `.sdd/stack-sections.proposed.md`) : le vrai
-`.sdd/templates/stack.md.template` n'est PAS modifié ici — l'édition du
-template est réservée à la fenêtre coordonnée de Phase 1. Ce parseur tolère
-donc l'absence totale des sections (stack.md legacy) sans erreur.
+Rétro-compatibilité : les 3 sections sont désormais présentes dans
+`.sdd/templates/stack.md.template`, mais ce parseur tolère toujours leur
+absence totale (stack.md antérieur au multi-provider) sans erreur — les
+défauts `claude-code` / `anthropic` / `static` s'appliquent alors.
 
 Pur : aucune I/O réseau, aucun side effect à l'import ; ``load_stack_config``
 est le seul point de lecture disque (fail-explicit si fichier absent).

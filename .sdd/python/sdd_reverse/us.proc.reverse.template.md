@@ -1,5 +1,5 @@
 <!--
-us.proc.reverse.template.md — isolated template for proc-reverse User Stories.
+us.proc.reverse.template.md — isolated template for db-reverse User Stories.
 Read by the reverse-sql-analyst agent (rung 1). One stored procedure = one US.
 Placeholders: {n} feat number, {m} US index, {usName} capability slug,
 {module} business module, {fqProc} schema.proc, {dialect} engine, {confidence}.

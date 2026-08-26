@@ -187,7 +187,7 @@ agents:
     optional: true
     available_from: v1.0.0       # stored-procedure reverse — DB live READ-ONLY → US (1 proc = 1 US)
     reads:
-      - workspace/old/{P}/.sys/inventory.json                    # units = modules (source: proc-reverse)
+      - workspace/old/{P}/.sys/inventory.json                    # units = modules (source: db-reverse)
       - workspace/old/{P}/.sys/proc-snapshot/{schema}.{proc}.sql # READ-ONLY body snapshot (Phase 1)
       - workspace/old/{P}/.sys/db-introspection.json             # deterministic signals (no secret)
       - .sdd/python/sdd_reverse/us.proc.reverse.template.md
@@ -285,12 +285,12 @@ commands:
     phase: "3.9"
     spawns: [reverse-clarifier]
     available_from: v0.9.0   # emprunt Reversa — structured human validation loop (generate / --ingest)
-  sdd-proc-reverse-full:
-    phase: "proc-reverse"
+  sdd-db-reverse-full:
+    phase: "db-reverse"
     spawns: [reverse-sql-analyst]
     available_from: v1.0.0   # stored-procedure reverse — all routines (read-only DB → US/FEAT)
-  sdd-proc-reverse:
-    phase: "proc-reverse"
+  sdd-db-reverse:
+    phase: "db-reverse"
     spawns: [reverse-sql-analyst]
     available_from: v1.0.0   # stored-procedure reverse — single routine
 
@@ -341,13 +341,13 @@ scripts:
   validate_parity_features:                    # Phase 3.8 — deterministic Gherkin parity gate (structure blocking-WARN, coverage informational)
     path: .sdd/python/sdd_reverse_scripts/validate_parity_features.py
     cli: python .sdd/python/sdd_reverse_scripts/validate_parity_features.py --feat-path <PATH> --parity-dir <DIR> [--json]
-  reverse_proc_introspect:                     # proc-reverse Phase 1 — live READ-ONLY introspection (SELECT-only, readonly_guard)
+  reverse_proc_introspect:                     # db-reverse Phase 1 — live READ-ONLY introspection (SELECT-only, readonly_guard)
     path: .sdd/python/sdd_reverse_scripts/reverse_proc_introspect.py
     cli: python .sdd/python/sdd_reverse_scripts/reverse_proc_introspect.py (--full | --proc NAME | --from-introspection P) [--project DB] [--stack PATH] [--json]
-  build_proc_us:                               # proc-reverse routing — deterministic 0-token US for simple procs, needs_llm list for complex
+  build_proc_us:                               # db-reverse routing — deterministic 0-token US for simple procs, needs_llm list for complex
     path: .sdd/python/sdd_reverse_scripts/build_proc_us.py
     cli: python .sdd/python/sdd_reverse_scripts/build_proc_us.py --project DB (--unit U-N | --all) [--dry-run] [--workspace DIR] [--json]
-  build_proc_feats:                            # proc-reverse rung 2 — deterministic module FEAT assembler (US → FEAT, no body re-read)
+  build_proc_feats:                            # db-reverse rung 2 — deterministic module FEAT assembler (US → FEAT, no body re-read)
     path: .sdd/python/sdd_reverse_scripts/build_proc_feats.py
     cli: python .sdd/python/sdd_reverse_scripts/build_proc_feats.py --project DB (--unit U-N | --all) [--workspace DIR] [--json]
 

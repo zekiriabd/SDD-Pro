@@ -158,6 +158,23 @@ QaFailOnSddFull: true
 #     parsers but has no runtime effect anymore.
 PlanCacheStrict: false
 
+# --- Acceptance Gate (quality.md §C) ---
+# Vérification de recette exécutable post-QA : test / lint / build / coverage /
+# smoke / E2E sur le code matérialisé (`validate_acceptance.py`, + hook
+# SubagentStop matcher=qa). Classe d'erreur : [ACCEPTANCE_GATE_FAILED].
+#   - off    : gate ignorée
+#   - warn   : exécute les checks, rapporte, n'arrête jamais le pipeline
+#   - strict : un check KO = STOP (défaut v7.0.0)
+# Audit 2026-08-26 : ces 4 clés étaient load-bearing mais absentes de
+# config.base.yml ET de project-config.schema.json — d'où un WARN permanent
+# [CONFIG_UNKNOWN_KEY] et une ConfigError dure sous SDD_CONFIG_STRICT=1, alors
+# que /sdd-profile émet lui-même `AcceptanceGate: strict`. Le défaut `strict`
+# ne vivait qu'en dur dans le Python, échappant donc à la team policy.
+AcceptanceGate: strict
+AcceptanceGate.RequireE2E: true       # exiger au moins 1 test E2E vert
+AcceptanceGate.SmokeTimeout: 10       # secondes avant abandon du smoke run
+AcceptanceGate.MinCoverage: 80        # plancher coverage propre à la gate
+
 # --- Gated workflow (backend-first) ---
 GatedWorkflow: true
 ApiGateRequired: true
@@ -265,6 +282,12 @@ FeatAntiGigoMode: warn
 # (audit-logged in force-bypass.log).
 UsGranularityHardCap: 10
 UsGranularityWarnAt: 6      # WARN above this (was historical hard cap)
+# Cible SOUPLE (informationnelle) : nombre d'US visé par FEAT. Lu par l'agent
+# `po` (§Granularité) pour choisir le bon niveau de découpage. Jamais bloquant
+# — c'est WarnAt/HardCap qui arbitrent. Audit 2026-08-26 : la clé existait dans
+# project-config.schema.json + stack.md.template avec ZÉRO lecteur (ni base.yml,
+# ni po.md, ni Python) ; elle est désormais branchée au lieu d'être décorative.
+UsGranularityTarget: 3
 
 # --- /feat-deepen elicitation gate (v7.0.0 audit §6.3 — revert v6.10.5) ---
 # v6.10.5 raised the deepen recommendation threshold from 2 to 4 (out of 5)

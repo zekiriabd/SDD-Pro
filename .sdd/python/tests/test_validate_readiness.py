@@ -21,6 +21,7 @@ SCRIPT = REPO_ROOT / ".sdd" / "python" / "sdd_scripts" / "validate_readiness.py"
 
 # Load the module to test internal helpers
 sys.path.insert(0, str(REPO_ROOT / ".sdd" / "python"))
+from sdd_lib.paths import stacks_dir  # noqa: E402
 from sdd_scripts import validate_readiness as vr  # noqa: E402
 
 
@@ -237,7 +238,7 @@ class TestExtractRequiredAuthKeys(unittest.TestCase):
 
     def test_reads_real_auth_local_stack_file(self) -> None:
         # Integration: validate against the actual auth-local.md in the repo.
-        auth_local = REPO_ROOT / ".claude" / "stacks" / "auth" / "auth-local.md"
+        auth_local = stacks_dir(REPO_ROOT) / "auth" / "auth-local.md"
         if not auth_local.is_file():
             self.skipTest("auth-local.md not present in this checkout")
         content = auth_local.read_text(encoding="utf-8")
@@ -249,7 +250,7 @@ class TestExtractRequiredAuthKeys(unittest.TestCase):
 
     def test_reads_real_azure_ad_stack_file(self) -> None:
         # Integration: validate against the actual azure-ad.md in the repo.
-        azure_ad = REPO_ROOT / ".claude" / "stacks" / "auth" / "azure-ad.md"
+        azure_ad = stacks_dir(REPO_ROOT) / "auth" / "azure-ad.md"
         if not azure_ad.is_file():
             self.skipTest("azure-ad.md not present in this checkout")
         content = azure_ad.read_text(encoding="utf-8")

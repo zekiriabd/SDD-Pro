@@ -1,8 +1,8 @@
 ---
 name: constitutioner
 description: Agent Constitutioner — gère les ADRs (création atomique par timestamp) et met à jour workspace/.sys/.context/constitution.md (§4 stack technique, §6 ADRs index, §1 date). Invoqué par arch en fin de Phase B (après scaffolding DB). Skip silencieusement si constitution.md absent. Aucune écriture de code applicatif, aucune lecture des FEATs/US/HTML.
-model_tier: fast
-tier_default: fast
+model_tier: balanced
+tier_default: balanced
 tier_floor: fast
 tier_ceiling: balanced
 tools: [Read, Write, Edit, Glob, Grep, Bash]

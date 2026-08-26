@@ -1,6 +1,6 @@
 """sql_dependency_graph.py — object↔object dependency graph for DB reverse (P0.2).
 
-Audit reverse-db 2026-07-24 (P0.2). The proc-reverse pipeline already extracts,
+Audit reverse-db 2026-07-24 (P0.2). The db-reverse pipeline already extracts,
 per SQL object, the tables it reads/writes and the routines it calls
 (`sql_body_analyzer` signals). This module turns that per-object data into a
 **global dependency graph** — usable for impact analysis ("what breaks if I

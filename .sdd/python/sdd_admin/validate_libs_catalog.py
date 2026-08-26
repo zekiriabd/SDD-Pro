@@ -233,7 +233,7 @@ def validate_catalog(file: Path, root: Path) -> tuple[dict[str, Any], list[dict]
 def main() -> int:
     args = parse_args()
     root = Path(args.repo_root).resolve() if args.repo_root else repo_root()
-    stacks_dir = stacks_dir(root)
+    stacks_root = stacks_dir(root)
 
     # All stacks under .sdd/stacks/ are validated (v7.0.0+ rollback of
     # _drafts/ quarantine — every category subdirectory is now active).
@@ -247,8 +247,8 @@ def main() -> int:
     # compatibility happens at `arch` STEP 4.5.6 via `## Active Auth Specs`
     # cross-check, not via schema validation. Cf. `library-and-stack.md §1.0`.
     catalogs = (
-        sorted(stacks_dir.rglob("*.libs.json"))
-        if stacks_dir.is_dir() else []
+        sorted(stacks_root.rglob("*.libs.json"))
+        if stacks_root.is_dir() else []
     )
     all_errors: list[dict[str, Any]] = []
     all_warnings: list[dict[str, Any]] = []

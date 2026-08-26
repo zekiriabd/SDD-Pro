@@ -74,11 +74,12 @@ avec `# source: base|team|project` par clé.
 - Pipeline : `MaxParallel`, `BuildLoopMaxIter`, `BuildLoopMaxCostUsd`,
   `MaxCostPerRun`, `MaxOpusInflight`
 - Workflow : `GatedWorkflow`, `ApiGateRequired`, `ApiGateMinPerEndpoint`,
-  `PlanReviewDefault`, `CheckpointMode`
+  `PlanReviewDefault`, `CheckpointMode`,
+  `AcceptanceGate` (+ `.RequireE2E` / `.SmokeTimeout` / `.MinCoverage`)
 - Identité projet : `AppName/FrontendName`, `BackendName`,
   `FrontendLocalPort`, `BackendLocalPort`, `LibStrategy`
 - Gates v7 : `FeatAntiGigoMode`, `FeatDeepenMode/Threshold`,
-  `ElicitorGapMode`, `UsGranularityHardCap/WarnAt`,
+  `ElicitorGapMode`, `UsGranularityTarget/WarnAt/HardCap`,
   `SpecComplianceRequiredForFeatValidate`
 - Tests : `MutationTestingMode/ScoreMin/TimeoutSec`,
   `E2EMode/MinPerUs/TimeoutSec`, `IntegrationTestMode`

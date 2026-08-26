@@ -83,6 +83,14 @@ QAMode: tests+coverage
 CoverageMin: 80
 MaxParallel: 3
 
+# Acceptance Gate — recette executable post-QA (test / lint / build /
+# coverage / smoke / E2E) sur le code materialise. off | warn | strict.
+# `strict` = un check KO arrete le pipeline ([ACCEPTANCE_GATE_FAILED]).
+AcceptanceGate: strict
+# AcceptanceGate.RequireE2E: true      # exiger >= 1 test E2E vert
+# AcceptanceGate.SmokeTimeout: 10      # secondes avant abandon du smoke
+# AcceptanceGate.MinCoverage: 80       # plancher coverage propre a la gate
+
 # Cost caps (USD, see config.base.yml for full doc) :
 MaxCostPerRun: 50
 BuildLoopMaxCostUsd: 15
@@ -157,7 +165,17 @@ PerfMode: "off"
 {{AuthActiveLines}}
 
 ## Active Database
-# DatabaseType ∈ {none, SqlServer, PostgreSql, MySql, Sqlite, MariaDb, Oracle, MongoDb}
+# DatabaseType ∈ {none, PostgreSql, SqlServer, MySql, MariaDb, Sqlite, Oracle, MongoDb}
+#
+# ⚠️ Tier de validation par moteur (SSoT machine : .sdd/templates/combos.json
+#    componentLevels.db — consomme par validate_stack_combo.py + le hook
+#    preflight_stack_combo). Choisir en connaissance de cause :
+#      🟢 validated    : none, PostgreSql
+#      🟡 experimental : SqlServer            -> WARN, le pipeline continue
+#      🔴 untested     : MySql, MariaDb, Sqlite, Oracle, MongoDb
+#                        -> /sdd-full et /sdd-poc sont BLOQUES par le hook
+#                           preflight_stack_combo. Bypass assume et audit-logue :
+#                           SDD_ALLOW_UNTESTED_COMBO=1
 #
 # Real values in clear (stack.md is gitignored). Agent arch composes the
 # connection string in RAM and writes it to the native config file ; the

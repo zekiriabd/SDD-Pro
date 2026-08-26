@@ -20,17 +20,109 @@ from typing import Any
 
 from sdd_lib.paths import workspace_root, repo_root
 
-_KV_RE = re.compile(r"^[-*]?\s*([A-Za-z][A-Za-z0-9_]*)\s*:\s*(.+?)\s*$")
+# Le `.` est admis dans le nom de cle : les cles composees du type
+# `AcceptanceGate.RequireE2E` / `.SmokeTimeout` / `.MinCoverage` sont lues
+# par `validate_acceptance.py` via la hierarchie layered
+# (base.yml <- team.yml <- stack.md). Avant l'audit 2026-08-26 la classe de
+# caracteres excluait le point : les 3 sous-cles etaient silencieusement
+# droppees cote `stack.md` ET cote `config.base.yml`, rendant mortes les
+# branches de `validate_acceptance._acceptance_config()`.
+_KV_RE = re.compile(r"^[-*]?\s*([A-Za-z][A-Za-z0-9_.]*)\s*:\s*(.+?)\s*$")
 # Bi-racine 2026-07-25 (MIGRATION-PLAN Phase 1) : les stack.md peuvent
 # référencer soit `.claude/stacks/...` (legacy) soit `.sdd/stacks/...`
 # (foyer neutre). Le pattern accepte les deux — l'ancien bootstrap génère
 # encore `.claude/stacks/` ; le nouveau bootstrap post-migration générera
 # `.sdd/stacks/`. `stack.md` reste projet, immutable dans son format.
-_ACTIVE_STACK_RE = re.compile(r"^\s*-\s*((?:\.claude|\.sdd)/stacks/[^\s]+\.md)\s*$")
-# `_SECTION_RE_TMPL` kept for backward-compat with external callers (none
-# in tree as of v7.0.0-alpha) — section parsing is now in
-# `sdd_lib.markdown_io.section_body` (audit CRIT-3, SSoT consolidation).
-_SECTION_RE_TMPL = r"^##\s+{heading}\s*\n(.*?)(?=^##\s+|\Z)"
+_STACK_ROOT_ALT = r"(?:\.claude|\.sdd)"
+CANONICAL_STACK_ROOT = ".sdd"
+STACK_CATEGORIES: tuple[str, ...] = (
+    "backend", "frontend", "fullstack", "mobiles", "ui", "qa", "auth", "archi",
+)
+_ACTIVE_STACK_RE = re.compile(rf"^\s*-\s*({_STACK_ROOT_ALT}/stacks/[^\s]+\.md)\s*$")
+_STACK_PATH_ANY_RE = re.compile(rf"{_STACK_ROOT_ALT}/stacks/")
+
+
+@lru_cache(maxsize=32)
+def stack_path_re(category: str | None = None, *, anchored: bool = True) -> re.Pattern[str]:
+    """Compiled bi-root regex matching an `## Active …` stack reference line.
+
+    SSoT for **every** consumer that parses stack paths out of `stack.md`
+    (audit 2026-08-25 — `phase_planner` saw 0 active stacks while
+    `sdd_full_planner` saw 8, because each had re-implemented the pattern
+    with a different root hardcoded). Never re-implement this regex : import
+    it.
+
+    Groups : `(1)` = category, `(2)` = stack id (both root-agnostic).
+
+    Args:
+        category: restrict to one category (e.g. `"backend"`). `None`
+            accepts any of `STACK_CATEGORIES`.
+        anchored: `True` (default) matches a whole list item line
+            (`  - .sdd/stacks/backend/x.md`) — use with `.match()`.
+            `False` matches the path anywhere in a line — use with
+            `.search()` (legacy `preflight` / `phase_planner` semantics).
+
+    Bi-racine (MIGRATION-PLAN Phase 1) : `.claude/stacks/…` (legacy
+    bootstrap) and `.sdd/stacks/…` (canonical, post-migration bootstrap)
+    are both accepted on read. Use `normalize_stack_path()` before
+    resolving anything on disk — only `.sdd/stacks/` exists there.
+    """
+    cat = re.escape(category) if category else "|".join(STACK_CATEGORIES)
+    body = rf"{_STACK_ROOT_ALT}/stacks/({cat})/([\w-]+)\.md"
+    if anchored:
+        return re.compile(rf"^\s*-\s*{body}\s*$", re.IGNORECASE)
+    return re.compile(body, re.IGNORECASE)
+
+
+def normalize_stack_path(path: str) -> str:
+    """Rewrite a legacy `.claude/stacks/…` reference to the canonical `.sdd/` root.
+
+    `stack.md` is a *project* artifact that may predate the `.claude → .sdd`
+    migration ; the framework only ships `.sdd/stacks/` on disk. Any caller
+    that turns a declared path into a filesystem lookup MUST normalize first.
+    Non-stack paths and already-canonical paths are returned unchanged.
+    """
+    return _STACK_PATH_ANY_RE.sub(f"{CANONICAL_STACK_ROOT}/stacks/", path, count=1)
+
+
+def parse_active_stack_ids(
+    text: str,
+    category: str | None = None,
+    *,
+    first_only: bool = False,
+) -> dict[str, list[str]]:
+    """Extract `{category: [stack_id, …]}` from a `stack.md` body (or one section).
+
+    Skips `#`-commented lines (a commented stack is an *inactive* stack —
+    the documented opt-out in every `## Active …` section). Order of
+    appearance is preserved.
+
+    Args:
+        text: full `stack.md` content or a single `## Active …` section body.
+        category: restrict parsing to one category.
+        first_only: keep only the first id per category (the "one active
+            stack per axis" contract used by `phase_planner` / `preflight`).
+    """
+    pattern = stack_path_re(category, anchored=False)
+    out: dict[str, list[str]] = {}
+    for line in text.splitlines():
+        if line.lstrip().startswith("#"):
+            continue
+        m = pattern.search(line)
+        if not m:
+            continue
+        cat, stack_id = m.group(1).lower(), m.group(2)
+        bucket = out.setdefault(cat, [])
+        if first_only and bucket:
+            continue
+        bucket.append(stack_id)
+    return out
+
+
+# Section parsing lives in `sdd_lib.markdown_io.section_body` (audit CRIT-3,
+# SSoT consolidation). Le duplicat local `_SECTION_RE_TMPL` a ete supprime
+# (audit 2026-08-26) : zero appelant en arbre, et sa variante divergente
+# etait exactement le drift que CRIT-3 fermait.
 
 # ---------------------------------------------------------------------------
 # Type coercion (v7.0.0-alpha, opt-in)
@@ -141,9 +233,19 @@ def _read_text_cached(path_str: str, mtime_ns: int) -> str:
     performs the existence + stat lookup that produces the cache key.
     Raises OSError if the file vanished between stat and read (rare race
     condition handled by the caller).
+
+    Encodage (audit 2026-08-26) : `utf-8-sig` + `errors="replace"`.
+    `stack.md` est gitignored, edite a la main, sous Windows, et porte des
+    commentaires accentues. Un re-save par un editeur en ANSI (cp1252) faisait
+    remonter un `UnicodeDecodeError` NON attrape a travers `read_project_config`
+    (~20 appelants) et `get_active_stack_paths` (~7) : tous les gates cassaient
+    d'un coup, avec une traceback brute donc sans prefixe `[CLASS]` (violation
+    `error-classification.md` §5). `utf-8-sig` absorbe aussi le BOM, alignant
+    ce lecteur sur ses jumeaux `stack_config.py` / `stack_db_config.py` /
+    `harness_preflight.py` / `conformance_run.py`.
     """
     del mtime_ns  # part of the key only — discriminates cached entries
-    return Path(path_str).read_text(encoding="utf-8")
+    return Path(path_str).read_text(encoding="utf-8-sig", errors="replace")
 
 
 def read_stack_md_text(root: Path | None = None) -> str | None:
@@ -164,8 +266,12 @@ def read_stack_md_text(root: Path | None = None) -> str | None:
         return None
     try:
         return _read_text_cached(str(path.resolve()), stat.st_mtime_ns)
-    except OSError:
-        # File vanished between stat() and read() — treat as absent.
+    except (OSError, ValueError):
+        # OSError    : file vanished between stat() and read().
+        # ValueError : couvre UnicodeDecodeError / LookupError (encodage exotique).
+        #              Avec `errors="replace"` ci-dessus c'est desormais une
+        #              ceinture de securite, plus le chemin nominal. Traiter comme
+        #              absent plutot que crasher les ~27 appelants (audit 2026-08-26).
         return None
 
 
@@ -315,10 +421,17 @@ def normalize_project_aliases(raw: dict[str, str]) -> dict[str, str]:
     return out
 
 
-def get_active_stack_paths(root: Path | None = None) -> list[str]:
-    """List `.claude/stacks/...` paths referenced under `## Active ...` sections.
+def get_active_stack_paths(root: Path | None = None, *, normalize: bool = True) -> list[str]:
+    """List stack paths referenced under the `## Active ...` sections of `stack.md`.
 
     v7.0.0-alpha (audit CRIT-2) : I/O cached via `read_stack_md_text()`.
+
+    Audit 2026-08-25 : returns **canonical `.sdd/stacks/...`** paths by
+    default. A legacy `stack.md` still referencing `.claude/stacks/...` is
+    parsed identically and rewritten on the fly, so downstream consumers
+    (`context_budget` pattern matching, disk resolution) get one single
+    truth. Pass `normalize=False` to get the raw declared strings (linters
+    reporting on the file's own content).
     """
     text = read_stack_md_text(root)
     if text is None:
@@ -327,5 +440,5 @@ def get_active_stack_paths(root: Path | None = None) -> list[str]:
     for line in text.splitlines():
         m = _ACTIVE_STACK_RE.match(line)
         if m:
-            paths.append(m.group(1))
+            paths.append(normalize_stack_path(m.group(1)) if normalize else m.group(1))
     return paths

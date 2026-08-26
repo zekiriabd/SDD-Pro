@@ -134,7 +134,7 @@ par `/spec-book`, précédemment sans label déclaré).
 | `[SECURITY]` | agent `security-reviewer` | 5 |
 | `[ARCH-REVIEW]` | agent `arch-reviewer` | 5 |
 | `[ADV-REVIEW]` | agent `adversarial-reviewer` (opt-out — actif par défaut, skip avec `--no-adversarial`) | 5 |
-| `[REVERSE]` | les 12 agents `reverse-*` + 18 commandes `/sdd-reverse*` + `/sdd-proc-reverse*` (module reverse — suffixes d'état et format : `rules/reverse-engineering.md §7`) | reverse 1-4 |
+| `[REVERSE]` | les 12 agents `reverse-*` + 18 commandes `/sdd-reverse*` + `/sdd-db-reverse*` (module reverse — suffixes d'état et format : `rules/reverse-engineering.md §7`) | reverse 1-4 |
 | `[SPECBOOK]` | agent `specbook-writer` (invoqué par `/spec-book` — vulgarise FEAT en langage humain, cache `workspace/docs/.sys/sections/`) | 5 (post-livraison) |
 | `[DONE]` | verdict final pipeline | 100% |
 

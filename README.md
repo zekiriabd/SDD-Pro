@@ -6,6 +6,9 @@ Framework FEAT-driven development **multi-harness** (Claude Code, Codex, Gemini 
 
 Documentation principale : [.claude/CLAUDE.md](.claude/CLAUDE.md)
 
+> 🗄️ **Vous avez une base legacy plutôt qu'un projet neuf ?** SDD_Pro lit vos procédures stockées, fonctions, vues, triggers et jobs **en lecture seule** et les rend sous forme de spécifications exploitables — [voir Reverse engineering SGBD](#-reverse-engineering-sgbd--votre-base-de-données-redevient-une-spécification).
+
+
 ---
 
 ## 🚀 Quickstart — nouveau projet
@@ -52,6 +55,8 @@ SDD_APP_NAME=MyApp SDD_COMBO=c1 python bootstrap.py --auto-init
 |---|:---:|:---:|:---:|:---:|:---:|
 | Multi-harness (Claude + Codex + Gemini…) | ✅ **natif** | ❌ | ❌ | ❌ | ❌ |
 | Multi-agents spécialisés | **25** | ~6 | ~5 | 4 | 8 |
+| Reverse engineering **SGBD** (procédures, fonctions, vues, triggers, jobs) | ✅ **natif** | ❌ | ❌ | ❌ | ❌ |
+| Reverse engineering **code legacy** (legacy → FEAT) | ✅ **natif** | ❌ | ❌ | ❌ | ❌ |
 | Reviewers post-code (5 angles, adversarial par défaut) | **5** ✅ | 1 | 1 | 1 | 2 |
 | Anti-derive strict (ownership matrix + STOP bloquant) | ✅ | partiel | ❌ | partiel | partiel |
 | Catalogues machine-readable (`.libs.json` + CVE + LTS) | ✅ | ❌ | ❌ | ❌ | ❌ |
@@ -75,6 +80,154 @@ Voir [cookbook 10 min](.sdd/docs/cookbook.md) pour démarrer.
 3. (Optionnel) déposer mockups HTML sous `workspace/ui/{n}-{m}-{Name}.html`.
 4. `/sdd-full {n}` — pipeline complet de A à Z.
 5. `/sdd-status [{n}]` — vérifier l'état.
+
+---
+
+## 🗄️ Reverse engineering SGBD — votre base de données redevient une spécification
+
+> **La logique métier de votre entreprise dort dans votre base de données.**
+> Des centaines de procédures stockées écrites sur quinze ans, par des développeurs
+> qui sont partis. Aucune documentation. Personne n'ose y toucher.
+> **SDD_Pro la lit — en lecture seule — et vous rend des spécifications.**
+
+Une seule commande, `/sdd-db-reverse-full`, se connecte avec la chaîne déclarée dans
+`stack.md ## Active Database`, inventorie **tout ce que la base sait faire**, et produit
+des FEATs SDD_Pro standard — immédiatement consommables par `/sdd-full` pour régénérer
+l'application par-dessus. Le patrimoine SQL cesse d'être une boîte noire : il devient
+un backlog lisible, tracé et versionné.
+
+### Ce que la machine remonte réellement
+
+| Famille d'objets | Traitement |
+|---|---|
+| **Procédures stockées** | corps analysé → **1 User Story** |
+| **Fonctions** (scalaires, inline, table) | corps analysé → **1 User Story** |
+| **Vues** et **triggers** | corps analysé → **1 User Story** |
+| **Packages Oracle** (spec + body) | corps analysé → **1 User Story** |
+| **Tables, colonnes, types, PK/FK, index, contraintes `CHECK`** | introspection live → `db-schema.json` |
+| **Jobs / scheduler, séquences, synonymes, linked servers, types utilisateur** | introspection live → `catalogObjects` |
+
+> 💡 **Ce que les autres outils ratent.** Les contraintes `CHECK` et les **jobs
+> planifiés** sont les deux plus gros gisements de règles métier *invisibles depuis
+> le code applicatif* : un job porte du comportement nocturne (recalcul, purge,
+> import) que rien, dans l'application, ne révèle. SDD_Pro les remonte au même titre
+> qu'une procédure.
+
+### Le modèle, en une ligne
+
+**1 objet SQL = 1 User Story · 1 module métier = 1 FEAT.** Pas de fusion, pas
+d'invention, pas de résumé qui écrase le détail.
+
+```
+stack.md (## Active Database)
+   └─ Phase 1 — introspection READ-ONLY (0 token)
+        ├─ snapshot des corps SQL + db-schema.json + inventory.json
+        └─ découpage en modules métier (stratégie AUTO, mesurée sur VOS noms d'objets)
+             └─ Rung 1 — reverse-sql-analyst × module (LLM, parallèle borné)
+                  └─ Rung 2 — composition des FEATs (déterministe, ou LLM en opt-in)
+                       └─ REVERSE-GATE ─► /sdd-full
+```
+
+### Une équipe d'agents spécialisés, pas un prompt géant
+
+Le module reverse mobilise **12 agents** dédiés, dont **2 experts SQL** sur le chemin
+base de données — chacun avec un périmètre de lecture verrouillé et un mandat unique :
+
+| Agent | Mandat |
+|---|---|
+| **`reverse-sql-analyst`** *(rung 1)* | Expert multi-dialecte (T-SQL, PL/pgSQL, PL/SQL, MySQL/PSM, SQL PL). Lit le corps d'un module et en tire une User Story par objet : comportement observé, critères d'acceptation dérivés du flux réel, evidence `fichier:ligne`, niveau de confiance plafonné par langage. |
+| **`reverse-sql-feat-composer`** *(rung 2, opt-in)* | Synthétise la FEAT métier d'un module : narratif transverse, plomberie technique démotée. À réserver aux modules à forte logique métier — pour du CRUD, l'assembleur déterministe suffit. |
+| **`reverse-completeness-reviewer`** | Confronte la FEAT produite à l'inventaire brut et **dit ce que l'extraction a oublié**. Verdict informationnel, jamais complaisant. |
+| **`reverse-clarifier`** | Transforme les zones d'ombre en questions structurées pour le Tech Lead, puis réinjecte les réponses dans les FEATs. Aucune réponse n'est jamais inventée. |
+
+Les agents s'exécutent **en parallèle borné** (`MaxParallel`, défaut 3), sur des
+écritures disjointes. Aucun agent n'en spawne un autre : c'est la commande qui
+orchestre — la facture reste prévisible.
+
+### 70 à 80 % de votre base ne coûte pas un seul token
+
+C'est le cœur de l'économie du module. Avant d'appeler le moindre LLM, un routeur
+**déterministe** classe chaque objet :
+
+- **objet simple** (CRUD / SELECT, sans branche, sans SQL dynamique, sans gestion
+  d'erreur) → sa User Story est générée **mécaniquement, à coût nul** ;
+- **objet complexe** (vraie logique métier) → et seulement là, un agent est réveillé.
+
+S'ajoutent un **cache par objet** (un corps inchangé n'est jamais ré-analysé : un
+second run après interruption est quasi gratuit) et des garde-fous de périmètre
+(`--schema`, `--include`, `--exclude`, `--limit`) qui **nomment toujours ce qu'ils
+ont écarté** — jamais de troncature silencieuse.
+
+### Le découpage en modules est mesuré, pas deviné
+
+C'est la décision la plus structurante du reverse : elle fixe le nombre de FEATs.
+SDD_Pro **profile vos conventions de nommage réelles** (préfixes `SP_`, `STP_`, `BI_`,
+verbes propres à la maison) au lieu de plaquer une convention théorique. Si le nommage
+est trop fragmenté pour être exploitable, le moteur **bascule automatiquement** sur la
+cohésion du graphe de dépendances (tables partagées, appels croisés) — et ne retient
+la bascule que si elle regroupe réellement mieux. La stratégie retenue, la
+fragmentation mesurée et le profil appris sont tracés dans `inventory.json` et
+annoncés en clair :
+
+```
+[REVERSE] DB Facturation → 214 procédure(s) regroupée(s) en 31 module(s)/FEAT
+          — regroupement par cohésion — nommage inexploitable (fragmentation 0.82). (Phase 1 OK)
+```
+
+### Lecture seule : une garantie d'architecture, pas une promesse
+
+Votre DBA peut dormir. Le moteur n'émet **que** des `SELECT` de catalogue
+(`sys.sql_modules`, `sys.procedures`, …) et `OBJECT_DEFINITION`, validés à l'exécution
+par un `readonly_guard`. **Jamais** de `DROP` / `DELETE` / `TRUNCATE` / `ALTER` /
+`INSERT` / `UPDATE` / `MERGE`, **jamais** d'exécution de procédure — l'interdit est
+porté par la classe bloquante `[DB_STRUCTURE_CHANGE_FORBIDDEN]` et l'invariant
+`reverse-db-readonly`. Le mot de passe reste en RAM : **jamais loggé, jamais persisté**
+dans les artefacts produits. Recommandation de défense en profondeur : un login dédié
+`GRANT VIEW DEFINITION` + `db_datareader`.
+
+### Rien n'est livré sans être qualifié
+
+- **Traçabilité descendante** : chaque item de FEAT remonte à un critère d'US, qui
+  remonte à une ligne de snapshot SQL. Les `evidence:` sont **résolues sur disque** —
+  un pointeur mort est un gap, pas un feu vert.
+- **Gate de consommation** : une FEAT dont la confiance n'est pas `high` **ne passe
+  pas** dans `/sdd-full` (exit 1). Du SQL dynamique ou chiffré impose une revue humaine
+  — le forçage existe (`--allow-reverse-low`) mais il est explicite et tracé.
+- **Votre travail n'est jamais écrasé** : chaque FEAT porte l'empreinte de son contenu
+  généré. Si vous l'avez éditée, un re-run la **préserve** et vous le dit.
+- **Idempotence** : re-lancer la commande réutilise les identifiants déjà alloués — pas
+  d'orphelin, pas de doublon.
+
+### Moteurs supportés
+
+| Moteur | Statut |
+|---|---|
+| **SQL Server**, **PostgreSQL** | 🟢 live-validés |
+| **Oracle**, **MySQL / MariaDB** | 🟡 scaffold-validés — requêtes read-only et flux hors ligne testés, runtime live à valider sur une base de test avant production |
+| DB2, SQLite | reconnus, refusés avec un message explicite |
+
+### Démarrer
+
+```bash
+# 1. Driver lecture seule (une fois)
+pip install -e ".sdd/python[reverse-db]"     # + ODBC Driver 18 pour SQL Server
+
+# 2. Renseigner stack.md ## Active Database (DB_HOST / DB_NAME / DB_USER / DB_PASSWORD,
+#    valeurs en clair ou placeholders ${VAR} résolus depuis un .env)
+```
+
+```text
+/sdd-db-reverse-full                          # toute la base
+/sdd-db-reverse-full --schema dbo --limit 50  # périmètre borné (recommandé au 1er run)
+/sdd-db-reverse dbo.usp_Contact_Insert        # un seul objet, pour évaluer sans engager
+```
+
+**Essayez sur un seul module.** Vous obtiendrez une FEAT lisible par un PO, sourcée
+ligne à ligne, sur du code que plus personne ne comprenait ce matin.
+
+Détail complet : [.sdd/docs/reverse-engineering-workflow.md](.sdd/docs/reverse-engineering-workflow.md) ·
+[.sdd/docs/reverse-db-audit-2026-07.md](.sdd/docs/reverse-db-audit-2026-07.md) ·
+[.sdd/rules/reverse-engineering.md](.sdd/rules/reverse-engineering.md)
 
 ---
 

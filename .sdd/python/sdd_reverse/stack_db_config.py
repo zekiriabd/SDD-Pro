@@ -32,6 +32,9 @@ _DOTENV_CANDIDATES = (
 )
 
 _REQUIRED = ("DB_HOST", "DB_NAME")
+# Keys under `## Active Database` that may hold a full connection string (M6).
+_CONNSTR_KEYS = ("DB_CONNECTION_STRING", "CONNECTIONSTRING", "CONNECTION_STRING",
+                 "DB_CONNSTR", "CONNSTR")
 _SECTION_RE = re.compile(r"^##\s+Active\s+Database\b", re.IGNORECASE)
 _NEXT_SECTION_RE = re.compile(r"^##\s+")
 # Accept "DB_HOST: x", "- DB_HOST: x", "DB_HOST = x", "`DB_HOST`: x"
@@ -75,23 +78,61 @@ class DbConfig:
             )
 
 
-def _load_dotenv(base: Path) -> dict[str, str]:
+def _dotenv_bases(stack_path: Path) -> list[Path]:
+    """Directories to search for a `.env`, most specific first.
+
+    Audit 2026-08-25: the search used to be relative to `Path.cwd()` ONLY. Run
+    from anywhere but the repo root — a subdirectory, a hook, a CI step with its
+    own working directory, or simply `--stack` given as an absolute path — the
+    `.env` was silently missed and the run failed with "references unset
+    environment variable(s)", which is actively misleading: the variables ARE
+    set, in a file the loader never looked at.
+
+    Anchoring on stack.md's own location fixes that, because `workspace/stack/`
+    is where the file lives by convention and the repo root is two levels up.
+    `Path.cwd()` is kept last for backward compatibility.
+    """
+    bases: list[Path] = []
+    try:
+        anchor = stack_path.resolve().parent
+    except OSError:                          # pragma: no cover - exotic FS
+        anchor = Path.cwd()
+    # Walk up from stack.md: workspace/stack → workspace → repo root → above.
+    current = anchor
+    for _ in range(4):
+        bases.append(current)
+        if current.parent == current:
+            break
+        current = current.parent
+    bases.append(Path.cwd())
+    seen: set[Path] = set()
+    unique: list[Path] = []
+    for b in bases:
+        if b not in seen:
+            seen.add(b)
+            unique.append(b)
+    return unique
+
+
+def _load_dotenv(bases: Path | list[Path]) -> dict[str, str]:
     """Parse simple KEY=VALUE lines from candidate .env files (zero-dep)."""
     env: dict[str, str] = {}
-    for rel in _DOTENV_CANDIDATES:
-        p = base / rel
-        try:
-            text = p.read_text(encoding="utf-8-sig")
-        except OSError:
-            continue
-        for line in text.splitlines():
-            line = line.strip()
-            if not line or line.startswith("#") or "=" not in line:
+    base_list = [bases] if isinstance(bases, Path) else list(bases)
+    for base in base_list:
+        for rel in _DOTENV_CANDIDATES:
+            p = base / rel
+            try:
+                text = p.read_text(encoding="utf-8-sig")
+            except OSError:
                 continue
-            k, _, v = line.partition("=")
-            k = k.strip()
-            v = v.strip().strip('"').strip("'")
-            env.setdefault(k, v)   # first file wins
+            for line in text.splitlines():
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                k, _, v = line.partition("=")
+                k = k.strip()
+                v = v.strip().strip('"').strip("'")
+                env.setdefault(k, v)   # first file wins (most specific base)
     return env
 
 
@@ -144,15 +185,20 @@ def read_db_config(stack_path: str | Path) -> DbConfig:
             kv[m.group("k").strip().upper()] = m.group("v").strip()
 
     # Resolve ${VAR}/$VAR placeholders from .env (if any) then the real env.
-    # .env candidates are relative to the project root = cwd when commands run.
-    env_map = {**_load_dotenv(Path.cwd()), **os.environ}
+    # Bases are anchored on stack.md's own location, not the cwd — see
+    # `_dotenv_bases`. The real environment always wins over a .env file.
+    bases = _dotenv_bases(p)
+    env_map = {**_load_dotenv(bases), **os.environ}
     missing: set[str] = set()
     kv = {k: _resolve(v, env_map, missing) for k, v in kv.items()}
     if missing:
+        searched = ", ".join(
+            str(base / rel) for base in bases[:3] for rel in _DOTENV_CANDIDATES
+        )
         raise StackConfigError(
             f"{ERROR_CLASS} stack.md '## Active Database' references unset "
             f"environment variable(s): {sorted(missing)}. Set them (shell or .env) "
-            f"or put literal values in stack.md."
+            f"or put literal values in stack.md. Searched for .env in: {searched}"
         )
 
     cfg = DbConfig(
@@ -164,6 +210,23 @@ def read_db_config(stack_path: str | Path) -> DbConfig:
         password=kv.get("DB_PASSWORD", ""),
         extra={k: v for k, v in kv.items()
                if k not in {"DATABASETYPE", "DB_TYPE", "DB_HOST", "DB_PORT",
-                            "DB_NAME", "DB_USER", "DB_PASSWORD"}},
+                            "DB_NAME", "DB_USER", "DB_PASSWORD",
+                            *_CONNSTR_KEYS}},
     )
+
+    # M6 (audit 2026-08-25) — accept a whole connection string, the form the Tech
+    # Lead actually holds (appsettings.json, persistence.xml, k8s secret). The
+    # decomposed keys stay authoritative where both are present: an explicit
+    # DB_HOST is a deliberate override, the connection string only fills gaps.
+    raw_cs = next((kv[k] for k in _CONNSTR_KEYS if kv.get(k)), "")
+    if raw_cs:
+        from sdd_reverse.conn_string import ConnStringError, parse_connection_string
+        try:
+            parsed = parse_connection_string(raw_cs, db_type_hint=cfg.db_type)
+        except ConnStringError as exc:
+            raise StackConfigError(str(exc)) from exc
+        for attr in ("db_type", "host", "port", "name", "user", "password"):
+            if not getattr(cfg, attr):
+                setattr(cfg, attr, getattr(parsed, attr))
+        cfg.extra.setdefault("_connStringFormat", parsed.fmt)
     return cfg

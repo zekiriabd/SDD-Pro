@@ -20,7 +20,7 @@
 | §1.12 | **Perf** (`[PERF_*]`) — héritage, réactivé via `ingest_lighthouse.py` | 16 | CI ingest | report only |
 | §1.13 | **Spec Compliance** (`[SPEC_*]`) — AC-by-AC verification | 9 | spec-compliance-reviewer | report only |
 | §1.14 | **Tooling/Governance** (`[SCAN_*]`/`[DISCOVER_*]`/`[CHECKPOINT_*]`/`[CONFIG_*]`/`[PROFILE_*]`/`[DRIFT_*]`/`[ARCH_*]`/`[REVIEW_*]`/`[STACK_COMBO_*]`/`[FRAMEWORK_PROTECTED]`/`[ENV_BYPASS_BLOCKED]`/`[PRICING_UNKNOWN]`/`[SECRET_PROVIDER_LEAK_RISK]`/hooks préflight) | 34 | scripts mono-shot + hooks | mostly info, qq. bloquantes |
-| §1.15 | **Adversarial** (`[ADV_*]`) — opt-in `/sdd-review --adversarial` | 6 | adversarial-reviewer | informational |
+| §1.15 | **Adversarial** (`[ADV_*]`) — opt-out (actif par défaut, `--no-adversarial` pour skip) | 6 | adversarial-reviewer | informational |
 | §1.16 | **Inconnue** (`[UNKNOWN]`) | 1 | fallback | report only |
 
 **Verdict consolidé** (§1.10-1.13) dépend du seuil `{Kind}FailOn` du
@@ -54,8 +54,9 @@ le tableau d'actions par famille.
 >    pour cohérence entities ↔ DB).
 ### 1.15 Adversarial Review (avocat du diable, R1 — 2026-05-24, v7.0.0)
 
-Émises par l'agent `adversarial-reviewer` (Sonnet 4.6) invoqué par
-`/sdd-review --adversarial` (opt-in). **Aucune classe n'est bloquante
+Émises par l'agent `adversarial-reviewer` (Sonnet 4.6), **actif par défaut**
+(`AdversarialReviewMode: full`). Pour désactiver ponctuellement : `--no-adversarial`.
+Pour désactiver en config : `AdversarialReviewMode: off`. **Aucune classe n'est bloquante
 par design** — verdict global toujours `informational`. Ces préfixes
 existent pour qu'une attaque soit traçable (file:line) et que le Tech
 Lead puisse extraire celles qui valent une US de remédiation.

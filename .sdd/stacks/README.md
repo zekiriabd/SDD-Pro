@@ -1,6 +1,6 @@
 # `.sdd/stacks/` — Catalogue des stacks techniques SDD_Pro
 
-> **Note de comptage** (audit MN2 2026-06-07) : ce fichier `README.md` est un **index documentaire**, PAS un stack. Le comptage canonique "34 stacks actifs" (cf. `CLAUDE.md §6`) **exclut** ce README. Si `find .claude/stacks -name "*.md"` retourne 35 entrées, le delta est ce fichier d'index.
+> **Note de comptage** (audit MN2 2026-06-07) : ce fichier `README.md` est un **index documentaire**, PAS un stack. Le comptage canonique "34 stacks actifs" (cf. `CLAUDE.md §6`) **exclut** ce README. Si `find .sdd/stacks -name "*.md"` retourne 35 entrées, le delta est ce fichier d'index.
 
 > Tous les stacks listés ici sont **chargeables** par le framework. Leur
 > niveau de maturité (🟢 reference / 🟡 experimental) est signalé par le

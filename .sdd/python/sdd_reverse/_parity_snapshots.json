@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
   "createdAt": "2026-06-10T08:42:50Z",
-  "updatedAt": "2026-06-11T20:42:29Z",
+  "updatedAt": "2026-08-24T12:16:26Z",
   "purpose": "ADV-16 parity tracking. Drift detection: if any hash here differs from current sdd_lib/* hash, reverse helpers may need a refresh sync. WARN-only via reverse_smoke.py (V2).",
   "snapshots": {
     "sdd_lib/atomic_write.py": "eeaeb38496e81cd94cef0a638b915283abec069c8a2dceb0fbdf3cdb044e919f",
-    "sdd_lib/file_locks.py": "96c6cb9a701fe574733581fbd05174b88e963f32d8957ef16069097656d9b7da",
+    "sdd_lib/file_locks.py": "b77381cc9c09102069f48ff8a89ca75cd09932d61421ce00d01abc8f89ab1f87",
     "sdd_reverse/atomic_write_local.py": "685b56d14d37f8dd50db1364c40b1b3d8ea858836c9b880a86d565a16c33d460",
     "sdd_reverse/file_locks_local.py": "d405a85de8b7c1fa2cb32ebbf02c9beab4aa72011c0aa106afbadd32ff7eb36e"
   },

@@ -98,9 +98,9 @@ supprimer ligne ET régénérer les US. `Covers` réfèrent par valeur.
 + 3 phases optionnelles emprunt Reversa (2026-06-12) : `/sdd-reverse-paradigm`
 (gap paradigme + curation), `/sdd-reverse-parity` (specs Gherkin de parité),
 `/sdd-reverse-questions` (boucle validation humaine, `--ingest`)
-+ 2 proc-reverse (2026-06-29, **base de données → FEAT**, lecture seule via
-`stack.md ## Active Database`) : `/sdd-proc-reverse-full` (tous les objets SQL)
-et `/sdd-proc-reverse {objet}` (un objet) — **procédures + fonctions + vues +
++ 2 db-reverse (2026-06-29, **base de données → FEAT**, lecture seule via
+`stack.md ## Active Database`) : `/sdd-db-reverse-full` (tous les objets SQL)
+et `/sdd-db-reverse {objet}` (un objet) — **procédures + fonctions + vues +
 triggers** (+ packages Oracle), 1 objet SQL = 1 US, 1 module = 1 FEAT.
 4 moteurs (2026-07-24) : SQL Server + PostgreSQL (live-validés), Oracle + MySQL/
 MariaDB (scaffold-validés, runtime live pending). SSoT : `@.sdd/docs/reverse-engineering-workflow.md`
@@ -120,7 +120,7 @@ FEAT en langage humain, cache `workspace/docs/.sys/sections/`).
 `reverse-tech-auditor`, `reverse-tech-analyst`, `reverse-us-writer`,
 `reverse-feat-composer`, `reverse-ui-extractor`, `reverse-completeness-reviewer`,
 `reverse-paradigm-advisor`, `reverse-parity-inspector`, `reverse-clarifier`,
-`reverse-sql-analyst` (proc-reverse : corps d'objet SQL → User Story, lecture seule),
+`reverse-sql-analyst` (db-reverse : corps d'objet SQL → User Story, lecture seule),
 `reverse-sql-feat-composer` (opt-in `SDD_REVERSE_FEAT_LLM=1` : compose la FEAT
 métier d'un module SQL).
 **Scripts déterministes** (0 token) : `complexity_router.py` (rubric
@@ -149,7 +149,7 @@ Templates : `@.sdd/docs/conventions.md §14-§15`.
 > **Chargement paresseux (TOK-C1, audit 2026-06-12)** : 9 des 11 rules portent une
 > frontmatter `paths:` (path-scoped rules, mécanisme natif Claude Code) → elles ne
 > s'auto-injectent qu'au contact de fichiers de leur périmètre (`workspace/src`,
-> `workspace/old`, `.sys/.validation`, `.claude/stacks`…) au lieu de polluer **chaque**
+> `workspace/old`, `.sys/.validation`, `.sdd/stacks`…) au lieu de polluer **chaque**
 > session et **chaque** sous-agent. Seules `output-protocol.md` + `error-classification.md`
 > restent inconditionnelles (contrat universel : tout agent émet chat 1L + `[CLASS]`).
 > Les agents continuent de Read explicitement leurs rules en STEP contexte (la

@@ -78,8 +78,28 @@ def main(argv: list[str] | None = None) -> int:
     signatures = load_signatures(language_signatures_path())
     scan_result = scan_project(project_root, signatures)
 
+    # Phase 1 code-graph.json — the strong (type-usage) edge resolver. Consumed
+    # instead of re-deriving internal edges from the weaker namespace+using
+    # heuristic, which resolved nothing at all on namespace-less legacy such as
+    # WebForms App_Code/ and therefore reported the whole app as dead code
+    # (audit F-03). Absent/corrupt file → rebuild in-memory from scan_result
+    # rather than silently degrading to the weak heuristic.
+    code_graph: dict | None = None
+    code_graph_path = sys_dir / "code-graph.json"
+    if code_graph_path.is_file():
+        try:
+            loaded = json.loads(code_graph_path.read_text(encoding="utf-8"))
+            if isinstance(loaded, dict):
+                code_graph = loaded
+        except (OSError, json.JSONDecodeError) as e:
+            print(f"WARN: [REVERSE_NO_SOURCE] code-graph.json unreadable ({e}) — rebuilding in memory",
+                  file=sys.stderr)
+    if code_graph is None:
+        from sdd_reverse.code_graph_builder import build_code_graph
+        code_graph = build_code_graph(project_root, scan_result)
+
     # Build deps graph
-    deps_graph = build_deps_graph(project_root, scan_result)
+    deps_graph = build_deps_graph(project_root, scan_result, code_graph=code_graph)
     atomic_write_text(sys_dir / "deps-graph.json",
                        json.dumps(deps_graph, indent=2, ensure_ascii=False) + "\n")
 

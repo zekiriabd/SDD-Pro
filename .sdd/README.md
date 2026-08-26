@@ -62,7 +62,6 @@ CalcABC) n'est pas `UNTESTED` ; tout autre combo attend un conformance run (§10
 | `capability-matrix.yml` | Matrice machine harnais × mécanismes (§7.1 du plan) | 0.2 |
 | `providers/{anthropic,openai,moonshot,google}.yaml` | Axe 2 — providers pluggables (schéma §8.2) | 1.8 |
 | `agent-bounds.yaml` | Bornes tier par agent (25 agents, table §8.bis.7) | 1.9 |
-| `stack-sections.proposed.md` | Texte des 3 sections à ajouter au `stack.md.template` (proposition, PAS appliquée) | 1.7 |
 | `python/sdd_lib/model_resolver.py` | Résolveur pur (clamp, level→tier, resolve) — testable en isolation | 1.5/1.9 |
 | `python/tests/test_model_resolver.py` | Tests unitaires du résolveur | 1.5/1.9 |
 | `rules-manifest.yaml` | Manifest neutre des 11 rules (body_source vers vivant, scope, mapping harnais) | 2.3 |

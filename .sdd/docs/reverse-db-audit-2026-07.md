@@ -24,11 +24,41 @@
 >    pur** (garde-fou `readonly_guard`). Cf. `tests/test_reverse_db_dialects.py`,
 >    `tests/test_reverse_db_views_triggers.py`. Les « ❌ » ci-dessous restent
 >    pour l'historique ; statut réel = ✅ (voir §7).
+>
+> **Mise à jour 2026-08-25 (C1 structure live + objets de catalogue + clustering)** :
+> 1. **Structure relationnelle lue en LIVE** (`db_schema_live.py`) : tables,
+>    colonnes, types, PK, FK, index, contraintes CHECK depuis le **catalogue**,
+>    plus depuis un DDL `.sql` statique. Produit le **même** contrat
+>    `db-schema.json` que `db_schema_extractor` avec `completeness: "live"`, donc
+>    l'ERD (`reverse_synth`), les entities et la FEAT transverse « Base de
+>    données » fonctionnent inchangés. L'evidence reste `file:line` grâce à un
+>    rendu `CREATE TABLE` lisible et **jamais exécuté** sous
+>    `.sys/schema-snapshot/`. Les 4 dialectes déclarent les 5 requêtes de
+>    structure (`tests/test_reverse_db_schema_live.py`).
+> 2. **Objets de catalogue sans corps** : jobs (SQL Agent / pg_cron /
+>    DBMS_SCHEDULER / events MySQL), séquences, synonymes, linked servers, types
+>    utilisateur — best-effort **par requête** (un `GRANT` refusé sur `msdb`
+>    dégrade en avertissement, il n'interrompt pas l'introspection).
+> 3. **Clustering en modules** : profilage dynamique du corpus de noms,
+>    rattachement des sous-objets (`ClientAdresse` → `Client`) et **bascule
+>    automatique** nommage → cohésion du graphe (seuil de fragmentation 0.50).
+>    Plus d'opt-in : c'est le défaut, avec deux overrides Tech Lead. Stratégie
+>    retenue **affichée en ligne de chat** + tracée dans
+>    `inventory.json._clusteringReport` (`tests/test_reverse_db_clustering.py`).
+> 4. **Connection string en entrée directe** (`conn_string.py`, `--conn-str`) et
+>    **bornage du périmètre** (`object_filter.py` : `--schema` / `--include` /
+>    `--exclude` / `--limit`), pour qu'une base de 3000 objets soit exécutable.
+>
+> **Réserve, explicite et non levée** : tout ce qui précède est validé
+> **hors ligne** (2400 tests, catalogues synthétiques). Aucun run n'a été fait
+> contre une vraie base — permissions, volumétrie et versions de moteur restent
+> à éprouver, en particulier sur `msdb` (jobs) et sur Oracle / MySQL, qui restent
+> **scaffold-validated**.
 
 ## 0. Verdict exécutif
 
 **La brique existe déjà, mais elle est étroite.** SDD_Pro possède un module
-`proc-reverse` (`/sdd-proc-reverse-full`, agent `reverse-sql-analyst`, dialectes
+`db-reverse` (`/sdd-db-reverse-full`, agent `reverse-sql-analyst`, dialectes
 SQL Server + PostgreSQL) qui fait ce qu'**aucun** des outils comparés ne fait :
 il **lit le corps des procédures stockées et le traduit en logique métier**
 (1 procédure = 1 User Story, 1 module = 1 FEAT), avec evidence `file:line`,
@@ -44,29 +74,31 @@ couvre aujourd'hui :
 |---|---|
 | Procédures stockées | ✅ corps analysé (business logic) |
 | Fonctions (scalaires/table) | ✅ corps analysé (`type IN 'FN','IF','TF'`) |
-| Tables / colonnes / contraintes / index / FK | ⚠️ **seulement via DDL statique** (`db_schema_extractor`), **pas** en live |
-| **Vues (corps)** | ❌ **noms seulement** (`db_schema_extractor` B4, corps non analysé) |
-| **Triggers (corps)** | ❌ **noms seulement** |
-| **Jobs / agent SQL** | ❌ absent |
-| **Packages (Oracle PL/SQL)** | ❌ absent |
-| **Séquences / synonymes** | ❌ absent |
-| **Linked servers** | ❌ absent |
+| Tables / colonnes / contraintes / index / FK | ✅ **live** depuis le catalogue (`db_schema_live`, C1 2026-08-25) — le DDL statique reste le chemin du reverse *applicatif* |
+| **Vues (corps)** | ✅ corps analysé (1 vue = 1 US) |
+| **Triggers (corps)** | ✅ corps analysé (1 trigger = 1 US) |
+| **Jobs / agent SQL** | ✅ **live** (msdb / pg_cron / DBMS_SCHEDULER / events MySQL), best-effort : un droit refusé dégrade en avertissement |
+| **Packages (Oracle PL/SQL)** | ✅ corps analysé |
+| **Séquences / synonymes** | ✅ **live** (objets de catalogue, best-effort) |
+| **Linked servers** | ✅ **live** (objets de catalogue, best-effort) |
 | **Dépendances objet↔objet** | ✅ **graphe global (P0.2)** — object→table + object→object, impact analysis, Mermaid |
 | **Applications consommatrices** | ✅ **corrélation DB↔apps (P0.3)** — `correlate_db_app.py` (db-introspection × data-access) : qui appelle quelle proc / touche quelle table, orphelins, drift |
-| Schéma global (ERD) | ⚠️ via `reverse_synth` (ERD Mermaid depuis DDL statique), pas depuis le live |
+| Schéma global (ERD) | ⚠️ via `reverse_synth` (ERD Mermaid) — alimenté **depuis le live** (C1) ; reste statique, pas d'exploration interactive (cf. DB7) |
 
-**En une phrase** : le cœur (escalier + business-logic + cahier des charges) est
-là et différenciant ; ce qui manque, c'est **(a)** l'introspection live du
-**graphe d'objets complet** (au-delà de proc+fonction), **(b)** l'analyse du
-**corps des vues/triggers**, **(c)** le **graphe de dépendances objet↔objet et
-objet↔application**, et **(d)** un **rapport structurel visuel** de niveau
-SchemaSpy. La roadmap §6 détaille.
+**En une phrase** (révisé 2026-08-25) : le cœur (escalier + business-logic +
+cahier des charges) est là et différenciant ; **(a)** l'introspection live du
+graphe d'objets complet, **(b)** l'analyse du corps des vues/triggers et
+**(c)** les graphes de dépendances objet↔objet et objet↔application sont
+**livrés** (P0.1 / P0.2 / P0.3 / C1). Ce qui manque réellement, c'est
+**(d)** un **rapport structurel visuel** de niveau SchemaSpy, **(e)** le lint /
+diff de schéma en CI, **(f)** un serveur MCP — et surtout **(g) la validation
+sur une vraie base**, qui n'a pas encore eu lieu. La roadmap §6 détaille.
 
 ---
 
 ## 1. Ce qui existe aujourd'hui (état précis, vérifié au code)
 
-Pipeline `proc-reverse` (SSoT : `reverse-proc-engineering.audit.md`) :
+Pipeline `db-reverse` (SSoT : `reverse-proc-engineering.audit.md`) :
 
 1. **Introspection live READ-ONLY** (`db_introspect.py` + `dialects/`) :
    connexion via `stack.md ## Active Database`, `ApplicationIntent=ReadOnly` +
@@ -89,26 +121,35 @@ Pipeline `proc-reverse` (SSoT : `reverse-proc-engineering.audit.md`) :
 6. **Validation** : `validate_reverse_feat.py` + REVERSE-GATE (confidence < high
    ⇒ `allow-sdd-full=false`).
 7. **Restitution humaine** : `/spec-book` → `cahier-des-charges.docx` (langage
-   gérant), **fonctionne déjà** sur les FEATs proc-reverse.
+   gérant), **fonctionne déjà** sur les FEATs db-reverse.
 
-Schéma structurel : `db_schema_extractor.py` extrait tables/colonnes/FK/index +
-ORM depuis **DDL statique `.sql`** (pas le live) ; vues/triggers = **noms seuls**
-(`parseWarnings`). `reverse_synth.py` rend un **ERD Mermaid** depuis ce schéma.
+Schéma structurel — **deux sources, un seul contrat** (`db-schema.json`) :
+- reverse **applicatif** (un dépôt legacy est présent) : `db_schema_extractor.py`
+  extrait tables/colonnes/FK/index + ORM depuis le **DDL statique `.sql`**
+  (`completeness: "basic"`) ;
+- reverse **base de données** (on n'a qu'une connection string) :
+  `db_schema_live.py` lit la même chose depuis le **catalogue vivant**
+  (`completeness: "live"`, C1 2026-08-25), plus les objets de catalogue sans
+  corps (jobs, séquences, synonymes, linked servers, types).
+
+`reverse_synth.py` rend un **ERD Mermaid** depuis ce schéma, quelle que soit la
+source. Vues et triggers ne sont plus des « noms seuls » : leur corps passe par
+l'escalier au même titre qu'une procédure.
 
 ---
 
 ## 2. Comparaison avec l'état de l'art
 
-| Critère | **SDD_Pro proc-reverse** | **SchemaSpy** | **SchemaCrawler** | **tbls** | **Cutter** |
+| Critère | **SDD_Pro db-reverse** | **SchemaSpy** | **SchemaCrawler** | **tbls** | **Cutter** |
 |---|---|---|---|---|---|
 | Domaine | DB → **spécifications métier** | DB → doc structurelle | DB → doc + lint + diff | DB → doc CI (markdown) | binaire → désassemblage |
-| Tables/colonnes/FK/index | ⚠️ DDL statique | ✅ live (JDBC) | ✅ live | ✅ live | n/a |
-| Vues (structure) | ❌ noms | ✅ | ✅ | ✅ | n/a |
-| **Vues / triggers (corps + logique)** | ❌ | ❌ | ❌ | ❌ | n/a |
+| Tables/colonnes/FK/index | ✅ live (catalogue) | ✅ live (JDBC) | ✅ live | ✅ live | n/a |
+| Vues (structure) | ✅ | ✅ | ✅ | ✅ | n/a |
+| **Vues / triggers (corps + logique)** | ✅ **corps → US** | ❌ | ❌ | ❌ | n/a |
 | **Procédures (logique métier)** | ✅ **corps → US** | ❌ | ❌ (métadonnées) | ❌ | n/a |
 | Relations implicites (sans FK) | ❌ | ✅ (heuristique) | ✅ | partiel | n/a |
-| ERD / diagrammes | ⚠️ Mermaid (synth) | ✅ **HTML interactif** | ✅ | ✅ (mermaid/PlantUML) | ✅ CFG/callgraph |
-| Graphe de dépendances | ⚠️ tables/proc | ✅ inter-tables | ✅ | ✅ | ✅ |
+| ERD / diagrammes | ⚠️ Mermaid (synth, depuis le live) | ✅ **HTML interactif** | ✅ | ✅ (mermaid/PlantUML) | ✅ CFG/callgraph |
+| Graphe de dépendances | ✅ objet↔table + objet↔objet + objet↔app | ✅ inter-tables | ✅ | ✅ | ✅ |
 | Rapport navigable HTML | ❌ | ✅ **fort** | ✅ | ✅ (markdown) | ✅ GUI |
 | Lint / diff schéma | ❌ | ❌ | ✅ **fort** | ✅ | n/a |
 | Intégration MCP / agentique | ⚠️ (headless, pas de serveur MCP) | ❌ | ✅ **serveur MCP** | ❌ | ✅ MCP (ReVA) |
@@ -152,11 +193,17 @@ ROI :
 ## 4. Failles / risques identifiés (spécifiques DB)
 
 ### 4.1 CRITIQUE
-- **DB1 — Couverture d'objets incomplète en live.** Seuls procs+fonctions sont
-  introspectés. Vues/triggers/jobs/packages/séquences/synonymes/linked servers
-  absents → un reverse « complet de la couche DB » ne l'est pas. Or beaucoup de
-  logique métier vit dans les **vues** (règles de présentation/agrégation) et
-  **triggers** (intégrité, cascades, audit).
+- ~~**DB1 — Couverture d'objets incomplète en live.**~~ ✅ **FERMÉ 2026-08-25
+  (P0.1 + C1)** : les objets **porteurs de corps** (procédures, fonctions, vues,
+  triggers, packages Oracle) passent tous par l'escalier — c'est là que vit la
+  logique métier des vues (agrégation/présentation) et des triggers (intégrité,
+  cascades, audit). Les objets **structurels et sans corps** sont lus dans le
+  même passage : tables, colonnes, types, PK/FK, index, contraintes CHECK
+  (`db_schema_live`), puis jobs, séquences, synonymes, linked servers et types
+  utilisateur (`catalog_object_queries`). **Reste ouvert** : la lecture est
+  best-effort par requête — un droit manquant (typiquement `msdb` pour les jobs
+  SQL Agent) dégrade le rapport en avertissement au lieu de le faire échouer, et
+  ce comportement n'a pas encore été observé sur une vraie base.
 - **DB2 — Analyse 100 % regex, pas d'AST SQL.** ⚠️ **PARTIELLEMENT ATTÉNUÉ
   2026-07-24 (P1)** : `sql_body_analyzer` masque désormais **commentaires ET
   littéraux de chaîne** avant l'extraction — le SQL construit dynamiquement
@@ -176,12 +223,31 @@ ROI :
   nom (le SQL dynamique reste invisible — cf. DB2).
 
 ### 4.2 MAJEUR
-- **DB4 — Clustering en modules par heuristique de nommage** (`usp_`, CamelCase).
-  ⚠️ **ATTÉNUÉ 2026-07-24 (P0.2)** : `cohesion_modules()` groupe par graphe de
-  dépendances (objets partageant des tables / s'appelant) — robuste sans
-  convention de nommage. **Opt-in** (`SDD_REVERSE_CLUSTER_COHESION=1`) pour ne
-  pas changer le comportement par défaut ; à promouvoir en défaut après
-  validation terrain.
+- ~~**DB4 — Clustering en modules par heuristique de nommage** (`usp_`,
+  CamelCase).~~ ✅ **FERMÉ 2026-08-25** — la promotion en défaut annoncée ci-dessus
+  a été faite, et l'heuristique fixe a été remplacée par une mesure :
+  1. **profilage du corpus** (`learn_name_profile`) : la structure de nommage est
+     *inférée* des noms réels (fréquence documentaire × concentration
+     positionnelle) au lieu d'être déclarée. Les marqueurs de type/sous-système
+     (`SP_`, `STP_`, `BI_`, `Prc`) et les verbes propres à la base sont
+     découverts, dans n'importe quelle langue. En dessous de 8 objets, aucun
+     profil n'est appris — et le rapport le dit, au lieu de prétendre avoir
+     appris quelque chose.
+  2. **rattachement des sous-objets** : `ClientAdresse` → module `Client` quand
+     `Client` est lui-même un module. Préfixe uniquement, frontières de tokens,
+     `Misc` exclu. L'US conserve le nom de **son** objet, donc deux US d'une même
+     FEAT ne collisionnent pas (CLAUDE.md §1).
+  3. **bascule automatique** : fragmentation (modules/objets) ≥ **0.50** ou un
+     objet sur deux sans verbe lisible ⇒ regroupement par **cohésion du graphe**.
+     La bascule n'est retenue que si elle regroupe réellement mieux ; sinon le
+     nommage est conservé et marqué `degraded` — un aveu, pas un faux positif.
+  4. **visible** : stratégie + fragmentation + sous-objets rattachés en ligne de
+     chat, et dans `inventory.json._clusteringReport`.
+
+  Overrides Tech Lead : `SDD_REVERSE_CLUSTER_COHESION=1` / `SDD_REVERSE_CLUSTER_NAMING=1`.
+  Couverture : `tests/test_reverse_db_clustering.py`. **Reste ouvert** : les
+  seuils (0.15 / 0.50) sont calibrés sur des corpus synthétiques ; ils devront
+  être revus après le premier run sur une vraie base.
 - **DB5 — Rung 2 déterministe côté DB vs LLM côté code.** ⚠️ **ADRESSÉ 2026-07-24
   (opt-in)** : nouvel agent `reverse-sql-feat-composer` (Opus, parité avec 3c
   `reverse-feat-composer`) qui synthétise la FEAT module depuis les US d'objets
@@ -275,9 +341,15 @@ ROI :
 5. ~~**Rung 2 LLM pour la FEAT DB** (DB5)~~ ✅ **LIVRÉ 2026-07-24 (opt-in)** :
    agent `reverse-sql-feat-composer` (`SDD_REVERSE_FEAT_LLM=1`). Reste : le
    promouvoir en défaut pour les modules complexes après validation terrain.
-6. **Dialecte Oracle** (DB6) : packages PL/SQL = le gisement de logique métier le
-   plus riche non couvert.
+6. ~~**Dialecte Oracle** (DB6)~~ ✅ **LIVRÉ 2026-07-24** : packages PL/SQL
+   (PACKAGE + PACKAGE BODY via DBMS_METADATA) introspectés. **Scaffold-validated**
+   — runtime live encore à faire.
 7. **Masquage secrets dans les corps SQL** (DB11).
+8. ~~**Structure relationnelle live** (tables/colonnes/PK/FK/index/CHECK)~~
+   ✅ **LIVRÉ 2026-08-25 (C1)** : `db_schema_live.py`, même contrat
+   `db-schema.json`, snapshot `CREATE TABLE` lisible et jamais exécuté pour
+   préserver l'evidence `file:line`. Ajoute jobs / séquences / synonymes /
+   linked servers / types (best-effort par requête).
 
 ### P2 — Restitution & intégration (emprunts)
 8. **Rapport structurel HTML + ERD interactif** (emprunt SchemaSpy) en complément
@@ -288,7 +360,7 @@ ROI :
 
 > **Déjà livré (2026-07-24)** : la **documentation cahier des charges** demandée
 > (« générer une doc de type cahier des charges dans le répertoire doc ») est
-> opérationnelle via `/spec-book` — elle humanise les FEATs proc-reverse
+> opérationnelle via `/spec-book` — elle humanise les FEATs db-reverse
 > (features, US, règles de gestion, scénarios) en `.docx` lisible par un
 > fonctionnel. Étendre P0 (vues/triggers/graphe) l'enrichira automatiquement,
 > puisque le cahier des charges se régénère depuis les FEATs.
@@ -301,11 +373,11 @@ ROI :
 |---|---|
 | Se connecter via connection string | ✅ `stack.md ## Active Database` + `db_introspect` (read-only) |
 | Récupérer procs, fonctions | ✅ |
-| Récupérer vues, triggers, tables, contraintes, index | ✅ **vues + triggers (corps, P0.1 livré, SQL Server)** ; tables/FK/index via DDL statique (live = P0 suite) |
+| Récupérer vues, triggers, tables, contraintes, index | ✅ **vues + triggers (corps analysé)** + **tables / colonnes / PK / FK / index / CHECK en live** (C1 2026-08-25) |
 | Packages (Oracle PL/SQL) | ✅ **P0.1 (Oracle, scaffold)** — PACKAGE + PACKAGE BODY via DBMS_METADATA |
-| Jobs, séquences, synonymes, linked servers | ❌ — suite P0 / P1 |
-| Schéma global (ERD) | ⚠️ Mermaid depuis DDL — **P2.8** pour le live/interactif |
-| Reverse détaillé de chaque composant SQL | ✅ procs/fonctions ; ⚠️ reste — **P0.1** |
+| Jobs, séquences, synonymes, linked servers | ✅ **live**, best-effort par requête (un droit refusé — `msdb` typiquement — dégrade en avertissement) |
+| Schéma global (ERD) | ⚠️ Mermaid **depuis le live** — **P2.8** pour l'interactif |
+| Reverse détaillé de chaque composant SQL | ✅ procs, fonctions, vues, triggers, packages Oracle |
 | Analyser la logique métier des procs/fonctions | ✅ (différenciateur) |
 | Dépendances objet↔objet et objet↔application | ✅ **P0.2 (graphe) + P0.3 (corrélation DB↔apps)** |
 | Escalade intelligente (comme le reverse code) | ✅ (routage complexité, escalier, confidence min-monotone) |

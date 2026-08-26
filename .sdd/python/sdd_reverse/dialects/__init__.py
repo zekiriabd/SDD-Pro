@@ -1,4 +1,4 @@
-"""dialects — DB-engine-specific catalog access for proc-reverse.
+"""dialects — DB-engine-specific catalog access for db-reverse.
 
 One generic SQL analyst agent + N small read-only dialects. MVP ships SQL Server;
 the seam below is where Postgres / Oracle / MySQL plug in (V2/V3) with no change

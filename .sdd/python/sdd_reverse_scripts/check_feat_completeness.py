@@ -63,8 +63,115 @@ def _resolve_unit(inventory: dict[str, Any], *, unit_id: str | None,
     return None
 
 
+def _mentioned(name: str, low_feat: str) -> bool:
+    """True if `name` appears in the FEAT, qualified or by its leaf.
+
+    Object names are schema-qualified since finding D1 (`dbo.Orders`), while a
+    FEAT may legitimately cite either form — comparing only the full string would
+    manufacture phantom gaps.
+    """
+    n = (name or "").strip().lower()
+    if not n:
+        return True
+    return n in low_feat or n.rsplit(".", 1)[-1] in low_feat
+
+
+def assess_db_module(unit: dict[str, Any], feat_text: str) -> dict[str, Any]:
+    """Completeness of a DB-reverse module FEAT vs its SQL objects.
+
+    Audit finding M3 (2026-08-25): this checker only understood the CODE-reverse
+    unit shape (`units[].classes` + `dataAccess`). A DB-reverse unit
+    (`kind: db-module`) carries `units[].procedures` instead, so the checker
+    found nothing to compare and returned a vacuous "complete" — worse than no
+    check at all, because it looked like a green verdict.
+
+    What matters for a SQL module, in order of severity:
+      - a SQL object of the module not named in the FEAT: the object IS the
+        capability, so an omission means a lost capability;
+      - a raised precondition (`RAISERROR`/`THROW`/`RAISE`/`SIGNAL`) with no trace
+        in the FEAT: that is a business RULE silently dropped;
+      - a written table not mentioned: undocumented data effect;
+      - an encrypted object: an inherent, irreducible gap — reported so it is
+        visible, never counted as an extraction failure.
+    """
+    gaps: list[dict[str, str]] = []
+    low = feat_text.lower()
+    procs = unit.get("procedures", []) or []
+
+    for p in procs:
+        fq = p.get("fqName", "")
+        if not _mentioned(fq, low):
+            gaps.append({
+                "type": "sql_object_not_mentioned",
+                "item": fq,
+                "role": str(p.get("routineType") or "routine"),
+                "severity": "serious",
+                "evidence": p.get("evidence", "?"),
+            })
+            # An object absent from the FEAT makes its own rules moot — do not
+            # pile up derived gaps that all say the same thing.
+            continue
+
+        if p.get("raises") and not any(
+            r.lower() in low for r in ("précondition", "precondition", "erreur",
+                                       "refus", "rejet", *[
+                                           str(x).lower() for x in p.get("raises", [])])
+        ):
+            gaps.append({
+                "type": "raised_rule_not_mentioned",
+                "item": f"{fq} ({', '.join(p.get('raises', []))})",
+                "severity": "serious",
+                "evidence": p.get("evidence", "?"),
+            })
+
+        for table in p.get("tablesWritten", []) or []:
+            if not _mentioned(table, low):
+                gaps.append({
+                    "type": "written_table_not_mentioned",
+                    "item": table,
+                    "severity": "moderate",
+                    "evidence": p.get("evidence", "?"),
+                })
+
+        if p.get("encrypted"):
+            gaps.append({
+                "type": "encrypted_object",
+                "item": fq,
+                "severity": "info",
+                "evidence": p.get("evidence", "?"),
+            })
+
+    serious = sum(1 for g in gaps if g["severity"] == "serious")
+    actionable = [g for g in gaps if g["severity"] != "info"]
+    if serious:
+        verdict = "incomplete"
+    elif actionable:
+        verdict = "partial"
+    else:
+        verdict = "complete"
+    return {
+        "unit": unit["id"],
+        "kind": "db-module",
+        "verdict": verdict,
+        "gaps": gaps,
+        "summary": {
+            "sqlObjects": len(procs),
+            "encrypted": sum(1 for p in procs if p.get("encrypted")),
+            "gapsTotal": len(actionable),
+            "serious": serious,
+        },
+    }
+
+
 def assess(unit: dict[str, Any], feat_text: str) -> dict[str, Any]:
     """Compute completeness gaps for a unit vs its FEAT text. Pure."""
+    # M3 — dispatch on the unit shape. A DB-reverse unit has `procedures`, never
+    # `classes`; running the code-reverse rubric on it yields a vacuous pass.
+    if unit.get("kind") == "db-module" or (
+        unit.get("procedures") and not unit.get("classes")
+    ):
+        return assess_db_module(unit, feat_text)
+
     gaps: list[dict[str, str]] = []
     low = feat_text.lower()
 
