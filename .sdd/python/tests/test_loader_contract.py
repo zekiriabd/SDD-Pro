@@ -92,7 +92,7 @@ REVERSE_AGENTS_V7 = frozenset({
     "reverse-paradigm-advisor",
     "reverse-parity-inspector",
     "reverse-clarifier",
-    # 2026-06-29 — stored-procedure reverse (proc-reverse) : DB live read-only
+    # 2026-06-29 — stored-procedure reverse (db-reverse) : DB live read-only
     # → US (1 proc = 1 US) / FEAT (1 module = 1 FEAT). loader.reverse.yml.
     "reverse-sql-analyst",
     # 2026-07-24 — OPT-IN rung 2 LLM composer for the DB module FEAT (parity

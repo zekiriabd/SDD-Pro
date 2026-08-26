@@ -30,7 +30,9 @@ jamais ce qu'elle devrait faire — *bias toward present*, evidence par AC.
 Argument requis : `{U-N}` (ex. `U-3`) ; optionnel `--proc {schema.nom}` (1 seule US).
 
 1. `workspace/old/{DbProject}/.sys/inventory.json` existe, `schemaVersion == 1`,
-   `source == "proc-reverse"`, et `units[id={U-N}]` présent. Sinon → STOP
+   `source == "db-reverse"` (les inventaires produits avant le renommage
+   2026-08-26 portent la valeur héritée `"proc-reverse"` — également acceptée),
+   et `units[id={U-N}]` présent. Sinon → STOP
    `[REVERSE_UNIT_NOT_FOUND]` ou `[REVERSE_INVENTORY_SCHEMA_STALE]`.
 2. Lire `.sdd/python/sdd_reverse/us.proc.reverse.template.md`. Absent → STOP
    `[REVERSE_TEMPLATE_MISSING]` (pas de fallback inline).

@@ -178,12 +178,15 @@ Format ERROR 3-lignes disque, 1 ligne chat (cf. `error-classification.md §2` qu
 | `[REVERSE_CURATION_PENDING]` | NON (WARN, Phase 2.7) | `reverse-paradigm-advisor` : ≥ 1 unité en verdict `HUMAN-DECISION` non arbitrée OU `Décision: PENDING` dans paradigm-decision.md. Le Tech Lead doit arbitrer avant `/sdd-full` — jamais bloquant, jamais destructif. |
 | `[REVERSE_QUESTIONS_PENDING]` | NON (informational, Phase 3.9) | `reverse-clarifier` : ≥ 1 bloc `Q-N` de `questions.md` sans `Réponse:` remplie. La boucle de validation humaine reste ouverte. |
 | `[REVERSE_ANSWER_INGEST_FAILED]` | NON (WARN, Phase 3.9) | `reverse-clarifier --ingest` : réponse `Q-N` inexploitable (ambiguë, hors sujet) — le bloc reste ouvert, aucun item FEAT édité pour ce Q-N. **Jamais comblé par interprétation**. |
-| `[REVERSE_DB_CONFIG_MISSING]` | **OUI** | proc-reverse : section `## Active Database` de `stack.md` absente/incomplète, OU `DatabaseType` non supporté par un dialecte implémenté. Émis par `stack_db_config.py` + `dialects.get_dialect`. |
-| `[REVERSE_DB_UNREACHABLE]` | **OUI** | proc-reverse : base injoignable (timeout/firewall) OU driver lecture seule absent (`pip install -e .sdd/python[reverse-db]`). Émis par `db_introspect.connect`. |
-| `[REVERSE_DB_AUTH_FAILED]` | **OUI** | proc-reverse : authentification refusée / droits insuffisants à la connexion lecture seule. Émis par `db_introspect.connect`. |
-| `[REVERSE_PROC_NOT_FOUND]` | **OUI** | proc-reverse : `/sdd-proc-reverse {nom}` sur une procédure absente du catalogue. Émis par `db_introspect.introspect` + `reverse_proc_introspect.py`. |
-| `[REVERSE_PROC_ENCRYPTED]` | NON (info) | proc-reverse : procédure `WITH ENCRYPTION` (corps `OBJECT_DEFINITION` NULL) — US `low` + bannière, jamais devinée. Émis par `db_introspect.build_introspection`. |
-| `[REVERSE_DB_READONLY_VIOLATION]` | **OUI** | proc-reverse : tentative d'envoyer au serveur un statement non-`SELECT` (DDL/DML/EXEC). Barrière mécanique `readonly_guard.assert_readonly` (défense en profondeur — ne devrait jamais se déclencher). |
+| `[REVERSE_DB_CONFIG_MISSING]` | **OUI** | db-reverse : section `## Active Database` de `stack.md` absente/incomplète, OU `DatabaseType` non supporté par un dialecte implémenté. Émis par `stack_db_config.py` + `dialects.get_dialect`. |
+| `[REVERSE_DB_UNREACHABLE]` | **OUI** | db-reverse : base injoignable (timeout/firewall) OU driver lecture seule absent (`pip install -e .sdd/python[reverse-db]`). Émis par `db_introspect.connect`. |
+| `[REVERSE_DB_AUTH_FAILED]` | **OUI** | db-reverse : authentification refusée / droits insuffisants à la connexion lecture seule. Émis par `db_introspect.connect`. |
+| `[REVERSE_PROC_NOT_FOUND]` | **OUI** | db-reverse : `/sdd-db-reverse {nom}` sur une procédure absente du catalogue. Émis par `db_introspect.introspect` + `reverse_proc_introspect.py`. |
+| `[REVERSE_PROC_ENCRYPTED]` | NON (info) | db-reverse : procédure `WITH ENCRYPTION` (corps `OBJECT_DEFINITION` NULL) — US `low` + bannière, jamais devinée. Émis par `db_introspect.build_introspection`. |
+| `[REVERSE_DB_READONLY_VIOLATION]` | **OUI** | db-reverse : tentative d'envoyer au serveur un statement non-`SELECT` (DDL/DML/EXEC), **ou** un pragma de session hors liste blanche. Deux barrières mécaniques : `readonly_guard.assert_readonly` (requêtes de catalogue) et `readonly_guard.assert_session_pragma` (les 3 `SET TRANSACTION …` émis à la connexion — audit 2026-08-25 N1 : ils partaient auparavant **sans garde**, ce qui rendait faux l'invariant `reverse-db-readonly`). Défense en profondeur — ne devrait jamais se déclencher. |
+| `[REVERSE_DB_SCHEMA_PARTIAL]` | NON (WARN) | db-reverse : une requête de **structure live** (`columns`/`primary_keys`/`foreign_keys`/`indexes`/`checks`) a échoué ou n'a rien renvoyé — droit manquant, version de moteur, catalogue absent. La section correspondante de `db-schema.json` reste vide, le reste du schéma est produit. Émis par `db_schema_live.fetch_structure` + `build_live_schema`. Un droit refusé dégrade le rapport, il n'interrompt jamais un run par ailleurs réussi. |
+| `[REVERSE_DB_OBJECTS_PARTIAL]` | NON (WARN) | db-reverse : une famille d'**objets sans corps** (job/séquence/synonyme/linked server/type utilisateur) n'est pas lisible. Cas NORMAL et fréquent : `msdb` non accordé au login d'introspection, extension `pg_cron` absente, `CHECK_CONSTRAINTS` inexistant avant MySQL 8.0.16. Émis par `db_schema_live.fetch_catalog_objects`. |
+| `[REVERSE_DB_HOMONYM]` | NON (info) | db-reverse : une même nom de table existe dans ≥ 2 schémas (`dbo.Orders` **et** `sales.Orders`). Légitime, mais signalé car tout consommateur qui indexe les entités par nom nu les fusionnerait — utiliser `qualifiedName`. Émis par `db_schema_live.build_live_schema`. |
 
 > **Classes retirées (audit 2026-06-11 MA-7)** : `[REVERSE_LANG_UNKNOWN]`,
 > `[REVERSE_DB_SCHEMA_MISSING]`, `[REVERSE_DB_SCHEMA_DEGRADED]`,
@@ -230,7 +233,7 @@ encore câblés. État vérifié par grep croisé code/prompts :
   taxonomie par l'audit 2026-06-11 — elles étaient émises par
   `reverse_status.py` sans figurer en §6, violant le contrat réciproque),
   `PARITY_INVALID`, `PARITY_COVERAGE_GAP` (`validate_parity_features.py`,
-  emprunt Reversa 2026-06-12), plus proc-reverse (DB live read-only) :
+  emprunt Reversa 2026-06-12), plus db-reverse (DB live read-only) :
   `DB_CONFIG_MISSING`, `DB_UNREACHABLE`, `DB_AUTH_FAILED`, `PROC_NOT_FOUND`,
   `PROC_ENCRYPTED`, `DB_READONLY_VIOLATION` (`stack_db_config.py` /
   `db_introspect.py` / `readonly_guard.py` / `reverse_proc_introspect.py`).
@@ -257,7 +260,7 @@ encore câblés. État vérifié par grep croisé code/prompts :
 > a été supprimée de §6 et de cet état : ces classes n'avaient aucun émetteur.
 > Total taxonomie après réconciliation audit 2026-06-11 + ajout `GATE_BLOCKED`
 > (audit 2026-06-12) + 6 classes des phases optionnelles 2.7/3.8/3.9 (emprunt
-> Reversa, audit comparatif 2026-06-12) + 6 classes proc-reverse (DB live
+> Reversa, audit comparatif 2026-06-12) + 6 classes db-reverse (DB live
 > read-only, 2026-06-29) + ré-câblage `[REVERSE_LADDER_STALE]` (2026-06-29)
 > + `[REVERSE_UI_PARSER_MISSING]` (audit C4 2026-07-24, agent `reverse-ui-extractor`) :
 > **37 classes** (23 scripts déterministes + 11 prompts
@@ -348,7 +351,7 @@ que `governance-major-reverse-spec-ladder` a décommissionnée). **Fail-safe** :
 tout signal manquant/ambigu (dont graphe de classes vide des langages non-.NET)
 → `complex` (= Opus). Aucune régression possible vs le comportement full-Opus
 antérieur. Rubrique SSoT : `docs/rubrics/reverse-complexity-routing.md`. Pendant
-de proc-reverse (`build_proc_us.py`, routage déterministe par complexité).
+de db-reverse (`build_proc_us.py`, routage déterministe par complexité).
 
 ## §9 Pas de spawn d'agent (no-spawn)
 

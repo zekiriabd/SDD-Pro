@@ -59,12 +59,12 @@ def test_reference_combo_is_level_a_and_tested():
     counts = report.mechanism_counts()
     assert counts["native"] == len(MECHANISM_LABELS) == 7
     assert counts["emulated"] == counts["ci_fallback"] == counts["unsupported"] == 0
-    # Aucun ⚠ de niveau mécanisme (tous natifs) ; ne restent que les
-    # avertissements provider (fidélité unknown + pricing absent).
+    # Aucun ⚠ de niveau mécanisme (tous natifs) ; ne reste que
+    # l'avertissement provider de fidélité unknown.
     assert not any(
         label in w for w in report.warnings for label in MECHANISM_LABELS.values()
     )
-    assert len(report.warnings) == 2  # fidélité + pricing seulement
+    assert len(report.warnings) == 1  # fidélité seulement
 
 
 def test_codex_moonshot_is_untested_level_b_with_warnings():
@@ -79,8 +79,8 @@ def test_codex_moonshot_is_untested_level_b_with_warnings():
     # deterministic_python/mcp=native (2).
     assert counts == {"native": 2, "emulated": 3, "ci_fallback": 1, "unsupported": 1}
     assert sum(counts.values()) == 7
-    # Un ⚠ par mécanisme non natif (5) + fidélité + pricing = 7 avertissements.
-    assert len(report.warnings) == 7
+    # Un ⚠ par mécanisme non natif (5) + fidélité = 6 avertissements.
+    assert len(report.warnings) == 6
 
 
 @pytest.mark.parametrize("provider", ["anthropic", "openai", "google", "moonshot"])

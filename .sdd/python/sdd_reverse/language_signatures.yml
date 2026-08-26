@@ -7,6 +7,16 @@
 #
 # Extensibility: add a new language entry, then re-run framework_smoke.
 # No code change required.
+#
+# `exclusive_group: <name>` (optionnel, audit F-05 2026-08-25) — declare que les
+# langages du meme groupe sont MUTUELLEMENT EXCLUSIFS pour un fichier donne : au
+# scan, seul le mieux score revendique le fichier (egalite -> ordre de
+# declaration ci-dessous). Requis pour les 4 dialectes SQL, qui partagent
+# l'extension .sql ET des patterns d'evidence (`CREATE PROCEDURE` matche T-SQL,
+# PL/pgSQL, PL/SQL et MySQL) : sans exclusivite, un fichier T-SQL etait revendique
+# par les 4 buckets, les artefacts sortaient en x4, et le plafond de confiance
+# min-monotone (§5.6) degradait une application 100% T-SQL (`high`) en `medium`
+# a cause de dialectes jamais presents.
 
 schemaVersion: 1
 languages:
@@ -223,12 +233,24 @@ languages:
     label: T-SQL (SQL Server)
     family: sql
     file_extensions: [.sql]
+    # Audit F-05 (2026-08-26) — poids rééquilibrés. Les patterns PARTAGÉS par les
+    # 4 moteurs (`CREATE TABLE`, `CREATE PROCEDURE`, …) sont démotés à 0.25 : ils
+    # prouvent « c'est du SQL », jamais « c'est CE dialecte ». Seuls les marqueurs
+    # portant `discriminative: true` — impossibles dans un autre moteur — pèsent
+    # lourd et décident du gagnant du `exclusive_group`.
     evidence_patterns:
-      - { pattern: '\bCREATE\s+TABLE\b', weight: 1.0, description: "DDL CREATE TABLE" }
-      - { pattern: '\bCREATE\s+PROCEDURE\b', weight: 1.0, description: "Stored procedure" }
-      - { pattern: '\bGO\s*\n', weight: 0.7, description: "T-SQL batch separator" }
-      - { pattern: '\bNVARCHAR\(', weight: 0.6, description: "T-SQL type" }
+      - { pattern: '\bGO\s*(?:\n|$)', weight: 1.0, discriminative: true, description: "T-SQL batch separator (sqlcmd/SSMS)" }
+      - { pattern: '\bGETDATE\s*\(\s*\)', weight: 0.9, discriminative: true, description: "T-SQL current timestamp" }
+      - { pattern: '\bUNIQUEIDENTIFIER\b', weight: 0.9, discriminative: true, description: "T-SQL GUID type" }
+      - { pattern: '\bSET\s+NOCOUNT\s+(?:ON|OFF)\b', weight: 0.9, discriminative: true, description: "T-SQL batch option" }
+      - { pattern: '\bIDENTITY\s*\(\s*\d+\s*,', weight: 0.8, discriminative: true, description: "T-SQL identity column" }
+      - { pattern: '@\w+\s+(?:N?VARCHAR|N?CHAR|INT|BIGINT|BIT|DATETIME2?|DECIMAL|MONEY|UNIQUEIDENTIFIER)\b', weight: 0.8, discriminative: true, description: "T-SQL typed parameter/variable" }
+      - { pattern: '\[[A-Za-z_]\w*\]\s*\.\s*\[', weight: 0.8, discriminative: true, description: "T-SQL bracket-quoted identifier" }
+      - { pattern: '\bNVARCHAR\s*\(', weight: 0.6, description: "T-SQL type (aussi MySQL/Sybase)" }
+      - { pattern: '\bCREATE\s+TABLE\b', weight: 0.25, description: "DDL partagé (tous moteurs)" }
+      - { pattern: '\bCREATE\s+PROCEDURE\b', weight: 0.25, description: "DDL partagé (tous moteurs)" }
     confidence_cap: high
+    exclusive_group: sql-dialect   # audit F-05 : un fichier .sql = UN dialecte
     excluded_paths: []
 
   - id: plpgsql
@@ -236,11 +258,56 @@ languages:
     family: sql
     file_extensions: [.sql, .pgsql]
     evidence_patterns:
-      - { pattern: '\bCREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\b', weight: 1.0, description: "PL/pgSQL function" }
-      - { pattern: '\bCREATE\s+(?:OR\s+REPLACE\s+)?PROCEDURE\b', weight: 1.0, description: "PG 11+ procedure" }
-      - { pattern: '\bLANGUAGE\s+plpgsql\b', weight: 1.0, description: "plpgsql language tag" }
-      - { pattern: '\bRETURNS\s+(?:SETOF\s+|TABLE)', weight: 0.7, description: "set-returning function" }
+      - { pattern: '\bLANGUAGE\s+plpgsql\b', weight: 1.0, discriminative: true, description: "plpgsql language tag" }
+      - { pattern: '\bRETURN\s+QUERY\b', weight: 0.9, discriminative: true, description: "plpgsql set return" }
+      - { pattern: '\b(?:BIG|SMALL)?SERIAL\b', weight: 0.9, discriminative: true, description: "PostgreSQL serial type" }
+      # Dollar-quoting ancré sur `AS $tag$` : `DELIMITER $$` (MySQL) ne matche pas.
+      - { pattern: '\bAS\s*\$[A-Za-z_]\w*\$|\bAS\s*\$\$', weight: 0.9, discriminative: true, description: "PostgreSQL dollar-quoted body" }
+      - { pattern: '::\s*(?:text|integer|bigint|numeric|boolean|timestamptz?|uuid|jsonb?)\b', weight: 0.8, discriminative: true, description: "PostgreSQL cast operator" }
+      - { pattern: '\bRETURNS\s+(?:SETOF\s+|TABLE)', weight: 0.5, description: "set-returning function (aussi T-SQL TVF)" }
+      - { pattern: '\bCREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\b', weight: 0.25, description: "DDL partagé (tous moteurs)" }
+      - { pattern: '\bCREATE\s+(?:OR\s+REPLACE\s+)?PROCEDURE\b', weight: 0.25, description: "DDL partagé (tous moteurs)" }
     confidence_cap: high
+    exclusive_group: sql-dialect   # audit F-05 : un fichier .sql = UN dialecte
+    excluded_paths: []
+
+  # Audit 2026-08-25 (finding D2) : `plsql` et `mysql` étaient ABSENTS de ce
+  # fichier alors que les dialectes Oracle et MySQL les déclarent comme
+  # `language_id`. `_lang_cap()` retombait donc silencieusement sur son défaut
+  # `high` — y compris pour du PL/SQL *wrapped* (obfusqué) illisible. Cap posé à
+  # `medium` tant que ces deux moteurs restent scaffold-validated (runtime live
+  # non exécuté au banc) : la confiance ne doit pas dépasser la validation.
+  - id: plsql
+    label: PL/SQL (Oracle)
+    family: sql
+    file_extensions: [.sql, .pls, .pkb, .pks, .prc, .fnc, .trg]
+    evidence_patterns:
+      - { pattern: '\bCREATE\s+(?:OR\s+REPLACE\s+)?PACKAGE(?:\s+BODY)?\b', weight: 1.0, discriminative: true, description: "PL/SQL package spec/body" }
+      - { pattern: '\bVARCHAR2\s*\(|\bNUMBER\s*\(\s*\d', weight: 0.9, discriminative: true, description: "Oracle scalar type" }
+      - { pattern: '\bFROM\s+dual\b', weight: 0.9, discriminative: true, description: "Oracle dual table" }
+      - { pattern: '\bEXECUTE\s+IMMEDIATE\b', weight: 0.9, discriminative: true, description: "PL/SQL dynamic SQL" }
+      - { pattern: '\bNVL\s*\(|\bSYSDATE\b', weight: 0.9, discriminative: true, description: "Oracle builtin" }
+      # `EXCEPTION WHEN` existe aussi en PL/pgSQL — non discriminant.
+      - { pattern: '\bEXCEPTION\s+WHEN\b', weight: 0.4, description: "bloc exception (aussi PL/pgSQL)" }
+      - { pattern: '\bCREATE\s+(?:OR\s+REPLACE\s+)?PROCEDURE\b', weight: 0.25, description: "DDL partagé (tous moteurs)" }
+    confidence_cap: medium  # scaffold-validated only + PL/SQL wrapping possible
+    exclusive_group: sql-dialect   # audit F-05 : un fichier .sql = UN dialecte
+    excluded_paths: []
+
+  - id: mysql
+    label: MySQL / MariaDB (SQL/PSM)
+    family: sql
+    file_extensions: [.sql]
+    evidence_patterns:
+      - { pattern: '^\s*DELIMITER\b', weight: 1.0, discriminative: true, description: "MySQL routine delimiter" }
+      - { pattern: '\bENGINE\s*=\s*(?:InnoDB|MyISAM|MEMORY|ARCHIVE)\b', weight: 1.0, discriminative: true, description: "MySQL storage engine" }
+      - { pattern: '\bAUTO_INCREMENT\b', weight: 0.9, discriminative: true, description: "MySQL identity" }
+      - { pattern: '\bDEFINER\s*=', weight: 0.9, discriminative: true, description: "MySQL routine definer" }
+      - { pattern: '`[A-Za-z_]\w*`', weight: 0.8, discriminative: true, description: "MySQL backtick-quoted identifier" }
+      - { pattern: '\bCREATE\s+PROCEDURE\b', weight: 0.25, description: "DDL partagé (tous moteurs)" }
+      - { pattern: '\bCREATE\s+FUNCTION\b', weight: 0.25, description: "DDL partagé (tous moteurs)" }
+    confidence_cap: medium  # scaffold-validated only
+    exclusive_group: sql-dialect   # audit F-05 : un fichier .sql = UN dialecte
     excluded_paths: []
 
   # === FALLBACK ===

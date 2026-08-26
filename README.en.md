@@ -9,6 +9,8 @@ FEAT-driven development framework — **multi-harness** (Claude Code, OpenAI Cod
 
 > ⚠ **This English page is a summary, not a translation.** It covers Quickstart + Console essentials only (~10 sections vs ~17 in the French canonical README). For exhaustive docs (architecture, agents, rules, stacks, governance, ROI, roadmap), use the French source.
 >
+> 🗄️ **Sitting on a legacy database rather than a greenfield project?** SDD_Pro reads your stored procedures, functions, views, triggers and jobs **read-only** and returns them as workable specifications — [see Database reverse engineering](#-database-reverse-engineering--your-schema-becomes-a-specification-again).
+
 > 🇫🇷 [Version française (canonical, complete)](README.md) — Main documentation: [.claude/CLAUDE.md](.claude/CLAUDE.md) (French).
 
 ---
@@ -50,6 +52,151 @@ Validated end-to-end combos:
 3. *(Optional)* drop HTML mockups under `workspace/ui/{n}-{m}-{Name}.html`.
 4. `/sdd-full {n}` — full pipeline (PO → arch → dev-back → API gate → dev-front → QA → reviewers).
 5. `/sdd-status [{n}]` — diagnostic.
+
+---
+
+## 🗄️ Database reverse engineering — your schema becomes a specification again
+
+> **Your company's business logic is asleep inside your database.**
+> Hundreds of stored procedures written over fifteen years, by developers who
+> have long since left. No documentation. Nobody dares touch it.
+> **SDD_Pro reads it — strictly read-only — and hands you specifications.**
+
+One command, `/sdd-db-reverse-full`, connects using the connection string declared in
+`stack.md ## Active Database`, inventories **everything the database knows how to do**,
+and produces standard SDD_Pro FEATs — immediately consumable by `/sdd-full` to
+regenerate an application on top. Your SQL estate stops being a black box and becomes
+a readable, traceable, version-controlled backlog.
+
+### What is actually extracted
+
+| Object family | Treatment |
+|---|---|
+| **Stored procedures** | body analysed → **1 User Story** |
+| **Functions** (scalar, inline, table-valued) | body analysed → **1 User Story** |
+| **Views** and **triggers** | body analysed → **1 User Story** |
+| **Oracle packages** (spec + body) | body analysed → **1 User Story** |
+| **Tables, columns, types, PK/FK, indexes, `CHECK` constraints** | live introspection → `db-schema.json` |
+| **Jobs / scheduler, sequences, synonyms, linked servers, user types** | live introspection → `catalogObjects` |
+
+> 💡 **What other tools miss.** `CHECK` constraints and **scheduled jobs** are the two
+> largest reservoirs of business rules that are *invisible from application code*: a job
+> carries night-time behaviour (recalculation, purge, import) that nothing in the app
+> reveals. SDD_Pro surfaces them alongside procedures.
+
+### The model, in one line
+
+**1 SQL object = 1 User Story · 1 business module = 1 FEAT.** No merging, no invention,
+no summary that flattens the detail away.
+
+```
+stack.md (## Active Database)
+   └─ Phase 1 — READ-ONLY introspection (0 tokens)
+        ├─ SQL body snapshots + db-schema.json + inventory.json
+        └─ clustering into business modules (AUTO strategy, measured on YOUR object names)
+             └─ Rung 1 — reverse-sql-analyst × module (LLM, bounded parallelism)
+                  └─ Rung 2 — FEAT composition (deterministic, or LLM opt-in)
+                       └─ REVERSE-GATE ─► /sdd-full
+```
+
+### A team of specialised agents, not one giant prompt
+
+The reverse module ships **12 dedicated agents**, **2 of them SQL experts** on the
+database path — each with a locked read scope and a single mandate:
+
+| Agent | Mandate |
+|---|---|
+| **`reverse-sql-analyst`** *(rung 1)* | Multi-dialect expert (T-SQL, PL/pgSQL, PL/SQL, MySQL/PSM, SQL PL). Reads a module's bodies and derives one User Story per object: observed behaviour, acceptance criteria drawn from the real control flow, `file:line` evidence, confidence capped per language. |
+| **`reverse-sql-feat-composer`** *(rung 2, opt-in)* | Synthesises a module's business FEAT: cross-cutting narrative, technical plumbing demoted. Worth it for logic-heavy modules — plain CRUD is served fine by the deterministic assembler. |
+| **`reverse-completeness-reviewer`** | Confronts the produced FEAT with the raw inventory and **states what the extraction missed**. Informational verdict, never complacent. |
+| **`reverse-clarifier`** | Turns grey areas into structured questions for the Tech Lead, then feeds the answers back into the FEATs. No answer is ever invented. |
+
+Agents run with **bounded parallelism** (`MaxParallel`, default 3) over disjoint writes.
+No agent spawns another — the command orchestrates, so the bill stays predictable.
+
+### 70–80% of your database costs zero tokens
+
+This is the economic core of the module. Before any LLM is called, a **deterministic
+router** classifies every object:
+
+- **simple object** (CRUD / SELECT, no branching, no dynamic SQL, no error handling)
+  → its User Story is generated **mechanically, at zero cost**;
+- **complex object** (real business logic) → only then is an agent woken up.
+
+On top of that: a **per-object cache** (an unchanged body is never re-analysed, so a
+second run after an interruption is near-free) and scope guards (`--schema`,
+`--include`, `--exclude`, `--limit`) that **always name what they left out** — never a
+silent truncation.
+
+### Module clustering is measured, not guessed
+
+It is the most structural decision of the whole reverse: it sets the number of FEATs.
+SDD_Pro **profiles your actual naming conventions** (`SP_`, `STP_`, `BI_` prefixes,
+in-house verbs) instead of imposing a theoretical one. If the naming is too fragmented
+to be usable, the engine **automatically falls back** to dependency-graph cohesion
+(shared tables, cross-calls) — and keeps that fallback only if it genuinely groups
+better. The chosen strategy, the measured fragmentation and the learned profile are
+recorded in `inventory.json` and announced in plain sight:
+
+```
+[REVERSE] DB Billing → 214 procedure(s) grouped into 31 module(s)/FEAT
+          — cohesion clustering — naming unusable (fragmentation 0.82). (Phase 1 OK)
+```
+
+### Read-only is an architectural guarantee, not a promise
+
+Your DBA can sleep. The engine emits **only** catalog `SELECT`s (`sys.sql_modules`,
+`sys.procedures`, …) and `OBJECT_DEFINITION`, validated at runtime by a `readonly_guard`.
+**Never** `DROP` / `DELETE` / `TRUNCATE` / `ALTER` / `INSERT` / `UPDATE` / `MERGE`,
+**never** a procedure execution — the ban is carried by the blocking
+`[DB_STRUCTURE_CHANGE_FORBIDDEN]` class and the `reverse-db-readonly` invariant. The
+password stays in RAM: **never logged, never persisted** into the produced artefacts.
+Defence-in-depth recommendation: a dedicated login with `GRANT VIEW DEFINITION` +
+`db_datareader`.
+
+### Nothing ships unqualified
+
+- **Downward traceability**: every FEAT item traces to a User Story criterion, which
+  traces to a line of SQL snapshot. `evidence:` pointers are **resolved on disk** — a
+  dead pointer is a gap, not a green light.
+- **Consumption gate**: a FEAT whose confidence is not `high` **does not enter**
+  `/sdd-full` (exit 1). Dynamic or encrypted SQL forces human review — the override
+  exists (`--allow-reverse-low`) but it is explicit and audit-logged.
+- **Your edits are never overwritten**: each FEAT carries a fingerprint of its generated
+  content. If you edited it, a re-run **preserves** it and tells you so.
+- **Idempotent**: re-running reuses already-allocated identifiers — no orphans, no
+  duplicates.
+
+### Supported engines
+
+| Engine | Status |
+|---|---|
+| **SQL Server**, **PostgreSQL** | 🟢 live-validated |
+| **Oracle**, **MySQL / MariaDB** | 🟡 scaffold-validated — read-only queries and offline flow tested; live runtime still to be validated on a test database before production |
+| DB2, SQLite | recognised, refused with an explicit message |
+
+### Get started
+
+```bash
+# 1. Read-only driver (once)
+pip install -e ".sdd/python[reverse-db]"     # + ODBC Driver 18 for SQL Server
+
+# 2. Fill in stack.md ## Active Database (DB_HOST / DB_NAME / DB_USER / DB_PASSWORD,
+#    clear values or ${VAR} placeholders resolved from a .env file)
+```
+
+```text
+/sdd-db-reverse-full                          # the whole database
+/sdd-db-reverse-full --schema dbo --limit 50  # bounded scope (recommended for a first run)
+/sdd-db-reverse dbo.usp_Contact_Insert        # a single object, to evaluate without committing
+```
+
+**Try it on one module.** You will get a FEAT a Product Owner can read, sourced line by
+line, over code nobody understood this morning.
+
+Full details: [.sdd/docs/reverse-engineering-workflow.md](.sdd/docs/reverse-engineering-workflow.md) ·
+[.sdd/docs/reverse-db-audit-2026-07.md](.sdd/docs/reverse-db-audit-2026-07.md) ·
+[.sdd/rules/reverse-engineering.md](.sdd/rules/reverse-engineering.md)
 
 ---
 

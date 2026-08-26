@@ -88,6 +88,16 @@ def resolve_value(value: str, env: dict[str, str], unresolved: set[str]) -> str:
     return _PLACEHOLDER_RE.sub(_sub, value)
 
 
+#: Signatures de variables non resolues deja signalees dans ce process.
+#: Evite N WARN identiques par run (cf. dedupe dans `resolve_config`).
+_WARNED_UNRESOLVED: set[tuple[str, ...]] = set()
+
+
+def reset_env_warn_cache() -> None:
+    """Vide le cache de dedupe des WARN (usage : tests unitaires)."""
+    _WARNED_UNRESOLVED.clear()
+
+
 def resolve_config(
     config: dict[str, str],
     root: Path,
@@ -114,10 +124,19 @@ def resolve_config(
     out = {k: resolve_value(v, env_map, unresolved) for k, v in config.items()}
 
     if warn_unresolved and unresolved:
-        sys.stderr.write(
-            "WARN [ENV_MISSING] Project Config references unset env var(s): "
-            f"{sorted(unresolved)}. Set them in the shell or a .env file at the "
-            "repo root (or put literal values in stack.md ## Project Config). "
-            "Left as literal placeholders for now.\n"
-        )
+        # Dedupe par set de variables (audit 2026-08-26). `resolve_config` est
+        # appele par CHAQUE `read_project_config` / `read_layered_config`, soit
+        # ~20+ fois sur un `/sdd-full` : le meme WARN etait reemis a l'identique
+        # a chaque appel, contre `output-protocol.md` §5 ("ne jamais dupliquer la
+        # meme ligne"). On ne re-avertit que si l'ensemble des variables
+        # manquantes CHANGE (nouvelle info reelle pour le Tech Lead).
+        signature = tuple(sorted(unresolved))
+        if signature not in _WARNED_UNRESOLVED:
+            _WARNED_UNRESOLVED.add(signature)
+            sys.stderr.write(
+                "WARN [ENV_MISSING] Project Config references unset env var(s): "
+                f"{sorted(unresolved)}. Set them in the shell or a .env file at the "
+                "repo root (or put literal values in stack.md ## Project Config). "
+                "Left as literal placeholders for now.\n"
+            )
     return out

@@ -26,16 +26,30 @@ def _dep(fs, fn, ts, tn, dt):
 
 
 class TestDependencyQueryReadOnly(unittest.TestCase):
-    def test_sqlserver_and_oracle_have_readonly_dep_query(self):
-        for eng in ("sqlserver", "oracle"):
+    def test_every_engine_has_a_readonly_dep_query(self):
+        """Audit 2026-08-25: PostgreSQL and MySQL were the two engines left with
+        a purely regex-derived object graph. They now read their own catalog —
+        `pg_depend`+`pg_rewrite` for PostgreSQL, `VIEW_TABLE_USAGE` for MySQL."""
+        for eng in ("sqlserver", "oracle", "postgresql", "mysql"):
             q = get_dialect(eng).dependency_query
             self.assertTrue(q, f"{eng} should declare a dependency_query")
             self.assertTrue(is_readonly(q), f"{eng} dependency_query not read-only")
 
-    def test_pg_mysql_declare_no_dep_query(self):
-        # Routine-level catalog deps aren't reliably available → empty (documented).
-        self.assertEqual(get_dialect("postgresql").dependency_query, "")
-        self.assertEqual(get_dialect("mysql").dependency_query, "")
+    def test_dep_queries_return_the_declared_column_contract(self):
+        """Each dep query must project the DEPENDENCY_COLUMNS aliases, in order."""
+        for eng in ("sqlserver", "oracle", "postgresql", "mysql"):
+            q = get_dialect(eng).dependency_query
+            for col in DEPENDENCY_COLUMNS:
+                self.assertIn(col, q, f"{eng} dependency_query lacks {col!r}")
+
+    def test_mysql_dep_query_is_documented_as_version_dependent(self):
+        """VIEW_TABLE_USAGE is MySQL 8.0.13+ only; absence must degrade, not fail.
+        The runtime tolerance lives in db_introspect.introspect (try/except)."""
+        import inspect
+
+        from sdd_reverse import db_introspect
+        src = inspect.getsource(db_introspect.introspect)
+        self.assertIn("dep_rows = []", src)  # best-effort fallback preserved
 
 
 class TestMerge(unittest.TestCase):

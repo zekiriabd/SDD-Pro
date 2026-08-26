@@ -7,8 +7,24 @@ Phase 2 (audit) script. Detects:
     - Naive cycle detection (Tarjan SCC on internal edges)
     - Dead code hints (files in scan_result but no incoming edge)
 
+Internal edges — resolution order (audit F-03, 2026-08-25)
+----------------------------------------------------------
+Phase 1 already produced ``code-graph.json`` with **type-usage resolved**
+class-to-class edges (``code_graph_builder.build_code_graph``). This module
+projects those edges down to file level FIRST, then adds its own
+namespace+import heuristic as a *supplement* for the families the code graph
+does not cover (Java, PHP, JS/TS relative imports).
+
+The namespace heuristic alone was structurally blind on a large share of real
+.NET legacy: ``App_Code/*.cs`` in a WebForms application declares no
+``namespace``, so ``namespace_to_file`` stayed empty, no edge was ever emitted,
+and ``deadCodeHint`` reported *every* file as unreferenced. That list feeds the
+``reverse-tech-auditor`` agent, ``tech-audit.md``, the MIGRATE/DISCARD curation
+of ``/sdd-reverse-paradigm`` and the C4 component diagram — a Tech Lead was
+being told a perfectly live legacy was 100% dead code.
+
 Public API:
-    build_deps_graph(project_root, scan_result) -> dict
+    build_deps_graph(project_root, scan_result, code_graph=None) -> dict
 
 Output shape: design doc §5.4.
 
@@ -246,8 +262,69 @@ def _extract_external_deps(project_root: Path) -> list[dict[str, Any]]:
     return deps
 
 
+def _edges_from_code_graph(code_graph: dict[str, Any] | None) -> list[dict[str, Any]]:
+    """Project the Phase 1 class-level code graph down to file-level edges.
+
+    ``code-graph.json`` resolves references by **type usage** (a class name
+    appearing in another class body), which does not depend on ``namespace`` /
+    ``using`` declarations at all. That makes it the strong resolver, and the
+    one to consume first — the result already exists on disk one phase earlier.
+
+    Class-to-class edges collapse to file-to-file: several classes may live in
+    the same file (partial classes, nested helpers), so edges internal to a
+    single file are dropped and duplicates are merged, keeping the first
+    ``evidence`` seen.
+    """
+    if not isinstance(code_graph, dict):
+        return []
+    classes = code_graph.get("classes")
+    raw_edges = code_graph.get("edges")
+    if not isinstance(classes, list) or not isinstance(raw_edges, list):
+        return []
+
+    # Simple class name -> declaring file (first declaration wins, mirroring
+    # build_code_graph's own `by_name` registry so both agree on collisions).
+    class_to_file: dict[str, str] = {}
+    for ci in classes:
+        if not isinstance(ci, dict):
+            continue
+        name = ci.get("name")
+        rel = ci.get("file")
+        if isinstance(name, str) and isinstance(rel, str) and name and rel:
+            class_to_file.setdefault(name, rel)
+
+    edges: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+    for e in raw_edges:
+        if not isinstance(e, dict):
+            continue
+        src_name, dst_name = e.get("from"), e.get("to")
+        if not isinstance(src_name, str) or not isinstance(dst_name, str):
+            continue
+        src_file = class_to_file.get(src_name)
+        dst_file = class_to_file.get(dst_name)
+        if not src_file or not dst_file or src_file == dst_file:
+            continue
+        key = (src_file, dst_file)
+        if key in seen:
+            continue
+        seen.add(key)
+        edge: dict[str, Any] = {"from": src_file, "to": dst_file, "kind": "reference"}
+        evidence = e.get("evidence")
+        if isinstance(evidence, str) and evidence:
+            edge["evidence"] = evidence
+        edges.append(edge)
+    return edges
+
+
 def _extract_internal_edges(scan_result: ScanResult, project_root: Path) -> list[dict[str, Any]]:
-    """Best-effort detection of intra-project file-to-file references."""
+    """Namespace/import heuristic — SUPPLEMENT to `_edges_from_code_graph`.
+
+    Kept for the families ``code-graph.json`` does not parse (it is .cs/.vb
+    only): Java ``import``, PHP ``use``, JS/TS relative ``import``/``require``.
+    On .NET it only adds edges the type-usage resolver could not see, and is
+    never relied upon as the sole source (audit F-03).
+    """
     edges: list[dict[str, Any]] = []
     # Build map: namespace/import-name → file path (simple heuristic for C#/Java)
     namespace_to_file: dict[str, str] = {}
@@ -348,6 +425,40 @@ def _detect_cycles(edges: list[dict[str, Any]]) -> list[list[str]]:
     return sccs
 
 
+# Markup extensions whose *code-behind* sibling is an entry point, not dead
+# code: `Login.aspx.cs` is reached from `Login.aspx`, never from another class.
+_CODEBEHIND_MARKUP_SUFFIXES = (
+    ".aspx", ".ascx", ".master", ".asmx", ".ashx", ".svc",
+    ".cshtml", ".vbhtml", ".xaml", ".asp", ".html",
+)
+
+_ENTRY_POINT_SUFFIXES = (
+    ".aspx", ".ascx", ".master", ".asmx", ".ashx", ".svc",
+    ".cshtml", ".vbhtml", ".jsp", ".jspx", ".php", ".xaml", ".asp",
+    "global.asax", "program.cs", "startup.cs", "main.java",
+)
+
+
+def _is_entry_point(rel: str) -> bool:
+    """True when a file is reached from outside the code graph.
+
+    Two cases, both of which the pre-F-03 list missed for code-behind:
+      * markup / bootstrap files (``Login.aspx``, ``Program.cs``, ``Global.asax``)
+      * their code-behind sibling (``Login.aspx.cs``, ``MainWindow.xaml.vb``) —
+        the runtime instantiates these from the markup's ``Inherits`` /
+        ``CodeFile`` attribute, so no class ever references them and they were
+        being reported as dead code on *every* WebForms/WPF legacy.
+    """
+    low = rel.lower()
+    if low.endswith(_ENTRY_POINT_SUFFIXES):
+        return True
+    # Code-behind: strip the language extension and re-test the markup suffix.
+    stem, _, ext = low.rpartition(".")
+    if ext in {"cs", "vb", "fs"} and stem.endswith(_CODEBEHIND_MARKUP_SUFFIXES):
+        return True
+    return False
+
+
 def _dead_code_hint(scan_result: ScanResult, edges: list[dict[str, Any]], project_root: Path) -> list[str]:
     """Files in scan but no incoming internal edge (best-effort)."""
     incoming: dict[str, int] = {}
@@ -358,17 +469,44 @@ def _dead_code_hint(scan_result: ScanResult, edges: list[dict[str, Any]], projec
         for f in lm.files:
             rel = str(f.relative_to(project_root).as_posix())
             # Entry points, page-level files unlikely to be "dead"
-            if rel.lower().endswith((".aspx", ".cshtml", ".jsp", ".php", "global.asax", "program.cs", "main.java")):
+            if _is_entry_point(rel):
                 continue
             if incoming.get(rel, 0) == 0 and lm.family in {"dotnet", "java", "php", "web"}:
                 hints.append(rel)
     return sorted(hints)[:50]  # bounded list
 
 
-def build_deps_graph(project_root: str | Path, scan_result: ScanResult) -> dict[str, Any]:
-    """Assemble deps-graph.json per design doc §5.4."""
+def _merge_edges(*edge_lists: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Union of edge lists, deduplicated on (from, to); first kind wins."""
+    merged: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+    for edges in edge_lists:
+        for e in edges:
+            key = (e.get("from", ""), e.get("to", ""))
+            if key in seen:
+                continue
+            seen.add(key)
+            merged.append(e)
+    return merged
+
+
+def build_deps_graph(
+    project_root: str | Path,
+    scan_result: ScanResult,
+    code_graph: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Assemble deps-graph.json per design doc §5.4.
+
+    ``code_graph`` is the Phase 1 ``code-graph.json`` payload. When supplied,
+    its type-usage-resolved edges are projected to file level and take
+    precedence; the local namespace/import heuristic only supplements them
+    (audit F-03). Passing ``None`` keeps the legacy heuristic-only behaviour.
+    """
     root = Path(project_root).resolve()
-    internal = _extract_internal_edges(scan_result, root)
+    internal = _merge_edges(
+        _edges_from_code_graph(code_graph),
+        _extract_internal_edges(scan_result, root),
+    )
     external = _extract_external_deps(root)
     cycles = _detect_cycles(internal)
     dead = _dead_code_hint(scan_result, internal, root)

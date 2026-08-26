@@ -10,8 +10,9 @@ description: /us-generate — Découpe une FEAT en User Stories
 > Utilisateur final : préférer `/sdd-full` ou `/dev-run` (gèrent pré-conditions, idempotence, état).
 
 Invoque l'agent PO pour découper une FEAT fonctionnelle en User
-Stories structurées (cible 1-3, warn au-delà de `UsGranularityWarnAt`
-défaut 6, hard cap `UsGranularityHardCap` défaut 10) dans `workspace/`.
+Stories structurées (cible `UsGranularityTarget` défaut 3, warn au-delà de
+`UsGranularityWarnAt` défaut 6, hard cap `UsGranularityHardCap` défaut 10)
+dans `workspace/`.
 
 **Usage :** `/us-generate {n}` — où `{n}` est le numéro de la FEAT
 

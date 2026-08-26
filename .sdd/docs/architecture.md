@@ -248,11 +248,34 @@ l'introspection des métadonnées.
 ## 4. Stacks supportés
 
 Sélectionnés par l'humain dans `workspace/stack/stack.md` (sections
-`## Active …` + `## Active App Type` v6.7.5+).
+`## Active …`). La **topologie projet** (`AppType`), elle, n'est plus
+déclarée : elle est **auto-détectée** depuis les stacks actifs.
 
-### 4.0 Active App Type (v6.7.5+)
+### 4.0 App Type — auto-détecté (v6.7.7+)
 
-Le bloc `## Active App Type` du `stack.md` déclare la **topologie projet** :
+`AppType` est **dérivé** par `preflight.py` (`detect_app_type_auto`) des
+stacks listés dans `## Active Tech Specs`. Il n'y a **rien à écrire** dans
+`stack.md` — le bloc `## Active App Type` de v6.7.5 n'est plus émis par
+`stack.md.template` :
+
+| Stacks actifs détectés | AppType dérivé |
+|---|---|
+| `backend/*` + `frontend/*` | `back-front` |
+| `fullstack/*` | `fullstack` |
+| `mobiles/*` [+ `backend/*`] | `back-front` avec `frontendKind=mobile` |
+| aucun | `back-front` (défaut) |
+
+**Compatibilité descendante** : un `## Active App Type` résiduel reste lu
+(`get_explicit_app_type`) et *réconcilié* avec l'auto-détection —
+`[APPTYPE_REDUNDANT]` (WARN) s'il concorde, `[APPTYPE_LEGACY_MOBILE]`
+(WARN) sur les valeurs `mobile-react-native` / `mobile-maui` retirées,
+`[APPTYPE_MISMATCH]` (ERROR) s'il contredit les stacks déclarés. Dans
+tous les cas la valeur auto-détectée gagne. Le bloc est donc à supprimer
+des `stack.md` héritages.
+
+<details>
+<summary>Topologies v6.7.5 (valeurs explicites — dépréciées)</summary>
+
 
 | AppType | Modèle | Stacks attendus |
 |---|---|---|
@@ -261,7 +284,10 @@ Le bloc `## Active App Type` du `stack.md` déclare la **topologie projet** :
 | `mobile-react-native` | Mobile cross-platform (backend distant séparé) | `mobiles/react-native.md` [+ backend distant `backend/*`] |
 | `mobile-maui` | Mobile cross-platform .NET MAUI (backend distant séparé) | `mobiles/maui.md` [+ backend distant `backend/*`] |
 
-Validation déterministe par `preflight.py` au démarrage de chaque agent dev-*. Cohérence `AppType ↔ ## Active Tech Specs` vérifiée :
+</details>
+
+Validation déterministe par `preflight.py` au démarrage de chaque agent
+dev-*. Cohérence `AppType ↔ ## Active Tech Specs` vérifiée :
 - `AppType=fullstack` SANS stack fullstack/* → `STACK_NOT_SELECTED`
 - `AppType=mobile-react-native` SANS `mobiles/react-native.md` → `STACK_NOT_SELECTED`
 - Etc.

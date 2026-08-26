@@ -77,16 +77,29 @@ def _is_llm_only_annotated(md_text: str, flag: str) -> bool:
 
 
 def _python_parses_flag(flag: str, python_files: list[Path]) -> bool:
-    """True if any Python file uses argparse.add_argument with this flag."""
-    # Match `add_argument("--foo"` or `add_argument('--foo'` or with comma
-    needle1 = f'add_argument("{flag}"'
-    needle2 = f"add_argument('{flag}'"
+    """True if any Python file uses argparse.add_argument with this flag.
+
+    Audit 2026-08-25: the match used to require the literal
+    `add_argument("--foo"` as ONE contiguous string, so a call wrapped across
+    lines — the normal formatting for a long argparse declaration —
+
+        parser.add_argument(
+            "--allow-reverse-low", action="store_true", ...)
+
+    was invisible. The guard then reported an implemented flag as doc-theater.
+    Tolerating whitespace (including newlines) between the paren and the literal
+    keeps the check just as strict about the flag being a real argparse argument,
+    while removing a whole class of false alarms.
+    """
+    pattern = re.compile(
+        r"add_argument\(\s*[\"']" + re.escape(flag) + r"[\"']"
+    )
     for p in python_files:
         try:
             content = p.read_text(encoding="utf-8", errors="replace")
         except OSError:
             continue
-        if needle1 in content or needle2 in content:
+        if pattern.search(content):
             return True
     return False
 

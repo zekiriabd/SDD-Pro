@@ -1024,15 +1024,45 @@ languages:
     evidence_patterns:                 # regex matchant le contenu
       - pattern: <regex>
         weight: <0..1>                 # poids dans le score de détection
+        discriminative: <bool>         # optionnel — cf. `exclusive_group` ci-dessous
         description: <string>
     framework_signatures:              # detection sous-frameworks
       - id: <string>
         evidence: <regex>
         version_extract: <regex group>
     confidence_cap: <high|medium|low>  # PLAFOND OFFICIEL (D1, §5.6 prompt master)
+    exclusive_group: <string>          # optionnel — arbitrage mutuellement exclusif
     excluded_paths:                    # paths à ignorer pour ce langage
       - <glob>
 ```
+
+**`exclusive_group` + `discriminative`** (audit F-05, 2026-08-26) — deux langages
+du même `exclusive_group` ne peuvent pas revendiquer le même fichier : les quatre
+dialectes SQL (`tsql`, `plpgsql`, `plsql`, `mysql`) partagent l'extension `.sql`
+*et* le DDL générique (`CREATE TABLE`, `CREATE PROCEDURE`, `CREATE FUNCTION`).
+Sans arbitrage, chaque fichier T-SQL était revendiqué par les 4 buckets — vues,
+triggers et `parseWarnings` sortaient ×4, et le plafond de confiance min-monotone
+(§5.6) dégradait une application 100 % SQL Server de `high` à `medium` à cause de
+moteurs jamais présents.
+
+L'arbitrage se joue en deux temps :
+
+1. **Par fichier** — le mieux classé revendique le fichier. Le classement met en
+   tête les dialectes ayant matché ≥ 1 pattern `discriminative: true`, puis le
+   score, puis l'ordre de déclaration. `discriminative` marque un marqueur
+   **impossible dans un moteur frère** (`GO` pour T-SQL, `LANGUAGE plpgsql`,
+   `DELIMITER`, `PACKAGE BODY`) ; le DDL partagé ne le porte jamais et pèse ≤ 0.6,
+   loin sous les marqueurs exclusifs. Sans ce critère, le score seul faisait
+   gagner `plpgsql`/`mysql` (2 × `CREATE …` à 1.0) sur du T-SQL évident.
+2. **Par projet** — un dialecte qui n'a jamais produit de preuve exclusive sur
+   *aucun* fichier est absorbé par le survivant du groupe (ses fichiers lui sont
+   transférés, rien n'est perdu). C'est ce qui empêche un unique `.sql` mal
+   attribué à un moteur `cap: medium` de dégrader tout l'escalier. Un dépôt
+   réellement polyglotte conserve ses deux dialectes : chacun a fait ses preuves.
+
+Ajouter un 5ᵉ dialecte SQL sans `exclusive_group` ni pattern `discriminative`
+réintroduit F-05 — deux tests d'anti-rot le verrouillent
+(`tests/test_sdd_reverse_audit_f03_f05.py`).
 
 ### 8.2 Valeurs initiales MVP
 

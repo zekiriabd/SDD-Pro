@@ -39,7 +39,7 @@ from typing import Any
 
 from sdd_reverse.atomic_write_local import atomic_write_text
 from sdd_reverse.dialects import ROUTINE_COLUMNS, Dialect
-from sdd_reverse.readonly_guard import assert_readonly
+from sdd_reverse.readonly_guard import assert_readonly, assert_session_pragma
 from sdd_reverse.sql_body_analyzer import analyze_routine, confidence_signal
 from sdd_reverse.sql_dependency_graph import build_dependency_graph
 
@@ -145,10 +145,7 @@ def _connect_pyodbc(conn_str: str):  # noqa: ANN202
         msg = str(exc)
         klass = "[REVERSE_DB_AUTH_FAILED]" if _looks_like_auth(msg) else "[REVERSE_DB_UNREACHABLE]"
         raise ReverseDbError(f"{klass} {msg[:160]}", klass) from exc
-    try:
-        conn.execute("SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED")
-    except Exception:  # pragma: no cover - best effort
-        pass
+    _harden_session(conn, "SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED")
     return conn
 
 
@@ -194,10 +191,7 @@ def _connect_oracledb(conn_str: str):  # noqa: ANN202
         klass = "[REVERSE_DB_AUTH_FAILED]" if _looks_like_auth(msg) else "[REVERSE_DB_UNREACHABLE]"
         raise ReverseDbError(f"{klass} {msg[:160]}", klass) from exc
     # Defence in depth: read-only transaction for the whole session.
-    try:
-        conn.cursor().execute("SET TRANSACTION READ ONLY")
-    except Exception:  # pragma: no cover - best effort
-        pass
+    _harden_session(conn, "SET TRANSACTION READ ONLY")
     return conn
 
 
@@ -229,11 +223,24 @@ def _connect_mysql(conn_str: str):  # noqa: ANN202
         klass = "[REVERSE_DB_AUTH_FAILED]" if _looks_like_auth(msg) else "[REVERSE_DB_UNREACHABLE]"
         raise ReverseDbError(f"{klass} {msg[:160]}", klass) from exc
     # Defence in depth: read-only session (best effort — ignore if unsupported).
-    try:
-        conn.cursor().execute("SET SESSION TRANSACTION READ ONLY")
-    except Exception:  # pragma: no cover - best effort
-        pass
+    _harden_session(conn, "SET SESSION TRANSACTION READ ONLY")
     return conn
+
+
+def _harden_session(conn, pragma: str) -> None:
+    """Issue one whitelisted session pragma, best effort (N1, audit 2026-08-25).
+
+    Goes through `assert_session_pragma` so NO statement reaches a cursor without
+    passing a guard — the invariant `reverse-db-readonly` claims exactly that, and
+    these three `SET TRANSACTION ...` calls used to bypass it entirely.
+    A pragma the engine rejects (unsupported syntax, insufficient right) is
+    non-fatal: the read-only guarantee rests on the guard, not on the pragma.
+    """
+    assert_session_pragma(pragma)
+    try:
+        conn.cursor().execute(pragma)
+    except Exception:  # pragma: no cover - best effort, engine-dependent
+        pass
 
 
 def _looks_like_auth(msg: str) -> bool:
@@ -438,13 +445,25 @@ def merge_introspection(existing: dict[str, Any], new: dict[str, Any]) -> dict[s
 
 def introspect(
     cfg: Any, project_root: str | Path, *, proc: str | None = None, lang_cap: str = "high",
+    with_schema: bool = True, obj_filter: Any = None,
 ) -> dict[str, Any]:
-    """Full live flow: connect → guarded fetch → analyse → snapshot → disconnect."""
+    """Full live flow: connect → guarded fetch → analyse → snapshot → disconnect.
+
+    `with_schema` (C1, audit 2026-08-25) additionally reads the LIVE relational
+    structure (tables/columns/datatypes/keys/indexes/checks) and the body-less
+    catalog objects (jobs, sequences, synonyms, linked servers, user types), and
+    writes `db-schema.json` with `completeness: "live"`. Whole-database runs only:
+    a single-object run (`--proc`) must not pay for a full catalog sweep, and
+    would produce a schema unrelated to the object asked for.
+    """
     from sdd_reverse.dialects import get_dialect
     dialect = get_dialect(cfg.db_type)
     conn_str = compose_connection_string(cfg, dialect)
     conn = connect(conn_str, dialect)
     dep_rows: list[tuple] = []
+    schema_rows: dict[str, list[tuple]] = {}
+    catalog_objects: list[dict[str, Any]] = []
+    schema_warnings: list[str] = []
     try:
         rows = fetch_rows(conn, dialect, proc=proc)
         # P0.2 catalog augmentation — authoritative object↔object deps, whole-DB
@@ -455,6 +474,11 @@ def introspect(
                 dep_rows = fetch_dependency_rows(conn, dialect)
             except Exception:  # pragma: no cover - best effort
                 dep_rows = []
+        if not proc and with_schema:
+            from sdd_reverse import db_schema_live as dsl
+            schema_rows, w1 = dsl.fetch_structure(conn, dialect)
+            catalog_objects, w2 = dsl.fetch_catalog_objects(conn, dialect)
+            schema_warnings = w1 + w2
     finally:
         try:
             conn.close()
@@ -465,11 +489,34 @@ def introspect(
             f"[REVERSE_PROC_NOT_FOUND] {proc!r} not found in {cfg.name}",
             "[REVERSE_PROC_NOT_FOUND]",
         )
+    # M6 — bound the scope AFTER the fetch, so the guarded SQL stays constant.
+    filter_report: dict[str, Any] = {"active": False}
+    if obj_filter is not None and getattr(obj_filter, "is_active", False):
+        rows, filter_report = obj_filter.apply(rows, ROUTINE_COLUMNS)
+
     model = build_introspection(
         rows, dialect, server=cfg.host, database=cfg.name, lang_cap=lang_cap, proc=proc
     )
+    if filter_report.get("active"):
+        model["objectFilter"] = filter_report
     if dep_rows:
         from sdd_reverse.dialects.base import DEPENDENCY_COLUMNS
         from sdd_reverse.sql_dependency_graph import merge_catalog_dependencies
         merge_catalog_dependencies(model["dependencyGraph"], dep_rows, DEPENDENCY_COLUMNS)
-    return write_snapshot(project_root, model)
+    model = write_snapshot(project_root, model)
+
+    # C1 — live structure written alongside, in the SAME contract the static
+    # extractor emits, so reverse_synth / reverse-tech-analyst need no change.
+    # `routines` is passed post-snapshot so views/triggers carry real evidence.
+    if schema_rows or catalog_objects or schema_warnings:
+        from sdd_reverse import db_schema_live as dsl
+        schema = dsl.build_live_schema(
+            schema_rows, catalog_objects,
+            project=Path(project_root).name, database=cfg.name,
+            db_type=dialect.id, routines=model.get("procedures"),
+            warnings=schema_warnings,
+        )
+        dsl.write_live_schema(project_root, schema)
+        model["schemaSummary"] = schema.get("summary", {})
+        model["schemaCompleteness"] = schema.get("completeness")
+    return model

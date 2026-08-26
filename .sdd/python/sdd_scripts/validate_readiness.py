@@ -27,7 +27,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sdd_lib.exit_codes import FAIL_FAST, SUCCESS  # noqa: E402
 from sdd_lib.paths import workspace_root, repo_root  # noqa: E402
-from sdd_lib.project_config import read_stack_md_text, section_body  # noqa: E402
+from sdd_lib.project_config import (  # noqa: E402
+    CANONICAL_STACK_ROOT,
+    parse_active_stack_ids,
+    read_stack_md_text,
+    section_body,
+)
 
 
 VALID_DB_TYPES = (
@@ -110,11 +115,33 @@ def find_feat_file(feats_dir: Path, n: int) -> tuple[Path | None, str | None, li
     return files[0], m.group(1) if m else None, files
 
 
+def id_line_re(prefix: str) -> re.Pattern[str]:
+    """Regex matching one stable-ID bullet (`- SFD-1: texte`).
+
+    Canonical form is the template's `- {PREFIX}-N: ` (cf.
+    `templates/feat.template.md`). Audit F-04 (2026-08-25) added tolerance for
+    two deviations found in generated / hand-written FEATs, because scoring them
+    as *zero* IDs silently disables every FD/SFD-keyed coverage check downstream
+    (an empty set passes any coverage assertion trivially):
+
+      * bold-wrapped IDs — `**SFD-1** — texte`
+      * a missing list marker before a bold ID
+
+    Still required: the ID sits at the start of its line, and a `:` / em-dash
+    separates it from the text. Prose mentioning "SFD-3" mid-sentence keeps
+    being ignored, which is what `get_covered_ids` is for.
+    """
+    return re.compile(
+        rf"^[ 	]*(?:[-*][ 	]+)?\*{{0,2}}{prefix}-(\d+)\*{{0,2}}[ 	]*(?::|—|–)",
+        re.MULTILINE,
+    )
+
+
 def test_id_sequence(content: str, prefix: str, heading: str) -> dict[str, Any]:
     body = section_body(content, heading)
     if body is None:
         return {"skipped": True}
-    ids = [int(m.group(1)) for m in re.finditer(rf"^- {prefix}-(\d+):", body, re.MULTILINE)]
+    ids = [int(m.group(1)) for m in id_line_re(prefix).finditer(body)]
     if not ids:
         return {"empty": True}
     counts: dict[int, int] = {}
@@ -137,7 +164,7 @@ def get_all_ids(content: str, prefix: str, heading: str) -> list[str]:
     body = section_body(content, heading)
     if body is None:
         return []
-    return [f"{prefix}-{m.group(1)}" for m in re.finditer(rf"^- {prefix}-(\d+):", body, re.MULTILINE)]
+    return [f"{prefix}-{m.group(1)}" for m in id_line_re(prefix).finditer(body)]
 
 
 def get_covered_ids(content: str, prefix: str) -> set[str]:
@@ -148,7 +175,7 @@ def count_bullets(content: str, heading: str, id_prefix: str) -> int:
     body = section_body(content, heading)
     if body is None:
         return SUCCESS
-    return len(re.findall(rf"(?m)^\s*-\s+{id_prefix}-\d+\s*:", body))
+    return len(id_line_re(id_prefix).findall(body))
 
 
 def count_oos_bullets(content: str) -> int:
@@ -209,7 +236,7 @@ def has_auth_stack_listed(stack_content: str) -> bool:
     body = section_body(stack_content, "Active Auth Specs")
     if body is None:
         return False
-    return bool(re.search(r"(?m)^\s*-\s+\.sdd/stacks/auth/", body))
+    return bool(parse_active_stack_ids(body, "auth"))
 
 
 def detect_active_auth_stack(stack_content: str) -> str | None:
@@ -222,8 +249,13 @@ def detect_active_auth_stack(stack_content: str) -> str | None:
     body = section_body(stack_content, "Active Auth Specs")
     if body is None:
         return None
-    m = re.search(r"(?m)^\s*-\s+(\.sdd/stacks/auth/[\w\-]+\.md)\s*$", body)
-    return m.group(1) if m else None
+    ids = parse_active_stack_ids(body, "auth").get("auth")
+    if not ids:
+        return None
+    # Chemin canonique `.sdd/` — la valeur sert à ouvrir le fichier sur
+    # disque, et un stack.md legacy peut déclarer la racine `.claude` qui
+    # n'existe plus sur disque (audit 2026-08-25).
+    return f"{CANONICAL_STACK_ROOT}/stacks/auth/{ids[0]}.md"
 
 
 def extract_required_auth_keys(auth_stack_content: str) -> list[str]:
@@ -334,7 +366,19 @@ def main() -> int:
                 continue
             if r.get("empty"):
                 if required:
-                    rep.add_warn(f"{prefix}-EMPTY", f"Section ## {section} presente mais vide ou sans IDs {prefix}-N")
+                    # Audit F-04 (2026-08-25) : BLOQUANT, plus un WARN. Une
+                    # section presente mais rendant zero ID neutralise
+                    # silencieusement tous les controles de couverture qui
+                    # s'appuient sur ces IDs (un ensemble vide passe
+                    # trivialement) - la tracabilite annoncee est alors
+                    # structurellement absente. Un WARN ne protege rien.
+                    rep.add_err(
+                        f"{prefix}-EMPTY",
+                        f"Section ## {section} presente mais vide ou sans IDs {prefix}-N - "
+                        f"la couverture indexee sur {prefix}-N passerait sur un ensemble vide",
+                        f"Ajouter des bullets au format '- {prefix}-1: texte' dans ## {section} "
+                        f"(cf. templates/feat.template.md)",
+                    )
                 continue
             if r.get("ok"):
                 rep.add_pass(f"{prefix}-IDS", f"{prefix}-N : {r['count']} IDs continus, pas de doublons")
@@ -410,10 +454,9 @@ def main() -> int:
             "backend": None, "frontend": None, "ui": None, "auth": None,
             "fullstack": None, "mobiles": None,
         }
-        for m in re.finditer(r"^\s*-\s*\.sdd/stacks/(\w+)/([\w-]+)\.md", active_tech_body, re.MULTILINE):
-            cat, stack_id = m.group(1), m.group(2)
+        for cat, ids in parse_active_stack_ids(active_tech_body, first_only=True).items():
             if cat in stacks_dict and stacks_dict[cat] is None:
-                stacks_dict[cat] = stack_id
+                stacks_dict[cat] = ids[0]
 
         try:
             from sdd_lib.stack_validator import validate_active_stacks_coherence
@@ -452,9 +495,9 @@ def main() -> int:
             ("Active Architecture Pattern", "archi"),
         ):
             body = section_body(stack_content, cat_header) or ""
-            m = re.search(r"^\s*-\s*\.sdd/stacks/(\w+)/([\w-]+)\.md", body, re.MULTILINE)
-            if m and extended_stacks.get(cat_key) is None:
-                extended_stacks[cat_key] = m.group(2)
+            ids = parse_active_stack_ids(body, cat_key).get(cat_key)
+            if ids and extended_stacks.get(cat_key) is None:
+                extended_stacks[cat_key] = ids[0]
 
         required_body = section_body(feat_content, "Required Stack") or ""
         if required_body.strip():

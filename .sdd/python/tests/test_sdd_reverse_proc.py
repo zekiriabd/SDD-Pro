@@ -1,6 +1,6 @@
 """test_sdd_reverse_proc.py — DB stored-procedure reverse (offline, no database).
 
-Covers the deterministic core of the proc-reverse flavor:
+Covers the deterministic core of the db-reverse flavor:
   - readonly_guard       : the hard read-only barrier
   - dialects             : registry + read-only catalog queries
   - sql_body_analyzer    : signal extraction + confidence downgrade
@@ -330,12 +330,44 @@ def test_build_and_snapshot(tmp_path):
 
 
 def test_callgraph_built():
+    """Audit 2026-08-25 (D1): the edge TARGET is now qualified like the source.
+
+    It used to be `{"from": "dbo.usp_A", "to": "usp_B"}` — a target that could
+    never match a node, since every node is keyed by `fqName` (`dbo.usp_B`).
+    Qualifying the capture made the graph actually connect.
+    """
     d = get_dialect("SqlServer")
     body = "CREATE PROCEDURE dbo.usp_A AS BEGIN EXEC dbo.usp_B; END"
     model = dbi.build_introspection(
         [_row("dbo", "usp_A", "P", body)], d, server="h", database="db"
     )
-    assert {"from": "dbo.usp_A", "to": "usp_B"} in model["callGraph"]
+    assert {"from": "dbo.usp_A", "to": "dbo.usp_B"} in model["callGraph"]
+
+
+def test_callgraph_target_shape_matches_node_keys():
+    """An edge must be resolvable against the procedures' own fqName keys."""
+    d = get_dialect("SqlServer")
+    rows = [
+        _row("dbo", "usp_A", "P", "CREATE PROCEDURE dbo.usp_A AS BEGIN EXEC dbo.usp_B; END"),
+        _row("dbo", "usp_B", "P", "CREATE PROCEDURE dbo.usp_B AS BEGIN SELECT 1; END"),
+    ]
+    model = dbi.build_introspection(rows, d, server="h", database="db")
+    node_keys = {p["fqName"] for p in model["procedures"]}
+    targets = {e["to"] for e in model["callGraph"]}
+    assert targets <= node_keys, f"unresolvable edge targets: {targets - node_keys}"
+
+
+def test_system_routine_calls_are_not_dependencies():
+    """N3: `EXEC sp_executesql @sql` is not a business edge."""
+    d = get_dialect("SqlServer")
+    body = ("CREATE PROCEDURE dbo.usp_Dyn AS BEGIN "
+            "EXEC sp_executesql @sql; EXEC dbo.usp_Real; END")
+    model = dbi.build_introspection(
+        [_row("dbo", "usp_Dyn", "P", body)], d, server="h", database="db"
+    )
+    targets = {e["to"] for e in model["callGraph"]}
+    assert "dbo.usp_Real" in targets
+    assert not any("executesql" in t.lower() for t in targets)
 
 
 # --------------------------------------------------------------------------- #

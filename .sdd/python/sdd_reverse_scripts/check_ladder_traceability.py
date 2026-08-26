@@ -9,6 +9,22 @@ the 3-rung ladder for ONE unit :
             --covers--> task T-N (plans/{n}-{Name}.analysis.md)
                 --evidence--> path:Lx-Ly
 
+The DATABASE reverse (`/sdd-db-reverse-full`) climbs the same ladder with one
+rung fewer — there is no 3a analysis, because the SQL object's own body IS the
+analysis. Its chain is checked in the same pass (audit 2026-08-25, finding M3) :
+
+    FEAT item (feats/{n}-{Module}.md)
+        --covers--> US AC (us/{n}-{m}-{Name}.md, one US per SQL object)
+            --evidence--> .sys/proc-snapshot/{schema}.{object}.sql:Lx-Ly
+
+Running the code-shaped check against a `db-module` unit used to report
+"artifacts missing" and stop, which read as "not run yet" rather than "wrong
+shape" — the downward half of the DB ladder was simply never verified.
+
+On the DB path the evidence path is additionally resolved ON DISK. The
+assembler writes `unknown:1` when it has no evidence, and that value used to
+pass every gate; a snapshot that does not exist is now a gap, not a green.
+
 Emits [REVERSE_LADDER_TRACEABILITY_GAP] findings. **Informational, never
 blocking** (mirrors check_feat_completeness.py) : gaps are reported, never
 filled by invention (bias toward not-verified). Exit 0 unless an infra error
@@ -306,6 +322,144 @@ def _parse_analysis_tasks(text: str) -> dict[str, bool]:
     return tasks
 
 
+_SOURCE_PROC_RE = re.compile(r"^source-proc:\s*(\S+)", re.MULTILINE)
+_EV_PATH_RE = re.compile(r"^(.*?):[Ll]?\d+(?:\s*-\s*[Ll]?\d+)?$")
+
+
+def _is_db_ladder(unit_dict: dict | None, us_texts: list) -> bool:
+    """True when this unit is a database module (2 rungs), not a code unit (3).
+
+    Two independent signals, because the checker is invoked both ways: with
+    `--project/--unit` (the inventory knows) and with `--feat-path` alone (it
+    does not, so the US themselves have to say — every DB-reverse US carries the
+    SQL object it was derived from).
+    """
+    if (unit_dict or {}).get("kind") == "db-module":
+        return True
+    return any(_SOURCE_PROC_RE.search(t) for _, t in us_texts)
+
+
+def _parse_us_acs_db(text: str) -> list[dict]:
+    """US ACs of a DB-reverse US: id + whether the AC carries an evidence ref."""
+    idm = re.search(r"^ID:\s*(\d+-\d+)-", text, re.MULTILINE)
+    us_short = idm.group(1) if idm else "?-?"
+    acs: list[dict] = []
+    ac_id_re = re.compile(r"\bAC-\d+\b")
+    for ac_id, block in _iter_item_blocks(text, ("## Acceptance Criteria",), ac_id_re):
+        em = _EVIDENCE_RE.search(block)
+        acs.append({
+            "us_ac": f"{us_short}#{ac_id}",
+            "evidence": (em.group(1).strip() if em else ""),
+        })
+    return acs
+
+
+def _evidence_resolves(project: Path | None, evidence: str) -> bool | None:
+    """Does an `path:Lx-Ly` evidence ref point at a file that exists?
+
+    None when it cannot be decided (no project root given). `unknown:1` — the
+    assembler's placeholder — never resolves, which is the whole point.
+    """
+    if not evidence or project is None:
+        return None
+    ref = evidence.split(",")[0].strip()
+    m = _EV_PATH_RE.match(ref)
+    path = (m.group(1) if m else ref).strip()
+    if not path or path == "unknown":
+        return False
+    return (project / path).exists()
+
+
+def _check_db_ladder(
+    *, project: Path | None, unit: str | None, n, name,
+    feat_text: str, us_texts: list, us_files: list, feat: Path,
+) -> dict:
+    """FEAT items → US ACs → snapshot evidence, for a `db-module` unit."""
+    feat_items = _parse_feat_items(feat_text)
+    us_acs: list[dict] = []
+    for _, t in us_texts:
+        us_acs.extend(_parse_us_acs_db(t))
+    us_ac_ids = {a["us_ac"] for a in us_acs}
+
+    gaps: list[str] = []
+    covered_us_acs: set[str] = set()
+
+    for it in feat_items:
+        if not it["covers_us"]:
+            gaps.append(f"FEAT {it['id']}: no `covers:` to any US AC")
+        for ref in it["covers_us"]:
+            covered_us_acs.add(ref)
+            if ref not in us_ac_ids:
+                gaps.append(
+                    f"FEAT {it['id']}: covers '{ref}' which has no matching US AC (dangling)")
+        if not it["has_evidence"]:
+            gaps.append(f"FEAT {it['id']}: no `evidence:` comment (rule §3)")
+
+    # The SQL object's body replaces the 3a task rung: an AC that points at no
+    # snapshot line is an AC nothing in the database backs.
+    for a in us_acs:
+        if not a["evidence"]:
+            gaps.append(f"US {a['us_ac']}: no `evidence:` to a snapshot line")
+        elif _evidence_resolves(project, a["evidence"]) is False:
+            gaps.append(
+                f"US {a['us_ac']}: evidence '{a['evidence']}' does not resolve "
+                f"to a file under the project — placeholder or stale snapshot")
+        if a["us_ac"] not in covered_us_acs:
+            gaps.append(f"US {a['us_ac']}: orphan — covered by no FEAT item (downward gap)")
+
+    conf_feat = _frontmatter_confidence(feat_text)
+    us_confs = [(f.name, _frontmatter_confidence(t)) for f, t in us_texts]
+    declared_us = [c for _, c in us_confs if c]
+    if conf_feat and declared_us:
+        floor = min(declared_us, key=lambda c: _CONF_ORDER[c])
+        if _CONF_ORDER[conf_feat] > _CONF_ORDER[floor]:
+            gaps.append(
+                f"confidence uprank: FEAT ({conf_feat}) > min(US) ({floor}) "
+                f"— min-monotone Q3 violated")
+    unit_language, unit_cap = _unit_cap(project, unit)
+    if unit_cap:
+        for fname, c in us_confs:
+            if c and _CONF_ORDER[c] > _CONF_ORDER[unit_cap]:
+                gaps.append(
+                    f"confidence cap: US {fname} ({c}) > cap[{unit_language}] "
+                    f"({unit_cap}) — D1 rule §4 violated")
+
+    stale_findings: list[str] = []
+    try:
+        feat_mtime = feat.stat().st_mtime
+        us_mtimes = [f.stat().st_mtime for f in us_files]
+        newest_us = max(us_mtimes) if us_mtimes else None
+        if newest_us is not None and newest_us > feat_mtime + 1:
+            stale_findings.append(
+                "the US are newer than the FEAT — re-run build_proc_feats "
+                "(upper rung stale)")
+    except OSError:
+        pass
+
+    verdict = "ladder-complete" if not gaps else ("partial" if len(gaps) <= 3 else "incomplete")
+    return {
+        "unit": unit, "n": n, "name": name,
+        "shape": "db-module",
+        "artifacts": {"feat": True, "analysis": None, "us_count": len(us_files)},
+        "ran": True,
+        "counts": {"feat_items": len(feat_items), "us_acs": len(us_acs), "tasks": 0},
+        "confidence": {
+            "analysis": None,
+            "us": {fname: c for fname, c in us_confs},
+            "feat": conf_feat,
+            "language": unit_language,
+            "language_cap": unit_cap,
+        },
+        "extraction_depth": "sql-body",
+        "verdict": verdict,
+        "gap_count": len(gaps),
+        "gaps": gaps,
+        "class": "[REVERSE_LADDER_TRACEABILITY_GAP]" if gaps else None,
+        "stale_findings": stale_findings,
+        "stale_class": "[REVERSE_LADDER_STALE]" if stale_findings else None,
+    }
+
+
 def check(project: Path | None, unit: str | None, feat_path: Path | None) -> dict:
     feat, n, name = _resolve_feat(project, unit, feat_path)
     feats_dir = workspace_root(REPO_ROOT) / "feats"
@@ -318,6 +472,21 @@ def check(project: Path | None, unit: str | None, feat_path: Path | None) -> dic
     # no longer share the FEAT {Name} — match by the numeric {n}- prefix only
     # (us_short is re-derived from each US `ID:` line in _parse_us_acs).
     us_files = sorted(us_dir.glob(f"{n}-*.md")) if us_dir.is_dir() else []
+
+    us_texts_all: list[tuple[Path, str]] = []
+    for f in us_files:
+        t = _read(f)
+        if t:
+            us_texts_all.append((f, t))
+
+    # A database module climbs a 2-rung ladder (no 3a analysis — the SQL body is
+    # the analysis). Dispatch BEFORE the artifact check, which would otherwise
+    # report a missing `analysis.md` that is not supposed to exist (M3).
+    if feat_text and us_texts_all and _is_db_ladder(_load_unit(project, unit), us_texts_all):
+        return _check_db_ladder(
+            project=project, unit=unit, n=n, name=name, feat_text=feat_text,
+            us_texts=us_texts_all, us_files=us_files, feat=feat,
+        )
 
     artifacts = {
         "feat": feat_text is not None,
@@ -333,13 +502,10 @@ def check(project: Path | None, unit: str | None, feat_path: Path | None) -> dic
         }
 
     feat_items = _parse_feat_items(feat_text)
+    us_texts = us_texts_all
     us_acs: list[dict] = []
-    us_texts: list[tuple[Path, str]] = []
-    for f in us_files:
-        t = _read(f)
-        if t:
-            us_texts.append((f, t))
-            us_acs.extend(_parse_us_acs(t))
+    for _, t in us_texts:
+        us_acs.extend(_parse_us_acs(t))
     tasks = _parse_analysis_tasks(analysis_text)
 
     us_ac_ids = {a["us_ac"] for a in us_acs}
@@ -515,7 +681,11 @@ def main(argv: list[str] | None = None) -> int:
         print(f"  verdict: {report['verdict']}")
         if report.get("ran"):
             c = report["counts"]
-            print(f"  counts : {c['feat_items']} FEAT items, {c['us_acs']} US ACs, {c['tasks']} tasks")
+            if report.get("shape") == "db-module":
+                print(f"  shape  : db-module (2 barreaux — pas d'analyse 3a)")
+                print(f"  counts : {c['feat_items']} FEAT items, {c['us_acs']} US ACs")
+            else:
+                print(f"  counts : {c['feat_items']} FEAT items, {c['us_acs']} US ACs, {c['tasks']} tasks")
             for g in report.get("gaps", [])[:20]:
                 print(f"    • {g}")
             if report["gap_count"] > 20:

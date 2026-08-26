@@ -1,15 +1,27 @@
 """readonly_guard.py — Hard read-only barrier for DB stored-procedure reverse.
 
-The proc-reverse adapter connects to a LIVE database. The single non-negotiable
+The db-reverse adapter connects to a LIVE database. The single non-negotiable
 contract is: **it never modifies anything**. This module is the mechanical
 enforcement of that contract (invariant `reverse-db-readonly`,
 `rules/reverse-engineering.md §6` class `[REVERSE_DB_READONLY_VIOLATION]`).
 
 Every SQL statement the adapter is about to send to the server passes through
-`assert_readonly()`. A statement is accepted ONLY if it is a pure read against
-catalog metadata: it must start with `SELECT` (or `WITH ... SELECT`) and must
-contain no DDL/DML token. Anything else raises `ReadOnlyViolation` — there is no
-code path in the adapter that issues `DROP`/`DELETE`/`ALTER`/`EXEC`/etc.
+one of TWO guards, and nothing reaches a cursor without passing one of them:
+
+  - `assert_readonly()` — for every catalog QUERY. Accepted ONLY if it is a pure
+    read: it must start with `SELECT` (or `WITH ... SELECT`) and must contain no
+    DDL/DML token. There is no code path in the adapter that issues
+    `DROP`/`DELETE`/`ALTER`/`EXEC`/etc.
+  - `assert_session_pragma()` — for the handful of *session pragmas* the adapter
+    issues right after connecting to harden the session itself
+    (`SET TRANSACTION ...`). These are not SELECTs, so they can never pass
+    `assert_readonly`; before the audit of 2026-08-25 (finding N1) they were sent
+    with no guard at all, which made this module's own contract false. They are
+    now matched against a CLOSED whitelist (`_SESSION_PRAGMAS`): a pragma that is
+    not literally one of them is refused like any mutation.
+
+The two guards are disjoint on purpose — widening `assert_readonly` to tolerate
+`SET` would have opened it to `SET @sql = ...` and friends.
 
 NOTE (smoke/test design): this module necessarily *names* the forbidden tokens
 in its blocklist. The `reverse_smoke` read-only check therefore validates the
@@ -20,6 +32,8 @@ body analyzer, which legitimately matches `INSERT`/`UPDATE` as analysis regex).
 Public API:
     is_readonly(sql) -> bool
     assert_readonly(sql) -> None            # raises ReadOnlyViolation
+    is_allowed_session_pragma(sql) -> bool
+    assert_session_pragma(sql) -> None      # raises ReadOnlyViolation
     class ReadOnlyViolation(Exception)       # .error_class = "[REVERSE_DB_READONLY_VIOLATION]"
 """
 
@@ -87,4 +101,44 @@ def assert_readonly(sql: str) -> None:
         raise ReadOnlyViolation(
             f"{ERROR_CLASS} refused non-read-only statement: "
             f"{sql.strip()[:120]!r}"
+        )
+
+
+# --------------------------------------------------------------------------- #
+# Session pragmas (N1, audit 2026-08-25)
+# --------------------------------------------------------------------------- #
+
+# CLOSED whitelist. Each entry is a session-hardening statement the adapter may
+# issue immediately after connecting; none of them reads or writes user data.
+#
+# SQL Server keeps READ UNCOMMITTED deliberately: an introspection run must never
+# take shared locks on a production catalog and block the application. Dirty
+# reads of catalog metadata are harmless (a routine being altered mid-scan is
+# reported by `modified` anyway); blocking a live app is not. The trade-off is
+# recorded here rather than silently changed.
+_SESSION_PRAGMAS = frozenset({
+    "SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED",   # SQL Server
+    "SET TRANSACTION READ ONLY",                          # Oracle
+    "SET SESSION TRANSACTION READ ONLY",                  # MySQL / MariaDB
+    "SET TRANSACTION ISOLATION LEVEL READ COMMITTED",     # generic fallback
+})
+
+_WS_RE = re.compile(r"\s+")
+
+
+def _normalise_pragma(sql: str) -> str:
+    return _WS_RE.sub(" ", _strip_comments(sql or "").strip().rstrip(";")).upper()
+
+
+def is_allowed_session_pragma(sql: str) -> bool:
+    """True iff `sql` is exactly one whitelisted session-hardening pragma."""
+    return _normalise_pragma(sql) in _SESSION_PRAGMAS
+
+
+def assert_session_pragma(sql: str) -> None:
+    """Raise `ReadOnlyViolation` unless `sql` is a whitelisted session pragma."""
+    if not is_allowed_session_pragma(sql):
+        raise ReadOnlyViolation(
+            f"{ERROR_CLASS} refused non-whitelisted session pragma: "
+            f"{(sql or '').strip()[:120]!r}"
         )

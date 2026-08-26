@@ -103,7 +103,7 @@ Le choix se fait dans `stack.md ## Active Model Provider`, résolu par
 | Artefact | Volume | Couplage Claude Code |
 |---|---:|---|
 | Agents `.claude/agents/*.md` | 25 | Frontmatter `name/description/model/tools` + corps markdown. Modèles hardcodés : 7 × `claude-opus-4-8` (dev-backend, dev-frontend, reverse-feat-composer, reverse-sql-analyst, reverse-sql-feat-composer, reverse-tech-analyst, reverse-ui-extractor), 18 × `claude-sonnet-4-6`. |
-| Commandes `.claude/commands/*.md` | 40 | **26 spawnent des sous-agents** (25 contiennent « spawn » : arch-init, dev-run, feat-validate, sdd-full, sdd-kill-server, sdd-proc-reverse[-full], les 15 sdd-reverse-*, sdd-review, spec-book + `qa-generate` via `subagent_type`). Syntaxe slash-command + tool `Task/Agent` = spécifiques Claude Code. |
+| Commandes `.claude/commands/*.md` | 40 | **26 spawnent des sous-agents** (25 contiennent « spawn » : arch-init, dev-run, feat-validate, sdd-full, sdd-kill-server, sdd-db-reverse[-full], les 15 sdd-reverse-*, sdd-review, spec-book + `qa-generate` via `subagent_type`). Syntaxe slash-command + tool `Task/Agent` = spécifiques Claude Code. |
 | Rules `.claude/rules/*.md` | 11 | 9 avec frontmatter `paths:` (path-scoped auto-load = mécanisme natif Claude Code). 2 inconditionnelles (`output-protocol`, `error-classification`). |
 | Skills `.claude/skills/` | 13 + VENDORED.md | Auto-trigger = mécanisme Claude Code. **4 skills SDD-owned** (using-sddpro, starting-a-new-feat, starting-a-reverse-eng, debugging-failed-pipeline, test-driven-development, a11y-local) + **~8 skills tiers vendorés** (webapp-testing, semgrep, codeql, sarif-parsing, insecure-defaults, frontend-design, c4-model — licences Apache 2.0 / CC BY-SA 4.0 / MIT, politique de màj manuelle dans `VENDORED.md`). |
 | Références lazy-load `@.claude/…` | **328** dans les `.md` de `.claude/` | Mécanisme `@import` propre à Claude Code (le user-brief en comptait 157 hors doublons ; le grep brut retourne 328 occurrences). |
@@ -728,7 +728,7 @@ chaîne déterministe. Le harnais ne suffit pas : **chaque provider/modèle doit
 ### 10.1 Protocole (par tier × provider)
 
 1. **Corpus** : 1 FEAT CalcABC canonique (2 US, back+front) + 1 FEAT reverse
-   (module proc-reverse SQL Server, déjà live-validé) = couvre forward + reverse.
+   (module db-reverse SQL Server, déjà live-validé) = couvre forward + reverse.
 2. **Exécution** : harnais de référence pour le provider (Claude Code pour
    anthropic/moonshot-anthropic-compat ; Codex pour openai/moonshot-openai-compat),
    3 runs par combo (variance).

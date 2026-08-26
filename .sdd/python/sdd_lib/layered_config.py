@@ -103,7 +103,10 @@ def _parse_yaml_minimal(text: str) -> dict[str, Any]:
     """
     out: dict[str, str] = {}
     seen: dict[str, int] = {}
-    line_re = re.compile(r"^\s*([A-Za-z][A-Za-z0-9_]*)\s*:\s*(.+?)\s*(?:#.*)?$")
+    # Le `.` est admis (audit 2026-08-26) — symetrie avec
+    # `project_config._KV_RE` : `AcceptanceGate.RequireE2E` & co doivent etre
+    # exprimables aux 3 niveaux de la hierarchie, pas seulement en theorie.
+    line_re = re.compile(r"^\s*([A-Za-z][A-Za-z0-9_.]*)\s*:\s*(.+?)\s*(?:#.*)?$")
     for lineno, raw in enumerate(text.splitlines(), start=1):
         line = raw.split("#", 1)[0].rstrip() if "#" in raw and not _is_in_quotes(raw, "#") else raw.rstrip()
         if not line.strip() or line.lstrip().startswith("#"):
@@ -313,6 +316,10 @@ _DEPRECATED_CONFIG_KEYS: dict[str, str] = {
     "PerfMode":          "agent performance-auditor retiré v7.0.0 — utiliser Lighthouse CI (cf. ingest_lighthouse.py)",
     "PerfFailOn":        "agent performance-auditor retiré v7.0.0 — utiliser Lighthouse CI",
     "DashboardMode":     "agent dashboard retiré v7.0.0 — utiliser console SDD (workspace/console/)",
+    "SecurityThreatModelEnabled":
+        "mode threat-model retiré v7.0.0 — utiliser le template humain "
+        "templates/threat-model.template.md (audit 2026-08-26 : la clé était "
+        "documentée DEPRECATED mais absente de cette table, donc no-op MUET)",
     "PlanCacheStrict":   "dev-*-strict variants retirés v7.0.0 — clé toujours acceptée en lecture mais sans effet",
     "PlanCacheRoot":     "dev-*-strict variants retirés v7.0.0 — clé toujours acceptée en lecture mais sans effet",
 }
@@ -364,6 +371,19 @@ def _load_schema_known_keys(root: Path | None = None) -> set[str]:
     return _SCHEMA_KEYS_CACHE
 
 
+#: Messages WARN de config deja emis dans ce process (audit 2026-08-26).
+#: `read_layered_config()` est appele ~20+ fois par run `/sdd-full` ; sans
+#: dedupe, chaque cle deprecie/inconnue produisait autant de lignes
+#: identiques, contre `output-protocol.md` §5. Le raise strict, lui, n'est
+#: JAMAIS dedupe (comportement bloquant, pas informationnel).
+_WARNED_CONFIG_KEYS: set[str] = set()
+
+
+def reset_config_warn_cache() -> None:
+    """Vide le cache de dedupe des WARN config (usage : tests unitaires)."""
+    _WARNED_CONFIG_KEYS.clear()
+
+
 def _warn_unknown_keys(effective: dict[str, Any], root: Path | None = None) -> None:
     """Emit stderr WARN [CONFIG_UNKNOWN_KEY] for keys absent from schema.
 
@@ -397,6 +417,10 @@ def _warn_unknown_keys(effective: dict[str, Any], root: Path | None = None) -> N
 
     for key in sorted(unknown):
         val = str(effective[key]).strip()
+        dedupe_key = f"unknown:{key}={val}"
+        if dedupe_key in _WARNED_CONFIG_KEYS:
+            continue
+        _WARNED_CONFIG_KEYS.add(dedupe_key)
         msg = (
             f"WARN [CONFIG_UNKNOWN_KEY] Project Config key '{key}={val}' is "
             f"NOT in project-config.schema.json properties (typo? legacy "
@@ -433,6 +457,10 @@ def _warn_deprecated_keys(effective: dict[str, Any]) -> None:
         # suggest the user expects an effect.
         if val.lower() in ("", "off", "0", "false", "no", "none"):
             continue
+        dedupe_key = f"deprecated:{key}={val}"
+        if dedupe_key in _WARNED_CONFIG_KEYS:
+            continue
+        _WARNED_CONFIG_KEYS.add(dedupe_key)
         print(
             f"WARN [CONFIG_DEPRECATED_KEY] Project Config key '{key}={val}' is "
             f"deprecated and has NO RUNTIME EFFECT — {reason}. "

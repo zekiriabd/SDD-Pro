@@ -205,7 +205,7 @@ Phase 5/6          : revue Tech Lead → /sdd-full {n}  (INCHANGÉ, via REVERSE-
 | `sqlcmd` brut en subprocess | mssql-tools | ⚠️ formatage multiligne `nvarchar(max)` pénible pour dumper les corps |
 
 > **Reco** : `pyodbc` extra opt-in par défaut (cohérent avec la philosophie
-> zéro-dep : un user forward n'installe rien ; un user proc-reverse fait
+> zéro-dep : un user forward n'installe rien ; un user db-reverse fait
 > `pip install -e .sdd/python[reverse-db]`), fallback `Invoke-Sqlcmd`.
 
 ---
@@ -224,6 +224,35 @@ FEATs ingérables. Une FEAT = *intention utilisateur cohérente* (design doc §1
 
 Mapping : **1 grappe → 1 unité U-N → 1 FEAT** ; **1 proc → 1+ User Story**
 (capability). Identique au mapping page→FEAT / capability→US existant.
+
+> **État réel au 2026-08-25 — ce paragraphe décrit l'intention, pas
+> l'implémentation.** Ce qui a été livré est plus large, et vit dans
+> `sdd_reverse/proc_module_clusterer.py` (pas `inventory_builder`), avec
+> `sdd_reverse/sql_dependency_graph.py::cohesion_modules` pour la cohésion.
+> Trois écarts à connaître avant de raisonner sur ce §5 :
+>
+> 1. **Le mapping final est `1 objet SQL = 1 US`** (pas « 1+ »), et un objet SQL
+>    n'est pas seulement une procédure : fonctions, vues, triggers et packages
+>    Oracle passent par le même escalier.
+> 2. **Le point 1 (« préfixe de nommage ») n'est plus une liste fixe.** La
+>    structure de nommage est **mesurée** sur le corpus réel de la base
+>    (`learn_name_profile` : fréquence documentaire × concentration
+>    positionnelle) : les marqueurs de type/sous-système et les verbes propres à
+>    la base sont découverts, dans n'importe quelle langue, au lieu d'être
+>    déclarés. En dessous de 8 objets, aucun profil n'est appris. S'y ajoute le
+>    **rattachement des sous-objets** (`ClientAdresse` → `Client`), qui n'était
+>    pas prévu ici et qui est ce qui empêche l'aggregate d'être éclaté en deux
+>    FEATs.
+> 3. **Les points 2-3 ne sont plus un repli, mais une stratégie concurrente,
+>    choisie automatiquement.** Si le nommage fragmente (modules/objets ≥ 0.50)
+>    ou qu'un objet sur deux n'a pas de verbe lisible, le regroupement bascule sur
+>    la cohésion du graphe — et n'est retenu que s'il regroupe réellement mieux.
+>    La stratégie effectivement appliquée est affichée en ligne de chat et tracée
+>    dans `inventory.json._clusteringReport`.
+>
+> Overrides : `SDD_REVERSE_CLUSTER_COHESION=1` / `SDD_REVERSE_CLUSTER_NAMING=1`.
+> Couverture : `tests/test_reverse_db_clustering.py`. Détail et statut :
+> `reverse-db-audit-2026-07.md` (finding DB4, fermé).
 
 `/sdd-reverse-proc {ProcName}` (mode 1 proc) reste possible : il résout la grappe
 contenant `{ProcName}` et génère/met à jour la FEAT correspondante (idempotent).
@@ -261,7 +290,7 @@ déjà en place (`check_ladder_traceability.py`), zéro nouveau code de gouverna
 
 La règle existe : `[DB_STRUCTURE_CHANGE_FORBIDDEN]` (STOP, escalade) +
 `library-and-stack.md §C` (introspection `INFORMATION_SCHEMA` autorisée, tout DDL/DML
-interdit). Application au proc-reverse :
+interdit). Application au db-reverse :
 
 1. **Surface SQL émise — liste blanche stricte** (l'adaptateur n'a aucun chemin de
    code produisant autre chose) :
@@ -289,7 +318,7 @@ interdit). Application au proc-reverse :
 
 Réutilise **exactement** la convention forward : section `## Active Database` de
 `stack.md` avec `DB_HOST / DB_PORT / DB_NAME / DB_USER / DB_PASSWORD`
-(`loader.yml:203-207`, `arch.md` STEP 8). Le proc-reverse lit ces 5 clés, compose
+(`loader.yml:203-207`, `arch.md` STEP 8). Le db-reverse lit ces 5 clés, compose
 la chaîne en RAM, introspect, déconnecte.
 
 **Nuance d'isolation D4 à arbitrer** : `stack.md` est aujourd'hui lu par les
@@ -306,8 +335,8 @@ script). Pas de copie de secret ; lecture seule.
 |---|---|
 | `sdd_reverse/db_introspect.py` | adaptateur live READ-ONLY (liste blanche SQL) |
 | `sdd_reverse/dialects/sqlserver.py` | requêtes catalogue T-SQL (seam multi-SGBD) |
-| `sdd_reverse/proc_unit_clusterer.py` | grappes de procs (§5) |
-| `sdd_reverse/tsql_body_analyzer.py` | signaux déterministes du corps (§6) |
+| `sdd_reverse/proc_unit_clusterer.py` | grappes de procs (§5) — **livré sous le nom `proc_module_clusterer.py`** |
+| `sdd_reverse/tsql_body_analyzer.py` | signaux déterministes du corps (§6) — **livré sous le nom `sql_body_analyzer.py`** (multi-dialecte, pas T-SQL seul) |
 | `sdd_reverse_scripts/reverse_proc_introspect.py` | CLI Phase 1L |
 | `.claude/agents/reverse-proc-analyst.md` | 3a spécialisé T-SQL (ou mode de `reverse-tech-analyst`) |
 | `.claude/commands/sdd-reverse-proc.md` (+ `-introspect`) | commandes user-facing |

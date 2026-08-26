@@ -177,7 +177,7 @@ deepening_contracts:
 
   - id: reverse-db-readonly-proc
     description: |
-      proc-reverse (stored-procedure reverse) is strictly READ-ONLY against the
+      db-reverse (stored-procedure reverse) is strictly READ-ONLY against the
       live database. Every dialect catalog query MUST pass
       readonly_guard.is_readonly (SELECT-only, no DDL/DML/EXEC/INTO/batch), and
       db_introspect MUST call assert_readonly before executing any statement. It
@@ -190,7 +190,7 @@ deepening_contracts:
 
   - id: reverse-proc-model-1proc-1us-1module-1feat
     description: |
-      proc-reverse mapping: 1 stored procedure = 1 User Story, 1 business module
+      db-reverse mapping: 1 stored procedure = 1 User Story, 1 business module
       (cluster of procedures by object) = 1 FEAT. Ascending ladder (remontée):
       the FEAT is composed from the module's US (build_proc_feats) WITHOUT
       re-reading the T-SQL bodies. Confidence is min-monotone over the module's

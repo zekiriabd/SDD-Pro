@@ -40,7 +40,14 @@ from sdd_reverse.data_access_extractor import _PROC_PARAM_RE  # noqa: PLC2701
 
 SCHEMA_VERSION = 1
 
-_OBJ = r"(?:\[?\w+\]?\.)?\[?(\w+)\]?"   # optional schema-qualified, bracketed
+# Object reference, capturing the FULL qualified name as written (D1, audit
+# 2026-08-25). The previous pattern captured only the LAST identifier, which
+# collapsed `sales.Orders` and `dbo.Orders` into one node and — on a 3-part name
+# like `LinkedDb.dbo.Orders` — captured the SCHEMA instead of the table.
+# Up to 3 parts (server/db . schema . object); brackets, backticks and double
+# quotes are stripped by `_norm_obj`. Qualification is preserved as written: a
+# schema is never invented.
+_OBJ = r"((?:[\[`\"]?\w+[\]`\"]?\s*\.\s*){0,2}[\[`\"]?\w+[\]`\"]?)"
 
 _WRITE_RES = {
     "INSERT": re.compile(r"\bINSERT\s+INTO\s+" + _OBJ, re.IGNORECASE),
@@ -78,7 +85,23 @@ _BLOCK_COMMENT_RE = re.compile(r"/\*[\s\S]*?\*/")
 # T-SQL / Oracle / PostgreSQL, not a string, so masking it would eat table names.
 _STRING_RE = re.compile(r"'(?:[^']|'')*'")
 
-_NOISE_TABLES = frozenset({"dual"})
+# Leaf names that are never a real table: Oracle's `dual`, and the trigger
+# pseudo-tables (`inserted`/`deleted` on SQL Server, `new`/`old` elsewhere) —
+# counting them as tables polluted the dependency graph with phantom nodes.
+_NOISE_TABLES = frozenset({"dual", "inserted", "deleted"})
+
+# System routines that are NOT business dependencies (N3, audit 2026-08-25).
+# `EXEC sp_executesql @sql` used to land in `callsProcs`, adding a phantom node
+# to the dependency graph and to cohesion clustering. Matched on the LEAF name.
+# Deliberately explicit rather than a blanket `sp_*`: legacy shops do ship user
+# procedures named `sp_Something`, and dropping those would lose real edges.
+_SYSTEM_ROUTINES = frozenset({
+    "sp_executesql", "sp_execute", "sp_prepare", "sp_unprepare", "sp_cursoropen",
+    "sp_helptext", "sp_rename", "sp_getapplock", "sp_releaseapplock",
+    "sp_send_dbmail", "sp_addextendedproperty", "sp_sqlexec",
+    "dbms_output", "dbms_sql", "dbms_lob", "dbms_utility",
+})
+_SYSTEM_ROUTINE_PREFIXES = ("xp_",)      # extended procedures are always system
 
 
 def _line_at(text: str, offset: int) -> int:
@@ -126,12 +149,55 @@ def _params_from_header(body: str) -> list[dict[str, Any]]:
     return out
 
 
-def _collect_objects(rx: re.Pattern, text: str) -> list[str]:
+_QUOTE_CHARS = str.maketrans("", "", '[]`"')
+
+
+def _norm_obj(raw: str) -> str:
+    """Normalise a captured object reference to `schema.name` as WRITTEN.
+
+    Strips brackets/backticks/quotes and whitespace around the dots. A name
+    written unqualified stays unqualified — the analyzer never invents a default
+    schema, because guessing `dbo.` would create a false identity between
+    `Orders` and `dbo.Orders` on engines where the caller's default schema
+    differs.
+    """
+    parts = [p.strip().translate(_QUOTE_CHARS).strip()
+             for p in (raw or "").split(".")]
+    return ".".join(p for p in parts if p)
+
+
+def object_leaf(name: str) -> str:
+    """Last segment of a (possibly qualified) object name — `dbo.T` → `T`."""
+    return (name or "").rsplit(".", 1)[-1]
+
+
+def _is_system_routine(name: str) -> bool:
+    leaf = object_leaf(name).lower()
+    return leaf in _SYSTEM_ROUTINES or leaf.startswith(_SYSTEM_ROUTINE_PREFIXES)
+
+
+def _collect_objects(
+    rx: re.Pattern, text: str, *, drop_system_routines: bool = False,
+) -> list[str]:
+    """Collect normalised object references, de-duplicated case-insensitively.
+
+    De-duplication is on the qualified, lower-cased form: `dbo.Orders` and
+    `sales.Orders` are two distinct objects (that was D1), while `DBO.Orders`
+    and `dbo.orders` are one.
+    """
     found: list[str] = []
+    seen: set[str] = set()
     for m in rx.finditer(text):
-        name = m.group(1)
-        if name and name.lower() not in _NOISE_TABLES and name not in found:
-            found.append(name)
+        name = _norm_obj(m.group(1))
+        if not name or object_leaf(name).lower() in _NOISE_TABLES:
+            continue
+        if drop_system_routines and _is_system_routine(name):
+            continue
+        key = name.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        found.append(name)
     return found
 
 
@@ -157,7 +223,7 @@ def analyze_routine(name: str, body: str) -> dict[str, Any]:
     written_lc = {t.lower() for t in tables_written}
     tables_read = [t for t in _collect_objects(_READ_RE, clean) if t.lower() not in written_lc]
 
-    calls = _collect_objects(_CALL_RE, clean)
+    calls = _collect_objects(_CALL_RE, clean, drop_system_routines=True)
     raises = sorted({m.group(0).upper() for m in _RAISE_RE.finditer(clean)})
 
     return {
@@ -180,29 +246,70 @@ def analyze_routine(name: str, body: str) -> dict[str, Any]:
     }
 
 
-def proc_complexity(rec: dict[str, Any]) -> str:
-    """Route a procedure to deterministic vs LLM analysis (token efficiency).
+# Volume above which a body cannot be faithfully summarised by a fixed template,
+# even with no branching (M2, audit 2026-08-25): a long linear ETL is exactly the
+# case the old rubric mis-routed to "simple".
+SIMPLE_MAX_LINES = 80
+# A contract this wide is a capability, not a CRUD accessor.
+SIMPLE_MAX_PARAMS = 4
 
-    "simple"  → pure CRUD/SELECT, statically trivial : no control-flow branches,
-                no dynamic SQL, no raised errors, no cursors. The US can be
-                generated deterministically (0 token) — an LLM adds nothing.
-    "complex" → real business logic worth understanding (branches, dynamic SQL,
-                raised preconditions, cursors) → spawn the LLM analyst.
+
+def complexity_reasons(rec: dict[str, Any]) -> list[str]:
+    """Why a routine is complex — empty list means genuinely trivial.
+
+    Returned as data (not just a verdict) so the orchestrator, the US banner and
+    the audit log can all state WHY an LLM was or was not spent on this object.
+    """
+    reasons: list[str] = []
+    if rec.get("branches", 0) > 0:
+        reasons.append(f"branches={rec['branches']}")
+    if rec.get("dynamicSql"):
+        reasons.append("dynamic-sql")
+    if rec.get("raises"):
+        reasons.append("raises=" + ",".join(rec.get("raises") or []))
+    if rec.get("cursors", 0):
+        reasons.append(f"cursors={rec['cursors']}")
+
+    # --- M2 additions: volume and data-effect breadth, not just control flow ---
+    lines = rec.get("lineCount") or 0
+    if lines > SIMPLE_MAX_LINES:
+        reasons.append(f"lines={lines}>{SIMPLE_MAX_LINES}")
+    written = rec.get("tablesWritten") or []
+    if len(written) >= 2:
+        reasons.append(f"writes={len(written)}-tables")
+    elif written and rec.get("hasTransaction"):
+        # An explicit transaction around a write encodes an all-or-nothing
+        # business invariant — that belongs in an AC, not in a template.
+        reasons.append("transactional-write")
+    params = rec.get("params") or []
+    if len(params) >= SIMPLE_MAX_PARAMS:
+        reasons.append(f"params={len(params)}")
+    return reasons
+
+
+def proc_complexity(rec: dict[str, Any]) -> str:
+    """Route a SQL object to deterministic vs LLM analysis (token efficiency).
+
+    "simple"  → statically trivial AND small: a short, single-effect CRUD/SELECT
+                with no control flow. A fixed template can describe it honestly,
+                so an LLM adds nothing and costs tokens.
+    "complex" → real business logic worth understanding — branches, dynamic SQL,
+                raised preconditions, cursors, volume, multi-table writes,
+                transactional invariants, or a wide parameter contract.
+                → spawn the LLM analyst.
 
     Encrypted routines (body unavailable) route to "simple": no model can read
     them, so we emit a deterministic low-confidence US with a banner.
+
+    Audit 2026-08-25 (M2): the rubric used to look at control flow ONLY. A
+    500-line branchless procedure writing twelve tables inside a transaction was
+    classified "simple", got a tautological template US, and — because nothing
+    downgraded its confidence — sailed through the REVERSE-GATE with no human
+    review. Volume and data-effect breadth are now first-class signals.
     """
     if rec.get("encrypted"):
         return "simple"
-    if rec.get("branches", 0) > 0:
-        return "complex"
-    if rec.get("dynamicSql"):
-        return "complex"
-    if rec.get("raises"):
-        return "complex"
-    if rec.get("cursors", 0):
-        return "complex"
-    return "simple"
+    return "complex" if complexity_reasons(rec) else "simple"
 
 
 def confidence_signal(signals: dict[str, Any], lang_cap: str) -> str:

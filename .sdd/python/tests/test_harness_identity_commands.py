@@ -5,7 +5,7 @@ le `.md` Claude Code via `ClaudeAdapter.emit_commands` dans un dossier
 temporaire SOUS `.sdd/.build/` (jamais `.claude/`), puis vérifie l'ÉGALITÉ
 SÉMANTIQUE avec le `.claude/commands/{name}.md` vivant :
 
-- **Commandes AVEC frontmatter** (18 : les `sdd-reverse-*` + `sdd-proc-reverse*`,
+- **Commandes AVEC frontmatter** (18 : les `sdd-reverse-*` + `sdd-db-reverse*`,
   champs {command, phase, description, loader}) — frontmatter comparé par
   VALEUR via `sdd_lib.harness_diff.diff_agent_texts` (parser loose, champs
   dynamiques = clés du pivot) + corps identique après normalisation CRLF/BOM.

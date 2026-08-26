@@ -81,7 +81,7 @@ pair-à-pair est **Reversa** — dont SDD_Pro a d'ailleurs déjà emprunté 3 co
   « bias toward present » (on ne documente que ce qu'on voit).
 - **Isolation D4** : `sdd_reverse/*` n'importe jamais le reste du framework
   (enforcé par `reverse_smoke.py`). Le module est un sous-système autonome.
-- **Sécurité DB (proc-reverse) exemplaire** : double barrière `readonly_guard`
+- **Sécurité DB (db-reverse) exemplaire** : double barrière `readonly_guard`
   + `ApplicationIntent=ReadOnly`, validation au constructeur de dialecte, jamais
   d'exécution de procédure, mot de passe jamais loggé/persisté.
 - **Tout-déterministe-quand-possible** : inventaire, crosscut, synthèse (C4/ERD),
@@ -128,7 +128,7 @@ Sévérité = impact sur la qualité perçue × fréquence d'occurrence en usage
 | m2 | ADR complexity-ladder corrompu en fin de fichier (résidu `</content></invoke>`). | `ADR-…-complexity-ladder.md` |
 | m3 | Référence morte à `reverse-functional-extractor` (décommissionné). | `reverse-inventory.md:56` |
 | m4 | Numérotation anti-derive inversée (items 10 avant 9). | `reverse-feat-composer.md:205-206` |
-| m5 | Bug de numérotation des STEPs (1,2,3,4,6,7,6 — pas de 5, 6 dupliqué). | `sdd-proc-reverse-full.md:48-68` |
+| m5 | Bug de numérotation des STEPs (1,2,3,4,6,7,6 — pas de 5, 6 dupliqué). | `sdd-db-reverse-full.md:48-68` |
 | m6 | Table des flags `--skip-*` trompeuse (colonne « Défaut » = « actif »). | `sdd-reverse-full.md:42-49` |
 | m7 | Doc maître périmée : §6.1 décrit la REVERSE-GATE comme « opt-in non-enforced » alors que le hook `preflight_reverse_gate.py` l'enforce désormais ; en-tête « 4 agents » alors qu'il y en a 11. | `reverse-engineering-workflow.md` |
 | m8 | Comptage d'agents incohérent dans CLAUDE.md §4 (« 11 » puis « 10 »). | `CLAUDE.md §4` |
@@ -306,7 +306,7 @@ charges fonctionnel** en Word, lisible par un gérant / décideur **non-IT**.
 | JS / jQuery | medium | ❌ | — | — | Faible |
 | Python, Ruby, ColdFusion, COBOL, Oracle Forms, Go, Kotlin, Angular/React/Vue modernes | ❌ | — | — | — | **Non supporté** |
 
-Dialectes proc-reverse : **SQL Server** (T-SQL) + **PostgreSQL** (PL/pgSQL)
+Dialectes db-reverse : **SQL Server** (T-SQL) + **PostgreSQL** (PL/pgSQL)
 implémentés ; Oracle/MySQL/DB2 planifiés non implémentés.
 
 ---

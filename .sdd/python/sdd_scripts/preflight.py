@@ -18,7 +18,6 @@ Migrated from .claude/scripts/preflight.ps1 (2026-05-13).
 from __future__ import annotations
 
 import argparse
-import functools
 import json
 import re
 import sys
@@ -29,7 +28,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from sdd_lib.exit_codes import FAIL_FAST, SUCCESS  # noqa: E402
 from sdd_lib.markdown_io import section_body  # noqa: E402
 from sdd_lib.paths import stacks_dir, workspace_root, normalize, repo_root  # noqa: E402
-from sdd_lib.project_config import read_stack_md_text  # noqa: E402
+from sdd_lib.project_config import (  # noqa: E402
+    parse_active_stack_ids,
+    read_stack_md_text,
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -40,33 +42,19 @@ def parse_args() -> argparse.Namespace:
     return p.parse_args()
 
 
-@functools.lru_cache(maxsize=16)
-def _stack_id_pattern(category: str) -> re.Pattern[str]:
-    """Cache per-category compiled regex (audit mineur #2 v7.0.0-alpha 2026-06-05).
-
-    Was rebuilt on every get_active_ids call ; now compiled once per category.
-    LRU cache bounded to 16 entries (more than enough — only ~8 categories exist).
-    """
-    return re.compile(rf"\.sdd/stacks/{re.escape(category)}/([\w-]+)\.md")
-
-
 def get_active_ids(block: str, category: str) -> list[str]:
     """Extract stack ids referenced under `## Active …` block for a given category.
 
     Skips lines commented with `#` (after leading whitespace), e.g.
     `# - .sdd/stacks/archi/ddd.md`.
+
+    Audit 2026-08-25 : délégué au SSoT bi-racine
+    `project_config.parse_active_stack_ids` (la regex locale n'acceptait que
+    la racine `.sdd` et ignorait silencieusement un `stack.md` legacy resté
+    sur la racine `.claude`). Le cache par catégorie vit désormais dans
+    `stack_path_re` (lru_cache).
     """
-    ids: list[str] = []
-    pattern = _stack_id_pattern(category)
-    for line in block.splitlines():
-        # Skip commented lines (leading `#`, ignoring whitespace)
-        stripped = line.lstrip()
-        if stripped.startswith("#"):
-            continue
-        m = pattern.search(line)
-        if m:
-            ids.append(m.group(1))
-    return ids
+    return parse_active_stack_ids(block, category).get(category, [])
 
 
 def extract_section(text: str, heading: str) -> str:

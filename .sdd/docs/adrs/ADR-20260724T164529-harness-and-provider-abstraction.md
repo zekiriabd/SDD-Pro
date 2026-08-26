@@ -169,7 +169,11 @@ et exige `SDD_ALLOW_UNTESTED_HARNESS=1` (audit-loggué, symétrique de
 - Bornes agents : `.sdd/agent-bounds.yaml`
 - Résolveur : `.sdd/python/sdd_lib/model_resolver.py` +
   `.sdd/python/tests/test_model_resolver.py`
-- Sections stack.md proposées : `.sdd/stack-sections.proposed.md`
+- Sections stack.md : **appliquées** dans `.sdd/templates/stack.md.template`
+  (`## Active Harness`, `## Active Model Provider`, `## Model Selection`).
+  L'ancien brouillon `.sdd/stack-sections.proposed.md` a été supprimé par
+  l'audit 2026-08-26 : il affirmait encore « proposition, PAS appliquée »
+  alors que le template les portait déjà.
 - ADR précédent (routage reverse) :
   `.sdd/docs/adrs/ADR-20260629T120000-7c3a-governance-reverse-complexity-ladder.md`
 - Prototype go/no-go P0.4 (Codex spawn) : **à réaliser** — verdict à

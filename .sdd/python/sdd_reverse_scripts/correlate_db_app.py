@@ -2,7 +2,7 @@
 """correlate_db_app.py — join db-introspection.json × data-access.json (P0.3).
 
 Answers "which application consumes which DB object". Reads the DB reverse
-artefact (`db-introspection.json`, from proc-reverse) and the application reverse
+artefact (`db-introspection.json`, from db-reverse) and the application reverse
 artefact (`data-access.json`, from the code reverse), and writes a consumption
 map + a Mermaid diagram under the DB project's `.sys/`.
 
@@ -35,7 +35,7 @@ def _load(path: Path, label: str) -> dict:
         raise FileNotFoundError(
             f"ERROR: {label} not found\n"
             f"CAUSE: [REVERSE_DB_CONFIG_MISSING] {path} absent\n"
-            f"FIX: run the {'proc-reverse' if 'introspect' in label else 'code reverse'} phase first"
+            f"FIX: run the {'db-reverse' if 'introspect' in label else 'code reverse'} phase first"
         )
     return json.loads(path.read_text(encoding="utf-8"))
 

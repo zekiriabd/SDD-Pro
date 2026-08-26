@@ -333,44 +333,65 @@ def extract_db_schema(
     parse_warnings: list[str] = []   # C8 — surfaced, never silent
 
     # Pass 1: SQL DDL files (most authoritative)
+    #
+    # Files are deduplicated ACROSS language buckets before parsing (audit F-05,
+    # 2026-08-25). A `.sql` file can be listed under several SQL dialects when
+    # their evidence patterns overlap; iterating the buckets then re-parsed the
+    # same file once per dialect, and `seen_vt` — being reset inside the file
+    # loop — could not catch it: every view, trigger and parseWarning was
+    # emitted once per dialect. `scan_legacy._resolve_exclusive_groups` now makes
+    # the dialects exclusive upstream; this set keeps the extractor correct on
+    # its own regardless of how the buckets are populated.
+    sql_files: list[Path] = []
+    seen_sql: set[Path] = set()
     for lm in scan_result.languages:
         if lm.id != "tsql" and lm.family != "sql":
             continue
         for f in lm.files:
-            content = _read_text(f)
-            content_samples.append(content[:500])
-            rel = str(f.relative_to(root).as_posix())
-            sources.append(rel)
-            # B4 — noms de vues/triggers (corps NON analysé, signalé).
-            seen_vt: set[str] = set()
-            for vm in _RE_CREATE_VIEW.finditer(content):
-                name = vm.group(1)
-                if ("v", name) in seen_vt:
-                    continue
-                seen_vt.add(("v", name))
-                line = content[: vm.start()].count("\n") + 1
-                all_views.append({"name": name, "evidence": f"{rel}:{line}"})
-            for tm in _RE_CREATE_TRIGGER.finditer(content):
-                name = tm.group(1)
-                if ("t", name) in seen_vt:
-                    continue
-                seen_vt.add(("t", name))
-                line = content[: tm.start()].count("\n") + 1
-                all_triggers.append({"name": name, "evidence": f"{rel}:{line}"})
-            if seen_vt:
-                parse_warnings.append(
-                    f"{rel}: {len(seen_vt)} view(s)/trigger(s) detected — names "
-                    "only, their body logic is NOT analyzed (blind spot for the "
-                    "extraction ladder, review manually)"
-                )
-            ents, rels = _parse_sql_ddl(content, rel, parse_warnings)
-            for e in ents:
-                if e["name"] not in all_entities:
-                    all_entities[e["name"]] = e
-                else:
-                    # Merge evidence
-                    all_entities[e["name"]]["evidence"].extend(e["evidence"])
-            all_relations.extend(rels)
+            try:
+                key = f.resolve()
+            except OSError:
+                key = f
+            if key in seen_sql:
+                continue
+            seen_sql.add(key)
+            sql_files.append(f)
+
+    for f in sql_files:
+        content = _read_text(f)
+        content_samples.append(content[:500])
+        rel = str(f.relative_to(root).as_posix())
+        sources.append(rel)
+        # B4 — noms de vues/triggers (corps NON analysé, signalé).
+        seen_vt: set[str] = set()
+        for vm in _RE_CREATE_VIEW.finditer(content):
+            name = vm.group(1)
+            if ("v", name) in seen_vt:
+                continue
+            seen_vt.add(("v", name))
+            line = content[: vm.start()].count("\n") + 1
+            all_views.append({"name": name, "evidence": f"{rel}:{line}"})
+        for tm in _RE_CREATE_TRIGGER.finditer(content):
+            name = tm.group(1)
+            if ("t", name) in seen_vt:
+                continue
+            seen_vt.add(("t", name))
+            line = content[: tm.start()].count("\n") + 1
+            all_triggers.append({"name": name, "evidence": f"{rel}:{line}"})
+        if seen_vt:
+            parse_warnings.append(
+                f"{rel}: {len(seen_vt)} view(s)/trigger(s) detected — names "
+                "only, their body logic is NOT analyzed (blind spot for the "
+                "extraction ladder, review manually)"
+            )
+        ents, rels = _parse_sql_ddl(content, rel, parse_warnings)
+        for e in ents:
+            if e["name"] not in all_entities:
+                all_entities[e["name"]] = e
+            else:
+                # Merge evidence
+                all_entities[e["name"]]["evidence"].extend(e["evidence"])
+        all_relations.extend(rels)
 
     # Pass 2: ORM annotations (fallback / complement) + class property registry.
     prop_registry: dict[str, list[dict[str, Any]]] = {}

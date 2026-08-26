@@ -30,7 +30,7 @@ agents:
   adversarial-reviewer:        { tier_default: balanced, tier_floor: balanced, tier_ceiling: deep }
   # --- Docs ---
   specbook-writer:             { tier_default: balanced, tier_floor: fast,     tier_ceiling: balanced }  # candidat fast canonique (reformulation bornée)
-  # --- Reverse (10 + 2 proc-reverse) ---
+  # --- Reverse (10 + 2 db-reverse) ---
   reverse-inventory:           { tier_default: balanced, tier_floor: fast,     tier_ceiling: balanced }  # floor fast confirmé 2026-07-24 (délègue au script déterministe)
   reverse-tech-auditor:        { tier_default: balanced, tier_floor: balanced, tier_ceiling: deep }
   reverse-tech-analyst:        { tier_default: deep,     tier_floor: balanced, tier_ceiling: deep }   # précédent existant : déjà routé Sonnet/Opus (ADR ladder)

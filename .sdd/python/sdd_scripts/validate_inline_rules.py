@@ -24,7 +24,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from sdd_lib.paths import repo_root  # noqa: E402
+from sdd_lib.paths import agents_dir as agents_dir_for, repo_root, rules_dir as rules_dir_for  # noqa: E402
 from sdd_lib.stderr import warn  # noqa: E402
 from sdd_lib.exit_codes import FAIL_FAST, SUCCESS  # noqa: E402
 
@@ -53,8 +53,11 @@ def iso(dt: datetime) -> str:
 def main() -> int:
     args = parse_args()
     root = repo_root()
-    agents_dir = root / ".claude" / "agents"
-    rules_dir = root / ".claude" / "rules"
+    # Audit 2026-08-25 : lire le SSoT (`.sdd/`) et non la façade régénérée.
+    # La façade est réécrite à chaque rebuild, donc ses mtimes sont toujours
+    # « maintenant » — la détection de drift agent↔rule y est aveugle.
+    agents_dir = agents_dir_for(root)
+    rules_dir = rules_dir_for(root)
 
     if not agents_dir.is_dir():
         warn(f"Agents dir not found: {agents_dir}")

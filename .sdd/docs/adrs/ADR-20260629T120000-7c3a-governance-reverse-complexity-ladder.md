@@ -26,7 +26,7 @@ dynamique. Sur un legacy à longue traîne de petites unités (le cas dominant e
 brownfield), l'essentiel du budget Opus part sur des unités triviales où Opus
 n'apporte rien de mesurable.
 
-**Précédent maison déterminant** : le stream proc-reverse a **déjà** résolu ce
+**Précédent maison déterminant** : le stream db-reverse a **déjà** résolu ce
 problème. `build_proc_us.py` qualifie chaque procédure par des signaux
 déterministes (branches / SQL dynamique / erreurs / curseurs) et génère les
 procs triviales **sans LLM** (~70-80 % d'une base typique = CRUD pur). Cet ADR
@@ -109,7 +109,7 @@ spawnent un agent unique chacune.
 - A/B trivial : comparer FEAT `simple` en Sonnet vs Opus sur un workspace réel ;
   rollback = retirer le routage (les agents sont inchangés).
 - Cohérence interne : le stream code adopte le pattern déjà éprouvé du stream
-  proc-reverse.
+  db-reverse.
 
 **Négatifs / dette acceptée :**
 - Le classifieur introduit un seuil à **calibrer sur les legacy réels** (le défaut
@@ -147,7 +147,7 @@ spawnent un agent unique chacune.
 - Audit source : conversation audit reverse 2026-06-29 (recommandation P1
   « back-port du routage par complexité »)
 - Précédent : `.sdd/python/sdd_reverse_scripts/build_proc_us.py` (routage
-  déterministe proc-reverse)
+  déterministe db-reverse)
 - Implémentation prévue (post-validation) :
   - `.sdd/python/sdd_reverse/code_unit_complexity.py` (classifieur, nouveau)
   - `docs/rubrics/reverse-complexity-routing.md` (rubrique SSoT, nouveau)

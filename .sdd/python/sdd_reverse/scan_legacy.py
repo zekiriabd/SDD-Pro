@@ -66,7 +66,14 @@ def _warn_bad_pattern(
 # Default exclusions applied to every scan (in addition to per-language).
 DEFAULT_GLOBAL_EXCLUSIONS = frozenset(
     {".git", ".svn", ".hg", "node_modules", "__pycache__", ".vs", ".idea",
-     ".gradle", "target", "bin", "obj", "dist", "build", "packages", "vendor"}
+     ".gradle", "target", "bin", "obj", "dist", "build", "packages", "vendor",
+     # Audit 2026-08-25: `.sys` is the reverse's OWN machine-managed output
+     # (`proc-snapshot/*.sql`, `schema-snapshot/*.sql`, inventory, caches).
+     # Scanning it made the module re-read its own artifacts as if they were
+     # legacy source: T-SQL language scores inflated by generated snapshots, and
+     # `db_schema_extractor` parsing our rendered `CREATE TABLE` documentation as
+     # discovered DDL. A reverse must never feed on its own output.
+     ".sys"}
 )
 
 # Binary file extensions to skip (no content read).
@@ -124,6 +131,11 @@ class LanguageMatch:
     files: list[Path] = field(default_factory=list)
     loc_total: int = 0
     score_total: float = 0.0
+    # Audit F-05: number of matches on patterns flagged `discriminative: true`,
+    # i.e. evidence that CANNOT come from a sibling dialect of the same
+    # `exclusive_group`. A dialect with 0 here has only been seen through DDL
+    # shared by every engine — see `_absorb_phantom_dialects`.
+    discriminative_hits: int = 0
     # NOTE: framework signatures detected during scan are aggregated globally
     # in ScanResult.frameworks (cross-language). The previous per-language
     # field was never populated — removed 2026-06-10 (audit closure).
@@ -310,6 +322,137 @@ def _read_file_with_sampling(path: Path, max_size_kb: int | None) -> tuple[bytes
         return b"", False
 
 
+def _exclusive_rank(
+    lang: dict[str, Any],
+    score: float,
+    discriminative_hits: int,
+    lang_order: dict[str, int],
+) -> tuple[int, float, int]:
+    """Sort key for the exclusivity arbitration — lowest wins.
+
+    Ordered by (1) does this dialect have EXCLUSIVE evidence here, (2) raw
+    score, (3) declaration order in `language_signatures.yml`. Criterion (1)
+    is the load-bearing one: score alone is not a dialect proof, because the
+    shared `CREATE PROCEDURE` / `CREATE FUNCTION` DDL matches every engine.
+    """
+    return (
+        0 if discriminative_hits else 1,
+        -score,
+        lang_order.get(lang["id"], 10_000),
+    )
+
+
+def _resolve_exclusive_groups(
+    scored: list[tuple[dict[str, Any], float, int]],
+    lang_order: dict[str, int],
+) -> list[tuple[dict[str, Any], float, int]]:
+    """Keep a single winner per `exclusive_group` FOR ONE FILE.
+
+    Audit F-05 (2026-08-25). The four SQL dialects share the `.sql` extension
+    AND share evidence patterns (`CREATE PROCEDURE` alone matches T-SQL,
+    PL/pgSQL, PL/SQL *and* MySQL), so every T-SQL file was being claimed by all
+    four buckets at once. Two consequences, the second the expensive one:
+
+      * artefacts emitted once per dialect — views/triggers/parseWarnings ×4
+      * `confidence_caps_applied` is min-monotone over detected languages
+        (`language_signatures.yml` §5.6), so a purely T-SQL application
+        (`cap: high`) was demoted to `medium` because PL/SQL and MySQL
+        (`cap: medium`, scaffold-validated only) were believed present. The
+        whole specification ladder then inherits that lowered confidence.
+
+    A file is written in ONE dialect: the best-ranked one wins
+    (cf. `_exclusive_rank`). Ties break on declaration order in
+    `language_signatures.yml`, which puts the dominant legacy dialect first —
+    deterministic, and never alphabetical (that would hand a tie to `mysql`
+    over `tsql`).
+
+    Languages with no `exclusive_group` are passed through untouched, so this is
+    a no-op for every non-SQL language.
+    """
+    if len(scored) < 2:
+        return scored
+
+    winners: dict[str, str] = {}   # group -> winning language id
+    for lang, score, hits in scored:
+        group = lang.get("exclusive_group")
+        if not group:
+            continue
+        champion = winners.get(group)
+        if champion is None:
+            winners[group] = lang["id"]
+            continue
+        current = next(e for e in scored if e[0]["id"] == champion)
+        if (_exclusive_rank(lang, score, hits, lang_order)
+                < _exclusive_rank(*current, lang_order)):
+            winners[group] = lang["id"]
+
+    # Filter in place — the input order is preserved so that downstream
+    # first-wins behaviour (framework detection) is unaffected by this pass.
+    return [
+        entry for entry in scored
+        if not entry[0].get("exclusive_group")
+        or winners.get(entry[0]["exclusive_group"]) == entry[0]["id"]
+    ]
+
+
+def _absorb_phantom_dialects(
+    matches: dict[str, "LanguageMatch"],
+    all_langs: dict[str, dict[str, Any]],
+    lang_order: dict[str, int],
+) -> None:
+    """Second F-05 pass, PROJECT-wide: fold dialects that never proved themselves.
+
+    Per-file exclusivity (`_resolve_exclusive_groups`) guarantees one dialect
+    per file but not one dialect per project: a single `.sql` file whose only
+    evidence is the shared DDL still opens a bucket of its own. That phantom
+    bucket is not cosmetic — `confidence_caps_applied` is min-monotone over the
+    detected languages, so one file wrongly attributed to `mysql` or `plsql`
+    (`cap: medium`, scaffold-validated only) demotes an entire SQL Server
+    application from `high` to `medium`, and the whole specification ladder
+    inherits it. This is the audit's fallback requirement — "exclude the
+    dialects that were not retained from the confidence-cap computation" —
+    enforced by removing them outright rather than special-casing the cap.
+
+    A dialect survives only if it carries EXCLUSIVE evidence somewhere in the
+    project (a pattern flagged `discriminative: true`). Dialects that never did
+    are absorbed into the group's best-ranked survivor: their files move over,
+    so nothing is lost for the extractor downstream — only the misattribution.
+
+    A genuinely polyglot repository is preserved: PostgreSQL scripts carrying
+    `LANGUAGE plpgsql` and MySQL scripts carrying `DELIMITER` each keep their
+    own bucket, because each proved itself.
+    """
+    groups: dict[str, list[LanguageMatch]] = {}
+    for lm in matches.values():
+        group = all_langs.get(lm.id, {}).get("exclusive_group")
+        if group:
+            groups.setdefault(group, []).append(lm)
+
+    for members in groups.values():
+        if len(members) < 2:
+            continue
+        proven = [lm for lm in members if lm.discriminative_hits]
+        phantoms = [lm for lm in members if not lm.discriminative_hits]
+        if not phantoms:
+            continue
+        # No dialect proved itself: keep the best-ranked one rather than
+        # dropping the group entirely (fail-safe — never lose the SQL files).
+        pool = proven or members
+        winner = min(
+            pool,
+            key=lambda lm: _exclusive_rank(
+                all_langs[lm.id], lm.score_total, lm.discriminative_hits, lang_order),
+        )
+        for lm in phantoms:
+            if lm is winner:
+                continue
+            winner.files.extend(lm.files)
+            winner.loc_total += lm.loc_total
+            winner.score_total += lm.score_total
+            del matches[lm.id]
+        winner.files.sort(key=str)
+
+
 def scan_project(
     project_root: str | Path,
     signatures: dict[str, Any],
@@ -335,8 +478,10 @@ def scan_project(
     # Build per-language lookup keyed by file extension.
     lang_by_ext: dict[str, list[dict[str, Any]]] = {}
     all_langs: dict[str, dict[str, Any]] = {}
-    for lang in signatures["languages"]:
+    all_langs_order: dict[str, int] = {}
+    for idx, lang in enumerate(signatures["languages"]):
         all_langs[lang["id"]] = lang
+        all_langs_order[lang["id"]] = idx
         for ext in lang.get("file_extensions", []):
             lang_by_ext.setdefault(ext.lower(), []).append(lang)
 
@@ -391,8 +536,10 @@ def scan_project(
         loc = _count_loc(content)
 
         # Score against each candidate language.
+        scored: list[tuple[dict[str, Any], float, int]] = []
         for lang in candidates:
             file_score = 0.0
+            file_discriminative = 0
             for ep in lang.get("evidence_patterns") or []:
                 pattern = ep.get("pattern")
                 weight = float(ep.get("weight", 0.0))
@@ -401,6 +548,8 @@ def scan_project(
                 try:
                     if re.search(pattern, content_str):
                         file_score += weight
+                        if ep.get("discriminative"):
+                            file_discriminative += 1
                 except re.error as err:
                     # Skip malformed regex but don't crash the scan.
                     _warn_bad_pattern(lang["id"], "evidence_pattern", pattern, err, file=path)
@@ -408,7 +557,14 @@ def scan_project(
 
             if file_score <= 0:
                 continue
+            scored.append((lang, file_score, file_discriminative))
 
+        # Mutually exclusive groups (audit F-05, 2026-08-25) — one file cannot
+        # be written in two dialects of the same engine family at once. See
+        # `_resolve_exclusive_groups`.
+        scored = _resolve_exclusive_groups(scored, all_langs_order)
+
+        for lang, file_score, file_discriminative in scored:
             lm = matches.get(lang["id"])
             if lm is None:
                 lm = LanguageMatch(
@@ -421,6 +577,7 @@ def scan_project(
             lm.files.append(path)
             lm.loc_total += loc
             lm.score_total += file_score
+            lm.discriminative_hits += file_discriminative
 
             # Framework detection
             for fsig in lang.get("framework_signatures") or []:
@@ -498,6 +655,10 @@ def scan_project(
                         "version": version,
                         "evidence": rel_path,
                     }
+
+    # Audit F-05, project-wide pass: fold the dialects that never carried
+    # exclusive evidence into the one that did — see `_absorb_phantom_dialects`.
+    _absorb_phantom_dialects(matches, all_langs, all_langs_order)
 
     duration_ms = int((time.monotonic() - t0) * 1000)
     # Sort matches by score desc, then by files count desc, then by id.

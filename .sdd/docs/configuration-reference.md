@@ -10,6 +10,10 @@ All Project Config keys + their layered defaults, ranges, and behaviour. Source 
 
 | Key | Default | Range / Values | Effect |
 |---|---|---|---|
+| `AcceptanceGate` | `strict` | `off \| warn \| strict` | Recette exécutable post-QA (test/lint/build/coverage/smoke/E2E) — `strict` = STOP `[ACCEPTANCE_GATE_FAILED]` |
+| `AcceptanceGate.MinCoverage` | `80` | `0-100` % | Plancher coverage propre à la gate (distinct de `CoverageMin`) |
+| `AcceptanceGate.RequireE2E` | `true` | `true \| false` | Exiger ≥ 1 test E2E vert |
+| `AcceptanceGate.SmokeTimeout` | `10` | `≥ 1` (s) | Délai avant abandon du smoke run |
 | `A11yFailOn` | `serious` | `info \| minor \| moderate \| serious \| critical` | Threshold for axe-core CI to flag 🔴 (retired, ingest-only) |
 | `A11yMode` | `off` | `off \| ingest` | Enable axe-core ingest from CI (no agent) |
 | `ApiGateMinPerEndpoint` | `2` | `≥ 1` | Min tests per endpoint at API Gate |
@@ -54,6 +58,7 @@ All Project Config keys + their layered defaults, ranges, and behaviour. Source 
 | `SpecComplianceMode` | `full` | `off \| manual \| full` | `full` = invoked in `/sdd-review` batch |
 | `SpecComplianceRequiredForFeatValidate` | `true` | `true \| false` | `/feat-validate` requires `spec-compliance.json` if code matérialisé |
 | `TokenUsageMode` | `record` | `off \| record \| debug` | `record_token_usage` hook behaviour |
+| `UsGranularityTarget` | `3` | `1-6` | Cible souple du nombre d'US par FEAT lue par `po` — jamais bloquante |
 | `UsGranularityHardCap` | `10` | `≥ 3` | Hard cap on US count per FEAT (use `--allow-large-feat` to bypass) |
 | `UsGranularityWarnAt` | `6` | `≥ 3` | WARN above this US count (was historical hard cap) |
 
@@ -86,6 +91,7 @@ QAMode: full                  # tests + coverage + quality scan
 CoverageMin: 80               # OBLIGATOIRE — no default
 GatedWorkflow: true           # arch → back → API Gate → front (strict)
 ApiGateRequired: true         # API Gate RED blocks frontend phase
+AcceptanceGate: strict        # recette exécutable post-QA (off | warn | strict)
 ApiGateMinPerEndpoint: 2      # min tests per endpoint (1 happy + 1 negative)
 ```
 

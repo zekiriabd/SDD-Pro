@@ -263,6 +263,30 @@
       "default": true,
       "description": "When false, API Gate FAIL becomes WARN (not blocking). Disabling NOT recommended in CI."
     },
+    "AcceptanceGate": {
+      "type": "string",
+      "enum": ["off", "warn", "strict"],
+      "default": "strict",
+      "description": "Acceptance Gate mode (quality.md §C) — recette exécutable (test / lint / build / coverage / smoke / E2E) sur le code matérialisé, lancée par validate_acceptance.py + hook SubagentStop matcher=qa. `off` = gate ignorée, `warn` = rapporte sans bloquer, `strict` = tout check KO → STOP [ACCEPTANCE_GATE_FAILED]. Enregistrée ici par l'audit 2026-08-26 : la clé était load-bearing mais absente de ce schéma, donc tout projet la posant déclenchait un WARN [CONFIG_UNKNOWN_KEY] permanent et une ConfigError dure sous SDD_CONFIG_STRICT=1 — alors que /sdd-profile l'émet lui-même."
+    },
+    "AcceptanceGate.RequireE2E": {
+      "type": "boolean",
+      "default": true,
+      "description": "Acceptance Gate : exiger au moins 1 test E2E vert. Clé pointée — atteignable depuis stack.md ## Project Config depuis l'audit 2026-08-26 (les regex de clé excluaient le `.`, la droppant silencieusement)."
+    },
+    "AcceptanceGate.SmokeTimeout": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 10,
+      "description": "Acceptance Gate : secondes avant abandon du smoke run."
+    },
+    "AcceptanceGate.MinCoverage": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100,
+      "default": 80,
+      "description": "Acceptance Gate : plancher coverage propre à la gate. Distinct du `CoverageMin` global consommé par /qa-generate — garder les deux alignés sauf volonté explicite d'une gate plus stricte que le verdict QA."
+    },
     "ApiGateMinPerEndpoint": {
       "$ref": "#/definitions/PositiveInt",
       "default": 2,
@@ -368,7 +392,8 @@
       "type": "integer",
       "minimum": 1,
       "maximum": 6,
-      "description": "Soft target for US count per FEAT (informational, used by po STEP 5 to pick the right split — not enforced). Hard cap = UsGranularityHardCap (10)."
+      "default": 3,
+      "description": "Cible SOUPLE du nombre d'US par FEAT, lue par l'agent `po` (§Granularité) pour choisir le bon découpage. Purement informationnelle, jamais bloquante : `UsGranularityWarnAt` / `UsGranularityHardCap` arbitrent. Audit 2026-08-26 : réellement branchée (config.base.yml + po.md) après avoir été déclarée ici avec zéro lecteur."
     }
   }
 }

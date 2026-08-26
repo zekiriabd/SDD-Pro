@@ -2,7 +2,7 @@
 
 (a) ROUND-TRIP identité — `ClaudeAdapter.emit_memory_file` régénère
     `CLAUDE.md` sous un temp SOUS `.sdd/.build/` depuis le pivot
-    `.sdd/entrypoint.md` (`body_source: .claude/CLAUDE.md`, lecture
+    `.sdd/entrypoint.md` (`body_source: .sdd/entrypoint-body.md`, lecture
     seule) ; le corps régénéré DOIT être identique au vivant après
     normalisation CRLF/BOM.
 (b) VARIANTES — `CodexAdapter` -> `AGENTS.md`, `GeminiAdapter` ->
@@ -66,11 +66,11 @@ def build_dir():
 
 
 def test_entrypoint_pivot_points_to_live_memory():
-    """Le pivot déclare body_source = .claude/CLAUDE.md + compte des @-refs."""
+    """Le pivot déclare body_source = .sdd/entrypoint-body.md + compte des @-refs."""
     assert PIVOT.is_file(), "pivot .sdd/entrypoint.md absent"
     fields, _body = parse_frontmatter(PIVOT.read_text(encoding="utf-8-sig"))
     assert fields.get("schema") == "sdd.memory/v1"
-    assert fields.get("body_source") == ".claude/CLAUDE.md"
+    assert fields.get("body_source") == ".sdd/entrypoint-body.md"
     assert int(fields.get("at_includes_total", 0)) > 0
     assert int(fields.get("at_includes_unique", 0)) > 0
 
