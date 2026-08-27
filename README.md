@@ -1,19 +1,51 @@
 # SDD_Pro
 
-Framework FEAT-driven development **multi-harness** (Claude Code, Codex, Gemini CLI, Antigravity) — **v7.0.3-dev** (base v7.0.0 GA 2026-06-07). Baseline LTS v6.10.x conservée jusqu'au 2026-12-31. Cf. [.sdd/docs/VERSIONING.md](.sdd/docs/VERSIONING.md) · [CHANGELOG](.sdd/docs/CHANGELOG.md).
+**The framework that refuses to ship code nobody validated.**
 
-> 🌍 [English README](README.en.md) — quickstart + console essentials (les docs FR restent canoniques).
+Spec-driven development (FEAT → User Stories → Code), **multi-harness**
+(Claude Code, OpenAI Codex, Gemini CLI, Antigravity) — **v7.0.3-dev** (base v7.0.0 GA 2026-06-07).
+LTS baseline v6.10.x kept until 2026-12-31.
+See [VERSIONING](.sdd/docs/VERSIONING.md) · [CHANGELOG](.sdd/docs/CHANGELOG.md).
 
-Documentation principale : [.claude/CLAUDE.md](.claude/CLAUDE.md)
-
-> 🗄️ **Vous avez une base legacy plutôt qu'un projet neuf ?** SDD_Pro lit vos procédures stockées, fonctions, vues, triggers et jobs **en lecture seule** et les rend sous forme de spécifications exploitables — [voir Reverse engineering SGBD](#-reverse-engineering-sgbd--votre-base-de-données-redevient-une-spécification).
-
+> 🇫🇷 [Version française](README.fr.md) — the French page is the canonical reference.
+> Main documentation: [.claude/CLAUDE.md](.claude/CLAUDE.md) (French).
 
 ---
 
-## 🚀 Quickstart — nouveau projet
+## The 30-second pitch
 
-**Option recommandée : utiliser ce repo comme [GitHub Template](https://docs.github.com/en/repositories/creating-and-managing-repositories/creating-a-template-repository).** Cliquer sur **"Use this template"** → "Create a new repository" → cloner localement → lancer le bootstrap interactif :
+Coding assistants start from the code and try to work back to the intent.
+SDD_Pro forces the opposite trajectory and **locks it behind deterministic gates**:
+
+```
+FEAT (versioned business spec)
+  └─ User Stories (stable IDs, traceable acceptance criteria)
+       └─ Technical plans (files, layers, preserves/adds contracts)
+            └─ Code (backend first → API Gate → frontend)
+                 └─ QA + 5 reviewers (code, security, spec, architecture, adversarial)
+```
+
+What that changes in practice:
+
+| Without SDD_Pro | With SDD_Pro |
+|---|---|
+| The spec lives in the prompt and is never re-read | The spec is a file versioned alongside the code |
+| The LLM "improvises" outside scope | `[DERIVE_VIOLATION]` → blocking **STOP** |
+| The frontend calls an endpoint that doesn't exist | Blocking in-memory **API Gate** between back and front |
+| Test coverage is a claim | `CoverageMin`, measured, 🔴 blocking |
+| The LLM bill is discovered afterwards | `MaxCostPerRun` (default $50) → hard stop |
+| A legacy database stays a black box | **Read-only** DB reverse → readable FEATs |
+
+**The niche**: SDD_Pro **industrialises quality** — the equivalent of *Sonar + Snyk +
+ADR governance* applied to a multi-agent pipeline, **on any LLM harness**.
+
+---
+
+## 🚀 Quickstart — new project
+
+**Recommended: use this repo as a [GitHub Template](https://docs.github.com/en/repositories/creating-and-managing-repositories/creating-a-template-repository).**
+Click **"Use this template"** → "Create a new repository" → clone locally → run the
+interactive bootstrap:
 
 ```bash
 # macOS / Linux
@@ -22,349 +54,498 @@ python3 bootstrap.py
 # Windows (PowerShell or cmd)
 python bootstrap.py
 
-# Non-interactive (CI / scripted) — uses validated combo C1
+# Non-interactive (CI / scripted) — validated combo C1
 python bootstrap.py --combo c1 --skip-install
 ```
 
-Le bootstrap :
-- Demande le nom du projet + 3-4 questions (stack, DB, auth)
-- Génère `workspace/stack/stack.md` (43 clés Project Config, defaults sûrs)
-- Crée la structure `workspace/.sys/` complète
-- Installe les dépendances Python (`pip install -e .sdd/python[dev]`)
-- Propose l'install des deps console (`npm install` dans `workspace/console/`)
-- Lance un smoke check final
+The bootstrap:
+- asks for the project name + 3-4 questions (stack, database, auth);
+- generates `workspace/stack/stack.md` (55 Project Config keys, safe defaults);
+- creates the full `workspace/.sys/` directory structure;
+- installs the Python dependencies (`pip install -e .sdd/python[dev]`);
+- runs a final smoke check.
 
-Combos disponibles :
-- **C1** 🟢 : .NET Minimal API + React + shadcn + Azure AD + xUnit (recommended)
-- **C2** 🟢 : Kotlin Spring Boot + React + shadcn + Azure AD + JUnit
-- **C3** 🟢 : Node Express + React + shadcn + auth-local (bench-validated 2026-06-05)
-- **C4** 🟢 : Python FastAPI + React + shadcn + auth-local (bench-validated 2026-06-05)
-- **C5** 🟢 : .NET Minimal API + Vue + Vuetify + Azure AD (bench-validated 2026-06-05)
-- `--combo custom` : composition manuelle (4 backends × 4 frontends × 3 UI)
+Available combos:
 
-CI mode (no prompts) :
+| Combo | Composition | Status |
+|---|---|:---:|
+| **C1** | .NET Minimal API + React + shadcn + Azure AD + xUnit | 🟢 validated end-to-end *(recommended)* |
+| **C2** | Kotlin Spring Boot + React + shadcn + Azure AD + JUnit | 🟢 validated end-to-end |
+| **C3** | Node Express + React + shadcn + local auth | 🟢 bench-validated runtime |
+| **C4** | Python FastAPI + React + shadcn + local auth | 🟢 bench-validated runtime |
+| **C5** | .NET Minimal API + Vue + Vuetify + Azure AD | 🟢 bench-validated runtime |
+| `--combo custom` | manual composition (4 backends × 4 frontends × 3 design systems) | — |
+
+**13 combos** carry an SLA commitment — machine source:
+[.sdd/templates/combos.json](.sdd/templates/combos.json), detail in
+[validated-combos.md](.sdd/docs/validated-combos.md).
+
+CI mode (no prompts):
 ```bash
 SDD_APP_NAME=MyApp SDD_COMBO=c1 python bootstrap.py --auto-init
 ```
 
 ---
 
-## 🆚 Pourquoi SDD_Pro vs BMAD / GSD / AgentOS / Superpowers ?
+## 🆚 Why SDD_Pro over BMAD / GSD / AgentOS / Superpowers?
 
-| Critère | SDD_Pro | BMAD | GSD | AgentOS | Superpowers |
+| Criterion | SDD_Pro | BMAD | GSD | AgentOS | Superpowers |
 |---|:---:|:---:|:---:|:---:|:---:|
-| Multi-harness (Claude + Codex + Gemini…) | ✅ **natif** | ❌ | ❌ | ❌ | ❌ |
-| Multi-agents spécialisés | **25** | ~6 | ~5 | 4 | 8 |
-| Reverse engineering **SGBD** (procédures, fonctions, vues, triggers, jobs) | ✅ **natif** | ❌ | ❌ | ❌ | ❌ |
-| Reverse engineering **code legacy** (legacy → FEAT) | ✅ **natif** | ❌ | ❌ | ❌ | ❌ |
-| Reviewers post-code (5 angles, adversarial par défaut) | **5** ✅ | 1 | 1 | 1 | 2 |
-| Anti-derive strict (ownership matrix + STOP bloquant) | ✅ | partiel | ❌ | partiel | partiel |
-| Catalogues machine-readable (`.libs.json` + CVE + LTS) | ✅ | ❌ | ❌ | ❌ | ❌ |
-| Error classification cross-agent (189 préfixes `[CLASS]`) | ✅ | ❌ | ❌ | ❌ | ❌ |
-| Telemetry SQLite + statusline IDE (coût, phase, tokens) | ✅ | ❌ | partiel | partiel | ❌ |
-| Idempotence / resume (checkpoint mode) | ✅ | ❌ | ❌ | partiel | ❌ |
-| Scripts déterministes 0-token LLM | **55 scripts** | ❌ | ❌ | partiel | partiel |
-| Plugin marketplace (discovery IDE natif) | ✅ `plugin.json` | ❌ | ❌ | ❌ | ❌ |
+| Multi-harness (Claude + Codex + Gemini + Antigravity) | ✅ **native** | ❌ | ❌ | ❌ | ❌ |
+| Specialised agents | **29** | ~6 | ~5 | 4 | 8 |
+| **Database** reverse engineering (procedures, functions, views, triggers, jobs) | ✅ **native** | ❌ | ❌ | ❌ | ❌ |
+| **Legacy code** reverse engineering (legacy → FEAT) | ✅ **native** | ❌ | ❌ | ❌ | ❌ |
+| Post-code reviewers (5 angles, adversarial on by default) | **5** ✅ | 1 | 1 | 1 | 2 |
+| Strict anti-drift (ownership matrix + blocking STOP) | ✅ | partial | ❌ | partial | partial |
+| Machine-readable dependency catalogs (`.libs.json` + CVE + LTS) | ✅ **30** | ❌ | ❌ | ❌ | ❌ |
+| Cross-agent error taxonomy (`[CLASS]`) | ✅ **191** | ❌ | ❌ | ❌ | ❌ |
+| Load-bearing invariants declared **and tested** | ✅ **31** | ❌ | ❌ | ❌ | ❌ |
+| SQLite telemetry + IDE statusline (cost, phase, tokens) | ✅ | ❌ | partial | partial | ❌ |
+| Idempotence / resume (checkpoint mode) | ✅ | ❌ | ❌ | partial | ❌ |
+| Deterministic zero-token scripts | **80 scripts** | ❌ | ❌ | partial | partial |
+| Plugin marketplace (native IDE discovery) | ✅ `plugin.json` | ❌ | ❌ | ❌ | ❌ |
 
-**Créneau différenciant** : SDD_Pro **industrialise la qualité** (5 reviewers dont adversarial
-par défaut, telemetry, anti-derive strict, gates déterministes) **sur n'importe quel harness LLM**.
-C'est l'équivalent **Sonar + Snyk + ADR governance** appliqué au pipeline multi-agent.
-Voir [cookbook 10 min](.sdd/docs/cookbook.md) pour démarrer.
-
----
-
-## Démarrage rapide (après bootstrap)
-
-1. Éditer les secrets dans [workspace/stack/stack.md](workspace/stack/stack.md) (DB password, Azure AD client ID, etc.) — fichier gitignored.
-2. Dans Claude Code : `/feat-generate <Nom>` — répondre aux 3-6 questions.
-3. (Optionnel) déposer mockups HTML sous `workspace/ui/{n}-{m}-{Name}.html`.
-4. `/sdd-full {n}` — pipeline complet de A à Z.
-5. `/sdd-status [{n}]` — vérifier l'état.
+See the [10-minute cookbook](.sdd/docs/cookbook.md) to start, or the
+[CTO / CIO case](.sdd/docs/WHY-SDD-PRO.md) to decide.
 
 ---
 
-## 🗄️ Reverse engineering SGBD — votre base de données redevient une spécification
+## After bootstrap
 
-> **La logique métier de votre entreprise dort dans votre base de données.**
-> Des centaines de procédures stockées écrites sur quinze ans, par des développeurs
-> qui sont partis. Aucune documentation. Personne n'ose y toucher.
-> **SDD_Pro la lit — en lecture seule — et vous rend des spécifications.**
+1. Fill in the secrets in [workspace/stack/stack.md](workspace/stack/stack.md)
+   (database password, Azure AD client ID, ports…) — **this file is gitignored**.
+2. In the harness: `/feat-generate <Name>` — answer the 3-6 elicitation questions.
+3. *(Optional)* drop HTML mockups under `workspace/ui/{n}-{m}-{Name}.html`.
+4. `/sdd-full {n}` — full A→Z pipeline.
+5. `/sdd-status [{n}]` — raw state · `/sdd-help [{n}]` — "what's next" guidance.
 
-Une seule commande, `/sdd-db-reverse-full`, se connecte avec la chaîne déclarée dans
-`stack.md ## Active Database`, inventorie **tout ce que la base sait faire**, et produit
-des FEATs SDD_Pro standard — immédiatement consommables par `/sdd-full` pour régénérer
-l'application par-dessus. Le patrimoine SQL cesse d'être une boîte noire : il devient
-un backlog lisible, tracé et versionné.
+Already have a repository? `/sdd-discover-stack` detects the stack and produces a
+`stack.md.candidate`.
 
-### Ce que la machine remonte réellement
+---
 
-| Famille d'objets | Traitement |
+## 🗄️ Database reverse engineering — your schema becomes a specification again
+
+> **Your company's business logic is asleep inside your database.**
+> Hundreds of stored procedures written over fifteen years, by developers who have long
+> since left. No documentation. Nobody dares touch it.
+> **SDD_Pro reads it — strictly read-only — and hands you specifications.**
+
+One command, `/sdd-db-reverse-full`, connects using the connection details declared in
+`stack.md ## Active Database`, inventories **everything the database knows how to do**,
+and produces standard SDD_Pro FEATs — immediately consumable by `/sdd-full` to regenerate
+an application on top. Your SQL estate stops being a black box and becomes a readable,
+traceable, version-controlled backlog.
+
+### What is actually extracted
+
+| Object family | Treatment |
 |---|---|
-| **Procédures stockées** | corps analysé → **1 User Story** |
-| **Fonctions** (scalaires, inline, table) | corps analysé → **1 User Story** |
-| **Vues** et **triggers** | corps analysé → **1 User Story** |
-| **Packages Oracle** (spec + body) | corps analysé → **1 User Story** |
-| **Tables, colonnes, types, PK/FK, index, contraintes `CHECK`** | introspection live → `db-schema.json` |
-| **Jobs / scheduler, séquences, synonymes, linked servers, types utilisateur** | introspection live → `catalogObjects` |
+| **Stored procedures** | body analysed → **1 User Story** |
+| **Functions** (scalar, inline, table-valued) | body analysed → **1 User Story** |
+| **Views** and **triggers** | body analysed → **1 User Story** |
+| **Oracle packages** (spec + body) | body analysed → **1 User Story** |
+| **Tables, columns, types, PK/FK, indexes, `CHECK` constraints** | live introspection → `db-schema.json` |
+| **Jobs / scheduler, sequences, synonyms, linked servers, user types** | live introspection → `catalogObjects` |
 
-> 💡 **Ce que les autres outils ratent.** Les contraintes `CHECK` et les **jobs
-> planifiés** sont les deux plus gros gisements de règles métier *invisibles depuis
-> le code applicatif* : un job porte du comportement nocturne (recalcul, purge,
-> import) que rien, dans l'application, ne révèle. SDD_Pro les remonte au même titre
-> qu'une procédure.
+> 💡 **What other tools miss.** `CHECK` constraints and **scheduled jobs** are the two
+> largest reservoirs of business rules that are *invisible from application code*: a job
+> carries night-time behaviour (recalculation, purge, import) that nothing in the app
+> reveals. SDD_Pro surfaces them alongside procedures.
 
-### Le modèle, en une ligne
+### The model, in one line
 
-**1 objet SQL = 1 User Story · 1 module métier = 1 FEAT.** Pas de fusion, pas
-d'invention, pas de résumé qui écrase le détail.
+**1 SQL object = 1 User Story · 1 business module = 1 FEAT.** No merging, no invention,
+no summary that flattens the detail away.
 
 ```
 stack.md (## Active Database)
-   └─ Phase 1 — introspection READ-ONLY (0 token)
-        ├─ snapshot des corps SQL + db-schema.json + inventory.json
-        └─ découpage en modules métier (stratégie AUTO, mesurée sur VOS noms d'objets)
-             └─ Rung 1 — reverse-sql-analyst × module (LLM, parallèle borné)
-                  └─ Rung 2 — composition des FEATs (déterministe, ou LLM en opt-in)
-                       └─ REVERSE-GATE ─► /sdd-full
+   └─ READ-ONLY introspection (0 tokens)  ─► SQL bodies + db-schema.json + inventory.json
+        └─ Phase 0 — Database Context (/sdd-db-context)
+             ├─ 0.A deterministic (0 tokens) : FACTS — CRUD matrix, call graph, waves
+             └─ 0.B reverse-db-architect    : HYPOTHESES — glossary, sub-domains, risks
+                  └─ Analysis waves: 4 specialised analysts (LLM, bounded parallelism)
+                       └─ FEAT composition (deterministic, or LLM on complex modules)
+                            └─ REVERSE-GATE ─► /sdd-full
 ```
 
-### Une équipe d'agents spécialisés, pas un prompt géant
+### Phase 0 — the database is understood **before** it is carved up
 
-Le module reverse mobilise **12 agents** dédiés, dont **2 experts SQL** sur le chemin
-base de données — chacun avec un périmètre de lecture verrouillé et un mandat unique :
+This is the structural addition (2026-08-26). Reading a procedure body in isolation
+produces a User Story that is **wrong but credible** as soon as composition is involved:
+nested procedures, dynamic SQL, cascading triggers. So `/sdd-db-context` builds a global
+understanding **once**, versioned, shared by every analyst:
 
-| Agent | Mandat |
+- **The facts ≠ hypotheses contract.** *Facts* (tables, keys, `CHECK` constraints, CRUD
+  matrix, call graph) come from deterministic scripts and **may** become acceptance
+  criteria. *Hypotheses* (business glossary, sub-domains, risk areas) come from the
+  `reverse-db-architect` agent and **never** may. The separation is **structural**: the
+  architect writes a separate file that a script merges into the `hypotheses` branch
+  only. It cannot overwrite a fact, even if it tries.
+- **A cache that expires honestly.** `contextVersion` is a sha256 of the canonical facts.
+  Database unchanged → the interpretation is reused and Phase 0.B is not paid for again.
+  Database changed → the stale interpretation is **discarded**, and the report says so:
+  an obsolete reading of a database that has moved is worse than no reading at all.
+- **Context packs that are computed, not guessed.** No agent reads the whole context.
+  Each object gets a bounded pack (default 14,000 bytes) with its contract, **only** the
+  tables it touches, what it calls (depth ≤ 2) and its callers. If the budget forces an
+  eviction, **the pack says so** — an agent handed a truncated view lowers its confidence
+  knowingly.
+
+### Waves: every callee is analysed before its caller
+
+The call graph is resolved, its strongly connected components condensed (Tarjan — self-
+calls and mutual recursion are real in T-SQL), then topologically sorted. **Guaranteed
+property**: a called object is analysed in a wave strictly earlier than its caller. A
+callee name that is missing or ambiguous stays an `unresolvedCallee` — never resolved by
+guesswork, because one false edge reorders the entire plan.
+
+Throughput does not suffer: bounded parallelism (`MaxParallel`) applies **inside** a wave;
+there is a single barrier between two waves, where the orchestrator — never an agent —
+capitalises the summaries produced and regenerates the next packs.
+
+### Four specialists, not one giant prompt
+
+The reverse module ships **16 dedicated agents**, **6 of them SQL experts**. What
+justifies a separate agent is **the angle** — never the SQL type in itself:
+
+| Agent | The question it asks the object |
 |---|---|
-| **`reverse-sql-analyst`** *(rung 1)* | Expert multi-dialecte (T-SQL, PL/pgSQL, PL/SQL, MySQL/PSM, SQL PL). Lit le corps d'un module et en tire une User Story par objet : comportement observé, critères d'acceptation dérivés du flux réel, evidence `fichier:ligne`, niveau de confiance plafonné par langage. |
-| **`reverse-sql-feat-composer`** *(rung 2, opt-in)* | Synthétise la FEAT métier d'un module : narratif transverse, plomberie technique démotée. À réserver aux modules à forte logique métier — pour du CRUD, l'assembleur déterministe suffit. |
-| **`reverse-completeness-reviewer`** | Confronte la FEAT produite à l'inventaire brut et **dit ce que l'extraction a oublié**. Verdict informationnel, jamais complaisant. |
-| **`reverse-clarifier`** | Transforme les zones d'ombre en questions structurées pour le Tech Lead, puis réinjecte les réponses dans les FEATs. Aucune réponse n'est jamais inventée. |
+| **`reverse-sql-analyst`** *(procedures)* | which operation, which data effects, which preconditions? |
+| **`reverse-sql-function-analyst`** *(functions)* | which reusable business calculation, which edge cases, which default? |
+| **`reverse-sql-view-analyst`** *(views)* | which information is exposed, and which **hidden filters** (`WHERE Active = 1`)? |
+| **`reverse-sql-trigger-analyst`** *(triggers)* | which event, which rule, which cascade, which transaction rejection? |
+| **`reverse-db-architect`** *(Phase 0.B)* | what is this database's business vocabulary, its sub-domains, its risk areas? |
+| **`reverse-sql-feat-composer`** *(module synthesis)* | which cross-cutting business FEAT, with the plumbing demoted? |
 
-Les agents s'exécutent **en parallèle borné** (`MaxParallel`, défaut 3), sur des
-écritures disjointes. Aucun agent n'en spawne un autre : c'est la commande qui
-orchestre — la facture reste prévisible.
+Shared expertise base: [.sdd/rules/db-reverse-tsql.md](.sdd/rules/db-reverse-tsql.md) —
+`MERGE` / `OUTPUT` / `inserted` / `NULL` pitfalls, atomicity, errors turned into negative
+acceptance criteria, T-SQL / PL-pgSQL / PL-SQL / MySQL equivalences.
 
-### 70 à 80 % de votre base ne coûte pas un seul token
+No agent spawns another — the command orchestrates, so **the bill stays predictable**.
 
-C'est le cœur de l'économie du module. Avant d'appeler le moindre LLM, un routeur
-**déterministe** classe chaque objet :
+### 70–80% of your database costs zero tokens
 
-- **objet simple** (CRUD / SELECT, sans branche, sans SQL dynamique, sans gestion
-  d'erreur) → sa User Story est générée **mécaniquement, à coût nul** ;
-- **objet complexe** (vraie logique métier) → et seulement là, un agent est réveillé.
+Before any LLM is called, a **deterministic router** grades every object by what its body
+*hides* — dynamic SQL, cursors, recursion, unresolved callees, orchestration, fan-in,
+volume — and returns a **tier** (`none` / `fast` / `balanced` / `deep`), never a model
+name: resolving that belongs to the active provider.
 
-S'ajoutent un **cache par objet** (un corps inchangé n'est jamais ré-analysé : un
-second run après interruption est quasi gratuit) et des garde-fous de périmètre
-(`--schema`, `--include`, `--exclude`, `--limit`) qui **nomment toujours ce qu'ils
-ont écarté** — jamais de troncature silencieuse.
+- **genuinely simple object** (CRUD, no branching, no dynamic SQL, no error handling,
+  **and no calls**) → its User Story is generated **mechanically, at zero cost**;
+- **object with real business logic** → only then is an agent woken up.
 
-### Le découpage en modules est mesuré, pas deviné
+On top: a **per-object cache** (an unchanged body is never re-analysed, so a second run
+after an interruption is near-free) and scope guards (`--schema`, `--include`,
+`--exclude`, `--limit`) that **always name what they left out** — never a silent
+truncation.
 
-C'est la décision la plus structurante du reverse : elle fixe le nombre de FEATs.
-SDD_Pro **profile vos conventions de nommage réelles** (préfixes `SP_`, `STP_`, `BI_`,
-verbes propres à la maison) au lieu de plaquer une convention théorique. Si le nommage
-est trop fragmenté pour être exploitable, le moteur **bascule automatiquement** sur la
-cohésion du graphe de dépendances (tables partagées, appels croisés) — et ne retient
-la bascule que si elle regroupe réellement mieux. La stratégie retenue, la
-fragmentation mesurée et le profil appris sont tracés dans `inventory.json` et
-annoncés en clair :
+> 🔎 **The false green we closed.** Until August 2026 the router weighed branching,
+> dynamic SQL, error handling, cursors and volume — **never calls**. A 38-line
+> orchestrator with no branching, delegating all of its business rules to six procedures,
+> was therefore classified "simple": templated User Story, `high` confidence for lack of
+> anything to degrade it, and **passage through the REVERSE-GATE with no human review**.
+> Delegating is not being simple. Now any call forces LLM analysis, and an unresolved
+> callee or a recursion caps confidence at `medium` — which propagates up to the FEAT and
+> triggers review.
+
+### Module clustering is measured, not guessed
+
+It is the most structural decision of the whole reverse: it sets the number of FEATs.
+SDD_Pro **profiles your actual naming conventions** (`SP_`, `STP_`, `BI_` prefixes,
+in-house verbs) instead of imposing a theoretical one. If the naming is too fragmented to
+be usable, the engine **automatically falls back** to dependency-graph cohesion (shared
+tables, cross-calls) — and keeps that fallback only if it genuinely groups better. The
+chosen strategy, the measured fragmentation and the learned profile are recorded in
+`inventory.json` and announced in plain sight:
 
 ```
-[REVERSE] DB Facturation → 214 procédure(s) regroupée(s) en 31 module(s)/FEAT
-          — regroupement par cohésion — nommage inexploitable (fragmentation 0.82). (Phase 1 OK)
+[REVERSE] DB Billing → 214 procedure(s) grouped into 31 module(s)/FEAT
+          — cohesion clustering — naming unusable (fragmentation 0.82). (Phase 1 OK)
 ```
 
-### Lecture seule : une garantie d'architecture, pas une promesse
+### Read-only is an architectural guarantee, not a promise
 
-Votre DBA peut dormir. Le moteur n'émet **que** des `SELECT` de catalogue
-(`sys.sql_modules`, `sys.procedures`, …) et `OBJECT_DEFINITION`, validés à l'exécution
-par un `readonly_guard`. **Jamais** de `DROP` / `DELETE` / `TRUNCATE` / `ALTER` /
-`INSERT` / `UPDATE` / `MERGE`, **jamais** d'exécution de procédure — l'interdit est
-porté par la classe bloquante `[DB_STRUCTURE_CHANGE_FORBIDDEN]` et l'invariant
-`reverse-db-readonly`. Le mot de passe reste en RAM : **jamais loggé, jamais persisté**
-dans les artefacts produits. Recommandation de défense en profondeur : un login dédié
-`GRANT VIEW DEFINITION` + `db_datareader`.
+Your DBA can sleep. The engine emits **only** catalog `SELECT`s (`sys.sql_modules`,
+`sys.procedures`, …) and `OBJECT_DEFINITION`, validated at runtime by a `readonly_guard`.
+**Never** `DROP` / `DELETE` / `TRUNCATE` / `ALTER` / `INSERT` / `UPDATE` / `MERGE`,
+**never** a procedure execution — the ban is carried by the blocking
+`[DB_STRUCTURE_CHANGE_FORBIDDEN]` class and the `reverse-db-readonly` invariant. The
+password stays in RAM: **never logged, never persisted** into the produced artefacts.
+Defence-in-depth recommendation: a dedicated login with `GRANT VIEW DEFINITION` +
+`db_datareader`.
 
-### Rien n'est livré sans être qualifié
+### Nothing ships unqualified
 
-- **Traçabilité descendante** : chaque item de FEAT remonte à un critère d'US, qui
-  remonte à une ligne de snapshot SQL. Les `evidence:` sont **résolues sur disque** —
-  un pointeur mort est un gap, pas un feu vert.
-- **Gate de consommation** : une FEAT dont la confiance n'est pas `high` **ne passe
-  pas** dans `/sdd-full` (exit 1). Du SQL dynamique ou chiffré impose une revue humaine
-  — le forçage existe (`--allow-reverse-low`) mais il est explicite et tracé.
-- **Votre travail n'est jamais écrasé** : chaque FEAT porte l'empreinte de son contenu
-  généré. Si vous l'avez éditée, un re-run la **préserve** et vous le dit.
-- **Idempotence** : re-lancer la commande réutilise les identifiants déjà alloués — pas
-  d'orphelin, pas de doublon.
+- **Downward traceability**: every FEAT item traces to a User Story criterion, which
+  traces to a line of SQL snapshot. `evidence:` pointers are **resolved on disk** — a
+  dead pointer is a gap, not a green light.
+- **Consumption gate**: a FEAT whose confidence is not `high` **does not enter**
+  `/sdd-full` (exit 1). Dynamic or encrypted SQL forces human review — the override
+  exists (`--allow-reverse-low`) but it is explicit and audit-logged.
+- **Your edits are never overwritten**: each FEAT carries a fingerprint of its generated
+  content. If you edited it, a re-run **preserves** it and tells you so.
+- **Idempotent**: re-running reuses already-allocated identifiers — no orphans, no
+  duplicates.
 
-### Moteurs supportés
+### Supported engines
 
-| Moteur | Statut |
+| Engine | Status |
 |---|---|
-| **SQL Server**, **PostgreSQL** | 🟢 live-validés |
-| **Oracle**, **MySQL / MariaDB** | 🟡 scaffold-validés — requêtes read-only et flux hors ligne testés, runtime live à valider sur une base de test avant production |
-| DB2, SQLite | reconnus, refusés avec un message explicite |
+| **SQL Server**, **PostgreSQL** | 🟢 live-validated |
+| **Oracle**, **MySQL / MariaDB** | 🟡 scaffold-validated — read-only queries and offline flow tested; live runtime still to be validated on a test database before production |
+| DB2, SQLite | recognised, refused with an explicit message |
 
-### Démarrer
+> ⚠️ **Honest caveat**: Phase 0 and wave ordering are validated **offline** (synthetic
+> catalogs, topological sort checked against a brute-force reference over 300 random
+> graphs). The thresholds — pack depth 2, 14,000-byte budget, 0.50 fragmentation — are
+> calibrated on synthetic corpora and will be revisited after the first run against a
+> real production database.
+
+### Get started
 
 ```bash
-# 1. Driver lecture seule (une fois)
-pip install -e ".sdd/python[reverse-db]"     # + ODBC Driver 18 pour SQL Server
+# 1. Read-only driver (once)
+pip install -e ".sdd/python[reverse-db]"     # + ODBC Driver 18 for SQL Server
 
-# 2. Renseigner stack.md ## Active Database (DB_HOST / DB_NAME / DB_USER / DB_PASSWORD,
-#    valeurs en clair ou placeholders ${VAR} résolus depuis un .env)
+# 2. Fill in stack.md ## Active Database (DB_HOST / DB_NAME / DB_USER / DB_PASSWORD,
+#    clear values or ${VAR} placeholders resolved from a .env file)
 ```
 
 ```text
-/sdd-db-reverse-full                          # toute la base
-/sdd-db-reverse-full --schema dbo --limit 50  # périmètre borné (recommandé au 1er run)
-/sdd-db-reverse dbo.usp_Contact_Insert        # un seul objet, pour évaluer sans engager
+/sdd-db-context                               # Phase 0 — understand the database (required)
+/sdd-db-context --no-architect                # facts only, 0 tokens
+/sdd-db-reverse-full                          # the whole database
+/sdd-db-reverse-full --schema dbo --limit 50  # bounded scope (recommended for a first run)
+/sdd-db-reverse dbo.usp_Contact_Insert        # a single object, to evaluate without committing
 ```
 
-**Essayez sur un seul module.** Vous obtiendrez une FEAT lisible par un PO, sourcée
-ligne à ligne, sur du code que plus personne ne comprenait ce matin.
+**Try it on one module.** You will get a FEAT a Product Owner can read, sourced line by
+line, over code nobody understood this morning.
 
-Détail complet : [.sdd/docs/reverse-engineering-workflow.md](.sdd/docs/reverse-engineering-workflow.md) ·
-[.sdd/docs/reverse-db-audit-2026-07.md](.sdd/docs/reverse-db-audit-2026-07.md) ·
-[.sdd/rules/reverse-engineering.md](.sdd/rules/reverse-engineering.md)
+Full details: [reverse-engineering-workflow.md](.sdd/docs/reverse-engineering-workflow.md) ·
+[reverse-db-audit-2026-07.md](.sdd/docs/reverse-db-audit-2026-07.md) ·
+[rules/reverse-engineering.md](.sdd/rules/reverse-engineering.md)
 
 ---
 
-## Console web — cockpit de validation
+## 🧬 Legacy code reverse engineering — the application too
 
-Depuis **v6.10**, une console web React + Fastify centralise toute la télémétrie du projet (QA, sécurité, coverage, runs, gates) en lisant la base SQLite `workspace/db/console.db`. Aucun fichier `.json` ni `.jsonl` de stats ne subsiste sur le FS — la DB est la source de vérité unique.
+The same module lifts a legacy **codebase** (WebForms, PHP, Delphi, monoliths…) into
+FEATs, through a three-rung "ladder" that refuses to skip altitude:
 
-### Lancer la console
+```
+/sdd-reverse-full            # full orchestrator (init → inventory → audit → ladder → UI)
+  ├─ 3a  faithful technical analysis  (reverse-tech-analyst)   — photo of the code, file:line evidence
+  ├─ 3b  lift into User Stories       (reverse-us-writer)      — business altitude, still traceable
+  └─ 3c  FEAT composition            (reverse-feat-composer)  — plumbing demoted
+```
+
+Three phases complete the picture: **paradigm gap** (your legacy is event-driven, your
+target is a unidirectional SPA — the decision is made consciously), **Gherkin parity
+specs** (behavioural equivalence legacy ↔ regenerated becomes executable), and a
+**question loop** for the Tech Lead (no answer is ever invented). Details:
+[reverse-engineering-workflow.md](.sdd/docs/reverse-engineering-workflow.md).
+
+---
+
+## 📊 Web Console — validation cockpit
+
+A React + Fastify web console centralises all project telemetry (QA, security, coverage,
+runs, gates) by reading the SQLite database `workspace/db/console.db`. No `.json` or
+`.jsonl` stat file remains on disk — **the database is the single source of truth**.
+
+> ℹ️ `workspace/` is **gitignored** (it holds your secrets and generated code): the
+> console ships with the internal distribution, not with a clone of the GitHub template.
+> If `workspace/console/package.json` is present, the bootstrap offers to run
+> `npm install`.
 
 ```bash
 cd workspace/console
-npm install        # première fois uniquement (Fastify + SDK Anthropic)
-npm start          # démarre sur http://127.0.0.1:4000
+npm install        # first time only (Fastify + Anthropic SDK)
+npm start          # boots at http://127.0.0.1:4000
 ```
 
-Pré-requis : Node.js ≥ 20 et Python ≥ 3.8 sur le PATH (utilisé pour requêter `console.db` via les helpers `sdd_lib`).
+Prerequisites: Node.js ≥ 20 and Python ≥ 3.8 on PATH (used to query `console.db` via the
+`sdd_lib` helpers).
 
-### Deux pages principales
+### Two main pages
 
-| Page | URL | Fonction |
-|---|---|---|
-| **Dashboard** *(défaut)* | `/` | KPI cards (FEATs, Tests API, Sécurité, Quality), grille statuts par FEAT, audit qualité style SonarQube (Vulnerabilities / Code Smells / Coverage avec ratings A→E), 4 charts modernes (coverage bars, quality stack, API gate, security donut), sparklines, theme dark/light persisté. |
-| **Features** *(ex-SDD Jira)* | `/` puis onglet Features | 3 vues : **Vue PO** (FEAT → US), **Vue technique** (FEAT → US → plans back/front), **Vue UX** (carrousel des mockups HTML par FEAT). Header avec bouton **Rafraîchir** qui re-scanne le FS (les nouveaux fichiers `.md`/`.html` apparaissent dynamiquement). |
+| Page | Purpose |
+|---|---|
+| **Dashboard** *(default)* | KPI cards (FEATs, API tests, Security, Quality), per-FEAT status grid, SonarQube-style quality audit (Vulnerabilities / Code Smells / Coverage with A→E ratings), 4 native SVG charts, sparklines, persisted dark/light theme. |
+| **Features** | 3 views: **PO** (FEAT → US), **technical** (FEAT → US → back/front plans), **UX** (carousel of HTML mockups). **Refresh** button re-scans the filesystem. |
 
-> ℹ️ **Doc framework retirée de la console 2026-06-06** — la console reste DÉDIÉE
-> aux stats des projets matérialisés. La documentation SDD_Pro elle-même vit
-> dans le site **MkDocs Material** (voir section [📖 Documentation site](#-documentation-site) ci-dessous).
+> ℹ️ **Framework docs were removed from the console (2026-06-06)** — the console stays
+> dedicated to materialised-project statistics. SDD_Pro's own documentation lives in
+> [.sdd/docs/](.sdd/docs/).
 
 ### Highlights
 
-- 🎨 **Theme light / dark** avec toggle en topbar, persisté en localStorage, suit `prefers-color-scheme` au premier load. **Logos adaptatifs** (versions claire / sombre).
-- 📊 **Charts SVG natifs** (donut, bar stacks, sparklines, gradient progress bars) — palette indigo/cyan/amber/red/emerald/violet, theme-aware. KPI cards avec valeurs en gradient clip-text.
-- 🛡 **Section Audit qualité (style SonarQube)** : 1 ligne par FEAT avec ratings A→E (Vulnerabilities, Code Smells, Coverage). Cartes affichées **uniquement** si les données existent en DB (pas de placeholder).
-- 🔍 **Drill-down expandable** : un clic sur une ligne FEAT déplie 3 tables (vulnerabilities critique/serious, code smells, coverage gaps) avec file:line, OWASP/CWE, règles, severities colorées.
-- 🖼 **Vue UX carrousel** : mockups HTML servis via route statique `/ui/*` (CSS relatif `design-system.css` chargé naturellement, **pas de duplication**). Thumbs cliquables + flèches `‹ ›` + iframe sandboxé.
-- ⏳ **Loading spinner** : SVG natif animé (rotation gradient + 3 dots pulse, theme-aware).
-- 🛡 **Gates manuels** : les phases `afterUS / afterReadiness / afterPlan / afterCode` posées par `/sdd-full --manual-gates` sont résolues depuis la console (POST `/api/gate-decide`), atomic write protégé par lock cross-language Python ↔ Node.
-- 🤖 **Reformulation IA** (LOT 4, opt-in) : bouton « Reformuler avec IA » sur les FEAT/US/Plans, utilise l'Anthropic SDK pour produire une version PO-friendly.
-- 📡 **Live updates** : SSE (`/api/events`) pousse les changements FS et les modifs `status.json` côté client — l'arbre se met à jour sans rechargement. Bouton **Rafraîchir** force un re-scan du filesystem.
+- 🎨 **Light / dark theme** with a topbar toggle, persisted in localStorage, following
+  `prefers-color-scheme` on first load.
+- 📊 **Native SVG charts** (donut, bar stacks, sparklines, gradient progress bars),
+  theme-aware — no charting dependency.
+- 🛡 **SonarQube-style quality audit**: one row per FEAT with A→E ratings. Cards render
+  **only** when the data exists in the database (no placeholders).
+- 🔍 **Expandable drill-down**: one click expands 3 tables (critical/serious
+  vulnerabilities, code smells, coverage gaps) with file:line, OWASP/CWE, colour-coded
+  severities.
+- 🛡 **Manual gates**: the `afterUS / afterReadiness / afterPlan / afterCode` phases set
+  by `/sdd-full --manual-gates` are resolved from the console, with atomic writes
+  protected by a cross-language Python ↔ Node lock.
+- 🤖 **AI rephrasing** (opt-in): a "Rephrase with AI" button on FEATs/US/Plans.
+- 📡 **Live updates**: SSE (`/api/events`) broadcasts filesystem and status changes — the
+  tree updates without a reload.
 
-### API HTTP exposée
+### Exposed HTTP API
 
 | Endpoint | Description |
 |---|---|
-| `GET /api/tree` | Arbre FEATs → US → plans + état `status.json` mergé |
-| `GET /api/dashboard` | Vue agrégée toutes FEATs (5 KPIs + 1 ligne par FEAT) |
-| `GET /api/feat/:n` | Détail d'une FEAT (coverage, quality, security, api-tests) |
-| `GET /api/feat/:n/details` | Issues sonar (vulns + smells + coverage gaps) |
-| `GET /api/audit` | Aggrégat tokens / contexte par agent |
-| `GET /api/state` | Dernier run + 30 derniers events |
-| `GET /api/gates?feat=N` | Historique gates pour 1 FEAT |
-| `GET /api/file?path=…` | Lecture brute d'un fichier MD du workspace |
-| `POST /api/validate` | Enregistre la décision PO/Tech Lead sur une US/Task |
-| `POST /api/gate-decide` | Résout un gate `afterUS/afterReadiness/...` |
-| `GET /api/events` | Server-Sent Events (broadcast modifs FS + gates) |
-| `GET /ui/*` | Sert directement `workspace/ui/` (mockups HTML avec leur CSS relatif `design-system.css`) |
+| `GET /api/tree` | FEATs → US → plans tree + merged state |
+| `GET /api/dashboard` | Aggregate view of all FEATs (5 KPIs + 1 row per FEAT) |
+| `GET /api/feat/:n` | FEAT detail (coverage, quality, security, api-tests) |
+| `GET /api/feat/:n/details` | Sonar issues (vulns + smells + coverage gaps) |
+| `GET /api/audit` | Per-agent token / context aggregate |
+| `GET /api/state` | Last run + 30 most recent events |
+| `GET /api/gates?feat=N` | Gate history for one FEAT |
+| `GET /api/file?path=…` | Raw read of a workspace Markdown file |
+| `POST /api/validate` | Records the PO / Tech Lead decision on a US |
+| `POST /api/gate-decide` | Resolves an `afterUS / afterReadiness / …` gate |
+| `GET /api/events` | Server-Sent Events (filesystem + gate changes) |
+| `GET /ui/*` | Serves `workspace/ui/` (HTML mockups with their relative CSS) |
 
 ---
 
-## Documentation détaillée
+## 🔍 What is verifiable (and how to verify it)
 
-### Pour les utilisateurs SDD_Pro
+SDD_Pro sells on numbers you can recount. Every one of these is derived from the
+repository, not from a pitch:
 
-- [.claude/CLAUDE.md](.claude/CLAUDE.md) — entry-point slim (~150 lignes, références vers le détail)
-- [.sdd/docs/quickstart.md](.sdd/docs/quickstart.md) — démarrage pas à pas
-- [.sdd/docs/architecture.md](.sdd/docs/architecture.md) — vision, modèles, agents, stacks
-- [.sdd/docs/workflow.md](.sdd/docs/workflow.md) — 4 phases du pipeline (FEAT → US → Code)
-- [.sdd/docs/conventions.md](.sdd/docs/conventions.md) — anti-derive, idempotence, plans
-
-### Pour les contributeurs framework
-
-- [.sdd/docs/CHANGELOG.md](.sdd/docs/CHANGELOG.md) — historique versions (focus v7.0.0 GA)
-- [.sdd/docs/MIGRATION.md](.sdd/docs/MIGRATION.md) — guides de mise à niveau (v6.10 → v7.0.0)
-- [.claude/loader.yml](.claude/loader.yml) — manifest reads/writes par agent
-- [.claude/rules/](.claude/rules/) — 8 règles opérationnelles consolidées v7.0.0 (`build-and-loop`, `library-and-stack`, `ownership`, `quality`, `error-classification` + `output-protocol`, `dev-shared-preflight`, `error-classification-legacy`)
-
-## 📖 Documentation site (MkDocs Material)
-
-La documentation complète du framework vit dans un **site statique MkDocs Material** (Python). Lancer en local :
+| Item | Count | Recount it |
+|---|---:|---|
+| Agents (13 forward + 16 reverse) | **29** | `ls .sdd/agents/ \| wc -l` |
+| Commands (13 user-facing + 9 internal + 19 reverse) | **41** | `ls .sdd/commands/ \| wc -l` |
+| Operational rules | **12** | `ls .sdd/rules/` |
+| Auto-triggered skills | **13** | `ls .sdd/skills/` |
+| Stacks (28 🟢 + 8 🟡) | **36** | `python .sdd/python/sdd_admin/framework_smoke.py` |
+| `.libs.json` dependency catalogs | **30** | `find .sdd/stacks -name "*.libs.json" \| wc -l` |
+| Combos under SLA commitment | **13** | [.sdd/templates/combos.json](.sdd/templates/combos.json) |
+| `[CLASS]` error classes (16 families) | **191** | [error-classification.md](.sdd/rules/error-classification.md) |
+| Project Config keys | **55** | [.sdd/config.base.yml](.sdd/config.base.yml) |
+| Load-bearing invariants (14 forward + 17 reverse) | **31** | `INVARIANTS.yml` + `INVARIANTS.reverse.yml` |
+| Deterministic scripts (0 tokens) | **80** | `sdd_scripts/` + `sdd_reverse_scripts/` |
+| Wired protection hooks | **20** | `ls .sdd/python/sdd_hooks/` |
+| Python tests | **2,542** *(175 files)* | `python -m pytest .sdd/python/tests/ -q` |
+| Supported LLM providers | **4** | `ls .sdd/providers/` |
 
 ```bash
-# Installer les deps docs (1ère fois uniquement)
-pip install -r requirements-docs.txt
+# Full framework check (consistency gates included)
+python .sdd/python/sdd_admin/framework_smoke.py
 
-# Serveur live-reload local
-mkdocs serve
-# → http://localhost:8000
-
-# Build statique (produit site/, HTML pur)
-mkdocs build
+# Test suite
+python -m pytest .sdd/python/tests/ -q
 ```
 
-Le site comprend :
-
-- 🚀 **Getting Started** (tutoriel 30 min) + **Cookbook** (recettes 10 min)
-- 🤖 **Agents reference** (12 cartes : role / model / IO / verdicts)
-- 💻 **Commands reference** (20 cartes : args / flags / decision tree)
-- ⚙️ **Configuration reference** (43 clés Project Config + policies non-bypass)
-- 🏗 **Architecture** (composants + workflow + 4 diagrammes mermaid)
-- 🛟 **Troubleshooting + FAQ** (22 erreurs `[CLASS]` + 8 FAQ)
-- 🤝 **Contributing** + Working Agreement + Versioning + ADRs
-
-> 💡 **Azure DevOps private project** : pas de publication GitHub Pages. Le dossier `site/` produit par `mkdocs build` peut être déployé manuellement (Azure Static Web Apps, file share, intranet). Cf. `mkdocs.yml` config.
-
-Hub navigation : [.sdd/docs/README.md](.sdd/docs/README.md) — explorer la doc sans MkDocs (Markdown brut sur GitHub/IDE).
+> The [INVARIANTS.yml](.sdd/INVARIANTS.yml) manifest is the framework's anti-rot device:
+> every load-bearing contract (two-stage gate, file ownership, cost cap, TDD test-first…)
+> points at its *enforcer* on disk, and a test fails if that enforcer disappears without
+> the manifest being updated.
 
 ---
 
-## Stack technique
+## 🏗 Architecture in one paragraph
 
-Framework écrit en **Python** (stdlib pure pour le moteur, pytest pour les tests — suite > 1000 tests couvrant `sdd_lib/`, `sdd_scripts/`, `sdd_hooks/`, `sdd_admin/`). **Console web** : Node.js 22.5+ (Fastify 5 + React 18 via CDN, pas de build step). **SQLite** (WAL mode) pour la télémétrie centralisée (`workspace/db/console.db`).
+SDD_Pro orchestrates **29 agents** — 13 on the forward pipeline (PO, arch, dev-backend,
+dev-frontend, QA, 5 reviewers, elicitor, constitutioner, specbook-writer) and 16 on the
+reverse module (legacy code and databases) — around a **strict file ownership matrix**, a
+**layered Project Config** (55 keys, JSON-schema validated), a **deterministic Python
+tooling layer** (~58 KLOC, 2,542 tests) and a **hard cost cap** ($50/run by default). The
+framework is **source-first**: every decision lives in a `.md` file (FEATs, US, plans,
+ADRs) versioned with the code — no hidden state in the LLM context. The pipeline is
+**backend-first and gated** (dev-backend ALL US → API Gate → dev-frontend ALL US) to
+eliminate silent contract drift between front and back. It is **harness-agnostic**: the
+`.sdd/` source layer is compiled into per-harness facades — the same pipeline logic
+whether you run Claude Code, Codex, Gemini CLI or Antigravity.
 
-Compte vérifiable localement :
-```bash
-python -m pytest .claude/python/tests/ -q          # collecte pytest complète (~570)
-python -m unittest discover -s .claude/python/tests -p "test_*.py"   # subset compatible stdlib (~530)
-```
+---
 
-Aucun runtime applicatif imposé sur le code généré — SDD_Pro produit du code dans le stack du projet cible.
+## 📚 Documentation
 
-**Catalogue stacks (v7.0.0 GA)** — terminologie stricte (source de vérité = entête `Validation:` du fichier `.md`) :
+### For users
 
-| Statut | Définition | Compte réel |
+| Doc | Purpose |
+|---|---|
+| [.claude/CLAUDE.md](.claude/CLAUDE.md) | Slim entry point (~150 lines, index into the detail) — FR |
+| [.sdd/docs/getting-started.en.md](.sdd/docs/getting-started.en.md) | First-steps tutorial (30 min) — EN |
+| [.sdd/docs/cookbook.md](.sdd/docs/cookbook.md) | Concrete recipes (10 min) |
+| [.sdd/docs/quickstart.md](.sdd/docs/quickstart.md) | Step-by-step start + brownfield |
+| [.sdd/docs/glossary.md](.sdd/docs/glossary.md) | Framework vocabulary |
+| [.sdd/docs/commands-reference.md](.sdd/docs/commands-reference.md) | Command cards (args / flags / outputs) |
+| [.sdd/docs/agents-reference.md](.sdd/docs/agents-reference.md) | Agent cards (role / model / I-O / verdicts) |
+| [.sdd/docs/configuration-reference.md](.sdd/docs/configuration-reference.md) | Project Config keys |
+| [.sdd/docs/troubleshooting.md](.sdd/docs/troubleshooting.md) | Common errors + recovery |
+
+### To decide (CTO / CIO)
+
+| Doc | Purpose |
+|---|---|
+| [.sdd/docs/WHY-SDD-PRO.md](.sdd/docs/WHY-SDD-PRO.md) | Business case and market comparison |
+| [.sdd/docs/SLA.md](.sdd/docs/SLA.md) | Service commitments |
+| [.sdd/docs/COMPLIANCE.md](.sdd/docs/COMPLIANCE.md) | Compliance and data handling |
+| [.sdd/docs/KNOWN-LIMITATIONS.md](.sdd/docs/KNOWN-LIMITATIONS.md) | What SDD_Pro does **not** do |
+| [.sdd/docs/validated-combos.md](.sdd/docs/validated-combos.md) | Validated combination matrix |
+| [.sdd/docs/poc-roi-methodology.md](.sdd/docs/poc-roi-methodology.md) | How to validate a new stack |
+
+### To contribute to the framework
+
+| Doc | Purpose |
+|---|---|
+| [.sdd/docs/architecture.md](.sdd/docs/architecture.md) | Components, agents, stacks |
+| [.sdd/docs/workflow.md](.sdd/docs/workflow.md) | Pipeline phases |
+| [.sdd/docs/conventions.md](.sdd/docs/conventions.md) | Anti-drift, idempotence, plans |
+| [.sdd/loader.yml](.sdd/loader.yml) | Per-agent reads/writes manifest (forward) |
+| [.sdd/loader.reverse.yml](.sdd/loader.reverse.yml) | Reverse module manifest |
+| [.sdd/rules/](.sdd/rules/) | The 12 operational rules |
+| [.sdd/docs/WORKING-AGREEMENT.md](.sdd/docs/WORKING-AGREEMENT.md) | Working agreement |
+| [.sdd/docs/adrs/](.sdd/docs/adrs/) | Architecture Decision Records |
+
+Navigation hub: [.sdd/docs/README.en.md](.sdd/docs/README.en.md).
+
+> 🇫🇷 The French documentation is canonical and more exhaustive. Where an English page
+> is missing, read the French one — the technical content (identifiers, classes, flags)
+> is identical.
+
+---
+
+## 🧱 Technical stack
+
+The framework is written in **Python** (pure stdlib for the engine, pytest for the
+tests). **Web console**: Node.js ≥ 20 (Fastify 5 + React 18). **SQLite** (WAL mode) for
+centralised telemetry (`workspace/db/console.db`).
+
+No application runtime is imposed on the generated code — SDD_Pro produces code in the
+target project's stack.
+
+**Stack catalog** — strict terminology, source of truth = the `Validation:` header of the
+`.md` file:
+
+| Status | Definition | Count |
 |:---:|---|:---:|
-| 🟢 **(validated / bench-validated / scaffold-validated)** | Stack avec entête `Validation: 🟢` — composant d'un combo validé bout-en-bout, bench-validé runtime, ou scaffold-validé. Inclut les 2 combos `validated` end-to-end (C1, C2) | **28 stacks** ([.sdd/docs/validated-combos.md](.sdd/docs/validated-combos.md)) |
-| 🟡 **experimental / POC-only** | Stack avec entête `Validation: 🟡` — chargeable mais sans validation bout-en-bout (5 experimental : `archi/ddd`, `archi/microservice`, `qa/mutation-testing`, `qa/playwright`, `fullstack/aspnet-mvc-razor` ; 1 POC-only : `fullstack/node-react` ; 1 scaffold-validated pending : `mobiles/kotlin-android`) | **7 stacks** |
+| 🟢 | `validated` (combo validated end-to-end), `bench-validated` (measured runtime) or `scaffold-validated` | **28** |
+| 🟡 | `experimental` or `POC-only` — loadable, but **never sold as a standalone offer** | **8** |
 
-**Total actif : 35 stacks (28 🟢 + 7 🟡)** répartis : Backend (4), Frontend (4), UI DS (3), QA (9 dont 2 opt-in `mutation-testing` + `playwright`), Auth (2), Archi (3 patterns `mvc`/`ddd`/`microservice`), Fullstack (7 dont `aspnet-mvc-razor` expérimental), Mobiles (3). SSoT = entête `Validation:` du `.md`. Détail : [.claude/CLAUDE.md §6](.claude/CLAUDE.md).
+**Total: 36 stacks** — Backend (4), Frontend (4), Design systems (3), QA (9), Auth (2),
+Architecture patterns (3), Fullstack (7), Mobile (3). Detail:
+[validated-combos.md](.sdd/docs/validated-combos.md).
 
-> ℹ️ **v7.0.0 GA audit P0-doc 2026-06-05** : la ligne "⏸️ draft (quarantaine)" et le dossier `_drafts/` ont été retirés (rollback `governance-stacks-quarantine-rollback` du 2026-05-24 ; cf. CHANGELOG). Aucun stack n'est en quarantaine — les stacks expérimentaux restent chargeables avec l'avertissement runtime.
-
-> ⚠️ Hors les 2 combos validés `C1`/`C2`, la composition multi-stacks n'a pas été validée par un PoC complet ; le pipeline peut échouer en runtime de manière non triviale. Pour activer une 3ᵉ combo, exécuter d'abord le PoC ROI méthodologie ([.sdd/docs/poc-roi-methodology.md](.sdd/docs/poc-roi-methodology.md)).
-
-Voir [.claude/python/README.md](.claude/python/README.md) pour les scripts utilitaires.
+> ⚠️ Outside the combos listed in [combos.json](.sdd/templates/combos.json), a
+> multi-stack composition has not been validated by a full PoC: the pipeline may fail at
+> runtime in non-trivial ways. The `preflight_stack_combo` hook flags it — the bypass
+> (`SDD_ALLOW_UNTESTED_COMBO=1`) exists, but it is audit-logged.
 
 ---
 
-## Licence & auteur
+## 📄 License & author
 
-Conçu et maintenu par **SDD-Pro maintainer** · 2026
+Designed and maintained by the **SDD-Pro maintainer** · 2026 — see [LICENSE](LICENSE).

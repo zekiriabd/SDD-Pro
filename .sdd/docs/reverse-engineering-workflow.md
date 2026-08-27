@@ -1686,6 +1686,130 @@ Issues à créer (V2 milestone) :
 
 ---
 
+## Annexe D — Chemin base de données : Phase 0 et vagues (2026-08-26)
+
+> Le corps de ce document décrit le reverse **de code** (escalier 3a→3b→3c). Le
+> reverse **base de données** partage les invariants (evidence, confidence
+> min-monotone, no-spawn, REVERSE-GATE) mais a une forme propre, décrite ici.
+> SSoT opérationnelle : `@.sdd/docs/reverse-db-audit-2026-07.md`.
+
+### D.1 Pourquoi une Phase 0
+
+Le chemin code monte en altitude par barreaux (analyse → US → FEAT). Le chemin
+base de données n'a pas besoin du barreau bas — **le corps de l'objet SQL *est*
+l'analyse**. Mais cette économie ne tient que pour un objet **feuille et
+autonome**. Dès qu'il y a composition (procédure imbriquée, SQL dynamique,
+trigger en cascade), lire un corps isolément produit une User Story fausse mais
+crédible.
+
+La Phase 0 remplace le barreau manquant par une **compréhension globale
+préalable**, construite une fois et partagée :
+
+```
+Phase 1 introspection READ-ONLY      -> db-introspection.json + db-schema.json
+   Phase 0.A  déterministe, 0 token  -> FAITS   (CRUD, graphe, vagues, contextVersion)
+   Phase 0.B  reverse-db-architect   -> HYPOTHÈSES (glossaire, domaines, rôles, risques)
+        => db-context.json (SSoT versionné) + db-context/ (arbre découpé + packs)
+```
+
+### D.2 Le contrat faits ≠ hypothèses
+
+| Branche | Producteur | Peut devenir un AC ? | Garantie |
+|---|---|:---:|---|
+| `facts` | scripts déterministes | **oui** (evidence `fichier:ligne`) | seule source de faits |
+| `hypotheses` | agent architecte | **jamais** | écrit un fichier séparé, fusionné par script |
+
+L'architecte ne peut pas écraser un fait **par construction** : il écrit
+`db-context.hypotheses.json`, et `db_context_build.py --merge-hypotheses` ne
+recopie que les cinq clés autorisées. Même patron que
+`db-schema.enrichment.json` (ADV-3). Un `contextVersion` périmé fait **échouer**
+la fusion plutôt qu'attacher une lecture obsolète à des faits frais.
+
+### D.3 Context slicing — le pack
+
+Aucun agent ne lit `db-context.json` en entier. `db_context_slice.build_pack()`
+produit, par objet, `db-context/packs/{schema}.{objet}.md` :
+
+1. l'objet — contrat, signaux, matrice CRUD, evidence ;
+2. la structure des **seules** tables qu'il touche (colonnes, clés, `CHECK`) ;
+3. ce qu'il appelle, profondeur ≤ 2, avec le **résumé déjà écrit** par la vague
+   précédente quand il existe (sinon les effets déterministes) ;
+4. ses appelants ;
+5. les hypothèses de l'architecte le concernant, marquées `kind: hypothesis`.
+
+Budget borné (`ContextPackBudget`, défaut 14 000 octets). Ordre de retrait
+déclaré — `callers`, `hypotheses`, `tables`, `callees` — et **tout retrait est
+annoncé dans le pack**, pour qu'un agent qui a reçu une vue tronquée baisse sa
+confidence en connaissance de cause.
+
+> La règle d'isolation (§1) n'est **pas** relâchée : l'agent lit toujours
+> exactement une chose. Le pack est le canal *sanctionné* du contexte transitif,
+> calculé plutôt que laissé au jugement de l'agent.
+
+### D.4 Ordonnancement par vagues
+
+`db_wave_planner.plan_waves()` :
+
+1. résout chaque `callsProcs` contre le catalogue — un nom absent ou **ambigu**
+   reste `unresolvedCallees` (jamais résolu au hasard : un faux arc réordonne
+   tout le plan) ;
+2. condense les composantes fortement connexes (Tarjan itératif — l'auto-appel
+   et la récursion mutuelle sont réels en T-SQL) ;
+3. tri topologique sur le graphe condensé → `waves[]`.
+
+Propriété garantie : **tout appelé résolu est analysé dans une vague strictement
+antérieure à son appelant** (hors cycle, où les membres partagent la vague).
+
+Le débit ne baisse pas : le parallélisme borné (`MaxParallel`) joue **à
+l'intérieur** d'une vague ; il n'y a qu'une barrière entre deux vagues, où
+l'orchestrateur — jamais un agent — écrit les résumés dans
+`db-context.findings` et régénère les packs suivants. Les agents n'écrivant que
+leur propre US, les écritures restent disjointes : aucun verrou supplémentaire.
+
+Une composante récursive de taille > 1 est confiée **d'un bloc** à un seul
+agent, tous les corps du cycle dans son pack, et sort plafonnée à `medium`.
+
+### D.5 Spécialistes et routage de tier
+
+| Famille | Agent | Question posée à l'objet |
+|---|---|---|
+| procédure | `reverse-sql-analyst` | quelle opération, quels effets, quelles préconditions ? |
+| fonction | `reverse-sql-function-analyst` | quel calcul réutilisable, quels cas limites ? |
+| vue | `reverse-sql-view-analyst` | quelle information exposée, quels filtres cachés ? |
+| trigger | `reverse-sql-trigger-analyst` | quel événement, quelle règle, quel rejet ? |
+
+Socle d'expertise SQL commun : `@.sdd/rules/db-reverse-tsql.md`. Ce qui justifie
+un agent distinct est **l'angle**, jamais le type SQL en soi.
+
+`db_tier_router.tier_for()` grade chaque objet — `none` (0 token) / `fast` /
+`balanced` / `deep` — selon ce que le corps **cache** : SQL dynamique, curseur,
+récursion, appelé non résolu, orchestration (≥ 2 appels), fan-in élevé, volume.
+Il retourne un **tier**, jamais un nom de modèle : la résolution appartient au
+provider actif (`.sdd/providers/*.yaml`).
+
+### D.6 Le faux vert que tout ceci ferme
+
+Avant 2026-08-26, `complexity_reasons()` pesait branches, SQL dynamique,
+erreurs, curseurs, volume, écritures et largeur de contrat — **jamais les
+appels**. Un orchestrateur de 38 lignes sans branche déléguant sa règle métier à
+six procédures était donc classé `simple` : User Story par template, aucun LLM,
+confidence `high` faute de quoi que ce soit qui la dégrade, et **passage de la
+REVERSE-GATE sans revue humaine**.
+
+Déléguer n'est pas être simple. Désormais : tout appel force l'analyse LLM ; un
+appelé non résolu ou une récursion plafonnent la confidence à `medium`, qui
+remonte par min-monotonie jusqu'à la FEAT et déclenche la revue.
+
+### D.7 Réserve
+
+Tout ce qui précède est validé **hors ligne** (`tests/test_db_context.py`,
+catalogues synthétiques, Tarjan vérifié contre une référence par force brute sur
+300 graphes aléatoires). Les seuils — profondeur de pack 2, budget 14 000,
+fragmentation de clustering 0.50 — sont calibrés sur corpus synthétiques et
+devront être revus après le premier run contre une base réelle.
+
+---
+
 ## Annexe A — Conformité SDD_Pro standard FEAT
 
 Toute FEAT produite par `reverse-feat-composer` (3c) DOIT respecter :

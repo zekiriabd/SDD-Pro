@@ -222,6 +222,78 @@ agents:
       # re-analyses the body (altitude already lifted by reverse-sql-analyst) and
       # NEVER connects to the live DB (it is disconnected by this phase).
 
+  # --- Phase 0 + spécialistes du reverse base de données (2026-08-26) --------
+  # Le db-reverse passe de 2 agents (analyste generaliste + composeur opt-in) a
+  # une Phase 0 obligatoire suivie de specialistes par famille d'objet SQL.
+  # Chacun lit son CONTEXT PACK (slice deterministe) plutot que de fouiller le
+  # projet : la regle d'isolation est redirigee, pas relachee.
+
+  reverse-db-architect:
+    model_tier: deep
+    phase: "db-0b"
+    optional: false             # Phase 0.B — obligatoire avant toute remontee en US
+    available_from: v1.2.0      # 2026-08-26 — Database Architect (interpretation layer)
+    reads:
+      - workspace/old/{P}/.sys/db-context.json                   # facts + execution plan (digest only)
+      - workspace/old/{P}/.sys/db-context/_overview.md           # orientation
+      - workspace/old/{P}/.sys/db-context/tables/{table}.md      # PIVOT tables only (ContextDigestBudget)
+    writes:
+      - workspace/old/{P}/.sys/db-context.hypotheses.json        # hypotheses branch ONLY — never facts
+    delegated_to:
+      - .sdd/python/sdd_reverse_scripts/db_context_build.py      # 0.A facts + deterministic merge of 0.B
+    forbidden_reads:
+      - workspace/old/{P}/.sys/proc-snapshot/   # never an object body — wrong altitude
+      - workspace/src/
+      # Writes a SEPARATE file merged by script (same guard as db-schema.enrichment.json,
+      # ADV-3): an agent cannot clobber the fact layer, by construction.
+
+  reverse-sql-function-analyst:
+    model_tier: balanced
+    phase: "db-1"
+    optional: true
+    available_from: v1.2.0      # 2026-08-26 — functions specialist (side-effect-free calculation)
+    reads:
+      - workspace/old/{P}/.sys/db-context/packs/{schema}.{object}.md  # the sanctioned context slice
+      - workspace/old/{P}/.sys/proc-snapshot/{schema}.{proc}.sql      # READ-ONLY own body
+      - workspace/old/{P}/.sys/inventory.json                         # (n, m, usName) allocations
+      - .sdd/python/sdd_reverse/us.proc.reverse.template.md
+    writes:
+      - workspace/us/{n}-{m}-{Name}.md                                # 1 function = 1 user story
+    forbidden_reads:
+      - workspace/src/
+
+  reverse-sql-view-analyst:
+    model_tier: balanced
+    phase: "db-1"
+    optional: true
+    available_from: v1.2.0      # 2026-08-26 — views specialist (projection / reporting)
+    reads:
+      - workspace/old/{P}/.sys/db-context/packs/{schema}.{object}.md
+      - workspace/old/{P}/.sys/proc-snapshot/{schema}.{proc}.sql
+      - workspace/old/{P}/.sys/inventory.json
+      - .sdd/python/sdd_reverse/us.proc.reverse.template.md
+    writes:
+      - workspace/us/{n}-{m}-{Name}.md                                # 1 view = 1 user story
+    forbidden_reads:
+      - workspace/src/
+
+  reverse-sql-trigger-analyst:
+    model_tier: deep
+    phase: "db-1"
+    optional: true
+    available_from: v1.2.0      # 2026-08-26 — triggers specialist (event-driven invariants)
+    reads:
+      - workspace/old/{P}/.sys/db-context/packs/{schema}.{object}.md
+      - workspace/old/{P}/.sys/proc-snapshot/{schema}.{proc}.sql
+      - workspace/old/{P}/.sys/inventory.json
+      - .sdd/python/sdd_reverse/us.proc.reverse.template.md
+    writes:
+      - workspace/us/{n}-{m}-{Name}.md                                # 1 trigger = 1 user story
+    forbidden_reads:
+      - workspace/src/
+      # Never routed below `balanced`: a trigger is the business rule the
+      # applications cannot see and cannot bypass.
+
 
 commands:
   sdd-reverse-init:

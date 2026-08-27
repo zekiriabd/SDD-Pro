@@ -1,6 +1,8 @@
 # 🤖 Agents Reference
 
-19 specialized AI agents power SDD_Pro: **12 forward** (cards below) + **7 reverse** (`reverse-inventory`, `reverse-tech-auditor`, `reverse-tech-analyst`, `reverse-us-writer`, `reverse-feat-composer`, `reverse-ui-extractor`, `reverse-completeness-reviewer` — documented in [reverse-engineering-workflow.md](reverse-engineering-workflow.md), manifest `loader.reverse.yml`). Each card below lists the role, model, triggers, inputs/outputs, tools and verdicts. **Read this when you need to know "what does agent X do" or "what files does it touch"**.
+**29 specialised agents** power SDD_Pro: **13 forward** (12 cards below + `specbook-writer`) + **16 reverse** (table at the end — legacy code *and* database modules, manifest `loader.reverse.yml`). Each card lists the role, model, triggers, inputs/outputs, tools and verdicts. **Read this when you need to know "what does agent X do" or "what files does it touch"**.
+
+> Recount at any time: `ls .sdd/agents/ | wc -l`.
 
 | Quick legend |
 |---|
@@ -263,14 +265,47 @@ Cross-file post-dev reviewers — each with a distinct angle. **5 verdicts → c
 
 ---
 
-## Reverse agents (7 — module optionnel, renvoi)
+## Reverse agents (16 — optional module)
 
-Le module reverse (legacy → FEAT) ajoute 7 agents non documentés en fiches ici :
-`reverse-inventory`, `reverse-tech-auditor` (Sonnet 4.6) ; `reverse-tech-analyst`
-(3a), `reverse-feat-composer` (3c), `reverse-ui-extractor` (Opus 4.8) ;
-`reverse-us-writer` (3b, Sonnet 4.6) ; `reverse-completeness-reviewer`
-(Sonnet 4.6). Manifest : `loader.reverse.yml`. Détail :
-`docs/reverse-engineering-workflow.md` + `rules/reverse-engineering.md`.
+The reverse module lifts existing assets into FEATs. It has its own manifest
+(`loader.reverse.yml`), its own invariants (`INVARIANTS.reverse.yml`) and a strict
+**no-spawn rule**: no reverse agent spawns another — commands orchestrate, so the bill
+stays predictable. Full detail: [reverse-engineering-workflow.md](reverse-engineering-workflow.md)
++ [../rules/reverse-engineering.md](../rules/reverse-engineering.md).
+
+### Legacy **code** path (10 agents)
+
+| Agent | Rung / phase | Mandate |
+|---|---|---|
+| `reverse-inventory` | 1 | Deterministic cartography of the legacy project (languages, pages, units `U-N`, file:line evidence) |
+| `reverse-tech-auditor` | 2 | Architecture / anti-patterns / EOL dependencies audit — informational |
+| `reverse-paradigm-advisor` | 2.7 | Paradigm gap legacy ↔ target stack + unit curation (MIGRATE / DISCARD / HUMAN-DECISION) |
+| `reverse-tech-analyst` | 3a | Faithful technical analysis of one unit — a photo of the code, never an interpretation |
+| `reverse-us-writer` | 3b | Lifts the analysis into User Stories per capability (business altitude, still traceable) |
+| `reverse-feat-composer` | 3c | Composes the clean business FEAT, plumbing demoted, transitive evidence |
+| `reverse-completeness-reviewer` | 5 | Confronts the FEAT with the raw inventory and **states what was missed** |
+| `reverse-parity-inspector` | 3.8 *(opt-in)* | Derives executable Gherkin parity specs (legacy ↔ regenerated behaviour) |
+| `reverse-clarifier` | 3.9 | Turns grey areas into structured questions for the Tech Lead, then re-injects the answers |
+| `reverse-ui-extractor` | 4 | Synthesises semantic HTML screens from legacy templates + CSS (no pixel cloning) |
+
+### **Database** path (6 agents)
+
+| Agent | Rung / phase | Mandate |
+|---|---|---|
+| `reverse-db-architect` | **0.B** | Interprets the database: business glossary, sub-domains, object roles, risk areas, open questions. Writes **hypotheses only** — never facts. Connects to no database. |
+| `reverse-sql-analyst` | 1 | **Stored procedures** — which operation, which data effects, which preconditions |
+| `reverse-sql-function-analyst` | 1 | **Functions** — which reusable calculation, which edge cases, which default value |
+| `reverse-sql-view-analyst` | 1 | **Views** — which information is exposed, which hidden filters |
+| `reverse-sql-trigger-analyst` | 1 | **Triggers** — which event, which rule, which cascade, which rejection |
+| `reverse-sql-feat-composer` | 2 | Cross-cutting business FEAT for one module, harmonising vocabulary across independently written User Stories |
+
+Shared SQL expertise base for the five SQL agents:
+[../rules/db-reverse-tsql.md](../rules/db-reverse-tsql.md).
+
+> ⚠️ **Phase 0 is mandatory** before any SQL object is lifted: `/sdd-db-context` builds
+> the versioned *Database Context* and separates **facts** (deterministic, may become
+> acceptance criteria) from **hypotheses** (the architect's, never may). Analysis then
+> runs **in waves** — every resolved callee is analysed before its caller.
 
 ## 📊 Agent matrix at a glance
 
@@ -297,4 +332,4 @@ Le module reverse (legacy → FEAT) ajoute 7 agents non documentés en fiches ic
 - [architecture.md §3](architecture.md) — agents communication model
 - [workflow.md](workflow.md) — pipeline phases (FEAT → US → Code → Review)
 - [../rules/error-classification.md](../rules/error-classification.md) — full `[CLASS]` taxonomy
-- [hooks-and-protections.md](hooks-and-protections.md) — 17 hooks that watch agents
+- [hooks-and-protections.md](hooks-and-protections.md) — the 20 hooks that watch agents

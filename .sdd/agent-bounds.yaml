@@ -43,9 +43,25 @@ agents:
   reverse-ui-extractor:        { tier_default: deep,     tier_floor: balanced, tier_ceiling: deep }
   reverse-sql-analyst:         { tier_default: deep,     tier_floor: balanced, tier_ceiling: deep }
   reverse-sql-feat-composer:   { tier_default: deep,     tier_floor: balanced, tier_ceiling: deep }   # opt-in SDD_REVERSE_FEAT_LLM=1
+  # --- Reverse base de donnees — Phase 0 + specialistes (2026-08-26) ---
+  # Ces valeurs sont le tier de l'AGENT. Pour les analystes d'objets SQL, le
+  # tier EFFECTIF est decide PAR OBJET par db_tier_router.tier_for() (rubrique
+  # deterministe, 0 token) puis re-clampe dans ces bornes : un accesseur CRUD
+  # ne paie pas le tier d'un orchestrateur transactionnel.
+  reverse-db-architect:        { tier_default: deep,     tier_floor: balanced, tier_ceiling: deep }   # synthese base entiere — jamais sous balanced
+  reverse-sql-function-analyst: { tier_default: balanced, tier_floor: fast,    tier_ceiling: deep }   # calcul sans effet de bord, contrat etroit
+  reverse-sql-view-analyst:    { tier_default: balanced, tier_floor: fast,     tier_ceiling: deep }   # projection/reporting, aucune ecriture
+  reverse-sql-trigger-analyst: { tier_default: deep,     tier_floor: balanced, tier_ceiling: deep }   # regle d'integrite invisible aux applis
 
-# Bilan (post-arbitrage 2026-07-24) : 25 agents — 20 floor=balanced,
-# 5 floor=fast (constitutioner, specbook-writer, reverse-inventory,
-# reverse-us-writer, reverse-clarifier), 0 floor=deep.
+# Bilan (post-arbitrage 2026-07-24, etendu 2026-08-26) : 29 agents —
+# 22 floor=balanced, 7 floor=fast (constitutioner, specbook-writer,
+# reverse-inventory, reverse-us-writer, reverse-clarifier,
+# reverse-sql-function-analyst, reverse-sql-view-analyst), 0 floor=deep.
+#
+# Rappel d'architecture : ce sont des TIERS, jamais des noms de modeles. La
+# resolution tier -> modele appartient au provider actif
+# (.sdd/providers/*.yaml `tier_map`) : `deep` vaut claude-opus-4-8 sur
+# anthropic, gemini-2.5-pro sur google, o1 sur openai, kimi-k3 sur moonshot.
+# Ajouter un provider ne touche aucun agent.
 # 18 ceiling=deep, 7 plafonnés balanced (dont elicitor, arbitré 2026-07-24).
 # Plus aucune entrée "a_valider_tech_lead".

@@ -47,8 +47,9 @@ def build_dir():
     shutil.rmtree(out, ignore_errors=True)
 
 
-def test_command_count_is_40():
-    assert N_COMMANDS == 40
+def test_command_count_is_41():
+    # +1 le 2026-08-26 : /sdd-db-context (Phase 0 du reverse base de donnees).
+    assert N_COMMANDS == 41
 
 
 # --------------------------------------------------------------------- #

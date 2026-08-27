@@ -94,20 +94,23 @@ def _diff_command(generated: Path, live: Path, pivot: dict) -> DiffReport:
 
 def test_command_pivot_count_is_40():
     """Verrou de périmètre : la couche commandes compte exactement 40 pivots."""
-    assert len(COMMANDS) == 40, f"attendu 40 pivots commande, trouvé {len(COMMANDS)}"
+    assert len(COMMANDS) == 41, f"attendu 41 pivots commande, trouvé {len(COMMANDS)}"
     live = sorted(p.stem for p in LIVE_COMMANDS_DIR.glob("*.md"))
     assert COMMANDS == live, "pivots .cmd.yaml != commandes vivantes .claude/commands/"
 
 
-def test_frontmatter_split_is_18_with_22_without():
-    """Verrou de forme : 18 commandes avec frontmatter, 22 corps pur.
+def test_frontmatter_split_is_19_with_22_without():
+    """Verrou de forme : 19 commandes avec frontmatter, 22 corps pur.
+
+    +1 le 2026-08-26 : /sdd-db-context (Phase 0 du reverse base de donnees)
+    porte une description, comme les autres commandes db-reverse.
 
     Post-consolidation 2026-07-25 : les pivots vivent dans le frontmatter YAML
     du `.md` unique (fusionné avec le body). `_pivot_from_md` retourne un dict
     équivalent à l'ancien `.cmd.yaml` (contient `has_frontmatter`).
     """
     with_fm = [c for c in COMMANDS if _pivot_from_md(c).get("has_frontmatter")]
-    assert len(with_fm) == 18, f"attendu 18 pivots has_frontmatter=true, trouvé {with_fm}"
+    assert len(with_fm) == 19, f"attendu 19 pivots has_frontmatter=true, trouvé {with_fm}"
 
 
 @pytest.fixture(scope="module")
@@ -196,7 +199,7 @@ def test_cli_agents_and_commands_combined(tmp_path_factory):
             ["--harness", "claude-code", "--agents-only", "--commands-only", "--out", str(out)]
         )
         assert rc == 0
-        assert len(list((out / "agents").glob("*.md"))) == 25
-        assert len(list((out / "commands").glob("*.md"))) == 40
+        assert len(list((out / "agents").glob("*.md"))) == 29
+        assert len(list((out / "commands").glob("*.md"))) == 41
     finally:
         shutil.rmtree(out, ignore_errors=True)

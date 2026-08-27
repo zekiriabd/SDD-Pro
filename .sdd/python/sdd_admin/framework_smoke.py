@@ -625,7 +625,7 @@ def _check_harness_parity(claude_root: Path, checks: "Checks") -> None:
         if not failures:
             checks.add("harness-parity", "OK",
                        "3 harnesses regenerate cleanly (claude-code + codex + gemini-cli, "
-                       "40 cmd each, 25 agents on Claude, no dead .claude/docs/ refs)")
+                       "41 cmd each, 29 agents on Claude, no dead .claude/docs/ refs)")
         else:
             detail = "; ".join(failures[:3])
             more = f" (+ {len(failures) - 3} more)" if len(failures) > 3 else ""

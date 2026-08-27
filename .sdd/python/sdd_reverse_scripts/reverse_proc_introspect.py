@@ -43,7 +43,8 @@ from sdd_reverse.console_safe import ensure_console_safe
 from sdd_reverse.dialects import UnsupportedDialect, get_dialect
 from sdd_reverse.object_filter import ObjectFilter
 from sdd_reverse.proc_module_clusterer import cluster_with_report
-from sdd_reverse.sql_body_analyzer import complexity_reasons
+from sdd_reverse.db_tier_router import tier_for
+from sdd_reverse.sql_body_analyzer import complexity_reasons, confidence_with_graph
 from sdd_reverse.stack_db_config import StackConfigError, read_db_config
 
 INVENTORY_NAME = "inventory.json"
@@ -193,6 +194,18 @@ def build_inventory(introspection: dict, *, project: str, feats_dir: Path, prior
         strategy = None                      # AUTO
     modules, cluster_report = cluster_with_report(routines, use_cohesion=strategy)
 
+    # Dependency-aware execution plan (audit 2026-08-26). Computed ONCE for the
+    # whole database, then projected onto each procedure record: the wave it
+    # belongs to, who calls it, what it calls that could not be resolved. This
+    # is what lets the orchestrator dispatch callees before their callers, and
+    # what lets the complexity rubric see composition.
+    from sdd_reverse.db_wave_planner import plan_waves
+    plan = plan_waves(procs)
+    plan_metrics = plan.get("metrics", {})
+    called_by: dict[str, list[str]] = {}
+    for edge in plan.get("edges", []):
+        called_by.setdefault(str(edge["to"]), []).append(str(edge["from"]))
+
     prior_names: dict[str, str] = (prior or {}).get("_allocatedNames", {})       # name -> uid
     prior_alloc: dict[str, int] = (prior or {}).get("_featAllocations", {})      # uid -> n
     prior_idx = _prior_proc_indices(prior)
@@ -235,7 +248,11 @@ def build_inventory(introspection: dict, *, project: str, feats_dir: Path, prior
         taken_names: set[str] = set()
         for r in members:
             p = r["_proc"]
-            conf = p.get("confidenceEstimate", "high")
+            pm = plan_metrics.get(p["fqName"], {})
+            # An unresolved callee or a recursive cycle means the body is not a
+            # complete account of its own behaviour — the User Story cannot be
+            # `high`, and the REVERSE-GATE must see that.
+            conf = confidence_with_graph(p.get("confidenceEstimate", "high"), pm)
             if order.get(conf, 0) < order.get(min_conf, 2):
                 min_conf = conf
             evidence_files.append(p.get("snapshotFile", ""))
@@ -281,8 +298,18 @@ def build_inventory(introspection: dict, *, project: str, feats_dir: Path, prior
                 "params": p.get("params", []),
                 "tablesWritten": p.get("tablesWritten", []),
                 "tablesRead": p.get("tablesRead", []),
+                "writeKinds": p.get("writeKinds", {}),
                 "raises": p.get("raises", []),
                 "hasTransaction": p.get("hasTransaction", False),
+                # Graph facts — the call was always extracted, never carried.
+                "callsProcs": p.get("callsProcs", []),
+                "calledBy": sorted(called_by.get(p["fqName"], [])),
+                "wave": pm.get("wave", 0),
+                "fanIn": pm.get("fanIn", 0),
+                "fanOut": pm.get("fanOut", 0),
+                "sccId": pm.get("sccId"),
+                "recursive": bool(pm.get("recursive")),
+                "unresolvedCallees": list(pm.get("unresolvedCallees") or []),
             }
             # Carry the routing decision AND its justification into the
             # inventory, so build_proc_us, the US banner and the audit trail all
@@ -291,6 +318,13 @@ def build_inventory(introspection: dict, *, project: str, feats_dir: Path, prior
             record["complexity"] = "simple" if p.get("encrypted") else (
                 "complex" if reasons else "simple")
             record["complexityReasons"] = reasons
+            # Which model tier this object is worth (audit 2026-08-26). A TIER,
+            # never a model name: the mapping tier -> model belongs to the active
+            # provider (.sdd/providers/*.yaml `tier_map`), so the same rubric
+            # routes correctly on Anthropic, Google or OpenAI.
+            tier, tier_reasons = tier_for(record)
+            record["modelTier"] = tier
+            record["modelTierReasons"] = tier_reasons
             unit_procs.append(record)
 
         units.append({
@@ -323,6 +357,13 @@ def build_inventory(introspection: dict, *, project: str, feats_dir: Path, prior
         # How the modules were decided — naming vs dependency cohesion,
         # with the measured fragmentation that drove the choice.
         "_clusteringReport": cluster_report,
+        # Dispatch order for the LLM rung: callees strictly before callers.
+        "_executionPlan": {
+            "waves": plan.get("waves", []),
+            "components": plan.get("components", []),
+            "unresolvedCallees": plan.get("unresolvedCallees", {}),
+            "stats": plan.get("stats", {}),
+        },
     }
 
 

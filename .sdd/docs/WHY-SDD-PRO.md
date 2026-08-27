@@ -20,13 +20,13 @@ remonter vers la spec.** Résultat :
 **SDD_Pro impose la trajectoire inverse** : FEAT (spec métier) → US (découpe)
 → Code (matérialisation gated). Chaque étape produit un artefact versionné,
 chaque gate est déterministe (Python, 0 token LLM), chaque écart est tracé
-par une classe d'erreur dans une taxonomie de 188 préfixes `[CLASS]`.
+par une classe d'erreur dans une taxonomie de **191 classes** `[CLASS]`.
 
 ---
 
-## 2. 5 axes où SDD_Pro est objectivement supérieur
+## 2. 6 axes où SDD_Pro est objectivement supérieur
 
-### 2.1 Gates déterministes (55 scripts Python)
+### 2.1 Gates déterministes (80 scripts Python, 0 token)
 
 | Gate | SDD_Pro | Cursor | Aider | Devin | BMAD | Superpowers | AgentOS |
 |---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
@@ -42,7 +42,7 @@ par une classe d'erreur dans une taxonomie de 188 préfixes `[CLASS]`.
 livrer** quand la qualité n'est pas atteinte. Les autres livrent toujours
 (quitte à livrer un mauvais code).
 
-### 2.2 Stack-awareness (34 catalogues machine-readable)
+### 2.2 Stack-awareness (30 catalogues machine-readable)
 
 Chaque stack a un fichier `{stack-id}.libs.json` qui déclare :
 - Versions LTS pinnées (anti-STS, anti-prerelease, anti-CVE)
@@ -56,7 +56,7 @@ agents personas, pas des catalogues machine.
 fantaisie trouvée sur Stack Overflow par le LLM**. Le hook
 `preflight_stack_combo` refuse les combos non listés.
 
-### 2.3 Taxonomie d'erreurs structurée (189 classes `[CLASS]`)
+### 2.3 Taxonomie d'erreurs structurée (191 classes `[CLASS]`)
 
 Chaque erreur du pipeline porte un préfixe canonique
 (`[BUILD_CORRECTIBLE]`, `[QA_COVERAGE_GAP]`, `[SEC_SQL_INJECTION]`,
@@ -74,7 +74,7 @@ en prose libre.
 
 | Phase | SDD_Pro | Cursor | Aider | Devin | BMAD | Superpowers | AgentOS |
 |---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| Discovery / Élicitation | ✅ `elicitor` (5 techniques) | ❌ | ❌ | ❌ | ✅ Mary BA | ⚠️ brainstorm | ⚠️ spec shape |
+| Discovery / Élicitation | ✅ `elicitor` (15 techniques) | ❌ | ❌ | ❌ | ✅ Mary BA | ⚠️ brainstorm | ⚠️ spec shape |
 | Découpage User Stories | ✅ `po` agent | ❌ | ❌ | ❌ | ✅ Sally PO | ❌ | ❌ |
 | Architecture + DB scaffolding | ✅ `arch` agent | ❌ | ❌ | ❌ | ✅ Winston Arch | ❌ | ❌ |
 | Code back/front parallèle isolé | ✅ ownership matrix | ❌ | ❌ | ❌ | ✅ Devon Dev | ⚠️ TDD | ❌ |
@@ -91,12 +91,51 @@ en prose libre.
 - **Statusline IDE** : phase courante + coût cumulé + tokens visibles en temps réel
   dans la barre de statut (VSCode, JetBrains, web). Format : `SDD F2:ARCH 💰$3.2 🔢18K`.
   Fail-open, compatible tout harness.
-- **9 ADRs versionnés** documentent les décisions structurantes.
+- **15 ADRs versionnés** documentent les décisions structurantes.
+- **31 invariants load-bearing déclarés** (14 forward + 17 reverse), chacun pointant
+  vers son *enforcer* sur disque — un test échoue si l'enforcer disparaît.
 - **`run_id` par exécution** : reproductibilité cross-machine.
 - **Hooks `SubagentStop`** : audit-loggué chaque sortie d'agent.
 - **`workspace/.sys/.audit/`** : trail forensique des bypass.
 
 Aucun concurrent ne fournit cette piste d'audit ni cette visibilité IDE en temps réel.
+
+### 2.6 Reverse engineering natif — le seul framework qui remonte l'existant
+
+Tous les concurrents partent d'une page blanche. SDD_Pro sait aussi partir de ce
+que vous avez déjà, et c'est souvent là que se trouve le budget réel d'une DSI :
+
+| Capacité | SDD_Pro | Cursor | Aider | Devin | BMAD | Superpowers | AgentOS |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| Base de données → spécifications (procédures, fonctions, vues, triggers, jobs) | ✅ **natif** | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Code legacy → FEATs (escalier analyse → US → FEAT) | ✅ **natif** | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Garantie de lecture seule sur la base (`readonly_guard`) | ✅ | — | — | — | — | — | — |
+| Traçabilité `fichier:ligne` résolue sur disque | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Gate de confiance bloquant avant réutilisation | ✅ REVERSE-GATE | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+
+**Argument DSI.** Une base de production porte quinze ans de règles métier que
+plus personne ne sait énoncer. SDD_Pro les rend sous forme de spécifications
+lisibles par un PO, **sans jamais écrire dans la base** : seuls des `SELECT` de
+catalogue sont émis, l'interdit est porté par la classe bloquante
+`[DB_STRUCTURE_CHANGE_FORBIDDEN]` et l'invariant `reverse-db-readonly`, et le mot
+de passe n'est ni loggué ni persisté.
+
+**Argument économique.** Un routeur déterministe classe chaque objet SQL avant
+tout appel LLM : les objets réellement simples (CRUD sans branche ni appel)
+produisent leur User Story **mécaniquement, à coût nul** — 70 à 80 % d'un
+patrimoine typique. Le budget LLM va uniquement là où il y a de la logique.
+
+**Argument de rigueur.** Depuis 2026-08-26, une Phase 0 obligatoire
+(`/sdd-db-context`) construit une compréhension globale versionnée de la base
+avant tout découpage, sépare **structurellement** les faits (qui peuvent devenir
+des critères d'acceptation) des hypothèses de l'architecte (qui ne le peuvent
+jamais), et ordonne l'analyse **par vagues** — tout objet appelé est analysé
+avant son appelant. Détail : `@.sdd/docs/reverse-engineering-workflow.md`.
+
+> ⚠️ **Réserve annoncée** : Phase 0 et ordonnancement par vagues sont validés hors
+> ligne (corpus synthétiques). Les seuils seront recalibrés après le premier run
+> contre une base de production réelle. SQL Server et PostgreSQL sont live-validés ;
+> Oracle et MySQL/MariaDB restent scaffold-validés.
 
 ---
 
@@ -106,11 +145,11 @@ Aucun concurrent ne fournit cette piste d'audit ni cette visibilité IDE en temp
 |---|---|---|---|---|---|---|---|
 | ⭐ GitHub | (nouveau) | 93k-150k | 48k | < 5k | (closed) | 25k | (closed) |
 | Méthodologie | FEAT-driven SDLC complet | TDD RED-GREEN-REFACTOR | Personas SDLC | Standards injection | Pair programming | Pair programming | Autonomous |
-| Agents | 12 spécialisés + 5 reviewers | 13 skills composables | 6 personas nommés | N/A | 1 (LLM) | 1 (LLM) | 1 (LLM) |
+| Agents | **29** (13 forward dont 5 reviewers + 16 reverse) | 13 skills composables | 6 personas nommés | N/A | 1 (LLM) | 1 (LLM) | 1 (LLM) |
 | Multi-harness | ✅ **Claude Code + Codex + Gemini CLI + Antigravity** | ✅ 7 harnesses | ✅ any LLM IDE | ✅ 4 IDEs | ✅ Cursor | ✅ CLI | ✅ web |
 | Stacks pré-validés | **36 (28 🟢 + 8 🟡)** | N/A | Via expansion packs | N/A | N/A | N/A | N/A |
-| Gates déterministes Python | **55 scripts + hooks** | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| Taxonomie d'erreurs | **189 classes** | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Gates déterministes Python | **80 scripts + 20 hooks** | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Taxonomie d'erreurs | **191 classes** | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | Statusline IDE (phase + coût + tokens) | ✅ hook natif | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | Plugin marketplace (discovery IDE natif) | ✅ `plugin.json` | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | Idempotence + resume | ✅ `--resume` | ❌ | ⚠️ partiel | ❌ | ❌ | ❌ | ❌ |
@@ -174,11 +213,14 @@ Adoption ≠ qualité technique. BMAD est un **excellent framework persona-drive
 mais aucune gate déterministe. Pour un POC créatif ou une démo, BMAD est plus
 séduisant. Pour un projet industriel auditable, SDD_Pro est plus rigoureux.
 
-### O3 — "Mono-IDE Claude Code, c'est un risque vendor-lockin."
-Vrai. SDD_Pro est conçu pour Claude Code (hooks, agents, sub-agent tool, skills).
-Si Anthropic disparaît, le framework est inutilisable. **Mitigation** :
-l'essentiel de la valeur (55 scripts Python + 34 catalogues stacks + taxonomie
-[CLASS]) est portable. Une porte v8 pourrait viser multi-IDE.
+### O3 — "Un seul IDE, c'est un risque de vendor lock-in."
+**Plus d'actualité depuis v7.0.2.** La couche source `.sdd/` est compilée en
+façades par harness : le même pipeline tourne sous **Claude Code, OpenAI Codex,
+Gemini CLI et Antigravity**, et 4 providers LLM sont déclarés
+(`.sdd/providers/`). Reste vrai : le socle de valeur (80 scripts Python,
+30 catalogues de stacks, taxonomie `[CLASS]`, 31 invariants) est du Python et du
+Markdown — **portable, lisible, sans runtime propriétaire**. Ce qui dépend du
+harness, ce sont les façades de commandes, pas la logique.
 
 ### O4 — "On peut tout faire avec un bon prompt."
 Empiriquement faux. Le post-mortem CMS-Back 2026-05-11 (cf.

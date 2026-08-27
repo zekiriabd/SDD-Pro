@@ -52,7 +52,7 @@ class TestPaths:
 class TestConfigLoader:
     def test_agent_bounds_reels_25_agents_complets(self):
         agents = load_agent_bounds(env=ENV)
-        assert len(agents) == 25
+        assert len(agents) == 29
         for bounds in agents.values():
             assert {"tier_default", "tier_floor", "tier_ceiling"} <= set(bounds)
 

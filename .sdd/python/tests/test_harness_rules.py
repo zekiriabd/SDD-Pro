@@ -1,11 +1,11 @@
 """Tests de la couche RULES (Phase 2 multi-harness — surface identité Claude).
 
-(a) MANIFEST — `.sdd/rules-manifest.yaml` liste les 11 rules vivantes, chaque
+(a) MANIFEST — `.sdd/rules-manifest.yaml` liste les 12 rules vivantes, chaque
     entrée porte `name` + `body_source` (-> `.sdd/rules/*.md` existant) +
     `scope` (universal|path-scoped). Aucune rule vivante orpheline.
 (b) ROUND-TRIP identité — `ClaudeAdapter.emit_rules` régénère chaque rule sous
     un temp SOUS `.sdd/.build/` ; le contenu régénéré DOIT être byte-identique
-    au vivant (post-normalisation CRLF/BOM), pour les 11 rules.
+    au vivant (post-normalisation CRLF/BOM), pour les 12 rules.
 (c) VARIANTES — Codex/Gemini : `emit_rules` lève NotImplementedError (pas de
     mécanisme path-scoped ; inline universelles + pointeurs — non câblé).
 (d) SÉCURITÉ + CLI — sortie confinée à .sdd/.build/ ; `--rules-only`.
@@ -68,7 +68,8 @@ def build_dir():
 def test_manifest_present_and_wellformed():
     assert MANIFEST.is_file(), "manifest .sdd/rules-manifest.yaml absent"
     rules = _load_rules_manifest(SDD_HOME)
-    assert len(rules) == 11, f"attendu 11 rules, trouvé {len(rules)}"
+    # +1 le 2026-08-26 : db-reverse-tsql (socle SQL partage des 5 agents db-reverse).
+    assert len(rules) == 12, f"attendu 12 rules, trouvé {len(rules)}"
     for entry in rules:
         assert entry["name"], "entrée sans name"
         assert entry["scope"] in VALID_SCOPES, f"scope invalide: {entry.get('scope')}"
@@ -91,7 +92,7 @@ def test_manifest_scope_counts():
     rules = _load_rules_manifest(SDD_HOME)
     universal = {e["name"] for e in rules if e["scope"] == "universal"}
     assert universal == {"error-classification", "output-protocol"}
-    assert sum(1 for e in rules if e["scope"] == "path-scoped") == 9
+    assert sum(1 for e in rules if e["scope"] == "path-scoped") == 10
 
 
 # --------------------------------------------------------------------- #
@@ -100,9 +101,9 @@ def test_manifest_scope_counts():
 
 
 def test_claude_rules_roundtrip_identity(build_dir):
-    """Les 11 rules régénérées == vivant (post-normalisation CRLF/BOM)."""
+    """Les 12 rules régénérées == vivant (post-normalisation CRLF/BOM)."""
     results = ClaudeAdapter(repo_root=REPO_ROOT).emit_rules(build_dir)
-    assert len(results) == 11
+    assert len(results) == 12
     assert all(r.ok for r in results), [r.skipped_reason for r in results if not r.ok]
     for result in results:
         generated = _normalize(result.written.read_text(encoding="utf-8-sig"))
@@ -144,7 +145,7 @@ def test_cli_rules_only(build_dir):
     rc = main(["--harness", "claude-code", "--rules-only", "--out", str(build_dir)])
     assert rc == 0
     assert (build_dir / "rules" / "output-protocol.md").is_file()
-    assert len(list((build_dir / "rules").glob("*.md"))) == 11
+    assert len(list((build_dir / "rules").glob("*.md"))) == 12
 
 
 def test_cli_rules_layer_refused_for_variant_harnesses(build_dir):

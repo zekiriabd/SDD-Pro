@@ -1,0 +1,139 @@
+# GENERATED FROM .sdd/ — DO NOT EDIT
+description = "Phase 0 du reverse base de données — construit le Database Context (SSoT versionné) avant toute remontée en User Story. Récolte déterministe des faits (tables, colonnes, PK/FK, index, contraintes CHECK, corps d'objets, matrice CRUD, graphe de dépendances, plan de vagues), puis interprétation par l'agent reverse-db-architect (glossaire, sous-domaines, rôles, risques, questions ouvertes). Produit db-context.json + un arbre Markdown découpé par objet, réutilisé tant que la base n'a pas changé. Ne modifie JAMAIS la base."
+prompt = """
+<!-- GENERATED FROM .sdd/ (commande /sdd-db-context) — DO NOT EDIT. -->
+<!-- IMPORTANT — Les instructions `Task(subagent_type=X)` / `Agent(X)` -->
+<!-- du corps sont Claude-Code-native. Sous Gemini CLI, l'émulation   -->
+<!-- passe par la CLI wrapper (audit R4 2026-07-26) :                 -->
+<!--                                                                  -->
+<!--   python .sdd/python/sdd_scripts/spawn_agent_cli.py \\           -->
+<!--       --agent <name> --task-file <path>                          -->
+<!--       [--harness gemini-cli] [--provider google]                 -->
+<!--                                                                  -->
+<!-- Le wrapper renvoie du JSON canonique sur stdout (ok, parsed,     -->
+<!-- raw, error_class, attempts, ...). Voir spawn_agent.py pour       -->
+<!-- isolation cwd, parallélisme borné, retry-on-schema-fail.         -->
+Arguments: {{args}}
+
+# /sdd-db-context [--project DB] [--refresh] [--no-architect] [--diff-against PATH] [--json]
+
+## Rôle
+
+Construit le **Database Context**, la source de vérité partagée du reverse base
+de données. Aucun objet SQL n'est remonté en User Story avant qu'elle existe :
+c'est ce qui empêche chaque analyste de redécouvrir la base, chacun à sa façon.
+
+```
+db-introspection.json + db-schema.json   (déjà extraits en LECTURE SEULE)
+   └─[0.A déterministe, 0 token]─► faits + graphe + plan de vagues
+        └─[0.B agent reverse-db-architect]─► hypothèses (glossaire, domaines, risques)
+             └─ db-context.json (SSoT versionné) + db-context/ (arbre découpé)
+                  └─ packs/{objet}.md ─► consommés par les analystes spécialisés
+```
+
+## Le contrat central — faits ≠ hypothèses
+
+| | Produit par | Contenu | Peut devenir un AC ? |
+|---|---|---|---|
+| `facts` | scripts déterministes (0 token) | tables, colonnes, clés, CHECK, CRUD, graphe | **oui** |
+| `hypotheses` | agent `reverse-db-architect` | glossaire, sous-domaines, rôles, risques | **jamais** |
+
+La séparation est **structurelle** : l'agent écrit un fichier distinct
+(`db-context.hypotheses.json`) qu'un script fusionne dans la seule branche
+`hypotheses`. Il ne peut pas écraser un fait, même en essayant. Même garde que
+`db-schema.enrichment.json` (ADV-3).
+
+## Args
+
+| Arg | Type | Description |
+|---|---|---|
+| `--project DB` | optionnel | Dossier sous `workspace/old/` (défaut = `DB_NAME` de `stack.md`) |
+| `--refresh` | flag | Ignore le contexte précédent et relance l'architecte (les hypothèses portées sont abandonnées) |
+| `--no-architect` **@llm-only-flag** | flag | S'arrête après 0.A — faits seuls, aucun coût LLM. Interprété par la commande (elle ne spawne pas l'architecte) ; le script 0.A n'en a pas besoin |
+| `--depth N` | optionnel | Profondeur d'appelés portée dans un pack (défaut 2) |
+| `--budget N` | optionnel | Taille max d'un pack en octets (défaut 14000) |
+| `--diff-against PATH` | optionnel | Compare à un `db-context.json` antérieur et rapporte la dérive (exit 4), sans rien écrire |
+| `--json` | flag | Sortie machine |
+
+## Pré-conditions
+
+1. `workspace/old/{DB}/.sys/db-introspection.json` existe (produit par
+   `reverse_proc_introspect.py --full`). Sinon → `[REVERSE_DB_CONFIG_MISSING]`.
+2. `db-schema.json` est optionnel mais fortement recommandé : sans lui, le
+   contexte n'a pas la structure relationnelle et les packs sont plus pauvres.
+
+## Actions
+
+1. **Phase 0.A — faits (déterministe, 0 token)** :
+   ```bash
+   python .sdd/python/sdd_reverse_scripts/db_context_build.py --project workspace/old/{DB}
+   ```
+   Produit `db-context.json` (faits + `executionPlan` + `contextVersion`) et
+   l'arbre `db-context/` : `_overview.md`, `tables/`, `procedures/`,
+   `functions/`, `views/`, `triggers/`, `packs/`.
+
+2. **Cache** : `contextVersion` est un sha256 des faits canoniques. Si la base
+   n'a pas bougé, l'interprétation de l'architecte est **réutilisée** — la
+   Phase 0.B n'est pas repayée. Si elle a bougé, l'interprétation périmée est
+   **abandonnée** (et le rapport le dit) : une lecture obsolète d'une base
+   modifiée est pire que pas de lecture.
+
+3. **Phase 0.B — interprétation** (sauf `--no-architect`, et sauf si le cache
+   est valide) : spawn `Agent(reverse-db-architect)` avec `{DB}`. Il lit le
+   **digest** (aperçu + métriques + fiches des tables pivot), jamais le
+   catalogue brut ni un corps d'objet, et écrit
+   `.sys/db-context.hypotheses.json`.
+
+4. **Fusion déterministe** :
+   ```bash
+   python .sdd/python/sdd_reverse_scripts/db_context_build.py \\
+     --project workspace/old/{DB} \\
+     --merge-hypotheses workspace/old/{DB}/.sys/db-context.hypotheses.json
+   ```
+   Refusée si le `contextVersion` déclaré par l'architecte ne correspond plus
+   aux faits (`[REVERSE_DB_CONTEXT_STALE]`). Les packs sont régénérés avec le
+   bloc d'hypothèses, marqué `kind: hypothesis`.
+
+5. Ligne chat `[REVERSE] Contexte DB {DB} → {t} table(s), {o} objet(s),
+   {w} vague(s), {u} appel(s) non résolu(s). (100%)`.
+
+## Dérive entre deux reverse
+
+```bash
+python .sdd/python/sdd_reverse_scripts/db_context_build.py \\
+  --project workspace/old/{DB} --diff-against chemin/vers/ancien-db-context.json
+```
+
+Rapporte les tables ajoutées/retirées/modifiées (colonnes, types, `CHECK`), les
+objets ajoutés/retirés/modifiés (corps, appels, écritures, contrat) et — le seul
+chiffre qui compte pour un Tech Lead — **la liste des objets dont la User Story
+doit être re-dérivée**. Exit 4 si les deux contextes diffèrent, 0 sinon : le
+gate CI qui garantit que le cahier des charges reste synchrone avec la base.
+
+## Sortie
+
+```
+workspace/old/{DB}/.sys/db-context.json              SSoT machine (faits + plan + hypothèses)
+workspace/old/{DB}/.sys/db-context.hypotheses.json   écrit par l'architecte, fusionné par script
+workspace/old/{DB}/.sys/db-context/_overview.md      orientation base entière
+workspace/old/{DB}/.sys/db-context/tables/*.md       1 fiche par table
+workspace/old/{DB}/.sys/db-context/{procedures,functions,views,triggers}/*.md
+workspace/old/{DB}/.sys/db-context/packs/*.md        1 slice par objet, pour les analystes
+```
+
+## Anti-derive
+
+- **Lecture seule absolue** : aucune requête n'est émise ici — la commande
+  consomme des artefacts déjà extraits sous `readonly_guard`.
+- **Structure uniquement** : aucune donnée métier, aucun identifiant de
+  connexion ne rentre dans le contexte.
+- **L'architecte n'écrit pas de faits** — garanti par construction, pas par consigne.
+- **Aucun agent ne lit tout le contexte** : chacun reçoit son pack, borné, qui
+  déclare ce qu'il a dû tronquer.
+- Idempotence : re-run sur une base inchangée réutilise tout et ne coûte rien.
+
+Voir `.sdd/docs/reverse-db-audit-2026-07.md` + `.sdd/rules/reverse-engineering.md`
++ invariants `reverse-db-context-facts-vs-hypotheses`,
+`reverse-db-context-versioned-and-diffable`, `reverse-db-context-slicing`.
+
+"""

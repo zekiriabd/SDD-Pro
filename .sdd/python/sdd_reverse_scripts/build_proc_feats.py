@@ -73,7 +73,12 @@ _KIND_LABEL = {
 }
 
 _US_TITLE_RE = re.compile(r"^#\s+US-(\d+)\s*:\s*(.+?)\s*$", re.MULTILINE)
-_AC_ID_RE = re.compile(r"^\s*-\s*(AC-\d+)\s*:", re.MULTILINE)
+# Tolerate the bold form `- **AC-1** :` alongside `- AC-1:`. Observed on a
+# real base (2026-08-27): 4 User Stories written by an LLM analyst used the
+# bold variant, and their 13 acceptance criteria were therefore invisible to
+# the FEAT `Covers:` back-fill — the RICHEST stories were the ones silently
+# dropped from the traceability chain.
+_AC_ID_RE = re.compile(r"^\s*-\s*\**\s*(AC-\d+)\s*\**\s*:", re.MULTILINE)
 _EXTRACTION_RE = re.compile(r"^extraction:\s*(\w+)\s*$", re.MULTILINE)
 _COVERS_SECTION_RE = re.compile(r"(^##\s+Covers\s*$)(.*?)(?=^##\s|\Z)",
                                 re.MULTILINE | re.DOTALL)

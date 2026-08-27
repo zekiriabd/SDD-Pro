@@ -1,6 +1,6 @@
 # Manifest neutre des RÈGLES (Phase 2 multi-harness — surface identité Claude)
 #
-# Les 11 rules sont du markdown pur harness-neutre. Le foyer neutre ne
+# Les 12 rules sont du markdown pur harness-neutre. Le foyer neutre ne
 # duplique PAS leur contenu : chaque entrée porte un `body_source` pointant
 # vers le fichier vivant `.sdd/rules/*.md` (lecture seule), même patron
 # que les pivots agents/commandes/entrypoint. La régénération Claude est une
@@ -12,7 +12,7 @@
 #                  frontmatter `paths:`). 2 rules.
 #   path-scoped  — auto-injectée seulement au contact de fichiers de son
 #                  périmètre (frontmatter `paths:`, mécanisme natif Claude
-#                  Code). 9 rules. TOK-C1 (CLAUDE.md §5).
+#                  Code). 10 rules. TOK-C1 (CLAUDE.md §5).
 #
 # harness_mapping — comment chaque harnais consomme la couche rules :
 #   claude-code : fichiers `.sdd/rules/*.md` (path-scoped natif). IDENTITÉ.
@@ -43,6 +43,9 @@ rules:
     scope: path-scoped
   - name: build-and-loop
     body_source: .sdd/rules/build-and-loop.md
+    scope: path-scoped
+  - name: db-reverse-tsql
+    body_source: .sdd/rules/db-reverse-tsql.md
     scope: path-scoped
   - name: dev-shared-preflight
     body_source: .sdd/rules/dev-shared-preflight.md

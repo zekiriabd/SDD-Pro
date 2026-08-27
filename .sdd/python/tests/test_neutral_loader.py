@@ -125,11 +125,14 @@ class TestBijectionLoaderPivots:
         orphans = set(_pivots()) - set(_loader_agents())
         assert not orphans, f"pivots sans entrée loader (orphelins): {sorted(orphans)}"
 
-    def test_effectifs_13_forward_12_reverse(self):
-        # Photo Phase 1 (2026-07-24) : 13 forward + 12 reverse = 25 = bounds.
+    def test_effectifs_13_forward_16_reverse(self):
+        # Photo 2026-08-26 : 13 forward + 16 reverse = 29 = bounds.
+        # +4 reverse le 2026-08-26 (refonte db-reverse) : reverse-db-architect
+        # (Phase 0.B) + les 3 specialistes par famille d'objet SQL
+        # (function / view / trigger analysts).
         assert len(_forward_agents()) == 13
-        assert len(_reverse_agents()) == 12
-        assert len(_loader_agents()) == len(_bounds()) == 25
+        assert len(_reverse_agents()) == 16
+        assert len(_loader_agents()) == len(_bounds()) == 29
 
     def test_pivot_name_interne_coherent(self):
         for name, pivot in _pivots().items():

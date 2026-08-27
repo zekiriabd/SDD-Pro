@@ -133,6 +133,70 @@ invariants:
 # stays pinned to the invariants+drift_checks above. Count corrected 11→13
 # audit 2026-06-11 MA-8 ; authoritative count = len(_ALL_CHECKS), pinned by
 # tests/test_reverse_smoke_selfcheck.py).
+  - id: reverse-db-context-facts-vs-hypotheses
+    description: |
+      Phase 0 of db-reverse separates what is PROVEN from what is INTERPRETED,
+      and the separation is structural, not editorial. `db-context.json.facts`
+      is produced only by the deterministic layer (db_context.build_facts, from
+      db-introspection.json + db-schema.json, both extracted under
+      readonly_guard); `db-context.json.hypotheses` is the only branch the
+      Database Architect agent may write. merge_architect_output MUST drop any
+      attempt by the agent to write facts or the execution plan. No LLM ever
+      invents a table, a column, a relation or a CRUD operation.
+      Structure only: no business data and no credentials reach the context.
+    enforcer: .sdd/python/tests/test_db_context.py
+    class: REVERSE_DB_CONTEXT_TAMPERED
+
+  - id: reverse-db-context-versioned-and-diffable
+    description: |
+      The Database Context is a versioned SSoT: `contextVersion` is a sha256
+      over the canonical facts, stable across runs and platforms. An unchanged
+      database MUST reuse the architect's interpretation (no repeat LLM cost);
+      a changed one MUST drop it rather than carry a stale reading, and say so
+      via `reuse.staleHypotheses`. Two contexts are diffable
+      (db_context.diff_contexts) and the diff names the objects whose User
+      Stories must be re-derived (`reAnalysisRequired`).
+    enforcer: .sdd/python/tests/test_db_context.py
+    class: REVERSE_DB_CONTEXT_STALE
+
+  - id: reverse-db-wave-ordering
+    description: |
+      The LLM rung of db-reverse is dispatched by dependency wave, never in
+      inventory iteration order: every resolvable callee is analysed in a
+      strictly earlier wave than its caller, so a caller receives the meaning
+      of what it delegates to. Cycles are real in T-SQL: strongly connected
+      components are condensed (Tarjan) and a component of size > 1 is planned
+      as ONE unit. An unresolvable callee is reported, never invented as a
+      graph node. Inside a wave, objects are independent and may run
+      concurrently under MaxParallel.
+    enforcer: .sdd/python/tests/test_db_context.py
+    class: REVERSE_DB_WAVE_ORDER_VIOLATED
+
+  - id: reverse-db-call-aware-routing
+    description: |
+      Composition is complexity. An object that calls another object is never
+      routed "simple" (no template User Story for an orchestrator), and an
+      object with an unresolved callee or inside a recursive component has its
+      confidence capped at `medium` — which makes the REVERSE-GATE require a
+      human review instead of passing a false green. confidence_with_graph only
+      ever LOWERS confidence, preserving min-monotonicity up the ladder. A
+      genuinely trivial leaf must stay `simple` (the 0-token path must not
+      regress).
+    enforcer: .sdd/python/tests/test_db_context.py
+    class: REVERSE_DB_ROUTING_UNDERESTIMATED
+
+  - id: reverse-db-context-slicing
+    description: |
+      No agent reads the whole Database Context. Each analysing agent receives a
+      per-object context pack (db_context_slice.build_pack): its own body, the
+      structure of the tables it touches, the already-written summaries of what
+      it calls (depth-bounded), its callers, and the hypotheses concerning it.
+      The isolation rule is redirected, not relaxed: the pack is the sanctioned
+      channel for transitive context. A pack is budget-bounded and MUST declare
+      every section it trimmed, so a truncated view lowers confidence knowingly.
+    enforcer: .sdd/python/tests/test_db_context.py
+    class: REVERSE_DB_PACK_TRUNCATED
+
 deepening_contracts:
 
   - id: reverse-evidence-transitive-l0

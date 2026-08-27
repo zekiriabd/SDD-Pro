@@ -49,6 +49,54 @@
 >    **bornage du périmètre** (`object_filter.py` : `--schema` / `--include` /
 >    `--exclude` / `--limit`), pour qu'une base de 3000 objets soit exécutable.
 >
+> **Mise à jour 2026-08-26 (refonte Phase 0 — comprendre avant d'écrire)** :
+> le pipeline passait du corps SQL brut à la User Story sans jamais construire de
+> représentation partagée du domaine. Quatre défauts s'en suivaient, tous fermés
+> ici :
+> 1. **Phase 0 obligatoire** (`/sdd-db-context`) — `db-context.json`, SSoT
+>    **versionné** (`contextVersion` = sha256 des faits) et **diffable**, en deux
+>    rungs : `0.A` déterministe (faits, matrice CRUD C/U/D, graphe d'appels
+>    résolu, plan de vagues) puis `0.B` `reverse-db-architect` (hypothèses —
+>    glossaire, sous-domaines, rôles, risques, questions ouvertes). Les deux
+>    couches vivent dans des branches séparées et l'agent écrit un **fichier
+>    distinct** fusionné par script : il ne peut pas écraser un fait. Une base
+>    inchangée réutilise l'interprétation ; une base modifiée l'abandonne.
+> 2. **Context slicing** — plus aucun agent ne lit la base entière. Chacun reçoit
+>    `db-context/packs/{objet}.md` : son corps, la structure des seules tables
+>    qu'il touche, le **résumé déjà écrit** de ce qu'il appelle (profondeur 2),
+>    ses appelants, les hypothèses le concernant. La règle d'isolation n'est pas
+>    relâchée, elle est **redirigée** — et le pack déclare ce qu'il a tronqué.
+> 3. **Ordonnancement par vagues** — le dispatch suivait l'ordre d'itération de
+>    l'inventaire, donc un appelant pouvait être analysé avant son appelé.
+>    Désormais : arêtes `calls` résolues, composantes fortement connexes
+>    condensées (Tarjan — la récursion T-SQL est réelle), tri topologique. Le
+>    débit ne baisse pas : le parallélisme borné joue **à l'intérieur** d'une
+>    vague, avec une seule barrière entre deux vagues, où les résumés sont
+>    réinjectés dans `db-context.findings`.
+> 4. **Routage conscient de la composition** — `complexity_reasons()` ignorait
+>    `callsProcs`. Un orchestrateur de 38 lignes sans branche déléguant sa règle
+>    à six procédures sortait « simple », décrit par un template, en `high` : un
+>    **faux vert** qui traversait la REVERSE-GATE. Déléguer n'est pas être
+>    simple. Un appelé non résolu ou une récursion plafonnent désormais la
+>    confidence à `medium`, min-monotone vers le haut.
+>
+> **Spécialisation** : l'analyste unique devient 4 spécialistes par famille
+> (`reverse-sql-analyst` procédures, `-function-`, `-view-`, `-trigger-analyst`),
+> parce que l'angle diffère réellement — une opération, un calcul sans effet de
+> bord, une projection et ses filtres cachés, un invariant événementiel. Socle
+> d'expertise commun factorisé dans `rules/db-reverse-tsql.md`.
+>
+> **Routage de tier par objet** (`db_tier_router`) : `none` / `fast` /
+> `balanced` / `deep` selon ce que le corps *cache*. Le routeur ne connaît aucun
+> nom de modèle — un test l'interdit ; la résolution tier → modèle appartient au
+> provider actif, donc la même rubrique vaut sur Anthropic, Google, OpenAI et
+> Moonshot.
+>
+> Couverture : `tests/test_db_context.py` (57 tests, hors ligne). Invariants :
+> `reverse-db-context-facts-vs-hypotheses`,
+> `reverse-db-context-versioned-and-diffable`, `reverse-db-wave-ordering`,
+> `reverse-db-call-aware-routing`, `reverse-db-context-slicing`.
+
 > **Réserve, explicite et non levée** : tout ce qui précède est validé
 > **hors ligne** (2400 tests, catalogues synthétiques). Aucun run n'a été fait
 > contre une vraie base — permissions, volumétrie et versions de moteur restent
@@ -248,8 +296,14 @@ ROI :
   Couverture : `tests/test_reverse_db_clustering.py`. **Reste ouvert** : les
   seuils (0.15 / 0.50) sont calibrés sur des corpus synthétiques ; ils devront
   être revus après le premier run sur une vraie base.
-- **DB5 — Rung 2 déterministe côté DB vs LLM côté code.** ⚠️ **ADRESSÉ 2026-07-24
-  (opt-in)** : nouvel agent `reverse-sql-feat-composer` (Opus, parité avec 3c
+- ~~**DB5 — Rung 2 déterministe côté DB vs LLM côté code.**~~ ✅ **FERMÉ
+  2026-08-26** : `reverse-sql-feat-composer` est désormais le **défaut pour les
+  modules complexes** (au moins un objet routé `deep`, ou une règle transverse à
+  plusieurs objets) ; le déterministe `build_proc_feats.py` reste le défaut pour
+  le CRUD. Sa valeur ajoutée est explicite : harmoniser sur le glossaire de
+  l'architecte le vocabulaire d'US écrites par des agents indépendants.
+  `SDD_REVERSE_FEAT_LLM=1|0` force l'un ou l'autre partout. Historique de
+  l'étape opt-in : nouvel agent `reverse-sql-feat-composer` (Opus, parité avec 3c
   `reverse-feat-composer`) qui synthétise la FEAT module depuis les US d'objets
   SQL (démotion plomberie, narratif transverse, même gate `validate_reverse_feat`).
   **Opt-in** `SDD_REVERSE_FEAT_LLM=1` ; défaut = déterministe `build_proc_feats.py`
@@ -329,9 +383,11 @@ ROI :
    `all_dependencies` Oracle — arêtes `source:"catalog"` fusionnées, résolution
    de noms exacte) + clustering cohésion + `impact_of()` + Mermaid. **Limite
    honnête** : le SQL **dynamique** reste invisible (aucun catalogue ne le trace).
-3. ~~**Corrélation objets DB ↔ applications**~~ ✅ **LIVRÉ 2026-07-24 (P0.3)** —
-   `correlate_db_app.py`. Reste : lancer automatiquement la corrélation en fin de
-   pipeline quand les deux artefacts (DB + code) coexistent.
+3. ~~**Corrélation objets DB ↔ applications**~~ ✅ **LIVRÉ 2026-07-24 (P0.3)**,
+   **câblée 2026-08-26** — `correlate_db_app.py` est appelé en fin de
+   `/sdd-db-reverse-full` (STEP 7.ter) dès que `data-access.json` existe, avec
+   `reverse_synth.py` pour l'ERD et la vue système. Les deux scripts existaient
+   et n'étaient invoqués par aucune commande.
 
 ### P1 — Fiabilité & couverture
 4. ~~**Parsing SQL plus robuste** — tokenizer conscient chaînes/commentaires~~

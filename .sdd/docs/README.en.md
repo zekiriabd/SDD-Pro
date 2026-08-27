@@ -1,10 +1,17 @@
 # 📚 SDD_Pro Documentation
 
-> **Spec-Driven Development for Claude Code** — a multi-agent framework that turns functional specifications into production-ready code through 12 specialized AI agents, deterministic Python orchestration, and 5 quality reviewers.
+> **Spec-driven development, multi-harness** (Claude Code, Codex, Gemini CLI,
+> Antigravity) — a multi-agent framework that turns functional specifications into
+> production-ready code through **29 specialised agents**, deterministic Python
+> orchestration (**80 scripts, 0 tokens**) and **5 quality reviewers**.
 
-This is the documentation hub. Every doc has a purpose and a target audience. Pick your path below.
+This is the documentation hub. Every doc has a purpose and a target audience.
+Pick your path below.
 
-> 🇫🇷 **Documentation FR is canonical**. EN versions are translations — some pages may fall back to FR until translated. Use the language switcher (top-right) to toggle.
+> 🇫🇷 **The French documentation is canonical.** English pages live next to their French
+> counterparts with an `.en.md` suffix (e.g. `getting-started.en.md`). When an English
+> page is missing, read the French one — the technical content (identifiers, `[CLASS]`
+> codes, flags) is identical.
 
 ---
 
@@ -12,11 +19,30 @@ This is the documentation hub. Every doc has a purpose and a target audience. Pi
 
 | Step | Goal | Doc |
 |---|---|---|
-| **1** | Understand what SDD_Pro is in 5 min | [getting-started.md](getting-started.md) |
+| **1** | Understand what SDD_Pro is in 5 min | [getting-started.en.md](getting-started.en.md) |
 | **2** | Get a working project in 30 min | [cookbook.md](cookbook.md) |
 | **3** | Learn the vocabulary | [glossary.md](glossary.md) |
 | **4** | Configure a brownfield repo | [quickstart.md](quickstart.md) |
 | **5** | Pick a stack combo | [validated-combos.md](validated-combos.md) |
+| **6** | Work under Codex or Gemini CLI | [multi-llm-getting-started.md](multi-llm-getting-started.md) |
+
+---
+
+## 🗄️ I have legacy to recover (reverse engineering)
+
+| Starting point | What it produces | Doc |
+|---|---|---|
+| **A database** (procedures, functions, views, triggers, jobs) | 1 SQL object = 1 User Story · 1 module = 1 FEAT | [reverse-engineering-workflow.md](reverse-engineering-workflow.md) *(Annex D)* |
+| **A legacy codebase** (WebForms, PHP, Delphi, monoliths) | ladder 3a analysis → 3b US → 3c FEAT | [reverse-engineering-workflow.md](reverse-engineering-workflow.md) |
+| Recipes per legacy technology | Concrete extraction examples | [reverse-engineering-cookbook/](reverse-engineering-cookbook/index.md) |
+| DB module audit decisions | What was arbitrated, and why | [reverse-db-audit-2026-07.md](reverse-db-audit-2026-07.md) |
+| Reverse anti-drift rules | `[REVERSE_*]` taxonomy, evidence, confidence | [../rules/reverse-engineering.md](../rules/reverse-engineering.md) |
+| Shared SQL expertise base | `MERGE` / `NULL` / atomicity pitfalls, multi-dialect equivalences | [../rules/db-reverse-tsql.md](../rules/db-reverse-tsql.md) |
+
+> ⚠️ **Phase 0 is mandatory** since 2026-08-26: `/sdd-db-context` builds the *Database
+> Context* (deterministic facts + architect hypotheses, versioned) **before** any lift
+> into User Stories. Without it, a composite object yields a spec that is wrong but
+> credible.
 
 ---
 
@@ -24,11 +50,13 @@ This is the documentation hub. Every doc has a purpose and a target audience. Pi
 
 | Topic | Audience | Doc |
 |---|---|---|
-| Pipeline visualization (mermaid) | Architect / Tech Lead | [workflow.md](workflow.md) |
+| Pipeline visualisation (mermaid) | Architect / Tech Lead | [workflow.md](workflow.md) |
 | Component model (agents, rules, hooks) | Architect / Tech Lead | [architecture.md](architecture.md) |
-| Why these design choices | All | [principles/source-first.md](principles/source-first.md) |
+| Gate map (who blocks what, when) | Tech Lead | [gates-map.md](gates-map.md) |
+| Why these design choices | Everyone | [principles/source-first.md](principles/source-first.md) |
 | User story granularity rules | PO / Tech Lead | [principles/us-granularity.md](principles/us-granularity.md) |
-| Anti-derive + idempotence + plans | Tech Lead | [conventions.md](conventions.md) |
+| Anti-drift + idempotence + plans | Tech Lead | [conventions.md](conventions.md) |
+| Runtime hooks and protections | Tech Lead | [hooks-and-protections.md](hooks-and-protections.md) |
 
 ---
 
@@ -36,22 +64,38 @@ This is the documentation hub. Every doc has a purpose and a target audience. Pi
 
 | Reference | Purpose | Doc |
 |---|---|---|
-| **12 LLM agents + 1 rubric** | Role / Model / Inputs / Outputs / Verdicts | [agents-reference.md](agents-reference.md) |
-| **21 commands** | Args / Flags / Agents / Outputs | [commands-reference.md](commands-reference.md) |
-| **Project Config (58 keys)** | Layered config + defaults + ranges | [configuration-reference.md](configuration-reference.md) |
-| **Error classes** | Taxonomy (188 prefixes `[CLASS]`) | [../rules/error-classification.md](../rules/error-classification.md) |
-| **Hooks + protections** | 17 Claude Code hooks wired | [hooks-and-protections.md](hooks-and-protections.md) |
+| **29 agents** (13 forward + 16 reverse) | Role / Model / Inputs / Outputs / Verdicts | [agents-reference.md](agents-reference.md) |
+| **41 commands** (13 user-facing + 9 internal + 19 reverse) | Args / Flags / Agents / Outputs | [commands-reference.md](commands-reference.md) |
+| **Project Config** | Layered config + defaults + ranges | [configuration-reference.md](configuration-reference.md) |
+| **Error classes** | **191 `[CLASS]` prefixes** across 16 families | [../rules/error-classification.md](../rules/error-classification.md) |
+| **Load-bearing invariants** | 14 forward + 17 reverse, each with its enforcer | [../INVARIANTS.yml](../INVARIANTS.yml) · [../INVARIANTS.reverse.yml](../INVARIANTS.reverse.yml) |
+| **Protection hooks** | The 20 wired hooks (preflight, ownership, cost cap…) | [hooks-and-protections.md](hooks-and-protections.md) |
+| **Per-stack prerequisites** | Runtimes, SDKs, drivers | [prerequisites-matrix.md](prerequisites-matrix.md) |
 
 ---
 
-## 🛟 I have an error / question
+## 🛟 I hit an error / have a question
 
 | Situation | Doc |
 |---|---|
 | Common errors + recovery | [troubleshooting.md](troubleshooting.md) |
+| Known runtime pitfalls | [runtime-pitfalls.md](runtime-pitfalls.md) |
 | Config precedence (base ← team ← project) | [config-precedence.md](config-precedence.md) |
-| Cleanup orphan files | [orphan-cleanup-policy.md](orphan-cleanup-policy.md) |
-| Stack version mismatch | [validated-combos.md](validated-combos.md) |
+| Cleaning up orphan files | [orphan-cleanup-policy.md](orphan-cleanup-policy.md) |
+| Stack version drift | [validated-combos.md](validated-combos.md) |
+| What SDD_Pro does **not** do | [KNOWN-LIMITATIONS.md](KNOWN-LIMITATIONS.md) |
+
+---
+
+## 💼 I have to decide (CTO / CIO)
+
+| Doc | Purpose |
+|---|---|
+| [WHY-SDD-PRO.md](WHY-SDD-PRO.md) | Business case and market comparison |
+| [SLA.md](SLA.md) | Service commitments (13 combos) |
+| [COMPLIANCE.md](COMPLIANCE.md) | Compliance and data handling |
+| [poc-roi-methodology.md](poc-roi-methodology.md) | How to validate a new stack |
+| [KNOWN-LIMITATIONS.md](KNOWN-LIMITATIONS.md) | Acknowledged limits |
 
 ---
 
@@ -59,21 +103,21 @@ This is the documentation hub. Every doc has a purpose and a target audience. Pi
 
 | Contribution | Doc |
 |---|---|
-| Code / docs / fixes | [../../CONTRIBUTING.md](../../CONTRIBUTING.md) |
 | Working agreement | [WORKING-AGREEMENT.md](WORKING-AGREEMENT.md) |
 | Versioning policy | [VERSIONING.md](VERSIONING.md) |
-| Add a new stack | [../stacks/README.md](../stacks/README.md) |
+| Adding a new stack | [../stacks/README.md](../stacks/README.md) |
+| Architecture decisions | [adrs/](adrs/) |
 
 ---
 
-## 📜 I'm reading history / changelogs
+## 📜 History / changelogs
 
 | Doc | Content |
 |---|---|
-| [CHANGELOG.md](CHANGELOG.md) | Version-by-version release notes |
+| [CHANGELOG.md](CHANGELOG.md) | Release notes |
 | [MIGRATION.md](MIGRATION.md) | v6 → v7 upgrade guides |
 | [adrs/](adrs/) | Architecture Decision Records |
-| [roadmap-v7-v8.md](roadmap-v7-v8.md) | What's coming next |
+| [roadmap-v7-v8.md](roadmap-v7-v8.md) | What comes next |
 
 ---
 
@@ -83,7 +127,7 @@ This is the documentation hub. Every doc has a purpose and a target audience. Pi
 |---|---|
 | [poc-roi-methodology.md](poc-roi-methodology.md) | How to validate a new stack |
 | [benchmarks/](benchmarks/) | Run reports + known gaps |
-| [cache-strategy.md](cache-strategy.md) | Prompt caching plan (v7.1 target) |
+| [cache-strategy.md](cache-strategy.md) | Prompt cache plan |
 
 ---
 
@@ -91,36 +135,39 @@ This is the documentation hub. Every doc has a purpose and a target audience. Pi
 
 | Subsystem | Doc |
 |---|---|
-| **Arch phases** (A/B/C deep dive) | [arch/phase-a-config-propagation.md](arch/phase-a-config-propagation.md), [arch/phase-b-db-scaffolding.md](arch/phase-b-db-scaffolding.md), [arch/phase-c-claude-md-generation.md](arch/phase-c-claude-md-generation.md) |
+| **Arch phases** (A/B/C deep dive) | [arch/phase-a-config-propagation.md](arch/phase-a-config-propagation.md) · [arch/phase-b-db-scaffolding.md](arch/phase-b-db-scaffolding.md) · [arch/phase-c-claude-md-generation.md](arch/phase-c-claude-md-generation.md) |
 | **Python codebase** | [../python/README.md](../python/README.md) |
-| **Stacks catalog** | [../stacks/README.md](../stacks/README.md) |
-| **Rules** (5 consolidated + 3 annexes) | [../rules/](../rules/) |
+| **Stack catalog** | [../stacks/README.md](../stacks/README.md) |
+| **The 12 operational rules** | [../rules/](../rules/) |
+| **Multi-harness facades** | [harness-codex.md](harness-codex.md) · [harness-gemini.md](harness-gemini.md) |
 
 ---
 
 ## ❓ Still lost?
 
-- **New contributor?** Read `getting-started.md` + `cookbook.md` (1 hour total).
+- **New contributor?** Read `getting-started.en.md` + `cookbook.md` (1 hour total).
 - **Onboarding a brownfield repo?** Run `/sdd-discover-stack`, then `quickstart.md`.
+- **Legacy to recover?** Database → `/sdd-db-context` then `/sdd-db-reverse-full`.
+  Source code → `/sdd-reverse-full`.
 - **Debugging a failing pipeline?** Open `troubleshooting.md` and grep your error class `[XXX]`.
-- **Adding a stack?** Read `poc-roi-methodology.md` first to understand the validation bar.
-- **Reviewing an audit report?** Check `architecture.md §3` for who-writes-what.
+- **Adding a stack?** Read `poc-roi-methodology.md` first — the validation bar is real.
 
-> 💡 **Tip** : the entry point `.claude/CLAUDE.md` (150 lines) is a slim index — every section there links into the docs you see here. If you only ever read 2 files, make them `CLAUDE.md` + this one.
+> 💡 **Tip**: the entry point `.claude/CLAUDE.md` (~150 lines) is a slim index — every
+> section links into the docs you see here. If you only ever read 2 files, make them
+> `CLAUDE.md` + this one.
 
 ---
 
 ## 🌐 Translation status
 
+English pages live next to the French ones with an `.en.md` suffix:
+
 | Page | FR | EN |
 |---|:---:|:---:|
-| README (this page) | ✅ canonical | ✅ |
-| Getting Started | ✅ canonical | ✅ |
-| Agents Reference | ✅ canonical | ✅ (technical content mostly English-friendly) |
-| Commands Reference | ✅ canonical | ✅ (technical content mostly English-friendly) |
-| Configuration Reference | ✅ canonical | 🟡 fallback to FR |
-| Troubleshooting | ✅ canonical | 🟡 fallback to FR |
-| Architecture | ✅ canonical | 🟡 fallback to FR |
-| Other pages | ✅ canonical | 🟡 fallback to FR |
+| README (this page) | ✅ canonical [README.md](README.md) | ✅ |
+| Getting Started | ✅ canonical | ✅ [getting-started.en.md](getting-started.en.md) |
+| Repository root README | ✅ [../../README.fr.md](../../README.fr.md) | ✅ [../../README.md](../../README.md) |
+| All other pages | ✅ canonical | 🟡 read the French version |
 
-> When an EN page is missing, the language switcher gracefully falls back to the FR version (via `fallback_to_default: true` in `mkdocs.yml`). Contributing new EN translations is welcome — add a `page.en.md` next to `page.md`.
+> English contributions welcome: add `page.en.md` next to `page.md`, then update this
+> table **and** the equivalent one in [README.md](README.md).
