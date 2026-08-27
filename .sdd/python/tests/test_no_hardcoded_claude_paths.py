@@ -71,6 +71,7 @@ _ALLOWED_FILES: frozenset[str] = frozenset({
     "tests/test_gates_map.py",  # bi-root patterns
     "tests/test_sdd_help_faq.py",  # bi-root regex
     "tests/test_hooks_wiring.py",  # settings.json hook checks
+    "tests/test_repo_gitignore_guards.py",  # asserte le TEXTE LITTERAL des regles .gitignore
     # sdd_admin
     "sdd_admin/strip_bom.py",  # bi-root scan roots
     "sdd_admin/framework_smoke.py",  # docstring on historic migration

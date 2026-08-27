@@ -1,4 +1,4 @@
-﻿################################################################################
+################################################################################
 # Ce fichier .gitignore a été automatiquement créé par Microsoft(R) Visual Studio.
 ################################################################################
 
@@ -47,16 +47,31 @@
 
 # Workspace runtime SDD (scaffolding, secrets, projets générés) — jamais commité.
 # stack.md porte DB_PASSWORD / AUTH_JWT_SECRET en clair (CLAUDE.md §9), les
-# projets sous src/ portent .env / appsettings / config runtime. `workspace/`
+# projets sous src/ portent .env / appsettings / config runtime. `workspace/**`
 # couvre déjà tout ; les entrées granulaires ci-dessous sont explicites pour
-# les fichiers porteurs de secrets (garde anti-fuite, test_generated_project_gitignore_template).
-#workspace/
-#workspace/db/
-#workspace/console/
-#workspace/stack/
-#workspace/src/*/.env
-#workspace/src/*/appsettings*.json
-#workspace/src/*/config/default.json
+# les fichiers porteurs de secrets (garde anti-fuite, test_repo_gitignore_guards).
+#
+# `workspace/**` et non `workspace/` : une exclusion de RÉPERTOIRE interdit
+# toute ré-inclusion ultérieure d'un fichier qu'il contient — cf. gitignore(5),
+# « It is not possible to re-include a file if a parent directory of that file
+# is excluded ». La forme `/**` exclut les fichiers sans verrouiller les
+# dossiers, ce qui rend le squelette `.gitkeep` ci-dessous possible.
+workspace/**
+workspace/db/
+workspace/console/
+workspace/stack/
+workspace/src/*/.env
+workspace/src/*/appsettings*.json
+workspace/src/*/config/default.json
+
+# Exception unique : le squelette de répertoires. git ne versionne pas les
+# dossiers vides ; ces sentinelles `.gitkeep` (0 octet, aucun contenu) rendent
+# l'arborescence `workspace/` visible après un `git clone` sans réintroduire le
+# moindre fichier runtime. `!workspace/**/` est obligatoire pour que git
+# descende dans les sous-dossiers avant d'évaluer la ré-inclusion.
+# NB : `**/node_modules/` (plus bas) reste prioritaire — dernière règle gagnante.
+!workspace/**/
+!workspace/**/.gitkeep
 
 # Sauvegardes de config pré-audit (nettoyage hooks 2026-07-25, ADR governance-protection-hooks-wiring)
 .claude/settings*.pre-hooks-audit.bak
