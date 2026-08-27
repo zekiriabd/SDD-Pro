@@ -62,7 +62,7 @@ supprimer ligne ET régénérer les US. `Covers` réfèrent par valeur.
 
 ---
 
-## 3. Commandes (40 : 13 user-facing + 9 internes [debug] + 18 reverse)
+## 3. Commandes (41 : 13 user-facing + 9 internes [debug] + 19 reverse)
 
 **User-facing** (orchestrantes, gèrent pré-conditions et idempotence) :
 
@@ -93,15 +93,19 @@ supprimer ligne ET régénérer les US. `Covers` réfèrent par valeur.
 ⚠️ `--no-validate`, `--unsequenced`, `--legacy-auditor-parallel`
 **désactivent des protections** (bypass audit-loggués). Détail : `@.sdd/commands/*.md`.
 
-**Reverse engineering** (18, module optionnel legacy→FEAT) : `/sdd-reverse-full`
+**Reverse engineering** (19, module optionnel legacy→FEAT) : `/sdd-reverse-full`
 (orchestrateur), `/sdd-reverse {U-N}`, `/sdd-reverse-{init,inventory,audit,analyze,stories,feat,crosscut,review,ui,status,synth}`,
 + 3 phases optionnelles emprunt Reversa (2026-06-12) : `/sdd-reverse-paradigm`
 (gap paradigme + curation), `/sdd-reverse-parity` (specs Gherkin de parité),
 `/sdd-reverse-questions` (boucle validation humaine, `--ingest`)
-+ 2 db-reverse (2026-06-29, **base de données → FEAT**, lecture seule via
-`stack.md ## Active Database`) : `/sdd-db-reverse-full` (tous les objets SQL)
-et `/sdd-db-reverse {objet}` (un objet) — **procédures + fonctions + vues +
-triggers** (+ packages Oracle), 1 objet SQL = 1 US, 1 module = 1 FEAT.
++ 3 db-reverse (**base de données → FEAT**, lecture seule via
+`stack.md ## Active Database`) : `/sdd-db-context` (**Phase 0 obligatoire**
+2026-08-26 — Database Context versionné : faits déterministes puis
+interprétation par `reverse-db-architect`, packs de contexte par objet),
+`/sdd-db-reverse-full` (tous les objets SQL) et `/sdd-db-reverse {objet}`
+(un objet) — **procédures + fonctions + vues + triggers** (+ packages Oracle),
+1 objet SQL = 1 US, 1 module = 1 FEAT. Dispatch **par vagues de dépendance**
+(tout appelé analysé avant son appelant) vers les 4 analystes spécialisés.
 4 moteurs (2026-07-24) : SQL Server + PostgreSQL (live-validés), Oracle + MySQL/
 MariaDB (scaffold-validés, runtime live pending). SSoT : `@.sdd/docs/reverse-engineering-workflow.md`
 + `@.sdd/docs/reverse-db-audit-2026-07.md`
@@ -109,20 +113,23 @@ MariaDB (scaffold-validés, runtime live pending). SSoT : `@.sdd/docs/reverse-en
 
 ---
 
-## 4. Agents (25 : 13 LLM forward + 12 reverse, + 1 rubric déterministe)
+## 4. Agents (29 : 13 LLM forward + 16 reverse, + 1 rubric déterministe)
 
 **Cœur** : `po`, `arch` (Sonnet 4.6) ; `dev-backend`, `dev-frontend` (Opus 4.8).
 **Support** : `elicitor`, `constitutioner`, `qa`, `specbook-writer` (vulgarise
 FEAT en langage humain, cache `workspace/docs/.sys/sections/`).
 **Auditors** : `code-reviewer`, `security-reviewer`, `spec-compliance-reviewer`,
 `arch-reviewer`, `adversarial-reviewer` (opt-in, informational).
-**Reverse** (12, manifest autonome `loader.reverse.yml`) : `reverse-inventory`,
+**Reverse** (16, manifest autonome `loader.reverse.yml`) : `reverse-inventory`,
 `reverse-tech-auditor`, `reverse-tech-analyst`, `reverse-us-writer`,
 `reverse-feat-composer`, `reverse-ui-extractor`, `reverse-completeness-reviewer`,
 `reverse-paradigm-advisor`, `reverse-parity-inspector`, `reverse-clarifier`,
-`reverse-sql-analyst` (db-reverse : corps d'objet SQL → User Story, lecture seule),
-`reverse-sql-feat-composer` (opt-in `SDD_REVERSE_FEAT_LLM=1` : compose la FEAT
-métier d'un module SQL).
+`reverse-sql-analyst` (db-reverse : spécialiste procédures stockées),
+`reverse-sql-function-analyst`, `reverse-sql-view-analyst`,
+`reverse-sql-trigger-analyst` (spécialistes par famille d'objet SQL, 2026-08-26),
+`reverse-db-architect` (Phase 0.B : interprétation de la base — hypothèses
+uniquement, jamais de faits), `reverse-sql-feat-composer` (synthèse métier d'un
+module ; défaut pour les modules complexes depuis 2026-08-26).
 **Scripts déterministes** (0 token) : `complexity_router.py` (rubric
 `docs/rubrics/complexity-router-scoring.md`), `phase_planner.py`.
 Détail modèles + retraits v7.0.0 (`a11y`/`perf`/`dashboard`/`*-strict`) :
@@ -132,7 +139,7 @@ Détail modèles + retraits v7.0.0 (`a11y`/`perf`/`dashboard`/`*-strict`) :
 
 ## 5. Règles & Templates
 
-`.sdd/rules/` (11 fichiers) :
+`.sdd/rules/` (12 fichiers) :
 - **5 règles consolidées** : `build-and-loop`, `quality`, `ownership`,
   `library-and-stack`, `error-classification`
 - **1 protocole chat** : `output-protocol.md` (1L `[AGENT] résumé (X%)`)
@@ -142,11 +149,14 @@ Détail modèles + retraits v7.0.0 (`a11y`/`perf`/`dashboard`/`*-strict`) :
   + `auditor-coordination.md` (matrice ownership findings, SSoT anti-doublon)
 - **1 annexe** : `error-classification-legacy.md` (`[A11Y_*]`/`[PERF_*]` ingest CI)
 - **1 module reverse** : `reverse-engineering.md` (anti-derive + taxonomie `[REVERSE_*]`)
+- **1 socle SQL** : `db-reverse-tsql.md` (sémantique partagée des 5 agents du reverse
+  base de données — pièges `MERGE`/`OUTPUT`/`inserted`/`NULL`, atomicité, erreurs →
+  AC négatifs, équivalences T-SQL / PL-pgSQL / PL-SQL / MySQL)
 
 **2 principes** : `.sdd/docs/principles/{source-first,us-granularity}.md`.
 Templates : `@.sdd/docs/conventions.md §14-§15`.
 
-> **Chargement paresseux (TOK-C1, audit 2026-06-12)** : 9 des 11 rules portent une
+> **Chargement paresseux (TOK-C1, audit 2026-06-12)** : 10 des 12 rules portent une
 > frontmatter `paths:` (path-scoped rules, mécanisme natif Claude Code) → elles ne
 > s'auto-injectent qu'au contact de fichiers de leur périmètre (`workspace/src`,
 > `workspace/old`, `.sys/.validation`, `.sdd/stacks`…) au lieu de polluer **chaque**
@@ -206,7 +216,7 @@ Anti-derive, ERROR 3L disque, idempotence, lecture sélective, parallélisme bor
 - **Gouvernance** : `@.sdd/docs/{VERSIONING,CHANGELOG,MIGRATION,WORKING-AGREEMENT}.md`
 - **Commercial / DSI** : `@.sdd/docs/{WHY-SDD-PRO,COMPLIANCE,SLA,KNOWN-LIMITATIONS}.md`
 - **ROI & roadmap** : `@.sdd/docs/{poc-roi-methodology,roadmap-v7-v8,cache-strategy,validated-combos,orphan-cleanup-policy}.md`
-- **Règles** : `@.sdd/rules/` (5 consolidées + 1 protocole + 1 hoist + 2 orchestration auditors + 1 annexe + 1 module reverse — cf. §5)
+- **Règles** : `@.sdd/rules/` (5 consolidées + 1 protocole + 1 hoist + 2 orchestration auditors + 1 annexe + 1 module reverse + 1 socle SQL — cf. §5)
 - **Skills auto-triggered** (v7.0.0+ emprunt superpowers) : `@.sdd/skills/` — 13 skills (`using-sddpro`, `starting-a-new-feat`, `starting-a-reverse-eng`, `debugging-failed-pipeline`, `test-driven-development`, `frontend-design`, `webapp-testing`, `a11y-local`, `sarif-parsing`, `semgrep`, `codeql`, `insecure-defaults`, `c4-model`) — inventaire complet dans `@.sdd/skills-manifest.yaml`.
 - **Invariants manifest** (v7.0.0+ audit P3 E4) : `@.sdd/INVARIANTS.yml` — 13 contrats load-bearing (two-stage gate, file ownership, cost cap, schema strict, TDD test-first, etc.) avec pointer vers chaque enforcer (hook/script/smoke test). Test `tests/test_invariants_manifest.py` vérifie que chaque enforcer existe sur disque. Anti-rot manifest : retirer un enforcer sans mettre à jour le manifest = FAIL au smoke.
 - **Python** : `@.sdd/python/README.md`

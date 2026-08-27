@@ -10,7 +10,7 @@ Ce guide t'emmène de zéro à une application full-stack générée par SDD_Pro
 
 **Spec-Driven Development pour Claude Code** : un framework qui transforme des **spécifications fonctionnelles** en **code prêt-à-livrer** via des agents IA coordonnés.
 
-Tu écris **ce que** le logiciel doit faire (FEAT spec + mockup HTML optionnel). SDD_Pro orchestre **12 agents LLM + 1 rubric Python déterministe** (`complexity-router` opt-in v7.0.0+, 0 token) pour déterminer **comment** :
+Tu écris **ce que** le logiciel doit faire (FEAT spec + mockup HTML optionnel). SDD_Pro orchestre **29 agents spécialisés** (13 sur le pipeline forward, 16 sur le module reverse) et des routeurs Python déterministes (0 token) pour déterminer **comment** :
 
 ```
 Tu écris :              SDD_Pro produit :
@@ -24,7 +24,7 @@ FEAT spec               • User Stories (atomiques, traçables)
                         • Architectural Decision Records (ADRs)
 ```
 
-L'innovation clé : **orchestration Python déterministe** (55 scripts, 0-coût) + **agents LLM** (12 spécialisés) + **5 reviewers cross-file** = pipeline auditable, idempotent et reprenable.
+L'innovation clé : **orchestration Python déterministe** (80 scripts, 0 token) + **agents LLM** (29 spécialisés) + **5 reviewers cross-file** = un pipeline auditable, idempotent et reprenable.
 
 ---
 
@@ -32,13 +32,13 @@ L'innovation clé : **orchestration Python déterministe** (55 scripts, 0-coût)
 
 | Aspect | SDD_Pro | BMAD | Spec-Kit |
 |---|---|---|---|
-| Multi-agents | **12 spécialisés** | ~6 | 1 |
+| Multi-agents | **29 spécialisés** | ~6 | 1 |
 | Reviewers post-code | **5 angles distincts** | 1 | 0 |
 | Anti-derive strict | strict (matrice ownership + STOP) | partiel | ❌ |
 | Catalogue stacks | `.libs.json` machine + CVE + LTS check | ❌ | ❌ |
-| Taxonomie d'erreurs | **188 classes `[CLASS]`** cross-agent | ❌ | ❌ |
+| Taxonomie d'erreurs | **191 classes `[CLASS]`** cross-agent | ❌ | ❌ |
 | Télémétrie | SQLite (cost cap, audit, gates) | ❌ | ❌ |
-| Déterminisme | 55 scripts Python (0 token) | ❌ | ❌ |
+| Déterminisme | 80 scripts Python (0 token) | ❌ | ❌ |
 | Idempotence / resume | mode checkpoint | ❌ | ❌ |
 
 **Différenciateur** : SDD_Pro **industrialise la qualité** — c'est l'équivalent de **Sonar + Snyk + gouvernance ADR** appliqué aux pipelines LLM.
@@ -93,7 +93,8 @@ L'innovation clé : **orchestration Python déterministe** (55 scripts, 0-coût)
 - **Python ≥ 3.10** (`python --version`)
 - **Node.js ≥ 20** (pour la console web optionnelle)
 - **Git**
-- **Une clé API Anthropic** (pour Claude Code) — `export ANTHROPIC_API_KEY=sk-ant-...`
+- **Une clé API Anthropic** (pour Claude Code) — `export ANTHROPIC_API_KEY=<votre-cle>`
+  (variable d'environnement uniquement — ne jamais écrire une clé dans un fichier versionné)
 - **Claude Code** installé (`https://claude.com/claude-code`)
 - Un runtime stack-spécifique selon le combo (ex. .NET 10, Node 22, etc.)
 
@@ -149,18 +150,23 @@ Ouvre `workspace/stack/stack.md` (déjà ouvert par bootstrap dans la plupart de
 ```yaml
 ## Active Database
 Type: PostgreSql
-Server: localhost
-Database: ma_premiere_app
-User: postgres
-Password: mon_mot_de_passe_dev   # ← à éditer
+Server: <hote-de-votre-base>
+Database: <nom-de-votre-base>
+User: <utilisateur>
+Password: <mot-de-passe>          # ← à renseigner
 Port: 5432
 
 ## Active Auth Specs
-AzureAD.TenantId: 00000000-0000-0000-0000-000000000000  # ← éditer (ou utiliser auth-local)
-AzureAD.ClientId: 11111111-1111-1111-1111-111111111111  # ← éditer
+AzureAD.TenantId: <votre-tenant-id>   # ← à renseigner (ou utiliser auth-local)
+AzureAD.ClientId: <votre-client-id>   # ← à renseigner
 ```
 
-> 🔒 `stack.md` est **gitignored** — les secrets restent en local. L'agent arch propage les valeurs vers `appsettings.json` / `application.yml` etc. au moment du scaffold.
+> 🔒 **Sécurité.** `stack.md` est **gitignored** : les secrets restent sur ton poste,
+> ne sont jamais commités et ne doivent jamais être recopiés dans une doc, une issue,
+> un ticket ou un message. L'agent arch propage les valeurs vers `appsettings.json` /
+> `application.yml` au moment du scaffold. Pour le reverse SGBD, utilise un login dédié
+> en **lecture seule** (`GRANT VIEW DEFINITION` + `db_datareader`) — jamais un compte
+> d'administration.
 
 ---
 
@@ -287,7 +293,10 @@ Lignes de code générées : **~1000-3000 LOC** (varie selon FEAT).
 | Rencontré une erreur ? | [troubleshooting.md](troubleshooting.md) |
 | Onboarding repo brownfield | [quickstart.md](quickstart.md) |
 | Ajouter un nouveau stack | [poc-roi-methodology.md](poc-roi-methodology.md) |
-| Contribuer au framework | [../../CONTRIBUTING.md](../../CONTRIBUTING.md) |
+| **Récupérer une base de données legacy** | [reverse-engineering-workflow.md](reverse-engineering-workflow.md) — `/sdd-db-context` puis `/sdd-db-reverse-full` |
+| **Récupérer du code source legacy** | [reverse-engineering-workflow.md](reverse-engineering-workflow.md) — `/sdd-reverse-full` |
+| Travailler sous Codex / Gemini CLI | [multi-llm-getting-started.md](multi-llm-getting-started.md) |
+| Contribuer au framework | [WORKING-AGREEMENT.md](WORKING-AGREEMENT.md) |
 
 ---
 
@@ -349,4 +358,4 @@ C'est le **Sonar + Snyk + gouvernance ADR** du développement assisté par LLM. 
 - 🤖 **Agent reference** : [agents-reference.md](agents-reference.md)
 - 💻 **Command reference** : [commands-reference.md](commands-reference.md)
 - 🛟 **Troubleshooting** : [troubleshooting.md](troubleshooting.md)
-- 🤝 **Contributing** : [../../CONTRIBUTING.md](../../CONTRIBUTING.md)
+- 🤝 **Contribuer** : [WORKING-AGREEMENT.md](WORKING-AGREEMENT.md) · [VERSIONING.md](VERSIONING.md)

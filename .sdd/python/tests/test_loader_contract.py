@@ -95,6 +95,12 @@ REVERSE_AGENTS_V7 = frozenset({
     # 2026-06-29 — stored-procedure reverse (db-reverse) : DB live read-only
     # → US (1 proc = 1 US) / FEAT (1 module = 1 FEAT). loader.reverse.yml.
     "reverse-sql-analyst",
+    # 2026-08-26 — refonte db-reverse : Phase 0 (Database Context) + specialistes
+    # par famille d'objet SQL. Declares dans loader.reverse.yml.
+    "reverse-db-architect",
+    "reverse-sql-function-analyst",
+    "reverse-sql-view-analyst",
+    "reverse-sql-trigger-analyst",
     # 2026-07-24 — OPT-IN rung 2 LLM composer for the DB module FEAT (parity
     # with code ladder 3c). Default rung 2 stays deterministic (build_proc_feats.py).
     "reverse-sql-feat-composer",

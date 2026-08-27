@@ -15,7 +15,7 @@ prompt = """
 <!-- isolation cwd, parallélisme borné, retry-on-schema-fail.         -->
 Arguments: {{args}}
 
-# /sdd-db-reverse-full [--project DB] [--json]
+# /sdd-db-reverse-full [--project DB] [--max-parallel N] [--sequential] [--no-architect] [--json]
 
 ## Rôle
 
@@ -26,19 +26,33 @@ produit des FEATs SDD_Pro standard consommables par `/sdd-full`.
 
 ```
 stack.md (## Active Database)  ← config + variables d'environnement (${VAR} via .env)
-   └─[Phase 1 introspect READ-ONLY]─► .sys/proc-snapshot/*.sql + db-introspection.json
-        │                              + .sys/schema-snapshot/*.sql + db-schema.json + inventory.json
-        └─[rung 1 : reverse-sql-analyst × module]─► us/{n}-{m}-{Name}.md   (1 objet SQL = 1 US)
-             └─[rung 2 : build_proc_feats déterministe]─► feats/{n}-{Module}.md  (1 module = 1 FEAT)
-                  └─ validate_reverse_feat + check_reverse_feat_for_full ─► REVERSE-GATE ─► /sdd-full
+   └─[Phase 1 introspect READ-ONLY]─► proc-snapshot/*.sql + db-introspection.json
+        │                              + schema-snapshot/*.sql + db-schema.json + inventory.json
+        └─[Phase 0.A déterministe]─► FAITS : CRUD, graphe d'appels, plan de vagues
+             └─[Phase 0.B reverse-db-architect]─► HYPOTHÈSES : glossaire, domaines, risques
+                  └─► db-context.json (SSoT versionné) + db-context/packs/{objet}.md
+                       └─[vagues : feuilles d'abord, spécialistes en parallèle borné]
+                       │    proc-analyst · function-analyst · view-analyst · trigger-analyst
+                       │    └─► us/{n}-{m}-{Name}.md   (1 objet SQL = 1 US)
+                       │         └─ résumé réinjecté dans db-context.findings ─┐
+                       │            (barrière de vague, puis vague suivante) ◄─┘
+                       └─[rung 2 : synthèse module]─► feats/{n}-{Module}.md  (1 module = 1 FEAT)
+                            └─ validate_reverse_feat + check_reverse_feat_for_full
+                                 └─► REVERSE-GATE ─► /sdd-full
 ```
 
 ## Modèle (confirmé)
 
 - **1 objet SQL = 1 User Story** · **1 module = 1 FEAT** (objets d'un même objet métier).
+- **Comprendre avant d'écrire** : aucune User Story n'est produite avant que la
+  Phase 0 ait construit le Database Context. Un analyste ne redécouvre jamais la
+  base — il reçoit le slice qui le concerne.
 - **Remontée stricte** : la FEAT est composée depuis les US + l'inventaire, jamais en
   relisant le corps SQL. L'assembleur lit réellement les US (titre métier, ACs,
   mode d'extraction) et y écrit en retour `Covers:` + le `Parent FEAT hash`.
+- **Faits ≠ hypothèses** : les faits viennent des scripts déterministes et
+  peuvent devenir des Acceptance Criteria ; les hypothèses viennent de
+  l'architecte et ne le peuvent jamais. La séparation est structurelle.
 
 ## Objets couverts
 
@@ -79,8 +93,23 @@ Recommandation DBA : login dédié `GRANT VIEW DEFINITION` + `db_datareader` (d�
 
 ## Périmètre et coût
 
-Sur une base volumineuse, borner le run — sans quoi le plafond de coût global
-(`[COST_CAP_EXCEEDED]`) le coupera au milieu :
+> **Décision Tech Lead 2026-08-27 — NE JAMAIS DEMANDER (non négociable).**
+> Le périmètre par défaut est **tous les objets de la base**, dispatchés au
+> parallélisme `MaxParallel` du Project Config. L'orchestrateur **ne pose aucune
+> question de confirmation** sur le périmètre, le coût ou le parallélisme : il
+> lance le run complet et se contente de **signaler** ce qu'il observe (nombre
+> d'objets par tier, bruit système détecté, plafond de coût configuré).
+> Ce qui borne le run, ce sont les **flags explicitement passés par le Tech Lead**
+> — jamais une question posée en cours de route.
+>
+> Rationale : le plafond `[COST_CAP_EXCEEDED]` est une protection *suffisante*, et
+> le **cache par objet** rend toute coupure reprenable quasi gratuitement. Demander
+> une confirmation n'ajoute donc aucune sécurité — seulement une interruption.
+> Corollaire : le bruit système (procédures de diagrammes SSMS `sp_*diagram*`,
+> `fn_diagramobjects`, débris de dev) est **analysé comme le reste** puis **signalé
+> dans le rapport final** comme supprimable — il n'est jamais l'objet d'une question.
+
+Pour borner explicitement un run sur une base volumineuse :
 
 | Flag | Effet |
 |---|---|
@@ -89,6 +118,9 @@ Sur une base volumineuse, borner le run — sans quoi le plafond de coût global
 | `--exclude 'usp_Debug*'` | écarte les objets matchant |
 | `--limit N` | plafonne le nombre d'objets — **nomme ce qu'il a écarté** (pas de troncature silencieuse) |
 | `--no-schema` | saute la lecture de structure (tables/colonnes/jobs) |
+| `--max-parallel N` | borne du parallélisme **à l'intérieur d'une vague** (1-12, défaut = `MaxParallel` du Project Config) |
+| `--sequential` **@llm-only-flag** | une vague par objet — débogage, jamais en production (interprété par l'orchestrateur) |
+| `--no-architect` **@llm-only-flag** | s'arrête après la Phase 0.A (faits seuls, aucun coût LLM de Phase 0) — interprété par l'orchestrateur, qui ne spawne alors pas l'architecte |
 
 La reprise repose sur le **cache par objet** : un objet dont le corps est inchangé
 et dont l'US existe n'est pas ré-extrait (`--no-cache` pour forcer). C'est ce qui
@@ -121,27 +153,97 @@ rend un second run quasi gratuit après une interruption.
      `SDD_REVERSE_CLUSTER_NAMING=1` (toujours nommage, sans bascule).
    - Traçabilité : `inventory.json._clusteringReport` (stratégie, fragmentation
      mesurée, profil appris, sous-objets rattachés) + résumé en ligne de chat.
-2. **Routage par complexité (0 token, token-efficient)** :
+1.ter **Phase 0 — Database Context (compréhension avant écriture)** :
+   ```bash
+   python .sdd/python/sdd_reverse_scripts/db_context_build.py --project workspace/old/{DB}
+   ```
+   - **0.A déterministe, 0 token** : faits (tables/colonnes/PK/FK/index/CHECK,
+     corps d'objets), **matrice CRUD** par objet (C/U/D distingués via
+     `writeKinds`, plus seulement « écrit »), **graphe d'appels résolu**, **plan
+     de vagues**, `contextVersion` (sha256 des faits) → `db-context.json` +
+     l'arbre `db-context/` (aperçu, 1 fiche par table, 1 fiche par objet,
+     1 **pack** par objet).
+   - **0.B interprétation** : spawn `Agent(reverse-db-architect)` — sauf
+     `--no-architect`, et **sauté si le `contextVersion` est inchangé** (une base
+     stable ne paie l'architecte qu'une fois). Il lit le *digest*, jamais le
+     catalogue brut, et écrit `db-context.hypotheses.json`, fusionné par
+     `--merge-hypotheses` dans la seule branche `hypotheses`.
+   - Détail complet et usage isolé : `/sdd-db-context`.
+
+2. **Routage par complexité et par tier (0 token, token-efficient)** :
    `python .sdd/python/sdd_reverse_scripts/build_proc_us.py --project DB --all --json`
-   - génère **déterministiquement** (0 token LLM) toutes les US des procédures
-     **simples** (CRUD/SELECT sans branche/SQL dynamique/erreur) — ~70-80 % d'une base typique ;
-   - retourne `needs_llm` = la liste des procédures **complexes** (logique métier).
-3. **Cache** : sauter les procédures dont le snapshot est inchangé ET dont l'US
+   - génère **déterministiquement** (0 token LLM) toutes les US des objets
+     **triviaux** (CRUD/SELECT court, sans branche, sans appel, sans SQL
+     dynamique ni erreur levée) ;
+   - retourne `needs_llm` = les objets à analyser, **chacun avec son tier**
+     (`db_tier_router`, rubrique déterministe) : `fast` pour une logique courte
+     et lisible, `balanced` pour une vraie règle métier, `deep` pour ce qui exige
+     de raisonner sur ce qui n'est pas écrit (SQL dynamique, récursion, appelé
+     non résolu, orchestration ≥ 2 appels, fan-in élevé).
+   - Le tier est un **tier**, jamais un nom de modèle : la résolution appartient
+     au provider actif (`.sdd/providers/*.yaml`), donc le même arbitrage vaut sur
+     Anthropic, Google, OpenAI ou Moonshot.
+
+   > **Correctif 2026-08-26.** La rubrique ignorait les appels : un orchestrateur
+   > de 38 lignes sans branche déléguant sa règle à six procédures était classé
+   > « simple », décrit par un template, et sortait en `high` — un faux vert qui
+   > traversait la REVERSE-GATE. Déléguer n'est pas être simple.
+
+3. **Cache** : sauter les objets dont le snapshot est inchangé ET dont l'US
    existe (`reverse_cache`/`update_extraction_cache`, fail-safe : doute = ré-extraire).
-4. **rung 1 (LLM, ciblé)** : pour chaque entrée de `needs_llm` **uniquement**, spawn
-   `Agent(reverse-sql-analyst)` avec `{U-N} --proc {fq}`. **Parallèle borné**
-   (`MaxParallel`, défaut 3 — pré-allocation faite, écritures US disjointes, parallel-safe §8.2).
-   Les procédures simples ne consomment **aucun token**.
-5. **rung 2 (composition des FEAT modules)** :
-   - **Défaut (déterministe, 0 token)** :
-     `python .sdd/python/sdd_reverse_scripts/build_proc_feats.py --project DB --all`
-     → 1 FEAT par module (remontée depuis les US + inventaire), confidence min-monotone.
-   - **Opt-in LLM (`SDD_REVERSE_FEAT_LLM=1`)** : pour chaque module, spawn
-     `Agent(reverse-sql-feat-composer)` avec `{U-N}` → FEAT métier synthétisée
-     (démotion plomberie, narratif transverse, parité avec l'escalier code 3c).
-     Parallèle borné (`MaxParallel`, FEATs disjointes). Même gate
-     `validate_reverse_feat.py`. À réserver aux modules à forte logique métier
-     (le déterministe suffit pour du CRUD).
+
+4. **rung 1 — dispatch PAR VAGUES (le cœur de la refonte)** :
+   `db-context.json.executionPlan.waves` ordonne les objets pour que **tout
+   appelé résolu soit analysé strictement avant son appelant**.
+
+   Pour chaque vague, dans l'ordre :
+   a. dispatcher **en parallèle borné** (`--max-parallel`, défaut `MaxParallel`
+      = 3) tous les objets de la vague présents dans `needs_llm`, chacun vers
+      **son spécialiste** selon `routineType` :
+
+      | Famille | Agent | Angle |
+      |---|---|---|
+      | procédure | `reverse-sql-analyst` | une opération — contrat, effets, préconditions |
+      | fonction | `reverse-sql-function-analyst` | un calcul réutilisable sans effet de bord |
+      | vue | `reverse-sql-view-analyst` | une projection — et ses filtres implicites |
+      | trigger | `reverse-sql-trigger-analyst` | un invariant déclenché par un événement |
+
+      Chaque agent reçoit `{U-N} --object {fq}` et lit **son pack**, pas la base.
+   b. **barrière de vague** : écrire les résumés produits dans
+      `db-context.json.findings` (par l'orchestrateur, en une passe atomique —
+      les agents n'écrivent que leur US, donc les écritures restent disjointes et
+      le parallélisme reste sûr sans nouveau verrou), puis régénérer les packs
+      de la vague suivante, qui citeront ces résumés au lieu de signaux bruts.
+
+   `--sequential` force une vague par objet (débogage). Une **composante
+   récursive** (cycle mutuel ou auto-appel) est confiée d'un bloc à un seul
+   agent, avec tous les corps du cycle dans son pack, et sort plafonnée à
+   `medium`.
+
+5. **rung 2 — synthèse de module** :
+   Le critère décisif est le **nombre d'objets à harmoniser**, pas le tier le plus
+   haut du module. Un module d'**un seul objet** n'a par construction aucune règle
+   transverse à remonter ni aucun vocabulaire à réconcilier entre US : le rung LLM
+   n'y apporte rien, quel que soit son tier.
+   - **déterministe, 0 token** (`build_proc_feats.py --project DB --unit {U-N}`) :
+     module **mono-objet**, ou module **purement CRUD** (aucun objet au-dessus de
+     `fast` et aucun objet routé LLM).
+   - **LLM** (spawn `Agent(reverse-sql-feat-composer)`) : module **multi-objets**
+     ayant au moins un objet routé LLM — c'est là que se trouvent les règles
+     transverses et le vocabulaire à harmoniser sur le glossaire de l'architecte.
+     Parallèle borné, FEATs disjointes, **même gate**.
+   - `SDD_REVERSE_FEAT_LLM=1` force le LLM partout ; `=0` force le déterministe.
+
+   > **Correctif 2026-08-27 (run 118 objets, PortailClient_Dev).** La règle
+   > précédente — « au moins un objet `deep` » — **inversait** le routage sur une
+   > base réelle : elle envoyait au composer LLM 7 modules mono-objet de
+   > procédures système SSMS (`sp_*diagram*`, classées `deep` par un faux positif
+   > de parsing d'`EXECUTE AS`), et confiait à l'assembleur déterministe les deux
+   > plus gros modules métier de la base — `Contact` (15 objets, dont un
+   > contournement d'authentification par littéral codé en dur) et `ModeleBrief`
+   > (16 objets). Le tier d'un objet mesure la difficulté de **l'analyser** (rung 1) ;
+   > il ne mesure pas l'intérêt de **synthétiser** son module (rung 2).
+
 6. **Validation en deux temps** (les deux sont obligatoires) :
    - `validate_reverse_feat.py` sur chaque FEAT — structure (frontmatter, ordre des
      sections, IDs stables, Given/When/Then, evidence + confidence par item) ;
@@ -166,6 +268,22 @@ rend un second run quasi gratuit après une interruption.
    > Audit 2026-08-25 (M3) : le vérificateur n'itérait que sur `units[].classes`
    > (forme du reverse de code) et rendait un vert vide sur une unité
    > `db-module`, qui porte `units[].procedures`.
+7.ter **Vue système et corrélation (informational, déterministe, 0 token)** —
+   deux livrables qui existaient déjà et que rien n'appelait :
+   - **ERD + vue de contexte** :
+     `python .sdd/python/sdd_reverse_scripts/reverse_synth.py --project workspace/old/{DB}`
+     rend l'ERD Mermaid et la vue système depuis `db-schema.json` +
+     `inventory.json` (jamais depuis les FEATs — lecture seule, sous `.sys/synthesis/`).
+   - **Qui consomme quoi** : si un reverse **applicatif** a déjà tourné et qu'un
+     `data-access.json` existe,
+     `python .sdd/python/sdd_reverse_scripts/correlate_db_app.py
+     --introspection workspace/old/{DB}/.sys/db-introspection.json
+     --data-access workspace/old/{App}/.sys/data-access.json`
+     produit la carte de consommation objet DB ↔ application. C'est ce qui
+     répond à « si je change cette procédure, quelle application casse ? ».
+   Les deux sont **informational** : ni l'un ni l'autre ne bloque le pipeline, et
+   leur absence (pas de reverse applicatif, pas de schéma) est un cas normal.
+
 8. Ligne chat finale `[REVERSE] DB {DB} → {p} objets SQL, {m} modules/FEAT, {u} US,
    {t} tables. (100%)`. La ligne de Phase 1 porte en plus la **stratégie de
    découpage** retenue, pour qu'elle soit visible sans ouvrir un JSON — p. ex.
@@ -182,6 +300,12 @@ workspace/old/{DB}/.sys/db-introspection.json                 (métadonnées + s
 workspace/old/{DB}/.sys/db-schema.json                        (tables/colonnes/types/PK/FK/index/checks)
 workspace/old/{DB}/.sys/inventory.json                        (units=modules, allocations)
 workspace/old/{DB}/.sys/proc-extraction-cache.json            (cache par objet)
+workspace/old/{DB}/.sys/db-context.json                       (SSoT versionné : faits + plan de vagues + hypothèses + findings)
+workspace/old/{DB}/.sys/db-context.hypotheses.json            (écrit par l'architecte, fusionné par script)
+workspace/old/{DB}/.sys/db-context/_overview.md               (orientation base entière)
+workspace/old/{DB}/.sys/db-context/tables/{table}.md          (1 fiche par table)
+workspace/old/{DB}/.sys/db-context/{procedures,functions,views,triggers}/{objet}.md
+workspace/old/{DB}/.sys/db-context/packs/{objet}.md           (le slice remis à l'agent qui analyse cet objet)
 workspace/us/{n}-{m}-{Name}.md                                (1 par objet SQL)
 workspace/feats/{n}-{Module}.md                               (1 par module)
 ```
@@ -193,6 +317,13 @@ une migration : rien n'est envoyé au serveur.
 ## Anti-derive
 
 - Lecture seule absolue ; le mot de passe n'est jamais loggé ni persisté.
+- **Structure uniquement** dans le contexte partagé : aucune donnée métier,
+  aucun identifiant de connexion.
+- **Aucun agent ne lit toute la base** : chacun reçoit son pack, borné, qui
+  déclare ce qu'il a dû tronquer — un pack tronqué en silence produit une User
+  Story confiante et fausse.
+- **L'architecte n'écrit pas de faits** : il écrit un fichier séparé, fusionné
+  par script dans la seule branche `hypotheses`. Garanti par construction.
 - No-spawn d'agent par les agents (la commande séquence/ spawn, pas les agents).
 - 1 objet SQL = 1 US, 1 module = 1 FEAT ; pas de fusion, pas d'invention (bias toward present).
 - Idempotence : re-run réutilise `(n, Name)` via `_featAllocations`, et un objet

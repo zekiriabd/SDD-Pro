@@ -70,8 +70,13 @@ _DYNAMIC_RE = re.compile(
     re.IGNORECASE,
 )
 # EXEC/CALL/PERFORM of a NAMED routine (not EXEC( dynamic ) — that's _DYNAMIC_RE).
+# `EXECUTE AS` is a SECURITY CONTEXT clause, not a call: `WITH EXECUTE AS 'dbo'`
+# and `execute as caller;` both extracted a phantom callee named "AS".
+# Observed on a real base (2026-08-27): the 7 SSMS diagram procedures each
+# reported an unresolved callee `AS`, which downgraded their confidence and
+# routed them to an LLM for nothing.
 _CALL_RE = re.compile(
-    r"\b(?:EXEC(?:UTE)?|CALL|PERFORM)\s+(?:@\w+\s*=\s*)?" + _OBJ + r"(?!\s*\()",
+    r"\b(?:EXEC(?:UTE)?|CALL|PERFORM)\s+(?!AS\b)(?:@\w+\s*=\s*)?" + _OBJ + r"(?!\s*\()",
     re.IGNORECASE,
 )
 _CURSOR_RE = re.compile(r"\bDECLARE\s+\w+\s+(?:INSENSITIVE\s+|SCROLL\s+)*CURSOR\b", re.IGNORECASE)
@@ -229,7 +234,12 @@ def analyze_routine(name: str, body: str) -> dict[str, Any]:
     return {
         "schemaVersion": SCHEMA_VERSION,
         "name": name,
-        "lineCount": body.count("\n") + 1 if body else 0,
+        # `count(NL) + 1` overcounts by one whenever the body ends with a
+        # newline — which SQL Server bodies do. Observed on a real base
+        # (2026-08-27): 90 evidence ranges pointed one line PAST end-of-file,
+        # so the anti-hallucination contract could not be resolved on disk.
+        # `splitlines()` is correct for trailing NL, CRLF and empty bodies.
+        "lineCount": len(body.splitlines()),
         "params": _params_from_header(body),
         "tablesRead": tables_read,
         "tablesWritten": tables_written,
@@ -252,6 +262,10 @@ def analyze_routine(name: str, body: str) -> dict[str, Any]:
 SIMPLE_MAX_LINES = 80
 # A contract this wide is a capability, not a CRUD accessor.
 SIMPLE_MAX_PARAMS = 4
+# Above this many distinct callers, an object is load-bearing for the database:
+# its meaning propagates everywhere, so it is worth an LLM read even when its
+# own body is trivial.
+FANIN_CRITICAL = 3
 
 
 def complexity_reasons(rec: dict[str, Any]) -> list[str]:
@@ -284,6 +298,25 @@ def complexity_reasons(rec: dict[str, Any]) -> list[str]:
     params = rec.get("params") or []
     if len(params) >= SIMPLE_MAX_PARAMS:
         reasons.append(f"params={len(params)}")
+
+    # --- Graph signals (audit 2026-08-26): composition is complexity ---------
+    # The rubric used to weigh only what a body does BY ITSELF. An orchestrator
+    # of forty branchless lines that delegates its whole business rule to six
+    # other procedures was therefore "simple": it got a template User Story, no
+    # LLM, and — nothing having downgraded it — sailed through the REVERSE-GATE
+    # with a `high` confidence it had not earned. Delegation is not simplicity.
+    calls = rec.get("callsProcs") or []
+    if calls:
+        reasons.append(f"calls={len(calls)}")
+    unresolved = rec.get("unresolvedCallees") or []
+    if unresolved:
+        reasons.append("unresolved-callees=" + ",".join(sorted(unresolved)[:3]))
+    if rec.get("recursive"):
+        reasons.append("recursive")
+    if (rec.get("fanIn") or 0) >= FANIN_CRITICAL:
+        # Not complex in itself, but critical by usage: getting it wrong is
+        # wrong in every caller at once.
+        reasons.append(f"fan-in={rec['fanIn']}")
     return reasons
 
 
@@ -325,4 +358,29 @@ def confidence_signal(signals: dict[str, Any], lang_cap: str) -> str:
         eff = "medium" if order[eff] > order["medium"] else eff
     if signals.get("lineCount", 0) == 0:           # encrypted / empty
         eff = "low"
+    return eff
+
+
+def confidence_with_graph(base: str, metrics: dict[str, Any] | None) -> str:
+    """Lower a routine's confidence for what its call graph hides from it.
+
+    Two situations make a body an incomplete account of its own behaviour, and
+    neither is visible in the text alone:
+
+      * an **unresolved callee** — a linked server, a cross-database call, a
+        dropped object, or a bare name that matches two schemas. The analyst
+        cannot read what that call does, so the User Story cannot be `high`.
+      * **recursion** — a self-recursive routine or a mutually recursive pair.
+        Termination and accumulated effect are not statically readable.
+
+    Applied on top of `confidence_signal`, never above it: this function only
+    ever lowers. Confidence stays min-monotone up the ladder, which is what
+    makes the REVERSE-GATE honest about composed behaviour.
+    """
+    order = {"low": 0, "medium": 1, "high": 2}
+    eff = base if base in order else "low"
+    if not metrics:
+        return eff
+    if metrics.get("unresolvedCallees") or metrics.get("recursive"):
+        eff = "medium" if order[eff] > order["medium"] else eff
     return eff

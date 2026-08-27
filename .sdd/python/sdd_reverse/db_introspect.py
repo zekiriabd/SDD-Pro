@@ -332,6 +332,10 @@ def build_introspection(
             "params": signals["params"],
             "tablesRead": signals["tablesRead"],
             "tablesWritten": signals["tablesWritten"],
+            # Which statement touched each table. `sql_body_analyzer` has always
+            # computed it; it used to be dropped here, which is why the CRUD
+            # matrix downstream could only say "written", never C vs U vs D.
+            "writeKinds": signals.get("writeKinds", {}),
             "callsProcs": signals["calls"],
             "branches": signals["branches"],
             "raises": signals["raises"],

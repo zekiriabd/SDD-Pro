@@ -1,6 +1,8 @@
 # 💻 Commands Reference
 
-33 slash commands : **13 user-facing** (the public API) + **8 internes [debug]** (low-level building blocks) + **12 reverse** (legacy→FEAT module — see [reverse-engineering-workflow.md](reverse-engineering-workflow.md)). Use the user-facing ones in everyday workflow ; the internal ones for debugging or surgical fixes.
+**41 slash commands** : **13 user-facing** (the public API) + **9 internes [debug]** (low-level building blocks) + **19 reverse** (legacy code *and* database modules). Use the user-facing ones in everyday workflow ; the internal ones for debugging or surgical fixes.
+
+> Recount at any time: `ls .sdd/commands/ | wc -l`.
 
 | Quick legend |
 |---|
@@ -319,7 +321,7 @@ The 4 macro-orchestrators (`sdd-bootstrap`, `sdd-full`, `sdd-poc`, `sdd-review`)
 
 ---
 
-## 🔧 Internes [debug] (8)
+## 🔧 Internes [debug] (9)
 
 Building blocks invoked by the user-facing commands. Use these for **targeted debugging** when an orchestrator fails — but prefer the orchestrator for normal flow.
 
@@ -468,6 +470,60 @@ Building blocks invoked by the user-facing commands. Use these for **targeted de
 
 **Quand l'utiliser** : Outil ops gouvernance team config. Aucun effet pipeline en cours.
 
+### `/spec-book`
+
+| | |
+|---|---|
+| **Args** | `{n}` (FEAT number) — optional, all FEATs if omitted |
+| **Agent** | `specbook-writer` |
+| **Role** | Functional specification book in plain language, for a non-IT reader (manager, sponsor). Vulgarises the technical content without deleting it. |
+| **Outputs** | `workspace/docs/` (`.docx` + `.md`), section cache in `workspace/docs/.sys/sections/` |
+| **Notes** | Works on forward **and** reverse FEATs. The final `.docx` render is produced by the deterministic script `generate_specbook.py` (0 tokens). |
+
+---
+
+## 🗄️ Reverse engineering (19)
+
+Optional module: turn what you already have into FEATs. Full workflow:
+[reverse-engineering-workflow.md](reverse-engineering-workflow.md).
+
+### Database path (3)
+
+| Command | Role |
+|---|---|
+| `/sdd-db-context` **(Phase 0 — mandatory)** | Builds the versioned *Database Context*: deterministic facts (tables, keys, `CHECK`, CRUD matrix, call graph, wave plan) then interpretation by `reverse-db-architect` (glossary, sub-domains, risks). Produces `db-context.json` + a per-object Markdown tree reused as long as the database has not changed. Flags: `--refresh`, `--no-architect` (facts only, 0 tokens), `--diff-against`, `--json`. |
+| `/sdd-db-reverse-full` | Every executable SQL object of the database — procedures, functions, views, triggers (+ Oracle packages). 1 SQL object = 1 User Story, 1 module = 1 FEAT. Scope guards: `--schema`, `--include`, `--exclude`, `--limit`. |
+| `/sdd-db-reverse {object}` | A single object, to evaluate the module without committing to a full run. |
+
+Engines: SQL Server + PostgreSQL 🟢 live-validated ; Oracle + MySQL/MariaDB 🟡
+scaffold-validated. **Read-only always** — the ban is enforced by `readonly_guard`
+and the blocking class `[DB_STRUCTURE_CHANGE_FORBIDDEN]`.
+
+### Legacy code path (16)
+
+| Command | Role |
+|---|---|
+| `/sdd-reverse-full` | Full orchestrator (phases 0→5), resumable phase by phase |
+| `/sdd-reverse {U-N}` | Sequencer for one unit: 3a analysis → 3b User Stories → 3c FEAT |
+| `/sdd-reverse-init` | Bootstraps `workspace/old/{Project}/.sys/` |
+| `/sdd-reverse-inventory` | Phase 1 — deterministic cartography (blocking for phase 3) |
+| `/sdd-reverse-audit` | Phase 2 — architecture / anti-patterns / EOL audit (informational) |
+| `/sdd-reverse-paradigm` | Paradigm gap + unit curation (MIGRATE / DISCARD / HUMAN-DECISION) |
+| `/sdd-reverse-analyze` | 3a — faithful technical analysis of one unit |
+| `/sdd-reverse-stories` | 3b — lift into User Stories |
+| `/sdd-reverse-feat` | 3c — business FEAT composition |
+| `/sdd-reverse-crosscut` | Cross-cutting deterministic FEATs (libraries, database) — 0 tokens |
+| `/sdd-reverse-synth` | System synthesis: C4, full ERD, `soul.md` — deterministic, 0 tokens |
+| `/sdd-reverse-parity` | Gherkin parity specs (opt-in, `--with-parity`) |
+| `/sdd-reverse-questions` | Human validation loop (`--ingest` to re-inject the answers) |
+| `/sdd-reverse-review` | Back completeness review of one reverse FEAT (informational) |
+| `/sdd-reverse-ui` | Phase 4 — semantic HTML mockup extraction |
+| `/sdd-reverse-status` | Reverse workflow diagnostic (read-only) |
+
+> 🚪 **REVERSE-GATE** — a reverse FEAT whose confidence is not `high` does **not** enter
+> `/sdd-full` (exit 1). The override (`--allow-reverse-low`) exists, but it is explicit
+> and audit-logged.
+
 ---
 
 ## 🗺 Decision tree
@@ -497,6 +553,16 @@ Building blocks invoked by the user-facing commands. Use these for **targeted de
                 ├─ Lancer le code généré
                 │      → /sdd-serve
                 │      → /sdd-kill-server
+                │
+                ├─ Base de données legacy à récupérer
+                │      → /sdd-db-context            (Phase 0, obligatoire)
+                │      → /sdd-db-reverse-full       (--schema / --limit au 1er run)
+                │
+                ├─ Code source legacy à récupérer
+                │      → /sdd-reverse-full
+                │
+                ├─ Cahier des charges pour un lecteur non-IT
+                │      → /spec-book [N]
                 │
                 └─ Debug ciblé
                        → /dev-backend N-M / /dev-frontend N-M

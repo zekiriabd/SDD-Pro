@@ -45,6 +45,8 @@ if str(PY_ROOT) not in sys.path:
 
 from sdd_reverse.atomic_write_local import atomic_write_text
 from sdd_reverse.sql_body_analyzer import complexity_reasons, proc_complexity
+from sdd_reverse.db_context_slice import family_of  # noqa: E402
+from sdd_reverse.db_tier_router import tier_for  # noqa: E402
 
 # Same sentinel the forward pipeline resolves (sdd_scripts/resolve_us_hash_sentinel.py).
 HASH_SENTINEL = "sha256:COMPUTE_REQUIRED"
@@ -68,6 +70,17 @@ _KIND_ANGLE = {
     "SQL_TABLE_VALUED_FUNCTION": ("fonction table", "jeu de données produit par la fonction"),
 }
 _DEFAULT_ANGLE = ("procédure stockée", "opération encapsulée par la procédure")
+
+
+# Which specialist owns each family of SQL object. The angle differs by
+# family — an operation, a reusable calculation, a projection, an invariant —
+# so the agent differs too.
+_AGENT_BY_FAMILY = {
+    "procedures": "reverse-sql-analyst",
+    "functions": "reverse-sql-function-analyst",
+    "views": "reverse-sql-view-analyst",
+    "triggers": "reverse-sql-trigger-analyst",
+}
 
 
 def _params_map(introspection: dict) -> dict[str, list]:
@@ -279,11 +292,27 @@ def main(argv: list[str] | None = None) -> int:
                     }
                 written.append(str(out))
             else:
+                # Audit 2026-08-26 — the orchestrator dispatches BY WAVE and
+                # BY TIER, so `needs_llm` must carry both. `agent` names the
+                # specialist that owns this object's family: a view and a
+                # trigger do not get the same questions asked of them.
+                tier = proc.get("modelTier") or tier_for(proc)[0]
                 needs_llm.append({
                     "unit": u["id"], "proc": proc["fqName"],
                     "usName": proc["usName"], "n": n, "m": proc["usIndex"],
                     "reasons": proc.get("complexityReasons") or complexity_reasons(proc),
+                    "modelTier": tier,
+                    "tierReasons": proc.get("modelTierReasons") or tier_for(proc)[1],
+                    "agent": _AGENT_BY_FAMILY[family_of(str(proc.get("routineType")))],
+                    "wave": proc.get("wave", 0),
+                    "recursive": bool(proc.get("recursive")),
+                    "sccId": proc.get("sccId"),
+                    "pack": f".sys/db-context/packs/{proc['fqName']}.md",
                 })
+
+    # Callees strictly before their callers, so a caller's pack can quote the
+    # summary its callee just produced. Ties broken by name for reproducibility.
+    needs_llm.sort(key=lambda e: (e.get("wave", 0), e["proc"].lower()))
 
     if not args.dry_run and not args.no_cache:
         save_cache(sysdir, cache)
@@ -293,8 +322,14 @@ def main(argv: list[str] | None = None) -> int:
                           "cached": cached}, ensure_ascii=False, indent=2))
     else:
         skip = f" · {len(cached)} inchangée(s) (cache)" if cached else ""
+        by_tier: dict[str, int] = {}
+        for e in needs_llm:
+            by_tier[e["modelTier"]] = by_tier.get(e["modelTier"], 0) + 1
+        shape = ", ".join(f"{v} {k}" for k, v in sorted(by_tier.items())) or "aucun"
+        waves = (max(e.get("wave", 0) for e in needs_llm) + 1) if needs_llm else 0
         print(f"[REVERSE] {len(written)} US déterministe(s) (0 token) · "
-              f"{len(needs_llm)} objet(s) complexe(s) → agent LLM{skip}.")
+              f"{len(needs_llm)} objet(s) → agent LLM ({shape}) "
+              f"sur {waves} vague(s){skip}.")
     return 0
 
 

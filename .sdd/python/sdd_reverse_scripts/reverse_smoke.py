@@ -253,7 +253,13 @@ def check_no_dangling_spawn() -> CheckResult:
     prompt lingered) would FAIL here. Prose mentions in docs/rules/CHANGELOG
     are intentionally NOT checked (historical references are legitimate).
     """
-    loader = REPO_ROOT / ".claude" / "loader.reverse.yml"
+    # Audit 2026-08-26 : le manifeste a demenage en `.sdd/` a la migration
+    # Phase 2 (foyer neutre). Le chemin `.claude/` etant reste code en dur, ce
+    # check rendait WARN "loader absent" depuis — c'est-a-dire qu'il ne
+    # verifiait plus rien. On resout `.sdd/` d'abord, `.claude/` en repli.
+    loader = REPO_ROOT / ".sdd" / "loader.reverse.yml"
+    if not loader.is_file():
+        loader = REPO_ROOT / ".claude" / "loader.reverse.yml"
     agents_dir = REPO_ROOT / ".claude" / "agents"
     if not loader.is_file():
         return CheckResult("reverse-no-dead-code", "WARN", "loader.reverse.yml absent")
