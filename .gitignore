@@ -35,15 +35,15 @@
 #                 --out .sdd/.build/<h> --agents-only --commands-only
 #                 --memory-only --rules-only [--deploy]`
 # bootstrap.py appelle cette commande au clone du repo. La garde
-# `protect_framework.py` refuse toute édition manuelle (agents produit) —
+# `protect_framework.py` refuse toute édition manuelle (artefact produit) —
 # seul harness_build.py peut écrire dans ces répertoires.
-.claude/agents/
-.claude/commands/
-.claude/rules/
-.claude/CLAUDE.md
-# .codex/ et .gemini/ sont COMMITÉS — façades multi-harness versionnées pour
-# que Codex et Gemini CLI fonctionnent out-of-the-box après git clone.
-# Seul .claude/ reste gitignored (régénéré par session_start hook Claude Code).
+#
+# Les 4 façades (.claude/{agents,commands,rules,CLAUDE.md}, .codex/, .gemini/)
+# sont COMMITÉES depuis 2026-08-29 — même logique out-of-the-box après git
+# clone pour les 3 harnais, plus de dépendance à l'exécution préalable du hook
+# session_start pour que Claude Code fonctionne. Anti-drift : ne PAS éditer
+# ces fichiers à la main — toujours repasser par harness_build.py, puis
+# `python -m pytest tests/test_harness_facade_parity.py` avant de commiter.
 
 # Workspace runtime SDD (scaffolding, secrets, projets générés) — jamais commité.
 # stack.md porte DB_PASSWORD / AUTH_JWT_SECRET en clair (CLAUDE.md §9), les
