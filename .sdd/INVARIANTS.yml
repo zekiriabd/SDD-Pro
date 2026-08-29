@@ -308,8 +308,13 @@ invariants:
       BOM/CRLF). Un test dédié `test_harness_codex_gemini.py` vérifie que
       les 41 commandes transpilées ne contiennent aucun dead-link `.sdd/<x>`.
 
-      Enforcement runtime : les 4 façades sont gitignorées (.gitignore),
-      donc le SSoT ne peut PAS drifter via commit direct sur une façade.
+      Enforcement runtime : le hook `protect_framework` bloque toute édition
+      manuelle des 4 façades (seul `harness_build.py` peut y écrire) ; les 4
+      sont désormais commitées (depuis 2026-08-29, `.claude/{agents,commands,
+      rules,CLAUDE.md}` rejoint `.codex/` et `.gemini/` — même logique
+      out-of-the-box après clone pour les 3 harnais). Le SSoT ne peut donc
+      drifter que si une façade est éditée à la main ET commitée sans
+      re-régénération — ce que l'enforcement CI détecte.
       Enforcement CI : les 82 tests harness (test_harness_*.py) doivent
       passer avant merge — un pivot édité SANS régénération correspondante
       casse la parité et bloque le CI.
@@ -328,7 +333,7 @@ invariants:
       # rules inclus.
       - .sdd/python/tests/test_harness_facade_parity.py  # façade committée ↔ build frais (3 harnais)
       - .sdd/harness_build.py  # transpileur idempotent, garde `_ensure_under_build`
-      - .gitignore  # façades .claude/{agents,commands,rules,CLAUDE.md}, .codex/, .gemini/
+      - .sdd/python/sdd_hooks/protect_framework.py  # bloque l'édition manuelle des façades
     bypasses:
       - "Env: SDD_ALLOW_UNTESTED_HARNESS=1 (audit-log, réservé bootstrap deploy)"
     added: 2026-07-26
