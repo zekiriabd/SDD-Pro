@@ -545,7 +545,7 @@ def _check_harness_parity(claude_root: Path, checks: "Checks") -> None:
     et vérifie :
       - `harness_build.py --harness X` exit 0 pour X ∈ {claude-code, codex, gemini-cli} ;
       - Chaque façade émise contient bien le nombre attendu de commandes
-        (40) et, pour Claude, d'agents (25) ;
+        (41) et, pour Claude, d'agents (29) ;
       - Aucun dead-ref `.claude/docs/` dans le fichier mémoire régénéré
         (contre-régression pour le bug `_rewrite_at_includes` fixé R7).
 

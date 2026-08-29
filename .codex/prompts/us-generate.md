@@ -34,8 +34,9 @@ Arguments: $ARGUMENTS
 > Utilisateur final : préférer `/sdd-full` ou `/dev-run` (gèrent pré-conditions, idempotence, état).
 
 Invoque l'agent PO pour découper une FEAT fonctionnelle en User
-Stories structurées (cible 1-3, warn au-delà de `UsGranularityWarnAt`
-défaut 6, hard cap `UsGranularityHardCap` défaut 10) dans `workspace/`.
+Stories structurées (cible `UsGranularityTarget` défaut 3, warn au-delà de
+`UsGranularityWarnAt` défaut 6, hard cap `UsGranularityHardCap` défaut 10)
+dans `workspace/`.
 
 **Usage :** `/us-generate {n}` — où `{n}` est le numéro de la FEAT
 
@@ -158,7 +159,7 @@ python .sdd/python/sdd_scripts/resolve_us_hash_sentinel.py --feat-number {n}
 ```
 
 **Garanties** (préservées vs implémentation inline) :
-- Aucune dépendance externe (`sed`/`pwsh`/Git Bash) — Python stdlib seulement
+- Aucune dépendance externe (`sed`/`python`/Git Bash) — Python stdlib seulement
 - UTF-8 sans BOM (compatible parser frontmatter YAML cross-OS)
 - Line endings préservés (`newline=''` → conserve LF original, pas de CRLF Windows)
 - Idempotent : re-exécution sur US déjà patchées → 0 patch

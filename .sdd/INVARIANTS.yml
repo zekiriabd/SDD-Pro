@@ -27,7 +27,7 @@
 
 schema_version: 1
 generated_at: 2026-06-08
-total: 14
+total: 15
 
 invariants:
 
@@ -289,8 +289,9 @@ invariants:
       = perte de contrôle multi-harness (une façade éditée directement
       dérive silencieusement du SSoT).
 
-      Périmètre couvert par la parité byte-identique (recount audit R5/m3
-      2026-07-26) : agents (25), commandes (40), rules (11), CLAUDE.md +
+      Périmètre couvert par la parité byte-identique (recount audit 2026-08-29,
+      ajout des 4 analystes SQL reverse le 2026-08-26) : agents (29), commandes
+      (41), rules (12), CLAUDE.md +
       variantes memory par harnais (AGENTS.md / GEMINI.md). Les skills
       (`.sdd/skills/`, 13 SKILL.md) ne sont PAS transpilés par
       `harness_build.py` — sous Claude Code ils sont chargés directement
@@ -305,7 +306,7 @@ invariants:
       Le golden test `test_harness_identity{,_commands}.py` compare
       sémantiquement la régénération à la façade vivante (post-normalisation
       BOM/CRLF). Un test dédié `test_harness_codex_gemini.py` vérifie que
-      les 40 commandes transpilées ne contiennent aucun dead-link `.sdd/<x>`.
+      les 41 commandes transpilées ne contiennent aucun dead-link `.sdd/<x>`.
 
       Enforcement runtime : les 4 façades sont gitignorées (.gitignore),
       donc le SSoT ne peut PAS drifter via commit direct sur une façade.
@@ -317,9 +318,37 @@ invariants:
       - .sdd/python/tests/test_harness_identity.py  # golden agents pivots ↔ façades
       - .sdd/python/tests/test_harness_identity_commands.py  # golden commands
       - .sdd/python/tests/test_harness_codex_gemini.py  # zero dead-link + escape rules
+      # Audit 2026-08-28 — les 3 enforcers ci-dessus ne comparaient les pivots
+      # qu'à `.claude/` ; `.codex/` et `.gemini/` n'étaient confrontés à rien,
+      # et avaient dérivé (`.codex/prompts/sdd-full.md` décrivait encore un
+      # enforcer PowerShell remplacé par du Python depuis plusieurs versions).
+      # Un invariant partiellement vérifié se comporte comme un invariant non
+      # vérifié sur la part qu'il ne couvre pas. Ce test compare la façade
+      # COMMITÉE à une régénération fraîche, pour les 3 harnais, agents et
+      # rules inclus.
+      - .sdd/python/tests/test_harness_facade_parity.py  # façade committée ↔ build frais (3 harnais)
       - .sdd/harness_build.py  # transpileur idempotent, garde `_ensure_under_build`
       - .gitignore  # façades .claude/{agents,commands,rules,CLAUDE.md}, .codex/, .gemini/
     bypasses:
       - "Env: SDD_ALLOW_UNTESTED_HARNESS=1 (audit-log, réservé bootstrap deploy)"
     added: 2026-07-26
     audit_ref: audit-2026-07-25 R12 (post-migration multi-harness gap closure)
+
+  - id: token-usage-telemetry-wired
+    name: record_token_usage.py must stay wired in settings.json (feeds cost-cap-per-run)
+    description: |
+      `preflight_cost_cap.py` (invariant `cost-cap-per-run`) decides whether to
+      block further Agent spawns by summing rows in the `token_usage` table.
+      Those rows are inserted exclusively by `record_token_usage.py`, wired as
+      a PostToolUse + SubagentStop hook on the `Agent` matcher. Before this
+      invariant, nothing detected the difference between "no cost yet" and
+      "the hook stopped firing" — a silent de-wiring would let the cost cap
+      run forever on stale/zero data with no alarm (audit 2026-08-29).
+    severity: major
+    enforcers:
+      - .sdd/python/sdd_hooks/record_token_usage.py
+      - .sdd/docs/gates-map.md  # §4 registers it; test_gates_map.py checks live wiring
+      - .sdd/python/tests/test_gates_map.py  # test_hook_enforcers_still_wired_in_settings
+    bypasses: []
+    added: 2026-08-29
+    audit_ref: audit-2026-08-29 (forward-pipeline review — orchestration/parallelism)

@@ -153,10 +153,10 @@ Read **uniquement** :
    `[QA_PRECONDITION_FAILED]`, `[QA_OWNERSHIP_VIOLATION]`,
    `[API_GATE_RED]`. Ordre de priorité émission documenté §1.7.
 10. **`.sdd/rules/build-and-loop.md`** — contrat API Gate (post-dev
-    backend, pré-dev frontend). Substance opérationnelle inlinée plus bas
-    (§API Gate STEP 2.7-2.9), Read le fichier source si cas-limite
-    (stratégie fixtures in-memory par stack QA §1.2, critère `gate_passed`
-    §1.3, boucle correction RED→GREEN §2).
+    backend, pré-dev frontend). Substance opérationnelle vit dans
+    `commands/qa-generate.md STEP 3` (mode `api-tests`), Read le fichier
+    source si cas-limite (stratégie fixtures in-memory par stack QA §1.2,
+    critère `gate_passed` §1.3, boucle correction RED→GREEN §2).
 
 **Rules inline (depuis SDD_Pro v5.0 — économie tokens)** : les règles
 `quality.md` (Partie A, ex-qa-coverage.md) et `library-and-stack.md` (Partie A, ex-stack-completeness.md) ne sont **PLUS lues** en

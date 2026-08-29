@@ -82,6 +82,22 @@ _CALL_RE = re.compile(
 _CURSOR_RE = re.compile(r"\bDECLARE\s+\w+\s+(?:INSENSITIVE\s+|SCROLL\s+)*CURSOR\b", re.IGNORECASE)
 _TEMP_RE = re.compile(r"#\w+|\bCREATE\s+(?:GLOBAL\s+)?TEMP(?:ORARY)?\s+TABLE\b", re.IGNORECASE)
 
+# db-reverse-tsql.md §2.1 — MERGE branch: WHEN NOT MATCHED BY SOURCE THEN DELETE
+# is a CONDITIONAL MASS DELETION, the most dangerous MERGE branch and the one most
+# likely to be demoted to "plumbing" by a reader who only sees the MERGE keyword.
+_MERGE_DELETE_RE = re.compile(
+    r"\bWHEN\s+NOT\s+MATCHED\s+BY\s+SOURCE\s+THEN\s+DELETE\b", re.IGNORECASE
+)
+# db-reverse-tsql.md §2.2 — OUTPUT without INTO returns a result set to the caller;
+# that is part of the CONTRACT, not plumbing. OUTPUT…INTO @t is plumbing (stays in
+# the proc).
+# Two-pass detection: (1) any OUTPUT keyword exists, AND (2) no OUTPUT…INTO pattern.
+# We cannot use a simple negative lookahead because INSERTED/DELETED pseudo-tables
+# follow OUTPUT directly ("OUTPUT inserted.Col") and "inserted" contains "INSERT",
+# which would accidentally suppress the match.
+_HAS_OUTPUT_RE = re.compile(r"\bOUTPUT\b", re.IGNORECASE)
+_OUTPUT_INTO_RE = re.compile(r"\bOUTPUT\b.+?\bINTO\b", re.IGNORECASE | re.DOTALL)
+
 # Comment strip so commented-out SQL does not inflate the signals.
 _LINE_COMMENT_RE = re.compile(r"--[^\n]*")
 _BLOCK_COMMENT_RE = re.compile(r"/\*[\s\S]*?\*/")
@@ -231,6 +247,15 @@ def analyze_routine(name: str, body: str) -> dict[str, Any]:
     calls = _collect_objects(_CALL_RE, clean, drop_system_routines=True)
     raises = sorted({m.group(0).upper() for m in _RAISE_RE.finditer(clean)})
 
+    # db-reverse-tsql.md §2.1: MERGE with WHEN NOT MATCHED BY SOURCE THEN DELETE is
+    # a conditional mass deletion — a distinct, high-severity write kind.
+    merge_delete = bool(_MERGE_DELETE_RE.search(clean))
+    if merge_delete and "MERGE" in write_kinds:
+        write_kinds["MERGE_DELETE"] = write_kinds.get("MERGE", [])
+
+    # db-reverse-tsql.md §2.2: OUTPUT without INTO returns a result set — contract.
+    output_contract = bool(_HAS_OUTPUT_RE.search(clean)) and not bool(_OUTPUT_INTO_RE.search(clean))
+
     return {
         "schemaVersion": SCHEMA_VERSION,
         "name": name,
@@ -253,6 +278,9 @@ def analyze_routine(name: str, body: str) -> dict[str, Any]:
         "cursors": len(_CURSOR_RE.findall(clean)),
         "tempTables": bool(_TEMP_RE.search(clean)),
         "isReadOnly": not tables_written and not write_kinds,
+        # Extended signals (db-reverse-tsql.md §2.1-§2.2)
+        "mergeDeleteBySource": merge_delete,
+        "outputContract": output_contract,
     }
 
 

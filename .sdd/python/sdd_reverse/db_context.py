@@ -323,6 +323,67 @@ def merge_architect_output(
     return merged
 
 
+def build_architect_digest(context: dict[str, Any]) -> dict[str, Any]:
+    """Produce a lightweight read-only digest for the reverse-db-architect agent.
+
+    On a 300-object database, db-context.json can be 500 KB+ (facts.tables,
+    facts.objects, facts.crud, executionPlan.waves are the main contributors).
+    The architect only needs structural metadata — never full table definitions or
+    wave assignments — so we pre-slice the document here, at deterministic
+    Phase 0.A cost, instead of letting the agent load and discard 90% of it.
+
+    Excluded intentionally:
+    - facts.tables  (full column lists — architect reads individual table cards)
+    - facts.objects (full signal lists — summarised in .objectInventory below)
+    - facts.crud    (per-object CRUD detail — summarised in tableMetrics)
+    - facts.tableUsage
+    - executionPlan.waves / .metrics (only stats are needed)
+    - hypotheses    (architect produces these, should not read prior output)
+    - findings      (wave findings — irrelevant for interpretation)
+    - reuse         (internal bookkeeping)
+    """
+    facts = context.get("facts", {})
+    plan = context.get("executionPlan", {})
+    stats = plan.get("stats", {})
+
+    # Compact per-object signal row: just what helps identify roles and risks.
+    obj_inventory = [
+        {
+            "fqName": o.get("fqName"),
+            "routineType": o.get("routineType"),
+            "lineCount": o.get("lineCount", 0),
+            "branches": o.get("branches", 0),
+            "raises": bool(o.get("raises")),
+            "dynamicSql": bool(o.get("dynamicSql")),
+            "encrypted": bool(o.get("encrypted")),
+            "hasTryCatch": bool(o.get("hasTryCatch")),
+            "hasTransaction": bool(o.get("hasTransaction")),
+            "callCount": len(o.get("callsProcs") or []),
+            "tablesReadCount": len(o.get("tablesRead") or []),
+            "tablesWrittenCount": len(o.get("tablesWritten") or []),
+        }
+        for o in facts.get("objects", [])
+    ]
+
+    return {
+        "schemaVersion": SCHEMA_VERSION,
+        "project": context.get("project", ""),
+        "contextVersion": context.get("contextVersion", ""),
+        "builtAt": context.get("builtAt", ""),
+        "database": facts.get("database", {}),
+        "summary": facts.get("summary", {}),
+        "tableMetrics": facts.get("tableMetrics", {}),
+        "relations": facts.get("relations", []),
+        "catalogObjects": facts.get("catalogObjects", []),
+        "objectInventory": obj_inventory,
+        "executionPlan": {
+            "stats": stats,
+            "unresolvedCallees": list(plan.get("unresolvedCallees") or []),
+            "clusteringReport": plan.get("clusteringReport"),
+        },
+    }
+
+
 def record_finding(
     context: dict[str, Any], fq: str, finding: dict[str, Any]
 ) -> dict[str, Any]:

@@ -1,4 +1,4 @@
-# SDD_Pro
+# SDD_Pro — Agentic Software Engineering, Industrialized
 
 **The framework that refuses to ship code nobody validated.**
 
@@ -467,6 +467,37 @@ ADRs) versioned with the code — no hidden state in the LLM context. The pipeli
 eliminate silent contract drift between front and back. It is **harness-agnostic**: the
 `.sdd/` source layer is compiled into per-harness facades — the same pipeline logic
 whether you run Claude Code, Codex, Gemini CLI or Antigravity.
+
+---
+
+## 🗺️ Visual blueprints
+
+Three schematics, one per pipeline — every agent, every gate, every parallel fork drawn
+as it actually runs.
+
+### A — Forward pipeline
+![Forward pipeline blueprint — FEAT to shipped code](https://i.imgur.com/UkbM1fw.jpeg)
+
+FEAT → User Stories → backend (parallel across User Stories, gated by an in-memory
+API Gate) → frontend (parallel) → QA → the two-stage reviewer batch (spec-compliance
+alone first, then code / security / architecture in parallel) → an adversarial pass →
+a single green / yellow / red verdict.
+
+### B — Reverse engineering: legacy code
+![Reverse-engineering blueprint — legacy code to FEAT](https://i.imgur.com/3pzuVfD.jpeg)
+
+Inventory → tech audit and paradigm-gap analysis → the three-rung ladder (faithful
+technical read-out → User Stories → FEAT composition, confidence never rising as it
+climbs) → mandatory crosscutting FEATs → completeness review → UI mockups → a human
+validation loop for anything left unresolved.
+
+### C — Reverse engineering: database
+![Reverse-engineering blueprint — database to FEAT](https://i.imgur.com/tgk0721.jpeg)
+
+Database Context (deterministic facts, then an architect's hypotheses on top) →
+wave-based dispatch — every stored object analysed only once everything it calls has
+already been analysed — through four specialised SQL analysts → FEAT composition →
+a dual REVERSE-GATE before anything reaches `/sdd-full`.
 
 ---
 

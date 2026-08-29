@@ -67,6 +67,39 @@ def run_quality_scan(feat_n: int) -> tuple[bool, str]:
     return proc.returncode == 0, "\n".join(tail[-6:])
 
 
+def run_pattern_scan(feat_n: int) -> tuple[bool, str]:
+    """Re-run the deterministic pattern scan for a FEAT. Returns (ok, stdout-tail).
+
+    Audit 2026-08-28, corrections #2 and #6. This is the CALLER that
+    `security_patterns.yaml` and `code_review_patterns.yaml` never had: 467
+    lines of regex covering 16 error classes sat in the repo with no runtime
+    consumer, while the detection was delegated to an LLM reading their prose
+    twin. Wiring it here — Python calling Python, inside the aggregator that
+    already refreshes `quality_scan` — means it runs whether or not an agent
+    remembers to, which is the whole point.
+
+    `--no-fail` is deliberate: exit 4 (verdict RED) is NOT a scan failure, and
+    /sdd-review owns the consolidated verdict. Letting a RED propagate as a
+    subprocess error here would make the aggregator report an infra problem
+    where there is a security finding.
+    """
+    cmd = [
+        sys.executable, "-m", "sdd_scripts.scan_patterns",
+        "--feat-number", str(feat_n), "--no-fail",
+    ]
+    try:
+        proc = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=180,
+            cwd=str(Path(__file__).resolve().parent.parent),
+        )
+    except subprocess.TimeoutExpired:
+        return False, "TIMEOUT (>180s)"
+    except OSError as exc:
+        return False, f"OSError: {exc}"
+    tail = (proc.stdout or proc.stderr or "").strip().splitlines()
+    return proc.returncode == 0, "\n".join(tail[-6:])
+
+
 def _norm_sev(s: str | None, src: str) -> str:
     if not s:
         return "info"
@@ -74,6 +107,40 @@ def _norm_sev(s: str | None, src: str) -> str:
     if src == "quality":
         return QUALITY_SEV_MAP.get(s, "info")
     return s if s in SEVERITY_RANK else "info"
+
+
+def _select_with_detector(conn, select: str, tail: str, params: tuple):
+    """Exécute `select` en ajoutant la colonne `detector` si elle existe.
+
+    Le schéma v8 l'ajoute (audit 2026-08-28). Une base restée en v7 — lue par
+    du code v8 sans être passée par `ensure_initialized` — n'a pas la colonne :
+    on retombe sur la requête d'origine, et `_is_agent_row` traite l'absence
+    de `detector` comme `'agent'`, ce qui reproduit exactement le comportement
+    antérieur. Une régression de télémétrie ne doit pas casser une lecture.
+    """
+    try:
+        return list(conn.execute(f"{select}, detector {tail}", params))
+    except sqlite3.OperationalError:
+        return list(conn.execute(f"{select} {tail}", params))
+
+
+def _is_agent_row(row) -> bool:
+    """Un finding prouve-t-il qu'un AGENT a tourné ?
+
+    Les findings déterministes (`detector='deterministic'`) alimentent le
+    verdict mais ne valent PAS preuve d'exécution de l'agent : sinon
+    `--ensure-scans` cesserait de détecter un reviewer LLM absent.
+
+    `qa_code_review` distingue en plus deux producteurs agent
+    (`agent:code-review` / `agent:arch-review`, cf. `ingest_agent_report.
+    ingest_code_review`) pour que leurs replace respectifs ne s'écrasent
+    plus — les deux valeurs restent des preuves d'exécution agent.
+    """
+    try:
+        det = row["detector"]
+    except (KeyError, IndexError, TypeError):
+        return True
+    return det in (None, "", "agent") or (isinstance(det, str) and det.startswith("agent:"))
 
 
 def fetch_findings(feat_n: int) -> tuple[list[Finding], list[str]]:
@@ -125,14 +192,15 @@ def fetch_findings(feat_n: int) -> tuple[list[Finding], list[str]]:
         # qa_code_review (LLM) — split by issue_class prefix:
         #   ARCH_* → source "arch" (emitted by arch-reviewer)
         #   *      → source "code-review" (emitted by code-reviewer)
-        for row in conn.execute(
-            "SELECT severity, issue_class, file_path, line, message "
+        for row in _select_with_detector(
+            conn, "SELECT severity, issue_class, file_path, line, message",
             "FROM qa_code_review WHERE feat_n=?", (feat_n,)
         ):
             cls = (row["issue_class"] or "").strip()
             is_arch = cls.startswith("ARCH_") or cls.startswith("[ARCH_")
             src = "arch" if is_arch else "code-review"
-            sources_present.add(src)
+            if _is_agent_row(row):
+                sources_present.add(src)
             findings.append(Finding(
                 source=src,
                 issue_class=cls or "REVIEW",
@@ -144,11 +212,12 @@ def fetch_findings(feat_n: int) -> tuple[list[Finding], list[str]]:
             ))
 
         # qa_security
-        for row in conn.execute(
-            "SELECT severity, issue_class, file_path, line, message, mode, owasp, cwe "
+        for row in _select_with_detector(
+            conn, "SELECT severity, issue_class, file_path, line, message, mode, owasp, cwe",
             "FROM qa_security WHERE feat_n=? AND (mode IS NULL OR mode='scan')", (feat_n,)
         ):
-            sources_present.add("security")
+            if _is_agent_row(row):
+                sources_present.add("security")
             findings.append(Finding(
                 source="security",
                 issue_class=row["issue_class"],

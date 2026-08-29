@@ -67,10 +67,32 @@ Read **uniquement** :
 
 1. `workspace/stack/stack.md` — sélecteur de stack + Project Config
    + blocs `## Active Database` et `## Active Auth Specs` (si présents)
-2. Les fichiers `.sdd/stacks/**/*.md` listés sous `## Active …` du
-   `stack.md` (sélectif). Pour le stack backend actif, récupérer :
-   §2.2 (Build / project_file), §2.2.1 (Init Commands), §3-§4 (scaffolding DB),
-   §5.1 (config file structure), §8.2 (connection string pattern).
+2. **`workspace/.sys/.context/packs/arch.md`** — ton **pack de contexte**, qui
+   remplace la lecture des stacks entiers (audit 2026-08-28, correction #4).
+
+   Le pack contient les sections des stacks actifs utiles à ton rôle :
+   mapping de couches, Init Commands, catalogue de libs, arborescence cible,
+   variables et ports, interdits. Il est construit **avant ton spawn** par le
+   hook de budget, tranché par rôle, et **déclare en tête ce qui a été
+   retiré** — 44 sections sur un projet type, soit -14,7 % de contexte.
+
+   Trois conséquences pour toi :
+   - **Ne Read PAS `.sdd/stacks/**/*.md` en entier.** Les 8 stacks actifs
+     pèsent 184 KB et faisaient dépasser ton budget de contexte (188 034 o >
+     180 000) sur un workspace vide — gate bloquante, pipeline arrêté avant la
+     première ligne de code.
+   - **Lis le manifeste en tête du pack.** S'il te manque une information pour
+     décider, dis-le et abaisse ta confiance — n'invente pas ce qui a été
+     retiré. Les sections écartées le sont parce qu'elles sortent de ton rôle,
+     pas parce qu'elles n'existent pas.
+   - **Si une section précise te manque vraiment** (cas rare : §2.2 Build,
+     §3-§4 scaffolding DB, §5.1 structure de config, §8.2 connection string du
+     backend actif), Read ce stack-là, **ciblé sur la section**, et jamais le
+     jeu complet.
+
+   Pack absent ou périmé → la gate de budget a déjà émis `[PACK_UNUSABLE]`
+   avant ton spawn. Reconstruire :
+   `python -m sdd_scripts.build_context_pack --agent arch`.
 3. `workspace/.sys/.context/constitution.md` — **si présent** (créé par
    `/feat-generate`). Acteurs, glossaire, ADRs tracés. Absent →
    continuer sans blocage (projet pré-SDD_Pro v3).

@@ -119,7 +119,7 @@ MariaDB (scaffold-validés, runtime live pending). SSoT : `@.sdd/docs/reverse-en
 **Support** : `elicitor`, `constitutioner`, `qa`, `specbook-writer` (vulgarise
 FEAT en langage humain, cache `workspace/docs/.sys/sections/`).
 **Auditors** : `code-reviewer`, `security-reviewer`, `spec-compliance-reviewer`,
-`arch-reviewer`, `adversarial-reviewer` (opt-in, informational).
+`arch-reviewer`, `adversarial-reviewer` (opt-out — actif par défaut, informational).
 **Reverse** (16, manifest autonome `loader.reverse.yml`) : `reverse-inventory`,
 `reverse-tech-auditor`, `reverse-tech-analyst`, `reverse-us-writer`,
 `reverse-feat-composer`, `reverse-ui-extractor`, `reverse-completeness-reviewer`,
@@ -218,5 +218,5 @@ Anti-derive, ERROR 3L disque, idempotence, lecture sélective, parallélisme bor
 - **ROI & roadmap** : `@.sdd/docs/{poc-roi-methodology,roadmap-v7-v8,cache-strategy,validated-combos,orphan-cleanup-policy}.md`
 - **Règles** : `@.sdd/rules/` (5 consolidées + 1 protocole + 1 hoist + 2 orchestration auditors + 1 annexe + 1 module reverse + 1 socle SQL — cf. §5)
 - **Skills auto-triggered** (v7.0.0+ emprunt superpowers) : `@.sdd/skills/` — 13 skills (`using-sddpro`, `starting-a-new-feat`, `starting-a-reverse-eng`, `debugging-failed-pipeline`, `test-driven-development`, `frontend-design`, `webapp-testing`, `a11y-local`, `sarif-parsing`, `semgrep`, `codeql`, `insecure-defaults`, `c4-model`) — inventaire complet dans `@.sdd/skills-manifest.yaml`.
-- **Invariants manifest** (v7.0.0+ audit P3 E4) : `@.sdd/INVARIANTS.yml` — 13 contrats load-bearing (two-stage gate, file ownership, cost cap, schema strict, TDD test-first, etc.) avec pointer vers chaque enforcer (hook/script/smoke test). Test `tests/test_invariants_manifest.py` vérifie que chaque enforcer existe sur disque. Anti-rot manifest : retirer un enforcer sans mettre à jour le manifest = FAIL au smoke.
+- **Invariants manifest** (v7.0.0+ audit P3 E4) : `@.sdd/INVARIANTS.yml` — 15 contrats load-bearing (two-stage gate, file ownership, cost cap, schema strict, TDD test-first, harness-parity, etc.) avec pointer vers chaque enforcer (hook/script/smoke test). Test `tests/test_invariants_manifest.py` vérifie que chaque enforcer existe sur disque. Anti-rot manifest : retirer un enforcer sans mettre à jour le manifest = FAIL au smoke.
 - **Python** : `@.sdd/python/README.md`

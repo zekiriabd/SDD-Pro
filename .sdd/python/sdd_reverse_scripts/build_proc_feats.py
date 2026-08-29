@@ -170,6 +170,41 @@ def read_us_index(us_dir: Path, n: int, procs: list[dict]) -> dict[str, dict]:
     return index
 
 
+# Matches both the canonical frontmatter form ("parent-feat:") and the prose
+# body form ("Parent FEAT:") that LLM analysts sometimes write.
+_PARENT_FEAT_RE = re.compile(
+    r"^((?:Parent FEAT|parent-feat):\s*)(.+?)\s*$", re.MULTILINE
+)
+
+
+def _fix_parent_feat(us_index: dict[str, dict], n: int, module_name: str) -> list[str]:
+    """Correct 'Parent FEAT: {n}-{wrong}' in every US of this module.
+
+    LLM analyst agents sometimes guess the database name instead of the module
+    name for the 'Parent FEAT:' field (BUG-1: observed on NounouJob run,
+    'parent-feat: 1-NounouJob' instead of '1-Contrat'). The assembler is the
+    only component that knows the authoritative module name from inventory, so it
+    fixes the US files in-place after loading the US index.
+    """
+    expected = f"{n}-{module_name}"
+    fixed: list[str] = []
+    for entry in us_index.values():
+        path: Path = entry["path"]
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        new_text = _PARENT_FEAT_RE.sub(
+            lambda m: m.group(1) + expected
+            if m.group(2).strip() != expected else m.group(0),
+            text,
+        )
+        if new_text != text:
+            path.write_text(new_text, encoding="utf-8", newline="")
+            fixed.append(str(path))
+    return fixed
+
+
 def build_module_feat(
     unit: dict, *, n: int, project: str, db_type: str,
     us_index: dict[str, dict] | None = None,
@@ -196,7 +231,7 @@ def build_module_feat(
     L: list[str] = []
     L.append("---")
     L.append("generated-by: sdd-reverse")
-    L.append(f"legacy-sources: [{', '.join(sources[:10]) or '(.sys/proc-snapshot)'}]")
+    L.append(f"legacy-sources: [{', '.join(sources[:10])}]")
     L.append(f"confidence: {conf}")
     L.append(f"extraction-date: {_now()}")
     L.append(f"language-detected: {language}")
@@ -338,8 +373,15 @@ def build_module_feat(
     for i, p in enumerate(procs, start=1):
         verb = _VERB_LABEL.get(p.get("verb") or "", "exécuter")
         tw = p.get("tablesWritten") or []
-        effect = (f"les données de {', '.join(tw[:3])} reflètent l'opération"
-                  if tw else "le résultat attendu est retourné")
+        us_ac = us_index.get(p["fqName"], {})
+        # BUG-3: "le résultat attendu est retourné" is non-verifiable and useless as
+        # an AC. Use the LLM title when available; fall back to a type-aware phrase.
+        if tw:
+            effect = f"les données de {', '.join(tw[:3])} reflètent l'opération"
+        elif us_ac.get("title"):
+            effect = f"le comportement attendu de « {us_ac['title']} » est reproduit"
+        else:
+            effect = f"la {_kind_label(p)} `{p['fqName']}` retourne le résultat attendu sans erreur"
         L.append(
             f"- AC-{i}: Given le module `{name}` en place, when on appelle "
             f"l'équivalent de `{p['fqName']}` ({verb}), then {effect}. "
@@ -384,6 +426,12 @@ def human_edited(path: Path) -> bool:
 
     No fingerprint at all → treated as human-owned too: a FEAT written before
     this guard existed must not be silently replaced either.
+
+    BUG-2 exception: a FEAT that was stamped before its US existed (both
+    us-analyzed and us-templated are 0) carries a fingerprint that locks in
+    empty content. Once US are available the assembler must be allowed to
+    regenerate it — otherwise the race condition between rung 1 and rung 2
+    permanently blocks the pipeline.
     """
     try:
         text = path.read_text(encoding="utf-8")
@@ -392,6 +440,10 @@ def human_edited(path: Path) -> bool:
     m = re.search(rf"^{_FINGERPRINT_KEY}:\s*([0-9a-f]+)\s*$", text, re.MULTILINE)
     if not m:
         return True
+    # Allow regeneration when the stamped FEAT had no US content yet.
+    if (re.search(r"^us-analyzed:\s*0\s*$", text, re.MULTILINE) and
+            re.search(r"^us-templated:\s*0\s*$", text, re.MULTILINE)):
+        return False
     return _fingerprint(text) != m.group(1)
 
 
@@ -443,10 +495,38 @@ def main(argv: list[str] | None = None) -> int:
                     help="overwrite a FEAT even if it was edited by a human (M5)")
     ap.add_argument("--no-covers", action="store_true",
                     help="skip the Covers back-fill in the US files")
+    ap.add_argument("--stamp", action="store_true",
+                    help="(GAP-1) add generated-fingerprint to existing sdd-reverse FEATs "
+                         "that lack one (e.g. written by reverse-sql-feat-composer). "
+                         "Content is unchanged; the stamp enables M5 protection on re-runs.")
     ap.add_argument("--json", action="store_true")
     args = ap.parse_args(argv)
 
     ws = Path(args.workspace)
+
+    # GAP-1: --stamp mode adds missing fingerprints to existing sdd-reverse FEATs.
+    # Runs before inventory loading (independent of module selection).
+    if getattr(args, "stamp", False):
+        stamped: list[str] = []
+        feats_dir_stamp = ws / "feats"
+        for feat_path in sorted(feats_dir_stamp.glob("*.md")):
+            try:
+                text = feat_path.read_text(encoding="utf-8")
+            except OSError:
+                continue
+            if "generated-by: sdd-reverse" not in text:
+                continue
+            if re.search(rf"^{_FINGERPRINT_KEY}:\s*[0-9a-f]+\s*$", text, re.MULTILINE):
+                continue  # already stamped
+            stamped_text = _stamp(text)
+            atomic_write_text(feat_path, stamped_text)
+            stamped.append(feat_path.name)
+        if args.json:
+            print(json.dumps({"stamped": stamped}, ensure_ascii=False, indent=2))
+        else:
+            print(f"[REVERSE] --stamp: {len(stamped)} FEAT(s) estampillée(s) (M5 activé).")
+        return 0
+
     inv_path = ws / "old" / args.project / ".sys" / "inventory.json"
     try:
         inventory = json.loads(inv_path.read_text(encoding="utf-8"))
@@ -466,13 +546,42 @@ def main(argv: list[str] | None = None) -> int:
             print(f"ERROR: build_proc_feats\nCAUSE: [REVERSE_UNIT_NOT_FOUND] {args.unit}", file=sys.stderr)
             return 2
 
+    # BUG-2 — Orchestration barrier: refuse to assemble a FEAT when LLM-routed
+    # objects are still missing their US (rung 1 not finished yet). --force skips
+    # the barrier (useful for debugging or re-runs where some US are intentionally
+    # absent). The check uses the `tier` field stored by the orchestrator in each
+    # procedure record: tier=none objects are deterministic and never produce a US.
+    if not args.force:
+        missing_us: list[str] = []
+        for u in units:
+            n_pre = inventory["_featAllocations"][u["id"]]
+            for p in u.get("procedures", []):
+                if (p.get("tier") or "none") == "none":
+                    continue
+                expected_us = us_dir / f"{n_pre}-{p['usIndex']}-{p['usName']}.md"
+                if not expected_us.is_file():
+                    missing_us.append(p["fqName"])
+        if missing_us:
+            print(
+                f"ERROR: build_proc_feats — barrière rung 1→2, {len(missing_us)} US manquante(s)\n"
+                f"CAUSE: [REVERSE_FEAT_VALIDATE_FAILED] objets sans US : "
+                + ", ".join(missing_us[:6]) + (" …" if len(missing_us) > 6 else "") + "\n"
+                f"FIX: attendre la fin des agents rung 1, "
+                f"puis relancer build_proc_feats.py (--force pour bypasser)",
+                file=sys.stderr,
+            )
+            return 5
+
     written: list[str] = []
     preserved: list[str] = []
     covers_updated: list[str] = []
+    parent_feat_fixed: list[str] = []
     for u in units:
         n = inventory["_featAllocations"][u["id"]]
         procs = u.get("procedures", [])
         us_index = read_us_index(us_dir, n, procs)
+        # BUG-1: correct 'Parent FEAT:' lines that LLM agents wrote incorrectly.
+        parent_feat_fixed.extend(_fix_parent_feat(us_index, n, u["suggestedName"]))
         feat, coverage = build_module_feat(
             u, n=n, project=args.project, db_type=db_type, us_index=us_index)
         out = feats_dir / f"{n}-{u['suggestedName']}.md"
@@ -495,11 +604,15 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.json:
         print(json.dumps({"written": written, "preserved": preserved,
-                          "coversUpdated": covers_updated}, ensure_ascii=False, indent=2))
+                          "coversUpdated": covers_updated,
+                          "parentFeatFixed": parent_feat_fixed},
+                         ensure_ascii=False, indent=2))
     else:
         extra = ""
         if covers_updated:
             extra += f" · {len(covers_updated)} US tracées (Covers + hash)"
+        if parent_feat_fixed:
+            extra += f" · {len(parent_feat_fixed)} US corrigées (Parent FEAT)"
         if preserved:
             extra += f" · {len(preserved)} FEAT préservée(s) (édition humaine, --force pour écraser)"
         print(f"[REVERSE] {len(written)} FEAT(s) module assemblée(s) depuis les US "

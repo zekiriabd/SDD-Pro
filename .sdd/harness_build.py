@@ -160,7 +160,7 @@ def _split_optional_frontmatter(text: str) -> tuple[dict | None, str]:
 #: SSoT décisionnelle : le pivot `.sdd/agents/*.md` reste Claude-annoté ;
 #: la traduction se fait à l'émission par harnais. Étendre au besoin
 #: (`WebSearch`, `WebFetch`, `NotebookEdit`, `ExitPlanMode`, `TodoWrite`
-#: sont aussi Claude-Code-only mais non utilisés par les 25 pivots SDD).
+#: sont aussi Claude-Code-only mais non utilisés par les 29 pivots SDD).
 _CLAUDE_ONLY_TOOLS = frozenset({"Skill", "AskUserQuestion"})
 
 

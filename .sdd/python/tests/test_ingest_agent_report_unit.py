@@ -301,6 +301,35 @@ def test_ingest_arch_review_routes_to_code_review_table(monkeypatch, fake_repo):
         assert len(rows) >= 1
 
 
+def test_ingest_code_review_and_arch_review_coexist(monkeypatch, fake_repo):
+    """Regression test — audit 2026-08-29: code-reviewer and arch-reviewer both
+    write into `qa_code_review`. Before the fix both used detector='agent', so
+    whichever ingest ran second wiped the other's rows via
+    `replace_qa_auditor_for_feat`. Distinct per-agent detector values
+    ('agent:code-review' / 'agent:arch-review') must keep both sets of
+    findings intact regardless of ingest order."""
+    code_body = {"summary": {"verdict": "warn"},
+                 "issues": [{"file": "Foo.cs", "line": 10, "issue_class": "[REVIEW_DUPLICATE_CODE]",
+                             "severity": "moderate", "message": "duplicated block"}]}
+    arch_body = {"summary": {"verdict": "warn"},
+                 "issues": [{"file": "Foo.cs", "line": 20, "issue_class": "[ARCH_PATTERN_VIOLATION]",
+                             "severity": "serious", "message": "Aggregate without Port"}]}
+    _write_report(fake_repo, "code-review", 4, code_body)
+    rc1 = _run(monkeypatch, ["--type", "code-review", "--feat", "4"])
+    assert rc1 == 0
+    _write_report(fake_repo, "arch-review", 4, arch_body)
+    rc2 = _run(monkeypatch, ["--type", "arch-review", "--feat", "4"])
+    assert rc2 == 0
+    with _db(fake_repo) as conn:
+        rows = conn.execute(
+            "SELECT issue_class FROM qa_code_review WHERE feat_n = 4"
+        ).fetchall()
+        classes = {r["issue_class"] for r in rows}
+        assert "[REVIEW_DUPLICATE_CODE]" in classes, (
+            "code-reviewer findings were wiped by the later arch-review ingest")
+        assert "[ARCH_PATTERN_VIOLATION]" in classes
+
+
 def test_ingest_replace_clears_previous_rows(monkeypatch, fake_repo):
     """A second ingest of the same feat must REPLACE prior rows."""
     body1 = {"summary": {"verdict": "red"},

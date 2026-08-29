@@ -167,12 +167,49 @@ arch:
     # (was `volatile` here only — incoherent. Tech Lead edits stack.md rarely
     # between sessions, not per-run; the 5min TTL absorbs the rare changes.)
     - workspace/stack/stack.md     # cache_layer: stable (Project Config invariant intra-session)
-    - .sdd/stacks/{cat}/{active}.md   # tous stacks actifs (sélectif — backend, frontend, ui, auth, qa, fullstack, mobiles). · cache_layer: stable
+    # ---------------------------------------------------------------------
+    # BASCULE PACK (audit 2026-08-28, correction #4 — fermeture du P0-1)
+    # ---------------------------------------------------------------------
+    # `arch` ne lit PLUS les stacks entiers. Il lit son pack, tranché par rôle.
+    #
+    # Pourquoi : mesuré sur ce dépôt, les 8 stacks actifs pèsent 184 KB et
+    # `arch` dépassait son propre budget (188 034 o > 180 000) sur un workspace
+    # VIDE — gate bloquante, pipeline arrêté avant la première ligne de code.
+    # Avec le pack : 158 KB, soit -14,7 %, sous le budget.
+    #
+    # Ce que le pack retire : `arch` bootstrappe et configure (mapping de
+    # couches, commandes d'init, catalogue de libs, arborescence, variables et
+    # ports). Il n'écrit AUCUN code applicatif — donc ni conventions d'usage,
+    # ni composants, ni styling, ni theming. 44 sections retirées, chacune
+    # DÉCLARÉE dans le manifeste en tête du pack pour que l'agent sache ce
+    # qu'il n'a pas vu et abaisse sa confiance plutôt que d'inventer.
+    #
+    # Garde-fou : une section que son auteur a marquée « load-bearing » ou
+    # « CRITIQUE » n'est jamais retirée, quel que soit le rôle. Une décision de
+    # packing n'écrase pas une décision d'auteur.
+    #
+    # Producteur garanti : le hook `preflight_agent_budget` construit le pack
+    # avant CHAQUE spawn (reconstruction seulement si l'empreinte des sources a
+    # bougé). Contrepartie : `context_budget` émet [PACK_UNUSABLE] — une ERREUR,
+    # pas un warning — si le pack est absent ou périmé. Un pack manquant pèse 0
+    # octet et aurait produit un vert éclatant sur un agent privé de contexte.
+    - workspace/.sys/.context/packs/arch.md   # pack tranché (remplace .sdd/stacks/{cat}/{active}.md + archi/{ArchiPattern}.md) · cache_layer: stable
+  # Sources DONT le pack est construit. Bloc distinct de `reads:` par
+  # nécessité : dès la bascule, `reads:` désigne le pack, et le constructeur
+  # ne peut pas y lire ses propres entrées sans circularité (un pack ne peut
+  # pas être sa propre source). `pack_sources:` est donc la déclaration
+  # explicite de ce qui entre dans le pack — et elle conserve le cadrage par
+  # dimension que `reads:` assurait auparavant.
+  #
+  # Lu par `sdd_scripts/build_context_pack.resolve_sources`, ignoré par
+  # `context_budget` (qui mesure ce que l'agent lit : le pack).
+  pack_sources:
+    - .sdd/stacks/{cat}/{active}.md        # tous stacks actifs (backend, frontend, ui, auth, qa, fullstack, mobiles)
+    - .sdd/stacks/archi/{ArchiPattern}.md  # MVC (défaut) / DDD / microservice (🟡 expérimental) — UNIQUEMENT si AppType=back-front
     # NOTE MN4 (audit 2026-06-07) — Distinction stack vs combo :
     #   - Côté STACK atomique : fullstack/* et mobiles/* restent 🟡 « experimental » (jamais validés en isolation end-to-end).
     #   - Côté COMBO (assemblage de 3-6 stacks) : 5 fullstacks (angular-universal, blazor-server, kotlin-mustache, next, nuxt) et 2 mobiles (maui Windows, react-native Expo Web) sont 🟢 bench-validated runtime 2026-06-05 dans des combos précis (cf. docs/validated-combos.md §1.3).
     # Marquage runtime via `preflight_stack_combo` (combos.json) ; la doc d'un stack reste à son tier d'isolation.
-    - .sdd/stacks/archi/{ArchiPattern}.md  # MVC (défaut) / DDD / microservice (🟡 expérimental) — UNIQUEMENT si AppType=back-front (v6.7.6+). · cache_layer: stable
     - .sdd/templates/adr.template.md  # v3 — nécessaire pour Phase D · cache_layer: stable
     - workspace/.sys/.context/constitution.md     # v3 — si présent · cache_layer: semi
     - workspace/.sys/.context/adrs/ADR-*.md       # v3 — index existants (idempotence) · cache_layer: semi
@@ -269,6 +306,7 @@ dev-backend:
     - workspace/src/{BackendName}/Mappers/
     - workspace/src/{BackendName}/Program.cs  # augment
     - workspace/plans/{n}-{m}-*.back.md    # mode :plan uniquement
+    - workspace/.sys/.state/dev-build-downgrade-{n}-{m}.flag  # sentinel Opus→Sonnet downgrade, lu par /dev-run STEP 6.a.bis
   forbidden_reads:
     - workspace/us/{other}                 # autres US
     - workspace/feats/
@@ -336,6 +374,7 @@ dev-frontend:
     - "**/*.razor.css"                  # CSS isolé adjacent
     - workspace/src/{AppName}/Program.cs   # augment éventuel
     - workspace/plans/{n}-{m}-*.front.md   # mode :plan uniquement
+    - workspace/.sys/.state/dev-build-downgrade-{n}-{m}.flag  # sentinel Opus→Sonnet downgrade, lu par /dev-run STEP 6.c.bis
   forbidden_reads:
     - workspace/us/{other}                 # autres US
     - workspace/feats/
@@ -544,7 +583,7 @@ arch-reviewer:
     - .sdd/rules/auditor-coordination.md    # matrice ownership findings 1 domaine = 1 owner (v7.0.1-dev, audit 2026-06-11 M7) · cache_layer: stable
     # Order: stable → semi → volatile (cache_control canonical order, cf. sdd_lib/cache_control.py)
     - workspace/stack/stack.md                # Project Config + Active Architecture Pattern + Active Tech Specs · cache_layer: stable
-    - .sdd/digests/error-classification.arch-reviewer.md         # taxonomie [ARCH_*] §1.18 · cache_layer: stable
+    - .sdd/digests/error-classification.arch-reviewer.md         # taxonomie [ARCH_*] §1.14 · cache_layer: stable
     - .sdd/stacks/archi/{mvc|ddd|microservice}.md  # §2 couches + §3 principes + §4 naming canonique (microservice 🟡 expérimental) · cache_layer: stable
     - .sdd/stacks/backend/{active}.md            # §1.3 layer mapping backend · cache_layer: stable
     - .sdd/stacks/frontend/{active}.md           # §1.3 layer mapping frontend · cache_layer: stable

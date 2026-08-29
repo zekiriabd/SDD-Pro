@@ -249,7 +249,15 @@ def insert_qa_a11y_batch(
 def insert_qa_code_review_batch(
     conn: sqlite3.Connection, *, feat_n: int, verdict: str | None,
     issues: Iterable[dict[str, Any]], extracted_at: str | None = None,
+    detector: str = "agent",
 ) -> int:
+    """`detector` sépare les producteurs (schema v8, audit 2026-08-28).
+
+    `'agent'` = reviewers LLM, `'deterministic'` = scan de patterns. Les deux
+    écrivent dans cette table et doivent COEXISTER : sans cette colonne, le
+    second producteur effaçait les findings du premier et affaiblissait le
+    verdict d'une gate bloquante.
+    """
     ensure_feat_row(conn, feat_n=feat_n)
     ts = extracted_at or iso_now_ms()
     rows = [(
@@ -258,13 +266,14 @@ def insert_qa_code_review_batch(
         it.get("severity"),
         it.get("file_path") or it.get("file"),
         it.get("line"), it.get("message"),
+        it.get("detector") or detector,
     ) for it in issues]
     if rows:
         conn.executemany(
             """
             INSERT INTO qa_code_review(feat_n, extracted_at, verdict, issue_class,
-                                        severity, file_path, line, message)
-            VALUES(?, ?, ?, ?, ?, ?, ?, ?)
+                                        severity, file_path, line, message, detector)
+            VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             rows,
         )
@@ -274,8 +283,14 @@ def insert_qa_code_review_batch(
 def insert_qa_security_batch(
     conn: sqlite3.Connection, *, feat_n: int, mode: str, verdict: str | None,
     issues: Iterable[dict[str, Any]], extracted_at: str | None = None,
+    detector: str = "agent",
 ) -> int:
-    """mode: 'threat-model' or 'scan'."""
+    """mode: 'threat-model' or 'scan'. `detector`: 'agent' | 'deterministic'.
+
+    Cf. `insert_qa_code_review_batch` — la colonne `detector` (schema v8)
+    permet au scan déterministe et au `security-reviewer` de coexister sur la
+    même FEAT au lieu de s'écraser.
+    """
     ensure_feat_row(conn, feat_n=feat_n)
     ts = extracted_at or iso_now_ms()
     rows = [(
@@ -284,14 +299,15 @@ def insert_qa_security_batch(
         it.get("severity"), it.get("owasp"), it.get("cwe"), it.get("stride"),
         it.get("file_path") or it.get("file"),
         it.get("line"), it.get("message"), it.get("control"),
+        it.get("detector") or detector,
     ) for it in issues]
     if rows:
         conn.executemany(
             """
             INSERT INTO qa_security(feat_n, mode, extracted_at, verdict, issue_class,
                                      severity, owasp, cwe, stride, file_path, line,
-                                     message, control)
-            VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                     message, control, detector)
+            VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             rows,
         )
@@ -357,20 +373,43 @@ def insert_qa_spec_compliance_batch(
     return len(rows)
 
 
+#: Tables portant la colonne `detector` (schema v8). Sur celles-ci, un
+#: producteur ne doit remplacer QUE ses propres lignes.
+_DETECTOR_TABLES = frozenset({"qa_code_review", "qa_security"})
+
+
 def replace_qa_auditor_for_feat(
-    conn: sqlite3.Connection, table: str, feat_n: int, mode: str | None = None
+    conn: sqlite3.Connection, table: str, feat_n: int, mode: str | None = None,
+    detector: str | None = None,
 ) -> None:
-    """Wipe prior rows for a FEAT in the given qa_* table before re-inserting."""
+    """Wipe prior rows for a FEAT in the given qa_* table before re-inserting.
+
+    `detector` (schema v8, audit 2026-08-28) borne la suppression à un seul
+    producteur. Sans lui, `scan_patterns` (déterministe) et
+    `ingest_agent_report` (reviewers LLM) — qui partagent `qa_code_review` et
+    `qa_security(mode='scan')` — s'effaçaient mutuellement : le dernier à
+    écrire faisait disparaître les findings de l'autre, et le verdict consolidé
+    de la gate 4.8 devenait plus faible que la réalité.
+
+    `detector=None` conserve le comportement historique (purge totale de la
+    FEAT) pour les tables sans cette colonne et pour les appelants qui veulent
+    explicitement tout remplacer.
+    """
     valid = {
         "qa_a11y", "qa_code_review", "qa_security", "qa_performance",
         "qa_spec_compliance",
     }
     if table not in valid:
         raise ValueError(f"unsupported table {table!r}")
+    where = ["feat_n = ?"]
+    params: list[Any] = [feat_n]
     if table == "qa_security" and mode:
-        conn.execute(f"DELETE FROM {table} WHERE feat_n = ? AND mode = ?", (feat_n, mode))
-    else:
-        conn.execute(f"DELETE FROM {table} WHERE feat_n = ?", (feat_n,))
+        where.append("mode = ?")
+        params.append(mode)
+    if detector and table in _DETECTOR_TABLES:
+        where.append("detector = ?")
+        params.append(detector)
+    conn.execute(f"DELETE FROM {table} WHERE {' AND '.join(where)}", tuple(params))
 
 
 # ============================================================

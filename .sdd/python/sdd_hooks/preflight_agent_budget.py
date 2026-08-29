@@ -36,6 +36,7 @@ from sdd_lib.hook_input import (  # noqa: E402
     get_subagent_type,
     read_hook_input,
 )
+from sdd_lib.paths import repo_root  # noqa: E402
 from sdd_lib.stderr import warn  # noqa: E402
 
 
@@ -133,6 +134,36 @@ def _resolve_mode() -> str:
     return "warn"
 
 
+def _ensure_context_pack(subagent: str) -> None:
+    """Construit (ou reconstruit) le pack de contexte de l'agent avant son spawn.
+
+    Ne reconstruit que si necessaire : `pack_is_fresh` compare l'empreinte des
+    sources au sidecar, ce qui coute quelques millisecondes contre ~70 ms de
+    slicing. Sur un run a douze spawns, la difference se voit.
+
+    Silencieux en cas de succes, WARN en cas d'echec, jamais bloquant : un
+    hook de preparation de contexte ne doit pas casser un pipeline. Si le pack
+    manque, c'est la gate de budget juste apres qui le signalera bruyamment.
+    """
+    try:
+        from sdd_scripts.build_context_pack import (
+            PACKABLE_AGENTS, build_for_agent, pack_is_fresh,
+        )
+        if subagent not in PACKABLE_AGENTS:
+            return
+        root = repo_root()
+        fresh, _reason = pack_is_fresh(subagent, root)
+        if fresh:
+            return
+        man = build_for_agent(subagent, root, write=True)
+        err = man.get("error")
+        if err:
+            warn(f"WARN preflight-agent-budget: pack {subagent} non construit ({err})")
+    except Exception as exc:  # noqa: BLE001
+        warn(f"WARN preflight-agent-budget: construction du pack {subagent} "
+             f"echouee ({exc})")
+
+
 def main() -> int:
     mode = _resolve_mode()
     if mode == "off":
@@ -165,6 +196,20 @@ def main() -> int:
     descr = get_nested(payload, "tool_input", "description", default="") or ""
     haystack = f"{prompt} {descr}"
     feat_number, us_id = extract_us_and_feat(haystack)
+
+    # Context pack : construit AVANT le spawn (audit 2026-08-28, correction #4).
+    #
+    # C'est le producteur garanti du pack. `loader.yml` fait lire à `arch` son
+    # pack au lieu des stacks entiers ; il faut donc que le pack existe et soit
+    # à jour au moment exact où l'agent démarre. Ce hook est le seul point du
+    # framework qui s'exécute systématiquement avant chaque spawn — donc le seul
+    # endroit où cette garantie peut être tenue.
+    #
+    # Best-effort et jamais bloquant : si la construction échoue, aucun pack
+    # n'est écrit, et la gate de budget qui suit refusera un pack déclaré mais
+    # absent. Le défaut est donc BRUYANT côté gate, jamais silencieux côté
+    # contexte de l'agent.
+    _ensure_context_pack(subagent)
 
     script_path = Path(__file__).resolve().parent.parent / "sdd_scripts" / "context_budget.py"
     if not script_path.is_file():

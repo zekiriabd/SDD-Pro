@@ -1,0 +1,476 @@
+# SDD_Pro INTEGRATION Registry — audit correction #2 (2026-08-28)
+#
+# ============================================================================
+# Pourquoi ce fichier existe
+# ============================================================================
+#
+# L'audit du 2026-08-28 a établi que le défaut structurel dominant du
+# framework n'est pas la qualité de ses composants déterministes, mais leur
+# CHAÎNAGE : plusieurs briques sont implémentées, testées, documentées — et
+# n'ont aucun appelant. Le motif se répète parce que celui qui devrait les
+# appeler est un LLM qui lit du Markdown, et qu'un fichier Markdown n'appelle
+# rien.
+#
+# `INVARIANTS.yml` répond à la question « ce contrat a-t-il un enforcer ? ».
+# CE fichier répond à la question suivante, qui n'était posée nulle part :
+#
+#     « ce composant est-il réellement APPELÉ, et par qui ? »
+#
+# ============================================================================
+# Le contrat (durcissement de la définition de « fait »)
+# ============================================================================
+#
+# Un composant porteur du framework n'est plus considéré comme livré à
+#
+#     implemented + unit-tested
+#
+# mais à
+#
+#     implemented + integrated + exercised + observable
+#
+#   implemented  le module existe et fait ce qu'il annonce
+#   integrated   un appelant réel le déclenche (commande, hook, autre script)
+#                — pas « un agent est censé l'invoquer »
+#   exercised    un test parcourt le chemin APPELANT → composant
+#   observable   après un run, un humain peut lire une trace de son passage
+#
+# ============================================================================
+# Statuts
+# ============================================================================
+#
+#   integrated       les 4 propriétés sont vraies. État cible.
+#   advisory         le composant tourne, mais rien ne consomme sa décision.
+#                    Coût payé, valeur non perçue. Dette réelle.
+#   orphan           aucun appelant. Code mort de fait.
+#   harness-blocked  ne PEUT pas être câblé dans le harnais courant, par
+#                    construction. Pas de la dette : une limite à documenter,
+#                    et à ne pas confondre avec un oubli.
+#
+# ============================================================================
+# Mécanisme de cliquet (le point important)
+# ============================================================================
+#
+# `tests/test_integration_registry.py` échoue si :
+#   - un `module:` déclaré n'existe pas sur disque ;
+#   - un `callers:` déclaré n'existe pas, OU ne référence pas textuellement
+#     le composant (le lien déclaré est vérifié, pas cru) ;
+#   - un composant `integrated` n'a pas d'appelant, de test d'intégration
+#     existant, et de moyen d'observation ;
+#   - un composant `advisory` / `orphan` / `harness-blocked` n'a pas de
+#     `reason` et d'`owner` ;
+#   - le nombre de composants non-`integrated` DÉPASSE `debt_ceiling`.
+#
+# Ce dernier point est le cliquet : la dette peut décroître, jamais croître.
+# Ajouter une brique non câblée exige de baisser le plafond ailleurs, ou de
+# l'assumer explicitement en modifiant ce fichier — donc en le rendant visible
+# en revue de code.
+#
+# ============================================================================
+
+schema_version: 1
+generated_at: "2026-08-28"
+audit_ref: "audit-2026-08-28 correction #2 (composants non câblés)"
+
+contract:
+  - implemented
+  - integrated
+  - exercised
+  - observable
+
+# Plafond de dette : nombre maximum de composants déclarés ci-dessous dont le
+# statut n'est pas `integrated`. Baisser cette valeur à chaque câblage ;
+# l'augmenter exige une justification en revue.
+#
+# 2026-08-28 état initial : 7 (2 advisory + 3 orphan + 2 harness-blocked)
+# 2026-08-28 après le lot de correction : 8 (+1 advisory `context-pack`, dont
+#   la consommation par les prompts reste à câbler — cf. son `exit_plan`).
+#   Le plafond MONTE ici, et c'est le comportement voulu du cliquet : ajouter
+#   une brique non consommée doit se voir en revue, pas se dissoudre dans un
+#   commit. Redescendre à 7 est la définition de « fini » pour la correction #4.
+# 2026-08-28 lot 5 : 7 (`wave-barrier` orphan → integrated, P0-4 fermé).
+#   Première baisse du plafond. C'est le seul sens dans lequel il doit bouger
+#   sans discussion.
+# 2026-08-28 lot 4 : 6 (`context-pack` advisory → integrated, P0-1 fermé).
+#   Reste : 2 advisory (complexity-router, pipeline-planner — tous deux en
+#   attente du Runner), 2 orphan (build-loop-trace, libname-lock), 2
+#   harness-blocked (prompt-cache-manifest, spawn-agent).
+debt_ceiling: 6
+
+components:
+
+  # ==========================================================================
+  # Câblés — l'état cible, listés pour que le registre ne soit pas
+  # qu'une liste de dettes et que le contrat ait des exemples vivants.
+  # ==========================================================================
+
+  - id: readiness-gate
+    module: .sdd/python/sdd_scripts/validate_readiness.py
+    symbol: validate_readiness
+    status: integrated
+    owner: sdd_scripts
+    callers:
+      - .sdd/commands/feat-validate.md
+    trigger: "/feat-validate {n} — gate 3.5 de /sdd-full"
+    output: "rapport readiness + exit code bloquant"
+    integration_test: .sdd/python/tests/test_validate_readiness.py
+    observability: "workspace/.sys/.validation/{n}-readiness.md"
+
+  - id: plan-staleness-gate
+    module: .sdd/python/sdd_scripts/validate_plan.py
+    symbol: validate_plan
+    status: integrated
+    owner: sdd_scripts
+    callers:
+      - .sdd/commands/dev-run.md
+    trigger: "/dev-run STEP 6.0.bis, avant toute invocation dev-*"
+    output: "exit 2 = [PLAN_STALE] / [PLAN_INVALID]"
+    integration_test: .sdd/python/tests/test_validate_plan.py
+    observability: "stdout --json + classe d'erreur en chat"
+
+  - id: us-dependency-graph
+    module: .sdd/python/sdd_scripts/validate_us_deps.py
+    symbol: validate_us_deps
+    status: integrated
+    owner: sdd_scripts
+    callers:
+      - .sdd/commands/dev-run.md
+    trigger: "/dev-run STEP 2.bis"
+    output: "exit 3 = cycle (Tarjan SCC), exit 4 = référence manquante"
+    integration_test: .sdd/python/tests/test_validate_us_deps.py
+    observability: "stdout + [US_DEPS_*] en chat"
+
+  - id: quality-scan
+    module: .sdd/python/sdd_scripts/quality_scan.py
+    symbol: quality_scan
+    status: integrated
+    owner: sdd_scripts
+    callers:
+      - .sdd/agents/qa.md
+    trigger: "agent qa, phase quality"
+    output: "console.db qa_quality"
+    integration_test: .sdd/python/tests/test_quality_scan.py
+    observability: "query_console_db.py quality --feat {n} --format md"
+
+  - id: acceptance-gate
+    module: .sdd/python/sdd_scripts/validate_acceptance.py
+    symbol: validate_acceptance
+    status: integrated
+    owner: sdd_scripts
+    callers:
+      - .sdd/agents/qa.md
+      - .sdd/python/sdd_hooks/validate_acceptance_gate.py
+    trigger: "SubagentStop matcher=qa (hook) + STEP 9.bis de l'agent"
+    output: "exit ≠ 0 = [ACCEPTANCE_GATE_FAILED], bloquant en mode strict"
+    integration_test: .sdd/python/tests/test_validate_acceptance.py
+    observability: "rapport acceptance + audit log"
+
+  - id: cost-cap
+    module: .sdd/python/sdd_hooks/preflight_cost_cap.py
+    symbol: preflight_cost_cap
+    status: integrated
+    owner: sdd_hooks
+    callers:
+      - .claude/settings.json
+    trigger: "PreToolUse matcher=Agent — avant chaque spawn"
+    output: "exit 2 = [COST_CAP_EXCEEDED] (bloquant)"
+    integration_test: .sdd/python/tests/test_preflight_cost_cap.py
+    observability: "console.db token_usage + stderr du hook"
+
+  - id: schema-slice
+    module: .sdd/python/sdd_scripts/generate_schema_slice.py
+    symbol: generate_schema_slice
+    status: integrated
+    owner: sdd_scripts
+    callers:
+      - .sdd/commands/dev-run.md
+    trigger: "/dev-run STEP 6.0, une passe par US avant la phase backend"
+    output: "workspace/db/schema-slice-{n}-{m}.json"
+    integration_test: .sdd/python/tests/test_generate_schema_slice_cli.py
+    observability: "_slice_metadata visible dans le rapport dev-backend"
+
+  - id: db-context-build
+    module: .sdd/python/sdd_reverse_scripts/db_context_build.py
+    symbol: db_context_build
+    status: integrated
+    owner: sdd_reverse_scripts
+    callers:
+      - .sdd/commands/sdd-db-reverse-full.md
+      - .sdd/commands/sdd-db-context.md
+    trigger: "Phase 0 du reverse base de données (obligatoire)"
+    output: "db-context.json + arbre db-context/ (packs par objet)"
+    integration_test: .sdd/python/tests/test_db_context.py
+    observability: "db-context.json.contextVersion + rapport de phase"
+
+  - id: proc-us-router
+    module: .sdd/python/sdd_reverse_scripts/build_proc_us.py
+    symbol: build_proc_us
+    status: integrated
+    owner: sdd_reverse_scripts
+    callers:
+      - .sdd/commands/sdd-db-reverse-full.md
+    trigger: "rung 1 du reverse DB — génère les US triviales, route le reste"
+    output: "US déterministes + liste needs_llm avec tier par objet"
+    integration_test: .sdd/python/tests/test_sdd_reverse_proc.py
+    observability: "stdout --json (needs_llm + tiers + raisons)"
+
+  - id: review-aggregator
+    module: .sdd/python/sdd_scripts/sdd_review.py
+    symbol: sdd_review
+    status: integrated
+    owner: sdd_scripts
+    callers:
+      - .sdd/commands/sdd-review.md
+    trigger: "/sdd-review — gate 4.8 de /sdd-full"
+    output: "verdict consolidé + exit 1 sur RED"
+    integration_test: .sdd/python/tests/test_sdd_review.py
+    observability: "query_console_db.py review --feat {n} --format md"
+
+  # --- câblés par la correction du 2026-08-28 -------------------------------
+
+  - id: pattern-scan
+    module: .sdd/python/sdd_scripts/scan_patterns.py
+    symbol: scan_patterns
+    status: integrated
+    owner: sdd_scripts
+    callers:
+      - .sdd/python/sdd_scripts/_review_fetch.py
+      - .sdd/python/sdd_scripts/sdd_review.py
+    trigger: >-
+      /sdd-review STEP 3 — re-run des scans déterministes, à côté de
+      quality_scan. Python appelle Python : le scan tourne qu'un agent y
+      pense ou non.
+    output: "console.db qa_security / qa_code_review + auditor_runs"
+    integration_test: .sdd/python/tests/test_scan_patterns.py
+    observability: "query_console_db.py security --feat {n} --format md"
+    note: >-
+      Rend exécutables les 2 catalogues de patterns qui étaient consommés par
+      personne (audit P1-1). Les agents security-reviewer / code-reviewer
+      passent de détecteurs à trieurs. Le câblage dans les commandes se fait
+      par l'agrégateur, donc à chaque /sdd-review et à la gate 4.8 de
+      /sdd-full. Périmètre publié par le scan lui-même : 11 classes
+      exécutables sur 23 côté sécurité, 5 sur 12 côté code-review — les
+      autres restent au LLM parce qu'elles exigent de comprendre un flux.
+
+  - id: agent-journal
+    module: .sdd/python/sdd_lib/journal.py
+    symbol: journal
+    status: integrated
+    owner: sdd_lib
+    callers:
+      - .sdd/python/sdd_hooks/record_token_usage.py
+      - .sdd/python/sdd_scripts/journal_cli.py
+    trigger: "PostToolUse matcher=Agent + SubagentStop — à chaque fin d'agent"
+    output: "console.db agent_journal (append-only) + blobs adressés par hash"
+    integration_test: .sdd/python/tests/test_journal.py
+    observability: "journal_cli.py show --run-id R / replay-plan --run-id R"
+
+  - id: context-pack
+    module: .sdd/python/sdd_lib/context_pack.py
+    symbol: context_pack
+    status: integrated
+    owner: sdd_lib
+    callers:
+      - .sdd/python/sdd_scripts/build_context_pack.py
+      - .sdd/python/sdd_hooks/preflight_agent_budget.py
+      - .sdd/python/sdd_scripts/context_budget.py
+    trigger: >-
+      hook PreToolUse=Agent — le pack de l'agent est construit avant CHAQUE
+      spawn (reconstruit seulement si l'empreinte de ses sources a bougé)
+    output: "pack Markdown borné + manifeste de ce qui a été retiré"
+    integration_test: .sdd/python/tests/test_context_pack.py
+    observability: "WARN PACK_PROJECTION dans le rapport de context_budget"
+    note: >-
+      Ferme le P0-1. `arch` lit désormais son pack au lieu des 8 stacks actifs :
+      `loader.yml` déclare `workspace/.sys/.context/packs/arch.md` dans ses
+      `reads:` et les stacks dans un bloc `pack_sources:` distinct (un pack ne
+      peut pas être sa propre source). Mesuré sur le dépôt : la gate de budget
+      passait de 188 034 o / exit 1 à 160 645 o / exit 0.
+
+      La contrepartie est le point important : un pack ABSENT pèse 0 octet et
+      aurait produit un vert éclatant sur un agent privé de contexte de stack ;
+      un pack PÉRIMÉ aurait nourri l'agent d'un stack d'hier. `context_budget`
+      émet donc `[PACK_UNUSABLE]` — une ERREUR, pas un avertissement — dès que
+      le pack déclaré est absent ou que l'empreinte de ses sources a changé.
+      Le gain de contexte est payé par une gate qui refuse bruyamment un pack
+      douteux au lieu de laisser passer un silence.
+
+      Reste hors périmètre de ce lot : les 3 reviewers (gain projeté -16 à
+      -21,5 %) et `constitutioner`. Leur budget est de 4 MB, donc leur gate ne
+      se déclenche jamais — le gain y serait réel en tokens mais invisible en
+      contrôle. À basculer sur le même patron, une fois celui-ci éprouvé sur
+      un run réel.
+    debt_ref: audit-2026-08-28 P0-1 / correction #4
+
+  # ==========================================================================
+  # Dette — advisory / orphan / harness-blocked
+  # Chaque entrée porte sa raison, son propriétaire et sa sortie prévue.
+  # ==========================================================================
+
+  - id: complexity-router
+    module: .sdd/python/sdd_scripts/complexity_router.py
+    symbol: complexity_router
+    status: advisory
+    owner: sdd_scripts
+    callers:
+      - .sdd/python/sdd_hooks/auto_invoke_complexity_router.py
+    trigger: "PreToolUse matcher=Skill avant /sdd-full"
+    output: "workspace/.sys/.routing/{n}-complexity.json"
+    integration_test: .sdd/python/tests/test_arg_parsers_and_router.py
+    observability: "rapport {n}-complexity.md"
+    reason: >-
+      Le script tourne et calcule un `pipeline_command` recommandé, mais
+      AUCUNE commande ne lit ce fichier : la recommandation n'est consommée
+      par personne. Le coût de calcul est nul, la valeur perçue aussi.
+    exit_plan: >-
+      Le runner (correction #1) lit le routage au démarrage et sélectionne
+      le plan de phases. Tant que le runner n'est pas autoritaire, câbler
+      ce composant reviendrait à demander au LLM de respecter une
+      recommandation — c'est-à-dire à ne rien garantir.
+    debt_ref: audit-2026-08-28 P2
+
+  - id: pipeline-planner
+    module: .sdd/python/sdd_scripts/sdd_full_planner.py
+    symbol: sdd_full_planner
+    status: advisory
+    owner: sdd_scripts
+    callers:
+      - .sdd/commands/sdd-full.md
+    trigger: "présenté comme « pattern recommandé » à côté de 19 STEPs Markdown"
+    output: "plan JSON + next-action + recap"
+    integration_test: .sdd/python/tests/test_sdd_full_planner.py
+    observability: "workspace/.sys/.state/plan-{n}.json"
+    reason: >-
+      Deux sources de vérité décrivent le même workflow (audit P1-9). Le
+      planner est optionnel, donc en pratique non emprunté ; et il a déjà
+      divergé : il déclare `manual_gates` sans émettre d'action de pause,
+      et ignore Flyway, la gate spec-compliance 4.7 et la détection de
+      drift 4.9.
+    exit_plan: >-
+      Promotion en runner autoritaire (correction #1 + #3) : le Python
+      devient la spécification, les STEPs Markdown sont régénérés depuis
+      lui. Nécessite un hook d'autorité, sans quoi le runner rejoint la
+      liste des composants advisory.
+    debt_ref: audit-2026-08-28 P1-9
+
+  - id: wave-barrier
+    module: .sdd/python/sdd_reverse/wave_barrier.py
+    symbol: wave_barrier
+    status: integrated
+    owner: sdd_reverse
+    callers:
+      - .sdd/python/sdd_reverse_scripts/db_context_build.py
+    trigger: >-
+      db_context_build.py --close-wave K — appelé à chaque barrière de vague du
+      reverse DB, entre deux vagues d'analystes SQL.
+    output: >-
+      db-context.json.findings (résumés des appelés) + packs de la vague K+1
+      régénérés pour les citer
+    integration_test: .sdd/python/tests/test_wave_barrier.py
+    observability: >-
+      ligne chat « Barrière vague K — n/m résumé(s) inscrit(s) » + rapport
+      --json (recorded / skipped / empty)
+    note: >-
+      Ferme le P0-4. `db_context.record_finding()` existait, documentée
+      « called by the orchestrator at a wave barrier », testée, et sans aucun
+      appelant : l'ordre par vagues coûtait un tri sans en tirer le bénéfice,
+      et un appelant recevait de ses appelés une matrice CRUD au lieu de leur
+      règle métier. Le résumé est EXTRAIT de l'User Story que l'agent vient
+      d'écrire (déterministe, 0 token) — un second appel LLM pour résumer un
+      texte que le premier vient de produire paierait deux fois la même
+      information et ouvrirait un écart entre l'US livrée et le résumé cité.
+      Mesuré sur le corpus de test : le pack d'un appelant passe de
+      « pas encore analysé · dbo.Stock=U » à la règle négative de l'appelé
+      (« lève RAISERROR et n'écrit rien »).
+
+  - id: build-loop-trace
+    module: .sdd/python/sdd_lib/build_loop_trace.py
+    symbol: build_loop_trace
+    status: orphan
+    owner: sdd_lib
+    callers: []
+    trigger: "devrait être écrit à chaque itération de build_loop"
+    output: "console.db build_loop_traces"
+    integration_test: .sdd/python/tests/test_build_loop_trace.py
+    observability: "table à 0 ligne — lue par report_roi, écrite par personne"
+    reason: >-
+      Le build_loop vit dans le prompt de dev-backend / dev-frontend, à
+      l'intérieur d'une seule invocation d'agent. Rien n'observe ses
+      itérations, donc le taux de convergence réel et les classes d'erreur
+      pathologiques restent inconnus.
+    exit_plan: >-
+      Sortir le build_loop de l'agent : une itération = un spawn, tracée par
+      le runner entre deux spawns. Débloque aussi le plafond de coût par US,
+      aujourd'hui aveugle à ce qui se passe pendant un agent (audit P1-6).
+    debt_ref: audit-2026-08-28 P1-6
+
+  - id: libname-lock
+    module: .sdd/python/sdd_lib/file_locks.py
+    symbol: file_locks
+    status: orphan
+    owner: sdd_lib
+    callers: []
+    trigger: "devrait sérialiser les écritures concurrentes sous {LibName}/"
+    output: "verrous exclusifs"
+    integration_test: .sdd/python/tests/test_file_locks.py
+    observability: "aucune"
+    reason: >-
+      Aucun consommateur dans le pipeline forward : `ownership.md §4`
+      documente un protocole bash artisanal (`set -C`) que le LLM doit
+      exécuter à la main, tandis que `build-and-loop.md §311` pointe vers
+      `acquire_libname_lock.py`. Deux protocoles, aucun ne passe par cette
+      bibliothèque. Seule la copie locale du reverse est utilisée.
+    exit_plan: >-
+      Supprimer le besoin plutôt que le verrou : les fichiers de composition
+      (Program.cs, DI, routing, DbContext) sortent du périmètre des agents
+      parallèles, chaque dev-* émet un fragment déclaratif, une passe
+      déterministe post-batch assemble (audit P1-5).
+    debt_ref: audit-2026-08-28 P1-5
+
+  - id: prompt-cache-manifest
+    module: .sdd/python/sdd_lib/cache_control.py
+    symbol: cache_control
+    status: harness-blocked
+    owner: sdd_lib
+    callers: []
+    trigger: "n/a"
+    output: "manifeste de breakpoints cache_control par agent"
+    integration_test: .sdd/python/tests/test_cache_control.py
+    observability: "aucune"
+    reason: >-
+      Non câblable sous Claude Code par construction : le framework ne
+      possède pas la boucle d'inférence, donc il ne posera jamais ses
+      propres marqueurs `cache_control` sur les requêtes Anthropic. Ce
+      n'est pas un oubli, c'est une limite de harnais — les 425 lignes et
+      les annotations `cache_layer` de loader.yml restent sans effet.
+    exit_plan: >-
+      Ne pas câbler ici. Le levier réellement disponible est la STABILITÉ
+      DU PRÉFIXE : un ordre de lecture strictement identique d'un spawn à
+      l'autre, du plus stable au plus volatil, produit le gain visé sans
+      marqueur. C'est ce que `context_pack` implémente. Le module ne
+      redevient pertinent que sous un harnais où SDD_Pro appelle l'API
+      directement (cf. spawn-agent).
+    debt_ref: audit-2026-08-28 P1 (levier 4)
+
+  - id: spawn-agent
+    module: .sdd/python/sdd_lib/spawn_agent.py
+    symbol: spawn_agent
+    status: harness-blocked
+    owner: sdd_lib
+    callers:
+      - .sdd/python/sdd_scripts/spawn_agent_cli.py
+    trigger: "harnais non-Claude (codex exec, gemini -p, claude -p headless)"
+    output: "complétion JSON validée contre un schéma, retry sur non-conformité"
+    integration_test: .sdd/python/tests/test_spawn_agent.py
+    observability: "stdout du CLI"
+    reason: >-
+      Sous Claude Code, seul le LLM peut appeler le tool Agent : un script
+      Python ne peut pas spawner un sous-agent du harnais. Le composant est
+      donc structurellement inutilisable dans le harnais de référence, et
+      reste marqué « non câblé au pipeline (Phase 3+) ».
+    exit_plan: >-
+      Il devient la fondation du runner en variante « driver » (Python pilote
+      le processus et appelle claude -p / le SDK en sous-processus), qui est
+      la seule variante offrant journal, replay et validation de schéma de
+      bout en bout. À trancher : mode interactif Claude Code (runner
+      autoritaire par hook) vs mode CI (runner driver via ce composant).
+    debt_ref: audit-2026-08-28 §08

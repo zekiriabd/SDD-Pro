@@ -35,10 +35,10 @@
 | Mécanisme | Claude Code | Gemini CLI | Stratégie de repli |
 |---|:---:|:---:|---|
 | Sous-agents isolés + `MaxParallel` | 🟢 native (tool Task/Agent) | 🟡 emulated | Wrapper `spawn_agent.py` mode `gemini -p` non-interactif : chaque agent = sous-processus, isolation contexte, parallélisme borné à `MaxParallel` (défaut 3). Antigravity a des agents natifs mais API d'orchestration différente — même wrapper appliqué. |
-| Hooks bloquants runtime | 🟢 native (non câblé aujourd'hui) | 🔴 ci_fallback | Idem Codex : gates pre/post-exec du wrapper + CI. **Perte réelle** : pas de blocage interactif intra-session. Les protections effectives vivent dans les 19 scripts `sdd_hooks/` invoqués par le wrapper + CI. |
+| Hooks bloquants runtime | 🟢 native (câblé — `.claude/settings.json` : PreToolUse cost-cap/TDD/ownership/env-bypass/glob-scope + SubagentStop acceptance-gate/file-ownership) | 🔴 ci_fallback | Idem Codex : gates pre/post-exec du wrapper + CI. **Perte réelle** : pas de blocage interactif intra-session — sous Gemini l'équivalent le plus proche tourne avant/après le process `gemini -p` complet, donc plus grossier que le blocage par tool-call de Claude Code. |
 | Skills auto-trigger (13 skills) | 🟢 native | 🟡 emulated | Injection statique dans `.gemini/GEMINI.md` (skills SDD-owned critiques : `using-sddpro`, `test-driven-development`). Skills outillés → commandes explicites. **Perte réelle** : pas de déclenchement contextuel automatique. |
 | Lazy-load `@file` | 🟢 native | 🟡 emulated | `@` **supporté par Gemini CLI dans les prompts** (pas en mémoire GEMINI.md — à confirmer selon version CLI). Wrapper émule l'inclusion à la volée si nécessaire. Coût contexte estimé ↑ marginal. |
-| Slash-commands (40) | 🟢 native (`.claude/commands/*.md`) | 🟢 **native** (`.gemini/commands/*.toml`) | Transpilation directe : `.gemini/commands/*.toml` avec substitution `{{args}}`. **Format natif Gemini** — pas d'émulation, byte-diff golden test (Phase 2.3). C'est le point fort du harnais Gemini. |
+| Slash-commands (41) | 🟢 native (`.claude/commands/*.md`) | 🟢 **native** (`.gemini/commands/*.toml`) | Transpilation directe : `.gemini/commands/*.toml` avec substitution `{{args}}`. **Format natif Gemini** — pas d'émulation, byte-diff golden test (Phase 2.3). C'est le point fort du harnais Gemini. |
 | Python déterministe (331 scripts) | 🟢 native | 🟢 native | Aucun repli — cœur portable. |
 | MCP | 🟢 native | 🟢 native | — |
 

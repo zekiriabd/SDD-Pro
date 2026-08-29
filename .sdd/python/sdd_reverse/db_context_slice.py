@@ -21,14 +21,31 @@ Every pack is budget-bounded and **declares what was trimmed**, so an agent that
 received a truncated view can lower its confidence knowingly instead of guessing
 confidently.
 
+What a pack gives up when it overflows is itself a design decision (audit
+2026-08-28). Relational structure is the LAST thing to go, and it goes by
+degrees, never as a block:
+
+    callers → hypotheses → callees
+        → tables at `no-index` (indexes + column defaults dropped)
+        → tables at `keys-only` (columns / PK / FK / CHECK — the load-bearing set)
+        → tables removed one at a time, read-only ones before written ones
+
+The reasoning: an unread callee still leaves a name, a routine type and a CRUD
+matrix, so the analyst can work around it and lower its confidence knowingly. An
+unknown column, foreign key or CHECK leaves nothing to work with — it makes the
+Acceptance Criteria factually wrong. The pre-2026-08-28 order dropped table
+structure BEFORE callee summaries, i.e. exactly on the fat procedures that need
+it most.
+
 Deterministic (0 token), offline, read-only on its inputs.
 
 Public API:
-    render_overview(context)                  -> str
-    render_table_card(context, qualified)     -> str
-    render_object_card(context, fq)           -> str
-    build_pack(context, fq, depth=2, budget=…) -> (str, dict)
-    write_context_tree(root, context, …)      -> dict
+    render_overview(context)                        -> str
+    render_table_card(context, qualified, detail=…) -> str
+    render_object_card(context, fq)                 -> str
+    build_pack(context, fq, depth=2, budget=…)      -> (str, dict)
+    write_context_tree(root, context, …)            -> dict
+    TABLE_DETAIL_LADDER                             -> tuple[str, ...]
 """
 from __future__ import annotations
 
@@ -176,11 +193,41 @@ def render_overview(context: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def render_table_card(context: dict[str, Any], qualified: str) -> str:
-    """One table: columns, keys, constraints, and who touches it."""
+# Degradation ladder for a table card inside a pack. A pack that no longer
+# fits its budget loses table DETAIL before it loses the table itself: an
+# unread callee can be inferred from its name and CRUD matrix, an unknown
+# column or foreign key makes the Acceptance Criteria plainly wrong.
+#   full      everything
+#   no-index  indexes and column defaults dropped
+#   keys-only columns / primary key / foreign keys / CHECK — the load-bearing set
+TABLE_DETAIL_LADDER = ("full", "no-index", "keys-only")
+
+_TABLE_DETAIL_NOTE = {
+    "no-index": "Fiche dégradée : index et valeurs par défaut retirés pour "
+                "tenir le budget de contexte.",
+    "keys-only": "Fiche dégradée : colonnes, clé primaire, clés étrangères et "
+                 "contraintes CHECK uniquement.",
+}
+
+
+def render_table_card(
+    context: dict[str, Any], qualified: str, *, detail: str = "full"
+) -> str:
+    """One table: columns, keys, constraints, and who touches it.
+
+    `detail` walks `TABLE_DETAIL_LADDER`. Whatever the level, the columns, the
+    primary key, the foreign keys and the CHECK constraints stay — they are the
+    facts an Acceptance Criteria is written against.
+    """
     table = _resolve_table(context, qualified)
     if table is None:
         return f"# Table `{qualified}`\n\n_Absente du catalogue lu._\n"
+
+    if detail not in TABLE_DETAIL_LADDER:
+        detail = "full"
+    with_defaults = detail == "full"
+    with_nullable = detail in ("full", "no-index")
+    with_indexes = detail == "full"
 
     facts = context.get("facts", {})
     usage = facts.get("tableUsage", {}).get(table["qualifiedName"], {})
@@ -188,18 +235,27 @@ def render_table_card(context: dict[str, Any], qualified: str) -> str:
             if _norm(str(r.get("from", {}).get("entity"))) == _norm(table["qualifiedName"])
             or _norm(str(r.get("to", {}).get("entity"))) == _norm(table["qualifiedName"])]
 
-    lines = [
-        f"# Table `{table['qualifiedName']}`",
-        "",
-        "| Colonne | Type | PK | Null | Défaut |",
-        "|---|---|:-:|:-:|---|",
-    ]
+    header = ["Colonne", "Type", "PK"]
+    align = ["---", "---", ":-:"]
+    if with_nullable:
+        header.append("Null")
+        align.append(":-:")
+    if with_defaults:
+        header.append("Défaut")
+        align.append("---")
+
+    lines = [f"# Table `{table['qualifiedName']}`", ""]
+    if detail in _TABLE_DETAIL_NOTE:
+        lines += [f"> {_TABLE_DETAIL_NOTE[detail]}", ""]
+    lines += ["| " + " | ".join(header) + " |", "|" + "|".join(align) + "|"]
+
     for c in table["columns"]:
-        lines.append(
-            f"| `{c['name']}` | `{c['type']}` | {'✓' if c['primaryKey'] else ''} | "
-            f"{'✓' if c['nullable'] else ''} | "
-            f"{('`' + str(c['default']) + '`') if c['default'] else ''} |"
-        )
+        cells = [f"`{c['name']}`", f"`{c['type']}`", "✓" if c["primaryKey"] else ""]
+        if with_nullable:
+            cells.append("✓" if c["nullable"] else "")
+        if with_defaults:
+            cells.append(("`" + str(c["default"]) + "`") if c["default"] else "")
+        lines.append("| " + " | ".join(cells) + " |")
     lines.append("")
 
     if table["checks"]:
@@ -218,7 +274,7 @@ def render_table_card(context: dict[str, Any], qualified: str) -> str:
                 f"`{t_.get('entity')}.{t_.get('field')}` (`{r.get('name')}`)")
         lines.append("")
 
-    if table["indexes"]:
+    if with_indexes and table["indexes"]:
         lines += ["## Index", ""]
         for i in table["indexes"]:
             flags = " ".join(f for f, on in (("unique", i["unique"]), ("pk", i["primary"])) if on)
@@ -347,6 +403,26 @@ def _callee_block(context: dict[str, Any], fq: str, depth: int) -> list[str]:
     return lines
 
 
+def _table_section(
+    context: dict[str, Any], touched: list[str], detail: str
+) -> list[str]:
+    """The `## Structure des tables touchées` block, at one detail level."""
+    lines = ["## Structure des tables touchées", ""]
+    for raw in touched:
+        table = _resolve_table(context, raw)
+        if table is None:
+            lines.append(f"### `{raw}`\n\n_Absente du catalogue lu._\n")
+            continue
+        card = render_table_card(context, table["qualifiedName"], detail=detail)
+        body = card.split("\n", 1)[1] if "\n" in card else ""
+        # Drop the "objects that touch it" section: in a pack it is noise.
+        body = body.split("## Objets qui la touchent")[0]
+        lines.append(f"### `{table['qualifiedName']}`")
+        lines.append(body.rstrip())
+        lines.append("")
+    return lines
+
+
 def build_pack(
     context: dict[str, Any],
     fq: str,
@@ -398,22 +474,8 @@ def build_pack(
         ]))
 
     touched = sorted({*(obj.get("tablesRead") or []), *(obj.get("tablesWritten") or [])})
-    table_lines: list[str] = []
     if touched:
-        table_lines = ["## Structure des tables touchées", ""]
-        for raw in touched:
-            table = _resolve_table(context, raw)
-            if table is None:
-                table_lines.append(f"### `{raw}`\n\n_Absente du catalogue lu._\n")
-                continue
-            card = render_table_card(context, table["qualifiedName"])
-            body = card.split("\n", 1)[1] if "\n" in card else ""
-            # Drop the "objects that touch it" section: in a pack it is noise.
-            body = body.split("## Objets qui la touchent")[0]
-            table_lines.append(f"### `{table['qualifiedName']}`")
-            table_lines.append(body.rstrip())
-            table_lines.append("")
-        sections.append(("tables", table_lines))
+        sections.append(("tables", _table_section(context, touched, "full")))
 
     callee_lines = _callee_block(context, obj["fqName"], depth)
     if callee_lines:
@@ -446,27 +508,93 @@ def build_pack(
         hyp_lines.append("")
         sections.append(("hypotheses", hyp_lines))
 
-    # Assemble, then trim in a declared order until the budget is met.
-    trim_order = ["callers", "hypotheses", "tables", "callees"]
+    # Assemble, then reduce in a declared order until the budget is met.
+    #
+    # `tables` now comes LAST, after `callees` — and it degrades by steps before
+    # it is dropped at all. Rationale (audit 2026-08-28): an unread callee still
+    # leaves a name, a routine type and a CRUD matrix in the pack, so the analyst
+    # can reason around it and lower its confidence knowingly. An unknown column,
+    # foreign key or CHECK leaves nothing to reason with — it makes the
+    # Acceptance Criteria factually wrong. The previous order removed the
+    # structure of a fat procedure's tables first, i.e. exactly on the objects
+    # that need it most.
+    trim_order = ["callers", "hypotheses", "callees"]
     trimmed: list[str] = []
-    while True:
-        body = "\n".join(head + [l for _, block in sections for l in block])
-        if len(body) <= budget or not sections:
-            break
-        for candidate in trim_order:
-            idx = next((i for i, (k, _) in enumerate(sections) if k == candidate), None)
-            if idx is not None:
-                trimmed.append(candidate)
-                sections.pop(idx)
-                break
-        else:
+    table_detail = "full"
+    kept_tables = list(touched)
+
+    # Once the detail ladder is exhausted, tables go one at a time rather than
+    # all at once — dropping the whole block to save the last hundred bytes
+    # would repeat, in miniature, the very pathology this ordering fixes.
+    # Read-only tables go first: the tables the object WRITES are where its
+    # Acceptance Criteria live.
+    _written = {_norm(t) for t in (obj.get("tablesWritten") or [])}
+    drop_order = ([t for t in reversed(touched) if _norm(t) not in _written]
+                  + [t for t in reversed(touched) if _norm(t) in _written])
+
+    def _assemble() -> str:
+        return "\n".join(head + [l for _, block in sections for l in block])
+
+    def _index_of(key: str) -> int | None:
+        return next((i for i, (k, _) in enumerate(sections) if k == key), None)
+
+    while sections:
+        body = _assemble()
+        if len(body) <= budget:
             break
 
+        idx = next((i for i in (_index_of(k) for k in trim_order) if i is not None), None)
+        if idx is not None:
+            trimmed.append(sections[idx][0])
+            sections.pop(idx)
+            continue
+
+        ti = _index_of("tables")
+        if ti is None:
+            break
+
+        step = TABLE_DETAIL_LADDER.index(table_detail) + 1
+        if step < len(TABLE_DETAIL_LADDER):
+            table_detail = TABLE_DETAIL_LADDER[step]
+            sections[ti] = ("tables", _table_section(context, kept_tables, table_detail))
+            trimmed.append(f"tables:{table_detail}")
+            continue
+
+        victim = next((t for t in drop_order if t in kept_tables), None)
+        if victim is None:
+            trimmed.append("tables")
+            sections.pop(ti)
+            continue
+        kept_tables.remove(victim)
+        trimmed.append(f"tables:-{victim}")
+        if kept_tables:
+            sections[ti] = ("tables", _table_section(context, kept_tables, table_detail))
+        else:
+            sections.pop(ti)
+
+    body = _assemble()
+
     if trimmed:
-        body += (
-            "\n\n---\n\n> ⚠️ **Pack tronqué** pour tenir le budget de contexte. "
-            f"Sections retirées : {', '.join(f'`{t}`' for t in trimmed)}. "
-            "Baisser la confidence en conséquence.\n")
+        removed = [t for t in trimmed if not t.startswith("tables:")]
+        degraded = [t.split(":", 1)[1] for t in trimmed
+                    if t.startswith("tables:") and not t.startswith("tables:-")]
+        dropped_tables = [t.split(":-", 1)[1] for t in trimmed if t.startswith("tables:-")]
+        notice = ["\n\n---\n\n> ⚠️ **Pack tronqué** pour tenir le budget de contexte."]
+        if removed:
+            notice.append(
+                " Sections retirées : " + ", ".join(f"`{t}`" for t in removed) + ".")
+        if degraded:
+            notice.append(
+                " Fiches de tables dégradées jusqu'à "
+                f"`{degraded[-1]}` (colonnes, clé primaire, clés étrangères et "
+                "CHECK conservés).")
+        if dropped_tables:
+            notice.append(
+                " Tables retirées faute de place : "
+                + ", ".join(f"`{t}`" for t in dropped_tables)
+                + " — leur structure n'a PAS été lue.")
+        notice.append(" Baisser la confidence en conséquence.\n")
+        body += "".join(notice)
 
     return body, {
         "object": obj["fqName"],
@@ -474,6 +602,7 @@ def build_pack(
         "bytes": len(body),
         "depth": depth,
         "trimmed": trimmed,
+        "tableDetail": table_detail,
         "wave": plan_metrics.get("wave"),
     }
 
@@ -503,6 +632,15 @@ def write_context_tree(
             render_table_card(context, table["qualifiedName"]))
         written["tables"] += 1
 
+    # Import here (not at module level) to preserve D4 isolation: this module is
+    # imported by tests that do NOT have the full sdd_reverse package in sys.path,
+    # and tier routing is only needed for the pack-skip optimisation.
+    try:
+        from sdd_reverse.db_tier_router import tier_for as _tier_for
+        _has_router = True
+    except ImportError:
+        _has_router = False
+
     pack_reports: list[dict[str, Any]] = []
     for obj in facts.get("objects", []):
         fq = str(obj["fqName"])
@@ -511,6 +649,18 @@ def write_context_tree(
             render_object_card(context, fq))
         written["objects"] += 1
         if with_packs:
+            # 🟡 Efficiency: tier=none objects are handled by the deterministic
+            # template path (build_proc_us.py) and their pack is never consumed by
+            # any LLM agent. Generating it wastes I/O and context budget.
+            obj_tier = "none"
+            if _has_router:
+                try:
+                    obj_tier, _ = _tier_for(obj)
+                except Exception:
+                    obj_tier = "fast"  # fail-safe: when in doubt, generate the pack
+            if obj_tier == "none":
+                written["packs"] += 0  # counted but not written
+                continue
             body, report = build_pack(context, fq, depth=depth, budget=budget)
             atomic_write_text(root / "packs" / f"{_safe(fq)}.md", body)
             pack_reports.append(report)

@@ -209,11 +209,37 @@ rend un second run quasi gratuit après une interruption.
       | trigger | `reverse-sql-trigger-analyst` | un invariant déclenché par un événement |
 
       Chaque agent reçoit `{U-N} --object {fq}` et lit **son pack**, pas la base.
-   b. **barrière de vague** : écrire les résumés produits dans
-      `db-context.json.findings` (par l'orchestrateur, en une passe atomique —
-      les agents n'écrivent que leur US, donc les écritures restent disjointes et
-      le parallélisme reste sûr sans nouveau verrou), puis régénérer les packs
-      de la vague suivante, qui citeront ces résumés au lieu de signaux bruts.
+   b. **barrière de vague** — un seul appel déterministe (0 token), après que
+      tous les agents de la vague `K` ont rendu leur US :
+      ```bash
+      python .sdd/python/sdd_reverse_scripts/db_context_build.py \\
+        --project workspace/old/{DB} --close-wave {K}
+      ```
+      Il inscrit dans `db-context.json.findings` le résumé de chaque objet de
+      la vague dont l'US existe, puis régénère **les packs de la vague `K+1`**
+      — qui citeront ces résumés au lieu de signaux bruts. Les agents
+      n'écrivent que leur US ; la barrière est la seule écriture sur le
+      contexte, en une passe atomique, donc le parallélisme intra-vague reste
+      sûr sans nouveau verrou.
+
+      Le résumé est **extrait** de l'US, jamais re-généré : un second appel LLM
+      pour résumer un texte que le premier vient de produire paierait deux fois
+      la même information et ouvrirait un écart entre l'US livrée et le résumé
+      que ses appelants vont citer.
+
+      Idempotent (relancer une barrière déjà fermée ne change rien) et honnête :
+      un objet sans US est rapporté `skipped` — cas normal, il n'était pas routé
+      LLM ou le cache l'a sauté — et une US sans titre ni AC exploitable produit
+      un résumé **vide signalé** (`empty`) plutôt qu'une phrase fabriquée.
+      Reprise partielle d'une vague : `--record-finding {fq} --from-us {path}`.
+
+      > Audit 2026-08-28 (P0-4) : cette étape n'était pas exécutable. La
+      > fonction `record_finding` existait, documentée « called by the
+      > orchestrator at a wave barrier » et testée, mais sans appelant ni point
+      > d'entrée CLI — la commande demandait une écriture atomique sans fournir
+      > l'outil. Le plan de vagues payait donc le prix d'un tri sans en tirer le
+      > bénéfice : un appelant lisait `dbo.Stock=U` là où il pouvait lire
+      > « lève RAISERROR et n'écrit rien ».
 
    `--sequential` force une vague par objet (débogage). Une **composante
    récursive** (cycle mutuel ou auto-appel) est confiée d'un bloc à un seul

@@ -80,7 +80,7 @@ FIX: renseigner FrontendName et BackendName dans ## Project Config
 
 | Stack actif | Répertoire | Commande de run |
 |---|---|---|
-| `backend/kotlin-spring-boot` | `workspace/src/{BackendName}/` | `./gradlew bootRun` (PowerShell : `.\gradlew.bat bootRun`) |
+| `backend/kotlin-spring-boot` | `workspace/src/{BackendName}/` | `./gradlew bootRun` (Python : `.\gradlew.bat bootRun`) |
 | `backend/dotnet-minimalapi` | `workspace/src/{BackendName}/` | `dotnet run --project {BackendName}.csproj` |
 | `backend/python-fastapi` | `workspace/src/{BackendName}/` | `uvicorn app.main:app --reload --port 8000` |
 | `backend/node-express` | `workspace/src/{BackendName}/` | `npm run dev` (fallback `npm start`) |
@@ -145,8 +145,8 @@ cd workspace/src/CMSPrintFront && npm run dev
 cd workspace/console && npm start
 ```
 
-PowerShell : utiliser `Set-Location` + `&` au lieu de `cd && cmd` car
-`&&` n'existe pas en PowerShell 5.1. Préférer le tool Bash (Git Bash
+Python : utiliser `Set-Location` + `&` au lieu de `cd && cmd` car
+`&&` n'existe pas en Python 5.1. Préférer le tool Bash (Git Bash
 sur Windows) qui supporte `&&`.
 
 Chaque process retourne un `bash_id`. Conserver les 3 IDs pour STEP 5.
