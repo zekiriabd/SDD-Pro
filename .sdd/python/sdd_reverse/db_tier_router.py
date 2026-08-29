@@ -92,7 +92,11 @@ def tier_for(rec: dict[str, Any]) -> tuple[str, list[str]]:
         bump("fast", "raises=" + ",".join(sorted(rec.get("raises") or [])[:3]))
     if lines > FAST_MAX_LINES:
         bump("balanced", f"lines={lines}")
-    if len(params) >= 4:
+    # Params alone are not a complexity signal: a getter/setter with 7 params but
+    # zero branches, zero raises and zero calls is still trivially readable — the
+    # 2026-08-26 run showed 6 Insert/Update procedures with 4-7 params that were
+    # sent to Sonnet unnecessarily because of this check.
+    if len(params) >= 4 and (branches or rec.get("raises") or calls or lines > FAST_MAX_LINES):
         bump("fast", f"params={len(params)}")
     if len(written) >= 2:
         bump("balanced", f"writes={len(written)}-tables")

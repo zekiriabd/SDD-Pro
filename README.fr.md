@@ -1,4 +1,4 @@
-# SDD_Pro
+# SDD_Pro — L'ingénierie logicielle agentique, industrialisée
 
 **Le framework qui refuse de livrer du code que personne n'a validé.**
 
@@ -472,6 +472,37 @@ caché dans le contexte du LLM. Le pipeline est **backend-first et gated**
 silencieux de contrat entre le front et le back. Enfin, il est **harness-agnostique** :
 la couche source `.sdd/` est compilée en façades par harness — même logique de pipeline
 sous Claude Code, Codex, Gemini CLI ou Antigravity.
+
+---
+
+## 🗺️ Schémas visuels
+
+Trois schémas, un par pipeline — chaque agent, chaque gate, chaque embranchement
+parallèle dessiné tel qu'il tourne réellement.
+
+### A — Pipeline forward
+![Schéma du pipeline forward — de la FEAT au code livré](https://i.imgur.com/UkbM1fw.jpeg)
+
+FEAT → User Stories → backend (parallèle par User Story, gaté par un API Gate en
+mémoire) → frontend (parallèle) → QA → la revue à deux étages (spec-compliance seule
+d'abord, puis code / sécurité / architecture en parallèle) → une passe adversariale →
+un verdict unique vert / jaune / rouge.
+
+### B — Reverse engineering : code legacy
+![Schéma du reverse engineering — du code legacy à la FEAT](https://i.imgur.com/3pzuVfD.jpeg)
+
+Inventaire → audit technique et analyse de gap de paradigme → l'escalier à trois
+barreaux (analyse technique fidèle → User Stories → composition de la FEAT, la
+confiance ne remonte jamais en grimpant) → FEATs transversales obligatoires → revue de
+complétude → mockups UI → boucle de validation humaine pour ce qui reste ouvert.
+
+### C — Reverse engineering : base de données
+![Schéma du reverse engineering — de la base de données à la FEAT](https://i.imgur.com/tgk0721.jpeg)
+
+Database Context (faits déterministes, puis hypothèses de l'architecte par-dessus) →
+dispatch par vagues de dépendance — un objet SQL n'est analysé qu'une fois tout ce
+qu'il appelle déjà analysé — vers quatre analystes SQL spécialisés → composition de la
+FEAT → un double REVERSE-GATE avant toute entrée dans `/sdd-full`.
 
 ---
 

@@ -54,22 +54,33 @@ Argument requis : `{DbProject}` (dossier sous `workspace/old/`).
 
 ## STEP 1 — Lecture sélective stricte (digest, jamais le catalogue brut)
 
-Lire **uniquement** :
+Lire **dans cet ordre** :
 
-1. `.sys/db-context/_overview.md` — volumétrie, plan de vagues, tables les plus
-   sollicitées, appels non résolus.
-2. `.sys/db-context.json` → `facts.tableMetrics`, `facts.relations`,
-   `facts.summary`, `executionPlan.stats`, `executionPlan.unresolvedCallees`.
+1. **`.sys/db-context.digest.json`** — digest pré-tranché par Phase 0.A
+   (≤ 20 KB sur une base de 300 objets). Contient :
+   `contextVersion`, `database`, `summary`, `tableMetrics`, `relations`,
+   `catalogObjects`, `objectInventory` (signaux compacts par objet : type, lignes,
+   branches, dynamicSql, encrypted, callCount, tablesRead/WrittenCount),
+   `executionPlan.stats`, `executionPlan.unresolvedCallees`.
+   **C'est le seul fichier qui contient `contextVersion`** — copie-le fidèlement
+   dans ta sortie (STEP 4).
+
+2. `.sys/db-context/_overview.md` — vue narrative : volumétrie, vagues, hot tables.
+
 3. Les fiches `.sys/db-context/tables/*.md` des **tables pivot uniquement**
-   (les mieux classées dans `tableMetrics`, plafond `ContextDigestBudget`,
-   défaut 25). Leurs contraintes `CHECK` sont la matière la plus riche.
-4. La **liste des noms** d'objets par famille (`procedures/`, `functions/`,
-   `views/`, `triggers/`) — les noms, pas les fiches.
+   (celles avec le plus d'objets dans `tableMetrics`, plafond 25).
+   Leurs colonnes, PK/FK et contraintes `CHECK` sont la matière la plus riche.
+
+4. (optionnel) La **liste des noms** d'objets par famille via Glob sur
+   `procedures/`, `functions/`, `views/`, `triggers/` — les noms seuls,
+   pas les fiches. Utile pour vérifier la couverture de ton découpage en
+   sous-domaines.
 
 **Interdit absolu** : aucune connexion à une base, aucun `.sys/proc-snapshot/*.sql`,
-aucune fiche d'objet, aucun `Bash` autre que de la lecture. Sur une base de
-3 000 objets, lire large ne te rendrait pas plus juste — seulement plus cher et
-plus bavard.
+aucun `db-context.json` complet, aucune fiche d'objet, aucun `Bash` autre que de
+la lecture. Sur une base de 300 objets, `db-context.json` peut peser 500 KB+ ;
+`db-context.digest.json` te donne les mêmes signaux en < 20 KB — lire le fichier
+complet ne te rendrait pas plus juste, seulement plus cher et plus bavard.
 
 ## STEP 2 — Interpréter
 

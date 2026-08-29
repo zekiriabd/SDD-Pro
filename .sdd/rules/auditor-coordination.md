@@ -31,7 +31,7 @@ paths:
 | Layer violation **intra-fichier** (DbContext dans UI, business dans controller) | `code-reviewer` | `[LAYER_VIOLATION]` | — |
 | Layer bypass **cross-fichier** + patterns archi (MVC/DDD), drift ADR, constitution gap | `arch-reviewer` (opt-in `ArchReviewMode: full`) | `[ARCH_*]` (§1.14) | code-reviewer s'arrête au niveau fichier |
 | Conformité AC-by-AC (chaque AC implémentée dans le code matérialisé) | `spec-compliance-reviewer` (Stage A gate) | `[SPEC_*]` (§1.13) | aucun autre reviewer ne lit les ACs |
-| Edge cases, hypothèses fragiles, dette masquée, failure modes, UX confusion | `adversarial-reviewer` (opt-in, informational) | `[ADV_*]` (§1.15) | drop obligatoire de toute attaque chevauchant un finding déjà émis (même file:line) |
+| Edge cases, hypothèses fragiles, dette masquée, failure modes, UX confusion | `adversarial-reviewer` (opt-out — actif par défaut, informational) | `[ADV_*]` (§1.15) | drop obligatoire de toute attaque chevauchant un finding déjà émis (même file:line) |
 | Accessibilité WCAG / Perf Core Web Vitals | ingests CI déterministes (`ingest_axe.py`, `ingest_lighthouse.py`) | `[A11Y_*]`/`[PERF_*]` (héritage) | aucun agent LLM (retraits v7.0.0) |
 | Coverage, tests unitaires, API gate | agent `qa` | `[QA_*]` (§1.7) | reviewers ne lancent jamais de tests |
 

@@ -262,6 +262,55 @@ def _persist_to_db(entry: dict[str, Any]) -> None:
             cache_creation_tokens=int(entry.get("cache_creation_input_tokens") or 0),
             cache_read_tokens=int(entry.get("cache_read_input_tokens") or 0),
         )
+        _record_journal_entry(conn, entry, run_id)
+
+
+def _record_journal_entry(conn, entry: dict[str, Any], run_id: str | None) -> None:
+    """Append the same event to `agent_journal` (audit 2026-08-28, correction #5).
+
+    `token_usage` answers « combien ». The journal answers « quoi, pour qui,
+    avec quelle fiabilité de prix, et avec quelle issue » — and it is the only
+    table that carries `pricing_source`, without which a cost total silently
+    mixes real Opus rates with Sonnet fallback rates.
+
+    Two deliberate limits of what a hook can know, recorded honestly rather
+    than guessed :
+
+    - `outcome` is `ok` on SubagentStop (the agent completed) and `unknown` on
+      PostToolUse (the tool returned, which does not prove the agent
+      succeeded). Writing `ok` everywhere would make the `failed` counter a
+      decoration.
+    - `context_hash` stays NULL. The hook does not assemble the agent's
+      context, so it cannot hash it. It becomes populated when the runner
+      builds the pack (correction #1 + #4) — and `replay_plan()` already
+      treats a missing hash as « not replayable » rather than as a cache hit.
+
+    Never raises : telemetry must not break a pipeline.
+    """
+    try:
+        from sdd_lib import journal
+        hook_event = str(entry.get("hook_event") or "")
+        outcome = "ok" if hook_event.startswith("SubagentStop") else "unknown"
+        journal.record(
+            conn,
+            agent=entry.get("subagent_type") or hook_event or "unknown",
+            kind="agent",
+            ts=entry.get("ts"),
+            run_id=run_id,
+            feat_n=entry.get("feat"),
+            us_id=entry.get("us_id"),
+            phase=entry.get("subagent_type"),
+            model=entry.get("model"),
+            input_tokens=int(entry.get("input_tokens") or 0),
+            output_tokens=int(entry.get("output_tokens") or 0),
+            cache_read_tokens=int(entry.get("cache_read_input_tokens") or 0),
+            cache_creation_tokens=int(entry.get("cache_creation_input_tokens") or 0),
+            outcome=outcome,
+            decision=hook_event or None,
+            notes=f"usage_source={entry.get('usage_source_path') or 'none'}",
+        )
+    except Exception:
+        pass
 
 
 def _debug_dump_payload(payload: dict[str, Any], audit_dir: Path) -> None:

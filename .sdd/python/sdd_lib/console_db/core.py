@@ -23,7 +23,7 @@ from typing import Any, Iterator
 
 from sdd_lib.paths import workspace_root, iso_now_ms, repo_root
 
-SCHEMA_VERSION = 6  # v7.0.0+ : v2 +qa_mutation, v3 +qa_e2e, v4 +auditor_runs (C3 fix), v5 +qa_api_tests.status (P3), v6 +build_loop_traces (audit CTO 2026-06-09 Bug #16 — migration 0006 stranded)
+SCHEMA_VERSION = 8  # v7.0.0+ : v2 +qa_mutation, v3 +qa_e2e, v4 +auditor_runs (C3 fix), v5 +qa_api_tests.status (P3), v6 +build_loop_traces (audit CTO 2026-06-09 Bug #16 — migration 0006 stranded), v7 +agent_journal (audit 2026-08-28 correction #5 — traçabilité/replay), v8 +qa_*.detector (audit 2026-08-28 — anti-clobbering agent vs déterministe)
 # BASE_SCHEMA_VERSION is the version represented by ``console_db_schema.sql``
 # itself (the "v1" full snapshot). When ``SCHEMA_VERSION`` exceeds it, the
 # difference is bridged by forward migrations under ``migrations/``.

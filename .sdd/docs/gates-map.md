@@ -51,6 +51,7 @@
 |---|---|---|---|---|
 | PreToolUse Agent | Coût cumulé par run | **primaire** | `sdd_hooks/preflight_cost_cap.py` | `SDD_DISABLE_COST_CAP=1` |
 | PreToolUse Agent | Context budget par agent | **primaire** | `sdd_hooks/preflight_agent_budget.py` | config |
+| PostToolUse/SubagentStop Agent | Télémétrie coût réel (`token_usage`, source de `preflight_cost_cap.py`) | **defense-in-depth** (alimente le cap ci-dessus) | `sdd_hooks/record_token_usage.py` | n/a |
 | PreToolUse Agent | Séquencement two-stage auditors | **defense-in-depth** (de 6.4.A) | `sdd_hooks/enforce_two_stage_auditor.py` | `AuditorBatchMode: legacy-parallel` |
 | PreToolUse Skill | Combo stack hors SLA | **primaire** | `sdd_hooks/preflight_stack_combo.py` | `SDD_ALLOW_UNTESTED_COMBO=1` |
 | PreToolUse Edit/Write | TDD test-first | **primaire** (warn interactif / strict CI) | `sdd_hooks/enforce_tdd.py` | `SDD_DISABLE_TDD=1` |

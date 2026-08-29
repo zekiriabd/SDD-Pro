@@ -270,7 +270,7 @@ class TestSnapshotAndEvidence(unittest.TestCase):
 
     def test_snapshot_file_written_and_entity_evidence_points_at_it(self):
         import tempfile
-        with tempfile.TemporaryDirectory() as td:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as td:
             root = Path(td)
             schema = self._write(root)
             ent = schema["entities"][0]
@@ -281,7 +281,7 @@ class TestSnapshotAndEvidence(unittest.TestCase):
 
     def test_each_column_evidence_points_at_its_own_line(self):
         import tempfile
-        with tempfile.TemporaryDirectory() as td:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as td:
             root = Path(td)
             schema = self._write(root)
             snap = (root / ".sys" / "schema-snapshot" / "dbo.Clients.sql")
@@ -293,7 +293,7 @@ class TestSnapshotAndEvidence(unittest.TestCase):
 
     def test_snapshot_documents_keys_indexes_and_checks(self):
         import tempfile
-        with tempfile.TemporaryDirectory() as td:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as td:
             root = Path(td)
             self._write(root)
             text = (root / ".sys" / "schema-snapshot" / "dbo.Clients.sql").read_text(encoding="utf-8")
@@ -305,7 +305,7 @@ class TestSnapshotAndEvidence(unittest.TestCase):
 
     def test_catalog_objects_snapshot_gives_jobs_an_evidence_line(self):
         import tempfile
-        with tempfile.TemporaryDirectory() as td:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as td:
             root = Path(td)
             schema = self._write(root)
             job = schema["catalogObjects"][0]
@@ -317,7 +317,7 @@ class TestSnapshotAndEvidence(unittest.TestCase):
 
     def test_db_schema_json_is_written_and_parseable(self):
         import tempfile
-        with tempfile.TemporaryDirectory() as td:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as td:
             root = Path(td)
             self._write(root)
             data = json.loads((root / ".sys" / "db-schema.json").read_text(encoding="utf-8"))
@@ -328,7 +328,7 @@ class TestSnapshotAndEvidence(unittest.TestCase):
         """reverse_synth / reverse-tech-analyst read this shape — it must not drift."""
         import tempfile
         from sdd_reverse.db_schema_extractor import DB_SCHEMA_VERSION
-        with tempfile.TemporaryDirectory() as td:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as td:
             schema = self._write(Path(td))
         for key in ("schemaVersion", "project", "extractDate", "source",
                     "completeness", "databaseType", "entities", "relations",

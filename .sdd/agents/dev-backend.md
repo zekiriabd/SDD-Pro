@@ -399,8 +399,8 @@ en cours sur cette US dépasse `BuildLoopMaxCostUsd * 0.5` (par défaut
 $7.50), **downgrade automatique** : la dernière tentative tourne sur
 Sonnet 4.6 (≈5× moins cher qu'Opus 4.8) plutôt que sur Opus. Sentinel
 fichier `workspace/.sys/.state/dev-build-downgrade-{n}-{m}.flag`
-écrit par `dev-backend` ; lu par l'orchestrateur (`/dev-run` STEP 6.b)
-qui re-spawn `dev-backend` avec `--fallback-model sonnet`. Justification
+écrit par `dev-backend` ; lu par l'orchestrateur (`/dev-run` STEP 6.a.bis)
+qui re-spawn `dev-backend` avec `model=sonnet`. Justification
 post-mortem : les erreurs `[BUILD_CORRECTIBLE]` qui survivent à 2 retries
 Opus sont rarement résolues par un 3e retry Opus identique — un changement
 de modèle apporte une perspective nouvelle pour le même prix qu'un retry

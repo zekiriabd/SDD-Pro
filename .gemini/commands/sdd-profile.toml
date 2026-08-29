@@ -59,7 +59,7 @@ Tous les arguments sont passés tels quels. Le script retourne :
 ## STEP 2 — Exemple workflow
 
 **Définir une policy stricte pour une équipe sécurité** :
-```powershell
+```bash
 # 1. Configurer ~/.sdd/config.team.yml manuellement
 # Ex. CoverageMin: 90, SecurityFailOn: critical, SpecComplianceMode: full
 

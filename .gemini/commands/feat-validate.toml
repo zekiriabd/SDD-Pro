@@ -285,8 +285,14 @@ FIX: corriger les ACs flag NOT_VERIFIED via /dev-run {n} (idempotent)
 ### 4.5.5 Anti-bypass
 
 - **Jamais** bypass par `--json` (CI/CD doit transporter le signal exit code).
-- **Bypass** possible par `/sdd-full --force --no-validate` (audit log
-  `force-bypass.log` capture la décision).
+- **`--force`/`--no-validate` ne bypassent PAS cette gate** (correction
+  2026-08 — l'affirmation antérieure était fausse) : ces deux flags
+  n'agissent que sur la Readiness Gate pré-dev (`sdd-full.md` STEP 3.5/3.6).
+  La gate spec-compliance post-dev (STEP 4.7 de `sdd-full.md`) est invoquée
+  inconditionnellement quel que soit l'état de `$FORCE`/`$NO_VALIDATE`.
+- **Seul bypass réel** : `SpecComplianceRequiredForFeatValidate: false` dans
+  `## Project Config` (décision tracée en git blame, cf. §4.5.2). Aucun flag
+  CLI ne s'y substitue.
 - Pre-dev (`MODE=pre-dev`) **n'est jamais** bloqué (par construction —
   spec-compliance ne peut pas s'exécuter sans code).
 

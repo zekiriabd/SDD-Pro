@@ -134,6 +134,10 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--run-id", default=None)
     p.add_argument("--out-file", default=None)
     p.add_argument("--json", action="store_true", help="Emit JSON record to stdout")
+    p.add_argument("--pack-projection", action="store_true",
+                   help="calculer la projection « avec pack » même sous budget "
+                        "(audit 2026-08-28 correction #4 ; sinon calculée "
+                        "seulement quand le budget est dépassé)")
     p.add_argument("--allow-unbounded-globs", action="store_true")
     p.add_argument("--bytes-per-token", type=int, default=4)
     p.add_argument("--input-usd-per-million-tokens", type=float, default=3.0)
@@ -312,6 +316,53 @@ def expand_files(pattern: str, root: Path) -> list[Path]:
     return out
 
 
+#: Marqueur reconnaissant un chemin de pack de contexte dans les `reads:`.
+#: Un agent qui déclare ce chemin a BASCULÉ : son pack remplace ses stacks.
+PACK_PATH_MARKER = "/.sys/.context/packs/"
+
+
+def _pack_state(agent: str) -> tuple[bool, str]:
+    """`(utilisable, raison)` — le pack de cet agent est-il présent ET à jour ?
+
+    Toute incertitude (module indisponible, exception) répond « inutilisable ».
+    C'est volontaire et c'est l'inverse du fail-open habituel des hooks : ici,
+    ne pas pouvoir vérifier le contexte d'un agent qui a basculé dessus est
+    exactement le cas où il faut s'arrêter, pas continuer.
+    """
+    try:
+        from sdd_scripts.build_context_pack import pack_is_fresh
+        return pack_is_fresh(agent, repo_root())
+    except Exception as exc:  # noqa: BLE001
+        return False, f"verification impossible: {exc}"
+
+
+def _pack_projection(agent: str, budget_bytes: int, bytes_per_token: int) -> dict | None:
+    """Ce que la gate dirait si l'agent lisait son pack au lieu de ses sources.
+
+    Best-effort et strictement informationnel : toute erreur retourne ``None``.
+    Une projection est une aide à la décision, pas une gate — si son calcul
+    échoue, le verdict de budget ne doit pas bouger d'un octet.
+    """
+    try:
+        from sdd_scripts.build_context_pack import PACKABLE_AGENTS, build_for_agent
+        if agent not in PACKABLE_AGENTS:
+            return None
+        m = build_for_agent(agent, repo_root(), budget=budget_bytes, write=False)
+        if m.get("error"):
+            return None
+        return {
+            "pack_path": m.get("pack_path"),
+            "bytes_before": m["bytes_before"],
+            "bytes_after": m["bytes_after"],
+            "gain_pct": -m["reduction_pct"],
+            "sections_dropped": sum(len(s["sections_dropped"]) for s in m["sources"]),
+            "over_budget": m["over_budget"],
+            "estimated_tokens": math.ceil(m["bytes_after"] / max(bytes_per_token, 1)),
+        }
+    except Exception:  # noqa: BLE001 — informationnel, jamais bloquant
+        return None
+
+
 def main() -> int:
     args = parse_args()
     started = time.monotonic()
@@ -391,6 +442,60 @@ def main() -> int:
             ),
         })
 
+    # Projection « avec pack » (audit 2026-08-28, correction #4).
+    #
+    # La gate continue de mesurer ce que l'agent lit RÉELLEMENT — les sources
+    # brutes. Elle ne bascule PAS sur le pack tant que les prompts d'agents ne
+    # pointent pas dessus : mesurer un pack que personne ne lit produirait un
+    # faux vert, exactement le défaut que cet audit reproche au reste du
+    # framework.
+    #
+    # Pour un agent qui n'a PAS encore basculé, la projection reste
+    # informationnelle : elle chiffre ce que la bascule rapporterait. Calculée
+    # uniquement quand elle est actionnable (budget dépassé, ou demande
+    # explicite) — ce script tourne avant CHAQUE spawn, et y ajouter ~70 ms de
+    # slicing systématique serait payer en permanence une information utile
+    # une fois.
+    declares_pack = any(
+        PACK_PATH_MARKER in normalize(e["path"]) for e in expanded
+    ) or any(
+        PACK_PATH_MARKER in normalize(str(w.get("pattern") or "")) for w in warnings
+    )
+
+    if declares_pack:
+        # L'agent a basculé : le pack EST son contexte de stack. La gate ne peut
+        # donc plus se contenter de compter des octets.
+        #
+        # Un pack ABSENT pèse 0 et produirait un vert éclatant sur un agent
+        # privé de tout contexte de stack. Un pack PÉRIMÉ nourrirait l'agent
+        # d'un stack d'hier. Les deux sont des ERREURS, pas des avertissements —
+        # c'est la contrepartie indispensable de la bascule : on gagne 14,7 % de
+        # contexte sur `arch`, et on paie ce gain par une gate qui refuse
+        # bruyamment un pack douteux plutôt que de laisser passer un silence.
+        ok, reason = _pack_state(args.agent)
+        if not ok:
+            errors.append({
+                "code": "PACK_UNUSABLE",
+                "message": (
+                    f"pack de contexte declare dans loader.yml mais inutilisable "
+                    f"({reason}) pour l'agent {args.agent} — FIX: python -m "
+                    f"sdd_scripts.build_context_pack --agent {args.agent}"
+                ),
+            })
+    elif bool(errors) or getattr(args, "pack_projection", False):
+        projection = _pack_projection(args.agent, budget_bytes, args.bytes_per_token)
+        if projection:
+            warnings.append({
+                "code": "PACK_PROJECTION",
+                "pattern": projection["pack_path"] or "(non écrit)",
+                "message": (
+                    f"avec pack : {projection['bytes_after']} o "
+                    f"({projection['gain_pct']:+.1f}% vs {projection['bytes_before']} o), "
+                    f"{projection['sections_dropped']} section(s) retirée(s), "
+                    f"budget {'OK' if not projection['over_budget'] else 'DÉPASSÉ'}"
+                ),
+            })
+
     elapsed_ms = int((time.monotonic() - started) * 1000)
     cost = round((estimated_tokens / 1_000_000.0) * args.input_usd_per_million_tokens, 6)
     record = {
@@ -439,7 +544,12 @@ def main() -> int:
             f"budget ~{budget_tokens} tokens, USD {cost}"
         )
         for w in warnings:
-            warn(f"WARN  {w['code']}: {w['pattern']}")
+            # Le message porte la substance sur les warnings qui en ont un
+            # (PACK_PROJECTION) ; les autres gardent le rendu historique
+            # `code: pattern`.
+            detail = w.get("message") or ""
+            warn(f"WARN  {w['code']}: {w['pattern']}"
+                 + (f" — {detail}" if detail and w["code"] == "PACK_PROJECTION" else ""))
         for e in errors:
             warn(f"ERROR {e['code']}: {e['message']}")
 

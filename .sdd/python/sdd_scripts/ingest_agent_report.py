@@ -161,12 +161,24 @@ def ingest_a11y(report: dict, feat: int) -> int:
         return n
 
 
-def ingest_code_review(report: dict, feat: int) -> int:
+def ingest_code_review(report: dict, feat: int, detector: str = "agent:code-review") -> int:
+    """`detector` scopes both the DELETE and the INSERT to one LLM producer.
+
+    `code-reviewer` and `arch-reviewer` both write into `qa_code_review`
+    (schema v8 audit 2026-08-28 only split `agent` vs `deterministic` —
+    it did not anticipate two *different* agents sharing the `agent`
+    value). Under Stage B parallel dispatch (`ArchReviewMode: full`),
+    whichever of the two committed last would wipe the other's rows via
+    `replace_qa_auditor_for_feat(..., detector="agent")` before inserting
+    its own. Distinct per-agent detector values (`agent:code-review` /
+    `agent:arch-review`) each replace only their own producer's rows.
+    """
     issues = _flatten_issues(report.get("issues") or report.get("findings"))
     verdict = _verdict_of(report)
     with connect() as conn:
-        replace_qa_auditor_for_feat(conn, "qa_code_review", feat)
-        n = insert_qa_code_review_batch(conn, feat_n=feat, verdict=verdict, issues=issues)
+        replace_qa_auditor_for_feat(conn, "qa_code_review", feat, detector=detector)
+        n = insert_qa_code_review_batch(conn, feat_n=feat, verdict=verdict, issues=issues,
+                                         detector=detector)
         # v7.0.0 P0 C3 fix : `qa_code_review` mixes code-review + arch findings
         # (split by [ARCH_*] prefix in sdd_review.fetch_findings). Record both
         # presence markers so --ensure-scans treats them independently.
@@ -202,7 +214,7 @@ def ingest_security(report: dict, feat: int, mode: str) -> int:
         issues = _flatten_issues(report.get("issues") or report.get("findings"))
     verdict = _verdict_of(report)
     with connect() as conn:
-        replace_qa_auditor_for_feat(conn, "qa_security", feat, mode=mode)
+        replace_qa_auditor_for_feat(conn, "qa_security", feat, mode=mode, detector="agent")
         n = insert_qa_security_batch(conn, feat_n=feat, mode=mode, verdict=verdict, issues=issues)
         # Only the `scan` mode is consumed by /sdd-review (threat-model is
         # informational pre-dev). The `security` auditor presence in the
@@ -396,8 +408,10 @@ def main(argv: list[str] | None = None) -> int:
             n = ingest_api_tests(report, args.feat)
         elif args.type == "arch-review":
             # arch-reviewer writes into qa_code_review with ARCH_* issue_class
-            # (reuses existing table, distinguishable via WHERE issue_class LIKE 'ARCH_%')
-            n = ingest_code_review(report, args.feat)
+            # (reuses existing table, distinguishable via WHERE issue_class LIKE 'ARCH_%').
+            # detector="agent:arch-review" keeps its replace-scope disjoint from
+            # code-reviewer's "agent:code-review" rows (see ingest_code_review docstring).
+            n = ingest_code_review(report, args.feat, detector="agent:arch-review")
         elif args.type == "adversarial":
             n = ingest_adversarial(report, args.feat)
         else:

@@ -54,6 +54,7 @@ from sdd_scripts._review_fetch import (  # noqa: E402,F401
     _normalize_path,
     deduplicate_findings,
     fetch_findings,
+    run_pattern_scan,
     run_quality_scan,
 )
 from sdd_scripts._review_report import (  # noqa: E402,F401
@@ -415,6 +416,19 @@ def main() -> int:
         if not ok:
             print(f"WARNING: quality_scan failed, continuing on stale DB.\n{tail}",
                   file=sys.stderr)
+
+        # Deterministic pattern scan (audit 2026-08-28, corrections #2 and #6).
+        # Executes the two pattern catalogues that had no runtime consumer,
+        # populating qa_security(mode='scan') and qa_code_review with
+        # full-recall findings on every class a regex can decide. The LLM
+        # reviewers keep the classes a regex cannot — the scan publishes that
+        # boundary itself in its `llm_only` manifest rather than implying
+        # coverage it does not have.
+        ok, tail = run_pattern_scan(feat_n)
+        scans_run.append("scan_patterns.py")
+        if not ok:
+            print(f"WARNING: pattern scan failed, continuing without its "
+                  f"findings.\n{tail}", file=sys.stderr)
 
     # STEP 3.5 — auto-ingest stale JSONs (Sprint 1.2 fix 2026-06-06)
     # If an agent ran but ingest_agent_report wasn't invoked (e.g. SubagentStop

@@ -72,7 +72,13 @@
       "Bash(python -m pytest tests/test_neutral_loader.py --tb=no -q)",
       "Bash(python -m pytest tests/test_harness_identity.py::test_forward_agent_count_is_13 tests/test_harness_identity_commands.py::test_command_pivot_count_is_40 --tb=short)",
       "Bash(python -m pytest tests/test_harness_identity.py tests/test_harness_identity_commands.py tests/test_harness_antigravity.py tests/test_harness_codex_gemini.py --tb=short -q)",
-      "Bash(python -m pytest \"tests/test_harness_identity_commands.py::test_command_roundtrip_semantic_identity[us-generate]\" --tb=short)"
+      "Bash(python -m pytest \"tests/test_harness_identity_commands.py::test_command_roundtrip_semantic_identity[us-generate]\" --tb=short)",
+      "Bash(python .sdd/python/sdd_reverse_scripts/reverse_proc_introspect.py --full)",
+      "Bash(python .sdd/python/sdd_reverse_scripts/db_context_build.py --project workspace/old/NounouJob)",
+      "Bash(python -c \"import datetime; print\\(datetime.datetime.now\\(datetime.timezone.utc\\).strftime\\('%Y-%m-%dT%H:%M:%SZ'\\)\\)\")",
+      "Bash(python .sdd/python/sdd_reverse_scripts/db_context_build.py --project workspace/old/NounouJob --merge-hypotheses workspace/old/NounouJob/.sys/db-context.hypotheses.json)",
+      "Bash(python -c \"import json; d=json.load\\(open\\('workspace/old/NounouJob/.sys/db-context.json',encoding='utf-8'\\)\\); h=d.get\\('hypotheses',{}\\); print\\('glossary',len\\(h.get\\('glossary',[]\\)\\)\\); print\\('subdomains',len\\(h.get\\('subdomains',[]\\)\\)\\); print\\('objectRoles',len\\(h.get\\('objectRoles',[]\\)\\)\\); print\\('risks',len\\(h.get\\('risks',[]\\)\\)\\); print\\('openQuestions',len\\(h.get\\('openQuestions',[]\\)\\)\\); print\\('contextVersion', d.get\\('contextVersion'\\)\\)\")",
+      "Bash(python .sdd/python/sdd_reverse_scripts/db_context_build.py --help)"
     ],
     "additionalDirectories": []
   },

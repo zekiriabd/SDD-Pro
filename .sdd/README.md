@@ -61,10 +61,10 @@ CalcABC) n'est pas `UNTESTED` ; tout autre combo attend un conformance run (§10
 | `docs/adrs/ADR-20260724T164529-harness-and-provider-abstraction.md` | ADR fondateur (2 axes, model_tier, mode static\|dynamic, invariant 14) | 0.1 |
 | `capability-matrix.yml` | Matrice machine harnais × mécanismes (§7.1 du plan) | 0.2 |
 | `providers/{anthropic,openai,moonshot,google}.yaml` | Axe 2 — providers pluggables (schéma §8.2) | 1.8 |
-| `agent-bounds.yaml` | Bornes tier par agent (25 agents, table §8.bis.7) | 1.9 |
+| `agent-bounds.yaml` | Bornes tier par agent (29 agents, table §8.bis.7) | 1.9 |
 | `python/sdd_lib/model_resolver.py` | Résolveur pur (clamp, level→tier, resolve) — testable en isolation | 1.5/1.9 |
 | `python/tests/test_model_resolver.py` | Tests unitaires du résolveur | 1.5/1.9 |
-| `rules-manifest.yaml` | Manifest neutre des 11 rules (body_source vers vivant, scope, mapping harnais) | 2.3 |
+| `rules-manifest.yaml` | Manifest neutre des 12 rules (body_source vers vivant, scope, mapping harnais) | 2.3 |
 | `skills-manifest.yaml` | Classification des 13 skills (owned/vendored, support par harnais) — artefact de conception, pas d'émission | 2.3 |
 | `python/sdd_lib/impact_report.py` | Rapport d'honnêteté des garanties par combo harnais × provider (§7.3) — consomme `capability-matrix.yml` + `providers/*.yaml`, imprimé + persisté (`harness-impact.md`) sur CHAQUE build, gate `untested_gate_ok` (SDD_ALLOW_UNTESTED_HARNESS) pour le futur consommateur pipeline | **2.5** |
 | `python/tests/test_impact_report.py` | Tests du rapport d'impact (20) — comptes mécanismes, marquage UNTESTED, gate, intégration CLI non bloquante, render ASCII-safe | **2.5** |
@@ -82,11 +82,11 @@ depuis `.sdd/` sous `.sdd/.build/claude/`, byte-diffée contre le vivant :
 
 | Surface | Round-trip | Niveau | Émission variantes (codex/gemini) |
 |---|---|---|---|
-| 25 agents | 25/25 | sémantique | **N/A** (sous-agents émulés au runtime par spawn_agent.py, Phase 3+) |
-| 40 commandes | 40/40 | **byte-identique** | **transpilées** : codex `.codex/prompts/*.md` (`$ARGUMENTS`) + gemini `.gemini/commands/*.toml` (`{{args}}`) |
+| 29 agents | 29/29 | sémantique | **N/A** (sous-agents émulés au runtime par spawn_agent.py, Phase 3+) |
+| 41 commandes | 41/41 | **byte-identique** | **transpilées** : codex `.codex/prompts/*.md` (`$ARGUMENTS`) + gemini `.gemini/commands/*.toml` (`{{args}}`) |
 | fichier-mémoire | CLAUDE.md | **byte-identique** | AGENTS.md + GEMINI.md générés |
 | config harnais | (n/a Claude) | — | codex `config.toml` + gemini `settings.json` (dérivés du provider actif, IDs « à valider ») |
-| 11 rules | 11/11 | **byte-identique** | non câblé (pas de path-scoped — inline universelles + pointeurs) |
+| 12 rules | 12/12 | **byte-identique** | non câblé (pas de path-scoped — inline universelles + pointeurs) |
 
 > **Façades Codex/Gemini (Phase 3.1/4.1 transpilation, 2026-07-24)** : la
 > couche COMMANDES + config est désormais générée pour codex et gemini-cli

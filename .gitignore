@@ -50,13 +50,13 @@
 # projets sous src/ portent .env / appsettings / config runtime. `workspace/`
 # couvre déjà tout ; les entrées granulaires ci-dessous sont explicites pour
 # les fichiers porteurs de secrets (garde anti-fuite, test_generated_project_gitignore_template).
-#workspace/
-#workspace/db/
-#workspace/console/
-#workspace/stack/
-#workspace/src/*/.env
-#workspace/src/*/appsettings*.json
-#workspace/src/*/config/default.json
+workspace/
+workspace/db/
+workspace/console/
+workspace/stack/
+workspace/src/*/.env
+workspace/src/*/appsettings*.json
+workspace/src/*/config/default.json
 
 # Sauvegardes de config pré-audit (nettoyage hooks 2026-07-25, ADR governance-protection-hooks-wiring)
 .claude/settings*.pre-hooks-audit.bak

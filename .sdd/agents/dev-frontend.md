@@ -412,7 +412,9 @@ Exécuter `Build` du stack frontend (§2.2).
 **Circuit-breaker coût** : symétrique avec dev-backend
 STEP 8. Sur dépassement `BuildLoopMaxCostUsd * 0.5`, downgrade Opus → Sonnet
 pour la dernière itération via sentinel
-`workspace/.sys/.state/dev-build-downgrade-{n}-{m}.flag`.
+`workspace/.sys/.state/dev-build-downgrade-{n}-{m}.flag`, lu par
+l'orchestrateur (`/dev-run` STEP 6.c.bis) qui re-spawn `dev-frontend`
+avec `model=sonnet`.
 Bypass : `BuildLoopAdaptiveFallback: false`.
 
 Si build échoue après `BuildLoopMaxIter` itérations → ERROR :

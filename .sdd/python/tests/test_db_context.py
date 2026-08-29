@@ -33,6 +33,7 @@ from sdd_reverse.db_context_slice import (  # noqa: E402
     build_pack,
     family_of,
     render_overview,
+    render_table_card,
     write_context_tree,
 )
 from sdd_reverse.db_tier_router import (  # noqa: E402
@@ -71,6 +72,61 @@ def _obj(fq, rtype="SQL_STORED_PROCEDURE", **kw):
         "evidence": f".sys/proc-snapshot/{fq}.sql:L1-{kw.get('lines', 20)}",
         "confidenceEstimate": kw.get("conf", "high"),
     }
+
+
+def _wide_table_context():
+    """Une grosse procédure : 3 tables larges, index, CHECK, clés étrangères.
+
+    Assez volumineuse pour que le budget morde vraiment, ce qui est le seul
+    moyen d'observer l'échelle de dégradation plutôt que de la supposer.
+    """
+    tables = ["dbo.Commande", "dbo.Client", "dbo.Ligne"]
+
+    def entity(q):
+        return {
+            "qualifiedName": q,
+            "name": q.split(".", 1)[1],
+            "fields": [
+                {"name": f"Colonne_{i}", "type": "nvarchar(200)",
+                 "primaryKey": i == 0, "nullable": i % 2 == 0,
+                 "default": "(getdate())" if i % 3 == 0 else None}
+                for i in range(14)
+            ],
+        }
+
+    schema = {
+        "completeness": "live",
+        "entities": [entity(t) for t in tables],
+        "relations": [
+            {"name": f"FK_Ligne_{i}",
+             "from": {"entity": "dbo.Ligne", "field": "CommandeId"},
+             "to": {"entity": "dbo.Commande", "field": "Id"}}
+            for i in range(3)
+        ],
+        "indexes": [
+            {"table": t, "name": f"IX_{t}_{i}", "columns": [f"Colonne_{i}"],
+             "unique": i == 0, "primary": False}
+            for t in tables for i in range(4)
+        ],
+        "checks": [
+            {"table": t, "name": f"CK_{t}_Statut",
+             "definition": "([Statut] IN (1,2,3))"}
+            for t in tables
+        ],
+    }
+    introspection = {
+        "schemaVersion": 1, "databaseType": "sqlserver", "languageId": "tsql",
+        "database": "SalesDb",
+        "procedures": [
+            _obj("dbo.usp_Gros", lines=300, read=tables,
+                 written=["dbo.Commande"], kinds={"UPDATE": ["dbo.Commande"]},
+                 calls=["dbo.usp_A", "dbo.usp_B"]),
+            _obj("dbo.usp_A", lines=20),
+            _obj("dbo.usp_B", lines=20),
+            _obj("dbo.usp_Appelant", lines=20, calls=["dbo.usp_Gros"]),
+        ],
+    }
+    return build_context(introspection, schema, project="SalesDb")
 
 
 @pytest.fixture
@@ -336,6 +392,53 @@ class TestSlicing:
         ctx = build_context({"procedures": objs}, None, project="X")
         body, _ = build_pack(ctx, "dbo.usp_A")
         assert "Cycle à analyser d'un bloc" in body
+
+    # --- ordre de réduction du pack (audit 2026-08-28) --------------------- #
+    #
+    # Ce que le pack sacrifie en premier n'est pas un détail d'implémentation :
+    # une colonne ou une clé étrangère inconnue rend l'AC faux, alors qu'un
+    # appelé non lu laisse un nom et une matrice CRUD exploitables. Ces tests
+    # verrouillent cet arbitrage.
+
+    def test_callees_are_given_up_before_table_structure(self, introspection, schema):
+        ctx = build_context(introspection, schema, project="SalesDb")
+        full, _ = build_pack(ctx, "dbo.usp_Commande_Valider", budget=10 ** 9)
+        body, report = build_pack(
+            ctx, "dbo.usp_Commande_Valider", budget=int(len(full) * 0.8))
+        assert "callees" in report["trimmed"]
+        assert "Structure des tables touchées" in body
+
+    def test_table_card_degrades_by_steps_instead_of_vanishing(self):
+        ctx = _wide_table_context()
+        full, _ = build_pack(ctx, "dbo.usp_Gros", budget=10 ** 9)
+        body, report = build_pack(ctx, "dbo.usp_Gros", budget=int(len(full) * 0.85))
+        # L'ensemble porteur survit : colonnes, PK, clés étrangères, CHECK.
+        assert report["tableDetail"] in ("no-index", "keys-only")
+        assert "Colonne_0" in body and "## Relations" in body
+        assert "Contraintes CHECK" in body
+        assert "## Index" not in body           # premier palier retiré
+
+    def test_last_resort_drops_tables_one_at_a_time_writes_last(self):
+        ctx = _wide_table_context()
+        full, _ = build_pack(ctx, "dbo.usp_Gros", budget=10 ** 9)
+        _, report = build_pack(ctx, "dbo.usp_Gros", budget=int(len(full) * 0.55))
+        dropped = [t.split(":-", 1)[1] for t in report["trimmed"]
+                   if t.startswith("tables:-")]
+        assert dropped, "les tables doivent partir une par une, pas en bloc"
+        # dbo.Commande est écrite : elle est la dernière à tomber.
+        assert dropped[0] != "dbo.Commande"
+
+    def test_dropped_table_is_named_not_silently_missing(self):
+        ctx = _wide_table_context()
+        full, _ = build_pack(ctx, "dbo.usp_Gros", budget=10 ** 9)
+        body, report = build_pack(ctx, "dbo.usp_Gros", budget=int(len(full) * 0.55))
+        assert any(t.startswith("tables:-") for t in report["trimmed"])
+        assert "n'a PAS été lue" in body
+
+    def test_table_card_on_disk_keeps_full_detail(self, introspection, schema):
+        ctx = build_context(introspection, schema, project="SalesDb")
+        card = render_table_card(ctx, "dbo.Commande")
+        assert "Défaut" in card
 
     def test_family_routing_puts_each_object_in_its_folder(self):
         assert family_of("SQL_SCALAR_FUNCTION") == "functions"

@@ -271,10 +271,11 @@ en AC). Pas de question à l'utilisateur.
 
 Pour chaque US (m = 1, 2, ..., max 6) :
 
-**v7.0.0 P1-11 (révisé v7.0.0-alpha 2026-05-22)** — l'agent `po` n'a
-**pas** le tool `Bash` (cf. frontmatter `tools: Read, Write, Edit,
-Glob, Grep`) et ne peut donc pas calculer un sha256. Écrire le
-**sentinel littéral** :
+**v7.0.0 P1-11 (révisé v7.0.0-alpha 2026-05-22 ; corrigé 2026-08)** —
+même si le frontmatter de l'agent inclut `Bash`, le calcul du hash
+sha256 reste délégué à un script déterministe plutôt qu'à une commande
+Bash inline invoquée par le LLM (0 token, pas de risque d'erreur de
+calcul/formatage côté modèle). Écrire le **sentinel littéral** :
 
 ```
 Parent FEAT hash: sha256:COMPUTE_REQUIRED

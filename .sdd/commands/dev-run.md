@@ -550,6 +550,24 @@ erreurs (cf. logs dev-backend) puis relancer /dev-run {n}.
 ```
 **STOP**, pas de 6b ni 6c.
 
+### 6.a.bis Circuit-breaker coût — lecture sentinel downgrade
+
+Après la fin de CHAQUE batch (avant le batch suivant ou 6.b) : pour
+chaque US du batch qui vient de tourner, vérifier l'existence de
+`workspace/.sys/.state/dev-build-downgrade-{n}-{m}.flag` (écrit par
+`dev-backend` STEP 8 — cf. `agents/dev-backend.md §Circuit-breaker coût`).
+
+Si présent ET `BuildLoopAdaptiveFallback` ≠ `false` (Project Config) :
+- re-invoquer une seule fois `Agent(dev-backend, args="{n}-{m}", model=sonnet)`
+  (dernière tentative forcée sur Sonnet 4.6, jamais un nouveau cycle Opus)
+- supprimer le sentinel après cette re-invocation, qu'elle réussisse ou non
+  (jamais de re-spawn en boucle sur le même flag)
+
+Émettre 1 ligne si déclenché :
+```
+[DEV-BACKEND/FIXING] US {n}-{m} — downgrade coût Opus→Sonnet (dernière tentative). (…%)
+```
+
 ### 6.b Phase QA API Gate (tests d'intégration HTTP)
 
 Si toutes US backend OK (incl. skipped frontend-only), invoquer
@@ -643,6 +661,19 @@ Chaque agent bénéficie de la **certitude que les endpoints backend
 honorent leur contrat** (vérifié par 6b). Les mismatches
 `[FRONTEND_BACKEND_CONTRACT_GAP]` ne peuvent plus se produire en
 silence.
+
+### 6.c.bis Circuit-breaker coût — lecture sentinel downgrade
+
+Symétrique avec 6.a.bis. Après la fin de CHAQUE batch frontend : pour
+chaque US du batch, vérifier `workspace/.sys/.state/dev-build-downgrade-{n}-{m}.flag`
+(écrit par `dev-frontend` STEP 9 — cf. `agents/dev-frontend.md §Circuit-breaker coût`).
+Si présent ET `BuildLoopAdaptiveFallback` ≠ `false` : re-invoquer une seule
+fois `Agent(dev-frontend, args="{n}-{m}", model=sonnet)`, puis supprimer le
+sentinel qu'elle réussisse ou non.
+
+```
+[DEV-FRONTEND/FIXING] US {n}-{m} — downgrade coût Opus→Sonnet (dernière tentative). (…%)
+```
 
 **Idempotence re-run après correction backend** : au début de 6a, requêter
 la DB. Si verdict postérieur au mtime backend ET `status ∈ {PASS, WARN}` →

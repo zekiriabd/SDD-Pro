@@ -97,12 +97,19 @@ FIX: /sdd-kill-server [back] [front] [console] [--port N]
 
 ## STEP 3 — Procédure de kill par port (Windows / Unix)
 
+Use the Python-only runtime helper after resolving the selected ports:
+
+`\\\\bash
+python .sdd/python/sdd_scripts/server_control.py --port Backend:8080 --port Frontend:5173 --port Console:4000
+`
+
+
 Pour chaque `(label, port)` dans `$PORTS`, identifier le PID qui écoute,
 puis le tuer. Idempotent : un port libre = no-op silencieux.
 
 ### 3.1 — Détection PID (cross-platform)
 
-**Windows (PowerShell ou Git Bash via netstat)** :
+**Windows (via netstat)** :
 ```bash
 PID=$(netstat -ano | grep ":$PORT " | grep LISTENING | awk '{print $5}' | head -1)
 ```
