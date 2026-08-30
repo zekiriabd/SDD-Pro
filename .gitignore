@@ -45,18 +45,43 @@
 # ces fichiers à la main — toujours repasser par harness_build.py, puis
 # `python -m pytest tests/test_harness_facade_parity.py` avant de commiter.
 
-# Workspace runtime SDD (scaffolding, secrets, projets générés) — jamais commité.
-# stack.md porte DB_PASSWORD / AUTH_JWT_SECRET en clair (CLAUDE.md §9), les
-# projets sous src/ portent .env / appsettings / config runtime. `workspace/`
-# couvre déjà tout ; les entrées granulaires ci-dessous sont explicites pour
-# les fichiers porteurs de secrets (garde anti-fuite, test_generated_project_gitignore_template).
-workspace/
-workspace/db/
-workspace/console/
-workspace/stack/
+# ============================================================================
+# Workspace runtime SDD — SQUELETTE versionné, CONTENU ignoré (2026-08-30).
+# ============================================================================
+# Décision Tech Lead : l'arborescence `workspace/` (répertoires + sous-répertoires)
+# est committée VIDE via des fichiers `.gitkeep`, pour qu'un `git clone` restitue
+# d'emblée le tree canonique attendu par bootstrap.py et les commandes SDD. Le
+# CONTENU runtime (FEATs, US, plans, code généré, legacy sous old/, caches .sys/)
+# reste ignoré et n'est jamais poussé.
+#
+# EXCEPTION : `workspace/stack/` est committé AVEC son contenu — stack.md est la
+# SSoT de configuration projet et doit voyager avec le repo.
+# ⚠️ stack.md peut porter DB_PASSWORD / AUTH_JWT_SECRET / SMTP_PASSWORD EN CLAIR
+# (CLAUDE.md §9). Depuis cette décision il est VERSIONNÉ : n'y écrire que des
+# placeholders `${VAR}` ou des valeurs non sensibles — tout secret réel écrit ici
+# part sur origin et doit être considéré comme compromis.
+#
+# Mécanique gitignore (l'ordre est load-bearing) :
+#   1. tout ignorer sous workspace/
+#   2. ré-inclure les RÉPERTOIRES (sinon git ne descend pas dedans)
+#   3. ré-inclure les .gitkeep (matérialisent les répertoires vides)
+#   4. ré-inclure le contenu de stack/
+workspace/**
+
+# Garde anti-fuite explicite (défense en profondeur — déjà couverte par
+# `workspace/**`, conservée pour test_generated_project_gitignore_template).
+# Suffixe `/**` obligatoire : `workspace/db/` ré-ignorerait le RÉPERTOIRE
+# lui-même et empêcherait le commit de son `.gitkeep`.
+workspace/db/**
+workspace/console/**
 workspace/src/*/.env
 workspace/src/*/appsettings*.json
 workspace/src/*/config/default.json
+
+# Ré-inclusions (doivent rester EN DERNIER — la dernière règle qui matche gagne).
+!workspace/**/
+!workspace/**/.gitkeep
+!workspace/stack/**
 
 # Sauvegardes de config pré-audit (nettoyage hooks 2026-07-25, ADR governance-protection-hooks-wiring)
 .claude/settings*.pre-hooks-audit.bak
