@@ -102,6 +102,16 @@ arch-reviewer feat-{n}: skipped (ArchReviewMode={mode})
 
 ## STEP 2 — Charger le contexte minimal
 
+### 2.0 Taxonomie d'erreur
+
+Read `.sdd/digests/error-classification.arch-reviewer.md` — classes émises
+par cet agent : `[ARCH_PATTERN_VIOLATION]`, `[ARCH_LAYER_BYPASS]`,
+`[ARCH_ADR_DRIFT]`, `[ARCH_NAMING_INVALID]`, `[ARCH_CONSTITUTION_GAP]`,
+`[ARCH_NO_TARGETS]`, plus `[LAYER_VIOLATION]` réutilisée. **Aucun bloc ERROR
+sans préfixe `[CLASS]`** (`rules/error-classification.md §5`). *(Read ajouté
+audit M7, 2026-08-29 — le digest `arch-reviewer` était généré mais lu par
+personne.)*
+
 ### 2.1 Stack actif
 
 Read `workspace/stack/stack.md` :

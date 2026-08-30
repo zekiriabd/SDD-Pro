@@ -7,6 +7,12 @@ agent — the §0 quick-ref (full 16-family navigation map, so NO class is ever
 invisible) + that agent's relevant §1.X families + the universal format/loop
 sections (§2/§3/§5) + a pointer to the full file for on-demand reads.
 
+TOK-C2 (audit tokens 2026-08-30): error-classification.md is now path-scoped
+(no longer auto-injected); the universal core (3-line ERROR format + mental
+rule) moved to output-protocol.md §7.3/§7.5 (the one rule still unconditional),
+so §2/§5 in the source — and thus in these digests — are now a skeleton +
+pointer rather than the full prose. Digests remain the nominal agent channel.
+
 Deterministic, 0-token. Idempotent. Mirrors `sync_stack_md.py` ergonomics:
     sync_error_class_digests.py            # (re)write all digests
     sync_error_class_digests.py --check    # exit 1 if any digest is stale (CI)

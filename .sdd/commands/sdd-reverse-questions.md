@@ -74,7 +74,7 @@ laisse le bloc ouvert.
 
 ```
 workspace/old/{P}/.sys/questions.md                      (generate / --interactive)
-workspace/feats/{n}-{Name}.md  (édités, --ingest / --interactive)  + US resynchronisées
+workspace/feats/{n}-{FeatName}.md  (édités, --ingest / --interactive)  + US resynchronisées
 ```
 
 ## Émission chat
@@ -92,4 +92,4 @@ workspace/feats/{n}-{Name}.md  (édités, --ingest / --interactive)  + US resync
 - `--ingest` est la SEULE voie d'édition d'une FEAT reverse post-3c (véhicule de la revue humaine Phase 5)
 - Jamais bloquant : questions ouvertes = `[REVERSE_QUESTIONS_PENDING]` informational
 
-Voir `.sdd/rules/reverse-engineering.md §6` ([REVERSE_QUESTIONS_PENDING], [REVERSE_ANSWER_INGEST_FAILED]) + §10 + `.claude/agents/reverse-clarifier.md`.
+Voir `.sdd/rules/reverse-engineering.md §6` ([REVERSE_QUESTIONS_PENDING], [REVERSE_ANSWER_INGEST_FAILED]) + §10 + `.sdd/agents/reverse-clarifier.md`.

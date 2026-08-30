@@ -248,13 +248,23 @@ python .sdd/python/sdd_scripts/sdd_state.py set-phase \
 
 | Phase | Statuts | Payload schema |
 |---|---|---|
-| `us-generate` | pass\|fail | `{"usCount":N}` |
-| `FEAT-validate` | pass\|warn\|fail | `{"errors":E,"warnings":W,"decision":"GO|WARN|NO-GO"}` |
-| `dev-plan` | pass\|warn\|fail | `{"plansCount":N}` |
+| `us_generate` | pass\|fail | `{"usCount":N}` |
+| `readiness` | pass\|warn\|fail | `{"errors":E,"warnings":W,"decision":"GO|WARN|NO-GO"}` |
+| `plan` | pass\|warn\|fail\|skip | `{"plansCount":N}` |
 | `arch` | pass\|fail | `{"shortCircuited":bool}` |
-| `dev-run` | pass\|warn\|fail | `{"backOk":Tb,"frontOk":Tf,"failed":F}` |
-| `qa-generate` | pass\|warn\|fail\|skip | `{"decision":"GREEN|YELLOW|RED","coverage":pct,"tests":N}` |
-| `doc-refresh` | pass\|warn | `{"htmlPages":N}` |
+| `dev_run` | pass\|warn\|fail | `{"backOk":Tb,"frontOk":Tf,"failed":F}` |
+| `qa` | pass\|warn\|fail\|skip | `{"decision":"GREEN|YELLOW|RED","coverage":pct,"tests":N}` |
+| `sdd_review` | pass\|warn\|fail\|skip | `{"verdict":"GREEN|YELLOW|RED","findings":N}` |
+| `doc_refresh` † | pass\|warn | `{"htmlPages":N}` |
+| `feat_validate_postdev` † | pass\|fail\|skip | `{"verdict":"GREEN|RED"}` |
+
+> **F-M2 fix (2026-08-30)** : les 7 premières lignes portent les noms
+> **canoniques** de `_PIPELINE_PHASES_ORDER` (`sdd_state.py`) — la table
+> publiait `us-generate`/`FEAT-validate`/`dev-plan`/`dev-run`/`qa-generate`,
+> jamais reconnus par `resume-target` → `--resume` redémarrait de zéro.
+> `set-phase` valide désormais le nom (erreur explicite sur nom inconnu ;
+> alias kebab-case legacy normalisés avec WARN).
+> † = phases **auxiliaires** (observabilité seule, hors routing `--resume`).
 
 Payload optionnel mais recommandé (metrics dashboard). STEPs aval réfèrent
 "**State tracking** : set-phase phase=X".
@@ -507,6 +517,15 @@ Succès → 3.6.c. ERROR → STOP.
 > **Pas de doublon** : exactement UN des deux mécanismes s'exécute
 > selon `$ManualGates`. C'est l'articulation propre exigée au LOT 3.
 
+**State tracking** : set-phase phase=plan (schema payload cf. STEP 1.ter) —
+status `pass` si plans écrits/reviewés (`ok`), `skip` si déclencheurs
+inactifs (GO sans `--plan`) ou escape hatch `--no-plan-on-warn`, `fail` si
+`/dev-plan` en erreur.
+> **FWD-M2 (2026-08-30)** : nom canonique `plan` (PAS `dev-plan`) — clé de
+> `_PIPELINE_PHASES_ORDER` pour `--resume` (STEP_3.6). Ce STEP était le seul
+> du pipeline sans ligne State tracking → un crash post-plans faisait
+> re-générer tous les plans au `--resume`.
+
 ---
 
 ## STEP 3.6.quart — Anti-cumul bypass (defense-in-depth)
@@ -602,7 +621,7 @@ Coût : **0 token**, latence < 100 ms. Non bloquant : sur exit ≠ 0,
 émettre WARNING et continuer vers STEP 4.5. L'INDEX ADRs est un
 artefact de navigation, pas une dépendance fonctionnelle du pipeline.
 
-**State tracking** : set-phase phase=doc-refresh (schema payload cf. STEP 1.ter).
+**State tracking** : set-phase phase=doc_refresh (phase auxiliaire †, schema payload cf. STEP 1.ter).
 
 ---
 
@@ -689,7 +708,7 @@ fi
 Idempotent (lit `spec-compliance.json` frais si `/dev-run §6.4` vient de
 tourner, ~50ms). Bypass : `SpecComplianceRequiredForFeatValidate: false`.
 
-**State tracking** : set-phase phase=feat-validate-postdev.
+**State tracking** : set-phase phase=feat_validate_postdev (phase auxiliaire †, cf. STEP 1.ter).
 
 ---
 

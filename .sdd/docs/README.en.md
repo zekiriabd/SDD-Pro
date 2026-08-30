@@ -67,7 +67,7 @@ Pick your path below.
 | **29 agents** (13 forward + 16 reverse) | Role / Model / Inputs / Outputs / Verdicts | [agents-reference.md](agents-reference.md) |
 | **41 commands** (13 user-facing + 9 internal + 19 reverse) | Args / Flags / Agents / Outputs | [commands-reference.md](commands-reference.md) |
 | **Project Config** | Layered config + defaults + ranges | [configuration-reference.md](configuration-reference.md) |
-| **Error classes** | **191 `[CLASS]` prefixes** across 16 families | [../rules/error-classification.md](../rules/error-classification.md) |
+| **Error classes** | **193 `[CLASS]` prefixes** across 16 families | [../rules/error-classification.md](../rules/error-classification.md) |
 | **Load-bearing invariants** | 14 forward + 17 reverse, each with its enforcer | [../INVARIANTS.yml](../INVARIANTS.yml) · [../INVARIANTS.reverse.yml](../INVARIANTS.reverse.yml) |
 | **Protection hooks** | The 20 wired hooks (preflight, ownership, cost cap…) | [hooks-and-protections.md](hooks-and-protections.md) |
 | **Per-stack prerequisites** | Runtimes, SDKs, drivers | [prerequisites-matrix.md](prerequisites-matrix.md) |

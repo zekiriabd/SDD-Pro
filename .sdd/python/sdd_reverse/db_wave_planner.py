@@ -20,6 +20,11 @@ analysed as a whole, by a single agent, with every body of the cycle in its pack
 Fully deterministic (0 token), offline, no DB access: it consumes the already
 normalised introspection objects, so every engine gets the same plan.
 
+The call graph it orders on has three sources, ranked by authority — the
+engine's dependency catalog, the keyword-anchored regex extraction, and the
+keyword-less invocation heuristic. See `resolve_calls` for what each is trusted
+to do and, more importantly, what each is NOT trusted to do.
+
 Public API:
     resolve_calls(objects)      -> (edges, unresolved)
     strongly_connected(nodes, adj) -> list[list[str]]
@@ -60,16 +65,41 @@ def _fq(obj: dict[str, Any]) -> str:
 def resolve_calls(
     objects: Iterable[dict[str, Any]],
 ) -> tuple[list[tuple[str, str]], dict[str, list[str]]]:
-    """Resolve every `callsProcs` entry against the known object set.
+    """Resolve every declared callee against the known object set.
 
     Returns `(edges, unresolved)` where `edges` are `(caller_fq, callee_fq)`
     pairs between objects that BOTH exist in this database, and `unresolved`
     maps a caller to the callee names that could not be resolved.
 
-    A callee is unresolved when it is absent from the catalog (linked server,
-    cross-database call, dropped object) or when its bare name is ambiguous
-    across schemas. Both cases are honest reasons to downgrade the caller's
-    confidence: the analyst cannot see what that call does.
+    Three sources feed the graph, in decreasing authority (C2, audit 2026-08-29):
+
+    ``catalogCalls``
+        Object→object edges read from the engine's own dependency catalog
+        (`sys.sql_expression_dependencies`, `all_dependencies`, `pg_depend`),
+        projected per object by `db_introspect.attach_catalog_calls`. This is
+        ground truth: it survives synonyms, renames and cross-schema
+        qualification, and it is the ONLY reliable source on Oracle, where a
+        PL/SQL call carries no keyword at all. It used to be collected and then
+        dropped on the floor — merged into `dependencyGraph`, never into the
+        graph `plan_waves` actually orders on.
+
+    ``callsProcs``
+        The keyword-anchored regex extraction (`EXEC` / `CALL` / `PERFORM`).
+        Authoritative enough to REPORT a failure: a name written here and absent
+        from the catalog is a linked server, a cross-database call, a dropped
+        object or a genuinely ambiguous bare name — all honest reasons to
+        downgrade the caller's confidence, because the analyst cannot read what
+        that call does.
+
+    ``callsInferred``
+        Keyword-less invocations (`pkg.proc(...)`, a scalar function inside an
+        expression). Heuristic by construction, so it is resolve-or-drop: it can
+        only ADD a real edge, never invent an unresolved callee.
+
+    Catalog data takes precedence where both describe the same object: when the
+    regex produced a name the object set cannot resolve, but the catalog resolved
+    a callee with the same bare name, the catalog's answer wins and no unresolved
+    callee is reported.
     """
     objs = list(objects)
     by_fq: dict[str, str] = {}
@@ -81,30 +111,56 @@ def resolve_calls(
         by_fq[_norm(fq)] = fq
         by_tail.setdefault(_tail(fq), []).append(fq)
 
+    def _resolve(callee: str) -> str | None:
+        target = by_fq.get(_norm(callee))
+        if target is not None:
+            return target
+        candidates = by_tail.get(_tail(callee), [])
+        # Exactly one candidate is a safe resolution; two are a guess, and a
+        # guess in a dependency graph silently reorders the plan.
+        return candidates[0] if len(candidates) == 1 else None
+
     edges: list[tuple[str, str]] = []
     unresolved: dict[str, list[str]] = {}
     seen: set[tuple[str, str]] = set()
+
+    def _add(caller: str, target: str) -> None:
+        key = (caller, target)
+        if key not in seen:
+            seen.add(key)
+            edges.append(key)
 
     for o in objs:
         caller = _fq(o)
         if not caller:
             continue
+
+        # 1. Catalog first — it also arbitrates the regex failures below.
+        catalog_tails: set[str] = set()
+        for callee in o.get("catalogCalls") or []:
+            target = _resolve(callee)
+            if target is None:
+                continue                      # a table, or an object outside scope
+            catalog_tails.add(_tail(target))
+            _add(caller, target)
+
+        # 2. Keyword-anchored regex — may report an unresolved callee.
         for callee in o.get("callsProcs") or []:
-            target = by_fq.get(_norm(callee))
+            target = _resolve(callee)
             if target is None:
-                candidates = by_tail.get(_tail(callee), [])
-                # Exactly one candidate is a safe resolution; two are a guess,
-                # and a guess in a dependency graph silently reorders the plan.
-                target = candidates[0] if len(candidates) == 1 else None
-            if target is None:
+                if _tail(callee) in catalog_tails:
+                    continue                  # the catalog already answered this
                 unresolved.setdefault(caller, [])
                 if callee not in unresolved[caller]:
                     unresolved[caller].append(callee)
                 continue
-            key = (caller, target)
-            if key not in seen:
-                seen.add(key)
-                edges.append(key)
+            _add(caller, target)
+
+        # 3. Keyword-less invocations — resolve or drop, never reported.
+        for callee in o.get("callsInferred") or []:
+            target = _resolve(callee)
+            if target is not None:
+                _add(caller, target)
 
     return edges, unresolved
 

@@ -208,34 +208,34 @@ class TestSddState(unittest.TestCase):
     def test_set_phase_start_marks_running(self) -> None:
         run_id = self._new_run(feat=1)
         result = _run(
-            ["set-phase", "--run-id", run_id, "--phase", "us-generate", "--status", "start"],
+            ["set-phase", "--run-id", run_id, "--phase", "us_generate", "--status", "start"],
             cwd=self.fake,
         )
         self.assertEqual(result.returncode, 0, msg=result.stderr)
         state = self._read_state(run_id)
-        phase = state["phases"]["us-generate"]
+        phase = state["phases"]["us_generate"]
         self.assertEqual(phase["status"], "running")
         self.assertIsNone(phase["endedAt"])
-        self.assertEqual(state["currentPhase"], "us-generate")
+        self.assertEqual(state["currentPhase"], "us_generate")
 
     def test_set_phase_pass_marks_ended(self) -> None:
         run_id = self._new_run(feat=1)
         _run(
-            ["set-phase", "--run-id", run_id, "--phase", "us-generate", "--status", "start"],
+            ["set-phase", "--run-id", run_id, "--phase", "us_generate", "--status", "start"],
             cwd=self.fake,
         )
         _run(
-            ["set-phase", "--run-id", run_id, "--phase", "us-generate", "--status", "pass"],
+            ["set-phase", "--run-id", run_id, "--phase", "us_generate", "--status", "pass"],
             cwd=self.fake,
         )
-        phase = self._read_state(run_id)["phases"]["us-generate"]
+        phase = self._read_state(run_id)["phases"]["us_generate"]
         self.assertEqual(phase["status"], "pass")
         self.assertIsNotNone(phase["endedAt"])
 
     def test_set_phase_emits_phase_end_event(self) -> None:
         run_id = self._new_run(feat=1)
         _run(
-            ["set-phase", "--run-id", run_id, "--phase", "feat-validate", "--status", "pass"],
+            ["set-phase", "--run-id", run_id, "--phase", "readiness", "--status", "pass"],
             cwd=self.fake,
         )
         events = self._read_events()
@@ -244,7 +244,7 @@ class TestSddState(unittest.TestCase):
             if e.get("event") == "phase.end" and e.get("runId") == run_id
         ]
         self.assertEqual(len(phase_ends), 1)
-        self.assertEqual(phase_ends[0]["phase"], "feat-validate")
+        self.assertEqual(phase_ends[0]["phase"], "readiness")
         self.assertEqual(phase_ends[0]["status"], "pass")
 
     def test_set_phase_with_payload_json(self) -> None:
@@ -253,22 +253,75 @@ class TestSddState(unittest.TestCase):
         result = _run(
             [
                 "set-phase", "--run-id", run_id,
-                "--phase", "plan_cache_evaluation", "--status", "pass",
+                "--phase", "plan", "--status", "pass",
                 "--payload-json", payload,
             ],
             cwd=self.fake,
         )
         self.assertEqual(result.returncode, 0, msg=result.stderr)
-        phase = self._read_state(run_id)["phases"]["plan_cache_evaluation"]
+        phase = self._read_state(run_id)["phases"]["plan"]
         self.assertEqual(phase["payload"]["us_strict_back"], 4)
         self.assertEqual(phase["payload"]["rate"], 0.8)
 
     def test_set_phase_unknown_run_id_returns_error(self) -> None:
         result = _run(
-            ["set-phase", "--run-id", "deadbeefdead", "--phase", "x", "--status", "pass"],
+            ["set-phase", "--run-id", "deadbeefdead", "--phase", "qa", "--status", "pass"],
             cwd=self.fake,
         )
         self.assertEqual(result.returncode, 1)
+
+    # ---- set-phase : validation du nom de phase (audit F-M2, 2026-08-30) ----
+
+    def test_set_phase_unknown_phase_name_rejected(self) -> None:
+        run_id = self._new_run(feat=1)
+        result = _run(
+            ["set-phase", "--run-id", run_id, "--phase", "typo_phase", "--status", "pass"],
+            cwd=self.fake,
+        )
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("phase inconnue", result.stderr)
+        # Le message d'erreur liste les noms canoniques valides
+        self.assertIn("us_generate", result.stderr)
+        self.assertIn("sdd_review", result.stderr)
+        # Rien ne doit avoir été persisté
+        state = self._read_state(run_id)
+        self.assertEqual(state["phases"], {})
+
+    def test_set_phase_legacy_alias_normalized_to_canonical(self) -> None:
+        run_id = self._new_run(feat=1)
+        result = _run(
+            ["set-phase", "--run-id", run_id, "--phase", "us-generate", "--status", "pass"],
+            cwd=self.fake,
+        )
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        self.assertIn("alias legacy", result.stderr)
+        state = self._read_state(run_id)
+        # Stocké sous le nom canonique (reconnu par resume-target), pas l'alias
+        self.assertIn("us_generate", state["phases"])
+        self.assertNotIn("us-generate", state["phases"])
+
+    def test_set_phase_aux_phase_accepted(self) -> None:
+        run_id = self._new_run(feat=1)
+        result = _run(
+            ["set-phase", "--run-id", run_id, "--phase", "auditor_batch", "--status", "pass"],
+            cwd=self.fake,
+        )
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        self.assertIn("auditor_batch", self._read_state(run_id)["phases"])
+
+    def test_resume_target_sees_canonical_phases(self) -> None:
+        """Round-trip F-M2 : phases émises via set-phase (noms canoniques)
+        doivent être reconnues par resume-target."""
+        run_id = self._new_run(feat=1)
+        for phase in ("us_generate", "readiness", "plan"):
+            _run(
+                ["set-phase", "--run-id", run_id, "--phase", phase, "--status", "pass"],
+                cwd=self.fake,
+            )
+        result = _run(["resume-target", "--run-id", run_id], cwd=self.fake)
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        # us_generate/readiness/plan done → prochaine phase = arch/dev_run (STEP_4)
+        self.assertEqual(result.stdout.strip(), "STEP_4")
 
     # ---- end-run ----
 
@@ -383,8 +436,8 @@ class TestSddState(unittest.TestCase):
         """v6.10: events live in SQLite, not JSONL. Verify ts + event_type
         + ISO-8601 ms timestamp on each row."""
         run_id = self._new_run(feat=1)
-        _run(["set-phase", "--run-id", run_id, "--phase", "x", "--status", "start"], cwd=self.fake)
-        _run(["set-phase", "--run-id", run_id, "--phase", "x", "--status", "pass"], cwd=self.fake)
+        _run(["set-phase", "--run-id", run_id, "--phase", "qa", "--status", "start"], cwd=self.fake)
+        _run(["set-phase", "--run-id", run_id, "--phase", "qa", "--status", "pass"], cwd=self.fake)
         _run(["end-run", "--run-id", run_id], cwd=self.fake)
         conn = self._open_db()
         try:

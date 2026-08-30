@@ -153,11 +153,15 @@ def _render_type(field: dict[str, Any]) -> str:
     scale = field.get("scale")
     if low in ("decimal", "numeric") and precision:
         return f"{base}({precision},{scale or 0})"
-    if max_len not in (None, "", 0, -1) and low not in ("int", "bigint", "smallint",
-                                                        "tinyint", "bit", "date",
-                                                        "datetime", "datetime2",
-                                                        "uniqueidentifier", "float",
-                                                        "real", "money", "text"):
+    # `-1` is SQL Server's encoding of `(max)` — it must reach the `n < 0` branch
+    # below (m1, audit 2026-08-29). Excluding it here meant every `NVARCHAR(MAX)`
+    # / `VARBINARY(MAX)` column was reported as the bare type, i.e. as BOUNDED,
+    # in the very artefact a Tech Lead reads to size a migration.
+    if max_len not in (None, "", 0) and low not in ("int", "bigint", "smallint",
+                                                    "tinyint", "bit", "date",
+                                                    "datetime", "datetime2",
+                                                    "uniqueidentifier", "float",
+                                                    "real", "money", "text"):
         try:
             n = int(max_len)
         except (TypeError, ValueError):

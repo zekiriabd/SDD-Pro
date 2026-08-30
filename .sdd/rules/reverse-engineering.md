@@ -17,12 +17,12 @@ paths:
 > `reverse-completeness-reviewer`, `reverse-paradigm-advisor` (2.7),
 > `reverse-parity-inspector` (3.8), `reverse-clarifier` (3.9) — les 3 derniers
 > empruntés à Reversa, audit comparatif 2026-06-12)
-> et aux scripts/commandes du module `sdd_reverse`. Ne s'applique pas aux 12
+> et aux scripts/commandes du module `sdd_reverse`. Ne s'applique pas aux 13
 > agents SDD_Pro standards.
 >
 > **Escalier ascendant (ADR `governance-major-reverse-spec-ladder`)** : la
 > Phase 3 (`code → FEAT`) est décomposée en 3 barreaux — 3a `reverse-tech-analyst`
-> (analyse technique → `plans/{n}-{Name}.analysis.md`), 3b
+> (analyse technique → `plans/{n}-{FeatName}.analysis.md`), 3b
 > `reverse-us-writer` (user stories → `us/`), 3c `reverse-feat-composer`
 > (FEAT métier → `feats/`). Remplace l'ex-`reverse-functional-extractor`
 > (saut mono-prompt décommissionné, D2). Fil de traçabilité FEAT→US→task→evidence,
@@ -33,8 +33,18 @@ paths:
 > `build-and-loop.md`. Aucune modification de ces règles existantes (D4 strict
 > isolation, design doc §3.1).
 >
-> **SSoT** : `.sdd/docs/reverse-engineering-workflow.md` — ce fichier en est
-> l'extrait opérationnel pour les agents.
+> **SSoT (préséance corrigée — audit 2026-08-29, M7)** : **cette règle fait foi**.
+> `.sdd/docs/reverse-engineering-workflow.md` est le **design doc de conception**
+> (historique, corrigé ponctuellement, pas rafraîchi en continu) : il était cité
+> ici comme SSoT alors qu'il datait du 2026-06-11 et contredisait cette règle
+> (périmètre « 4 agents », copie gelée de la taxonomie §6). Les agents chargent
+> cette règle à l'exécution ; c'est elle qui est verrouillée par les tests.
+>
+> **Périmètre agents (recompte 2026-08-29)** : les 10 agents code-reverse listés
+> ci-dessus **+ les 6 agents db-reverse** (`reverse-sql-analyst`,
+> `reverse-sql-function-analyst`, `reverse-sql-view-analyst`,
+> `reverse-sql-trigger-analyst`, `reverse-db-architect`,
+> `reverse-sql-feat-composer`) = **16** (SSoT machine : `.sdd/loader.reverse.yml`).
 
 ## TOC
 
@@ -47,6 +57,7 @@ paths:
 - [§7 Label chat `[REVERSE]` (output-protocol)](#7-label-chat-reverse-output-protocol)
 - [§8 Phase 3 séquentielle stricte (ADV-2)](#8-phase-3-séquentielle-stricte-adv-2)
 - [§9 Pas de spawn d'agent (no-spawn)](#9-pas-de-spawn-dagent-no-spawn)
+- [§10 Pont reverse → /sdd-full (handoff, REV-C1)](#10-pont-reverse--sdd-full-handoff-rev-c1-audit-2026-06-12)
 
 ---
 
@@ -187,6 +198,11 @@ Format ERROR 3-lignes disque, 1 ligne chat (cf. `error-classification.md §2` qu
 | `[REVERSE_DB_SCHEMA_PARTIAL]` | NON (WARN) | db-reverse : une requête de **structure live** (`columns`/`primary_keys`/`foreign_keys`/`indexes`/`checks`) a échoué ou n'a rien renvoyé — droit manquant, version de moteur, catalogue absent. La section correspondante de `db-schema.json` reste vide, le reste du schéma est produit. Émis par `db_schema_live.fetch_structure` + `build_live_schema`. Un droit refusé dégrade le rapport, il n'interrompt jamais un run par ailleurs réussi. |
 | `[REVERSE_DB_OBJECTS_PARTIAL]` | NON (WARN) | db-reverse : une famille d'**objets sans corps** (job/séquence/synonyme/linked server/type utilisateur) n'est pas lisible. Cas NORMAL et fréquent : `msdb` non accordé au login d'introspection, extension `pg_cron` absente, `CHECK_CONSTRAINTS` inexistant avant MySQL 8.0.16. Émis par `db_schema_live.fetch_catalog_objects`. |
 | `[REVERSE_DB_HOMONYM]` | NON (info) | db-reverse : une même nom de table existe dans ≥ 2 schémas (`dbo.Orders` **et** `sales.Orders`). Légitime, mais signalé car tout consommateur qui indexe les entités par nom nu les fusionnerait — utiliser `qualifiedName`. Émis par `db_schema_live.build_live_schema`. |
+| `[REVERSE_OBJECT_KIND_MISMATCH]` | NON (info) | db-reverse : un analyste d'objet SQL (procédure/fonction/vue/trigger) reçoit un objet hors de sa famille (ex. une vue routée vers `reverse-sql-analyst`). L'agent décline plutôt que d'écrire une User Story sous le mauvais angle métier — re-dispatch vers le bon spécialiste. Émis par les 4 analystes d'objet (garde de type ajoutée/complétée à l'audit 2026-08-29 M4). |
+| `[REVERSE_DB_PACK_MISSING]` | **OUI** | db-reverse : le pack de contexte déterministe `.sys/db-context/packs/{schema}.{objet}.md` d'un objet est absent — l'analyste n'a aucun contexte sanctionné et s'arrête plutôt que d'improviser. Émis par les agents analystes/compositeur SQL. Fix : relancer `/sdd-db-context`. |
+| `[REVERSE_DB_CONTEXT_STALE]` | **OUI** | db-reverse : les hypothèses de `reverse-db-architect` ont été construites sur un `contextVersion` qui ne correspond plus aux faits courants (audit 2026-08-29 M2 — la version couvre désormais aussi un hash de corps par objet) — la fusion est refusée. Émis par `db_context_build.py`. Fix : relancer l'architecte sur le contexte à jour. |
+| `[REVERSE_FILE_UNREADABLE]` | NON (WARN, Phase 1) | Un fichier legacy **dans le périmètre** n'a pas pu être lu (permissions, I/O, encodage indécodable) : il n'a contribué **aucune** evidence. Avant l'audit 2026-08-29 (M3), `scan_legacy.read_text_normalized` renvoyait `""` sur toute `OSError` et le scan l'absorbait dans `files_skipped` — les 7 extracteurs (data-access, config, db-schema, deps, templates UI, CSS, dépendances) recevaient un fichier vide sans le moindre signal, et un reverse dont toute la promesse est « on ne rapporte que ce qui est littéralement dans la source » rapportait une source incomplète comme si elle était complète. Émis par `scan_legacy._record_read_issue` (dédupliqué par chemin, WARN agrégé + événement `structured_log`, exposé dans `ScanResult.to_dict().filesUnreadable`). Jamais bloquant : l'extraction best-effort continue, seul son silence est corrigé. |
+| `[REVERSE_LARGE_FILE_SAMPLED]` | NON (WARN, Phase 1) | Un fichier legacy dépasse un cap de lecture et n'a été analysé que **partiellement** : cap générique 5 Mo de `read_text_normalized` (troncature en tête) ou cap `max_file_size_kb` par langage du scan (échantillonnage tête 200 Ko + queue 200 Ko, ADV-8 — le milieu du fichier n'est **pas** analysé). Toute evidence vivant dans la portion non lue est absente de l'inventaire. Même émetteur et même canal que `[REVERSE_FILE_UNREADABLE]` ; `ScanResult.to_dict().filesSampled`. Le drapeau `was_sampled` était calculé puis jeté depuis ADV-8 — recâblé à l'audit 2026-08-29 (M3). |
 
 > **Classes retirées (audit 2026-06-11 MA-7)** : `[REVERSE_LANG_UNKNOWN]`,
 > `[REVERSE_DB_SCHEMA_MISSING]`, `[REVERSE_DB_SCHEMA_DEGRADED]`,
@@ -223,7 +239,7 @@ FIX: attendre fin Phase 3a en cours OU supprimer manuellement .alloc.lock après
 Le tableau §6 déclare le **contrat** ; tous les émetteurs ne sont pas
 encore câblés. État vérifié par grep croisé code/prompts :
 
-- **Émises par scripts déterministes (23)** : `NO_SOURCE`, `UNIT_NOT_FOUND`,
+- **Émises par scripts déterministes (29)** : `NO_SOURCE`, `UNIT_NOT_FOUND`,
   `EVIDENCE_MISSING`, `LOCK_HELD`, `ENRICHMENT_INVALID`,
   `ENRICHMENT_TYPE_CONFLICT`, `GATE_DRIFT`, `INVENTORY_SCHEMA_STALE`,
   `COMPLETENESS_GAP`, `SECRETS_DETECTED`, `LADDER_TRACEABILITY_GAP`,
@@ -236,8 +252,13 @@ encore câblés. État vérifié par grep croisé code/prompts :
   emprunt Reversa 2026-06-12), plus db-reverse (DB live read-only) :
   `DB_CONFIG_MISSING`, `DB_UNREACHABLE`, `DB_AUTH_FAILED`, `PROC_NOT_FOUND`,
   `PROC_ENCRYPTED`, `DB_READONLY_VIOLATION` (`stack_db_config.py` /
-  `db_introspect.py` / `readonly_guard.py` / `reverse_proc_introspect.py`).
-- **Émises par prompts agents/commandes uniquement (11)** : `BINARY_ONLY`,
+  `db_introspect.py` / `readonly_guard.py` / `reverse_proc_introspect.py`),
+  `DB_SCHEMA_PARTIAL`, `DB_OBJECTS_PARTIAL`, `DB_HOMONYM` (`db_schema_live.py`,
+  ajoutées 2026-07/2026-08-25 — présentes en §6 mais jamais comptées ici, d'où
+  l'écart 37↔40 corrigé par l'audit 2026-08-29 M6), `DB_CONTEXT_STALE`
+  (`db_context_build.py`, audit 2026-08-29 M2/m5), plus
+  `FILE_UNREADABLE`, `LARGE_FILE_SAMPLED` (`scan_legacy.py`, audit 2026-08-29 M3).
+- **Émises par prompts agents/commandes uniquement (13)** : `BINARY_ONLY`,
   `FEAT_VALIDATE_FAILED`, `ISOLATION_VIOLATION`, `INVENTORY_STALE`,
   `NAME_COLLISION`, `TEMPLATE_MISSING`, `PARADIGM_GAP`, `CURATION_PENDING`,
   `QUESTIONS_PENDING`, `ANSWER_INGEST_FAILED`, `UI_PARSER_MISSING` (émission
@@ -245,7 +266,10 @@ encore câblés. État vérifié par grep croisé code/prompts :
   `PARADIGM_GAP`/`CURATION_PENDING`/`QUESTIONS_PENDING`/`ANSWER_INGEST_FAILED` :
   agents `reverse-paradigm-advisor` + `reverse-clarifier`, emprunt Reversa
   2026-06-12 ; `UI_PARSER_MISSING` : agent `reverse-ui-extractor`, audit C4
-  2026-07-24, sur signal déterministe `ui_template_parser`).
+  2026-07-24, sur signal déterministe `ui_template_parser`), plus
+  `OBJECT_KIND_MISMATCH` (les 4 analystes d'objet SQL) et `DB_PACK_MISSING`
+  (analystes/compositeur SQL) — audit 2026-08-29 M5/m5, émission LLM sur
+  garde de type / absence de pack, symétrique du reste de cette sous-liste.
 - **Enforced par `reverse_smoke` sous leur nom de check (2)** :
   `VALIDATOR_DRIFT` (`check_validator_parity_drift`), `HELPER_DRIFT`
   (`check_helper_parity_drift`) — le préfixe `[CLASS]` n'apparaît pas
@@ -262,10 +286,28 @@ encore câblés. État vérifié par grep croisé code/prompts :
 > (audit 2026-06-12) + 6 classes des phases optionnelles 2.7/3.8/3.9 (emprunt
 > Reversa, audit comparatif 2026-06-12) + 6 classes db-reverse (DB live
 > read-only, 2026-06-29) + ré-câblage `[REVERSE_LADDER_STALE]` (2026-06-29)
-> + `[REVERSE_UI_PARSER_MISSING]` (audit C4 2026-07-24, agent `reverse-ui-extractor`) :
-> **37 classes** (23 scripts déterministes + 11 prompts
+> + `[REVERSE_UI_PARSER_MISSING]` (audit C4 2026-07-24, agent `reverse-ui-extractor`)
+> + 3 classes db-reverse de dégradation partielle (`DB_SCHEMA_PARTIAL`,
+> `DB_OBJECTS_PARTIAL`, `DB_HOMONYM`, 2026-07/2026-08-25)
+> + 2 classes de sous-extraction en lecture (`FILE_UNREADABLE`,
+> `LARGE_FILE_SAMPLED`, audit 2026-08-29 M3)
+> + 3 classes db-reverse issues du remède de l'audit 2026-08-29 sur les
+> barrières facts/hypothèses et guard de type (`OBJECT_KIND_MISMATCH`,
+> `DB_PACK_MISSING`, `DB_CONTEXT_STALE`, M4/M2/m5) :
+> **45 classes** (29 scripts déterministes + 13 prompts
 > agents/commandes + 2 enforced par `reverse_smoke` + 1 hook). Règle : aucune
 > classe `[REVERSE_*]` ne vit dans §6 sans émetteur identifié.
+>
+> **Anti-drift (audit 2026-08-29, M6)** : ce total était annoncé à `37` alors que
+> la table §6 en comptait déjà `40` — les 3 classes db-reverse de 2026-07/08
+> avaient été ajoutées au tableau sans mettre à jour le décompte, et **rien** ne
+> le vérifiait (le pipeline forward, lui, verrouille son propre décompte avec
+> `tests/test_error_classification_count.py`). Le test
+> `tests/test_reverse_audit_2026_08_29.py::TestReverseTaxonomyCount` compare
+> désormais le nombre annoncé ci-dessus au nombre de lignes réelles de la table
+> §6 : ajouter une classe **sans** corriger ce total fait échouer la CI — c'est
+> exactement ce garde-fou qui a forcé cette mise à jour 42→45 (3 classes
+> ajoutées par le remède reverse-DB M2/M4/m5 de ce même audit).
 
 > **Monotonie de confidence (Q3)** : enforced depuis 2026-06-11 par
 > `check_ladder_traceability.py` (gaps `confidence uprank: ...` sous

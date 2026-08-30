@@ -149,6 +149,41 @@ def _count_actors(text: str) -> int:
     return len([a for a in actor_lines if not a.strip().startswith("<")])
 
 
+#: `1.000` / `1,000,000` / `1 000` — separators used as THOUSANDS grouping.
+_THOUSANDS_GROUPED_RE = re.compile(r"^\d{1,3}(?:[.,\s]\d{3})+$")
+#: `1.5` / `0,75` — a single separator followed by 1-2 digits is DECIMAL.
+_DECIMAL_RE = re.compile(r"^\d+[.,]\d{1,2}$")
+
+
+def _parse_numeric_token(raw: str) -> float | None:
+    """Parse a human-written number, disambiguating thousands vs decimal.
+
+    Audit m1 (2026-08-29). FEAT authors write volumes in mixed conventions
+    (`10k`, `10 000`, `10,000`, `1.5k`, `100.000`). Blanket-stripping `.` and
+    `,` reads `1.5` as `15`; blanket-treating them as decimal points reads
+    `100.000` as `100`. Both are wrong in one direction each, so the shape of
+    the token decides:
+
+      - `1.000`, `1,000,000`, `10 000`  → grouped thousands, separators dropped
+      - `1.5`, `0,75`                    → decimal, separator normalized to `.`
+      - anything else                    → digits only
+
+    Returns None when nothing parseable remains.
+    """
+    token = raw.strip()
+    if not token:
+        return None
+    if _THOUSANDS_GROUPED_RE.match(token):
+        return float(re.sub(r"[.,\s]", "", token))
+    compact = token.replace(" ", "")
+    if _DECIMAL_RE.match(compact):
+        return float(compact.replace(",", "."))
+    digits = re.sub(r"[^\d]", "", token)
+    if not digits:
+        return None
+    return float(digits)
+
+
 def _check_volume_high(volume_str: str) -> tuple[bool, bool]:
     """Returns (is_high_threshold_10k, is_critical_threshold_100k).
 
@@ -158,16 +193,21 @@ def _check_volume_high(volume_str: str) -> tuple[bool, bool]:
         return False, False
     v = volume_str.lower()
 
-    # Numeric extraction — find first number, then check k/m suffix
-    num_match = re.search(r"(\d[\d\s,.]*)\s*([kKmM]?)", v)
+    # Numeric extraction — find first number, then check k/m suffix.
+    #
+    # Audit m1 (2026-08-29) — the previous regex stripped `.` and `,` from the
+    # captured token *before* applying the multiplier, so `"1.5k req/day"`
+    # became `15 * 1000 = 15_000` and tripped the ≥10k "high volume" signal
+    # for a FEAT serving 1 500 requests a day: a 10x mis-scoring that silently
+    # routed small FEATs into the heavy pipeline. Separators now have to be
+    # disambiguated (thousands vs decimal) before the multiplier applies.
+    num_match = re.search(r"(\d[\d\s.,]*\d|\d)\s*([kKmM])?", v)
     if not num_match:
         return False, False
-    raw = num_match.group(1).replace(",", "").replace(".", "").replace(" ", "")
-    try:
-        n = int(raw)
-    except ValueError:
+    n = _parse_numeric_token(num_match.group(1))
+    if n is None:
         return False, False
-    suffix = num_match.group(2).lower()
+    suffix = (num_match.group(2) or "").lower()
     if suffix == "k":
         n *= 1_000
     elif suffix == "m":
@@ -193,12 +233,30 @@ def _check_perf_strict(perf_str: str) -> bool:
     return False
 
 
+#: Accepted `SDD_FORCE_PIPELINE` values -> forced complexity (audit M8).
+_FORCE_MAP: dict[str, str] = {
+    "poc": "small", "small": "small",
+    "standard": "medium", "medium": "medium",
+    "full": "large", "large": "large",
+    "critical": "critical",
+}
+
+#: Whole-word markers of a ≥ 1 year retention (audit m1, 2026-08-29).
+_RETENTION_LONG_RE = re.compile(
+    r"\b(?:ans?|années?|years?|gdpr|rgpd)\b", re.IGNORECASE
+)
+
+
 def _check_retention_long(retention_str: str) -> bool:
     """True if data retention ≥ 1 year."""
     if not _is_non_empty_value(retention_str):
         return False
     v = retention_str.lower()
-    if any(k in v for k in ("an", "année", "year", "gdpr", "rgpd")):
+    # Audit m1 (2026-08-29) — this was a substring test on the 2-letter token
+    # `"an"`, which matches inside `plan`, `avant`, `management`, `bancaire`,
+    # `analytics`… so a retention field reading "aucun plan de purge" scored
+    # as "≥ 1 an" and pushed the FEAT toward `critical`. Word-boundary match.
+    if _RETENTION_LONG_RE.search(v):
         return True
     # Try to parse days/months
     days_match = re.search(r"(\d+)\s*jour|(\d+)\s*day", v)
@@ -552,16 +610,31 @@ def main() -> int:
     score = compute_score(signals)
     complexity = classify_complexity(score, signals)
 
-    # Honor force override env var (debug / CI)
+    # Honor force override env var (debug / CI).
+    #
+    # Audit M8 (2026-08-29) — this override silently rewrote the computed
+    # complexity, so a run forced to `poc` looked, in every artifact and log,
+    # exactly like a FEAT the rubric had genuinely scored as small. The scored
+    # value is now preserved in the report (`scored_complexity`) and the
+    # override announced on stderr, so the routing decision stays auditable.
     force_pipeline = os.environ.get("SDD_FORCE_PIPELINE", "").strip().lower()
-    if force_pipeline in ("poc", "small"):
-        complexity = "small"
-    elif force_pipeline in ("standard", "medium"):
-        complexity = "medium"
-    elif force_pipeline in ("full", "large"):
-        complexity = "large"
-    elif force_pipeline in ("critical",):
-        complexity = "critical"
+    scored_complexity = complexity
+    forced = _FORCE_MAP.get(force_pipeline)
+    if forced:
+        complexity = forced
+        print(
+            f"[complexity-router] BYPASS via SDD_FORCE_PIPELINE={force_pipeline!r} "
+            f"— complexité calculée {scored_complexity!r} (score {score}) "
+            f"IGNORÉE, forcée à {complexity!r}",
+            file=sys.stderr,
+        )
+    elif force_pipeline:
+        print(
+            f"[complexity-router] WARN SDD_FORCE_PIPELINE={force_pipeline!r} "
+            f"non reconnu (attendu: {'|'.join(sorted(_FORCE_MAP))}) — ignoré, "
+            f"complexité calculée {complexity!r} conservée",
+            file=sys.stderr,
+        )
 
     rec = recommend_pipeline(complexity, args.feat_number)
 
@@ -572,6 +645,10 @@ def main() -> int:
         "extracted_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "score":        score,
         "complexity":   complexity,
+        # Audit M8 — keep the rubric's own verdict alongside the effective
+        # one so a forced run is distinguishable after the fact.
+        "scored_complexity": scored_complexity,
+        "forced_by_env": force_pipeline if forced else None,
         "signals":      signals,
         "recommended":  rec,
         "generator":    "complexity_router.py (deterministic, 0 LLM tokens)",

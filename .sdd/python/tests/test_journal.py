@@ -122,7 +122,8 @@ class TestRecord(_DbCase):
                            input_tokens=100_000, outcome="ok")
             r = journal.entries(c)[0]
         self.assertEqual(r["pricing_source"], "known")
-        self.assertAlmostEqual(r["cost_usd"], 1.5, places=3)
+        # 100k input @ $5/MTok (opus-4-8, 2026-08-30 rate correction) = $0.5
+        self.assertAlmostEqual(r["cost_usd"], 0.5, places=3)
 
     def test_script_kind_records_zero_cost_as_information(self) -> None:
         """Un scan déterministe coûte 0 — et ce 0 mesure ce qu'on a cessé de

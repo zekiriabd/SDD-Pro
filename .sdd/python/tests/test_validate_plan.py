@@ -345,24 +345,62 @@ class TestValidatorIntegration(unittest.TestCase):
             self.assertEqual(payload["result"], "valid")
             self.assertEqual(payload["files_count"], 2)
 
-    def test_v1_plan_not_strict_ready_with_strict(self) -> None:
-        """Test 2: V1 plan (schema-version absent) + --strict → exit 1 not_strict_ready."""
+    def test_v1_plan_with_legacy_strict_flag_is_still_exit_0(self) -> None:
+        """Audit M5 (2026-08-29) — `--strict` is a retired no-op.
+
+        This test previously asserted `exit 1` / `result=not_strict_ready`,
+        the strict-readiness verdict that gated the `dev-*-strict` agents.
+        Those agents were deleted in v7.0.0, so no documented caller passes
+        `--strict` and exit 1 was unreachable in production. Strict mode is
+        now retired rather than resurrected: the flag stays accepted (an old
+        script must not crash) but changes nothing.
+        """
         with _PlanFixture(V1_LEGACY_PLAN) as fix:
             assert fix.plan_path
             code, payload = self._run(fix.plan_path, strict=True)
-            self.assertEqual(code, 1)
-            self.assertEqual(payload["result"], "not_strict_ready")
+            self.assertEqual(code, 0)
+            self.assertEqual(payload["result"], "valid")
 
-    def test_v2_plan_strict_ready(self) -> None:
-        """Test 3: V2 plan with matching us-hash + ## Inline Digest → exit 0 ready."""
+    def test_legacy_strict_flag_changes_nothing(self) -> None:
+        """`--strict` and no-flag must produce byte-identical verdicts."""
+        with _PlanFixture(V1_LEGACY_PLAN) as fix:
+            assert fix.plan_path
+            code_plain, payload_plain = self._run(fix.plan_path, strict=False)
+            code_strict, payload_strict = self._run(fix.plan_path, strict=True)
+        self.assertEqual(code_plain, code_strict)
+        payload_plain.pop("strict_mode", None)
+        payload_strict.pop("strict_mode", None)
+        self.assertEqual(payload_plain, payload_strict)
+
+    def test_v2_plan_valid(self) -> None:
+        """Test 3: V2 plan with matching us-hash + ## Inline Digest → exit 0."""
         v2_plan = _v2_plan_with_us_hash()
         with _PlanFixture(v2_plan, us_content=_SAMPLE_US) as fix:
             assert fix.plan_path and fix.us_path
-            code, payload = self._run(fix.plan_path, strict=True, us_path=fix.us_path)
+            code, payload = self._run(fix.plan_path, us_path=fix.us_path)
             self.assertEqual(code, 0, msg=f"errors: {payload.get('errors')}")
-            self.assertEqual(payload["result"], "ready")
+            self.assertEqual(payload["result"], "valid")
             self.assertTrue(payload["us_hash_match"])
             self.assertTrue(payload["inline_digest_present"])
+
+    def test_exit_code_1_is_unreachable(self) -> None:
+        """Audit M5 — no input may produce exit 1 any more.
+
+        `dev-plan.md` published an exit-1 row that could never occur. The
+        row is gone; this locks the contract so it cannot silently return.
+        """
+        cases = [
+            (V1_LEGACY_PLAN, False),
+            (V1_LEGACY_PLAN, True),
+            (V2_MISSING_DIGEST, False),
+            (V2_MISSING_DIGEST, True),
+            (_v2_plan_with_us_hash(), False),
+        ]
+        for content, strict in cases:
+            with _PlanFixture(content) as fix:
+                assert fix.plan_path
+                code, _ = self._run(fix.plan_path, strict=strict)
+            self.assertNotEqual(code, 1, f"exit 1 resurfaced (strict={strict})")
 
     def test_v2_plan_stale_us_hash(self) -> None:
         """Test 4: V2 plan with stale us-hash → exit 2 invalid (PLAN_STALE)."""
@@ -415,14 +453,72 @@ class TestValidatorIntegration(unittest.TestCase):
             err_codes = [e["code"] for e in payload["errors"]]  # type: ignore[index]
             self.assertIn("PLAN_NO_FRONTMATTER", err_codes)
 
-    def test_v2_plan_missing_inline_digest(self) -> None:
-        """Test 6: V2 plan without ## Inline Digest → exit 1 not_strict_ready."""
+    def test_v2_plan_missing_inline_digest_is_a_warning(self) -> None:
+        """Test 6: V2 plan without ## Inline Digest → exit 0 + WARN.
+
+        Audit M5 — a missing digest was a *strict-readiness* concern, not a
+        correctness one. With strict mode retired it becomes a non-blocking
+        warning; the plan stays usable by dev-* in From-Plan classic mode
+        (which is exactly what `build-and-loop.md §7.6` already said about
+        the old exit 1).
+        """
         with _PlanFixture(V2_MISSING_DIGEST) as fix:
             assert fix.plan_path
-            code, payload = self._run(fix.plan_path, strict=True)
-            self.assertEqual(code, 1)
-            self.assertEqual(payload["result"], "not_strict_ready")
+            code, payload = self._run(fix.plan_path)
+            self.assertEqual(code, 0)
+            self.assertEqual(payload["result"], "valid")
             self.assertFalse(payload["inline_digest_present"])
+            warn_codes = [w["code"] for w in payload["warnings"]]  # type: ignore[index]
+            self.assertIn("PLAN_DIGEST_ABSENT", warn_codes)
+
+    # --- Audit M6 (2026-08-29) — staleness-unknown must not look fresh ----
+
+    def test_staleness_unverifiable_when_us_path_absent(self) -> None:
+        """A declared us-hash with no --us-path must WARN, not pass silently.
+
+        Regression : `validate_staleness` used to `return` bare in this
+        branch, so a caller reading exit 0 could not distinguish "provably
+        in sync" from "nobody could check". Staleness-unknown must never
+        look identical to staleness-confirmed-fresh.
+        """
+        v2_plan = _v2_plan_with_us_hash()
+        with _PlanFixture(v2_plan) as fix:
+            assert fix.plan_path
+            code, payload = self._run(fix.plan_path)  # no --us-path
+        self.assertEqual(code, 0, "unverifiable staleness stays non-blocking")
+        self.assertIsNone(payload["us_hash_match"])
+        warn_codes = [w["code"] for w in payload["warnings"]]  # type: ignore[index]
+        self.assertIn("PLAN_STALENESS_UNVERIFIABLE", warn_codes)
+
+    def test_staleness_unverifiable_when_us_file_missing(self) -> None:
+        v2_plan = _v2_plan_with_us_hash()
+        with _PlanFixture(v2_plan) as fix:
+            assert fix.plan_path
+            ghost = fix.plan_path.parent / "no-such-us.md"
+            code, payload = self._run(fix.plan_path, us_path=ghost)
+        self.assertEqual(code, 0)
+        self.assertIsNone(payload["us_hash_match"])
+        warn_codes = [w["code"] for w in payload["warnings"]]  # type: ignore[index]
+        self.assertIn("PLAN_STALENESS_UNVERIFIABLE", warn_codes)
+
+    def test_v1_plan_without_us_hash_warns_unverifiable(self) -> None:
+        with _PlanFixture(V1_LEGACY_PLAN) as fix:
+            assert fix.plan_path
+            code, payload = self._run(fix.plan_path)
+        self.assertEqual(code, 0)
+        warn_codes = [w["code"] for w in payload["warnings"]]  # type: ignore[index]
+        self.assertIn("PLAN_STALENESS_UNVERIFIABLE", warn_codes)
+
+    def test_verified_fresh_plan_has_no_unverifiable_warning(self) -> None:
+        """The contrast case: a genuinely verified plan must NOT warn."""
+        v2_plan = _v2_plan_with_us_hash()
+        with _PlanFixture(v2_plan, us_content=_SAMPLE_US) as fix:
+            assert fix.plan_path and fix.us_path
+            code, payload = self._run(fix.plan_path, us_path=fix.us_path)
+        self.assertEqual(code, 0)
+        self.assertTrue(payload["us_hash_match"])
+        warn_codes = [w["code"] for w in payload["warnings"]]  # type: ignore[index]
+        self.assertNotIn("PLAN_STALENESS_UNVERIFIABLE", warn_codes)
 
     def test_augment_missing_contract(self) -> None:
         """Test 7: augment file without preserves/adds → exit 2 invalid."""

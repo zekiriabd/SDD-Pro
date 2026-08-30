@@ -158,6 +158,19 @@ def _object_facts(introspection: dict[str, Any]) -> list[dict[str, Any]]:
             "tablesWritten": list(p.get("tablesWritten") or []),
             "writeKinds": dict(p.get("writeKinds") or {}),
             "callsProcs": list(p.get("callsProcs") or []),
+            # C1/C2 (audit 2026-08-29) — the two other sources of call edges the
+            # wave planner orders on. `callsInferred` is the keyword-less
+            # invocation heuristic (PL/SQL, scalar functions in expressions);
+            # `catalogCalls` is the engine's own dependency catalog, which is the
+            # authoritative source on Oracle. Both are resolve-or-drop, so
+            # carrying them here cannot invent an object.
+            "callsInferred": list(p.get("callsInferred") or []),
+            "catalogCalls": list(p.get("catalogCalls") or []),
+            # M2 — the body's own content hash. Without it, two bodies of the
+            # same shape (same lines, same tables, same branch count) whose
+            # constants differ produced the SAME contextVersion, so a semantic
+            # edit was invisible to `diff_contexts`.
+            "bodyHash": p.get("bodyHash") or "",
             "branches": p.get("branches", 0),
             "cursors": p.get("cursors", 0),
             "raises": list(p.get("raises") or []),
@@ -238,8 +251,14 @@ def context_version(facts: dict[str, Any]) -> str:
     """sha256 over the canonical facts — the cache and drift key.
 
     Stable across runs and platforms: sorted keys, no whitespace, no timestamp.
-    Any structural change to the database (a column, a body, a call) changes it;
+    Any change to the database — a column, a call, a body — changes it;
     re-running an unchanged database does not.
+
+    The body is covered by `objects[].bodyHash` (M2, audit 2026-08-29). Before
+    that field existed the facts described a body's SHAPE only, so changing a
+    threshold inside an existing `IF` left the version untouched: `diff_contexts`
+    reported no drift, and the architect's cached hypotheses were reused against
+    a database whose behaviour had moved.
     """
     payload = json.dumps(facts, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     return "sha256:" + hashlib.sha256(payload.encode("utf-8")).hexdigest()
@@ -465,7 +484,11 @@ def diff_contexts(old: dict[str, Any], new: dict[str, Any]) -> dict[str, Any]:
     for k in sorted(no.keys() & oo.keys()):
         a, b = oo[k], no[k]
         reasons = []
-        if a.get("evidence") != b.get("evidence"):
+        # `bodyHash` (M2) sees a value edit inside an unchanged structure; the
+        # evidence range only sees a change of size. Either is a body change.
+        if (a.get("bodyHash") or "") != (b.get("bodyHash") or ""):
+            reasons.append("body")
+        elif a.get("evidence") != b.get("evidence"):
             reasons.append("body")
         if sorted(a.get("callsProcs") or []) != sorted(b.get("callsProcs") or []):
             reasons.append("calls")

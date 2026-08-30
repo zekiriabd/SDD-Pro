@@ -1,11 +1,6 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python -c ' *)",
-      "Bash(git commit -m ' *)",
-      "Bash(git commit *)",
-      "Bash(GIT_COMMITTER_NAME=\"SDD-Pro maintainer\" GIT_COMMITTER_EMAIL=\"maintainer@sdd-pro.local\" git commit --amend --author=\"SDD-Pro maintainer <maintainer@sdd-pro.local>\" --no-edit)",
-      "Bash(git push *)",
       "Bash(python -c \"import sys; sys.path.insert\\(0, 'python'\\); print\\('OK'\\)\")",
       "Bash(git -C c:/DEV/sdd-pro ls-files .sdd)",
       "Bash(git -C c:/DEV/sdd-pro ls-files .claude)",
@@ -184,12 +179,16 @@
     ],
     "SubagentStop": [
       {
-        "matcher": "arch|po|elicitor|dev-backend|dev-frontend|qa|code-reviewer|security-reviewer|spec-compliance-reviewer|arch-reviewer|adversarial-reviewer|constitutioner",
+        "matcher": "^(po|arch|dev-backend|dev-frontend|qa|elicitor|reverse-db-architect|reverse-sql-analyst|reverse-sql-function-analyst|reverse-sql-view-analyst|reverse-sql-trigger-analyst|reverse-sql-feat-composer)$",
         "hooks": [
           {
             "type": "command",
             "command": "python -c \"import os,sys,pathlib; r=os.environ.get('CLAUDE_PROJECT_DIR') or next((str(p) for p in [pathlib.Path.cwd()]+list(pathlib.Path.cwd().parents) if (p/'.claude').is_dir()),'.'); sys.path.insert(0,r+'/.sdd/python'); import _hook; _hook.run('sdd_hooks.audit_file_ownership')\""
-          },
+          }
+        ]
+      },
+      {
+        "hooks": [
           {
             "type": "command",
             "command": "python -c \"import os,sys,pathlib; r=os.environ.get('CLAUDE_PROJECT_DIR') or next((str(p) for p in [pathlib.Path.cwd()]+list(pathlib.Path.cwd().parents) if (p/'.claude').is_dir()),'.'); sys.path.insert(0,r+'/.sdd/python'); import _hook; _hook.run('sdd_hooks.record_token_usage')\""
@@ -197,7 +196,7 @@
         ]
       },
       {
-        "matcher": "po",
+        "matcher": "^po$",
         "hooks": [
           {
             "type": "command",
@@ -206,7 +205,7 @@
         ]
       },
       {
-        "matcher": "qa",
+        "matcher": "^qa$",
         "hooks": [
           {
             "type": "command",

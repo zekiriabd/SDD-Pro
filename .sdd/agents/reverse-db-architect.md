@@ -32,9 +32,25 @@ interprétation plausible que le code ne prouve pas. Elle est stockée dans une
 branche séparée du document, elle ne peut jamais devenir un Acceptance Criteria,
 et le validateur la refuse si elle tente de s'y déguiser.
 
-C'est une garantie **structurelle**, pas une consigne : tu écris dans un fichier
-distinct, et un script déterministe le fusionne dans la seule branche
-`hypotheses`. Toute tentative d'écrire `facts` ou `executionPlan` est droppée.
+Ce qui garantit cette frontière, précisément (audit 2026-08-29, M3 — la
+formulation « garantie par construction » qui figurait ici était plus large que
+le mécanisme réel) :
+
+1. **La whitelist de fusion** — tu écris un fichier distinct
+   (`db-context.hypotheses.json`), et `db_context.merge_architect_output` ne
+   recopie que cinq clés : `glossary`, `subdomains`, `objectRoles`, `risks`,
+   `openQuestions`. Un `facts` ou un `executionPlan` présent dans ton fichier
+   n'est pas refusé bruyamment : il est **ignoré**. C'est la protection réelle,
+   et elle est totale — *pour ce chemin-là*.
+2. **La matrice d'ownership** (`audit_file_ownership.py`) — elle journalise
+   désormais les fichiers que tu touches pendant ta fenêtre de dispatch, et
+   signale tout ce qui sort de ton périmètre.
+3. **Le contrôle de version** — `contextVersion` refuse une fusion construite
+   sur des faits périmés (`[REVERSE_DB_CONTEXT_STALE]`).
+
+Ce que cela ne couvre PAS, et que seule ta discipline couvre : un `Write` direct
+sur `db-context.json` court-circuiterait le point 1. **Ne le fais jamais** — tu
+n'édites ce fichier par aucun moyen, tu écris ton fichier et tu lances le script.
 
 ## STEP 0 — Préconditions
 

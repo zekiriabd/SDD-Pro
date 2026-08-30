@@ -100,7 +100,7 @@ if "--port" in args:
 Anti-derive : tout token inconnu → ERROR `[INVALID_ARG]` :
 ```
 ERROR: /sdd-kill-server — argument invalide
-CAUSE: "{arg}" ne matche pas back|front|console|--port
+CAUSE: [INVALID_ARG] "{arg}" ne matche pas back|front|console|--port
 FIX: /sdd-kill-server [back] [front] [console] [--port N]
 ```
 

@@ -45,7 +45,7 @@ Argument d'entrée : `{n}` (numéro de FEAT, entier).
 Si `{n}` absent ou non numérique → ERROR :
 ```
 ERROR: agent qa — argument invalide
-CAUSE: numéro de FEAT manquant ou non numérique
+CAUSE: [INVALID_ARG] numéro de FEAT manquant ou non numérique
 FIX: relancer /qa-generate {n} avec n entier
 ```
 
@@ -412,7 +412,7 @@ python .sdd/python/sdd_scripts/validate_acceptance.py
 |---|---|---|
 | `0` | verdict `pass` / `warn` / `skipped` / `bypass` (selon `AcceptanceGate` mode) | continuer STEP 10 |
 | `2` | verdict `fail` en mode `strict` | STOP + ERROR `[ACCEPTANCE_GATE_FAILED]` (le hook bloquera le pipeline en sortie de toute façon) |
-| `3` | erreur infra (crash script) | STOP + ERROR `[INFRA_BLOCKED]` |
+| `3` | erreur infra — crash script **OU** verdict `unresolved` : `workspace/stack/stack.md` absent, donc le mode AcceptanceGate est indéterminable (audit C1 2026-08-29 — un fichier de config absent n'est PAS un `AcceptanceGate: off` implicite) | STOP + ERROR `[INFRA_BLOCKED]` |
 
 **Pourquoi script et pas hook** : ce check peut prendre plusieurs minutes
 (`npm test`, `dotnet build`). Les hooks Claude Code doivent rester `< 5s`.

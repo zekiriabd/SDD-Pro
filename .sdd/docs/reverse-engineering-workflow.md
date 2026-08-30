@@ -1,12 +1,38 @@
 ---
 title: Reverse Engineering Workflow — Design Doc Maître
 status: Draft (en attente validation Tech Lead)
-version: 0.7.0
+version: 0.7.2
 created: 2026-06-10
-updated: 2026-06-11
+updated: 2026-08-30
 authors: SDD_Pro Architect
 scope: workflow nouveau, isolé, cohabitant avec SDD_Pro v7.0.0+ sans édition de fichier existant
+canonical_source: .sdd/rules/reverse-engineering.md
 changelog:
+  - v0.7.2 (2026-08-30) — **Deuxième passe de correctifs ciblés (suivi audit 2026-08-29).**
+      Le rafraîchissement complet annoncé "NON fait" en v0.7.1 reste hors périmètre
+      (chantier trop large pour une passe de suivi mécanique — cf. note en fin de
+      ce changelog) ; corrigés cette fois : (a) décompte taxonomie 42 → **45**
+      classes (3 classes ajoutées le 2026-08-30 par le remède reverse-DB du même
+      audit — `OBJECT_KIND_MISMATCH`/`DB_PACK_MISSING`/`DB_CONTEXT_STALE`) ;
+      (b) les 5 mentions codées en dur « Opus 4.8 » pour 3a/3c (§4.3 tableau
+      barreaux, §4.5 récapitulatif modèles) remplacées par « tier `deep`, routé
+      par complexité » — ces deux agents sont routés Sonnet/Opus par unité
+      depuis l'ADR `governance-reverse-complexity-ladder` (2026-06-29), et le
+      tableau affirmait encore un modèle fixe près de deux mois après ce
+      changement ; `reverse-ui-extractor` reste correctement `deep` fixe (non
+      routé, aucune correction nécessaire sur cette ligne au-delà du vocabulaire
+      tier vs modèle).
+  - v0.7.1 (2026-08-29) — **Correctifs de dérive documentaire (audit code-reverse, M7).**
+      Ce document est resté figé au 2026-06-11 pendant que le module doublait de
+      taille, tout en étant cité comme SSoT par la règle qui, elle, était à jour.
+      Trois corrections ciblées : (a) le périmètre « 4 agents reverse » (effectif
+      v0.3.0) est porté à **16** (10 code-reverse + 6 db-reverse, SSoT
+      `loader.reverse.yml`) ; (b) la **copie dupliquée** de la taxonomie
+      `[REVERSE_*]` en §10 — 16 classes gelées, contredisant la règle sur le TTL
+      du lock et l'émetteur de `FEAT_VALIDATE_FAILED` — est remplacée par un
+      renvoi vers la table canonique ; (c) note de préséance ci-dessous.
+      **Rafraîchissement complet du contenu : NON fait** (hors périmètre de cette
+      passe) — le corps décrit encore l'état de juin 2026 sur plusieurs chapitres.
   - v0.7.0 (2026-06-11) — **Escalier ascendant Phase 3 (ADR `governance-major-reverse-spec-ladder`)**.
       La Phase 3 mono-saut (agent `reverse-functional-extractor`, code→FEAT en un prompt — qui faisait
       baver l'altitude technique dans la FEAT métier) est **décomposée** en 3 barreaux ascendants :
@@ -78,6 +104,15 @@ changelog:
 
 # Reverse Engineering Workflow — Design Doc Maître
 
+> ⚠️ **Préséance (audit 2026-08-29, M7)** — en cas de désaccord entre ce document
+> et `.sdd/rules/reverse-engineering.md`, **la règle fait foi**. C'est elle que
+> les agents chargent à l'exécution, elle qui est tenue à jour à chaque audit, et
+> elle qui est verrouillée par des tests ; ce design doc est un **document de
+> conception historique**, corrigé ponctuellement mais pas rafraîchi en continu.
+> Il se décrivait lui-même comme la « SSoT » alors qu'il datait de 3 mois et
+> contredisait la règle qui le citait — la relation est désormais explicite et
+> dans l'autre sens.
+
 > **Statut** : **v0.7.0 — implémenté** (escalier 3a/3b/3c livré, ~200 tests verts, smoke 13/13). L'historique Draft v0.4.x (4 revues adversariales, loop CLOS) est conservé dans le changelog frontmatter ci-dessus.
 >
 > **v0.4.0** clôt la 3ème revue contradictoire (`workspace/.sys/.validation/reverse-design-doc-adversarial-v3.md`) — 4 patches micro (ADV-18, 19, 20, 22) + 1 V2 (ADV-21).
@@ -98,7 +133,7 @@ changelog:
 - [§1 Vue d'ensemble — pipeline 7 phases](#1-vue-densemble--pipeline-7-phases)
 - [§2 Workspace cible — arborescence](#2-workspace-cible--arborescence)
 - [§3 Schéma d'ID `U-N` — stabilité + résolution](#3-schéma-did-u-n--stabilité--résolution)
-- [§4 Schémas I/O par agent (4 agents)](#4-schémas-io-par-agent-4-agents)
+- [§4 Schémas I/O par agent](#4-schémas-io-par-agent)
 - [§5 Formats JSON des outputs Python déterministes](#5-formats-json-des-outputs-python-déterministes)
 - [§6 Contrats inter-phases](#6-contrats-inter-phases)
 - [§7 Mécanisme de découverte `loader.reverse.yml`](#7-mécanisme-de-découverte-loaderreverseyml)
@@ -385,7 +420,13 @@ workspace/
 
 ---
 
-## §4 Schémas I/O par agent (4 agents)
+## §4 Schémas I/O par agent
+
+> **Périmètre (corrigé audit 2026-08-29, M7)** : ce chapitre décrivait « 4 agents »,
+> l'effectif de la v0.3.0. Le module en compte **16** (`loader.reverse.yml`, SSoT) :
+> 10 côté code-reverse et 6 côté db-reverse. Les schémas détaillés ci-dessous ne
+> couvrent que les agents historiques ; pour les autres, le manifeste
+> `loader.reverse.yml` est la référence reads/writes.
 
 ### 4.1 `reverse-inventory`
 
@@ -484,9 +525,9 @@ tools: Read, Write, Glob, Grep, Bash
 
 | Barreau | Agent (`.claude/agents/`) | Modèle | Input principal | Output |
 |---|---|---|---|---|
-| **3a** | `reverse-tech-analyst.md` | Opus 4.8 | `units[U-N].evidenceFiles` + db-schema (+ tech-audit opt.) | `workspace/plans/{n}-{Name}.analysis.md` (analyse technique fidèle, tasks T-N, evidence file:line) |
+| **3a** | `reverse-tech-analyst.md` | tier `deep` **routé par complexité** (`code_unit_complexity.py`, ADR `governance-reverse-complexity-ladder` 2026-06-29 — Sonnet si unité simple, Opus sinon) | `units[U-N].evidenceFiles` + db-schema (+ tech-audit opt.) | `workspace/plans/{n}-{Name}.analysis.md` (analyse technique fidèle, tasks T-N, evidence file:line) |
 | **3b** | `reverse-us-writer.md` | Sonnet 4.6 (downgrade audité 2026-06-11) | analyse 3a | `workspace/us/{n}-{m}-{Name}.md` (US par capability, AC → covers T-N, ligne header `Confidence:`) |
-| **3c** | `reverse-feat-composer.md` | Opus 4.8 | US 3b + analyse 3a | `workspace/feats/{n}-{Name}.md` (FEAT métier, plomberie démotée, REVERSE-GATE) |
+| **3c** | `reverse-feat-composer.md` | tier `deep` **routé par complexité** (même ADR — Sonnet si unité simple, Opus sinon) | US 3b + analyse 3a | `workspace/feats/{n}-{Name}.md` (FEAT métier, plomberie démotée, REVERSE-GATE) |
 
 **Invariants de l'escalier** :
 - Confidence **min-monotone ascendante** : `conf(3c) ≤ min(conf(US 3b)) ≤ conf(3a)`
@@ -633,10 +674,10 @@ décompilation lui-même (palier V3, §13.3).
 |---|---|---|---|
 | `reverse-inventory` | Sonnet 4.6 | 1 | Synthèse + délégation scripts |
 | `reverse-tech-auditor` | Sonnet 4.6 | 2 (opt) | Audit, informational |
-| `reverse-tech-analyst` (3a) | Opus 4.8 | 3 | Analyse technique fidèle, anti-hallucination strict |
+| `reverse-tech-analyst` (3a) | tier `deep`, routé par complexité (ADR 2026-06-29) | 3 | Analyse technique fidèle, anti-hallucination strict |
 | `reverse-us-writer` (3b) | Sonnet 4.6 | 3 | Altitude-lift US (jamais de lecture code legacy) |
-| `reverse-feat-composer` (3c) | Opus 4.8 | 3 | Composition FEAT métier, plomberie démotée |
-| `reverse-ui-extractor` | Opus 4.8 | 4 (V2) | Génération HTML sémantique |
+| `reverse-feat-composer` (3c) | tier `deep`, routé par complexité (ADR 2026-06-29) | 3 | Composition FEAT métier, plomberie démotée |
+| `reverse-ui-extractor` | tier `deep` (fixe, non routé) | 4 (V2) | Génération HTML sémantique |
 
 ---
 
@@ -903,7 +944,8 @@ Comme `/sdd-full` est un fichier existant **intouchable** (Annexe B), la gate pr
 
 ```yaml
 # .sdd/loader.reverse.yml — SSoT du workflow reverse engineering
-# Format miroir de loader.yml, périmètre limité aux 4 agents reverse.
+# Format miroir de loader.yml, périmètre limité aux agents reverse
+# (16 au 2026-08-29 : 10 code-reverse + 6 db-reverse — cf. loader.reverse.yml).
 
 schemaVersion: 1
 manifestType: reverse-engineering
@@ -1003,7 +1045,7 @@ Chaque commande/skill lit `loader.reverse.yml` au démarrage pour résoudre path
 ### 7.3 Cohabitation
 
 - `loader.yml` continue à servir les agents SDD_Pro existants (po, arch, dev-*, qa, *-reviewer).
-- `loader.reverse.yml` sert exclusivement les 4 nouveaux agents reverse.
+- `loader.reverse.yml` sert exclusivement les agents reverse (16 au 2026-08-29 — le « 4 » historique datait de la v0.3.0).
 - Aucun overlap : les paths declared par l'un ne sont pas declared par l'autre (sauf `workspace/feats/` et `workspace/ui/` qui sont **lus** par les agents SDD_Pro et **écrits** par les agents reverse — séparation reader/writer claire).
 
 ---
@@ -1231,24 +1273,21 @@ Chaque AC, SFD, BR porte son propre `<!-- confidence: ... -->`. Le cap global es
 
 Hérite du format SDD_Pro `error-classification.md` (3 lignes disque, 1 ligne chat). À documenter dans la **nouvelle** règle `.sdd/rules/reverse-engineering.md` (pas dans le fichier principal `error-classification.md`).
 
-| Code | Bloquant | Sens |
-|---|---|---|
-| `[REVERSE_NO_SOURCE]` | **OUI** | `workspace/old/{P}/` vide ou inexistant → STOP |
-| `[REVERSE_BINARY_ONLY]` | **OUI** | Seuls des exécutables détectés, pas de source → STOP + escalade (§0 hors-scope) |
-| `[REVERSE_UNIT_NOT_FOUND]` | **OUI** | `/sdd-reverse U-N` où `U-N` absent de `inventory.json` |
-| `[REVERSE_FEAT_VALIDATE_FAILED]` | NON (WARN) | 3 itérations `/feat-validate` sans GO → FEAT marquée `low` + bannière + escalade |
-| `[REVERSE_EVIDENCE_MISSING]` | **OUI** au niveau item | AC/SFD/BR sans `<!-- evidence: ... -->` → item rejeté de la FEAT (l'agent itère, ne hard-fail pas la FEAT entière sauf si zéro item valide reste) |
-| `[REVERSE_ISOLATION_VIOLATION]` | **OUI** | Tentative d'écriture sur un path framework existant → STOP |
-| `[REVERSE_INVENTORY_STALE]` | NON (WARN) | `/sdd-reverse {U-N}` lancé alors que `mtime` legacy > `inventory.json.legacyMtimeMax` (ADV-1) |
-| `[REVERSE_LOCK_HELD]` | **OUI** | `.alloc.lock` détenu par autre `agent_id` < 30s → tentative de Phase 3 parallèle (ADV-2) |
-| `[REVERSE_NAME_COLLISION]` | NON (info) | `Name_base` déjà pris par une FEAT existante → suffixe `-Legacy` appliqué (ADV-4) |
-| `[REVERSE_ENRICHMENT_INVALID]` | **OUI** | `db-schema.enrichment.json` référence entity absente de base → merge refusé (ADV-3) |
-| `[REVERSE_ENRICHMENT_TYPE_CONFLICT]` | NON (info, V2) | `merge_db_schema` détecte un type différent entre base et enrichment → base wins par défaut (ADV-12) |
-| `[REVERSE_TEMPLATE_MISSING]` | **OUI** | `feat.reverse.template.md` absent → STOP (pas de fallback inline silencieux, ADV-9) |
-| `[REVERSE_VALIDATOR_DRIFT]` | NON (WARN V2) | `reverse_smoke.py` détecte que `validate_readiness.py` standard a évolué et `validate_reverse_feat.py` n'a pas suivi (ADV-14) |
-| `[REVERSE_HELPER_DRIFT]` | NON (WARN V2) | `reverse_smoke.py` détecte que `sdd_lib/file_locks.py` ou `atomic_write.py` a changé alors que copies locales sont figées (ADV-16) |
-| `[REVERSE_GATE_DRIFT]` | **OUI** | Désync entre frontmatter `confidence` et commentaire `<!-- REVERSE-GATE -->` détectée par `validate_reverse_feat.py` (ADV-22) |
-| `[REVERSE_INVENTORY_SCHEMA_STALE]` | NON (INFO) | `--use-cache` invoqué sur cache pre-v0.4.0 (manque `_allocatedNames` ou `schemaVersion`) → refresh forcé silencieux (ADV-23) |
+> **Table déplacée — SSoT unique (audit 2026-08-29, M7).** La taxonomie complète
+> vivait ici EN DOUBLE, gelée à ses 16 classes de juin 2026 : elle ignorait les
+> 26 classes ajoutées depuis (escalier, parité, paradigme, questions, db-reverse,
+> sous-extraction en lecture) et contredisait la règle sur des points de fait —
+> TTL du `.alloc.lock` annoncé à 30 s alors qu'il est passé à 1800 s (audit C5),
+> `[REVERSE_FEAT_VALIDATE_FAILED]` attribué à `/feat-validate` alors que la gate
+> est `validate_reverse_feat.py`. Un lecteur ne pouvait pas savoir laquelle des
+> deux tables faisait foi.
+>
+> **Source unique : `.sdd/rules/reverse-engineering.md §6`** — 45 classes
+> (42 au 2026-08-29 + 3 ajoutées le lendemain par le remède reverse-DB de ce
+> même audit : `OBJECT_KIND_MISMATCH`, `DB_PACK_MISSING`, `DB_CONTEXT_STALE`),
+> décompte verrouillé par `tests/test_reverse_audit_2026_08_29.py`. Ce document
+> n'en garde que le format d'émission ci-dessous. Aucune classe ne s'ajoute sans
+> son émetteur (règle §6.3).
 
 ### 10.1 Format ERROR exemple
 
@@ -1889,7 +1928,7 @@ Toute tentative de modification d'un fichier listé déclenche `[REVERSE_ISOLATI
 | **Confidence** | Niveau de fiabilité d'un item ou d'une FEAT. Enum strict `high | medium | low`. |
 | **Confidence cap** | Plafond imposé par langage (cf. `language_signatures.yml`). Cap effectif = min(cap langage, estimation agent, dégradation §9.2). |
 | **Bias toward present** | Discipline anti-hallucination : ne pas inventer ; si non visible dans le code, non documenté. |
-| **`loader.reverse.yml`** | Manifeste reads/writes autonome pour les 4 agents reverse. Ne touche jamais `loader.yml`. |
+| **`loader.reverse.yml`** | Manifeste reads/writes autonome pour les 16 agents reverse (10 code + 6 db). Ne touche jamais `loader.yml`. |
 | **Phase atomique** | Phase reprenable, réexécutable, qui écrase son output (pas de merge). |
 
 ---

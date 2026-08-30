@@ -1,9 +1,13 @@
 ---
-# TOK-C1 (audit 2026-06-12) : chargement paresseux (path-scoped rule). Référencée par
-# dev-backend/frontend dans leurs STEP 0–1.bis (Read explicite) ; auto-injection au contact
-# du code généré. Aucun autre agent ne la consomme.
+# TOK-C2 (audit tokens 2026-08-30) : auto-injection pipeline RETIRÉE. Les SEULS
+# consommateurs (dev-backend/dev-frontend, STEP 0–1.bis) l'appliquent DÉJÀ par Read
+# explicite — l'ex-portée `workspace/src/**` créait un double-chargement systématique.
+# La clé `paths:` reste présente car une rule SANS `paths:` est inconditionnelle
+# (mécanisme natif Claude Code — vérifié 2026-08-30) : portée réduite au fichier
+# lui-même (maintenance framework). Chargement pipeline = Read explicite uniquement.
 paths:
-  - "workspace/src/**"
+  - ".sdd/rules/dev-shared-preflight.md"
+  - ".claude/rules/dev-shared-preflight.md"
 ---
 
 # Règle — Dev-shared preflight (STEP 0/0.5/1/1.bis cross-agent, v7.0.0)

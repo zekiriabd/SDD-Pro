@@ -98,11 +98,11 @@ Glob `workspace/feats/{n}-*.md` :
 
 ### 2.2 US réelles existantes — guard anti-écrasement (audit M8 closure 2026-06-07)
 
-Avant d'invoquer `feat_to_pseudo_us.py`, détecter si des US **réelles** (générées par `po` via `/us-generate` ou `/sdd-full`) existent déjà sous `workspace/us/{n}-*.md`. Distinguer pseudo-US vs réelles par le frontmatter `Status: Pseudo` (ajouté par `feat_to_pseudo_us.py`) :
+Avant d'invoquer `feat_to_pseudo_us.py`, détecter si des US **réelles** (générées par `po` via `/us-generate` ou `/sdd-full`) existent déjà sous `workspace/us/{n}-*.md`. Distinguer pseudo-US vs réelles par le marqueur frontmatter `generated-by: feat_to_pseudo_us.py` (le marqueur **réellement** écrit par le script — fix C1 2026-08-30 : l'ancien grep `Status: Pseudo` ne matchait rien, la pseudo-US porte `Status: Ready`, donc chaque re-run POC levait un faux `[POC_OVERWRITE_REAL_US]` sur sa propre pseudo-US) :
 
 ```bash
-REAL_US=$(grep -L "Status: Pseudo" workspace/us/{n}-*.md 2>/dev/null | head -5)
-PSEUDO_US=$(grep -l "Status: Pseudo" workspace/us/{n}-*.md 2>/dev/null | head -5)
+REAL_US=$(grep -L "generated-by: feat_to_pseudo_us.py" workspace/us/{n}-*.md 2>/dev/null | head -5)
+PSEUDO_US=$(grep -l "generated-by: feat_to_pseudo_us.py" workspace/us/{n}-*.md 2>/dev/null | head -5)
 
 if [ -n "$REAL_US" ] && [ "$force" != "true" ]; then
   cat <<EOF >&2
@@ -260,7 +260,7 @@ Invoquer l'agent `dev-frontend` avec `{n}-1`. Substance complète :
 Émettre **un seul bloc final** :
 
 ```
-[DONE/POC] FEAT {n}-{FeatName} livrée en mode POC. (100%)
+[DONE] FEAT {n}-{FeatName} livrée en mode POC. (100%)
 
 ⚠️ POC mode — pas de tests, pas de review, pas d'API Gate.
    NE PAS déployer en prod sans repasser par /sdd-full {n}.
@@ -316,7 +316,8 @@ avec préfixe `[CLASS]` préservé (cf. `error-classification.md §1`).
 
 Applique `.sdd/rules/output-protocol.md`. Labels canoniques :
 `[ANALYSIS]`, `[PO]`, `[PLAN]` (seulement si `--with-plans`), `[ARCH]`,
-`[DEV-BACKEND]`, `[DEV-FRONTEND]`, `[DONE/POC]` (variante `[DONE]`
-spécifique POC — signale visuellement le mode). Granularité 5-7 updates
+`[DEV-BACKEND]`, `[DEV-FRONTEND]`, `[DONE]` (liste fermée §3 du protocole —
+le mode POC est signalé dans le **texte** du verdict, jamais par un label
+hors liste ; fix mineur audit 2026-08-30, ex-`[DONE/POC]`). Granularité 5-7 updates
 totaux. Bannières STEP 3 et STEP 8 obligatoires (non comptées dans la
 limite). Bypass `SDD_CHAT_VERBOSE=1` (§10).

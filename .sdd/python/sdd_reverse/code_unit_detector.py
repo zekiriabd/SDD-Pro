@@ -177,7 +177,14 @@ def detect_code_units(
     if not classes:
         return []
 
-    by_name: dict[str, dict[str, Any]] = {c["name"]: c for c in classes}
+    # (audit 2026-08-29, m6) A `by_name` index used to be built here and never
+    # read once: every downstream step works on the class dicts directly
+    # (`controllers`, `orphan_behavioural`, `anchor`) or on the `adj` graph
+    # below. Removed rather than wired in — and it was worse than merely dead:
+    # its `{c["name"]: c}` comprehension was LAST-WINS across partial-class
+    # duplicates, the exact defect M18 fixed for `adj` right underneath. Keeping
+    # it would have been an ambush for whoever eventually used it.
+    # The legitimate name→class registry lives in `code_graph_builder` (first-wins).
     # UNION across partial-class duplicates (audit M18 — was overwritten).
     adj: dict[str, set[str]] = {}
     for c in classes:

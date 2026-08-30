@@ -1,20 +1,23 @@
 # Règle — Output Protocol (Executive chat output, v7.0.0)
 
 > **Nouveau v7.0.0** : règle SSoT pour la verbosité de sortie en chat.
-> Le Tech Lead voit la progression du pipeline SDD comme un **executive
-> dashboard** (1 ligne par étape, label `[AGENT]` + résumé + %), pas
-> comme une console terminal verbose. Les détails techniques restent
-> persistés en base (`console.db` tables `qa_*` / `validation_reports` —
-> rendu à la demande via `query_console_db.py ... --format md`) et sur
-> disque (`workspace/.sys/.audit/...`) pour debug/audit.
+> Le Tech Lead voit la progression comme un **executive dashboard** (1 ligne
+> par étape, label `[AGENT]` + résumé + %). Les détails techniques restent
+> persistés en base (`console.db` — rendu via `query_console_db.py ...
+> --format md`) et sur disque (`workspace/.sys/.audit/...`).
 >
 > **Load-bearing** : règle universelle chargée par les 13 agents LLM
 > (`po`, `arch`, `dev-backend`, `dev-frontend`, `qa`, `elicitor`,
 > `constitutioner`, `specbook-writer`, `code-reviewer`, `security-reviewer`,
 > `spec-compliance-reviewer`, `arch-reviewer`, `adversarial-reviewer`)
-> et les 13 commandes user-facing. Le rubric `complexity-router` (script
-> Python déterministe, 0 token) n'est PAS un agent LLM et ne charge pas
-> cette règle (sortie textuelle = exit code uniquement).
+> et les 13 commandes user-facing (`complexity-router`, script déterministe
+> 0 token, n'en fait pas partie).
+>
+> **Seule rule inconditionnelle (audit tokens 2026-08-30)** :
+> `error-classification.md` est passée path-scoped (digests par agent =
+> canal nominal) — ce fichier porte désormais aussi le **noyau universel**
+> error-classification (§7.3/§7.5 : format ERROR 3L disque + règle mentale
+> `[CLASS]` + pointeur taxonomie/digests).
 
 ## TOC
 
@@ -41,16 +44,13 @@ VSCode, web). Producteurs concernés : Claude (orchestration), sub-agents SDD,
 bloquant) inchangés.
 
 **Avant v7.0.0** (verbose, 9 lignes) : "Let me read...", "Reads workspace/...",
-`{exit: 0, ledger_path: ...}`, "Writing US...", etc.
-**Après v7.0.0** (executive, 2 lignes) :
-```
-[PO] Découpage FEAT en User Stories... (8%)
-[PO] FEAT 1-Auth → 2 US identifiées. (12%)
-```
+`{exit: 0, ...}`, etc. **Après** (executive, 2 lignes) :
+`[PO] Découpage FEAT en User Stories... (8%)` puis
+`[PO] FEAT 1-Auth → 2 US identifiées. (12%)`.
 
 **N'impacte PAS** : (a) fichiers disque (rapports QA, audit logs, JSON ledgers,
 ADRs — format complet préservé), (b) stdout scripts Python en debug manuel,
-(c) format ERROR 3L disque (`error-classification.md §2` — load-bearing pour
+(c) format ERROR 3L disque (§7.3/§7.5 ci-dessous — load-bearing pour
 build_loop / hooks / dashboards).
 
 ---
@@ -109,12 +109,8 @@ après cette ligne sauf bloc ERROR si verdict 🔴 (cf. §7).
 
 ## 3. Mapping agent → label `[AGENT]`
 
-19 labels canoniques (depuis v7.0.0+ — ajout `[ROUTER]` pour le routeur de
-complexité ; audit 2026-06-11 : ajout `[REVERSE]` pour le module reverse, qui
-était utilisé par les 7 agents reverse sans figurer dans cette table fermée ;
-audit 2026-07-25 : ajout `[SPECBOOK]` pour l'agent `specbook-writer` invoqué
-par `/spec-book`, précédemment sans label déclaré).
-**Aucun autre label admis** dans le chat.
+19 labels canoniques (v7.0.0+ ; ajouts audités : `[ROUTER]` 2026-06-11 (avec
+`[REVERSE]`), `[SPECBOOK]` 2026-07-25). **Aucun autre label admis** dans le chat.
 
 | Label chat | Agent / Commande source | Phase pipeline |
 |---|---|---|
@@ -138,11 +134,9 @@ par `/spec-book`, précédemment sans label déclaré).
 | `[SPECBOOK]` | agent `specbook-writer` (invoqué par `/spec-book` — vulgarise FEAT en langage humain, cache `workspace/docs/.sys/sections/`) | 5 (post-livraison) |
 | `[DONE]` | verdict final pipeline | 100% |
 
-> **Migration** : `[REVIEW]` (générique) supprimé v7.0.0-alpha — utilisé auparavant
-> par 4 agents distincts avec collisions de plage. Les logs/scripts qui matchaient
-> `^\[REVIEW\]` doivent désormais matcher `^\[(?:CODE|SPEC|ARCH|ADV)-REVIEW\]`.
-> `[ARCH]` reste réservé à l'agent `arch` ; la phase de finalisation par
-> `constitutioner` émet `[CONSTITUTION]`.
+> **Migration** : `[REVIEW]` (générique) supprimé v7.0.0-alpha — matcher désormais
+> `^\[(?:CODE|SPEC|ARCH|ADV)-REVIEW\]`. `[ARCH]` reste réservé à l'agent `arch` ;
+> la finalisation par `constitutioner` émet `[CONSTITUTION]`.
 
 **Labels d'état orthogonaux** (peuvent suffixer un label agent) :
 
@@ -180,7 +174,7 @@ Régression possible uniquement sur `[…/FIXING]` (retry, le % du retry
 | Spec compliance | `[SPEC-REVIEW]` | 91-94 |
 | Security review | `[SECURITY]` | 94-96 |
 | Arch review | `[ARCH-REVIEW]` | 96-98 |
-| Adversarial review (opt-out, défaut) | `[ADV-REVIEW]` | 98-99 (cf. audit P0-doc 2026-06-05 — ne pas chevaucher `[DONE]` 100%) |
+| Adversarial review (opt-out, défaut) | `[ADV-REVIEW]` | 98-99 (jamais 100% — réservé `[DONE]`) |
 | Verdict final | `[DONE]` | 100 |
 
 Invocation isolée (ex. `/dev-backend 1-1` hors `/sdd-full`) : 0%→100% sur scope local.
@@ -233,9 +227,16 @@ Exception : `build_loop iter X/Y` autorisé **uniquement** dans `[…/FIXING]`.
 🔴 [VALIDATE/FAIL] FEAT 1 NO-GO — [READINESS_NO_GO] 2 ACs sans Given/When/Then → workspace/.sys/.validation/1-readiness.md. (15%)
 ```
 
-### 7.3 Format ERROR sur disque (3 lignes, inchangé)
+### 7.3 Format ERROR sur disque (3 lignes — SSoT universel depuis 2026-08-30)
 
-Préservation littérale du format `error-classification.md §2` dans le rapport :
+Format canonique (ex-`error-classification.md §2`, déplacé ici — audit tokens
+2026-08-30 ; §2 là-bas en garde le squelette côté taxonomie) :
+```
+ERROR: {feat/us/task or pipeline-step} failed
+CAUSE: [{CLASS}] {détail 1L}
+FIX: {action 1L}
+```
+Exemple (`[BUILD_CORRECTIBLE]` — build_loop itère) :
 ```
 ERROR: dev-backend 1-2 build failed (iter 1/3)
 CAUSE: [BUILD_CORRECTIBLE] missing import 'SIM.Backend.Services.IBebeService' in BebesEndpoints.cs:1
@@ -249,6 +250,19 @@ FIX: add 'using SIM.Backend.Services;'
 🟡 [CODE-REVIEW/WARN] Code review FEAT 1 — 3 issues serious mais < seuil. (94%)
 ```
 
+### 7.5 Noyau universel error-classification (déplacé ici, audit tokens 2026-08-30)
+
+`error-classification.md` est **path-scoped** : elle ne s'auto-injecte plus
+dans les sessions/agents ordinaires. Son contrat universel vit ici :
+
+- **Format** : chat 1L §7.2, rapport 3L disque §7.3.
+- **Règle mentale** : *« Pas de bloc ERROR sans préfixe `[CLASS]`. Si rien ne
+  matche → `[UNKNOWN]`. »* — décision mécanique build_loop, classement 0-LLM.
+- **Taxonomie complète** (16 familles, comportement build_loop §3) :
+  `@.sdd/rules/error-classification.md` (Read on-demand). **Tranche par
+  agent** : `.sdd/digests/error-classification.{agent}.md` (Read en STEP
+  contexte — canal nominal des 12 agents mappés).
+
 ---
 
 ## 8. Itérations `build_loop` (retry visibles, bornes)
@@ -259,15 +273,13 @@ Itère jusqu'à `BuildLoopMaxIter` (default 3). Chaque itération **DOIT** être
 visible en chat (signal de coût). `%` ne progresse pas pendant retries
 (load-bearing : Tech Lead voit que le coût monte sans avancement).
 ```
-[DEV-BACKEND] Implémentation US 1-2 en cours... (48%)
 [DEV-BACKEND/FIXING] Correction erreur compilation (iter 1/3)... (48%)
-[DEV-BACKEND] US 1-2 livrée, build vert. (54%)
 ```
 
-**Échec terminal** :
+Échec terminal (`[BUILD_LOOP_EXHAUSTED]` iters, ou `[BUILD_LOOP_COST_EXCEEDED]`
+cap $) : format §7.2, ex. :
 ```
 🔴 [DEV-BACKEND/FAIL] US 1-2 — [BUILD_LOOP_EXHAUSTED] 3/3 iters sans convergence → stderr build_loop (voir chat). (48%)
-🔴 [DEV-BACKEND/FAIL] US 1-2 — [BUILD_LOOP_COST_EXCEEDED] $15.30 ≥ $15 cap → STOP. (48%)
 ```
 
 ---
@@ -295,76 +307,17 @@ Après `[DONE]`, **aucune** ligne supplémentaire (pas de "next steps", "conside
 
 ## 10.bis Mode minimal `SDD_CHAT_MINIMAL=1` (CI/CD opt-in, v7.0.1-dev)
 
-`SDD_CHAT_MINIMAL=1` (export parent shell AVANT démarrage Claude Code) →
-**1 ligne par invocation** au lieu des 3-6 updates standard. Conçu pour
-les runs CI/CD où le log doit rester concis (parsing automatique, taille
-contrôlée, économie de cache prompt pour orchestration).
-
-### 10.bis.1 Format minimal
-
-Pour chaque agent / phase, **uniquement la ligne de résultat finale**
-au format `[AGENT] verdict (PROGRESS%)`. Les `[AGENT/FIXING]` retries
-sont supprimés. Les `[AGENT]` updates intermédiaires sont supprimés.
-
-**Exemple comparatif** (FEAT 1-Auth, 2 US) :
-
-| Mode | Lignes émises |
-|---|---:|
-| Default (executive) | ~30-50 lignes (3-6 par agent × ~10 agents) |
-| `SDD_CHAT_VERBOSE=1` | ~150-300 lignes (legacy v6) |
-| `SDD_CHAT_MINIMAL=1` | ~10-12 lignes (1 par agent + verdict final) |
-
-### 10.bis.2 Sortie type mode minimal
-
-```
-[PO] 2 User Stories créées. (12%)
-[VALIDATE] FEAT 1-Auth GO. (15%)
-[ARCH] Scaffolding terminé (1 backend + 1 frontend). (32%)
-[CONSTITUTION] ADRs indexés. (36%)
-[DEV-BACKEND] 2 US livrées, build vert. (58%)
-[QA] API Gate PASS (24/24 tests). (66%)
-[DEV-FRONTEND] 2 US livrées, fidelity 95%. (78%)
-[QA] Coverage 82% ≥ 80%, verdict 🟢. (88%)
-[CODE-REVIEW] 🟢 0 issue critique. (91%)
-[SPEC-REVIEW] 🟢 6/6 AC vérifiés. (94%)
-[SECURITY] 🟢 0 hard-blocking. (96%)
-[DONE] FEAT 1-Auth livrée — 🟢 GREEN. (100%)
-```
-
-### 10.bis.3 Combinaison des modes
-
-| `SDD_CHAT_VERBOSE` | `SDD_CHAT_MINIMAL` | Effet |
-|:---:|:---:|---|
-| (vide) | (vide) | Mode executive standard v7.0.0 |
-| `1` | (vide) | Mode verbose legacy v6 |
-| (vide) | `1` | Mode minimal CI/CD |
-| `1` | `1` | **VERBOSE wins** (debug prevails) — un WARN stderr signale la collision |
-
-### 10.bis.4 Erreurs en mode minimal
-
-Les erreurs `🔴 [AGENT/FAIL]` restent émises (1 ligne — déjà conforme au
-format minimal §7.2). Les warnings `🟡 [AGENT/WARN]` sont émis aussi
-(coût info précieux même en minimal). Seuls les updates de progression
-intermédiaires sont supprimés.
-
-### 10.bis.5 Detection runtime
-
-Chaque agent vérifie `os.environ.get("SDD_CHAT_MINIMAL", "")` au début
-de son exécution. Si truthy (`1`/`true`/`yes`/`on`), bascule en mode
-minimal : ne loggue que (a) ligne de résultat finale + (b) erreurs/warnings.
-
-Les commandes orchestratrices (`/sdd-full`, `/dev-run`) propagent
-l'env var aux sub-agents (héritée par défaut via subprocess).
+Substance déplacée vers `@.sdd/docs/output-protocol-minimal.md` (audit tokens
+2026-08-30 — mode opt-in CI/CD, Read on-demand). Résumé : 1 ligne de résultat
+par agent, erreurs/warnings conservés, `VERBOSE` gagne sur collision.
 
 ---
 
 ## 11. Enforcement et anti-derive
 
-**Périmètre** : les 13 agents LLM (po, arch, dev-backend, dev-frontend, qa, elicitor,
-constitutioner, specbook-writer, code-reviewer, security-reviewer, spec-compliance-reviewer,
-arch-reviewer, adversarial-reviewer) + 1 script déterministe `complexity_router.py`
-(label `[ROUTER]`), les 13 commandes user-facing (cf.
-`entrypoint-body.md §3`), et Claude orchestrateur.
+**Périmètre** : les 13 agents LLM (liste en tête de fichier) + 1 script
+déterministe `complexity_router.py` (label `[ROUTER]`), les 13 commandes
+user-facing (cf. `entrypoint-body.md §3`), et Claude orchestrateur.
 
 **Anti-derive — NE JAMAIS** :
 - Réécrire ce protocole inline (Read par référence au STEP contexte)
@@ -383,7 +336,8 @@ Hook `PreOutputHook` runtime = follow-up hors scope (cf. roadmap).
 
 ## 12. Pointeurs
 
-- `error-classification.md §2` — format ERROR 3L disque (préservé)
+- §7.3/§7.5 — format ERROR 3L disque (SSoT universel) ; taxonomie complète :
+  `error-classification.md` (path-scoped) + digests `.sdd/digests/`
 - `build-and-loop.md §1.3` — statuts QA API Gate (PASS/WARN/FAIL/SKIPPED/INFRA_BLOCKED)
 - `quality.md §A` — verdict coverage 🟢/🟡/🔴
 - `CLAUDE.md §7` — conventions strictes (chat output minimal)

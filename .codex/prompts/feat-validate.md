@@ -68,14 +68,14 @@ Tout autre flag inconnu → ignoré silencieusement (forward-compat).
 Si absent →
 ```
 ERROR: /feat-validate — argument manquant
-CAUSE: aucun numéro de FEAT fourni
+CAUSE: [INVALID_ARG] aucun numéro de FEAT fourni
 FIX: relancer /feat-validate {n} (ex. /feat-validate 1)
 ```
 
 Si non numérique →
 ```
 ERROR: /feat-validate — argument invalide
-CAUSE: "{argument}" n'est pas un entier
+CAUSE: [INVALID_ARG] "{argument}" n'est pas un entier
 FIX: relancer /feat-validate {n}
 ```
 

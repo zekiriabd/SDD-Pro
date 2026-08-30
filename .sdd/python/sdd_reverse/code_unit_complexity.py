@@ -26,7 +26,8 @@ executable mirror — keep both in sync).
 
 Public API:
     classify_unit(unit: dict) -> "simple" | "complex"
-    model_for(unit: dict, rung: str) -> model-id
+    tier_for(unit: dict, rung: str) -> "deep" | "balanced"   # PREFERRED
+    model_for(unit: dict, rung: str) -> model-id             # legacy id-shaped view
     complexity_signals(unit: dict) -> dict   # explainability (why simple/complex)
 """
 
@@ -34,8 +35,21 @@ from __future__ import annotations
 
 from typing import Any
 
+# --- Model tiers (m5, audit 2026-08-29) --------------------------------------
+# The agent system expresses model choice as a TIER (`model_tier: deep|balanced`
+# in every `.sdd/agents/*.md` frontmatter; `db_tier_router.TIERS` on the DB
+# stream), not as a concrete model id. This module used to hand callers a raw
+# `claude-opus-4-8` / `claude-sonnet-4-6`, which drifts the day the roster moves
+# and bypasses each agent's declared tier_floor / tier_ceiling. `tier_for()` is
+# now the primary API; the id-shaped constants below survive only so the
+# existing `model_for()` callers keep working.
+TIER_DEEP = "deep"
+TIER_BALANCED = "balanced"
+
+#: Legacy id-shaped view of the two tiers. Prefer `tier_for()`.
 OPUS = "claude-opus-4-8"
 SONNET = "claude-sonnet-4-6"
+_TIER_TO_MODEL = {TIER_DEEP: OPUS, TIER_BALANCED: SONNET}
 
 # --- D1 rubric defaults (MVP, conservative). Calibrate on real legacy. ---------
 SIMPLE_KINDS: frozenset[str] = frozenset({"form", "page", "grid", "api"})
@@ -110,15 +124,105 @@ def classify_unit(unit: dict) -> str:
     return "simple" if complexity_signals(unit).get("is_simple") else "complex"
 
 
-def model_for(unit: dict, rung: str) -> str:
-    """Model id for a ladder rung given the unit's complexity.
+def tier_for(unit: dict, rung: str) -> str:
+    """Model TIER for a ladder rung given the unit's complexity.
 
-    rung ∈ {'3a', '3b', '3c'}. 3b is always Sonnet (altitude-lift, D2 of the
-    spec-ladder ADR). 3a/3c are Sonnet for `simple` units, Opus for `complex`.
-    Unknown rung → Opus (fail-safe).
+    rung ∈ {'3a', '3b', '3c'}. 3b is always `balanced` (altitude-lift, D2 of the
+    spec-ladder ADR). 3a/3c are `balanced` for `simple` units, `deep` for
+    `complex`. Unknown rung → `deep` (fail-safe: doubt costs a deep pass, never
+    an under-analysis).
     """
     if rung == "3b":
-        return SONNET
+        return TIER_BALANCED
     if rung in ("3a", "3c"):
-        return SONNET if classify_unit(unit) == "simple" else OPUS
-    return OPUS
+        return TIER_BALANCED if classify_unit(unit) == "simple" else TIER_DEEP
+    return TIER_DEEP
+
+
+def model_for(unit: dict, rung: str) -> str:
+    """Legacy id-shaped view of `tier_for()` — kept for existing callers.
+
+    Prefer `tier_for()`: the agent frontmatter speaks tiers, and a concrete id
+    here silently overrides each agent's declared tier_floor / tier_ceiling.
+    """
+    return _TIER_TO_MODEL[tier_for(unit, rung)]
+
+
+# --------------------------------------------------------------------------- #
+# CLI — the routing entry point used by /sdd-reverse-analyze and
+# /sdd-reverse-feat (M2, audit 2026-08-29).
+#
+# Both commands used to embed a `python -c` one-liner that globbed
+# `workspace/old/*/.sys/inventory.json` and took `[0]` — ALWAYS the first legacy
+# project on disk, discarding the project their own Action 1 had just resolved.
+# With two projects checked out, unit `U-3` was routed against a stranger's
+# inventory. Worse, the uncaught IndexError / StopIteration meant the documented
+# "doubt → deep" fail-safe did not exist: a traceback surfaced where a tier was
+# expected. Here the project is REQUIRED and every failure prints `deep`.
+# --------------------------------------------------------------------------- #
+
+def route_tier(project_root, unit_id: str, rung: str) -> tuple[str, str | None]:
+    """Return (tier, failure_reason). Never raises — doubt yields TIER_DEEP.
+
+    `failure_reason` is None on a real classification, else a one-line
+    explanation the caller surfaces on stderr so a silent mis-route is
+    impossible to confuse with a deliberate deep routing.
+    """
+    import json
+    from pathlib import Path
+
+    inv_path = Path(project_root) / ".sys" / "inventory.json"
+    try:
+        data = json.loads(inv_path.read_text(encoding="utf-8"))
+    except OSError as exc:
+        return TIER_DEEP, f"inventory unreadable ({inv_path}): {exc}"
+    except json.JSONDecodeError as exc:
+        return TIER_DEEP, f"inventory is not valid JSON ({inv_path}): {exc}"
+    unit = next(
+        (u for u in (data.get("units") or []) if isinstance(u, dict) and u.get("id") == unit_id),
+        None,
+    )
+    if unit is None:
+        return TIER_DEEP, f"unit {unit_id!r} absent from {inv_path}"
+    return tier_for(unit, rung), None
+
+
+def main(argv: list[str] | None = None) -> int:
+    import argparse
+    import sys
+
+    p = argparse.ArgumentParser(
+        prog="code_unit_complexity",
+        description="Deterministic complexity routing for one reverse code unit "
+                    "(prints a model tier: deep|balanced). Fail-safe: any error "
+                    "prints 'deep' and explains why on stderr, exit 0.",
+    )
+    p.add_argument("--project", required=True,
+                   help="Legacy project root — workspace/old/{P} (the project "
+                        "the command's own Action 1 resolved, never a glob).")
+    p.add_argument("--unit", required=True, help="Unit id, e.g. U-3")
+    p.add_argument("--rung", default="3a", choices=["3a", "3b", "3c"])
+    p.add_argument("--json", action="store_true",
+                   help="Emit {tier, model, unit, rung, reason} instead of the bare tier.")
+    args = p.parse_args(argv)
+
+    tier, reason = route_tier(args.project, args.unit, args.rung)
+    if reason:
+        # ASCII only: this lands on a cp1252 Windows console (M10 convention).
+        print(f"[REVERSE/WARN] complexity routing unavailable - {reason}. "
+              f"Defaulting to tier '{TIER_DEEP}' (fail-safe).", file=sys.stderr)
+    if args.json:
+        import json as _json
+        print(_json.dumps({
+            "tier": tier, "model": _TIER_TO_MODEL[tier],
+            "unit": args.unit, "rung": args.rung, "reason": reason,
+        }, ensure_ascii=False))
+    else:
+        print(tier)
+    return 0  # never blocking — the caller always receives a usable tier
+
+
+if __name__ == "__main__":
+    import sys
+
+    sys.exit(main())

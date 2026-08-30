@@ -6,7 +6,7 @@ checks stack/hash/mockups — absent at Phase 3 of reverse pipeline.
 Invocation:
     python -m sdd_reverse_scripts.validate_reverse_feat \
         --feat-path workspace/feats/{n}-{Name}.md \
-        [--json]
+        [--legacy-root workspace/old/{P}] [--json]
     python -m sdd_reverse_scripts.validate_reverse_feat \
         --reconcile [--project workspace/old/{P}/] [--json]
 
@@ -23,6 +23,12 @@ Checks (deterministic, 0 token):
     4. Stable IDs (SFD-N, FD-N, BR-N, AC-N) non-reordered
     5. AC in Given/When/Then format
     6. Each SFD/FD/BR/AC has <!-- evidence: ... --> and <!-- confidence: ... -->
+    6.bis (audit C1, 2026-08-29) when --legacy-root is supplied, each evidence
+       citation is RESOLVED on disk: the cited file must exist and hold at
+       least `Lend` lines. Presence of the comment was the only thing ever
+       checked before, so a fabricated `Foo.cs:34-38` validated GREEN. Without
+       --legacy-root the check degrades to presence-only (backward compatible),
+       never to a guess.
     7. REVERSE-GATE comment present + sync with frontmatter.confidence (ADV-22)
     8. Banner present if confidence=low
 
@@ -36,6 +42,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -44,6 +51,7 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from sdd_reverse.console_safe import ensure_console_safe
+from sdd_reverse.evidence_resolver import resolve_evidence
 from sdd_reverse.feat_structure_spec import (
     AC_GIVEN_WHEN_THEN_RE,
     CONFIDENCE_COMMENT_RE,
@@ -59,10 +67,21 @@ from sdd_reverse.feat_structure_spec import (
 )
 
 
+# Same comment as EVIDENCE_COMMENT_RE but capturing the citation body, so it
+# can be handed to the resolver (audit C1, 2026-08-29).
+_EVIDENCE_REF_RE = re.compile(r"<!--\s*evidence:\s*([^>]+?)\s*-->")
+
+
 def _check_items_have_evidence_and_confidence(
-    content: str, section: str,
+    content: str, section: str, legacy_root: Path | None = None,
 ) -> list[str]:
-    """For each ID-line in section, verify the following lines/inline have evidence + confidence."""
+    """For each ID-line in section, verify the following lines/inline have evidence + confidence.
+
+    When `legacy_root` is given (the `workspace/old/{P}/` the citations are
+    relative to), each evidence ref is additionally RESOLVED on disk — file must
+    exist and hold the cited line range (audit C1, 2026-08-29). Without it the
+    check stays presence-only, as it has always been.
+    """
     errors: list[str] = []
     pat = ID_PATTERNS.get(section)
     if not pat:
@@ -97,17 +116,33 @@ def _check_items_have_evidence_and_confidence(
         else:
             block_end = len(section_body)
         lookahead = section_body[line_start:block_end]
-        has_evidence = bool(EVIDENCE_COMMENT_RE.search(lookahead))
+        ev_match = EVIDENCE_COMMENT_RE.search(lookahead)
         has_confidence = bool(CONFIDENCE_COMMENT_RE.search(lookahead))
-        if not has_evidence:
+        if not ev_match:
             errors.append(f"[REVERSE_EVIDENCE_MISSING] {item_id} in {section}: missing <!-- evidence: ... -->")
+        elif legacy_root is not None:
+            # EVIDENCE_COMMENT_RE (feat_structure_spec, shared with the DB path)
+            # carries no capture group — re-read the ref itself, locally.
+            ref_m = _EVIDENCE_REF_RE.search(lookahead)
+            citation = ref_m.group(1).strip() if ref_m else ""
+            if resolve_evidence(legacy_root, citation) is False:
+                errors.append(
+                    f"[REVERSE_EVIDENCE_MISSING] {item_id} in {section}: evidence "
+                    f"'{citation}' does not resolve — no such file, or fewer lines "
+                    f"than the cited range, under {legacy_root}")
         if not has_confidence:
             errors.append(f"{item_id} in {section}: missing <!-- confidence: ... -->")
     return errors
 
 
-def validate_feat(feat_path: Path) -> tuple[bool, list[str], list[str]]:
+def validate_feat(
+    feat_path: Path, legacy_root: Path | None = None,
+) -> tuple[bool, list[str], list[str]]:
     """Validate a reverse FEAT.
+
+    `legacy_root` (optional, `workspace/old/{P}/`) turns the per-item evidence
+    check from "the comment is present" into "the citation resolves to a real
+    file:line-range" (audit C1, 2026-08-29). Omitted → presence-only, as before.
 
     Returns (ok, errors, warnings).
     """
@@ -164,7 +199,8 @@ def validate_feat(feat_path: Path) -> tuple[bool, list[str], list[str]]:
     for section in REQUIRED_SECTIONS:
         if section == "## Actors" or section == "## Project Config":
             continue  # no per-ID evidence required
-        errors.extend(_check_items_have_evidence_and_confidence(body, section))
+        errors.extend(
+            _check_items_have_evidence_and_confidence(body, section, legacy_root))
 
     # 7. REVERSE-GATE comment + sync (ADV-22)
     gate_match = REVERSE_GATE_RE.search(body)
@@ -303,6 +339,11 @@ def main(argv: list[str] | None = None) -> int:
         help="Reconcile mode (ADV-21): remove orphan _allocatedNames / _featAllocations entries")
     parser.add_argument("--project", default=None,
         help="In --reconcile mode: limit to one project under workspace/old/")
+    parser.add_argument("--legacy-root", default=None,
+        help="Legacy project root (workspace/old/{P}) the evidence citations are "
+             "relative to. Supplied → each <!-- evidence: path:Lx-Ly --> is "
+             "RESOLVED on disk (file exists + holds the cited range). Omitted → "
+             "presence-only check (audit C1, 2026-08-29).")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
     ensure_console_safe()
@@ -326,12 +367,19 @@ def main(argv: list[str] | None = None) -> int:
     if not args.feat_path:
         parser.error("--feat-path required (unless --reconcile)")
     feat_path = Path(args.feat_path)
-    ok, errors, warnings = validate_feat(feat_path)
+    legacy_root = Path(args.legacy_root) if args.legacy_root else None
+    if legacy_root is not None and not legacy_root.is_dir():
+        print(f"[WARN] --legacy-root {legacy_root} is not a directory — evidence "
+              f"resolution disabled (presence-only check).", file=sys.stderr)
+        legacy_root = None
+    ok, errors, warnings = validate_feat(feat_path, legacy_root)
 
     if args.json:
         print(json.dumps({
             "ok": ok,
             "feat_path": str(feat_path),
+            "legacy_root": str(legacy_root) if legacy_root else None,
+            "evidence_resolved": legacy_root is not None,
             "errors": errors,
             "warnings": warnings,
         }, ensure_ascii=False))

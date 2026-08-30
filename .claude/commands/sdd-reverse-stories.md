@@ -1,5 +1,5 @@
 ---
-description: Phase 3b du workflow reverse — remontée de l'analyse technique 3a en User Stories par capability (barreau moyen de l'escalier). Spawn agent reverse-us-writer (Sonnet 4.6 — downgrade audité 2026-06-11, 3a/3c restent Opus 4.8). Lit plans/{n}-{Name}.analysis.md, écrit us/{n}-{m}-{Name}.md. Consommé par /sdd-reverse-feat (3c).
+description: Phase 3b du workflow reverse — remontée de l'analyse technique 3a en User Stories par capability (barreau moyen de l'escalier). Spawn agent reverse-us-writer, toujours au tier `balanced` (downgrade audité 2026-06-11) ; 3a/3c sont routés par complexité depuis l'ADR governance-reverse-complexity-ladder (2026-06-29). Lit plans/{n}-{FeatName}.analysis.md, écrit us/{n}-{m}-{Name}.md. Consommé par /sdd-reverse-feat (3c).
 ---
 # /sdd-reverse-stories {U-N} [--json]
 
@@ -9,7 +9,7 @@ Lancer la **Phase 3b** : remonter l'**analyse technique 3a** d'une marche
 d'altitude vers des **User Stories par capability métier**. Une seule unité par invocation.
 
 ```
-plans/{n}-{Name}.analysis.md --[3b /sdd-reverse-stories]--> us/{n}-{m}-{Name}.md
+plans/{n}-{FeatName}.analysis.md --[3b /sdd-reverse-stories]--> us/{n}-{m}-{Name}.md
 ```
 
 Le fil de traçabilité monte : chaque AC d'US pointe vers les tasks `T-N` de
@@ -24,22 +24,22 @@ l'analyse (`<!-- covers: T-N -->`). Confidence min-monotone (≤ analyse 3a).
 
 ## Pré-conditions
 
-1. `(n, Name)` résolu via `inventory.json._featAllocations[{U-N}]` (3a a tourné). Absent → ERROR `[REVERSE_UNIT_NOT_FOUND]`.
-2. `workspace/plans/{n}-{Name}.analysis.md` existe (barreau 3a). Absent → ERROR `[REVERSE_UNIT_NOT_FOUND]` + suggérer `/sdd-reverse-analyze {U-N}`.
+1. `(n, FeatName)` résolu via `inventory.json._featAllocations[{U-N}]` (3a a tourné). Absent → ERROR `[REVERSE_UNIT_NOT_FOUND]`.
+2. `workspace/plans/{n}-{FeatName}.analysis.md` existe (barreau 3a). Absent → ERROR `[REVERSE_UNIT_NOT_FOUND]` + suggérer `/sdd-reverse-analyze {U-N}`.
 3. `.sdd/python/sdd_reverse/us.reverse.template.md` présent (ADV-9). Sinon → ERROR `[REVERSE_TEMPLATE_MISSING]`.
 
 ## Actions
 
 1. **Résoudre le projet legacy** via `inventory.json._featAllocations`.
 2. **Spawn unique** `Agent(reverse-us-writer)` avec args = `{U-N}`.
-3. L'agent suit STEP 0 à 5 de `.claude/agents/reverse-us-writer.md`.
+3. L'agent suit STEP 0 à 5 de `.sdd/agents/reverse-us-writer.md`.
 4. Émission ligne chat finale `[REVERSE] {U-N} → {U} US 3b (...). (PROGRESS%)`.
 
 ## Sortie
 
 ```
 workspace/us/{n}-{m}-{Name}.md                  (1 à 5 US par capability)
-workspace/old/{P}/.sys/modules/{Name}/stories-3b.md    (log décision)
+workspace/old/{P}/.sys/modules/{FeatName}/stories-3b.md    (log décision)
 ```
 
 ## Anti-derive

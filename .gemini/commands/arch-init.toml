@@ -44,7 +44,7 @@ entrée non commentée sous `## Active Tech Specs`.
 Si absent ou vide →
 ```
 ERROR: /arch-init — stack non sélectionné
-CAUSE: workspace/stack/stack.md manque ou ## Active Tech Specs vide
+CAUSE: [STACK_MALFORMED] workspace/stack/stack.md manque ou ## Active Tech Specs vide
 FIX: créer workspace/stack/stack.md et activer au moins un backend ou frontend
 ```
 
@@ -63,7 +63,7 @@ dans `## Project Config`).
   seule manque :
   ```
   ERROR: /arch-init — clé(s) DB manquante(s) dans ## Active Database
-  CAUSE: clés non définies : {liste}
+  CAUSE: [ENV_MISSING] clés non définies : {liste}
   FIX: renseigner les valeurs dans workspace/stack/stack.md ## Active Database
   ```
 

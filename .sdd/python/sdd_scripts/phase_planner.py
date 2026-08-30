@@ -91,14 +91,35 @@ SECURITY_AC_HINTS = re.compile(
 # Kept absent rather than aliased to avoid silent re-introduction.
 
 
+class FeatAmbiguousError(Exception):
+    """Plusieurs fichiers `workspace/feats/{n}-*.md` matchent (audit M11).
+
+    `complexity_router.find_feat_file` lève déjà sur ce cas et émet
+    `[FEAT_AMBIGUOUS]`. `phase_planner` prenait `matches[0]` — deviner
+    laquelle des FEATs homonymes est la bonne, puis router les auditors
+    d'après elle. Les deux scripts tournent sur le MÊME workspace dans le
+    MÊME run : diverger sur l'ambiguïté produit un plan de phases calculé
+    sur une FEAT que le routeur a refusé de choisir.
+    """
+
+
 def _read_feat_file(root: Path, feat_number: int) -> tuple[str | None, str | None]:
-    """Lit la FEAT N. Retourne (FeatName, content) ou (None, None)."""
+    """Lit la FEAT N. Retourne (FeatName, content) ou (None, None).
+
+    Raises:
+        FeatAmbiguousError: si ≥ 2 fichiers matchent `{n}-*.md`.
+    """
     feats_dir = workspace_root(root) / "feats"
     if not feats_dir.is_dir():
         return None, None
     matches = sorted(feats_dir.glob(f"{feat_number}-*.md"))
     if not matches:
         return None, None
+    if len(matches) > 1:
+        raise FeatAmbiguousError(
+            f"{len(matches)} fichiers matchent workspace/feats/{feat_number}-*.md "
+            f"({', '.join(p.name for p in matches)})"
+        )
     feat_file = matches[0]
     name = feat_file.stem  # ex. "4-Bebes"
     name_parts = name.split("-", 1)
@@ -227,11 +248,31 @@ def plan(feat_number: int) -> dict[str, object]:
             "error": f"{exc.cause}",
             "phases": {},
         }
-    except Exception as exc:  # noqa: BLE001
-        # Backward-compat fallback to legacy read_project_config()
+    except (OSError, UnicodeDecodeError, ValueError, KeyError, TypeError) as exc:
+        # Audit M11 (2026-08-29) — this used to be a bare `except Exception`.
+        #
+        # `read_layered_config` is where `[CONFIG_SECURITY_DOWNGRADE]` is
+        # enforced (a project may not relax a team-pinned SecurityFailOn /
+        # CoverageMin). Catching *everything* meant that ANY unexpected bug in
+        # the layered reader — including the deliberate refusal it raises to
+        # block a downgrade — silently fell back to `read_project_config`,
+        # which reads the project layer ALONE and therefore applies exactly
+        # the relaxed policy the team forbade. A defensive fallback that
+        # bypasses the control it is falling back from is worse than a crash.
+        #
+        # Now: only the narrow set of parse/IO failures a config reader can
+        # legitimately raise is absorbed; anything else propagates loudly to
+        # the caller. The fallback is also announced on stderr, because losing
+        # the team layer is a policy event, not an implementation detail.
+        sys.stderr.write(
+            f"WARN phase_planner — read_layered_config a échoué "
+            f"({type(exc).__name__}: {exc}) ; fallback read_project_config "
+            f"(couche PROJET SEULE — les policies team/base ne sont PAS "
+            f"appliquées pour cette invocation).\n"
+        )
         try:
             config = read_project_config(root=root, keys=PROJECT_CONFIG_KEYS)
-        except Exception as inner:  # noqa: BLE001
+        except (OSError, UnicodeDecodeError, ValueError, KeyError, TypeError) as inner:
             return {
                 "feat_number": feat_number,
                 "error": f"[STACK_MALFORMED] Project Config illisible: {inner}",
@@ -273,7 +314,15 @@ def plan(feat_number: int) -> dict[str, object]:
     has_backend_code = _project_has_backend_code(root, backend_name)
 
     # 4. FEAT + US content (pour détecter mentions perf/sec dans ACs)
-    feat_name, feat_content = _read_feat_file(root, feat_number)
+    try:
+        feat_name, feat_content = _read_feat_file(root, feat_number)
+    except FeatAmbiguousError as exc:
+        # Audit M11 — aligné sur `complexity_router` : on refuse de deviner.
+        return {
+            "feat_number": feat_number,
+            "error": f"[FEAT_AMBIGUOUS] {exc}",
+            "phases": {},
+        }
     us_contents = _read_us_files(root, feat_number)
 
     if not feat_name or not feat_content:

@@ -331,12 +331,13 @@ Building blocks invoked by the user-facing commands. Use these for **targeted de
 |---|---|
 | **Phase** | 2 (US) |
 | **Args** | `{n}` |
-| **Flags** | `--allow-large-feat` (bypass hard cap 10 US) |
+| **Flags** | `--allow-large-feat` (bypass hard cap 10 US), `--replace-pseudo` (supprime la pseudo-US POC de `/sdd-poc` avant génération — migration POC → standard) |
 | **Agents spawn** | `po` (Sonnet 4.6) |
 | **Outputs** | `us/{n}-{m}-{Name}.md` (1-6 fichiers) |
 
 ```bash
 /us-generate 1
+/us-generate 1 --replace-pseudo   # migration POC → standard
 ```
 
 **Quand l'utiliser** : Debug isolé du découpage US. Préférer `/sdd-full` en usage normal.

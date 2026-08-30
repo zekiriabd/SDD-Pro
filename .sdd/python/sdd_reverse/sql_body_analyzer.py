@@ -14,6 +14,12 @@ FEAT can carry `<!-- evidence: <snapshot>.sql:Lstart-Lend -->`:
   - has_try_catch    : structured error handling
   - dynamic_sql      : sp_executesql / EXEC(...) / EXECUTE IMMEDIATE / PREPARE
   - calls            : EXEC / CALL / PERFORM of other routines (dependency edges)
+  - calls_inferred   : invocations written WITHOUT a call keyword — PL/SQL
+                       `pkg.proc(...)`, scalar functions inside an expression
+                       (`SELECT dbo.fnVat(x)`, `v := fn_rate(1)`). Heuristic, so
+                       it lives in its OWN field: consumers resolve it against
+                       the catalog and DROP what does not resolve, instead of
+                       reporting phantom unresolved callees (see below).
   - cursors          : DECLARE ... CURSOR
   - temp_tables      : #temp / temporary tables
 
@@ -48,6 +54,10 @@ SCHEMA_VERSION = 1
 # quotes are stripped by `_norm_obj`. Qualification is preserved as written: a
 # schema is never invented.
 _OBJ = r"((?:[\[`\"]?\w+[\]`\"]?\s*\.\s*){0,2}[\[`\"]?\w+[\]`\"]?)"
+# Anchor closing an `_OBJ` capture. It asserts "the identifier ends HERE" without
+# constraining what follows, so the regex engine never backtracks INSIDE the
+# identifier to satisfy it (C1, audit 2026-08-29 — see `_CALL_RE`).
+_OBJ_END = r"(?![\w.])"
 
 _WRITE_RES = {
     "INSERT": re.compile(r"\bINSERT\s+INTO\s+" + _OBJ, re.IGNORECASE),
@@ -66,7 +76,11 @@ _TXN_RE = re.compile(
 )
 _TRY_RE = re.compile(r"\bBEGIN\s+TRY\b|\bEXCEPTION\s+WHEN\b|\bEXCEPTION\b", re.IGNORECASE)
 _DYNAMIC_RE = re.compile(
-    r"\bsp_executesql\b|\bEXEC(?:UTE)?\s*\(|\bEXECUTE\s+IMMEDIATE\b|\bPREPARE\b",
+    r"\bsp_executesql\b|\bEXEC(?:UTE)?\s*\(|\bEXECUTE\s+IMMEDIATE\b|\bPREPARE\b"
+    # PL/pgSQL builds its dynamic statement with `EXECUTE format(...)`; the
+    # keyword alone is a proc call in T-SQL, so the `format(` is what tells them
+    # apart. Without this the plpgsql idiom was neither dynamic nor a call.
+    r"|\bEXECUTE\s+format\s*\(",
     re.IGNORECASE,
 )
 # EXEC/CALL/PERFORM of a NAMED routine (not EXEC( dynamic ) — that's _DYNAMIC_RE).
@@ -75,10 +89,39 @@ _DYNAMIC_RE = re.compile(
 # Observed on a real base (2026-08-27): the 7 SSMS diagram procedures each
 # reported an unresolved callee `AS`, which downgraded their confidence and
 # routed them to an LLM for nothing.
+#
+# C1 (audit 2026-08-29) — the trailing anchor used to be `(?!\s*\()`, a *content*
+# constraint meant to keep `EXEC(@sql)` out of the call list. Because it can be
+# satisfied by ending the identifier one character early, the engine backtracked
+# INSIDE the name to make it true: `CALL spB(1,2)` yielded the callee `sp`,
+# `PERFORM fnB(1)` yielded `fn`, and `EXEC dbo.usp_Child(1)` yielded
+# `dbo.usp_Chil`. A caller and its callee then landed in the SAME wave, which is
+# precisely what wave planning exists to prevent. The dynamic-SQL case is now a
+# SEPARATE discriminator: `_DYNAMIC_RE` keys on `EXEC(`, and the mandatory `\s+`
+# below means `EXEC(@sql)` cannot match this pattern in the first place.
+#
+# Reserved words that can follow the keyword without being a callee. Kept to a
+# tiny, dialect-reserved set on purpose: unlike the inferred scan below, an
+# explicit `EXEC <name>` is an unambiguous call, and filtering it against a broad
+# built-in list would silently drop user routines that happen to share a name.
+_CALL_STOPWORD = r"(?:AS|IMMEDIATE|FORMAT|STATEMENT)\b"
 _CALL_RE = re.compile(
-    r"\b(?:EXEC(?:UTE)?|CALL|PERFORM)\s+(?!AS\b)(?:@\w+\s*=\s*)?" + _OBJ + r"(?!\s*\()",
+    r"\b(?:EXEC(?:UTE)?|CALL|PERFORM)\s+(?!" + _CALL_STOPWORD + r")"
+    r"(?:@\w+\s*=\s*)?" + _OBJ + _OBJ_END,
     re.IGNORECASE,
 )
+# Invocation WITHOUT a call keyword: `<name>(` in statement or expression
+# position. PL/SQL has no `EXEC` inside a body (`pkg_util.do_thing(1);` IS the
+# call), and every dialect invokes a scalar function inside an expression
+# (`SELECT dbo.fnCalcVat(Amount)`, `v := fn_rate(1)`). Neither was extracted at
+# all before C1.
+#
+# The lookbehind stops the match from starting inside a longer identifier or on a
+# variable (`@fn(`). This scan is HEURISTIC — `INSERT INTO dbo.T (a,b)` looks
+# exactly like a call — so its output goes to `callsInferred`, never to `calls`:
+# consumers resolve it against the real object set and drop what does not match,
+# so a false positive costs nothing while a real edge is recovered.
+_INVOKE_RE = re.compile(r"(?<![\w.@])" + _OBJ + r"\s*\(", re.IGNORECASE)
 _CURSOR_RE = re.compile(r"\bDECLARE\s+\w+\s+(?:INSENSITIVE\s+|SCROLL\s+)*CURSOR\b", re.IGNORECASE)
 _TEMP_RE = re.compile(r"#\w+|\bCREATE\s+(?:GLOBAL\s+)?TEMP(?:ORARY)?\s+TABLE\b", re.IGNORECASE)
 
@@ -123,6 +166,84 @@ _SYSTEM_ROUTINES = frozenset({
     "dbms_output", "dbms_sql", "dbms_lob", "dbms_utility",
 })
 _SYSTEM_ROUTINE_PREFIXES = ("xp_",)      # extended procedures are always system
+
+# Leaf names that may sit immediately before a `(` without being a routine call.
+# Consulted ONLY by the inferred-invocation scan (`_INVOKE_RE`), never by the
+# explicit `EXEC/CALL/PERFORM` scan — see `_CALL_STOPWORD` for why.
+# Three groups: SQL statement/clause keywords, declared type names, and the
+# built-in function libraries of the four supported engines.
+_NOT_A_CALL = frozenset(w.lower() for w in (
+    # --- statement / clause keywords -------------------------------------- #
+    "select", "insert", "update", "delete", "merge", "from", "where", "into",
+    "values", "set", "declare", "begin", "end", "as", "is", "if", "elsif",
+    "elseif", "else", "then", "case", "when", "while", "loop", "for", "do",
+    "and", "or", "not", "in", "exists", "between", "like", "any", "all", "some",
+    "on", "using", "join", "inner", "left", "right", "full", "outer", "cross",
+    "apply", "union", "intersect", "except", "group", "order", "by", "having",
+    "with", "over", "partition", "top", "distinct", "output", "returns",
+    "return", "returning", "limit", "offset", "fetch", "open", "close", "next",
+    "deallocate", "cursor", "table", "view", "trigger", "procedure", "proc",
+    "function", "package", "index", "constraint", "primary", "key", "foreign",
+    "references", "unique", "check", "default", "identity", "computed",
+    "create", "alter", "drop", "truncate", "grant", "revoke", "exec", "execute",
+    "call", "perform", "raise", "raiserror", "throw", "signal", "print",
+    "commit", "rollback", "save", "tran", "transaction", "goto", "break",
+    "continue", "exception", "when_others", "others", "null", "add", "column",
+    "type", "row", "rows", "only", "nowait", "readonly", "out", "inout",
+    # --- declared type names (a `varchar(50)` is not a call) --------------- #
+    "char", "nchar", "varchar", "nvarchar", "varchar2", "nvarchar2", "text",
+    "ntext", "binary", "varbinary", "blob", "clob", "nclob", "raw", "long",
+    "decimal", "numeric", "number", "float", "real", "double", "int", "integer",
+    "bigint", "smallint", "tinyint", "bit", "boolean", "money", "smallmoney",
+    "datetime", "datetime2", "smalldatetime", "datetimeoffset", "timestamp",
+    "time", "date", "interval", "uniqueidentifier", "uuid", "xml", "json",
+    "jsonb", "sql_variant", "hierarchyid", "geography", "geometry", "enum",
+    # --- built-in functions (T-SQL / PL-pgSQL / PL-SQL / MySQL) ------------ #
+    "count", "sum", "avg", "min", "max", "abs", "round", "floor", "ceiling",
+    "ceil", "power", "sqrt", "exp", "log", "log10", "sign", "mod", "rand",
+    "random", "isnull", "ifnull", "nullif", "coalesce", "nvl", "nvl2", "decode",
+    "iif", "choose", "greatest", "least", "len", "length", "datalength",
+    "substring", "substr", "left", "right", "charindex", "patindex", "instr",
+    "position", "replace", "stuff", "reverse", "upper", "lower", "ltrim",
+    "rtrim", "trim", "lpad", "rpad", "space", "replicate", "concat",
+    "concat_ws", "string_agg", "group_concat", "listagg", "split_part",
+    "format", "cast", "convert", "try_cast", "try_convert", "try_parse",
+    "parse", "to_char", "to_date", "to_number", "to_timestamp", "str_to_date",
+    "date_format", "getdate", "getutcdate", "sysdatetime", "sysutcdatetime",
+    "systimestamp", "sysdate", "now", "curdate", "curtime", "current_date",
+    "current_time", "current_timestamp", "localtimestamp", "dateadd",
+    "datediff", "datepart", "datename", "date_add", "date_sub", "date_trunc",
+    "trunc", "extract", "age", "year", "month", "day", "hour", "minute",
+    "second", "week", "quarter", "dayofweek", "last_day", "eomonth",
+    "row_number", "rank", "dense_rank", "ntile", "lag", "lead", "first_value",
+    "last_value", "cume_dist", "percent_rank", "newid", "newsequentialid",
+    "uuid_generate_v4", "gen_random_uuid", "scope_identity", "ident_current",
+    "identity_insert", "object_id", "object_name", "object_definition",
+    "schema_name", "schema_id", "db_name", "db_id", "type_name", "col_name",
+    "columnproperty", "objectproperty", "serverproperty", "has_perms_by_name",
+    "suser_sname", "suser_name", "user_name", "current_user", "session_user",
+    "system_user", "host_name", "app_name", "original_login",
+    "error_message", "error_number", "error_severity", "error_state",
+    "error_line", "error_procedure", "sqlerrm", "sqlcode", "raise_application_error",
+    "checksum", "binary_checksum", "hashbytes", "md5", "sha2", "crc32",
+    "json_value", "json_query", "json_modify", "json_extract", "openjson",
+    "openquery", "openrowset", "opendatasource", "containstable", "freetexttable",
+    "isnumeric", "isdate", "try_convert_json", "nextval", "currval", "setval",
+    "generate_series", "unnest", "array_agg", "string_to_array", "array_to_string",
+    "regexp_replace", "regexp_substr", "regexp_like", "regexp_instr", "regexp_count",
+    "grouping", "grouping_id", "rollup", "cube", "sets",
+))
+
+# Where a routine BODY starts, after its `CREATE …` header. The header's own
+# parameter list (`CREATE PROCEDURE dbo.spA(@a int)`) looks exactly like an
+# invocation of `dbo.spA`, and taking it as one would mark every routine in the
+# database self-recursive. Genuine self-recursion inside the body still matches.
+_CREATE_HEADER_RE = re.compile(
+    r"\bCREATE\s+(?:OR\s+(?:REPLACE|ALTER)\s+)?"
+    r"(?:PROCEDURE|PROC|FUNCTION|VIEW|TRIGGER|PACKAGE(?:\s+BODY)?)\b",
+    re.IGNORECASE,
+)
+_BODY_START_RE = re.compile(r"\b(?:AS|IS|BEGIN|RETURN)\b", re.IGNORECASE)
 
 
 def _line_at(text: str, offset: int) -> int:
@@ -222,6 +343,47 @@ def _collect_objects(
     return found
 
 
+def _body_region(text: str) -> str:
+    """The routine body with its `CREATE …` header removed (see `_CREATE_HEADER_RE`).
+
+    Returns the text unchanged when there is no header — MySQL's
+    `ROUTINE_DEFINITION` ships the `BEGIN … END` block alone, and a hand-built
+    fragment has none either.
+    """
+    m = _CREATE_HEADER_RE.search(text)
+    if not m:
+        return text
+    m2 = _BODY_START_RE.search(text, m.end())
+    return text[m2.end():] if m2 else text[m.end():]
+
+
+def _collect_inferred_calls(clean: str, explicit: list[str]) -> list[str]:
+    """Invocations written without a call keyword, minus keywords and built-ins.
+
+    Deliberately permissive on the regex and strict on the filter: what survives
+    is a *candidate* edge, resolved against the real catalog by the consumer
+    (`db_wave_planner.resolve_calls`, `sql_dependency_graph`), which drops
+    anything that does not name a known object. A leftover false positive
+    therefore never produces a phantom node or an unresolved-callee report.
+    """
+    already = {n.lower() for n in explicit}
+    found: list[str] = []
+    seen: set[str] = set()
+    for m in _INVOKE_RE.finditer(_body_region(clean)):
+        name = _norm_obj(m.group(1))
+        leaf = object_leaf(name).lower()
+        if not name or leaf in _NOT_A_CALL or leaf in _NOISE_TABLES:
+            continue
+        if _is_system_routine(name):
+            continue
+        key = name.lower()
+        if key in seen or key in already:
+            continue
+        seen.add(key)
+        found.append(name)
+    return found
+
+
 def analyze_routine(name: str, body: str) -> dict[str, Any]:
     """Extract deterministic signals from one routine body. 0 token."""
     body = body or ""
@@ -245,6 +407,7 @@ def analyze_routine(name: str, body: str) -> dict[str, Any]:
     tables_read = [t for t in _collect_objects(_READ_RE, clean) if t.lower() not in written_lc]
 
     calls = _collect_objects(_CALL_RE, clean, drop_system_routines=True)
+    calls_inferred = _collect_inferred_calls(clean, calls)
     raises = sorted({m.group(0).upper() for m in _RAISE_RE.finditer(clean)})
 
     # db-reverse-tsql.md §2.1: MERGE with WHEN NOT MATCHED BY SOURCE THEN DELETE is
@@ -275,6 +438,8 @@ def analyze_routine(name: str, body: str) -> dict[str, Any]:
         "hasTryCatch": bool(_TRY_RE.search(clean)),
         "dynamicSql": bool(_DYNAMIC_RE.search(clean)),
         "calls": calls,
+        # Heuristic sibling of `calls` — resolve-or-drop, never "unresolved".
+        "callsInferred": calls_inferred,
         "cursors": len(_CURSOR_RE.findall(clean)),
         "tempTables": bool(_TEMP_RE.search(clean)),
         "isReadOnly": not tables_written and not write_kinds,

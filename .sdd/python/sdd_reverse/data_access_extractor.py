@@ -69,6 +69,53 @@ _PARAM_ADD_RE = re.compile(
     re.IGNORECASE,
 )
 
+# --- M1 (audit 2026-08-29) : dynamic-SQL signal on the CODE stream -----------
+# `code_unit_complexity._has_dynamic_sql` has read a `dynamicSql` key on every
+# query / proc-call since the complexity router shipped, but nothing on the code
+# side ever wrote one — the key only existed on the DB-reverse side. The signal
+# was therefore dead: a unit whose SQL is assembled at runtime (the single
+# strongest reason to spend an Opus on it, because its behaviour is NOT
+# statically observable) was routed exactly like a unit of parameterized
+# literals.
+#
+# Definition kept deliberately consistent with the DB side
+# (`sql_body_analyzer._DYNAMIC_RE`) so "dynamic" means the same thing in both
+# streams, plus the two idioms that only exist in application code:
+#   1. an execution marker inside the SQL text — sp_executesql / EXEC( / EXECUTE
+#      IMMEDIATE / PREPARE  (shared with the DB side)
+#   2. the SQL text carries an interpolation placeholder — String.Format `{0}`,
+#      C# `$"{x}"`, f-string `{x}`, JSP/EL `${x}`, MyBatis `#{x}`, PHP `$var`
+#   3. the literal is concatenated with a NON-literal expression — `"… WHERE id="
+#      + userId`, `'…' . $where`, `"…" & sVar`. Literal-to-literal concatenation
+#      is NOT dynamic: `_merge_concatenated_literals` has already folded those
+#      into one static string.
+# `@p` / `:p` bind parameters are the opposite of dynamic and never match.
+_DYNAMIC_EXEC_RE = re.compile(
+    r"\bsp_executesql\b|\bEXEC(?:UTE)?\s*\(|\bEXECUTE\s+IMMEDIATE\b|\bPREPARE\b",
+    re.IGNORECASE,
+)
+_INTERPOLATION_RE = re.compile(
+    r"\{\s*\w+\s*\}"        # {0} / {name} — String.Format, f-string, .format()
+    r"|\$\{\s*\w+\s*\}"     # ${name} — JSP/EL, shell, template literals
+    r"|#\{\s*\w+\s*\}"      # #{name} — MyBatis, Ruby
+    r"|\$\w+"               # $var — PHP double-quoted interpolation
+)
+# Gap between a literal's closing quote and the next token, when that token is
+# an expression rather than another string literal.
+_CONCAT_WITH_EXPR_RE = re.compile(r"^[\s_]*[+&.][\s_]*(?![\"'])[\w$@(]")
+
+
+def _is_dynamic_sql_text(sql: str) -> bool:
+    """Literal-level dynamic-SQL signals (execution marker OR interpolation)."""
+    return bool(_DYNAMIC_EXEC_RE.search(sql) or _INTERPOLATION_RE.search(sql))
+
+
+def _concatenated_with_expression(text: str, literal_end: int) -> bool:
+    """True when the literal ending at `literal_end` is glued to an expression."""
+    gap = text[literal_end + 1: literal_end + 40]
+    return bool(_CONCAT_WITH_EXPR_RE.match(gap))
+
+
 # CREATE PROCEDURE header (T-SQL / common dialects).
 _CREATE_PROC_RE = re.compile(
     r"CREATE\s+(?:OR\s+ALTER\s+)?PROC(?:EDURE)?\s+(?:\[?dbo\]?\.)?\[?(\w+)\]?",
@@ -89,6 +136,8 @@ class Query:
     params: list[str] = field(default_factory=list)
     file: str = ""
     line: int = 0
+    #: M1 (audit 2026-08-29) — SQL assembled at runtime (see _is_dynamic_sql_text).
+    dynamic_sql: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         # Truncate long SQL in the artefact to keep it readable; full text stays
@@ -103,6 +152,8 @@ class Query:
             "params": sorted(set(self.params)),
             "file": self.file,
             "line": self.line,
+            # Read by code_unit_complexity._has_dynamic_sql (model routing).
+            "dynamicSql": self.dynamic_sql,
         }
 
 
@@ -204,7 +255,7 @@ def extract_sql_from_text(
     """
     out: list[Query] = []
     literals = list(_iter_string_literals(text, include_single_quotes=include_single_quotes))
-    for content, off, _end in _merge_concatenated_literals(literals, text):
+    for content, off, end in _merge_concatenated_literals(literals, text):
         if not _SQL_START_RE.match(content):
             continue
         verb_m = _SQL_START_RE.match(content)
@@ -218,6 +269,10 @@ def extract_sql_from_text(
             params=params,
             file=source,
             line=_line_at(text, off),
+            dynamic_sql=(
+                _is_dynamic_sql_text(content)
+                or _concatenated_with_expression(text, end)
+            ),
         ))
     return out
 
@@ -258,9 +313,12 @@ def _extract_proc_calls(text: str, source: str) -> list[dict[str, Any]]:
                 "file": source,
                 "line": _line_at(text, marker_off),
                 "via": "CommandType.StoredProcedure",
+                # A name found as a plain literal IS the static case; it only
+                # turns dynamic when the surrounding window builds it (M1).
+                "dynamicSql": _is_dynamic_sql_text(window),
             })
     # 2. EXEC sp_xxx inside SQL strings or .sql files.
-    for content, off, _end in literals:
+    for content, off, end in literals:
         for em in _EXEC_RE.finditer(content):
             calls.append({
                 "name": em.group(1),
@@ -268,6 +326,10 @@ def _extract_proc_calls(text: str, source: str) -> list[dict[str, Any]]:
                 "file": source,
                 "line": _line_at(text, off),
                 "via": "EXEC",
+                "dynamicSql": (
+                    _is_dynamic_sql_text(content)
+                    or _concatenated_with_expression(text, end)
+                ),
             })
     return calls
 
@@ -327,6 +389,9 @@ def _query_from_sql(sql: str, rel: str, line: int) -> Query | None:
         params=_PARAM_RE.findall(sql),
         file=rel,
         line=line,
+        # Declarative markup / .xsd command text has no surrounding code to
+        # concatenate with — only the literal-level signals apply (M1).
+        dynamic_sql=_is_dynamic_sql_text(sql),
     )
 
 
@@ -373,6 +438,10 @@ def extract_data_access(project_root: str | Path, scan_result: Any) -> dict[str,
                         "file": rel,
                         "line": _line_at(text, em.start()),
                         "via": "EXEC",
+                        # A .sql script is static text — the only dynamic form
+                        # here is an explicit sp_executesql / EXEC( … ) marker.
+                        "dynamicSql": _is_dynamic_sql_text(
+                            text[max(0, em.start() - 200): em.end() + 200]),
                     })
 
     # M4 : Typed DataSets (.xsd) hold TableAdapter queries — not part of any

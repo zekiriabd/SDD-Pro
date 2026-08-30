@@ -29,10 +29,36 @@ import datetime as _dt
 # ---------------------------------------------------------------------------
 # Schema : { model_id : { "input", "output", "cache_read", "cache_creation" } }
 # Cache creation = 1.25x input, cache read = 0.10x input (Anthropic policy).
+#
+# Audit C2 (2026-08-29) — current-generation ids added. Before this fix the
+# table stopped at the 4.x family, so a runtime model id such as
+# ``claude-opus-5`` (or ``claude-opus-5[1m]``) missed every lookup and
+# ``get_pricing()`` silently returned FALLBACK_PRICING (Sonnet rates),
+# under-counting the run. Rates below are the published per-MTok Anthropic
+# API rates for the 5-generation.
+#
+# KNOWN DIVERGENCE — CLOSED 2026-08-30 (follow-up to audit 2026-08-29 C2).
+# The ``claude-opus-4-*`` rows carried a historical $15/$75 rate; the
+# published rate for that family is $5/$25 (same as the opus-5 row). They
+# were over-counting (a cost cap that trips early — conservative, never a
+# safety hole), but a wrong number is still a wrong number in a cost report.
+# Corrected here AND in every coordinated location that pinned the old
+# figures: `providers/anthropic.yaml`, `sdd_scripts/bench_run.py` docstring,
+# `tests/test_pricing.py`, `tests/test_preflight_cost_cap.py`,
+# `tests/test_report_roi.py`. Deliberately NOT touched: any cost already
+# recorded in a project's live `console.db` — those rows are a historical
+# record of what was actually computed at the time, not a live value to
+# retroactively rewrite.
 PRICING: dict[str, dict[str, float]] = {
-    "claude-opus-4-8":    {"input": 15.00, "output": 75.00, "cache_read": 1.50, "cache_creation": 18.75},
-    "claude-opus-4-7":    {"input": 15.00, "output": 75.00, "cache_read": 1.50, "cache_creation": 18.75},
-    "claude-opus-4-6":    {"input": 15.00, "output": 75.00, "cache_read": 1.50, "cache_creation": 18.75},
+    # --- current generation (5) -------------------------------------------
+    "claude-fable-5":     {"input": 10.00, "output": 50.00, "cache_read": 1.00, "cache_creation": 12.50},
+    "claude-mythos-5":    {"input": 10.00, "output": 50.00, "cache_read": 1.00, "cache_creation": 12.50},
+    "claude-opus-5":      {"input":  5.00, "output": 25.00, "cache_read": 0.50, "cache_creation":  6.25},
+    "claude-sonnet-5":    {"input":  2.00, "output": 10.00, "cache_read": 0.20, "cache_creation":  2.50},
+    # --- 4.x family -------------------------------------------------------
+    "claude-opus-4-8":    {"input":  5.00, "output": 25.00, "cache_read": 0.50, "cache_creation":  6.25},
+    "claude-opus-4-7":    {"input":  5.00, "output": 25.00, "cache_read": 0.50, "cache_creation":  6.25},
+    "claude-opus-4-6":    {"input":  5.00, "output": 25.00, "cache_read": 0.50, "cache_creation":  6.25},
     "claude-sonnet-4-6":  {"input":  3.00, "output": 15.00, "cache_read": 0.30, "cache_creation":  3.75},
     "claude-sonnet-4-5":  {"input":  3.00, "output": 15.00, "cache_read": 0.30, "cache_creation":  3.75},
     "claude-haiku-4-5":   {"input":  1.00, "output":  5.00, "cache_read": 0.10, "cache_creation":  1.25},
@@ -183,7 +209,7 @@ def as_tuple(model_id: str) -> tuple[float, float, float, float]:
 #: ISO date of the last manual review against https://www.anthropic.com/pricing
 #: BUMP THIS each time you edit the PRICING table — `framework_smoke.py`
 #: checks staleness against `PricingFreshnessMaxAgeDays` (config.base.yml).
-PRICING_LAST_REVIEWED = "2026-07-26"
+PRICING_LAST_REVIEWED = "2026-08-30"
 
 
 def check_pricing_freshness(max_age_days: int = 90, today: _dt.date | None = None

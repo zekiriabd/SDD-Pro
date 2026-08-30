@@ -65,7 +65,7 @@ Quel est le numéro de la FEAT à planifier ? (ex. : 1)
 Si non numérique →
 ```
 ERROR: /dev-plan — argument invalide
-CAUSE: "{argument}" n'est pas un entier
+CAUSE: [INVALID_ARG] "{argument}" n'est pas un entier
 FIX: relancer /dev-plan {n} (ex. /dev-plan 1)
 ```
 
@@ -78,7 +78,7 @@ Glob `workspace/us/{n}-*.md` → liste `US_LIST` (basenames sans extension).
 Si `US_LIST` est vide →
 ```
 ERROR: /dev-plan — aucune US à planifier
-CAUSE: aucun fichier workspace/us/{n}-*.md
+CAUSE: [US_NOT_FOUND] aucun fichier workspace/us/{n}-*.md
 FIX: lancer /us-generate {n} pour générer les US d'abord
 ```
 
@@ -143,11 +143,12 @@ Si l'US n'a pas de contrepartie pour la famille → exit silent
 > « strict-readiness ». Les variants d'agents `dev-*-strict` ont été
 > retirés en v7.0.0 (cf. ADR `governance-major-auditors-trim` §3 +
 > `docs/CHANGELOG.md` entrée v7.0.0), il n'y a donc
-> plus de routing strict/classic. Le flag `--strict` de `validate_plan.py`
-> reste accepté en CLI (no-op) pour backward-compat scripts, mais ce
-> STEP ne décide plus de routing — uniquement validation structurelle
-> (frontmatter v2, us-hash, AC coverage) pour détecter les plans stale
-> avant matérialisation côté `/dev-run`.
+> plus de routing strict/classic. Le chemin de code `--strict` /
+> `validate_strict()` a été **supprimé** de `validate_plan.py` (audit M5,
+> 2026-08-29) ; le flag reste accepté en CLI en pur no-op pour ne pas casser
+> un script ancien. Ce STEP ne décide plus de routing — uniquement validation
+> structurelle (frontmatter v2, us-hash, AC coverage) pour détecter les plans
+> stale avant matérialisation côté `/dev-run`.
 
 Pour chaque plan généré (back et front), invoquer `validate_plan.py`
 pour confirmer la conformité (frontmatter `plan-schema-version: 2`
@@ -163,9 +164,17 @@ python .sdd/python/sdd_scripts/validate_plan.py \
 
 | Exit | Sens | Comportement |
 |---|---|---|
-| `0` | Plan v2 valide avec `## Inline Digest` | log compteur `$S_v2++` |
-| `1` | Plan v1 legacy (pas de `## Inline Digest`) | log compteur `$S_v1++` + WARN 1L (utilisable, mais incomplet) |
-| `2` | Plan stale (us-hash mismatch) OU corrompu | ERROR + nettoyer le plan (sera regénéré au re-run) |
+| `0` | Plan valide. Lire `warnings[]` du JSON : `PLAN_DIGEST_ABSENT` (plan v1 legacy, utilisable mais incomplet → `$S_v1++`), `PLAN_STALENESS_UNVERIFIABLE` (fraîcheur non vérifiable), `PLAN_AC_COVERAGE_ABSENT`. Sinon plan v2 complet → `$S_v2++` |
+| `2` | Plan stale (us-hash mismatch), AC coverage gap OU corrompu | ERROR + nettoyer le plan (sera regénéré au re-run) |
+
+> **Exit 1 retiré (audit M5, 2026-08-29)** — cette table publiait une ligne
+> `1` = « plan v1 legacy » qui ne pouvait **jamais** se produire : exit 1
+> (`[PLAN_NOT_STRICT_READY]`) n'était émis que par `validate_strict()`, sous
+> le flag `--strict` qu'aucune invocation documentée ne passe. Reliquat du
+> retrait des variants `dev-*-strict` en v7.0.0. Le mode strict est
+> maintenant retiré proprement côté script : ses checks utiles (digest,
+> AC coverage, drift `claude-md-hash`) sont always-on, en warning ou en
+> exit 2 selon qu'ils touchent la lisibilité ou la traçabilité.
 
 **Émettre un event state.jsonl** par plan validé (si `$RUN_ID` disponible) :
 ```bash
@@ -174,18 +183,20 @@ python .sdd/python/sdd_scripts/sdd_state.py emit-event \
   --payload-json '{"us":"{n}-{m}","family":"{back|front}","exit":N,"result":"v2|v1|invalid"}'
 ```
 
-**Non bloquant** : un plan exit 1 reste utilisable par `dev-*` (Opus)
-en mode From-Plan classique. Exit 2 nettoie le plan pour éviter qu'un
-re-run ultérieur ne le consomme à tort.
+**Non bloquant sur warnings** : un plan exit 0 avec warnings (v1 legacy
+`PLAN_DIGEST_ABSENT`, etc.) reste utilisable par `dev-*` (Opus) en mode
+From-Plan classique. Exit 2 nettoie le plan pour éviter qu'un re-run
+ultérieur ne le consomme à tort.
 
 Si tous les plans sont exit 0 → émettre 1 ligne récap :
 ```
 FEAT {n} — plans v2 valides : {S_v2_back}/{P_back} back + {S_v2_front}/{P_front} front
 ```
 
-Si au moins un exit 1 → émettre WARNING 1 ligne :
+Si au moins un plan porte le warning `PLAN_DIGEST_ABSENT` (plan v1 legacy,
+`$S_v1 ≥ 1`) → émettre WARNING 1 ligne :
 ```
-🟡 FEAT {n} — {N_v1} plan(s) v1 legacy (utilisables par dev-* Opus, sans Inline Digest)
+🟡 FEAT {n} — {S_v1} plan(s) v1 legacy (utilisables par dev-* Opus, sans Inline Digest)
 ```
 
 ---

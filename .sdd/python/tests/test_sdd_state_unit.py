@@ -205,7 +205,7 @@ def test_set_phase_unknown_run_id_returns_1(monkeypatch, fake_repo, capsys):
     _run_main(monkeypatch, ["new-run", "--feat-number", "1", "--command", "/x"])
     capsys.readouterr()
     rc = _run_main(monkeypatch, [
-        "set-phase", "--run-id", "doesnotexist", "--phase", "ph1", "--status", "start",
+        "set-phase", "--run-id", "doesnotexist", "--phase", "qa", "--status", "start",
     ])
     assert rc == 1
     assert "Unknown runId" in capsys.readouterr().err
@@ -215,12 +215,12 @@ def test_set_phase_start_creates_running_phase(monkeypatch, fake_repo, db_path, 
     _run_main(monkeypatch, ["new-run", "--feat-number", "1", "--command", "/x"])
     run_id = capsys.readouterr().out.strip()
     rc = _run_main(monkeypatch, [
-        "set-phase", "--run-id", run_id, "--phase", "backend", "--status", "start",
+        "set-phase", "--run-id", run_id, "--phase", "dev_run", "--status", "start",
     ])
     assert rc == 0
     with _open_db(db_path) as conn:
         ph = conn.execute(
-            "SELECT * FROM run_phases WHERE run_id = ? AND phase = ?", (run_id, "backend"),
+            "SELECT * FROM run_phases WHERE run_id = ? AND phase = ?", (run_id, "dev_run"),
         ).fetchone()
         assert ph["status"] == "running"
         assert ph["started_at"]
@@ -230,15 +230,15 @@ def test_set_phase_pass_sets_ended_at(monkeypatch, fake_repo, db_path, capsys):
     _run_main(monkeypatch, ["new-run", "--feat-number", "1", "--command", "/x"])
     run_id = capsys.readouterr().out.strip()
     _run_main(monkeypatch, [
-        "set-phase", "--run-id", run_id, "--phase", "backend", "--status", "start",
+        "set-phase", "--run-id", run_id, "--phase", "dev_run", "--status", "start",
     ])
     _run_main(monkeypatch, [
-        "set-phase", "--run-id", run_id, "--phase", "backend", "--status", "pass",
+        "set-phase", "--run-id", run_id, "--phase", "dev_run", "--status", "pass",
         "--payload-json", '{"tests":47}',
     ])
     with _open_db(db_path) as conn:
         ph = conn.execute(
-            "SELECT * FROM run_phases WHERE run_id = ? AND phase = ?", (run_id, "backend"),
+            "SELECT * FROM run_phases WHERE run_id = ? AND phase = ?", (run_id, "dev_run"),
         ).fetchone()
         assert ph["status"] == "pass"
         assert ph["ended_at"]
@@ -258,6 +258,49 @@ def test_set_phase_fail_emits_phase_end_event(monkeypatch, fake_repo, db_path, c
             (run_id,),
         ).fetchall()
         assert len(evts) == 1
+
+
+# ---------- resolve_phase_name (audit F-M2, 2026-08-30) ----------
+
+
+def test_resolve_phase_name_canonical_passthrough():
+    assert sdd_state.resolve_phase_name("us_generate") == ("us_generate", None)
+    assert sdd_state.resolve_phase_name("sdd_review") == ("sdd_review", None)
+
+
+def test_resolve_phase_name_aux_phase_accepted():
+    assert sdd_state.resolve_phase_name("doc_refresh") == ("doc_refresh", None)
+    assert sdd_state.resolve_phase_name("feat_validate_postdev") == (
+        "feat_validate_postdev", None,
+    )
+    assert sdd_state.resolve_phase_name("auditor_batch") == ("auditor_batch", None)
+
+
+def test_resolve_phase_name_legacy_alias_warns():
+    name, warning = sdd_state.resolve_phase_name("feat-validate")
+    assert name == "readiness"
+    assert warning is not None and "alias legacy" in warning
+
+
+def test_resolve_phase_name_unknown_returns_none():
+    assert sdd_state.resolve_phase_name("typo_phase") == (None, None)
+    assert sdd_state.resolve_phase_name("") == (None, None)
+
+
+def test_known_phases_cover_pipeline_order():
+    """Chaque clé de _PIPELINE_PHASES_ORDER doit être un nom set-phase valide."""
+    for phase, _step in sdd_state._PIPELINE_PHASES_ORDER:
+        assert phase in sdd_state._KNOWN_PHASES
+
+
+def test_set_phase_unknown_phase_rejected(monkeypatch, fake_repo, capsys):
+    _run_main(monkeypatch, ["new-run", "--feat-number", "1", "--command", "/x"])
+    run_id = capsys.readouterr().out.strip()
+    rc = _run_main(monkeypatch, [
+        "set-phase", "--run-id", run_id, "--phase", "backend", "--status", "start",
+    ])
+    assert rc == 1
+    assert "phase inconnue" in capsys.readouterr().err
 
 
 # ---------- action_end_run ----------
@@ -340,14 +383,14 @@ def test_show_run_prints_full_state_json(monkeypatch, fake_repo, capsys):
     _run_main(monkeypatch, ["new-run", "--feat-number", "1", "--command", "/x"])
     run_id = capsys.readouterr().out.strip()
     _run_main(monkeypatch, [
-        "set-phase", "--run-id", run_id, "--phase", "p1", "--status", "pass",
+        "set-phase", "--run-id", run_id, "--phase", "plan", "--status", "pass",
     ])
     capsys.readouterr()
     _run_main(monkeypatch, ["show-run", "--run-id", run_id])
     state = json.loads(capsys.readouterr().out)
     assert state["runId"] == run_id
     assert state["FeatNumber"] == 1
-    assert "p1" in state["phases"]
+    assert "plan" in state["phases"]
 
 
 def test_list_runs_empty_prints_placeholder(monkeypatch, fake_repo, capsys):

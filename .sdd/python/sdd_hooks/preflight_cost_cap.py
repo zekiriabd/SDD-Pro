@@ -42,24 +42,90 @@ from sdd_lib.run_id import get_or_create_run_id  # noqa: E402  # v7.0.1 stable s
 from sdd_lib.stderr import warn  # noqa: E402
 
 
+def _coerce_cap(raw: object, *, default: float, key: str) -> float:
+    """Parse a configured USD cap, refusing to silently WIDEN the budget.
+
+    Audit M9 (2026-08-29) — the pre-fix code wrapped `float()` in a bare
+    ``except Exception: return <default>``. A typo (``MaxCostPerRun: 5O``,
+    ``$15``, ``fifteen``) therefore replaced a deliberately *tighter* team
+    value with the framework default, which is frequently **larger** — a
+    defensive fallback that is weaker than the value it replaces. That is the
+    one direction a safety default must never move.
+
+    New behaviour : a malformed value is loud (ERROR on stderr, naming the
+    raw text) and resolves to the *most conservative* interpretation
+    available — the default, but only after the operator has been told the
+    configured value was discarded. A negative value is treated as malformed
+    rather than as "disabled" (only an explicit ``0`` disables).
+    """
+    if raw is None:
+        return default
+    text = str(raw).strip()
+    if not text:
+        return default
+    try:
+        value = float(text)
+    except (TypeError, ValueError):
+        warn(f"ERROR: preflight-cost-cap — valeur de config invalide")
+        warn(f"CAUSE: [STACK_MALFORMED] {key}={text!r} n'est pas un "
+             f"nombre — valeur IGNORÉE, fallback ${default:.2f}. Si votre "
+             f"équipe visait un plafond PLUS SERRÉ, il vient d'être élargi "
+             f"silencieusement jusqu'à ce message.")
+        warn(f"FIX: corriger {key} dans ## Project Config (stack.md) ou "
+             f"~/.sdd/config.team.yml — un nombre décimal en USD, ou 0 pour "
+             f"désactiver explicitement le cap.")
+        return default
+    if value < 0:
+        warn(f"ERROR: preflight-cost-cap — valeur de config invalide")
+        warn(f"CAUSE: [STACK_MALFORMED] {key}={text!r} est négatif — "
+             f"valeur IGNORÉE, fallback ${default:.2f} (utiliser 0 pour "
+             f"désactiver le cap de façon explicite).")
+        warn(f"FIX: corriger {key} dans ## Project Config (stack.md).")
+        return default
+    return value
+
+
+def _log_cost_cap_bypass(scope: str) -> None:
+    """Emit the audit line for a `SDD_DISABLE_COST_CAP=1` bypass.
+
+    Audit M8 (2026-08-29) — the docstring above and `error-classification.md`
+    both describe this bypass as "audité dans shell history", but the code
+    returned `0.0` in silence: nothing on stderr, nothing in the transcript,
+    nothing in console.db. A bypass nobody can see is not audited. Matches
+    the house style already used by `preflight_stack_combo.py`.
+    """
+    warn(f"[cost-cap] {scope} : BYPASS via SDD_DISABLE_COST_CAP=1 — "
+         f"le plafond de dépense est DÉSACTIVÉ pour cette invocation")
+
+
+def _cost_cap_env_disabled() -> bool:
+    return (os.environ.get("SDD_DISABLE_COST_CAP", "").strip().lower()
+            in ("1", "true", "yes"))
+
+
 def _resolve_cap() -> float:
     """Resolve MaxCostPerRun from layered config (env override possible).
 
     Returns 0.0 to disable. Defaults to $50.00 if config unreadable.
     """
     # Env one-shot disable
-    if (os.environ.get("SDD_DISABLE_COST_CAP", "").strip().lower()
-            in ("1", "true", "yes")):
+    if _cost_cap_env_disabled():
+        _log_cost_cap_bypass("run-level cap (MaxCostPerRun)")
         return 0.0
     try:
         from sdd_lib.layered_config import read_layered_config
         cfg = read_layered_config()
         raw = cfg.get("MaxCostPerRun")
-        if raw is None:
-            return 50.00
-        return float(str(raw).strip())
-    except Exception:
-        return 50.00  # defensive default — never break the pipeline
+    except Exception as e:  # noqa: BLE001 — never break the pipeline
+        # Audit M9 (2026-08-29) — a config layer that cannot be READ falls
+        # back to the framework default. That is defensible (the value is
+        # unknown, not wrong) but it must be visible, since $50 may be
+        # looser than what the team intended.
+        warn(f"WARN [cost-cap] layered config unreadable ({type(e).__name__}: {e}) "
+             f"— fallback MaxCostPerRun=$50.00. Vérifier stack.md ## Project "
+             f"Config / ~/.sdd/config.team.yml.")
+        return 50.00
+    return _coerce_cap(raw, default=50.00, key="MaxCostPerRun")
 
 
 def _resolve_us_cap() -> float:
@@ -73,19 +139,20 @@ def _resolve_us_cap() -> float:
     config.base.yml line 194). Shares the env one-shot disable with the
     run-level cap.
     """
-    # Env one-shot disable (same as run-level — single bypass for both)
-    if (os.environ.get("SDD_DISABLE_COST_CAP", "").strip().lower()
-            in ("1", "true", "yes")):
+    # Env one-shot disable (same as run-level — single bypass for both).
+    # The run-level resolver already logged the bypass for this invocation;
+    # staying quiet here avoids a duplicated audit line (audit M8).
+    if _cost_cap_env_disabled():
         return 0.0
     try:
         from sdd_lib.layered_config import read_layered_config
         cfg = read_layered_config()
         raw = cfg.get("BuildLoopMaxCostUsd")
-        if raw is None:
-            return 15.00
-        return float(str(raw).strip())
-    except Exception:
-        return 15.00  # defensive default — never break the pipeline
+    except Exception as e:  # noqa: BLE001 — never break the pipeline
+        warn(f"WARN [cost-cap] layered config unreadable ({type(e).__name__}: {e}) "
+             f"— fallback BuildLoopMaxCostUsd=$15.00.")
+        return 15.00
+    return _coerce_cap(raw, default=15.00, key="BuildLoopMaxCostUsd")
 
 
 def _check_telemetry_health() -> None:
@@ -117,6 +184,70 @@ def _check_telemetry_health() -> None:
         pass
 
 
+# --------------------------------------------------------------------------- #
+# SDD agent registry — scope of the fail-closed [PRICING_UNKNOWN] guard
+# (audit C-1, 2026-08-30)
+# --------------------------------------------------------------------------- #
+#
+# The guard exists to protect the SDD cost cap from under-counting a model it
+# cannot price. It has no business blocking a CI run because of a subagent SDD
+# does not own : Claude Code's built-ins (Explore, general-purpose, …) are
+# recorded in `token_usage` like any other spawn, they carry `model IS NULL`
+# (the Agent hook payload has no model field, and `_model_from_agent_tier`
+# resolves nothing for an agent with no `.sdd/agents/{name}.md`), and before
+# this fix every one of them tripped a HOOK_DENY in CI.
+#
+# Their tokens are still priced and still counted against the cap — only the
+# *blocking* verdict is scoped to the agents the loader manifest declares.
+_AGENT_REGISTRY_CACHE: frozenset[str] | None = None
+_AGENT_REGISTRY_LOADED = False
+
+#: Agent labels that identify nobody — `record_token_usage` falls back to the
+#: hook event name (or the literal "unknown") when the payload carries no
+#: `subagent_type`. Such a row COULD be an SDD agent, so it stays blocking.
+_UNATTRIBUTED_PREFIXES: tuple[str, ...] = ("posttooluse", "subagentstop", "unknown")
+
+
+def _sdd_agent_registry() -> frozenset[str] | None:
+    """Names of the agents SDD_Pro owns, or None if the registry is unreadable.
+
+    On-disk projection of the loader manifest : one `.sdd/agents/{name}.md`
+    per declared agent (forward + reverse). Returning None makes the caller
+    treat every row as in-registry — an unreadable registry must never
+    *weaken* the guard, only a readable one may narrow it.
+    """
+    global _AGENT_REGISTRY_CACHE, _AGENT_REGISTRY_LOADED
+    if not _AGENT_REGISTRY_LOADED:
+        _AGENT_REGISTRY_LOADED = True
+        try:
+            from sdd_lib.paths import repo_root, sdd_home
+            agents_dir = sdd_home(repo_root()) / "agents"
+            names = {p.stem for p in agents_dir.glob("*.md")} if agents_dir.is_dir() else set()
+            _AGENT_REGISTRY_CACHE = frozenset(names) or None
+        except Exception:  # noqa: BLE001 — a hook never breaks the pipeline
+            _AGENT_REGISTRY_CACHE = None
+    return _AGENT_REGISTRY_CACHE
+
+
+def _blocks_on_unknown_pricing(agent: object) -> bool:
+    """True when an unpriced row from `agent` may block (DENY) in CI.
+
+    Fail-closed by default : only an agent that is positively identified AND
+    positively absent from the SDD registry is exempted.
+    """
+    registry = _sdd_agent_registry()
+    if registry is None:
+        return True
+    name = str(agent or "").strip()
+    if not name:
+        return True
+    if name in registry:
+        return True
+    if name.lower().startswith(_UNATTRIBUTED_PREFIXES):
+        return True
+    return False
+
+
 # Module-level cache (process-local) for cost queries.
 # Mitigates per-Agent-spawn SQL hit (audit finding C3 v7.0.0-alpha 2026-06-04).
 # TTL 30s : cap precision is $50 default with O(0.01$) telemetry resolution,
@@ -127,11 +258,15 @@ def _check_telemetry_health() -> None:
 # effectif si le hook est un jour invoqué in-process (harness long-vie).
 # Extended v7.0.2 (audit R2) : tuple now carries `unknown_models` list so
 # fail-closed detection survives the cache hit.
-_COST_CACHE: dict[str, tuple[float, float, int, str, tuple[str, ...]]] = {}
+# Extended 2026-08-30 (audit C-1) : a second list carries the unpriced models
+# consumed by agents OUTSIDE the SDD registry — reported, never blocking.
+_COST_CACHE: dict[
+    str, tuple[float, float, int, str, tuple[str, ...], tuple[str, ...]]
+] = {}
 _COST_CACHE_TTL_SEC = 30.0
 
 
-def _compute_run_cost() -> tuple[float, int, str, tuple[str, ...]]:
+def _compute_run_cost() -> tuple[float, int, str, tuple[str, ...], tuple[str, ...]]:
     """Aggregate USD spent so far in the current run.
 
     Run scoping (precedence v7.0.0 audit fix 2026-05-20) :
@@ -154,7 +289,11 @@ def _compute_run_cost() -> tuple[float, int, str, tuple[str, ...]]:
     accumulates. Cache invalidation = TTL expiry (next Agent spawn after 30s
     re-queries). Sufficient for cap enforcement at $0.01 precision.
 
-    Returns (cost_usd, call_count, scope_label).
+    Returns (cost_usd, call_count, scope_label, unknown_models,
+    unknown_models_out_of_registry). The last two split the unpriced rows by
+    ownership (audit C-1, 2026-08-30) : only the first list may produce a
+    HOOK_DENY — the second belongs to subagents SDD does not declare and is
+    reported as a WARN. Both are priced into `cost_usd` either way.
 
     Scope label conventions (v7.0.0-alpha telemetry-trust fix) :
       - "run={id} (no rows yet)" : DB readable, run scope empty → safe ALLOW
@@ -171,12 +310,12 @@ def _compute_run_cost() -> tuple[float, int, str, tuple[str, ...]]:
     try:
         from sdd_lib.console_db import connect_ro, default_db_path
     except Exception as e:
-        return 0.0, 0, f"db error: import failed: {e}", ()
+        return 0.0, 0, f"db error: import failed: {e}", (), ()
 
     # Distinguish absent (legit fresh state) from unreadable (suspect).
     try:
         if not default_db_path().exists():
-            return 0.0, 0, "db absent", ()
+            return 0.0, 0, "db absent", (), ()
     except Exception:
         # repo_root() failure is itself a problem — surface it.
         pass
@@ -190,33 +329,58 @@ def _compute_run_cost() -> tuple[float, int, str, tuple[str, ...]]:
     now = time.monotonic()
     cached = _COST_CACHE.get(run_id)
     if cached is not None:
-        cached_ts, cached_cost, cached_count, cached_scope, cached_unknown = cached
+        (cached_ts, cached_cost, cached_count, cached_scope,
+         cached_unknown, cached_foreign) = cached
         if (now - cached_ts) < _COST_CACHE_TTL_SEC:
-            return cached_cost, cached_count, cached_scope, cached_unknown
+            return (cached_cost, cached_count, cached_scope,
+                    cached_unknown, cached_foreign)
 
     try:
         with connect_ro() as conn:
             cur = conn.cursor()
             cur.execute(
                 "SELECT model, input_tokens, output_tokens, "
-                "       cache_creation_tokens, cache_read_tokens "
+                "       cache_creation_tokens, cache_read_tokens, agent "
                 "FROM token_usage WHERE run_id = ?",
                 (run_id,),
             )
             rows = cur.fetchall()
             if not rows:
-                return 0.0, 0, f"run={run_id[:8]} (no rows yet)", ()
+                return 0.0, 0, f"run={run_id[:8]} (no rows yet)", (), ()
             scope = f"run={run_id[:8]}"
     except Exception as e:
         # SCOPE = "db error: ..." signals the caller that 0.0 is NOT a
         # legitimate "no cost yet" but a "cap unenforceable" condition.
-        return 0.0, 0, f"db error: {e}", ()
+        return 0.0, 0, f"db error: {e}", (), ()
 
     total = 0.0
     unknown: list[str] = []  # audit R2 : models with no known pricing (Sonnet fallback = under-count)
-    for model, inp, outp, cc, cr in rows:
-        if model and not has_known_pricing(model) and model not in unknown:
-            unknown.append(model)
+    foreign: list[str] = []  # audit C-1 : same, but consumed outside the SDD registry
+    for row in rows:
+        model, inp, outp, cc, cr = row[:5]
+        agent = row[5] if len(row) > 5 else None
+        # Audit C2 (2026-08-29) — fail-closed on a NULL/empty model too.
+        # The pre-fix guard was `if model and not has_known_pricing(model)`.
+        # Every row in the live console.db has `model IS NULL` (the Agent hook
+        # payload carries no model field), and NULL short-circuits the truthy
+        # test — so the [PRICING_UNKNOWN] safety valve could never fire on the
+        # exact population it exists to protect. An unrecorded model is *more*
+        # suspect than an unrecognized one, not less : the cost is estimated at
+        # Sonnet rates either way.
+        #
+        # Audit C-1 (2026-08-30) — that fail-closed stance is right for the
+        # agents SDD_Pro declares and wrong for everybody else : a built-in
+        # Claude Code subagent (Explore, general-purpose…) also lands here with
+        # `model IS NULL`, and denying a CI run over a spawn the framework
+        # neither routes nor prices protects nothing. Unpriced rows are
+        # therefore split by ownership — SDD agents keep the DENY, the rest are
+        # reported. Both are still priced into the total.
+        key = (model or "").strip()
+        label = key or "<unrecorded>"
+        if not key or not has_known_pricing(key):
+            bucket = unknown if _blocks_on_unknown_pricing(agent) else foreign
+            if label not in bucket:
+                bucket.append(label)
         p = get_pricing(model)
         total += (inp or 0) * p["input"] / 1_000_000
         total += (outp or 0) * p["output"] / 1_000_000
@@ -224,9 +388,11 @@ def _compute_run_cost() -> tuple[float, int, str, tuple[str, ...]]:
         total += (cr or 0) * p["cache_read"] / 1_000_000
 
     unknown_tuple = tuple(unknown)
+    foreign_tuple = tuple(foreign)
     # Cache write (C3 fix) — TTL expiry on next read past 30s.
-    _COST_CACHE[run_id] = (now, total, len(rows), scope, unknown_tuple)
-    return total, len(rows), scope, unknown_tuple
+    _COST_CACHE[run_id] = (now, total, len(rows), scope,
+                           unknown_tuple, foreign_tuple)
+    return total, len(rows), scope, unknown_tuple, foreign_tuple
 
 
 # Module-level cache (process-local) for per-US cost queries (RUPT-2).
@@ -340,7 +506,7 @@ def main() -> int:
     subagent = get_subagent_type(payload)
     if not subagent:
         return HOOK_ALLOW
-    cost, calls, scope, unknown_models = _compute_run_cost()
+    cost, calls, scope, unknown_models, foreign_unknown = _compute_run_cost()
     pct = (cost / cap * 100) if cap > 0 else 0
 
     # v7.0.0 audit fix — emit visible alert if record_token_usage.py is
@@ -384,6 +550,16 @@ def main() -> int:
     #   - Interactive (or SDD_ALLOW_UNKNOWN_PRICING=1)  → visible WARN + ALLOW
     #   - Bypass one-shot                               : SDD_ALLOW_UNKNOWN_PRICING=1
     #   - Bypass hard (cost cap globally off)           : SDD_DISABLE_COST_CAP=1
+    #
+    # Audit C-1 (2026-08-30) — the DENY is scoped to the agents the loader
+    # declares. Unpriced spawns from outside the registry (Claude Code
+    # built-ins) are surfaced here and counted in the total, but they never
+    # abort a CI run : SDD prices what SDD routes.
+    if foreign_unknown:
+        warn("WARN preflight-cost-cap : pricing inconnu pour "
+             f"{list(foreign_unknown)!r} sur des subagents hors registre SDD "
+             "— coût compté au tarif de repli, jamais bloquant (le "
+             "fail-closed [PRICING_UNKNOWN] ne couvre que les agents du loader)")
     if unknown_models:
         is_ci = _detect_ci()
         bypass = (os.environ.get("SDD_ALLOW_UNKNOWN_PRICING", "").strip().lower()

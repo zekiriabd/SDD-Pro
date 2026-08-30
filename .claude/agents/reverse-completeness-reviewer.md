@@ -22,7 +22,7 @@ respecte-t-il les ACs ? », tu réponds « la FEAT capture-t-elle assez du legac
 
 Arguments : `{U-N}` + `{LegacyProject}` (ou `--feat-path`).
 - `workspace/old/{P}/.sys/inventory.json` doit exister et contenir `units[id={U-N}]`.
-- La FEAT correspondante doit exister (`_featAllocations[{U-N}]` → `{n}-{Name}.md`).
+- La FEAT correspondante doit exister (`_featAllocations[{U-N}]` → `{n}-{FeatName}.md`).
 
 Sinon → STOP + ERROR `[REVERSE_UNIT_NOT_FOUND]`.
 
@@ -84,7 +84,7 @@ informe le Tech Lead et l'orchestrateur. Classe d'erreur émise dans le log :
 
 ## STEP 4 — Rapport
 
-Écrire `workspace/old/{P}/.sys/modules/{Name}/completeness-review.md` :
+Écrire `workspace/old/{P}/.sys/modules/{FeatName}/completeness-review.md` :
 verdict, liste des gaps confirmés (file:line), gaps écartés + raison.
 
 ## STEP 5 — Confirmation chat

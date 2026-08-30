@@ -19,12 +19,58 @@ def test_pricing_last_reviewed_is_iso_date():
     assert reviewed.year >= 2024  # sanity floor
 
 
+#: Fixed reference "today" for the arithmetic tests below.
+#:
+#: Audit C3 (2026-08-29) — this constant deliberately does NOT derive from
+#: `pricing.PRICING_LAST_REVIEWED`. The pre-fix test set
+#: `today = PRICING_LAST_REVIEWED` and asserted `age == 0`, which is a
+#: tautology: it holds for every possible value of PRICING_LAST_REVIEWED and
+#: could therefore never fail, no matter how stale the table got. With a
+#: hardcoded date the function's arithmetic is genuinely checked, and
+#: `test_pricing_is_not_stale_against_real_clock` below is what actually
+#: catches rot.
+_REF_TODAY = dt.date(2026, 9, 1)
+
+
+def test_check_pricing_freshness_computes_age_against_fixed_today():
+    """Age is (today - PRICING_LAST_REVIEWED), computed, not assumed."""
+    reviewed = dt.date.fromisoformat(pricing.PRICING_LAST_REVIEWED)
+    expected_age = (_REF_TODAY - reviewed).days
+    is_fresh, age, last = pricing.check_pricing_freshness(
+        max_age_days=90, today=_REF_TODAY
+    )
+    assert age == expected_age
+    assert last == pricing.PRICING_LAST_REVIEWED
+    assert is_fresh is (expected_age <= 90)
+
+
 def test_check_pricing_freshness_within_window():
-    """Reviewed today → fresh."""
-    today = dt.date.fromisoformat(pricing.PRICING_LAST_REVIEWED)
-    is_fresh, age, _ = pricing.check_pricing_freshness(max_age_days=90, today=today)
+    """A table reviewed 10d before the reference date is fresh at a 90d cap."""
+    with_reviewed = _REF_TODAY - dt.timedelta(days=10)
+    is_fresh, age, _ = pricing.check_pricing_freshness(
+        max_age_days=90,
+        today=dt.date.fromisoformat(pricing.PRICING_LAST_REVIEWED) + dt.timedelta(days=10),
+    )
     assert is_fresh is True
-    assert age == 0
+    assert age == 10
+    assert with_reviewed <= _REF_TODAY  # sanity on the fixture itself
+
+
+def test_pricing_is_not_stale_against_real_clock():
+    """The check that can actually fail when the pricing table rots.
+
+    Uses the REAL current date (same call shape as `framework_smoke.py`'s
+    `_check_pricing_freshness`). A generous 365d cap keeps this from
+    flapping in CI on a normal quarterly cadence while still failing loudly
+    when the table has been abandoned for a year.
+    """
+    is_fresh, age, reviewed = pricing.check_pricing_freshness(max_age_days=365)
+    assert is_fresh, (
+        f"PRICING table last reviewed {reviewed} ({age}d ago) — re-check "
+        f"https://www.anthropic.com/pricing, update sdd_lib/pricing.py and "
+        f"bump PRICING_LAST_REVIEWED. A stale table silently mis-prices the "
+        f"cost cap."
+    )
 
 
 def test_check_pricing_freshness_stale():

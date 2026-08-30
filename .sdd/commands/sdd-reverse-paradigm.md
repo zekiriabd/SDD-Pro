@@ -64,4 +64,4 @@ workspace/old/{P}/.sys/curation.md          (header machine-parseable <!-- CURAT
   intégral par défaut — la curation n'est qu'une suggestion `--units`
 - Idempotent : relancer régénère l'analyse en **préservant** les arbitrages humains posés
 
-Voir `.sdd/rules/reverse-engineering.md §6` ([REVERSE_PARADIGM_GAP], [REVERSE_CURATION_PENDING]) + `.claude/agents/reverse-paradigm-advisor.md`.
+Voir `.sdd/rules/reverse-engineering.md §6` ([REVERSE_PARADIGM_GAP], [REVERSE_CURATION_PENDING]) + `.sdd/agents/reverse-paradigm-advisor.md`.

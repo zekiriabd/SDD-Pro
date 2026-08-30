@@ -347,7 +347,8 @@ def regenerate_wave_packs(
     written: list[str] = []
     trimmed: list[str] = []
     for fq in wave_members(context, wave_index):
-        body, report = build_pack(context, fq, depth=depth, budget=budget)
+        body, report = build_pack(context, fq, depth=depth, budget=budget,
+                                  project_root=project_root)
         atomic_write_text(root / f"{_safe(fq)}.md", body)
         written.append(fq)
         if report.get("trimmed"):

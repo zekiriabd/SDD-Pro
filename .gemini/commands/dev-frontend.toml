@@ -50,7 +50,7 @@ Quelle est l'US à matérialiser côté frontend ? (format : {n}-{m}, ex. 1-2)
 Si format invalide →
 ```
 ERROR: /dev-frontend — argument invalide
-CAUSE: "{argument}" ne respecte pas le format {n}-{m}
+CAUSE: [INVALID_ARG] "{argument}" ne respecte pas le format {n}-{m}
 FIX: relancer /dev-frontend {n}-{m} (ex. /dev-frontend 1-2)
 ```
 

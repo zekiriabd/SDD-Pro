@@ -20,9 +20,12 @@ from sdd_reverse.dialects.sqlserver import DIALECT as _SQLSERVER
 
 # Normalised DatabaseType (from stack.md ## Active Database) → Dialect.
 # Keys are lowercased on lookup, so list every common alias once.
-# The 4 principal engines (2026-07-24). SQL Server + PostgreSQL are
-# live-validated; Oracle + MySQL/MariaDB are scaffold-validated (read-only
-# query shape + offline flow tested, live runtime pending — no driver at bench).
+# The 4 principal engines (2026-07-24). SQL Server is the only live-validated
+# engine (real runs against a real base); PostgreSQL + Oracle + MySQL/MariaDB
+# are scaffold-validated (read-only query shape + offline flow tested, live
+# runtime pending — no driver at bench). PostgreSQL was wrongly announced
+# "live-validated" until the 2026-08-29 audit downgraded it: no run was ever
+# executed against a real PostgreSQL base (cf. CLAUDE.md §3).
 _REGISTRY: dict[str, Dialect] = {
     "sqlserver": _SQLSERVER,
     "mssql": _SQLSERVER,

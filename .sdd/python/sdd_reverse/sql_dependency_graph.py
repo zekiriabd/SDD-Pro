@@ -49,6 +49,24 @@ def _display(ident: str) -> str:
     return ident.strip().strip("[]`\"").strip()
 
 
+def _resolve_callee(
+    callee: str, by_fq: dict[str, str], by_tail: dict[str, list[str]],
+) -> str | None:
+    """Resolve a callee name to a known object, or None. NEVER guesses.
+
+    Same policy as `db_wave_planner.resolve_calls` (m3, audit 2026-08-29): an
+    exact qualified match wins; a bare name resolves only when exactly ONE object
+    carries it. Two objects sharing a bare name across schemas (`dbo.usp_Do` and
+    `sales.usp_Do`) is an ambiguity, and picking one of them writes a dependency
+    that may simply be false into a graph used for impact analysis.
+    """
+    exact = by_fq.get(_norm(callee))
+    if exact is not None:
+        return exact
+    candidates = by_tail.get(_tail(callee), [])
+    return candidates[0] if len(candidates) == 1 else None
+
+
 # --------------------------------------------------------------------------- #
 # Graph construction
 # --------------------------------------------------------------------------- #
@@ -59,22 +77,24 @@ def build_dependency_graph(objects: list[dict[str, Any]]) -> dict[str, Any]:
     Each object contributes edges:
       * object --reads--> table   (from tablesRead)
       * object --writes--> table  (from tablesWritten)
-      * object --calls--> object  (from callsProcs, matched by trailing name)
+      * object --calls--> object  (from callsProcs / callsInferred, resolved
+        against the known object set — never guessed, see `_resolve_callee`)
 
     Nodes carry `kind` ('object' with routineType, or 'table', or 'external'
     for an unmatched callee). Stats include per-node in/out degree so callers
     can rank impact.
     """
     # Index objects by canonical fq and by trailing name (for call resolution).
-    by_fq: dict[str, dict] = {}
+    by_fq: dict[str, str] = {}
     by_tail: dict[str, list[str]] = {}
     for o in objects:
         fq = o.get("fqName") or o.get("name", "")
-        by_fq[_norm(fq)] = o
+        by_fq[_norm(fq)] = fq
         by_tail.setdefault(_tail(fq), []).append(fq)
 
     nodes: dict[str, dict] = {}
     edges: list[dict[str, str]] = []
+    seen_edges: set[tuple[str, str, str]] = set()
 
     def _node(nid: str, kind: str, ntype: str) -> None:
         if nid not in nodes:
@@ -82,6 +102,12 @@ def build_dependency_graph(objects: list[dict[str, Any]]) -> dict[str, Any]:
                           "inDegree": 0, "outDegree": 0}
 
     def _edge(src: str, dst: str, rel: str, source: str = "body") -> None:
+        # The same call can now arrive from two extraction sources (keyword and
+        # keyword-less); one dependency must still be one edge.
+        key = (_norm(src), _norm(dst), rel)
+        if key in seen_edges:
+            return
+        seen_edges.add(key)
         edges.append({"from": src, "to": dst, "rel": rel, "source": source})
         nodes[src]["outDegree"] += 1
         nodes[dst]["inDegree"] += 1
@@ -101,14 +127,27 @@ def build_dependency_graph(objects: list[dict[str, Any]]) -> dict[str, Any]:
             _node(tid, kind="TABLE", ntype="table")
             _edge(fq, tid, "writes")
         for callee in o.get("callsProcs", []) or []:
-            matches = by_tail.get(_tail(callee), [])
-            if matches:
-                dst = _display(matches[0])
-                _edge(fq, dst, "calls")
+            dst = _resolve_callee(callee, by_fq, by_tail)
+            if dst is not None:
+                _edge(fq, _display(dst), "calls")
             else:
+                # Unresolvable (absent) or AMBIGUOUS (same bare name in two
+                # schemas). m3, audit 2026-08-29: this used to take
+                # `matches[0]` on ambiguity, silently asserting an edge to one
+                # schema's object while `db_wave_planner.resolve_calls` — on
+                # the same data — correctly refused to guess. Two components
+                # disagreeing about the same graph is worse than either answer.
+                # An `external` node says "we could not resolve this", which is
+                # exactly what the reader needs to know.
                 ext = _display(callee)
                 _node(ext, kind="EXTERNAL", ntype="external")
                 _edge(fq, ext, "calls")
+        # Keyword-less invocations (C1): resolve or drop. Never an external node
+        # — the heuristic is not authoritative enough to assert a missing object.
+        for callee in o.get("callsInferred", []) or []:
+            dst = _resolve_callee(callee, by_fq, by_tail)
+            if dst is not None:
+                _edge(fq, _display(dst), "calls")
 
     return {
         "schemaVersion": SCHEMA_VERSION,
@@ -140,7 +179,9 @@ def merge_catalog_dependencies(
     """
     col = {c: i for i, c in enumerate(columns)}
     nodes = {n["id"]: n for n in graph.get("nodes", [])}
-    existing = {(_norm(e["from"]), _norm(e["to"])) for e in graph.get("edges", [])}
+    existing: dict[tuple[str, str], dict[str, str]] = {}
+    for e in graph.get("edges", []):
+        existing.setdefault((_norm(e["from"]), _norm(e["to"])), e)
     added = 0
 
     def _ensure(nid: str, kind: str, ntype: str) -> None:
@@ -161,12 +202,22 @@ def merge_catalog_dependencies(
         _ensure(src, "OBJECT", "object")
         ntype = "table" if "TABLE" in dtype else ("object" if dtype else "object")
         _ensure(dst, dtype or "OBJECT", ntype)
-        if (_norm(src), _norm(dst)) in existing:
-            continue                       # already known from the body scan
-        graph["edges"].append({"from": src, "to": dst, "rel": "depends", "source": "catalog"})
+        key = (_norm(src), _norm(dst))
+        prior = existing.get(key)
+        if prior is not None:
+            # Already known from the body scan. The catalog is the authority on
+            # what depends on what, so the edge is RE-STAMPED as catalog-confirmed
+            # rather than left looking purely regex-derived (C2, audit
+            # 2026-08-29): `db_introspect.attach_catalog_calls` reads this
+            # provenance to decide which edges the wave planner may trust.
+            if "catalog" not in str(prior.get("source", "")):
+                prior["source"] = "body+catalog"
+            continue
+        edge = {"from": src, "to": dst, "rel": "depends", "source": "catalog"}
+        graph["edges"].append(edge)
         nodes[src]["outDegree"] += 1
         nodes[dst]["inDegree"] += 1
-        existing.add((_norm(src), _norm(dst)))
+        existing[key] = edge
         added += 1
 
     st = graph.setdefault("stats", {})
@@ -203,18 +254,25 @@ def cohesion_modules(objects: list[dict[str, Any]]) -> dict[str, str]:
 
     # table → objects touching it
     table_to_objs: dict[str, list[str]] = {}
-    by_tail: dict[str, str] = {}
+    # m3, audit 2026-08-29: `by_tail` was a plain dict keyed on the bare name, so
+    # `dbo.usp_Do` and `sales.usp_Do` overwrote each other — the last one read
+    # won, and every call to that bare name was silently attributed to it.
+    # A multi-map keeps both, and an ambiguous name then resolves to neither.
+    by_fq: dict[str, str] = {}
+    by_tail: dict[str, list[str]] = {}
     for o, fq in zip(objects, fqs):
-        by_tail[_tail(fq)] = fq
+        by_fq[_norm(fq)] = fq
+        by_tail.setdefault(_tail(fq), []).append(fq)
         for t in (o.get("tablesRead", []) or []) + (o.get("tablesWritten", []) or []):
             table_to_objs.setdefault(_norm(t), []).append(fq)
     for objs in table_to_objs.values():
         for other in objs[1:]:
             union(objs[0], other)
-    # call edges
+    # call edges — both extraction sources, resolved with the no-guess policy.
     for o, fq in zip(objects, fqs):
-        for callee in o.get("callsProcs", []) or []:
-            dst = by_tail.get(_tail(callee))
+        callees = (o.get("callsProcs", []) or []) + (o.get("callsInferred", []) or [])
+        for callee in callees:
+            dst = _resolve_callee(callee, by_fq, by_tail)
             if dst:
                 union(fq, dst)
 

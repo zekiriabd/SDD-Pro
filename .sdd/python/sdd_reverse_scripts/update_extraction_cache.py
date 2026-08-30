@@ -13,8 +13,12 @@ Two modes (deterministic, 0 token) :
 
     --check  (orchestrator /sdd-reverse-full, STEP 3a) :
         python .sdd/python/sdd_reverse_scripts/update_extraction_cache.py \
-            --project workspace/old/{P} --unit U-3 --check [--feats-dir DIR]
+            --project workspace/old/{P} --unit U-3 --check \
+            [--feats-dir DIR] [--plans-dir DIR] [--us-dir DIR]
         Exit 0 = cached (skip extraction) ; exit 1 = not cached (extract).
+        A HIT requires the FEAT **and** the 3a plan **and** ≥ 1 3b US on disk
+        (M5, audit 2026-08-29) — the plan is not required for `db-module` units,
+        whose ladder has no 3a rung.
 
 Exit codes:
     0  saved OK / cache hit (--check)
@@ -65,6 +69,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--name", default=None, help="FEAT Name (required with --save)")
     parser.add_argument("--feats-dir", default=None,
         help="FEATs directory (default: workspace/feats relative to repo)")
+    parser.add_argument("--plans-dir", default=None,
+        help="Plans directory (default: sibling workspace/plans). A cache HIT "
+             "requires {n}-{name}.analysis.md there, except for db-module units.")
+    parser.add_argument("--us-dir", default=None,
+        help="User-stories directory (default: sibling workspace/us). A cache HIT "
+             "requires at least one {n}-*.md there.")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
 
@@ -82,9 +92,15 @@ def main(argv: list[str] | None = None) -> int:
     feats_dir = Path(args.feats_dir).resolve() if args.feats_dir else (
         project_root.parent.parent / "feats"
     )
+    # M5 (audit 2026-08-29): a HIT must mean "the whole ladder is still on disk",
+    # not just the FEAT — deleting workspace/us/ to force US regeneration used to
+    # be swallowed as a cache hit. Siblings of workspace/feats/ by default.
+    workspace = feats_dir.parent
+    plans_dir = Path(args.plans_dir).resolve() if args.plans_dir else workspace / "plans"
+    us_dir = Path(args.us_dir).resolve() if args.us_dir else workspace / "us"
 
     if args.check:
-        cached = is_unit_cached(project_root, unit, feats_dir)
+        cached = is_unit_cached(project_root, unit, feats_dir, plans_dir, us_dir)
         if args.json:
             print(json.dumps({"ok": True, "unit": args.unit, "cached": cached}))
         else:

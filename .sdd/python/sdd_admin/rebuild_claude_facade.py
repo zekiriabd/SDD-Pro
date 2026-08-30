@@ -35,8 +35,65 @@ def _repo_root() -> Path:
     return _HERE.parents[3]  # .sdd/python/sdd_admin/X.py -> repo
 
 
-def _needs_rebuild(claude_dir: Path) -> bool:
-    """Return True if any of the 4 façade slots is missing/empty."""
+#: Source dir under `.sdd/` -> façade dir under `.claude/`.
+_FACADE_SLOTS: tuple[tuple[str, str], ...] = (
+    ("agents", "agents"),
+    ("commands", "commands"),
+    ("rules", "rules"),
+)
+
+
+def _sources_newer_than_facade(repo: Path, claude_dir: Path) -> str | None:
+    """Return the first `.sdd/` source found to be newer than its façade copy.
+
+    Audit M4 (2026-08-29) — `_needs_rebuild` only asked "is the façade
+    *missing*?". A façade that exists but has DRIFTED from `.sdd/` (a rule
+    edited, an agent's prompt changed) was reported as "present, no rebuild
+    needed", so the auto-rebuild fired exactly once in a repo's life and
+    never again. Every subsequent edit to `.sdd/` silently left Claude Code
+    running the stale compiled copy — the exact drift class that
+    `harness-parity` is declared `severity: critical` to prevent.
+
+    Deliberately mtime-based, not content-hash based: this runs on a hot
+    path (session start), and a content compare would mean transpiling the
+    whole tree just to decide whether to transpile it. mtime over-triggers
+    (a touched-but-unchanged file forces one needless rebuild) and never
+    under-triggers, which is the safe direction. The byte-level check
+    remains `tests/test_harness_facade_parity.py`.
+
+    Returns a short human-readable reason, or None when the façade is
+    up to date.
+    """
+    sdd_dir = repo / ".sdd"
+    for src_name, dst_name in _FACADE_SLOTS:
+        src_dir, dst_dir = sdd_dir / src_name, claude_dir / dst_name
+        if not src_dir.is_dir():
+            continue
+        for src in src_dir.glob("*.md"):
+            dst = dst_dir / src.name
+            try:
+                if not dst.is_file():
+                    return f"{dst_name}/{src.name} absent de la façade"
+                if src.stat().st_mtime_ns > dst.stat().st_mtime_ns:
+                    return f".sdd/{src_name}/{src.name} plus récent que la façade"
+            except OSError:
+                # Unreadable stat → rebuild rather than assume freshness.
+                return f"{src_name}/{src.name} illisible (stat)"
+    # The memory layer (CLAUDE.md) is compiled from the entrypoint sources.
+    facade_md = claude_dir / "CLAUDE.md"
+    for src_name in ("CLAUDE.md", "entrypoint-body.md"):
+        src = sdd_dir / src_name
+        try:
+            if src.is_file() and facade_md.is_file() and \
+                    src.stat().st_mtime_ns > facade_md.stat().st_mtime_ns:
+                return f".sdd/{src_name} plus récent que .claude/CLAUDE.md"
+        except OSError:
+            return f"{src_name} illisible (stat)"
+    return None
+
+
+def _needs_rebuild(claude_dir: Path, repo: Path | None = None) -> bool:
+    """True if a façade slot is missing/empty, OR a source has drifted (M4)."""
     checks = [
         claude_dir / "agents",
         claude_dir / "commands",
@@ -48,6 +105,8 @@ def _needs_rebuild(claude_dir: Path) -> bool:
         if not any(d.glob("*.md")):
             return True
     if not (claude_dir / "CLAUDE.md").is_file():
+        return True
+    if repo is not None and _sources_newer_than_facade(repo, claude_dir):
         return True
     return False
 
@@ -62,13 +121,17 @@ def rebuild(force: bool = False, provider: str = "anthropic", verbose: bool = Tr
     claude_dir = repo / ".claude"
     build_dir = repo / ".sdd" / ".build" / "claude"
 
-    if not force and not _needs_rebuild(claude_dir):
+    drift_reason = _sources_newer_than_facade(repo, claude_dir) if not force else None
+    if not force and not _needs_rebuild(claude_dir, repo):
         if verbose:
-            print(f"[rebuild_claude_facade] .claude/ facade present, no rebuild needed.")
+            print(f"[rebuild_claude_facade] .claude/ facade present and up to date, "
+                  f"no rebuild needed.")
         return SUCCESS
 
     if verbose:
-        print(f"[rebuild_claude_facade] rebuilding .claude/ from .sdd/ (provider={provider})...")
+        why = f" ({drift_reason})" if drift_reason else ""
+        print(f"[rebuild_claude_facade] rebuilding .claude/ from .sdd/ "
+              f"(provider={provider}){why}...")
 
     # Step 1: transpile .sdd/ -> .sdd/.build/claude/
     cmd = [

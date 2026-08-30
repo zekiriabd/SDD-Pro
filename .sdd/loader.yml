@@ -36,7 +36,7 @@
 # ============================================================================
 
 version: "7.0.0"
-updated: "2026-06-08"
+updated: "2026-08-30"
 
 # =========================================================================
 # Cache layers (v7.0.0 P2 #11 — Anthropic prompt caching strategy)
@@ -304,7 +304,14 @@ dev-backend:
     - workspace/src/{BackendName}/Endpoints/
     - workspace/src/{BackendName}/DTOs/
     - workspace/src/{BackendName}/Mappers/
+    - workspace/src/{BackendName}/Entities/   # augment (entities scaffoldées par arch — cf. ownership.md §1 "Entities augmentées")
+    - workspace/src/{BackendName}/Middleware/
+    - workspace/src/{BackendName}/Validators/
     - workspace/src/{BackendName}/Program.cs  # augment
+    # F-M5 (audit 2026-08-30) : territoire déclaré dans ownership.md §4 et
+    # build-and-loop.md §1.bis/§2 mais absent d'ici — DTOs/Models partagés,
+    # UNIQUEMENT si LibStrategy=shared, sous First-write wins + LibName lock.
+    - workspace/src/{LibName}/**              # si LibStrategy=shared — lock obligatoire (ownership.md §4, build-and-loop.md §2)
     - workspace/plans/{n}-{m}-*.back.md    # mode :plan uniquement
     - workspace/.sys/.state/dev-build-downgrade-{n}-{m}.flag  # sentinel Opus→Sonnet downgrade, lu par /dev-run STEP 6.a.bis
   forbidden_reads:
@@ -373,6 +380,10 @@ dev-frontend:
     - workspace/src/{AppName}/wwwroot/css/theme.css  # augment
     - "**/*.razor.css"                  # CSS isolé adjacent
     - workspace/src/{AppName}/Program.cs   # augment éventuel
+    # F-M5 (audit 2026-08-30) : symétrie avec dev-backend — DTOs/Models
+    # partagés, UNIQUEMENT si LibStrategy=shared, sous First-write wins +
+    # LibName lock (ownership.md §4, build-and-loop.md §2).
+    - workspace/src/{LibName}/**           # si LibStrategy=shared — lock obligatoire
     - workspace/plans/{n}-{m}-*.front.md   # mode :plan uniquement
     - workspace/.sys/.state/dev-build-downgrade-{n}-{m}.flag  # sentinel Opus→Sonnet downgrade, lu par /dev-run STEP 6.c.bis
   forbidden_reads:
@@ -420,12 +431,17 @@ elicitor:
     - workspace/ui/                        # hors scope élicitation
     - workspace/us/                       # antérieur dans le pipeline
     - workspace/src/                      # post-implementation
-  techniques:                          # 5 techniques d'élicitation
+  techniques:                          # bibliothèque 15 techniques (v7.0.0+, SSoT .sdd/docs/brainstorming-techniques.md — sélection 2-3 par contexte)
+    # Les 5 techniques historiques v6.x (mode --legacy-5) restent détaillées :
     - 1_pre_mortem: "risques projet (3-5 risques classifiés)"
     - 2_first_principles: "hypothèses implicites (max 7)"
     - 3_red_team: "edge cases (max 8)"
     - 4_stakeholder_mapping: "RACI (max 6)"
     - 5_inversion: "failure modes (max 4)"
+    # + 10 techniques v7.0.0 chargées à la demande depuis la bibliothèque :
+    # SCAMPER, Reverse Brainstorming, 5 Whys, Customer Journey Mapping,
+    # Empathy Map, Crazy 8s, Six Thinking Hats, Cynefin, OKR Decomposition,
+    # Lotus Blossom.
   modes:
     - interactive: "5×1-2 questions, default"
     - quick: "--quick flag, génération directe sans question"
@@ -443,6 +459,10 @@ qa:
   model_tier: balanced   # parité frontmatter agents/qa.md — enforced par tests/test_loader_model_parity.py
   reads:
     # Order: stable → semi → volatile (cache_control canonical order, cf. sdd_lib/cache_control.py)
+    # F-M4 (audit 2026-08-30) : stack.md était en forbidden_reads alors que
+    # agents/qa.md le lit obligatoirement (STEP 2.3 QAMode + CoverageMin,
+    # STEP 2.4 Active QA Specs, STEP 8 seuil coverage). Interdiction levée.
+    - workspace/stack/stack.md      # ## Project Config (QAMode, CoverageMin, QaFailOn*) + ## Active QA Specs · cache_layer: stable
     - .sdd/stacks/qa/{active}.md    # tous QA stacks actifs (sélectif) · cache_layer: stable
     - workspace/src/{BackendName}/CLAUDE.md  # architecture backend (passif) · cache_layer: semi
     - workspace/src/{AppName}/CLAUDE.md      # architecture frontend (passif) · cache_layer: semi
@@ -475,8 +495,6 @@ qa:
     # are persisted directly to console.db by quality_scan.py/parse_coverage.py.
     # The only file written is the transient api-tests JSON (ingested+deleted).
     - workspace/.sys/.validation/{n}-api-tests.json  # transient (ingest_agent_report → console.db, then unlink)
-  forbidden_reads:
-    - workspace/stack/                     # hors scope QA (lecture indirecte via QA stacks)
   forbidden_writes:
     - workspace/src/{BackendName}/Services/  # code production (read-only strict)
     - workspace/src/{AppName}/Pages/         # code production (read-only strict)
@@ -744,7 +762,7 @@ security-reviewer:
     - workspace/us/{other-feat}            # autres FEATs
     - workspace/feats/{other}.md            # autres FEATs
     - .sdd/stacks/qa/                          # hors scope (responsabilité qa)
-    - .sdd/stacks/ui/                          # hors scope (responsabilité a11y/dev-frontend)
+    - .sdd/stacks/ui/                          # hors scope (responsabilité dev-frontend ; a11y → ingest axe-core CI depuis v7.0.0, agent retiré)
     - workspace/db/                        # console.db (qa_coverage/qa_quality/qa_a11y = responsabilité qa, hors scope direct)
   forbidden_writes:
     - workspace/src/                       # read-only strict (jamais de patch)

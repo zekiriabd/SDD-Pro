@@ -5,7 +5,7 @@ model_tier: deep
 tier_default: deep
 tier_floor: balanced
 tier_ceiling: deep
-tools: [Read, Write, Edit, Glob, Grep, Bash]
+tools: [Read, Write, Edit, Glob, Grep]
 ---
 # Agent Reverse-SQL-Trigger-Analyst — spécialiste triggers
 
@@ -72,6 +72,14 @@ Citer `fichier:ligne` à chaque assertion. Extraire, **dans cet ordre** :
 7. **Zone de doute** — SQL dynamique, `UPDATE()`/`COLUMNS_UPDATED()`, curseurs,
    récursion (`RECURSIVE_TRIGGERS`), `NOT FOR REPLICATION`.
 
+> **Un trigger est attaché à une table et à un événement.** Si l'objet reçu n'en
+> porte pas (`routineType` hors `SQL_TRIGGER` / `TRIGGER`, aucune clause
+> `AFTER`/`BEFORE`/`INSTEAD OF` dans le corps, aucune table porteuse), ce n'est
+> pas un trigger : c'est une procédure, une fonction ou une vue, et son
+> spécialiste l'écrira sous le bon angle. Émettre
+> `[REVERSE_OBJECT_KIND_MISMATCH]` et laisser la main plutôt que produire une US
+> événementielle sur un objet que rien ne déclenche.
+
 ## STEP 3 — Confidence
 
 `min(cap du langage, dégradation)` :
@@ -94,10 +102,13 @@ repris de `inventory.json` — jamais recalculés.
 - **Un AC négatif par branche de rejet** — sans exception : c'est la partie que
   les équipes applicatives découvrent en production.
 - Chaque AC porte son `<!-- evidence: …:Ls-Le -->` et `<!-- confidence: … -->`.
-- `## Dependencies` : table porteuse, tables écrites, procédures appelées,
-  triggers potentiellement déclenchés en cascade.
+- Placeholders du template : `{objectFamily}` → « trigger » ; `{objectType}` →
+  le `routineType` du catalogue tel quel ; `Parent FEAT hash:` → **laisser le
+  sentinel tel quel** (résolu au rung 2) ; `extraction: analyzed` → conserver.
+- `## Dependencies` (section du template) : table porteuse, tables écrites,
+  procédures appelées, triggers potentiellement déclenchés en cascade.
 - Plomberie en `## Data Effects` ; hypothèses en `## Hypothèses métier` avec
-  `<!-- kind: hypothesis -->`, jamais en AC.
+  `<!-- kind: hypothesis -->`, jamais en AC (« aucune » est valide).
 
 ## STEP 5 — Sortie chat (output-protocol)
 

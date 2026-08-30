@@ -109,8 +109,8 @@ class TestPricingTable(unittest.TestCase):
 
     def test_opus_priced_correctly(self):
         p = PRICING["claude-opus-4-7"]
-        self.assertEqual(p["input"], 15.00)
-        self.assertEqual(p["output"], 75.00)
+        self.assertEqual(p["input"], 5.00)
+        self.assertEqual(p["output"], 25.00)
 
     def test_cache_creation_is_125x_input(self):
         """Anthropic convention : cache_creation = input * 1.25."""
@@ -224,8 +224,10 @@ class TestCostCapBlocking(unittest.TestCase):
     def test_above_cap_blocks_in_interactive(self):
         """Was the legacy interactive bypass — now blocks per R1 fix."""
         run_id = "test-run-over-cap"
+        # Opus 4.7 @ $5/$25 per MTok (2026-08-30 rate correction): 10M input
+        # ($50) + 100k output ($2.5) = $52.5 > $50 default cap.
         _seed_token_usage(self.repo, run_id,
-                          input_tokens=3_000_000, output_tokens=100_000)
+                          input_tokens=10_000_000, output_tokens=100_000)
 
         payload = {
             "tool_name": "Agent",
@@ -244,7 +246,7 @@ class TestCostCapBlocking(unittest.TestCase):
         """CI context → also blocks (same code path)."""
         run_id = "test-run-over-cap-ci"
         _seed_token_usage(self.repo, run_id,
-                          input_tokens=3_000_000, output_tokens=100_000)
+                          input_tokens=10_000_000, output_tokens=100_000)
 
         payload = {
             "tool_name": "Agent",
@@ -262,8 +264,8 @@ class TestCostCapBlocking(unittest.TestCase):
         """Stderr line must include $cost / $cap for operator clarity."""
         run_id = "test-run-msg"
         _seed_token_usage(self.repo, run_id,
-                          input_tokens=4_000_000, output_tokens=0)
-        # $15 * 4 = $60 > $50
+                          input_tokens=11_000_000, output_tokens=0)
+        # Opus 4.7 @ $5/MTok input (2026-08-30 rate correction): $5 * 11 = $55 > $50
 
         payload = {
             "tool_name": "Agent",

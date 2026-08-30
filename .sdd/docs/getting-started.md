@@ -36,7 +36,7 @@ L'innovation clé : **orchestration Python déterministe** (80 scripts, 0 token)
 | Reviewers post-code | **5 angles distincts** | 1 | 0 |
 | Anti-derive strict | strict (matrice ownership + STOP) | partiel | ❌ |
 | Catalogue stacks | `.libs.json` machine + CVE + LTS check | ❌ | ❌ |
-| Taxonomie d'erreurs | **191 classes `[CLASS]`** cross-agent | ❌ | ❌ |
+| Taxonomie d'erreurs | **193 classes `[CLASS]`** cross-agent | ❌ | ❌ |
 | Télémétrie | SQLite (cost cap, audit, gates) | ❌ | ❌ |
 | Déterminisme | 80 scripts Python (0 token) | ❌ | ❌ |
 | Idempotence / resume | mode checkpoint | ❌ | ❌ |

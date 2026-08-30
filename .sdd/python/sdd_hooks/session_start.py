@@ -37,6 +37,18 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+# Windows cp1252 hardening (audit 2026-08-30) : le banner contient des
+# caractères hors charmap (→, flèches du pipeline ASCII-art). Sans
+# reconfiguration, `sys.stdout.write` crashe en cp1252
+# ("'charmap' codec can't encode character '→'") → le hook tombait
+# dans son fallback et émettait un banner VIDE à chaque session Windows.
+# Le repo cible Python 3.11 : `reconfigure` existe toujours ; le guard
+# try/except couvre les stdout non-reconfigurables (wrappers de test).
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+except (AttributeError, ValueError, OSError):
+    pass
+
 from sdd_lib.exit_codes import SUCCESS  # noqa: E402
 
 

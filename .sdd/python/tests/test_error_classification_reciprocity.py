@@ -15,6 +15,13 @@ line (error-classification.md §2). The `[BRACKET]` convention is overloaded
 markers); restricting to `CAUSE: [X]` isolates the subset that `build_loop`
 and the audit log actually consume, with zero false positives.
 
+Extension audit M6 2026-08-30 : le scan couvre aussi (a) le format VERDICT
+`🔴 RED [X]` (gates two-stage — avait raté [AUDITOR_RUNTIME_ERROR]),
+(b) les codes JSON structurés `"code": "X"` des scripts Python (avait raté
+[PACK_UNUSABLE]), et (c) le foyer neutre `.sdd/{agents,commands,rules}` en
+plus des façades `.claude/`. Les sous-codes JSON internes connus sont
+ratchetés dans `_KNOWN_JSON_SUBCODES`.
+
 If this test fails: a `CAUSE: [NEW_CLASS]` was added without declaring it.
 Per the framework's own rule ("ajouter la classe ICI d'abord"), add a row to
 the matching `error-classification.md §1.X` table (and bump the §0 counts —
@@ -37,6 +44,13 @@ if str(_PY_ROOT) not in sys.path:
 
 _CLASS = r"([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)"
 _CAUSE_RE = re.compile(r"CAUSE:\s*\[" + _CLASS + r"\]")
+# Extension audit M6 2026-08-30 : les gates two-stage émettent leur classe en
+# format VERDICT (`🔴 RED [AUDITOR_RUNTIME_ERROR]`), pas en `CAUSE: [X]` — le
+# scan CAUSE-only avait raté [AUDITOR_RUNTIME_ERROR] et [PACK_UNUSABLE].
+_VERDICT_RE = re.compile(r"🔴\s*RED\s*\[" + _CLASS + r"\]")
+# Codes émis par les scripts en JSON structuré (`"code": "X"`) — même contrat
+# machine que CAUSE:, autre canal (ex. context_budget.py → [PACK_UNUSABLE]).
+_JSON_CODE_RE = re.compile(r"\"code\":\s*\"" + _CLASS + r"\"")
 _DECL_RE = re.compile(r"\[" + _CLASS + r"\]")
 
 # Bi-racine 2026-07-25 : rules déplacées sous `.sdd/rules/` (Phase 1).
@@ -57,7 +71,41 @@ _EMITTER_DIRS = (
     ".sdd/python/sdd_reverse",
     ".sdd/python/sdd_reverse_scripts",
 )
-_EMITTER_MD_DIRS = (".claude/agents", ".claude/commands")
+_EMITTER_MD_DIRS = (
+    ".claude/agents",
+    ".claude/commands",
+    # Extension audit M6 2026-08-30 — le foyer neutre est le SSoT (les façades
+    # .claude/.codex/.gemini en sont régénérées) et les RULES émettent aussi
+    # des classes (gate two-stage dans auditor-orchestration.md).
+    ".sdd/agents",
+    ".sdd/commands",
+    ".sdd/rules",
+)
+
+# Faux positifs connus du scan étendu (exemples pédagogiques, placeholders de
+# format, jamais des émissions réelles). Y ajouter une entrée exige de
+# vérifier que le `[X]` matché n'est PAS une classe réellement émise.
+_SCAN_EXCLUSIONS: set[str] = set()
+
+# Ratchet (audit M6 2026-08-30) — sous-codes internes émis en JSON structuré
+# (`"code": "X"`) par des scripts mono-shot, comme DÉTAIL de champ dans leur
+# payload : ils ne sont PAS des classes `[CLASS]` au sens du contrat
+# error-classification.md §2 (jamais rendus en `CAUSE: [X]`, jamais consommés
+# par build_loop). Suivis ici pour que tout NOUVEAU code JSON non déclaré
+# fasse échouer le test ([PACK_UNUSABLE], même canal, EST déclaré §1.14).
+# Retirer une entrée le jour où le code est promu en classe taxonomie.
+_KNOWN_JSON_SUBCODES: frozenset[str] = frozenset({
+    # validate_project_config.py — validation par clé du ## Project Config
+    "TYPE_MISMATCH", "ENUM_VIOLATION", "BELOW_MINIMUM", "ABOVE_MAXIMUM",
+    "UNKNOWN_KEY",
+    # context_budget.py — détail de la gate de budget (l'agrégat visible est
+    # l'exit code de la gate ; PACK_UNUSABLE, lui, est déclaré)
+    "BUDGET_EXCEEDED", "UNBOUNDED_GLOB", "READ_MISSING", "PACK_PROJECTION",
+    # preflight.py — variantes WARN-only du mode :plan
+    "PROJECT_NOT_INIT_WARN", "STACK_DIGEST_MISSING_WARN",
+    # sdd_full_planner.py — erreur de parse Project Config remontée au planner
+    "PROJECT_CONFIG_INVALID",
+})
 
 
 def _declared_classes() -> set[str]:
@@ -82,7 +130,11 @@ def _emitted_classes() -> dict[str, set[str]]:
             txt = f.read_text(encoding="utf-8")
         except OSError:
             continue
-        for cls in _CAUSE_RE.findall(txt):
+        found: set[str] = set(_CAUSE_RE.findall(txt))
+        found |= set(_VERDICT_RE.findall(txt))
+        if f.suffix == ".py":
+            found |= set(_JSON_CODE_RE.findall(txt)) - _KNOWN_JSON_SUBCODES
+        for cls in found - _SCAN_EXCLUSIONS:
             emitted.setdefault(cls, set()).add(f.name)
     return emitted
 

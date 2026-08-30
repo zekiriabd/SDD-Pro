@@ -54,9 +54,10 @@ La séparation est **structurelle** : l'agent écrit un fichier distinct
    ```bash
    python .sdd/python/sdd_reverse_scripts/db_context_build.py --project workspace/old/{DB}
    ```
-   Produit `db-context.json` (faits + `executionPlan` + `contextVersion`) et
-   l'arbre `db-context/` : `_overview.md`, `tables/`, `procedures/`,
-   `functions/`, `views/`, `triggers/`, `packs/`.
+   Produit `db-context.json` (faits + `executionPlan` + `contextVersion`),
+   `db-context.digest.json` (digest léger pour l'architecte) et l'arbre
+   `db-context/` : `_overview.md`, `glossary.json`, `tables/`, `procedures/`,
+   `functions/`, `views/`, `triggers/`, `packages/`, `packs/`.
 
 2. **Cache** : `contextVersion` est un sha256 des faits canoniques. Si la base
    n'a pas bougé, l'interprétation de l'architecte est **réutilisée** — la
@@ -78,7 +79,9 @@ La séparation est **structurelle** : l'agent écrit un fichier distinct
    ```
    Refusée si le `contextVersion` déclaré par l'architecte ne correspond plus
    aux faits (`[REVERSE_DB_CONTEXT_STALE]`). Les packs sont régénérés avec le
-   bloc d'hypothèses, marqué `kind: hypothesis`.
+   bloc d'hypothèses, marqué `kind: hypothesis`, et l'extrait léger
+   `db-context/glossary.json` (glossaire + sous-domaines + `contextVersion`)
+   est réécrit pour le composer rung 2.
 
 5. Ligne chat `[REVERSE] Contexte DB {DB} → {t} table(s), {o} objet(s),
    {w} vague(s), {u} appel(s) non résolu(s). (100%)`.
@@ -100,10 +103,16 @@ gate CI qui garantit que le cahier des charges reste synchrone avec la base.
 
 ```
 workspace/old/{DB}/.sys/db-context.json              SSoT machine (faits + plan + hypothèses)
+workspace/old/{DB}/.sys/db-context.digest.json       digest léger lu par l'architecte (0.B) — le SEUL
+                                                     porteur du contextVersion qu'il recopie dans
+                                                     db-context.hypotheses.json
 workspace/old/{DB}/.sys/db-context.hypotheses.json   écrit par l'architecte, fusionné par script
 workspace/old/{DB}/.sys/db-context/_overview.md      orientation base entière
+workspace/old/{DB}/.sys/db-context/glossary.json     extrait léger (glossary + subdomains +
+                                                     contextVersion) pour le composer rung 2 —
+                                                     évite la lecture du db-context.json entier
 workspace/old/{DB}/.sys/db-context/tables/*.md       1 fiche par table
-workspace/old/{DB}/.sys/db-context/{procedures,functions,views,triggers}/*.md
+workspace/old/{DB}/.sys/db-context/{procedures,functions,views,triggers,packages}/*.md
 workspace/old/{DB}/.sys/db-context/packs/*.md        1 slice par objet, pour les analystes
 ```
 
@@ -113,7 +122,16 @@ workspace/old/{DB}/.sys/db-context/packs/*.md        1 slice par objet, pour les
   consomme des artefacts déjà extraits sous `readonly_guard`.
 - **Structure uniquement** : aucune donnée métier, aucun identifiant de
   connexion ne rentre dans le contexte.
-- **L'architecte n'écrit pas de faits** — garanti par construction, pas par consigne.
+- **L'architecte n'écrit pas de faits** — garanti par la **whitelist de fusion**
+  de `db_context.merge_architect_output`, qui ne recopie que les cinq clés de
+  `hypotheses` depuis le fichier séparé `db-context.hypotheses.json` : un `facts`
+  ou un `executionPlan` qu'il aurait produit est ignoré. Complété par l'entrée
+  `reverse-db-architect` de la matrice `audit_file_ownership.py` (audit
+  2026-08-29, M3), qui journalise tout fichier touché hors périmètre. La
+  formulation précédente — « garanti par construction » — couvrait plus large que
+  le mécanisme : un `Write` direct sur `db-context.json` contourne la fusion, et
+  c'est le hook `protect_framework.py` (a priori) plus cette matrice (a
+  posteriori) qui traitent ce cas, pas la fusion elle-même.
 - **Aucun agent ne lit tout le contexte** : chacun reçoit son pack, borné, qui
   déclare ce qu'il a dû tronquer.
 - Idempotence : re-run sur une base inchangée réutilise tout et ne coûte rien.

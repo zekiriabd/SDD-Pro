@@ -30,7 +30,7 @@ Argument d'entrée : `{n}` (numéro de FEAT, entier).
 Si `{n}` absent ou non numérique → ERROR :
 ```
 ERROR: agent po — argument invalide
-CAUSE: numéro de FEAT manquant ou non numérique
+CAUSE: [INVALID_ARG] numéro de FEAT manquant ou non numérique
 FIX: relancer /us-generate {n} avec n entier
 ```
 
@@ -49,18 +49,43 @@ Glob `workspace/feats/{n}-*.md`.
 - 0 fichier trouvé → ERROR :
   ```
   ERROR: agent po — FEAT introuvable
-  CAUSE: aucun fichier workspace/feats/{n}-*.md
+  CAUSE: [FEAT_NOT_FOUND] aucun fichier workspace/feats/{n}-*.md
   FIX: créer la FEAT via /feat-generate ou déposer manuellement le fichier
   ```
 - 1 fichier trouvé → continuer avec son chemin
 - > 1 fichier → ERROR (nommage invalide, doublon de numéro) :
   ```
   ERROR: agent po — numérotation invalide
-  CAUSE: plusieurs fichiers commencent par {n}- dans workspace/feats/
+  CAUSE: [FEAT_AMBIGUOUS] plusieurs fichiers commencent par {n}- dans workspace/feats/
   FIX: renommer pour qu'un seul fichier ait le préfixe {n}-
   ```
 
 Stocker le nom de FEAT (`{FeatName}` extrait du nom de fichier).
+
+---
+
+## STEP 2.bis — Détecter les pseudo-US POC résiduelles (fix C1, 2026-08-30)
+
+Grep `generated-by: feat_to_pseudo_us.py` dans `workspace/us/{n}-*.md`
+(marqueur frontmatter écrit par `/sdd-poc` via `feat_to_pseudo_us.py`).
+
+- **Aucun match** → continuer normalement (cas nominal).
+- **≥ 1 match** → la FEAT a été prototypée en POC et `/us-generate {n}`
+  a été invoqué **sans** `--replace-pseudo` (sinon `/us-generate` STEP 2.4
+  les aurait déjà supprimées). Émettre un WARN collision (non bloquant)
+  puis continuer la génération :
+  ```
+  WARN: agent po — pseudo-US POC résiduelle(s) détectée(s)
+  CAUSE: [GRANULARITY_VIOLATION] {liste fichiers} générée(s) par /sdd-poc ; la
+         régénération écrase par basename, une pseudo-US {n}-1-{FeatName}.md
+         survivra si le {Name} réel diffère (doublon d'US {n}-1 sur disque)
+  FIX: relancer /us-generate {n} --replace-pseudo (supprime les pseudo-US
+       avant génération — migration POC → standard, idempotent)
+  ```
+
+Anti-derive : l'agent **ne supprime JAMAIS** ces fichiers lui-même — la
+suppression est owned par `/us-generate --replace-pseudo` (décision
+d'orchestration tracée). Le WARN suffit côté agent.
 
 ---
 
@@ -70,6 +95,12 @@ Read **uniquement** :
 - `.sdd/templates/us.template.md` (nécessaire pour STEP 8 Write)
 - `workspace/.sys/.context/constitution.md` **si présent** (acteurs et termes
   déjà connus du projet — évite les doublons en STEP 8.5)
+- `.sdd/digests/error-classification.po.md` — taxonomie des classes émises par
+  cet agent : `[INVALID_ARG]`, `[FEAT_NOT_FOUND]`, `[FEAT_AMBIGUOUS]`,
+  `[FEAT_REJECTED]`, `[GRANULARITY_VIOLATION]`, `[TRACEABILITY_GAP]`,
+  `[ELICITOR_GAP]`, `[PO_HASH_PLACEHOLDER]`. **Aucun bloc ERROR sans préfixe
+  `[CLASS]`** (`rules/error-classification.md §5`). *(Read ajouté audit M7,
+  2026-08-29 — le digest `po` était généré mais lu par personne.)*
 
 **Rules inline (depuis SDD_Pro v5.0 — économie tokens)** : les règles
 `us-granularity.md` et `.sdd/rules/ownership.md`
@@ -122,7 +153,7 @@ plutôt que les ignorer (correction du "cargo-cult elicitor" — audit §6.11) :
 2. Si aucune US ne couvre un FAIL/EDGE → STOP + WARN `[ELICITOR_GAP]` :
 ```
 WARN: agent PO — élicitation non couverte
-CAUSE: FAIL-{N} "{description}" non mappé sur aucune AC d'aucune US générée
+CAUSE: [ELICITOR_GAP] FAIL-{N} "{description}" non mappé sur aucune AC d'aucune US générée
 FIX: (a) ajouter AC dans une US existante ; (b) créer une US dédiée ;
      (c) marquer en `## Out of Scope` de la FEAT et re-run /feat-deepen
 ```
@@ -133,7 +164,7 @@ Si `## Functional Needs` contient des entrées au format technique
 `US-N: As a..., I want..., so that...` → REJETER la FEAT :
 ```
 ERROR: FEAT {n}-{FeatName} rejetée
-CAUSE: ## Functional Needs contient des US structurées — le PO humain écrit des SFD bullets identifiés (SFD-N:) uniquement
+CAUSE: [FEAT_REJECTED] ## Functional Needs contient des US structurées — le PO humain écrit des SFD bullets identifiés (SFD-N:) uniquement
 FIX: remplacer les entrées US-N par des bullets SFD-N: ; l'agent PO génère les US
 ```
 
@@ -141,7 +172,7 @@ Si la section existe mais que les bullets ne sont pas préfixés `SFD-N:` →
 ERROR :
 ```
 ERROR: FEAT {n}-{FeatName} — IDs SFD manquants
-CAUSE: ## Functional Needs contient des bullets sans préfixe SFD-N:
+CAUSE: [FEAT_REJECTED] ## Functional Needs contient des bullets sans préfixe SFD-N:
 FIX: préfixer chaque bullet par SFD-1:, SFD-2:, … (IDs stables et explicites)
 ```
 
@@ -247,7 +278,7 @@ une US générée.
 Si un élément n'est pas couvert → STOP + ERROR `[TRACEABILITY_GAP]` :
 ```
 ERROR: FEAT {n}-{FeatName} traceability gap
-CAUSE: {liste des IDs non couverts} non couverts par les US générées
+CAUSE: [TRACEABILITY_GAP] {liste des IDs non couverts} non couverts par les US générées
 FIX: ajouter ces IDs au Covers d'une US existante OU compléter les ACs
 ```
 
@@ -434,7 +465,7 @@ Aucun autre champ §1 ne doit être modifié.
    colonne 1 du tableau §3. Si **un seul** manque → STOP + ERROR :
    ```
    ERROR: agent po — extension constitution §3 incomplète
-   CAUSE: acteur(s) {liste} attendu(s) absent(s) du tableau §3
+   CAUSE: [INFRA_BLOCKED] acteur(s) {liste} attendu(s) absent(s) du tableau §3
           après le write (placeholder mal détecté ou Edit échoué)
    FIX: vérifier le format du tableau §3 dans workspace/.sys/.context/constitution.md ;
         si l'agent a été modifié, vérifier le STEP 8.5.1 (gestion placeholder)

@@ -13,13 +13,45 @@
 
 ---
 
+> **Contre-audit 2026-08-29 — ce qui était affirmé et ne l'était pas.**
+>
+> Un audit indépendant a relu le code plutôt que cette documentation. La garantie
+> read-only est ressortie comme le point le plus solide du framework (8 sites
+> d'exécution SQL, tous gardés, défense en profondeur réelle) ; la **garantie
+> d'ordonnancement par vagues**, elle, était fausse sur 3 des 4 moteurs annoncés.
+> Corrections appliquées :
+>
+> | # | Ce qui était affirmé | Ce qui était vrai | Correctif |
+> |---|---|---|---|
+> | C1 | « tout appelé est analysé avant son appelant » | `CALL spB(1,2)` extrayait l'appelé `sp` (le lookahead `(?!\s*\()` faisait rétro-agir le moteur *à l'intérieur* du nom) ; les appels PL/SQL nus, les fonctions scalaires en expression et les affectations n'étaient extraits dans **aucun** dialecte → appelant et appelé dans la **même** vague | ancrage de fin d'identifiant + canal `callsInferred` (résolu-ou-jeté) ; `db-reverse-tsql.md §2.11` ; tests bout-en-bout par dialecte |
+> | C2 | catalogue de dépendances « exploité » | lu, gardé, fusionné dans `dependencyGraph`… puis ignoré par `plan_waves`, qui n'ordonnait que sur le regex — sur Oracle, le seul moteur où le regex ne peut structurellement pas suffire | `attach_catalog_calls` projette les arêtes catalogue sur les objets ; `resolve_calls` les consomme en premier |
+> | M2 | « tout changement de corps change la `contextVersion` » | seule la **forme** était hachée : déplacer un seuil dans un `IF` existant laissait la version identique, donc aucune dérive détectée et hypothèses périmées réutilisées | `bodyHash` par objet, entré dans les faits |
+> | M1 | PostgreSQL « live-validé » | aucun run réel — contredit par la réserve inscrite dans ce document même | ramené à `scaffold-validated` (cf. §Réserve) |
+> | M3 | frontière faits/hypothèses « garantie par construction » | garantie par la whitelist de fusion uniquement ; aucune entrée de matrice d'ownership pour les 6 agents db-reverse | entrées ajoutées + formulation corrigée en décrivant le mécanisme réel |
+> | m4 | `reverse_smoke` « valide les constantes read-only des dialectes » | il ne les regardait pas | `check_dialect_queries_readonly` ajouté (14ᵉ check) |
+>
+> Leçon transverse, valable au-delà de ce module : **les trois affirmations les
+> plus fausses étaient les trois plus visibles** — une garantie d'ordre, une
+> garantie de version, un label commercial. Un mécanisme qu'on décrit sans le
+> tester finit par être décrit à la place d'être vrai.
+
+---
+
 > **Mise à jour 2026-07-24 (P0.1 + 4 dialectes livrés)** :
 > 1. **Vues + triggers** introspectés (corps analysé par le même escalier —
 >    1 objet SQL = 1 US) : `dialects/*.py`, agent `reverse-sql-analyst`.
-> 2. **4 moteurs principaux** couverts : **SQL Server** et **PostgreSQL**
->    (live-validés), **Oracle** (PL/SQL + packages) et **MySQL/MariaDB**
->    (scaffold-validés : requêtes read-only + flux offline testés, runtime live
->    pending — aucun driver/instance au bench). Chaque moteur enumère
+> 2. **4 moteurs principaux** couverts : **SQL Server** (live-validé — run réel
+>    du 2026-08-27, cf. les post-mortems `EXECUTE AS` et `lineCount` dans
+>    `sql_body_analyzer.py`), **PostgreSQL**, **Oracle** (PL/SQL + packages) et
+>    **MySQL/MariaDB** (scaffold-validés : requêtes read-only + flux offline
+>    testés, runtime live pending — aucun driver/instance au bench).
+>    **Correction 2026-08-29 (M1)** : PostgreSQL était annoncé « live-validé »
+>    ici et au §7, en contradiction directe avec la réserve non levée inscrite
+>    quelques lignes plus bas (« aucun run n'a été fait contre une vraie base »).
+>    Aucune trace d'un run PostgreSQL réel n'existe. Statut ramené à
+>    **scaffold-validated** tant qu'une preuve n'est pas produite : une
+>    validation qu'on ne peut pas montrer n'est pas une validation.
+>    Chaque moteur enumère
 >    procédures + fonctions + vues + triggers (+ packages Oracle) en **SELECT
 >    pur** (garde-fou `readonly_guard`). Cf. `tests/test_reverse_db_dialects.py`,
 >    `tests/test_reverse_db_views_triggers.py`. Les « ❌ » ci-dessous restent
@@ -97,11 +129,17 @@
 > `reverse-db-context-versioned-and-diffable`, `reverse-db-wave-ordering`,
 > `reverse-db-call-aware-routing`, `reverse-db-context-slicing`.
 
-> **Réserve, explicite et non levée** : tout ce qui précède est validé
-> **hors ligne** (2400 tests, catalogues synthétiques). Aucun run n'a été fait
-> contre une vraie base — permissions, volumétrie et versions de moteur restent
-> à éprouver, en particulier sur `msdb` (jobs) et sur Oracle / MySQL, qui restent
-> **scaffold-validated**.
+> **Réserve, explicite et partiellement levée** : tout ce qui précède est validé
+> **hors ligne** (2400 tests, catalogues synthétiques). Seul **SQL Server** a
+> depuis été éprouvé contre une vraie base (2026-08-27, base de 118 objets — les
+> défauts trouvés à cette occasion sont documentés dans `sql_body_analyzer.py` :
+> callee fantôme `AS` sur `EXECUTE AS`, `lineCount` surcompté d'une ligne).
+> **PostgreSQL, Oracle et MySQL** n'ont jamais été exécutés contre une instance
+> réelle : permissions, volumétrie et versions de moteur restent à éprouver, en
+> particulier sur `msdb` (jobs). Ces trois moteurs restent
+> **scaffold-validated** — cf. la correction M1 (2026-08-29) en tête de document
+> et au §7 DB6, où PostgreSQL était annoncé « live-validé » en contradiction
+> avec cette réserve.
 
 ## 0. Verdict exécutif
 
@@ -309,12 +347,17 @@ ROI :
   **Opt-in** `SDD_REVERSE_FEAT_LLM=1` ; défaut = déterministe `build_proc_feats.py`
   (0 token). Réservé aux modules à forte logique métier.
 - ~~**DB6 — Multi-dialecte partiel.**~~ ✅ **LARGEMENT ADRESSÉ 2026-07-24** :
-  les **4 moteurs principaux** sont couverts — SQL Server + PostgreSQL
-  (live-validés), Oracle (PL/SQL + packages) + MySQL/MariaDB (scaffold-validés,
-  runtime live pending). Reste DB2/SQLite en `_PLANNED`. **Caveat** : Oracle et
-  MySQL doivent être validés en runtime sur une vraie base (driver + instance)
-  avant usage prod — la forme des requêtes et le flux sont testés offline, pas
-  le comportement live.
+  les **4 moteurs principaux** sont couverts — SQL Server (live-validé, run réel
+  2026-08-27), PostgreSQL + Oracle (PL/SQL + packages) + MySQL/MariaDB
+  (scaffold-validés, runtime live pending). Reste DB2/SQLite en `_PLANNED`.
+  **Caveat** : PostgreSQL, Oracle et MySQL doivent être validés en runtime sur
+  une vraie base (driver + instance) avant usage prod — la forme des requêtes et
+  le flux sont testés offline, pas le comportement live.
+  > **M1, audit 2026-08-29** : PostgreSQL figurait ici comme « live-validé ».
+  > Ce document déclare pourtant, §Réserve, qu'aucun run n'a jamais été fait
+  > contre une vraie base. Les deux affirmations ne pouvaient pas être vraies
+  > ensemble ; c'est la réserve qui l'était. Statut corrigé en
+  > **scaffold-validated**.
 - **DB7 — Pas de rapport structurel visuel** de niveau SchemaSpy (HTML navigable,
   ERD cliquable, anomalies). `reverse_synth` produit un ERD Mermaid statique
   depuis le DDL, pas une exploration interactive depuis le live.

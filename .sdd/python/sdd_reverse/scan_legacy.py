@@ -7,6 +7,9 @@ Public API:
     load_signatures(yaml_path) -> dict
     normalize_bytes(file_bytes) -> bytes              # ADV-11 + ADV-20
     scan_project(project_root, signatures, exclusions=None) -> ScanResult
+    read_text_normalized(path, max_bytes=…) -> str    # centralised legacy read
+    read_text_normalized_ex(path, max_bytes=…) -> (str, issue_kind | None)
+    read_issues() / reset_read_issues() / emit_read_issue_summary()
 
 ScanResult shape (machine-readable):
     {
@@ -28,6 +31,7 @@ from __future__ import annotations
 import logging
 import pathlib
 import re
+import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -40,6 +44,97 @@ import yaml
 # `language_signatures.yml` instead of swallowing them silently (audit
 # 2026-06-10 P0 closure).
 _LOG = logging.getLogger("sdd_reverse.scan_legacy")
+
+
+# --- M3 (audit 2026-08-29) : under-extraction must never be silent -----------
+# `read_text_normalized` returned "" on ANY OSError and head-truncated above the
+# 5 MB cap, both without a word. All 7 evidence extractors (data-access, config,
+# db-schema, deps, UI templates, CSS, dependency inventory) consume it, so a
+# permission-denied file or a 300 MB dump silently contributed NOTHING to the
+# inventory — and a reverse whose whole promise is "we only report what is
+# literally in the source" reported an incomplete source as if it were complete.
+#
+# Every drop is now recorded (deduped by path+kind), surfaced as a structured
+# event, and aggregated into a stderr WARN carrying the [CLASS] prefix, so the
+# condition is auditable in the inventory output. Never raises: an unreadable
+# file still yields "" — the extractors' best-effort contract is unchanged, only
+# its silence is.
+CLASS_FILE_UNREADABLE = "[REVERSE_FILE_UNREADABLE]"
+CLASS_LARGE_FILE_SAMPLED = "[REVERSE_LARGE_FILE_SAMPLED]"
+
+#: kind → error class, for the two ways evidence can go missing on read.
+READ_ISSUE_CLASSES = {
+    "unreadable": CLASS_FILE_UNREADABLE,
+    "sampled": CLASS_LARGE_FILE_SAMPLED,
+}
+
+_READ_ISSUES: dict[tuple[str, str], dict[str, Any]] = {}
+
+
+def reset_read_issues() -> None:
+    """Clear the accounting (called at the start of each `scan_project`)."""
+    _READ_ISSUES.clear()
+
+
+def read_issues() -> list[dict[str, Any]]:
+    """Every distinct (path, kind) drop recorded since the last reset."""
+    return list(_READ_ISSUES.values())
+
+
+def _record_read_issue(path: Any, kind: str, detail: str) -> None:
+    """Record one drop + emit a structured event (idempotent per path+kind)."""
+    key = (str(path), kind)
+    if key in _READ_ISSUES:
+        return
+    issue = {
+        "path": str(path),
+        "kind": kind,
+        "class": READ_ISSUE_CLASSES.get(kind, "[UNKNOWN]"),
+        "detail": detail,
+    }
+    _READ_ISSUES[key] = issue
+    try:
+        from sdd_reverse.structured_log import get_logger, log_event
+
+        logger = get_logger(__name__)
+        # Structured logging is opt-in (install_default_handler / SDD_REVERSE_LOG).
+        # Without that guard a WARN record falls through to logging's lastResort
+        # handler and prints one raw line PER FILE on stderr — the aggregated
+        # summary below is the human-facing signal, this is the machine one.
+        if logging.getLogger("sdd_reverse").hasHandlers():
+            log_event(
+                logger,
+                f"scan.file.{kind}",
+                level="WARN",
+                path=issue["path"],
+                error_class=issue["class"],
+                detail=detail,
+            )
+    except ImportError:  # structured logging is optional infrastructure
+        pass
+
+
+def emit_read_issue_summary(stream=None) -> dict[str, int]:
+    """Print ONE aggregated WARN per class (ASCII, cp1252-safe). Returns counts.
+
+    Aggregated on purpose: a legacy with 400 oversized SQL dumps must produce a
+    signal, not 400 lines of noise. The per-file detail stays in `read_issues()`
+    and in the structured event stream.
+    """
+    counts: dict[str, int] = {}
+    for issue in _READ_ISSUES.values():
+        counts[issue["kind"]] = counts.get(issue["kind"], 0) + 1
+    if not counts:
+        return counts
+    out = stream if stream is not None else sys.stderr
+    for kind, n in sorted(counts.items()):
+        sample = next(i["path"] for i in _READ_ISSUES.values() if i["kind"] == kind)
+        what = ("unreadable - contributed no evidence" if kind == "unreadable"
+                else "over the read cap - only the head was analysed")
+        print(f"WARN: {READ_ISSUE_CLASSES[kind]} {n} file(s) {what} "
+              f"(e.g. {sample}). Extraction is INCOMPLETE for those files.",
+              file=out)
+    return counts
 
 
 def _warn_bad_pattern(
@@ -149,6 +244,9 @@ class ScanResult:
     files_scanned: int
     files_skipped: int
     duration_ms: int
+    #: M3 (audit 2026-08-29) — files whose content was dropped or truncated on
+    #: read. Each entry: {path, kind: unreadable|sampled, class, detail}.
+    read_issues: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -168,6 +266,12 @@ class ScanResult:
             "filesScanned": self.files_scanned,
             "filesSkipped": self.files_skipped,
             "scanDurationMs": self.duration_ms,
+            # M3 — under-extraction, surfaced rather than absorbed.
+            "filesUnreadable": sum(
+                1 for i in self.read_issues if i.get("kind") == "unreadable"),
+            "filesSampled": sum(
+                1 for i in self.read_issues if i.get("kind") == "sampled"),
+            "readIssues": self.read_issues,
         }
 
 
@@ -471,6 +575,7 @@ def scan_project(
         raise FileNotFoundError(f"Project root not found: {project}")
 
     t0 = time.monotonic()
+    reset_read_issues()  # M3: accounting is per-scan, never cumulative
     excl = set(DEFAULT_GLOBAL_EXCLUSIONS)
     if exclusions:
         excl |= set(exclusions)
@@ -522,13 +627,28 @@ def scan_project(
                 max_kb = lang_max if max_kb is None else min(max_kb, lang_max)
         raw, was_sampled = _read_file_with_sampling(path, max_kb)
         if not raw:
+            # M3 (audit 2026-08-29): this branch is "we could not read a file we
+            # had already decided was in scope" — an empty file and a
+            # permission-denied file used to be the same silent `files_skipped`.
+            _record_read_issue(
+                path, "unreadable",
+                f"no bytes returned (I/O error or empty file, cap={max_kb} kB)")
             files_skipped += 1
             continue
+        if was_sampled:
+            # `was_sampled` was computed and then dropped on the floor since
+            # ADV-8 shipped: head+tail sampling silently hid the middle of every
+            # oversized file from the evidence regex.
+            _record_read_issue(
+                path, "sampled",
+                f"over the per-language cap of {max_kb} kB - scanned as "
+                f"head 200 kB + tail 200 kB, the middle was NOT analysed")
 
         try:
             content = normalize_bytes(raw)
             content_str = decode_text(content)
-        except (UnicodeDecodeError, UnicodeError):
+        except (UnicodeDecodeError, UnicodeError) as exc:
+            _record_read_issue(path, "unreadable", f"undecodable: {exc}")
             files_skipped += 1
             continue
 
@@ -667,6 +787,9 @@ def scan_project(
         key=lambda m: (-m.score_total, -len(m.files), m.id),
     )
     primary = sorted_matches[0].id if sorted_matches else None
+    # M3: one aggregated WARN per class, so an incomplete extraction is visible
+    # to the Tech Lead instead of being absorbed into `files_skipped`.
+    emit_read_issue_summary()
     return ScanResult(
         primary_language=primary,
         languages=sorted_matches,
@@ -674,6 +797,7 @@ def scan_project(
         files_scanned=files_scanned,
         files_skipped=files_skipped,
         duration_ms=duration_ms,
+        read_issues=read_issues(),
     )
 
 
@@ -689,26 +813,58 @@ def scan_project(
 DEFAULT_READ_CAP_BYTES = 5 * 1024 * 1024  # 5 Mo
 
 
-def read_text_normalized(path, max_bytes: int | None = DEFAULT_READ_CAP_BYTES) -> str:
-    """Read + normalize + decode a legacy file, with a size cap.
+def read_text_normalized_ex(
+    path, max_bytes: int | None = DEFAULT_READ_CAP_BYTES, *, record: bool = True,
+) -> tuple[str, str | None]:
+    """Read + normalize + decode a legacy file, reporting WHAT WAS LOST.
 
-    Returns "" on any I/O error (best-effort extractors). Files larger than
-    `max_bytes` are read head-truncated (pass max_bytes=None to disable).
-    Decoding via decode_text (utf-8 strict -> cp1252 -> replace) — unifie les
-    2 variantes historiques (certains modules perdaient le fallback cp1252).
+    Returns `(text, issue_kind)` where `issue_kind` is:
+        None          — the whole file was read
+        "unreadable"  — I/O error; `text` is "" and NOTHING was extracted
+        "sampled"     — file over `max_bytes`; only the head was decoded
+
+    The tuple is the point (M3, audit 2026-08-29): the historical
+    `read_text_normalized` collapsed both degraded outcomes into a bare `""` /
+    truncated string, so seven extractors could not tell "this file holds no
+    SQL" from "this file was never read". `record=True` also files the drop in
+    the module accounting (`read_issues()`), which is what makes it visible in
+    the inventory output.
+
+    Head truncation (rather than sampling) is deliberate for the generic cap:
+    CREATE TABLE / imports / usings live at the top of a file.
+    Decoding via decode_text (utf-8 strict -> cp1252 -> replace).
     """
     p = pathlib.Path(path)
     try:
         if max_bytes is not None:
             try:
                 too_big = p.stat().st_size > max_bytes
-            except OSError:
-                return ""
+            except OSError as exc:
+                if record:
+                    _record_read_issue(p, "unreadable", f"stat failed: {exc}")
+                return "", "unreadable"
             if too_big:
                 with open(p, "rb") as f:
                     raw = f.read(max_bytes)
-                return decode_text(normalize_bytes(raw))
+                if record:
+                    _record_read_issue(
+                        p, "sampled",
+                        f"file exceeds the {max_bytes} byte read cap - "
+                        f"only the first {max_bytes} bytes were analysed")
+                return decode_text(normalize_bytes(raw)), "sampled"
         raw = p.read_bytes()
-    except OSError:
-        return ""
-    return decode_text(normalize_bytes(raw))
+    except OSError as exc:
+        if record:
+            _record_read_issue(p, "unreadable", f"read failed: {exc}")
+        return "", "unreadable"
+    return decode_text(normalize_bytes(raw)), None
+
+
+def read_text_normalized(path, max_bytes: int | None = DEFAULT_READ_CAP_BYTES) -> str:
+    """Text-only view of `read_text_normalized_ex` (unchanged signature).
+
+    Kept for the 7 extractors that consume text and nothing else. The drop is
+    still recorded in the module accounting, so it is no longer silent even
+    through this door — callers that need to BRANCH on it use the `_ex` form.
+    """
+    return read_text_normalized_ex(path, max_bytes)[0]

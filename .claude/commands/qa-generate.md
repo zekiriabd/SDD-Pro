@@ -15,10 +15,12 @@ Délègue à l'agent `qa` (Sonnet 4.6) pour générer les tests unitaires
 - `/qa-generate {n} --mode {full|tests-only|tests+coverage|quality-only}`
   — override le `QAMode` du Project Config pour cette invocation
 
-**Décisions possibles** :
+**Décisions possibles** (alignées STEP 7 + `error-classification.md §1.7` —
+fix mineur audit 2026-08-30, l'en-tête disait à tort YELLOW sur coverage gap) :
 - 🟢 **GREEN** : tous tests passent + coverage OK + 0 quality error
-- 🟡 **YELLOW** : tests passent mais coverage < seuil OU quality errors
-- 🔴 **RED** : au moins 1 test échoué
+- 🟡 **YELLOW** : tests passent, coverage OK, mais quality errors
+- 🔴 **RED** : au moins 1 test échoué OU coverage < `CoverageMin`
+  (`[QA_COVERAGE_GAP]` est RED bloquant depuis v6.1)
 
 ---
 
@@ -29,14 +31,14 @@ Argument **obligatoire** : `{n}` (entier ≥ 1).
 Si absent →
 ```
 ERROR: /qa-generate — argument manquant
-CAUSE: aucun numéro de FEAT fourni
+CAUSE: [INVALID_ARG] aucun numéro de FEAT fourni
 FIX: relancer /qa-generate {n} (ex. /qa-generate 1)
 ```
 
 Si non numérique →
 ```
 ERROR: /qa-generate — argument invalide
-CAUSE: "{argument}" n'est pas un entier
+CAUSE: [INVALID_ARG] "{argument}" n'est pas un entier
 FIX: relancer /qa-generate {n}
 ```
 
@@ -88,7 +90,7 @@ Glob `workspace/feats/{n}-*.md`.
 - 0 fichier → ERROR :
   ```
   ERROR: /qa-generate — FEAT introuvable
-  CAUSE: aucun fichier workspace/feats/{n}-*.md
+  CAUSE: [FEAT_NOT_FOUND] aucun fichier workspace/feats/{n}-*.md
   FIX: créer la FEAT via /feat-generate avant
   ```
 - > 1 fichier → ERROR (numérotation invalide).
@@ -229,7 +231,10 @@ Modes propagés à l'agent via le mode résolu en STEP 3.
 
 Si `mode == "api-tests"`, l'agent vient d'écrire `api-tests.json`. Le bridge
 Python parse, insère dans `qa_api_tests` + `qa_api_endpoints` (console.db)
-puis supprime le `.json`. Le `.md` est conservé.
+puis supprime le `.json`. **Aucun fichier persistant** (le fichier
+`api-tests.md` a été supprimé le 2026-07-06, cf. `dev-run.md §6.b`) — le
+rapport humain est rendu à la demande :
+`query_console_db.py api-gate --feat {n} --format md`.
 
 ```bash
 if [ "$mode" = "api-tests" ]; then
@@ -238,13 +243,12 @@ fi
 ```
 
 Sur exit ≠ 0 → WARN (rapport JSON manquant ou invalide). Non bloquant
-pour le pipeline qa-generate (le `.md` reste lisible humainement).
+pour le pipeline qa-generate (l'API Gate côté `/dev-run` §6.b fail-safe
+sur DB vide → `INFRA_BLOCKED`).
 
 ---
 
----
-
-## STEP 6.bis — Checkpoint record (v6.6.3, opt-in)
+## STEP 6.ter — Checkpoint record (v6.6.3, opt-in ; renuméroté ex-« 6.bis » dupliqué, audit 2026-08-30)
 
 Si `CheckpointMode ∈ {record, resume}` (défaut `off` = skip ce STEP) :
 
@@ -328,7 +332,7 @@ Si invoqué depuis `/sdd-full {n}` (héritage), le mode résolu est
 `QAMode` du Project Config. Si `QAMode: off` ou `QAMode: manual`,
 `/sdd-full` skippe simplement `/qa-generate`.
 
-Voir `/sdd-full` STEP 5 pour la logique d'invocation auto.
+Voir `/sdd-full` STEP 4.5 pour la logique d'invocation auto.
 
 ---
 

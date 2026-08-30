@@ -129,7 +129,7 @@ class TestComputeRunCostScopes(unittest.TestCase):
         os.environ["SDD_REPO_ROOT"] = str(self.repo)
         try:
             from sdd_hooks.preflight_cost_cap import _compute_run_cost
-            cost, calls, scope, _unknown = _compute_run_cost()
+            cost, calls, scope, _unknown, _foreign = _compute_run_cost()
             self.assertEqual(cost, 0.0)
             self.assertEqual(calls, 0)
             self.assertEqual(scope, "db absent")
@@ -146,7 +146,7 @@ class TestComputeRunCostScopes(unittest.TestCase):
             db_path.write_bytes(b"this is not a sqlite database, surprise!")
 
             from sdd_hooks.preflight_cost_cap import _compute_run_cost
-            cost, calls, scope, _unknown = _compute_run_cost()
+            cost, calls, scope, _unknown, _foreign = _compute_run_cost()
             self.assertEqual(cost, 0.0)
             self.assertTrue(scope.startswith("db error:"),
                             f"Expected 'db error:' prefix, got {scope!r}")

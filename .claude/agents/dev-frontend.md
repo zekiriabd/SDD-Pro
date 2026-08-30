@@ -128,7 +128,7 @@ détail à la demande uniquement.
 Lire `workspace/src/{AppName}/CLAUDE.md`. Si absent → ERROR :
 ```
 ERROR: agent dev-frontend — CLAUDE.md projet absent
-CAUSE: workspace/src/{AppName}/CLAUDE.md introuvable (Arch n'a pas tourné ?)
+CAUSE: [PROJECT_NOT_INIT] workspace/src/{AppName}/CLAUDE.md introuvable (Arch n'a pas tourné ?)
 FIX: lancer /arch-init avant /dev-frontend (ou /dev-run {n} qui enchaîne)
 ```
 
@@ -203,7 +203,7 @@ Lire `appType` + `frontendKind` depuis le JSON preflight :
 Si aucun stack à lire selon le tableau (et frontendKind ≠ null) → ERROR :
 ```
 ERROR: agent dev-frontend — stack frontend/fullstack/mobile non sélectionné
-CAUSE: appType={appType}, frontendKind={frontendKind} mais aucun stack {category}/*.md actif dans workspace/stack/stack.md
+CAUSE: [STACK_MALFORMED] appType={appType}, frontendKind={frontendKind} mais aucun stack {category}/*.md actif dans workspace/stack/stack.md
 FIX: décommenter un stack adapté selon appType + frontendKind (cf. tableau ci-dessus)
 ```
 
@@ -322,7 +322,7 @@ Si HTML ou US référence des composants natifs (table, form) mais
 aucun stack `ui-*` actif → STOP + ERROR :
 ```
 ERROR: agent dev-frontend — design system non sélectionné
-CAUSE: HTML mockup contient des éléments structurés (table, form, ...) mais ## Active UI Specs vide
+CAUSE: [STACK_MALFORMED] HTML mockup contient des éléments structurés (table, form, ...) mais ## Active UI Specs vide
 FIX: décommenter un design system (radzen-blazor, shadcn, vuetify)
 ```
 
@@ -368,7 +368,7 @@ Glob le `project_file` du stack frontend (§2.2 du fichier stack).
 Si absent → ERROR :
 ```
 ERROR: agent dev-frontend — projet non initialisé
-CAUSE: aucun fichier projet trouvé pour le stack {stack-id}
+CAUSE: [PROJECT_NOT_INIT] aucun fichier projet trouvé pour le stack {stack-id}
 FIX: lancer /arch-init avant /dev-frontend (ou utiliser /dev-run {n})
 ```
 
@@ -401,7 +401,12 @@ HTML dit X, **HTML gagne**. Mapping DS dit comment traduire, pas quel libellé.
 Exécuter `Build` du stack frontend (§2.2).
 
 - Exit 0 → STEP 10
-- Exit ≠ 0 → corriger minimalement, retry.
+- Exit ≠ 0 → classifier l'erreur (`error-classification.md §1.4/§3`) :
+  - `[BUILD_CORRECTIBLE]` → **seule classe qui itère** : corriger
+    minimalement, retry (max `BuildLoopMaxIter`).
+  - `[BUILD_BLOCKING]` / `[DEP_MISSING]` / `[CIRCULAR_DEP]` → **fail-fast
+    immédiat**, STOP + bloc ERROR 3L (problème structurel, pas de retry).
+  - `[BUILD_LOOP_EXHAUSTED]` → état terminal (limite atteinte, ci-dessous).
 
 **Limite** : `BuildLoopMaxIter` dans `## Project Config` (défaut `3`, range
 1-10 ; cf. `agents/dev-backend.md STEP 8`). Même paramètre BE/FE.

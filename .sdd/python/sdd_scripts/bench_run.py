@@ -29,9 +29,9 @@ Exit codes:
     3  snapshot-before manquant pour snapshot-after
     4  IO error
 
-Pricing applique (dollars per million tokens, v7.0.0) :
+Pricing applique (dollars per million tokens — SSoT sdd_lib/pricing.py, 2026-08-30) :
     sonnet-4-6 :  input $3.00, output $15.00, cache_read $0.30
-    opus-4-7   :  input $15.00, output $75.00, cache_read $1.50
+    opus-4-7   :  input $5.00,  output $25.00, cache_read $0.50
     haiku-4-5  :  input $1.00, output $5.00,  cache_read $0.10
 """
 from __future__ import annotations

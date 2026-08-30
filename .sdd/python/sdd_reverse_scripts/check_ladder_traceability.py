@@ -21,9 +21,16 @@ Running the code-shaped check against a `db-module` unit used to report
 "artifacts missing" and stop, which read as "not run yet" rather than "wrong
 shape" — the downward half of the DB ladder was simply never verified.
 
-On the DB path the evidence path is additionally resolved ON DISK. The
-assembler writes `unknown:1` when it has no evidence, and that value used to
-pass every gate; a snapshot that does not exist is now a gap, not a green.
+Evidence citations are resolved ON DISK on BOTH paths. The DB assembler writes
+`unknown:1` when it has no evidence, and that value used to pass every gate; a
+snapshot that does not exist is a gap, not a green. Since the audit of
+2026-08-29 (C1) the CODE path resolves too — FEAT items and 3a tasks — and the
+resolver checks the cited LINE RANGE, not merely the file's existence: a
+fabricated `App_Code/DataAccess.cs:34-38` on a 12-line file is now
+[REVERSE_EVIDENCE_MISSING], where before only the presence of the HTML comment
+was ever observed. Resolution needs a legacy project root, so it runs in
+`--project/--unit` mode; in `--feat-path` mode it is skipped (undecidable),
+never guessed.
 
 Emits [REVERSE_LADDER_TRACEABILITY_GAP] findings. **Informational, never
 blocking** (mirrors check_feat_completeness.py) : gaps are reported, never
@@ -54,6 +61,7 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from sdd_reverse.console_safe import ensure_console_safe
+from sdd_reverse.evidence_resolver import resolve_evidence
 from sdd_reverse.paths import workspace_root
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -293,10 +301,14 @@ def _parse_feat_items(text: str) -> list[dict]:
         cm = _COVERS_RE.search(block)
         if cm:
             covers = [f"{a}#{b}" for a, b in _US_AC_REF_RE.findall(cm.group(1))]
+        em = _EVIDENCE_RE.search(block)
         items.append({
             "id": item_id,
             "covers_us": covers,
-            "has_evidence": bool(_EVIDENCE_RE.search(block)),
+            "has_evidence": bool(em),
+            # Raw citation, so the caller can RESOLVE it on disk and not merely
+            # observe that the comment is there (audit C1, 2026-08-29).
+            "evidence": (em.group(1).strip() if em else ""),
         })
     return items
 
@@ -314,16 +326,23 @@ def _parse_us_acs(text: str) -> list[dict]:
     return acs
 
 
-def _parse_analysis_tasks(text: str) -> dict[str, bool]:
-    """task id -> has_evidence (block-aware, within ## Comportements observés)."""
-    tasks: dict[str, bool] = {}
+def _parse_analysis_tasks(text: str) -> dict[str, str]:
+    """task id -> raw evidence citation ("" when absent).
+
+    Block-aware, within `## Comportements observés`. Returns the citation rather
+    than a boolean since the audit of 2026-08-29 (C1) so the caller can resolve
+    it on disk; `""` is falsy, so the historical `if not tasks[t]` reads the same.
+    """
+    tasks: dict[str, str] = {}
     for task_id, block in _iter_item_blocks(text, ("## Comportements observés",), _TASK_ID_RE):
-        tasks[task_id] = bool(_EVIDENCE_RE.search(block))
+        em = _EVIDENCE_RE.search(block)
+        tasks[task_id] = em.group(1).strip() if em else ""
     return tasks
 
 
 _SOURCE_PROC_RE = re.compile(r"^source-proc:\s*(\S+)", re.MULTILINE)
-_EV_PATH_RE = re.compile(r"^(.*?):[Ll]?\d+(?:\s*-\s*[Ll]?\d+)?$")
+# (the `path:Lx-Ly` grammar now lives in sdd_reverse/evidence_resolver.py —
+#  single SSoT for both this checker and validate_reverse_feat.py, audit C1)
 
 
 def _is_db_ladder(unit_dict: dict | None, us_texts: list) -> bool:
@@ -355,19 +374,25 @@ def _parse_us_acs_db(text: str) -> list[dict]:
 
 
 def _evidence_resolves(project: Path | None, evidence: str) -> bool | None:
-    """Does an `path:Lx-Ly` evidence ref point at a file that exists?
+    """DB-ladder resolver: does the cited snapshot FILE exist?
 
+    Thin alias over `sdd_reverse.evidence_resolver.resolve_evidence` (the single
+    SSoT since audit C1, 2026-08-29). File-identity only — the DB citations are
+    written by the deterministic assembler against a snapshot it just produced.
     None when it cannot be decided (no project root given). `unknown:1` — the
     assembler's placeholder — never resolves, which is the whole point.
     """
-    if not evidence or project is None:
-        return None
-    ref = evidence.split(",")[0].strip()
-    m = _EV_PATH_RE.match(ref)
-    path = (m.group(1) if m else ref).strip()
-    if not path or path == "unknown":
-        return False
-    return (project / path).exists()
+    return resolve_evidence(project, evidence, check_lines=False)
+
+
+def _evidence_resolves_strict(project: Path | None, evidence: str) -> bool | None:
+    """CODE-ladder resolver: file exists AND holds the cited line range.
+
+    The code ladder's citations are written by an LLM, so `Foo.cs:34-38` on a
+    12-line file is exactly the failure mode the module exists to prevent
+    (audit C1, 2026-08-29). Tri-state — None (undecidable) is never a gap.
+    """
+    return resolve_evidence(project, evidence, check_lines=True)
 
 
 def _check_db_ladder(
@@ -524,6 +549,16 @@ def check(project: Path | None, unit: str | None, feat_path: Path | None) -> dic
                 gaps.append(f"FEAT {it['id']}: covers '{ref}' which has no matching US AC (dangling)")
         if not it["has_evidence"]:
             gaps.append(f"FEAT {it['id']}: no `evidence:` comment (rule §3)")
+        elif _evidence_resolves_strict(project, it["evidence"]) is False:
+            # C1 (audit 2026-08-29): the CODE path used to check the comment's
+            # PRESENCE and stop there, so a fabricated `Foo.cs:34-38` on a file
+            # that does not exist (or is 12 lines long) was indistinguishable
+            # from a real citation. The anti-hallucination guarantee is the whole
+            # product — resolve it.
+            gaps.append(
+                f"FEAT {it['id']}: [REVERSE_EVIDENCE_MISSING] evidence "
+                f"'{it['evidence']}' does not resolve to an existing "
+                f"file:line-range under the legacy project (rule §2)")
 
     # US ACs → tasks
     for a in us_acs:
@@ -535,9 +570,17 @@ def check(project: Path | None, unit: str | None, feat_path: Path | None) -> dic
                 gaps.append(f"US {a['us_ac']}: covers '{tk}' absent from 3a analysis (dangling)")
 
     # tasks → evidence + orphan (downward completeness)
-    for tk, has_ev in tasks.items():
-        if not has_ev:
+    for tk, ev in tasks.items():
+        if not ev:
             gaps.append(f"task {tk}: no `evidence:` comment in 3a analysis")
+        elif _evidence_resolves_strict(project, ev) is False:
+            # C1 (audit 2026-08-29) — the bottom rung is where the whole ladder
+            # touches reality; an unresolvable citation here invalidates every
+            # item that transitively covers this task.
+            gaps.append(
+                f"task {tk}: [REVERSE_EVIDENCE_MISSING] evidence '{ev}' does "
+                f"not resolve to an existing file:line-range under the legacy "
+                f"project (rule §2)")
         if tk not in covered_tasks:
             gaps.append(f"task {tk}: orphan — covered by no US AC (downward gap)")
     for a in us_acs:

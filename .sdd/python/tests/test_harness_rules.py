@@ -88,11 +88,17 @@ def test_manifest_covers_every_live_rule():
 
 
 def test_manifest_scope_counts():
-    """2 universelles (error-classification, output-protocol) + 9 path-scoped."""
+    """1 universelle (output-protocol) + 11 path-scoped.
+
+    TOK-C2 (audit tokens 2026-08-30) : error-classification est passée
+    path-scoped — le canal agent est le digest `.sdd/digests/`, le noyau
+    universel (format ERROR 3L + règle mentale) vit dans output-protocol
+    §7.3/§7.5.
+    """
     rules = _load_rules_manifest(SDD_HOME)
     universal = {e["name"] for e in rules if e["scope"] == "universal"}
-    assert universal == {"error-classification", "output-protocol"}
-    assert sum(1 for e in rules if e["scope"] == "path-scoped") == 10
+    assert universal == {"output-protocol"}
+    assert sum(1 for e in rules if e["scope"] == "path-scoped") == 11
 
 
 # --------------------------------------------------------------------- #

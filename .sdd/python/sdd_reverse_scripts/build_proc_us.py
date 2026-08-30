@@ -27,7 +27,13 @@ CLI:
     python build_proc_us.py --project DB [--unit U-N | --all] [--workspace DIR]
                             [--no-cache] [--dry-run] [--json]
 
-Output (JSON): {"written": [...], "needs_llm": [...], "cached": [...]}
+Output (JSON): {"written": [...], "needs_llm": [...], "cached": [...],
+                "modules": [{unit, module, n, objects, llmRouted,
+                             featComposer: "llm"|"deterministic"}]}
+`modules[].featComposer` (D-M4, 2026-08-30) est le verdict DÉTERMINISTE du
+routage rung 2 (règle 2026-08-27 : LLM si multi-objets + ≥1 objet routé LLM ;
+déterministe si mono-objet ou purement CRUD) — consommé par
+/sdd-db-reverse-full au lieu d'une ré-interprétation par l'orchestrateur.
 Exit codes: 0 OK · 2 inventory/IO error · 3 usage.
 """
 
@@ -45,7 +51,7 @@ if str(PY_ROOT) not in sys.path:
 
 from sdd_reverse.atomic_write_local import atomic_write_text
 from sdd_reverse.sql_body_analyzer import complexity_reasons, proc_complexity
-from sdd_reverse.db_context_slice import family_of  # noqa: E402
+from sdd_reverse.db_context_slice import family_of, pack_relpath  # noqa: E402
 from sdd_reverse.db_tier_router import tier_for  # noqa: E402
 
 # Same sentinel the forward pipeline resolves (sdd_scripts/resolve_us_hash_sentinel.py).
@@ -74,12 +80,15 @@ _DEFAULT_ANGLE = ("procédure stockée", "opération encapsulée par la procédu
 
 # Which specialist owns each family of SQL object. The angle differs by
 # family — an operation, a reusable calculation, a projection, an invariant —
-# so the agent differs too.
+# so the agent differs too. Exception assumée : les packages Oracle sont
+# possédés par le proc-analyst (1 package = 1 US, un package est un faisceau
+# d'opérations — même angle qu'une procédure, pas une cinquième spécialité).
 _AGENT_BY_FAMILY = {
     "procedures": "reverse-sql-analyst",
     "functions": "reverse-sql-function-analyst",
     "views": "reverse-sql-view-analyst",
     "triggers": "reverse-sql-trigger-analyst",
+    "packages": "reverse-sql-analyst",
 }
 
 
@@ -269,15 +278,21 @@ def main(argv: list[str] | None = None) -> int:
     written: list[str] = []
     needs_llm: list[dict] = []
     cached: list[str] = []
+    modules: list[dict] = []
     for u in units:
         n = inventory["_featAllocations"][u["id"]]
         module = u["suggestedName"]
+        llm_routed = 0
         for proc in u.get("procedures", []):
             out = us_dir / f"{n}-{proc['usIndex']}-{proc['usName']}.md"
             body_hash = _snapshot_hash(project_root, proc)
             # The inventory already carries the routing verdict; recompute only
             # if an older inventory predates it (backward compatible).
             verdict = proc.get("complexity") or proc_complexity(proc)
+            # Compté AVANT le court-circuit du cache : un objet complexe déjà
+            # analysé reste un objet routé LLM aux yeux du routage rung 2.
+            if verdict != "simple":
+                llm_routed += 1
             if is_cached(cache, proc, body_hash, out):
                 cached.append(str(out))
                 continue
@@ -307,8 +322,26 @@ def main(argv: list[str] | None = None) -> int:
                     "wave": proc.get("wave", 0),
                     "recursive": bool(proc.get("recursive")),
                     "sccId": proc.get("sccId"),
-                    "pack": f".sys/db-context/packs/{proc['fqName']}.md",
+                    # Chemin RÉEL du pack (même règle _safe que le slicer) — le
+                    # fqName brut ne correspond à aucun fichier quand il porte
+                    # des caractères hors [A-Za-z0-9._-] (audit 2026-08-29).
+                    "pack": pack_relpath(proc["fqName"]),
                 })
+        # D-M4 — verdict de routage rung 2 émis ICI, déterministiquement, par
+        # module (règle correcte 2026-08-27) : composer LLM si le module est
+        # multi-objets ET porte au moins un objet routé LLM ; assembleur
+        # déterministe (build_proc_feats.py, 0 token) sinon — module mono-objet
+        # ou purement CRUD. L'orchestrateur consomme ce champ au lieu de
+        # ré-interpréter la règle (3 formulations divergentes recensées à
+        # l'audit 2026-08-29).
+        modules.append({
+            "unit": u["id"], "module": module, "n": n,
+            "objects": len(u.get("procedures", [])),
+            "llmRouted": llm_routed,
+            "featComposer": ("llm"
+                             if len(u.get("procedures", [])) > 1 and llm_routed
+                             else "deterministic"),
+        })
 
     # Callees strictly before their callers, so a caller's pack can quote the
     # summary its callee just produced. Ties broken by name for reproducibility.
@@ -319,7 +352,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.json:
         print(json.dumps({"written": written, "needs_llm": needs_llm,
-                          "cached": cached}, ensure_ascii=False, indent=2))
+                          "cached": cached, "modules": modules},
+                         ensure_ascii=False, indent=2))
     else:
         skip = f" · {len(cached)} inchangée(s) (cache)" if cached else ""
         by_tier: dict[str, int] = {}

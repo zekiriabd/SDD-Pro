@@ -112,7 +112,9 @@ ArchReviewFailOn:  serious   # défaut: serious
 
 Si `ReviewMode: read-only` → forcer `--skip-scans` (pas de re-run quality_scan).
 
-Si `ArchReviewMode: full` → spawn agent `arch-reviewer` au STEP 3.5 ci-dessous.
+Si `ArchReviewMode: full` → spawn agent `arch-reviewer` au STEP 3.0 ci-dessous
+(batch fallback standalone — fix référence audit 2026-08-30, ex-« STEP 3.5 »
+qui désigne la persistance interne de `sdd_review.py`).
 
 Sauf `AdversarialReviewMode: off` OU flag CLI `--no-adversarial` → spawn agent
 `adversarial-reviewer` au STEP 4.5 (post-agrégation, opt-out, jamais bloquant).
@@ -375,7 +377,8 @@ Agent: adversarial-reviewer
 
 ## STEP 5 — Suite manuelle (auto-fix Phase B à venir)
 
-Phase C (arch-reviewer) est câblée via le two-stage gate (cf. §19). Tant que
+Phase C (arch-reviewer) est câblée via le two-stage gate (cf. STEP 3.0.bis +
+STEP 3.0 ci-dessus et `/dev-run` STEP 6.4). Tant que
 Phase B (auto-fix dispatcher `dispatch_fixes.py`, à venir v7.2) n'est pas
 livrée, le Tech Lead arbitre les findings :
 

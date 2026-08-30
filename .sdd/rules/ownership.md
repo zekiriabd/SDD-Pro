@@ -1,10 +1,20 @@
 ---
 # TOK-C1 (audit 2026-06-12) : chargement paresseux (path-scoped rule). Lue on-demand par
-# dev-*/arch/po/constitutioner ; auto-injection au contact des artefacts workspace (src, us,
-# feats, .sys/.context). Hors-périmètre (chat, maintenance pure) : 0 token.
+# dev-*/arch/po/constitutioner ; auto-injection au contact des artefacts workspace listés.
+# TOK-C2 (audit tokens 2026-08-30) : narrowing — l'ex-glob `workspace/**` injectait ces
+# ~25 KB au contact de N'IMPORTE QUEL fichier workspace (ui/, console/, db/, .sys/.audit…)
+# et rendait l'entrée `workspace/feats/**` redondante. Portée = les artefacts que la
+# matrice §1 arbitre ET dont un writer ne lit pas la rule explicitement.
+# `workspace/plans/**` ajouté : les writers (dev-* en mode `:plan`) ne la lisent que par
+# pointeur « cf. », pas en STEP contexte. Non repris : ui/ (writer = humain, agents
+# read-only), db/ + .sys/.audit (writers arch/hooks — substance inlinée / déterministe),
+# console/ (console web + scripts, hors agents).
 paths:
-  - "workspace/**"
+  - "workspace/src/**"
+  - "workspace/us/**"
   - "workspace/feats/**"
+  - "workspace/plans/**"
+  - "workspace/.sys/.context/**"
 ---
 
 # Règle — Ownership (File matrix + Constitution + ADRs, consolidated v7.0.0)
@@ -56,6 +66,7 @@ non déterministes.
 | `workspace/us/{n}-{m}-*.md` | `po` | Create exclusif (1 fichier = 1 US) | 2 |
 | `workspace/ui/{n}-{m}-*.html` | UX Designer humain | Read-only stricte côté agents | 2.5 |
 | `workspace/plans/{n}-{m}-*.{back\|front}.md` | `dev-backend` (`.back`) / `dev-frontend` (`.front`) | Create exclusif (mode `:plan`) | 2.7 |
+| `workspace/src/{BackendName}.Tests/**`, `workspace/src/{AppName}.Tests/**` + patterns test adjacents (`**/__tests__/**`, `*.test.ts`, `*.FEAT.ts`, `test_*.py`, `*Test.kt`) | `qa` | Create/Edit exclusif (territoire test — jamais le code production, cf. `[QA_OWNERSHIP_VIOLATION]`) | 5 |
 | `workspace/.sys/.validation/{n}-readiness.md` | `/feat-validate` | Create exclusif | 2.6 |
 | `workspace/.sys/.audit/` | hooks framework (`*.log`/`*.jsonl`, rotation `rotate_audit_logs.py`) **+** rapports d'audit code holistiques `AUDIT-*.md` (emplacement canonique, 2026-07-06 — ex-`output/audit/` ; `rotate_audit_logs` ne touche pas les `.md`) | Append (logs) / Create (audits) | hooks / ad-hoc |
 | `workspace/feats/{n}-*.md` | `/feat-generate` puis `elicitor` (append-only) | Sérialisé | 1, 1.5 |
@@ -205,7 +216,7 @@ restent indexables, les ADRs v7.0.0+ avec rand4 aussi.
 Tri par filename = ordre temporel stable cross-team/cross-machine
 (timestamp ISO 8601 compact lexicographiquement croissant).
 
-L'index §6 de `constitution.md` (mis à jour par arch uniquement)
+L'index §6 de `constitution.md` (mis à jour par `constitutioner` uniquement — CR-2, cf. §2 et Partie B §4.4)
 ré-indexe alphabétiquement (= ordre chronologique). Alias courts
 (`ADR-001`) **non-load-bearing** acceptables dans le H1 du fichier mais
 identifiant réel = nom de fichier timestamp+rand4.

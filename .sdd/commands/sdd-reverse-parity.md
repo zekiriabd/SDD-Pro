@@ -23,12 +23,12 @@ contre la nouvelle application pour **prouver** la parité.
 
 | Arg | Type | Description |
 |---|---|---|
-| `{n}` | requis | Numéro de la FEAT reverse (`workspace/feats/{n}-{Name}.md`) |
+| `{n}` | requis | Numéro de la FEAT reverse (`workspace/feats/{n}-{FeatName}.md`) |
 | `--json` | flag | Émet le verdict en JSON |
 
 ## Pré-conditions
 
-1. `workspace/feats/{n}-{Name}.md` existe et porte `generated-by: sdd-reverse`.
+1. `workspace/feats/{n}-{FeatName}.md` existe et porte `generated-by: sdd-reverse`.
    Sinon → ERROR `[REVERSE_UNIT_NOT_FOUND]`.
 2. ≥ 1 US `workspace/us/{n}-{m}-*.md` existe (escalier 3b a tourné).
 
@@ -39,7 +39,7 @@ contre la nouvelle application pour **prouver** la parité.
    `parity-map.md`, puis valide via :
    ```bash
    python .sdd/python/sdd_reverse_scripts/validate_parity_features.py \
-       --feat-path workspace/feats/{n}-{Name}.md \
+       --feat-path workspace/feats/{n}-{FeatName}.md \
        --parity-dir workspace/parity/feat-{n} --json
    ```
    (max 3 itérations de correction sur `[REVERSE_PARITY_INVALID]`).
@@ -70,4 +70,4 @@ dérivables restent listés, jamais comblés par invention).
 - Verdict informational — ne bloque ni Phase 4 ni `/sdd-full`
 - Idempotent : relancer écrase `feat-{n}/`
 
-Voir `.sdd/rules/reverse-engineering.md §6` ([REVERSE_PARITY_*]) + `.claude/agents/reverse-parity-inspector.md`.
+Voir `.sdd/rules/reverse-engineering.md §6` ([REVERSE_PARITY_*]) + `.sdd/agents/reverse-parity-inspector.md`.

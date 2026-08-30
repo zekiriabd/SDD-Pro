@@ -447,7 +447,7 @@ def test_proc_complexity_routing():
     assert proc_complexity({"encrypted": True}) == "simple"                 # body unreadable → deterministic
 
 
-def test_build_proc_us_routes_simple_vs_complex(tmp_path):
+def test_build_proc_us_routes_simple_vs_complex(tmp_path, capsys):
     from sdd_reverse_scripts import build_proc_us, reverse_proc_introspect
 
     d = get_dialect("SqlServer")
@@ -464,6 +464,7 @@ def test_build_proc_us_routes_simple_vs_complex(tmp_path):
         ["--from-introspection", str(project_root / ".sys" / "db-introspection.json"),
          "--project", project, "--workspace", str(tmp_path)]
     )
+    capsys.readouterr()
 
     rc = build_proc_us.main(["--project", project, "--all", "--workspace", str(tmp_path), "--json"])
     assert rc == 0
@@ -471,6 +472,18 @@ def test_build_proc_us_routes_simple_vs_complex(tmp_path):
     us_files = [p.name for p in (tmp_path / "us").glob("*.md")]
     assert any("Consulter-Contact" in f for f in us_files)
     assert not any("Creer-Contact" in f for f in us_files)
+
+    out = json.loads(capsys.readouterr().out)
+    # Mineur 2 (2026-08-30) : needs_llm porte le chemin RÉEL du pack (règle
+    # _safe du slicer), jamais le fqName brut interpolé.
+    entry = next(e for e in out["needs_llm"] if e["proc"] == "dbo.usp_Contact_Insert")
+    assert entry["pack"] == ".sys/db-context/packs/dbo.usp_Contact_Insert.md"
+    # D-M4 (2026-08-30) : le verdict de routage rung 2 est émis par le script,
+    # par module — multi-objets + ≥1 objet routé LLM ⇒ composer LLM.
+    contact = next(m for m in out["modules"] if m["module"] == "Contact")
+    assert contact["objects"] == 2
+    assert contact["llmRouted"] == 1
+    assert contact["featComposer"] == "llm"
 
 
 # --------------------------------------------------------------------------- #

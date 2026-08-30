@@ -290,6 +290,30 @@ class TestMainEndToEnd(unittest.TestCase):
                 rc = vud.main()
             self.assertEqual(rc, 3)
 
+    def test_io_error_returns_5(self):
+        """Audit F-M3 (2026-08-30) : une OSError de lecture US remonte en
+        exit 5 [INFRA_BLOCKED] au lieu d'être avalée (deps vides silencieuses)."""
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            tmp_p = Path(tmp)
+            self._setup(tmp_p, [(1, 1, "A", []), (1, 2, "B", ["1-1"])])
+            with mock.patch.object(vud, "repo_root", return_value=tmp_p), \
+                 mock.patch.object(vud, "build_graph",
+                                   side_effect=OSError("permission denied")), \
+                 mock.patch.object(sys, "argv",
+                                   ["validate_us_deps.py", "--feat", "1"]):
+                rc = vud.main()
+            self.assertEqual(rc, 5)
+
+    def test_build_graph_propagates_oserror(self):
+        """build_graph ne doit plus avaler l'OSError (F-M3)."""
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            tmp_p = Path(tmp)
+            (tmp_p / ".claude").mkdir()
+            us = _make_us(tmp_p, 1, 1, "A", [])
+            with mock.patch.object(Path, "read_text", side_effect=OSError("boom")):
+                with self.assertRaises(OSError):
+                    vud.build_graph([us])
+
     def test_invalid_us_id_returns_2(self):
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             tmp_p = Path(tmp)

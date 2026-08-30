@@ -69,6 +69,15 @@ adversarial-reviewer feat-{n}: skipped (AdversarialReviewMode=off)
 
 ## STEP 2 — Charger le contexte minimal (lecture sélective)
 
+### 2.0 Taxonomie d'erreur
+
+Read `.sdd/digests/error-classification.adversarial-reviewer.md` — classes
+émises par cet agent : `[ADV_EDGE_CASE]`, `[ADV_FRAGILE_ASSUMPTION]`,
+`[ADV_HIDDEN_TECH_DEBT]`, `[ADV_FAILURE_MODE]`, `[ADV_UX_CONFUSION]`,
+`[ADV_PRECONDITION_FAILED]`. **Aucun bloc ERROR sans préfixe `[CLASS]`**
+(`rules/error-classification.md §5`). *(Read ajouté audit M7, 2026-08-29 —
+le digest `adversarial-reviewer` était généré mais lu par personne.)*
+
 ### 2.1 Verdict consolidé déjà produit
 Lire le verdict + les findings depuis la base (2026-07-06 : plus de
 `review.md`) :
