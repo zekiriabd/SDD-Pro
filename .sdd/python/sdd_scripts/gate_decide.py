@@ -208,8 +208,12 @@ def main() -> int:
                         conn, gate_name=args.phase, decision="pending",
                         feat_n=args.feat_num, payload={"askedAt": gate["askedAt"]},
                     )
-            except Exception:  # pragma: no cover — telemetry must not break gates
-                pass
+            except Exception as exc:  # pragma: no cover — must not break gates
+                # Audit M10 — same reasoning as the `set` branch below: a
+                # lost mirror write is tolerable, an invisible one is not.
+                warn(f"WARN gate_decide — mirror console.db échoué pour "
+                     f"gate={args.phase} feat={args.feat_num} (pending) : "
+                     f"{type(exc).__name__}: {exc}")
             if args.json:
                 print(json.dumps(gate, separators=(",", ":")))
             else:
@@ -236,8 +240,19 @@ def main() -> int:
                         feat_n=args.feat_num, by_user=args.answered_by,
                         payload={"answeredAt": gate["answeredAt"]},
                     )
-            except Exception:  # pragma: no cover
-                pass
+            except Exception as exc:  # pragma: no cover
+                # Audit M10 (2026-08-29) — the console.db `gates` table is the
+                # only QUERYABLE record of a manual-gate approval (status.json
+                # is per-run scratch). Swallowing this write in silence meant
+                # an approval could vanish from the audit trail with nobody
+                # informed. Non-fatal (the gate decision itself is already
+                # persisted to status.json and the pipeline must not stall on
+                # a telemetry problem) — but never again silent.
+                warn(f"WARN gate_decide — mirror console.db échoué pour "
+                     f"gate={args.phase} feat={args.feat_num} "
+                     f"decision={args.decision} : {type(exc).__name__}: {exc}")
+                warn("  → la décision reste dans status.json mais N'APPARAÎTRA "
+                     "PAS dans les requêtes d'audit (table `gates`).")
             if args.json:
                 print(json.dumps(gate, separators=(",", ":")))
             else:

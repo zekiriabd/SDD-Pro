@@ -1,7 +1,7 @@
 # loader.reverse.yml — Reverse engineering manifest (D4 autonomous)
 #
 # Mirror format of loader.yml but isolated. Discovered via frontmatter
-# `loader: .sdd/loader.reverse.yml` in the 12 reverse commands and the
+# `loader: .sdd/loader.reverse.yml` in the 19 reverse commands and the
 # starting-a-reverse-eng skill. NEVER referenced by loader.yml.
 #
 # ADV-17 closure: reverse-tech-auditor.writes points to db-schema.enrichment.json
@@ -64,7 +64,7 @@ agents:
       - .sdd/python/sdd_reverse/language_signatures.yml
       - .sdd/python/sdd_reverse/analysis.reverse.template.md # isolated tech-analysis template (D5)
     writes:
-      - workspace/plans/{n}-{Name}.analysis.md           # tech-analysis output (distinct ext from forward .back/.front)
+      - workspace/plans/{n}-{FeatName}.analysis.md       # tech-analysis output (distinct ext from forward .back/.front)
       - workspace/old/{P}/.sys/modules/{Module}/extraction.md   # extraction log
       - workspace/old/{P}/.sys/inventory.json                   # _featAllocations + _allocatedNames (legacy mode only — 3a owns allocation)
 
@@ -73,7 +73,7 @@ agents:
     phase: 3b
     available_from: v0.7.0       # ADR governance-major-reverse-spec-ladder — barreau moyen
     reads:
-      - workspace/plans/{n}-{Name}.analysis.md          # 3a tech-analysis (SOLE content source)
+      - workspace/plans/{n}-{FeatName}.analysis.md      # 3a tech-analysis (SOLE content source)
       - workspace/old/{P}/.sys/inventory.json                  # units[U-N] metadata (kind, roles, allocation) — NOT new content
       - .sdd/python/sdd_reverse/us.reverse.template.md
     writes:
@@ -88,12 +88,12 @@ agents:
     available_from: v0.7.0       # ADR governance-major-reverse-spec-ladder — barreau haut (remplace reverse-functional-extractor, décommissionné D2)
     reads:
       - workspace/us/{n}-{m}-{Name}.md                  # 3b user stories (SOLE content source)
-      - workspace/plans/{n}-{Name}.analysis.md          # 3a tech-analysis (evidence resolution + plumbing to demote)
+      - workspace/plans/{n}-{FeatName}.analysis.md      # 3a tech-analysis (evidence resolution + plumbing to demote)
       - workspace/old/{P}/.sys/inventory.json                  # units[U-N] metadata (kind, dataAccess, allocation)
       - .sdd/python/sdd_reverse/language_signatures.yml
       - .sdd/python/sdd_reverse/feat.reverse.template.md    # ADV-9 isolated template (reused)
     writes:
-      - workspace/feats/{n}-{Name}.md                    # the FEAT output (business altitude, plumbing demoted)
+      - workspace/feats/{n}-{FeatName}.md                # the FEAT output (business altitude, plumbing demoted)
       - workspace/old/{P}/.sys/modules/{Module}/feat-3c.md     # composition log
     forbidden_reads:
       - workspace/old/{P}/{evidenceFiles}                      # 3c NEVER reads legacy code — only US 3b + analysis 3a
@@ -105,7 +105,7 @@ agents:
     available_from: v0.5.0       # L5 — back-side completeness review (informational)
     reads:
       - workspace/old/{P}/.sys/inventory.json                   # units[U-N].classes + dataAccess
-      - workspace/feats/{n}-{Name}.md                     # the FEAT under review
+      - workspace/feats/{n}-{FeatName}.md                 # the FEAT under review
       - workspace/old/{P}/{evidenceFiles}                       # strict, to judge gaps
     writes:
       - workspace/old/{P}/.sys/modules/{Module}/completeness-review.md
@@ -121,7 +121,7 @@ agents:
     reads:
       - workspace/old/{P}/.sys/inventory.json
       - workspace/old/{P}/{templateFiles, cssFiles}             # selective, ≤ 15 files
-      - workspace/feats/{n}-{Name}.md                     # the FEAT produced Phase 3
+      - workspace/feats/{n}-{FeatName}.md                 # the FEAT produced Phase 3
     writes:
       - workspace/ui/{n}-{m}-{Name}.html
 
@@ -131,9 +131,9 @@ agents:
     optional: true
     available_from: v0.9.0     # emprunt Reversa (Inspector) — audit comparatif 2026-06-12
     reads:
-      - workspace/feats/{n}-{Name}.md                     # FEAT reverse (SOLE behavioral source)
+      - workspace/feats/{n}-{FeatName}.md                 # FEAT reverse (SOLE behavioral source)
       - workspace/us/{n}-{m}-{Name}.md                   # US 3b (scenario granularity)
-      - workspace/plans/{n}-{Name}.analysis.md           # 3a (evidence resolution only)
+      - workspace/plans/{n}-{FeatName}.analysis.md       # 3a (evidence resolution only)
       - .sdd/python/sdd_reverse/parity.reverse.template.feature
     writes:
       - workspace/parity/feat-{n}/{m}-{Slug}.feature
@@ -169,12 +169,12 @@ agents:
       - workspace/old/{P}/.sys/modules/{Module}/completeness-review.md
       - workspace/old/{P}/.sys/curation.md                      # optional (Phase 2.7)
       - workspace/parity/feat-{n}/parity-map.md       # optional (Phase 3.8)
-      - workspace/feats/{n}-{Name}.md                     # items medium/low + ingest target
+      - workspace/feats/{n}-{FeatName}.md                 # items medium/low + ingest target
       - workspace/old/{P}/.sys/questions.md                     # Q-N stability + answers (--ingest)
       - .sdd/python/sdd_reverse/questions.reverse.template.md
     writes:
       - workspace/old/{P}/.sys/questions.md
-      - workspace/feats/{n}-{Name}.md                     # --ingest ONLY (human-validated patching, §10 resync)
+      - workspace/feats/{n}-{FeatName}.md                 # --ingest ONLY (human-validated patching, §10 resync)
     forbidden_reads:
       - workspace/old/{P}/{evidenceFiles}                       # never re-reads legacy code — gaps come from reports
     delegated_to:
@@ -188,10 +188,11 @@ agents:
     available_from: v1.0.0       # stored-procedure reverse — DB live READ-ONLY → US (1 proc = 1 US)
     reads:
       - workspace/old/{P}/.sys/inventory.json                    # units = modules (source: db-reverse)
+      - workspace/old/{P}/.sys/db-context/packs/{schema}.{object}.md # the sanctioned context slice (Phase 0)
       - workspace/old/{P}/.sys/proc-snapshot/{schema}.{proc}.sql # READ-ONLY body snapshot (Phase 1)
-      - workspace/old/{P}/.sys/db-introspection.json             # deterministic signals (no secret)
       - .sdd/python/sdd_reverse/us.proc.reverse.template.md
       - .sdd/python/sdd_reverse/language_signatures.yml
+      - .sdd/rules/db-reverse-tsql.md                            # socle SQL partagé (pièges MERGE/OUTPUT/NULL, AC négatifs)
     writes:
       - workspace/us/{n}-{m}-{Name}.md                    # 1 user story per stored procedure
     delegated_to:
@@ -203,16 +204,21 @@ agents:
   reverse-sql-feat-composer:
     model_tier: deep
     phase: "proc-2"
-    optional: true              # OPT-IN rung 2 (SDD_REVERSE_FEAT_LLM=1) — default = build_proc_feats.py (0 token)
+    optional: true              # routage par module (DÉFAUT depuis 2026-08-26) : build_proc_feats.py (0 token) si module mono-objet/CRUD pur ; composer LLM si multi-objets + ≥ 1 objet analysé par LLM
     available_from: v1.1.0      # 2026-07-24 — LLM module-FEAT composer, parity with code ladder 3c
     reads:
       - workspace/old/{P}/.sys/inventory.json                    # module metadata + _featAllocations
+      - workspace/old/{P}/.sys/db-context/glossary.json          # glossaire métier léger (extrait des hypothèses Phase 0.B — jamais db-context.json entier)
       - workspace/us/{n}-{m}-{Name}.md                           # the module's SQL-object User Stories (only content source)
       - workspace/old/{P}/.sys/proc-snapshot/{schema}.{proc}.sql # READ-ONLY, evidence resolution only
       - .sdd/python/sdd_reverse/feat.reverse.template.md
       - .sdd/python/sdd_reverse/language_signatures.yml
+      # NB: PAS de db-reverse-tsql.md — le composer rung 2 ne relit jamais un
+      # corps SQL (altitude déjà remontée par les analystes rung 1) ; son prompt
+      # ne charge que output-protocol / error-classification / reverse-engineering.
+      # Déclaration retirée 2026-08-30 (drift loader ↔ prompt).
     writes:
-      - workspace/feats/{n}-{Name}.md                            # the module business FEAT
+      - workspace/feats/{n}-{FeatName}.md                        # the module business FEAT
       - workspace/us/{n}-{m}-{Name}.md                           # Edit-augment back-fill (Covers/Status/hash) — pont /sdd-full
     delegated_to:
       - .sdd/python/sdd_reverse_scripts/validate_reverse_feat.py    # deterministic gate (max 3 iters)
@@ -237,6 +243,7 @@ agents:
       - workspace/old/{P}/.sys/db-context.json                   # facts + execution plan (digest only)
       - workspace/old/{P}/.sys/db-context/_overview.md           # orientation
       - workspace/old/{P}/.sys/db-context/tables/{table}.md      # PIVOT tables only (ContextDigestBudget)
+      - .sdd/rules/db-reverse-tsql.md                            # socle SQL partagé — chargé par son prompt (STEP contexte)
     writes:
       - workspace/old/{P}/.sys/db-context.hypotheses.json        # hypotheses branch ONLY — never facts
     delegated_to:
@@ -257,6 +264,7 @@ agents:
       - workspace/old/{P}/.sys/proc-snapshot/{schema}.{proc}.sql      # READ-ONLY own body
       - workspace/old/{P}/.sys/inventory.json                         # (n, m, usName) allocations
       - .sdd/python/sdd_reverse/us.proc.reverse.template.md
+      - .sdd/rules/db-reverse-tsql.md                                 # socle SQL partagé
     writes:
       - workspace/us/{n}-{m}-{Name}.md                                # 1 function = 1 user story
     forbidden_reads:
@@ -272,6 +280,7 @@ agents:
       - workspace/old/{P}/.sys/proc-snapshot/{schema}.{proc}.sql
       - workspace/old/{P}/.sys/inventory.json
       - .sdd/python/sdd_reverse/us.proc.reverse.template.md
+      - .sdd/rules/db-reverse-tsql.md                                 # socle SQL partagé
     writes:
       - workspace/us/{n}-{m}-{Name}.md                                # 1 view = 1 user story
     forbidden_reads:
@@ -287,6 +296,7 @@ agents:
       - workspace/old/{P}/.sys/proc-snapshot/{schema}.{proc}.sql
       - workspace/old/{P}/.sys/inventory.json
       - .sdd/python/sdd_reverse/us.proc.reverse.template.md
+      - .sdd/rules/db-reverse-tsql.md                                 # socle SQL partagé
     writes:
       - workspace/us/{n}-{m}-{Name}.md                                # 1 trigger = 1 user story
     forbidden_reads:
@@ -330,7 +340,7 @@ commands:
     spawns: [reverse-ui-extractor]
     available_from: v0.2.0   # V2 — implemented
   sdd-reverse-full:
-    phase: "1-4"
+    phase: "0-5"                # aligné sur le frontmatter réel de la commande (resync audit 2026-08-30)
     spawns: []                  # sequences commands, NOT agents (no-spawn rule §9 rules/reverse-engineering.md)
     available_from: v0.2.0   # V2 — implemented
   sdd-reverse-status:
@@ -357,14 +367,25 @@ commands:
     phase: "3.9"
     spawns: [reverse-clarifier]
     available_from: v0.9.0   # emprunt Reversa — structured human validation loop (generate / --ingest)
+  sdd-db-context:
+    phase: "db-0"
+    spawns: [reverse-db-architect]   # Phase 0.B — interprétation ; 0.A délégué au script déterministe db_context_build.py
+    available_from: v1.2.0   # 2026-08-26 — Phase 0 Database Context (obligatoire avant toute remontée en US)
   sdd-db-reverse-full:
     phase: "db-reverse"
-    spawns: [reverse-sql-analyst]
-    available_from: v1.0.0   # stored-procedure reverse — all routines (read-only DB → US/FEAT)
+    # Phase 0 si absente (architect), Phase 1 par vagues de dépendance (les 4
+    # analystes par famille d'objet), Phase 2 (composer LLM pour les modules
+    # complexes ; build_proc_feats.py 0 token pour le CRUD).
+    spawns: [reverse-db-architect, reverse-sql-analyst, reverse-sql-function-analyst, reverse-sql-view-analyst, reverse-sql-trigger-analyst, reverse-sql-feat-composer]
+    available_from: v1.0.0   # SQL-object reverse — all objects (read-only DB → US/FEAT)
   sdd-db-reverse:
     phase: "db-reverse"
-    spawns: [reverse-sql-analyst]
-    available_from: v1.0.0   # stored-procedure reverse — single routine
+    # Phase 0 câblée en mode objet unique (2026-08-30) : sans le pack produit par
+    # db_context_build.py, l'analyste STOP en [REVERSE_DB_PACK_MISSING] sur un
+    # projet frais. 0.B (architect) sautée par --no-architect ou par le cache.
+    # Puis routage par famille d'objet : procédure / fonction / vue / trigger.
+    spawns: [reverse-db-architect, reverse-sql-analyst, reverse-sql-function-analyst, reverse-sql-view-analyst, reverse-sql-trigger-analyst]
+    available_from: v1.0.0   # SQL-object reverse — single object
 
 
 scripts_v2:
@@ -422,6 +443,21 @@ scripts:
   build_proc_feats:                            # db-reverse rung 2 — deterministic module FEAT assembler (US → FEAT, no body re-read)
     path: .sdd/python/sdd_reverse_scripts/build_proc_feats.py
     cli: python .sdd/python/sdd_reverse_scripts/build_proc_feats.py --project DB (--unit U-N | --all) [--workspace DIR] [--json]
+  db_context_build:                            # db-reverse Phase 0.A — Database Context versionné (facts + packs par objet, 0 token, offline) + merge déterministe des hypothèses 0.B
+    path: .sdd/python/sdd_reverse_scripts/db_context_build.py
+    cli: python .sdd/python/sdd_reverse_scripts/db_context_build.py --project workspace/old/{P} [--refresh] [--diff-against PREV] [--json]
+  correlate_db_app:                            # db-reverse P0.3 — jointure db-introspection.json × data-access.json (quelle application consomme quel objet SQL)
+    path: .sdd/python/sdd_reverse_scripts/correlate_db_app.py
+    cli: python .sdd/python/sdd_reverse_scripts/correlate_db_app.py --introspection <PATH> --data-access <PATH> [--out DIR] [--json]
+  reverse_report:                              # db-reverse — rapport de synthèse Markdown par module (tiers, confidence, REVERSE-GATE) avant /sdd-full
+    path: .sdd/python/sdd_reverse_scripts/reverse_report.py
+    cli: python .sdd/python/sdd_reverse_scripts/reverse_report.py --project DB [--workspace DIR] [--json]
+  promote_confidence:                          # db-reverse — promotion humaine medium/low → high (déverrouille REVERSE-GATE, jamais d'invention)
+    path: .sdd/python/sdd_reverse_scripts/promote_confidence.py
+    cli: python .sdd/python/sdd_reverse_scripts/promote_confidence.py --feat-path <PATH> [--reason TXT] [--dry-run] [--json]
+  scan_snapshot_secrets:                       # db-reverse — scan des secrets hardcodés dans .sys/proc-snapshot/ ([REVERSE_SECRETS_DETECTED], informational)
+    path: .sdd/python/sdd_reverse_scripts/scan_snapshot_secrets.py
+    cli: python .sdd/python/sdd_reverse_scripts/scan_snapshot_secrets.py --project DB [--workspace DIR] [--json] [--exit-on-found]
 
 
 # Invariants reverse (V2 — to be hoisted in INVARIANTS.reverse.yml)

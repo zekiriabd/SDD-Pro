@@ -24,10 +24,18 @@ The two guards are disjoint on purpose — widening `assert_readonly` to tolerat
 `SET` would have opened it to `SET @sql = ...` and friends.
 
 NOTE (smoke/test design): this module necessarily *names* the forbidden tokens
-in its blocklist. The `reverse_smoke` read-only check therefore validates the
-**dialect query constants** via `is_readonly()` (they must pass), NOT a blind
-grep for the words (which would false-positive on this blocklist and on the
-body analyzer, which legitimately matches `INSERT`/`UPDATE` as analysis regex).
+in its blocklist. The `reverse_smoke` read-only check
+(`check_dialect_queries_readonly`, registry name
+`reverse-db-readonly-dialect-queries`) therefore validates the **dialect query
+constants** via `is_readonly()` (they must pass), NOT a blind grep for the words
+(which would false-positive on this blocklist and on the body analyzer, which
+legitimately matches `INSERT`/`UPDATE` as analysis regex). The pytest suite
+covers the same ground from the other side — `tests/test_reverse_db_dialects.py`
+and `tests/test_sdd_reverse_proc.py`, the enforcers named by
+`INVARIANTS.reverse.yml:reverse-db-readonly-proc`.
+
+(Audit 2026-08-29, m4: this paragraph described the smoke check for months
+before one existed. It exists now.)
 
 Public API:
     is_readonly(sql) -> bool

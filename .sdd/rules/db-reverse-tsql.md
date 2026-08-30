@@ -134,6 +134,32 @@ fonctionnel, pas une optimisation.
 Un `INNER JOIN` **filtre** : une commande sans client disparaît du reporting.
 Une jointure est une règle de visibilité autant qu'un assemblage.
 
+### 2.11 Un appel n'a pas toujours de mot-clé
+
+`EXEC` / `CALL` / `PERFORM` ne sont que **la forme la plus visible** d'un appel.
+Trois autres formes portent exactement la même délégation de règle métier :
+
+| Forme | Exemple | Où |
+|---|---|---|
+| Appel de package/procédure nu | `pkg_tarif.applique(:id);` | PL/SQL — il n'existe **aucun** `EXEC` dans un bloc PL/SQL |
+| Fonction scalaire dans une expression | `SELECT dbo.fnTva(Montant) FROM …` | tous les moteurs |
+| Fonction dans une affectation | `v_taux := fn_taux(p_id);` | PL/SQL, PL/pgSQL, MySQL/PSM |
+
+**Pourquoi c'est une règle de lecture et pas un détail** : ces appels délèguent
+du comportement à un autre objet. Un lecteur qui ne les voit pas décrit la
+procédure comme si elle calculait elle-même ce qu'elle sous-traite — et la
+chaîne de dépendance qui devrait faire analyser l'appelé **avant** son appelant
+est rompue. Une fonction scalaire appelée au milieu d'un `SELECT` n'est pas de
+la plomberie : c'est très souvent *là* qu'est la formule métier.
+
+> Extraction déterministe correspondante :
+> `sql_body_analyzer.calls` (formes à mot-clé) + `callsInferred` (les trois
+> formes ci-dessus). L'audit du 2026-08-29 (C1) a montré que ces trois formes
+> n'étaient extraites dans **aucun** dialecte, et que `CALL spB(1,2)` remontait
+> un appelé tronqué `sp`. Quand le moteur expose un catalogue de dépendances
+> (`sys.sql_expression_dependencies`, `all_dependencies`, `pg_depend`), c'est
+> lui qui fait autorité — la lecture du texte n'est que le filet de sécurité.
+
 ---
 
 ## §3 Effets données : lire un CRUD honnête
@@ -215,6 +241,8 @@ façon :
 | Portée trigger | par **instruction** (lot) | `FOR EACH ROW` ou statement | `FOR EACH ROW` ou statement | `FOR EACH ROW` |
 | Renvoi de lignes affectées | `OUTPUT` | `RETURNING` | `RETURNING INTO` | (absent) |
 | Table temporaire | `#t` / `@t` | `TEMP TABLE` | `GLOBAL TEMPORARY` | `TEMPORARY` |
+| Appeler une procédure | `EXEC p @a=1` | `CALL p(1)` / `PERFORM f(1)` | `p(1);` (**aucun mot-clé**) | `CALL p(1)` |
+| Catalogue de dépendances | `sys.sql_expression_dependencies` | `pg_depend` | `all_dependencies` | (absent) |
 
 **Piège de portée** : en T-SQL un trigger est déclenché **une fois par
 instruction** (d'où §2.3) ; en PL/SQL et MySQL, `FOR EACH ROW` est courant. Ne

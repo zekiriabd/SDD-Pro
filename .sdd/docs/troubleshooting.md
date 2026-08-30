@@ -494,7 +494,8 @@ know what you're doing** — readiness gate is your safety net.
 update with your security officer (audit-logged decision).
 
 ### `[SCHEMA_MISMATCH]`
-**Symptom** : `dev-backend` fails STEP 4.5 with `[SCHEMA_MISMATCH]`.
+**Symptom** : `dev-backend` fails STEP 5 with `[SCHEMA_MISMATCH]` (schema
+loaded at STEP 3, consumed for plan/DTOs at STEP 5).
 **Cause** : your US references entity `User.role` but `schema.json` does
 not declare `role` on `User`.
 **Fix** : update `## Data Model` in the FEAT and re-run `/arch-init` to

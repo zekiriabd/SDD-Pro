@@ -13,6 +13,7 @@ realignment. Decision : keep as-is.
 """
 from __future__ import annotations
 
+import re
 import sqlite3
 import subprocess
 import sys
@@ -281,6 +282,36 @@ def fetch_findings(feat_n: int) -> tuple[list[Finding], list[str]]:
     return findings, missing
 
 
+#: Leading `./`, repeated. A prefix strip — NOT `lstrip("./")`, which strips a
+#: character set and eats any leading dot (audit M12, 2026-08-29).
+_LEADING_DOT_SLASH_RE = re.compile(r"^(?:\./)+")
+
+#: Repo prefixes stripped so paths from different auditor scopes converge.
+#: Order matters — longest first.
+_PATH_PREFIXES: tuple[str, ...] = (
+    "workspace/src/",
+    "workspace/",
+    "src/",
+)
+
+
+def _segment_prefix_index(s: str, prefix: str) -> int | None:
+    """Index of `prefix` in `s` where it starts a path SEGMENT, else None.
+
+    Audit M12 — a plain `s.find("src/")` matches mid-segment, so
+    `mysrc/Auth.cs` normalized to the same key as `src/Auth.cs` and one of
+    the two findings was silently dropped by the dedup pass.
+    """
+    start = 0
+    while True:
+        idx = s.find(prefix, start)
+        if idx < 0:
+            return None
+        if idx == 0 or s[idx - 1] == "/":
+            return idx
+        start = idx + 1
+
+
 def _normalize_path(p: str | None) -> str:
     """v7.0.0 audit §6.R3 — normalize finding file paths for cross-source dedup.
 
@@ -299,19 +330,28 @@ def _normalize_path(p: str | None) -> str:
     """
     if not p:
         return ""
-    # Normalize separators + strip leading ./ and redundant slashes
-    s = p.replace("\\", "/").lstrip("./").lower()
+    # Normalize separators + strip redundant slashes.
+    #
+    # Audit M12 (2026-08-29) — the leading `./` strip used to be
+    # `s.lstrip("./")`, which removes a *character set*, not a prefix: every
+    # leading `.` and `/` in any order disappears. `.sdd/x` became `sdd/x`
+    # and, worse, any path whose first characters are dots/slashes lost them
+    # silently. Combined with the substring `find()` below (kept: it is what
+    # lets an absolute path converge with a relative one), unrelated files
+    # collided on the same dedup key and the lower-severity finding was
+    # dropped without trace. `^(\./)+` strips exactly what was intended.
+    s = _LEADING_DOT_SLASH_RE.sub("", p.replace("\\", "/")).lower()
     while "//" in s:
         s = s.replace("//", "/")
-    # Strip well-known repo prefixes so paths from different scopes converge
-    PREFIXES = (
-        "workspace/src/",
-        "workspace/",
-        "src/",
-    )
-    for prefix in PREFIXES:
-        idx = s.find(prefix)
-        if idx >= 0:
+    # Strip well-known repo prefixes so paths from different scopes converge.
+    #
+    # Audit M12 — anchored on a SEGMENT boundary. `find("src/")` matched
+    # mid-segment, so `mysrc/Auth.cs` was treated as `src/Auth.cs`: two
+    # unrelated files, one dedup key, one finding silently discarded. The
+    # prefix must start the string or follow a `/`.
+    for prefix in _PATH_PREFIXES:
+        idx = _segment_prefix_index(s, prefix)
+        if idx is not None:
             # Keep everything from the first match of the prefix forward
             # (this handles both absolute paths and relative ones uniformly)
             s = s[idx + len(prefix):]

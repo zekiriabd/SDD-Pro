@@ -22,13 +22,13 @@ Lancer la **Phase 4** : traduire les templates legacy d'une unité U-N en mockup
 1. Phase 1 + Phase 3 préalables pour cette unité :
    - `workspace/old/{P}/.sys/inventory.json` contient `units[id={U-N}]`
    - `inventory.json._featAllocations[{U-N}]` renseigné → résolution `n` figée
-   - `workspace/feats/{n}-{Name}.md` existe (sinon → ERROR `[REVERSE_NO_SOURCE]`)
+   - `workspace/feats/{n}-{FeatName}.md` existe (sinon → ERROR `[REVERSE_NO_SOURCE]`)
 2. Les `units[U-N].evidenceFiles` contiennent au moins 1 fichier UI (`.aspx`, `.ascx`, `.cshtml`, `.jsp`, `.blade.php`, `.html`, `.dfm`, `.frm`, `.xaml`). Sinon → SKIP silencieux (unité backend-only sans UI). (`.xaml` ajouté 2026-06-10 — audit M12 : WPF supporté en Phase 1 mais SKIPpé en silence en Phase 4.)
 
 ## Actions
 
 1. **Spawn unique** `Agent(reverse-ui-extractor)` avec args = `{U-N}`
-2. L'agent suit STEP 1 à 5 documenté dans `.claude/agents/reverse-ui-extractor.md`
+2. L'agent suit STEP 1 à 5 documenté dans `.sdd/agents/reverse-ui-extractor.md`
 3. Délégation scripts déterministes : `css_palette_extractor` + `ui_template_parser`
 4. Génération 1-5 fichiers HTML par unité (selon écrans détectés)
 5. Émission ligne chat finale `[REVERSE] {U-N} → {M} écran(s) UI. (75%)`

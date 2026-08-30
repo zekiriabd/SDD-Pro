@@ -32,6 +32,7 @@ Public API:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import time
 from pathlib import Path
@@ -284,9 +285,111 @@ def fetch_dependency_rows(conn, dialect: Dialect) -> list[tuple]:
     return rows
 
 
+def fetch_param_rows(conn, dialect: Dialect) -> list[tuple]:
+    """Run the dialect's OPTIONAL catalog parameter query (read-only).
+
+    Returns rows in PARAM_ROW order, or [] if the dialect declares no params
+    query (its params are already fully recoverable from the body header).
+    """
+    if not dialect.params_query:
+        return []
+    assert_readonly(dialect.params_query)
+    cur = conn.cursor()
+    cur.execute(dialect.params_query)
+    rows = [tuple(r) for r in cur.fetchall()]
+    cur.close()
+    return rows
+
+
+def _params_by_fq(rows: list[tuple]) -> dict[str, list[dict[str, Any]]]:
+    """Group PARAM_ROW rows into the same `{name, type, output}` shape the
+    body-header regex (`sql_body_analyzer._params_from_header`) already
+    produces, keyed by lowercased `schema.routine`, ordinal-ordered.
+    """
+    from sdd_reverse.dialects.base import PARAM_ROW
+    col = {c: i for i, c in enumerate(PARAM_ROW)}
+    by_fq: dict[str, list[tuple[int, dict[str, Any]]]] = {}
+    for row in rows:
+        fq = f"{row[col['schema']]}.{row[col['routine']]}".lower()
+        mode = str(row[col["mode"]] or "").upper()
+        by_fq.setdefault(fq, []).append((
+            int(row[col["ordinal"]] or 0),
+            {
+                "name": str(row[col["name"]]),
+                "type": str(row[col["type"]] or ""),
+                "output": mode in ("OUT", "INOUT"),
+            },
+        ))
+    return {fq: [p for _, p in sorted(entries)] for fq, entries in by_fq.items()}
+
+
 # --------------------------------------------------------------------------- #
 # Analysis + snapshot layer (PURE — offline-testable)
 # --------------------------------------------------------------------------- #
+
+def _snapshot_content(body: str) -> str:
+    """Exactly the bytes `write_snapshot` will put on disk for this body."""
+    return body if body.endswith("\n") else body + "\n"
+
+
+def body_hash(body: str) -> str:
+    """sha256 of the routine body, or '' when there is none (encrypted object).
+
+    Same construction as `build_proc_us._snapshot_hash` (which hashes the
+    snapshot file), so the two agree on what "the body changed" means.
+
+    Load-bearing for M2 (audit 2026-08-29): `context_version()` hashes the FACTS,
+    and the facts used to describe only the SHAPE of a body — line count,
+    parameters, tables, calls, branch count. Editing a threshold inside an
+    existing `IF` changed the behaviour of the database without changing any of
+    those, so the context version stayed identical and `diff_contexts` reported
+    no drift on a routine whose meaning had moved.
+    """
+    if not body:
+        return ""
+    digest = hashlib.sha256(_snapshot_content(body).encode("utf-8")).hexdigest()
+    return "sha256:" + digest
+
+
+def _norm_fq(ident: str) -> str:
+    if not ident:
+        return ""
+    return ident.strip().strip("[]`\"").strip().lower()
+
+
+def attach_catalog_calls(model: dict[str, Any]) -> dict[str, Any]:
+    """Project the catalog-sourced object→object edges onto each routine record.
+
+    C2 (audit 2026-08-29). `merge_catalog_dependencies` folds the engine's own
+    dependency catalog into `model["dependencyGraph"]` — authoritative data that
+    resolves synonyms, renames and cross-schema references the body regex cannot.
+    But `plan_waves` orders on the ROUTINE records, not on that graph, so the
+    catalog data was collected and then discarded for the one purpose it is best
+    at. This projects it back where the planner will see it, as `catalogCalls`.
+
+    Only edges whose BOTH ends are routines in this model are kept: a dependency
+    on a table is already covered by `tablesRead`/`tablesWritten` and would add a
+    node the wave planner has no business ordering.
+    """
+    graph = model.get("dependencyGraph") or {}
+    by_norm = {_norm_fq(str(p.get("fqName"))): str(p.get("fqName"))
+               for p in model.get("procedures") or []}
+    per_src: dict[str, set[str]] = {}
+    for edge in graph.get("edges") or []:
+        if "catalog" not in str(edge.get("source", "")):
+            continue
+        src, dst = _norm_fq(str(edge.get("from"))), _norm_fq(str(edge.get("to")))
+        if src == dst or src not in by_norm or dst not in by_norm:
+            continue
+        per_src.setdefault(src, set()).add(by_norm[dst])
+    for p in model.get("procedures") or []:
+        names = sorted(per_src.get(_norm_fq(str(p.get("fqName"))), ()))
+        if names:
+            p["catalogCalls"] = names
+        else:
+            p.pop("catalogCalls", None)
+    return model
+
 
 def build_introspection(
     rows: list[tuple],
@@ -296,9 +399,18 @@ def build_introspection(
     database: str,
     lang_cap: str = "high",
     proc: str | None = None,
+    param_rows: list[tuple] | None = None,
 ) -> dict[str, Any]:
-    """Turn catalog rows into the introspection model (no secrets, no connection)."""
+    """Turn catalog rows into the introspection model (no secrets, no connection).
+
+    `param_rows` (audit 2026-08-29 m2, optional) — catalog-sourced PARAM_ROW
+    rows, used to OVERRIDE the body-header-parsed params for a routine when
+    the dialect's own catalog is the only place they are recoverable (e.g.
+    MySQL, whose `ROUTINE_DEFINITION` never includes the signature). Absent or
+    empty is a no-op: the body-derived `params` stands as before.
+    """
     col = {c: i for i, c in enumerate(ROUTINE_COLUMNS)}
+    catalog_params = _params_by_fq(param_rows) if param_rows else {}
     procedures: list[dict[str, Any]] = []
     call_graph: list[dict[str, str]] = []
     encrypted: list[str] = []
@@ -314,6 +426,15 @@ def build_introspection(
         fq = f"{schema}.{name}"
 
         signals = analyze_routine(fq, body)
+        # Catalog params (when the dialect declares a params_query) override
+        # the body-header regex BEFORE complexity/confidence scoring, so a
+        # MySQL routine with a wide signature is still weighed on real param
+        # count instead of the 0 the body text can never reveal.
+        params = catalog_params.get(fq.lower())
+        if params is not None:
+            signals["params"] = params
+        else:
+            params = signals["params"]
         conf = "low" if is_enc else confidence_signal(signals, lang_cap)
         if is_enc:
             encrypted.append(fq)
@@ -329,7 +450,7 @@ def build_introspection(
             "routineType": rtype,
             "encrypted": is_enc,
             "lineCount": signals["lineCount"],
-            "params": signals["params"],
+            "params": params,
             "tablesRead": signals["tablesRead"],
             "tablesWritten": signals["tablesWritten"],
             # Which statement touched each table. `sql_body_analyzer` has always
@@ -337,12 +458,20 @@ def build_introspection(
             # matrix downstream could only say "written", never C vs U vs D.
             "writeKinds": signals.get("writeKinds", {}),
             "callsProcs": signals["calls"],
+            # C1 — keyword-less invocations (PL/SQL `pkg.proc(…)`, scalar
+            # functions inside an expression). Kept apart from `callsProcs`
+            # because it is a heuristic: consumers resolve it against the real
+            # object set and drop what does not match, so it can only add a true
+            # edge, never a phantom unresolved callee.
+            "callsInferred": signals.get("callsInferred", []),
             "branches": signals["branches"],
             "raises": signals["raises"],
             "hasTransaction": signals["hasTransaction"],
             "hasTryCatch": signals["hasTryCatch"],
             "dynamicSql": signals["dynamicSql"],
             "cursors": signals["cursors"],
+            # M2 — content, not just shape. See `body_hash`.
+            "bodyHash": body_hash(body),
             "confidenceEstimate": conf,
             "modified": str(modified) if modified is not None else None,
             "_body": body,           # consumed by write_snapshot, stripped after
@@ -465,6 +594,7 @@ def introspect(
     conn_str = compose_connection_string(cfg, dialect)
     conn = connect(conn_str, dialect)
     dep_rows: list[tuple] = []
+    param_rows: list[tuple] = []
     schema_rows: dict[str, list[tuple]] = {}
     catalog_objects: list[dict[str, Any]] = []
     schema_warnings: list[str] = []
@@ -478,6 +608,14 @@ def introspect(
                 dep_rows = fetch_dependency_rows(conn, dialect)
             except Exception:  # pragma: no cover - best effort
                 dep_rows = []
+        # m2 (audit 2026-08-29) — catalog-sourced params for dialects whose body
+        # text never carries the signature (MySQL). Same whole-DB-only, same
+        # best-effort discipline as the dependency query above.
+        if not proc and dialect.params_query:
+            try:
+                param_rows = fetch_param_rows(conn, dialect)
+            except Exception:  # pragma: no cover - best effort
+                param_rows = []
         if not proc and with_schema:
             from sdd_reverse import db_schema_live as dsl
             schema_rows, w1 = dsl.fetch_structure(conn, dialect)
@@ -499,7 +637,8 @@ def introspect(
         rows, filter_report = obj_filter.apply(rows, ROUTINE_COLUMNS)
 
     model = build_introspection(
-        rows, dialect, server=cfg.host, database=cfg.name, lang_cap=lang_cap, proc=proc
+        rows, dialect, server=cfg.host, database=cfg.name, lang_cap=lang_cap, proc=proc,
+        param_rows=param_rows,
     )
     if filter_report.get("active"):
         model["objectFilter"] = filter_report
@@ -507,6 +646,10 @@ def introspect(
         from sdd_reverse.dialects.base import DEPENDENCY_COLUMNS
         from sdd_reverse.sql_dependency_graph import merge_catalog_dependencies
         merge_catalog_dependencies(model["dependencyGraph"], dep_rows, DEPENDENCY_COLUMNS)
+        # C2 — project those authoritative edges back onto the routine records,
+        # which is the shape `plan_waves` consumes. Without this the catalog was
+        # read, guarded, merged into a graph, and then ignored for ordering.
+        attach_catalog_calls(model)
     model = write_snapshot(project_root, model)
 
     # C1 — live structure written alongside, in the SAME contract the static

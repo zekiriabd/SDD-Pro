@@ -246,12 +246,27 @@ def check_no_dangling_spawn() -> CheckResult:
       2. every reverse-* agent block declared under `agents:` has a `.md` on
          disk ;
       3. every `reverse-*.md` prompt on disk is declared as an `agents:` block
-         (no orphan prompt).
+         (no orphan prompt) ;
+      4. (audit 2026-08-29, m1) every `sdd_reverse_scripts/*.py` has at least one
+         referrer somewhere in `.sdd/` — WARN, not FAIL.
 
     This is the gate that makes the 3a/3b/3c ladder migration safe : removing
     `reverse-functional-extractor` while a command still spawned it (or its
     prompt lingered) would FAIL here. Prose mentions in docs/rules/CHANGELOG
     are intentionally NOT checked (historical references are legitimate).
+
+    Scope note (audit 2026-08-29, m1) : despite its name this check only ever
+    looked at loader<->prompt WIRING — never at Python. Three orphan scripts sat
+    in `sdd_reverse_scripts/` with zero referrers anywhere in the repo and it
+    stayed green. Part (4) closes that blind spot so the name is honest. It is
+    deliberately WARN and not FAIL: a script landed one commit ahead of the
+    prompt that will call it is normal in-flight work, not a defect — the signal
+    is for the human, the gate stays on the wiring that can actually break a run.
+
+    Part (4) is a reachability scan since the M-1 follow-up (2026-08-30) : the
+    referrer set is computed per script, then réduit à point fixe — un orphelin
+    référencé uniquement par un autre orphelin est désormais rapporté (cluster
+    mort entier), plus seulement sa racine.
     """
     # Audit 2026-08-26 : le manifeste a demenage en `.sdd/` a la migration
     # Phase 2 (foyer neutre). Le chemin `.claude/` etant reste code en dur, ce
@@ -309,7 +324,79 @@ def check_no_dangling_spawn() -> CheckResult:
             f"{len(violations)} dead-wiring / orphan issue(s) (ADR reverse-spec-ladder D2)",
             {"violations": violations[:10]},
         )
+
+    # (4) Python scripts with zero referrers — WARN (see the scope note above).
+    orphan_scripts = _unreferenced_reverse_scripts()
+    if orphan_scripts:
+        return CheckResult(
+            "reverse-no-dead-code", "WARN",
+            f"wiring OK, but {len(orphan_scripts)} script(s) under "
+            f"sdd_reverse_scripts/ have no referrer in .sdd/ "
+            f"(dead code, or wiring still to come)",
+            {"unreferenced_scripts": orphan_scripts},
+        )
     return CheckResult("reverse-no-dead-code", "OK")
+
+
+#: Referrers are looked for in the manifests, prompts, docs and Python that make
+#: up the module — never in `.git`, caches or generated facades.
+_REF_SEARCH_GLOBS = ("*.py", "*.md", "*.yml", "*.yaml", "*.json")
+_REF_SKIP_PARTS = frozenset({"__pycache__", ".build", ".git", "node_modules"})
+
+
+def _unreferenced_reverse_scripts() -> list[str]:
+    """Names of `sdd_reverse_scripts/*.py` unreachable from any live referrer.
+
+    Fixed-point extension (M-1 follow-up, audit 2026-08-30) : the original scan
+    was direct-reference only, so an orphan referenced solely by ANOTHER orphan
+    script stayed invisible (e.g. `promote_confidence` cited only by an orphan
+    `reverse_report`). We now record, per script, WHICH files mention it, then
+    iterate: a script whose remaining referrers are all orphan scripts becomes
+    orphan itself, until nothing changes (point fixe).
+    """
+    scripts_dir = REPO_ROOT / ".sdd" / "python" / "sdd_reverse_scripts"
+    if not scripts_dir.is_dir():
+        return []
+    stems = {
+        p.stem for p in scripts_dir.glob("*.py")
+        if p.stem != "__init__" and not p.stem.startswith("_")
+    }
+    if not stems:
+        return []
+    # Pass 1 — record referrer paths per stem (one filesystem walk).
+    referrers: dict[str, set[Path]] = {stem: set() for stem in stems}
+    for pattern in _REF_SEARCH_GLOBS:
+        for path in (REPO_ROOT / ".sdd").rglob(pattern):
+            if any(part in _REF_SKIP_PARTS for part in path.parts):
+                continue
+            # This very file names scripts in prose; a checker must not be the
+            # reason its own subject looks alive.
+            if path.resolve() == Path(__file__).resolve():
+                continue
+            try:
+                text = path.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
+            for stem in stems:
+                # A file never counts as its own referrer.
+                if path.parent == scripts_dir and path.stem == stem:
+                    continue
+                if stem in text:
+                    referrers[stem].add(path)
+    # Pass 2 — fixed point : discard referrers that are themselves orphans.
+    orphans: set[str] = set()
+    changed = True
+    while changed:
+        changed = False
+        for stem in sorted(stems - orphans):
+            live = [
+                p for p in referrers[stem]
+                if not (p.parent == scripts_dir and p.stem in orphans)
+            ]
+            if not live:
+                orphans.add(stem)
+                changed = True
+    return sorted(orphans)
 
 
 def check_helper_parity_drift() -> CheckResult:
@@ -543,6 +630,66 @@ def check_validator_parity_drift() -> CheckResult:
     return CheckResult("validator-parity-drift", "OK")
 
 
+def check_dialect_queries_readonly() -> CheckResult:
+    """Every registered dialect's catalog query constants must be pure reads.
+
+    m4, audit 2026-08-29. `readonly_guard`'s own docstring claimed this check
+    lived here; it did not — the only verification was inside the pytest suite,
+    so a Tech Lead running the smoke script got an "all invariants OK" that said
+    nothing about the module's headline safety property.
+
+    Constructing each `Dialect` re-runs `Dialect.__post_init__`, which validates
+    the routine queries, the optional dependency query, the structure queries and
+    the catalog-object queries. Every constant is then re-checked here explicitly
+    so the count in the message is the real number of guarded statements, not a
+    claim about them.
+    """
+    try:
+        from sdd_reverse.dialects import get_dialect, supported_db_types
+        from sdd_reverse.readonly_guard import is_readonly
+    except Exception as exc:  # pragma: no cover - layout guard
+        return CheckResult(
+            "reverse-db-readonly-dialect-queries", "FAIL",
+            f"dialect registry not importable: {exc}",
+        )
+
+    offenders: list[str] = []
+    checked = 0
+    engines = supported_db_types()
+    for eng in engines:
+        try:
+            d = get_dialect(eng)          # re-runs __post_init__ validation
+        except Exception as exc:
+            offenders.append(f"{eng}: construction refused ({exc})")
+            continue
+        named: list[tuple[str, str]] = [
+            ("list_routines_sql", d.list_routines_sql),
+            ("single_routine_sql", d.single_routine_sql),
+        ]
+        if d.dependency_query:
+            named.append(("dependency_query", d.dependency_query))
+        named += [(f"schema_queries[{n}]", q) for n, q in d.schema_queries]
+        named += [(f"catalog_object_queries[{n}]", q)
+                  for n, q in d.catalog_object_queries]
+        for label, sql in named:
+            checked += 1
+            if not is_readonly(sql):
+                offenders.append(f"{eng}.{label}")
+
+    if offenders:
+        return CheckResult(
+            "reverse-db-readonly-dialect-queries", "FAIL",
+            f"non-read-only catalog query constants: {offenders}",
+            {"engines": engines, "checked": checked},
+        )
+    return CheckResult(
+        "reverse-db-readonly-dialect-queries", "OK",
+        f"{checked} catalog query constant(s) across {len(engines)} engine(s) "
+        f"pass readonly_guard.is_readonly",
+        {"engines": engines, "checked": checked},
+    )
+
+
 def check_lock_format() -> CheckResult:
     """If .alloc.lock exists, validate its JSON shape (informational)."""
     lock = workspace_root(REPO_ROOT) / "feats" / ".alloc.lock"
@@ -565,13 +712,15 @@ def check_lock_format() -> CheckResult:
     return CheckResult("reverse-lock-format-valid", "OK")
 
 
-# Smoke check registry — 13 deterministic checks (audit 2026-06-11 MA-8 :
-# the doc/manifest historically said "11" but the registry has grown to 13
-# after the P1.6 closure added 4 direct-enforcement checks while one was
-# folded in elsewhere). The authoritative count is `len(_ALL_CHECKS)` ; the
-# anti-rot test `tests/test_reverse_smoke_selfcheck.py` pins it to 13 and
-# cross-maps every INVARIANTS.reverse.yml id to a check here.
-_EXPECTED_CHECK_COUNT = 13
+# Smoke check registry — 14 deterministic checks (audit 2026-06-11 MA-8 :
+# the doc/manifest historically said "11" but the registry has grown after the
+# P1.6 closure added 4 direct-enforcement checks while one was folded in
+# elsewhere ; audit 2026-08-29 m4 added the dialect read-only check, which
+# `readonly_guard`'s docstring had claimed lived here for months without it
+# existing). The authoritative count is `len(_ALL_CHECKS)` ; the anti-rot test
+# `tests/test_reverse_smoke_selfcheck.py` pins it and cross-maps every
+# INVARIANTS.reverse.yml id to a check here.
+_EXPECTED_CHECK_COUNT = 14
 _ALL_CHECKS = [
     check_isolation_no_cross_imports,       # reverse-isolation-no-cross-imports
     check_loader_autonomous,                # reverse-loader-autonomous
@@ -588,6 +737,8 @@ _ALL_CHECKS = [
     check_reverse_confidence_enum_strict,   # reverse-confidence-enum-strict
     check_reverse_gate_comment_sync,        # reverse-gate-comment-sync
     check_validator_parity_drift,           # validator-parity-drift (drift_check)
+    # m4 closure (2026-08-29) — the read-only barrier, verifiable without pytest
+    check_dialect_queries_readonly,         # reverse-db-readonly-dialect-queries
 ]
 assert len(_ALL_CHECKS) == _EXPECTED_CHECK_COUNT, (
     f"reverse_smoke registry drift: {len(_ALL_CHECKS)} checks "

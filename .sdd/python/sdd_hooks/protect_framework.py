@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import os
 import sys
+from fnmatch import fnmatch
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -83,6 +84,16 @@ FRAMEWORK_OWNED: tuple[str, ...] = (
     ".gemini/GEMINI.md",
     ".gemini/commands/",
     ".gemini/settings.json",
+    # db-reverse fact layer (workspace/old/{P}/.sys/) — written ONLY by
+    # db_context_build.py --merge-hypotheses, never directly by an agent.
+    # Blocks reverse-db-architect (or any other agent) from writing the
+    # facts branch directly, bypassing merge_architect_output's 5-key
+    # whitelist. db-context.hypotheses.json is deliberately ABSENT here —
+    # that file is the architect's own, legitimate output.
+    "workspace/old/*/.sys/db-context.json",
+    "workspace/old/*/.sys/db-context.digest.json",
+    "workspace/old/*/.sys/db-schema.json",
+    "workspace/old/*/.sys/db-introspection.json",
 )
 
 
@@ -116,7 +127,12 @@ def _is_framework_path(file_path: str, repo: Path) -> bool:
     rel_str = normalize(str(rel))
     # Strict prefix match : "foo/.claude/rules/" must NOT match "rules/" pattern
     for owned in FRAMEWORK_OWNED:
-        if owned.endswith("/"):
+        if "*" in owned:
+            # Per-project glob (e.g. "workspace/old/*/.sys/db-context.json") —
+            # exact fnmatch, no prefix semantics.
+            if fnmatch(rel_str, owned):
+                return True
+        elif owned.endswith("/"):
             # Directory : exact prefix from repo root
             if rel_str.startswith(owned):
                 return True
@@ -142,6 +158,14 @@ def _resolve_mode() -> str:
 def _main_inner() -> int:
     mode = _resolve_mode()
     if mode == "off":
+        # Audit M8 (2026-08-29) — `SDD_PROTECT_FRAMEWORK_MODE=off` is
+        # documented as an audit-logged bypass, but the pre-fix code returned
+        # HOOK_ALLOW in total silence: the framework-write protection could be
+        # disabled for an entire session with no trace anywhere. Emit the same
+        # kind of stderr audit line the strict branch below already uses.
+        # Kept cheap and payload-free — this fires before reading hook input.
+        warn("[protect-framework] BYPASS via SDD_PROTECT_FRAMEWORK_MODE=off — "
+             "la protection d'écriture sur .claude/** est DÉSACTIVÉE")
         return HOOK_ALLOW
     payload = read_hook_input()
     file_path = get_file_path(payload)

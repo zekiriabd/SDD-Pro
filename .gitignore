@@ -95,9 +95,9 @@ node_modules/
 **/*.sddtmp
 **/.sys/.validation/*.tmp
 
-# MCPB bundle build artifact (régénérable via python -m sdd_mcp.build_mcpb)
-.sdd/python/.mcpb-build/
-.sdd/python/*.mcpb
+# Cache pytest/outillage sous .sdd/python (protection explicite, non dépendante
+# du .gitignore auto-écrit par pytest dans le répertoire de cache)
+.sdd/python/.cache/
 
 # .NET / Java / Node build outputs (au cas où des projets seraient générés à la racine)
 **/bin/

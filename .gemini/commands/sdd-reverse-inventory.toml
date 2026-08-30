@@ -41,7 +41,19 @@ Si manquant → STOP + ERROR `[REVERSE_NO_SOURCE]` ou `[INFRA_BLOCKED]`.
 
 1. **Spawn unique** `Agent(reverse-inventory)` avec args = `{LegacyProject}`
 2. L'agent vérifie préconditions + invoque `python .sdd/python/sdd_reverse_scripts/reverse_inventory.py --project workspace/old/{LegacyProject}` (+ `--use-cache` / `--refresh` / `--json` si transmis — invocation canonique par chemin de fichier, C6)
-3. Le script écrit les 5 artefacts `.sys/*`
+3. Le script écrit les **9 artefacts** `.sys/*` (recompte audit 2026-08-30 — `reverse_inventory.py` écrit aussi les 4 artefacts L0/L1) :
+   - `inventory.json` — unités fonctionnelles U-N (fingerprint stable) + evidence + allocations
+   - `inventory.md` — rendu FR (enrichi ensuite par l'agent, étape 4)
+   - `code-graph.json` — graphe de classes symbol-level + rôles (L0)
+   - `data-access.json` — SQL inline + appels de procédures stockées + params (L1)
+   - `config.json` — connection strings, secrets masqués (L1)
+   - `dependencies.json` — NuGet/.csproj/PackageReference + assembly refs + DLLs bin (L1)
+   - `db-schema.json` — schéma DB basique déduit du code
+   - `db-schema.md` — rendu markdown du schéma
+   - `language-detected.json` — langages détectés + confidence caps appliqués
+
+   `dependencies.json` et `config.json` sont des **pré-conditions de
+   `/sdd-reverse-crosscut`** (FEATs transversales Librairies + Database).
 4. L'agent enrichit `inventory.md` FR avec résumé exécutif + regroupements sémantiques
 5. Émission ligne chat finale `[REVERSE] {LegacyProject} : N unités, M entités, langage primaire {lang}. (15%)`
 
@@ -54,6 +66,10 @@ Si `inventory.json` existant et passe la gate ADV-23 (`schemaVersion == 1` ET `_
 ```
 workspace/old/{LegacyProject}/.sys/
 ├── inventory.{md,json}
+├── code-graph.json                (L0)
+├── data-access.json               (L1)
+├── config.json                    (L1 — pré-condition /sdd-reverse-crosscut)
+├── dependencies.json              (L1 — pré-condition /sdd-reverse-crosscut)
 ├── db-schema.{md,json}
 └── language-detected.json
 ```

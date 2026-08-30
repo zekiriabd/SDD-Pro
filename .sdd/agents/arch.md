@@ -130,7 +130,7 @@ de `workspace/stack/stack.md`. Si `## Active Tech Specs` vide → ERROR :
 
 ```
 ERROR: agent arch — aucun stack actif
-CAUSE: ## Active Tech Specs vide dans workspace/stack/stack.md
+CAUSE: [STACK_MALFORMED] ## Active Tech Specs vide dans workspace/stack/stack.md
 FIX: décommenter au moins un stack (backend/frontend/fullstack/mobiles)
 ```
 

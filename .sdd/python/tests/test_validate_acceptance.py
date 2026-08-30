@@ -45,13 +45,35 @@ class TestValidateAcceptanceScript(unittest.TestCase):
     def _report_path(self) -> Path:
         return self.root / "workspace" / ".sys" / ".acceptance" / "acceptance.json"
 
-    def test_no_stack_md_skipped(self):
-        # No stack.md → mode=off → skipped, exit 0
+    def test_no_stack_md_is_unresolved_not_off(self):
+        """Regression — audit C1 (2026-08-29).
+
+        `workspace/stack/` is gitignored, so `stack.md` is absent on every
+        fresh clone / CI checkout. Before this fix that resolved to
+        ``mode=off`` → ``verdict=skipped`` → the hook returned HOOK_ALLOW,
+        i.e. the Acceptance Gate was silently dead on every clone.
+
+        A missing config file must now surface as a precondition failure
+        (`[INFRA_BLOCKED]`, exit 3, verdict=unresolved), NEVER as an
+        allowing gate. The legitimate `AcceptanceGate: off` opt-out is
+        covered by `test_mode_off_skipped` below and stays untouched.
+        """
         with patch.object(sys, "argv", ["validate_acceptance.py"]):
             rc = va.main()
-        self.assertEqual(rc, 0)
+        self.assertEqual(rc, 3, "missing stack.md must exit INFRA_BLOCKED (3)")
         report = json.loads(self._report_path().read_text(encoding="utf-8"))
-        self.assertEqual(report["verdict"], "skipped")
+        self.assertEqual(report["verdict"], "unresolved")
+        self.assertEqual(report["mode"], "unresolved")
+        self.assertNotEqual(report["verdict"], "skipped")
+        # And the hook must NOT allow on that report.
+        self.assertEqual(vag.main(), 2, "unresolved verdict must DENY")
+
+    def test_read_config_missing_stack_md_never_returns_off(self):
+        """`_read_acceptance_config` must not conflate absent-file with off."""
+        cfg = va._read_acceptance_config(self.root)
+        self.assertEqual(cfg["mode"], "unresolved")
+        self.assertNotEqual(cfg["mode"], "off")
+        self.assertIn("unresolved_reason", cfg)
 
     def test_mode_off_skipped(self):
         self._write_stack("off")
@@ -139,6 +161,21 @@ class TestAcceptanceGateHook(unittest.TestCase):
         self._write_report({"verdict": "skipped", "mode": "off", "failures": []})
         rc = vag.main()
         self.assertEqual(rc, 0)
+
+    def test_unresolved_verdict_denies(self):
+        """Regression — audit C1 (2026-08-29). Mode-unknown never allows."""
+        self._write_report({
+            "verdict": "unresolved", "mode": "unresolved",
+            "reason": "workspace/stack/stack.md absent", "failures": [],
+        })
+        self.assertEqual(vag.main(), 2)  # HOOK_DENY
+
+    def test_unresolved_verdict_with_bypass_allows(self):
+        self._write_report({
+            "verdict": "unresolved", "mode": "unresolved", "failures": [],
+        })
+        with patch.dict(os.environ, {"SDD_ALLOW_ACCEPTANCE_BYPASS": "1"}):
+            self.assertEqual(vag.main(), 0)
 
     def test_bypass_verdict_allows(self):
         self._write_report({"verdict": "bypass", "mode": "bypass", "failures": []})

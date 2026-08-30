@@ -23,11 +23,11 @@ telemetry:
   optout_available: true               # Zero Data Retention (enterprise + special API keys)
   optout_mechanism: "Anthropic ZDR flag (enterprise / trust-center request)"
   reference_url: "https://trust.anthropic.com/"
-pricing:                 # USD per million tokens — aligned with sdd_lib/pricing.py PRICING (2026-07-26)
+pricing:                 # USD per million tokens — aligned with sdd_lib/pricing.py PRICING (2026-08-30)
   # SSoT machine : sdd_lib/pricing.py. Ce bloc miroir permet à
   # impact_report.py de valider `pricing_present=True` (évite le warning
   # [TELEMETRY_UNAVAILABLE] à chaque `harness_build`). Toute modification
   # doit être répercutée dans pricing.py + bump `PRICING_LAST_REVIEWED`.
-  claude-opus-4-8:   {input: 15.00, output: 75.00, cache_read: 1.50, cache_creation: 18.75}
+  claude-opus-4-8:   {input:  5.00, output: 25.00, cache_read: 0.50, cache_creation:  6.25}
   claude-sonnet-4-6: {input:  3.00, output: 15.00, cache_read: 0.30, cache_creation:  3.75}
   claude-haiku-4-5:  {input:  1.00, output:  5.00, cache_read: 0.10, cache_creation:  1.25}

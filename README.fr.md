@@ -99,7 +99,7 @@ SDD_APP_NAME=MyApp SDD_COMBO=c1 python bootstrap.py --auto-init
 | Reviewers post-code (5 angles, adversarial actif par défaut) | **5** ✅ | 1 | 1 | 1 | 2 |
 | Anti-derive strict (matrice d'ownership + STOP bloquant) | ✅ | partiel | ❌ | partiel | partiel |
 | Catalogues de dépendances machine-readable (`.libs.json` + CVE + LTS) | ✅ **30** | ❌ | ❌ | ❌ | ❌ |
-| Taxonomie d'erreurs cross-agent (`[CLASS]`) | ✅ **191** | ❌ | ❌ | ❌ | ❌ |
+| Taxonomie d'erreurs cross-agent (`[CLASS]`) | ✅ **193** | ❌ | ❌ | ❌ | ❌ |
 | Invariants load-bearing déclarés **et testés** | ✅ **31** | ❌ | ❌ | ❌ | ❌ |
 | Télémétrie SQLite + statusline IDE (coût, phase, tokens) | ✅ | ❌ | partiel | partiel | ❌ |
 | Idempotence / reprise (checkpoint mode) | ✅ | ❌ | ❌ | partiel | ❌ |
@@ -435,7 +435,7 @@ pas d'un argumentaire :
 | Stacks (28 🟢 + 8 🟡) | **36** | `python .sdd/python/sdd_admin/framework_smoke.py` |
 | Catalogues de dépendances `.libs.json` | **30** | `find .sdd/stacks -name "*.libs.json" \| wc -l` |
 | Combos sous engagement SLA | **13** | [.sdd/templates/combos.json](.sdd/templates/combos.json) |
-| Classes d'erreur `[CLASS]` (16 familles) | **191** | [error-classification.md](.sdd/rules/error-classification.md) |
+| Classes d'erreur `[CLASS]` (16 familles) | **193** | [error-classification.md](.sdd/rules/error-classification.md) |
 | Clés Project Config | **55** | [.sdd/config.base.yml](.sdd/config.base.yml) |
 | Invariants load-bearing (14 forward + 17 reverse) | **31** | `INVARIANTS.yml` + `INVARIANTS.reverse.yml` |
 | Scripts déterministes (0 token) | **80** | `sdd_scripts/` + `sdd_reverse_scripts/` |

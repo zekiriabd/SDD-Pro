@@ -98,6 +98,20 @@ def test_committed_facade_matches_a_fresh_build(harness):
         f"{harness} : {len(missing)} fichier(s) produits par le build et absents "
         f"de la façade committée : {missing[:8]}")
 
+    # Audit M3 (2026-08-29) — sens inverse. Avant ce fix la parité ne
+    # regardait QUE les fichiers manquants : un fichier committé dans la
+    # façade sans source correspondante sous `.sdd/` (copie oubliée, agent
+    # renommé sans supprimer l'ancien, édition à la main de la façade)
+    # passait indéfiniment. `INVARIANTS.yml` déclare `harness-parity` en
+    # `severity: critical` — « régénérations byte-identiques » implique les
+    # deux sens, pas seulement l'inclusion.
+    orphans = sorted(set(committed) - set(built))
+    assert not orphans, (
+        f"{harness} : {len(orphans)} fichier(s) présents dans la façade "
+        f"committée sans source correspondante sous .sdd/ : {orphans[:8]}. "
+        f"Supprimer le(s) fichier(s) orphelin(s) de {facade_rel}/ OU créer "
+        f"leur source dans le foyer neutre.")
+
     drifted = [name for name in sorted(built)
                if _norm(built[name]) != _norm(committed[name])]
     assert not drifted, (
@@ -139,3 +153,44 @@ def test_claude_facade_matches_a_fresh_build():
     assert not drifted, (
         f"{len(drifted)} fichier(s) de .claude/ ont dérivé du foyer neutre : "
         f"{drifted[:10]}. Régénérer avec harness_build.py puis recopier.")
+
+
+def test_claude_facade_has_no_orphan_files():
+    """Sens inverse : aucun fichier de `.claude/` sans source dans `.sdd/`.
+
+    Audit M3 (2026-08-29). Les tests de parité ne détectaient QUE l'absence
+    (`built - committed`) et la dérive de contenu. Un fichier **surnuméraire**
+    — agent renommé dont l'ancien nom survit dans la façade, commande copiée à
+    la main, brouillon oublié — n'était vu par rien, alors que Claude Code
+    **charge** tout ce qui traîne dans `.claude/agents/`. Un agent fantôme
+    reste donc spawnable indéfiniment.
+
+    Vérifié en dupliquant temporairement un agent sous un nom bidon : le test
+    échoue bien, puis repasse au vert une fois le fichier retiré.
+    """
+    root = repo_root()
+    out = root / ".sdd" / ".build" / "parity-test-claude-orphans"
+    proc = subprocess.run(
+        [sys.executable, str(root / ".sdd" / "harness_build.py"),
+         "--harness", "claude-code", "--provider", "anthropic",
+         "--out", str(out), "--agents-only", "--commands-only",
+         "--memory-only", "--rules-only"],
+        capture_output=True, text=True, timeout=300, cwd=str(root))
+    assert proc.returncode == 0, f"{proc.stdout}\n{proc.stderr}"
+
+    orphans: list[str] = []
+    for sub in ("agents", "commands", "rules"):
+        built_dir, facade_dir = out / sub, root / ".claude" / sub
+        if not built_dir.is_dir() or not facade_dir.is_dir():
+            continue
+        built = {p.name for p in built_dir.iterdir() if p.is_file()}
+        for p in sorted(facade_dir.iterdir()):
+            if p.is_file() and p.name not in built:
+                orphans.append(f"{sub}/{p.name}")
+
+    assert not orphans, (
+        f"{len(orphans)} fichier(s) de .claude/ n'ont AUCUNE source dans "
+        f".sdd/ : {orphans[:10]}. Claude Code charge tout le contenu de "
+        f".claude/agents|commands|rules — un orphelin reste actif sans que "
+        f"personne ne puisse le retrouver dans le foyer neutre. Supprimer "
+        f"l'orphelin, ou créer sa source sous .sdd/ puis régénérer.")

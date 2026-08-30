@@ -1,10 +1,16 @@
 ---
-# TOK-C1 (audit 2026-06-12) : chargement paresseux (path-scoped rule). Substance chargée
-# explicitement par dev-backend/frontend (STEP 3) + qa ; auto-injection au contact du code
-# généré / des rapports QA. Hors-périmètre (po, arch-init pré-scaffold, chat) : 0 token.
+# TOK-C2 (audit tokens 2026-08-30) : auto-injection pipeline RETIRÉE. Tous les
+# consommateurs la lisent DÉJÀ explicitement en STEP contexte (dev-backend/dev-frontend
+# STEP 3, qa STEP contexte, code-reviewer ; arch/po/arch-reviewer appliquent §1 Partie B
+# par référence @) — l'ex-portée `workspace/src/**` + `workspace/.sys/.validation/**`
+# créait donc un DOUBLE-chargement (~28 KB × 2) pour chaque dev-* et qa.
+# La clé `paths:` reste présente car une rule SANS `paths:` est inconditionnelle
+# (mécanisme natif Claude Code — vérifié 2026-08-30) : portée réduite au fichier
+# lui-même (la rule ne s'injecte qu'en maintenance framework de sa propre source).
+# Chargement pipeline = Read explicite uniquement.
 paths:
-  - "workspace/src/**"
-  - "workspace/.sys/.validation/**"
+  - ".sdd/rules/build-and-loop.md"
+  - ".claude/rules/build-and-loop.md"
 ---
 
 # Règle — Build & Loop (Backend-First gate + Dev-shared patterns, consolidated v7.0.0)
@@ -141,7 +147,10 @@ Les callers legacy peuvent lire `verdict` ou `gate_passed`.
 
 ## 2. Boucle correction FAIL → PASS
 
-1. Consulter `api-tests.md` (par endpoint en échec)
+1. Consulter le rapport API Gate à la demande —
+   `query_console_db.py api-gate --feat {n} --format md` (par endpoint en
+   échec ; le fichier `api-tests.md` n'existe plus depuis 2026-07-06,
+   cf. §1.4 — DB-only)
 2. Corriger : (a) `/dev-backend {n}-{m}` (idempotent), (b) édit manuel
    backend, ou (c) édit test (QA ownership, dans `*.Tests/Api/`)
 3. Re-tester : `/qa-generate {n} --mode api-tests [--filter {endpoint}]`
@@ -394,7 +403,9 @@ domain-specific (DB read-only pour arch, périmètre QA pour qa, etc.).
      Q/R structuré PO humain ↔ LLM). Bullet 1 ne s'applique pas.
    - `arch` → `constitutioner` : `arch` écrit sentinel disque
      `workspace/.sys/.state/arch-ready-for-constitutioner.flag`,
-     spawn vit côté `/arch-init STEP 3.5` (no-spawn préservé).
+     spawn vit côté commandes orchestrantes — `/arch-init STEP 3.5` ET
+     `/dev-run STEP 5.bis` (fix FWD-C2 2026-06-12 : le pipeline nominal
+     `/sdd-full` → `/dev-run` consomme aussi le sentinel) — no-spawn préservé.
 
 ---
 

@@ -508,3 +508,40 @@ class TestLadderTraceabilityOnTheDbShape:
         # legitimate "not run yet", reported as such.
         assert report.get("shape") != "db-module"
         assert report["ran"] is False
+
+
+# --------------------------------------------------------------------------- #
+# D-M1 (2026-08-30) — the LLM template carries the deterministic contract
+# --------------------------------------------------------------------------- #
+
+class TestLlmTemplateContract:
+    """Le template des 4 analystes doit porter le MÊME contrat de frontmatter
+    que le chemin déterministe (`build_us`) : sans le sentinel de hash, le
+    `text.replace(HASH_SENTINEL, …)` de l'assembleur est un no-op sur le chemin
+    LLM et `[FEAT_HASH_MISMATCH]` y est mort ; sans `extraction: analyzed`, le
+    comptage `us-analyzed`/`us-templated` de la FEAT tombe en `unknown`.
+    """
+
+    TEMPLATE = _PY_ROOT / "sdd_reverse" / "us.proc.reverse.template.md"
+
+    def test_frontmatter_matches_the_deterministic_path(self):
+        text = self.TEMPLATE.read_text(encoding="utf-8")
+        # La MÊME constante que build_proc_us/build_proc_feats — pas une copie.
+        assert f"Parent FEAT hash: {build_proc_feats.HASH_SENTINEL}" in text
+        assert re.search(r"^extraction: analyzed$", text, re.MULTILINE)
+        assert "source-object-type: {objectType}" in text
+
+    def test_sections_the_analysts_must_fill_are_present(self):
+        text = self.TEMPLATE.read_text(encoding="utf-8")
+        assert "## Dependencies" in text
+        assert "## Hypothèses métier" in text
+        assert "## Covers" in text
+
+    def test_banner_is_family_parametric_not_hardcoded(self):
+        text = self.TEMPLATE.read_text(encoding="utf-8")
+        assert "{objectFamily}" in text
+        # L'en-tête ne doit plus hardcoder « procédure stockée » dans le corps
+        # de l'US (le placeholder vit dans la bannière, la famille est fournie
+        # par chaque spécialiste).
+        body = text.split("---", 1)[1]
+        assert "depuis la procédure stockée" not in body

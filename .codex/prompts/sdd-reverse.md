@@ -1,5 +1,5 @@
 <!-- GENERATED FROM .sdd/ (commande /sdd-reverse) — DO NOT EDIT -->
-<!-- Phase 3 du workflow reverse — SÉQUENCEUR de l'escalier ascendant pour UNE unité U-N (3a analyse → 3b user stories → 3c FEAT). Ne spawn AUCUN agent directement (no-spawn §9) — enchaîne /sdd-reverse-analyze + /sdd-reverse-stories + /sdd-reverse-feat. Output final workspace/feats/{n}-{Name}.md consommable par /sdd-full. -->
+<!-- Phase 3 du workflow reverse — SÉQUENCEUR de l'escalier ascendant pour UNE unité U-N (3a analyse → 3b user stories → 3c FEAT). Ne spawn AUCUN agent directement (no-spawn §9) — enchaîne /sdd-reverse-analyze + /sdd-reverse-stories + /sdd-reverse-feat. Output final workspace/feats/{n}-{FeatName}.md consommable par /sdd-full. -->
 <!-- ============================================================ -->
 <!-- IMPORTANT — SPAWN SEMANTICS UNDER CODEX (audit R10 2026-07-26) -->
 <!-- Toute mention `Task tool (subagent_type=X)`, `Agent(X)`, ou    -->
@@ -37,9 +37,9 @@ agent directement, il enchaîne les 3 sous-commandes barreau par barreau :
 
 ```
 /sdd-reverse {U-N}
-  ├─ 3a  /sdd-reverse-analyze {U-N}   → plans/{n}-{Name}.analysis.md   (reverse-tech-analyst)
+  ├─ 3a  /sdd-reverse-analyze {U-N}   → plans/{n}-{FeatName}.analysis.md   (reverse-tech-analyst)
   ├─ 3b  /sdd-reverse-stories {U-N}   → us/{n}-{m}-{Name}.md           (reverse-us-writer)
-  └─ 3c  /sdd-reverse-feat {U-N}      → feats/{n}-{Name}.md             (reverse-feat-composer)
+  └─ 3c  /sdd-reverse-feat {U-N}      → feats/{n}-{FeatName}.md             (reverse-feat-composer)
 ```
 
 > **Décommission (ADR reverse-spec-ladder D2)** : l'ancien `/sdd-reverse`
@@ -67,15 +67,15 @@ Sinon → ERROR remontée par le barreau concerné (`[REVERSE_*]`).
 1. **3a** : exécuter `/sdd-reverse-analyze {U-N}`. Échec (`[REVERSE_*]`) → STOP (pas de 3b/3c).
 2. **3b** : exécuter `/sdd-reverse-stories {U-N}`. Échec → STOP (pas de 3c).
 3. **3c** : exécuter `/sdd-reverse-feat {U-N}`.
-4. Émission ligne chat finale `[REVERSE] {U-N} → escalier 3a→3b→3c terminé, FEAT {n}-{Name} (confidence={cap}). (PROGRESS%)`.
+4. Émission ligne chat finale `[REVERSE] {U-N} → escalier 3a→3b→3c terminé, FEAT {n}-{FeatName} (confidence={cap}). (PROGRESS%)`.
 
 ## Sortie
 
 ```
-workspace/plans/{n}-{Name}.analysis.md         (3a — analyse technique legacy)
+workspace/plans/{n}-{FeatName}.analysis.md         (3a — analyse technique legacy)
 workspace/us/{n}-{m}-{Name}.md                 (3b — user stories)
-workspace/feats/{n}-{Name}.md                   (3c — FEAT métier, pont vers /sdd-full)
-workspace/old/{P}/.sys/modules/{Name}/{extraction,stories-3b,feat-3c}.md   (logs)
+workspace/feats/{n}-{FeatName}.md                   (3c — FEAT métier, pont vers /sdd-full)
+workspace/old/{P}/.sys/modules/{FeatName}/{extraction,stories-3b,feat-3c}.md   (logs)
 ```
 
 ## Confidence ≠ high

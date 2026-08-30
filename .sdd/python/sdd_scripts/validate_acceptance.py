@@ -17,7 +17,8 @@ New design:
 Exit codes:
   0 = all checks passed (or AcceptanceGate=off / warn mode tolerant)
   2 = at least one fail in strict mode (BLOCK)
-  3 = infra failure (cannot run checks: cwd missing, etc.)
+  3 = infra failure (cannot run checks: cwd missing, stack.md absent so the
+      gate mode is *unresolved* — audit C1 2026-08-29, see below)
 
 Bypass: SDD_ALLOW_ACCEPTANCE_BYPASS=1
 """
@@ -75,16 +76,30 @@ def _read_acceptance_config(root: Path) -> dict[str, str]:
     is absent at every layer (cf. `quality.md §C.3`) :
         mode=strict, require_e2e=true, smoke_timeout=10, min_coverage=80.
 
-    A missing `stack.md` (no project yet) degrades the gate to `off` so a
-    fresh repo is never blocked.
+    A missing `stack.md` resolves to the sentinel mode ``unresolved`` — NOT
+    ``off`` (audit C1, 2026-08-29).
+
+    Root cause of the regression this replaces : `workspace/stack/` is
+    `.gitignore`d, so `stack.md` never exists on a fresh clone or a CI
+    checkout. The former `off` fallback therefore silently disabled the
+    Acceptance Gate on **every** clone — and `validate_acceptance_gate.py`
+    mapped the resulting `skipped` verdict to `HOOK_ALLOW`, i.e. a free pass.
+
+    ``off`` now means one thing only : a team that *explicitly* configured
+    ``AcceptanceGate: off`` in Project Config. "Config file absent" is a
+    precondition failure (`[INFRA_BLOCKED]`), never an implicit opt-out.
     """
     stack_md = workspace_root(root) / "stack" / "stack.md"
     if not stack_md.is_file():
         return {
-            "mode": "off",
+            "mode": "unresolved",
             "require_e2e": "false",
             "smoke_timeout": "10",
             "min_coverage": "80",
+            "unresolved_reason": (
+                f"workspace/stack/stack.md absent ({stack_md.as_posix()}) — "
+                f"AcceptanceGate mode cannot be determined"
+            ),
         }
 
     try:
@@ -396,6 +411,32 @@ def main(argv: list[str] | None = None) -> int:
 
     config = _read_acceptance_config(root)
     mode = config["mode"]
+
+    # Audit C1 (2026-08-29) — "cannot determine the mode" must NOT look like
+    # "the mode is off". `workspace/stack/` is gitignored, so a fresh clone /
+    # CI checkout has no stack.md ; the pre-fix code returned mode=off →
+    # verdict=skipped → HOOK_ALLOW, i.e. the gate was dead on every clone.
+    if mode == "unresolved":
+        reason = config.get(
+            "unresolved_reason", "AcceptanceGate mode could not be determined"
+        )
+        _write_report(report_path, {
+            "verdict": "unresolved",
+            "mode": "unresolved",
+            "reason": reason,
+            "extractedAt": datetime.now(timezone.utc).isoformat(),
+            "projects": {},
+            "failures": [],
+        })
+        sys.stderr.write("ERROR: AcceptanceGate precondition failed\n")
+        sys.stderr.write(f"CAUSE: [INFRA_BLOCKED] {reason}\n")
+        sys.stderr.write(
+            "FIX: create workspace/stack/stack.md (run /sdd-bootstrap or "
+            "/sdd-discover-stack) so AcceptanceGate resolves ; to disable the "
+            "gate deliberately set `AcceptanceGate: off` in ## Project Config ; "
+            "one-shot bypass : SDD_ALLOW_ACCEPTANCE_BYPASS=1\n"
+        )
+        return INFRA_BLOCKED
 
     if mode == "off":
         _write_report(report_path, {

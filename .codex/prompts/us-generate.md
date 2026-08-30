@@ -38,7 +38,10 @@ Stories structurées (cible `UsGranularityTarget` défaut 3, warn au-delà de
 `UsGranularityWarnAt` défaut 6, hard cap `UsGranularityHardCap` défaut 10)
 dans `workspace/`.
 
-**Usage :** `/us-generate {n}` — où `{n}` est le numéro de la FEAT
+**Usage :**
+- `/us-generate {n}` — où `{n}` est le numéro de la FEAT
+- `/us-generate {n} --replace-pseudo` — migration POC → standard : supprime
+  la pseudo-US générée par `/sdd-poc` avant de générer les vraies US
 
 ---
 
@@ -51,6 +54,16 @@ Arguments :
   métier légitimement très larges (≥ 11 flux distincts). Effet : export
   `SDD_ALLOW_LARGE_FEAT=1` avant invocation agent `po`, audit-log dans
   `workspace/.sys/.audit/force-bypass.log`. Préférer split FEAT.
+- `--replace-pseudo` (optionnel, fix C1 audit 2026-08-30) — **migration
+  POC → standard** (chemin promis par `/sdd-poc` STEP 8 et
+  `feat_to_pseudo_us.py`). Supprime AVANT génération les pseudo-US POC de
+  la FEAT (fichiers `workspace/us/{n}-*.md` portant le marqueur frontmatter
+  `generated-by: feat_to_pseudo_us.py`), puis la génération PO produit les
+  vraies US granulaires. Sans ce flag, une pseudo-US résiduelle cohabite
+  avec les vraies US (le PO écrase `{n}-{m}-{Name}.md` par basename, pas
+  par `{m}` — la pseudo `{n}-1-{FeatName}.md` survivrait si le `{Name}`
+  réel diffère) → WARN collision émis (cf. STEP 2.4 et po.md STEP 2.bis).
+  No-op silencieux si aucune pseudo-US détectée (idempotent).
 
 Si `{n}` absent → demander :
 ```
@@ -60,7 +73,7 @@ Quel est le numéro de la FEAT à découper ? (ex. : 1 pour workspace/feats/1-Au
 Si non numérique → ERROR :
 ```
 ERROR: /us-generate — argument invalide
-CAUSE: "{argument}" n'est pas un entier
+CAUSE: [INVALID_ARG] "{argument}" n'est pas un entier
 FIX: relancer /us-generate {n} avec n entier (ex. /us-generate 1)
 ```
 
@@ -85,15 +98,45 @@ Glob `workspace/feats/{n}-*.md`.
 - 0 fichier → ERROR :
   ```
   ERROR: /us-generate — FEAT introuvable
-  CAUSE: aucun fichier workspace/feats/{n}-*.md
+  CAUSE: [FEAT_NOT_FOUND] aucun fichier workspace/feats/{n}-*.md
   FIX: créer la FEAT via /feat-generate ou la déposer manuellement
   ```
 - > 1 fichier → ERROR :
   ```
   ERROR: /us-generate — numérotation invalide
-  CAUSE: plusieurs fichiers commencent par {n}- dans workspace/feats/
+  CAUSE: [FEAT_AMBIGUOUS] plusieurs fichiers commencent par {n}- dans workspace/feats/
   FIX: renommer pour qu'un seul fichier ait le préfixe {n}-
   ```
+
+---
+
+## STEP 2.4 — Pseudo-US POC : remplacement ou WARN collision (fix C1, 2026-08-30)
+
+Détecter les pseudo-US POC de la FEAT via le marqueur frontmatter écrit par
+`feat_to_pseudo_us.py` (`generated-by: feat_to_pseudo_us.py`) :
+
+```bash
+PSEUDO_US=$(grep -l "generated-by: feat_to_pseudo_us.py" workspace/us/{n}-*.md 2>/dev/null)
+
+if [[ "$@" == *--replace-pseudo* ]]; then
+  if [ -n "$PSEUDO_US" ]; then
+    N_PSEUDO=$(echo "$PSEUDO_US" | wc -l)
+    echo "$PSEUDO_US" | xargs rm -f
+    echo "[PO] $N_PSEUDO pseudo-US POC supprimée(s) avant génération (--replace-pseudo). (5%)"
+  else
+    echo "[PO/SKIP] --replace-pseudo : aucune pseudo-US POC détectée (no-op idempotent). (5%)"
+  fi
+elif [ -n "$PSEUDO_US" ]; then
+  echo "🟡 [PO/WARN] Pseudo-US POC présente(s) sans --replace-pseudo : $PSEUDO_US" >&2
+  echo "   Elle(s) survivront à la génération si le {Name} réel diffère → doublon d'US {n}-1." >&2
+  echo "   Recommandé : /us-generate {n} --replace-pseudo (migration POC → standard)." >&2
+fi
+```
+
+> **Pourquoi ici et pas dans l'agent `po`** : la suppression est une décision
+> d'orchestration (flag CLI) ; l'agent `po` reste strictement exécutif. Il
+> porte néanmoins le même check en filet de sécurité WARN (invocation `po`
+> standalone hors `/us-generate`) — cf. `agents/po.md` STEP 2.bis.
 
 ---
 

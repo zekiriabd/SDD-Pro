@@ -20,7 +20,7 @@ remonter vers la spec.** Résultat :
 **SDD_Pro impose la trajectoire inverse** : FEAT (spec métier) → US (découpe)
 → Code (matérialisation gated). Chaque étape produit un artefact versionné,
 chaque gate est déterministe (Python, 0 token LLM), chaque écart est tracé
-par une classe d'erreur dans une taxonomie de **191 classes** `[CLASS]`.
+par une classe d'erreur dans une taxonomie de **193 classes** `[CLASS]`.
 
 ---
 
@@ -56,7 +56,7 @@ agents personas, pas des catalogues machine.
 fantaisie trouvée sur Stack Overflow par le LLM**. Le hook
 `preflight_stack_combo` refuse les combos non listés.
 
-### 2.3 Taxonomie d'erreurs structurée (191 classes `[CLASS]`)
+### 2.3 Taxonomie d'erreurs structurée (193 classes `[CLASS]`)
 
 Chaque erreur du pipeline porte un préfixe canonique
 (`[BUILD_CORRECTIBLE]`, `[QA_COVERAGE_GAP]`, `[SEC_SQL_INJECTION]`,
@@ -149,7 +149,7 @@ avant son appelant. Détail : `@.sdd/docs/reverse-engineering-workflow.md`.
 | Multi-harness | ✅ **Claude Code + Codex + Gemini CLI + Antigravity** | ✅ 7 harnesses | ✅ any LLM IDE | ✅ 4 IDEs | ✅ Cursor | ✅ CLI | ✅ web |
 | Stacks pré-validés | **36 (28 🟢 + 8 🟡)** | N/A | Via expansion packs | N/A | N/A | N/A | N/A |
 | Gates déterministes Python | **80 scripts + 20 hooks** | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| Taxonomie d'erreurs | **191 classes** | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Taxonomie d'erreurs | **193 classes** | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | Statusline IDE (phase + coût + tokens) | ✅ hook natif | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | Plugin marketplace (discovery IDE natif) | ✅ `plugin.json` | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | Idempotence + resume | ✅ `--resume` | ❌ | ⚠️ partiel | ❌ | ❌ | ❌ | ❌ |

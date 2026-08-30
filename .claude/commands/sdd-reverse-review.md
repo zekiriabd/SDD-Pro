@@ -26,7 +26,7 @@ informational).
 ## Pré-conditions
 
 1. `workspace/old/{P}/.sys/inventory.json` existe et contient `units[id={U-N}]`. Sinon → ERROR `[REVERSE_UNIT_NOT_FOUND]`.
-2. La FEAT correspondante existe (`_featAllocations[{U-N}]` → `{n}-{Name}.md`). Sinon → ERROR `[REVERSE_UNIT_NOT_FOUND]`.
+2. La FEAT correspondante existe (`_featAllocations[{U-N}]` → `{n}-{FeatName}.md`). Sinon → ERROR `[REVERSE_UNIT_NOT_FOUND]`.
 
 ## Actions
 
@@ -38,12 +38,12 @@ informational).
        --project workspace/old/{P} --unit {U-N} --json
    ```
    puis juge chaque gap (réel / faux positif) et écrit
-   `workspace/old/{P}/.sys/modules/{Name}/completeness-review.md`.
+   `workspace/old/{P}/.sys/modules/{FeatName}/completeness-review.md`.
 
 ## Sortie
 
 ```
-workspace/old/{P}/.sys/modules/{Name}/completeness-review.md
+workspace/old/{P}/.sys/modules/{FeatName}/completeness-review.md
 ```
 
 Verdicts (`summary.verdict`, ASCII) : `complete` | `partial` | `incomplete` —
@@ -63,4 +63,4 @@ re-`/sdd-reverse {U-N}`).
 - Verdict informational — ne bloque ni Phase 4 ni `/sdd-full`
 - Idempotent : relancer écrase `completeness-review.md`
 
-Voir `.sdd/rules/reverse-engineering.md §6` ([REVERSE_COMPLETENESS_GAP]) + `.claude/agents/reverse-completeness-reviewer.md`.
+Voir `.sdd/rules/reverse-engineering.md §6` ([REVERSE_COMPLETENESS_GAP]) + `.sdd/agents/reverse-completeness-reviewer.md`.

@@ -2,7 +2,7 @@
 > **GENERATED — do not edit.** Slice of `@.claude/rules/error-classification.md` for the `po` agent (audit 2026-06-12, block 5). Regenerate via `python .sdd/python/sdd_admin/sync_error_class_digests.py`.
 >
 > Contains the §0 quick-ref (full 16-family map) + this agent's families + the universal format/loop sections. For a class OUTSIDE this slice, §0 names its family — Read the full file on-demand (rule `build-and-loop.md §8`).
-## 0. Quick reference — 16 familles (191 classes)
+## 0. Quick reference — 16 familles (193 classes)
 
 | # | Famille | Classes | Émetteur principal | Comportement build_loop |
 |---|---|---:|---|---|
@@ -19,7 +19,7 @@
 | §1.11 | **Security** (`[SEC_*]`) — OWASP Top 10 2021 | 23 | security-reviewer | report only + 8 hard-blocking |
 | §1.12 | **Perf** (`[PERF_*]`) — héritage, réactivé via `ingest_lighthouse.py` | 16 | CI ingest | report only |
 | §1.13 | **Spec Compliance** (`[SPEC_*]`) — AC-by-AC verification | 9 | spec-compliance-reviewer | report only |
-| §1.14 | **Tooling/Governance** (`[SCAN_*]`/`[DISCOVER_*]`/`[CHECKPOINT_*]`/`[CONFIG_*]`/`[PROFILE_*]`/`[DRIFT_*]`/`[ARCH_*]`/`[REVIEW_*]`/`[STACK_COMBO_*]`/`[FRAMEWORK_PROTECTED]`/`[ENV_BYPASS_BLOCKED]`/`[PRICING_UNKNOWN]`/`[SECRET_PROVIDER_LEAK_RISK]`/hooks préflight) | 34 | scripts mono-shot + hooks | mostly info, qq. bloquantes |
+| §1.14 | **Tooling/Governance** (`[SCAN_*]`/`[DISCOVER_*]`/`[CHECKPOINT_*]`/`[CONFIG_*]`/`[PROFILE_*]`/`[DRIFT_*]`/`[ARCH_*]`/`[REVIEW_*]`/`[AUDITOR_RUNTIME_ERROR]`/`[STACK_COMBO_*]`/`[FRAMEWORK_PROTECTED]`/`[ENV_BYPASS_BLOCKED]`/`[PRICING_UNKNOWN]`/`[SECRET_PROVIDER_LEAK_RISK]`/`[PACK_UNUSABLE]`/hooks préflight) | 36 | scripts mono-shot + hooks | mostly info, qq. bloquantes |
 | §1.15 | **Adversarial** (`[ADV_*]`) — opt-out (actif par défaut, `--no-adversarial` pour skip) | 6 | adversarial-reviewer | informational |
 | §1.16 | **Inconnue** (`[UNKNOWN]`) | 1 | fallback | report only |
 
@@ -57,7 +57,7 @@ le tableau d'actions par famille.
 | Préfixe | Usage | Phase |
 |---|---|---|
 | `[STACK_MALFORMED]` | `stack.md` invalide, section manquante | arch STEP 1 |
-| `[SCHEMA_MISMATCH]` | Table/colonne absente de `schema.json` | dev-backend STEP 4.5 |
+| `[SCHEMA_MISMATCH]` | Table/colonne absente de `schema.json` | arch Phase B (échec `flyway migrate`), dev-backend STEP 5 (plan/DTOs sur le schema chargé au STEP 3) |
 | `[FEAT_REJECTED]` | FEAT ne respecte pas le format | po STEP 2 |
 | `[FEAT_NOT_FOUND]` | Aucun fichier `workspace/feats/{n}-*.md` matché | feat-validate, sdd-full STEP 1 |
 | `[FEAT_AMBIGUOUS]` | Plusieurs fichiers `workspace/feats/{n}-*.md` matchent | feat-validate, sdd-full STEP 1 |
@@ -66,22 +66,22 @@ le tableau d'actions par famille.
 | `[READINESS_NO_GO]` | `/feat-validate` NO-GO sans `--force` | feat-validate |
 | `[FORCE_CUMUL_REJECTED]` | ≥ 2 bypass flags (`--force`, `--no-plan-on-warn`, `--no-validate`) cumulés sans `SDD_ALLOW_FORCE=1` env | sdd-full STEP 3.6.quart (v7.0.0 audit P0 R1) |
 | `[COST_CAP_EXCEEDED]` | Cumulative USD cost ≥ `MaxCostPerRun` (default $50) sur le run en cours. Bloquant CI + interactif (v7.0.0 R1 fix). Bypass : `SDD_DISABLE_COST_CAP=1` one-shot OU `MaxCostPerRun: 0` config. | preflight_cost_cap.py (v7.0.0 P0 §4.3) |
-| `[BUILD_LOOP_COST_EXCEEDED]` | Cumulative USD spent on build_loop iterations for ONE US ≥ `BuildLoopMaxCostUsd` (default $15) avant que `BuildLoopMaxIter` ne soit atteint. STOP fail-fast — distinguer de `[BUILD_LOOP_EXHAUSTED]` (iter limit) car la cause-racine est cost-pathological pas convergence-pathological. Bypass : `BuildLoopMaxCostUsd: 0` config. | dev-* build_loop (v7.0.0 P1 §6) |
+| `[BUILD_LOOP_COST_EXCEEDED]` | Cumulative USD spent on build_loop iterations for ONE US ≥ `BuildLoopMaxCostUsd` (default $15) avant que `BuildLoopMaxIter` ne soit atteint. STOP fail-fast — distinguer de `[BUILD_LOOP_EXHAUSTED]` (iter limit) car la cause-racine est cost-pathological pas convergence-pathological. Bypass : `BuildLoopMaxCostUsd: 0` config. | hook `preflight_cost_cap.py` (HOOK_DENY au spawn dev-backend/dev-frontend ; v7.0.0 P1 §6) |
 | `[QA_FAIL_BLOCKING_SDD_FULL]` | `/qa-generate` verdict RED + `QaFailOnSddFull: true` (default v7.0.0) → STOP `/sdd-full` post-STEP 4.5. Symétrise le gate avec `/qa-generate` standalone (avant : bloquant standalone, ignoré dans `/sdd-full`). Bypass : `QaFailOnSddFull: false` (audit-log). | sdd-full STEP 4.5 (v7.0.0 audit §6.9) |
 | `[FEAT_HASH_MISMATCH]` | Hash sha256 de la FEAT parente diffère de celui inscrit dans une US (`Parent FEAT hash: sha256:...`). FEAT modifiée après génération US → `Covers:` potentiellement obsolète. Fix : re-run `/us-generate {n}` (idempotent). | dev-*, validate_readiness, auditors (v7.0.0 audit §6 P1-11) |
 | `[ELICITOR_GAP]` | FEAT contient sections élicitor (FAIL-N, EDGE-N, Red Team) mais ≥ 1 item n'est mappé sur aucune AC d'aucune US. WARN par défaut (`ElicitorGapMode: warn`), `strict` = NO-GO. | po STEP 4 (v7.0.0 audit §6.11 — boucle elicitor) |
 | `[PHASE_PLAN_INIT_FAILED]` | `/dev-run` standalone : `phase_planner.py` exit ≠ 0 (FEAT inexistante / Project Config malformé). Bloquant STEP 5.5.1 — sans `$PHASE_PLAN`, STEP 6.4 (auditor batch) ne peut décider quels reviewers spawner. | dev-run STEP 5.5.1 (v7.0.0 audit P2) |
 | `[PLAN_NOT_FOUND]` | Plan attendu absent (Glob 0 match dans `workspace/plans/`) | validate_plan.py |
 | `[PLAN_INVALID]` | Plan structurellement invalide. **Englobe 7 sous-cas** (v7.0.0-alpha Sprint 2.4 — fusion documentaire 2026-06-07) : `_UNREADABLE` I/O error, `_NO_FRONTMATTER` YAML missing, `_FRONTMATTER_INVALID` field type/value, `_MISSING_REQUIRED_FIELD` `us`/`family` absent, `_FILES_SECTION_MISSING` `## Files` empty, `_FILE_ENTRY_INVALID` path/operation/layer missing, `_AUGMENT_CONTRACT_MISSING` augment sans preserves/adds. Le message ERROR détaillera le sous-cas. | validate_plan.py |
-| `[PLAN_AC_COVERAGE_GAP]` | ACs de l'US absents de `## ACs Coverage Summary` du plan | validate_plan.py (strict) |
-| `[PLAN_STALE]` | us-hash mismatch — US modifiée post-plan, re-`/dev-plan` requis | validate_plan.py (strict) → STOP |
-| ~~`[PLAN_NOT_STRICT_READY]`~~ | **DÉPRÉCIÉ v7.0.0** — strict variants supprimés (`governance-major-auditors-trim`). Toléré en lecture des bases console.db legacy. | (n/a) |
+| `[PLAN_AC_COVERAGE_GAP]` | ACs de l'US absents de `## ACs Coverage Summary` du plan | validate_plan.py (**always-on** depuis audit M5 2026-08-29 — auparavant sous `--strict`, donc jamais atteint) |
+| `[PLAN_STALE]` | us-hash mismatch — US modifiée post-plan, re-`/dev-plan` requis | validate_plan.py (always-on) → STOP |
+| ~~`[PLAN_NOT_STRICT_READY]`~~ | **DÉPRÉCIÉ v7.0.0, code SUPPRIMÉ 2026-08-29 (audit M5)** — les variants `dev-*-strict` avaient disparu (`governance-major-auditors-trim`) mais `validate_strict()` survivait, rendant l'exit 1 inatteignable dans toute invocation documentée. Chemin retiré ; `--strict` reste un no-op CLI. Toléré en lecture des bases console.db legacy. | (n/a) |
 | ~~`[PLAN_DIGEST_INSUFFICIENT]`~~ | **DÉPRÉCIÉ v7.0.0** — strict variants supprimés. Toléré en lecture des bases console.db legacy. | (n/a) |
 | `[INVALID_ARG]` | Argument CLI invalide (regex `^\d+-\d+(:plan)?$` ou `^\d+$` non matché) | dev-*, sdd-full, dev-run, dev-plan, feat-validate STEP 1 |
 | `[INVALID_MODE]` | Mode d'exécution incompatible (`:plan` invoqué alors qu'un plan existe ; etc.) | `build-and-loop.md §1.ter.3` (Partie B) |
 | `[PROJECT_NOT_INIT]` | Fichier projet absent (`.csproj`/`package.json`/`pyproject.toml`/`build.gradle.kts`/`angular.json`) — arch n'a pas tourné | preflight.py B4, dev-*-strict STEP 4 |
 | `[PLAN_REVIEW_GATE_SKIPPED]` | Plan-then-review gate bypassé (WARN informationnel) | sdd-full STEP 3.6 |
-| `[STACK_SCAFFOLDING_MISSING]` | Arch n'a pas scaffoldé les entities attendues (DB→entities cohérence cassée) | arch Phase B, dev-backend STEP 4.5 |
+| `[STACK_SCAFFOLDING_MISSING]` | Arch n'a pas scaffoldé les entities attendues (DB→entities cohérence cassée) | arch Phase B, dev-backend STEP 5 (entities attendues au plan, schema chargé au STEP 3) |
 | `[POC_OVERWRITE_REAL_US]` | `/sdd-poc` refuse d'écraser des US réelles pré-existantes par des pseudo-US POC (garde anti-perte) | sdd-poc.md STEP US |
 | `[PO_HASH_PLACEHOLDER]` | Placeholder `Parent FEAT hash: sha256:PENDING` non résolu dans une US après génération (sentinel à résoudre par `resolve_po_hash_sentinel`/`resolve_us_hash_sentinel`) | po.md, us-generate.md, hook `SubagentStop` matcher=po |
 ### 1.3 Contrat (preserves/adds, layers, ownership)
@@ -112,32 +112,20 @@ le tableau d'actions par famille.
 ---
 ## 2. Format obligatoire
 
-**Chat** (compressé — 1L succès, 2L max erreur) :
-```
-🔴 {agent} {n}-{m} — {résumé}
-CAUSE: [{CLASS}] {détail 1L} → {pointer fichier rapport}
-```
-
-**Rapport** (3 lignes, persisté en base `console.db` ou stderr ; ex-`workspace/qa/...`, `.sys/.validation/...`) :
+**Noyau universel déplacé** (audit tokens 2026-08-30) : le format canonique —
+chat 1L (`🔴 [AGENT/FAIL] … [CLASS] …`) et rapport 3L disque
+(`ERROR / CAUSE / FIX`) avec exemple `[BUILD_CORRECTIBLE]` — est porté par
+**`output-protocol.md §7`** (§7.2 chat, §7.3 disque + exemple, §7.5 noyau),
+rule inconditionnelle auto-injectée dans tout contexte. Rappel du squelette
+rapport (persisté en base `console.db` ou stderr ; ex-`workspace/qa/...`,
+`.sys/.validation/...`) :
 ```
 ERROR: {feat/us/task or pipeline-step} failed
 CAUSE: [{CLASS}] {détail 1L}
 FIX: {action 1L}
 ```
-
-**Exemple `[BUILD_CORRECTIBLE]`** (build_loop itère) :
-```
-ERROR: dev-backend 1-2 build failed (iter 1/3)
-CAUSE: [BUILD_CORRECTIBLE] missing import 'SIM.Backend.Services.IBebeService' in BebesEndpoints.cs:1
-FIX: add 'using SIM.Backend.Services;'
-```
-
-**Exemple `[BUILD_BLOCKING]`** (fail-fast) :
-```
-ERROR: dev-frontend 2-1 build failed (iter 1/3)
-CAUSE: [BUILD_BLOCKING] business logic detected in Pages/Login.razor (DbContext usage in UI layer)
-FIX: move data access to Services/AuthService.cs, inject via DI
-```
+`[BUILD_CORRECTIBLE]` itère, `[BUILD_BLOCKING]` fail-fast — comportements §1.4,
+décision mécanique §3.
 
 ---
 ## 3. Comportement `build_loop` selon classe
@@ -152,5 +140,6 @@ Une seule classe déclenche une itération `build_loop` :
 
 **"Pas de bloc ERROR sans préfixe `[CLASS]`. Si rien ne matche → `[UNKNOWN]`."**
 
-Discipline qui permet à `build_loop` de décider mécaniquement, aux
+Reprise verbatim dans `output-protocol.md §7.5` (canal universel — auto-injecté
+partout). Discipline qui permet à `build_loop` de décider mécaniquement, aux
 scripts de classer sans LLM, au dashboard de visualiser par cause-racine.

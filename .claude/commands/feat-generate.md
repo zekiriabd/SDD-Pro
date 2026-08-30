@@ -198,7 +198,7 @@ ligne bullet ne correspond pas → ERROR :
 
 ```
 ERROR: /feat-generate — numérotation SFD invalide
-CAUSE: ligne(s) sous ## Functional Needs sans préfixe SFD-N (ex. : "{ligne fautive}")
+CAUSE: [FEAT_REJECTED] ligne(s) sous ## Functional Needs sans préfixe SFD-N (ex. : "{ligne fautive}")
 FIX: numéroter tous les bullets de ## Functional Needs au format "SFD-1: …", "SFD-2: …" puis re-sauver
 ```
 

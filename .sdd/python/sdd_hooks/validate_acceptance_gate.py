@@ -21,8 +21,9 @@ New design (audit P0-security 2026-06-05):
   - Total hook latency: < 100ms (single file read + JSON parse).
 
 Exit codes:
-  0 = ALLOW   (verdict=pass / warn / skipped / bypass, OR report missing — see below)
-  2 = DENY    (verdict=fail in strict mode)
+  0 = ALLOW   (verdict=pass / warn / skipped / bypass)
+  2 = DENY    (verdict=fail in strict mode, verdict=unresolved, OR report
+               missing — see below)
 
 Report missing behaviour (audit 2026-06-06 D7 — strict mode in CI)
 ─────────────────────────────────────────────────────────────────
@@ -96,6 +97,24 @@ def main() -> int:
 
     verdict = (payload.get("verdict") or "").lower()
     mode = (payload.get("mode") or "").lower()
+
+    # Audit C1 (2026-08-29) — `unresolved` means validate_acceptance.py could
+    # not determine the gate mode (no workspace/stack/stack.md, which is
+    # gitignored and therefore absent on every fresh clone / CI checkout).
+    # It must NEVER map to an allowing gate : "mode unknown" is a precondition
+    # failure, not an implicit opt-out. Symmetric with the missing-report case
+    # above (DENY in CI *and* interactive, explicit bypass env var only).
+    if verdict == "unresolved":
+        reason = payload.get("reason") or "AcceptanceGate mode could not be determined"
+        sys.stderr.write(
+            "ERROR: AcceptanceGate precondition failed\n"
+            f"CAUSE: [INFRA_BLOCKED] {reason}\n"
+            "FIX: create workspace/stack/stack.md (/sdd-bootstrap or "
+            "/sdd-discover-stack) ; to disable the gate deliberately set "
+            "`AcceptanceGate: off` in ## Project Config ; one-shot bypass : "
+            "SDD_ALLOW_ACCEPTANCE_BYPASS=1 (audit-logged)\n"
+        )
+        return HOOK_DENY
 
     if verdict in ("pass", "warn", "skipped", "bypass"):
         if verdict == "warn":

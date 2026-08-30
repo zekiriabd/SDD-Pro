@@ -73,6 +73,14 @@ CHECK_ROW = ("schema", "table", "constraint_name", "definition")
 # user type). `detail` is a free-text, engine-specific summary.
 CATALOG_OBJECT_ROW = ("kind", "schema", "name", "detail")
 
+# One row per DECLARED PARAMETER of a routine, from the engine's own catalog
+# rather than guessed by regex from the body (audit 2026-08-29 m2). Needed
+# because a body-header regex cannot see a signature the catalog never puts
+# IN the body text at all — MySQL's `ROUTINE_DEFINITION` holds only the
+# statement block, never the `CREATE PROCEDURE name(...)` header, so every
+# MySQL routine reported zero parameters regardless of its real signature.
+PARAM_ROW = ("schema", "routine", "name", "type", "mode", "ordinal")
+
 # Recognised keys of `Dialect.schema_queries`, mapped to their row contract.
 SCHEMA_QUERY_CONTRACTS = {
     "columns": COLUMN_ROW,
@@ -95,6 +103,10 @@ class Dialect:
     dependency_query: str = ""  # OPTIONAL SELECT of authoritative object→object
                                 # deps (DEPENDENCY_COLUMNS order). "" = engine has
                                 # no usable catalog dep source (graph stays body-derived).
+    params_query: str = ""  # OPTIONAL SELECT of declared routine parameters
+                            # (PARAM_ROW order). "" = engine's params are fully
+                            # recoverable from the body header (regex-parsed),
+                            # so no catalog query is needed.
     # C1 — live relational structure. Keys must be in SCHEMA_QUERY_CONTRACTS.
     schema_queries: tuple[tuple[str, str], ...] = field(default=())
     # C1/P2.1 — body-less catalog objects, one query per kind (best-effort).
@@ -106,6 +118,8 @@ class Dialect:
         queries = [self.list_routines_sql, self.single_routine_sql]
         if self.dependency_query:
             queries.append(self.dependency_query)
+        if self.params_query:
+            queries.append(self.params_query)
         queries += [sql for _, sql in self.schema_queries]
         queries += [sql for _, sql in self.catalog_object_queries]
         for sql in queries:

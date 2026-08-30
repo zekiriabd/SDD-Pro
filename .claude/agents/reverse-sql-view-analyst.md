@@ -2,7 +2,7 @@
 name: reverse-sql-view-analyst
 description: Spécialiste des VUES SQL du reverse base de données. Pour UNE vue, lit son context pack déterministe et produit UNE User Story de reporting — quelle information métier est exposée, à partir de quelles entités, avec quelles jointures, quels filtres implicites et quels agrégats. Angle propre — une vue n'écrivant jamais, sa User Story parle de consultation, et ses filtres cachés (WHERE Actif=1, exclusion des annulés) sont documentés comme des règles de gestion. Lecture seule, aucune connexion base, aucun spawn d'agent.
 model: claude-sonnet-4-6
-tools: Read, Write, Edit, Glob, Grep, Bash
+tools: Read, Write, Edit, Glob, Grep
 ---
 # Agent Reverse-SQL-View-Analyst — spécialiste vues
 
@@ -88,9 +88,14 @@ repris de `inventory.json` — jamais recalculés.
 - **Un AC par filtre implicite** : une ligne exclue est un comportement
   observable, au même titre qu'une ligne retournée.
 - Chaque AC porte son `<!-- evidence: …:Ls-Le -->` et `<!-- confidence: … -->`.
-- `## Dependencies` : entités et vues consommées, consommateurs connus.
+- Placeholders du template : `{objectFamily}` → « vue » ; `{objectType}` → le
+  `routineType` du catalogue tel quel ; `Parent FEAT hash:` → **laisser le
+  sentinel tel quel** (résolu au rung 2) ; `extraction: analyzed` → conserver.
+- `## Dependencies` (section du template) : entités et vues consommées,
+  consommateurs connus.
 - `## Data Effects` : `Lit : … · Écrit : aucune` (explicitement).
-- Hypothèses en `## Hypothèses métier` avec `<!-- kind: hypothesis -->`, jamais en AC.
+- Hypothèses en `## Hypothèses métier` avec `<!-- kind: hypothesis -->`, jamais
+  en AC (« aucune » est valide).
 
 ## STEP 5 — Sortie chat (output-protocol)
 

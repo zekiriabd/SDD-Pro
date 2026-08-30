@@ -393,6 +393,50 @@ class TestSlicing:
         body, _ = build_pack(ctx, "dbo.usp_A")
         assert "Cycle à analyser d'un bloc" in body
 
+    # --- corps des co-membres d'un cycle (D-M3, 2026-08-30) ----------------- #
+    #
+    # La commande promettait « tous les corps du cycle dans son pack » ; le
+    # slicer ne listait que les noms. Ces tests verrouillent la promesse — et
+    # sa dégradation déclarée quand le budget mord.
+
+    @staticmethod
+    def _cycle_project(tmp_path, body_b="SELECT 1; -- corps de B"):
+        objs = [_obj("dbo.usp_A", calls=["dbo.usp_B"]),
+                _obj("dbo.usp_B", calls=["dbo.usp_A"])]
+        ctx = build_context({"procedures": objs}, None, project="X")
+        snap = tmp_path / ".sys" / "proc-snapshot"
+        snap.mkdir(parents=True)
+        (snap / "dbo.usp_A.sql").write_text("SELECT 0; -- corps de A", encoding="utf-8")
+        (snap / "dbo.usp_B.sql").write_text(body_b, encoding="utf-8")
+        return ctx
+
+    def test_cycle_pack_carries_the_co_member_bodies(self, tmp_path):
+        ctx = self._cycle_project(tmp_path)
+        body, report = build_pack(ctx, "dbo.usp_A", project_root=tmp_path)
+        assert "Corps de `dbo.usp_B`" in body
+        assert "-- corps de B" in body
+        assert "-- corps de A" not in body      # son propre corps n'est pas dupliqué
+        assert report["cycleBodies"] == 1
+
+    def test_cycle_bodies_shrink_first_and_declare_it(self, tmp_path):
+        ctx = self._cycle_project(tmp_path, body_b="SELECT 'x';\n" * 800)
+        full, _ = build_pack(ctx, "dbo.usp_A", project_root=tmp_path, budget=10 ** 9)
+        body, report = build_pack(ctx, "dbo.usp_A", project_root=tmp_path,
+                                  budget=int(len(full) * 0.6))
+        assert any(t.startswith("cycle:") for t in report["trimmed"])
+        # Les corps rétrécissent AVANT les autres sections du pack.
+        first_trim = report["trimmed"][0]
+        assert first_trim.startswith("cycle:")
+        assert "Corps tronqué" in body or "Corps des co-membres retirés" in body
+        assert "Pack tronqué" in body
+
+    def test_cycle_without_project_root_keeps_names_only(self, tmp_path):
+        ctx = self._cycle_project(tmp_path)
+        body, report = build_pack(ctx, "dbo.usp_A")   # rétro-compat
+        assert "dbo.usp_B" in body
+        assert "Corps de `dbo.usp_B`" not in body
+        assert report["cycleBodies"] == 0
+
     # --- ordre de réduction du pack (audit 2026-08-28) --------------------- #
     #
     # Ce que le pack sacrifie en premier n'est pas un détail d'implémentation :
@@ -445,6 +489,8 @@ class TestSlicing:
         assert family_of("VIEW") == "views"
         assert family_of("SQL_TRIGGER") == "triggers"
         assert family_of("SQL_STORED_PROCEDURE") == "procedures"
+        assert family_of("PACKAGE") == "packages"
+        assert family_of("PACKAGE BODY") == "packages"
 
     def test_overview_states_what_it_does_not_know(self, introspection, schema):
         ctx = build_context(introspection, schema, project="SalesDb")
@@ -593,11 +639,13 @@ class TestDispatchContract:
 
     def test_every_family_has_exactly_one_owning_specialist(self):
         from sdd_reverse_scripts.build_proc_us import _AGENT_BY_FAMILY
-        assert set(_AGENT_BY_FAMILY) == {"procedures", "functions", "views", "triggers"}
-        # No family shares an agent: the angle of analysis is what justifies a
-        # separate agent, so two families pointing at one agent would mean one
-        # of them is not really specialised.
+        assert set(_AGENT_BY_FAMILY) == {
+            "procedures", "functions", "views", "triggers", "packages"}
+        # No family shares an agent, with ONE deliberate exception: the Oracle
+        # packages family is owned by the proc-analyst (a package is a bundle
+        # of operations — same angle as a procedure, not a fifth speciality).
         assert len(set(_AGENT_BY_FAMILY.values())) == 4
+        assert _AGENT_BY_FAMILY["packages"] == _AGENT_BY_FAMILY["procedures"]
 
     def test_routine_types_route_to_their_specialist(self):
         from sdd_reverse_scripts.build_proc_us import _AGENT_BY_FAMILY
@@ -607,6 +655,11 @@ class TestDispatchContract:
             "SQL_INLINE_TABLE_VALUED_FUNCTION": "reverse-sql-function-analyst",
             "VIEW": "reverse-sql-view-analyst",
             "SQL_TRIGGER": "reverse-sql-trigger-analyst",
+            # Oracle packages: explicit family since 2026-08-30 (they used to
+            # fall back on "procedures" by accident, and the proc-analyst could
+            # refuse them through its kind guard).
+            "PACKAGE": "reverse-sql-analyst",
+            "PACKAGE BODY": "reverse-sql-analyst",
         }
         for routine_type, expected in cases.items():
             assert _AGENT_BY_FAMILY[family_of(routine_type)] == expected

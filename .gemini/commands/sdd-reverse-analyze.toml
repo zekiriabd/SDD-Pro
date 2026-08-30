@@ -1,5 +1,5 @@
 # GENERATED FROM .sdd/ — DO NOT EDIT
-description = "Phase 3a du workflow reverse — analyse technique fidèle d'UNE unité U-N (barreau bas de l'escalier reverse). Spawn agent reverse-tech-analyst avec modèle routé par complexité (Sonnet 4.6 si unité simple, Opus 4.8 si complexe — ADR governance-reverse-complexity-ladder). Output workspace/plans/{n}-{Name}.analysis.md, consommé par /sdd-reverse-stories (3b)."
+description = "Phase 3a du workflow reverse — analyse technique fidèle d'UNE unité U-N (barreau bas de l'escalier reverse). Spawn agent reverse-tech-analyst avec modèle routé par complexité (Sonnet 4.6 si unité simple, Opus 4.8 si complexe — ADR governance-reverse-complexity-ladder). Output workspace/plans/{n}-{FeatName}.analysis.md, consommé par /sdd-reverse-stories (3b)."
 prompt = """
 <!-- GENERATED FROM .sdd/ (commande /sdd-reverse-analyze) — DO NOT EDIT. -->
 <!-- IMPORTANT — Les instructions `Task(subagent_type=X)` / `Agent(X)` -->
@@ -24,15 +24,15 @@ unité fonctionnelle (Phase 1) en **analyse technique legacy** — photo fidèle
 code, sans interprétation métier. Une seule unité par invocation.
 
 ```
-code source --[3a /sdd-reverse-analyze]--> plans/{n}-{Name}.analysis.md
+code source --[3a /sdd-reverse-analyze]--> plans/{n}-{FeatName}.analysis.md
             --[3b /sdd-reverse-stories]--> us/{n}-{m}-{Name}.md
-            --[3c /sdd-reverse-feat]------> feats/{n}-{Name}.md
+            --[3c /sdd-reverse-feat]------> feats/{n}-{FeatName}.md
 ```
 
 En mode pré-alloué (L5, `preallocate_feats` exécuté), plusieurs invocations
 peuvent tourner **en parallèle borné** (§8.2 `rules/reverse-engineering.md`) ;
 sans pré-allocation, séquentiel strict (ADV-2 §8.1). 3a possède l'allocation
-`(n, Name)` que 3b/3c réutilisent.
+`(n, FeatName)` que 3b/3c réutilisent.
 
 ## Args
 
@@ -52,22 +52,27 @@ sans pré-allocation, séquentiel strict (ADV-2 §8.1). 3a possède l'allocation
 
 ## Actions
 
-1. **Résoudre le projet legacy** : lire `workspace/old/*/.sys/inventory.json` pour trouver lequel contient `units[id={U-N}]`. Plusieurs matchs → ERROR ambiguïté, demander `--project {P}`.
-2. **Routage de modèle (déterministe, ADR `governance-reverse-complexity-ladder`)** :
+1. **Résoudre le projet legacy** : lire `workspace/old/*/.sys/inventory.json` pour trouver lequel contient `units[id={U-N}]`. Plusieurs matchs → ERROR ambiguïté, demander `--project {P}`. Le nom retenu est `{P}` — **toutes** les étapes suivantes l'utilisent, jamais un re-glob.
+2. **Routage de tier (déterministe, ADR `governance-reverse-complexity-ladder`)** —
+   sur le projet `{P}` **résolu en 1** :
    ```bash
-   python -c "import sys,json; sys.path.insert(0,'.sdd/python'); from sdd_reverse.code_unit_complexity import model_for; inv=json.load(open([p for p in __import__('glob').glob('workspace/old/*/.sys/inventory.json')][0],encoding='utf-8')); u=next(x for x in inv['units'] if x['id']=='{U-N}'); print(model_for(u,'3a'))"
+   python .sdd/python/sdd_reverse/code_unit_complexity.py \\
+       --project workspace/old/{P} --unit {U-N} --rung 3a
    ```
-   → `claude-sonnet-4-6` si l'unité est `simple`, `claude-opus-4-8` si `complex`
-   (rubrique `docs/rubrics/reverse-complexity-routing.md`, fail-safe : doute → Opus).
-3. **Spawn unique** `Agent(reverse-tech-analyst)` avec args = `{U-N}` ET `model` = le modèle routé en 2 (override au spawn — l'agent est inchangé, seul son modèle d'exécution varie ; no-spawn préservé).
-4. L'agent suit STEP 0 à 7 de `.claude/agents/reverse-tech-analyst.md`.
-5. Émission ligne chat finale `[REVERSE] {U-N} → analyse 3a {n}-{Name} ({modèle}, ...). (PROGRESS%)`.
+   → imprime `balanced` si l'unité est `simple`, `deep` si `complex` (rubrique
+   `docs/rubrics/reverse-complexity-routing.md`). **Fail-safe câblé** : toute
+   erreur (inventory absent/illisible, `{U-N}` inconnu) imprime `deep` sur stdout
+   ET la raison sur stderr, exit 0 — le doute coûte une passe `deep`, jamais un
+   traceback ni une sous-analyse.
+3. **Spawn unique** `Agent(reverse-tech-analyst)` avec args = `{U-N}` ET `model_tier` = le tier routé en 2 (override au spawn, borné par `tier_floor`/`tier_ceiling` de l'agent — l'agent est inchangé, seul son tier d'exécution varie ; no-spawn préservé).
+4. L'agent suit STEP 0 à 7 de `.sdd/agents/reverse-tech-analyst.md`.
+5. Émission ligne chat finale `[REVERSE] {U-N} → analyse 3a {n}-{FeatName} ({modèle}, ...). (PROGRESS%)`.
 
 ## Sortie
 
 ```
-workspace/plans/{n}-{Name}.analysis.md          (analyse technique legacy)
-workspace/old/{P}/.sys/modules/{Name}/extraction.md    (log décision)
+workspace/plans/{n}-{FeatName}.analysis.md          (analyse technique legacy)
+workspace/old/{P}/.sys/modules/{FeatName}/extraction.md    (log décision)
 workspace/old/{P}/.sys/inventory.json                  (update _featAllocations + _allocatedNames — mode legacy)
 ```
 

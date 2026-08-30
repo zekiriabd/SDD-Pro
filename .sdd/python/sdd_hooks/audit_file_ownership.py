@@ -76,6 +76,60 @@ OWNERSHIP_MATRIX: dict[str, list[str]] = {
         r"^workspace/feats/.+\.md$",  # append-only
         r"^workspace/\.sys/\.context/constitution\.md$",  # append-only §7
     ],
+    # ----------------------------------------------------------------------- #
+    # Module db-reverse (base de données → FEAT). Audit 2026-08-29, M3.
+    #
+    # Ces 6 agents n'avaient AUCUNE entrée ici, alors que la doc de deux d'entre
+    # eux annonce une séparation faits/hypothèses « garantie par construction ».
+    # Rien ne l'auditait : un Write direct sur la branche de faits de
+    # db-context.json ne laissait aucune trace.
+    #
+    # Deux mécanismes, complémentaires et volontairement distincts :
+    #   - `merge_architect_output` (db_context.py) est la whitelist de fusion :
+    #     seules les clés de `hypotheses` passent, tout le reste est droppé.
+    #     C'est ce qui protège le CONTENU.
+    #   - cette matrice est l'audit a posteriori : elle constate quel agent a
+    #     touché quel fichier pendant sa fenêtre de dispatch. C'est ce qui
+    #     protège le PÉRIMÈTRE.
+    #   - le blocage a priori d'un Write direct relève de `protect_framework.py`
+    #     (hook PreToolUse), pas d'ici : ce hook-ci tourne APRÈS l'écriture.
+    #
+    # `db-context.json`, son digest et l'arbre de fiches figurent dans le
+    # périmètre de l'architecte parce que le script de fusion qu'il DOIT invoquer
+    # (`db_context_build.py --merge-hypotheses`) les régénère pendant sa fenêtre
+    # de dispatch. Les y interdire produirait une violation à chaque exécution
+    # nominale, et un journal d'audit qui crie toujours n'est plus lu.
+    "reverse-db-architect": [
+        # Le seul fichier que l'agent écrit lui-même (Phase 0.B).
+        r"^workspace/old/[^/]+/\.sys/db-context\.hypotheses\.json$",
+        # Régénérés par db_context_build.py, que l'agent invoque.
+        r"^workspace/old/[^/]+/\.sys/db-context\.json$",
+        r"^workspace/old/[^/]+/\.sys/db-context\.digest\.json$",
+        r"^workspace/old/[^/]+/\.sys/db-context\.waves-completed\.json$",
+        r"^workspace/old/[^/]+/\.sys/db-context/.+",
+    ],
+    # Les 4 spécialistes d'objet SQL n'écrivent QU'UNE User Story (1 objet = 1
+    # US). Ni FEAT, ni contexte, ni snapshot : le corps qu'ils lisent est
+    # produit en amont, en lecture seule, par l'introspection.
+    "reverse-sql-analyst": [
+        r"^workspace/us/.+\.md$",
+    ],
+    "reverse-sql-function-analyst": [
+        r"^workspace/us/.+\.md$",
+    ],
+    "reverse-sql-view-analyst": [
+        r"^workspace/us/.+\.md$",
+    ],
+    "reverse-sql-trigger-analyst": [
+        r"^workspace/us/.+\.md$",
+    ],
+    # Rung 2 : compose la FEAT du module, et back-fille les US du module
+    # (`Covers:` / `Status` / `Parent FEAT hash`) — cf. l'agent, section
+    # anti-derive « Écrit uniquement … (+ Edit back-fill des US du module) ».
+    "reverse-sql-feat-composer": [
+        r"^workspace/feats/.+\.md$",
+        r"^workspace/us/.+\.md$",
+    ],
 }
 
 # Paths to ignore during ownership audit

@@ -16,6 +16,13 @@ Subcommands:
     run-latest  --feat N            → {run_id, status, current_phase, started_at}
     feat-stats  --feat N            → consolidated overview across all qa_*
 
+Predicate subcommands (exit 0 = fresh findings present, exit 1 = absent/stale ;
+TTL via --max-age-hours, default 24h) :
+    arch-review-present      --feat N   → qa_code_review, classes ARCH_*
+    code-review-present      --feat N   → qa_code_review, classes non-ARCH_*
+    security-present         --feat N   → qa_security, mode 'scan'
+    spec-compliance-present  --feat N   → qa_spec_compliance
+
 Output format:
     --format json (default)   → machine-readable JSON on stdout
     --format md               → human-readable Markdown (on-demand render;
@@ -337,6 +344,87 @@ def query_spec_compliance_present(feat: int, max_age_hours: int = 24) -> dict:
     }
 
 
+def query_code_review_present(feat: int, max_age_hours: int = 24) -> dict:
+    """Predicate query : are there FRESH code-review findings persisted for this FEAT ?
+
+    v7.0.1 (audit F-M1 2026-08-30) : used by `/sdd-review §3.0` (fallback
+    standalone) to decide whether to spawn `code-reviewer`. Miroir exact de
+    `query_arch_review_present` — même table `qa_code_review`, mais en
+    EXCLUANT les classes `[ARCH_*]` (persistées dans la même table par
+    `arch-reviewer` et déjà couvertes par `arch-review-present`).
+
+    TTL filter (default 24h) via `max_age_hours`. Stale findings (code
+    changed since last run) are ignored → fallback re-runs the agent.
+    Override via CLI flag `--max-age-hours N` (0 = disable TTL).
+
+    Predicate semantics : main() returns exit 0 when ≥ 1 fresh non-ARCH row
+    exists in `qa_code_review` for this FEAT, exit 1 otherwise. The JSON
+    payload (always emitted on stdout) carries count + max_age_hours.
+    """
+    with connect_ro() as conn:
+        if max_age_hours and max_age_hours > 0:
+            row = conn.execute(
+                "SELECT COUNT(*) FROM qa_code_review "
+                "WHERE feat_n = ? AND issue_class NOT LIKE 'ARCH_%' "
+                f"AND extracted_at > datetime('now', '-{int(max_age_hours)} hours')",
+                (feat,),
+            ).fetchone()
+        else:
+            row = conn.execute(
+                "SELECT COUNT(*) FROM qa_code_review "
+                "WHERE feat_n = ? AND issue_class NOT LIKE 'ARCH_%'",
+                (feat,),
+            ).fetchone()
+    count = int(row[0]) if row else 0
+    return {
+        "present":   count > 0,
+        "feat":      feat,
+        "count":     count,
+        "max_age_hours": max_age_hours,
+        "_exit_code": 0 if count > 0 else 1,
+    }
+
+
+def query_security_present(feat: int, max_age_hours: int = 24) -> dict:
+    """Predicate query : are there FRESH security-scan findings persisted for this FEAT ?
+
+    v7.0.1 (audit F-M1 2026-08-30) : used by `/sdd-review §3.0` (fallback
+    standalone) to decide whether to spawn `security-reviewer`. Miroir exact
+    de `query_spec_compliance_present`, source `qa_security` restreinte au
+    mode `scan` (le mode `threat-model` pré-dev ne prouve pas qu'un scan
+    post-dev a tourné).
+
+    TTL filter (default 24h) via `max_age_hours`. Stale findings (code
+    changed since last run) are ignored → fallback re-runs the agent.
+    Override via CLI flag `--max-age-hours N` (0 = disable TTL).
+
+    Predicate semantics : main() returns exit 0 when ≥ 1 fresh scan row
+    exists in `qa_security` for this FEAT, exit 1 otherwise. The JSON
+    payload (always emitted on stdout) carries count + max_age_hours.
+    """
+    with connect_ro() as conn:
+        if max_age_hours and max_age_hours > 0:
+            row = conn.execute(
+                "SELECT COUNT(*) FROM qa_security "
+                "WHERE feat_n = ? AND mode = 'scan' "
+                f"AND extracted_at > datetime('now', '-{int(max_age_hours)} hours')",
+                (feat,),
+            ).fetchone()
+        else:
+            row = conn.execute(
+                "SELECT COUNT(*) FROM qa_security WHERE feat_n = ? AND mode = 'scan'",
+                (feat,),
+            ).fetchone()
+    count = int(row[0]) if row else 0
+    return {
+        "present":   count > 0,
+        "feat":      feat,
+        "count":     count,
+        "max_age_hours": max_age_hours,
+        "_exit_code": 0 if count > 0 else 1,
+    }
+
+
 def query_review(feat: int) -> dict:
     """Read latest /sdd-review run for FEAT (table validation_reports, type='review')."""
     with connect_ro() as conn:
@@ -380,6 +468,8 @@ DISPATCH = {
     "review":                query_review,
     "arch-review-present":         query_arch_review_present,    # v7.0.0-alpha audit CRIT-4
     "spec-compliance-present":     query_spec_compliance_present, # v7.0.0+ two-stage gate
+    "code-review-present":         query_code_review_present,     # v7.0.1 audit F-M1 2026-08-30
+    "security-present":            query_security_present,        # v7.0.1 audit F-M1 2026-08-30
     "run-latest":            query_run_latest,
     "feat-stats":            query_feat_stats,
 }
@@ -387,7 +477,12 @@ DISPATCH = {
 # Predicate-style subcommands : main() propagates `_exit_code` from the
 # payload so callers can use the script as a shell predicate (exit 0 = yes,
 # exit 1 = no), in addition to consuming the JSON on stdout.
-_PREDICATE_SUBCOMMANDS = {"arch-review-present", "spec-compliance-present"}
+_PREDICATE_SUBCOMMANDS = {
+    "arch-review-present",
+    "spec-compliance-present",
+    "code-review-present",
+    "security-present",
+}
 
 
 def _render_review_md(feat: int, result: dict) -> str:
@@ -461,15 +556,13 @@ def main(argv: list[str] | None = None) -> int:
                         help="Output format. `md` renders a human-readable report "
                              "on-demand from console.db (no file written).")
     parser.add_argument("--max-age-hours", type=int, default=24,
-                        help="(arch-review-present only, v7.0.1 audit C4) TTL filter for "
-                             "freshness check ; 0 disables. Default 24h.")
+                        help="(*-present predicate subcommands, v7.0.1 audit C4) TTL "
+                             "filter for freshness check ; 0 disables. Default 24h.")
     args = parser.parse_args(argv)
 
     try:
-        if args.subcommand == "arch-review-present":
-            result = query_arch_review_present(args.feat, max_age_hours=args.max_age_hours)
-        elif args.subcommand == "spec-compliance-present":
-            result = query_spec_compliance_present(args.feat, max_age_hours=args.max_age_hours)
+        if args.subcommand in _PREDICATE_SUBCOMMANDS:
+            result = DISPATCH[args.subcommand](args.feat, max_age_hours=args.max_age_hours)
         else:
             result = DISPATCH[args.subcommand](args.feat)
     except FileNotFoundError as exc:

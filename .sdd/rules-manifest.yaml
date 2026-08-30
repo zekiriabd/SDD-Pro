@@ -9,18 +9,25 @@
 #
 # scope:
 #   universal    — chargée par TOUT agent (contrat inconditionnel, pas de
-#                  frontmatter `paths:`). 2 rules.
+#                  frontmatter `paths:`). 1 rule : output-protocol (qui porte
+#                  aussi le noyau universel error-classification §7.3/§7.5 —
+#                  TOK-C2, audit tokens 2026-08-30).
 #   path-scoped  — auto-injectée seulement au contact de fichiers de son
 #                  périmètre (frontmatter `paths:`, mécanisme natif Claude
-#                  Code). 10 rules. TOK-C1 (CLAUDE.md §5).
+#                  Code). 11 rules. TOK-C1 (CLAUDE.md §5) + TOK-C2 :
+#                  error-classification est passée path-scoped (digests par
+#                  agent = canal nominal) ; build-and-loop et
+#                  dev-shared-preflight gardent une clé `paths:` réduite à
+#                  leur propre fichier (auto-injection pipeline retirée — les
+#                  consommateurs les lisent explicitement en STEP contexte).
 #
 # harness_mapping — comment chaque harnais consomme la couche rules :
 #   claude-code : fichiers `.sdd/rules/*.md` (path-scoped natif). IDENTITÉ.
-#   codex       : PAS de mécanisme path-scoped. Les 2 universelles sont
-#                 inlinées dans AGENTS.md ; les 9 path-scoped sont référencées
+#   codex       : PAS de mécanisme path-scoped. La rule universelle est
+#                 inlinée dans AGENTS.md ; les 11 path-scoped sont référencées
 #                 par pointeur (chargement paresseux non disponible -> l'agent
 #                 les Read explicitement, comme aujourd'hui en STEP contexte).
-#   gemini-cli  : idem codex (inline universelles dans GEMINI.md + pointeurs).
+#   gemini-cli  : idem codex (inline universelle dans GEMINI.md + pointeurs).
 #
 # NOTE — la transpilation Codex/Gemini de la couche rules n'est PAS encore
 # câblée (comme les couches agents/commandes) : `emit_rules` lève
@@ -55,7 +62,7 @@ rules:
     scope: path-scoped
   - name: error-classification
     body_source: .sdd/rules/error-classification.md
-    scope: universal
+    scope: path-scoped
   - name: library-and-stack
     body_source: .sdd/rules/library-and-stack.md
     scope: path-scoped

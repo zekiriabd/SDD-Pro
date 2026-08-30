@@ -49,7 +49,7 @@ Quelle est l'US à matérialiser côté backend ? (format : {n}-{m}, ex. 1-3)
 Si format invalide →
 ```
 ERROR: /dev-backend — argument invalide
-CAUSE: "{argument}" ne respecte pas le format {n}-{m}
+CAUSE: [INVALID_ARG] "{argument}" ne respecte pas le format {n}-{m}
 FIX: relancer /dev-backend {n}-{m} (ex. /dev-backend 1-3)
 ```
 

@@ -81,8 +81,8 @@ class TestModelCost(unittest.TestCase):
     def test_opus_pricing(self) -> None:
         # 100k input + 10k output on Opus 4.7
         c = model_cost("claude-opus-4-7", 100_000, 10_000, 0, 0)
-        # 100k * 15 / 1M + 10k * 75 / 1M = 1.5 + 0.75 = 2.25
-        self.assertAlmostEqual(c, 2.25, places=2)
+        # 100k * 5 / 1M + 10k * 25 / 1M = 0.5 + 0.25 = 0.75
+        self.assertAlmostEqual(c, 0.75, places=2)
 
     def test_sonnet_pricing(self) -> None:
         c = model_cost("claude-sonnet-4-6", 100_000, 10_000, 0, 0)
@@ -160,11 +160,12 @@ class TestCollectFeatData(unittest.TestCase):
             self.assertEqual(data["tokens"]["cache_read"], 50_000)
             # billed = input + output + cache_creation (cache_read excluded)
             self.assertEqual(data["tokens"]["billed_total"], 137_000)
-            # cost = Opus(100k/10k/20k cc/50k cr) + Sonnet(5k/2k)
-            #      = 1.5 + 0.75 + 0.375 + 0.075 + 0.015 + 0.030
-            #      = ~2.745
-            self.assertGreater(data["cost_usd"], 2.5)
-            self.assertLess(data["cost_usd"], 3.0)
+            # cost = Opus(100k in @5 + 10k out @25 + 20k cache_creation @6.25
+            #             + 50k cache_read @0.50) + Sonnet(5k in @3 + 2k out @15)
+            #      = 0.5 + 0.25 + 0.125 + 0.025 + 0.015 + 0.030
+            #      = ~0.945
+            self.assertGreater(data["cost_usd"], 0.85)
+            self.assertLess(data["cost_usd"], 1.05)
 
     def test_rework_detection(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:

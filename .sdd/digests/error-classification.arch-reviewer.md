@@ -2,7 +2,7 @@
 > **GENERATED — do not edit.** Slice of `@.claude/rules/error-classification.md` for the `arch-reviewer` agent (audit 2026-06-12, block 5). Regenerate via `python .sdd/python/sdd_admin/sync_error_class_digests.py`.
 >
 > Contains the §0 quick-ref (full 16-family map) + this agent's families + the universal format/loop sections. For a class OUTSIDE this slice, §0 names its family — Read the full file on-demand (rule `build-and-loop.md §8`).
-## 0. Quick reference — 16 familles (191 classes)
+## 0. Quick reference — 16 familles (193 classes)
 
 | # | Famille | Classes | Émetteur principal | Comportement build_loop |
 |---|---|---:|---|---|
@@ -19,7 +19,7 @@
 | §1.11 | **Security** (`[SEC_*]`) — OWASP Top 10 2021 | 23 | security-reviewer | report only + 8 hard-blocking |
 | §1.12 | **Perf** (`[PERF_*]`) — héritage, réactivé via `ingest_lighthouse.py` | 16 | CI ingest | report only |
 | §1.13 | **Spec Compliance** (`[SPEC_*]`) — AC-by-AC verification | 9 | spec-compliance-reviewer | report only |
-| §1.14 | **Tooling/Governance** (`[SCAN_*]`/`[DISCOVER_*]`/`[CHECKPOINT_*]`/`[CONFIG_*]`/`[PROFILE_*]`/`[DRIFT_*]`/`[ARCH_*]`/`[REVIEW_*]`/`[STACK_COMBO_*]`/`[FRAMEWORK_PROTECTED]`/`[ENV_BYPASS_BLOCKED]`/`[PRICING_UNKNOWN]`/`[SECRET_PROVIDER_LEAK_RISK]`/hooks préflight) | 34 | scripts mono-shot + hooks | mostly info, qq. bloquantes |
+| §1.14 | **Tooling/Governance** (`[SCAN_*]`/`[DISCOVER_*]`/`[CHECKPOINT_*]`/`[CONFIG_*]`/`[PROFILE_*]`/`[DRIFT_*]`/`[ARCH_*]`/`[REVIEW_*]`/`[AUDITOR_RUNTIME_ERROR]`/`[STACK_COMBO_*]`/`[FRAMEWORK_PROTECTED]`/`[ENV_BYPASS_BLOCKED]`/`[PRICING_UNKNOWN]`/`[SECRET_PROVIDER_LEAK_RISK]`/`[PACK_UNUSABLE]`/hooks préflight) | 36 | scripts mono-shot + hooks | mostly info, qq. bloquantes |
 | §1.15 | **Adversarial** (`[ADV_*]`) — opt-out (actif par défaut, `--no-adversarial` pour skip) | 6 | adversarial-reviewer | informational |
 | §1.16 | **Inconnue** (`[UNKNOWN]`) | 1 | fallback | report only |
 
@@ -112,6 +112,13 @@ Substance : `agents/arch-reviewer.md §5`.
 | `[REVIEW_SCAN_FAILED]` | `quality_scan.py` re-run échoué | WARN (continue sur DB stale) |
 | `[REVIEW_SOURCES_MISSING]` | Sources de review absentes (code matérialisé / rapports auditors introuvables au démarrage de `/sdd-review`) | WARN |
 
+**Two-stage auditor gate** (`auditor-orchestration.md §4.1-§4.2`, appliqué
+par les orchestrateurs `/sdd-full` et `/dev-run` STEP 6.4) :
+
+| Préfixe | Sens | Bloquant |
+|---|---|:---:|
+| `[AUDITOR_RUNTIME_ERROR]` | Verdict JSON d'un auditor illisible au moment où l'orchestrateur two-stage lit `summary.verdict` (`workspace/.sys/.validation/{n}-{kind}.json` absent — agent STOP runtime, ou `.json` supprimé faute de `--keep-json` à l'ingest, cf. FWD-C1 audit 2026-06-12). Gate stricte : verdict forcé `🔴 RED`, jamais de fallback silencieux. | OUI — **exception `arch-reviewer`** : WARN seulement (jamais hard-blocking par design, `ArchReviewFailOn: serious` défaut) |
+
 **Hooks préflight & gates runtime** (PreToolUse/SubagentStop — déclarés ici
 pour la réciprocité émetteurs↔taxonomie, audit 2026-06-12) :
 
@@ -124,10 +131,11 @@ pour la réciprocité émetteurs↔taxonomie, audit 2026-06-12) :
 | `[ENV_BYPASS_BLOCKED]` | Tentative de bypass d'une protection via env var interdite | OUI (hook `block_env_bypass`) |
 | `[GLOB_SCOPE_TOO_BROAD]` | Glob non borné (token explosion) | WARN (strict via `SDD_GLOB_SCOPE_STRICT=1`, hook `preflight_glob_scope`) |
 | `[TELEMETRY_UNAVAILABLE]` | `console.db` télémétrie indisponible au precheck coût | info, fail-open (hook `preflight_cost_cap`) |
-| `[PRICING_UNKNOWN]` | Modèle sans pricing connu (ni canonical `pricing.py` ni provider YAML) — coût cappé sur `FALLBACK_PRICING` Sonnet, risque under-count 5× | OUI en CI, WARN interactif (hook `preflight_cost_cap`, audit R2 2026-07-26). Bypass : `SDD_ALLOW_UNKNOWN_PRICING=1` |
+| `[PRICING_UNKNOWN]` | Modèle sans pricing connu (ni canonical `pricing.py` ni provider YAML, `model` NULL inclus) — coût cappé sur `FALLBACK_PRICING` Sonnet, risque under-count 5×. **Périmètre du blocage = les agents du registre SDD** (`.sdd/agents/*.md`, projection du loader) ; un usage attribué à un subagent hors registre (built-ins du harnais) est compté dans le total mais rapporté en WARN, jamais bloquant (audit C-1 2026-08-30). Un usage non attribué (`unknown`, nom d'événement de hook) reste fail-closed. | OUI en CI, WARN interactif (hook `preflight_cost_cap`, audit R2 2026-07-26). Bypass : `SDD_ALLOW_UNKNOWN_PRICING=1` |
 | `[SECRET_PROVIDER_LEAK_RISK]` | Secrets détectés dans `workspace/stack/stack.md` alors que provider actif est non-Anthropic (retention par défaut : OpenAI 30j, Google 55j, Moonshot inconnu) | WARN (jamais bloquant — hook `preflight_secret_scan`, audit R5 2026-07-26). Bypass : `SDD_ALLOW_SECRET_TO_PROVIDER=1` |
 | `[AGENT_REMOVED_V7]` | Spawn d'un agent retiré en v7.0.0 (a11y/perf/dashboard/*-strict) | OUI (hook `preflight_agent_budget`) |
 | `[BUDGET_PRECHECK_TIMEOUT]` | Timeout du precheck budget agent | info, fail-open (hook `preflight_agent_budget`) |
+| `[PACK_UNUSABLE]` | Pack de contexte déclaré dans `loader.yml` (`reads:`) mais inutilisable : absent ou périmé (empreinte des sources changée). Une **ERREUR, pas un warning** — un pack manquant pèse 0 octet et produirait un vert trompeur sur un agent privé de contexte de stack. FIX : `python -m sdd_scripts.build_context_pack --agent {agent}` (le hook `preflight_agent_budget` reconstruit le pack avant chaque spawn). | OUI (gate `context_budget.py`, audit 2026-08-28) |
 
 > Réciprocité enforced par `tests/test_error_classification_reciprocity.py` :
 > toute classe émise en `CAUSE: [X]` DOIT figurer dans cette taxonomie.
@@ -142,32 +150,20 @@ pour la réciprocité émetteurs↔taxonomie, audit 2026-06-12) :
 ---
 ## 2. Format obligatoire
 
-**Chat** (compressé — 1L succès, 2L max erreur) :
-```
-🔴 {agent} {n}-{m} — {résumé}
-CAUSE: [{CLASS}] {détail 1L} → {pointer fichier rapport}
-```
-
-**Rapport** (3 lignes, persisté en base `console.db` ou stderr ; ex-`workspace/qa/...`, `.sys/.validation/...`) :
+**Noyau universel déplacé** (audit tokens 2026-08-30) : le format canonique —
+chat 1L (`🔴 [AGENT/FAIL] … [CLASS] …`) et rapport 3L disque
+(`ERROR / CAUSE / FIX`) avec exemple `[BUILD_CORRECTIBLE]` — est porté par
+**`output-protocol.md §7`** (§7.2 chat, §7.3 disque + exemple, §7.5 noyau),
+rule inconditionnelle auto-injectée dans tout contexte. Rappel du squelette
+rapport (persisté en base `console.db` ou stderr ; ex-`workspace/qa/...`,
+`.sys/.validation/...`) :
 ```
 ERROR: {feat/us/task or pipeline-step} failed
 CAUSE: [{CLASS}] {détail 1L}
 FIX: {action 1L}
 ```
-
-**Exemple `[BUILD_CORRECTIBLE]`** (build_loop itère) :
-```
-ERROR: dev-backend 1-2 build failed (iter 1/3)
-CAUSE: [BUILD_CORRECTIBLE] missing import 'SIM.Backend.Services.IBebeService' in BebesEndpoints.cs:1
-FIX: add 'using SIM.Backend.Services;'
-```
-
-**Exemple `[BUILD_BLOCKING]`** (fail-fast) :
-```
-ERROR: dev-frontend 2-1 build failed (iter 1/3)
-CAUSE: [BUILD_BLOCKING] business logic detected in Pages/Login.razor (DbContext usage in UI layer)
-FIX: move data access to Services/AuthService.cs, inject via DI
-```
+`[BUILD_CORRECTIBLE]` itère, `[BUILD_BLOCKING]` fail-fast — comportements §1.4,
+décision mécanique §3.
 
 ---
 ## 3. Comportement `build_loop` selon classe
@@ -182,5 +178,6 @@ Une seule classe déclenche une itération `build_loop` :
 
 **"Pas de bloc ERROR sans préfixe `[CLASS]`. Si rien ne matche → `[UNKNOWN]`."**
 
-Discipline qui permet à `build_loop` de décider mécaniquement, aux
+Reprise verbatim dans `output-protocol.md §7.5` (canal universel — auto-injecté
+partout). Discipline qui permet à `build_loop` de décider mécaniquement, aux
 scripts de classer sans LLM, au dashboard de visualiser par cause-racine.

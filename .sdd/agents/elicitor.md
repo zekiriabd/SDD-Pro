@@ -66,7 +66,7 @@ Arguments :
 Si `{n}` absent → ERROR :
 ```
 ERROR: agent elicitor — argument manquant
-CAUSE: numéro de FEAT manquant
+CAUSE: [INVALID_ARG] numéro de FEAT manquant
 FIX: relancer /feat-deepen {n}
 ```
 
@@ -91,7 +91,7 @@ Glob `workspace/feats/{n}-*.md`.
 - 0 fichier → ERROR :
   ```
   ERROR: agent elicitor — FEAT introuvable
-  CAUSE: aucun fichier workspace/feats/{n}-*.md
+  CAUSE: [FEAT_NOT_FOUND] aucun fichier workspace/feats/{n}-*.md
   FIX: créer la FEAT via /feat-generate
   ```
 - > 1 fichier → ERROR (nommage invalide).
@@ -122,6 +122,11 @@ La FEAT {n}-{FeatName} contient déjà des sections enrichies. Que faire ?
 ## STEP 3 — Charger templates, règles, et bibliothèque techniques
 
 Read **uniquement** :
+- `.sdd/digests/error-classification.elicitor.md` — taxonomie des classes
+  émises par cet agent (`[INVALID_ARG]`, `[FEAT_NOT_FOUND]`,
+  `[FEAT_AMBIGUOUS]`, `[ELICITOR_GAP]`). **Aucun bloc ERROR sans préfixe
+  `[CLASS]`** (`rules/error-classification.md §5`). *(Read ajouté audit M7,
+  2026-08-29 — le digest `elicitor` était généré mais lu par personne.)*
 - `.sdd/templates/risks-assumptions.template.md` (sections cibles à append)
 - `.sdd/docs/brainstorming-techniques.md` — **bibliothèque 15 techniques
   (v7.0.0+ wired audit P2 M1 2026-06-08)**. Lecture sélective : §0 Quick

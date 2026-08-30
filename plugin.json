@@ -6,7 +6,7 @@
   "author": "SDD-Pro maintainer",
   "license": "SEE LICENSE",
   "contextFiles": [
-    ".claude/AGENTS.md"
+    ".claude/CLAUDE.md"
   ],
   "commands": ".claude/commands",
   "skills": ".sdd/skills",

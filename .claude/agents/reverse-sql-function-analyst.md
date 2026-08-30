@@ -2,7 +2,7 @@
 name: reverse-sql-function-analyst
 description: Spécialiste des FONCTIONS SQL (scalaires, inline, table) du reverse base de données. Pour UNE fonction, lit son context pack déterministe et produit UNE User Story décrivant le calcul métier réutilisable qu'elle porte — contrat d'entrée/sortie, formule, cas limites, valeur par défaut. Angle propre — une fonction n'ayant pas d'effet de bord, sa User Story parle de règle de calcul et jamais de données modifiées. Ce sont les feuilles du graphe de dépendances, dont les résumés alimentent toutes les vagues suivantes. Lecture seule, aucune connexion base, aucun spawn d'agent.
 model: claude-sonnet-4-6
-tools: Read, Write, Edit, Glob, Grep, Bash
+tools: Read, Write, Edit, Glob, Grep
 ---
 # Agent Reverse-SQL-Function-Analyst — spécialiste fonctions
 
@@ -92,10 +92,13 @@ jamais recalculés.
 - Chaque AC porte
   `<!-- evidence: .sys/proc-snapshot/{schema}.{nom}.sql:Ls-Le -->`
   (chiffres nus, pas de préfixe `L` dans la valeur) et `<!-- confidence: … -->`.
-- Une section `## Dependencies` listant appelés et appelants du pack.
+- Placeholders du template : `{objectFamily}` → « fonction » ; `{objectType}` →
+  le `routineType` du catalogue tel quel ; `Parent FEAT hash:` → **laisser le
+  sentinel tel quel** (résolu au rung 2) ; `extraction: analyzed` → conserver.
+- Renseigner la section `## Dependencies` du template : appelés et appelants du pack.
 - La plomberie (types techniques, noms de colonnes) descend en `## Data Effects`.
 - Une hypothèse non prouvée par le corps va en `## Hypothèses métier` avec
-  `<!-- kind: hypothesis -->` — **jamais** en AC.
+  `<!-- kind: hypothesis -->` — **jamais** en AC (« aucune » est valide).
 
 ## STEP 5 — Sortie chat (output-protocol)
 

@@ -219,6 +219,22 @@ def action_new_run(args: argparse.Namespace) -> int:
     print(run_id)
     return SUCCESS
 def action_set_phase(args: argparse.Namespace) -> int:
+    # Audit F-M2 (2026-08-30) : validation du nom de phase. Avant ce fix,
+    # --phase acceptait du texte libre ; un nom hors _PIPELINE_PHASES_ORDER
+    # (typo, kebab-case legacy) rendait la phase invisible pour
+    # `resume-target` → `--resume` redémarrait de zéro sans signal.
+    phase_name, alias_warning = resolve_phase_name(args.phase)
+    if phase_name is None:
+        valid = ", ".join(sorted(_KNOWN_PHASES))
+        warn(
+            f"[set-phase] phase inconnue {args.phase!r} — noms valides : {valid} "
+            f"(alias legacy tolérés : {', '.join(sorted(_LEGACY_PHASE_ALIASES))})"
+        )
+        return FAIL_FAST
+    if alias_warning:
+        warn(alias_warning)
+    args.phase = phase_name
+
     ensure_initialized()
     now = iso_now()
     payload = parse_payload(args.payload_json)
@@ -432,6 +448,59 @@ _PIPELINE_PHASES_ORDER: tuple[tuple[str, str], ...] = (
 )
 
 _RESUME_DONE_STATUSES = {"pass", "warn", "success", "skip"}
+
+#: Phases auxiliaires trackées hors routing --resume (observabilité seule).
+#: Elles n'apparaissent PAS dans _PIPELINE_PHASES_ORDER (resume-target les
+#: ignore) mais sont des noms légitimes pour `set-phase` — émises par
+#: sdd-full.md STEP 4.45 / STEP 4.7 et dev-run.md STEP 6.4.5
+#: (+ auditor-orchestration.md).
+_AUX_PHASES: frozenset[str] = frozenset({
+    "doc_refresh",            # sdd-full STEP 4.45 (refresh INDEX ADRs)
+    "feat_validate_postdev",  # sdd-full STEP 4.7 (spec-compliance gate post-dev)
+    "auditor_batch",          # dev-run STEP 6.4.5 (two-stage auditor)
+})
+
+#: Alias legacy (pré-audit F-M2 2026-08-30) → nom canonique. Les vieux
+#: callers/docs utilisaient des noms kebab-case qui ne matchaient pas
+#: _PIPELINE_PHASES_ORDER → `--resume` ne reconnaissait jamais la phase.
+#: On normalise silencieusement (warn stderr) au lieu de rejeter, pour ne
+#: pas casser les workspaces existants.
+_LEGACY_PHASE_ALIASES: dict[str, str] = {
+    "us-generate":           "us_generate",
+    "feat-validate":         "readiness",
+    "FEAT-validate":         "readiness",
+    "dev-plan":              "plan",
+    "dev-run":               "dev_run",
+    "qa-generate":           "qa",
+    "sdd-review":            "sdd_review",
+    "doc-refresh":           "doc_refresh",
+    "feat-validate-postdev": "feat_validate_postdev",
+}
+
+#: Noms de phase acceptés par `set-phase` (audit F-M2 2026-08-30 — avant,
+#: --phase acceptait du texte libre : un typo rendait la phase invisible
+#: pour `resume-target` sans aucun signal).
+_KNOWN_PHASES: frozenset[str] = (
+    frozenset(phase for phase, _step in _PIPELINE_PHASES_ORDER) | _AUX_PHASES
+)
+
+
+def resolve_phase_name(raw: str) -> tuple[str | None, str | None]:
+    """Validate/normalize a `--phase` value.
+
+    Returns (canonical_name, warning) on success — warning non-None quand un
+    alias legacy a été normalisé. Returns (None, None) si le nom est inconnu.
+    """
+    name = (raw or "").strip()
+    if name in _KNOWN_PHASES:
+        return name, None
+    if name in _LEGACY_PHASE_ALIASES:
+        canonical = _LEGACY_PHASE_ALIASES[name]
+        return canonical, (
+            f"[set-phase] alias legacy {name!r} normalisé en {canonical!r} "
+            "(F-M2 2026-08-30 — mettre à jour le caller)"
+        )
+    return None, None
 
 
 def action_resume_target(args: argparse.Namespace) -> int:

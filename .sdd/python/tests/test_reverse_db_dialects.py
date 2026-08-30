@@ -91,6 +91,71 @@ class TestIntrospectionFlow(unittest.TestCase):
             self.assertEqual(intro["databaseType"], d.id)
 
 
+class TestCatalogParams(unittest.TestCase):
+    """m2 (audit 2026-08-29) — MySQL's ROUTINE_DEFINITION never carries the
+    CREATE PROCEDURE header, so a MySQL routine's params are unrecoverable
+    from the body: they must come from `information_schema.PARAMETERS`
+    instead. Reproduces the exact "MySQL body -> params=[]" bug and proves
+    the catalog-sourced override closes it, while every OTHER engine (whose
+    params query is "", the default) is completely unaffected.
+    """
+
+    def test_mysql_declares_a_readonly_params_query(self):
+        d = get_dialect("mysql")
+        self.assertTrue(d.params_query, "mysql dialect should declare params_query")
+        self.assertTrue(is_readonly(d.params_query))
+
+    def test_other_engines_do_not_need_a_params_query(self):
+        # Their body header IS a real signature the regex can already parse —
+        # declaring a query here would just be an unused surface to guard.
+        for eng in ("sqlserver", "postgresql", "oracle"):
+            self.assertEqual(get_dialect(eng).params_query, "", eng)
+
+    def test_mysql_body_alone_yields_zero_params_without_the_fix(self):
+        # MySQL's ROUTINE_DEFINITION holds only the statement block.
+        rows = [_row("app", "usp_Save", "SQL_STORED_PROCEDURE",
+                      "BEGIN INSERT INTO app.T(a) VALUES (1); END")]
+        intro = build_introspection(rows, get_dialect("mysql"), server="h", database="AppDb")
+        self.assertEqual(intro["procedures"][0]["params"], [])
+
+    def test_catalog_param_rows_override_the_empty_body_result(self):
+        from sdd_reverse.dialects.base import PARAM_ROW
+        rows = [_row("app", "usp_Save", "SQL_STORED_PROCEDURE",
+                      "BEGIN INSERT INTO app.T(a) VALUES (p_a); END")]
+        param_rows = [
+            tuple({"schema": "app", "routine": "usp_Save", "name": "p_a",
+                   "type": "int", "mode": "IN", "ordinal": 1}[c] for c in PARAM_ROW),
+            tuple({"schema": "app", "routine": "usp_Save", "name": "p_out",
+                   "type": "varchar(50)", "mode": "OUT", "ordinal": 2}[c] for c in PARAM_ROW),
+        ]
+        intro = build_introspection(
+            rows, get_dialect("mysql"), server="h", database="AppDb", param_rows=param_rows,
+        )
+        params = intro["procedures"][0]["params"]
+        self.assertEqual(
+            params,
+            [{"name": "p_a", "type": "int", "output": False},
+             {"name": "p_out", "type": "varchar(50)", "output": True}],
+        )
+
+    def test_a_routine_absent_from_param_rows_keeps_its_body_result(self):
+        # Whole-DB param fetch only returns rows for routines that HAVE
+        # parameters in the catalog — one routine's absence must not blank
+        # out another routine's already-correct (possibly non-empty) params.
+        from sdd_reverse.dialects.base import PARAM_ROW
+        rows = [
+            _row("app", "usp_NoCatalogEntry", "SQL_STORED_PROCEDURE", "BEGIN SELECT 1; END"),
+        ]
+        param_rows = [
+            tuple({"schema": "app", "routine": "usp_OtherRoutine", "name": "p_x",
+                   "type": "int", "mode": "IN", "ordinal": 1}[c] for c in PARAM_ROW),
+        ]
+        intro = build_introspection(
+            rows, get_dialect("mysql"), server="h", database="AppDb", param_rows=param_rows,
+        )
+        self.assertEqual(intro["procedures"][0]["params"], [])
+
+
 class TestConnectionStrings(unittest.TestCase):
     def test_compose_per_engine(self):
         cfg = _Cfg()

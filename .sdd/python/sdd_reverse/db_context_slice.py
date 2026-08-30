@@ -9,7 +9,7 @@ the glossary terms of its subdomain — and nothing else.
     db-context/
         _overview.md                  whole-database orientation
         tables/{schema}.{table}.md    one card per table
-        procedures/…  functions/…  views/…  triggers/…
+        procedures/…  functions/…  views/…  triggers/…  packages/…
         packs/{schema}.{object}.md    the slice handed to the analysing agent
 
 The pack is what makes nested stored procedures analysable. The isolation rule
@@ -43,9 +43,12 @@ Public API:
     render_overview(context)                        -> str
     render_table_card(context, qualified, detail=…) -> str
     render_object_card(context, fq)                 -> str
-    build_pack(context, fq, depth=2, budget=…)      -> (str, dict)
+    build_pack(context, fq, depth=2, budget=…,
+               project_root=…)                      -> (str, dict)
     write_context_tree(root, context, …)            -> dict
+    pack_relpath(fq)                                -> str
     TABLE_DETAIL_LADDER                             -> tuple[str, ...]
+    CYCLE_BODY_LADDER                               -> tuple[int | None, ...]
 """
 from __future__ import annotations
 
@@ -61,11 +64,24 @@ SCHEMA_VERSION = 1
 DEFAULT_PACK_BUDGET = 14_000
 DEFAULT_DEPTH = 2
 
+# Échelle de dégradation des corps de co-membres d'un cycle (D-M3, 2026-08-30).
+# Un cycle « doit être analysé d'un bloc » : le pack de chaque membre embarque
+# donc les corps des autres membres. Quand le budget mord, ces corps sont les
+# PREMIERS à rétrécir — par paliers d'octets par corps, puis noms seuls (None =
+# corps complet, 0 = noms seuls). Chaque palier est déclaré dans `trimmed`.
+CYCLE_BODY_LADDER: tuple[int | None, ...] = (None, 4_000, 1_200, 0)
+
 _FAMILIES = {
     "procedures": ("PROCEDURE",),
     "functions": ("FUNCTION",),
     "views": ("VIEW",),
     "triggers": ("TRIGGER",),
+    # Packages Oracle (spec + body). Famille explicite depuis 2026-08-30 :
+    # avant, `PACKAGE` retombait sur le défaut "procedures" par accident, et le
+    # proc-analyst pouvait le refuser via sa garde de type. La famille est
+    # possédée par `reverse-sql-analyst` (1 package = 1 US), qui accepte
+    # explicitement ces objets.
+    "packages": ("PACKAGE",),
 }
 
 
@@ -87,6 +103,14 @@ def family_of(routine_type: str) -> str:
 def _safe(fq: str) -> str:
     """Filename for an object, keeping schema qualification readable."""
     return "".join(c if c.isalnum() or c in "._-" else "_" for c in (fq or "unknown"))
+
+
+def pack_relpath(fq: str) -> str:
+    """Chemin (relatif au projet) du pack d'un objet — même règle de nommage
+    que `write_context_tree`. C'est ce que `needs_llm.pack` doit porter : le
+    fqName brut d'un objet aux caractères exotiques ne correspond à aucun
+    fichier sur disque (audit 2026-08-29, mineur 2)."""
+    return f".sys/db-context/packs/{_safe(fq)}.md"
 
 
 def _index(context: dict[str, Any]) -> dict[str, dict[str, Any]]:
@@ -423,18 +447,70 @@ def _table_section(
     return lines
 
 
+def _cycle_section(
+    fq: str,
+    scc: dict[str, Any],
+    co_bodies: list[tuple[str, str]],
+    body_cap: int | None,
+) -> list[str]:
+    """Le bloc `## Cycle à analyser d'un bloc`, à un palier de dégradation donné.
+
+    `co_bodies` = [(fqName, corps)] des AUTRES membres du cycle. `body_cap`
+    marche `CYCLE_BODY_LADDER` : None = corps complets, N = tronqués à N
+    octets (troncature déclarée dans le bloc), 0 = noms seuls (comportement
+    d'avant 2026-08-30, désormais réservé au dernier palier).
+    """
+    lines = [
+        "## Cycle à analyser d'un bloc",
+        "",
+        f"Composante `{scc['id']}` — ces objets s'appellent mutuellement et "
+        "ne peuvent pas être compris séparément :",
+        "",
+        *[f"- `{m}`" for m in scc["members"]],
+        "",
+    ]
+    if body_cap == 0 and co_bodies:
+        lines += [
+            "> ⚠️ Corps des co-membres retirés pour tenir le budget de contexte "
+            "— lire les snapshots `.sys/proc-snapshot/` si nécessaire, et "
+            "plafonner la confidence à `medium`.",
+            "",
+        ]
+        return lines
+    for member_fq, body in co_bodies:
+        lines += [f"### Corps de `{member_fq}` (co-membre du cycle)", ""]
+        shown = body
+        if body_cap is not None and len(body) > body_cap:
+            shown = body[:body_cap]
+            lines += [
+                f"> ⚠️ Corps tronqué à {body_cap} caractère(s) sur {len(body)} "
+                "pour tenir le budget de contexte — la fin n'a PAS été lue.",
+                "",
+            ]
+        lines += ["```sql", shown.rstrip("\n"), "```", ""]
+    return lines
+
+
 def build_pack(
     context: dict[str, Any],
     fq: str,
     *,
     depth: int = DEFAULT_DEPTH,
     budget: int = DEFAULT_PACK_BUDGET,
+    project_root: str | Path | None = None,
 ) -> tuple[str, dict[str, Any]]:
     """Assemble the context slice handed to the agent analysing `fq`.
 
     Returns `(markdown, report)`. `report.trimmed` names every section dropped to
     fit the budget — a pack never shrinks silently, because a silently shrunk
     pack produces a confidently wrong User Story.
+
+    `project_root` (D-M3, 2026-08-30) : racine du projet reverse
+    (`workspace/old/{DB}`). Quand elle est fournie et que l'objet appartient à
+    une composante récursive, les CORPS des autres membres du cycle (snapshots
+    `.sys/proc-snapshot/`) sont embarqués dans le pack — c'est ce qui rend la
+    promesse « tous les corps du cycle dans son pack » vraie. Sans elle
+    (rétro-compat), seuls les noms des membres sont listés.
     """
     objects = _index(context)
     obj = objects.get(_norm(fq))
@@ -462,16 +538,26 @@ def build_pack(
 
     sections: list[tuple[str, list[str]]] = []
 
+    # D-M3 — corps des co-membres du cycle, lus depuis les snapshots.
+    co_bodies: list[tuple[str, str]] = []
+    cycle_cap_step = 0  # index dans CYCLE_BODY_LADDER
     if scc and scc.get("recursive") and len(scc["members"]) > 1:
-        sections.append(("cycle", [
-            "## Cycle à analyser d'un bloc",
-            "",
-            f"Composante `{scc['id']}` — ces objets s'appellent mutuellement et "
-            "ne peuvent pas être compris séparément :",
-            "",
-            *[f"- `{m}`" for m in scc["members"]],
-            "",
-        ]))
+        if project_root is not None:
+            for member in scc["members"]:
+                if _norm(str(member)) == _norm(obj["fqName"]):
+                    continue
+                m_obj = objects.get(_norm(str(member))) or {}
+                rel = m_obj.get("snapshotFile") or ""
+                if not rel:
+                    continue
+                try:
+                    body_txt = (Path(project_root) / rel).read_text(
+                        encoding="utf-8", errors="replace")
+                except OSError:
+                    continue
+                co_bodies.append((str(member), body_txt))
+        sections.append(("cycle", _cycle_section(
+            obj["fqName"], scc, co_bodies, CYCLE_BODY_LADDER[cycle_cap_step])))
 
     touched = sorted({*(obj.get("tablesRead") or []), *(obj.get("tablesWritten") or [])})
     if touched:
@@ -543,6 +629,20 @@ def build_pack(
         if len(body) <= budget:
             break
 
+        # Les corps des co-membres d'un cycle rétrécissent EN PREMIER (D-M3) :
+        # ils sont volumineux par nature et l'analyste garde, même dégradés,
+        # les noms + la consigne d'analyser le cycle d'un bloc.
+        ci = _index_of("cycle")
+        if (ci is not None and co_bodies
+                and cycle_cap_step < len(CYCLE_BODY_LADDER) - 1):
+            cycle_cap_step += 1
+            cap = CYCLE_BODY_LADDER[cycle_cap_step]
+            sections[ci] = ("cycle", _cycle_section(
+                obj["fqName"], scc, co_bodies, cap))
+            trimmed.append("cycle:names-only" if cap == 0
+                           else f"cycle:bodies-{cap}")
+            continue
+
         idx = next((i for i in (_index_of(k) for k in trim_order) if i is not None), None)
         if idx is not None:
             trimmed.append(sections[idx][0])
@@ -575,11 +675,17 @@ def build_pack(
     body = _assemble()
 
     if trimmed:
-        removed = [t for t in trimmed if not t.startswith("tables:")]
+        removed = [t for t in trimmed
+                   if not t.startswith("tables:") and not t.startswith("cycle:")]
+        cycle_steps = [t.split(":", 1)[1] for t in trimmed if t.startswith("cycle:")]
         degraded = [t.split(":", 1)[1] for t in trimmed
                     if t.startswith("tables:") and not t.startswith("tables:-")]
         dropped_tables = [t.split(":-", 1)[1] for t in trimmed if t.startswith("tables:-")]
         notice = ["\n\n---\n\n> ⚠️ **Pack tronqué** pour tenir le budget de contexte."]
+        if cycle_steps:
+            notice.append(
+                " Corps des co-membres du cycle dégradés jusqu'à "
+                f"`{cycle_steps[-1]}`.")
         if removed:
             notice.append(
                 " Sections retirées : " + ", ".join(f"`{t}`" for t in removed) + ".")
@@ -603,6 +709,7 @@ def build_pack(
         "depth": depth,
         "trimmed": trimmed,
         "tableDetail": table_detail,
+        "cycleBodies": len(co_bodies),
         "wave": plan_metrics.get("wave"),
     }
 
@@ -661,7 +768,8 @@ def write_context_tree(
             if obj_tier == "none":
                 written["packs"] += 0  # counted but not written
                 continue
-            body, report = build_pack(context, fq, depth=depth, budget=budget)
+            body, report = build_pack(context, fq, depth=depth, budget=budget,
+                                      project_root=project_root)
             atomic_write_text(root / "packs" / f"{_safe(fq)}.md", body)
             pack_reports.append(report)
             written["packs"] += 1

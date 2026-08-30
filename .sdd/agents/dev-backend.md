@@ -174,7 +174,7 @@ Suffixes interdits = union des deux fichiers.
 Lire `workspace/src/{BackendName}/CLAUDE.md`. Si absent → ERROR :
 ```
 ERROR: agent dev-backend — CLAUDE.md projet absent
-CAUSE: workspace/src/{BackendName}/CLAUDE.md introuvable (Arch n'a pas tourné ?)
+CAUSE: [PROJECT_NOT_INIT] workspace/src/{BackendName}/CLAUDE.md introuvable (Arch n'a pas tourné ?)
 FIX: lancer /arch-init avant /dev-backend (ou /dev-run {n} qui enchaîne)
 ```
 
@@ -224,7 +224,7 @@ Lire `appType`, `frontendKind` ET `archiPattern` depuis le JSON preflight :
 Si aucun stack à lire selon les règles ci-dessus → ERROR :
 ```
 ERROR: agent dev-backend — stack backend non sélectionné
-CAUSE: appType={appType}, frontendKind={frontendKind} mais aucun stack {category}/*.md actif dans workspace/stack/stack.md
+CAUSE: [STACK_MALFORMED] appType={appType}, frontendKind={frontendKind} mais aucun stack {category}/*.md actif dans workspace/stack/stack.md
 FIX: décommenter un stack adapté (cf. tableau ci-dessus)
 ```
 
@@ -347,7 +347,7 @@ Glob le `project_file` du stack backend (§2.2 du fichier stack).
 Si absent → ERROR :
 ```
 ERROR: agent dev-backend — projet non initialisé
-CAUSE: aucun fichier projet trouvé pour le stack {stack-id}
+CAUSE: [PROJECT_NOT_INIT] aucun fichier projet trouvé pour le stack {stack-id}
 FIX: lancer /arch-init avant /dev-backend (ou utiliser /dev-run {n})
 ```
 
@@ -380,8 +380,15 @@ Si une **skill plugin** est disponible et pertinente (ex.
 Exécuter la commande `Build` du stack backend (§2.2 du fichier stack).
 
 - Exit code 0 → STEP 9
-- Exit code ≠ 0 → analyser l'erreur, corriger **minimalement** les
-  fichiers générés, relancer le build.
+- Exit code ≠ 0 → classifier l'erreur (`error-classification.md §1.4/§3`) :
+  - `[BUILD_CORRECTIBLE]` (import, typo, override, nullability, signature
+    DI) → **seule classe qui itère** : corriger **minimalement** les
+    fichiers générés, relancer le build (max `BuildLoopMaxIter`).
+  - `[BUILD_BLOCKING]` (erreur architecturale : layer violation, cycle DI,
+    design break) / `[DEP_MISSING]` / `[CIRCULAR_DEP]` → **fail-fast
+    immédiat**, STOP + bloc ERROR 3L — un retry ne résout pas un problème
+    structurel.
+  - `[BUILD_LOOP_EXHAUSTED]` → état terminal (limite atteinte, ci-dessous).
 
 **Limite d'itérations** : configurable via `## Project Config` de
 `workspace/stack/stack.md` :
@@ -492,5 +499,6 @@ le code."* Le code généré est une cible, jamais une source.
 
 ## Chat Output Protocol
 
-Applique `@.sdd/rules/output-protocol.md` (label `[DEV-BACKEND]`, plage `32-58%`).
+Applique `@.sdd/rules/output-protocol.md` (label `[DEV-BACKEND]`, plage `36-58%`
+— 32-36% appartient à `[CONSTITUTION]`, cf. output-protocol.md §4 ; fix audit 2026-08-30).
 Retry build_loop visible via `[DEV-BACKEND/FIXING] (iter X/N)` (% gelé).

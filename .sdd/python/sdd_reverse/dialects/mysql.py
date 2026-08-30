@@ -62,6 +62,23 @@ _DEPS_SQL = (
     f"WHERE v.VIEW_SCHEMA NOT IN {_SKIP_SCHEMAS}"
 )
 
+# Declared parameters (audit 2026-08-29 m2). `ROUTINE_DEFINITION` holds only the
+# statement block — MySQL never puts the `CREATE PROCEDURE name(...)` header in
+# it — so params are unrecoverable from the body and must come from the
+# catalog. `information_schema.PARAMETERS` also emits one ORDINAL_POSITION=0 row
+# per FUNCTION for its return value (PARAMETER_NAME IS NULL) — excluded here,
+# since that is not a parameter of the call.
+_PARAMS_SQL = (
+    "SELECT p.SPECIFIC_SCHEMA AS schema_name, p.SPECIFIC_NAME AS routine_name, "
+    "p.PARAMETER_NAME AS param_name, p.DTD_IDENTIFIER AS param_type, "
+    "COALESCE(p.PARAMETER_MODE, 'RETURN') AS param_mode, "
+    "p.ORDINAL_POSITION AS ordinal "
+    "FROM information_schema.PARAMETERS p "
+    f"WHERE p.SPECIFIC_SCHEMA NOT IN {_SKIP_SCHEMAS} "
+    "AND p.PARAMETER_NAME IS NOT NULL "
+    "ORDER BY p.SPECIFIC_SCHEMA, p.SPECIFIC_NAME, p.ORDINAL_POSITION"
+)
+
 # --------------------------------------------------------------------------- #
 # Live relational structure (C1, audit 2026-08-25)
 # --------------------------------------------------------------------------- #
@@ -164,6 +181,7 @@ DIALECT = Dialect(
     list_routines_sql=_LIST_SQL,
     single_routine_sql=_SINGLE_SQL,
     dependency_query=_DEPS_SQL,
+    params_query=_PARAMS_SQL,
     schema_queries=(
         ("columns", _COLUMNS_SQL),
         ("primary_keys", _PK_SQL),

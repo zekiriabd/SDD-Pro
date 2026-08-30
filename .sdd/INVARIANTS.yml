@@ -26,8 +26,8 @@
 # updating this manifest = test failure.
 
 schema_version: 1
-generated_at: 2026-06-08
-total: 15
+generated_at: 2026-08-30
+total: 20
 
 invariants:
 
@@ -357,3 +357,92 @@ invariants:
     bypasses: []
     added: 2026-08-29
     audit_ref: audit-2026-08-29 (forward-pipeline review — orchestration/parallelism)
+
+  - id: reverse-db-readonly
+    name: db-reverse never modifies a live database
+    description: |
+      Every statement issued by the db-reverse module against a live
+      database passes through readonly_guard (assert_readonly for catalog
+      SELECTs, assert_session_pragma for a closed whitelist of session
+      pragmas), and every Dialect validates its query constants as
+      read-only at construction time (Dialect.__post_init__).
+    severity: critical
+    enforcers:
+      - .sdd/python/sdd_reverse/readonly_guard.py
+      - .sdd/python/sdd_reverse/dialects/base.py  # Dialect.__post_init__
+      - .sdd/python/sdd_reverse_scripts/reverse_smoke.py  # check_dialect_queries_readonly
+    bypasses: []
+    added: 2026-08-30
+    audit_ref: audit-2026-08-29 (reverse-db module review)
+
+  - id: reverse-db-wave-ordering
+    name: Every resolvable callee is analysed strictly before its caller
+    description: |
+      db_wave_planner.plan_waves condenses the call graph (Tarjan SCC) so
+      recursive components are planned as one unit, then orders remaining
+      waves so a callee's wave index is always lower than its caller's.
+      Regex-derived call edges are corroborated/overridden by
+      catalog-sourced dependency data (sys.sql_expression_dependencies,
+      all_dependencies, pg_depend) where available, since keyword-less
+      call syntax (PL/SQL, MySQL/PostgreSQL CALL) is otherwise unreliable
+      to extract by pattern alone.
+    severity: major
+    enforcers:
+      - .sdd/python/sdd_reverse/db_wave_planner.py  # plan_waves, resolve_calls
+      - .sdd/python/sdd_reverse/sql_body_analyzer.py  # call/invoke extraction
+      - .sdd/python/tests/test_db_reverse_call_extraction.py
+    bypasses: []
+    added: 2026-08-30
+    audit_ref: audit-2026-08-29 (reverse-db module review — C1/C2)
+
+  - id: reverse-db-context-facts-vs-hypotheses
+    name: Only the deterministic layer writes db-context facts
+    description: |
+      db-context.json's facts branch is produced exclusively by
+      db_context_build.py; reverse-db-architect (the only LLM agent in
+      this module with Write access) may write only its own
+      db-context.hypotheses.json, and merge_architect_output whitelists
+      exactly 5 hypothesis keys when folding that file back in — anything
+      else is dropped. protect_framework additionally denies direct edits
+      to the facts-branch files under workspace/old/*/.sys/, and
+      audit_file_ownership's matrix covers all 6 db-reverse agents.
+    severity: major
+    enforcers:
+      - .sdd/python/sdd_reverse/db_context.py  # merge_architect_output
+      - .sdd/python/sdd_hooks/audit_file_ownership.py  # OWNERSHIP_MATRIX
+      - .sdd/python/sdd_hooks/protect_framework.py  # FRAMEWORK_OWNED db-context globs
+    bypasses: []
+    added: 2026-08-30
+    audit_ref: audit-2026-08-29 (reverse-db module review — M3)
+
+  - id: reverse-db-context-versioned-and-diffable
+    name: contextVersion changes on any factual OR body-level change
+    description: |
+      context_version() is a sha256 over the canonical facts, which now
+      includes a per-object bodyHash (not just evidence range, line count,
+      params, tables, and calls) — so a same-shape edit inside an existing
+      branch (e.g. a changed constant) is detected as drift by
+      diff_contexts, not silently missed.
+    severity: major
+    enforcers:
+      - .sdd/python/sdd_reverse/db_context.py  # context_version, diff_contexts
+      - .sdd/python/sdd_reverse/db_introspect.py  # body_hash()
+      - .sdd/python/tests/test_db_reverse_context_and_schema_20260829.py
+    bypasses: []
+    added: 2026-08-30
+    audit_ref: audit-2026-08-29 (reverse-db module review — M2)
+
+  - id: reverse-db-call-aware-routing
+    name: Complexity/tier routing weighs call composition, not just body size
+    description: |
+      The per-object complexity rubric factors in calls, unresolved
+      callees, recursion, and fan-in — so a thin orchestrator that
+      delegates its real business rule to a callee is never routed as
+      trivial just because its own body is short.
+    severity: major
+    enforcers:
+      - .sdd/python/sdd_reverse/sql_body_analyzer.py  # complexity_reasons
+      - .sdd/python/sdd_reverse/db_tier_router.py  # tier_for
+    bypasses: []
+    added: 2026-08-30
+    audit_ref: audit-2026-08-29 (reverse-db module review — M6)

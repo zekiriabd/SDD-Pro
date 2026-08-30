@@ -15,8 +15,9 @@
     - la FEAT 3c pointera ensuite vers les AC de cette US   (fait en 3c)
   Le fil de traçabilité (D3) se construit bas → haut.
 
-  `Parent FEAT: {n}-{Name}` est PRÉ-ALLOUÉ par 3a (la FEAT n'existe pas encore à
-  3b — elle sera composée en 3c).
+  `Parent FEAT: {n}-{FeatName}` est PRÉ-ALLOUÉ par 3a (la FEAT n'existe pas
+  encore à 3b). {FeatName} = famille FEAT ≠ {Name} (ID) = slug distinctif
+  par US — jamais interchangeables (clôture nommage M4).
 
   `Parent FEAT hash: sha256:COMPUTE_REQUIRED` (sentinel, REV-C1 audit 2026-06-12) :
   posé non-résolu par 3b (la FEAT n'existe pas encore). 3c le résout via le
@@ -28,14 +29,14 @@
   (US ≤ analyse 3a, FEAT 3c ≤ min(US)) via check_ladder_traceability.py —
   doit rester synchrone avec le commentaire de provenance ci-dessous.
 
-  Placeholders : {n}, {m}, {Name}, {Title}, {SourceUnit}, {Confidence},
+  Placeholders : {n}, {m}, {Name}, {FeatName}, {Title}, {SourceUnit}, {Confidence},
   {ExtractionDate}, {Actor}, {Action}, {Value}, {ACs}, {SourceTasks},
   {Dependencies}.
 -->
 # US-{m}: {Title}
 
 ID: {n}-{m}-{Name}
-Parent FEAT: {n}-{Name}
+Parent FEAT: {n}-{FeatName}
 Parent FEAT hash: sha256:COMPUTE_REQUIRED
 Status: Draft
 Confidence: {Confidence}
@@ -56,7 +57,7 @@ Afin de {Value}
 {ACs}
 
 ## Source (barreau 3a — analyse technique)
-<!-- Tasks T-N de plans/{n}-{Name}.analysis.md que cette US abstrait.
+<!-- Tasks T-N de plans/{n}-{FeatName}.analysis.md que cette US abstrait.
      Fil de traçabilité descendant (D3) : US → tasks → evidence file:line. -->
 {SourceTasks}
 

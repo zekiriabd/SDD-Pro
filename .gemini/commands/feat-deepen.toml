@@ -98,7 +98,7 @@ Quelle FEAT veux-tu approfondir ? (numéro, ex. : 1)
 Si non numérique →
 ```
 ERROR: /feat-deepen — argument invalide
-CAUSE: "{argument}" n'est pas un entier
+CAUSE: [INVALID_ARG] "{argument}" n'est pas un entier
 FIX: relancer /feat-deepen {n}
 ```
 
@@ -113,7 +113,7 @@ Glob `workspace/feats/{n}-*.md`.
 - 0 fichier → ERROR :
   ```
   ERROR: /feat-deepen — FEAT introuvable
-  CAUSE: aucun fichier workspace/feats/{n}-*.md
+  CAUSE: [FEAT_NOT_FOUND] aucun fichier workspace/feats/{n}-*.md
   FIX: créer la FEAT via /feat-generate avant
   ```
 - > 1 fichier → ERROR (numérotation invalide).

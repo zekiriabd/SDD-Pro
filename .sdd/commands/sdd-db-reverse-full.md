@@ -1,7 +1,7 @@
 ---
 command: sdd-db-reverse-full
 phase: db-reverse
-description: "Reverse engineering de TOUS les objets SQL exécutables d'une base (lecture seule) — procédures stockées, fonctions, vues et triggers (P0.1 2026-07-24). Introspecte via la connection string de stack.md (## Active Database), regroupe les objets en modules, génère 1 User Story par objet SQL et 1 FEAT par module. Multi-dialecte — SQL Server + PostgreSQL (live-validés), Oracle + MySQL/MariaDB (scaffold-validés, runtime live pending). Ne modifie JAMAIS la base."
+description: "Reverse engineering de TOUS les objets SQL exécutables d'une base (lecture seule) — procédures stockées, fonctions, vues et triggers (P0.1 2026-07-24). Introspecte via la connection string de stack.md (## Active Database), regroupe les objets en modules, génère 1 User Story par objet SQL et 1 FEAT par module. Multi-dialecte — SQL Server (live-validé), PostgreSQL + Oracle + MySQL/MariaDB (scaffold-validés, runtime live pending — downgrade PostgreSQL audit 2026-08-29). Ne modifie JAMAIS la base."
 loader: .sdd/loader.reverse.yml
 ---
 # /sdd-db-reverse-full [--project DB] [--max-parallel N] [--sequential] [--no-architect] [--json]
@@ -75,9 +75,11 @@ Recommandation DBA : login dédié `GRANT VIEW DEFINITION` + `db_datareader` (d�
    `[REVERSE_DB_CONFIG_MISSING]`, dont le message liste les chemins `.env` fouillés.
 2. Driver lecture seule disponible (`pip install -e .sdd/python[reverse-db]`,
    ODBC Driver 18 pour SQL Server). Sinon → `[REVERSE_DB_UNREACHABLE]`.
-3. `DatabaseType` supporté : **SQL Server** et **PostgreSQL** (live-validés),
-   **Oracle** et **MySQL/MariaDB** (scaffold-validés — requêtes read-only et flux
-   hors ligne testés, runtime live à valider sur une base de test avant prod).
+3. `DatabaseType` supporté : **SQL Server** (seul moteur **live-validé** —
+   preuves de runs réels), **PostgreSQL**, **Oracle** et **MySQL/MariaDB**
+   (scaffold-validés — requêtes read-only et flux hors ligne testés, runtime
+   live à valider sur une base de test avant prod ; PostgreSQL était annoncé
+   « live-validé » à tort, downgrade audit 2026-08-29 — cf. CLAUDE.md §3).
    DB2 et SQLite sont reconnus mais refusés avec un message explicite.
 
 ## Périmètre et coût
@@ -121,6 +123,18 @@ rend un second run quasi gratuit après une interruption.
    `python .sdd/python/sdd_reverse_scripts/reverse_proc_introspect.py --full [--project DB]`
    → snapshot + `db-introspection.json` + `inventory.json` (units = modules,
    `(n, Name)` pré-alloués). Erreur DB → STOP avec la classe `[REVERSE_DB_*]`.
+   Aussitôt le snapshot écrit, **scanner les secrets codés en dur** (WARN
+   informational, jamais bloquant — classe `[REVERSE_SECRETS_DETECTED]`,
+   `rules/reverse-engineering.md §6`) :
+   ```bash
+   python .sdd/python/sdd_reverse_scripts/scan_snapshot_secrets.py --project {DB} [--json]
+   ```
+   Un corps de procédure legacy porte parfois un mot de passe, une connection
+   string ou une clé API en littéral — le snapshot vient de le copier sur
+   disque. Le scan pointe la ligne sans jamais logger la valeur ; actions :
+   révoquer le credential exposé, suivre les recommandations `.gitignore`
+   imprimées, re-provisionner via vault. `--exit-on-found` (CI) rend le exit 1
+   sur détection ; en interactif, on continue.
 1.bis **Découpage en modules — stratégie AUTO** (déterministe, 0 token ; c'est la
    décision la plus structurante du reverse DB : elle fixe le nombre de FEATs) :
    - **profilage du corpus** : la structure de nommage est *mesurée* sur les noms
@@ -192,12 +206,20 @@ rend un second run quasi gratuit après une interruption.
 
       | Famille | Agent | Angle |
       |---|---|---|
-      | procédure | `reverse-sql-analyst` | une opération — contrat, effets, préconditions |
+      | procédure · package Oracle | `reverse-sql-analyst` | une opération — contrat, effets, préconditions (1 package = 1 US) |
       | fonction | `reverse-sql-function-analyst` | un calcul réutilisable sans effet de bord |
       | vue | `reverse-sql-view-analyst` | une projection — et ses filtres implicites |
       | trigger | `reverse-sql-trigger-analyst` | un invariant déclenché par un événement |
 
+      Le champ `agent` de chaque entrée `needs_llm` porte déjà ce verdict —
+      l'utiliser tel quel plutôt que re-mapper la famille.
+
       Chaque agent reçoit `{U-N} --object {fq}` et lit **son pack**, pas la base.
+      **Passer le tier calculé à l'étape 2** comme override `model` du spawn
+      (`Agent(reverse-sql-*, model=<résolution du tier via le provider actif>)`)
+      — sans ce passage, `db_tier_router` calcule un arbitrage par objet que
+      rien ne consomme, et chaque spécialiste tourne au tier statique de sa
+      définition d'agent quel que soit l'objet (audit 2026-08-29 m7).
    b. **barrière de vague** — un seul appel déterministe (0 token), après que
       tous les agents de la vague `K` ont rendu leur US :
       ```bash
@@ -247,7 +269,14 @@ rend un second run quasi gratuit après une interruption.
      ayant au moins un objet routé LLM — c'est là que se trouvent les règles
      transverses et le vocabulaire à harmoniser sur le glossaire de l'architecte.
      Parallèle borné, FEATs disjointes, **même gate**.
-   - `SDD_REVERSE_FEAT_LLM=1` force le LLM partout ; `=0` force le déterministe.
+   - **Le verdict par module est émis déterministiquement à l'étape 2** :
+     `build_proc_us.py --json` porte `modules[].featComposer:
+     "llm"|"deterministic"` (2026-08-30). **Consommer ce champ tel quel** —
+     l'orchestrateur ne ré-interprète jamais la règle (3 formulations
+     divergentes de ce routage recensées à l'audit 2026-08-29 ; le script est
+     désormais l'unique arbitre).
+   - `SDD_REVERSE_FEAT_LLM=1` force le LLM partout ; `=0` force le déterministe
+     (les deux overrides priment sur `featComposer`).
 
    > **Correctif 2026-08-27 (run 118 objets, PortailClient_Dev).** La règle
    > précédente — « au moins un objet `deep` » — **inversait** le routage sur une
@@ -268,6 +297,21 @@ rend un second run quasi gratuit après une interruption.
      > Audit 2026-08-25 (M1) : ce second appel manquait. Le commentaire
      > `REVERSE-GATE` était écrit dans la FEAT et **rien ne le lisait** — la revue
      > humaine sur du SQL dynamique ou chiffré était donc facultative de fait.
+
+   **Après revue humaine d'une FEAT `medium`/`low`**, la voie sanctionnée de
+   promotion est le script dédié — jamais un Edit à la main du frontmatter :
+   ```bash
+   python .sdd/python/sdd_reverse_scripts/promote_confidence.py \
+     --feat-path workspace/feats/{n}-{Module}.md \
+     --reason "revue Tech Lead {YYYY-MM-DD}" [--dry-run] [--json]
+   ```
+   Il passe `confidence: high`, déverrouille la REVERSE-GATE
+   (`allow-sdd-full=true`, avec date + raison tracées dans le commentaire) et
+   ré-estampille le `generated-fingerprint` (M5) pour que les runs suivants de
+   `build_proc_feats.py` reconnaissent la version promue comme autoritative.
+   `--allow-reverse-low` reste le bypass **one-shot** (rien n'est promu, la
+   FEAT reste bloquée au run suivant) ; `promote_confidence.py` est la décision
+   **durable**. Exit 1 = déjà `high`, 2 = pas une FEAT sdd-reverse.
 7. **Complétude (informational)** : `check_feat_completeness.py --project
    workspace/old/{DB} --unit {U-N}` — confronte la FEAT à ses objets SQL et
    signale un objet non mentionné, une règle `RAISERROR` perdue, une table écrite
@@ -298,6 +342,16 @@ rend un second run quasi gratuit après une interruption.
      répond à « si je change cette procédure, quelle application casse ? ».
    Les deux sont **informational** : ni l'un ni l'autre ne bloque le pipeline, et
    leur absence (pas de reverse applicatif, pas de schéma) est un cas normal.
+7.quater **Rapport de synthèse du run (informational, déterministe, 0 token)** :
+   ```bash
+   python .sdd/python/sdd_reverse_scripts/reverse_report.py --project {DB} \
+     --output workspace/old/{DB}/.sys/reverse-report.md
+   ```
+   Table par module — objets, distribution des tiers, US (analysées ↑ vs
+   gabarits ⬜), ACs, confidence, statut REVERSE-GATE — plus, pour chaque FEAT
+   bloquée, la commande `promote_confidence.py` prête à copier. C'est la
+   **surface de décision une page** du Tech Lead avant de lancer `/sdd-full`
+   sur les FEATs à `allow-sdd-full=true`. Jamais bloquant.
 
 8. Ligne chat finale `[REVERSE] DB {DB} → {p} objets SQL, {m} modules/FEAT, {u} US,
    {t} tables. (100%)`. La ligne de Phase 1 porte en plus la **stratégie de
@@ -316,11 +370,14 @@ workspace/old/{DB}/.sys/db-schema.json                        (tables/colonnes/t
 workspace/old/{DB}/.sys/inventory.json                        (units=modules, allocations)
 workspace/old/{DB}/.sys/proc-extraction-cache.json            (cache par objet)
 workspace/old/{DB}/.sys/db-context.json                       (SSoT versionné : faits + plan de vagues + hypothèses + findings)
+workspace/old/{DB}/.sys/db-context.digest.json                (digest léger pour l'architecte — seul porteur du contextVersion qu'il lit)
 workspace/old/{DB}/.sys/db-context.hypotheses.json            (écrit par l'architecte, fusionné par script)
 workspace/old/{DB}/.sys/db-context/_overview.md               (orientation base entière)
+workspace/old/{DB}/.sys/db-context/glossary.json              (extrait léger glossaire + sous-domaines + contextVersion, lu par le composer rung 2)
 workspace/old/{DB}/.sys/db-context/tables/{table}.md          (1 fiche par table)
-workspace/old/{DB}/.sys/db-context/{procedures,functions,views,triggers}/{objet}.md
+workspace/old/{DB}/.sys/db-context/{procedures,functions,views,triggers,packages}/{objet}.md
 workspace/old/{DB}/.sys/db-context/packs/{objet}.md           (le slice remis à l'agent qui analyse cet objet)
+workspace/old/{DB}/.sys/reverse-report.md                     (synthèse une page du run — 7.quater)
 workspace/us/{n}-{m}-{Name}.md                                (1 par objet SQL)
 workspace/feats/{n}-{Module}.md                               (1 par module)
 ```

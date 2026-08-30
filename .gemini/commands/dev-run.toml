@@ -159,7 +159,7 @@ Quel est le numéro de la FEAT à matérialiser ? (ex. : 1)
 Si `{n}` non numérique →
 ```
 ERROR: /dev-run — argument invalide
-CAUSE: "{argument}" n'est pas un entier
+CAUSE: [INVALID_ARG] "{argument}" n'est pas un entier
 FIX: relancer /dev-run {n} (ex. /dev-run 1)
 ```
 
@@ -240,7 +240,7 @@ Glob `workspace/us/{n}-*.md` → liste `US_LIST` (basenames sans extension).
 Si `US_LIST` est vide →
 ```
 ERROR: /dev-run — aucune US à matérialiser
-CAUSE: aucun fichier workspace/us/{n}-*.md
+CAUSE: [US_NOT_FOUND] aucun fichier workspace/us/{n}-*.md
 FIX: lancer /us-generate {n} pour générer les US d'abord
 ```
 
@@ -260,13 +260,21 @@ python .sdd/python/sdd_scripts/validate_us_deps.py --feat {n} --json
 DEPS_EXIT=$?
 case $DEPS_EXIT in
   0) ;;  # OK
+  1) echo "ERROR: [US_NOT_FOUND] aucune US pour le scope demandé" >&2; exit 1 ;;
+  2) echo "ERROR: [INVALID_ARG] args malformés" >&2; exit 2 ;;
   3) echo "ERROR: [US_DEPS_CYCLE]" >&2; exit 1 ;;
   4) echo "ERROR: [US_DEPS_MISSING] ref vers US inexistante" >&2; exit 1 ;;
-  5) echo "ERROR: [US_DEPS_PARSE_ERROR] frontmatter ## Dependencies malformé" >&2; exit 1 ;;
-  1) echo "ERROR: [INVALID_ARG] args malformés" >&2; exit 2 ;;
+  5) echo "ERROR: [INFRA_BLOCKED] I/O sur workspace/us/ (permissions/disque)" >&2; exit 3 ;;
   *) echo "ERROR: [INFRA_BLOCKED] exit $DEPS_EXIT" >&2; exit 3 ;;
 esac
 ```
+
+> **F-M3 fix (2026-08-30)** : mapping aligné sur les exit codes réels de
+> `validate_us_deps.py` (docstring) — l'ancien tableau mappait `1` sur
+> `[INVALID_ARG]` (réel : `[US_NOT_FOUND]`), ignorait `2` (`[INVALID_ARG]`
+> réel) et inventait `[US_DEPS_PARSE_ERROR]`, classe absente de la
+> taxonomie. Exit `5` est réellement émis depuis ce fix (l'OSError de
+> lecture n'est plus avalée par `build_graph`).
 
 Sur exit 0, récupérer **les batches layered Kahn** (v7.0.0) :
 
@@ -302,7 +310,7 @@ Lire `workspace/stack/stack.md`.
 - Si aucun `## Active Tech Specs` `backend-*` ET aucun `frontend-*` →
   ```
   ERROR: /dev-run — aucun stack tech sélectionné
-  CAUSE: ## Active Tech Specs vide ou seul ui/auth présents
+  CAUSE: [STACK_MALFORMED] ## Active Tech Specs vide ou seul ui/auth présents
   FIX: décommenter au moins un backend ou un frontend
   ```
 
@@ -327,7 +335,7 @@ Parser ces blocs (cf. `agents/arch.md §2.ter.1`) **sans afficher** les
 valeurs. Si ≥ 1 clé absente/vide →
 ```
 ERROR: /dev-run — clé(s) manquante(s) dans stack.md
-CAUSE: clés non définies : {liste exacte} dans {## Active Database | ## Active Auth Specs}
+CAUSE: [ENV_MISSING] clés non définies : {liste exacte} dans {## Active Database | ## Active Auth Specs}
 FIX: renseigner les valeurs dans workspace/stack/stack.md (bloc concerné)
 ```
 
@@ -502,7 +510,7 @@ python .sdd/python/sdd_scripts/validate_plan.py \\
 | `0` / `1` | plan valide → 6.a |
 | `2` | STOP + ERROR `[PLAN_STALE]` ou `[PLAN_INVALID]` (FIX : `/dev-plan {n}`) |
 
-### 6.0 Schema slice generation (Levier 4 v7.0.x, audit 2026-06-08)
+### 6.0.ter Schema slice generation (Levier 4 v7.0.x, audit 2026-06-08 ; renuméroté ex-« 6.0 » dupliqué, audit 2026-08-30)
 
 Pour chaque US `{n}-{m}-{Name}`, générer un slice du schema DB
 restreint aux tables référencées par l'US (+ FK transitive). Le slice
@@ -910,9 +918,15 @@ Cas API Gate RED → format §6.b.STOP (seul rapport affiché).
 > — SSoT non dupliqué ici (format 1L §2, interdits §5, erreurs §7,
 > verdict `[DONE]` §9, bypass `SDD_CHAT_VERBOSE=1` §10).
 
-**Spécifique `/dev-run`** : plage `15-78%` (sans review/QA finale), labels
+**Spécifique `/dev-run`** : plage `15-98%` — `/dev-run` exécute aussi le
+two-stage auditor (STEP 6.4 : spec gate 91-94% puis batch code/security/arch
+88-98%), seuls la QA complète `/qa-generate` (78-88%) et le verdict pipeline
+`[DONE]` 100% restant hors scope quand invoqué par `/sdd-full` (fix mineur
+audit 2026-08-30 — l'ancienne prose « 15-78% (sans review) » contredisait
+les labels `[*-REVIEW]`/`[SECURITY]` listés ci-dessous). Labels
 `[PLAN]`/`[ARCH]`/`[CONSTITUTION]`/`[DEV-*]`/`[QA]`/`[*-REVIEW]`/`[SECURITY]`/
-`[DONE]`. Granularité : 1 update par phase orchestrée (8-10 updates).
+`[DONE]` (invocation standalone : 0→100% sur scope local, cf. protocole §4).
+Granularité : 1 update par phase orchestrée (8-10 updates).
 **API Gate** : 1 ligne transitionnelle dédiée avec statut canonique
 PASS/WARN/FAIL/SKIPPED/INFRA_BLOCKED (`build-and-loop.md §1.3`), ex.
 `[QA] API Gate: 16/16 endpoints couverts, status PASS. (66%)`.

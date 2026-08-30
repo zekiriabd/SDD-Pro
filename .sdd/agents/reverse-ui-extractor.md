@@ -22,7 +22,7 @@ Pour une unité fonctionnelle déjà extraite en FEAT (Phase 3), produire des mo
 Arguments requis : `{U-N}` (ex. `U-3`).
 
 1. `workspace/old/{P}/.sys/inventory.json` existe et contient `units[id={U-N}]`
-2. La FEAT correspondante existe : `workspace/feats/{n}-{Name}.md` (Phase 3 préalable)
+2. La FEAT correspondante existe : `workspace/feats/{n}-{FeatName}.md` (Phase 3 préalable)
 3. `inventory.json._featAllocations[{U-N}]` est renseigné (résolution `n` figée)
 
 Sinon → STOP + ERROR `[REVERSE_UNIT_NOT_FOUND]` ou `[REVERSE_NO_SOURCE]`.
@@ -31,7 +31,7 @@ Sinon → STOP + ERROR `[REVERSE_UNIT_NOT_FOUND]` ou `[REVERSE_NO_SOURCE]`.
 
 Read en mémoire :
 1. `workspace/old/{P}/.sys/inventory.json` → `units[id={U-N}]`
-2. `workspace/feats/{n}-{Name}.md` (le contrat sémantique de Phase 3)
+2. `workspace/feats/{n}-{FeatName}.md` (le contrat sémantique de Phase 3)
 3. **Tous les templates de l'unité** : fichiers de `units[U-N].evidenceFiles` dont extension ∈ {`.aspx`, `.ascx`, `.cshtml`, `.jsp`, `.blade.php`, `.html`, `.dfm`, `.frm`, `.xaml`} (`.xaml` ajouté 2026-06-10 — audit M12)
 4. **Sélectif CSS** : tous les `.css` du projet (limite : ≤ 10 fichiers, ≤ 200 KB total)
 

@@ -4,7 +4,7 @@ Audit 2026-06-11 (MA-8). Mirror of `tests/test_invariants_manifest.py` for the
 reverse-engineering workflow. Guards against two silent drifts :
 
 1. **Registry count drift** — `reverse_smoke._ALL_CHECKS` must hold the
-   expected number of checks (13). The doc/manifest historically said "11" ;
+   expected number of checks (14). The doc/manifest historically said "11" ;
    if a check is added/removed without updating the pinned count, this fails.
 
 2. **Manifest ↔ registry mapping** — every `invariants[].id` declared in
@@ -37,7 +37,7 @@ except Exception as exc:  # pragma: no cover - layout guard
 else:
     _IMPORT_ERROR = None
 
-_EXPECTED_CHECK_COUNT = 13
+_EXPECTED_CHECK_COUNT = 14
 
 # `.sdd/python/tests/` → parents[3] == repo root
 _REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -55,7 +55,7 @@ def _require_module():
 # ---------------------------------------------------------------------------
 
 def test_all_checks_count_matches_expected() -> None:
-    """`_ALL_CHECKS` must hold exactly the pinned number of checks (13)."""
+    """`_ALL_CHECKS` must hold exactly the pinned number of checks (14)."""
     _require_module()
     actual = len(reverse_smoke._ALL_CHECKS)
     assert actual == _EXPECTED_CHECK_COUNT, (

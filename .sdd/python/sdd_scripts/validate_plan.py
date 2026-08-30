@@ -4,37 +4,38 @@
 Validates `workspace/plans/{n}-{m}-{Name}.{back|front}.md` files
 for structure, coherence, and staleness vs source US.
 
-Two layers of validation:
+Validation (single layer — strict mode retired, audit M5 2026-08-29):
 
-1. **Structural** (always applied):
-   - YAML frontmatter parseable
-   - Mandatory fields present: `us`, `family`
-   - `## Files` section with entries
-   - Each file entry has: `path`, `operation` (create|augment), `layer`,
-     `covers_acs`
-   - `augment` operations have both `preserves:` and `adds:` keys
-
-2. **Strict** (only with `--strict`, gates dev-*-strict.md path):
-   - `plan-schema-version: 2` or higher
-   - `us-hash` field present and matches current US SHA256 (if `--us-path`)
-   - `## Inline Digest` section present and non-empty
-   - `## ACs Coverage Summary` covers all AC-N declared in the US
-   - `claude-md-hash` present (optional check vs `--claude-md-path`)
+  - YAML frontmatter parseable
+  - Mandatory fields present: `us`, `family`
+  - `## Files` section with entries
+  - Each file entry has: `path`, `operation` (create|augment), `layer`,
+    `covers_acs`
+  - `augment` operations have both `preserves:` and `adds:` keys
+  - `us-hash` matches the current US SHA256 (if `--us-path`) → `[PLAN_STALE]`
+  - `## ACs Coverage Summary` covers every AC-N declared in the US
+    → `[PLAN_AC_COVERAGE_GAP]`
+  - informational: `plan-schema-version`, `## Inline Digest` presence,
+    `claude-md-hash` drift (warnings only, never exit codes)
 
 Usage:
     validate_plan.py --plan-path PATH [--us-path PATH] [--claude-md-path PATH]
-                     [--strict] [--json]
+                     [--json]
 
 Output (default): human-readable summary on stdout.
 Output (`--json`): single line of structured JSON on stdout.
 
-Exit codes (contrat v7.0.0 — les variants dev-*-strict ont été supprimés,
-`build-and-loop.md §7.6` : exit 0/1 mènent au MÊME agent dev-* Opus 4.8 ;
-le flag --strict reste accepté en no-op pour backward-compat) :
-    0 = plan valide AVEC `## Inline Digest` (plan v2)
-    1 = plan valide SANS digest (plan v1 legacy)
+Exit codes:
+    0 = plan valide (voir `warnings[]` pour les signaux non bloquants :
+        digest absent, fraîcheur invérifiable, couverture AC absente)
     2 = plan is invalid / corrupted / stale
         → callers must STOP + ERROR [PLAN_INVALID] or [PLAN_STALE]
+
+    Exit 1 (`[PLAN_NOT_STRICT_READY]`) est RETIRÉ — audit M5 2026-08-29. Il
+    n'était produit que par `validate_strict()`, gate des agents
+    `dev-*-strict` supprimés en v7.0.0, donc inatteignable dans toutes les
+    invocations documentées (aucune ne passait `--strict`). Le flag
+    `--strict` reste accepté en no-op pour ne pas casser un script ancien.
 
 Conventions (cf. `.sdd/python/README.md`):
 - Python 3.10+ stdlib only (no external deps)
@@ -68,7 +69,9 @@ from sdd_lib.paths import normalize  # noqa: E402
 from sdd_lib.stderr import error_block  # noqa: E402
 
 
-SCHEMA_VERSION_STRICT_MIN = 2
+#: Retired with strict mode (audit M5, 2026-08-29) — kept as a named constant
+#: because `## Inline Digest`-bearing plans are still called "v2" in the docs.
+SCHEMA_VERSION_V2 = 2
 ERR_CLASSES = {
     "PLAN_NOT_FOUND": 2,
     "PLAN_UNREADABLE": 2,
@@ -80,7 +83,10 @@ ERR_CLASSES = {
     "PLAN_AUGMENT_CONTRACT_MISSING": 2,
     "PLAN_AC_COVERAGE_GAP": 2,
     "PLAN_STALE": 2,
-    "PLAN_NOT_STRICT_READY": 1,
+    # `PLAN_NOT_STRICT_READY` (exit 1) retired — audit M5, 2026-08-29.
+    # Exit 1 is no longer reachable: strict mode gated the `dev-*-strict`
+    # agents deleted in v7.0.0, so the only code path that produced it was
+    # unreachable in every documented invocation.
 }
 
 
@@ -160,7 +166,12 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--plan-path", required=True, help="Path to .back.md or .front.md plan")
     p.add_argument("--us-path", default=None, help="Path to source US (for us-hash check)")
     p.add_argument("--claude-md-path", default=None, help="Path to project CLAUDE.md (for hash check)")
-    p.add_argument("--strict", action="store_true", help="Enforce v2 schema + strict-ready checks")
+    p.add_argument(
+        "--strict", action="store_true",
+        help="RETIRÉ (audit M5, 2026-08-29) — no-op accepté pour "
+             "backward-compat. Le mode strict gatait les agents dev-*-strict, "
+             "supprimés en v7.0.0 ; ses checks utiles sont désormais always-on.",
+    )
     p.add_argument("--json", action="store_true", help="Emit structured JSON output on stdout")
     p.add_argument("--workspace-root", default=None, help="Override repo root (testing)")
     return p.parse_args()
@@ -328,13 +339,42 @@ def validate_staleness(report: PlanReport, us_path: Path | None) -> None:
     """
     us_hash_decl = report.frontmatter.get("us-hash", "")
     if not us_hash_decl:
-        return  # v1 plan (no hash) → nothing to compare, not stale
-    if us_path is None or not us_path.is_file():
-        return  # no source to compare against
+        report.add_warning(
+            "PLAN_STALENESS_UNVERIFIABLE",
+            "frontmatter `us-hash` absent (plan v1 legacy) — la fraîcheur du "
+            "plan vis-à-vis de son US ne peut PAS être vérifiée ; "
+            "régénérer via /dev-plan pour obtenir un plan v2 hashé",
+        )
+        report.us_hash_match = None
+        return
+    # Audit M6 (2026-08-29) — staleness-UNKNOWN must never look identical to
+    # staleness-confirmed-fresh. The pre-fix code returned bare on a missing
+    # US path, so a caller reading `exit 0` could not distinguish "the plan
+    # is provably in sync" from "nobody could check". Both branches below now
+    # leave a visible trace in the report (and on stderr via _emit_output),
+    # while staying non-blocking: an unverifiable plan is a warning, only a
+    # *proven* mismatch is `[PLAN_STALE]` (exit 2).
+    if us_path is None:
+        report.add_warning(
+            "PLAN_STALENESS_UNVERIFIABLE",
+            "aucun --us-path fourni — us-hash déclaré mais non comparé "
+            "(fraîcheur du plan INCONNUE, pas 'fraîche')",
+        )
+        report.us_hash_match = None
+        return
+    if not us_path.is_file():
+        report.add_warning(
+            "PLAN_STALENESS_UNVERIFIABLE",
+            f"US source introuvable ({normalize(us_path)}) — us-hash déclaré "
+            f"mais non comparé (fraîcheur du plan INCONNUE, pas 'fraîche')",
+        )
+        report.us_hash_match = None
+        return
     try:
         us_content = us_path.read_text(encoding="utf-8")
     except OSError as e:
         report.add_warning("PLAN_US_READ_FAILED", f"lecture US impossible : {e}")
+        report.us_hash_match = None
         return
     actual = sha256_hex(us_content)
     declared = us_hash_decl.replace("sha256:", "").strip()
@@ -347,14 +387,21 @@ def validate_staleness(report: PlanReport, us_path: Path | None) -> None:
         )
 
 
-def validate_strict(body: str, report: PlanReport, us_path: Path | None,
-                    claude_md_path: Path | None) -> None:
-    """Apply strict-mode validations (exit 1 if not ready, exit 2 if stale).
+def validate_metadata(body: str, report: PlanReport,
+                      claude_md_path: Path | None) -> None:
+    """Always-applied metadata pass (schema version, digest, CLAUDE.md drift).
 
-    Note: the `us-hash` staleness comparison moved to `validate_staleness`
-    (always-on, audit 2026-06-12). Strict mode no longer re-checks it here to
-    avoid a double `[PLAN_STALE]` report — `validate_staleness` runs first in
-    `main()` for both strict and non-strict invocations.
+    Audit M5 (2026-08-29) — replaces the retired ``validate_strict()``.
+
+    The strict layer gated the removed ``dev-*-strict`` agent variants
+    (v7.0.0, ADR ``governance-major-auditors-trim``). Once those agents were
+    deleted, `--strict` became a documented no-op and exit code 1
+    (``[PLAN_NOT_STRICT_READY]``) was unreachable in **every** documented
+    invocation — while `dev-plan.md` still published an exit-1 row. Rather
+    than resurrect strict mode, the layer is retired: the checks that still
+    carry information (schema version, digest presence, CLAUDE.md drift)
+    become always-on and purely *informational*; the ones that only existed
+    to decide strict routing are gone.
     """
     schema_str = report.frontmatter.get("plan-schema-version", "1")
     try:
@@ -366,28 +413,12 @@ def validate_strict(body: str, report: PlanReport, us_path: Path | None,
         )
         return
 
-    if report.schema_version < SCHEMA_VERSION_STRICT_MIN:
-        report.add_error(
-            "PLAN_NOT_STRICT_READY",
-            f"plan-schema-version={report.schema_version} < {SCHEMA_VERSION_STRICT_MIN} "
-            "(regenerer via /dev-plan)",
-        )
-
     digest = extract_section_body(body, "Inline Digest")
-    if digest and digest.strip():
-        report.inline_digest_present = True
-    else:
-        report.add_error(
-            "PLAN_NOT_STRICT_READY",
-            "section `## Inline Digest` absente ou vide (requise en strict mode)",
-        )
-
-    # us-hash presence is still required in strict mode (regen signal), but the
-    # actual staleness COMPARISON is done by validate_staleness() — always-on.
-    if not report.frontmatter.get("us-hash", ""):
-        report.add_error(
-            "PLAN_NOT_STRICT_READY",
-            "frontmatter us-hash absent (requis en strict mode)",
+    report.inline_digest_present = bool(digest and digest.strip())
+    if not report.inline_digest_present:
+        report.add_warning(
+            "PLAN_DIGEST_ABSENT",
+            "section `## Inline Digest` absente (plan v1 legacy — utilisable)",
         )
 
     claude_md_hash_decl = report.frontmatter.get("claude-md-hash", "")
@@ -409,37 +440,51 @@ def validate_strict(body: str, report: PlanReport, us_path: Path | None,
                     "claude-md-hash mismatch (non-bloquant, plan reste utilisable)",
                 )
 
+
+def validate_ac_coverage(body: str, report: PlanReport, us_path: Path | None) -> None:
+    """Always-applied AC coverage gate → `[PLAN_AC_COVERAGE_GAP]` (exit 2).
+
+    Audit M5 (2026-08-29) — this check used to run only under `--strict`,
+    which no documented caller passes, so `[PLAN_AC_COVERAGE_GAP]` had no
+    reachable emitter. `dev-plan.md` STEP 4.7 already *describes* AC coverage
+    as part of the standard post-generation validation; this aligns the code
+    with the documented contract.
+
+    Deliberately narrower than the old strict variant: a plan with **no**
+    `## ACs Coverage Summary` at all is a WARNING (that section was a
+    strict-readiness requirement, not a correctness one). Only a coverage
+    summary that *omits ACs declared in the US* is an error — that is a real
+    traceability hole.
+    """
     report.ac_coverage = parse_ac_coverage(body)
     if not report.ac_coverage:
-        report.add_error(
-            "PLAN_NOT_STRICT_READY",
-            "section `## ACs Coverage Summary` absente ou vide",
+        report.add_warning(
+            "PLAN_AC_COVERAGE_ABSENT",
+            "section `## ACs Coverage Summary` absente ou vide "
+            "(traçabilité AC non vérifiable pour ce plan)",
         )
-
-    if us_path is not None and us_path.is_file() and report.ac_coverage:
-        try:
-            us_acs = set(extract_us_acs(us_path.read_text(encoding="utf-8")))
-        except OSError:
-            us_acs = set()
-        plan_acs = set(report.ac_coverage.keys())
-        missing = us_acs - plan_acs
-        if missing:
-            report.add_error(
-                "PLAN_AC_COVERAGE_GAP",
-                f"ACs presents dans l'US mais absents du plan: {sorted(missing)}",
-            )
+        return
+    if us_path is None or not us_path.is_file():
+        return
+    try:
+        us_acs = set(extract_us_acs(us_path.read_text(encoding="utf-8")))
+    except OSError:
+        return
+    missing = us_acs - set(report.ac_coverage.keys())
+    if missing:
+        report.add_error(
+            "PLAN_AC_COVERAGE_GAP",
+            f"ACs presents dans l'US mais absents du plan: {sorted(missing)}",
+        )
 
 
 def determine_result(report: PlanReport) -> None:
-    """Set report.result based on exit_code + strict_mode."""
-    if report.exit_code == 2:
-        report.result = "invalid"
-    elif report.exit_code == 1:
-        report.result = "not_strict_ready"
-    elif report.strict_mode:
-        report.result = "ready"
-    else:
-        report.result = "valid"
+    """Set report.result based on exit_code.
+
+    Audit M5 — the `not_strict_ready` result (exit 1) is retired along with
+    strict mode. Only `valid` (0) and `invalid` (2) remain.
+    """
+    report.result = "invalid" if report.exit_code == 2 else "valid"
 
 
 def main() -> int:
@@ -487,8 +532,12 @@ def main() -> int:
     if report.exit_code < 2:
         validate_staleness(report, us_path)
 
-    if args.strict and report.exit_code < 2:
-        validate_strict(body, report, us_path, claude_md_path)
+    # Audit M5 (2026-08-29) — ex-strict checks, now always-on. `--strict` is
+    # a retired no-op kept only so an old script does not crash on it.
+    if report.exit_code < 2:
+        validate_metadata(body, report, claude_md_path)
+    if report.exit_code < 2:
+        validate_ac_coverage(body, report, us_path)
 
     determine_result(report)
     _emit_output(report, args.json)
@@ -501,7 +550,7 @@ def _emit_output(report: PlanReport, as_json: bool) -> None:
         return
 
     # Human-readable summary on stdout
-    status_symbol = {"ready": "OK", "valid": "OK", "not_strict_ready": "WARN", "invalid": "FAIL"}
+    status_symbol = {"valid": "OK", "invalid": "FAIL"}
     sym = status_symbol.get(report.result, "?")
     print(f"[{sym}] plan={report.plan_path} schema-version={report.schema_version} "
           f"files={len(report.files)} result={report.result}")

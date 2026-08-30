@@ -87,6 +87,64 @@ METHOD_PATTERNS: tuple[str, ...] = (
     r"def\s+\w+\s*\([^)]*\)\s*:",
 )
 
+#: A method longer than this many lines is reported (audit m2 keeps the
+#: historical 50-line threshold; only the *measurement* changed).
+LONG_METHOD_THRESHOLD = 50
+#: Lines scanned forward looking for the closing brace. Was 100 — barely twice
+#: the threshold, so a 150-line method (exactly the kind worth reporting)
+#: exhausted the window, left `close_line == -1`, and was silently cleared.
+LONG_METHOD_WINDOW = 400
+
+
+def _method_span(content: str, start: int, *, is_python: bool) -> tuple[int, bool]:
+    """Measure a method's length from its declaration. Returns (lines, resolved).
+
+    ``resolved`` is False when the end could not be located — the caller must
+    NOT read that as "the method is short" (audit m2, 2026-08-29).
+
+    Two strategies, because brace-depth counting cannot work on Python at all:
+    a `def foo():` body has no braces, so `depth` never rose above 0, the
+    sentinel stayed -1, and *every* Python method was silently exempt from
+    the long-method check. Python is measured by indentation instead — the
+    body ends at the first non-blank line indented no deeper than the `def`.
+    """
+    lines = content[start:].split("\n")
+    window = lines[:LONG_METHOD_WINDOW]
+
+    if is_python:
+        # Indentation of the `def` line, as it appears in the FULL source
+        # (content[start:] begins at the `def` keyword, not at column 0).
+        line_start = content.rfind("\n", 0, start) + 1
+        def_indent = len(content[line_start:start]) - len(content[line_start:start].lstrip())
+        if start > line_start and content[line_start:start].strip():
+            # `def` is not the first token on its line — not a real method decl.
+            def_indent = len(content[line_start:start])
+        for i, line in enumerate(window[1:], start=1):
+            if not line.strip() or line.lstrip().startswith("#"):
+                continue
+            indent = len(line) - len(line.lstrip())
+            if indent <= def_indent:
+                return i, True
+        # Body ran to EOF (file shorter than the window) → span is known.
+        if len(lines) <= LONG_METHOD_WINDOW:
+            return max(len(lines) - 1, 0), True
+        return LONG_METHOD_WINDOW, False
+
+    depth = 0
+    started = False
+    for i, line in enumerate(window):
+        if "{" in line:
+            depth += line.count("{")
+            started = True
+        if "}" in line:
+            depth -= line.count("}")
+            if started and depth <= 0:
+                return i, True
+    # Unresolved: either the window was exhausted, or the file ended with
+    # unbalanced braces. Either way the length is UNKNOWN, not small.
+    return min(len(lines) - 1, LONG_METHOD_WINDOW), False
+
+
 MAGIC_NUMBER_SKIP: re.Pattern[str] = re.compile(
     r"^(200|201|204|301|302|400|401|403|404|500|503|"
     r"1000|1024|2048|4096|8080|8443|3306|5432|27017)$"
@@ -210,32 +268,41 @@ def scan_file(path: Path, rel_path: str, results: dict[str, list]) -> None:
 
     # 4. Long methods (heuristic)
     if re.search(r"\.(cs|kt|ts|tsx|js|jsx|py)$", rel_path):
+        is_python = rel_path.endswith(".py")
         for pat in METHOD_PATTERNS:
             for m in re.finditer(pat, content):
                 start_line = line_at(content, m.start())
-                remaining = content[m.start():]
-                method_lines = remaining.split("\n")[:100]
-                depth = 0
-                started = False
-                close_line = -1
-                for i, line in enumerate(method_lines):
-                    if "{" in line:
-                        depth += 1
-                        started = True
-                    if "}" in line:
-                        depth -= 1
-                        if started and depth <= 0:
-                            close_line = i
-                            break
-                if close_line > 50:
+                span, resolved = _method_span(content, m.start(), is_python=is_python)
+                if span <= LONG_METHOD_THRESHOLD:
+                    # Audit m2 (2026-08-29) — only claim "short" when the span
+                    # was actually RESOLVED. The pre-fix code compared a
+                    # sentinel `close_line == -1` against the threshold, so
+                    # `-1 > 50` was False and an undetermined method silently
+                    # passed as compliant.
+                    if resolved:
+                        continue
                     results["warnings"].append({
                         "category": "long-method",
                         "severity": "warning",
                         "file": rel_path,
                         "line": start_line,
-                        "tag": "method-over-50-lines",
-                        "message": f"Method spans approximately {close_line} lines - consider refactoring",
+                        "tag": "method-length-undetermined",
+                        "message": (
+                            "Method length could not be determined (unbalanced "
+                            f"braces within {LONG_METHOD_WINDOW} lines) - "
+                            "review manually; scan cannot certify it is short"
+                        ),
                     })
+                    continue
+                approx = "at least " if not resolved else "approximately "
+                results["warnings"].append({
+                    "category": "long-method",
+                    "severity": "warning",
+                    "file": rel_path,
+                    "line": start_line,
+                    "tag": "method-over-50-lines",
+                    "message": f"Method spans {approx}{span} lines - consider refactoring",
+                })
 
     # 5. Commented-out code blocks
     if re.search(r"\.(cs|kt|ts|tsx|js|jsx|py|razor)$", rel_path):

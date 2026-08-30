@@ -58,8 +58,8 @@ class TestPricingTable(unittest.TestCase):
 class TestGetPricing(unittest.TestCase):
     def test_known_model_returns_correct_dict(self) -> None:
         p = pricing.get_pricing("claude-opus-4-7")
-        self.assertEqual(p["input"], 15.00)
-        self.assertEqual(p["output"], 75.00)
+        self.assertEqual(p["input"], 5.00)
+        self.assertEqual(p["output"], 25.00)
 
     def test_unknown_model_falls_back_to_sonnet(self) -> None:
         p = pricing.get_pricing("claude-unknown-future-model")
@@ -71,7 +71,7 @@ class TestAsTuple(unittest.TestCase):
     def test_tuple_order_input_output_cachecreation_cacheread(self) -> None:
         """Legacy report_roi.py shape: (in, out, cache_creation, cache_read)."""
         t = pricing.as_tuple("claude-opus-4-7")
-        self.assertEqual(t, (15.00, 75.00, 18.75, 1.50))
+        self.assertEqual(t, (5.00, 25.00, 6.25, 0.50))
 
     def test_tuple_unknown_model(self) -> None:
         t = pricing.as_tuple("claude-unknown")

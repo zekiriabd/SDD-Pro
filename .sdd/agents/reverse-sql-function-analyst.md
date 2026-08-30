@@ -5,7 +5,7 @@ model_tier: balanced
 tier_default: balanced
 tier_floor: fast
 tier_ceiling: deep
-tools: [Read, Write, Edit, Glob, Grep, Bash]
+tools: [Read, Write, Edit, Glob, Grep]
 ---
 # Agent Reverse-SQL-Function-Analyst — spécialiste fonctions
 
@@ -95,10 +95,13 @@ jamais recalculés.
 - Chaque AC porte
   `<!-- evidence: .sys/proc-snapshot/{schema}.{nom}.sql:Ls-Le -->`
   (chiffres nus, pas de préfixe `L` dans la valeur) et `<!-- confidence: … -->`.
-- Une section `## Dependencies` listant appelés et appelants du pack.
+- Placeholders du template : `{objectFamily}` → « fonction » ; `{objectType}` →
+  le `routineType` du catalogue tel quel ; `Parent FEAT hash:` → **laisser le
+  sentinel tel quel** (résolu au rung 2) ; `extraction: analyzed` → conserver.
+- Renseigner la section `## Dependencies` du template : appelés et appelants du pack.
 - La plomberie (types techniques, noms de colonnes) descend en `## Data Effects`.
 - Une hypothèse non prouvée par le corps va en `## Hypothèses métier` avec
-  `<!-- kind: hypothesis -->` — **jamais** en AC.
+  `<!-- kind: hypothesis -->` — **jamais** en AC (« aucune » est valide).
 
 ## STEP 5 — Sortie chat (output-protocol)
 

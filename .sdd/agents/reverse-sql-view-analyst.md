@@ -5,7 +5,7 @@ model_tier: balanced
 tier_default: balanced
 tier_floor: fast
 tier_ceiling: deep
-tools: [Read, Write, Edit, Glob, Grep, Bash]
+tools: [Read, Write, Edit, Glob, Grep]
 ---
 # Agent Reverse-SQL-View-Analyst — spécialiste vues
 
@@ -91,9 +91,14 @@ repris de `inventory.json` — jamais recalculés.
 - **Un AC par filtre implicite** : une ligne exclue est un comportement
   observable, au même titre qu'une ligne retournée.
 - Chaque AC porte son `<!-- evidence: …:Ls-Le -->` et `<!-- confidence: … -->`.
-- `## Dependencies` : entités et vues consommées, consommateurs connus.
+- Placeholders du template : `{objectFamily}` → « vue » ; `{objectType}` → le
+  `routineType` du catalogue tel quel ; `Parent FEAT hash:` → **laisser le
+  sentinel tel quel** (résolu au rung 2) ; `extraction: analyzed` → conserver.
+- `## Dependencies` (section du template) : entités et vues consommées,
+  consommateurs connus.
 - `## Data Effects` : `Lit : … · Écrit : aucune` (explicitement).
-- Hypothèses en `## Hypothèses métier` avec `<!-- kind: hypothesis -->`, jamais en AC.
+- Hypothèses en `## Hypothèses métier` avec `<!-- kind: hypothesis -->`, jamais
+  en AC (« aucune » est valide).
 
 ## STEP 5 — Sortie chat (output-protocol)
 

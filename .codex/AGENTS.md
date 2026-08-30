@@ -4,15 +4,24 @@
 
 # SDD_Pro v7.0.0 GA — FEAT-Driven Development pour Claude Code
 
-> ✅ **v7.0.0 GA tagué 2026-06-07** (audit CTO closure : 20 Critical + 38 Major
-> fermés, taxonomie 191 classes, 13 combos SLA). v6.10.4-LTS conservée pour
-> projets legacy. Cf. `.sdd/docs/VERSIONING.md` + `.sdd/docs/CHANGELOG.md`.
+> ✅ **v7.0.0 GA — désignation datée du 2026-06-07** (audit CTO closure :
+> 20 Critical + 38 Major fermés, taxonomie 193 classes, 13 combos SLA).
+> v6.10.4-LTS conservée pour projets legacy. Cf. `.sdd/docs/VERSIONING.md` +
+> `.sdd/docs/CHANGELOG.md`.
+>
+> ⚠️ **Aucun tag git n'existe pour cette version** (`git tag --list` vide,
+> vérifié audit 2026-08-29). La version est portée par la documentation et le
+> CHANGELOG, pas par une référence git — ne pas s'appuyer sur `git describe`
+> ni sur un checkout `v7.0.0` dans un script ou un pipeline CI.
 
 > Framework SDD strict : FEAT → User Stories → Code (back/front parallèle).
 > Lecture sélective, anti-derive, isolation par US et famille.
 
-> **Slim entry point** : ~155 lignes max (ADR `governance-major-prompts-trim`).
-> Substance déléguée à `.sdd/docs/` et `.sdd/rules/`.
+> **Slim entry point** : budget cible ~155 lignes (ADR
+> `governance-major-prompts-trim`) — **actuellement ~240 lignes, hors budget**
+> (audit 2026-08-29). Le trim réel est un chantier séparé : chaque section
+> porte des cross-références vers `.sdd/docs/` et `.sdd/rules/` qu'une coupe
+> à l'aveugle casserait. Substance déléguée à `.sdd/docs/` et `.sdd/rules/`.
 
 ---
 
@@ -110,8 +119,12 @@ interprétation par `reverse-db-architect`, packs de contexte par objet),
 (un objet) — **procédures + fonctions + vues + triggers** (+ packages Oracle),
 1 objet SQL = 1 US, 1 module = 1 FEAT. Dispatch **par vagues de dépendance**
 (tout appelé analysé avant son appelant) vers les 4 analystes spécialisés.
-4 moteurs (2026-07-24) : SQL Server + PostgreSQL (live-validés), Oracle + MySQL/
-MariaDB (scaffold-validés, runtime live pending). SSoT : `.sdd/docs/reverse-engineering-workflow.md`
+4 moteurs (2026-07-24 ; **downgrade PostgreSQL audit 2026-08-29**) : SQL Server
+(live-validé — preuves de runs réels), PostgreSQL + Oracle + MySQL/MariaDB
+(scaffold-validés, runtime live pending). PostgreSQL était annoncé
+« live-validé » à tort : l'audit du module db-reverse porte une réserve
+explicite jamais levée — aucun run n'a jamais été exécuté contre une base
+PostgreSQL réelle. SSoT : `.sdd/docs/reverse-engineering-workflow.md`
 + `.sdd/docs/reverse-db-audit-2026-07.md`
 + `.sdd/docs/reverse-proc-engineering.audit.md` + `.sdd/rules/reverse-engineering.md`.
 
@@ -160,16 +173,23 @@ Détail modèles + retraits v7.0.0 (`a11y`/`perf`/`dashboard`/`*-strict`) :
 **2 principes** : `.sdd/docs/principles/{source-first,us-granularity}.md`.
 Templates : `.sdd/docs/conventions.md §14-§15`.
 
-> **Chargement paresseux (TOK-C1, audit 2026-06-12)** : 10 des 12 rules portent une
-> frontmatter `paths:` (path-scoped rules, mécanisme natif Claude Code) → elles ne
-> s'auto-injectent qu'au contact de fichiers de leur périmètre (`workspace/src`,
-> `workspace/old`, `.sys/.validation`, `.sdd/stacks`…) au lieu de polluer **chaque**
-> session et **chaque** sous-agent. Seules `output-protocol.md` + `error-classification.md`
-> restent inconditionnelles (contrat universel : tout agent émet chat 1L + `[CLASS]`).
-> Les agents continuent de Read explicitement leurs rules en STEP contexte (la
-> frontmatter ne retire que la redondance de l'auto-load). **Vérification** : dans une
-> session fraîche, `/memory` liste les rules chargées ; hors-pipeline il ne doit rester
-> que les 2 inconditionnelles. Économie : ~150-200 KB de contexte en session hors-périmètre.
+> **Chargement paresseux (TOK-C1 audit 2026-06-12, resserré TOK-C2 audit tokens
+> 2026-08-30)** : 11 des 12 rules portent une frontmatter `paths:` (path-scoped
+> rules, mécanisme natif Claude Code) → elles ne s'auto-injectent qu'au contact de
+> fichiers de leur périmètre (`workspace/src`, `workspace/old`, `.sys/.validation`,
+> `.sdd/stacks`…) au lieu de polluer **chaque** session et **chaque** sous-agent.
+> Seule `output-protocol.md` reste inconditionnelle — elle porte aussi le noyau
+> universel error-classification (§7.3/§7.5 : format ERROR 3L + règle mentale
+> `[CLASS]`) ; la taxonomie complète `error-classification.md` est path-scoped
+> depuis 2026-08-30 (canal agent = digests `.sdd/digests/error-classification.{agent}.md`).
+> Cas particulier : `build-and-loop.md` + `dev-shared-preflight.md` ont une portée
+> réduite à leur propre fichier (auto-injection pipeline retirée — leurs consommateurs
+> les lisent explicitement en STEP contexte ; l'ex-portée `workspace/src/**` doublait
+> ce chargement). Les agents continuent de Read explicitement leurs rules/digests en
+> STEP contexte. **Vérification** : dans une session fraîche, `/memory` liste les
+> rules chargées ; hors-pipeline il ne doit rester que `output-protocol.md`.
+> Économie : ~190-240 KB de contexte en session hors-périmètre ; fixe par sous-agent
+> ramené de ~78 KB à ~27 KB (CLAUDE.md + output-protocol).
 
 ---
 
@@ -179,9 +199,12 @@ Templates : `.sdd/docs/conventions.md §14-§15`.
 > scaffold-validated ; ajout `fullstack/aspnet-mvc-razor` 2026-06-10 ;
 > downgrade `mobiles/kotlin-android` 🟢→🟡 scaffold-validated, audit CTO 2026-06-07) :
 > **28 🟢 (validated/bench-validated) + 8 🟡 = 36 total**.
-> Validation auto : `python .sdd/python/sdd_admin/framework_smoke.py` (gate `stacks-count`).
+> Validation auto : `python .sdd/python/sdd_admin/framework_smoke.py`, check
+> **`stack-md-headers`** (nom corrigé audit 2026-08-29 — il n'existe pas de
+> check `stacks-count`). ⚠️ Ce check émet **WARN, pas FAIL**, sur un drift de
+> compte : c'est un signal consultatif, pas une barrière dure.
 
-**🟡 (8)** : 5 experimental (`archi/ddd`, `archi/microservice`, `qa/mutation-testing` (opt-in), `qa/playwright` (opt-in), `fullstack/aspnet-mvc-razor`) + 1 POC-only (`fullstack/node-react` — console SDD interne, non destiné prod externe) + 2 scaffold-validated (`mobiles/kotlin-android` — APK runtime pending, SDK absent au bench ; `mobiles/delphi-fmx` — Delphi FMX mobile, runtime live pending).
+**🟡 (8)** : 6 experimental (`archi/ddd`, `archi/microservice`, `qa/mutation-testing` (opt-in), `qa/playwright` (opt-in), `fullstack/aspnet-mvc-razor`, `mobiles/delphi-fmx` — 🟡 *experimental* dans son propre en-tête `Validation:`, correction audit 2026-08-29) + 1 POC-only (`fullstack/node-react` — console SDD interne, non destiné prod externe) + 1 scaffold-validated (`mobiles/kotlin-android` — APK runtime pending, SDK absent au bench).
 **🟢 (28)** : tous les autres (cf. table détaillée + tiers `validated` / `bench-validated` / `scaffold-validated` dans `.sdd/docs/validated-combos.md §1-§2`).
 
 **Engagement commercial — 13 combos SLA** : 2 `validated` end-to-end (C1, C2) + 11 `bench-validated runtime` (C3-C13). SSoT machine : `.sdd/templates/combos.json`. Marquage runtime via hook `preflight_stack_combo` (`SDD_ALLOW_UNTESTED_COMBO=1` = bypass audit-loggué). Les stacks 🟡 ne sont **jamais vendus en offre standalone** (pas de SLA sur la dimension isolée). **Exception documentée (GOV-C1, 2026-06-12)** : un *pattern* archi 🟡 peut apparaître **à l'intérieur d'un combo `validated`** dont le run `/sdd-full` bout-en-bout a été vérifié — cas unique **C2** (`archi/ddd`, validé sur workspace réel 2026-05-11 ; cf. `combos.json` C2 `notes`). Le SLA porte sur le **combo** vérifié, pas sur la dimension 🟡 isolée.
@@ -222,5 +245,6 @@ Anti-derive, ERROR 3L disque, idempotence, lecture sélective, parallélisme bor
 - **ROI & roadmap** : `.sdd/docs/{poc-roi-methodology,roadmap-v7-v8,cache-strategy,validated-combos,orphan-cleanup-policy}.md`
 - **Règles** : `.sdd/rules/` (5 consolidées + 1 protocole + 1 hoist + 2 orchestration auditors + 1 annexe + 1 module reverse + 1 socle SQL — cf. §5)
 - **Skills auto-triggered** (v7.0.0+ emprunt superpowers) : `.sdd/skills/` — 13 skills (`using-sddpro`, `starting-a-new-feat`, `starting-a-reverse-eng`, `debugging-failed-pipeline`, `test-driven-development`, `frontend-design`, `webapp-testing`, `a11y-local`, `sarif-parsing`, `semgrep`, `codeql`, `insecure-defaults`, `c4-model`) — inventaire complet dans `.sdd/skills-manifest.yaml`.
-- **Invariants manifest** (v7.0.0+ audit P3 E4) : `.sdd/INVARIANTS.yml` — 15 contrats load-bearing (two-stage gate, file ownership, cost cap, schema strict, TDD test-first, harness-parity, etc.) avec pointer vers chaque enforcer (hook/script/smoke test). Test `tests/test_invariants_manifest.py` vérifie que chaque enforcer existe sur disque. Anti-rot manifest : retirer un enforcer sans mettre à jour le manifest = FAIL au smoke.
+- **Invariants manifest** (v7.0.0+ audit P3 E4) : `.sdd/INVARIANTS.yml` — 20 contrats load-bearing (two-stage gate, file ownership, cost cap, schema strict, TDD test-first, harness-parity, etc.) avec pointer vers chaque enforcer (hook/script/smoke test). Test `tests/test_invariants_manifest.py` vérifie que chaque enforcer existe sur disque. Anti-rot manifest : retirer un enforcer sans mettre à jour le manifest = FAIL au smoke.
+- **Multi-harness / multi-provider** (réel, testé, **volontairement gaté** — documenté ici depuis l'audit 2026-08-29 : le système existait sans aucune mention dans cette page) : `.sdd/harness_build.py` transpile le foyer neutre `.sdd/` vers 4 adaptateurs — `claude-code` (façade `.claude/`, la seule utilisée au quotidien), `codex` (`.codex/prompts/`), `gemini-cli` (`.gemini/commands/`), `antigravity`. Providers déclarés dans `.sdd/providers/*.yaml` (`anthropic`, `openai`, `google`, `moonshot` : `tier_map`, `pricing`, rétention télémétrie). Tout combo harnais/provider non-Claude/Anthropic est marqué **`COMBO UNTESTED`** et bloqué par le hook `preflight_stack_combo` (bypass audit-loggué `SDD_ALLOW_UNTESTED_COMBO=1`) — présence ≠ support. Parité façade ↔ foyer enforcée par `tests/test_harness_facade_parity.py` (invariant `harness-parity`, `severity: critical`).
 - **Python** : `.sdd/python/README.md`

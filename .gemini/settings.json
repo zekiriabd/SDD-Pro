@@ -1,13 +1,13 @@
 {
   "_generated": "FROM .sdd/ — DO NOT EDIT — IDs à valider (providers/*.yaml)",
   "harness": "gemini-cli",
-  "provider": "google",
+  "provider": "anthropic",
   "model": {
-    "name": "gemini-2.5-flash"
+    "name": "claude-sonnet-4-6"
   },
   "security": {
     "auth": {
-      "env": "GEMINI_API_KEY"
+      "env": "ANTHROPIC_API_KEY"
     }
   }
 }

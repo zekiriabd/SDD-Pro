@@ -42,6 +42,16 @@ ACTIVE_V7_AGENTS = frozenset({
     "qa", "elicitor", "constitutioner",
     "code-reviewer", "security-reviewer",
     "spec-compliance-reviewer", "arch-reviewer",
+    # Module db-reverse (audit 2026-08-29, M3). Ces 6 agents écrivent dans
+    # `workspace/` et n'étaient couverts par aucune entrée de matrice, alors
+    # que deux d'entre eux documentent une frontière faits/hypothèses.
+    # `ownership.md §1` reste la source de vérité NARRATIVE ; le test
+    # `test_ownership_md_references_matrix_agents` ci-dessous n'exige la
+    # mention que des 4 agents cœur, donc l'ajout ne crée pas de drift.
+    "reverse-db-architect",
+    "reverse-sql-analyst", "reverse-sql-function-analyst",
+    "reverse-sql-view-analyst", "reverse-sql-trigger-analyst",
+    "reverse-sql-feat-composer",
 })
 
 

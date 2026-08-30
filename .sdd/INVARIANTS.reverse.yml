@@ -105,6 +105,13 @@ invariants:
       reverse-functional-extractor (decommissioned) while a command still
       spawned it would FAIL. Prose mentions in docs/rules/CHANGELOG are NOT
       checked (historical references are legitimate).
+      Audit 2026-08-29 (m1) — the check was named "no-dead-code" but only
+      inspected loader<->prompt wiring, never Python: orphan scripts under
+      sdd_reverse_scripts/ kept it green. It now also reports scripts with
+      zero referrers under .sdd/, at WARN level (a script landed ahead of its
+      caller is in-flight work, not a defect). M-1 follow-up (2026-08-30) —
+      the scan is now transitive (fixed point): an orphan referenced solely
+      by another orphan script is reported too (whole dead cluster).
     enforcer: .sdd/python/sdd_reverse_scripts/reverse_smoke.py
     class: (informational)
 
@@ -129,9 +136,10 @@ invariants:
     class: REVERSE_TEMPLATE_MISSING
 
 # L0-L6 deepening contracts (V2 2026-06-10 — informational, enforced by the
-# dedicated pytest suites, NOT by the reverse_smoke 13-check registry which
+# dedicated pytest suites, NOT by the reverse_smoke 14-check registry which
 # stays pinned to the invariants+drift_checks above. Count corrected 11→13
-# audit 2026-06-11 MA-8 ; authoritative count = len(_ALL_CHECKS), pinned by
+# audit 2026-06-11 MA-8, then 13→14 audit 2026-08-29 m4 (dialect read-only
+# check) ; authoritative count = len(_ALL_CHECKS), pinned by
 # tests/test_reverse_smoke_selfcheck.py).
   - id: reverse-db-context-facts-vs-hypotheses
     description: |

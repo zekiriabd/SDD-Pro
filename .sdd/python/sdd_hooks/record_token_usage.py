@@ -152,12 +152,99 @@ def _find_usage(payload: dict[str, Any]) -> tuple[dict[str, Any] | None, str | N
     return None, None
 
 
-def _find_model(payload: dict[str, Any]) -> str | None:
-    """Best-effort extraction of model id from common payload locations."""
+#: Env vars a harness may expose to name the model actually driving the agent.
+#: Checked in order, first non-empty wins (audit C2, 2026-08-29).
+_MODEL_ENV_VARS: tuple[str, ...] = (
+    "SDD_AGENT_MODEL",
+    "ANTHROPIC_MODEL",
+    "CLAUDE_MODEL",
+)
+
+
+def _canonical_model_id(raw: str | None) -> str | None:
+    """Normalize a raw model id (strip a runtime ``[1m]`` context suffix)."""
+    if not isinstance(raw, str):
+        return None
+    base = raw.strip().split("[", 1)[0].strip()
+    return base or None
+
+
+def _model_from_agent_tier(subagent: str | None) -> str | None:
+    """Resolve the model id from the agent's declared tier (last-resort).
+
+    Audit C2 (2026-08-29) — root cause of `token_usage.model IS NULL` on
+    every row of the live console.db : the `PostToolUse.Agent` /
+    `SubagentStop` payloads simply do not carry a `model` field (they wrap a
+    *tool* response, not a raw API message), so `_find_model` always returned
+    None. A NULL model makes `preflight_cost_cap` price the row with
+    FALLBACK_PRICING (Sonnet) — a silent ~5x under-count for the Opus-tier
+    dev agents, and it also defeated the `[PRICING_UNKNOWN]` guard.
+
+    We therefore reconstruct the id deterministically from what SDD_Pro
+    *does* know : the agent's `model_tier` (or `tier_default`) frontmatter in
+    `.sdd/agents/{name}.md`, mapped through the active provider's `tier_map`
+    (`.sdd/providers/{provider}.yaml`). This is an approximation of the
+    routed model, not a billing oracle — but it is a *correct-tier*
+    approximation, which is exactly what the cost cap needs, and it is
+    strictly better than NULL.
+
+    Never raises : telemetry must not break a pipeline.
+    """
+    if not subagent:
+        return None
+    try:
+        from sdd_lib.paths import sdd_home, repo_root
+        sdd_root = sdd_home(repo_root())
+        agent_md = sdd_root / "agents" / f"{subagent}.md"
+        if not agent_md.is_file():
+            return None
+        head = agent_md.read_text(encoding="utf-8", errors="replace")[:4096]
+        # An explicit `model:` pin always wins over the tier indirection.
+        m = re.search(r"^model:\s*([^\s#]+)\s*$", head, re.MULTILINE)
+        if m:
+            return _canonical_model_id(m.group(1).strip("'\""))
+        m = re.search(r"^(?:model_tier|tier_default):\s*([a-z]+)\s*$", head, re.MULTILINE)
+        if not m:
+            return None
+        tier = m.group(1).strip()
+
+        provider = (os.environ.get("SDD_MODEL_PROVIDER") or "").strip() or None
+        if not provider:
+            try:
+                from sdd_lib.stack_config import load_stack_config
+                from sdd_lib.paths import workspace_root
+                stack_md = workspace_root(repo_root()) / "stack" / "stack.md"
+                if stack_md.is_file():
+                    provider = load_stack_config(stack_md).provider_for_tier(tier)
+            except Exception:
+                provider = None
+        provider = provider or "anthropic"
+
+        from sdd_lib.config_loader import get_provider_tier_map
+        return _canonical_model_id(get_provider_tier_map(provider).get(tier))
+    except Exception:
+        return None
+
+
+def _find_model(payload: dict[str, Any], subagent: str | None = None) -> str | None:
+    """Best-effort extraction of model id, with deterministic fallbacks.
+
+    Resolution order (audit C2, 2026-08-29) :
+      1. the hook payload itself (only source that is factual);
+      2. an env var the harness may expose (`SDD_AGENT_MODEL`, ...);
+      3. the agent's declared tier mapped through the active provider —
+         see :func:`_model_from_agent_tier`.
+
+    Returning None here writes a NULL `token_usage.model`, which the cost cap
+    now treats as `[PRICING_UNKNOWN]` rather than silently pricing at Sonnet
+    rates — so a None result is loud, not free.
+    """
     candidates = (
         ("tool_response", "model"),
         ("tool_response", "message", "model"),
         ("response", "model"),
+        ("response", "message", "model"),
+        ("message", "model"),
         ("model",),
     )
     for path in candidates:
@@ -165,8 +252,14 @@ def _find_model(payload: dict[str, Any]) -> str | None:
         if isinstance(node, str) and node.strip():
             # Strip a runtime context-window suffix like "[1m]" so the stored
             # model id stays canonical and prices correctly (audit CR-1).
-            return node.strip().split("[", 1)[0].strip()
-    return None
+            return _canonical_model_id(node)
+
+    for var in _MODEL_ENV_VARS:
+        resolved = _canonical_model_id(os.environ.get(var))
+        if resolved:
+            return resolved
+
+    return _model_from_agent_tier(subagent)
 
 
 def _extract_feat_and_us(payload: dict[str, Any]) -> tuple[int | None, str | None]:
@@ -350,14 +443,15 @@ def main() -> int:
 
     usage_dict, usage_path = _find_usage(payload)
     feat, us_id = _extract_feat_and_us(payload)
+    subagent = get_subagent_type(payload)
 
     entry: dict[str, Any] = {
         "ts": iso_now_ms(),
         "hook_event": _hook_event_name(payload),
-        "subagent_type": get_subagent_type(payload),
+        "subagent_type": subagent,
         "feat": feat,
         "us_id": us_id,
-        "model": _find_model(payload),
+        "model": _find_model(payload, subagent),
         "raw_usage_found": usage_dict is not None,
         "usage_source_path": usage_path,
     }

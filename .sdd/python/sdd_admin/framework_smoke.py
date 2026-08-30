@@ -492,6 +492,68 @@ def _check_stack_md_headers(claude_root: Path, checks: "Checks") -> None:
                    f"validate_stack_md_headers invocation failed: {e}")
 
 
+def _check_pricing_freshness(checks: "Checks") -> None:
+    """#18.bis pricing table staleness (audit C3, 2026-08-29).
+
+    `sdd_lib.pricing.check_pricing_freshness()` was written for
+    `framework_smoke.py` (its own docstring says so) but had **zero runtime
+    callers** — only a unit test invoked it, and that test pinned `today` to
+    `PRICING_LAST_REVIEWED` itself, so it asserted `age == 0` and could never
+    fail. The freshness contract was therefore entirely decorative. This
+    check wires it to the real clock.
+
+    Severity per `PricingFreshnessMode` (config.base.yml, default `warn`) :
+      - ``off``    : no check
+      - ``warn``   : WARN on stale (default)
+      - ``strict`` : FAIL on stale
+    """
+    try:
+        from sdd_lib.pricing import check_pricing_freshness
+    except Exception as e:  # noqa: BLE001 — smoke must never crash
+        checks.add("pricing-freshness", "WARN", f"pricing module not importable: {e}")
+        return
+
+    mode = "warn"
+    max_age = 90
+    try:
+        from sdd_lib.layered_config import read_layered_config
+        cfg = read_layered_config(
+            keys=("PricingFreshnessMode", "PricingFreshnessMaxAgeDays")
+        )
+        raw_mode = cfg.get("PricingFreshnessMode")
+        if raw_mode not in (None, ""):
+            mode = str(raw_mode).strip().lower()
+        raw_age = cfg.get("PricingFreshnessMaxAgeDays")
+        if raw_age not in (None, ""):
+            max_age = int(str(raw_age).strip())
+    except Exception:
+        pass  # defaults above — never break the smoke on a config layer
+
+    if mode == "off":
+        return
+
+    try:
+        # `today=None` → real clock. That is the whole point of this check.
+        is_fresh, age, reviewed = check_pricing_freshness(max_age_days=max_age)
+    except Exception as e:  # noqa: BLE001
+        checks.add("pricing-freshness", "WARN",
+                   f"PRICING_LAST_REVIEWED unparseable: {e}")
+        return
+
+    if is_fresh:
+        checks.add("pricing-freshness", "OK",
+                   f"pricing reviewed {reviewed} ({age}d ago, cap {max_age}d)")
+        return
+
+    detail = (
+        f"pricing table stale : reviewed {reviewed}, {age}d ago > cap {max_age}d. "
+        f"Re-check https://www.anthropic.com/pricing, update "
+        f"`sdd_lib/pricing.py` PRICING + bump PRICING_LAST_REVIEWED "
+        f"(a stale table under-counts the cost cap)."
+    )
+    checks.add("pricing-freshness", "FAIL" if mode == "strict" else "WARN", detail)
+
+
 def _check_adr_naming(claude_root: Path, checks: "Checks") -> None:
     """#19 ADR filename pattern gate (audit CTO 2026-06-09 Major #18 closure).
 
@@ -993,6 +1055,7 @@ def main() -> int:
         pytests_dir = sdd_root / "python" / "tests"
         _check_pytest_smoke(pytests_dir, claude_root, checks)
         _check_stack_md_headers(claude_root, checks)
+        _check_pricing_freshness(checks)
         _check_adr_naming(claude_root, checks)
         _check_harness_parity(claude_root, checks)
 

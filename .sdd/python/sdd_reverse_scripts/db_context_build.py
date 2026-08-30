@@ -6,10 +6,12 @@ Consumes the two artefacts the read-only introspection already produced
 Database Context / SSoT plus its sliced Markdown tree:
 
     .sys/db-context.json          machine SSoT (facts + execution plan)
+    .sys/db-context.digest.json   lightweight digest for the architect (0.B)
     .sys/db-context/_overview.md  orientation
     .sys/db-context/tables/…      one card per table
-    .sys/db-context/{procedures,functions,views,triggers}/…
+    .sys/db-context/{procedures,functions,views,triggers,packages}/…
     .sys/db-context/packs/…       the per-object slice handed to each agent
+    .sys/db-context/glossary.json glossary+subdomains extract for rung 2 (D-M6)
 
 Deterministic, 0 token, offline. It opens no database connection and imports no
 driver: everything it needs was extracted earlier under `readonly_guard`.
@@ -340,6 +342,19 @@ def main(argv: list[str] | None = None) -> int:
         atomic_write_text(
             sys_dir / "db-context.digest.json",
             json.dumps(digest, ensure_ascii=False, indent=2, sort_keys=False) + "\n")
+        # D-M6 (2026-08-30) — extrait léger pour le composer rung 2 : le
+        # glossaire + les sous-domaines de l'architecte, avec le contextVersion
+        # qui les date. Le composer lisait le db-context.json ENTIER (500 KB+
+        # sur une base réelle) pour ces deux seules clés. Toujours réécrit ici
+        # (même vide) pour rester synchrone avec les hypothèses courantes.
+        hyp = context.get("hypotheses") or {}
+        atomic_write_text(
+            sys_dir / "db-context" / "glossary.json",
+            json.dumps({
+                "contextVersion": context["contextVersion"],
+                "glossary": hyp.get("glossary") or [],
+                "subdomains": hyp.get("subdomains") or [],
+            }, ensure_ascii=False, indent=2, sort_keys=False) + "\n")
         tree = write_context_tree(
             root, context,
             depth=args.depth, budget=args.budget, with_packs=not args.no_packs)

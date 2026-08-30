@@ -27,7 +27,9 @@ Exit codes (granular — documented exception to sdd_lib/exit_codes.py conventio
     2  Invalid args [INVALID_ARG]
     3  Cycle(s) detected [US_DEPS_CYCLE]
     4  Missing references detected [US_DEPS_MISSING]
-    5  I/O error
+    5  I/O error reading a US file [INFRA_BLOCKED] (émis réellement depuis
+       l'audit F-M3 2026-08-30 — auparavant l'OSError était avalée dans
+       build_graph et le graphe continuait silencieusement avec des deps vides)
 
 Note (v7.0.0 P1 #10) : This script uses 6 distinct exit codes (vs the
 canonical 0/1/2/3 of sdd_lib/exit_codes.py) because callers (`/dev-run`
@@ -98,6 +100,11 @@ def build_graph(us_files: list[Path]) -> tuple[dict[str, set[str]], dict[str, Pa
 
     graph: node short-id -> set of dependency short-ids
     id_to_path: short-id -> Path of the US file
+
+    Raises OSError if a US file cannot be read (audit F-M3 2026-08-30 —
+    auparavant avalée : le nœud recevait un set de deps vide, ce qui
+    pouvait fausser silencieusement l'ordonnancement layered de /dev-run).
+    Le caller (main) traduit en exit 5 [INFRA_BLOCKED].
     """
     graph: dict[str, set[str]] = {}
     id_to_path: dict[str, Path] = {}
@@ -105,12 +112,7 @@ def build_graph(us_files: list[Path]) -> tuple[dict[str, set[str]], dict[str, Pa
         sid = short_id_from_filename(path)
         if sid is None:
             continue
-        try:
-            content = path.read_text(encoding="utf-8")
-        except OSError:
-            graph[sid] = set()
-            id_to_path[sid] = path
-            continue
+        content = path.read_text(encoding="utf-8")
         graph[sid] = parse_us_deps(content)
         id_to_path[sid] = path
     return graph, id_to_path
@@ -317,7 +319,15 @@ def main() -> int:
         )
         return 1
 
-    graph, id_to_path = build_graph(us_files)
+    try:
+        graph, id_to_path = build_graph(us_files)
+    except OSError as e:
+        error_block(
+            "validate_us_deps — I/O error reading US file",
+            f"[INFRA_BLOCKED] {e}",
+            "vérifier permissions/disque sur workspace/us/ puis relancer (idempotent)",
+        )
+        return 5
     missing = detect_missing(graph)
     cycles = detect_cycles(graph)
     orphans = detect_orphans(graph)

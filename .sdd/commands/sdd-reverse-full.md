@@ -1,7 +1,7 @@
 ---
 command: sdd-reverse-full
 phase: '"0-5"'
-description: 'Orchestrateur COMPLET du reverse engineering (Phase 0→5). Séquence init + inventory + audit + paradigm + extraction (escalier 3a→3b→3c) + crosscut + review + synth + UI + questions + status — tous PAR DÉFAUT (décision Tech Lead 2026-06-13), opt-out via --skip-* / --minimal. SEULE exception : la parité (Phase 3.8) est opt-in via --with-parity (et ses artefacts vont dans output/parity/, jamais dans qa/). N''EST PAS UN AGENT — séquenceur de commandes (no-spawn rule §9 rules/reverse-engineering.md). Reprenable phase par phase.'
+description: 'Orchestrateur COMPLET du reverse engineering (Phase 0→5). Séquence init + inventory + audit + paradigm + extraction (escalier 3a→3b→3c) + crosscut + review + synth + UI + questions + status — tous PAR DÉFAUT (décision Tech Lead 2026-06-13), opt-out via --skip-* / --minimal. SEULE exception : la parité (Phase 3.8) est opt-in via --with-parity (et ses artefacts vont dans workspace/parity/, jamais dans qa/). N''EST PAS UN AGENT — séquenceur de commandes (no-spawn rule §9 rules/reverse-engineering.md). Reprenable phase par phase.'
 loader: .sdd/loader.reverse.yml
 ---
 <!-- @llm-only-flags-file — tous les flags de /sdd-reverse-full sont
@@ -9,7 +9,7 @@ loader: .sdd/loader.reverse.yml
      Python dédié : elle invoque les sous-commandes (/sdd-reverse-init,
      /sdd-reverse-inventory, etc.) qui chacune ont leur propre parsing. -->
 
-# /sdd-reverse-full {LegacyProject} [--minimal] [--skip-audit] [--skip-paradigm] [--skip-synth] [--with-parity] [--skip-ui] [--skip-review] [--skip-questions] [--skip-status] [--synth-level essentiel|complet|detaille] [--units U-1,U-2,...] [--max-parallel N] [--no-cache] [--sequential] [--json]
+# /sdd-reverse-full {LegacyProject} [--minimal] [--skip-audit] [--skip-paradigm] [--skip-synth] [--with-parity] [--skip-ui] [--skip-review] [--skip-questions] [--interactive] [--skip-status] [--synth-level essentiel|complet|detaille] [--units U-1,U-2,...] [--max-parallel N] [--no-cache] [--sequential] [--json]
 
 ## Rôle
 
@@ -38,15 +38,15 @@ spawn son propre agent identifiable (séparation responsabilités).
 |---|---|---|---|
 | `{LegacyProject}` | requis | — | Sous-dossier `workspace/old/` |
 | `--minimal` | flag | off | Mode lean : équivaut à `--skip-paradigm --skip-synth --skip-questions`. Garde le cœur (init+inventory+audit+extraction+crosscut+review+UI+status). Pour un run rapide / itératif |
-| `--skip-audit` | flag | **actif** | Saute Phase 2 (tech audit) — perd l'enrichissement DB schema |
-| `--skip-paradigm` | flag | **actif** | Saute Phase 2.4 (gap paradigme + curation MIGRATE/DISCARD/HUMAN-DECISION) |
-| `--skip-synth` | flag | **actif** | Saute Phase 3.7 (synthèse système : C4 + ERD + soul.md, déterministe) |
+| `--skip-audit` | flag | off (phase active) | Saute Phase 2 (tech audit) — perd l'enrichissement DB schema |
+| `--skip-paradigm` | flag | off (phase active) | Saute Phase 2.7 (gap paradigme + curation MIGRATE/DISCARD/HUMAN-DECISION) |
+| `--skip-synth` | flag | off (phase active) | Saute Phase 3.7 (synthèse système : C4 + ERD + soul.md, déterministe) |
 | `--with-parity` | flag | **off** | **Opt-in** (décision Tech Lead 2026-06-13 — parité exclue par défaut) : active Phase 3.8 (specs Gherkin de parité comportementale → `workspace/parity/`, jamais dans `qa/`) |
-| `--skip-ui` | flag | **actif** | Saute Phase 4 (génération des interfaces / mockups HTML) |
-| `--skip-review` | flag | **actif** | Saute Phase 3.6 (revue de complétude back, `reverse-completeness-reviewer`) |
-| `--skip-questions` | flag | **actif** | Saute Phase 5 (génération `questions.md` — boucle de validation humaine) |
-| `--interactive` | flag | off | **Ferme la boucle humaine dans le run** (C3) : à Phase 5, pose les questions ouvertes en session + ingère les réponses, au lieu de s'arrêter sur `questions.md`. Sans effet en batch/CI (dégrade en génération seule) |
-| `--skip-status` | flag | **actif** | Saute le diagnostic final `/sdd-reverse-status` |
+| `--skip-ui` | flag | off (phase active) | Saute Phase 4 (génération des interfaces / mockups HTML) |
+| `--skip-review` | flag | off (phase active) | Saute Phase 3.6 (revue de complétude back, `reverse-completeness-reviewer`) |
+| `--skip-questions` | flag | off (phase active) | Saute Phase 3.9 (génération `questions.md` — boucle de validation humaine) |
+| `--interactive` | flag | off | **Ferme la boucle humaine dans le run** (C3) : à Phase 3.9, pose les questions ouvertes en session + ingère les réponses, au lieu de s'arrêter sur `questions.md`. Sans effet en batch/CI (dégrade en génération seule) |
+| `--skip-status` | flag | off (phase active) | Saute le diagnostic final `/sdd-reverse-status` |
 | `--synth-level` | `essentiel\|complet\|detaille` | `complet` | Niveau de synthèse passé à `/sdd-reverse-synth` (ignoré si `--skip-synth`) |
 | `--units U-N,U-M` | flag | toutes | Limite l'extraction (Phase 3 + 4 + parité) à un sous-ensemble d'unités |
 | `--max-parallel N` | flag | 3 | Borne de parallélisme Phase 3 (range 1-12, aligné `ownership.md §5`) |
@@ -62,21 +62,26 @@ spawn son propre agent identifiable (séparation responsabilités).
 
 ## Séquence (Phase 0→5 — tout actif par défaut)
 
+> **Numérotation phase-based, pas séquentielle** : les numéros de STEP reprennent
+> les numéros de PHASE du workflow reverse (2.5 pré-allocation, 3.5 crosscut, 3.9
+> questions…), donc ils ne sont pas monotones à la lecture. Ordre d'exécution réel :
+> 0 → 1 → 2 → 2.7 → 2.5 → 3 → 3.5 → 3.6 → 3.7 → 3.8 → 4 → 3.9 → 5 → 5.bis.
+
 ```
 STEP 0 — /sdd-reverse-init {LegacyProject}
    └─ bootstrap workspace/old/{P}/.sys/
 
 STEP 1 — /sdd-reverse-inventory {LegacyProject}
    └─ Phase 1 : inventory.json (+ code-graph/data-access/config/dependencies, L0-L1)
-   └─ AGENT : reverse-inventory (Sonnet 4.6)
+   └─ AGENT : reverse-inventory (tier `balanced`)
 
 STEP 2 — Tech audit (SAUF --skip-audit)
    └─ /sdd-reverse-audit {LegacyProject}   → tech-audit.md + db-schema.merged.json
-   └─ AGENT : reverse-tech-auditor (Sonnet 4.6)
+   └─ AGENT : reverse-tech-auditor (tier `balanced`)
 
-STEP 2.4 — Gap paradigme + curation (SAUF --skip-paradigm)
+STEP 2.7 — Gap paradigme + curation (SAUF --skip-paradigm)
    └─ /sdd-reverse-paradigm {LegacyProject}
-   └─ AGENT : reverse-paradigm-advisor (Sonnet 4.6)
+   └─ AGENT : reverse-paradigm-advisor (tier `balanced`)
    └─ paradigm-decision.md (gap legacy↔cible, Décision: PENDING) + curation.md
       (MIGRATE/DISCARD/HUMAN-DECISION — informational, jamais destructif ;
       verdicts MIGRATE → suggestion --units pour un run ciblé)
@@ -93,9 +98,9 @@ STEP 3 — Extraction Phase 3 (PARALLÈLE BORNÉ par défaut, L5)
             --project workspace/old/{P} --unit {U-N} --check
         └─ exit 0 (HIT) → SKIP l'unité ; exit 1 (MISS) → extraire
      b. Sinon dispatcher /sdd-reverse {U-N}  (SÉQUENCEUR escalier 3a→3b→3c)
-        └─ /sdd-reverse-analyze {U-N}  → AGENT reverse-tech-analyst (3a, Opus 4.8) → plans/{n}-{Name}.analysis.md
-        └─ /sdd-reverse-stories {U-N}  → AGENT reverse-us-writer (3b, Sonnet 4.6) → us/{n}-{m}-{Name}.md
-        └─ /sdd-reverse-feat {U-N}     → AGENT reverse-feat-composer (3c, Opus 4.8) → feats/{n}-{Name}.md
+        └─ /sdd-reverse-analyze {U-N}  → AGENT reverse-tech-analyst (3a, tier routé par complexité) → plans/{n}-{FeatName}.analysis.md
+        └─ /sdd-reverse-stories {U-N}  → AGENT reverse-us-writer (3b, tier `balanced`) → us/{n}-{m}-{Name}.md
+        └─ /sdd-reverse-feat {U-N}     → AGENT reverse-feat-composer (3c, tier routé par complexité) → feats/{n}-{FeatName}.md
            └─ enregistre le cache en fin de 3c (--save, C4)
    Dispatch : par lots de --max-parallel (défaut 3) dans un seul message d'agents.
    Si --sequential OU pré-allocation absente → 1 unité à la fois (mode ADV-2 §8.1).
@@ -121,7 +126,7 @@ STEP 3.7 — Synthèse système (SAUF --skip-synth)
 
 STEP 3.8 — Specs de parité comportementale (SI --with-parity — opt-in, off par défaut)
    Pour chaque FEAT {n} extraite (filtré par --units) :
-     └─ /sdd-reverse-parity {n}   → AGENT reverse-parity-inspector (Sonnet 4.6)
+     └─ /sdd-reverse-parity {n}   → AGENT reverse-parity-inspector (tier `balanced`)
         └─ workspace/parity/feat-{n}/*.feature + parity-map.md
         └─ gate déterministe validate_parity_features.py (structure WARN,
            couverture informational [REVERSE_PARITY_COVERAGE_GAP])
@@ -129,14 +134,14 @@ STEP 3.8 — Specs de parité comportementale (SI --with-parity — opt-in, off 
 STEP 4 — Génération des interfaces / UI (SAUF --skip-ui)
    Pour chaque U-N extraite (kind ∈ {page,form,grid,wizard}) — parallèle borné :
      └─ /sdd-reverse-ui {U-N}   → workspace/ui/{n}-{m}-{Name}.html
-        └─ AGENT : reverse-ui-extractor (Opus 4.8)
+        └─ AGENT : reverse-ui-extractor (tier `deep`)
         └─ Skip silencieux si U-N n'a pas de fichier UI evidence (kind api/module)
 
-STEP 5 — Boucle de validation humaine (SAUF --skip-questions)
+STEP 3.9 — Boucle de validation humaine (SAUF --skip-questions)
    └─ /sdd-reverse-questions {LegacyProject}   (mode generate)
-   └─ AGENT : reverse-clarifier (Sonnet 4.6)
+   └─ AGENT : reverse-clarifier (tier `balanced`)
    └─ consolide les gaps (complétude 3.6, traçabilité, items medium/low,
-      AC non dérivables 3.8, curation HUMAN-DECISION 2.4) en
+      AC non dérivables 3.8, curation HUMAN-DECISION 2.7) en
       workspace/old/{P}/.sys/questions.md (Q-N stables)
    └─ SANS --interactive (défaut, batch/CI) : STOP propre. Le Tech Lead répond
       aux Q-N puis lance /sdd-reverse-questions {P} --ingest hors run (§10).
@@ -145,14 +150,14 @@ STEP 5 — Boucle de validation humaine (SAUF --skip-questions)
       (AskUserQuestion) + écrit les réponses (reverse_questions_io) + --ingest.
       La boucle se ferme DANS le run ; les FEATs clarifiées montent en `high`.
 
-STEP 6 — Diagnostic final (SAUF --skip-status)
+STEP 5 — Diagnostic final (SAUF --skip-status)
    └─ /sdd-reverse-status {LegacyProject}
        └─ état des phases + liste FEATs reverse ([REV]/[REV⚠️]) + gaps en suspens
           (questions.md non remplies, curation PENDING, confidence < high)
        └─ read-only, déterministe, jamais bloquant — clôture le run par un
           récapitulatif actionnable.
 
-STEP 7 — Cahier des charges (best-effort, jamais bloquant)
+STEP 5.bis — Cahier des charges (best-effort, jamais bloquant)
    └─ /spec-book
        └─ (ré)humanise les FEATs reverse nouvellement produites puis réassemble
           workspace/docs/cahier-des-charges.docx (langage gérant, non-IT).
@@ -180,7 +185,7 @@ est interrompu (Ctrl-C, crash, timeout) :
 
 ## Phase 3 : parallèle borné après pré-allocation (L5)
 
-Depuis L5, la **pré-allocation déterministe** (STEP 2.5) fige `(n, Name)` puis la
+Depuis L5, la **pré-allocation déterministe** (STEP 2.5) fige `(n, FeatName)` puis la
 Phase 3 dispatche en **parallèle borné** (`--max-parallel`, défaut 3) : chaque
 unité écrit un fichier disjoint, sans contention de lock (`rules/reverse-engineering.md §8.2`).
 `--sequential` rétablit le comportement strict (ADV-2 §8.1), utile en debug.
@@ -193,20 +198,23 @@ utilisateur = 1 chaîne de commandes claire.
 
 ## Émission chat
 
+Label `[REVERSE]` strict (table fermée `output-protocol.md §3` — seuls les
+suffixes /FIXING /SKIP /WARN /FAIL sont admis, jamais `/FULL`) :
+
 ```
-[REVERSE/FULL] Phase 0 OK (init). (3%)
-[REVERSE/FULL] Phase 1 OK : {N} unités, {M} entités. (12%)
-[REVERSE/FULL] Phase 2 OK : {anti-patterns} anti-patterns, {eol} EOL. (20%)        # sauf --skip-audit
-[REVERSE/FULL] Phase 2.4 OK : gap paradigme documenté, {k} unités curées. (26%)    # sauf --skip-paradigm
-[REVERSE/FULL] Phase 3 (U-1/U-{N})... (40%)
-[REVERSE/FULL] Phase 3 OK : {N} FEATs générées. (58%)
-[REVERSE/FULL] Phase 3.5 OK : crosscut Libraries + Database. (62%)
-[REVERSE/FULL] Phase 3.6 OK : complétude {complete/partial} sur {N} unités. (68%)  # sauf --skip-review
-[REVERSE/FULL] Phase 3.7 OK : synthèse {synth-level} (C4 + ERD + soul). (74%)       # sauf --skip-synth
-[REVERSE/FULL] Phase 3.8 OK : specs de parité sur {N} FEATs. (82%)                  # SI --with-parity (opt-in)
-[REVERSE/FULL] Phase 4 OK : {M} interfaces (mockups HTML). (90%)                    # sauf --skip-ui
-[REVERSE/FULL] Phase 5 OK : questions.md généré ({Q} questions à remplir). (96%)    # sauf --skip-questions
-[REVERSE/FULL] {LegacyProject} → {N} FEATs reverse + {M} UI ; {gaps} à arbiter. (100%)
+[REVERSE] Phase 0 OK (init). (3%)
+[REVERSE] Phase 1 OK : {N} unités, {M} entités. (12%)
+[REVERSE] Phase 2 OK : {anti-patterns} anti-patterns, {eol} EOL. (20%)        # sauf --skip-audit
+[REVERSE] Phase 2.7 OK : gap paradigme documenté, {k} unités curées. (26%)    # sauf --skip-paradigm
+[REVERSE] Phase 3 (U-1/U-{N})... (40%)
+[REVERSE] Phase 3 OK : {N} FEATs générées. (58%)
+[REVERSE] Phase 3.5 OK : crosscut Libraries + Database. (62%)
+[REVERSE] Phase 3.6 OK : complétude {complete/partial} sur {N} unités. (68%)  # sauf --skip-review
+[REVERSE] Phase 3.7 OK : synthèse {synth-level} (C4 + ERD + soul). (74%)       # sauf --skip-synth
+[REVERSE] Phase 3.8 OK : specs de parité sur {N} FEATs. (82%)                  # SI --with-parity (opt-in)
+[REVERSE] Phase 4 OK : {M} interfaces (mockups HTML). (90%)                    # sauf --skip-ui
+[REVERSE] Phase 3.9 OK : questions.md généré ({Q} questions à remplir). (96%)    # sauf --skip-questions
+[REVERSE] {LegacyProject} → {N} FEATs reverse + {M} UI ; {gaps} à arbiter. (100%)
 ```
 
 ## Sortie
@@ -222,8 +230,8 @@ workspace/old/{LegacyProject}/.sys/
 ├── tech-audit.md                             (Phase 2)
 ├── deps-graph.json                           (Phase 2)
 ├── language-detected.json                    (Phase 1)
-├── paradigm-decision.md, curation.md         (Phase 2.4, sauf --skip-paradigm)
-├── questions.md                              (Phase 5, sauf --skip-questions)
+├── paradigm-decision.md, curation.md         (Phase 2.7, sauf --skip-paradigm)
+├── questions.md                              (Phase 3.9, sauf --skip-questions)
 ├── modules/{Name}/extraction.md              (Phase 3, log par unité)
 └── synthesis/                                (Phase 3.7, sauf --skip-synth)
     ├── c4-context.md, c4-containers.md, c4-components.md
@@ -232,7 +240,7 @@ workspace/old/{LegacyProject}/.sys/
     └── manifest.json
 
 workspace/feats/
-├── {n}-{Name}.md                             (Phase 3, N fichiers)
+├── {n}-{FeatName}.md                             (Phase 3, N fichiers)
 └── {n}-{Libraries,Database}.md               (Phase 3.5, crosscut obligatoire)
 
 workspace/ui/
@@ -249,7 +257,7 @@ workspace/parity/feat-{n}/
 - **Quasi-tout actif par défaut** : opt-out explicite (`--skip-*` / `--minimal`). **Exception : la parité (3.8) est opt-in** (`--with-parity`) et n'écrit **jamais** dans `qa/` (réservé aux tests) — décision Tech Lead 2026-06-13
 - Phase 3 parallèle borné **après pré-allocation STEP 2.5** ; séquentielle stricte (ADV-2 §8.1) si `--sequential` ou pré-allocation absente
 - Crosscut STEP 3.5 non skippable (C3)
-- Phase 5 `--ingest` (ré-injection des réponses) reste **manuelle** : le run génère `questions.md`, l'humain répond et ré-injecte ensuite (jamais d'invention de réponse)
+- Phase 3.9 `--ingest` (ré-injection des réponses) reste **manuelle** : le run génère `questions.md`, l'humain répond et ré-injecte ensuite (jamais d'invention de réponse)
 - Chaque commande appelée respecte ses propres pré-conditions (vérifie inventory.json présent, etc.)
 - Idempotence préservée
 

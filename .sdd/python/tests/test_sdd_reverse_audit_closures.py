@@ -248,6 +248,15 @@ def test_update_extraction_cache_save_then_check(tmp_path: Path) -> None:
     feats = tmp_path / "feats"
     feats.mkdir()
     (feats / "1-Login.md").write_text("# FEAT", encoding="utf-8")
+    # M5 (audit 2026-08-29) : un HIT exige désormais l'ESCALIER COMPLET sur
+    # disque (FEAT + plan 3a + >= 1 US 3b), pas la seule FEAT — la fixture
+    # représente donc une extraction réellement terminée.
+    plans = tmp_path / "plans"
+    plans.mkdir()
+    (plans / "1-Login.analysis.md").write_text("# Analyse", encoding="utf-8")
+    us = tmp_path / "us"
+    us.mkdir()
+    (us / "1-1-Se-Connecter.md").write_text("# US", encoding="utf-8")
 
     # MISS avant save
     assert cache_main(["--project", str(project), "--unit", "U-1",
