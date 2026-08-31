@@ -70,7 +70,11 @@ de migration vers LTS).
 
 **Secrets / config en clair (Pattern B)** : `stack.md` est la SSoT
 unique pour les valeurs sensibles (DB_PASSWORD, AUTH_JWT_SECRET,
-AZ_TENANTID, ports, etc.). Le fichier est **gitignored** ; `arch`
+AZ_TENANTID, ports, etc.). ⚠️ Le fichier est **VERSIONNÉ** depuis
+2026-08-30 (`.gitignore` : `!workspace/stack/stack.md`) — n'y écrire
+que des placeholders `${VAR}` ou des valeurs non sensibles, tout secret
+réel y devient public au premier push (cf. amendement 2026-08-31 de
+l'ADR ci-dessous). `arch`
 propage les valeurs en clair dans les configs natives
 (`appsettings.json`, `application.yml`, etc.) lors du scaffolding.
 Le code applicatif lit les configs natives via `IConfiguration` /

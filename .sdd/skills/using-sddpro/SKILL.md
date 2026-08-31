@@ -47,8 +47,9 @@ description: Use IMMEDIATELY at session start, before responding to any user mes
    reviewers (code, security, arch) sont skippés — pas de gaspillage
    à reviewer du code qui sera réécrit.
 
-4. **Stack `.md` = SSoT secrets** (gitignored) : DB_PASSWORD, JWT
-   secrets, etc. Code lit via `IConfiguration` / `@Value` / `Settings()`.
+4. **Stack `.md` = SSoT secrets** (⚠️ fichier **versionné** — placeholders
+   `${VAR}` uniquement) : DB_PASSWORD, JWT secrets, etc. Code lit via
+   `IConfiguration` / `@Value` / `Settings()`.
    **Jamais** `process.env` direct (sinon `[SEC_ENV_VAR_FORBIDDEN]`).
 
 5. **Anti-derive** : refuser scope hors US, lib hors §2.4 du stack,

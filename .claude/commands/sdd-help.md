@@ -103,7 +103,7 @@ sans argument.
 | `brownfield`, `repo existant`, `scan`, `découvrir` | `/sdd-discover-stack` — scanne le repo et génère `stack.md.candidate` que tu peux promouvoir en `stack.md`. |
 | `cost`, `coût`, `budget`, `token`, `usd` | Cap par défaut `MaxCostPerRun: 50` USD dans Project Config. Bypass one-shot : `SDD_DISABLE_COST_CAP=1`. Cf. `error-classification.md §1.2 [COST_CAP_EXCEEDED]`. |
 | `cors`, `front + back ne se parlent pas`, `failed to fetch` | Cf. `library-and-stack.md §B` (CORS stack-aware). arch auto-injecte la config dev. En prod : `Cors:AllowedOrigins` env var. |
-| `secrets`, `mot de passe`, `password`, `env var` | `stack.md` = SSoT unique pour `DB_PASSWORD`, `AUTH_JWT_SECRET`, `AZ_TENANTID`. Fichier gitignored. Code lit via `IConfiguration` / `@Value` / `Settings()` — **jamais** `process.env` direct (sinon `[SEC_ENV_VAR_FORBIDDEN]`). |
+| `secrets`, `mot de passe`, `password`, `env var` | `stack.md` = SSoT unique pour `DB_PASSWORD`, `AUTH_JWT_SECRET`, `AZ_TENANTID`. ⚠️ Fichier **versionné** depuis 2026-08-30 : placeholders `${VAR}` uniquement, jamais de secret réel. Code lit via `IConfiguration` / `@Value` / `Settings()` — **jamais** `process.env` direct (sinon `[SEC_ENV_VAR_FORBIDDEN]`). |
 | `coverage`, `couverture`, `seuil` | `CoverageMin: 80` dans Project Config (obligatoire). `0` = désactivé. RED bloquant si `coverage_lines_pct < seuil`. |
 | `gate`, `api gate`, `bloqué` | Cf. `build-and-loop.md §A`. Statuts canoniques v7.0.0 : PASS/WARN/FAIL/SKIPPED/INFRA_BLOCKED. Bypass strict : `GatedWorkflow: false` (déconseillé, audit-loggué). |
 | `review`, `audit`, `sonar` | `/sdd-review {n}` — audit consolidé (quality + code-review + security + spec-compliance + arch-reviewer si full). Verdict 🟢/🟡/🔴 selon `ReviewFailOn`. |

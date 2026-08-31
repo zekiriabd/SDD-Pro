@@ -229,7 +229,7 @@ Anti-derive, ERROR 3L disque, idempotence, lecture sélective, parallélisme bor
 
 0. Greenfield : `python bootstrap.py [--combo c1|c2|c3|c4|c5|custom] [--dry-run|--auto-init]` (ou `/sdd-bootstrap` — détail `python bootstrap.py --help`). Brownfield : `/sdd-discover-stack`.
 0.bis **Phase 0 Discovery (facultatif, projets > 3 FEATs)** : copier `.sdd/templates/product-brief.template.md` ou `prfaq.template.md` dans `workspace/discovery/` pour cadrer vision/personas/KPIs avant les FEATs. Anti-derive : si une FEAT proposée ne sert pas une promesse de la Discovery, c'est probablement du scope creep.
-1. Éditer `workspace/stack/stack.md` (SSoT unique — valeurs en clair `DB_PASSWORD`, `AUTH_JWT_SECRET`, `AZ_TENANTID`, ports ; fichier **gitignored**, arch propage en `appsettings.json` / `application.yml`).
+1. Éditer `workspace/stack/stack.md` (SSoT unique — valeurs en clair `DB_PASSWORD`, `AUTH_JWT_SECRET`, `AZ_TENANTID`, ports ; arch propage en `appsettings.json` / `application.yml`). ⚠️ **Le fichier est VERSIONNÉ depuis 2026-08-30** (`.gitignore` : `!workspace/stack/stack.md` — il voyage avec le repo comme SSoT projet) : n'y écrire que des placeholders `${VAR}`, tout secret réel part sur `origin` au premier push. Le reste de `workspace/` reste gitignored.
 2. `/feat-generate Auth` (3-6 questions). Optionnel : mockups HTML dans `workspace/ui/`.
 3. `/sdd-full 1` → `/sdd-status [{n}]` (état brut) ou `/sdd-help [{n}]` (guidance "what's next"). **Cookbook 10 min : `.sdd/docs/cookbook.md`**. Variantes complètes : `.sdd/docs/quickstart.md`.
 

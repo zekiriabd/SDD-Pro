@@ -34,7 +34,8 @@ SDD_APP_NAME=MyApp SDD_COMBO=c1 SDD_DB_TYPE=PostgreSql \
 
 ## ⏱️ Minute 2-5 — Secrets + premier FEAT
 
-Édit `workspace/stack/stack.md` (gitignored) — remplir au minimum :
+Édit `workspace/stack/stack.md` (⚠️ **versionné** — placeholders `${VAR}` uniquement,
+jamais de secret réel) — remplir au minimum :
 
 ```yaml
 DB_PASSWORD: <secret>

@@ -54,18 +54,25 @@
 # CONTENU runtime (FEATs, US, plans, code généré, legacy sous old/, caches .sys/)
 # reste ignoré et n'est jamais poussé.
 #
-# EXCEPTION : `workspace/stack/` est committé AVEC son contenu — stack.md est la
-# SSoT de configuration projet et doit voyager avec le repo.
+# EXCEPTION : le SEUL fichier `workspace/stack/stack.md` est committé — SSoT de
+# configuration projet, il doit voyager avec le repo.
 # ⚠️ stack.md peut porter DB_PASSWORD / AUTH_JWT_SECRET / SMTP_PASSWORD EN CLAIR
-# (CLAUDE.md §9). Depuis cette décision il est VERSIONNÉ : n'y écrire que des
+# (cf. `sdd_hooks/preflight_secret_scan.py`). Étant VERSIONNÉ : n'y écrire que des
 # placeholders `${VAR}` ou des valeurs non sensibles — tout secret réel écrit ici
 # part sur origin et doit être considéré comme compromis.
+#
+# ⚠️ La ré-inclusion porte sur le FICHIER, jamais sur le RÉPERTOIRE (audit
+# 2026-08-31, PR #2) : `!workspace/stack/**` ré-incluait tout le répertoire, donc
+# un `workspace/stack/.env` recréé (il a existé jusqu'au commit 34ce860) repartait
+# sur origin au premier `git add -A`. Un `.gitignore` n'a AUCUN effet rétroactif
+# sur un fichier déjà tracké → le garde-fou est un test qui interroge l'index :
+#   python -m pytest .sdd/python/tests/test_repo_gitignore_index_guard.py
 #
 # Mécanique gitignore (l'ordre est load-bearing) :
 #   1. tout ignorer sous workspace/
 #   2. ré-inclure les RÉPERTOIRES (sinon git ne descend pas dedans)
 #   3. ré-inclure les .gitkeep (matérialisent les répertoires vides)
-#   4. ré-inclure le contenu de stack/
+#   4. ré-inclure le SEUL fichier stack.md
 workspace/**
 
 # Garde anti-fuite explicite (défense en profondeur — déjà couverte par
@@ -81,7 +88,7 @@ workspace/src/*/config/default.json
 # Ré-inclusions (doivent rester EN DERNIER — la dernière règle qui matche gagne).
 !workspace/**/
 !workspace/**/.gitkeep
-!workspace/stack/**
+!workspace/stack/stack.md
 
 # Sauvegardes de config pré-audit (nettoyage hooks 2026-07-25, ADR governance-protection-hooks-wiring)
 .claude/settings*.pre-hooks-audit.bak

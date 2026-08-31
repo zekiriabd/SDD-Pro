@@ -89,10 +89,13 @@ lit `IConfiguration` / `application.yml` / `config/default.json` /
 - Lecture via mécanismes natifs framework : `IConfiguration["AzureAd:*"]`,
   `@Value("${azure.ad.*}")`, `config.get("azure.ad")`, `azure_settings.*`
 - **Env var binding runtime INTERDIT** (Pattern B 2026-06-06) : `stack.md` =
-  SSoT gitignored, `arch` propage en config native. Lecture directe
+  SSoT (fichier versionné — placeholders uniquement), `arch` propage en
+  config native. Lecture directe
   `AZ_*`/`DB_*`/`AUTH_*`/`SMTP_*` via `process.env`/`os.environ`/
   `Environment.GetEnvironmentVariable`/`@Value("${AZ_*}")` = `[SEC_ENV_VAR_FORBIDDEN]`
-- Secrets jamais commités : `workspace/` gitignored, rotation prod
+- Secrets jamais commités : `workspace/` gitignored — ⚠️ SAUF
+  `workspace/stack/stack.md`, versionné depuis 2026-08-30 (placeholders
+  `${VAR}` uniquement) ; rotation prod
   via secret manager hors repo
 
 ### §2.bis — Propagation stack.md → config native (load-bearing)

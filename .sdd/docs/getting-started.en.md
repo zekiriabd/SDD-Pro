@@ -161,9 +161,13 @@ AzureAD.TenantId: <your-tenant-id>    # ← fill in (or use auth-local)
 AzureAD.ClientId: <your-client-id>    # ← fill in
 ```
 
-> 🔒 **Security.** `stack.md` is **gitignored**: secrets stay on your machine, are never
-> committed, and must never be copied into documentation, an issue, a ticket or a chat
-> message. The arch agent propagates the values into `appsettings.json` /
+> 🔒 **Security.** ⚠️ Since 2026-08-30 `stack.md` is **versioned**: it travels with the
+> repo as the project configuration SSoT. Any real secret written here **ships to
+> `origin` on the first push** and must be considered compromised. Keep it to `${VAR}`
+> placeholders or non-sensitive values; to hold real values locally without pushing
+> them: `git update-index --skip-worktree workspace/stack/stack.md`. The rest of
+> `workspace/` stays ignored. Never copy a secret into documentation, an issue, a
+> ticket or a chat message.
 > `application.yml` at scaffold time. For database reverse engineering, use a dedicated
 > **read-only** login (`GRANT VIEW DEFINITION` + `db_datareader`) — never an
 > administrative account.
@@ -328,7 +332,8 @@ This pauses after each major phase, letting you inspect + approve in the web con
 
 ### "Is my data secure?"
 
-- `workspace/stack/stack.md` (secrets) is gitignored.
+- ⚠️ `workspace/stack/stack.md` is **versioned** (project config SSoT) — `${VAR}`
+  placeholders only; everything else under `workspace/` is gitignored.
 - `workspace/console/.certs/` (HTTPS keys) is gitignored.
 - No telemetry leaves your machine (SQLite is local).
 - Anthropic API calls follow Claude Code's policy.

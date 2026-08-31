@@ -308,9 +308,50 @@ def detect_existing_project() -> bool:
     return len(feats) > 0
 
 
+def _stack_md_is_untouched_clone_copy() -> bool:
+    """True when stack.md is the copy shipped by the clone, never edited here.
+
+    `408c511` made `workspace/stack/stack.md` a tracked file, so it exists on
+    EVERY fresh clone. `detect_stack_md()` therefore answered "this project is
+    already initialised" to the very first `python bootstrap.py` of every new
+    user, behind a prompt whose default is N — the install aborted before it
+    started. (CI is unaffected: `--auto-init` implies `--force`.)
+
+    Comparing against `stack.md.template` would not work: the committed copy
+    is a *rendered* stack.md, not the template. The reliable signal is "git
+    reports no local modification", i.e. nobody has touched the file on this
+    machine. Anything unclear — no git, no checkout, untracked file, git error
+    — returns False so the protective prompt is kept.
+    """
+    if not (REPO_ROOT / ".git").exists():
+        return False
+    try:
+        rel = STACK_TARGET.relative_to(REPO_ROOT).as_posix()
+        tracked = subprocess.run(
+            ["git", "ls-files", "--error-unmatch", "--", rel],
+            cwd=str(REPO_ROOT), capture_output=True, timeout=15,
+        )
+        if tracked.returncode != 0:
+            return False  # fichier local, jamais livré par le clone
+        # --quiet : rc 0 = identique à HEAD, rc 1 = modifié localement.
+        diff = subprocess.run(
+            ["git", "diff", "--quiet", "HEAD", "--", rel],
+            cwd=str(REPO_ROOT), capture_output=True, timeout=15,
+        )
+        return diff.returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
 def detect_stack_md() -> bool:
-    """True if a stack.md already exists (not the template)."""
-    return STACK_TARGET.is_file() and STACK_TARGET.stat().st_size > 100
+    """True if a *user* stack.md already exists (not the template).
+
+    Excludes the pristine copy that ships with the clone — cf.
+    `_stack_md_is_untouched_clone_copy`.
+    """
+    if not (STACK_TARGET.is_file() and STACK_TARGET.stat().st_size > 100):
+        return False
+    return not _stack_md_is_untouched_clone_copy()
 
 
 # ---------------------------------------------------------------------------

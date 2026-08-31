@@ -59,7 +59,8 @@ sur un projet non critique (POC) — cf. §7.
 
 ## 3. Configuration `stack.md`
 
-Le fichier `workspace/stack/stack.md` (gitignored, SSoT projet) pilote les 2 axes.
+Le fichier `workspace/stack/stack.md` (SSoT projet, versionné — pas de secret réel)
+pilote les 2 axes.
 Exemple minimal pour un projet Gemini :
 
 ```markdown
