@@ -176,9 +176,12 @@ existant (déjà certifié) plutôt que comme service externe.
 ### 7.1 Pattern B obligatoire (`stack.md` comme SSoT)
 
 Les secrets de configuration (DB password, JWT secret, Azure tenant…) sont
-déclarés en clair dans `workspace/stack/stack.md`, fichier
-**`.gitignored`** par défaut. L'agent `arch` les propage dans la config
-native du projet généré (`appsettings.json`, `application.yml`,
+déclarés en clair dans `workspace/stack/stack.md`. ⚠️ Ce fichier est
+**VERSIONNÉ** depuis 2026-08-30 (SSoT de configuration projet, il voyage
+avec le repo) : l'exploitant DOIT n'y placer que des placeholders `${VAR}`
+et tenir les valeurs réelles hors repo (secret manager, ou
+`git update-index --skip-worktree`). Le reste de `workspace/` reste
+**`.gitignored`**. L'agent `arch` les propage dans la config
 `config.toml`, etc.).
 
 **Anti-pattern bloqué par hook** : `[SEC_ENV_VAR_FORBIDDEN]` interdit au
