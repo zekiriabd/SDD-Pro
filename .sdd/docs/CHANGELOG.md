@@ -38,6 +38,18 @@ Format : [version] — date courte. Sections : `Breaking`, `Added`, `Changed`, `
   (la décision Pattern B est intacte ; seule la propriété de confidentialité
   tombe).
 
+- **`bootstrap.py` — plus de prompt « ALREADY initialized » sur un clone frais.**
+  `stack.md` étant tracké depuis `408c511`, il existe sur TOUT clone :
+  `detect_stack_md()` répondait donc « projet déjà initialisé » au tout premier
+  `python bootstrap.py --combo c1` de chaque nouvel utilisateur, derrière un
+  prompt dont le défaut est `N` — l'installation s'arrêtait avant de commencer.
+  Nouveau `_stack_md_is_untouched_clone_copy()` : la copie livrée par le clone
+  (aucune modification locale vue par `git diff HEAD`) ne compte pas comme une
+  config utilisateur ; un `stack.md` édité localement, si — le garde-fou
+  anti-écrasement reste donc entier. Fail-safe hors checkout git (tarball,
+  sdist) : le prompt est conservé. La CI n'était pas concernée
+  (`--auto-init` implique `--force`).
+
 ### Added
 
 - **`tests/test_repo_gitignore_index_guard.py`** — garde d'INDEX : interroge

@@ -13,6 +13,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 _REPO = Path(__file__).resolve().parents[3]
@@ -244,6 +245,58 @@ class TestDetection(unittest.TestCase):
 # ============================================================================
 # CLI : dry-run on real repo
 # ============================================================================
+
+class TestStackMdDetection(unittest.TestCase):
+    """Régression 2026-08-31 — prompt « ALREADY initialized » sur clone frais.
+
+    `408c511` a rendu `workspace/stack/stack.md` tracké : il est présent sur
+    TOUT clone. `detect_stack_md()` répondait donc « déjà initialisé » au tout
+    premier `python bootstrap.py --combo c1` de chaque nouvel utilisateur, avec
+    un prompt dont le défaut est N — l'installation s'arrêtait avant de
+    commencer. Le fichier livré par le clone ne doit pas compter comme une
+    config utilisateur ; un fichier édité localement, si.
+    """
+
+    @staticmethod
+    def _big_stack(tmp: str) -> Path:
+        target = Path(tmp) / "stack.md"
+        target.write_text("x" * 200, encoding="utf-8")
+        return target
+
+    def test_missing_or_stub_stack_md_is_not_detected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "stack.md"
+            with mock.patch.object(bootstrap, "STACK_TARGET", target):
+                self.assertFalse(bootstrap.detect_stack_md())
+                target.write_text("trop court", encoding="utf-8")
+                self.assertFalse(bootstrap.detect_stack_md())
+
+    def test_untouched_clone_copy_is_not_user_config(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with mock.patch.object(bootstrap, "STACK_TARGET",
+                                   self._big_stack(tmp)), \
+                 mock.patch.object(bootstrap,
+                                   "_stack_md_is_untouched_clone_copy",
+                                   return_value=True):
+                self.assertFalse(bootstrap.detect_stack_md())
+
+    def test_locally_modified_stack_md_is_user_config(self):
+        """Sens protecteur : on ne doit jamais écraser une config éditée."""
+        with tempfile.TemporaryDirectory() as tmp:
+            with mock.patch.object(bootstrap, "STACK_TARGET",
+                                   self._big_stack(tmp)), \
+                 mock.patch.object(bootstrap,
+                                   "_stack_md_is_untouched_clone_copy",
+                                   return_value=False):
+                self.assertTrue(bootstrap.detect_stack_md())
+
+    def test_outside_a_git_checkout_the_prompt_is_kept(self):
+        """Fail-safe : sans git (tarball, sdist), on garde le garde-fou."""
+        with tempfile.TemporaryDirectory() as tmp:
+            with mock.patch.object(bootstrap, "REPO_ROOT", Path(tmp)):
+                self.assertFalse(
+                    bootstrap._stack_md_is_untouched_clone_copy())
+
 
 class TestNonValidatedDetection(unittest.TestCase):
     """Audit CTO 2026-06-07 — bootstrap.py previously hardcoded
