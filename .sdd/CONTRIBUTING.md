@@ -162,7 +162,9 @@ Before opening a PR :
 - [ ] Framework smoke passes : `python .sdd/python/sdd_admin/framework_smoke.py`
 - [ ] If you touched a rule / hook / agent → ADR added under `.sdd/docs/adrs/`
 - [ ] CHANGELOG.md updated (add/extend the top-most dated dev section, e.g. `## [v7.0.1-dev] — YYYY-MM-DD` — there is no `[Unreleased]` section)
-- [ ] No secret committed (`stack.md` is gitignored — verify with `git status`)
+- [ ] No secret committed — ⚠️ `workspace/stack/stack.md` IS tracked: check your diff,
+      not just `git status`. Index guard: `python -m pytest
+      .sdd/python/tests/test_repo_gitignore_index_guard.py`
 - [ ] No `print()` left in production scripts (use `sys.stderr.write` or `logging`)
 - [ ] No `eval`, `exec`, `shell=True`, `os.system` (security policy)
 

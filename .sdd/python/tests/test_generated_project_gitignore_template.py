@@ -31,9 +31,29 @@ def test_generated_project_gitignore_template_covers_sdd_secret_configs():
     assert not missing
 
 
+def _repo_gitignore_rules() -> list[str]:
+    """Règles ACTIVES du .gitignore racine (commentaires et blancs retirés).
+
+    Load-bearing : une assertion `pattern in text` reste vraie quand la règle
+    porte un `#` devant. C'est par ce trou que `b97e86c` a neutralisé les 7
+    règles `workspace/` en gardant la CI verte — les secrets sont devenus
+    committables sans qu'aucun test ne rougisse. On ne compare donc que des
+    lignes de règle réelles, jamais des sous-chaînes.
+
+    Pendant côté index (un .gitignore n'est pas rétroactif) :
+    `test_repo_gitignore_index_guard.py`.
+    """
+    text = (REPO_ROOT / ".gitignore").read_text(encoding="utf-8-sig")
+    return [
+        stripped
+        for line in text.splitlines()
+        if (stripped := line.strip()) and not stripped.startswith("#")
+    ]
+
+
 def test_repo_root_gitignore_covers_sdd_runtime_artifacts():
     """Le CONTENU runtime de workspace/ reste ignoré (garde anti-fuite)."""
-    text = (REPO_ROOT / ".gitignore").read_text(encoding="utf-8")
+    rules = _repo_gitignore_rules()
     required = [
         "workspace/**",
         "workspace/db/**",
@@ -42,8 +62,8 @@ def test_repo_root_gitignore_covers_sdd_runtime_artifacts():
         "workspace/src/*/appsettings*.json",
         "workspace/src/*/config/default.json",
     ]
-    missing = [pattern for pattern in required if pattern not in text]
-    assert not missing
+    missing = [pattern for pattern in required if pattern not in rules]
+    assert not missing, f"règles d'ignore workspace absentes (ou commentées): {missing}"
 
 
 def test_repo_root_gitignore_keeps_workspace_skeleton_versioned():
@@ -52,13 +72,24 @@ def test_repo_root_gitignore_keeps_workspace_skeleton_versioned():
     Les 3 ré-inclusions sont load-bearing ET ordonnées : sans `!workspace/**/`
     git ne descend pas dans les répertoires exclus et les `.gitkeep` ne peuvent
     plus être ré-inclus. Elles doivent rester APRÈS les règles d'exclusion.
+
+    La 3e porte sur le FICHIER `stack.md`, jamais sur le répertoire (audit
+    2026-08-31) : `!workspace/stack/**` ré-incluait tout `workspace/stack/`,
+    donc un `.env` déposé là repartait sur origin au premier `git add -A`.
     """
-    text = (REPO_ROOT / ".gitignore").read_text(encoding="utf-8")
-    negations = ["!workspace/**/", "!workspace/**/.gitkeep", "!workspace/stack/**"]
-    missing = [pattern for pattern in negations if pattern not in text]
-    assert not missing, f"ré-inclusions workspace absentes: {missing}"
-    lines = text.splitlines()
-    assert lines.index("workspace/**") < min(lines.index(n) for n in negations)
+    rules = _repo_gitignore_rules()
+    negations = [
+        "!workspace/**/",
+        "!workspace/**/.gitkeep",
+        "!workspace/stack/stack.md",
+    ]
+    missing = [pattern for pattern in negations if pattern not in rules]
+    assert not missing, f"ré-inclusions workspace absentes (ou commentées): {missing}"
+    assert "!workspace/stack/**" not in rules, (
+        "négation trop large : `!workspace/stack/**` ré-inclut le RÉPERTOIRE "
+        "entier — utiliser `!workspace/stack/stack.md`."
+    )
+    assert rules.index("workspace/**") < min(rules.index(n) for n in negations)
 
 
 def test_workspace_skeleton_dirs_have_gitkeep():

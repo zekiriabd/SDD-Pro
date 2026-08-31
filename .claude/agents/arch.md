@@ -366,7 +366,8 @@ injectant `db_config` + `auth_config` (STEP 2.ter).
 3. **🔒 Pattern stack.md = SSoT (Pattern B)** :
    les sections DB/Auth/SMTP de `appsettings.json` / `application.yml` /
    `config/default.json` / `app/config.py` sont **peuplées avec les valeurs
-   en clair lues depuis stack.md** (qui est gitignored). Le code applicatif
+   en clair lues depuis stack.md** (fichier VERSIONNÉ depuis 2026-08-30 — ne
+   jamais y écrire de secret réel). Le code applicatif
    lit la config native (`IConfiguration["ConnectionStrings:Default"]`,
    `@Value("${spring.datasource.password}")`, `config.get('db.password')`,
    `Settings().db_password`). **Plus jamais** d'accès direct aux env vars
