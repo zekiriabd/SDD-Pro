@@ -68,13 +68,13 @@ PerfMode: "off"
  - AZ_FE_CALLBACKPATH: ${AZ_FE_CALLBACKPATH}
 
 ## Active Database
-# SQL Server (reverse SGBD NounouJob, lecture seule)
+# SQL Server (reverse SGBD, lecture seule)
  - DatabaseType: sqlserver
- - DB_HOST: localhost
- - DB_PORT: 1433
- - DB_NAME: NounouJob
- - DB_USER:
- - DB_PASSWORD:
+ - DB_HOST: ${DB_HOST}
+ - DB_PORT: ${DB_PORT}
+ - DB_NAME: ${DB_NAME}
+ - DB_USER: ${DB_USER}
+ - DB_PASSWORD: ${DB_PASSWORD}
 
 ## Active SMTP Server
  - SMTP_HOST: ${SMTP_HOST}
