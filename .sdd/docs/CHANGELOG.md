@@ -4,6 +4,60 @@ Format : [version] — date courte. Sections : `Breaking`, `Added`, `Changed`, `
 
 ---
 
+## [v7.0.4-dev] — 2026-08-31 (garde anti-fuite workspace/stack)
+
+> Suite de `408c511` (squelette `workspace/` versionné) et de la PR #2. La
+> mécanique gitignore de `408c511` était juste ; sa ré-inclusion de la config
+> projet était trop large.
+
+### Fixed
+
+- **`.gitignore` — ré-inclusion `workspace/stack` bornée au seul `stack.md`.**
+  `!workspace/stack/**` ré-incluait le RÉPERTOIRE entier : comme c'est la
+  dernière règle qui matche qui gagne, tout fichier déposé dans
+  `workspace/stack/` redevenait committable (`git add -An workspace/stack/`
+  stageait un `.leaktest`). Concrètement, un `workspace/stack/.env` recréé — le
+  fichier a existé jusqu'à `34ce860` — repartait sur `origin` au premier
+  `git add -A`, sur un repo dont `stack.md` porte `DB_PASSWORD` /
+  `AUTH_JWT_SECRET` / `SMTP_PASSWORD` en clair par contrat. Corrigé en
+  `!workspace/stack/stack.md` : la décision de `408c511` (stack.md voyage avec
+  le repo) et le squelette `.gitkeep` sont préservés, le reste du répertoire
+  retombe sous `workspace/**`.
+
+- **Dérive de documentation `408c511` — 17 emplacements annonçaient encore
+  `stack.md` gitignored**, dont deux promesses de sécurité devenues fausses
+  (`getting-started.{md,en.md}` : « les secrets restent sur ton poste, ne sont
+  jamais commités » ; `COMPLIANCE.md §7.1`). Réalignés sur l'état réel :
+  fichier versionné, placeholders `${VAR}` uniquement, `git update-index
+  --skip-worktree` pour garder des valeurs réelles en local. Touche aussi
+  `entrypoint-body.md §9` (pivot `CLAUDE.md`), `rules/library-and-stack.md`
+  (Pattern B), `agents/arch.md` STEP 4.5, `commands/sdd-help.md`,
+  `skills/using-sddpro`, `cookbook.md`, `harness-codex.md`,
+  `multi-llm-getting-started.md`, `CONTRIBUTING.md`, `stacks/auth/azure-ad.md`.
+  `ADR-20260606T120000-secrets-config-ssot-stack-md` reçoit un amendement daté
+  (la décision Pattern B est intacte ; seule la propriété de confidentialité
+  tombe).
+
+### Added
+
+- **`tests/test_repo_gitignore_index_guard.py`** — garde d'INDEX : interroge
+  `git ls-files` pour vérifier qu'aucun fichier porteur de secrets ni aucun
+  artefact runtime n'est tracké sous `workspace/`, et `git check-ignore -q`
+  pour vérifier que les règles couvrent bien les chemins sensibles. Rationale :
+  un `.gitignore` n'a AUCUN effet rétroactif sur un fichier déjà tracké —
+  l'index est la seule source fiable. Pendant local du job CI
+  `facade-write-guard` : la régression devient visible avant le push.
+
+### Changed
+
+- **`tests/test_generated_project_gitignore_template.py` — assertions
+  ligne-à-ligne** au lieu de `pattern in text`. Un `#` devant une règle laissait
+  la sous-chaîne intacte : c'est précisément par ce trou que `b97e86c` a pu
+  neutraliser les 7 règles `workspace/` en gardant la CI verte. Ajout d'une
+  assertion négative explicite contre le retour de `!workspace/stack/**`.
+
+---
+
 ## [v7.0.3-dev] — 2026-07-26 (audit comparatif + 5 améliorations produit)
 
 > Audit comparatif SDD_Pro vs 4 concurrents (BMAD-METHOD, Agent-OS, GSD-Core-Next,

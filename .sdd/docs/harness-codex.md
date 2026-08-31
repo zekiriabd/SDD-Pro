@@ -46,7 +46,7 @@ Bilan quantitatif (`.codex/harness-impact.md`) : **native=2 · émulé=3 · repo
 
 ## 4. Comment activer (Tech Lead)
 
-Dans `workspace/stack/stack.md` (gitignored, SSoT projet) :
+Dans `workspace/stack/stack.md` (SSoT projet, versionné — pas de secret réel) :
 
 ```markdown
 ## Active Harness

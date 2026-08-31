@@ -161,9 +161,13 @@ AzureAD.TenantId: <votre-tenant-id>   # ← à renseigner (ou utiliser auth-loca
 AzureAD.ClientId: <votre-client-id>   # ← à renseigner
 ```
 
-> 🔒 **Sécurité.** `stack.md` est **gitignored** : les secrets restent sur ton poste,
-> ne sont jamais commités et ne doivent jamais être recopiés dans une doc, une issue,
-> un ticket ou un message. L'agent arch propage les valeurs vers `appsettings.json` /
+> 🔒 **Sécurité.** ⚠️ Depuis le 2026-08-30, `stack.md` est **versionné** : il voyage
+> avec le repo comme SSoT de configuration projet. Tout secret réel écrit ici **part
+> sur `origin` au premier push** et doit être considéré comme compromis. N'y mettre
+> que des placeholders `${VAR}` ou des valeurs non sensibles ; pour garder des vraies
+> valeurs en local sans les pousser : `git update-index --skip-worktree
+> workspace/stack/stack.md`. Le reste de `workspace/` reste ignoré. Ne jamais recopier
+> un secret dans une doc, une issue, un ticket ou un message.
 > `application.yml` au moment du scaffold. Pour le reverse SGBD, utilise un login dédié
 > en **lecture seule** (`GRANT VIEW DEFINITION` + `db_datareader`) — jamais un compte
 > d'administration.
@@ -328,7 +332,8 @@ La logique de resume utilise `sdd_state.py resume-target` pour sauter les phases
 
 ### "Mes données sont-elles sécurisées ?"
 
-- `workspace/stack/stack.md` (secrets) est gitignored.
+- ⚠️ `workspace/stack/stack.md` est **versionné** (SSoT config projet) — placeholders
+  `${VAR}` uniquement ; tout le reste de `workspace/` est gitignored.
 - `workspace/console/.certs/` (clés HTTPS) est gitignored.
 - Aucune télémétrie ne quitte ta machine (SQLite est local).
 - Les appels API Anthropic suivent la politique Claude Code.
