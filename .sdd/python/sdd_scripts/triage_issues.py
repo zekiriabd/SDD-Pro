@@ -13,7 +13,7 @@ Reads `## Project Config` of `workspace/stack/stack.md` to resolve
 `AppName` (frontend), `BackendName` (backend), `LibName` (shared, optional).
 
 Usage (CLI, mostly for debug/audit):
-    python triage_issues.py --path "workspace/src/CMSPrintFront/src/pages/LoginPage.tsx"
+    python triage_issues.py --path "workspace/src/DemoAppFront/src/pages/LoginPage.tsx"
     python triage_issues.py --classify-batch issues.json
 """
 from __future__ import annotations

@@ -64,7 +64,7 @@ python -c "import shutil; N=5; shutil.copy2(r'.sdd/templates/bench-feats/mockups
 ### Étape 1.3 — Préparer DB de test
 
 ```bash
-# DB postgres locale isolée du workspace actif (sinon contamine CMSPrint)
+# DB postgres locale isolée du workspace actif (sinon contamine DemoApp)
 # Suggestion : container Docker dédié
 docker run -d --name bench-postgres -p 5433:5432 -e POSTGRES_USER=bench -e POSTGRES_PASSWORD=bench -e POSTGRES_DB=bench_orders postgres:16
 
@@ -97,17 +97,17 @@ INSERT INTO products (sku, name, current_price) VALUES
 
 ### Étape 1.4 — Configurer stack.md pour le bench
 
-Créer un **fork temporaire** du `stack.md` actuel (le workspace CMSPrint
+Créer un **fork temporaire** du `stack.md` actuel (le workspace DemoApp
 ne doit pas être modifié) :
 
 ```bash
 # Sauvegarde
-python -c "import shutil; shutil.copy2(r'workspace/stack/stack.md', r'workspace/stack/stack.md.cmsprint-backup')"
+python -c "import shutil; shutil.copy2(r'workspace/stack/stack.md', r'workspace/stack/stack.md.demoapp-backup')"
 
 # Éditer workspace/stack/stack.md :
 #   BackendName: BenchOrdersBack
 #   FrontendName: BenchOrdersFront
-#   BackendLocalPort: 44329  (différent du CMSPrint)
+#   BackendLocalPort: 44329  (différent du DemoApp)
 #   FrontendLocalPort: 5186
 #   ## Active Database :
 #     DatabaseType: postgres
@@ -120,7 +120,7 @@ python -c "import shutil; shutil.copy2(r'workspace/stack/stack.md', r'workspace/
 #   ## Active Tech Specs : kotlin-spring-boot + react
 #   ## Active UI Specs : shadcn
 #   ## Active QA Specs : kotlin-junit + node-vitest + code-quality
-#   ## Active Auth Specs : azure-ad (mêmes vars que CMSPrint OK)
+#   ## Active Auth Specs : azure-ad (mêmes vars que DemoApp OK)
 ```
 
 ---
@@ -372,8 +372,8 @@ git tag v7.0.0-rc1 -m "Release candidate 1 — FEAT M Kotlin ROI mesuré (3 runs
 ## Cleanup post-bench
 
 ```bash
-# Restaurer stack.md original (CMSPrint)
-python -c "from pathlib import Path; Path('workspace/stack/stack.md.cmsprint-backup').replace('workspace/stack/stack.md')"
+# Restaurer stack.md original (DemoApp)
+python -c "from pathlib import Path; Path('workspace/stack/stack.md.demoapp-backup').replace('workspace/stack/stack.md')"
 
 # Stopper container postgres bench (optionnel)
 docker stop bench-postgres

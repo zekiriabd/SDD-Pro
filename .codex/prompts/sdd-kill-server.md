@@ -166,7 +166,7 @@ Pour les stacks JVM (Spring Boot via Gradle), le wrapper `gradlew` peut
 forker un JVM enfant qui survit au kill du wrapper. Détection :
 
 ```bash
-# Liste tous les java.exe avec dans la ligne de commande "CMSPrintBack" ou app name
+# Liste tous les java.exe avec dans la ligne de commande "DemoAppBack" ou app name
 wmic process where "name='java.exe'" get processid,commandline 2>/dev/null | grep -i "{AppName}\|{BackendName}\|bootRun"
 ```
 

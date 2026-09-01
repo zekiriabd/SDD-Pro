@@ -312,9 +312,9 @@ class DBSettings(BaseSettings):
     type: str = "postgres"          # depuis ## Active Database DatabaseType
     host: str = "127.0.0.1"         # depuis DB_HOST
     port: int = 5432                # depuis DB_PORT
-    name: str = "CMSPrint"          # depuis DB_NAME
+    name: str = "DemoApp"          # depuis DB_NAME
     user: str = "postgres"          # depuis DB_USER
-    password: str = "cmsprint."     # depuis DB_PASSWORD
+    password: str = "{DB_PASSWORD}"     # depuis DB_PASSWORD
     model_config = SettingsConfigDict(env_prefix="DB_")
 
 class AzureADSettings(BaseSettings):

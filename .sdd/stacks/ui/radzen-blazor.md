@@ -202,7 +202,7 @@ Interdiction :
   layout = **HTML verbatim du mockup** + CSS porté dans `.razor.css`
   ou `MainLayout.razor.css`. **PAS** de `RadzenLayout`/`RadzenHeader`/
   `RadzenSidebar`/`RadzenFooter` qui écraseraient la structure du mockup
-  (cf. post-mortem MainLayout CMSPrint 2026-05-22).
+  (cf. post-mortem MainLayout DemoApp 2026-05-22).
 - **Si pas de mockup HTML** (cas rare en SDD_Pro) : `RadzenLayout`
   acceptable comme fallback générique.
 - CSS custom pour structurer la page (`display:flex`, `grid`,
@@ -330,7 +330,7 @@ STEP 3c) DOIT injecter ces deux lignes au scaffold initial quand
      (Blazor scoped CSS — cf. `stacks/frontend/blazor-webassembly.md §3.7`)
    - **JAMAIS** déclarer ces classes dans le `.razor.css` d'une page parent
      qui consomme `<MonComposant />` — scope hash différent, CSS jamais
-     appliqué (post-mortem CMSPrint 2026-05-22 : `Pages/CampagneInfosPage.razor.css`
+     appliqué (post-mortem DemoApp 2026-05-22 : `Pages/CampagneInfosPage.razor.css`
      contenait `.section-title`/`.field` consommés par `Components/CampagneInfosForm.razor` →
      form non stylé en runtime)
    - **JAMAIS** essayer de mapper un `<nav class="nav" style="display:flex">`
@@ -376,7 +376,7 @@ STEP 3c) DOIT injecter ces deux lignes au scaffold initial quand
 | Sélecteur de langue | `<button class="country">` (mockup verbatim) | Aucun Radzen — dropdown custom avec `<ul>` styled (le mockup définit le look) |
 | Avatar utilisateur | `<div class="avatar">` (mockup gradient circulaire) | `DialogService.OpenAsync<T>` pour le popup (Radzen pour comportement modal) |
 
-### 7.2 Anti-patterns (post-mortem 2026-05-22, CMSPrint)
+### 7.2 Anti-patterns (post-mortem 2026-05-22, DemoApp)
 
 - ❌ `<nav class="nav">` horizontal du mockup → `RadzenSidebar` (vertical) **ou** `RadzenLayout`
 - ❌ `<div class="stepper">` du mockup → `RadzenSteps` (look natif Radzen différent)
@@ -439,7 +439,7 @@ de layout neutres autorisés explicitement).
 > souveraine). `<nav class="submenu">` avec stepper, `<nav class="nav">`
 > top bar, sélecteurs custom du mockup ne sont **JAMAIS** mappés vers
 > `RadzenMenu`/`RadzenPanelMenu`/`RadzenSidebar` (look natif Radzen
-> incompatible avec le design mockup — cf. post-mortem CMSPrint
+> incompatible avec le design mockup — cf. post-mortem DemoApp
 > 2026-05-22).
 
 | HTML source                              | ~~Radzen primitive (déprécié)~~           | Règle §7.0 (active) |

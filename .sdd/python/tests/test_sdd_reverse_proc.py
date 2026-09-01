@@ -267,17 +267,17 @@ STACK_MD_ENV = """\
 def test_env_var_placeholders_resolved(tmp_path, monkeypatch):
     monkeypatch.setenv("DB_HOST", "127.0.0.1")
     monkeypatch.setenv("DB_PORT", "5432")
-    monkeypatch.setenv("DB_NAME", "CMSPrint")
+    monkeypatch.setenv("DB_NAME", "DemoApp")
     monkeypatch.setenv("DB_USER", "postgres")
-    monkeypatch.setenv("DB_PASSWORD", "cmsprint.")
+    monkeypatch.setenv("DB_PASSWORD", "pwd-de-test")
     sp = tmp_path / "stack.md"
     sp.write_text(STACK_MD_ENV, encoding="utf-8")
     cfg = read_db_config(sp)
     cfg.require_complete()
     assert cfg.host == "127.0.0.1"
-    assert cfg.name == "CMSPrint"
-    assert cfg.password == "cmsprint."
-    assert "cmsprint" not in cfg.masked()
+    assert cfg.name == "DemoApp"
+    assert cfg.password == "pwd-de-test"
+    assert "pwd-de-test" not in cfg.masked()
 
 
 def test_env_var_placeholder_unset_raises(tmp_path, monkeypatch):

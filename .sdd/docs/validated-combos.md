@@ -28,7 +28,7 @@
 | ID | Backend | Frontend | UI DS | QA | Auth | DB | Status | Dernière PoC |
 |:---:|---|---|---|---|---|---|:---:|---|
 | **C1** | `dotnet-minimalapi` | `react` | `shadcn` | `dotnet-xunit` | `azure-ad` | PostgreSQL | 🟢 validated | 2026-05-07 |
-| **C2** | `kotlin-spring-boot` | `react` | `shadcn` | `kotlin-junit` + `node-vitest` | `azure-ad` | PostgreSQL | 🟢 validated | 2026-05-11 (workspace CMSPrint) |
+| **C2** | `kotlin-spring-boot` | `react` | `shadcn` | `kotlin-junit` + `node-vitest` | `azure-ad` | PostgreSQL | 🟢 validated | 2026-05-11 (workspace DemoApp) |
 
 ### 1.3 Combos « bench-validated runtime » — bench 2026-06-05 (23 combinaisons)
 
@@ -239,7 +239,7 @@ Output JSON (extrait) :
     "archi": {"id": "ddd", "level": "experimental"}
   },
   "warnings": [
-    "Archi pattern 'ddd' is experimental (workspace CMSPrint uses it but no formal PoC)"
+    "Archi pattern 'ddd' is experimental (workspace DemoApp uses it but no formal PoC)"
   ]
 }
 ```
@@ -330,7 +330,7 @@ Pour information / mitigation préventive si vous tentez un combo 🟡/🔴 :
 | Combo | Tag SDD_Pro | Date | Validateur | Note |
 |:---:|---|---|---|---|
 | C1 | v6.0.0 | 2026-05-07 | SDD-Pro maintainer | Stack initial du framework |
-| C2 | v6.10.4-LTS | 2026-05-11 | SDD-Pro maintainer | Workspace CMSPrint (4 FEATs, 10 US, schema PostgreSQL) |
+| C2 | v6.10.4-LTS | 2026-05-11 | SDD-Pro maintainer | Workspace DemoApp (4 FEATs, 10 US, schema PostgreSQL) |
 | C3-bis | en cours | 2026-06-05 (décidé) | SDD-Pro maintainer | PoC partiel Demo + console SDD v0.4.0. Cible v7.1 (cf. §3) |
 | C4-C6 | `<TBD>` | `<TBD>` | `<TBD>` | Planifiés post-C3-bis validé (cf. §3) |
 

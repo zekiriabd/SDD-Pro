@@ -575,9 +575,9 @@ Exemple `application.yml` généré par arch pour `DatabaseType: postgres` :
 ```yaml
 spring:
   datasource:
-    url: jdbc:postgresql://127.0.0.1:5432/CMSPrint    # valeurs littérales depuis ## Active Database
+    url: jdbc:postgresql://127.0.0.1:5432/DemoApp    # valeurs littérales depuis ## Active Database
     username: postgres
-    password: cmsprint.
+    password: {DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:

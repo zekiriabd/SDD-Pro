@@ -426,7 +426,7 @@ compat Npgsql 9.x preview) :
 > (LCD compatible avec tous les drivers ci-dessus). Tant que
 > `Npgsql.EntityFrameworkCore.PostgreSQL` n'a pas de release stable 10.x,
 > ne PAS bumper EF Core à 10.x — déclenche `NU1608` warning + `MissingMethodException`
-> runtime au premier accès `DbSet`. Cf. post-mortem CMSPrint 2026-05-22.
+> runtime au premier accès `DbSet`. Cf. post-mortem DemoApp 2026-05-22.
 
 **Anti-pattern (corrigé 2026-05-22)** :
 - ❌ `core[]` contenait `Microsoft.EntityFrameworkCore.SqlServer` hardcodé,
@@ -619,7 +619,7 @@ exploites sont dans `tech-auth-azure.md`.
 > runtime dans `Program.cs` qui assemble la connection string depuis les
 > env vars `DB_*` déclarées en `## Active Database` de stack.md.
 >
-> Motif : la scaffolding `arch` v6.x écrivait `Password=cmsprint.` en
+> Motif : la scaffolding `arch` v6.x écrivait `Password=<mot de passe reel>` en
 > littéral dans `appsettings.json`, créant un `[SEC_SECRET_HARDCODED]`
 > critique même si `workspace/` est gitignored (leak via dev
 > machine, template partagé, screenshot debug).
@@ -995,7 +995,7 @@ Cf. `.sdd/stacks/frontend/react.md §5` pour le grep côté frontend.
 `Environment.GetEnvironmentVariable` — ses `environmentVariables`
 **overrident le shell parent**. Cette propriété est load-bearing pour
 neutraliser un shell utilisateur pollué (post-mortem AADSTS50011
-CMSPrint 2026-05-22 : un `AZ_FE_CALLBACKPATH=/login-callback` hérité
+DemoApp 2026-05-22 : un `AZ_FE_CALLBACKPATH=/login-callback` hérité
 d'un ancien projet React dans le profil PowerShell faisait échouer
 le bootstrap MSAL Blazor).
 
