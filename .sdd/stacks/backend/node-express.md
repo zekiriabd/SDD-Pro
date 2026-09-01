@@ -488,9 +488,9 @@ Exemple `config/default.json` produit par arch :
     "type": "postgres",
     "host": "127.0.0.1",
     "port": 5432,
-    "name": "CMSPrint",
+    "name": "DemoApp",
     "user": "postgres",
-    "password": "***REMOVED***"
+    "password": "{DB_PASSWORD}"
   }
 }
 ```

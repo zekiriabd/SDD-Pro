@@ -131,8 +131,8 @@
     "lastUpdated": "2026-06-07",
     "format": "compact (v2)",
     "changeLog": [
-      "2026-05-22 — fix: removed hardcoded EF.SqlServer from core[] (was installed for ALL projects regardless of DatabaseType). Expanded dbDrivers from 1 → 7 entries (sqlserver, postgres, mysql, mariadb, sqlite, oracle, mongodb). Pinned ef-core 10.0.6 → 9.0.4 (LCD across all drivers since Npgsql.EF 10.x is preview only). Post-mortem CMSPrint 2026-05-22: NU1608 EF 10.0.6 vs Npgsql.EF 9.0.4 became runtime MissingMethodException on first DbSet access.",
-      "2026-06-07 — Audit CTO 2026-06-07 : revert ef-core 10.0.0 → 9.0.4 (drift post-mortem CMSPrint 2026-05-22 re-introduced silently)."
+      "2026-05-22 — fix: removed hardcoded EF.SqlServer from core[] (was installed for ALL projects regardless of DatabaseType). Expanded dbDrivers from 1 → 7 entries (sqlserver, postgres, mysql, mariadb, sqlite, oracle, mongodb). Pinned ef-core 10.0.6 → 9.0.4 (LCD across all drivers since Npgsql.EF 10.x is preview only). Post-mortem DemoApp 2026-05-22: NU1608 EF 10.0.6 vs Npgsql.EF 9.0.4 became runtime MissingMethodException on first DbSet access.",
+      "2026-06-07 — Audit CTO 2026-06-07 : revert ef-core 10.0.0 → 9.0.4 (drift post-mortem DemoApp 2026-05-22 re-introduced silently)."
     ]
   }
 }

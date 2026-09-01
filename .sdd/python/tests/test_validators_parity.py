@@ -155,14 +155,28 @@ def test_asymmetry_reverse_only_sections():
     les valide pas structurellement (il valide stack.md / US à la place)."""
     assert "## Actors" in REQUIRED_SECTIONS
     assert "## Project Config" in REQUIRED_SECTIONS
-    # Forward : seuls SFD/FD sont des sections requises (cf. validate_readiness
-    # main(), required=True uniquement sur Functional Needs / Deliverables).
+    # Forward : l'asymétrie est désormais lue dans la table déclarative
+    # `validate_readiness.FEAT_ID_SECTIONS` plutôt que dans le texte source
+    # de main() — le pin survit à un refactor sans perdre son rôle.
+    #
+    # Audit 2026-09-01 : `## Acceptance Criteria` est devenue une section
+    # OBLIGATOIRE. Elle etait optionnelle des deux cotes, si bien qu'une FEAT
+    # sans un seul AC sortait en GO et que la gate spec-compliance post-dev
+    # verifiait ensuite l'ensemble vide et rendait GREEN. Sa COUVERTURE par
+    # les US reste non bloquante : un AC non cite est un defaut de
+    # tracabilite, pas une FEAT invalide — d'ou deux drapeaux distincts.
     from sdd_scripts import validate_readiness as vr
-    import inspect
-    src = inspect.getsource(vr.main)
-    assert '("SFD", "Functional Needs", True)' in src
-    assert '("BR",  "Business Rules", False)' in src, (
-        "si le forward rend BR/AC requis, mettre à jour cette asymétrie pinnée"
+    sections_requises = {
+        section for _p, section, obligatoire, _cov in vr.FEAT_ID_SECTIONS if obligatoire
+    }
+    couverture_bloquante = {
+        section for _p, section, _obl, bloquante in vr.FEAT_ID_SECTIONS if bloquante
+    }
+    assert sections_requises == {
+        "Functional Needs", "Functional Deliverables", "Acceptance Criteria",
+    }, "si le forward rend BR requise, mettre à jour cette asymétrie pinnée"
+    assert couverture_bloquante == {"Functional Needs", "Functional Deliverables"}, (
+        "si la couverture BR/AC devient bloquante, mettre à jour cette asymétrie pinnée"
     )
 
 

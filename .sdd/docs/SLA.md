@@ -14,7 +14,7 @@ Voir `@.sdd/docs/validated-combos.md §1.2` pour la liste détaillée.
 
 **Tier 1 — Validated end-to-end (2 combos)** (SSoT : `validated-combos.md §1.2`) :
 - **C1** : `dotnet-minimalapi + react + shadcn + dotnet-xunit + azure-ad + mvc` — PoC 2026-05-07
-- **C2** : `kotlin-spring-boot + react + shadcn + kotlin-junit + node-vitest + azure-ad + mvc` — PoC 2026-05-11 (workspace CMSPrint)
+- **C2** : `kotlin-spring-boot + react + shadcn + kotlin-junit + node-vitest + azure-ad + mvc` — PoC 2026-05-11 (workspace DemoApp)
 
 **Tier 2 — Bench-validated runtime (11 combos SLA — sélection au sein du matrix bench 2026-06-05)** :
 - Sélection de 11 combos `bench-validated` parmi les **23 combinaisons** testées au bench du 2026-06-05 (cf. `validated-combos.md §1.3`).

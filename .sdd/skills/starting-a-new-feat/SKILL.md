@@ -94,7 +94,44 @@ Après `/feat-generate` → guider vers la suite :
 | "Je vais coder direct, c'est juste 1 endpoint" | NON. Pour 1 endpoint, créer une US dans FEAT existante ou `/sdd-poc`. Pas de code sans US. |
 | "L'utilisateur veut juste une démo rapide" | `/sdd-poc {n}` est pour ça (pipeline minimaliste). Mais cadrage minimal requis quand même. |
 | "Je connais ce qu'il veut, pas besoin de poser les questions" | NON. L'élicitor capture ce que TU ne sais pas. Q/R = signal de gaps. |
-| "Je vais écrire la FEAT manuellement et skipper /feat-generate" | OK si Tech Lead expert, à condition de respecter `feat.template.md` (frontmatter + sections SFD/BR/AC). |
+| "Je vais écrire la FEAT manuellement et skipper /feat-generate" | OK si Tech Lead expert, à condition de respecter le contrat de « Rédaction manuelle » ci-dessous. |
+
+## Rédaction manuelle
+
+Écrire la FEAT à la main au lieu de `/feat-generate` est acceptable pour un
+Tech Lead expert. Le contrat ci-dessous est celui que `/feat-validate` vérifie
+de manière déterministe — il n'y a pas de tolérance.
+
+**Fichier** — `workspace/feats/{n}-{Nom}.md`, un seul fichier par préfixe `{n}-`.
+
+**Pas de frontmatter.** Une FEAT *forward* n'en a pas : le gate lit `^FEAT ID:`
+dans le CORPS (`generate_specbook.py` : « frontmatter-less FEATs use body
+lines »). Seules les FEAT *reverse* portent un frontmatter.
+
+**Titres exacts, jamais annotés.** `section_body()` compile
+`^##\s+{titre}\s*$`. `## Quantified Goal (v7.0.0)` n'est PAS
+`## Quantified Goal` : la section est declarée absente. Copier les titres de
+`.sdd/templates/feat.template.md` à l'identique.
+
+**Sections bloquantes** — absentes, vides, ou sans identifiant : NO-GO.
+
+| Section | Identifiants | Absente / vide | Couverture par les US |
+|---|---|---|---|
+| `## Functional Needs` | `SFD-N` | NO-GO | bloquante |
+| `## Functional Deliverables` | `FD-N` | NO-GO | bloquante |
+| `## Acceptance Criteria` | `AC-N` | NO-GO | WARN |
+| `## Business Rules` | `BR-N` | non bloquante | WARN |
+
+Format d'un identifiant : `- SFD-1: <texte>`, numérotation continue à partir
+de 1, sans doublon. Ne jamais réordonner ni renuméroter après génération des
+US — ajouter en fin de liste.
+
+**Couverture** — chaque `SFD-N` et `FD-N` doit être cité par au moins une US
+(`Covers:`), sinon NO-GO. Les `AC-N` et `BR-N` non couverts sortent en WARN :
+défaut de traçabilité, pas FEAT invalide.
+
+**Enchaînement** — `/us-generate {n}` puis `/feat-validate {n}`. Ne pas lancer
+`/dev-run` avant un verdict GO.
 
 ## Pointeurs
 

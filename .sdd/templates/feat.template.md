@@ -9,8 +9,13 @@ Status: Draft
 ## Objective
 <Un seul résultat mesurable. Observable, pas aspirationnel.>
 
-## Quantified Goal (v7.0.0 — anti-GIGO)
-<KPI mesurable + valeur cible + délai. Exemples :
+## Quantified Goal
+<v7.0.0 — anti-GIGO. NE PAS annoter ce titre. `sdd_lib/markdown_io.section_body()` compile
+`^##\s+{titre}\s*$` : une parenthese ou un numero de version rend la
+section INTROUVABLE pour /feat-validate, qui la declare alors absente
+alors qu'elle est sous vos yeux.
+
+KPI mesurable + valeur cible + délai. Exemples :
 "taux conversion +15% sous 6 mois", "p95 latence < 300ms sous charge nominale",
 "taux abandon panier -20% sur cible mobile". Écrire `<à préciser>` si non
 connu — mais le gap doit être explicite, pas absent.>
@@ -18,8 +23,13 @@ connu — mais le gap doit être explicite, pas absent.>
 - Target: <à préciser>
 - Deadline: <à préciser>
 
-## Non-Functional Constraints (v7.0.0)
-<Champs structurés non-skippables. Si non applicable, écrire `n/a`
+## Non-Functional Constraints
+<v7.0.0. NE PAS annoter ce titre. `sdd_lib/markdown_io.section_body()` compile
+`^##\s+{titre}\s*$` : une parenthese ou un numero de version rend la
+section INTROUVABLE pour /feat-validate, qui la declare alors absente
+alors qu'elle est sous vos yeux.
+
+Champs structurés non-skippables. Si non applicable, écrire `n/a`
 explicitement — l'absence du champ déclenche un WARN feat-validate.>
 - Expected volume: <ex. 10k requêtes/jour, 500 utilisateurs concurrents, ou n/a>
 - Performance SLA: <ex. p95 < 500ms, ou n/a>
@@ -49,8 +59,13 @@ liste avec un nouveau N).>
 - AC-1: <condition observable, testable>
 - AC-N: <condition observable, testable>
 
-## Required Stack (v7.0.0-alpha Sprint 1.3 — anti-stack-drift)
-<Déclare les stacks attendus par cette FEAT. /feat-validate vérifie que
+## Required Stack
+<v7.0.0-alpha Sprint 1.3 — anti-stack-drift. NE PAS annoter ce titre. `sdd_lib/markdown_io.section_body()` compile
+`^##\s+{titre}\s*$` : une parenthese ou un numero de version rend la
+section INTROUVABLE pour /feat-validate, qui la declare alors absente
+alors qu'elle est sous vos yeux.
+
+Déclare les stacks attendus par cette FEAT. /feat-validate vérifie que
 `workspace/stack/stack.md` a activé exactement ces stacks (les commentés
 sont rejetés). Évite que l'opérateur lance /sdd-full {n} avec un stack.md
 configuré pour une autre FEAT (cas typique : bench multi-stack).

@@ -112,10 +112,10 @@ multiples).
 
 ```bash
 # Backend
-cd workspace/src/CMSPrintBack && .\gradlew.bat bootRun
+cd workspace/src/DemoAppBack && .\gradlew.bat bootRun
 
 # Frontend
-cd workspace/src/CMSPrintFront && npm run dev
+cd workspace/src/DemoAppFront && npm run dev
 
 # Console (si node_modules présent)
 cd workspace/console && npm start
@@ -136,8 +136,8 @@ Après les 3 lancements, afficher en une seule sortie :
 ```
 🚀 SDD Run — process démarrés en arrière-plan
 
-  Backend  ▶ CMSPrintBack         (kotlin-spring-boot) → :8080   [bash_id: xxx]
-  Frontend ▶ CMSPrintFront        (react)              → :5173   [bash_id: yyy]
+  Backend  ▶ DemoAppBack         (kotlin-spring-boot) → :8080   [bash_id: xxx]
+  Frontend ▶ DemoAppFront        (react)              → :5173   [bash_id: yyy]
   Console  ▶ workspace/console    (fastify)            → :4000   [bash_id: zzz]
             (default v7.0.0-alpha — was 5173 conflicting with Vite ;
              override via env PORT=)

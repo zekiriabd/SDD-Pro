@@ -29,7 +29,7 @@
     {
       "id": "C2",
       "tier": "validated",
-      "label": "stack-kotlin + react (workspace CMSPrint)",
+      "label": "stack-kotlin + react (workspace DemoApp)",
       "backend": "kotlin-spring-boot",
       "frontend": "react",
       "ui": "shadcn",

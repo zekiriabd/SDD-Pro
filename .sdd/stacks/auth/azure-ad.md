@@ -692,7 +692,7 @@ redirectUri: "http://localhost:5173/login-callback"  // hardcode (cassé prod)
 Backend `/auth/config` : `redirectUri` retourné DOIT être un path
 commençant par `/` (jamais URL complète, jamais vide).
 
-#### 5.2.7.3.ter `navigateToLoginRequestUrl: false` OBLIGATOIRE (post-mortem 2026-05-22, CMSPrint)
+#### 5.2.7.3.ter `navigateToLoginRequestUrl: false` OBLIGATOIRE (post-mortem 2026-05-22, DemoApp)
 
 **Symptôme** : auth Azure OK, callback consommé, utilisateur **renvoyé en
 boucle sur `/login`** au lieu de home.

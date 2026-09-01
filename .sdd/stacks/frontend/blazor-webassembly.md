@@ -315,7 +315,7 @@ conflit avec `Refit.ApiResponse<T>`).
   ligne, runtime exception `Could not find 'AuthenticationService.init'` au premier rendu d'un
   composant `[Authorize]`. Identifiant `preserves:` pour les augments ulterieurs :
   `AuthenticationService.js`.
-- ⚠️ **Syntaxe fingerprint INTERDITE en standalone** (post-mortem 2026-05-22 CMSPrint) :
+- ⚠️ **Syntaxe fingerprint INTERDITE en standalone** (post-mortem 2026-05-22 DemoApp) :
   ne JAMAIS écrire `_framework/blazor.webassembly#[.{fingerprint}].js`. La substitution du
   placeholder `#[.{fingerprint}]` est faite par `MapStaticAssets()` côté **serveur** (Blazor
   Web App / hosted), pas par Blazor WASM **standalone**. En standalone, le placeholder est

@@ -119,11 +119,11 @@ Path cible P doit matcher EXACTEMENT l'un de :
 `## Project Config`, pas un dérivé (`kotlin/{AppName}`, `/front`, `/web`).
 
 > **Alias v6.10.2+** : la clé préférée côté `stack.md` est désormais
-> **`FrontendName`** (alias de `AppName`, ex. `FrontendName: CMSPrintFront`).
+> **`FrontendName`** (alias de `AppName`, ex. `FrontendName: DemoAppFront`).
 > Le token canonique du framework reste `{AppName}` — la normalisation
 > est faite par `sdd_lib.project_config.normalize_project_aliases()`. Pour
 > un projet **fullstack** (single-project), drop le suffixe `Front` côté
-> nom (ex. `CMSPrintFront` → `CMSPrint`). Les clés `AppNamespace` /
+> nom (ex. `DemoAppFront` → `DemoApp`). Les clés `AppNamespace` /
 > `BackendNamespace` ne sont **plus requises** dans `stack.md` : elles
 > sont auto-dérivées (`AppNamespace = AppName`, `BackendNamespace = BackendName`).
 

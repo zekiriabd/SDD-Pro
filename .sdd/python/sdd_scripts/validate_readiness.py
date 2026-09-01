@@ -39,6 +39,28 @@ VALID_DB_TYPES = (
     "none", "postgres", "sqlserver", "mysql", "sqlite", "oracle", "mariadb",
 )
 
+# Audit 2026-09-01 - sections a identifiants de la FEAT.
+#
+# DEUX drapeaux distincts, et c'est le coeur du correctif. Avant, un seul
+# booleen `required` pilotait a la fois "la section est-elle obligatoire" et
+# "sa couverture par les US est-elle bloquante". Pour AC ce choix unique
+# etait forcement faux :
+#
+#   - a False (l'etat livre) la section devenait optionnelle : une FEAT sans
+#     un seul Acceptance Criteria sortait en GO, et la gate spec-compliance
+#     post-dev (STEP 4.5) verifiait alors l'ensemble vide et rendait GREEN ;
+#   - a True, la COUVERTURE des AC par les US devenait bloquante, alors
+#     qu'un AC non cite dans une US est un defaut de tracabilite, pas une
+#     FEAT invalide.
+#
+# (prefixe, section, section_obligatoire, couverture_bloquante)
+FEAT_ID_SECTIONS = (
+    ("SFD", "Functional Needs",        True,  True),
+    ("FD",  "Functional Deliverables", True,  True),
+    ("AC",  "Acceptance Criteria",     True,  False),
+    ("BR",  "Business Rules",          False, False),
+)
+
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser()
@@ -349,12 +371,7 @@ def main() -> int:
 
     # 1.1 ID sequence coherence
     if feat_file:
-        for prefix, section, required in [
-            ("SFD", "Functional Needs", True),
-            ("FD",  "Functional Deliverables", True),
-            ("BR",  "Business Rules", False),
-            ("AC",  "Acceptance Criteria", False),
-        ]:
+        for prefix, section, required, _coverage_blocking in FEAT_ID_SECTIONS:
             r = test_id_sequence(feat_content, prefix, section)
             if r.get("skipped"):
                 if required:
@@ -409,12 +426,7 @@ def main() -> int:
         )
     elif feat_file and us_files:
         all_us_content = "\n\n".join(read_text_safe(f) for f in us_files)
-        for prefix, section, required in [
-            ("SFD", "Functional Needs", True),
-            ("FD",  "Functional Deliverables", True),
-            ("BR",  "Business Rules", False),
-            ("AC",  "Acceptance Criteria", False),
-        ]:
+        for prefix, section, _section_required, required in FEAT_ID_SECTIONS:
             declared = get_all_ids(feat_content, prefix, section)
             if not declared:
                 continue
@@ -507,37 +519,53 @@ def main() -> int:
                 if cat in extended_stacks:
                     required_stacks[cat] = sid
 
-            mismatches: list[str] = []
-            for cat, sid in required_stacks.items():
-                active = extended_stacks.get(cat)
-                if sid == "none":
-                    if active is not None:
-                        mismatches.append(
-                            f"{cat}: FEAT exige 'none' mais stack.md active '{active}'"
-                        )
-                else:
-                    if active is None:
-                        mismatches.append(
-                            f"{cat}: FEAT exige '{sid}' mais aucun stack {cat}/* actif"
-                        )
-                    elif active != sid:
-                        mismatches.append(
-                            f"{cat}: FEAT exige '{sid}' mais stack.md active '{active}'"
-                        )
-
-            if mismatches:
+            if not required_stacks:
+                # Audit 2026-09-01 : sans cette branche, une section dont
+                # AUCUNE ligne n'est parsable - les valeurs `<ex. ...>` du
+                # gabarit, typiquement - laissait `required_stacks` vide,
+                # donc `mismatches` vide, donc REQUIRED-STACK-MATCH. Un PASS
+                # sur l'ensemble vide : la classe de defaut exacte que
+                # l'audit F-04 a fermee pour SFD/FD.
                 rep.add_warn(
-                    "REQUIRED-STACK-MISMATCH",
-                    "FEAT ## Required Stack ne correspond pas à stack.md ## Active Tech Specs : "
-                    + " ; ".join(mismatches) + ". "
-                    "Aligner stack.md OU corriger la FEAT (cas bench multi-stack légitime).",
+                    "REQUIRED-STACK-UNRESOLVED",
+                    "## Required Stack presente mais aucune categorie exploitable - "
+                    "le drift de stack n'est PAS verifie pour cette FEAT. "
+                    "Format attendu, une categorie par ligne : "
+                    "`- backend: kotlin-spring-boot`, `- frontend: none`. "
+                    "Categories valides : " + ", ".join(sorted(extended_stacks)) + ".",
                 )
             else:
-                rep.add_pass(
-                    "REQUIRED-STACK-MATCH",
-                    f"FEAT ## Required Stack ({len(required_stacks)} catégories) "
-                    f"matche stack.md ## Active Tech Specs",
-                )
+                mismatches: list[str] = []
+                for cat, sid in required_stacks.items():
+                    active = extended_stacks.get(cat)
+                    if sid == "none":
+                        if active is not None:
+                            mismatches.append(
+                                f"{cat}: FEAT exige 'none' mais stack.md active '{active}'"
+                            )
+                    else:
+                        if active is None:
+                            mismatches.append(
+                                f"{cat}: FEAT exige '{sid}' mais aucun stack {cat}/* actif"
+                            )
+                        elif active != sid:
+                            mismatches.append(
+                                f"{cat}: FEAT exige '{sid}' mais stack.md active '{active}'"
+                            )
+
+                if mismatches:
+                    rep.add_warn(
+                        "REQUIRED-STACK-MISMATCH",
+                        "FEAT ## Required Stack ne correspond pas à stack.md ## Active Tech Specs : "
+                        + " ; ".join(mismatches) + ". "
+                        "Aligner stack.md OU corriger la FEAT (cas bench multi-stack légitime).",
+                    )
+                else:
+                    rep.add_pass(
+                        "REQUIRED-STACK-MATCH",
+                        f"FEAT ## Required Stack ({len(required_stacks)} catégories) "
+                        f"matche stack.md ## Active Tech Specs",
+                    )
         else:
             rep.add_info(
                 "REQUIRED-STACK-ABSENT",
@@ -769,15 +797,45 @@ def main() -> int:
         # filled (not just empty/absent). WARN only — backward-compat with
         # FEATs written pre-v7.0.0. NO-GO bypass via Project Config flag
         # `FeatAntiGigoMode: off`.
+        # Audit 2026-09-01 : `FeatAntiGigoMode` etait declare dans
+        # project-config.schema.json, regle dans config.base.yml, documente
+        # `off | warn | strict` dans configuration-reference.md et annonce
+        # par le commentaire ci-dessus - mais AUCUNE ligne ne le lisait. Les
+        # deux WARN etaient donc inconditionnels et le drapeau sans effet :
+        # la seule echappatoire restait `/sdd-full --force`, qui assume AUSSI
+        # la readiness et se journalise en bypass. Un garde-fou qu'on ne peut
+        # pas parametrer finit toujours contourne par le drapeau le plus
+        # large - ce que le HARD-GATE anti-cumul bypass de sdd-full.md
+        # STEP 1.bis existe precisement pour eviter. Meme contrat que
+        # FeatDeepenMode en 1.6.
+        try:
+            from sdd_lib.layered_config import read_layered_config
+            _gigo_mode = str(
+                read_layered_config().get("FeatAntiGigoMode") or "warn"
+            ).lower()
+        except Exception:
+            _gigo_mode = "warn"
+        if _gigo_mode not in ("off", "warn", "strict"):
+            _gigo_mode = "warn"
+
+        def _add_gigo(code: str, message: str, fix: str) -> None:
+            if _gigo_mode == "strict":
+                rep.add_err(code, message, fix)
+            elif _gigo_mode == "warn":
+                rep.add_warn(code, message)
+            else:
+                rep.add_info(code, f"{message} (FeatAntiGigoMode=off, non bloquant)")
+
         qg_body = section_body(feat_content, "Quantified Goal") or ""
         nfc_body = section_body(feat_content, "Non-Functional Constraints") or ""
 
         if not qg_body.strip():
-            rep.add_warn(
+            _add_gigo(
                 "FEAT-NO-QUANTIFIED-GOAL",
                 "Section `## Quantified Goal` absente (v7.0.0 anti-GIGO). "
-                "Une FEAT senior doit declarer Metric/Target/Deadline mesurables. "
-                "Ajouter la section ou ecrire `<a preciser>` explicite. Non bloquant (WARN).",
+                "Une FEAT senior doit declarer Metric/Target/Deadline mesurables.",
+                "Ajouter la section ## Quantified Goal (Metric/Target/Deadline), ou "
+                "ecrire `<a preciser>` explicite. Bypass : FeatAntiGigoMode=warn ou off.",
             )
         elif "<a preciser>" in qg_body.lower() or "<à préciser>" in qg_body.lower():
             rep.add_info(
@@ -787,11 +845,14 @@ def main() -> int:
             )
 
         if not nfc_body.strip():
-            rep.add_warn(
+            _add_gigo(
                 "FEAT-NO-NFC",
                 "Section `## Non-Functional Constraints` absente (v7.0.0 anti-GIGO). "
-                "Champs requis : Volume, Performance, Retention, Compliance, Integration, "
-                "Degraded mode. Ecrire `n/a` explicitement si non applicable.",
+                "Champs requis : Volume, Performance, Retention, Compliance, "
+                "Integration, Degraded mode.",
+                "Ajouter la section ## Non-Functional Constraints, en ecrivant `n/a` "
+                "explicitement pour chaque champ non applicable. "
+                "Bypass : FeatAntiGigoMode=warn ou off.",
             )
 
     # Output
