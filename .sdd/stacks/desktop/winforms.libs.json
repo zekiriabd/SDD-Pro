@@ -1,0 +1,222 @@
+{
+  "$schema": "../../templates/libs-catalog.schema.json",
+  "stackId": "winforms",
+  "category": "desktop",
+  "schemaVersion": 1,
+  "buildSystem": "dotnet",
+  "manifest": {
+    "files": [
+      "workspace/src/{AppName}/{AppName}.csproj",
+      "workspace/src/{AppName}/Program.cs",
+      "workspace/src/{AppName}/appsettings.json"
+    ]
+  },
+  "metadata": {
+    "lastUpdated": "2026-09-02",
+    "platforms": [
+      "windows"
+    ],
+    "targetFramework": "net10.0-windows",
+    "rendering": "native-windows",
+    "notes": "Client desktop Windows en Windows Forms. TFM net10.0-windows + UseWindowsForms=true, obligatoires. WINDOWS UNIQUEMENT. POSITIONNEMENT : ce stack existe pour MAINTENIR et ETENDRE un parc d'applications metier existant. Pour un NOUVEAU projet desktop Windows, desktop/wpf est preferable (data binding reel, separation MVVM, theming). WinForms n'a pas de data binding declaratif comparable : le pattern retenu ici est MVP (Model-View-Presenter) et non MVVM, parce que la liaison bidirectionnelle XAML n'existe pas. Consomme un backend separe optionnel."
+  },
+  "versions": {
+    "dotnet": "net10.0-windows",
+    "extensions-di": "10.0.11",
+    "extensions-hosting": "10.0.11",
+    "extensions-config-json": "10.0.11",
+    "extensions-logging": "10.0.11",
+    "serilog-hosting": "10.0.0",
+    "serilog-file": "7.0.0",
+    "windows-compat": "10.0.11",
+    "ef-sqlite": "10.0.11",
+    "refit": "15.2.0",
+    "fluentvalidation": "12.1.1",
+    "automapper": "16.2.0",
+    "livecharts-wpf": "2.0.5",
+    "webview2": "1.0.4191.47",
+    "closedxml": "0.105.1",
+    "questpdf": "2026.8.0",
+    "velopack": "1.2.0",
+    "xunit": "2.9.3",
+    "nsubstitute": "6.2.0",
+    "shouldly": "4.3.0",
+    "flaui": "5.0.0"
+  },
+  "core": [
+    {
+      "module": "Microsoft.Extensions.DependencyInjection",
+      "ref": "extensions-di",
+      "rationale": "Conteneur DI — c'est ce qui permet d'injecter un Presenter dans un Form plutot que de l'instancier dans le constructeur"
+    },
+    {
+      "module": "Microsoft.Extensions.Hosting",
+      "ref": "extensions-hosting",
+      "rationale": "Generic Host : DI + configuration + logs cables au demarrage, avant Application.Run"
+    },
+    {
+      "module": "Microsoft.Extensions.Configuration.Json",
+      "ref": "extensions-config-json"
+    },
+    {
+      "module": "Microsoft.Extensions.Logging",
+      "ref": "extensions-logging"
+    },
+    {
+      "module": "Serilog.Extensions.Hosting",
+      "ref": "serilog-hosting"
+    },
+    {
+      "module": "Serilog.Sinks.File",
+      "ref": "serilog-file",
+      "rationale": "Journal local — pas de collecteur central sur un poste client. Pin 7.0.0 (la 8.0.0-nblumhardt-* est une prerelease)"
+    }
+  ],
+  "onDemand": [
+    {
+      "module": "Microsoft.Windows.Compatibility",
+      "ref": "windows-compat",
+      "capability": "legacy-interop",
+      "rationale": "Ramene les APIs Windows absentes de .NET moderne (registre, WMI, ACL, System.Drawing etendu, ODBC). C'est LA dependance des migrations depuis .NET Framework — le point de blocage n 1 de ce type de portage",
+      "triggers": [
+        "registre",
+        "\\bwmi\\b",
+        "framework.*4",
+        "migration.*legacy",
+        "odbc",
+        "api.*windows"
+      ]
+    },
+    {
+      "module": "Microsoft.EntityFrameworkCore.Sqlite",
+      "ref": "ef-sqlite",
+      "capability": "local-db",
+      "triggers": [
+        "base.*locale",
+        "sqlite",
+        "hors.*ligne"
+      ]
+    },
+    {
+      "module": "Refit.HttpClientFactory",
+      "ref": "refit",
+      "capability": "http-client",
+      "triggers": [
+        "appel.*api",
+        "backend",
+        "rest"
+      ]
+    },
+    {
+      "module": "FluentValidation",
+      "ref": "fluentvalidation",
+      "capability": "validation",
+      "rationale": "La validation WinForms native passe par l'evenement Validating, disperse dans le code-behind ; FluentValidation la centralise",
+      "triggers": [
+        "validation",
+        "regle.*saisie",
+        "formulaire"
+      ]
+    },
+    {
+      "module": "AutoMapper",
+      "ref": "automapper",
+      "capability": "mapping",
+      "triggers": [
+        "mapping",
+        "dto"
+      ]
+    },
+    {
+      "module": "LiveChartsCore.SkiaSharpView.WPF",
+      "ref": "livecharts-wpf",
+      "capability": "charts",
+      "rationale": "Hebergeable dans un Form via ElementHost. WinForms n'a pas de bibliotheque de graphiques moderne propre",
+      "triggers": [
+        "chart",
+        "graphique",
+        "courbe"
+      ]
+    },
+    {
+      "module": "Microsoft.Web.WebView2",
+      "ref": "webview2",
+      "capability": "webview",
+      "rationale": "Voie recommandee pour moderniser un ecran WinForms par increments : heberger une vue web dans un Form existant",
+      "triggers": [
+        "webview",
+        "contenu.*web",
+        "moderniser.*ecran"
+      ]
+    },
+    {
+      "module": "ClosedXML",
+      "ref": "closedxml",
+      "capability": "excel",
+      "triggers": [
+        "excel",
+        "xlsx",
+        "export.*tableur"
+      ]
+    },
+    {
+      "module": "QuestPDF",
+      "ref": "questpdf",
+      "capability": "pdf",
+      "triggers": [
+        "\\bpdf\\b",
+        "impression"
+      ]
+    },
+    {
+      "module": "Velopack",
+      "ref": "velopack",
+      "capability": "auto-update",
+      "rationale": "Mise a jour automatique du poste. Pin 1.2.0",
+      "triggers": [
+        "mise.*a.*jour",
+        "auto-update",
+        "installeur"
+      ]
+    },
+    {
+      "module": "xunit",
+      "ref": "xunit",
+      "capability": "unit-tests",
+      "rationale": "Tests des Presenters — c'est precisement l'interet du MVP : le Presenter se teste sans Form",
+      "triggers": [
+        "tests.*unitaires",
+        "xunit",
+        "presenter.*test"
+      ]
+    },
+    {
+      "module": "NSubstitute",
+      "ref": "nsubstitute",
+      "capability": "unit-tests",
+      "triggers": [
+        "mock",
+        "substitute"
+      ]
+    },
+    {
+      "module": "Shouldly",
+      "ref": "shouldly",
+      "capability": "unit-tests",
+      "triggers": [
+        "assertions",
+        "should"
+      ]
+    },
+    {
+      "module": "FlaUI.UIA3",
+      "ref": "flaui",
+      "capability": "ui-automation",
+      "triggers": [
+        "test.*ui",
+        "automation",
+        "flaui"
+      ]
+    }
+  ]
+}

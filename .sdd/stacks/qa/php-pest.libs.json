@@ -1,0 +1,121 @@
+{
+  "$schema": "../../templates/libs-catalog.schema.json",
+  "stackId": "php-pest",
+  "category": "qa",
+  "schemaVersion": 1,
+  "buildSystem": "composer",
+  "manifest": {
+    "files": [
+      "workspace/src/{BackendName}/composer.json",
+      "workspace/src/{BackendName}/phpunit.xml",
+      "workspace/src/{BackendName}/tests/Pest.php"
+    ]
+  },
+  "metadata": {
+    "lastUpdated": "2026-09-02",
+    "targetStacks": ["backend/laravel", "fullstack/laravel-blade", "fullstack/symfony-twig"],
+    "coverageTool": "Xdebug ou PCOV (extension PHP) + pest --coverage",
+    "notes": "Stack QA PHP base sur Pest 5. PLANCHER RUNTIME : pestphp/pest 5.1.3 declare `php: ^8.4` et phpunit/phpunit 13.3.2 declare `php: >=8.4.1`. C'est CE STACK QA, et non le framework applicatif, qui fixe le plancher PHP des stacks Laravel/Symfony (laravel/framework 13 se contente de `^8.3`) — cf. backend/laravel.md 2.3. LE COVERAGE EXIGE UNE EXTENSION PHP : Xdebug (mode coverage) ou PCOV. Aucune des deux n'est installable par composer — ce sont des extensions compilees, absentes de ce catalog par nature. Sans l'une des deux, `pest --coverage` echoue avec un message sur le driver de couverture, pas sur une dependance manquante. Pest s'appuie sur PHPUnit : les deux runners coexistent, et un TestCase PHPUnit classique reste executable par Pest."
+  },
+  "versions": {
+    "pest": "5.1.3",
+    "pest-laravel": "5.0.1",
+    "pest-arch": "5.0.0",
+    "pest-faker": "5.0.0",
+    "pest-type-coverage": "5.0.2",
+    "pest-watch": "3.0.0",
+    "phpunit": "13.3.2",
+    "mockery": "1.6.15",
+    "faker": "1.24.1",
+    "infection": "0.35.4",
+    "foundry": "2.12.1",
+    "doctrine-test-bundle": "8.6.0",
+    "browser-kit": "8.1.5",
+    "css-selector": "8.1.6"
+  },
+  "core": [
+    { "module": "pestphp/pest", "ref": "pest", "rationale": "Runner de tests (dev). Syntaxe fonctionnelle `it()` / `expect()`, execution parallele integree. C'est lui qui impose le plancher PHP 8.4", "license": "MIT" },
+    { "module": "mockery/mockery", "ref": "mockery", "rationale": "Mocking (dev) — PHP n'a pas de mocking par reflexion sans lui ; utilise aussi par les helpers de test Laravel", "license": "BSD-3-Clause" },
+    { "module": "fakerphp/faker", "ref": "faker", "rationale": "Generation de donnees de test (dev) — requis par les factories de modele", "license": "MIT" }
+  ],
+  "onDemand": [
+    {
+      "module": "pestphp/pest-plugin-laravel",
+      "ref": "pest-laravel",
+      "capability": "laravel-testing",
+      "rationale": "Helpers Laravel : get/post/put, assertDatabaseHas, actingAs, RefreshDatabase. OBLIGATOIRE sur backend/laravel et fullstack/laravel-blade",
+      "triggers": ["laravel", "artisan", "eloquent", "test.*http.*laravel"]
+    },
+    {
+      "module": "pestphp/pest-plugin-arch",
+      "ref": "pest-arch",
+      "capability": "architecture-tests",
+      "rationale": "Tests d'ARCHITECTURE executables : `expect('App\\\\Models')->toOnlyBeUsedIn(...)`. C'est le seul moyen de faire respecter par la CI les regles de couches des 1.4 (controller mince, pas de logique dans un modele) au lieu de les laisser en prose",
+      "triggers": ["test.*architecture", "regle.*couche", "dependance.*interdite", "arch.*test"]
+    },
+    {
+      "module": "pestphp/pest-plugin-faker",
+      "ref": "pest-faker",
+      "capability": "test-fixtures",
+      "rationale": "Helper `fake()` directement dans un test, sans instancier un Generator",
+      "triggers": ["faker", "donnees.*aleatoires", "fixture"]
+    },
+    {
+      "module": "pestphp/pest-plugin-type-coverage",
+      "ref": "pest-type-coverage",
+      "capability": "type-coverage",
+      "rationale": "Mesure le taux de code ANNOTE en types (distinct du coverage d'execution) — utile sur une base PHP en cours de typage",
+      "triggers": ["type.*coverage", "couverture.*typage", "annotation.*type"]
+    },
+    {
+      "module": "pestphp/pest-plugin-watch",
+      "ref": "pest-watch",
+      "capability": "watch-mode",
+      "rationale": "Re-execution a la sauvegarde (dev uniquement)",
+      "triggers": ["watch", "re-execution.*automatique"]
+    },
+    {
+      "module": "phpunit/phpunit",
+      "ref": "phpunit",
+      "capability": "phpunit-direct",
+      "rationale": "Pest embarque PHPUnit ; ne le declarer explicitement que si l'US impose des `TestCase` classiques (base de code existante)",
+      "triggers": ["phpunit", "testcase.*classique", "extends TestCase"],
+      "alternative": true
+    },
+    {
+      "module": "infection/infection",
+      "ref": "infection",
+      "capability": "mutation-testing",
+      "rationale": "Mutation testing PHP — l'equivalent de qa/mutation-testing.md pour cet ecosysteme. Couteux : opt-in, jamais dans la boucle de dev",
+      "triggers": ["mutation.*testing", "infection", "msi"]
+    },
+    {
+      "module": "zenstruck/foundry",
+      "ref": "foundry",
+      "capability": "symfony-fixtures",
+      "rationale": "Factories d'entites Doctrine — l'equivalent des factories Eloquent pour fullstack/symfony-twig",
+      "triggers": ["symfony", "doctrine", "factory.*entite", "foundry"]
+    },
+    {
+      "module": "dama/doctrine-test-bundle",
+      "ref": "doctrine-test-bundle",
+      "capability": "symfony-fixtures",
+      "rationale": "Enveloppe chaque test dans une transaction annulee a la fin — rend une suite Doctrine rapide ET isolee",
+      "triggers": ["symfony", "doctrine", "isolation.*base.*test"]
+    },
+    {
+      "module": "symfony/browser-kit",
+      "ref": "browser-kit",
+      "capability": "symfony-functional",
+      "rationale": "Client HTTP de test Symfony (WebTestCase)",
+      "triggers": ["symfony", "test.*fonctionnel", "webtestcase", "crawler"]
+    },
+    {
+      "module": "symfony/css-selector",
+      "ref": "css-selector",
+      "capability": "symfony-functional",
+      "rationale": "Selecteurs CSS pour le Crawler — requis pour assertion sur du HTML rendu (Twig)",
+      "triggers": ["symfony", "crawler", "selecteur.*css", "assertion.*html"]
+    }
+  ]
+}

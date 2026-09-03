@@ -54,7 +54,8 @@ interdits en `## Active Tech Specs` pour prod.
 | **Node.js** | 22 "Jod" (Oct 2024) | Apr 2027 | ✅ `react`, `vue`, `angular`, `node-express` |
 | **Java**    | 21 (Sep 2023) | Sep 2028 | ✅ `kotlin-spring-boot` |
 | **Python**  | 3.12 (Oct 2023) | Oct 2028 | ✅ `python-fastapi` (3.13 OK) |
-| **Kotlin**  | 2.0.21 (Oct 2024) | TBD | ✅ pin `kotlin-spring-boot.libs.json` = 2.0.21 (stable, LTS-aligned via Java 21) |
+| **PHP**     | *aucune LTS* — 8.4 en `active support` | 8.4 : sécurité jusqu'à ~fin 2028 | ✅ `laravel` — PHP n'a PAS de LTS : ~2 ans d'`active support` puis ~1 an de `security support`. Plancher effectif du stack = **8.4.1**, imposé par `pestphp/pest` 5 (`^8.4`) et `phpunit` 13 (`>=8.4.1`), et NON par `laravel/framework` 13 (`^8.3`) — cf. `stacks/backend/laravel.md §2.3` |
+| **Kotlin**  | 2.0.21 (Oct 2024) | TBD | ✅ pin `kotlin-spring-boot.libs.json` = 2.0.21 (stable, LTS-aligned via Java 21). ⚠️ Les stacks `mobiles/kotlin-android` et `mobiles/kotlin-multiplatform` sont pinnés sur **2.4.10** depuis le 2026-09-02 (Compose exige le plugin compilateur versionné avec Kotlin) — divergence assumée et documentée dans leur §2.3, pas un drift |
 
 **Interdictions** : pin sur version STS (.NET 9, Node 23, Java 22…),
 prerelease (`-rc/-preview/-alpha/-beta/-snapshot`) sans ADR, version
@@ -122,7 +123,7 @@ Structure :
   "stackId": "kotlin-spring-boot",
   "category": "backend",
   "schemaVersion": 1,
-  "buildSystem": "gradle | dotnet | npm | pnpm | yarn | maven | pip | poetry | uv | cargo | go-mod",
+  "buildSystem": "gradle | dotnet | npm | pnpm | yarn | maven | pip | poetry | uv | cargo | go-mod | msbuild | pub | swift | composer | cmake",
   "manifest": { "files": [...], "versionCatalogPath": "..." },
   "versions": { "kotlin": "2.0.21", "spring-boot": "3.3.5" },
   "core":     [ { "id", "module", "versionRef", "rationale", "installCommand", "license" } ],
@@ -162,12 +163,13 @@ Project Config).
 
 | Catégorie | Stacks |
 |---|---|
-| Backend | `dotnet-minimalapi`, `kotlin-spring-boot`, `python-fastapi`, `node-express` |
+| Backend | `dotnet-minimalapi`, `kotlin-spring-boot`, `python-fastapi`, `node-express`, `django`, `nestjs`, `laravel` |
 | Frontend | `blazor-webassembly`, `react`, `vue`, `angular` |
-| QA | `dotnet-xunit`, `blazor-bunit`, `node-vitest`, `python-pytest`, `kotlin-junit`, `angular-jasmine`, `mutation-testing`, `playwright` |
+| QA | `dotnet-xunit`, `blazor-bunit`, `node-vitest`, `python-pytest`, `kotlin-junit`, `angular-jasmine`, `mutation-testing`, `playwright`, `flutter-test`, `swift-testing`, `php-pest` |
 | UI DS | `radzen-blazor`, `shadcn` (7 core + 15 onDemand Radix), `vuetify` |
-| Fullstack | `next`, `nuxt`, `angular-universal`, `blazor-server`, `kotlin-mustache`, `node-react`, `aspnet-mvc-razor` |
-| Mobiles | `kotlin-android`, `maui`, `react-native` |
+| Fullstack | `next`, `nuxt`, `angular-universal`, `blazor-server`, `kotlin-mustache`, `node-react`, `aspnet-mvc-razor`, `laravel-blade`, `symfony-twig`, `django-templates` |
+| Mobiles | `kotlin-android`, `maui`, `react-native`, `delphi-fmx`, `flutter`, `kotlin-multiplatform`, `swiftui`, `ionic-capacitor` |
+| Desktop | `delphi-vcl`, `wpf`, `qt-cpp`, `electron`, `winforms`, `javafx`, `pyside` |
 
 **Hors périmètre `.libs.json`** (par design) : `auth/*` (protocoles
 cross-langage — libs concrètes dans `.libs.json` consommateur),

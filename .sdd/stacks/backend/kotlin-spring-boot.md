@@ -17,7 +17,7 @@ Scope: backend uniquement (REST API, logique métier, persistance)
 
 ### 1.1 Pattern applicatif (Kotlin/Spring idioms)
 
-Pour `ArchiPattern: MVC` (défaut), suit `archi/mvc.md` avec idioms Spring Boot 3.3 LTS + Kotlin 2.0.21 :
+Pour `ArchiPattern: MVC` (défaut), suit `archi/mvc.md` avec les idiomes Spring Boot 3.5 + Kotlin 2.0.21 :
 - **Data classes Kotlin** pour DTOs (`val` exclusivement → immuables par construction, `equals/hashCode/toString` auto-générés)
 - **Constructor injection** native Kotlin (`class UsersService(val repo: UsersRepository, ...)`)
 - **Coroutines** pour I/O async (`suspend fun` + Spring WebFlux optionnel) OU pattern bloquant Spring MVC classique
@@ -73,7 +73,7 @@ Hérités de `archi/mvc.md §4`. **Ajouts** Kotlin :
 - **Stack ID** : `back-kotlin-spring`
 - **Langage** : Kotlin 2.0.21 (LTS-aligned via Java 21)
 - **Runtime** : JDK 21 LTS
-- **Framework principal** : Spring Boot 3.3.x LTS (canonique SDD_Pro v7.0.0 — Spring Boot 4 sera évalué en roadmap v8 après stabilisation Spring Security 7)
+- **Framework principal** : Spring Boot **3.5.x** (ligne en place — pin `3.5.16`). Spring Boot **4.1.1** est publié et Spring Security 7 est stable (7.1.1), mais la montée en majeure est une **tâche dédiée** : elle invalide le badge 🟢 reference de ce stack, adossé au combo C2 validé end-to-end sur la ligne 3.x (cf. §2.3.1)
 - **Build tool** : **Gradle 8.10** avec **Kotlin DSL** (`build.gradle.kts`)
 - **Package racine** : `{BackendNamespace}` (ex. `com.example.myapp`)
 
@@ -163,7 +163,7 @@ cd workspace/src/{BackendName} && ./gradlew compileKotlin --no-daemon
 
 # capability: sqlserver-flyway
 # Gradle : ajouter les modules en implementation(...) dans build.gradle.kts
-#   implementation("org.flywaydb:flyway-sqlserver:10.21.0")
+#   implementation("org.flywaydb:flyway-sqlserver:11.20.3")
 ```
 <!-- ONDEMAND_PACKAGES_END -->
 
@@ -205,6 +205,57 @@ Codes prioritaires Kotlin :
 - `Property must be initialized or be abstract`
 - `Null can not be a value of a non-null type`
 
+### 2.3.1 Politique de version — audit 2026-09-02
+
+Règle appliquée à ce stack, et à tout stack portant un badge 🟢 :
+
+| Type de bump | Décision | Pourquoi |
+|---|---|---|
+| **Patch / minor dans la majeure en place** | appliqué | correctifs de sécurité, aucun risque de rupture d'API |
+| **Majeure** | **non appliqué** — documenté ici | invalide la validation runtime sur laquelle repose le badge |
+
+#### Ce qui a été bumpé
+
+| Lib | Après | Avant |
+|---|---|---|
+| `spring-boot` | **3.5.16** (dernier patch de la ligne 3.5) | 3.5.4 |
+| `springdoc-openapi` | 2.9.0 | 2.8.9 |
+| `flyway-core` | 11.20.3 | 11.7.2 |
+| `postgresql` (JDBC) | 42.7.13 | 42.7.10 |
+| `mssql-jdbc` | 13.4.0.jre11 | 12.8.1.jre11 |
+| `nimbus-jose-jwt` | 10.9.1 | 9.40 |
+
+Corrigé au même passage : le `rationale` de `flyway-core` affirmait « Pin
+10.21.0 » alors que la version pinnée était 11.7.2 — commentaire hérité d'un
+bump antérieur, désormais faux et trompeur pour quiconque relit le catalog.
+
+#### Ce qui n'a PAS été bumpé, et pourquoi
+
+**La 4.1.1 de Spring Boot est publiée.** Spring Security 7 est stable (7.1.1), ce qui
+lève la réserve inscrite dans l'ancienne §2.1 (« sera évalué après
+stabilisation de Spring Security 7 »). La montée n'a pourtant pas été faite :
+
+- Ce stack porte **🟢 reference**, badge adossé au **combo C2** validé
+  end-to-end sur un workspace réel (2026-05-11) avec la ligne 3.x.
+- Spring Boot 4 embarque Spring Framework 7 : révision du modèle de
+  configuration, retrait d'API dépréciées, changements Jakarta.
+- **Aucun `/sdd-full` ne peut être rejoué ici** pour re-valider le combo.
+
+Bumper la majeure aurait donc produit un stack annoncé `validated` dont la
+validation ne porte plus sur le code livré — exactement la dérive silencieuse
+que les gates de ce framework existent pour empêcher.
+
+**Migration Spring Boot 4 — tâche dédiée**, à traiter comme un PoC formel
+(`docs/poc-roi-methodology.md`) : bump du catalog, régénération de §2.2.1,
+run `/sdd-full` complet sur le combo C2, puis mise à jour du badge et de
+`combos.json`. À défaut, le stack reste sur la ligne 3.5, qui est maintenue.
+
+> Le même raisonnement s'applique à `backend/node-express` (Express 5 publié,
+> stack maintenu sur la ligne 4.x) — cf. sa §2.3.1.
+
+---
+
+
 <!-- LIBS_CATALOG_START -->
 ### 2.4 Librairies
 
@@ -222,15 +273,15 @@ Codes prioritaires Kotlin :
 | spring-boot-starter-oauth2-client |  | OAuth2 client flow (utilise par certains scenarios M2M) |
 | spring-boot-starter-data-jpa |  | ORM Hibernate + Spring Data repositories (PagingAndSortingRepository, JpaRepository) |
 | spring-boot-starter-validation |  | Bean Validation Jakarta (@Valid, @NotBlank, @Email) sur DTOs entrants |
-| flyway-core | 10.21.0 | Moteur migrations versionnees V{n}__*.sql + autoconfig Spring (pas de starter dedie). Pin 10.21.0 (compat Spring Boot 3.3.x BOM, Flyway 10 externalise les dialects DB en modules separes). Cf. kotlin-spring-boot.md §4.4 |
-| flyway-database-postgresql | 10.21.0 | Module support PostgreSQL Flyway 10+ (externalise depuis flyway-core en 10.x, n'existe PAS en branche 9.x — d'ou la bump). Necessaire si DatabaseType=postgres |
-| springdoc-openapi-starter-webmvc-ui | 2.7.0 | OpenAPI 3 + Swagger UI auto-generes depuis controllers (path /swagger custom, cf. §5.6) |
+| flyway-core | 11.20.3 | Moteur migrations versionnees V{n}__*.sql + autoconfig Spring (pas de starter dedie). Ligne 11.x (Flyway 10+ externalise les dialects DB en modules separes — cf. flyway-database-postgresql ci-dessous). Cf. kotlin-spring-boot.md Â§4.4 |
+| flyway-database-postgresql | 11.20.3 | Module support PostgreSQL Flyway 10+ (externalise depuis flyway-core en 10.x, n'existe PAS en branche 9.x â€” d'ou la bump). Necessaire si DatabaseType=postgres |
+| springdoc-openapi-starter-webmvc-ui | 2.9.0 | OpenAPI 3 + Swagger UI auto-generes depuis controllers (path /swagger custom, cf. Â§5.6) |
 | spring-context |  | DI core (transitive via web, listee explicitement pour clarte) |
 | jackson-module-kotlin |  | Serialization Kotlin data classes (sans no-arg constructor) |
-| kotlin-reflect | 2.3.21 | Reflection runtime requise par Jackson/Spring (DI Kotlin idiomatique) |
-| nimbus-jose-jwt | 9.40 | JWT decoder + JWKS resolver (utilise par JwtDecoder custom Azure AD, cf. auth/azure-ad.md §5.1 Piege 7) |
+| kotlin-reflect | 2.0.21 | Reflection runtime requise par Jackson/Spring (DI Kotlin idiomatique) |
+| nimbus-jose-jwt | 10.9.1 | JWT decoder + JWKS resolver (utilise par JwtDecoder custom Azure AD, cf. auth/azure-ad.md Â§5.1 Piege 7) |
 | spring-boot-starter-test |  | Test scaffolding (JUnit 5 + AssertJ + Mockito + Spring TestContext) |
-| spring-boot-starter-webmvc-test |  | MockMvc + @WebMvcTest pour tests controllers slices (utilise par QA API Gate, cf. build-and-loop.md (Partie A)) |
+| spring-boot-starter-webmvc-test |  | MockMvc + @WebMvcTest pour tests controllers slices (utilise par QA API Gate, cf. build-and-loop.md Partie A) |
 | spring-security-test |  | @WithMockUser, SecurityMockMvcRequestPostProcessors (auth mockee dans tests) |
 | kotest-runner-junit5 | 5.9.1 | Runner Kotest sur JUnit Platform (style DescribeSpec/StringSpec) |
 | kotest-assertions-core | 5.9.1 | DSL d'assertions Kotest (`shouldBe`, `shouldThrow`, soft assertions) |
@@ -243,26 +294,26 @@ Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'U
 
 | Capability | Lib | Version | Triggers |
 |---|---|---|---|
-| redis-cache | spring-boot-starter-data-redis |  | redis, cache distribu, distributed cache, session partag |
-| sqlserver-flyway | flyway-sqlserver | 10.21.0 | sqlserver, mssql |
+| redis-cache | spring-boot-starter-data-redis |  | \bredis\b, cache distribu, distributed cache, session partag |
+| sqlserver-flyway | flyway-sqlserver | 11.20.3 | sqlserver, mssql |
 
 #### 2.4.c Plugins build-system
 
 | Plugin | Version | Role |
 |---|---|---|
-| org.jetbrains.kotlin.jvm | 2.3.21 | Compilateur Kotlin/JVM (cible JDK 21) |
-| org.jetbrains.kotlin.plugin.spring | 2.3.21 | Genere all-open pour @Component/@Service/@Configuration (Spring proxies) |
-| org.jetbrains.kotlin.plugin.jpa | 2.3.21 | Genere no-arg constructor pour @Entity (exigence Hibernate) |
-| org.springframework.boot | 4.0.6 | Gere bootRun, bootJar, dependency-management BOM |
+| org.jetbrains.kotlin.jvm | 2.0.21 | Compilateur Kotlin/JVM (cible JDK 21) |
+| org.jetbrains.kotlin.plugin.spring | 2.0.21 | Genere all-open pour @Component/@Service/@Configuration (Spring proxies) |
+| org.jetbrains.kotlin.plugin.jpa | 2.0.21 | Genere no-arg constructor pour @Entity (exigence Hibernate) |
+| org.springframework.boot | 3.5.16 | Gere bootRun, bootJar, dependency-management BOM |
 | org.jlleitschuh.gradle.ktlint | 14.2.0 | Lint + auto-format Kotlin (tasks ktlintCheck / ktlintFormat) |
-| org.flywaydb.flyway | 10.21.0 | Tasks Gradle flywayMigrate / flywayInfo / flywayClean (CLI hors runtime) |
+| org.flywaydb.flyway | 11.20.3 | Tasks Gradle flywayMigrate / flywayInfo / flywayClean (CLI hors runtime) |
 
 #### 2.4.d DB Drivers (selectionne par arch selon DatabaseType)
 
 | DatabaseType | Module | Version | Scope |
 |---|---|---|---|
-| postgres | `org.postgresql:postgresql` | 42.7.10 | runtime |
-| sqlserver | `com.microsoft.sqlserver:mssql-jdbc` | 12.8.1.jre11 | runtime |
+| postgres | `org.postgresql:postgresql` | 42.7.13 | runtime |
+| sqlserver | `com.microsoft.sqlserver:mssql-jdbc` | 13.4.0.jre11 | runtime |
 <!-- LIBS_CATALOG_END -->
 
 ### 2.5 Conventions de nommage

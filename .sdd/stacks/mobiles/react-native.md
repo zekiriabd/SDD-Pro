@@ -3,9 +3,9 @@
 > §2.4 (Librairies) regeneree depuis `react-native.libs.json` — ne pas editer manuellement (`python .sdd/python/sdd_admin/sync_stack_md.py --stack-id react-native`).
 
 Status: Experimental
-Validation: 🟢 bench-validated runtime — Expo Web (2026-06-05 — CalcABCRN :44399, `create-expo-app` SDK 56 + RN 0.81 + Expo Router, `expo start --web` Metro 13s cold, HTTP 200 / 45KB, `<TextInput>` × 3 + `<Pressable>` Calculate compilés en HTML/CSS via RN-Web, POST → FastAPI :44329 cross-origin 🟢. Cibles iOS/Android natives non testées sans device. Bug fix : :44399 absent de l'allowlist FastAPI → ajouter aux 14 origins. Pipeline `/sdd-full` complet pas encore validé end-to-end — scaffolding manuel mainteneur, cf. `docs/benchmarks/known-gaps.md`)
+Validation: 🟢 bench-validated runtime — Expo Web (2026-06-05 — CalcABCRN :44399, `create-expo-app` SDK 56 + RN 0.81 + Expo Router, `expo start --web` Metro 13s cold, HTTP 200 / 45KB, `<TextInput>` × 3 + `<Pressable>` Calculate compilés en HTML/CSS via RN-Web, POST → FastAPI :44329 cross-origin 🟢. Cibles iOS/Android natives non testées sans device. Bug fix : :44399 absent de l'allowlist FastAPI → ajouter aux 14 origins. Pipeline `/sdd-full` complet pas encore validé end-to-end — scaffolding manuel mainteneur, cf. `docs/benchmarks/known-gaps.md`. **Rebase catalog 2026-09-02** : le `.libs.json` a été repinné SDK 52 → **SDK 57 / RN 0.86.3** — le bench avait tourné sur SDK 56 alors que le catalog annonçait encore SDK 52, incohérence fermée. 4 bugs bloquants corrigés au passage, cf. §2.3.)
 Tech FEAT ID: tech-react-native
-Scope: **mobile cross-platform** — application React Native via **Expo SDK 52** dans UN seul projet `{AppName}/`. UI React Native + state + navigation + acces APIs natives + auth vivent dans le meme projet TypeScript. Pas de separation `{BackendName}` / `{LibName}`. Cible iOS + Android (+ Web optionnel via Expo Web).
+Scope: **mobile cross-platform** — application React Native via **Expo SDK 57** dans UN seul projet `{AppName}/`. UI React Native + state + navigation + acces APIs natives + auth vivent dans le meme projet TypeScript. Pas de separation `{BackendName}` / `{LibName}`. Cible iOS + Android (+ Web optionnel via Expo Web).
 
 > **Backend separe** : ce stack est PUREMENT client mobile. Il consomme une API backend distincte declaree en `## Active Tech Specs` (ex. `backend/node-express.md`, `backend/dotnet-minimalapi.md`). Pour un app monolithe sans backend distinct → utiliser un Backend-as-a-Service (Supabase, Firebase, Appwrite) configure via env vars.
 
@@ -18,12 +18,12 @@ Scope: **mobile cross-platform** — application React Native via **Expo SDK 52*
 **Application React Native (Expo Managed Workflow)** cible iOS + Android :
 
 - **Expo Router** (file-based routing, alternative moderne a React Navigation) — par defaut depuis Expo SDK 51
-- **React Native** 0.76+ avec **New Architecture** active (Fabric renderer + TurboModules + JSI) — perf native, GC reduit
+- **React Native** 0.86 avec **New Architecture** (Fabric + TurboModules + JSI) — seul mode supporte depuis l'SDK 55, l'ancienne archi est supprimee
 - **TypeScript** strict (config etendue de `expo`)
 - **State client** : Zustand (top-1 pour cas simples) ; alternative `@tanstack/react-query` pour server state
 - **Forms** : React Hook Form + Zod (meme pattern que `.sdd/stacks/frontend/react.md §1.1`)
 - **HTTP** : `fetch` natif Expo OU `axios` (capability `http-client`)
-- **Styling** : **NativeWind 4** (Tailwind compile vers StyleSheet) + design tokens via Tailwind v3 (compatible NativeWind)
+- **Styling** : **NativeWind 4.2** (Tailwind compile vers StyleSheet) + design tokens via Tailwind **v3** — NativeWind 4 ne supporte PAS Tailwind v4 (cf. §2.3)
 - **Storage** : `@react-native-async-storage/async-storage` (cles non sensibles) + `expo-secure-store` (tokens JWT, secrets)
 
 Architecture cible (un seul projet Expo) :
@@ -109,7 +109,7 @@ Un seul projet sous `workspace/src/{AppName}/`. **Convention single-project — 
 
 **Architecture Expo Router + RN** :
 - **Defaut Expo Managed Workflow** — pas de `npm run prebuild` ni d'ejection sauf necessite documentee. Si besoin code natif custom → migrer vers **Expo Dev Client** (capability `dev-client`), pas **ejection complete**.
-- **New Architecture active** (`"newArchEnabled": true` dans `app.json`) — Fabric + TurboModules par defaut Expo SDK 52
+- **New Architecture active** — Fabric + TurboModules. Depuis l'SDK 55 c'est le **seul** mode : le flag `newArchEnabled` n'a plus a etre pose, et `"newArchEnabled": false` fait echouer le build
 - **Aucun acces direct API native** depuis un component — toujours via un Expo module ou un hook custom
 - **State separe** : `useState` local pour UI, Zustand pour state app-wide, TanStack Query pour server state. PAS de Context API pour state metier (perf degradation re-render).
 - **Validation Zod obligatoire** sur :
@@ -117,7 +117,7 @@ Un seul projet sous `workspace/src/{AppName}/`. **Convention single-project — 
   - Tout parsing reponse API (`Schema.parse(json)`) — protege contre changement de schema backend silencieux
 - **Navigation typed** : Expo Router auto-genere les types des routes (`href` typed). Utiliser `useRouter()` + `router.push('/users/[id]')` plutot que strings.
 - **TypeScript strict** (`"strict": true`, `"noUncheckedIndexedAccess": true`)
-- **Listes performantes** : `FlatList` ou `FlashList` (capability `shopify-flashlist`) pour > 50 items. JAMAIS `map` dans un `ScrollView` pour de longues listes (rendu sync, freeze UI).
+- **Listes performantes** : `FlatList` ou `FlashList` (capability `flashlist`) pour > 50 items. JAMAIS `map` dans un `ScrollView` pour de longues listes (rendu sync, freeze UI).
 - **Memo + useCallback** sur composants avec callbacks dans listes — sinon re-render integral a chaque scroll/key change.
 
 **Securite mobile-specific** :
@@ -163,9 +163,9 @@ Ce stack est CLIENT mobile — la persistance "base de donnees" reelle vit cote 
 ## 2.1 Identite
 
 - **Stack ID** : `mobile-react-native`
-- **Langage** : TypeScript 5.x strict
-- **Runtime** : Expo SDK 52 / React Native 0.76 / React 19
-- **Plateformes** : iOS 13.4+ / Android API 24+ (Android 7.0)
+- **Langage** : TypeScript 6.x strict (version du template `expo-template-default@57`)
+- **Runtime** : Expo SDK 57 / React Native 0.86.3 / React 19.2.3
+- **Plateformes** : iOS 15.1+ / Android API 24+ (Android 7.0) — planchers Expo SDK 57
 - **Build system** : Expo (CLI + EAS Build pour CI/CD natif cloud)
 - **Bundler** : Metro (integre Expo)
 - **Namespace** : `{AppNamespace}` (utilise dans `app.json.expo.scheme` pour deep linking)
@@ -179,6 +179,7 @@ Ce stack est CLIENT mobile — la persistance "base de donnees" reelle vit cote 
 - **Run iOS** : `(cd workspace/src/{AppName} && npx expo run:ios)` — necessite Xcode (macOS uniquement)
 - **Run Android** : `(cd workspace/src/{AppName} && npx expo run:android)` — necessite Android Studio + JDK 17
 - **Build iOS / Android (cloud)** : `(cd workspace/src/{AppName} && eas build --platform [ios|android|all])` — EAS Build (cloud build farm Expo)
+- **Audit coherence deps** : `(cd workspace/src/{AppName} && npx expo-doctor)` — **gate obligatoire** : detecte tout ecart entre une version installee et celle attendue par l'SDK (cf. §2.3)
 - **Smoke Command** :
 
 ```bash
@@ -199,7 +200,7 @@ test -f workspace/src/{AppName}/app.json
 ```bash
 if [ ! -f "workspace/src/{AppName}/package.json" ]; then
 
-# STEP 1 — Bootstrap Expo SDK 52 (template TypeScript + Expo Router)
+# STEP 1 — Bootstrap Expo SDK 57 (template TypeScript + Expo Router)
 npx --yes create-expo-app@latest workspace/src/{AppName} \
   --template default --no-install
 
@@ -207,7 +208,9 @@ cd workspace/src/{AppName}
 npm install --silent
 
 # STEP 2 — Installer NativeWind 4 (Tailwind pour RN)
-npm install nativewind@4.1.23 tailwindcss@3.4.17
+# ATTENTION : tailwindcss est pinne sur la ligne v3. NativeWind 4 ne supporte
+# PAS Tailwind v4 (il faudrait NativeWind 5, encore en preview) — cf. §2.3.
+npm install nativewind@4.2.6 tailwindcss@3.4.19
 npx --yes tailwindcss init
 
 # Configurer babel.config.js et metro.config.js (cf. https://www.nativewind.dev/getting-started)
@@ -231,24 +234,36 @@ cat > global.css <<'CSS'
 @tailwind utilities;
 CSS
 
-# STEP 3 — Installer libs CORE (cf. §2.4)
+# STEP 3 — Installer les libs CORE natives / Expo (cf. §2.4.a)
+# `expo install` (et NON `npm install`) : il resout chaque version depuis le
+# bundledNativeModules.json de l'SDK installe. C'est la seule commande qui
+# garantit un jeu de deps coherent — cf. §2.3.
 npx --yes expo install \
-  zustand \
-  @tanstack/react-query \
-  react-hook-form \
-  @hookform/resolvers \
-  zod \
-  @react-native-async-storage/async-storage \
   expo-secure-store \
   expo-status-bar \
+  expo-system-ui \
   expo-font \
   expo-splash-screen \
   expo-image \
   expo-linking \
   expo-constants \
-  expo-localization
+  expo-localization \
+  react-native-reanimated \
+  react-native-worklets \
+  react-native-gesture-handler \
+  react-native-screens \
+  react-native-safe-area-context \
+  @react-native-async-storage/async-storage
 
-# STEP 4 — Creer arborescence applicative
+# STEP 4 — Installer les libs CORE pure-JS (pas de code natif -> npm direct)
+npm install \
+  zustand@5.0.15 \
+  @tanstack/react-query@5.102.8 \
+  react-hook-form@7.87.0 \
+  @hookform/resolvers@5.9.1 \
+  zod@4.5.4
+
+# STEP 5 — Creer arborescence applicative
 mkdir -p \
   app/'(tabs)' \
   app/'(auth)' \
@@ -262,19 +277,62 @@ mkdir -p \
   assets/images \
   assets/fonts
 
-# STEP 5 — Patcher app.json avec config par defaut (rempli par arch)
+# STEP 6 — Patcher app.json avec config par defaut (rempli par arch)
+# NB : on ne pose PLUS `newArchEnabled` — depuis l'SDK 55 la New Architecture
+# est le seul mode supporte et le flag est ignore (le poser a false casse le build).
 node -e "
   const fs = require('fs');
   const cfg = JSON.parse(fs.readFileSync('app.json', 'utf8'));
   cfg.expo.scheme = '{AppNamespace}'.toLowerCase().replace(/\W+/g, '');
-  cfg.expo.newArchEnabled = true;
   cfg.expo.experiments = cfg.expo.experiments || {};
   cfg.expo.experiments.typedRoutes = true;
   fs.writeFileSync('app.json', JSON.stringify(cfg, null, 2));
 "
 
+# STEP 7 — Gate de coherence : doit sortir 0 avant de rendre la main
+npx --yes expo-doctor
+
 fi
 ```
+
+---
+
+## 2.3 Regle de pin des versions (source de verite)
+
+> Cette section existe parce que le catalog a derive deux fois. Elle est
+> **normative** : `arch` la respecte avant tout bump de `react-native.libs.json`.
+
+Expo publie, dans chaque version du paquet `expo`, un fichier
+`bundledNativeModules.json` qui declare **la version exacte de chaque lib
+native attendue par l'SDK**. `npx expo install` lit ce fichier ; `npm install`
+l'ignore.
+
+| Nature de la lib | Source de la version | Exemple |
+|---|---|---|
+| Presente dans `bundledNativeModules.json` | **cette valeur, pas npm latest** | `react-native-gesture-handler` → `2.32.0` (npm latest = `3.2.1`, incompatible) |
+| Module `expo-*` | idem (aligne sur le numero d'SDK) | `expo-router` → `57.0.18` |
+| Pure-JS, absente du bundle | npm latest stable | `zustand`, `zod`, `@tanstack/react-query` |
+
+Verification : `npx expo-doctor` echoue des qu'une version installee sort de la
+plage attendue. **Ce check est un gate**, pas un warning.
+
+### Bugs fermes par l'audit 2026-09-02
+
+| # | Probleme | Correction |
+|---|---|---|
+| 1 | `@azure/msal-react-native` (capability `auth-azure-ad`) — **le paquet n'existe pas sur npm** (404). Toute US Azure AD echouait a l'install. | Remplace par `react-native-msal` 4.0.4 |
+| 2 | `react-native-reanimated` 4.x **exige** le peer `react-native-worklets`, absent du catalog → echec au bundling Metro | `react-native-worklets` 0.10.1 ajoute en CORE |
+| 3 | `expo-barcode-scanner` : module **retire d'Expo depuis l'SDK 51**, absent du `bundledNativeModules` | Capability `barcode` fusionnee dans `camera` (`CameraView.onBarcodeScanned` d'`expo-camera`) |
+| 4 | Catalog pinne SDK 52 / RN 0.76 alors que l'en-tete `Validation:` documentait un bench sur SDK 56 / RN 0.81 | Rebase complet sur SDK 57 / RN 0.86.3 |
+
+Peers ajoutes par la meme occasion (ils manquaient et cassaient l'install
+des capabilities concernees) : `react-native-nitro-modules` (peer de
+`react-native-mmkv` 4.x et de `react-native-vision-camera` 5.x),
+`react-native-nitro-image` (peer de `vision-camera` 5.x),
+`test-renderer` (peer de `@testing-library/react-native` 14.x),
+`expo-web-browser` (peer d'`expo-auth-session`).
+
+Modules deprecies retires du catalog : `expo-av` → `expo-video` + `expo-audio`.
 
 ---
 
@@ -287,35 +345,38 @@ fi
 
 | Lib | Version | Role |
 |-----|---------|------|
-| expo | 52.0.20 | SDK Expo (Metro, modules natifs, EAS Build) |
-| react | 19.0.0 |  |
-| react-native | 0.76.5 |  |
-| react-dom | 19.0.0 | Necessaire pour Expo Web optionnel |
-| typescript | 5.7.2 |  |
-| @types/react | 19.0.2 |  |
-| expo-router | 4.0.15 | File-based routing — defaut Expo SDK 51+ |
-| expo-status-bar | 2.0.0 |  |
-| expo-constants | 17.0.3 |  |
-| expo-linking | 7.0.3 | Deep linking + Universal Links |
-| expo-splash-screen | 0.29.18 |  |
-| expo-font | 13.0.1 |  |
-| expo-image | 2.0.3 | Cache + transformations (remplace RN Image) |
-| expo-localization | 16.0.0 |  |
-| expo-secure-store | 14.0.1 | Tokens JWT, secrets (Keychain iOS / Keystore Android) |
-| react-native-screens | 4.4.0 | Peer Expo Router (native screens) |
-| react-native-safe-area-context | 5.0.0 | Peer Expo Router (notch / status bar insets) |
-| react-native-gesture-handler | 2.21.2 | Peer Expo Router (gestures natifs) |
-| react-native-reanimated | 3.16.7 | Animations natives 60fps, peer plusieurs libs |
-| nativewind | 4.1.23 | Tailwind compile vers StyleSheet RN — top-1 styling 2024-2025 |
-| tailwindcss | 3.4.17 | Peer NativeWind — v3 obligatoire (v4 incompat RN) |
-| zustand | 5.0.2 | State manager client — top-1 simple, succede Redux/Context |
-| @tanstack/react-query | 5.62.7 | Server state cache — standard de facto |
-| react-hook-form | 7.54.2 | Forms — meme stack que web/react.md |
-| @hookform/resolvers | 3.10.0 |  |
-| zod | 3.24.1 | Validation forms + parsing API responses |
-| @react-native-async-storage/async-storage | 2.1.0 | KV storage non sensible — standard RN |
-| eslint | 9.17.0 |  |
-| eslint-config-expo | 8.0.1 |  |
+| expo | 57.0.19 | SDK Expo 57 (Metro, modules natifs, EAS Build) |
+| react | 19.2.3 | Version imposee par l'SDK 57 (bundledNativeModules) |
+| react-native | 0.86.3 | Version imposee par l'SDK 57 — PAS npm latest (0.87.x casse l'SDK 57) |
+| react-dom | 19.2.3 | Necessaire pour Expo Web optionnel |
+| react-native-web | 0.21.2 | Cible Web optionnelle — c'est la cible du bench 2026-06-05 |
+| typescript | 6.0.3 | Version du template expo-template-default@57 — TS 7.x pas encore valide par Expo |
+| @types/react | 19.2.2 |  |
+| expo-router | 57.0.18 | File-based routing — defaut Expo SDK 51+ |
+| expo-status-bar | 57.0.1 |  |
+| expo-constants | 57.0.17 | Lecture de app.json.expo.extra (apiBaseUrl, apiVersion) |
+| expo-linking | 57.0.9 | Deep linking + Universal Links |
+| expo-splash-screen | 57.0.8 |  |
+| expo-font | 57.0.3 |  |
+| expo-image | 57.0.4 | Cache + transformations (remplace RN Image) |
+| expo-localization | 57.0.1 |  |
+| expo-secure-store | 57.0.3 | Tokens JWT, secrets (Keychain iOS / Keystore Android) |
+| expo-system-ui | 57.0.3 | Couleur de fond racine + barre navigation Android (template SDK 57) |
+| react-native-screens | 4.26.0 | Peer Expo Router (native screens) |
+| react-native-safe-area-context | 5.7.0 | Peer Expo Router (notch / status bar insets) |
+| react-native-gesture-handler | 2.32.0 | Peer Expo Router — pin SDK 57 (~2.32), npm latest 3.x incompatible |
+| react-native-reanimated | 4.5.1 | Animations natives 60fps. v4 externalise les Worklets (cf. lib suivante) |
+| react-native-worklets | 0.10.1 | PEER OBLIGATOIRE de reanimated 4.x — absent du catalog avant l'audit 2026-09-02, le bundling echouait |
+| nativewind | 4.2.6 | Tailwind compile vers StyleSheet RN — top-1 styling |
+| tailwindcss | 3.4.19 | Peer NativeWind 4 — ligne v3 (tag npm v3-lts) OBLIGATOIRE. Tailwind v4 exige NativeWind 5, encore en preview |
+| zustand | 5.0.15 | State manager client — top-1 simple, succede Redux/Context |
+| @tanstack/react-query | 5.102.8 | Server state cache — standard de facto |
+| react-hook-form | 7.87.0 | Forms — meme stack que frontend/react.md |
+| @hookform/resolvers | 5.9.1 | v5 requis pour supporter Zod v4 |
+| zod | 4.5.4 | Validation forms + parsing API responses (v4) |
+| @react-native-async-storage/async-storage | 2.2.0 | KV storage non sensible — standard RN |
+| eslint | 10.9.1 |  |
+| eslint-config-expo | 57.0.2 |  |
 
 ### 2.4.b Librairies ON-DEMAND (installees si l'US declenche)
 
@@ -323,33 +384,48 @@ Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'U
 
 | Capability | Lib | Version | Triggers |
 |---|---|---|---|
-| http-client | axios | 1.7.9 | axios, http-client, appel.*api.*externe |
-| date-utils | date-fns | 4.1.0 | dates.*format, duree, intervalle.*temps |
-| date-utils | dayjs (alt) | 1.11.13 | dayjs, dates.*format |
-| icons | lucide-react-native | 0.469.0 | icones, icon-set, lucide |
-| icons | @expo/vector-icons (alt) | 14.0.4 | icones, vector-icons, ionicons, material-icons |
-| forms-ui | react-native-keyboard-controller | 1.16.0 | keyboard.*controller, forms.*native |
-| flashlist | @shopify/flash-list | 1.7.3 | grandes.*listes, performance.*list, virtualization |
-| mmkv | react-native-mmkv | 3.1.0 | mmkv, kv.*rapide, performance.*storage |
-| offline-db | expo-sqlite | 15.0.4 | sqlite, offline-first, local.*db, persistance.*locale |
-| camera | expo-camera | 16.0.7 | camera, scan.*qr, photo |
-| camera | react-native-vision-camera (alt) | 4.6.1 | vision-camera, photo.*haute.*qualite, video |
-| barcode | expo-barcode-scanner | 13.0.1 | scan.*barcode, scan.*qr, code-barre |
-| image-picker | expo-image-picker | 16.0.4 | gallerie, image-picker, choisir.*photo |
-| location | expo-location | 18.0.4 | gps, location, geolocalisation |
-| maps | react-native-maps | 1.20.1 | maps, carte, marker, google.*maps |
-| maps | @rnmapbox/maps (alt) | 10.1.34 | mapbox, carte.*custom |
-| push | expo-notifications | 0.29.11 | push.*notification, notification.*push |
-| auth-azure-ad | @azure/msal-react-native | 1.0.0 | azure-ad, msal, sso |
-| auth-local | expo-auth-session | 6.0.2 | oauth, auth-local, oidc |
-| biometric | expo-local-authentication | 15.0.2 | biometric, face-id, touch-id, fingerprint |
-| sentry | @sentry/react-native | 6.4.0 | sentry, error.*tracking, monitoring.*erreurs |
-| i18n | i18next | 24.1.2 | i18n, multi.*langue, traductions |
-| i18n | react-i18next | 15.4.0 | i18n, react-i18next |
-| stripe | @stripe/stripe-react-native | 0.41.0 | stripe, paiement, payment |
-| webview | react-native-webview | 13.13.1 | webview, embed.*page.*web |
-| svg | react-native-svg | 15.10.2 | svg, vector.*graphics |
-| reactive-state | jotai (alt) | 2.11.0 | jotai, atomic.*state |
+| http-client | axios | 1.20.0 | \baxios\b, http-client, appel.*api.*externe |
+| date-utils | date-fns | 4.4.0 | dates.*format, duree, intervalle.*temps |
+| date-utils | dayjs (alt) | 1.11.23 | dayjs, dates.*format |
+| icons | @expo/vector-icons | 15.1.1 | icones, icon-set, vector-icons, ionicons, material-icons |
+| icons | lucide-react-native (alt) | 1.39.0 | lucide |
+| native-ui | @expo/ui | 57.0.15 | composants.*natifs, swiftui, jetpack.*compose, look.*natif |
+| forms-ui | react-native-keyboard-controller | 1.21.9 | keyboard.*controller, forms.*native |
+| flashlist | @shopify/flash-list | 2.0.2 | grandes.*listes, performance.*list, virtualization |
+| nitro | react-native-nitro-modules | 0.37.1 | nitro, mmkv, vision-camera |
+| mmkv | react-native-mmkv | 4.3.2 | mmkv, kv.*rapide, performance.*storage |
+| offline-db | expo-sqlite | 57.0.2 | sqlite, offline-first, local.*db, persistance.*locale |
+| camera | expo-camera | 57.0.4 | camera, photo, scan.*qr, scan.*barcode, code-barre |
+| camera | react-native-vision-camera (alt) | 5.2.3 | vision-camera, photo.*haute.*qualite, frame.*processor |
+| nitro | react-native-nitro-image (alt) | 0.15.2 | vision-camera |
+| image-picker | expo-image-picker | 57.0.15 | gallerie, image-picker, choisir.*photo |
+| location | expo-location | 57.0.15 | gps, location, geolocalisation |
+| maps | expo-maps | 57.0.2 | maps, carte, marker |
+| maps | react-native-maps (alt) | 1.27.2 | react-native-maps, google.*maps |
+| maps | @rnmapbox/maps (alt) | 10.3.5 | mapbox, carte.*custom |
+| push | expo-notifications | 57.0.16 | push.*notification, notification.*push |
+| auth-local | expo-auth-session | 57.0.11 | oauth, auth-local, oidc, pkce |
+| auth-local | expo-web-browser | 57.0.2 | oauth, oidc, auth.*navigateur |
+| auth-azure-ad | react-native-msal | 4.0.4 | azure-ad, msal, entra, sso |
+| biometric | expo-local-authentication | 57.0.2 | biometric, face-id, touch-id, fingerprint |
+| sentry | @sentry/react-native | 7.11.0 | sentry, error.*tracking, monitoring.*erreurs |
+| i18n | i18next | 26.4.1 | i18n, multi.*langue, traductions |
+| i18n | react-i18next | 17.0.13 | i18n, react-i18next |
+| stripe | @stripe/stripe-react-native | 0.64.0 | stripe, paiement, payment |
+| webview | react-native-webview | 13.16.1 | webview, embed.*page.*web |
+| svg | react-native-svg | 15.15.4 | svg, vector.*graphics, lucide |
+| media-playback | expo-video | 57.0.3 | video, lecteur.*video, player |
+| media-playback | expo-audio | 57.0.4 | audio, son, enregistrement.*audio |
+| filesystem | expo-file-system | 57.0.6 | fichier.*local, download, telechargement, cache.*disque |
+| connectivity | @react-native-community/netinfo | 12.0.1 | offline, hors.*ligne, connectivite, reseau.*disponible |
+| ota-updates | expo-updates | 57.0.20 | ota, eas.*update, mise.*a.*jour.*a.*chaud |
+| dev-client | expo-dev-client | 57.0.17 | dev-client, module.*natif.*custom, prebuild |
+| dev-client | expo-build-properties | 57.0.16 | build.*properties, minsdk, deployment.*target |
+| rn-testing | jest | 30.5.1 | tests.*unitaires.*mobile, jest |
+| rn-testing | jest-expo | 57.0.5 | tests.*unitaires.*mobile, jest |
+| rn-testing | @testing-library/react-native | 14.0.1 | tests.*composants, testing-library, render.*screen |
+| rn-testing | test-renderer | 1.2.0 | testing-library |
+| reactive-state | jotai (alt) | 2.20.3 | jotai, atomic.*state |
 <!-- LIBS_CATALOG_END -->
 
 ---
@@ -416,6 +492,10 @@ Le backend expose `/api/v1/{domain}` (recommande). Cote mobile : maintenir une *
 - `setTimeout` / `setInterval` sans cleanup `useEffect` return — memory leak
 - `Image` (RN core) pour images critiques — preferer `expo-image` (cache + perf)
 - `react-native-vector-icons` — preferer `@expo/vector-icons` (gere par Expo, pas de linking manuel)
+- `expo-barcode-scanner` — module **retire depuis l'SDK 51**, utiliser `expo-camera` (`CameraView.onBarcodeScanned`)
+- `expo-av` — **deprecie**, utiliser `expo-video` (video) et `expo-audio` (son)
+- `npm install <lib-native>` pour une lib presente dans le `bundledNativeModules` — utiliser `npx expo install` (cf. §2.3)
+- Poser `newArchEnabled: false` dans `app.json` — l'ancienne architecture n'existe plus depuis l'SDK 55
 
 **Code quality** :
 - `any` injustifie
@@ -456,7 +536,7 @@ Stack mobile → pas de "DB scaffolding" classique. Pour offline-first reel : ca
 ## 7. Temps reel
 
 Pattern client mobile :
-- **SSE** : utiliser `react-native-event-source` (capability `sse`) ou `EventSource` natif (Expo SDK 52+ inclut polyfill)
+- **SSE** : `EventSource` natif (polyfill inclus depuis l'Expo SDK 52) ou `react-native-event-source` (capability `sse`)
 - **WebSocket** : `WebSocket` natif RN OU `socket.io-client` (capability `socketio`)
 - **Push notifications** : `expo-notifications` (capability `push`) + setup APNS (iOS) + FCM (Android) cote backend
 
@@ -498,7 +578,7 @@ Ce stack est optimise pour :
 4. **Injecter** `app.json.expo.extra.apiBaseUrl` depuis une nouvelle section `## Active Mobile Config` du `stack.md` (a creer si absente — convention `MOBILE_API_BASE_URL`)
 5. **`## Active UI Specs`** : aucun design system web n'est compatible. Stack utilise NativeWind (Tailwind) par defaut. Si `shadcn`/`vuetify`/`radzen-blazor` declare → WARNING bloquant `[STACK_INCOMPAT]`. Alternative mobile : `react-native-paper` (Material), `tamagui`, `gluestack-ui` (capabilities futures)
 6. **Phase B (DB)** : SKIP — pas de DB locale par defaut (sauf capability `offline-db` qui ne necessite pas le scan DB serveur)
-7. **Phase C (ADRs)** : creer `ADR-{ts}-stack-mobile-react-native.md` documentant Expo SDK 52 + Expo Router + NativeWind
+7. **Phase C (ADRs)** : creer `ADR-{ts}-stack-mobile-react-native.md` documentant Expo SDK 57 + Expo Router + NativeWind 4 (et le choix Tailwind v3, cf. §2.3)
 
 ---
 
@@ -536,9 +616,10 @@ test -f app/_layout.tsx
 test -f app.json
 test -f tailwind.config.js
 test -f metro.config.js
-grep -q "\"newArchEnabled\": true" app.json
-grep -q "expo.*~?52" package.json
-grep -q "react-native.*0\\.76" package.json
+grep -q "expo.*57" package.json
+grep -q "react-native.*0\.86" package.json
+grep -q "react-native-worklets" package.json   # peer obligatoire de reanimated 4
+npx --yes expo-doctor                          # gate coherence versions SDK
 echo "smoke OK"
 ```
 

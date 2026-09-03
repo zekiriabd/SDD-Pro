@@ -32,6 +32,26 @@ S'applique aux projets `workspace/src/{BackendName}/` typés Python.
 - **pytest-mock** (`mocker` fixture)
 - Pour HTTP : **httpx** + **respx**
 
+## 1.bis Rattachement aux stacks applicatifs (MAJ 2026-09-02)
+
+| Stack applicatif | Capability à activer |
+|---|---|
+| `backend/python-fastapi` | — (le CORE suffit) |
+| `backend/django` | **`django-testing`** |
+| `fullstack/django-templates` | **`django-testing`** |
+
+> `pytest-django` n'est pas une commodité : sans lui, `pytest` ne sait pas
+> amorcer Django, et **tout import de modèle lève `ImproperlyConfigured`**.
+> Le message ne mentionne ni pytest ni le paquet manquant — d'où cette note.
+>
+> Il faut aussi déclarer `DJANGO_SETTINGS_MODULE` dans `pytest.ini` :
+> ```ini
+> [pytest]
+> DJANGO_SETTINGS_MODULE = config.settings.local
+> ```
+
+---
+
 <!-- LIBS_CATALOG_START -->
 ### 2.4 Librairies
 
@@ -41,12 +61,12 @@ S'applique aux projets `workspace/src/{BackendName}/` typés Python.
 
 | Lib | Version | Role |
 |-----|---------|------|
-| pytest | 8.3.4 |  |
-| pytest-asyncio | 0.25.0 |  |
-| pytest-cov | 6.0.0 |  |
-| pytest-mock | 3.14.0 |  |
-| httpx | 0.28.0 |  |
-| coverage | 7.6.9 |  |
+| pytest | 9.1.1 |  |
+| pytest-asyncio | 1.3.0 |  |
+| pytest-cov | 7.1.0 |  |
+| pytest-mock | 3.15.1 |  |
+| httpx | 0.28.1 |  |
+| coverage | 7.11.1 |  |
 
 ### 2.4.b Librairies ON-DEMAND (installees si l'US declenche)
 
@@ -55,6 +75,8 @@ Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'U
 | Capability | Lib | Version | Triggers |
 |---|---|---|---|
 | http-mock | respx | 0.22.0 | respx, mock.*http, intercept.*requests |
+| django-testing | pytest-django | 4.14.0 | django, pytest-django, test.*modele.*django |
+| django-testing | model-bakery | 1.24.0 | django, fixture.*modele, baker, donnees.*test |
 <!-- LIBS_CATALOG_END -->
 
 ## 3. Init Commands (idempotent)
@@ -65,12 +87,12 @@ Si `workspace/src/{BackendName}/tests/` n'existe pas :
 ```bash
 # Auto-genere depuis python-pytest.libs.json -- ne pas editer (utiliser sync_stack_md.py).
 uv add --project workspace/src/{BackendName} \
-  pytest==8.3.4 \
-  pytest-asyncio==0.25.0 \
-  pytest-cov==6.0.0 \
-  pytest-mock==3.14.0 \
-  httpx==0.28.0 \
-  coverage==7.6.9
+  pytest==9.1.1 \
+  pytest-asyncio==1.3.0 \
+  pytest-cov==7.1.0 \
+  pytest-mock==3.15.1 \
+  httpx==0.28.1 \
+  coverage==7.11.1
 ```
 <!-- CORE_PACKAGES_END -->
 
@@ -79,6 +101,9 @@ uv add --project workspace/src/{BackendName} \
 # Auto-genere depuis python-pytest.libs.json (on-demand) -- installe par dev-* si l'US declenche un trigger.
 # capability: http-mock
 uv add --project workspace/src/{BackendName} respx==0.22.0
+
+# capability: django-testing
+uv add --project workspace/src/{BackendName} pytest-django==4.14.0 model-bakery==1.24.0
 ```
 <!-- ONDEMAND_PACKAGES_END -->
 

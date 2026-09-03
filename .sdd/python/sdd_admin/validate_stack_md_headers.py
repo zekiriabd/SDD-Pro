@@ -23,7 +23,7 @@ Usage :
   python validate_stack_md_headers.py --strict   # exit 1 if any MISS
 
 Scope :
-  - .sdd/stacks/{backend,frontend,ui,qa,auth,archi,fullstack,mobiles}/*.md
+  - .sdd/stacks/{backend,frontend,ui,qa,auth,archi,fullstack,mobiles,desktop}/*.md
   - All stacks under .sdd/stacks/ are considered active since v7.0.0+
     rollback of the _drafts/ quarantine mechanism.
 """
@@ -55,19 +55,33 @@ from sdd_lib.console_safe import ensure_console_safe
 # Validation badges allowed in v7.0.0 — drift detector for typos
 VALID_BADGES = ("🟢", "🟡", "🔴")
 
-# MA-10 gate (audit 2026-06-09, recount 2026-07-25) — expected SPLIT of the
-# 36 active stacks by Validation badge. Le total (36) est gaté par
-# `framework_smoke.py::_check_stack_md_headers::expected_total` ; ce split
+# MA-10 gate (audit 2026-06-09, recount 2026-09-02) — expected SPLIT of the
+# 56 active stacks by Validation badge. Le total (56) est gaté par
+# `framework_smoke.py::_check_stack_md_headers::expected_total` (42) ; ce split
 # ajoute la vérif catégorielle pour que tout flip silencieux 🟢→🟡 (ou
 # vice-versa) soit détecté.
 #   🟢 = validated / bench-validated / scaffold-validated  → 28 stacks
-#   🟡 = experimental / POC-only / scaffold-validated       → 8 stacks
+#   🟡 = experimental / POC-only / scaffold-validated       → 28 stacks
 #        (dont mobiles/delphi-fmx 2026-06-21 + mobiles/kotlin-android downgrade)
+#
+# Recount 2026-09-02 — quatre batches (36 -> 56 stacks, 🟡 8 -> 28). Les 20
+# ajouts sont TOUS 🟡 experimental : leurs catalogs sont resolus contre les
+# registres amont (pub.dev, npm, maven-metadata.xml, GitHub Releases, PyPI,
+# Packagist) mais AUCUN n'a de run runtime. Ne pas les promouvoir sans bench.
+#   batch mobiles : mobiles/flutter, mobiles/kotlin-multiplatform,
+#                   mobiles/swiftui, mobiles/ionic-capacitor,
+#                   qa/flutter-test, qa/swift-testing
+#   batch backend : backend/django, backend/nestjs, backend/laravel,
+#                   qa/php-pest
+#   batch fullstack : fullstack/laravel-blade, fullstack/symfony-twig,
+#                     fullstack/django-templates
+#   batch desktop   : NOUVELLE CATEGORIE — desktop/{delphi-vcl, wpf, qt-cpp,
+#                     electron, winforms, javafx, pyside}
 # SSoT : entrypoint-body.md §6 + each stack's `Validation:` header. Bump
 # these two constants (keeping their sum aligned avec `expected_total` de
 # framework_smoke.py) whenever a stack is intentionally promoted or demoted.
-EXPECTED_GREEN = 28  # 🟢 stacks
-EXPECTED_YELLOW = 8  # 🟡 stacks (recount 2026-07-25 : ajout delphi-fmx)
+EXPECTED_GREEN = 28   # 🟢 stacks
+EXPECTED_YELLOW = 28  # 🟡 stacks (recount 2026-09-02 : mobiles + backend + fullstack + desktop)
 
 # v7.0.0-alpha (audit MIN-10, 2026-06-04) — `Validation:` header has 3
 # coexisting syntaxes observed in the wild :
@@ -252,7 +266,7 @@ def main() -> int:
         sys.stderr.write(
             f"ERROR: stack badge split mismatch\n"
             f"CAUSE: [STACK_MALFORMED] observed 🟢 {green_count}/🟡 {yellow_count}, "
-            f"expected 🟢 {EXPECTED_GREEN}/🟡 {EXPECTED_YELLOW} (sum 35)\n"
+            f"expected 🟢 {EXPECTED_GREEN}/🟡 {EXPECTED_YELLOW} (sum {EXPECTED_GREEN + EXPECTED_YELLOW})\n"
             f"FIX: if the promotion/demotion is intentional, bump EXPECTED_GREEN/"
             f"EXPECTED_YELLOW in validate_stack_md_headers.py (keep sum == total) "
             f"AND CLAUDE.md §6 ; otherwise restore the stack's Validation: badge\n"

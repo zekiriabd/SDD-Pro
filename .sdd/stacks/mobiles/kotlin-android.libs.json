@@ -6,41 +6,53 @@
   "buildSystem": "gradle",
   "manifest": {
     "files": [
+      "workspace/src/{AppName}/settings.gradle.kts",
       "workspace/src/{AppName}/build.gradle.kts",
+      "workspace/src/{AppName}/app/build.gradle.kts",
       "workspace/src/{AppName}/gradle/libs.versions.toml",
-      "workspace/src/{AppName}/settings.gradle.kts"
+      "workspace/src/{AppName}/gradle.properties",
+      "workspace/src/{AppName}/app/src/main/AndroidManifest.xml"
     ],
     "versionCatalogPath": "gradle/libs.versions.toml"
   },
   "versions": {
-    "kotlin": "2.0.21",
-    "agp": "8.6.1",
+    "kotlin": "2.4.10",
+    "ksp": "2.3.11",
+    "agp": "8.13.2",
+    "gradle": "8.14.5",
+    "jvm-target": "17",
     "compile-sdk": "36",
     "min-sdk": "24",
     "target-sdk": "36",
-    "compose": "1.7.0",
-    "compose-material3": "1.3.1",
-    "androidx-core": "1.15.0",
-    "androidx-activity": "1.9.0",
-    "androidx-lifecycle": "2.8.0",
-    "androidx-room": "2.6.1",
-    "androidx-datastore": "1.1.1",
-    "androidx-work": "2.10.0",
-    "hilt": "2.51",
-    "ksp": "2.0.21-1.0.27",
-    "retrofit": "2.11.0",
-    "okhttp": "4.12.0",
-    "kotlinx-json": "1.7.0",
+    "compose-bom": "2026.08.00",
+    "androidx-navigation": "2.10.0",
+    "androidx-core": "1.19.0",
+    "androidx-activity": "1.13.0",
+    "androidx-lifecycle": "2.11.0",
+    "androidx-room": "2.8.4",
+    "androidx-datastore": "1.2.1",
+    "androidx-work": "2.11.2",
+    "androidx-paging": "3.5.1",
+    "androidx-splashscreen": "1.2.0",
+    "androidx-biometric": "1.1.0",
+    "hilt": "2.60.1",
+    "coroutines": "1.11.0",
+    "kotlinx-json": "1.11.0",
+    "retrofit": "3.0.0",
+    "okhttp": "5.5.0",
+    "coil": "3.6.1",
     "timber": "5.0.1",
+    "accompanist": "0.37.3",
+    "firebase": "34.18.0",
+    "camera": "1.6.2",
+    "google-maps": "8.5.0",
+    "play-services-location": "21.4.0",
+    "spotless": "8.10.1",
     "junit": "4.13.2",
-    "mockito": "5.7.0",
-    "espresso": "3.5.1",
-    "accompanist": "0.36.0",
-    "firebase": "33.7.0",
-    "camera": "1.4.0",
-    "google-maps": "6.2.1",
-    "paging": "3.3.4",
-    "spotless": "7.0.0"
+    "androidx-test-junit": "1.3.0",
+    "espresso": "3.7.0",
+    "mockk": "1.14.11",
+    "turbine": "1.2.1"
   },
   "core": [
     {
@@ -49,148 +61,220 @@
       "rationale": "Stdlib Kotlin core"
     },
     {
-      "module": "com.android.tools.build:gradle",
-      "ref": "agp",
-      "rationale": "Android Gradle Plugin (compilateur, packaging APK/AAB, resource merging)"
+      "module": "androidx.compose:compose-bom",
+      "ref": "compose-bom",
+      "rationale": "BOM Compose — aligne ui / material3 / foundation / runtime sur un train teste ensemble. Les artefacts Compose ci-dessous sont donc declares SANS version (c'est le BOM qui la fixe)"
     },
     {
       "module": "androidx.compose.ui:ui",
-      "ref": "compose",
-      "rationale": "Jetpack Compose UI foundation (Layout, Modifier, State)"
+      "rationale": "Jetpack Compose UI foundation (Layout, Modifier, State) — version via compose-bom"
+    },
+    {
+      "module": "androidx.compose.ui:ui-graphics",
+      "rationale": "Primitives graphiques Compose — version via compose-bom"
+    },
+    {
+      "module": "androidx.compose.ui:ui-tooling-preview",
+      "rationale": "Annotation @Preview (le pendant debug ui-tooling est en capability compose-tooling) — version via compose-bom"
     },
     {
       "module": "androidx.compose.material3:material3",
-      "ref": "compose-material3",
-      "rationale": "Material Design 3 components (Button, Card, TextField, Navigation, etc.)"
+      "rationale": "Material Design 3 (Button, Card, TextField, Scaffold) — version via compose-bom"
     },
     {
       "module": "androidx.compose.runtime:runtime",
-      "ref": "compose",
-      "rationale": "Compose runtime (Recomposition, State, Effect)"
+      "rationale": "Compose runtime (recomposition, State, Effect) — version via compose-bom"
     },
     {
       "module": "androidx.compose.foundation:foundation",
-      "ref": "compose",
-      "rationale": "Foundation layouts (Box, Row, Column, LazyColumn, LazyRow, ScrollState)"
+      "rationale": "Layouts fondation (Box, Row, Column, LazyColumn/LazyRow) — version via compose-bom"
     },
     {
       "module": "androidx.navigation:navigation-compose",
-      "ref": "compose",
-      "rationale": "Navigation Compose (NavController, NavGraph, Routes typées)"
+      "ref": "androidx-navigation",
+      "rationale": "Navigation Compose (NavController, NavGraph, routes typees). VERSION PROPRE : ce module suit la ligne androidx.navigation 2.x, il n'a jamais eu de 1.7.x — le catalog le pointait a tort sur la version Compose (bug corrige 2026-09-02)"
     },
     {
       "module": "androidx.core:core-ktx",
       "ref": "androidx-core",
-      "rationale": "Android core APIs extensions (Context, SharedPreferences, etc.)"
+      "rationale": "Extensions Kotlin des APIs Android core"
     },
     {
       "module": "androidx.activity:activity-compose",
       "ref": "androidx-activity",
-      "rationale": "Activity integration with Compose (setContent, LocalContext)"
+      "rationale": "Pont Activity <-> Compose (setContent, LocalContext) — sans lui aucun ecran ne s'affiche"
     },
     {
       "module": "androidx.lifecycle:lifecycle-runtime-ktx",
       "ref": "androidx-lifecycle",
-      "rationale": "Lifecycle-aware coroutines (lifecycleScope, repeatOnLifecycle)"
+      "rationale": "Coroutines lifecycle-aware (lifecycleScope, repeatOnLifecycle)"
     },
     {
       "module": "androidx.lifecycle:lifecycle-viewmodel-ktx",
       "ref": "androidx-lifecycle",
-      "rationale": "ViewModel lifecycle management (viewModelScope)"
+      "rationale": "ViewModel + viewModelScope"
     },
     {
       "module": "androidx.lifecycle:lifecycle-viewmodel-compose",
       "ref": "androidx-lifecycle",
-      "rationale": "ViewModel integration with Compose (hiltViewModel, collectAsStateWithLifecycle)"
+      "rationale": "viewModel() cote Compose"
+    },
+    {
+      "module": "androidx.lifecycle:lifecycle-runtime-compose",
+      "ref": "androidx-lifecycle",
+      "rationale": "collectAsStateWithLifecycle — la seule facon correcte de consommer un StateFlow depuis un @Composable"
     },
     {
       "module": "androidx.room:room-runtime",
       "ref": "androidx-room",
-      "rationale": "Room persistence library (SQLite ORM avec @Entity, @Dao, @Database)"
+      "rationale": "Room (SQLite ORM : @Entity, @Dao, @Database)"
     },
     {
       "module": "androidx.room:room-ktx",
       "ref": "androidx-room",
-      "rationale": "Room Kotlin extensions (suspend functions, Flow queries)"
+      "rationale": "Extensions Kotlin Room (suspend fun, requetes Flow)"
+    },
+    {
+      "module": "androidx.room:room-compiler",
+      "ref": "androidx-room",
+      "rationale": "Processeur KSP Room — OBLIGATOIRE, il genere les implementations de @Dao/@Database. Absent du catalog avant l'audit 2026-09-02 alors que le build.gradle.kts de la 2.2.1 faisait deja ksp(libs.room.compiler) : le build echouait sur un alias inconnu"
     },
     {
       "module": "androidx.datastore:datastore-preferences",
       "ref": "androidx-datastore",
-      "rationale": "DataStore async key-value storage (preference moderne, replacement SharedPreferences)"
+      "rationale": "Stockage cle-valeur asynchrone (remplacant moderne de SharedPreferences)"
     },
     {
       "module": "com.google.dagger:hilt-android",
       "ref": "hilt",
-      "rationale": "Hilt dependency injection (DI scopes, @Inject, @Module, @HiltViewModel)"
+      "rationale": "Injection de dependances (@Inject, @Module, @HiltViewModel)"
+    },
+    {
+      "module": "com.google.dagger:hilt-android-compiler",
+      "ref": "hilt",
+      "rationale": "Processeur KSP Hilt — OBLIGATOIRE, il genere le graphe DI. Meme bug que room-compiler : reference par la 2.2.1, absent du catalog (corrige 2026-09-02)"
     },
     {
       "module": "com.squareup.retrofit2:retrofit",
       "ref": "retrofit",
-      "rationale": "Retrofit HTTP client (REST API, declarative, interceptors, suspend fun)"
+      "rationale": "Client HTTP REST declaratif (interfaces suspend)"
     },
     {
       "module": "com.squareup.retrofit2:converter-kotlinx-serialization",
       "ref": "retrofit",
-      "rationale": "Retrofit converter Kotlin Serialization (JSON deserialization)"
+      "rationale": "Converter Retrofit <-> kotlinx.serialization"
     },
     {
       "module": "com.squareup.okhttp3:okhttp",
       "ref": "okhttp",
-      "rationale": "OkHttp HTTP client core (connection pooling, interceptors, request/response logging)"
+      "rationale": "Moteur HTTP (pool de connexions, interceptors)"
     },
     {
       "module": "com.squareup.okhttp3:logging-interceptor",
       "ref": "okhttp",
-      "rationale": "OkHttp logging interceptor (debug HTTP requests/responses)"
+      "rationale": "Log des requetes/reponses en debug"
     },
     {
       "module": "org.jetbrains.kotlinx:kotlinx-serialization-json",
       "ref": "kotlinx-json",
-      "rationale": "Kotlin Serialization JSON parser (alternative Jackson/GSON, Kotlin-native)"
+      "rationale": "Parseur JSON Kotlin-native"
+    },
+    {
+      "module": "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+      "ref": "coroutines",
+      "rationale": "Coroutines (Flow, async, withContext). VERSION PROPRE : ligne 1.x — le catalog la pointait a tort sur la version Kotlin (2.0.21), version qui n'existe pas pour cet artefact (bug corrige 2026-09-02)"
+    },
+    {
+      "module": "org.jetbrains.kotlinx:kotlinx-coroutines-android",
+      "ref": "coroutines",
+      "rationale": "Dispatchers.Main Android. Meme correction de ref que ci-dessus"
     },
     {
       "module": "com.jakewharton.timber:timber",
       "ref": "timber",
-      "rationale": "Timber logging library (wrapper SLF4J-like Android, debug tree plugin)"
+      "rationale": "Logger (arbre de debug plugable)"
     },
     {
-      "module": "org.jetbrains.kotlinx:kotlinx-coroutines-android",
-      "ref": "kotlin",
-      "rationale": "Kotlin Coroutines Android support (Dispatchers.Main)"
+      "module": "junit:junit",
+      "ref": "junit",
+      "rationale": "Tests unitaires JVM (testImplementation) — le stack n'en declarait aucun malgre le testImplementation(libs.junit) de la 2.2.1"
     },
     {
-      "module": "org.jetbrains.kotlinx:kotlinx-coroutines-core",
-      "ref": "kotlin",
-      "rationale": "Kotlin Coroutines core (Flow, async, launch, withContext)"
+      "module": "io.mockk:mockk",
+      "ref": "mockk",
+      "rationale": "Mocking idiomatique Kotlin (objets final/suspend) — remplace Mockito, inadapte a Kotlin"
+    },
+    {
+      "module": "org.jetbrains.kotlinx:kotlinx-coroutines-test",
+      "ref": "coroutines",
+      "rationale": "runTest + TestDispatcher — indispensable pour tester un ViewModel"
     }
   ],
   "onDemand": [
     {
+      "module": "androidx.compose.ui:ui-tooling",
+      "capability": "compose-tooling",
+      "rationale": "Rendu des @Preview dans l'IDE (a poser en debugImplementation) — version via compose-bom",
+      "triggers": ["preview.*compose", "compose.*preview", "layout.*inspector"]
+    },
+    {
+      "module": "androidx.compose.ui:ui-test-junit4",
+      "capability": "compose-ui-tests",
+      "rationale": "createAndroidComposeRule, onNodeWithText — tests UI instrumentes",
+      "triggers": ["tests.*ui", "compose.*test", "instrumented.*test"]
+    },
+    {
+      "module": "androidx.test.ext:junit",
+      "ref": "androidx-test-junit",
+      "capability": "compose-ui-tests",
+      "triggers": ["tests.*ui", "instrumented.*test", "androidtest"]
+    },
+    {
+      "module": "androidx.test.espresso:espresso-core",
+      "ref": "espresso",
+      "capability": "compose-ui-tests",
+      "triggers": ["espresso", "tests.*ui", "instrumented.*test"]
+    },
+    {
+      "module": "app.cash.turbine:turbine",
+      "ref": "turbine",
+      "capability": "flow-testing",
+      "rationale": "Assertions sur un Flow emis dans le temps",
+      "triggers": ["test.*flow", "turbine", "stateflow.*test"]
+    },
+    {
+      "module": "io.coil-kt.coil3:coil-compose",
+      "ref": "coil",
+      "capability": "image-loading",
+      "rationale": "AsyncImage — chargement/cache d'images distantes. Standard Compose (Coil 3 est multiplatform)",
+      "triggers": ["image.*distante", "avatar", "charger.*image", "coil", "vignette"]
+    },
+    {
+      "module": "io.coil-kt.coil3:coil-network-okhttp",
+      "ref": "coil",
+      "capability": "image-loading",
+      "rationale": "Backend reseau de Coil 3 — OBLIGATOIRE, Coil 3 ne fournit plus de client HTTP par defaut",
+      "triggers": ["image.*distante", "coil"]
+    },
+    {
       "module": "com.google.firebase:firebase-bom",
       "ref": "firebase",
       "capability": "firebase",
-      "rationale": "Firebase Bill of Materials (versioning transitive dependencies: messaging, auth, firestore, analytics)",
+      "rationale": "BOM Firebase (aligne messaging / auth / firestore / analytics)",
       "triggers": ["\\bfirebase\\b", "cloud messaging", "notifications push", "fcm"]
     },
     {
-      "module": "com.google.firebase:firebase-messaging-ktx",
-      "ref": "firebase",
+      "module": "com.google.firebase:firebase-messaging",
       "capability": "firebase",
+      "rationale": "Version via firebase-bom. Artefact `-ktx` fusionne dans l'artefact principal depuis le BOM 33",
       "triggers": ["\\bfirebase\\b", "cloud messaging", "notifications push"]
-    },
-    {
-      "module": "androidx.room:room-ktx",
-      "ref": "androidx-room",
-      "capability": "room-database",
-      "rationale": "Room persistence already in core for basic cases; this extends for advanced scenarios (migrations, testing)",
-      "triggers": ["\\broom\\b", "database local", "sqlite persistence", "dao"]
     },
     {
       "module": "androidx.camera:camera-core",
       "ref": "camera",
       "capability": "camera",
-      "rationale": "AndroidX Camera library (camera preview, capture photos/videos, lifecycle-aware)",
-      "triggers": ["\\bcamera\\b", "photo capture", "video record", "image picker"]
+      "rationale": "CameraX (preview, capture photo/video, lifecycle-aware)",
+      "triggers": ["\\bcamera\\b", "photo capture", "video record"]
     },
     {
       "module": "androidx.camera:camera-camera2",
@@ -205,65 +289,111 @@
       "triggers": ["\\bcamera\\b"]
     },
     {
+      "module": "androidx.camera:camera-view",
+      "ref": "camera",
+      "capability": "camera",
+      "rationale": "PreviewView — le composant qui affiche reellement le flux camera",
+      "triggers": ["\\bcamera\\b", "apercu.*camera"]
+    },
+    {
       "module": "com.google.accompanist:accompanist-permissions",
       "ref": "accompanist",
       "capability": "permissions",
-      "rationale": "Accompanist permissions (runtime permissions Compose, @Composable permission UI)",
+      "rationale": "rememberPermissionState — permissions runtime cote Compose",
       "triggers": ["permissions runtime", "permission compose", "permission ui"]
     },
     {
       "module": "androidx.work:work-runtime-ktx",
       "ref": "androidx-work",
       "capability": "background-jobs",
-      "rationale": "WorkManager background job scheduling (periodic tasks, constraints, battery optimization)",
+      "rationale": "WorkManager (taches periodiques, contraintes batterie/reseau)",
       "triggers": ["background job", "scheduled task", "periodic work", "workmanager"]
     },
     {
       "module": "com.google.maps.android:maps-compose",
       "ref": "google-maps",
       "capability": "google-maps",
-      "rationale": "Google Maps Compose (Google Maps SDK intégration via Compose)",
       "triggers": ["google maps", "\\bmaps\\b", "location map"]
     },
     {
+      "module": "com.google.android.gms:play-services-location",
+      "ref": "play-services-location",
+      "capability": "location",
+      "rationale": "FusedLocationProviderClient — position GPS",
+      "triggers": ["gps", "geolocalisation", "position.*utilisateur", "localisation"]
+    },
+    {
       "module": "androidx.paging:paging-compose",
-      "ref": "paging",
+      "ref": "androidx-paging",
       "capability": "paging",
-      "rationale": "Jetpack Paging 3 Compose integration (LazyPagingItems, infinite scroll)",
+      "rationale": "Paging 3 cote Compose (LazyPagingItems, scroll infini)",
       "triggers": ["paging", "pagination", "lazy load", "infinite scroll"]
+    },
+    {
+      "module": "androidx.core:core-splashscreen",
+      "ref": "androidx-splashscreen",
+      "capability": "splashscreen",
+      "rationale": "SplashScreen API retro-compatible (API 24+)",
+      "triggers": ["splash", "ecran.*demarrage", "splashscreen"]
+    },
+    {
+      "module": "androidx.biometric:biometric",
+      "ref": "androidx-biometric",
+      "capability": "biometric",
+      "rationale": "BiometricPrompt (empreinte / visage)",
+      "triggers": ["biometric", "empreinte", "fingerprint", "face.*unlock"]
     }
   ],
   "plugins": [
     {
       "id": "com.android.application",
       "ref": "agp",
-      "rationale": "Android Application plugin (cible apk/aab, resource packaging, manifest merging)"
+      "rationale": "Plugin application Android (packaging apk/aab, merge manifest/resources)"
     },
     {
-      "id": "kotlin-android",
+      "id": "org.jetbrains.kotlin.android",
       "ref": "kotlin",
-      "rationale": "Kotlin Android plugin (compilateur Kotlin/JVM, Kotlin sources integration)"
+      "rationale": "Compilateur Kotlin cible Android"
     },
     {
-      "id": "com.google.dagger.hilt.android",
-      "ref": "hilt",
-      "rationale": "Hilt plugin (code generation DI, @HiltAndroidApp, @HiltViewModel)"
+      "id": "org.jetbrains.kotlin.plugin.compose",
+      "ref": "kotlin",
+      "rationale": "Compilateur Compose. OBLIGATOIRE depuis Kotlin 2.0+ : il est versionne avec Kotlin et remplace le bloc `composeOptions { kotlinCompilerExtensionVersion }`, qui n'est plus lu. Absent du catalog avant l'audit 2026-09-02 — aucun @Composable ne compilait"
+    },
+    {
+      "id": "org.jetbrains.kotlin.plugin.serialization",
+      "ref": "kotlin",
+      "rationale": "Genere les serializers pour @Serializable — requis par kotlinx-serialization-json et par le converter Retrofit"
     },
     {
       "id": "com.google.devtools.ksp",
       "ref": "ksp",
-      "rationale": "Kotlin Symbol Processing (KSP compiler plugin pour annotation processors: Hilt, Room, etc.)"
+      "rationale": "Kotlin Symbol Processing — moteur des processeurs Room et Hilt. Depuis KSP2 le plugin a son propre versionnage (2.3.x), il n'est plus suffixe par la version Kotlin"
+    },
+    {
+      "id": "com.google.dagger.hilt.android",
+      "ref": "hilt",
+      "rationale": "Plugin Hilt (@HiltAndroidApp, @HiltViewModel)"
     },
     {
       "id": "com.diffplug.spotless",
       "ref": "spotless",
-      "rationale": "Spotless formatter (ktfmt Kotlin formatting, tasks spotlessCheck / spotlessApply)"
+      "rationale": "Formatage ktfmt (taches spotlessCheck / spotlessApply)"
     }
   ],
   "metadata": {
-    "lastUpdated": "2026-05-24",
+    "lastUpdated": "2026-09-02",
     "format": "compact (v2)",
     "maintainer": "SDD_Pro Framework",
-    "notes": "Kotlin Android native stack cible API 24-36 (Android 7.0-14). Jetpack Compose declarative UI, Hilt DI, Retrofit+OkHttp, Room+Datastore, Coroutines+Flow. Clean Architecture (Domain-Data-Presentation). Mono-projet {AppName}/ sous workspace/src/."
+    "toolchain": {
+      "kotlin": "2.4.10",
+      "agp": "8.13.2",
+      "gradle": "8.14.5",
+      "jdk": "17",
+      "compileSdk": 36,
+      "minSdk": 24,
+      "targetSdk": 36
+    },
+    "notes": "Stack Android natif Kotlin + Jetpack Compose, cible API 24-36. Clean Architecture (domain / data / presentation). Mono-projet {AppName}/ sous workspace/src/, module applicatif :app. AUDIT 2026-09-02 — 6 defauts bloquants corriges : (1) navigation-compose pointait sur la version Compose (1.7.0) au lieu de sa propre ligne 2.x ; (2) kotlinx-coroutines pointait sur la version Kotlin (2.0.21) au lieu de la ligne 1.x ; (3) room-compiler absent alors que reference en ksp() ; (4) hilt-android-compiler absent, idem ; (5) plugin org.jetbrains.kotlin.plugin.compose absent (obligatoire depuis Kotlin 2.0) ; (6) room-ktx declare deux fois (core + onDemand). AGP volontairement maintenu sur la derniere 8.x (8.13.2) et non 9.4.0 : la ligne 9 change les defauts du DSL et le scaffolding de 2.2.1 n'a pas ete re-valide dessus (cf. .md 2.3)."
   }
 }

@@ -11,32 +11,128 @@
     ]
   },
   "versions": {
-    "vitest": "2.1.8",
-    "happy-dom": "16.0.1",
-    "jsdom": "25.0.1",
-    "testing-library-react": "16.1.0",
-    "testing-library-jest-dom": "6.6.3",
-    "testing-library-user-event": "14.5.2",
-    "vue-test-utils": "2.4.6",
-    "supertest": "7.0.0",
-    "supertest-types": "6.0.2",
-    "msw": "2.7.0"
+    "vitest": "4.1.11",
+    "happy-dom": "20.13.2",
+    "jsdom": "30.0.1",
+    "testing-library-react": "16.3.3",
+    "testing-library-jest-dom": "7.0.1",
+    "testing-library-user-event": "14.6.7",
+    "vue-test-utils": "2.5.0",
+    "supertest": "7.2.2",
+    "supertest-types": "7.2.1",
+    "msw": "2.15.0"
   },
   "core": [
-    { "module": "vitest", "ref": "vitest" },
-    { "module": "@vitest/coverage-v8", "ref": "vitest" }
+    {
+      "module": "vitest",
+      "ref": "vitest"
+    },
+    {
+      "module": "@vitest/coverage-v8",
+      "ref": "vitest"
+    }
   ],
   "onDemand": [
-    { "module": "happy-dom", "ref": "happy-dom", "capability": "dom-env", "triggers": ["happy-dom", "test.*composant", "test.*ui"] },
-    { "module": "jsdom", "ref": "jsdom", "capability": "dom-env", "triggers": ["jsdom", "test.*composant", "test.*ui"], "alternative": true },
-    { "module": "@testing-library/react", "ref": "testing-library-react", "capability": "test-react", "triggers": ["test.*react", "testing-library", "frontend.*react"] },
-    { "module": "@testing-library/jest-dom", "ref": "testing-library-jest-dom", "capability": "test-react", "triggers": ["test.*react", "testing-library", "frontend.*react"] },
-    { "module": "@testing-library/user-event", "ref": "testing-library-user-event", "capability": "test-react", "triggers": ["test.*react", "testing-library", "frontend.*react"] },
-    { "module": "@vue/test-utils", "ref": "vue-test-utils", "capability": "test-vue", "triggers": ["test.*vue", "vue-test-utils", "frontend.*vue"] },
-    { "module": "supertest", "ref": "supertest", "capability": "api-tests", "triggers": ["api.*test", "supertest", "integration.*http", "qa.*api-tests"] },
-    { "module": "@types/supertest", "ref": "supertest-types", "capability": "api-tests", "triggers": ["api.*test", "supertest", "integration.*http", "qa.*api-tests"] },
-    { "module": "msw", "ref": "msw", "capability": "http-mock", "triggers": ["msw", "mock.*service.*worker", "intercept.*http"] }
+    {
+      "module": "happy-dom",
+      "ref": "happy-dom",
+      "capability": "dom-env",
+      "triggers": [
+        "happy-dom",
+        "test.*composant",
+        "test.*ui"
+      ]
+    },
+    {
+      "module": "jsdom",
+      "ref": "jsdom",
+      "capability": "dom-env",
+      "triggers": [
+        "jsdom",
+        "test.*composant",
+        "test.*ui"
+      ],
+      "alternative": true
+    },
+    {
+      "module": "@testing-library/react",
+      "ref": "testing-library-react",
+      "capability": "test-react",
+      "triggers": [
+        "test.*react",
+        "testing-library",
+        "frontend.*react"
+      ]
+    },
+    {
+      "module": "@testing-library/jest-dom",
+      "ref": "testing-library-jest-dom",
+      "capability": "test-react",
+      "triggers": [
+        "test.*react",
+        "testing-library",
+        "frontend.*react"
+      ]
+    },
+    {
+      "module": "@testing-library/user-event",
+      "ref": "testing-library-user-event",
+      "capability": "test-react",
+      "triggers": [
+        "test.*react",
+        "testing-library",
+        "frontend.*react"
+      ]
+    },
+    {
+      "module": "@vue/test-utils",
+      "ref": "vue-test-utils",
+      "capability": "test-vue",
+      "triggers": [
+        "test.*vue",
+        "vue-test-utils",
+        "frontend.*vue"
+      ]
+    },
+    {
+      "module": "supertest",
+      "ref": "supertest",
+      "capability": "api-tests",
+      "triggers": [
+        "api.*test",
+        "supertest",
+        "integration.*http",
+        "qa.*api-tests"
+      ]
+    },
+    {
+      "module": "@types/supertest",
+      "ref": "supertest-types",
+      "capability": "api-tests",
+      "triggers": [
+        "api.*test",
+        "supertest",
+        "integration.*http",
+        "qa.*api-tests"
+      ]
+    },
+    {
+      "module": "msw",
+      "ref": "msw",
+      "capability": "http-mock",
+      "triggers": [
+        "msw",
+        "mock.*service.*worker",
+        "intercept.*http"
+      ]
+    }
   ],
   "plugins": [],
-  "metadata": { "lastUpdated": "2026-05-07", "format": "compact (v2)" }
+  "metadata": {
+    "lastUpdated": "2026-09-02",
+    "format": "compact (v2)",
+    "changeLog": [
+      "2026-09-02 — Audit QA. Rebase des versions depuis npm (catalog fige : vitest 2.1.8 -> 4.1.11). BUG corrige : `@types/supertest` etait pinne en 6.0.2 alors que `supertest` etait en 7.0.0. Les paquets DefinitelyTyped suivent la majeure de leur sujet — les typings 6.x decrivent l'API de supertest 6. Meme classe de defaut que le `@types/express` 5.x / `express` 4.x corrige sur backend/node-express au meme audit. Realigne sur 7.2.1."
+    ]
+  }
 }

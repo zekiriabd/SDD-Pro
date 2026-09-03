@@ -43,9 +43,9 @@ S'applique aux projets `workspace/src/{BackendName}/` typés Kotlin.
 
 | Lib | Version | Role |
 |-----|---------|------|
-| junit-jupiter | 5.11.4 |  |
-| kotlin-test-junit5 | 2.3.21 |  |
-| mockk | 1.13.13 |  |
+| junit-jupiter | 5.14.2 |  |
+| kotlin-test-junit5 | 2.0.21 |  |
+| mockk | 1.14.11 |  |
 
 ### 2.4.b Librairies ON-DEMAND (installees si l'US declenche)
 
@@ -53,10 +53,10 @@ Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'U
 
 | Capability | Lib | Version | Triggers |
 |---|---|---|---|
-| spring-test | spring-boot-starter-test | 4.0.6 | spring, MockMvc, WebTestClient |
-| spring-security-test | spring-security-test | 6.4.1 | WithMockUser, spring.*security, auth.*test |
+| spring-test | spring-boot-starter-test | 3.5.16 | spring, MockMvc, WebTestClient |
+| spring-security-test | spring-security-test | 6.5.11 | WithMockUser, spring.*security, auth.*test |
 | fluent-assertions | kotest-assertions-core | 5.9.1 | kotest, shouldBe |
-| testcontainers | postgresql | 1.20.4 | testcontainers, docker.*test, postgresql.*test |
+| testcontainers | postgresql | 1.21.4 | testcontainers, docker.*test, postgresql.*test |
 
 #### 2.4.c Plugins build-system
 
@@ -132,11 +132,11 @@ tasks.jacocoTestCoverageVerification {
 # Auto-genere depuis kotlin-junit.libs.json (on-demand) -- installe par dev-* si l'US declenche un trigger.
 # capability: spring-test
 # Gradle : ajouter les modules en implementation(...) dans build.gradle.kts
-#   implementation("org.springframework.boot:spring-boot-starter-test:4.0.6")
+#   implementation("org.springframework.boot:spring-boot-starter-test:3.5.16")
 
 # capability: spring-security-test
 # Gradle : ajouter les modules en implementation(...) dans build.gradle.kts
-#   implementation("org.springframework.security:spring-security-test:6.4.1")
+#   implementation("org.springframework.security:spring-security-test:6.5.11")
 
 # capability: fluent-assertions
 # Gradle : ajouter les modules en implementation(...) dans build.gradle.kts
@@ -144,7 +144,7 @@ tasks.jacocoTestCoverageVerification {
 
 # capability: testcontainers
 # Gradle : ajouter les modules en implementation(...) dans build.gradle.kts
-#   implementation("org.testcontainers:postgresql:1.20.4")
+#   implementation("org.testcontainers:postgresql:1.21.4")
 ```
 <!-- ONDEMAND_PACKAGES_END -->
 

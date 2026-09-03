@@ -14,15 +14,15 @@
   },
   "versions": {
     "kotlin": "2.0.21",
-    "spring-boot": "3.5.4",
+    "spring-boot": "3.5.16",
     "ktlint": "14.2.0",
-    "flyway": "11.7.2",
-    "springdoc": "2.8.9",
-    "postgresql": "42.7.10",
-    "mssql-jdbc": "12.8.1.jre11",
+    "flyway": "11.20.3",
+    "springdoc": "2.9.0",
+    "postgresql": "42.7.13",
+    "mssql-jdbc": "13.4.0.jre11",
     "kotest": "5.9.1",
     "kotest-extensions-spring": "1.3.0",
-    "nimbus-jose-jwt": "9.40",
+    "nimbus-jose-jwt": "10.9.1",
     "mockwebserver": "4.12.0"
   },
   "dbDrivers": {
@@ -71,17 +71,17 @@
     {
       "module": "org.flywaydb:flyway-core",
       "ref": "flyway",
-      "rationale": "Moteur migrations versionnees V{n}__*.sql + autoconfig Spring (pas de starter dedie). Pin 10.21.0 (compat Spring Boot 4 BOM, Flyway 10 externalise les dialects DB en modules separes). Cf. kotlin-spring-boot.md \u00c2\u00a74.4"
+      "rationale": "Moteur migrations versionnees V{n}__*.sql + autoconfig Spring (pas de starter dedie). Ligne 11.x (Flyway 10+ externalise les dialects DB en modules separes — cf. flyway-database-postgresql ci-dessous). Cf. kotlin-spring-boot.md Â§4.4"
     },
     {
       "module": "org.flywaydb:flyway-database-postgresql",
       "ref": "flyway",
-      "rationale": "Module support PostgreSQL Flyway 10+ (externalise depuis flyway-core en 10.x, n'existe PAS en branche 9.x \u00e2\u20ac\u201d d'ou la bump). Necessaire si DatabaseType=postgres"
+      "rationale": "Module support PostgreSQL Flyway 10+ (externalise depuis flyway-core en 10.x, n'existe PAS en branche 9.x â€” d'ou la bump). Necessaire si DatabaseType=postgres"
     },
     {
       "module": "org.springdoc:springdoc-openapi-starter-webmvc-ui",
       "ref": "springdoc",
-      "rationale": "OpenAPI 3 + Swagger UI auto-generes depuis controllers (path /swagger custom, cf. \u00c2\u00a75.6)"
+      "rationale": "OpenAPI 3 + Swagger UI auto-generes depuis controllers (path /swagger custom, cf. Â§5.6)"
     },
     {
       "module": "org.springframework:spring-context",
@@ -99,7 +99,7 @@
     {
       "module": "com.nimbusds:nimbus-jose-jwt",
       "ref": "nimbus-jose-jwt",
-      "rationale": "JWT decoder + JWKS resolver (utilise par JwtDecoder custom Azure AD, cf. auth/azure-ad.md \u00c2\u00a75.1 Piege 7)"
+      "rationale": "JWT decoder + JWKS resolver (utilise par JwtDecoder custom Azure AD, cf. auth/azure-ad.md Â§5.1 Piege 7)"
     },
     {
       "module": "org.springframework.boot:spring-boot-starter-test",
@@ -149,7 +149,7 @@
       "module": "org.flywaydb:flyway-sqlserver",
       "ref": "flyway",
       "capability": "sqlserver-flyway",
-      "rationale": "Flyway 10+ a externalise le support SQL Server hors flyway-core. Obligatoire si DatabaseType=SqlServer ET Flyway active (sinon FlywayException: Unsupported Database). Cf. kotlin-spring-boot.md \u00c2\u00a74.4.1.",
+      "rationale": "Flyway 10+ a externalise le support SQL Server hors flyway-core. Obligatoire si DatabaseType=SqlServer ET Flyway active (sinon FlywayException: Unsupported Database). Cf. kotlin-spring-boot.md Â§4.4.1.",
       "triggers": [
         "sqlserver",
         "mssql"
@@ -189,12 +189,13 @@
     }
   ],
   "metadata": {
-    "lastUpdated": "2026-06-07",
+    "lastUpdated": "2026-09-02",
     "format": "compact (v2)",
-    "source": "User Working Agreement 2026-05-07 \u00e2\u20ac\u201d schema v2 compact migration",
+    "source": "User Working Agreement 2026-05-07 â€” schema v2 compact migration",
     "changeLog": [
-      "2026-06-07 \u2014 Audit CTO 2026-06-07 : suppression du bloc runtimeException factice (pinnedVersion 2.3.21 / spring-boot-starter-webflux 4.0.6 inexistants). Le pin r\u00e9el est kotlin 2.0.21 (LTS-aligned via Java 21) \u2014 aucun bypass STS n\u00e9cessaire.",
-      "2026-07-03 \u2014 Remediation audit consent-hub-admin : bump spring-boot 3.3.5 \u2192 3.5.4 (3.3.x hors support OSS mi-2025, CVE Tomcat/Spring non patchables), flyway 10.21.0 \u2192 11.7.2 (align\u00e9 BOM Spring Boot 3.5), springdoc 2.7.0 \u2192 2.8.9. @MockBean d\u00e9pr\u00e9ci\u00e9 \u2192 @MockitoBean (Spring Boot 3.4+). Aucune nouvelle librairie ajout\u00e9e (versions uniquement)."
+      "2026-06-07 — Audit CTO 2026-06-07 : suppression du bloc runtimeException factice (pinnedVersion 2.3.21 / spring-boot-starter-webflux 4.0.6 inexistants). Le pin réel est kotlin 2.0.21 (LTS-aligned via Java 21) — aucun bypass STS nécessaire.",
+      "2026-07-03 — Remediation audit consent-hub-admin : bump spring-boot 3.3.5 → 3.5.4 (3.3.x hors support OSS mi-2025, CVE Tomcat/Spring non patchables), flyway 10.21.0 → 11.7.2 (aligné BOM Spring Boot 3.5), springdoc 2.7.0 → 2.8.9. @MockBean déprécié → @MockitoBean (Spring Boot 3.4+). Aucune nouvelle librairie ajoutée (versions uniquement).",
+      "2026-09-02 — Audit backend. Bumps de PATCH dans la ligne majeure en place : Spring Boot 3.5.4 -> 3.5.16, springdoc 2.8.9 -> 2.9.0, Flyway 11.7.2 -> 11.20.3, PostgreSQL JDBC 42.7.10 -> 42.7.13, mssql-jdbc 12.8.1 -> 13.4.0, nimbus-jose-jwt 9.40 -> 10.9.1. PAS de montee en Spring Boot 4 : la 4.1.1 est publiee, mais ce stack porte le badge 🟢 reference adosse au combo C2 valide end-to-end sur workspace reel (2026-05-11) avec la ligne 3.x. Une majeure Spring (Framework 7, Jakarta, retrait d'API depreciees) invalide cette validation et ne peut pas etre re-jouee ici. La migration est une tache dediee, cf. .md 2.3.1."
     ]
   }
 }

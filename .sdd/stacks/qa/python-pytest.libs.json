@@ -5,28 +5,88 @@
   "schemaVersion": 1,
   "buildSystem": "uv",
   "manifest": {
-    "files": ["workspace/src/{BackendName}/pyproject.toml"]
+    "files": [
+      "workspace/src/{BackendName}/pyproject.toml"
+    ]
   },
   "versions": {
-    "pytest": "8.3.4",
-    "pytest-asyncio": "0.25.0",
-    "pytest-cov": "6.0.0",
-    "pytest-mock": "3.14.0",
-    "httpx": "0.28.0",
+    "pytest": "9.1.1",
+    "pytest-asyncio": "1.3.0",
+    "pytest-cov": "7.1.0",
+    "pytest-mock": "3.15.1",
+    "httpx": "0.28.1",
     "respx": "0.22.0",
-    "coverage": "7.6.9"
+    "coverage": "7.11.1",
+    "pytest-django": "4.14.0",
+    "model-bakery": "1.24.0"
   },
   "core": [
-    { "module": "pytest", "ref": "pytest" },
-    { "module": "pytest-asyncio", "ref": "pytest-asyncio" },
-    { "module": "pytest-cov", "ref": "pytest-cov" },
-    { "module": "pytest-mock", "ref": "pytest-mock" },
-    { "module": "httpx", "ref": "httpx" },
-    { "module": "coverage", "ref": "coverage" }
+    {
+      "module": "pytest",
+      "ref": "pytest"
+    },
+    {
+      "module": "pytest-asyncio",
+      "ref": "pytest-asyncio"
+    },
+    {
+      "module": "pytest-cov",
+      "ref": "pytest-cov"
+    },
+    {
+      "module": "pytest-mock",
+      "ref": "pytest-mock"
+    },
+    {
+      "module": "httpx",
+      "ref": "httpx"
+    },
+    {
+      "module": "coverage",
+      "ref": "coverage"
+    }
   ],
   "onDemand": [
-    { "module": "respx", "ref": "respx", "capability": "http-mock", "triggers": ["respx", "mock.*http", "intercept.*requests"] }
+    {
+      "module": "respx",
+      "ref": "respx",
+      "capability": "http-mock",
+      "triggers": [
+        "respx",
+        "mock.*http",
+        "intercept.*requests"
+      ]
+    },
+    {
+      "module": "pytest-django",
+      "ref": "pytest-django",
+      "capability": "django-testing",
+      "rationale": "Fixtures Django pour pytest (db, client, settings, admin_client) + lecture de DJANGO_SETTINGS_MODULE. OBLIGATOIRE sur backend/django et fullstack/django-templates : sans lui, pytest ne sait pas amorcer Django et TOUT import de modele leve ImproperlyConfigured",
+      "triggers": [
+        "django",
+        "pytest-django",
+        "test.*modele.*django"
+      ]
+    },
+    {
+      "module": "model-bakery",
+      "ref": "model-bakery",
+      "capability": "django-testing",
+      "rationale": "Instancie un modele Django et TOUTES ses relations obligatoires en un appel — evite les cascades de setUp",
+      "triggers": [
+        "django",
+        "fixture.*modele",
+        "baker",
+        "donnees.*test"
+      ]
+    }
   ],
   "plugins": [],
-  "metadata": { "lastUpdated": "2026-05-07", "format": "compact (v2)" }
+  "metadata": {
+    "lastUpdated": "2026-09-02",
+    "format": "compact (v2)",
+    "changeLog": [
+      "2026-09-02 — Audit QA. Rebase des versions depuis PyPI (catalog fige au 2026-05-07 : pytest 8.3.4 -> 9.1.1, pytest-asyncio 0.25.0 -> 1.3.0). Ajout de la capability `django-testing` (pytest-django + model-bakery), requise par les nouveaux stacks backend/django et fullstack/django-templates : ce stack QA ne couvrait jusqu'ici que FastAPI."
+    ]
+  }
 }

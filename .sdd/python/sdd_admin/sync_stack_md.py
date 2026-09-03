@@ -130,6 +130,71 @@ def format_core_package_lines(libs: list[dict[str, Any]], catalog: dict[str, Any
         for i, item in enumerate(items):
             sep = " \\" if i < len(items) - 1 else ")"
             lines.append(f"  {item}{sep}")
+    elif bs == "cmake":
+        # C++ / Qt — aucune install par CLI : les dependances sont resolues par
+        # find_package() contre un toolchain (Qt online installer, vcpkg, Conan).
+        # On emet donc les lignes CMake a ecrire, pas une commande.
+        lines.append("# CMake : declarer ces dependances dans CMakeLists.txt")
+        lines.append("# (les paquets doivent etre fournis par le toolchain : Qt, vcpkg ou Conan).")
+        for lib in libs:
+            v = resolve_version(lib, catalog)
+            mod = lib.get("module", "")
+            if "::" in mod:
+                pkg = mod.split("::")[0]
+                lines.append(f'#   find_package({pkg} {v} REQUIRED COMPONENTS {mod.split("::")[-1]})')
+            else:
+                lines.append(f"#   find_package({mod} {v} REQUIRED)")
+    elif bs == "composer":
+        # PHP — `composer require` writes composer.json. Versions pinned exactly
+        # (SDD_Pro pins ; Composer would otherwise write a `^x.y` caret range).
+        lines.append(f"(cd {project_dir} && composer require \\")
+        items = [
+            f"{lib.get('module')}:{resolve_version(lib, catalog)}" if resolve_version(lib, catalog)
+            else lib.get("module", "")
+            for lib in libs
+        ]
+        for i, item in enumerate(items):
+            sep = " \\" if i < len(items) - 1 else ")"
+            lines.append(f"  {item}{sep}")
+    elif bs == "pub":
+        # Dart/Flutter — `flutter pub add` writes pubspec.yaml. Versions are
+        # pinned with a caret-free exact constraint so the generated project is
+        # reproducible (SDD_Pro pins, it does not float).
+        lines.append(f"(cd {project_dir} && flutter pub add \\")
+        items = [
+            f"{lib.get('module')}:{resolve_version(lib, catalog)}" if resolve_version(lib, catalog)
+            else lib.get("module", "")
+            for lib in libs
+        ]
+        for i, item in enumerate(items):
+            sep = " \\" if i < len(items) - 1 else ")"
+            lines.append(f"  {item}{sep}")
+    elif bs == "swift":
+        # SwiftPM — no imperative CLI to add a dependency to an existing
+        # manifest, so emit the `Package.swift` entries the agent must write.
+        lines.append("# SwiftPM : declarer ces dependances dans Package.swift")
+        lines.append("# (ou Xcode > Package Dependencies pour un .xcodeproj).")
+        for lib in libs:
+            v = resolve_version(lib, catalog)
+            mod = lib.get("module", "")
+            if v:
+                lines.append(
+                    f'#   .package(url: "https://github.com/{mod}.git", from: "{v}"),'
+                )
+            else:
+                lines.append(f'#   .package(url: "https://github.com/{mod}.git"),')
+    elif bs == "msbuild":
+        # Delphi — aucune CLI d'install canonique (GetIt / DPM / Boss / clone
+        # manuel selon la lib). Chaque entree porte son propre installCommand.
+        lines.append("# Delphi/MSBuild : pas de gestionnaire de paquets unique.")
+        lines.append("# Chaque lib porte son `installCommand` explicite dans le .libs.json.")
+        for lib in libs:
+            cmd = lib.get("installCommand")
+            if cmd:
+                lines.append(cmd)
+            else:
+                v = resolve_version(lib, catalog)
+                lines.append(f"# {lib.get('module')} {v} — installCommand a renseigner")
     elif bs == "gradle":
         manifest = catalog.get("manifest") or {}
         catalog_path = manifest.get("versionCatalogPath") or "gradle/libs.versions.toml"
@@ -243,6 +308,55 @@ def format_ondemand_package_lines(libs: list[dict[str, Any]], catalog: dict[str,
                 av = resolve_version(a, catalog)
                 token = f"{a.get('module')}@{av}" if av else a.get("module", "")
                 lines.append(f"# OU (alt) : (cd {project_dir} && poetry add {token})")
+        elif bs == "cmake":
+            for lib in primary_libs:
+                lines.append(f'#   find_package({lib.get("module")} {resolve_version(lib, catalog)} REQUIRED)')
+            for alt in alt_libs:
+                lines.append(f'#   OU (alt) find_package({alt.get("module")} {resolve_version(alt, catalog)} REQUIRED)')
+        elif bs == "composer":
+            if primary_libs:
+                items = [
+                    f"{lib.get('module')}:{resolve_version(lib, catalog)}" if resolve_version(lib, catalog)
+                    else lib.get("module", "")
+                    for lib in primary_libs
+                ]
+                lines.append(f"(cd {project_dir} && composer require {' '.join(items)})")
+            for a in alt_libs:
+                av = resolve_version(a, catalog)
+                token = f"{a.get('module')}:{av}" if av else a.get("module", "")
+                lines.append(f"# OU (alt) : (cd {project_dir} && composer require {token})")
+        elif bs == "pub":
+            if primary_libs:
+                items = [
+                    f"{lib.get('module')}:{resolve_version(lib, catalog)}" if resolve_version(lib, catalog)
+                    else lib.get("module", "")
+                    for lib in primary_libs
+                ]
+                lines.append(f"(cd {project_dir} && flutter pub add {' '.join(items)})")
+            for a in alt_libs:
+                av = resolve_version(a, catalog)
+                token = f"{a.get('module')}:{av}" if av else a.get("module", "")
+                lines.append(f"# OU (alt) : (cd {project_dir} && flutter pub add {token})")
+        elif bs == "swift":
+            for lib in primary_libs:
+                v = resolve_version(lib, catalog)
+                lines.append(
+                    f'#   .package(url: "https://github.com/{lib.get("module")}.git", from: "{v}"),'
+                )
+            for a in alt_libs:
+                av = resolve_version(a, catalog)
+                lines.append(
+                    f'#   OU (alt) .package(url: "https://github.com/{a.get("module")}.git", from: "{av}"),'
+                )
+        elif bs == "msbuild":
+            for lib in primary_libs:
+                cmd = lib.get("installCommand")
+                lines.append(cmd if cmd else
+                             f"# {lib.get('module')} {resolve_version(lib, catalog)} — installCommand a renseigner")
+            for a in alt_libs:
+                cmd = a.get("installCommand")
+                lines.append(f"# OU (alt) : {cmd}" if cmd else
+                             f"# OU (alt) {a.get('module')} {resolve_version(a, catalog)}")
         elif bs == "gradle":
             lines.append("# Gradle : ajouter les modules en implementation(...) dans build.gradle.kts")
             for lib in primary_libs:

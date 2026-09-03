@@ -35,6 +35,31 @@ natif via `ng test`).
 - Pour tests React : `@testing-library/react`
 - Pour tests Vue : `@vue/test-utils`
 
+## 1.bis Rattachement aux stacks applicatifs (MAJ 2026-09-02)
+
+| Stack applicatif | Runner de tests |
+|---|---|
+| `frontend/react`, `frontend/vue` | **Vitest** (ce stack) |
+| `fullstack/next`, `fullstack/nuxt` | **Vitest** (ce stack) |
+| `backend/node-express` | **Vitest** (ce stack) |
+| `backend/nestjs` | ⚠️ **Jest**, pas Vitest — voir ci-dessous |
+
+> **NestJS livre Jest, pas Vitest.** `@nestjs/cli` génère une configuration
+> Jest, `@nestjs/testing` est éprouvé avec, et `ts-jest` fait partie de la
+> chaîne de build. Le catalog de `backend/nestjs` déclare donc `jest` et
+> `ts-jest` en CORE, dans **son propre** `.libs.json`.
+>
+> Faire tourner NestJS sous Vitest est possible (via `unplugin-swc`), mais
+> impose de remplacer la transformation des décorateurs — `emitDecoratorMetadata`
+> n'est pas géré nativement par esbuild, et la DI casse au runtime sans
+> message explicite. **Ce n'est pas catalogué** : sur `backend/nestjs`,
+> utiliser Jest.
+>
+> Conséquence pour `## Active QA Specs` : ne pas déclarer `qa/node-vitest`
+> pour un projet NestJS — son outillage de test vit dans son propre stack.
+
+---
+
 <!-- LIBS_CATALOG_START -->
 ### 2.4 Librairies
 
@@ -44,8 +69,8 @@ natif via `ng test`).
 
 | Lib | Version | Role |
 |-----|---------|------|
-| vitest | 2.1.8 |  |
-| @vitest/coverage-v8 | 2.1.8 |  |
+| vitest | 4.1.11 |  |
+| @vitest/coverage-v8 | 4.1.11 |  |
 
 ### 2.4.b Librairies ON-DEMAND (installees si l'US declenche)
 
@@ -53,15 +78,15 @@ Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'U
 
 | Capability | Lib | Version | Triggers |
 |---|---|---|---|
-| dom-env | happy-dom | 16.0.1 | happy-dom, test.*composant, test.*ui |
-| dom-env | jsdom (alt) | 25.0.1 | jsdom, test.*composant, test.*ui |
-| test-react | @testing-library/react | 16.1.0 | test.*react, testing-library, frontend.*react |
-| test-react | @testing-library/jest-dom | 6.6.3 | test.*react, testing-library, frontend.*react |
-| test-react | @testing-library/user-event | 14.5.2 | test.*react, testing-library, frontend.*react |
-| test-vue | @vue/test-utils | 2.4.6 | test.*vue, vue-test-utils, frontend.*vue |
-| api-tests | supertest | 7.0.0 | api.*test, supertest, integration.*http, qa.*api-tests |
-| api-tests | @types/supertest | 6.0.2 | api.*test, supertest, integration.*http, qa.*api-tests |
-| http-mock | msw | 2.7.0 | msw, mock.*service.*worker, intercept.*http |
+| dom-env | happy-dom | 20.13.2 | happy-dom, test.*composant, test.*ui |
+| dom-env | jsdom (alt) | 30.0.1 | jsdom, test.*composant, test.*ui |
+| test-react | @testing-library/react | 16.3.3 | test.*react, testing-library, frontend.*react |
+| test-react | @testing-library/jest-dom | 7.0.1 | test.*react, testing-library, frontend.*react |
+| test-react | @testing-library/user-event | 14.6.7 | test.*react, testing-library, frontend.*react |
+| test-vue | @vue/test-utils | 2.5.0 | test.*vue, vue-test-utils, frontend.*vue |
+| api-tests | supertest | 7.2.2 | api.*test, supertest, integration.*http, qa.*api-tests |
+| api-tests | @types/supertest | 7.2.1 | api.*test, supertest, integration.*http, qa.*api-tests |
+| http-mock | msw | 2.15.0 | msw, mock.*service.*worker, intercept.*http |
 <!-- LIBS_CATALOG_END -->
 
 ## 3. Init Commands (idempotent)
@@ -72,8 +97,8 @@ Si Vitest n'est pas dans `package.json` :
 ```bash
 # Auto-genere depuis node-vitest.libs.json -- ne pas editer (utiliser sync_stack_md.py).
 (cd workspace/src/{BackendName} && pnpm add \
-  vitest@2.1.8 \
-  @vitest/coverage-v8@2.1.8)
+  vitest@4.1.11 \
+  @vitest/coverage-v8@4.1.11)
 ```
 <!-- CORE_PACKAGES_END -->
 
@@ -81,20 +106,20 @@ Si Vitest n'est pas dans `package.json` :
 ```bash
 # Auto-genere depuis node-vitest.libs.json (on-demand) -- installe par dev-* si l'US declenche un trigger.
 # capability: dom-env
-(cd workspace/src/{BackendName} && pnpm add happy-dom@16.0.1)
-# OU (alt) : (cd workspace/src/{BackendName} && pnpm add jsdom@25.0.1)
+(cd workspace/src/{BackendName} && pnpm add happy-dom@20.13.2)
+# OU (alt) : (cd workspace/src/{BackendName} && pnpm add jsdom@30.0.1)
 
 # capability: test-react
-(cd workspace/src/{BackendName} && pnpm add @testing-library/react@16.1.0 @testing-library/jest-dom@6.6.3 @testing-library/user-event@14.5.2)
+(cd workspace/src/{BackendName} && pnpm add @testing-library/react@16.3.3 @testing-library/jest-dom@7.0.1 @testing-library/user-event@14.6.7)
 
 # capability: test-vue
-(cd workspace/src/{BackendName} && pnpm add @vue/test-utils@2.4.6)
+(cd workspace/src/{BackendName} && pnpm add @vue/test-utils@2.5.0)
 
 # capability: api-tests
-(cd workspace/src/{BackendName} && pnpm add supertest@7.0.0 @types/supertest@6.0.2)
+(cd workspace/src/{BackendName} && pnpm add supertest@7.2.2 @types/supertest@7.2.1)
 
 # capability: http-mock
-(cd workspace/src/{BackendName} && pnpm add msw@2.7.0)
+(cd workspace/src/{BackendName} && pnpm add msw@2.15.0)
 ```
 <!-- ONDEMAND_PACKAGES_END -->
 

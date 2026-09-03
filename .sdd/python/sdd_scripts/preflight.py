@@ -96,44 +96,61 @@ def get_explicit_app_type(stack_content: str) -> str | None:
 
 
 def detect_app_type_auto(
-    be_ids: list[str], fe_ids: list[str], fs_ids: list[str], mobile_ids: list[str]
+    be_ids: list[str], fe_ids: list[str], fs_ids: list[str], mobile_ids: list[str],
+    desktop_ids: list[str] | None = None,
 ) -> tuple[str, str | None]:
     """Auto-detect (appType, frontendKind) from declared stack categories.
 
     Rules (v6.7.7+):
       - any fullstack/*  → ("fullstack", None)
       - any mobiles/*    → ("back-front", "mobile")
+      - any desktop/*    → ("back-front", "desktop")   # 2026-09-02
       - any frontend/*   → ("back-front", "web")
       - backend-only     → ("back-front", None)
       - empty            → ("back-front", None)   # errored downstream
 
-    Mix detection (fullstack + backend/frontend/mobile) → reported by
+    `desktop_ids` est optionnel et arrive en DERNIER : la categorie `desktop/`
+    a ete ajoutee le 2026-09-02, et plusieurs appelants (dont les tests
+    unitaires historiques) passent encore 4 arguments positionnels.
+
+    Mix detection (fullstack + backend/frontend/mobile/desktop) → reported by
     validate_stack_combo(). Here we still return fullstack as primary.
     """
+    desktop_ids = desktop_ids or []
     if fs_ids:
         return "fullstack", None
     if mobile_ids:
         return "back-front", "mobile"
+    if desktop_ids:
+        return "back-front", "desktop"
     if fe_ids:
         return "back-front", "web"
     return "back-front", None
 
 
 def validate_stack_combo(
-    be_ids: list[str], fe_ids: list[str], fs_ids: list[str], mobile_ids: list[str]
+    be_ids: list[str], fe_ids: list[str], fs_ids: list[str], mobile_ids: list[str],
+    desktop_ids: list[str] | None = None,
 ) -> str | None:
     """Validate stack combo coherence. Return hint string if invalid, None otherwise.
 
-    Forbidden mixes (v6.7.7+):
-      - fullstack + (backend OR frontend OR mobile) → mutually exclusive
+    Forbidden mixes (v6.7.7+, desktop ajoute 2026-09-02):
+      - fullstack + (backend OR frontend OR mobile OR desktop) → mutually exclusive
       - mobile + frontend (web) → choose one frontend kind
+      - desktop + frontend (web) → idem
+      - desktop + mobile → idem
       - multiple fullstack → max 1
       - multiple mobile → max 1
+      - multiple desktop → max 1
+
+    `desktop_ids` est optionnel et en dernier (retro-compat, cf.
+    detect_app_type_auto).
     """
-    if fs_ids and (be_ids or fe_ids or mobile_ids):
+    desktop_ids = desktop_ids or []
+    if fs_ids and (be_ids or fe_ids or mobile_ids or desktop_ids):
         return (
-            "stack fullstack/* exclusif — supprimer backend/*, frontend/* "
-            "et mobiles/* de ## Active Tech Specs"
+            "stack fullstack/* exclusif — supprimer backend/*, frontend/*, "
+            "mobiles/* et desktop/* de ## Active Tech Specs"
         )
     if len(fs_ids) > 1:
         return f"un seul fullstack/* attendu, trouvé : {','.join(fs_ids)}"
@@ -142,8 +159,21 @@ def validate_stack_combo(
             "frontend mobile et web déclarés simultanément — choisir un seul "
             "(commenter mobiles/* OU frontend/*)"
         )
+    if desktop_ids and fe_ids:
+        return (
+            "frontend desktop et web déclarés simultanément — choisir un seul "
+            "(commenter desktop/* OU frontend/*)"
+        )
+    if desktop_ids and mobile_ids:
+        return (
+            "desktop/* et mobiles/* déclarés simultanément — un seul client par "
+            "projet (commenter l'un des deux ; pour livrer les deux, créer deux "
+            "projets sous workspace/src/)"
+        )
     if len(mobile_ids) > 1:
         return f"un seul mobiles/* attendu, trouvé : {','.join(mobile_ids)}"
+    if len(desktop_ids) > 1:
+        return f"un seul desktop/* attendu, trouvé : {','.join(desktop_ids)}"
     return None
 
 
@@ -502,6 +532,7 @@ def main() -> int:
     auth_ids = get_active_ids(auth_block, "auth")
     fs_ids = get_active_ids(tech_block, "fullstack")
     mobile_ids = get_active_ids(tech_block, "mobiles")
+    desktop_ids = get_active_ids(tech_block, "desktop")
 
     result["activeStacks"] = {
         "backend": ",".join(be_ids),
@@ -510,6 +541,7 @@ def main() -> int:
         "auth": ",".join(auth_ids),
         "fullstack": ",".join(fs_ids),
         "mobile": ",".join(mobile_ids),
+        "desktop": ",".join(desktop_ids),
     }
 
     # B1.alpha — STACK_EXPERIMENTAL detection (v6.10.5, audit 2026-05-19)
@@ -528,13 +560,14 @@ def main() -> int:
             "auth":      auth_ids,
             "fullstack": fs_ids,
             "mobiles":   mobile_ids,
+            "desktop":   desktop_ids,
             "archi":     [archi_id] if archi_id else [],
         },
         add_warn=add_warn,
     )
 
     # B1.bis — AppType auto-detection (v6.7.7+) avec reconcile explicit
-    combo_err = validate_stack_combo(be_ids, fe_ids, fs_ids, mobile_ids)
+    combo_err = validate_stack_combo(be_ids, fe_ids, fs_ids, mobile_ids, desktop_ids)
     if combo_err:
         add_err("STACK_COMBO_INVALID", combo_err)
 
@@ -632,10 +665,11 @@ def main() -> int:
                 "STACK_NOT_SELECTED",
                 "aucun stack fullstack/*.md déclaré dans ## Active Tech Specs",
             )
-        elif app_type == "back-front" and not (fe_ids or mobile_ids):
+        elif app_type == "back-front" and not (fe_ids or mobile_ids or desktop_ids):
             add_err(
                 "STACK_NOT_SELECTED",
-                "aucun frontend déclaré : ajouter frontend/*.md (web) ou mobiles/*.md (mobile) dans ## Active Tech Specs",
+                "aucun frontend déclaré : ajouter frontend/*.md (web), mobiles/*.md (mobile) "
+                "ou desktop/*.md (desktop) dans ## Active Tech Specs",
             )
 
     # B2 — Project Config field (BackendName or AppName)
@@ -644,6 +678,10 @@ def main() -> int:
     if app_type == "fullstack":
         key_name = "AppName"
     elif app_type in ("mobile-react-native", "mobile-maui") and args.family == "frontend":
+        key_name = "AppName"
+    elif result.get("frontendKind") in ("mobile", "desktop") and args.family == "frontend":
+        # Un client mobile ou desktop est un projet unique : il porte AppName,
+        # pas BackendName (2026-09-02 pour desktop, aligne sur mobiles/).
         key_name = "AppName"
     else:
         key_name = "BackendName" if args.family == "backend" else "AppName"
@@ -668,12 +706,26 @@ def main() -> int:
             else:
                 add_err("STACK_DIGEST_MISSING", hint)
 
-    # B4 — project file (csproj/package.json/pyproject/build.gradle/angular.json)
+    # B4 — project file (csproj/package.json/pyproject/gradle/angular.json/pubspec/dproj/Package.swift)
     if result["appOrBackendName"]:
         proj_dir = workspace_root(root) / "src" / str(result["appOrBackendName"])
         project_files: list[Path] = []
         if proj_dir.is_dir():
-            for pat in ("*.csproj", "package.json", "pyproject.toml", "build.gradle.kts", "angular.json"):
+            # 2026-09-02 — les stacks `mobiles/` non-JS/.NET portent un
+            # fichier-projet propre. Sans ces globs, B4 echouait ("lancer
+            # /dev-run") sur un projet Flutter/Delphi/SwiftUI pourtant
+            # correctement scaffolde :
+            #   pubspec.yaml   -> mobiles/flutter
+            #   *.dproj        -> mobiles/delphi-fmx
+            #   Package.swift  -> mobiles/swiftui (SwiftPM)
+            #   *.xcodeproj    -> mobiles/swiftui (projet Xcode classique)
+            #   build.gradle   -> KMP/Android en Groovy DSL (legacy)
+            #   CMakeLists.txt -> desktop/qt-cpp (2026-09-02)
+            #   *.sln          -> solution .NET multi-projets (WPF/WinForms)
+            for pat in ("*.csproj", "package.json", "pyproject.toml",
+                        "build.gradle.kts", "build.gradle", "angular.json",
+                        "pubspec.yaml", "*.dproj", "Package.swift", "*.xcodeproj",
+                        "CMakeLists.txt", "*.sln"):
                 project_files.extend(proj_dir.glob(pat))
         if not project_files:
             hint = "lancer /dev-run (Phase A bootstrap projets)"

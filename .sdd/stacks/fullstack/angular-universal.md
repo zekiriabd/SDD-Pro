@@ -227,6 +227,51 @@ fi
 
 ---
 
+## 2.3 Politique de version — audit 2026-09-02
+
+Ce stack porte un badge **🟢 bench-validated** : sa validation repose sur un run
+runtime daté, exécuté sur une version précise. La règle appliquée à tout le
+catalogue lors de cet audit :
+
+| Type de bump | Décision |
+|---|---|
+| **Patch / minor dans la majeure en place** | appliqué |
+| **Majeure** | **non appliqué** — documenté ici, tâche dédiée avec re-bench |
+
+### Ce qui a été bumpé
+
+`@angular/*` **19.0.0 → 19.2.25** (dernier patch de la ligne 19), plus
+`zone.js` 0.16.2, `zod` 4.5.4, `tailwindcss` 4.3.3, `prisma` 7.10.0.
+
+Express reste sur la ligne **4** (`4.22.2`), exactement comme
+`backend/node-express` — npm maintient un dist-tag `latest-4` dédié, la ligne
+est donc toujours suivie en amont.
+
+### Ce qui n'a PAS été bumpé
+
+**La 22.1.4 d'Angular est publiée** — soit **trois majeures** au-dessus du bench
+(19 → 20 → 21 → 22). Montée = tâche dédiée, par paliers, avec re-bench.
+
+### Correction obligatoire, sans rapport avec les majeures
+
+Le couple MSAL était **désaligné** : `@azure/msal-angular` **4.0.3** avec
+`@azure/msal-browser` **4.0.0**, alors que `msal-angular` déclare
+`@azure/msal-browser` en peer-dependency stricte. Ces deux paquets se bumpent
+**ensemble**. Réaligné dans la ligne 4 : `msal-angular` **4.1.1** +
+`msal-browser` **4.30.0`.
+
+C'est la même classe de défaut que le `@types/express` 5.x / `express` 4.x
+corrigé sur `backend/node-express` : deux paquets solidaires, pinnés
+indépendamment.
+
+> Le raisonnement complet est développé une fois dans
+> `backend/kotlin-spring-boot.md §2.3.1`. Les stacks 🟢 concernés par le même
+> arbitrage : `backend/kotlin-spring-boot` (Spring Boot 3.5.x vs 4.1.1),
+> `backend/node-express` (Express 4.x vs 5.2.1), `fullstack/kotlin-mustache`,
+> `fullstack/next`, `fullstack/nuxt`, `fullstack/angular-universal`.
+
+---
+
 <!-- LIBS_CATALOG_START -->
 ### 2.4 Librairies
 
@@ -236,27 +281,27 @@ fi
 
 | Lib | Version | Role |
 |-----|---------|------|
-| @angular/core | 19.0.0 |  |
-| @angular/common | 19.0.0 |  |
-| @angular/router | 19.0.0 |  |
-| @angular/forms | 19.0.0 |  |
-| @angular/platform-browser | 19.0.0 |  |
-| @angular/platform-browser-dynamic | 19.0.0 |  |
-| @angular/ssr | 19.0.0 | SSR engine (Express) |
-| @angular/material | 19.0.0 | UI Design System defaut |
-| @angular/cdk | 19.0.0 |  |
-| @angular/animations | 19.0.0 |  |
-| express | 4.21.2 | Server bootstrappe par @angular/ssr |
-| rxjs | 7.8.1 |  |
-| zod | 3.24.0 | Validation schemas (server + client) |
-| typescript | 5.7.0 |  |
-| zone.js | 0.15.0 | Change detection (deprecate progressif vers signals, reste CORE en v19) |
+| @angular/core | 19.2.25 |  |
+| @angular/common | 19.2.25 |  |
+| @angular/router | 19.2.25 |  |
+| @angular/forms | 19.2.25 |  |
+| @angular/platform-browser | 19.2.25 |  |
+| @angular/platform-browser-dynamic | 19.2.25 |  |
+| @angular/ssr | 19.2.25 | SSR engine (Express) |
+| @angular/material | 19.2.25 | UI Design System defaut |
+| @angular/cdk | 19.2.25 |  |
+| @angular/animations | 19.2.25 |  |
+| express | 4.22.2 | Server bootstrappe par @angular/ssr |
+| rxjs | 7.8.2 |  |
+| zod | 4.5.4 | Validation schemas (server + client) |
+| typescript | 5.9.3 |  |
+| zone.js | 0.16.2 | Change detection (deprecate progressif vers signals, reste CORE en v19) |
 | @ngx-translate/core | 16.0.4 |  |
-| @ngx-translate/http-loader | 16.1.1 |  |
-| @azure/msal-angular | 4.0.3 | Auth Azure AD (selon ## Active Auth Specs) |
-| @azure/msal-browser | 4.0.0 |  |
-| eslint | 9.17.0 |  |
-| @angular-eslint/builder | 19.0.0 |  |
+| @ngx-translate/http-loader | 16.0.1 |  |
+| @azure/msal-angular | 4.1.1 | Auth Azure AD (selon ## Active Auth Specs) |
+| @azure/msal-browser | 4.30.0 |  |
+| eslint | 10.9.1 |  |
+| @angular-eslint/builder | 19.8.1 |  |
 
 ### 2.4.b Librairies ON-DEMAND (installees si l'US declenche)
 
@@ -264,16 +309,16 @@ Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'U
 
 | Capability | Lib | Version | Triggers |
 |---|---|---|---|
-| prisma | prisma | 6.1.0 | DatabaseType.*(SqlServer|PostgreSql|MySql|Sqlite), orm, db-first |
-| prisma | @prisma/client | 6.1.0 | prisma, orm |
-| tailwind | tailwindcss | 4.0.0 | tailwind, atomic.*css |
-| tailwind | postcss | 8.5.0 | tailwind |
-| signals-store | @ngrx/signals | 19.0.0 | ngrx, store.*signal, state-mgmt |
-| http-client | undici | 7.2.0 | appel.*api.*externe |
-| excel | exceljs | 4.4.0 | excel, \.xlsx, export.*excel |
-| pdf | pdfmake | 0.2.15 | pdf, export.*pdf |
-| smtp | nodemailer | 6.9.16 | email, smtp |
-| date-utils | date-fns | 4.1.0 | dates.*format |
+| prisma | prisma | 7.10.0 | DatabaseType.*\b(SqlServer|PostgreSql|MySql|Sqlite)\b, orm, db-first |
+| prisma | @prisma/client | 7.10.0 | prisma, orm |
+| tailwind | tailwindcss | 4.3.3 | tailwind, atomic.*css |
+| tailwind | postcss | 8.5.26 | tailwind |
+| signals-store | @ngrx/signals | 19.2.1 | ngrx, store.*signal, state-mgmt |
+| http-client | undici | 7.29.0 | appel.*api.*externe |
+| excel | exceljs | 4.4.0 | \bexcel\b, \.xlsx\b, export.*excel |
+| pdf | pdfmake | 0.2.15 | \bpdf\b, export.*pdf |
+| smtp | nodemailer | 6.10.1 | email, smtp |
+| date-utils | date-fns | 4.4.0 | dates.*format |
 | charts | ng2-charts | 7.0.0 | graph, chart, visualisation |
 <!-- LIBS_CATALOG_END -->
 

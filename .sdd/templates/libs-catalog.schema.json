@@ -14,8 +14,8 @@
     },
     "category": {
       "type": "string",
-      "enum": ["backend", "frontend", "ui", "auth", "qa", "fullstack", "mobiles"],
-      "description": "Stack category. MUST match the parent directory name under .sdd/stacks/. 'mobiles' (plural) and 'fullstack' added 2026-05-16 for single-project multi-target stacks (React Native, MAUI, Next.js, Blazor Server, ...)."
+      "enum": ["backend", "frontend", "ui", "auth", "qa", "fullstack", "mobiles", "desktop"],
+      "description": "Stack category. MUST match the parent directory name under .sdd/stacks/. 'mobiles' (plural) and 'fullstack' added 2026-05-16 for single-project multi-target stacks (React Native, MAUI, Next.js, Blazor Server, ...). 'desktop' added 2026-09-02 for native desktop clients (Delphi VCL, WPF, Qt, Electron, WinForms, JavaFX, PySide) — same single-project model as 'mobiles', detected by preflight as frontendKind=desktop."
     },
     "schemaVersion": {
       "type": "integer",
@@ -23,8 +23,8 @@
     },
     "buildSystem": {
       "type": "string",
-      "enum": ["dotnet", "npm", "pnpm", "yarn", "gradle", "maven", "pip", "poetry", "uv", "cargo", "go-mod"],
-      "description": "Drives auto-derivation of installCommand when omitted on a lib entry."
+      "enum": ["dotnet", "npm", "pnpm", "yarn", "gradle", "maven", "pip", "poetry", "uv", "cargo", "go-mod", "msbuild", "pub", "swift", "composer", "cmake"],
+      "description": "Drives auto-derivation of installCommand when omitted on a lib entry. 'msbuild' (Delphi .dproj/.dpk), 'pub' (Dart/Flutter pubspec.yaml) 'swift' (SwiftPM Package.swift / Xcode) 'composer' (PHP composer.json — Laravel / Symfony) and 'cmake' (C++ CMakeLists.txt — Qt) added 2026-09-02 — they were already accepted by validate_libs_catalog.py::BUILD_SYSTEMS but absent from this enum (schema drift closed)."
     },
     "manifest": {
       "type": "object",

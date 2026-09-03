@@ -14,61 +14,70 @@
     ]
   },
   "metadata": {
-    "platforms": [
-      "android",
-      "ios"
+    "lastUpdated": "2026-09-02",
+    "platforms": ["android", "ios"],
+    "optionalPlatforms": ["maccatalyst", "windows"],
+    "framework": "net10.0-maui",
+    "targetFrameworks": [
+      "net10.0-android36.0",
+      "net10.0-ios26.0",
+      "net10.0-maccatalyst26.0",
+      "net10.0-windows10.0.19041.0"
     ],
-    "optionalPlatforms": [
-      "maccatalyst",
-      "windows"
-    ],
-    "framework": "net9.0-maui",
     "workflow": "single-project-multi-target",
-    "notes": "Stack mobile .NET MAUI. Consomme un backend separe (declare en ## Active Tech Specs). category=mobiles (depuis schema v1 etendu 2026-05-16). buildSystem=dotnet (NuGet, dotnet CLI). SDK Channel: SDK 10 supporte net9.0 et net10.0 ; net8.0 rejete par dotnet new maui template (bench 2026-06-05 cf. ADR-20260605T150000). Si SDK 11+ a venir, retester compat avant bump versions.dotnet."
+    "notes": "Stack mobile .NET MAUI. Consomme un backend separe (declare en ## Active Tech Specs). category=mobiles (depuis schema v1 etendu 2026-05-16). buildSystem=dotnet (NuGet, dotnet CLI). REBASE 2026-09-02 : net9.0 est passe en support 'maintenance' cote Microsoft — le stack cible desormais net10.0 (LTS 'active', SDK 10.0.400). Les suffixes de plateforme (android36 / ios26 / maccatalyst26) sont ceux publies par CommunityToolkit.Maui 15.0.1, qui sert de reference d'alignement. Audit du meme jour : 3 references NuGet inexistantes retirees, cf. .md 2.3."
   },
   "versions": {
-    "dotnet": "net9.0",
-    "maui-controls": "9.0.40",
-    "maui-essentials": "9.0.40",
-    "communitytoolkit-mvvm": "8.4.0",
-    "communitytoolkit-maui": "11.0.0",
-    "communitytoolkit-maui-markup": "5.1.0",
-    "sqlite-net-pcl": "1.9.172",
-    "sqlitepclraw-bundle": "2.1.10",
-    "extensions-http": "9.0.0",
-    "extensions-http-resilience": "9.0.0",
-    "refit": "8.0.0",
-    "fluentvalidation": "11.10.0",
-    "serilog-extensions": "9.0.0",
+    "dotnet": "net10.0",
+    "maui-controls": "10.0.100",
+    "maui-essentials": "10.0.100",
+    "communitytoolkit-mvvm": "8.4.2",
+    "communitytoolkit-maui": "15.0.1",
+    "communitytoolkit-maui-markup": "8.0.0",
+    "sqlite-net-pcl": "1.11.285",
+    "sqlitepclraw-bundle": "2.1.11",
+    "extensions-http": "10.0.11",
+    "extensions-http-resilience": "10.9.0",
+    "extensions-options": "10.0.11",
+    "extensions-config-json": "10.0.11",
+    "extensions-logging-debug": "10.0.11",
+    "refit": "15.2.0",
+    "fluentvalidation": "12.1.1",
+    "serilog-extensions": "10.0.0",
     "serilog-sinks-debug": "3.0.0",
-    "ef-sqlite": "9.0.0",
-    "msal": "4.66.0",
-    "livecharts-maui": "2.0.0-rc4.1",
-    "microcharts-maui": "1.0.0",
-    "skiasharp-maui": "3.116.1",
-    "zxing-net-maui": "0.4.0",
-    "plugin-firebase": "3.1.0",
-    "plugin-maui-audio": "3.0.1",
-    "plugin-fingerprint": "3.0.0",
-    "plugin-maui-app-rating": "2.0.0",
-    "plugin-in-app-billing": "8.0.5",
-    "maui-maps": "9.0.40",
-    "stripe-net": "47.1.0",
-    "sentry-maui": "5.3.0",
-    "extensions-localization": "9.0.0",
-    "plugin-cert-pinning": "1.0.0"
+    "ef-sqlite": "10.0.11",
+    "msal": "4.88.0",
+    "livecharts-maui": "2.0.5",
+    "microcharts-maui": "2.0.0.3",
+    "skiasharp-maui": "4.151.1",
+    "zxing-net-maui": "0.10.4",
+    "plugin-firebase": "4.2.1",
+    "plugin-maui-audio": "4.0.0",
+    "plugin-fingerprint": "2.1.5",
+    "plugin-maui-app-rating": "1.3.0",
+    "plugin-in-app-billing": "10.0.0",
+    "plugin-local-notification": "14.1.1",
+    "maui-maps": "10.0.100",
+    "stripe-net": "52.4.1",
+    "sentry-maui": "6.9.0",
+    "extensions-localization": "10.0.11",
+    "xunit": "2.9.3",
+    "xunit-runner-vs": "4.0.0",
+    "test-sdk": "18.9.0",
+    "nsubstitute": "6.2.0",
+    "shouldly": "4.3.0"
   },
   "core": [
     {
       "module": "CommunityToolkit.Mvvm",
       "ref": "communitytoolkit-mvvm",
-      "rationale": "Source-gen MVVM (ObservableProperty + RelayCommand) \u00e2\u20ac\u201d top-1 standard 2024-2025",
+      "rationale": "Source-gen MVVM (ObservableProperty + RelayCommand) — top-1 standard",
       "license": "MIT"
     },
     {
       "module": "CommunityToolkit.Maui",
       "ref": "communitytoolkit-maui",
-      "rationale": "Toolkit officiel communautaire \u00e2\u20ac\u201d Behaviors, Converters, Popup, Snackbar, MediaElement",
+      "rationale": "Toolkit officiel communautaire — Behaviors, Converters, Popup, Snackbar, MediaElement. Sert de reference d'alignement net10 pour ce stack",
       "license": "MIT"
     },
     {
@@ -80,7 +89,7 @@
     {
       "module": "sqlite-net-pcl",
       "ref": "sqlite-net-pcl",
-      "rationale": "ORM SQLite local \u00e2\u20ac\u201d top-1 standard de facto MAUI",
+      "rationale": "ORM SQLite local — top-1 standard de facto MAUI",
       "license": "MIT"
     },
     {
@@ -100,9 +109,24 @@
       "rationale": "Retry / circuit breaker / timeout (succede a Polly direct en .NET 8+)"
     },
     {
+      "module": "Microsoft.Extensions.Options",
+      "ref": "extensions-options",
+      "rationale": "Binding fortement type de appsettings.json vers des records d'options (IOptions<T>)"
+    },
+    {
+      "module": "Microsoft.Extensions.Configuration.Json",
+      "ref": "extensions-config-json",
+      "rationale": "Lecture de appsettings.json declare au manifest — sans ce paquet la config n'est pas chargee"
+    },
+    {
+      "module": "Microsoft.Extensions.Logging.Debug",
+      "ref": "extensions-logging-debug",
+      "rationale": "Provider ILogger vers la fenetre Debug de l'IDE"
+    },
+    {
       "module": "Refit",
       "ref": "refit",
-      "rationale": "REST client typed \u00e2\u20ac\u201d top-1 wrapper HttpClient C#",
+      "rationale": "REST client typed — top-1 wrapper HttpClient C#",
       "license": "MIT"
     },
     {
@@ -133,165 +157,142 @@
       "module": "Microsoft.EntityFrameworkCore.Sqlite",
       "ref": "ef-sqlite",
       "capability": "ef-sqlite",
-      "triggers": [
-        "ef-core",
-        "entity.*framework",
-        "ef-sqlite"
-      ],
+      "rationale": "Alternative a sqlite-net-pcl quand l'US demande explicitement EF Core (migrations, LINQ complet)",
+      "triggers": ["ef-core", "entity.*framework", "ef-sqlite"],
       "alternative": true
     },
     {
       "module": "Microsoft.Identity.Client",
       "ref": "msal",
       "capability": "msal",
-      "triggers": [
-        "msal",
-        "azure-ad",
-        "auth-azure-ad",
-        "sso"
-      ]
+      "rationale": "MSAL.NET — auth Entra ID / Azure AD avec broker natif",
+      "triggers": ["msal", "azure-ad", "entra", "auth-azure-ad", "sso"]
     },
     {
       "module": "LiveChartsCore.SkiaSharpView.Maui",
       "ref": "livecharts-maui",
       "capability": "charts",
-      "triggers": [
-        "chart",
-        "graph",
-        "visualisation",
-        "courbe"
-      ]
+      "rationale": "Charts anime SkiaSharp — 2.0.5 est la premiere release STABLE (le catalog pinnait 2.0.0-rc4.1, seule pre-release du repo)",
+      "triggers": ["chart", "graph", "visualisation", "courbe"]
     },
     {
       "module": "Microcharts.Maui",
       "ref": "microcharts-maui",
       "capability": "charts",
-      "triggers": [
-        "microcharts",
-        "chart.*simple"
-      ],
+      "triggers": ["microcharts", "chart.*simple"],
       "alternative": true
     },
     {
       "module": "SkiaSharp.Views.Maui.Controls",
       "ref": "skiasharp-maui",
       "capability": "skia",
-      "triggers": [
-        "skia",
-        "dessin.*custom",
-        "canvas"
-      ]
+      "triggers": ["skia", "dessin.*custom", "canvas"]
     },
     {
       "module": "ZXing.Net.Maui.Controls",
       "ref": "zxing-net-maui",
       "capability": "barcode",
-      "triggers": [
-        "barcode",
-        "qr.*code",
-        "scan.*qr"
-      ]
+      "triggers": ["barcode", "qr.*code", "scan.*qr"]
     },
     {
       "module": "Plugin.Firebase",
       "ref": "plugin-firebase",
       "capability": "firebase-push",
-      "triggers": [
-        "firebase",
-        "push.*notification",
-        "fcm",
-        "notification"
-      ]
+      "rationale": "ATTENTION : 4.2.1 ne publie que des assets net9.0-* ; consommable depuis net10.0-* par compat NuGet mais emet un warning. Alternative sans dette : Plugin.LocalNotification (capability local-notification) si le push distant n'est pas requis",
+      "triggers": ["firebase", "push.*notification", "fcm", "notification.*distante"]
+    },
+    {
+      "module": "Plugin.LocalNotification",
+      "ref": "plugin-local-notification",
+      "capability": "local-notification",
+      "rationale": "Notifications locales planifiees, sans dependance Firebase/APNS",
+      "triggers": ["notification.*locale", "rappel", "reminder", "notification.*planifiee"]
     },
     {
       "module": "Plugin.Maui.Audio",
       "ref": "plugin-maui-audio",
       "capability": "audio",
-      "triggers": [
-        "audio",
-        "lecture.*son",
-        "enregistrement.*audio"
-      ]
+      "triggers": ["audio", "lecture.*son", "enregistrement.*audio"]
     },
     {
       "module": "Plugin.Fingerprint",
       "ref": "plugin-fingerprint",
       "capability": "biometric",
-      "triggers": [
-        "biometric",
-        "fingerprint",
-        "face-id",
-        "touch-id"
-      ]
+      "rationale": "Derniere version STABLE = 2.1.5. La 3.0.0 que pinnait le catalog n'existe qu'en 3.0.0-beta.1 (phantom corrige 2026-09-02)",
+      "triggers": ["biometric", "fingerprint", "face-id", "touch-id"]
     },
     {
       "module": "Plugin.Maui.AppRating",
       "ref": "plugin-maui-app-rating",
       "capability": "in-app-rating",
-      "triggers": [
-        "rating",
-        "app-store-rating",
-        "demande.*review"
-      ]
+      "rationale": "Derniere version publiee = 1.3.0. Le catalog pinnait 2.0.0, jamais publiee (phantom corrige 2026-09-02)",
+      "triggers": ["rating", "app-store-rating", "demande.*review"]
     },
     {
       "module": "Plugin.InAppBilling",
       "ref": "plugin-in-app-billing",
       "capability": "in-app-billing",
-      "triggers": [
-        "in-app-purchase",
-        "abonnement",
-        "billing"
-      ]
+      "triggers": ["in-app-purchase", "abonnement", "billing"]
     },
     {
       "module": "Microsoft.Maui.Controls.Maps",
       "ref": "maui-maps",
       "capability": "maps",
-      "triggers": [
-        "maps",
-        "carte",
-        "marker"
-      ]
+      "triggers": ["maps", "carte", "marker"]
     },
     {
       "module": "Stripe.net",
       "ref": "stripe-net",
       "capability": "stripe",
-      "triggers": [
-        "stripe",
-        "paiement",
-        "payment"
-      ]
+      "rationale": "SDK serveur Stripe. Cote mobile il ne sert qu'a typer les payloads — la cle secrete reste cote backend",
+      "triggers": ["stripe", "paiement", "payment"]
     },
     {
       "module": "Sentry.Maui",
       "ref": "sentry-maui",
       "capability": "sentry",
-      "triggers": [
-        "sentry",
-        "error.*tracking",
-        "monitoring.*erreurs"
-      ]
+      "rationale": "6.9.0 = derniere stable reelle. NuGet expose aussi un 14.12.1-dump1 qui n'est pas une release Sentry",
+      "triggers": ["sentry", "error.*tracking", "monitoring.*erreurs"]
     },
     {
       "module": "Microsoft.Extensions.Localization",
       "ref": "extensions-localization",
       "capability": "localization",
-      "triggers": [
-        "i18n",
-        "localization",
-        "multi.*langue"
-      ]
+      "triggers": ["i18n", "localization", "multi.*langue"]
     },
     {
-      "module": "Plugin.MauiCertPinning",
-      "ref": "plugin-cert-pinning",
-      "capability": "cert-pinning",
-      "triggers": [
-        "cert-pinning",
-        "ssl-pinning"
-      ]
+      "module": "xunit",
+      "ref": "xunit",
+      "capability": "maui-unit-tests",
+      "rationale": "Tests des ViewModels / services dans un projet net10.0 separe (pas de TFM mobile)",
+      "triggers": ["tests.*unitaires", "xunit", "viewmodel.*test"]
+    },
+    {
+      "module": "xunit.runner.visualstudio",
+      "ref": "xunit-runner-vs",
+      "capability": "maui-unit-tests",
+      "triggers": ["tests.*unitaires", "xunit"]
+    },
+    {
+      "module": "Microsoft.NET.Test.Sdk",
+      "ref": "test-sdk",
+      "capability": "maui-unit-tests",
+      "triggers": ["tests.*unitaires", "xunit"]
+    },
+    {
+      "module": "NSubstitute",
+      "ref": "nsubstitute",
+      "capability": "maui-unit-tests",
+      "rationale": "Mocking — retenu plutot que Moq (incident SponsorLink) et FluentAssertions (licence commerciale depuis la v8)",
+      "triggers": ["mock", "stub", "substitute", "tests.*unitaires"]
+    },
+    {
+      "module": "Shouldly",
+      "ref": "shouldly",
+      "capability": "maui-unit-tests",
+      "rationale": "Assertions lisibles sous licence BSD — remplace FluentAssertions, passe en licence payante a partir de la v8",
+      "triggers": ["assertions", "should", "tests.*unitaires"],
+      "alternative": true
     }
   ]
 }

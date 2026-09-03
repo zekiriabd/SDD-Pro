@@ -12,31 +12,31 @@
   },
   "versions": {
     "python": "3.12",
-    "fastapi": "0.115.5",
-    "uvicorn": "0.32.1",
-    "pydantic": "2.11.0",
-    "pydantic-settings": "2.7.0",
-    "sqlalchemy": "2.0.36",
-    "alembic": "1.14.0",
-    "asyncpg": "0.30.0",
+    "fastapi": "0.141.1",
+    "uvicorn": "0.52.4",
+    "pydantic": "2.13.5",
+    "pydantic-settings": "2.15.0",
+    "sqlalchemy": "2.0.52",
+    "alembic": "1.19.1",
+    "asyncpg": "0.31.0",
     "aiomysql": "0.2.0",
     "aioodbc": "0.5.0",
-    "aiosqlite": "0.20.0",
-    "structlog": "24.4.0",
+    "aiosqlite": "0.22.1",
+    "structlog": "26.1.0",
     "python-json-logger": "2.0.7",
-    "httpx": "0.28.0",
-    "tenacity": "9.0.0",
-    "fastapi-pagination": "0.12.32",
-    "slowapi": "0.1.9",
-    "python-multipart": "0.0.20",
-    "babel": "2.16.0",
-    "pyjwt": "2.10.1",
-    "argon2-cffi": "23.1.0",
-    "email-validator": "2.2.0",
+    "httpx": "0.28.1",
+    "tenacity": "9.1.4",
+    "fastapi-pagination": "0.15.16",
+    "slowapi": "0.1.10",
+    "python-multipart": "0.0.32",
+    "babel": "2.18.0",
+    "pyjwt": "2.13.0",
+    "argon2-cffi": "25.1.0",
+    "email-validator": "2.3.0",
     "openpyxl": "3.1.5",
-    "reportlab": "4.2.5",
-    "ruff": "0.8.4",
-    "mypy": "1.13.0"
+    "reportlab": "5.0.1",
+    "ruff": "0.16.5",
+    "mypy": "2.3.1"
   },
   "dbDrivers": {
     "postgres": {
@@ -178,7 +178,10 @@
   ],
   "plugins": [],
   "metadata": {
-    "lastUpdated": "2026-05-07",
-    "format": "compact (v2) \u00e2\u20ac\u201d DB drivers moved to top-level dbDrivers"
+    "lastUpdated": "2026-09-02",
+    "format": "compact (v2) â€” DB drivers moved to top-level dbDrivers",
+    "changeLog": [
+      "2026-09-02 — Audit backend. Catalog rebase depuis PyPI (etait fige au 2026-05-07). Deux points d'attention : (1) `python-json-logger` 2.0.7 est CONSERVE tel quel — c'est le dernier de sa ligne 2.x et structlog 26.x le remplace fonctionnellement ; il ne reste que pour le formatage JSON en sortie stdlib. (2) `reportlab` passe en majeure 4 -> 5 : c'est la seule majeure appliquee ici, la lib n'etant utilisee que par la capability `pdf` (surface reduite, pas d'API traversant le code applicatif). Le runtime Python reste pinne 3.12 (matrice LTS de rules/library-and-stack.md 0)."
+    ]
   }
 }
