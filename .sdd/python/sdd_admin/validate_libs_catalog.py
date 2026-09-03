@@ -32,6 +32,13 @@ from sdd_lib.exit_codes import FAIL_FAST  # noqa: E402
 BUILD_SYSTEMS = (
     "dotnet", "npm", "pnpm", "yarn", "gradle", "maven",
     "pip", "poetry", "uv", "cargo", "go-mod", "msbuild",
+    # 2026-09-02 — mobiles catalog extension (Flutter / SwiftUI).
+    #   pub   : Dart/Flutter, `flutter pub add` -> pubspec.yaml
+    #   swift : SwiftPM, `Package.swift` dependencies / Xcode SPM
+    #   composer : PHP, `composer require` -> composer.json (Laravel / Symfony)
+    #   cmake    : C++ / Qt, CMakeLists.txt (find_package / target_link_libraries)
+    # Kept in sync with `templates/libs-catalog.schema.json` buildSystem enum.
+    "pub", "swift", "composer", "cmake",
 )
 REQUIRED_TOP_KEYS = ("stackId", "category", "schemaVersion", "buildSystem", "versions", "core")
 VERSION_KEY_RE = re.compile(r"^[a-z][a-z0-9-]*$")

@@ -1,0 +1,119 @@
+{
+  "$schema": "../../templates/libs-catalog.schema.json",
+  "stackId": "swift-testing",
+  "category": "qa",
+  "schemaVersion": 1,
+  "buildSystem": "swift",
+  "manifest": {
+    "files": [
+      "workspace/src/{AppName}/Package.swift",
+      "workspace/src/{AppName}/{AppName}.xcodeproj/project.pbxproj"
+    ]
+  },
+  "metadata": {
+    "lastUpdated": "2026-09-02",
+    "targetStack": "mobiles/swiftui",
+    "coverageTool": "xccov (llvm-cov via Xcode, natif)",
+    "hostRequirement": "macOS + Xcode 26 (obligatoire)",
+    "notes": "Stack QA du stack mobiles/swiftui. LE RUNNER ET LE COVERAGE SONT FOURNIS PAR LA TOOLCHAIN : `Swift Testing` (@Test / #expect) est integre a Swift 6, `XCTest` et `XCUITest` au SDK, et le coverage se collecte par `xcodebuild -enableCodeCoverage YES` puis `xcrun xccov`. Aucun de ces quatre elements n'a de version SwiftPM : ils ne peuvent pas figurer dans ce catalog, et validate_libs_catalog.py ne peut pas les verifier. Ce catalog ne declare donc que ce que la toolchain ne fournit PAS : snapshot tests, introspection de vue SwiftUI, stubbing HTTP, matchers alternatifs. Le champ `module` porte la coordonnee GitHub `owner/repo`. PRE-REQUIS : hote macOS — ce stack QA n'est pas executable sur Windows/Linux, exactement comme le stack applicatif qu'il accompagne.",
+    "manualInstall": true,
+    "manualInstallRationale": "core=[] est INTENTIONNEL : le runner (Swift Testing, integre a Swift 6), XCTest, XCUITest et la collecte de coverage (xcodebuild -enableCodeCoverage + xcrun xccov) sont tous fournis par la toolchain et le SDK, sans coordonnee SwiftPM. arch n'a donc aucune librairie a installer pour rendre ce stack QA operationnel — il doit en revanche activer le code coverage sur le scheme Xcode (cf. .md 3). Tout ce qui est declare ici est on-demand, car chaque entree est un CHOIX (snapshot, introspection, stubbing HTTP) et non un prerequis."
+  },
+  "versions": {
+    "snapshot-testing": "1.19.4",
+    "view-inspector": "0.10.3",
+    "custom-dump": "1.7.3",
+    "mocker": "3.0.2",
+    "ohhttpstubs": "9.1.0",
+    "nimble": "14.0.0",
+    "quick": "7.6.2"
+  },
+  "core": [],
+  "onDemand": [
+    {
+      "module": "pointfreeco/swift-snapshot-testing",
+      "ref": "snapshot-testing",
+      "capability": "snapshot-tests",
+      "rationale": "Non-regression visuelle sur une vue SwiftUI. C'est le moyen le plus direct de tester du rendu declaratif : un `body` ne s'inspecte pas facilement, mais son rendu se compare",
+      "triggers": [
+        "snapshot",
+        "regression.*visuelle",
+        "test.*rendu",
+        "test.*vue"
+      ],
+      "license": "MIT"
+    },
+    {
+      "module": "nalexn/ViewInspector",
+      "ref": "view-inspector",
+      "capability": "view-introspection",
+      "rationale": "Inspection de la hierarchie d'une vue SwiftUI (assertions sur le texte, l'etat, les actions) sans passer par un snapshot ni un test UI complet. Complementaire de snapshot-tests : l'un verifie le rendu, l'autre la structure",
+      "triggers": [
+        "inspecter.*vue",
+        "assertion.*hierarchie",
+        "viewinspector",
+        "test.*unitaire.*vue"
+      ],
+      "license": "MIT"
+    },
+    {
+      "module": "pointfreeco/swift-custom-dump",
+      "ref": "custom-dump",
+      "capability": "diff-assertions",
+      "rationale": "`expectNoDifference` — produit un diff lisible entre deux valeurs imbriquees. Sur un modele profond, le message d'echec par defaut de #expect est illisible",
+      "triggers": [
+        "diff.*lisible",
+        "comparaison.*structure",
+        "custom-dump"
+      ],
+      "license": "MIT"
+    },
+    {
+      "module": "WeTransfer/Mocker",
+      "ref": "mocker",
+      "capability": "http-stubbing",
+      "rationale": "Stub d'URLSession par URLProtocol — permet de tester un APIClient sans reseau. C'est le complement naturel du choix `URLSession` du stack applicatif (mobiles/swiftui 2.3)",
+      "triggers": [
+        "mock.*http",
+        "stub.*reseau",
+        "test.*apiclient",
+        "mocker"
+      ],
+      "license": "MIT"
+    },
+    {
+      "module": "AliSoftware/OHHTTPStubs",
+      "ref": "ohhttpstubs",
+      "capability": "http-stubbing",
+      "rationale": "Alternative historique, Objective-C. A retenir uniquement sur une base de code qui l'utilise deja",
+      "triggers": [
+        "ohhttpstubs"
+      ],
+      "alternative": true
+    },
+    {
+      "module": "Quick/Nimble",
+      "ref": "nimble",
+      "capability": "assertions",
+      "rationale": "Matchers expressifs. Swift Testing (#expect) est integre a la toolchain et couvre la plupart des cas SANS dependance — n'ajouter Nimble que si l'equipe l'utilise deja",
+      "triggers": [
+        "nimble",
+        "matchers",
+        "assertions.*expressives"
+      ],
+      "alternative": true
+    },
+    {
+      "module": "Quick/Quick",
+      "ref": "quick",
+      "capability": "assertions",
+      "rationale": "Tests en style BDD (describe/it). Redondant avec la structure @Suite / @Test de Swift Testing",
+      "triggers": [
+        "quick",
+        "bdd",
+        "describe.*it"
+      ],
+      "alternative": true
+    }
+  ]
+}

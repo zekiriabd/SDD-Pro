@@ -1,0 +1,228 @@
+{
+  "$schema": "../../templates/libs-catalog.schema.json",
+  "stackId": "swiftui",
+  "category": "mobiles",
+  "schemaVersion": 1,
+  "buildSystem": "swift",
+  "manifest": {
+    "files": [
+      "workspace/src/{AppName}/{AppName}.xcodeproj/project.pbxproj",
+      "workspace/src/{AppName}/Package.swift",
+      "workspace/src/{AppName}/{AppName}/Info.plist",
+      "workspace/src/{AppName}/{AppName}/{AppName}App.swift",
+      "workspace/src/{AppName}/.swiftlint.yml",
+      "workspace/src/{AppName}/.swift-format"
+    ]
+  },
+  "metadata": {
+    "lastUpdated": "2026-09-02",
+    "platforms": ["ios"],
+    "optionalPlatforms": ["ipados", "macos-catalyst", "visionos"],
+    "workflow": "native-single-platform",
+    "toolchain": {
+      "swift": "6.3.3",
+      "xcode": "26.6",
+      "iosSdk": "26",
+      "iosDeploymentTarget": "18.0",
+      "swiftLanguageMode": "6",
+      "hostRequirement": "macOS + Xcode (obligatoire — aucune cible constructible ailleurs)"
+    },
+    "notes": "Stack iOS NATIF : SwiftUI + Observation (@Observable) + async/await + URLSession. Consomme un backend separe declare en ## Active Tech Specs. buildSystem='swift' (SwiftPM : dependances declarees dans Package.swift ou dans les Package Dependencies du .xcodeproj). CORE VOLONTAIREMENT MINIMAL : le SDK Apple couvre nativement ce que les autres stacks du catalogue delegent a des libs — reseau (URLSession + async/await), state (Observation), DI (@Environment), navigation (NavigationStack), persistance (SwiftData), logs (OSLog), tests (Swift Testing). Ajouter Alamofire ou un framework d'architecture est un CHOIX, pas un prerequis — d'ou leur presence en onDemand et non en core. PAQUETS FOURNIS PAR LA TOOLCHAIN, absents de ce catalog car sans version SPM : swift-testing (integre depuis Swift 6), XCTest, SwiftData, Observation. Le champ `module` porte ici la coordonnee GitHub `owner/repo` : sync_stack_md.py la rend en `.package(url: \"https://github.com/{module}.git\", from: \"{version}\")`. PRE-REQUIS : hote macOS + Xcode 26 — ce stack n'est ni constructible ni verifiable sur Windows/Linux."
+  },
+  "versions": {
+    "swift-collections": "1.6.0",
+    "swift-algorithms": "1.2.1",
+    "swift-async-algorithms": "1.1.5",
+    "keychain-access": "4.2.2",
+    "factory": "3.3.2",
+    "swift-log": "1.15.0",
+    "alamofire": "5.12.0",
+    "kingfisher": "8.12.0",
+    "nuke": "13.2.0",
+    "grdb": "7.11.1",
+    "sqlite-swift": "0.16.0",
+    "tca": "1.26.2",
+    "swift-dependencies": "1.17.1",
+    "swift-sharing": "2.10.1",
+    "snapshot-testing": "1.19.4",
+    "nimble": "14.0.0",
+    "sentry-cocoa": "9.26.1",
+    "firebase-ios": "12.18.0",
+    "msal-objc": "2.15.0",
+    "stripe-ios": "26.9.0",
+    "lottie-ios": "4.6.1",
+    "swiftui-introspect": "26.0.2",
+    "swiftlint": "0.65.1",
+    "swift-format": "603.0.0"
+  },
+  "core": [
+    {
+      "module": "apple/swift-collections",
+      "ref": "swift-collections",
+      "rationale": "OrderedDictionary / OrderedSet / Deque — absents de la stdlib. Un OrderedDictionary est la structure correcte pour une liste SwiftUI qui doit rester ordonnee ET indexable par identifiant",
+      "license": "Apache-2.0"
+    },
+    {
+      "module": "apple/swift-async-algorithms",
+      "ref": "swift-async-algorithms",
+      "rationale": "debounce / throttle / combineLatest sur AsyncSequence. Indispensable des qu'un champ de recherche declenche un appel reseau ; il n'y a pas d'equivalent natif",
+      "license": "Apache-2.0"
+    },
+    {
+      "module": "kishikawakatsumi/KeychainAccess",
+      "ref": "keychain-access",
+      "rationale": "Wrapper Keychain. L'API brute (SecItemAdd et ses CFDictionary) est verbeuse et facile a mal utiliser — c'est precisement le composant ou une erreur devient une faille",
+      "license": "MIT"
+    },
+    {
+      "module": "hmlongco/Factory",
+      "ref": "factory",
+      "rationale": "Conteneur DI compile-safe et leger. Retenu plutot que Swinject (resolution au runtime) : les dependances manquantes sont detectees a la compilation. @Environment suffit pour l'UI, pas pour injecter un repository dans un @Observable",
+      "license": "MIT"
+    }
+  ],
+  "onDemand": [
+    {
+      "module": "Alamofire/Alamofire",
+      "ref": "alamofire",
+      "capability": "http-client",
+      "rationale": "URLSession + async/await couvre le cas standard SANS dependance. Alamofire ne se justifie que si l'US demande de l'upload multipart avec suivi de progression, du retry declaratif ou de la validation de reponse chainee",
+      "triggers": ["alamofire", "multipart", "upload.*progression", "retry.*declaratif"],
+      "alternative": true
+    },
+    {
+      "module": "onevcat/Kingfisher",
+      "ref": "kingfisher",
+      "capability": "image-loading",
+      "rationale": "Cache disque + memoire, downsampling, placeholders. AsyncImage (natif) ne met en cache que de facon opportuniste et ne convient pas a une liste qui defile",
+      "triggers": ["image.*distante", "avatar", "vignette", "cache.*image", "kingfisher"]
+    },
+    {
+      "module": "kean/Nuke",
+      "ref": "nuke",
+      "capability": "image-loading",
+      "triggers": ["nuke", "pipeline.*image"],
+      "alternative": true
+    },
+    {
+      "module": "groue/GRDB.swift",
+      "ref": "grdb",
+      "capability": "offline-db",
+      "rationale": "SQLite avec observation par ValueObservation. A preferer a SwiftData quand l'US exige du SQL explicite, des migrations versionnees ou une base partagee avec un autre stack",
+      "triggers": ["sqlite", "offline-first", "base.*locale", "migration.*locale", "grdb"]
+    },
+    {
+      "module": "stephencelis/SQLite.swift",
+      "ref": "sqlite-swift",
+      "capability": "offline-db",
+      "triggers": ["sqlite.swift", "requetes.*typees.*sqlite"],
+      "alternative": true
+    },
+    {
+      "module": "pointfreeco/swift-composable-architecture",
+      "ref": "tca",
+      "capability": "architecture-tca",
+      "rationale": "Architecture unidirectionnelle (State / Action / Reducer) avec exhaustivite testable. Choix STRUCTURANT : il redefinit l'organisation de toute l'app. A ne retenir que si l'equipe le connait deja",
+      "triggers": ["composable.*architecture", "\\btca\\b", "reducer", "architecture.*unidirectionnelle"]
+    },
+    {
+      "module": "pointfreeco/swift-dependencies",
+      "ref": "swift-dependencies",
+      "capability": "architecture-tca",
+      "rationale": "Injection de dependances de TCA — remplace Factory dans ce mode (ne pas cumuler les deux)",
+      "triggers": ["composable.*architecture", "\\btca\\b", "swift-dependencies"]
+    },
+    {
+      "module": "pointfreeco/swift-sharing",
+      "ref": "swift-sharing",
+      "capability": "architecture-tca",
+      "rationale": "Etat persiste et partage entre reducers",
+      "triggers": ["composable.*architecture", "\\btca\\b", "swift-sharing"],
+      "alternative": true
+    },
+    {
+      "module": "pointfreeco/swift-snapshot-testing",
+      "ref": "snapshot-testing",
+      "capability": "snapshot-tests",
+      "rationale": "Tests de non-regression visuelle sur une vue SwiftUI — le seul moyen realiste de tester du rendu declaratif",
+      "triggers": ["snapshot", "regression.*visuelle", "test.*rendu", "test.*ui.*vue"]
+    },
+    {
+      "module": "Quick/Nimble",
+      "ref": "nimble",
+      "capability": "assertions",
+      "rationale": "Matchers expressifs. Swift Testing (#expect) est integre a la toolchain et couvre la plupart des cas sans dependance",
+      "triggers": ["nimble", "matchers", "assertions.*expressives"],
+      "alternative": true
+    },
+    {
+      "module": "getsentry/sentry-cocoa",
+      "ref": "sentry-cocoa",
+      "capability": "sentry",
+      "triggers": ["sentry", "error.*tracking", "crash.*report", "monitoring.*erreurs"]
+    },
+    {
+      "module": "firebase/firebase-ios-sdk",
+      "ref": "firebase-ios",
+      "capability": "push",
+      "rationale": "Firebase Cloud Messaging. Pour du push APNS pur, UserNotifications (natif) suffit et evite tout le SDK",
+      "triggers": ["push.*notification", "fcm", "firebase", "notification.*distante"]
+    },
+    {
+      "module": "AzureAD/microsoft-authentication-library-for-objc",
+      "ref": "msal-objc",
+      "capability": "auth-azure-ad",
+      "rationale": "MSAL iOS (Objective-C, interoperable Swift) — auth Entra ID / Azure AD avec broker",
+      "triggers": ["azure-ad", "msal", "entra", "sso"]
+    },
+    {
+      "module": "stripe/stripe-ios",
+      "ref": "stripe-ios",
+      "capability": "stripe",
+      "triggers": ["stripe", "paiement", "payment", "apple.*pay"]
+    },
+    {
+      "module": "airbnb/lottie-ios",
+      "ref": "lottie-ios",
+      "capability": "animations",
+      "rationale": "Lecture d'animations After Effects. Les animations SwiftUI natives couvrent tout le reste",
+      "triggers": ["lottie", "animation.*apres.*effects", "animation.*json"]
+    },
+    {
+      "module": "siteline/swiftui-introspect",
+      "ref": "swiftui-introspect",
+      "capability": "uikit-bridge",
+      "rationale": "Acces a la vue UIKit sous-jacente d'un composant SwiftUI. Echappatoire pour une propriete non exposee par SwiftUI — a justifier au cas par cas",
+      "triggers": ["introspect", "uikit.*sous-jacent", "personnaliser.*composant.*natif"]
+    },
+    {
+      "module": "apple/swift-log",
+      "ref": "swift-log",
+      "capability": "logging",
+      "rationale": "Facade de log. OSLog / Logger (natif) est preferable sur iOS : integration Console.app et confidentialite des donnees. swift-log ne se justifie que si du code est partage avec un backend Swift",
+      "triggers": ["swift-log", "log.*partage.*backend"],
+      "alternative": true
+    },
+    {
+      "module": "apple/swift-algorithms",
+      "ref": "swift-algorithms",
+      "capability": "algorithms",
+      "rationale": "chunked / windows / combinations — utilitaires de sequence absents de la stdlib",
+      "triggers": ["chunked", "permutations", "algorithmes.*sequence"]
+    },
+    {
+      "module": "realm/SwiftLint",
+      "ref": "swiftlint",
+      "capability": "lint",
+      "rationale": "Linter, a brancher en Build Tool Plugin SPM. Outil de developpement, pas une dependance du binaire",
+      "triggers": ["swiftlint", "lint", "analyse.*statique"]
+    },
+    {
+      "module": "swiftlang/swift-format",
+      "ref": "swift-format",
+      "capability": "lint",
+      "rationale": "Formateur officiel. Sa version suit la toolchain : la ligne 603.x correspond a Swift 6.3 — la desynchroniser du compilateur provoque des reformattages en boucle",
+      "triggers": ["swift-format", "formatage", "format.*code"]
+    }
+  ]
+}

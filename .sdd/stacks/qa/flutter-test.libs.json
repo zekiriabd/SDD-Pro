@@ -1,0 +1,81 @@
+{
+  "$schema": "../../templates/libs-catalog.schema.json",
+  "stackId": "flutter-test",
+  "category": "qa",
+  "schemaVersion": 1,
+  "buildSystem": "pub",
+  "manifest": {
+    "files": [
+      "workspace/src/{AppName}/pubspec.yaml",
+      "workspace/src/{AppName}/analysis_options.yaml"
+    ]
+  },
+  "metadata": {
+    "lastUpdated": "2026-09-02",
+    "targetStack": "mobiles/flutter",
+    "coverageTool": "flutter test --coverage (lcov, natif)",
+    "notes": "Stack QA du stack mobiles/flutter. LE RUNNER ET LE COVERAGE SONT NATIFS : `flutter_test` et `integration_test` sont fournis par le SDK (`sdk: flutter` dans pubspec.yaml) et n'ont donc AUCUNE version pub — ils ne peuvent pas figurer dans ce catalog, et `validate_libs_catalog.py` ne peut pas les verifier. De meme `flutter test --coverage` produit un lcov.info sans aucune dependance. Ce catalog ne declare donc que ce que le SDK ne fournit PAS : mocking, golden tests, E2E natif. DEUX PAQUETS ONT ETE ECARTES a la construction (2026-09-02) : `golden_toolkit` est marque DISCONTINUED sur pub.dev (remplace par alchemist), et `network_image_mock` declare `sdk: >=2.12.0 <3.0.0` — il est incompatible avec Dart 3 et ne resoudra jamais sur ce stack."
+  },
+  "versions": {
+    "mocktail": "1.0.5",
+    "alchemist": "0.14.0",
+    "patrol": "4.9.0",
+    "patrol-finders": "3.6.0",
+    "bloc-test": "10.0.0",
+    "coverage": "1.15.1",
+    "dart-test": "1.31.2"
+  },
+  "core": [
+    {
+      "module": "mocktail",
+      "ref": "mocktail",
+      "rationale": "Mocking sans codegen (dev_dependency). Retenu plutot que mockito, qui impose un `build_runner` par classe mockee — friction inacceptable en TDD",
+      "license": "MIT"
+    }
+  ],
+  "onDemand": [
+    {
+      "module": "alchemist",
+      "ref": "alchemist",
+      "capability": "golden-tests",
+      "rationale": "Golden tests (non-regression visuelle) avec separation goldens CI / plateforme. REMPLACE golden_toolkit, marque discontinued sur pub.dev",
+      "triggers": ["golden", "regression.*visuelle", "snapshot.*widget", "test.*rendu"]
+    },
+    {
+      "module": "patrol",
+      "ref": "patrol",
+      "capability": "e2e-native",
+      "rationale": "E2E pilotant les dialogues NATIFS (permissions, notifications, WebView) — hors de portee d'integration_test, qui ne voit que l'arbre Flutter",
+      "triggers": ["tests.*e2e", "test.*permission.*natif", "patrol", "dialogue.*systeme"]
+    },
+    {
+      "module": "patrol_finders",
+      "ref": "patrol-finders",
+      "capability": "e2e-native",
+      "rationale": "API de selection de haut niveau ($ / tap / enterText) — utilisable seule dans un widget test, sans le harnais natif de patrol",
+      "triggers": ["patrol", "finders.*lisibles"]
+    },
+    {
+      "module": "bloc_test",
+      "ref": "bloc-test",
+      "capability": "bloc-testing",
+      "rationale": "`blocTest()` — pertinent UNIQUEMENT si la capability state-management-alt (flutter_bloc) est active sur mobiles/flutter. Inutile en Riverpod, ou un provider se teste avec un ProviderContainer",
+      "triggers": ["\\bbloc\\b", "cubit", "bloc_test"]
+    },
+    {
+      "module": "coverage",
+      "ref": "coverage",
+      "capability": "coverage-tooling",
+      "rationale": "Manipulation de lcov en Dart (filtrage, fusion, format). `flutter test --coverage` suffit a PRODUIRE le rapport ; ce paquet ne sert qu'a le post-traiter (exclure le code genere, fusionner plusieurs suites)",
+      "triggers": ["coverage.*seuil", "exclure.*coverage", "fusion.*coverage", "lcov"]
+    },
+    {
+      "module": "test",
+      "ref": "dart-test",
+      "capability": "dart-only-tests",
+      "rationale": "Runner Dart PUR, pour un package sans dependance Flutter. Dans une app Flutter, c'est `flutter_test` (SDK) qui est utilise — ne pas cumuler les deux",
+      "triggers": ["package.*dart.*pur", "test.*sans.*flutter"],
+      "alternative": true
+    }
+  ]
+}

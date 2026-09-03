@@ -301,47 +301,47 @@ Codes Razor specifiques : `RZ1006` (tag helper inconnu — generalement `@addTag
 
 | Lib | Version | Role |
 |-----|---------|------|
-| Microsoft.AspNetCore.Mvc.Razor.RuntimeCompilation | 10.0.6 | Hot-reload Views .cshtml en dev |
-| Microsoft.EntityFrameworkCore | 10.0.6 | ORM principal |
-| Microsoft.EntityFrameworkCore.SqlServer | 10.0.6 | Provider defaut (override via dbDrivers selon DatabaseType) |
-| Microsoft.EntityFrameworkCore.Design | 10.0.6 | Scaffolding entities |
-| Microsoft.EntityFrameworkCore.Tools | 10.0.6 | CLI ef |
-| AutoMapper | 16.1.1 | Mapping Entity → ViewModel |
-| FluentValidation.AspNetCore | 11.10.0 | Validation declarative auto-bind ModelState |
-| DevExtreme.AspNet.Data | 5.0.0 | DataSourceLoader server-side (filter/sort/group/page sur IQueryable) |
-| DevExtreme.AspNet.Mvc | 25.1.5 | HtmlHelpers Razor (@Html.DevExtreme().DataGrid()...) |
+| Microsoft.AspNetCore.Mvc.Razor.RuntimeCompilation | 10.0.11 | Hot-reload des vues .cshtml en dev (recompile a la volee, ne pas pin sur ef-core, version aligne ASP.NET Core) |
+| Microsoft.EntityFrameworkCore | 10.0.11 | ORM principal |
+| Microsoft.EntityFrameworkCore.SqlServer | 10.0.11 | Provider defaut (override via dbDrivers selon DatabaseType) |
+| Microsoft.EntityFrameworkCore.Design | 10.0.11 |  |
+| Microsoft.EntityFrameworkCore.Tools | 10.0.11 |  |
+| AutoMapper | 16.2.0 | Mapping Entity -> ViewModel |
+| FluentValidation.AspNetCore | 11.3.1 | Validation declarative cote Controller (auto-binding ModelState) |
+| DevExtreme.AspNet.Data | 5.1.0 | DataSourceLoader server-side (filter, sort, group, page sur IQueryable<T>) pour endpoints JSON consommes par les widgets DevExtreme |
+| DevExtreme.AspNet.Mvc | 26.1.4 | HtmlHelpers DevExtreme cote Razor: @(Html.DevExtreme().DataGrid()...) — generation widgets server-side |
 | Serilog.AspNetCore | 10.0.0 | Logger structure |
-| Serilog.Sinks.Console | 6.1.1 | Sink console defaut |
-| Microsoft.Extensions.Caching.Memory | 10.0.0 | IMemoryCache (transitif ASP.NET Core) |
+| Serilog.Sinks.Console | 6.1.1 |  |
+| Microsoft.Extensions.Caching.Memory | 10.0.11 | IMemoryCache integre (pas de package racine, transitif ASP.NET Core) |
 
-#### 2.4.b Librairies ON-DEMAND (installees si l'US declenche)
+### 2.4.b Librairies ON-DEMAND (installees si l'US declenche)
 
 Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'US + ACs.
 
 | Capability | Lib | Version | Triggers |
 |---|---|---|---|
-| db-postgres | Npgsql.EntityFrameworkCore.PostgreSQL | 9.0.4 | DatabaseType.*PostgreSql, postgres |
+| db-postgres | Npgsql.EntityFrameworkCore.PostgreSQL | 10.0.3 | DatabaseType.*PostgreSql, postgres |
 | db-mysql | Pomelo.EntityFrameworkCore.MySql | 9.0.0 | DatabaseType.*MySql, mysql, mariadb |
-| db-sqlite | Microsoft.EntityFrameworkCore.Sqlite | 10.0.6 | DatabaseType.*Sqlite |
-| azure-ad | Microsoft.Identity.Web | floating | auth-azure-ad, azure.*ad, msal, AzureAd |
-| azure-ad | Microsoft.Identity.Web.UI | floating | auth-azure-ad, azure.*ad |
-| openapi | Swashbuckle.AspNetCore | 7.2.0 | swagger, openapi, /api-docs |
-| excel | ClosedXML | 0.104.1 | excel, \.xlsx, export.*excel |
-| pdf | QuestPDF | 2024.12.3 | pdf, \.pdf, export.*pdf, generer.*pdf |
-| http-client | Microsoft.Extensions.Http.Polly | 9.0.1 | appel.*api.*externe, service.*externe, polly, retry.*http |
-| smtp | MailKit | 4.9.0 | email, smtp, envoi.*mail, notification.*mail |
-| smtp | MimeKit | 4.9.0 | email, smtp |
-| logging-file | Serilog.Sinks.File | 6.0.0 | log.*file, log.*rolling, audit.*log |
-| redis-cache | StackExchange.Redis | 2.8.16 | redis, distributed.*cache |
+| db-sqlite | Microsoft.EntityFrameworkCore.Sqlite | 10.0.11 | DatabaseType.*Sqlite |
+| azure-ad | Microsoft.Identity.Web | 4.14.2 | auth-azure-ad, azure.*ad, \bmsal\b, AzureAd |
+| azure-ad | Microsoft.Identity.Web.UI | 4.14.2 | auth-azure-ad, azure.*ad |
+| openapi | Swashbuckle.AspNetCore | 10.2.3 | swagger, openapi, /api-docs |
+| excel | ClosedXML | 0.105.1 | \bexcel\b, \.xlsx\b, export.*excel |
+| pdf | QuestPDF | 2026.8.0 | \bpdf\b, \.pdf\b, export.*pdf, generer.*pdf |
+| http-client | Microsoft.Extensions.Http.Polly | 10.0.11 | appel.*api.*externe, service.*externe, \bpolly\b, retry.*http |
+| smtp | MailKit | 4.17.0 | email, smtp, envoi.*mail, notification.*mail |
+| smtp | MimeKit | 4.17.0 | email, smtp |
+| logging-file | Serilog.Sinks.File | 7.0.0 | log.*file, log.*rolling, audit.*log |
+| redis-cache | StackExchange.Redis | 3.1.31 | \bredis\b, distributed.*cache |
 
 #### 2.4.d DB Drivers (selectionne par arch selon DatabaseType)
 
 | DatabaseType | Module | Version | Scope |
 |---|---|---|---|
-| sqlserver | `Microsoft.EntityFrameworkCore.SqlServer` | 10.0.6 | runtime |
-| postgres | `Npgsql.EntityFrameworkCore.PostgreSQL` | 9.0.4 | runtime |
+| sqlserver | `Microsoft.EntityFrameworkCore.SqlServer` | 10.0.11 | runtime |
+| postgres | `Npgsql.EntityFrameworkCore.PostgreSQL` | 10.0.3 | runtime |
 | mysql | `Pomelo.EntityFrameworkCore.MySql` | 9.0.0 | runtime |
-| sqlite | `Microsoft.EntityFrameworkCore.Sqlite` | 10.0.6 | runtime |
+| sqlite | `Microsoft.EntityFrameworkCore.Sqlite` | 10.0.11 | runtime |
 <!-- LIBS_CATALOG_END -->
 
 ---

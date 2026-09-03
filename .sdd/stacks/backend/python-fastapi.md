@@ -17,7 +17,7 @@ Scope: backend uniquement (API REST async, logique métier, persistance)
 
 ### 1.1 Pattern applicatif (Python/FastAPI idioms)
 
-Pour `ArchiPattern: MVC` (défaut), suit `archi/mvc.md` avec idioms FastAPI 0.115 + Pydantic v2 + SQLAlchemy 2.x async :
+Pour `ArchiPattern: MVC` (défaut), suit `archi/mvc.md` avec les idiomes FastAPI 0.141 + Pydantic v2 + SQLAlchemy 2.x async :
 - **Endpoint** = `APIRouter` FastAPI avec route decorators (`@router.get`, `@router.post`)
 - **Validation Pydantic** auto sur Input DTOs (FastAPI parse + valide automatiquement le body)
 - **Service interface** = classe abstraite `abc.ABC` dans `services/interfaces/` — convention `IXxxService` (préfixe `I` non-Python idiomatique, mais consistant cross-stack SDD_Pro)
@@ -73,7 +73,7 @@ Hérités de `archi/mvc.md §4`. **Ajouts** Python :
 - **Stack ID** : `back-fastapi`
 - **Langage** : Python 3.12+
 - **Runtime** : ASGI (uvicorn 0.32+)
-- **Framework principal** : FastAPI 0.115.x
+- **Framework principal** : FastAPI 0.141.x
 - **Build tool** : pip + venv (Poetry / uv tolérés)
 - **Namespace racine** : `{BackendNamespace}` (ex. `app`)
 
@@ -135,23 +135,23 @@ source .venv/bin/activate 2>/dev/null || .venv\\Scripts\\activate
 ```bash
 # Auto-genere depuis python-fastapi.libs.json -- ne pas editer (utiliser sync_stack_md.py).
 uv add --project workspace/src/{BackendName} \
-  fastapi==0.115.5 \
-  uvicorn[standard]==0.32.1 \
-  pydantic==2.10.3 \
-  pydantic-settings==2.6.1 \
-  sqlalchemy[asyncio]==2.0.36 \
-  alembic==1.14.0 \
-  structlog==24.4.0 \
+  fastapi==0.141.1 \
+  uvicorn[standard]==0.52.4 \
+  pydantic==2.13.5 \
+  pydantic-settings==2.15.0 \
+  sqlalchemy[asyncio]==2.0.52 \
+  alembic==1.19.1 \
+  structlog==26.1.0 \
   python-json-logger==2.0.7 \
-  httpx==0.28.0 \
-  tenacity==9.0.0 \
-  fastapi-pagination==0.12.32 \
-  slowapi==0.1.9 \
-  python-multipart==0.0.20 \
-  babel==2.16.0 \
-  email-validator==2.2.0 \
-  ruff==0.8.4 \
-  mypy==1.13.0
+  httpx==0.28.1 \
+  tenacity==9.1.4 \
+  fastapi-pagination==0.15.16 \
+  slowapi==0.1.10 \
+  python-multipart==0.0.32 \
+  babel==2.18.0 \
+  email-validator==2.3.0 \
+  ruff==0.16.5 \
+  mypy==2.3.1
 ```
 <!-- CORE_PACKAGES_END -->
 
@@ -159,16 +159,16 @@ uv add --project workspace/src/{BackendName} \
 ```bash
 # Auto-genere depuis python-fastapi.libs.json (on-demand) -- installe par dev-* si l'US declenche un trigger.
 # capability: auth-local
-uv add --project workspace/src/{BackendName} passlib[bcrypt]==1.7.4
+uv add --project workspace/src/{BackendName} argon2-cffi==25.1.0
 
 # capability: jwt
-uv add --project workspace/src/{BackendName} python-jose[cryptography]==3.3.0
+uv add --project workspace/src/{BackendName} pyjwt[crypto]==2.13.0
 
 # capability: excel
 uv add --project workspace/src/{BackendName} openpyxl==3.1.5
 
 # capability: pdf
-uv add --project workspace/src/{BackendName} reportlab==4.2.5
+uv add --project workspace/src/{BackendName} reportlab==5.0.1
 ```
 <!-- ONDEMAND_PACKAGES_END -->
 
@@ -204,6 +204,29 @@ EOF
 fi
 ```
 
+### 2.3.0 Rebase du catalog — audit 2026-09-02
+
+Le catalog était figé au 2026-05-07. Toutes les versions ont été re-résolues
+contre PyPI. Deux décisions à connaître :
+
+- **`reportlab` 4.2.5 → 5.0.1** : seule montée en **majeure** appliquée sur ce
+  stack. Justification : la lib ne sert que la capability `pdf`, sa surface
+  d'API ne traverse pas le code applicatif (elle est encapsulée dans un
+  service de génération). Le critère retenu partout ailleurs — pas de majeure
+  sur un stack validé sans re-bench — ne s'applique pas à une dépendance
+  aussi périphérique.
+- **`python-json-logger` 2.0.7 conservé** : c'est le dernier de sa ligne 2.x.
+  `structlog` (bumpé 24.4.0 → 26.1.0) le remplace fonctionnellement ; il ne
+  subsiste que pour le formatage JSON en sortie stdlib.
+
+Le runtime reste pinné **Python 3.12** conformément à la matrice LTS de
+`rules/library-and-stack.md §0`. À noter : la quasi-totalité du catalog
+déclare désormais `requires_python >= 3.10`, et `django` (nouveau stack
+`backend/django`) exige `>= 3.12` — 3.12 reste donc le plancher cohérent
+pour l'ensemble des stacks Python du catalogue.
+
+---
+
 ### 2.3 Patterns d'erreurs compilation / runtime
 
 Format Python :
@@ -236,23 +259,23 @@ Erreurs ruff/mypy :
 
 | Lib | Version | Role |
 |-----|---------|------|
-| fastapi | 0.115.5 |  |
-| uvicorn[standard] | 0.32.1 |  |
-| pydantic | 2.11.0 |  |
-| pydantic-settings | 2.7.0 |  |
-| sqlalchemy[asyncio] | 2.0.36 |  |
-| alembic | 1.14.0 |  |
-| structlog | 24.4.0 |  |
+| fastapi | 0.141.1 |  |
+| uvicorn[standard] | 0.52.4 |  |
+| pydantic | 2.13.5 |  |
+| pydantic-settings | 2.15.0 |  |
+| sqlalchemy[asyncio] | 2.0.52 |  |
+| alembic | 1.19.1 |  |
+| structlog | 26.1.0 |  |
 | python-json-logger | 2.0.7 |  |
-| httpx | 0.28.0 |  |
-| tenacity | 9.0.0 |  |
-| fastapi-pagination | 0.12.32 |  |
-| slowapi | 0.1.9 |  |
-| python-multipart | 0.0.20 |  |
-| babel | 2.16.0 |  |
-| email-validator | 2.2.0 |  |
-| ruff | 0.8.4 |  |
-| mypy | 1.13.0 |  |
+| httpx | 0.28.1 |  |
+| tenacity | 9.1.4 |  |
+| fastapi-pagination | 0.15.16 |  |
+| slowapi | 0.1.10 |  |
+| python-multipart | 0.0.32 |  |
+| babel | 2.18.0 |  |
+| email-validator | 2.3.0 |  |
+| ruff | 0.16.5 |  |
+| mypy | 2.3.1 |  |
 
 ### 2.4.b Librairies ON-DEMAND (installees si l'US declenche)
 
@@ -260,19 +283,19 @@ Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'U
 
 | Capability | Lib | Version | Triggers |
 |---|---|---|---|
-| auth-local | passlib[bcrypt] | 1.7.4 | auth-local, hash.*password, bcrypt |
-| jwt | python-jose[cryptography] | 3.3.0 | jwt, jose, auth-local, auth-azure-ad |
-| excel | openpyxl | 3.1.5 | excel, \.xlsx, export.*excel, import.*excel, tableur |
-| pdf | reportlab | 4.2.5 | pdf, \.pdf, export.*pdf, generer.*pdf, imprim |
+| auth-local | argon2-cffi | 25.1.0 | auth-local, hash.*password, bcrypt, argon2 |
+| jwt | pyjwt[crypto] | 2.13.0 | \bjwt\b, jose, auth-local, auth-azure-ad |
+| excel | openpyxl | 3.1.5 | \bexcel\b, \.xlsx\b, export.*excel, import.*excel, tableur |
+| pdf | reportlab | 5.0.1 | \bpdf\b, \.pdf\b, export.*pdf, generer.*pdf, imprim |
 
 #### 2.4.d DB Drivers (selectionne par arch selon DatabaseType)
 
 | DatabaseType | Module | Version | Scope |
 |---|---|---|---|
-| postgres | `asyncpg` | 0.30.0 | runtime |
+| postgres | `asyncpg` | 0.31.0 | runtime |
 | mysql | `aiomysql` | 0.2.0 | runtime |
 | sqlserver | `aioodbc` | 0.5.0 | runtime |
-| sqlite | `aiosqlite` | 0.20.0 | runtime |
+| sqlite | `aiosqlite` | 0.22.1 | runtime |
 <!-- LIBS_CATALOG_END -->
 
 ### 2.5 Conventions de nommage

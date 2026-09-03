@@ -1,7 +1,7 @@
 # Tech FEAT: nuxt (fullstack)
 
 Status: Experimental
-Validation: 🟢 bench-validated runtime (2026-06-05 — CalcABCNuxt :44369, Nuxt 3.15.0 + Nitro 2.13.4 + Vite 7 + Vue 3.5, Server Routes `server/api/calc.post.ts` REST-like via `$fetch`, startup Nitro 1059ms + Vite 39ms, POST 5ms, AC-1/2/3 🟢 bug-free (out-of-the-box). Pipeline `/sdd-full` complet pas encore validé end-to-end — scaffolding manuel mainteneur, cf. `docs/benchmarks/known-gaps.md`. Note : bench original mentionnait une preview Nuxt 4.x mais le pin canonique `.libs.json` reste sur Nuxt 3 LTS — la branche 4 en preview au moment du bench, exclue de CORE par policy runtime LTS only)
+Validation: 🟢 bench-validated runtime (2026-06-05 — CalcABCNuxt :44369, sur la 3.15.0 de Nuxt + Nitro 2.13.4 + Vite 7 + Vue 3.5, Server Routes `server/api/calc.post.ts` REST-like via `$fetch`, startup Nitro 1059ms + Vite 39ms, POST 5ms, AC-1/2/3 🟢 bug-free (out-of-the-box). Pipeline `/sdd-full` complet pas encore validé end-to-end — scaffolding manuel mainteneur, cf. `docs/benchmarks/known-gaps.md`. Note : bench original mentionnait une preview Nuxt 4.x mais le pin canonique `.libs.json` reste sur Nuxt 3 LTS — la branche 4 en preview au moment du bench, exclue de CORE par policy runtime LTS only. **MAJ 2026-09-02** : la branche 4 est désormais stable (4.5.2), ce qui lève la raison d'origine — mais le pin reste sur la ligne 3 (`3.21.11`), une montée de majeure invalidant ce bench. Tâche dédiée, cf. §2.3)
 Tech FEAT ID: tech-nuxt
 Scope: **fullstack monolithe** — application Nuxt 3 dans UN seul projet `{AppName}/`. UI (Vue 3 SFC server-rendered + client-hydrated) + server routes (Nitro `server/api/`) + middleware + auth vivent dans le meme processus Node.js. Pas de separation `{BackendName}` / `{AppName}` / `{LibName}`. Modele **SSR vrai** : HTML pre-rendu serveur par defaut, hydratation universelle cote client.
 
@@ -142,9 +142,9 @@ Patterns reconnus : `Entity`, `Entities`, `Repository`, `Repositories`, `Migrati
 - **Stack ID** : `fullstack-nuxt`
 - **Langage** : TypeScript 5.x strict
 - **Runtime serveur** : Node.js 22 LTS (deployable serverless via Nitro presets)
-- **Framework** : Nuxt 3.15.x (Nitro engine)
+- **Framework** : Nuxt **3.21.x** (pin `3.21.11`, Nitro engine) — ligne 3 maintenue, cf. §2.3
 - **UI lib** : Vue 3.5
-- **UI Design System** : Vuetify 3.7 (defaut) — cf. `.sdd/stacks/ui/vuetify.md`. Alternative : Nuxt UI 3 (capability `nuxt-ui`).
+- **UI Design System** : Vuetify 3.13 (defaut) — cf. `.sdd/stacks/ui/vuetify.md`. Alternative : Nuxt UI 3 (capability `nuxt-ui`).
 - **Styling** : Vuetify themes OU Tailwind v4 si capability `tailwind` declaree
 - **Namespace** : `{AppNamespace}` (utilise dans imports `~/components/...`)
 
@@ -236,6 +236,52 @@ fi
 
 ---
 
+## 2.3 Politique de version — audit 2026-09-02
+
+Ce stack porte un badge **🟢 bench-validated** : sa validation repose sur un run
+runtime daté, exécuté sur une version précise. La règle appliquée à tout le
+catalogue lors de cet audit :
+
+| Type de bump | Décision |
+|---|---|
+| **Patch / minor dans la majeure en place** | appliqué |
+| **Majeure** | **non appliqué** — documenté ici, tâche dédiée avec re-bench |
+
+### Ce qui a été bumpé
+
+`nuxt` **3.15.0 → 3.21.11** (dernier patch de la ligne 3), `vuetify` 3.13.3
+(ligne 3, aligné sur `ui/vuetify.md`), `pinia` 2.3.1, plus les dépendances
+hors framework.
+
+### Ce qui n'a PAS été bumpé
+
+**La 4.5.2 de Nuxt est stable.** L'en-tête `Validation:` de ce stack documentait
+déjà un pin volontaire sur la ligne 3 : *« la branche 4 en preview au moment
+du bench, exclue de CORE par policy runtime LTS only »*. Cette raison
+d'origine **est levée** — la branche 4 n'est plus en preview. Mais le pin
+reste, pour l'autre raison : le bench a tourné sur la ligne 3, et Nuxt 4
+change la structure de répertoires par défaut (`app/`), la résolution des
+imports auto et le comportement de Nitro. Montée = tâche dédiée avec re-bench.
+
+### Correction obligatoire, sans rapport avec les majeures
+
+`nuxt-ui` était pinné en **`3.0.0-alpha.10`** — une **préversion**, interdite
+par `rules/library-and-stack.md §5`. C'était le second WARN `PRERELEASE` du
+catalogue. La ligne 4 est désormais **stable** : pin **4.11.0**.
+
+> **Piège de registre sur `vuetify-nuxt-module`** : son dist-tag npm `latest`
+> pointe sur **`1.0.0-rc.5`**, une préversion. La dernière **stable** est la
+> **0.19.5** — c'est elle qui est pinnée. Ne pas « bumper vers latest » sur ce
+> paquet sans lire ses dist-tags, sous peine de réintroduire une préversion.
+
+> Le raisonnement complet est développé une fois dans
+> `backend/kotlin-spring-boot.md §2.3.1`. Les stacks 🟢 concernés par le même
+> arbitrage : `backend/kotlin-spring-boot` (Spring Boot 3.5.x vs 4.1.1),
+> `backend/node-express` (Express 4.x vs 5.2.1), `fullstack/kotlin-mustache`,
+> `fullstack/next`, `fullstack/nuxt`, `fullstack/angular-universal`.
+
+---
+
 <!-- LIBS_CATALOG_START -->
 ### 2.4 Librairies
 
@@ -245,21 +291,21 @@ fi
 
 | Lib | Version | Role |
 |-----|---------|------|
-| nuxt | 3.15.0 | Framework SSR + Nitro |
-| vue | 3.5.13 |  |
-| vuetify | 3.7.5 | Design System defaut |
-| vuetify-nuxt-module | 0.18.6 | Integration Nuxt + Vuetify SSR-ready |
-| typescript | 5.7.0 |  |
-| zod | 3.24.0 | Validation schemas |
-| vee-validate | 4.14.7 | Forms validation Vue-idiomatic |
-| @vee-validate/zod | 4.14.7 |  |
-| pinia | 2.3.0 | State store client |
-| @pinia/nuxt | 0.9.0 |  |
+| nuxt | 3.21.11 | Framework SSR + Nitro |
+| vue | 3.5.42 |  |
+| vuetify | 3.13.3 | Design System defaut |
+| vuetify-nuxt-module | 0.19.5 | Integration Nuxt + Vuetify SSR-ready |
+| typescript | 5.9.3 |  |
+| zod | 4.5.4 | Validation schemas |
+| vee-validate | 4.15.1 | Forms validation Vue-idiomatic |
+| @vee-validate/zod | 4.15.1 |  |
+| pinia | 2.3.1 | State store client |
+| @pinia/nuxt | 0.11.3 |  |
 | @sidebase/nuxt-auth | 0.10.0 | Auth (NextAuth-like pour Nuxt) |
-| @nuxtjs/i18n | 9.1.0 |  |
-| @nuxt/eslint | 0.7.4 |  |
-| pino | 9.5.0 |  |
-| pino-pretty | 13.0.0 |  |
+| @nuxtjs/i18n | 9.5.6 |  |
+| @nuxt/eslint | 0.7.6 |  |
+| pino | 10.3.1 |  |
+| pino-pretty | 13.1.3 |  |
 
 ### 2.4.b Librairies ON-DEMAND (installees si l'US declenche)
 
@@ -267,18 +313,18 @@ Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'U
 
 | Capability | Lib | Version | Triggers |
 |---|---|---|---|
-| prisma | prisma | 6.1.0 | DatabaseType.*(SqlServer|PostgreSql|MySql|Sqlite), orm, db-first |
-| prisma | @prisma/client | 6.1.0 | prisma, orm |
-| tailwind | @nuxtjs/tailwindcss | 6.13.0 | tailwind, atomic.*css |
-| nuxt-ui | @nuxt/ui (alt) | 3.0.0-alpha.10 | nuxt-ui, ui-kit-nuxt |
-| auth-azure-ad | @azure/msal-node | 3.1.0 | auth-azure-ad, msal |
-| http-client | ofetch | 1.4.1 | appel.*api.*externe |
-| excel | exceljs | 4.4.0 | excel, \.xlsx, export.*excel |
-| pdf | pdfkit | 0.15.2 | pdf, export.*pdf |
-| smtp | nodemailer | 6.9.16 | email, smtp |
-| date-utils | @vueuse/core | 12.0.0 | date, time, utils.*reactive |
-| security-headers | nuxt-security | 2.0.0 | csp, security.*headers, helmet |
-| analytics | nuxt-gtag | 3.0.0 | analytics, google.*tag |
+| prisma | prisma | 7.10.0 | DatabaseType.*\b(SqlServer|PostgreSql|MySql|Sqlite)\b, orm, db-first |
+| prisma | @prisma/client | 7.10.0 | prisma, orm |
+| tailwind | @nuxtjs/tailwindcss | 6.14.0 | tailwind, atomic.*css |
+| nuxt-ui | @nuxt/ui (alt) | 4.11.0 | nuxt-ui, ui-kit-nuxt |
+| auth-azure-ad | @azure/msal-node | 3.8.10 | auth-azure-ad, msal |
+| http-client | ofetch | 1.5.1 | appel.*api.*externe |
+| excel | exceljs | 4.4.0 | \bexcel\b, \.xlsx\b, export.*excel |
+| pdf | pdfkit | 0.20.2 | \bpdf\b, export.*pdf |
+| smtp | nodemailer | 6.10.1 | email, smtp |
+| date-utils | @vueuse/core | 12.8.2 | date, time, utils.*reactive |
+| security-headers | nuxt-security | 2.6.0 | csp, security.*headers, helmet |
+| analytics | nuxt-gtag | 3.0.3 | analytics, google.*tag |
 <!-- LIBS_CATALOG_END -->
 
 ---

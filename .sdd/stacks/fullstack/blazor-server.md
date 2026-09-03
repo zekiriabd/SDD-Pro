@@ -258,15 +258,15 @@ Codes prioritaires : CS0246, CS0103, CS1061, CS1002, CS1003, CS1513, CS0029, CS0
 
 | Lib | Version | Role |
 |-----|---------|------|
-| Microsoft.EntityFrameworkCore | 10.0.6 | ORM principal |
-| Microsoft.EntityFrameworkCore.SqlServer | 10.0.6 | Provider defaut (override via dbDrivers selon DatabaseType) |
-| Microsoft.EntityFrameworkCore.Design | 10.0.6 |  |
-| Microsoft.EntityFrameworkCore.Tools | 10.0.6 |  |
-| AutoMapper | 16.1.1 | Mapping Entity → Model |
+| Microsoft.EntityFrameworkCore | 10.0.11 | ORM principal |
+| Microsoft.EntityFrameworkCore.SqlServer | 10.0.11 | Provider defaut (override via dbDrivers selon DatabaseType) |
+| Microsoft.EntityFrameworkCore.Design | 10.0.11 |  |
+| Microsoft.EntityFrameworkCore.Tools | 10.0.11 |  |
+| AutoMapper | 16.2.0 | Mapping Entity → Model |
 | Serilog.AspNetCore | 10.0.0 | Logger structure |
 | Serilog.Sinks.Console | 6.1.1 |  |
-| Microsoft.Identity.Web | floating | Auth Azure AD — NON PINNE (CVE cycle, dotnet add sans --version) |
-| Microsoft.Identity.Web.UI | floating | UI auth Azure AD — NON PINNE |
+| Microsoft.Identity.Web | 4.14.2 | Auth Azure AD — NON PINNE (CVE cycle, dotnet add sans --version) |
+| Microsoft.Identity.Web.UI | 4.14.2 | UI auth Azure AD — NON PINNE |
 
 ### 2.4.b Librairies ON-DEMAND (installees si l'US declenche)
 
@@ -274,23 +274,23 @@ Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'U
 
 | Capability | Lib | Version | Triggers |
 |---|---|---|---|
-| db-postgres | Npgsql.EntityFrameworkCore.PostgreSQL | 9.0.4 | DatabaseType.*PostgreSql, postgres |
+| db-postgres | Npgsql.EntityFrameworkCore.PostgreSQL | 10.0.3 | DatabaseType.*PostgreSql, postgres |
 | db-mysql | Pomelo.EntityFrameworkCore.MySql | 9.0.0 | DatabaseType.*MySql, mysql, mariadb |
-| db-sqlite | Microsoft.EntityFrameworkCore.Sqlite | 10.0.6 | DatabaseType.*Sqlite |
-| excel | ClosedXML | 0.104.1 | excel, \.xlsx, export.*excel |
-| pdf | QuestPDF | 2024.12.3 | pdf, \.pdf, export.*pdf, generer.*pdf |
-| http-client | Microsoft.Extensions.Http.Polly | 9.0.1 | appel.*api.*externe, service.*externe |
-| smtp | MailKit | 4.9.0 | email, smtp, envoi.*mail, notification.*mail |
-| smtp | MimeKit | 4.9.0 | email, smtp |
+| db-sqlite | Microsoft.EntityFrameworkCore.Sqlite | 10.0.11 | DatabaseType.*Sqlite |
+| excel | ClosedXML | 0.105.1 | \bexcel\b, \.xlsx\b, export.*excel |
+| pdf | QuestPDF | 2026.8.0 | \bpdf\b, \.pdf\b, export.*pdf, generer.*pdf |
+| http-client | Microsoft.Extensions.Http.Polly | 10.0.11 | appel.*api.*externe, service.*externe |
+| smtp | MailKit | 4.17.0 | email, smtp, envoi.*mail, notification.*mail |
+| smtp | MimeKit | 4.17.0 | email, smtp |
 
 #### 2.4.d DB Drivers (selectionne par arch selon DatabaseType)
 
 | DatabaseType | Module | Version | Scope |
 |---|---|---|---|
-| sqlserver | `Microsoft.EntityFrameworkCore.SqlServer` | 10.0.6 | runtime |
-| postgres | `Npgsql.EntityFrameworkCore.PostgreSQL` | 9.0.4 | runtime |
+| sqlserver | `Microsoft.EntityFrameworkCore.SqlServer` | 10.0.11 | runtime |
+| postgres | `Npgsql.EntityFrameworkCore.PostgreSQL` | 10.0.3 | runtime |
 | mysql | `Pomelo.EntityFrameworkCore.MySql` | 9.0.0 | runtime |
-| sqlite | `Microsoft.EntityFrameworkCore.Sqlite` | 10.0.6 | runtime |
+| sqlite | `Microsoft.EntityFrameworkCore.Sqlite` | 10.0.11 | runtime |
 <!-- LIBS_CATALOG_END -->
 
 ### 2.5 Conventions de nommage

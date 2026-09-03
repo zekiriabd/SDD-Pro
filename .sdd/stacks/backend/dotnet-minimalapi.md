@@ -117,25 +117,25 @@ dotnet add workspace/src/{BackendName}/{BackendName}.csproj reference workspace/
 <!-- CORE_PACKAGES_START -->
 ```bash
 # Auto-genere depuis dotnet-minimalapi.libs.json -- ne pas editer (utiliser sync_stack_md.py).
-dotnet add workspace/src/{BackendName}/{BackendName}.csproj package Microsoft.EntityFrameworkCore --version 9.0.4
-dotnet add workspace/src/{BackendName}/{BackendName}.csproj package Microsoft.EntityFrameworkCore.Design --version 9.0.4
-dotnet add workspace/src/{BackendName}/{BackendName}.csproj package Microsoft.EntityFrameworkCore.Tools --version 9.0.4
-dotnet add workspace/src/{BackendName}/{BackendName}.csproj package Microsoft.AspNetCore.OpenApi --version 9.0.4
-dotnet add workspace/src/{BackendName}/{BackendName}.csproj package AutoMapper --version 16.1.1
-dotnet add workspace/src/{BackendName}/{BackendName}.csproj package Serilog.AspNetCore --version 9.0.0
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj package Microsoft.EntityFrameworkCore --version 10.0.11
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj package Microsoft.EntityFrameworkCore.Design --version 10.0.11
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj package Microsoft.EntityFrameworkCore.Tools --version 10.0.11
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj package Microsoft.AspNetCore.OpenApi --version 10.0.11
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj package AutoMapper --version 16.2.0
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj package Serilog.AspNetCore --version 10.0.0
 dotnet add workspace/src/{BackendName}/{BackendName}.csproj package Serilog.Sinks.Console --version 6.1.1
-dotnet add workspace/src/{BackendName}/{BackendName}.csproj package Swashbuckle.AspNetCore --version 9.0.4
-dotnet add workspace/src/{BackendName}/{BackendName}.csproj package Swashbuckle.AspNetCore.Annotations --version 9.0.4
-dotnet add workspace/src/{BackendName}/{BackendName}.csproj package Asp.Versioning.Http --version 8.1.1
-dotnet add workspace/src/{BackendName}/{BackendName}.csproj package Asp.Versioning.Mvc.ApiExplorer --version 8.1.1
-dotnet add workspace/src/{BackendName}/{BackendName}.csproj package Microsoft.OpenApi --version 2.4.1
-dotnet add workspace/src/{BackendName}/{BackendName}.csproj package Microsoft.Identity.Web --version 4.9.0
-dotnet add workspace/src/{BackendName}/{BackendName}.csproj package FluentValidation --version 11.11.0
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj package Swashbuckle.AspNetCore --version 10.2.3
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj package Swashbuckle.AspNetCore.Annotations --version 10.2.3
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj package Asp.Versioning.Http --version 10.2.3
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj package Asp.Versioning.Mvc.ApiExplorer --version 10.2.3
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj package Microsoft.OpenApi --version 3.10.2
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj package Microsoft.Identity.Web --version 4.14.2
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj package FluentValidation --version 12.1.1
 dotnet add workspace/src/{BackendName}/{BackendName}.csproj package FluentValidation.AspNetCore --version 11.3.1
-dotnet add workspace/src/{BackendName}/{BackendName}.csproj package FluentValidation.DependencyInjectionExtensions --version 11.11.0
-dotnet add workspace/src/{BackendName}/{BackendName}.csproj package Polly --version 8.5.1
-dotnet add workspace/src/{BackendName}/{BackendName}.csproj package Microsoft.Extensions.Http.Resilience --version 9.0.0
-dotnet add workspace/src/{BackendName}/{BackendName}.csproj package Microsoft.Extensions.Caching.Memory --version 9.0.0
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj package FluentValidation.DependencyInjectionExtensions --version 12.1.1
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj package Polly --version 8.7.0
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj package Microsoft.Extensions.Http.Resilience --version 10.9.0
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj package Microsoft.Extensions.Caching.Memory --version 10.0.11
 ```
 <!-- CORE_PACKAGES_END -->
 
@@ -192,30 +192,30 @@ piloter l'alternative.
 ```bash
 # Auto-genere depuis dotnet-minimalapi.libs.json (on-demand) -- installe par dev-* si l'US declenche un trigger.
 # capability: excel
-dotnet add workspace/src/{BackendName}/{BackendName}.csproj package EPPlus --version 7.5.3
-# OU (alt mutuellement exclusif) : dotnet add workspace/src/{BackendName}/{BackendName}.csproj package ClosedXML --version 0.104.2
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj package EPPlus --version 8.7.0
+# OU (alt mutuellement exclusif) : dotnet add workspace/src/{BackendName}/{BackendName}.csproj package ClosedXML --version 0.105.1
 
 # capability: pdf
-dotnet add workspace/src/{BackendName}/{BackendName}.csproj package QuestPDF --version 2024.12.3
-# OU (alt mutuellement exclusif) : dotnet add workspace/src/{BackendName}/{BackendName}.csproj package itext7 --version 9.0.0
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj package QuestPDF --version 2026.8.0
+# OU (alt mutuellement exclusif) : dotnet add workspace/src/{BackendName}/{BackendName}.csproj package itext7 --version 9.7.0
 
 # capability: cqrs
-dotnet add workspace/src/{BackendName}/{BackendName}.csproj package MediatR --version 12.4.1
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj package MediatR --version 14.2.0
 
 # capability: redis-cache
-dotnet add workspace/src/{BackendName}/{BackendName}.csproj package StackExchange.Redis --version 2.8.16
-dotnet add workspace/src/{BackendName}/{BackendName}.csproj package Microsoft.Extensions.Caching.StackExchangeRedis --version 9.0.0
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj package StackExchange.Redis --version 3.1.31
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj package Microsoft.Extensions.Caching.StackExchangeRedis --version 10.0.11
 
 # capability: fast-mapping
-dotnet add workspace/src/{BackendName}/{BackendName}.csproj package Mapster --version 7.4.0
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj package Mapster --version 10.0.12
 
 # capability: email
-dotnet add workspace/src/{BackendName}/{BackendName}.csproj package MailKit --version 4.8.0
-dotnet add workspace/src/{BackendName}/{BackendName}.csproj package MimeKit --version 4.8.0
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj package MailKit --version 4.17.0
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj package MimeKit --version 4.17.0
 
 # capability: auth-local
-dotnet add workspace/src/{BackendName}/{BackendName}.csproj package BCrypt.Net-Next --version 4.0.3
-dotnet add workspace/src/{BackendName}/{BackendName}.csproj package Microsoft.AspNetCore.Authentication.JwtBearer --version 9.0.4
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj package BCrypt.Net-Next --version 4.2.1
+dotnet add workspace/src/{BackendName}/{BackendName}.csproj package Microsoft.AspNetCore.Authentication.JwtBearer --version 10.0.11
 ```
 <!-- ONDEMAND_PACKAGES_END -->
 
@@ -241,25 +241,25 @@ Codes prioritaires : CS0246, CS0103, CS1061, CS1002, CS1003, CS1513, CS0029, CS0
 
 | Lib | Version | Role |
 |-----|---------|------|
-| Microsoft.EntityFrameworkCore | 9.0.4 |  |
-| Microsoft.EntityFrameworkCore.Design | 9.0.4 |  |
-| Microsoft.EntityFrameworkCore.Tools | 9.0.4 |  |
-| Microsoft.AspNetCore.OpenApi | 9.0.4 |  |
-| AutoMapper | 16.1.1 |  |
-| Serilog.AspNetCore | 9.0.0 |  |
+| Microsoft.EntityFrameworkCore | 10.0.11 |  |
+| Microsoft.EntityFrameworkCore.Design | 10.0.11 |  |
+| Microsoft.EntityFrameworkCore.Tools | 10.0.11 |  |
+| Microsoft.AspNetCore.OpenApi | 10.0.11 |  |
+| AutoMapper | 16.2.0 |  |
+| Serilog.AspNetCore | 10.0.0 |  |
 | Serilog.Sinks.Console | 6.1.1 |  |
-| Swashbuckle.AspNetCore | 9.0.4 |  |
-| Swashbuckle.AspNetCore.Annotations | 9.0.4 |  |
-| Asp.Versioning.Http | 8.1.1 |  |
-| Asp.Versioning.Mvc.ApiExplorer | 8.1.1 |  |
-| Microsoft.OpenApi | 2.4.1 |  |
-| Microsoft.Identity.Web | 4.9.0 |  |
-| FluentValidation | 11.11.0 |  |
+| Swashbuckle.AspNetCore | 10.2.3 |  |
+| Swashbuckle.AspNetCore.Annotations | 10.2.3 |  |
+| Asp.Versioning.Http | 10.2.3 |  |
+| Asp.Versioning.Mvc.ApiExplorer | 10.2.3 |  |
+| Microsoft.OpenApi | 3.10.2 |  |
+| Microsoft.Identity.Web | 4.14.2 |  |
+| FluentValidation | 12.1.1 |  |
 | FluentValidation.AspNetCore | 11.3.1 |  |
-| FluentValidation.DependencyInjectionExtensions | 11.11.0 |  |
-| Polly | 8.5.1 |  |
-| Microsoft.Extensions.Http.Resilience | 9.0.0 |  |
-| Microsoft.Extensions.Caching.Memory | 9.0.0 |  |
+| FluentValidation.DependencyInjectionExtensions | 12.1.1 |  |
+| Polly | 8.7.0 |  |
+| Microsoft.Extensions.Http.Resilience | 10.9.0 |  |
+| Microsoft.Extensions.Caching.Memory | 10.0.11 |  |
 
 ### 2.4.b Librairies ON-DEMAND (installees si l'US declenche)
 
@@ -267,31 +267,31 @@ Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'U
 
 | Capability | Lib | Version | Triggers |
 |---|---|---|---|
-| excel | EPPlus | 7.5.3 | excel, \.xlsx, export.*excel, import.*excel, tableur |
-| excel | ClosedXML (alt) | 0.104.2 | excel, \.xlsx, export.*excel, import.*excel, tableur |
-| pdf | QuestPDF | 2024.12.3 | pdf, \.pdf, export.*pdf, generer.*pdf, imprim |
-| pdf | itext7 (alt) | 9.0.0 | pdf, \.pdf, export.*pdf, generer.*pdf, imprim |
-| cqrs | MediatR | 12.4.1 | cqrs, mediatr, command.*handler, query.*handler |
-| redis-cache | StackExchange.Redis | 2.8.16 | redis, cache distribu, distributed cache |
-| redis-cache | Microsoft.Extensions.Caching.StackExchangeRedis | 9.0.0 | redis, cache distribu, distributed cache |
-| fast-mapping | Mapster | 7.4.0 | mapster, mapping perf, high.?performance.*mapp |
-| email | MailKit | 4.8.0 | smtp, envoi.*email, envoi.*courriel, send.*email, email.*notification, notification.*par.*email, mail.*confirmation, verifier.*email |
-| email | MimeKit | 4.8.0 | smtp, envoi.*email, envoi.*courriel, send.*email, email.*notification, notification.*par.*email, mail.*confirmation, verifier.*email |
-| auth-local | BCrypt.Net-Next | 4.0.3 | bcrypt, password.*hash, hash.*password, motdepasse.*hash, mot.*passe.*hash, auth-local, password_hash, verify.*password, connexion.*mot.*passe, inscription, register.*user |
-| auth-local | Microsoft.AspNetCore.Authentication.JwtBearer | 9.0.4 | jwt, jsonwebtoken, bearer.*token, auth-local, issue.*token, verify.*token, validate.*token, jwt.*authent, token.*authent, authorize.*attribute, \[Authorize\] |
+| excel | EPPlus | 8.7.0 | \bexcel\b, \.xlsx\b, export.*excel, import.*excel, tableur |
+| excel | ClosedXML (alt) | 0.105.1 | \bexcel\b, \.xlsx\b, export.*excel, import.*excel, tableur |
+| pdf | QuestPDF | 2026.8.0 | \bpdf\b, \.pdf\b, export.*pdf, generer.*pdf, imprim |
+| pdf | itext7 (alt) | 9.7.0 | \bpdf\b, \.pdf\b, export.*pdf, generer.*pdf, imprim |
+| cqrs | MediatR | 14.2.0 | \bcqrs\b, mediatr, command.*handler, query.*handler |
+| redis-cache | StackExchange.Redis | 3.1.31 | \bredis\b, cache distribu, distributed cache |
+| redis-cache | Microsoft.Extensions.Caching.StackExchangeRedis | 10.0.11 | \bredis\b, cache distribu, distributed cache |
+| fast-mapping | Mapster | 10.0.12 | mapster\b, mapping perf, high.?performance.*mapp |
+| email | MailKit | 4.17.0 | \bsmtp\b, envoi.*email, envoi.*courriel, send.*email, email.*notification, notification.*par.*email, mail.*confirmation, verifier.*email |
+| email | MimeKit | 4.17.0 | \bsmtp\b, envoi.*email, envoi.*courriel, send.*email, email.*notification, notification.*par.*email, mail.*confirmation, verifier.*email |
+| auth-local | BCrypt.Net-Next | 4.2.1 | bcrypt, password.*hash, hash.*password, motdepasse.*hash, mot.*passe.*hash, auth-local, password_hash, verify.*password, connexion.*mot.*passe, inscription, register.*user |
+| auth-local | Microsoft.AspNetCore.Authentication.JwtBearer | 10.0.11 | \bjwt\b, jsonwebtoken, bearer.*token, auth-local, issue.*token, verify.*token, validate.*token, jwt.*authent, token.*authent, authorize.*attribute, \[Authorize\] |
 
 #### 2.4.d DB Drivers (selectionne par arch selon DatabaseType)
 
 | DatabaseType | Module | Version | Scope |
 |---|---|---|---|
-| sqlserver | `Microsoft.EntityFrameworkCore.SqlServer` | 9.0.4 | runtime |
-| postgres | `Npgsql.EntityFrameworkCore.PostgreSQL` | 9.0.4 | runtime |
-| postgresql | `Npgsql.EntityFrameworkCore.PostgreSQL` | 9.0.4 | runtime |
+| sqlserver | `Microsoft.EntityFrameworkCore.SqlServer` | 10.0.11 | runtime |
+| postgres | `Npgsql.EntityFrameworkCore.PostgreSQL` | 10.0.3 | runtime |
+| postgresql | `Npgsql.EntityFrameworkCore.PostgreSQL` | 10.0.3 | runtime |
 | mysql | `Pomelo.EntityFrameworkCore.MySql` | 9.0.0 | runtime |
 | mariadb | `Pomelo.EntityFrameworkCore.MySql` | 9.0.0 | runtime |
-| sqlite | `Microsoft.EntityFrameworkCore.Sqlite` | 9.0.4 | runtime |
-| oracle | `Oracle.EntityFrameworkCore` | 9.23.60 | runtime |
-| mongodb | `MongoDB.EntityFrameworkCore` | 9.0.0 | runtime |
+| sqlite | `Microsoft.EntityFrameworkCore.Sqlite` | 10.0.11 | runtime |
+| oracle | `Oracle.EntityFrameworkCore` | 10.23.26300 | runtime |
+| mongodb | `MongoDB.EntityFrameworkCore` | 10.0.3 | runtime |
 <!-- LIBS_CATALOG_END -->
 
 ### 2.5 Conventions de nommage
@@ -405,28 +405,41 @@ verifier la signature exacte (anti-pattern `[FRONTEND_BACKEND_CONTRACT_GAP]`).
 
 **Source canonique** : `dotnet-minimalapi.libs.json` `dbDrivers` (catalogue
 machine, lu par arch). Tableau de référence humain ci-dessous, à jour
-2026-05-22 (post-mortem version mismatch NU1608 → MissingMethodException
-runtime ; pin actuel EF Core 9.0.4 aligné avec Npgsql.EF 9.0.4 — cf. audit
-CRIT-6 closure 2026-06-07 et `libs.json` changelog "revert 10.0.0→9.0.4" pour
-compat Npgsql 9.x preview) :
+**2026-09-02** :
 
-| `DatabaseType` | Package NuGet à installer | `Use{X}` extension | Version |
-|---|---|---|---:|
-| `sqlserver` | `Microsoft.EntityFrameworkCore.SqlServer` | `UseSqlServer` | 9.0.4 |
-| `postgres` / `postgresql` | `Npgsql.EntityFrameworkCore.PostgreSQL` | `UseNpgsql` | 9.0.4 |
-| `mysql` | `Pomelo.EntityFrameworkCore.MySql` | `UseMySql` | 9.0.0 |
-| `mariadb` | `Pomelo.EntityFrameworkCore.MySql` | `UseMySql` | 9.0.0 |
-| `sqlite` | `Microsoft.EntityFrameworkCore.Sqlite` | `UseSqlite` | 9.0.4 |
-| `oracle` | `Oracle.EntityFrameworkCore` | `UseOracle` | 9.23.60 |
-| `mongodb` | `MongoDB.EntityFrameworkCore` | `UseMongoDB` | 9.0.0 |
-| `none` | (aucun — pas de DbContext scaffold) | — | — |
+| `DatabaseType` | Package NuGet à installer | `Use{X}` extension | Version driver | EF Core requis |
+|---|---|---|---:|---:|
+| `sqlserver` | `Microsoft.EntityFrameworkCore.SqlServer` | `UseSqlServer` | 10.0.11 | **10.0.11** |
+| `postgres` / `postgresql` | `Npgsql.EntityFrameworkCore.PostgreSQL` | `UseNpgsql` | 10.0.3 | **10.0.11** |
+| `sqlite` | `Microsoft.EntityFrameworkCore.Sqlite` | `UseSqlite` | 10.0.11 | **10.0.11** |
+| `oracle` | `Oracle.EntityFrameworkCore` | `UseOracle` | 10.23.26300 | **10.0.11** |
+| `mongodb` | `MongoDB.EntityFrameworkCore` | `UseMongoDB` | 10.0.3 | **10.0.11** |
+| ⚠️ `mysql` | `Pomelo.EntityFrameworkCore.MySql` | `UseMySql` | 9.0.0 | **9.0.4** (cf. ci-dessous) |
+| ⚠️ `mariadb` | `Pomelo.EntityFrameworkCore.MySql` | `UseMySql` | 9.0.0 | **9.0.4** (cf. ci-dessous) |
+| `none` | (aucun — pas de DbContext scaffold) | — | — | — |
 
-> **Règle load-bearing v7.0.0** : `Microsoft.EntityFrameworkCore` et
-> `Microsoft.EntityFrameworkCore.Design`/`Tools` sont pinnés **9.0.4**
-> (LCD compatible avec tous les drivers ci-dessus). Tant que
-> `Npgsql.EntityFrameworkCore.PostgreSQL` n'a pas de release stable 10.x,
-> ne PAS bumper EF Core à 10.x — déclenche `NU1608` warning + `MissingMethodException`
-> runtime au premier accès `DbSet`. Cf. post-mortem DemoApp 2026-05-22.
+> **Règle load-bearing — EF Core n'est PAS uniforme selon `DatabaseType`.**
+>
+> Le pin historique en 9.0.4 pour *tous* les drivers venait du post-mortem
+> DemoApp 2026-05-22 : `Npgsql.EntityFrameworkCore.PostgreSQL` n'existait alors
+> qu'en préversion 10.x, et mélanger la 10.0.6 d'EF Core avec Npgsql.EF 9.0.4
+> produisait un warning `NU1608` puis un `MissingMethodException` au premier
+> accès `DbSet`. **Cette cause a disparu** (audit 2026-09-02) : Npgsql.EF
+> **10.0.3** est stable, tout comme SqlServer/Sqlite 10.0.11, Oracle
+> 10.23.26300 et MongoDB 10.0.3. Le catalog était par ailleurs incohérent —
+> la ligne EF Core 9 (`9.0.4`) cohabitait avec des paquets ASP.NET **10.x**
+> (`Microsoft.AspNetCore.OpenApi`, `Http.Resilience`, `Caching.Memory`,
+> `JwtBearer`) sur un TFM `net10.0`.
+>
+> **La contrainte subsiste pour MySQL / MariaDB** : `Pomelo.EntityFrameworkCore.MySql`
+> n'a **aucune** version 10.x publiée (dernière stable `9.0.0`). Pour ces deux
+> `DatabaseType`, EF Core **doit rester sur la ligne 9** (`9.0.4`) — c'est le champ
+> `dbDrivers[mysql|mariadb].efCoreVersionOverride` du `.libs.json`, et
+> `versions.ef-core-mysql-lcd`. Poser EF Core 10 avec Pomelo 9 **reproduit
+> exactement** le NU1608 → `MissingMethodException` du post-mortem.
+>
+> Conséquence opérationnelle pour `arch` : lire `DatabaseType` **avant**
+> d'installer EF Core, pas après.
 
 **Anti-pattern (corrigé 2026-05-22)** :
 - ❌ `core[]` contenait `Microsoft.EntityFrameworkCore.SqlServer` hardcodé,

@@ -1,0 +1,176 @@
+{
+  "$schema": "../../templates/libs-catalog.schema.json",
+  "stackId": "pyside",
+  "category": "desktop",
+  "schemaVersion": 1,
+  "buildSystem": "uv",
+  "manifest": {
+    "files": [
+      "workspace/src/{AppName}/pyproject.toml",
+      "workspace/src/{AppName}/src/{AppName}/__main__.py",
+      "workspace/src/{AppName}/src/{AppName}/ui/main_window.py"
+    ]
+  },
+  "metadata": {
+    "lastUpdated": "2026-09-02",
+    "platforms": [
+      "windows",
+      "linux",
+      "macos"
+    ],
+    "runtime": "python 3.12",
+    "qtVersion": "6.11 (via PySide6 6.11.2)",
+    "notes": "Client desktop multiplateforme en Python + Qt (PySide6). PySide6 EST le binding OFFICIEL de Qt, sous LGPL-3.0 — c'est ce qui le distingue de PyQt6 (Riverbank), en GPL-3.0 ou commerciale : une application a code ferme peut utiliser PySide6 en liaison dynamique sans licence commerciale, alors que PyQt6 imposerait soit la GPL, soit un achat. Ce point est la raison principale du choix. La version de PySide6 suit celle de Qt : PySide6 6.11.2 -> Qt 6.11. CAS D'USAGE VISE : outils internes, data/IA, instrumentation — la ou Python donne acces a numpy/pandas/scikit sans passerelle. Moins adapte au grand public (packaging lourd, demarrage lent) : cf. .md 8."
+  },
+  "versions": {
+    "python": "3.12",
+    "pyside6": "6.11.2",
+    "shiboken6": "6.11.2",
+    "qtawesome": "1.4.2",
+    "pyqtgraph": "0.14.0",
+    "qasync": "0.28.0",
+    "sqlalchemy": "2.0.52",
+    "pydantic": "2.13.5",
+    "httpx": "0.28.1",
+    "structlog": "26.1.0",
+    "pyinstaller": "6.22.2",
+    "ruff": "0.16.5",
+    "mypy": "2.3.1",
+    "pytest": "9.1.1",
+    "pytest-qt": "4.5.0",
+    "pytest-cov": "7.1.0"
+  },
+  "core": [
+    {
+      "module": "PySide6",
+      "ref": "pyside6",
+      "license": "LGPL-3.0",
+      "rationale": "Binding Qt OFFICIEL sous LGPL — c'est le coeur du stack, et la raison du choix face a PyQt6 (GPL/commerciale)"
+    },
+    {
+      "module": "shiboken6",
+      "ref": "shiboken6",
+      "rationale": "Couche de binding C++ <-> Python dont depend PySide6. Sa version DOIT etre identique a celle de PySide6, sinon l'import echoue au demarrage"
+    },
+    {
+      "module": "structlog",
+      "ref": "structlog",
+      "rationale": "Logs structures — meme choix que les stacks Python du catalogue"
+    },
+    {
+      "module": "ruff",
+      "ref": "ruff",
+      "rationale": "Lint + format (dev)"
+    },
+    {
+      "module": "mypy",
+      "ref": "mypy",
+      "rationale": "Typage statique (dev) — PySide6 expose des stubs, le typage est donc reellement exploitable"
+    },
+    {
+      "module": "pytest",
+      "ref": "pytest",
+      "rationale": "Runner de tests (dev)"
+    },
+    {
+      "module": "pytest-qt",
+      "ref": "pytest-qt",
+      "rationale": "Fixture qtbot : pilote les widgets et attend les signaux. Sans elle, tester un widget Qt exige de gerer la boucle d'evenements a la main"
+    }
+  ],
+  "onDemand": [
+    {
+      "module": "qtawesome",
+      "ref": "qtawesome",
+      "capability": "icons",
+      "rationale": "Icones FontAwesome / Material en QIcon",
+      "triggers": [
+        "icone",
+        "pictogramme",
+        "qtawesome"
+      ]
+    },
+    {
+      "module": "pyqtgraph",
+      "ref": "pyqtgraph",
+      "capability": "charts",
+      "rationale": "Graphiques TEMPS REEL sur Qt — nettement plus rapide que matplotlib pour un flux de donnees qui defile, ce qui est le cas d'usage typique de ce stack (instrumentation, supervision)",
+      "triggers": [
+        "chart",
+        "graphique",
+        "courbe",
+        "temps.*reel",
+        "visualisation.*donnees"
+      ]
+    },
+    {
+      "module": "qasync",
+      "ref": "qasync",
+      "capability": "asyncio",
+      "rationale": "Marie la boucle d'evenements Qt et celle d'asyncio. OBLIGATOIRE pour utiliser des coroutines dans une app Qt : les deux boucles ne cohabitent pas nativement",
+      "triggers": [
+        "asyncio",
+        "async",
+        "coroutine",
+        "appel.*asynchrone"
+      ]
+    },
+    {
+      "module": "SQLAlchemy",
+      "ref": "sqlalchemy",
+      "capability": "local-db",
+      "rationale": "ORM pour une base locale SQLite",
+      "triggers": [
+        "base.*locale",
+        "sqlite",
+        "\\borm\\b",
+        "hors.*ligne"
+      ]
+    },
+    {
+      "module": "httpx",
+      "ref": "httpx",
+      "capability": "http-client",
+      "rationale": "Client HTTP vers le backend separe optionnel — a coupler avec qasync si utilise en asynchrone",
+      "triggers": [
+        "appel.*api",
+        "backend",
+        "http",
+        "rest"
+      ]
+    },
+    {
+      "module": "pydantic",
+      "ref": "pydantic",
+      "capability": "validation",
+      "rationale": "Validation et parsing des reponses API + des fichiers de configuration",
+      "triggers": [
+        "validation",
+        "schema",
+        "parsing.*reponse"
+      ]
+    },
+    {
+      "module": "pyinstaller",
+      "ref": "pyinstaller",
+      "capability": "packaging",
+      "rationale": "Produit un executable autonome. INDISPENSABLE pour livrer : l'utilisateur final n'a pas d'interpreteur Python. Compter 60 a 150 Mo par binaire, Qt inclus",
+      "triggers": [
+        "executable",
+        "packaging",
+        "livraison",
+        "installeur",
+        "binaire"
+      ]
+    },
+    {
+      "module": "pytest-cov",
+      "ref": "pytest-cov",
+      "capability": "coverage",
+      "triggers": [
+        "coverage",
+        "couverture.*tests"
+      ]
+    }
+  ]
+}

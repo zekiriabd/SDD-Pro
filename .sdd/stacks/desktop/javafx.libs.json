@@ -1,0 +1,224 @@
+{
+  "$schema": "../../templates/libs-catalog.schema.json",
+  "stackId": "javafx",
+  "category": "desktop",
+  "schemaVersion": 1,
+  "buildSystem": "gradle",
+  "manifest": {
+    "files": [
+      "workspace/src/{AppName}/build.gradle.kts",
+      "workspace/src/{AppName}/settings.gradle.kts",
+      "workspace/src/{AppName}/gradle/libs.versions.toml",
+      "workspace/src/{AppName}/src/main/java/module-info.java"
+    ],
+    "versionCatalogPath": "gradle/libs.versions.toml"
+  },
+  "metadata": {
+    "lastUpdated": "2026-09-02",
+    "platforms": [
+      "windows",
+      "linux",
+      "macos"
+    ],
+    "jdk": "21 LTS",
+    "javafxVersion": "21.0.12",
+    "notes": "Client desktop JVM multiplateforme en JavaFX. LIGNE LTS : JDK 21 LTS + JavaFX 21.0.12 (ligne LTS-alignee). Adoptium expose 8, 11, 17, 21 et 25 comme LTS — la 25 est la plus recente, et JavaFX publie une 25.x correspondante ; le pin reste sur 21 pour rester coherent avec `rules/library-and-stack.md 0`, qui declare Java 21 LTS pour l'ensemble du catalogue (backend/kotlin-spring-boot). Migration JDK 25 = tache dediee, a mener sur tout le catalogue JVM a la fois. ATTENTION : JavaFX n'est PLUS inclus dans le JDK depuis la 11 — c'est une dependance a part entiere, d'ou les artefacts org.openjfx ci-dessous. Le plugin Gradle org.openjfx.javafxplugin gere les classifiers de plateforme (win/linux/mac) ; sans lui, le build ne produit un binaire que pour l'OS courant. NE PAS resoudre javafx-* en `latest` : Maven Central expose des builds `-ea` (early access, ex. 28-ea+6) que les filtres de prerelease usuels ne detectent pas."
+  },
+  "versions": {
+    "jdk": "21",
+    "javafx": "21.0.12",
+    "javafx-plugin": "0.1.0",
+    "controlsfx": "11.2.4",
+    "formsfx": "11.6.0",
+    "ikonli": "12.4.0",
+    "validatorfx": "1.0.0",
+    "atlantafx": "2.1.0",
+    "guice": "7.0.0",
+    "jackson": "2.22.2",
+    "sqlite-jdbc": "3.53.4.0",
+    "slf4j": "2.0.18",
+    "logback": "1.6.3",
+    "junit": "5.14.2",
+    "testfx": "4.0.18",
+    "mockito": "5.23.0"
+  },
+  "core": [
+    {
+      "module": "org.openjfx:javafx-base",
+      "ref": "javafx",
+      "rationale": "Socle JavaFX (proprietes, collections observables)"
+    },
+    {
+      "module": "org.openjfx:javafx-graphics",
+      "ref": "javafx",
+      "rationale": "Moteur de rendu et scene graph"
+    },
+    {
+      "module": "org.openjfx:javafx-controls",
+      "ref": "javafx",
+      "rationale": "Controles standard (Button, TableView, TreeView)"
+    },
+    {
+      "module": "org.openjfx:javafx-fxml",
+      "ref": "javafx",
+      "rationale": "Vues declaratives FXML + injection du Controller — l'equivalent de XAML pour ce stack"
+    },
+    {
+      "module": "org.slf4j:slf4j-api",
+      "ref": "slf4j",
+      "rationale": "Facade de logs"
+    },
+    {
+      "module": "ch.qos.logback:logback-classic",
+      "ref": "logback",
+      "rationale": "Implementation avec sink fichier — sur un poste client, c'est le seul journal disponible"
+    },
+    {
+      "module": "com.fasterxml.jackson.core:jackson-databind",
+      "ref": "jackson",
+      "rationale": "JSON (configuration, echanges avec le backend separe optionnel)"
+    },
+    {
+      "module": "org.junit.jupiter:junit-jupiter",
+      "ref": "junit",
+      "rationale": "Tests unitaires (ligne 5, alignee sur qa/kotlin-junit)"
+    }
+  ],
+  "onDemand": [
+    {
+      "module": "org.controlsfx:controlsfx",
+      "ref": "controlsfx",
+      "capability": "control-library",
+      "rationale": "Controles absents de JavaFX (notifications, CheckComboBox, table filtrable, assistants)",
+      "triggers": [
+        "controle.*avance",
+        "notification",
+        "controlsfx",
+        "composant.*riche"
+      ]
+    },
+    {
+      "module": "io.github.mkpaz:atlantafx-base",
+      "ref": "atlantafx",
+      "capability": "modern-theme",
+      "rationale": "Themes modernes. Le look JavaFX par defaut (Modena) date de 2013 — c'est la premiere critique faite a ce stack",
+      "triggers": [
+        "theme",
+        "apparence.*moderne",
+        "dark.*mode",
+        "atlantafx"
+      ]
+    },
+    {
+      "module": "org.kordamp.ikonli:ikonli-javafx",
+      "ref": "ikonli",
+      "capability": "icons",
+      "rationale": "Icones vectorielles (FontAwesome, Material)",
+      "triggers": [
+        "icone",
+        "ikonli",
+        "pictogramme"
+      ]
+    },
+    {
+      "module": "net.synedra:validatorfx",
+      "ref": "validatorfx",
+      "capability": "validation",
+      "rationale": "Validation de formulaire liee aux proprietes JavaFX",
+      "triggers": [
+        "validation",
+        "formulaire",
+        "regle.*saisie"
+      ]
+    },
+    {
+      "module": "com.dlsc.formsfx:formsfx-core",
+      "ref": "formsfx",
+      "capability": "form-builder",
+      "rationale": "Construction de formulaires par API plutot qu'en FXML",
+      "triggers": [
+        "formulaire.*genere",
+        "formsfx"
+      ]
+    },
+    {
+      "module": "com.google.inject:guice",
+      "ref": "guice",
+      "capability": "dependency-injection",
+      "rationale": "DI — JavaFX n'en fournit aucune, et les Controllers FXML sont instancies par le FXMLLoader : sans DI, ils font leurs propres new",
+      "triggers": [
+        "injection.*dependance",
+        "\\bdi\\b",
+        "guice"
+      ]
+    },
+    {
+      "module": "org.xerial:sqlite-jdbc",
+      "ref": "sqlite-jdbc",
+      "capability": "local-db",
+      "triggers": [
+        "base.*locale",
+        "sqlite",
+        "hors.*ligne"
+      ]
+    },
+    {
+      "module": "org.openjfx:javafx-web",
+      "ref": "javafx",
+      "capability": "webview",
+      "rationale": "WebView (WebKit). ATTENTION : alourdit nettement le paquet livre",
+      "triggers": [
+        "webview",
+        "contenu.*web"
+      ]
+    },
+    {
+      "module": "org.openjfx:javafx-media",
+      "ref": "javafx",
+      "capability": "media",
+      "triggers": [
+        "audio",
+        "video",
+        "lecture.*media"
+      ]
+    },
+    {
+      "module": "org.testfx:testfx-junit5",
+      "ref": "testfx",
+      "capability": "ui-tests",
+      "rationale": "Pilotage de l'UI JavaFX en test (robot). Necessite un affichage, ou Monocle en headless pour la CI",
+      "triggers": [
+        "test.*ui",
+        "testfx",
+        "test.*bout.*en.*bout"
+      ]
+    },
+    {
+      "module": "org.mockito:mockito-core",
+      "ref": "mockito",
+      "capability": "unit-tests",
+      "triggers": [
+        "mock",
+        "mockito",
+        "tests.*unitaires"
+      ]
+    }
+  ],
+  "plugins": [
+    {
+      "id": "application",
+      "version": "built-in-gradle",
+      "rationale": "Plugin Gradle application — genere les scripts de lancement"
+    },
+    {
+      "id": "org.openjfx.javafxplugin",
+      "ref": "javafx-plugin",
+      "rationale": "Resout les artefacts JavaFX AVEC leur classifier de plateforme (win/linux/mac). Sans lui, le build ne produit un binaire utilisable que pour l'OS de compilation"
+    },
+    {
+      "id": "org.beryx.jlink",
+      "version": "3.1.1",
+      "rationale": "Produit un runtime image jlink + installeur natif via jpackage — c'est ce qui evite d'exiger un JDK installe chez l'utilisateur"
+    }
+  ]
+}

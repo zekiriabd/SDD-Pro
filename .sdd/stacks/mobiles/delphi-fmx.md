@@ -3,7 +3,7 @@
 > §2.4 (Librairies) régénérée depuis `delphi-fmx.libs.json` — ne pas éditer manuellement (`python .sdd/python/sdd_admin/sync_stack_md.py --stack-id delphi-fmx`).
 
 Status: Experimental
-Validation: 🟡 experimental — Spec stack OK + `.libs.json` validé. Jamais exécuté end-to-end via `/sdd-full`. Stack ajouté 2026-06-21 sur demande utilisateur. Validation runtime à programmer (RAD Studio 13 Florence requis pour bench, MSBuild + Android SDK pour Android target, macOS host + XCode pour iOS target).
+Validation: 🟡 experimental — Spec stack OK + `.libs.json` validé. Jamais exécuté end-to-end via `/sdd-full`. Stack ajouté 2026-06-21 sur demande utilisateur. Validation runtime à programmer (RAD Studio 13 Florence requis pour bench, MSBuild + Android SDK pour Android target, macOS host + XCode pour iOS target). **Audit 2026-09-02** : correction d'un chemin projet non conforme — le stack pointait sur `workspace/output/src/{AppName}/` alors que tous les autres stacks, `sdd_lib.paths.workspace_root()` et le gate B4 de `preflight.py` utilisent `workspace/src/{AppName}/` ; le gate « fichier projet présent » ne pouvait pas passer. `*.dproj` ajouté aux globs reconnus par `preflight.py`. 12 versions de libs rebasées sur le dernier tag stable des dépôts upstream.
 Tech FEAT ID: tech-delphi-fmx
 Scope: **mobile + desktop cross-platform** — application **Delphi FireMonkey (FMX)** dans UN seul projet `{AppName}/`. Single codebase Object Pascal qui cible Android + iOS + Windows + macOS (+ Linux serveur sans UI). UI FMX déclarative `.fmx` + code-behind `.pas` + persistance + auth + accès APIs natives vivent dans le même `.dproj`. Pas de séparation `{BackendName}` / `{LibName}`.
 
@@ -84,27 +84,27 @@ Architecture cible (un seul `.dproj`) :
 
 ## 1.3 Mapping couche → répertoire
 
-Un seul projet sous `workspace/output/src/{AppName}/`. **Convention single-project — `{BackendName}` et `{LibName}` ne s'appliquent pas à ce stack**. Arch lève WARNING `[STACK_MALFORMED]` si déclarés avec valeur non null.
+Un seul projet sous `workspace/src/{AppName}/`. **Convention single-project — `{BackendName}` et `{LibName}` ne s'appliquent pas à ce stack**. Arch lève WARNING `[STACK_MALFORMED]` si déclarés avec valeur non null.
 
 | Layer | Path |
 |---|---|
-| Project file | `workspace/output/src/{AppName}/{AppName}.dproj` |
-| App entry | `workspace/output/src/{AppName}/{AppName}.dpr` |
-| Bootstrap | `workspace/output/src/{AppName}/App.Bootstrap.pas` |
-| Form (Page) | `workspace/output/src/{AppName}/UI/{Domain}/{Name}.fmx` + `{Name}.pas` |
-| Frame (Component) | `workspace/output/src/{AppName}/UI/{Domain}/{Name}Frame.fmx` + `{Name}Frame.pas` |
-| ViewModel | `workspace/output/src/{AppName}/ViewModels/{Domain}/{Name}ViewModel.pas` |
-| Service interface | `workspace/output/src/{AppName}/Services/Interfaces/I{Domain}Service.pas` |
-| Service impl | `workspace/output/src/{AppName}/Services/{Domain}Service.pas` |
-| Repository | `workspace/output/src/{AppName}/Repositories/{Domain}Repository.pas` |
-| Model / DTO | `workspace/output/src/{AppName}/Models/{Name}.pas` |
-| Common helpers | `workspace/output/src/{AppName}/Common/{Name}.pas` |
-| Resources Styles | `workspace/output/src/{AppName}/Resources/Styles/tokens.style`, `App.style` |
-| Images / Fonts | `workspace/output/src/{AppName}/Resources/Images/`, `Resources/Fonts/` |
-| Platform Android | `workspace/output/src/{AppName}/Platforms/Android/AndroidManifest.template.xml` |
-| Platform iOS | `workspace/output/src/{AppName}/Platforms/iOS/Info.plist.TemplateiOS.xml` |
-| Config app | `workspace/output/src/{AppName}/appsettings.json` (peuplé par arch — backend URL, JWT issuer) |
-| Tests DUnitX | `workspace/output/src/{AppName}.Tests/{AppName}Tests.dproj` (owned par qa) |
+| Project file | `workspace/src/{AppName}/{AppName}.dproj` |
+| App entry | `workspace/src/{AppName}/{AppName}.dpr` |
+| Bootstrap | `workspace/src/{AppName}/App.Bootstrap.pas` |
+| Form (Page) | `workspace/src/{AppName}/UI/{Domain}/{Name}.fmx` + `{Name}.pas` |
+| Frame (Component) | `workspace/src/{AppName}/UI/{Domain}/{Name}Frame.fmx` + `{Name}Frame.pas` |
+| ViewModel | `workspace/src/{AppName}/ViewModels/{Domain}/{Name}ViewModel.pas` |
+| Service interface | `workspace/src/{AppName}/Services/Interfaces/I{Domain}Service.pas` |
+| Service impl | `workspace/src/{AppName}/Services/{Domain}Service.pas` |
+| Repository | `workspace/src/{AppName}/Repositories/{Domain}Repository.pas` |
+| Model / DTO | `workspace/src/{AppName}/Models/{Name}.pas` |
+| Common helpers | `workspace/src/{AppName}/Common/{Name}.pas` |
+| Resources Styles | `workspace/src/{AppName}/Resources/Styles/tokens.style`, `App.style` |
+| Images / Fonts | `workspace/src/{AppName}/Resources/Images/`, `Resources/Fonts/` |
+| Platform Android | `workspace/src/{AppName}/Platforms/Android/AndroidManifest.template.xml` |
+| Platform iOS | `workspace/src/{AppName}/Platforms/iOS/Info.plist.TemplateiOS.xml` |
+| Config app | `workspace/src/{AppName}/appsettings.json` (peuplé par arch — backend URL, JWT issuer) |
+| Tests DUnitX | `workspace/src/{AppName}.Tests/{AppName}Tests.dproj` (owned par qa) |
 
 ---
 
@@ -194,7 +194,7 @@ iOS exige obligatoirement un host macOS (PAServer) ou cloud Mac (MacInCloud) pou
 ## 2.2 Outils
 
 - **IDE** : RAD Studio 13 Florence (Delphi Community/Pro/Enterprise/Architect editions)
-- **Project file** : `workspace/output/src/{AppName}/{AppName}.dproj` (XML MSBuild)
+- **Project file** : `workspace/src/{AppName}/{AppName}.dproj` (XML MSBuild)
 - **Build CLI Win64** : `MSBuild.exe {AppName}.dproj /p:Config=Debug /p:Platform=Win64 /t:Build`
 - **Build CLI Android** : `MSBuild.exe {AppName}.dproj /p:Config=Debug /p:Platform=Android64 /t:Build` (RAD Android SDK requis)
 - **Build CLI iOS** : `MSBuild.exe {AppName}.dproj /p:Config=Debug /p:Platform=iOSDevice64 /t:Build` (PAServer macOS requis)
@@ -216,7 +216,7 @@ test -f "Win64/Debug/{AppName}.exe"
 ## 2.2.1 Init Commands
 
 ```bash
-if [ ! -f "workspace/output/src/{AppName}/{AppName}.dproj" ]; then
+if [ ! -f "workspace/src/{AppName}/{AppName}.dproj" ]; then
 
 # Pre-requis (verifies par arch en STEP 0) :
 # - RAD Studio 13 Florence installe (ou 12 Athens minimum)
@@ -225,18 +225,18 @@ if [ ! -f "workspace/output/src/{AppName}/{AppName}.dproj" ]; then
 # - macOS host + XCode + PAServer pour cible iOS (sinon Android only)
 
 # STEP 1 — Scaffold structure projet FMX (RAD genere via File > New > Multi-Device Application)
-mkdir -p workspace/output/src/{AppName}/UI \
-         workspace/output/src/{AppName}/ViewModels \
-         workspace/output/src/{AppName}/Models \
-         workspace/output/src/{AppName}/Services/Interfaces \
-         workspace/output/src/{AppName}/Repositories \
-         workspace/output/src/{AppName}/Common \
-         workspace/output/src/{AppName}/Resources/Styles \
-         workspace/output/src/{AppName}/Resources/Images \
-         workspace/output/src/{AppName}/Resources/Fonts \
-         workspace/output/src/{AppName}/Platforms/Android \
-         workspace/output/src/{AppName}/Platforms/iOS \
-         workspace/output/src/{AppName}/Platforms/Windows
+mkdir -p workspace/src/{AppName}/UI \
+         workspace/src/{AppName}/ViewModels \
+         workspace/src/{AppName}/Models \
+         workspace/src/{AppName}/Services/Interfaces \
+         workspace/src/{AppName}/Repositories \
+         workspace/src/{AppName}/Common \
+         workspace/src/{AppName}/Resources/Styles \
+         workspace/src/{AppName}/Resources/Images \
+         workspace/src/{AppName}/Resources/Fonts \
+         workspace/src/{AppName}/Platforms/Android \
+         workspace/src/{AppName}/Platforms/iOS \
+         workspace/src/{AppName}/Platforms/Windows
 
 # STEP 2 — Generer .dpr (point d'entree) + .dproj (XML MSBuild) + Main.fmx/.pas
 # Via template arch (cf. .sdd/templates/delphi-fmx/{AppName}.dproj.template + .dpr.template)
@@ -286,7 +286,7 @@ git clone https://github.com/andrea-magni/TSubjectStand C:\Lib\TSubjectStand 2>/
 # (Edit via Read+Edit du .dproj, pas sed — XML sensible aux espaces)
 
 # STEP 5 — Bootstrap appsettings.json (peuple par arch depuis stack.md)
-cat > "workspace/output/src/{AppName}/appsettings.json" <<'JSON'
+cat > "workspace/src/{AppName}/appsettings.json" <<'JSON'
 {
   "Api": {
     "BaseUrl": "(injectee par arch depuis ## Active Mobile Config)"
@@ -301,7 +301,7 @@ JSON
 # STEP 6 — Compiler sanity check (Win64 — disponible sur tout host Windows sans toolchain mobile)
 # Pre-condition cle (cf. §15.4 + §15.8 + §15.9) : .dproj patche en chemins absolus,
 # Winapi present dans DCC_Namespace, 11 sous-dossiers Spring4D listes explicitement.
-cd workspace/output/src/{AppName}
+cd workspace/src/{AppName}
 MSBuild "{AppName}.dproj" /p:Config=Debug /p:Platform=Win64 /t:Build /v:minimal || true
 
 # STEP 7 — Validation post-scaffolding (cf. §15.10 récap, exit non-zero = STOP)
@@ -339,48 +339,48 @@ fi
 <!-- LIBS_CATALOG_START -->
 ### 2.4 Librairies
 
-> Source de vérité : `.sdd/stacks/mobiles/delphi-fmx.libs.json`. Ne pas éditer cette section manuellement -- utiliser `.sdd/python/sdd_admin/sync_stack_md.py --stack-id delphi-fmx`.
+> Source de verite : `.sdd/stacks/mobiles/delphi-fmx.libs.json`. Ne pas editer cette section manuellement -- utiliser `.sdd/python/sdd_admin/sync_stack_md.py --stack-id delphi-fmx`.
 
-#### 2.4.a Librairies CORE (installées par arch en section 2.2.1, toujours)
+#### 2.4.a Librairies CORE (installees par arch en section 2.2.1, toujours)
 
-| Lib | Version | Rôle |
+| Lib | Version | Role |
 |-----|---------|------|
-| Skia4Delphi | 6.2.0 | Google Skia binding — text HQ, SVG, Lottie. Bundled RAD 12+ |
-| Spring4D | 2.0.0 | DI container + collections génériques + Patterns SOLID |
-| DUnitX | 1.6.0 | Tests unitaires modernes — successeur DUnit |
-| Delphi-Neon | 1.8.0 | Sérialiseur JSON annotations-driven |
-| TFrameStand | 1.6.0 | State management FMX — show/hide/animate frames empilés |
-| TSubjectStand | 1.0.1 | Observer pattern companion TFrameStand |
-| Indy | 10.6.3 | Réseau (HTTP/SMTP/FTP/TCP) bundled RAD |
-| JsonDataObjects | 1.9.6 | Parser JSON ultra-rapide (3-5× System.JSON) |
+| Skia4Delphi | 7.3.0 | Google Skia binding — text rendering haute qualité, SVG, Lottie animations, shaders, codecs images étendus. Bundled dans RAD 12 Athens+ (officiellement endossé par Embarcadero) — top-1 must-have FMX moderne. |
+| Spring4D | 2.0.0 | Framework Spring pour Delphi — DI container, collections génériques (TList<T>, TDictionary<T>, IEnumerable<T>), persistence ORM. Standard de facto OSS pour SOLID/clean code Delphi cross-VCL/FMX. |
+| DUnitX | 1.6.0 | Framework de tests unitaires moderne pour Delphi — successeur de DUnit. Annotations TestCase, Setup/TearDown, runner console/IDE. Pré-requis QA Delphi. |
+| Delphi-Neon | 4.1.0 | Sérialiseur/désérialiseur JSON moderne, annotations-driven (NeonProperty, NeonInclude), supporte objets, génériques, énums. Top-1 OSS pour JSON typé en Delphi FMX/VCL. |
+| TFrameStand | 2.0 | State management FMX pour Frames/Forms — show/hide/animate frames empilés (modal, drawer, toast) avec lifecycle propre. Solution communautaire dominante pour SPA-like navigation en FMX (Andrea Magni). |
+| TSubjectStand | 1.0.1 | Companion de TFrameStand — pattern Observer générique pour Subject/Observer en Delphi (notification UI ↔ ViewModel sans Bindings lourd). |
+| Indy | 10.6.3 | Internet Direct — bibliothèque réseau historique (HTTP/HTTPS, SMTP, FTP, TCP, UDP). Bundled avec RAD Studio depuis Delphi 2007 — composants TIdHTTP, TIdSMTP utilisés massivement. |
+| JsonDataObjects | 1.9.6 | Parser/serializer JSON ultra-rapide (Andreas Hausladen) — alternative légère à System.JSON pour gros volumes. ~3-5× plus rapide que System.JSON intégré. |
 
-#### 2.4.b Librairies ON-DEMAND (installées si l'US déclenche)
+### 2.4.b Librairies ON-DEMAND (installees si l'US declenche)
 
-Triggers (regex case-insensitive) cherchés par `detect_capabilities.py` dans l'US + ACs.
+Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'US + ACs.
 
 | Capability | Lib | Version | Triggers |
 |---|---|---|---|
-| ormot-orm | mORMot2 | 2.3.7 | ormot, mormot, soa.*framework, rest.*server |
-| fmx-cross-platform-helpers | Kastri | 2025.06.01 | kastri, push.*notification, fcm, firebase, biometric, fingerprint, share.*sheet, in-app-purchase, ble, geolocation |
-| barcode | ZXing.Delphi | 1.4.0 | barcode, qr.*code, scan.*qr |
-| openssl | Delphi-OpenSSL | 1.2.0 | openssl, tls, crypto.*aes, x509 |
-| method-hooking | DDetours | 2.5 | ddetours, method.*hook, mock.*runtime |
-| pdf-generation | SynPDF | 2.3.7 | pdf.*generation, rapport.*pdf, export.*pdf |
-| memory-manager | FastMM5 | 5.04 | fastmm, memory.*leak.*tracking |
+| ormot-orm | mORMot2 | 3.35.3 | ormot, mormot, soa.*framework, rest.*server |
+| fmx-cross-platform-helpers | Kastri | 2025.06.01 | kastri, push.*notification, fcm, firebase, biometric, fingerprint, face-id, share.*sheet, in-app-purchase, ble, bluetooth.*low.*energy, geolocation, background.*service |
+| barcode | ZXing.Delphi | 3.10.0 | barcode, qr.*code, scan.*qr, code-128, ean-13 |
+| openssl | Delphi-OpenSSL | 1.0.43 | openssl, tls, crypto.*aes, x509 |
+| method-hooking | DDetours | 2.0 | ddetours, method.*hook, mock.*runtime, detour |
+| pdf-generation | SynPDF | 3.35.3 | pdf.*generation, rapport.*pdf, synpdf, export.*pdf |
+| memory-manager | FastMM5 | 5.07 | fastmm, memory.*leak.*tracking, memory.*manager |
 | xml-parsing | OmniXML | 1.2 | omnixml, xml.*parsing, xml.*dom |
 | mvvm-bindings | DSharp | 1.2 | dsharp, mvvm.*binding, two.*way.*binding |
-| templating | Sempare.Template | 1.9.0 | template.*engine, sempare, mustache |
-| charts | TeeChart-FMX-Standard | 2024.39 | teechart, chart, graph, courbe |
-| reporting | FastReport-FMX | 2024.2.20 | fastreport, rapport, report.*generator |
-| ui-controls-premium | TMS.FNC.UIPack | 5.0.1.0 | tms.*fnc, tms.*ui, premium.*controls |
-| charts | TMS.FNC.Chart | 2.0.5.0 | tms.*chart, fnc.*chart |
-| websockets | sgcWebSockets | 4.5.5 | websocket, socket.*temps.*reel, real.*time.*push |
+| templating | Sempare.Template | 1.8.1 | template.*engine, sempare, mustache, handlebars |
+| charts | TeeChart-FMX-Standard | 2024.39 | teechart, chart, graph, courbe, graphique |
+| reporting | FastReport-FMX | 2024.2.20 | fastreport, rapport, report.*generator, édition.*pdf |
+| ui-controls-premium | TMS.FNC.UIPack | 5.0.1.0 | tms.*fnc, tms.*ui, premium.*controls, ui-pack |
+| charts | TMS.FNC.Chart (alt) | 2.0.5.0 | tms.*chart, fnc.*chart |
+| websockets | sgcWebSockets | 4.5.5 | websocket, socket.*temps.*reel, real.*time.*push, sgcwebsockets |
 | mqtt | Delphi.MQTT | 1.0.0 | mqtt, iot.*broker, mosquitto |
 | redis | Delphi-Redis-Client | 0.7.0 | redis, cache.*distribue, key.*value.*store |
-| db-universal | UniDAC | 11.0 | unidac, devart.*data.*access, multi-db |
-| db-zeos | ZeosLib | 8.0.0 | zeos, zeoslib, db.*open.*source |
-| jwt-auth | Delphi-JOSE-JWT | 3.2.0 | jwt, jose, json.*web.*token, bearer.*token |
-| password-hashing | scrypt | 1.0 | scrypt, bcrypt, password.*hash |
+| db-universal | UniDAC (alt) | 11.0 | unidac, devart.*data.*access, db.*universel, multi-db |
+| db-zeos | ZeosLib (alt) | 8.0.0 | zeos, zeoslib, db.*open.*source |
+| jwt-auth | Delphi-JOSE-JWT | 4.0.2 | jwt, jose, json.*web.*token, bearer.*token |
+| password-hashing | scrypt | 1.0 | scrypt, bcrypt, password.*hash, kdf |
 <!-- LIBS_CATALOG_END -->
 
 ---
@@ -541,9 +541,9 @@ Ce stack est optimisé pour :
 ## 10. Notes pour l'agent `arch`
 
 1. **Détecter** `## Active Tech Specs` contient `mobiles/delphi-fmx.md` → reconnaître comme stack **mobile/desktop FMX-only**
-2. **Le backend reste déclaré séparément** dans `## Active Tech Specs` (ex. `backend/dotnet-minimalapi.md`) — co-existent sous `workspace/output/src/`
+2. **Le backend reste déclaré séparément** dans `## Active Tech Specs` (ex. `backend/dotnet-minimalapi.md`) — co-existent sous `workspace/src/`
 3. **Pré-requis** : vérifier `MSBuild.exe` dans PATH (Embarcadero Command Prompt — `rsvars.bat` configure `BDS`, `MSBuild`, libs DCC). Vérifier RAD Studio installé (`HKLM\SOFTWARE\Embarcadero\BDS\<version>`). Pour Android : SDK + NDK configurés dans IDE. Pour iOS : macOS host + PAServer. Sur Linux : aucune cible UI FMX (Linux64 supporte seulement console/serveur Pascal).
-4. **Créer** `workspace/output/src/{AppName}/` via templates (`.sdd/templates/delphi-fmx/`) — pas de `dotnet new`/`expo init` équivalent, scaffolding manuel via templates substitués (`{AppName}`, `{AppNamespace}`).
+4. **Créer** `workspace/src/{AppName}/` via templates (`.sdd/templates/delphi-fmx/`) — pas de `dotnet new`/`expo init` équivalent, scaffolding manuel via templates substitués (`{AppName}`, `{AppNamespace}`).
 5. **Composer** `appsettings.json` depuis `## Active Mobile Config` (`MOBILE_API_BASE_URL`) + `## Active Auth Specs`. **JAMAIS** écrire les secrets en clair — utiliser plutôt Kastri.SecureStorage runtime + injection à la première connexion.
 6. **`## Active UI Specs`** : aucun design system web n'est compatible (`shadcn`/`vuetify`/`radzen-blazor` → WARNING bloquant). FMX utilise son propre theming via `Resources/Styles/*.style` (StyleBook FMX). Alternative : capability `ui-controls-premium` (TMS FNC UI Pack commercial).
 7. **Phase B (DB)** : SKIP — pas de DB serveur scaffoldée par arch côté client. Si `firedac-sqlite` capability (par défaut) → tables SQLite locales créées au premier run via `FDConnection.ExecuteScript('CREATE TABLE IF NOT EXISTS …')`.
@@ -562,27 +562,27 @@ Ce stack est optimisé pour :
 
 | Path | Owner |
 |---|---|
-| `workspace/output/src/{AppName}/UI/**` (`.fmx` + `.pas`) | `dev-frontend` |
-| `workspace/output/src/{AppName}/ViewModels/**` | `dev-frontend` |
-| `workspace/output/src/{AppName}/Services/**` | `dev-frontend` (toute la logique vit dans le projet Delphi) |
-| `workspace/output/src/{AppName}/Repositories/**` | `dev-frontend` (DB locale) |
-| `workspace/output/src/{AppName}/Models/**` | `dev-frontend` |
-| `workspace/output/src/{AppName}/Common/**` | `dev-frontend` |
-| `workspace/output/src/{AppName}/Resources/**` | `dev-frontend` |
-| `workspace/output/src/{AppName}/Platforms/**` | `arch` (create) + `dev-frontend` (augment permissions / manifest entries) |
-| `workspace/output/src/{AppName}/{AppName}.dpr` | `arch` (create) + `dev-frontend` (augment forms enregistrement) |
-| `workspace/output/src/{AppName}/{AppName}.dproj` | `arch` (create) + `dev-frontend` (augment Library Paths via package on-demand) |
-| `workspace/output/src/{AppName}/App.Bootstrap.pas` | `arch` (create) + `dev-frontend` (augment DI registrations) |
-| `workspace/output/src/{AppName}/appsettings.json` | `arch` (create exclusif — config) |
+| `workspace/src/{AppName}/UI/**` (`.fmx` + `.pas`) | `dev-frontend` |
+| `workspace/src/{AppName}/ViewModels/**` | `dev-frontend` |
+| `workspace/src/{AppName}/Services/**` | `dev-frontend` (toute la logique vit dans le projet Delphi) |
+| `workspace/src/{AppName}/Repositories/**` | `dev-frontend` (DB locale) |
+| `workspace/src/{AppName}/Models/**` | `dev-frontend` |
+| `workspace/src/{AppName}/Common/**` | `dev-frontend` |
+| `workspace/src/{AppName}/Resources/**` | `dev-frontend` |
+| `workspace/src/{AppName}/Platforms/**` | `arch` (create) + `dev-frontend` (augment permissions / manifest entries) |
+| `workspace/src/{AppName}/{AppName}.dpr` | `arch` (create) + `dev-frontend` (augment forms enregistrement) |
+| `workspace/src/{AppName}/{AppName}.dproj` | `arch` (create) + `dev-frontend` (augment Library Paths via package on-demand) |
+| `workspace/src/{AppName}/App.Bootstrap.pas` | `arch` (create) + `dev-frontend` (augment DI registrations) |
+| `workspace/src/{AppName}/appsettings.json` | `arch` (create exclusif — config) |
 
-**Backend séparé** : même matrice ownership que pour son propre stack. Les 2 projets co-existent sous `workspace/output/src/{BackendName}/` et `workspace/output/src/{AppName}/`.
+**Backend séparé** : même matrice ownership que pour son propre stack. Les 2 projets co-existent sous `workspace/src/{BackendName}/` et `workspace/src/{AppName}/`.
 
 ---
 
 ## 12. Smoke test attendu (post-init arch)
 
 ```bash
-cd workspace/output/src/{AppName}
+cd workspace/src/{AppName}
 
 # Pré-requis : rsvars.bat exécuté dans le shell pour exposer MSBuild + BDS env vars
 MSBuild "{AppName}.dproj" /p:Config=Debug /p:Platform=Win64 /t:Build /v:minimal /nologo
@@ -951,12 +951,12 @@ Garder la clause `uses` minimale mais **complète** : ajouter l'unité déclaran
 **Auto-check post-génération** (à inclure dans le hook `dev-frontend` post-step pour FMX) :
 ```bash
 # (a) Aucun commentaire dans .fmx
-if grep -lE '^\s*(\{|\(\*|//)' workspace/output/src/{AppName}/UI/**/*.fmx 2>/dev/null; then
+if grep -lE '^\s*(\{|\(\*|//)' workspace/src/{AppName}/UI/**/*.fmx 2>/dev/null; then
   echo "[FMX_COMMENT_FORBIDDEN] commentaire détecté dans .fmx — strip obligatoire"; exit 1
 fi
 
 # (b) CRLF obligatoire
-for f in workspace/output/src/{AppName}/UI/**/*.fmx; do
+for f in workspace/src/{AppName}/UI/**/*.fmx; do
   grep -q $'\r' "$f" || { echo "[FMX_LF_LINE_ENDINGS] $f en LF — convertir CRLF"; exit 1; }
 done
 ```
@@ -993,7 +993,7 @@ done
 
 **Auto-check** :
 ```bash
-grep -nE '^\s*(ClientHeight|ClientWidth|Left|Top|Width|Height|Tag|TabOrder|BorderIcons|BorderStyle)\s*=\s*[0-9]+\.[0-9]+' workspace/output/src/{AppName}/UI/**/*.fmx \
+grep -nE '^\s*(ClientHeight|ClientWidth|Left|Top|Width|Height|Tag|TabOrder|BorderIcons|BorderStyle)\s*=\s*[0-9]+\.[0-9]+' workspace/src/{AppName}/UI/**/*.fmx \
   && { echo "[FMX_INT_PROP_FLOAT] propriété Integer en literal float"; exit 1; }
 ```
 
@@ -1096,7 +1096,7 @@ interface
 **Auto-check** :
 ```bash
 # Détection naive : "{" seul sur sa ligne (signature d'un docblock {} ouvrant)
-grep -rlE '^\s*\{[^$].*$' workspace/output/src/{AppName}/ --include="*.pas" --include="*.dpr" 2>/dev/null \
+grep -rlE '^\s*\{[^$].*$' workspace/src/{AppName}/ --include="*.pas" --include="*.dpr" 2>/dev/null \
   | xargs -I{} sh -c "head -n 30 '{}' | grep -qE '^\{[^\$]?\s*$' && echo 'DOCBLOCK_BAD: {}'"
 # Tout fichier détecté → convertir le docblock { → (*  et } → *).
 ```
@@ -1128,7 +1128,7 @@ end;
 
 **Auto-check** :
 ```bash
-grep -rnE "\['\{[0-9A-Fa-f-]*[^0-9A-Fa-f\-\}']" workspace/output/src/{AppName}/ --include="*.pas" \
+grep -rnE "\['\{[0-9A-Fa-f-]*[^0-9A-Fa-f\-\}']" workspace/src/{AppName}/ --include="*.pas" \
   && { echo "[DELPHI_GUID_INVALID] GUIDs non-hex détectés"; exit 1; }
 ```
 
@@ -1389,8 +1389,8 @@ Si mismatch → STOP + ERROR `[DELPHI_DPROJ_BASE_CHAIN]`.
 # Côté Tech Lead, après que arch a réécrit le .dproj :
 # 1. Fermer le projet dans RAD Studio (File → Close All)
 # 2. Supprimer le cache .dcu obsolète :
-rm -rf workspace/output/src/{AppName}/Win64
-rm -rf workspace/output/src/{AppName}/__recovery
+rm -rf workspace/src/{AppName}/Win64
+rm -rf workspace/src/{AppName}/__recovery
 # 3. Rouvrir {AppName}.dproj → Project → Clean → Project → Build
 ```
 

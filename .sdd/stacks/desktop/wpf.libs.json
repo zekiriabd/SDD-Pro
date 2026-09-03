@@ -1,0 +1,269 @@
+{
+  "$schema": "../../templates/libs-catalog.schema.json",
+  "stackId": "wpf",
+  "category": "desktop",
+  "schemaVersion": 1,
+  "buildSystem": "dotnet",
+  "manifest": {
+    "files": [
+      "workspace/src/{AppName}/{AppName}.csproj",
+      "workspace/src/{AppName}/App.xaml",
+      "workspace/src/{AppName}/App.xaml.cs",
+      "workspace/src/{AppName}/appsettings.json"
+    ]
+  },
+  "metadata": {
+    "lastUpdated": "2026-09-02",
+    "platforms": [
+      "windows"
+    ],
+    "targetFramework": "net10.0-windows",
+    "rendering": "native-windows",
+    "notes": "Client desktop Windows natif en WPF (XAML + data binding). UN seul projet {AppName}/. TFM net10.0-windows : le suffixe -windows est OBLIGATOIRE, avec UseWPF=true — sans le suffixe, les types WPF ne sont pas references et la compilation echoue sur des symboles introuvables. WINDOWS UNIQUEMENT : WPF n'est pas portable, dotnet build echoue sur Linux/macOS. Pattern MVVM impose via CommunityToolkit.Mvvm (source generators). Consomme un backend separe optionnel declare en ## Active Tech Specs ; une app WPF autonome (base locale SQLite) est aussi un cas valide."
+  },
+  "versions": {
+    "dotnet": "net10.0-windows",
+    "communitytoolkit-mvvm": "8.4.2",
+    "extensions-di": "10.0.11",
+    "extensions-hosting": "10.0.11",
+    "extensions-config-json": "10.0.11",
+    "extensions-logging": "10.0.11",
+    "serilog-hosting": "10.0.0",
+    "serilog-file": "7.0.0",
+    "xaml-behaviors": "1.1.158",
+    "wpf-ui": "3.4.2.7",
+    "material-design": "5.3.2",
+    "handycontrol": "3.5.1",
+    "livecharts-wpf": "2.0.5",
+    "ef-sqlite": "10.0.11",
+    "refit": "15.2.0",
+    "fluentvalidation": "12.1.1",
+    "automapper": "16.2.0",
+    "webview2": "1.0.4191.47",
+    "closedxml": "0.105.1",
+    "questpdf": "2026.8.0",
+    "velopack": "1.2.0",
+    "xunit": "2.9.3",
+    "nsubstitute": "6.2.0",
+    "shouldly": "4.3.0",
+    "flaui": "5.0.0"
+  },
+  "core": [
+    {
+      "module": "CommunityToolkit.Mvvm",
+      "ref": "communitytoolkit-mvvm",
+      "license": "MIT",
+      "rationale": "MVVM par source generators : [ObservableProperty] et [RelayCommand] remplacent le INotifyPropertyChanged ecrit a la main. Sans lui, chaque propriete liee coute une dizaine de lignes de boilerplate"
+    },
+    {
+      "module": "Microsoft.Extensions.DependencyInjection",
+      "ref": "extensions-di",
+      "rationale": "Conteneur DI — WPF n'en fournit aucun, les ViewModels seraient sinon instancies dans le code-behind"
+    },
+    {
+      "module": "Microsoft.Extensions.Hosting",
+      "ref": "extensions-hosting",
+      "rationale": "Generic Host : cycle de vie, configuration et DI cables ensemble au demarrage de l'App"
+    },
+    {
+      "module": "Microsoft.Extensions.Configuration.Json",
+      "ref": "extensions-config-json",
+      "rationale": "Lecture d'appsettings.json declare au manifest"
+    },
+    {
+      "module": "Microsoft.Extensions.Logging",
+      "ref": "extensions-logging"
+    },
+    {
+      "module": "Serilog.Extensions.Hosting",
+      "ref": "serilog-hosting",
+      "rationale": "Logs structures branches sur le Generic Host"
+    },
+    {
+      "module": "Serilog.Sinks.File",
+      "ref": "serilog-file",
+      "rationale": "Sink fichier — sur un client desktop il n'y a pas de collecteur central : le fichier local EST le journal de diagnostic. Pin 7.0.0 : nuget expose un 8.0.0-nblumhardt-* qui est une prerelease"
+    },
+    {
+      "module": "Microsoft.Xaml.Behaviors.Wpf",
+      "ref": "xaml-behaviors",
+      "rationale": "Behaviors et triggers declaratifs — evite le code-behind pour brancher un evenement sur une commande"
+    }
+  ],
+  "onDemand": [
+    {
+      "module": "Wpf.Ui",
+      "ref": "wpf-ui",
+      "capability": "modern-theme",
+      "rationale": "Theme Fluent/WinUI 3. Le rendu WPF par defaut date de 2006 — un theme est quasi systematiquement requis",
+      "triggers": [
+        "theme",
+        "fluent",
+        "winui",
+        "apparence.*moderne",
+        "dark.*mode"
+      ]
+    },
+    {
+      "module": "MaterialDesignThemes",
+      "ref": "material-design",
+      "capability": "modern-theme",
+      "rationale": "Material Design. Pin 5.3.2 : NuGet expose des builds -ciNNNN qui sont des prereleases",
+      "triggers": [
+        "material.*design"
+      ],
+      "alternative": true
+    },
+    {
+      "module": "HandyControl",
+      "ref": "handycontrol",
+      "capability": "control-library",
+      "rationale": "Bibliotheque de controles etendue",
+      "triggers": [
+        "controle.*avance",
+        "handycontrol",
+        "composant.*riche"
+      ]
+    },
+    {
+      "module": "LiveChartsCore.SkiaSharpView.WPF",
+      "ref": "livecharts-wpf",
+      "capability": "charts",
+      "triggers": [
+        "chart",
+        "graphique",
+        "courbe",
+        "visualisation.*donnees"
+      ]
+    },
+    {
+      "module": "Microsoft.EntityFrameworkCore.Sqlite",
+      "ref": "ef-sqlite",
+      "capability": "local-db",
+      "rationale": "Base locale — une app desktop autonome n'a pas de serveur",
+      "triggers": [
+        "base.*locale",
+        "sqlite",
+        "hors.*ligne",
+        "donnees.*locales"
+      ]
+    },
+    {
+      "module": "Refit.HttpClientFactory",
+      "ref": "refit",
+      "capability": "http-client",
+      "rationale": "Client REST type vers le backend separe declare en ## Active Tech Specs",
+      "triggers": [
+        "appel.*api",
+        "backend",
+        "rest",
+        "http"
+      ]
+    },
+    {
+      "module": "FluentValidation",
+      "ref": "fluentvalidation",
+      "capability": "validation",
+      "triggers": [
+        "validation",
+        "formulaire",
+        "regle.*saisie"
+      ]
+    },
+    {
+      "module": "AutoMapper",
+      "ref": "automapper",
+      "capability": "mapping",
+      "triggers": [
+        "mapping",
+        "dto.*vers.*viewmodel"
+      ]
+    },
+    {
+      "module": "Microsoft.Web.WebView2",
+      "ref": "webview2",
+      "capability": "webview",
+      "rationale": "Hote Chromium embarque — pour afficher du contenu web dans l'app",
+      "triggers": [
+        "webview",
+        "contenu.*web",
+        "afficher.*page"
+      ]
+    },
+    {
+      "module": "ClosedXML",
+      "ref": "closedxml",
+      "capability": "excel",
+      "triggers": [
+        "excel",
+        "xlsx",
+        "export.*tableur"
+      ]
+    },
+    {
+      "module": "QuestPDF",
+      "ref": "questpdf",
+      "capability": "pdf",
+      "triggers": [
+        "\\bpdf\\b",
+        "impression",
+        "export.*pdf"
+      ]
+    },
+    {
+      "module": "Velopack",
+      "ref": "velopack",
+      "capability": "auto-update",
+      "rationale": "Installeur + mise a jour automatique. Un client desktop n'a PAS de deploiement centralise : sans mecanisme d'update, chaque correctif exige une reinstallation manuelle sur chaque poste. Pin 1.2.0 (les versions -gXXXXXXX sont des prereleases)",
+      "triggers": [
+        "mise.*a.*jour",
+        "auto-update",
+        "installeur",
+        "deploiement.*poste"
+      ]
+    },
+    {
+      "module": "xunit",
+      "ref": "xunit",
+      "capability": "unit-tests",
+      "rationale": "Tests des ViewModels dans un projet net10.0 separe (SANS suffixe -windows : un projet de test n'a pas besoin de WPF)",
+      "triggers": [
+        "tests.*unitaires",
+        "xunit",
+        "viewmodel.*test"
+      ]
+    },
+    {
+      "module": "NSubstitute",
+      "ref": "nsubstitute",
+      "capability": "unit-tests",
+      "triggers": [
+        "mock",
+        "substitute",
+        "tests.*unitaires"
+      ]
+    },
+    {
+      "module": "Shouldly",
+      "ref": "shouldly",
+      "capability": "unit-tests",
+      "rationale": "Assertions BSD — retenu plutot que FluentAssertions, passe en licence payante en v8",
+      "triggers": [
+        "assertions",
+        "should"
+      ]
+    },
+    {
+      "module": "FlaUI.UIA3",
+      "ref": "flaui",
+      "capability": "ui-automation",
+      "rationale": "Pilotage de l'UI via UI Automation — le seul moyen de tester un ecran WPF de bout en bout",
+      "triggers": [
+        "test.*ui",
+        "automation",
+        "test.*bout.*en.*bout",
+        "flaui"
+      ]
+    }
+  ]
+}

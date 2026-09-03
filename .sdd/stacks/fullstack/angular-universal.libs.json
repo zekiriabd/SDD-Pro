@@ -13,70 +13,235 @@
     ]
   },
   "metadata": {
-    "platforms": ["node-22"],
+    "platforms": [
+      "node-22"
+    ],
     "framework": "Angular 19 + @angular/ssr (Express integre)",
     "workflow": "single-project-ssr-hydration",
-    "notes": "Standalone components + signals. Build produit dist/{AppName}/browser/ + dist/{AppName}/server/. SSR Express bootstrappe par @angular/ssr."
+    "notes": "Standalone components + signals. Build produit dist/{AppName}/browser/ + dist/{AppName}/server/. SSR Express bootstrappe par @angular/ssr.",
+    "lastUpdated": "2026-09-02",
+    "changeLog": [
+      "2026-09-02 — Audit fullstack. Rebase npm complet (Angular 19 -> 22.1.4). COUPLE MSAL realigne : `@azure/msal-angular` 6.2.0 declare le peer `@azure/msal-browser: ^5.20.0` ; le catalog associait msal-angular 4.0.3 a msal-browser 4.0.0. Ces deux paquets se bumpent ENSEMBLE. Express reste sur la ligne 4 (4.22.2), comme backend/node-express — cf. sa 2.3. TypeScript pinne 6.0.3 et non 7.0.2.",
+      "2026-09-02 (rectificatif du meme audit) — CORRECTION DE COHERENCE. Le premier passage avait monte ce stack d'une MAJEURE. C'est incoherent avec la politique appliquee aux autres stacks 🟢 du meme audit (backend/kotlin-spring-boot reste en 3.5.x face a Spring Boot 4.1.1, backend/node-express reste en 4.x face a Express 5.2.1) : une majeure invalide la validation runtime qui porte le badge, et aucun bench ne peut etre re-joue ici. Le stack est donc ramene sur le DERNIER PATCH de sa majeure en place. La montee de majeure reste disponible en tache dediee, avec re-bench. Angular reste sur la ligne 19 (19.2.25) — trois majeures separent la 19 de la 22, le bench a tourne sur la 19. Le couple MSAL reste realigne DANS sa majeure : msal-angular 4.1.1 + msal-browser 4.30.0 (le catalog associait 4.0.3 a 4.0.0 ; ces deux paquets se bumpent ensemble, c'etait le vrai defaut)."
+    ]
   },
   "versions": {
-    "angular": "19.0.0",
-    "express": "4.21.2",
-    "rxjs": "7.8.1",
-    "zod": "3.24.0",
-    "typescript": "5.7.0",
-    "zone-js": "0.15.0",
+    "angular": "19.2.25",
+    "express": "4.22.2",
+    "rxjs": "7.8.2",
+    "zod": "4.5.4",
+    "typescript": "5.9.3",
+    "zone-js": "0.16.2",
     "ngx-translate-core": "16.0.4",
-    "ngx-translate-http": "16.1.1",
-    "msal-angular": "4.0.3",
-    "msal-browser": "4.0.0",
-    "eslint": "9.17.0",
-    "angular-eslint": "19.0.0",
-    "prisma": "6.1.0",
-    "prisma-client": "6.1.0",
-    "tailwindcss": "4.0.0",
-    "postcss": "8.5.0",
-    "ngrx-signals": "19.0.0",
-    "undici": "7.2.0",
+    "ngx-translate-http": "16.0.1",
+    "msal-angular": "4.1.1",
+    "msal-browser": "4.30.0",
+    "eslint": "10.9.1",
+    "angular-eslint": "19.8.1",
+    "prisma": "7.10.0",
+    "prisma-client": "7.10.0",
+    "tailwindcss": "4.3.3",
+    "postcss": "8.5.26",
+    "ngrx-signals": "19.2.1",
+    "undici": "7.29.0",
     "exceljs": "4.4.0",
     "pdfmake": "0.2.15",
-    "nodemailer": "6.9.16",
-    "date-fns": "4.1.0",
+    "nodemailer": "6.10.1",
+    "date-fns": "4.4.0",
     "ng2-charts": "7.0.0"
   },
   "core": [
-    { "module": "@angular/core", "ref": "angular" },
-    { "module": "@angular/common", "ref": "angular" },
-    { "module": "@angular/router", "ref": "angular" },
-    { "module": "@angular/forms", "ref": "angular" },
-    { "module": "@angular/platform-browser", "ref": "angular" },
-    { "module": "@angular/platform-browser-dynamic", "ref": "angular" },
-    { "module": "@angular/ssr", "ref": "angular", "rationale": "SSR engine (Express)" },
-    { "module": "@angular/material", "ref": "angular", "rationale": "UI Design System defaut" },
-    { "module": "@angular/cdk", "ref": "angular" },
-    { "module": "@angular/animations", "ref": "angular" },
-    { "module": "express", "ref": "express", "rationale": "Server bootstrappe par @angular/ssr" },
-    { "module": "rxjs", "ref": "rxjs" },
-    { "module": "zod", "ref": "zod", "rationale": "Validation schemas (server + client)" },
-    { "module": "typescript", "ref": "typescript" },
-    { "module": "zone.js", "ref": "zone-js", "rationale": "Change detection (deprecate progressif vers signals, reste CORE en v19)" },
-    { "module": "@ngx-translate/core", "ref": "ngx-translate-core" },
-    { "module": "@ngx-translate/http-loader", "ref": "ngx-translate-http" },
-    { "module": "@azure/msal-angular", "ref": "msal-angular", "rationale": "Auth Azure AD (selon ## Active Auth Specs)" },
-    { "module": "@azure/msal-browser", "ref": "msal-browser" },
-    { "module": "eslint", "ref": "eslint" },
-    { "module": "@angular-eslint/builder", "ref": "angular-eslint" }
+    {
+      "module": "@angular/core",
+      "ref": "angular"
+    },
+    {
+      "module": "@angular/common",
+      "ref": "angular"
+    },
+    {
+      "module": "@angular/router",
+      "ref": "angular"
+    },
+    {
+      "module": "@angular/forms",
+      "ref": "angular"
+    },
+    {
+      "module": "@angular/platform-browser",
+      "ref": "angular"
+    },
+    {
+      "module": "@angular/platform-browser-dynamic",
+      "ref": "angular"
+    },
+    {
+      "module": "@angular/ssr",
+      "ref": "angular",
+      "rationale": "SSR engine (Express)"
+    },
+    {
+      "module": "@angular/material",
+      "ref": "angular",
+      "rationale": "UI Design System defaut"
+    },
+    {
+      "module": "@angular/cdk",
+      "ref": "angular"
+    },
+    {
+      "module": "@angular/animations",
+      "ref": "angular"
+    },
+    {
+      "module": "express",
+      "ref": "express",
+      "rationale": "Server bootstrappe par @angular/ssr"
+    },
+    {
+      "module": "rxjs",
+      "ref": "rxjs"
+    },
+    {
+      "module": "zod",
+      "ref": "zod",
+      "rationale": "Validation schemas (server + client)"
+    },
+    {
+      "module": "typescript",
+      "ref": "typescript"
+    },
+    {
+      "module": "zone.js",
+      "ref": "zone-js",
+      "rationale": "Change detection (deprecate progressif vers signals, reste CORE en v19)"
+    },
+    {
+      "module": "@ngx-translate/core",
+      "ref": "ngx-translate-core"
+    },
+    {
+      "module": "@ngx-translate/http-loader",
+      "ref": "ngx-translate-http"
+    },
+    {
+      "module": "@azure/msal-angular",
+      "ref": "msal-angular",
+      "rationale": "Auth Azure AD (selon ## Active Auth Specs)"
+    },
+    {
+      "module": "@azure/msal-browser",
+      "ref": "msal-browser"
+    },
+    {
+      "module": "eslint",
+      "ref": "eslint"
+    },
+    {
+      "module": "@angular-eslint/builder",
+      "ref": "angular-eslint"
+    }
   ],
   "onDemand": [
-    { "module": "prisma", "ref": "prisma", "capability": "prisma", "triggers": ["DatabaseType.*\\b(SqlServer|PostgreSql|MySql|Sqlite)\\b", "orm", "db-first"] },
-    { "module": "@prisma/client", "ref": "prisma-client", "capability": "prisma", "triggers": ["prisma", "orm"] },
-    { "module": "tailwindcss", "ref": "tailwindcss", "capability": "tailwind", "triggers": ["tailwind", "atomic.*css"] },
-    { "module": "postcss", "ref": "postcss", "capability": "tailwind", "triggers": ["tailwind"] },
-    { "module": "@ngrx/signals", "ref": "ngrx-signals", "capability": "signals-store", "triggers": ["ngrx", "store.*signal", "state-mgmt"] },
-    { "module": "undici", "ref": "undici", "capability": "http-client", "triggers": ["appel.*api.*externe"] },
-    { "module": "exceljs", "ref": "exceljs", "capability": "excel", "triggers": ["\\bexcel\\b", "\\.xlsx\\b", "export.*excel"] },
-    { "module": "pdfmake", "ref": "pdfmake", "capability": "pdf", "triggers": ["\\bpdf\\b", "export.*pdf"] },
-    { "module": "nodemailer", "ref": "nodemailer", "capability": "smtp", "triggers": ["email", "smtp"] },
-    { "module": "date-fns", "ref": "date-fns", "capability": "date-utils", "triggers": ["dates.*format"] },
-    { "module": "ng2-charts", "ref": "ng2-charts", "capability": "charts", "triggers": ["graph", "chart", "visualisation"] }
+    {
+      "module": "prisma",
+      "ref": "prisma",
+      "capability": "prisma",
+      "triggers": [
+        "DatabaseType.*\\b(SqlServer|PostgreSql|MySql|Sqlite)\\b",
+        "orm",
+        "db-first"
+      ]
+    },
+    {
+      "module": "@prisma/client",
+      "ref": "prisma-client",
+      "capability": "prisma",
+      "triggers": [
+        "prisma",
+        "orm"
+      ]
+    },
+    {
+      "module": "tailwindcss",
+      "ref": "tailwindcss",
+      "capability": "tailwind",
+      "triggers": [
+        "tailwind",
+        "atomic.*css"
+      ]
+    },
+    {
+      "module": "postcss",
+      "ref": "postcss",
+      "capability": "tailwind",
+      "triggers": [
+        "tailwind"
+      ]
+    },
+    {
+      "module": "@ngrx/signals",
+      "ref": "ngrx-signals",
+      "capability": "signals-store",
+      "triggers": [
+        "ngrx",
+        "store.*signal",
+        "state-mgmt"
+      ]
+    },
+    {
+      "module": "undici",
+      "ref": "undici",
+      "capability": "http-client",
+      "triggers": [
+        "appel.*api.*externe"
+      ]
+    },
+    {
+      "module": "exceljs",
+      "ref": "exceljs",
+      "capability": "excel",
+      "triggers": [
+        "\\bexcel\\b",
+        "\\.xlsx\\b",
+        "export.*excel"
+      ]
+    },
+    {
+      "module": "pdfmake",
+      "ref": "pdfmake",
+      "capability": "pdf",
+      "triggers": [
+        "\\bpdf\\b",
+        "export.*pdf"
+      ]
+    },
+    {
+      "module": "nodemailer",
+      "ref": "nodemailer",
+      "capability": "smtp",
+      "triggers": [
+        "email",
+        "smtp"
+      ]
+    },
+    {
+      "module": "date-fns",
+      "ref": "date-fns",
+      "capability": "date-utils",
+      "triggers": [
+        "dates.*format"
+      ]
+    },
+    {
+      "module": "ng2-charts",
+      "ref": "ng2-charts",
+      "capability": "charts",
+      "triggers": [
+        "graph",
+        "chart",
+        "visualisation"
+      ]
+    }
   ]
 }

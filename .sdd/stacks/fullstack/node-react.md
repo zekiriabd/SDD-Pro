@@ -309,12 +309,12 @@ fi
 | @fastify/helmet | 13.0.1 | Security headers (CSP, HSTS) |
 | @fastify/rate-limit | 10.2.1 |  |
 | @fastify/sensible | 6.0.1 |  |
-| pino | 9.5.0 | Logger JSON structure |
-| pino-pretty | 13.0.0 |  |
-| zod | 3.24.0 | Validation schemas (body/query/params) |
+| pino | 10.3.1 | Logger JSON structure |
+| pino-pretty | 13.1.3 |  |
+| zod | 4.5.4 | Validation schemas (body/query/params) |
 | config | 3.3.12 | Lecture config/default.json peuple par arch |
-| eslint | 9.17.0 |  |
-| @eslint/js | 9.17.0 |  |
+| eslint | 10.9.1 |  |
+| @eslint/js | 10.9.1 |  |
 
 ### 2.4.b Librairies ON-DEMAND (installees si l'US declenche)
 
@@ -322,31 +322,31 @@ Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'U
 
 | Capability | Lib | Version | Triggers |
 |---|---|---|---|
-| anthropic-ai | @anthropic-ai/sdk | 0.40.1 | claude, anthropic, reformulation.*ia, explain.*ia |
-| jwt | @fastify/jwt | 9.0.1 | jwt, auth-local, auth-azure-ad |
-| auth-local | bcryptjs | 2.4.3 | auth-local, hash.*password, bcrypt |
-| prisma | prisma | 6.1.0 | prisma, orm, database.*scaffold, db-first |
-| prisma | @prisma/client | 6.1.0 | prisma, orm |
+| anthropic-ai | @anthropic-ai/sdk | 0.40.1 | \bclaude\b, anthropic, reformulation.*ia, explain.*ia |
+| jwt | @fastify/jwt | 9.0.1 | \bjwt\b, auth-local, auth-azure-ad |
+| auth-local | bcrypt | 6.0.0 | auth-local, hash.*password, bcrypt |
+| prisma | prisma | 7.10.0 | prisma, orm, database.*scaffold, db-first |
+| prisma | @prisma/client | 7.10.0 | prisma, orm |
 | websocket | @fastify/websocket | 11.0.1 | websocket, ws, realtime.*bidirectional |
-| http-client | undici | 7.2.0 | appel.*api.*externe, http-client, fetch.*backend |
-| markdown | marked | 14.1.4 | markdown.*render, md.*rendu, marked |
-| date-utils | dayjs | 1.11.13 | dates.*format, duree, intervalle.*temps |
+| http-client | undici | 8.10.1 | appel.*api.*externe, http-client, fetch.*backend |
+| markdown | marked | 14.1.4 | markdown.*render, \bmd\b.*rendu, \bmarked\b |
+| date-utils | dayjs | 1.11.23 | dates.*format, duree, intervalle.*temps |
 | file-upload | @fastify/multipart | 9.0.1 | upload.*fichier, multipart, form-data |
-| excel | exceljs | 4.4.0 | excel, \.xlsx, export.*excel |
-| pdf | pdfkit | 0.15.2 | pdf, \.pdf, export.*pdf |
-| smtp | nodemailer | 6.9.16 | email, smtp, envoi.*mail, notification.*mail |
+| excel | exceljs | 4.4.0 | \bexcel\b, \.xlsx\b, export.*excel |
+| pdf | pdfkit | 0.20.2 | \bpdf\b, \.pdf\b, export.*pdf |
+| smtp | nodemailer | 9.1.1 | email, smtp, envoi.*mail, notification.*mail |
 | compression | @fastify/compress | 8.0.1 | compression, gzip, brotli |
-| scheduled-jobs | node-cron | 3.0.3 | scheduled.*job, cron, scheduler, nightly, background.*service, task.*planifi, tache.*planifi |
+| scheduled-jobs | node-cron | 3.0.3 | scheduled.*job, cron, \bscheduler\b, nightly, background.*service, task.*planifi, tache.*planifi |
 
 #### 2.4.d DB Drivers (selectionne par arch selon DatabaseType)
 
 | DatabaseType | Module | Version | Scope |
 |---|---|---|---|
-| sqlserver | `@prisma/client` | 6.1.0 | runtime |
-| postgres | `@prisma/client` | 6.1.0 | runtime |
-| mysql | `@prisma/client` | 6.1.0 | runtime |
-| sqlite | `@prisma/client` | 6.1.0 | runtime |
-| mariadb | `@prisma/client` | 6.1.0 | runtime |
+| sqlserver | `@prisma/client` | 7.10.0 | runtime |
+| postgres | `@prisma/client` | 7.10.0 | runtime |
+| mysql | `@prisma/client` | 7.10.0 | runtime |
+| sqlite | `@prisma/client` | 7.10.0 | runtime |
+| mariadb | `@prisma/client` | 7.10.0 | runtime |
 <!-- LIBS_CATALOG_END -->
 
 ---

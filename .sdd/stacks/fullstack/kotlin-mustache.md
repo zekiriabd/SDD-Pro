@@ -1,7 +1,7 @@
 # Tech FEAT: kotlin-mustache (fullstack)
 
 Status: Experimental
-Validation: 🟢 bench-validated runtime (2026-06-05 — CalcABCMustache :44349, Spring Boot 3.4.1 (bumped depuis 3.3.5 du bench original) + JMustache, monolithe SSR classique form POST reload, 159 LOC le plus compact du bench, AC-1/2/3 🟢. Bug fix appliqué : JMustache rejette `null` keys → populer Model avec strings vides + flags `hasX` booléens. Pattern documenté `library-and-stack.md §7.3`. Pipeline `/sdd-full` complet pas encore validé end-to-end — scaffolding manuel mainteneur, cf. `docs/benchmarks/known-gaps.md`)
+Validation: 🟢 bench-validated runtime (2026-06-05 — CalcABCMustache :44349, sur la 3.4.1 de Spring Boot (bumped depuis la 3.3.5 du bench original) + JMustache, monolithe SSR classique form POST reload, 159 LOC le plus compact du bench, AC-1/2/3 🟢. Bug fix appliqué : JMustache rejette `null` keys → populer Model avec strings vides + flags `hasX` booléens. Pattern documenté `library-and-stack.md §7.3`. Pipeline `/sdd-full` complet pas encore validé end-to-end — scaffolding manuel mainteneur, cf. `docs/benchmarks/known-gaps.md`)
 Tech FEAT ID: tech-kotlin-mustache
 Scope: **fullstack monolithe** — application Spring Boot 3.x (Kotlin) avec **templates Mustache** rendus serveur dans UN seul projet `{AppName}/`. UI HTML server-rendered + Controllers + Services + Spring Data JPA + Spring Security vivent dans le meme JAR. Pas de separation `{BackendName}` / `{AppName}` / `{LibName}`. Modele **SSR classique JVM** : HTML genere serveur (FreeMarker-like via Mustache), interactivite optionnelle via HTMX ou Alpine.js (capabilities) — pas de JS bundler, pas de SPA.
 
@@ -161,7 +161,7 @@ Quand est-ce qu'on a besoin de plus que du HTML statique render serveur ?
 - **Stack ID** : `fullstack-kotlin-mustache`
 - **Langage** : Kotlin 2.1.x
 - **Runtime** : JVM 21 LTS (Temurin/Adoptium recommande)
-- **Framework** : Spring Boot 3.4.x
+- **Framework** : Spring Boot **3.5.x** (pin `3.5.16`) — ligne en place ; la 4.1.1 est publiée mais la montée est une tâche dédiée avec re-bench, cf. `backend/kotlin-spring-boot.md §2.3.1`
 - **Template engine** : Mustache (logic-less) via `spring-boot-starter-mustache`
 - **Build system** : Gradle 8.x avec Kotlin DSL (`build.gradle.kts`)
 - **Namespace** : `{AppNamespace}` (package racine Kotlin)
@@ -295,14 +295,14 @@ fi
 
 | Lib | Version | Role |
 |-----|---------|------|
-| spring-boot-starter-web | 3.4.1 | Spring MVC + Tomcat embedded |
-| spring-boot-starter-mustache | 3.4.1 | Template engine Mustache |
-| spring-boot-starter-data-jpa | 3.4.1 | Spring Data JPA + Hibernate |
-| spring-boot-starter-validation | 3.4.1 | Bean Validation (Jakarta) |
-| spring-boot-starter-security | 3.4.1 | Spring Security |
-| spring-boot-starter-actuator | 3.4.1 | /actuator/health, metrics |
-| jackson-module-kotlin | 2.18.2 | JSON Kotlin-aware |
-| kotlinx-coroutines-core | 1.10.1 |  |
+| spring-boot-starter-web | 3.5.16 | Spring MVC + Tomcat embedded |
+| spring-boot-starter-mustache | 3.5.16 | Template engine Mustache |
+| spring-boot-starter-data-jpa | 3.5.16 | Spring Data JPA + Hibernate |
+| spring-boot-starter-validation | 3.5.16 | Bean Validation (Jakarta) |
+| spring-boot-starter-security | 3.5.16 | Spring Security |
+| spring-boot-starter-actuator | 3.5.16 | /actuator/health, metrics |
+| jackson-module-kotlin | 2.22.2 | JSON Kotlin-aware |
+| kotlinx-coroutines-core | 1.11.0 |  |
 
 ### 2.4.b Librairies ON-DEMAND (installees si l'US declenche)
 
@@ -310,20 +310,20 @@ Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'U
 
 | Capability | Lib | Version | Triggers |
 |---|---|---|---|
-| db-postgres | postgresql | 42.7.4 | DatabaseType.*PostgreSql, postgres |
-| db-mysql | mysql-connector-j | 9.1.0 | DatabaseType.*MySql, mysql, mariadb |
-| db-sqlserver | mssql-jdbc | 12.8.1.jre11 | DatabaseType.*SqlServer |
-| db-sqlite | sqlite-jdbc | 3.47.1.0 | DatabaseType.*Sqlite |
-| htmx | htmx.org | 2.0.4 | htmx, partial.*reload, server.*fragment |
-| alpine | alpinejs | 3.14.8 | alpine, alpine\.js, mini.*reactive |
-| flyway | flyway-core | 11.1.0 | flyway, migrations, db.*versionning |
-| openapi | springdoc-openapi-starter-webmvc-ui | 2.7.0 | swagger, openapi, /api-docs |
-| jwt | jjwt-api | 0.12.6 | jwt, auth-local |
-| azure-ad | spring-cloud-azure-starter-active-directory | 5.18.0 | auth-azure-ad, msal, azure-ad |
-| excel | poi-ooxml | 5.4.0 | excel, \.xlsx, export.*excel |
-| pdf | itext | 4.0.5 | pdf, export.*pdf |
-| smtp | spring-boot-starter-mail | 3.4.1 | email, smtp, envoi.*mail |
-| caffeine-cache | caffeine | 3.2.0 | cache, performance, memoization |
+| db-postgres | postgresql | 42.7.13 | DatabaseType.*PostgreSql, postgres |
+| db-mysql | mysql-connector-j | 26.7.0 | DatabaseType.*MySql, mysql, mariadb |
+| db-sqlserver | mssql-jdbc | 13.4.0.jre11 | DatabaseType.*SqlServer |
+| db-sqlite | sqlite-jdbc | 3.53.4.0 | DatabaseType.*Sqlite |
+| htmx | htmx.org | 4.0.0 | htmx, partial.*reload, server.*fragment |
+| alpine | alpinejs | 3.16.3 | alpine, alpine\.js, mini.*reactive |
+| flyway | flyway-core | 11.20.3 | flyway, migrations, db.*versionning |
+| openapi | springdoc-openapi-starter-webmvc-ui | 2.9.0 | swagger, openapi, /api-docs |
+| jwt | jjwt-api | 0.13.0 | \bjwt\b, auth-local |
+| azure-ad | spring-cloud-azure-starter-active-directory | 7.4.0 | auth-azure-ad, msal, azure-ad |
+| excel | poi-ooxml | 5.5.1 | \bexcel\b, \.xlsx\b, export.*excel |
+| pdf | itext | 9.7.1 | \bpdf\b, export.*pdf |
+| smtp | spring-boot-starter-mail | 3.5.16 | email, smtp, envoi.*mail |
+| caffeine-cache | caffeine | 3.2.4 | cache, performance, memoization |
 
 #### 2.4.c Plugins build-system
 
@@ -332,7 +332,7 @@ Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'U
 | org.jetbrains.kotlin.jvm | 2.1.0 | Plugin Kotlin JVM |
 | org.jetbrains.kotlin.plugin.spring | 2.1.0 | Compiler open des classes Spring |
 | org.jetbrains.kotlin.plugin.jpa | 2.1.0 | Compiler no-arg pour entities JPA |
-| org.springframework.boot | 3.4.1 | Spring Boot Gradle plugin (bootJar) |
+| org.springframework.boot | 3.5.16 | Spring Boot Gradle plugin (bootJar) |
 | io.spring.dependency-management |  | BOM management Spring Boot |
 | org.jlleitschuh.gradle.ktlint | 12.1.2 | Lint Kotlin (capability code-quality) |
 
@@ -340,10 +340,10 @@ Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'U
 
 | DatabaseType | Module | Version | Scope |
 |---|---|---|---|
-| postgres | `org.postgresql:postgresql` | 42.7.4 | runtime |
-| mysql | `com.mysql:mysql-connector-j` | 9.1.0 | runtime |
-| sqlserver | `com.microsoft.sqlserver:mssql-jdbc` | 12.8.1.jre11 | runtime |
-| sqlite | `org.xerial:sqlite-jdbc` | 3.47.1.0 | runtime |
+| postgres | `org.postgresql:postgresql` | 42.7.13 | runtime |
+| mysql | `com.mysql:mysql-connector-j` | 26.7.0 | runtime |
+| sqlserver | `com.microsoft.sqlserver:mssql-jdbc` | 13.4.0.jre11 | runtime |
+| sqlite | `org.xerial:sqlite-jdbc` | 3.53.4.0 | runtime |
 <!-- LIBS_CATALOG_END -->
 
 ---
@@ -510,7 +510,7 @@ Ce stack est optimise pour :
 4. **`## Active UI Specs`** : aucun design system n'est applicable (pas de React/Vue/Blazor). Si declare → WARNING bloquant `[STACK_INCOMPAT]`. CSS custom dans `static/css/` + composants Mustache.
 5. **Capabilites recommandees** : `htmx` + `alpine` pour interactivite minimaliste. Si l'US contient "filtre dynamique", "modal", "pagination ajax" → trigger `htmx` automatiquement.
 6. **Phase B (DB scaffolding)** : selon `DatabaseType` — pattern Database-First identique a `kotlin-spring-boot.md §8.3` (jpa-entity-generator OU hibernate-tools)
-7. **Phase C (ADRs)** : creer `ADR-{ts}-stack-fullstack-kotlin-mustache.md` documentant Spring Boot 3.4 + Kotlin + Mustache + (eventuellement HTMX)
+7. **Phase C (ADRs)** : creer `ADR-{ts}-stack-fullstack-kotlin-mustache.md` documentant la ligne Spring Boot 3.5 + Kotlin + Mustache + (eventuellement HTMX)
 
 ---
 

@@ -6,11 +6,11 @@
   "buildSystem": "msbuild",
   "manifest": {
     "files": [
-      "workspace/output/src/{AppName}/{AppName}.dproj",
-      "workspace/output/src/{AppName}/{AppName}.dpr",
-      "workspace/output/src/{AppName}/{AppName}.dproj.local",
-      "workspace/output/src/{AppName}/AndroidManifest.template.xml",
-      "workspace/output/src/{AppName}/Info.plist.TemplateiOS.xml"
+      "workspace/src/{AppName}/{AppName}.dproj",
+      "workspace/src/{AppName}/{AppName}.dpr",
+      "workspace/src/{AppName}/{AppName}.dproj.local",
+      "workspace/src/{AppName}/AndroidManifest.template.xml",
+      "workspace/src/{AppName}/Info.plist.TemplateiOS.xml"
     ]
   },
   "metadata": {
@@ -31,30 +31,32 @@
       "DPM (Delphi Package Manager, community — github.com/DelphiPackageManager/DPM)",
       "Boss (community, modeled after npm — github.com/HashLoad/boss)"
     ],
-    "notes": "Stack mobile/desktop cross-platform Delphi FMX (FireMonkey). UI declarative .fmx + code-behind .pas. buildSystem='msbuild' (Delphi dproj/dpk projects compile via MSBuild.exe + EmbarcaderoCommonProps targets). Aucune install CLI canonique pour les libs — installCommand explicite par lib (GetIt CLI, DPM restore, Boss install, ou clone+search-path manuel). Le catalog reflète l'écosystème OSS dominant : Spring4D (DI/Collections), Skia4Delphi (Skia rendering, bundled depuis RAD 12 Athens), DUnitX (tests), Neon (JSON), TFrameStand (FMX state mgmt). Backend séparé déclaré en ## Active Tech Specs. Pré-requis arch : MSBuild + RAD Studio Command Prompt (rsvars.bat) dans PATH. category=mobiles — couvre aussi desktop FMX (Win/macOS/Linux) car même framework UI."
+    "notes": "Stack mobile/desktop cross-platform Delphi FMX (FireMonkey). UI declarative .fmx + code-behind .pas. buildSystem='msbuild' (Delphi dproj/dpk projects compile via MSBuild.exe + EmbarcaderoCommonProps targets). Aucune install CLI canonique pour les libs — installCommand explicite par lib (GetIt CLI, DPM restore, Boss install, ou clone+search-path manuel). Le catalog reflète l'écosystème OSS dominant : Spring4D (DI/Collections), Skia4Delphi (Skia rendering, bundled depuis RAD 12 Athens), DUnitX (tests), Neon (JSON), TFrameStand (FMX state mgmt). Backend séparé déclaré en ## Active Tech Specs. Pré-requis arch : MSBuild + RAD Studio Command Prompt (rsvars.bat) dans PATH. category=mobiles — couvre aussi desktop FMX (Win/macOS/Linux) car même framework UI. AUDIT 2026-09-02 : (1) le manifest et le .md pointaient sur `workspace/output/src/{AppName}/` alors que TOUS les autres stacks — et `sdd_lib.paths.workspace_root()` + le gate B4 de preflight.py — utilisent `workspace/src/{AppName}/`. delphi-fmx etait le seul stack du repo avec ce chemin : le gate 'fichier projet present' ne pouvait pas passer. Corrige. (2) 12 versions rebasees sur le dernier tag stable upstream (le catalog etait fige sur des versions anterieures, ex. Skia4Delphi 6.2.0 -> 7.3.0, mORMot2 2.3.7 -> 3.35.3). (3) `*.dproj` ajoute aux globs de fichier-projet reconnus par preflight.py.",
+    "lastUpdated": "2026-09-02",
+    "versioningCaveat": "Les libs Delphi ne vivent pas dans un registre indexe (pas de NuGet/npm/Maven) : chaque version ci-dessus est le dernier tag de release STABLE du depot GitHub upstream, verifie le 2026-09-02. Elles sont consommees en source (search path) ou via GetIt/DPM/Boss, donc `validate_libs_catalog.py` ne peut PAS les cross-checker automatiquement — la revalidation est manuelle."
   },
   "versions": {
     "rad-studio": "13.0",
     "delphi": "13.0",
     "fmx": "13.0",
-    "skia4delphi": "6.2.0",
+    "skia4delphi": "7.3.0",
     "spring4d": "2.0.0",
     "dunitx": "1.6.0",
-    "delphi-neon": "1.8.0",
-    "tframestand": "1.6.0",
+    "delphi-neon": "4.1.0",
+    "tframestand": "2.0",
     "tsubjectstand": "1.0.1",
     "indy": "10.6.3",
-    "mormot2": "2.3.7",
+    "mormot2": "3.35.3",
     "kastri": "2025.06.01",
-    "zxing-delphi": "1.4.0",
-    "delphi-openssl": "1.2.0",
-    "ddetours": "2.5",
+    "zxing-delphi": "3.10.0",
+    "delphi-openssl": "1.0.43",
+    "ddetours": "2.0",
     "jsondataobjects": "1.9.6",
-    "synpdf": "2.3.7",
-    "fastmm5": "5.04",
+    "synpdf": "3.35.3",
+    "fastmm5": "5.07",
     "omnixml": "1.2",
     "dsharp": "1.2",
-    "sempare-template": "1.9.0",
+    "sempare-template": "1.8.1",
     "teechart-fmx": "2024.39",
     "fastreport-fmx": "2024.2.20",
     "tms-fnc-uipack": "5.0.1.0",
@@ -62,11 +64,11 @@
     "sgcwebsockets": "4.5.5",
     "delphi-mqtt": "1.0.0",
     "scrypt": "1.0",
-    "synopse-mormot-orm": "2.3.7",
+    "synopse-mormot-orm": "3.35.3",
     "delphi-redis-client": "0.7.0",
     "unidac": "11.0",
     "zeoslib": "8.0.0",
-    "delphi-jose-jwt": "3.2.0"
+    "delphi-jose-jwt": "4.0.2"
   },
   "core": [
     {

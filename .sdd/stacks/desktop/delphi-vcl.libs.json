@@ -1,0 +1,272 @@
+{
+  "$schema": "../../templates/libs-catalog.schema.json",
+  "stackId": "delphi-vcl",
+  "category": "desktop",
+  "schemaVersion": 1,
+  "buildSystem": "msbuild",
+  "manifest": {
+    "files": [
+      "workspace/src/{AppName}/{AppName}.dproj",
+      "workspace/src/{AppName}/{AppName}.dpr",
+      "workspace/src/{AppName}/{AppName}.dproj.local"
+    ]
+  },
+  "metadata": {
+    "lastUpdated": "2026-09-02",
+    "platforms": [
+      "windows"
+    ],
+    "framework": "VCL (Visual Component Library)",
+    "language": "Object Pascal",
+    "ide": "RAD Studio 13 Florence (12 Athens / 11 Alexandria egalement supportes)",
+    "buildCli": "MSBuild.exe {AppName}.dproj /p:Config=Release /p:Platform=Win32|Win64",
+    "packageManagers": [
+      "GetIt",
+      "DPM",
+      "Boss",
+      "clone + search path"
+    ],
+    "notes": "Client desktop Windows natif en Delphi VCL. VCL vs FMX : la VCL enveloppe les controles Win32/Win64 natifs — le rendu EST celui du systeme, et c'est ce qui la distingue de FireMonkey (mobiles/delphi-fmx), qui dessine ses propres controles pour etre portable. La VCL est WINDOWS UNIQUEMENT ; en echange elle donne le meilleur rendu natif et le RAD le plus rapide du catalogue. VERSIONS NON INDEXEES : l'ecosysteme Delphi n'a pas de registre central (ni NuGet, ni npm, ni Maven). Chaque version ci-dessous est le dernier tag de release stable du depot GitHub upstream, verifie le 2026-09-02 ; validate_libs_catalog.py ne peut PAS les cross-checker. Les libs sont consommees en source (search path) ou via GetIt / DPM / Boss — d'ou un installCommand explicite par entree. Meme convention que mobiles/delphi-fmx."
+  },
+  "versions": {
+    "rad-studio": "13.0",
+    "delphi": "13.0",
+    "vcl": "13.0",
+    "spring4d": "2.0.0",
+    "dunitx": "0.5.1",
+    "delphi-neon": "4.1.0",
+    "jsondataobjects": "1.9.6",
+    "indy": "10.6.3",
+    "skia4delphi": "7.3.0",
+    "mormot2": "3.35.3",
+    "delphi-openssl": "1.0.43",
+    "delphi-jose-jwt": "4.0.2",
+    "synpdf": "3.35.3",
+    "fastmm5": "5.07",
+    "omnithreadlibrary": "3.07.9",
+    "virtualtreeview": "8.1.0",
+    "delphi-redis-client": "0.7.0",
+    "unidac": "11.0",
+    "zeoslib": "8.0.0",
+    "ddetours": "2.0",
+    "sempare-template": "1.8.1",
+    "teechart-vcl": "2024.39",
+    "fastreport-vcl": "2024.2.20"
+  },
+  "core": [
+    {
+      "module": "Spring4D",
+      "ref": "spring4d",
+      "rationale": "Collections generiques, DI et Nullable<T> — le socle qui manque a la RTL Delphi",
+      "installCommand": "git clone https://github.com/spring4d/spring4d C:\\Lib\\Spring4D puis ajouter $(SPRING4D)\\Source aux Library Paths du .dproj"
+    },
+    {
+      "module": "JsonDataObjects",
+      "ref": "jsondataobjects",
+      "rationale": "Parseur JSON — nettement plus rapide que System.JSON de la RTL, et son API est plus sure",
+      "installCommand": "git clone https://github.com/ahausladen/JsonDataObjects puis ajouter le repertoire au search path"
+    },
+    {
+      "module": "Delphi-Neon",
+      "ref": "delphi-neon",
+      "rationale": "Serialisation objet <-> JSON par RTTI — evite d'ecrire un mapper par classe",
+      "installCommand": "git clone https://github.com/paolo-rossi/delphi-neon puis ajouter Source au search path"
+    },
+    {
+      "module": "Indy",
+      "ref": "indy",
+      "rationale": "Pile reseau (HTTP, TLS) — livree avec RAD Studio, listee ici pour fixer la version attendue",
+      "installCommand": "livre avec RAD Studio (aucune installation)"
+    },
+    {
+      "module": "DUnitX",
+      "ref": "dunitx",
+      "rationale": "Framework de tests unitaires — livre avec RAD Studio",
+      "installCommand": "livre avec RAD Studio (aucune installation)"
+    }
+  ],
+  "onDemand": [
+    {
+      "module": "VirtualTreeView",
+      "ref": "virtualtreeview",
+      "capability": "data-grid",
+      "rationale": "Grille et arbre virtualises — le TListView de la VCL s'effondre au-dela de quelques milliers de lignes, ce composant tient le million",
+      "triggers": [
+        "grille",
+        "arbre",
+        "grande.*liste",
+        "tableau.*volumineux",
+        "treeview"
+      ],
+      "installCommand": "GetIt ou git clone https://github.com/JAM-Software/Virtual-TreeView"
+    },
+    {
+      "module": "OmniThreadLibrary",
+      "ref": "omnithreadlibrary",
+      "capability": "threading",
+      "rationale": "Abstractions de parallelisme (pipeline, pool, async/await) — la VCL etant mono-thread pour l'UI, tout travail long DOIT sortir du thread principal",
+      "triggers": [
+        "thread",
+        "parallel",
+        "tache.*fond",
+        "traitement.*long",
+        "asynchrone"
+      ],
+      "installCommand": "GetIt ou git clone https://github.com/gabr42/OmniThreadLibrary"
+    },
+    {
+      "module": "mORMot2",
+      "ref": "mormot2",
+      "capability": "ormot-orm",
+      "rationale": "ORM + client/serveur REST haute performance",
+      "triggers": [
+        "\\borm\\b",
+        "mormot",
+        "rest.*client",
+        "persistance"
+      ],
+      "installCommand": "git clone https://github.com/synopse/mORMot2 puis ajouter src aux Library Paths"
+    },
+    {
+      "module": "UniDAC",
+      "ref": "unidac",
+      "capability": "db-universal",
+      "rationale": "Acces universel aux bases (Oracle, SQL Server, PostgreSQL, MySQL) — COMMERCIAL",
+      "triggers": [
+        "base.*donnees",
+        "unidac",
+        "oracle",
+        "sql.*server"
+      ],
+      "installCommand": "produit commercial Devart — installation via l'installeur fourni"
+    },
+    {
+      "module": "ZeosLib",
+      "ref": "zeoslib",
+      "capability": "db-zeos",
+      "rationale": "Alternative libre a UniDAC",
+      "triggers": [
+        "zeos",
+        "base.*donnees.*libre"
+      ],
+      "installCommand": "GetIt ou git clone https://github.com/marsupilami79/zeoslib",
+      "alternative": true
+    },
+    {
+      "module": "Skia4Delphi",
+      "ref": "skia4delphi",
+      "capability": "modern-rendering",
+      "rationale": "Rendu Skia : anti-aliasing, SVG, animations Lottie. Livre avec RAD Studio 12+",
+      "triggers": [
+        "svg",
+        "animation",
+        "rendu.*moderne",
+        "lottie",
+        "skia"
+      ],
+      "installCommand": "livre avec RAD Studio 12+, sinon GetIt"
+    },
+    {
+      "module": "Delphi-JOSE-JWT",
+      "ref": "delphi-jose-jwt",
+      "capability": "jwt-auth",
+      "triggers": [
+        "\\bjwt\\b",
+        "token",
+        "authentification"
+      ],
+      "installCommand": "git clone https://github.com/paolo-rossi/delphi-jose-jwt"
+    },
+    {
+      "module": "Delphi-OpenSSL",
+      "ref": "delphi-openssl",
+      "capability": "openssl",
+      "triggers": [
+        "openssl",
+        "chiffrement",
+        "certificat"
+      ],
+      "installCommand": "git clone https://github.com/lminuti/Delphi-OpenSSL"
+    },
+    {
+      "module": "SynPDF",
+      "ref": "synpdf",
+      "capability": "pdf-generation",
+      "triggers": [
+        "\\bpdf\\b",
+        "impression",
+        "export.*pdf"
+      ],
+      "installCommand": "inclus dans mORMot2 (src/ui)"
+    },
+    {
+      "module": "FastMM5",
+      "ref": "fastmm5",
+      "capability": "memory-manager",
+      "rationale": "Gestionnaire memoire avec detection de fuites — utile sur une application longue duree",
+      "triggers": [
+        "fuite.*memoire",
+        "memory.*leak",
+        "fastmm"
+      ],
+      "installCommand": "git clone https://github.com/pleriche/FastMM5"
+    },
+    {
+      "module": "TeeChart-VCL",
+      "ref": "teechart-vcl",
+      "capability": "charts",
+      "rationale": "Graphiques — l'edition Standard est livree avec RAD Studio",
+      "triggers": [
+        "chart",
+        "graphique",
+        "courbe"
+      ],
+      "installCommand": "edition Standard livree avec RAD Studio ; edition Pro commerciale (Steema)"
+    },
+    {
+      "module": "FastReport-VCL",
+      "ref": "fastreport-vcl",
+      "capability": "reporting",
+      "rationale": "Generateur d'etats — COMMERCIAL. Standard de fait des applications de gestion Delphi",
+      "triggers": [
+        "rapport",
+        "etat",
+        "reporting",
+        "impression.*complexe"
+      ],
+      "installCommand": "produit commercial Fast Reports — installeur fourni"
+    },
+    {
+      "module": "Delphi-Redis-Client",
+      "ref": "delphi-redis-client",
+      "capability": "redis",
+      "triggers": [
+        "redis",
+        "cache.*distribue"
+      ],
+      "installCommand": "git clone https://github.com/danieleteti/delphiredisclient"
+    },
+    {
+      "module": "DDetours",
+      "ref": "ddetours",
+      "capability": "method-hooking",
+      "triggers": [
+        "hook",
+        "detour",
+        "interception.*methode"
+      ],
+      "installCommand": "git clone https://github.com/MahdiSafsafi/DDetours"
+    },
+    {
+      "module": "Sempare.Template",
+      "ref": "sempare-template",
+      "capability": "templating",
+      "triggers": [
+        "template",
+        "generation.*texte",
+        "publipostage"
+      ],
+      "installCommand": "git clone https://github.com/sempare/sempare-delphi-template-engine"
+    }
+  ]
+}

@@ -243,6 +243,52 @@ fi
 
 ---
 
+## 2.3 Politique de version — audit 2026-09-02
+
+Ce stack porte un badge **🟢 bench-validated** : sa validation repose sur un run
+runtime daté, exécuté sur une version précise. La règle appliquée à tout le
+catalogue lors de cet audit :
+
+| Type de bump | Décision |
+|---|---|
+| **Patch / minor dans la majeure en place** | appliqué |
+| **Majeure** | **non appliqué** — documenté ici, tâche dédiée avec re-bench |
+
+### Ce qui a été bumpé
+
+`next` **15.1.0 → 15.5.25** (dernier patch de la ligne 15), plus les
+dépendances hors framework : `react` 19.2.3, `tailwindcss` 4.3.3, `zod` 4.5.4,
+`prisma` 7.10.0, `@types/*`.
+
+### Ce qui n'a PAS été bumpé
+
+**La 16.3.4 de Next.js est publiée.** Le bench de ce stack a tourné sur la ligne 15,
+et une majeure Next touche le routage, le cache et les Server Actions. Montée
+= tâche dédiée.
+
+### Correction obligatoire, sans rapport avec les majeures
+
+`next-auth` était pinné en **`5.0.0-beta.25`** — une **préversion**, ce que
+`rules/library-and-stack.md §5` interdit sans ADR. C'était l'un des deux WARN
+`PRERELEASE` que remontait `validate_libs_catalog.py` sur tout le catalogue.
+
+Le dist-tag npm `latest` de `next-auth` pointe sur la **4.24.15 stable** ; la
+ligne 5 est encore en beta (beta.32 à ce jour, soit 7 betas devant le pin).
+Le catalog passe donc en **4.24.15**, qui déclare
+`next: ^12 || ^13 || ^14 || ^15 || ^16` et `react: ^17 || ^18 || ^19` — donc
+pleinement compatible avec la ligne 15 comme avec la 16.
+
+Utiliser `next-auth@5` reste possible, mais exige un ADR explicite au titre
+du §5.
+
+> Le raisonnement complet est développé une fois dans
+> `backend/kotlin-spring-boot.md §2.3.1`. Les stacks 🟢 concernés par le même
+> arbitrage : `backend/kotlin-spring-boot` (Spring Boot 3.5.x vs 4.1.1),
+> `backend/node-express` (Express 4.x vs 5.2.1), `fullstack/kotlin-mustache`,
+> `fullstack/next`, `fullstack/nuxt`, `fullstack/angular-universal`.
+
+---
+
 <!-- LIBS_CATALOG_START -->
 ### 2.4 Librairies
 
@@ -252,25 +298,25 @@ fi
 
 | Lib | Version | Role |
 |-----|---------|------|
-| next | 15.1.0 | Framework App Router + RSC + Server Actions |
-| react | 19.0.0 | UI lib compatible RSC |
-| react-dom | 19.0.0 |  |
-| @types/react | 19.0.2 |  |
-| @types/react-dom | 19.0.2 |  |
-| @types/node | 22.10.0 |  |
-| typescript | 5.7.0 |  |
-| tailwindcss | 4.0.0 |  |
-| @tailwindcss/postcss | 4.0.0 |  |
-| postcss | 8.5.0 |  |
-| zod | 3.24.0 | Validation schemas (server + client) |
-| react-hook-form | 7.54.2 |  |
-| @hookform/resolvers | 3.10.0 |  |
-| next-auth | 5.0.0-beta.25 | Auth (NextAuth v5 / Auth.js) |
-| next-intl | 3.26.0 | i18n |
-| pino | 9.5.0 |  |
-| pino-pretty | 13.0.0 |  |
-| eslint | 9.17.0 |  |
-| eslint-config-next | 15.1.0 |  |
+| next | 15.5.25 | Framework App Router + RSC + Server Actions |
+| react | 19.2.3 | UI lib compatible RSC |
+| react-dom | 19.2.3 |  |
+| @types/react | 19.2.18 |  |
+| @types/react-dom | 19.2.5 |  |
+| @types/node | 26.4.1 |  |
+| typescript | 5.9.3 |  |
+| tailwindcss | 4.3.3 |  |
+| @tailwindcss/postcss | 4.3.3 |  |
+| postcss | 8.5.26 |  |
+| zod | 4.5.4 | Validation schemas (server + client) |
+| react-hook-form | 7.87.0 |  |
+| @hookform/resolvers | 5.9.1 |  |
+| next-auth | 4.24.15 | Auth (NextAuth v5 / Auth.js) |
+| next-intl | 3.26.5 | i18n |
+| pino | 10.3.1 |  |
+| pino-pretty | 13.1.3 |  |
+| eslint | 10.9.1 |  |
+| eslint-config-next | 15.5.25 |  |
 
 ### 2.4.b Librairies ON-DEMAND (installees si l'US declenche)
 
@@ -278,16 +324,16 @@ Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'U
 
 | Capability | Lib | Version | Triggers |
 |---|---|---|---|
-| prisma | prisma | 6.1.0 | DatabaseType.*(SqlServer|PostgreSql|MySql|Sqlite), orm, db-first |
-| prisma | @prisma/client | 6.1.0 | prisma, orm |
-| auth-azure-ad | @azure/msal-node | 3.1.0 | auth-azure-ad, msal |
-| jwt | jose | 5.9.6 | jwt, auth-local |
-| http-client | undici | 7.2.0 | appel.*api.*externe, http-client |
-| excel | exceljs | 4.4.0 | excel, \.xlsx, export.*excel |
-| pdf | @react-pdf/renderer | 4.1.5 | pdf, export.*pdf |
-| smtp | nodemailer | 6.9.16 | email, smtp, envoi.*mail |
-| date-utils | date-fns | 4.1.0 | dates.*format, duree, intervalle.*temps |
-| state-mgmt | zustand | 5.0.2 | global.*state, store, zustand |
+| prisma | prisma | 7.10.0 | DatabaseType.*\b(SqlServer|PostgreSql|MySql|Sqlite)\b, orm, db-first |
+| prisma | @prisma/client | 7.10.0 | prisma, orm |
+| auth-azure-ad | @azure/msal-node | 3.8.10 | auth-azure-ad, msal |
+| jwt | jose | 5.10.0 | \bjwt\b, auth-local |
+| http-client | undici | 7.29.0 | appel.*api.*externe, http-client |
+| excel | exceljs | 4.4.0 | \bexcel\b, \.xlsx\b, export.*excel |
+| pdf | @react-pdf/renderer | 4.9.0 | \bpdf\b, export.*pdf |
+| smtp | nodemailer | 6.10.1 | email, smtp, envoi.*mail |
+| date-utils | date-fns | 4.4.0 | dates.*format, duree, intervalle.*temps |
+| state-mgmt | zustand | 5.0.15 | global.*state, store, zustand |
 | analytics | @vercel/analytics | 1.4.1 | analytics, telemetry.*ui |
 <!-- LIBS_CATALOG_END -->
 

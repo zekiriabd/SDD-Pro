@@ -472,7 +472,7 @@ def _check_stack_md_headers(claude_root: Path, checks: "Checks") -> None:
                     + s.get("blockquoted_only", 0)
                     + s.get("invalid_badge", 0))
         n_stacks = payload.get("stacks_count", 0)
-        expected_total = 36  # CLAUDE.md §6 recount 2026-07-25 : 28 🟢 + 8 🟡 (ajout delphi-fmx 2026-06-21)
+        expected_total = 56  # CLAUDE.md §6 recount 2026-09-02 : 28 🟢 + 28 🟡 (mobiles + backend + fullstack + desktop)
         if res.returncode == 0 and problems == 0:
             if n_stacks == expected_total:
                 checks.add("stack-md-headers", "OK",

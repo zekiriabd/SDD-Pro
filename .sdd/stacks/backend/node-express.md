@@ -127,30 +127,30 @@ Namespace racine : `{BackendNamespace}`
 
 | Lib | Version | Role |
 |-----|---------|------|
-| express | 4.21.2 |  |
-| prisma | 6.1.0 |  |
-| @prisma/client | 6.1.0 |  |
-| pino | 9.5.0 |  |
-| pino-http | 10.3.0 |  |
-| pino-pretty | 13.0.0 |  |
-| zod | 3.24.0 |  |
-| swagger-jsdoc | 6.2.8 |  |
+| express | 4.22.2 |  |
+| prisma | 7.10.0 |  |
+| @prisma/client | 7.10.0 |  |
+| pino | 10.3.1 |  |
+| pino-http | 11.0.0 |  |
+| pino-pretty | 13.1.3 |  |
+| zod | 4.5.4 |  |
+| swagger-jsdoc | 6.3.0 |  |
 | swagger-ui-express | 5.0.1 |  |
-| helmet | 8.0.0 |  |
-| cors | 2.8.5 |  |
-| dotenv | 16.4.7 |  |
-| compression | 1.7.5 |  |
-| express-rate-limit | 7.4.1 |  |
-| typescript | 5.6.3 |  |
+| helmet | 8.3.0 |  |
+| cors | 2.8.6 |  |
+| dotenv | 17.4.2 |  |
+| compression | 1.8.1 |  |
+| express-rate-limit | 8.7.0 |  |
+| typescript | 6.0.3 |  |
 | ts-node-dev | 2.0.0 |  |
-| tsc-alias | 1.8.10 |  |
-| @types/node | 22.10.0 |  |
-| @types/express | 5.0.0 |  |
-| @types/cors | 2.8.17 |  |
+| tsc-alias | 1.9.4 |  |
+| @types/node | 26.4.1 |  |
+| @types/express | 4.17.25 |  |
+| @types/cors | 2.8.19 |  |
 | @types/swagger-jsdoc | 6.0.4 |  |
 | @types/swagger-ui-express | 4.1.7 |  |
-| eslint | 9.17.0 |  |
-| typescript-eslint | 8.18.1 |  |
+| eslint | 10.9.1 |  |
+| typescript-eslint | 8.69.0 |  |
 
 ### 2.4.b Librairies ON-DEMAND (installees si l'US declenche)
 
@@ -158,21 +158,21 @@ Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'U
 
 | Capability | Lib | Version | Triggers |
 |---|---|---|---|
-| uuid-gen | uuid | 11.0.5 | uuid, guid.*genere, id.*aleatoire |
-| uuid-gen | @types/uuid | 10.0.0 | uuid, guid.*genere, id.*aleatoire |
-| date-utils | dayjs | 1.11.13 | dates.*format, duree, intervalle.*temps |
-| auth-local | bcryptjs | 2.4.3 | auth-local, hash.*password, bcrypt |
-| auth-local | @types/bcryptjs | 2.4.6 | auth-local, hash.*password, bcrypt |
-| jwt | jsonwebtoken | 9.0.2 | jwt, auth-local, auth-azure-ad |
-| jwt | @types/jsonwebtoken | 9.0.7 | jwt, auth-local, auth-azure-ad |
-| http-client | axios | 1.7.9 | axios, appel.*api.*externe, service.*externe, third.party |
-| http-client | axios-retry | 4.5.0 | axios, retry.*http, resilience |
-| excel | exceljs | 4.4.0 | excel, \.xlsx, export.*excel, import.*excel, tableur |
-| pdf | pdfkit | 0.15.2 | pdf, \.pdf, export.*pdf, generer.*pdf |
-| file-upload | multer | 1.4.5-lts.1 | upload.*fichier, multipart, form-data |
-| file-upload | @types/multer | 1.4.12 | upload.*fichier, multipart, form-data |
+| uuid-gen | uuid | 14.0.2 | \buuid\b, guid.*genere, id.*aleatoire |
+| uuid-gen | @types/uuid | 10.0.0 | \buuid\b, guid.*genere, id.*aleatoire |
+| date-utils | dayjs | 1.11.23 | dates.*format, duree, intervalle.*temps |
+| auth-local | bcrypt | 6.0.0 | auth-local, hash.*password, bcrypt |
+| auth-local | @types/bcrypt | 6.0.0 | auth-local, hash.*password, bcrypt |
+| jwt | jsonwebtoken | 9.0.3 | \bjwt\b, auth-local, auth-azure-ad |
+| jwt | @types/jsonwebtoken | 9.0.10 | \bjwt\b, auth-local, auth-azure-ad |
+| http-client | axios | 1.20.0 | \baxios\b, appel.*api.*externe, service.*externe, third.party |
+| http-client | axios-retry | 4.5.0 | \baxios\b, retry.*http, resilience |
+| excel | exceljs | 4.4.0 | \bexcel\b, \.xlsx\b, export.*excel, import.*excel, tableur |
+| pdf | pdfkit | 0.20.2 | \bpdf\b, \.pdf\b, export.*pdf, generer.*pdf |
+| file-upload | multer | 2.3.0 | upload.*fichier, multipart, form-data |
+| file-upload | @types/multer | 2.2.0 | upload.*fichier, multipart, form-data |
 | object-mapping | class-transformer | 0.5.1 | class-transformer, auto.*mapping, dto.*mapping |
-| decorator-validation | class-validator (alt) | 0.14.1 | class-validator, decorator.*validation |
+| decorator-validation | class-validator (alt) | 0.15.1 | class-validator, decorator.*validation |
 <!-- LIBS_CATALOG_END -->
 
 ### 2.2 Outils
@@ -205,30 +205,30 @@ npm init -y
 ```bash
 # Auto-genere depuis node-express.libs.json -- ne pas editer (utiliser sync_stack_md.py).
 (cd workspace/src/{BackendName} && pnpm add \
-  express@4.21.2 \
-  prisma@6.1.0 \
-  @prisma/client@6.1.0 \
-  pino@9.5.0 \
-  pino-http@10.3.0 \
-  pino-pretty@13.0.0 \
-  zod@3.24.0 \
-  swagger-jsdoc@6.2.8 \
+  express@4.22.2 \
+  prisma@7.10.0 \
+  @prisma/client@7.10.0 \
+  pino@10.3.1 \
+  pino-http@11.0.0 \
+  pino-pretty@13.1.3 \
+  zod@4.5.4 \
+  swagger-jsdoc@6.3.0 \
   swagger-ui-express@5.0.1 \
-  helmet@8.0.0 \
-  cors@2.8.5 \
-  dotenv@16.4.7 \
-  compression@1.7.5 \
-  express-rate-limit@7.4.1 \
-  typescript@5.6.3 \
+  helmet@8.3.0 \
+  cors@2.8.6 \
+  dotenv@17.4.2 \
+  compression@1.8.1 \
+  express-rate-limit@8.7.0 \
+  typescript@6.0.3 \
   ts-node-dev@2.0.0 \
-  tsc-alias@1.8.10 \
-  @types/node@22.10.0 \
-  @types/express@5.0.0 \
-  @types/cors@2.8.17 \
+  tsc-alias@1.9.4 \
+  @types/node@26.4.1 \
+  @types/express@4.17.25 \
+  @types/cors@2.8.19 \
   @types/swagger-jsdoc@6.0.4 \
   @types/swagger-ui-express@4.1.7 \
-  eslint@9.17.0 \
-  typescript-eslint@8.18.1)
+  eslint@10.9.1 \
+  typescript-eslint@8.69.0)
 ```
 <!-- CORE_PACKAGES_END -->
 
@@ -253,34 +253,34 @@ cd ../../..
 ```bash
 # Auto-genere depuis node-express.libs.json (on-demand) -- installe par dev-* si l'US declenche un trigger.
 # capability: uuid-gen
-(cd workspace/src/{BackendName} && pnpm add uuid@11.0.5 @types/uuid@10.0.0)
+(cd workspace/src/{BackendName} && pnpm add uuid@14.0.2 @types/uuid@10.0.0)
 
 # capability: date-utils
-(cd workspace/src/{BackendName} && pnpm add dayjs@1.11.13)
+(cd workspace/src/{BackendName} && pnpm add dayjs@1.11.23)
 
 # capability: auth-local
-(cd workspace/src/{BackendName} && pnpm add bcryptjs@2.4.3 @types/bcryptjs@2.4.6)
+(cd workspace/src/{BackendName} && pnpm add bcrypt@6.0.0 @types/bcrypt@6.0.0)
 
 # capability: jwt
-(cd workspace/src/{BackendName} && pnpm add jsonwebtoken@9.0.2 @types/jsonwebtoken@9.0.7)
+(cd workspace/src/{BackendName} && pnpm add jsonwebtoken@9.0.3 @types/jsonwebtoken@9.0.10)
 
 # capability: http-client
-(cd workspace/src/{BackendName} && pnpm add axios@1.7.9 axios-retry@4.5.0)
+(cd workspace/src/{BackendName} && pnpm add axios@1.20.0 axios-retry@4.5.0)
 
 # capability: excel
 (cd workspace/src/{BackendName} && pnpm add exceljs@4.4.0)
 
 # capability: pdf
-(cd workspace/src/{BackendName} && pnpm add pdfkit@0.15.2)
+(cd workspace/src/{BackendName} && pnpm add pdfkit@0.20.2)
 
 # capability: file-upload
-(cd workspace/src/{BackendName} && pnpm add multer@1.4.5-lts.1 @types/multer@1.4.12)
+(cd workspace/src/{BackendName} && pnpm add multer@2.3.0 @types/multer@2.2.0)
 
 # capability: object-mapping
 (cd workspace/src/{BackendName} && pnpm add class-transformer@0.5.1)
 
 # capability: decorator-validation
-# OU (alt) : (cd workspace/src/{BackendName} && pnpm add class-validator@0.14.1)
+# OU (alt) : (cd workspace/src/{BackendName} && pnpm add class-validator@0.15.1)
 ```
 <!-- ONDEMAND_PACKAGES_END -->
 
@@ -297,6 +297,47 @@ cd ../../..
 ```
 
 ---
+
+## 2.3 Politique de version — audit 2026-09-02
+
+### Express reste sur la ligne 4
+
+`express` **5.2.1** est publié. Le stack reste pinné sur **4.22.2**, et c'est
+un choix, pas un oubli :
+
+- npm expose un dist-tag dédié **`latest-4` → 4.22.2** : la ligne 4 est
+  toujours maintenue en amont, elle reçoit ses correctifs.
+- Express 5 change le **routage** (patterns de chemin), la **propagation des
+  erreurs async** et retire des API (`app.del`, `res.sendfile`, arguments de
+  `req.param`…).
+- Ce stack est **bench-validated** (combo C3, runtime vérifié 2026-06-05).
+  Une majeure invalide ce bench et il ne peut pas être rejoué ici.
+
+Migration Express 5 → tâche dédiée, avec re-run du bench C3. Même
+raisonnement que `backend/kotlin-spring-boot` face à Spring Boot 4 (cf. sa
+§2.3.1).
+
+### TypeScript est plafonné en dessous de 7
+
+TypeScript **7.0.2** est disponible sur npm. Le stack pin **6.0.3**. Vérifier
+les peer-dependencies de la chaîne de build avant tout bump : sur ce stack et
+sur `backend/nestjs`, les outils de transpilation et de test déclarent encore
+`typescript: <7`. Un `npm install typescript@latest` casse le build sans
+message explicite sur la cause.
+
+### Deux pièges de registre relevés à l'audit
+
+| Piège | Détail |
+|---|---|
+| **`prisma` : le dist-tag `latest` est une préversion** | npm résout `prisma@latest` → `8.0.0-rc.12`. La dernière **stable** est la **7.10.0**, exposée par le dist-tag `prev`. `@prisma/client` est, lui, en 7.10.0 sur `latest`. Installer les deux « en latest » produit un CLI RC 8 avec un client 7 — désalignement de schéma garanti. |
+| **`@types/express` était sur la mauvaise majeure** | Le catalog pinnait `@types/express` **5.0.0** avec `express` **4.21.2**. Les typings 5.x décrivent l'API d'Express 5 : le compilateur validait le code contre un runtime différent de celui installé. Réaligné sur **4.17.25**. |
+
+Le second point est un **défaut réel corrigé**, pas une préférence : c'est la
+même classe de bug que ceux fermés sur `mobiles/` au même audit — une
+coordonnée qui ne correspond pas à ce qui tourne.
+
+---
+
 
 ## 2.4 Patterns erreurs compilation
 

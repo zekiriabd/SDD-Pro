@@ -1,0 +1,271 @@
+{
+  "$schema": "../../templates/libs-catalog.schema.json",
+  "stackId": "electron",
+  "category": "desktop",
+  "schemaVersion": 1,
+  "buildSystem": "npm",
+  "manifest": {
+    "files": [
+      "workspace/src/{AppName}/package.json",
+      "workspace/src/{AppName}/electron.vite.config.ts",
+      "workspace/src/{AppName}/electron-builder.yml",
+      "workspace/src/{AppName}/src/main/index.ts",
+      "workspace/src/{AppName}/src/preload/index.ts",
+      "workspace/src/{AppName}/tsconfig.json"
+    ]
+  },
+  "metadata": {
+    "lastUpdated": "2026-09-02",
+    "platforms": [
+      "windows",
+      "linux",
+      "macos"
+    ],
+    "electronVersion": "44.1.1",
+    "nodeEngine": ">=22.12.0",
+    "notes": "Client desktop multiplateforme en Electron + TypeScript : Chromium pour le rendu, Node.js pour l'acces systeme. TROIS PROCESSUS, ET C'EST LA CLE DU STACK : `main` (Node, acces complet a l'OS), `preload` (pont, contexte isole) et `renderer` (l'UI web, SANS acces Node). La securite depend entierement de ce cloisonnement — `nodeIntegration: false` et `contextIsolation: true` sont NON NEGOCIABLES (cf. .md 1.4). Toute communication passe par contextBridge + IPC, jamais par un acces direct a Node depuis le renderer. Electron 44 exige Node >= 22.12.0. COUT ASSUME : ~150 Mo de binaire livre et plusieurs centaines de Mo de RAM par instance — c'est le prix d'embarquer Chromium."
+  },
+  "versions": {
+    "electron": "44.1.1",
+    "electron-vite": "5.0.0",
+    "electron-builder": "26.15.3",
+    "electron-updater": "6.8.9",
+    "electron-log": "5.4.4",
+    "electron-store": "11.0.2",
+    "toolkit-preload": "3.0.2",
+    "toolkit-utils": "4.0.0",
+    "electron-rebuild": "4.2.0",
+    "vite": "8.2.2",
+    "typescript": "6.0.3",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "zustand": "5.0.15",
+    "zod": "4.5.4",
+    "better-sqlite3": "13.0.3",
+    "better-sqlite3-types": "9.6.0",
+    "devtools-installer": "4.0.0",
+    "playwright": "1.62.1",
+    "playwright-test": "1.62.1",
+    "vitest": "4.1.11",
+    "node-types": "26.4.1",
+    "react-types": "19.2.18",
+    "react-dom-types": "19.2.5",
+    "eslint": "10.9.1",
+    "typescript-eslint": "8.69.0",
+    "prettier": "3.9.6"
+  },
+  "core": [
+    {
+      "module": "electron",
+      "ref": "electron",
+      "rationale": "Runtime (devDependency : il est empaquete, pas installe chez l'utilisateur). Exige Node >= 22.12.0"
+    },
+    {
+      "module": "electron-vite",
+      "ref": "electron-vite",
+      "rationale": "Build des TROIS processus (main / preload / renderer) avec rechargement a chaud. Sans lui, il faut trois configurations de bundler distinctes"
+    },
+    {
+      "module": "electron-builder",
+      "ref": "electron-builder",
+      "rationale": "Empaquetage et signature : .exe (NSIS), .dmg, .AppImage, .deb"
+    },
+    {
+      "module": "@electron-toolkit/preload",
+      "ref": "toolkit-preload",
+      "rationale": "Helpers contextBridge — expose une API typee au renderer sans ouvrir Node"
+    },
+    {
+      "module": "@electron-toolkit/utils",
+      "ref": "toolkit-utils",
+      "rationale": "Utilitaires du processus main (detection dev/prod, raccourcis fenetre)"
+    },
+    {
+      "module": "electron-log",
+      "ref": "electron-log",
+      "rationale": "Journalisation fichier + console, cote main ET renderer. Sur un poste client, le fichier local est le seul journal disponible"
+    },
+    {
+      "module": "vite",
+      "ref": "vite",
+      "rationale": "Peer d'electron-vite"
+    },
+    {
+      "module": "typescript",
+      "ref": "typescript",
+      "rationale": "Pin ligne 6.0 — coherent avec les autres stacks TypeScript du catalogue"
+    },
+    {
+      "module": "@types/node",
+      "ref": "node-types"
+    },
+    {
+      "module": "eslint",
+      "ref": "eslint"
+    },
+    {
+      "module": "typescript-eslint",
+      "ref": "typescript-eslint"
+    },
+    {
+      "module": "prettier",
+      "ref": "prettier"
+    }
+  ],
+  "onDemand": [
+    {
+      "module": "react",
+      "ref": "react",
+      "capability": "renderer-react",
+      "rationale": "UI du renderer. Le renderer est une page web : n'importe quel framework frontend du catalogue y fonctionne",
+      "triggers": [
+        "react",
+        "interface",
+        "\\bui\\b",
+        "composant"
+      ]
+    },
+    {
+      "module": "react-dom",
+      "ref": "react-dom",
+      "capability": "renderer-react",
+      "triggers": [
+        "react"
+      ]
+    },
+    {
+      "module": "@types/react",
+      "ref": "react-types",
+      "capability": "renderer-react",
+      "triggers": [
+        "react"
+      ]
+    },
+    {
+      "module": "@types/react-dom",
+      "ref": "react-dom-types",
+      "capability": "renderer-react",
+      "triggers": [
+        "react"
+      ]
+    },
+    {
+      "module": "zustand",
+      "ref": "zustand",
+      "capability": "renderer-state",
+      "rationale": "State du renderer — meme choix que frontend/react et mobiles/react-native",
+      "triggers": [
+        "state",
+        "store",
+        "etat.*global"
+      ]
+    },
+    {
+      "module": "zod",
+      "ref": "zod",
+      "capability": "ipc-validation",
+      "rationale": "Validation des messages IPC. Le processus main a un acces COMPLET a l'OS : tout payload venant du renderer doit etre valide a la frontiere, exactement comme un payload HTTP cote serveur",
+      "triggers": [
+        "validation",
+        "ipc",
+        "schema",
+        "message.*inter.*processus"
+      ]
+    },
+    {
+      "module": "electron-store",
+      "ref": "electron-store",
+      "capability": "settings",
+      "rationale": "Preferences persistees en JSON. NON CHIFFRE : ne jamais y stocker de jeton (cf. .md 1.4)",
+      "triggers": [
+        "preference",
+        "reglage",
+        "configuration.*utilisateur",
+        "settings"
+      ]
+    },
+    {
+      "module": "better-sqlite3",
+      "ref": "better-sqlite3",
+      "capability": "local-db",
+      "rationale": "SQLite synchrone, cote main uniquement. MODULE NATIF : il doit etre recompile pour l'ABI Electron (capability native-rebuild)",
+      "triggers": [
+        "base.*locale",
+        "sqlite",
+        "hors.*ligne",
+        "donnees.*locales"
+      ]
+    },
+    {
+      "module": "@types/better-sqlite3",
+      "ref": "better-sqlite3-types",
+      "capability": "local-db",
+      "triggers": [
+        "sqlite"
+      ]
+    },
+    {
+      "module": "@electron/rebuild",
+      "ref": "electron-rebuild",
+      "capability": "native-rebuild",
+      "rationale": "Recompile les modules natifs contre l'ABI d'Electron. OBLIGATOIRE des qu'un module natif (better-sqlite3, serialport, keytar) est utilise : le binaire compile pour Node ne se charge PAS dans Electron",
+      "triggers": [
+        "module.*natif",
+        "better-sqlite3",
+        "serialport",
+        "rebuild"
+      ]
+    },
+    {
+      "module": "electron-updater",
+      "ref": "electron-updater",
+      "capability": "auto-update",
+      "rationale": "Mise a jour automatique depuis un serveur ou GitHub Releases. Sans elle, chaque correctif exige une reinstallation manuelle sur chaque poste",
+      "triggers": [
+        "mise.*a.*jour",
+        "auto-update",
+        "deploiement.*poste"
+      ]
+    },
+    {
+      "module": "electron-devtools-installer",
+      "ref": "devtools-installer",
+      "capability": "dev-tools",
+      "rationale": "dev uniquement",
+      "triggers": [
+        "devtools",
+        "react.*devtools",
+        "debug"
+      ]
+    },
+    {
+      "module": "vitest",
+      "ref": "vitest",
+      "capability": "unit-tests",
+      "rationale": "Tests unitaires de la logique main et renderer — cf. qa/node-vitest.md",
+      "triggers": [
+        "tests.*unitaires",
+        "vitest"
+      ]
+    },
+    {
+      "module": "@playwright/test",
+      "ref": "playwright-test",
+      "capability": "e2e-tests",
+      "rationale": "Playwright pilote Electron nativement (_electron.launch) — c'est la voie supportee pour tester l'application empaquetee",
+      "triggers": [
+        "test.*e2e",
+        "playwright",
+        "test.*bout.*en.*bout"
+      ]
+    },
+    {
+      "module": "playwright",
+      "ref": "playwright",
+      "capability": "e2e-tests",
+      "triggers": [
+        "playwright"
+      ]
+    }
+  ]
+}

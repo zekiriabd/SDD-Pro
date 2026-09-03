@@ -19,7 +19,9 @@
       "backend": "dotnet-minimalapi",
       "frontend": "react",
       "ui": "shadcn",
-      "qa": ["dotnet-xunit"],
+      "qa": [
+        "dotnet-xunit"
+      ],
       "auth": "azure-ad",
       "db": "postgres",
       "archi": "mvc",
@@ -33,7 +35,10 @@
       "backend": "kotlin-spring-boot",
       "frontend": "react",
       "ui": "shadcn",
-      "qa": ["kotlin-junit", "node-vitest"],
+      "qa": [
+        "kotlin-junit",
+        "node-vitest"
+      ],
       "auth": "azure-ad",
       "db": "postgres",
       "archi": "ddd",
@@ -47,7 +52,9 @@
       "backend": "node-express",
       "frontend": "react",
       "ui": "shadcn",
-      "qa": ["node-vitest"],
+      "qa": [
+        "node-vitest"
+      ],
       "auth": "auth-local",
       "db": "postgres",
       "archi": "mvc",
@@ -61,7 +68,10 @@
       "backend": "python-fastapi",
       "frontend": "react",
       "ui": "shadcn",
-      "qa": ["python-pytest", "node-vitest"],
+      "qa": [
+        "python-pytest",
+        "node-vitest"
+      ],
       "auth": "auth-local",
       "db": "postgres",
       "archi": "mvc",
@@ -75,7 +85,10 @@
       "backend": "dotnet-minimalapi",
       "frontend": "vue",
       "ui": "vuetify",
-      "qa": ["dotnet-xunit", "node-vitest"],
+      "qa": [
+        "dotnet-xunit",
+        "node-vitest"
+      ],
       "auth": "azure-ad",
       "db": "postgres",
       "archi": "mvc",
@@ -89,7 +102,10 @@
       "backend": "kotlin-spring-boot",
       "frontend": "blazor-webassembly",
       "ui": "radzen-blazor",
-      "qa": ["kotlin-junit", "blazor-bunit"],
+      "qa": [
+        "kotlin-junit",
+        "blazor-bunit"
+      ],
       "auth": "azure-ad",
       "db": "postgres",
       "archi": "mvc",
@@ -103,7 +119,10 @@
       "backend": "kotlin-spring-boot",
       "frontend": "vue",
       "ui": "vuetify",
-      "qa": ["kotlin-junit", "node-vitest"],
+      "qa": [
+        "kotlin-junit",
+        "node-vitest"
+      ],
       "auth": "azure-ad",
       "db": "postgres",
       "archi": "mvc",
@@ -117,7 +136,10 @@
       "backend": "kotlin-spring-boot",
       "frontend": "angular",
       "ui": "shadcn",
-      "qa": ["kotlin-junit", "angular-jasmine"],
+      "qa": [
+        "kotlin-junit",
+        "angular-jasmine"
+      ],
       "auth": "azure-ad",
       "db": "postgres",
       "archi": "mvc",
@@ -131,7 +153,10 @@
       "backend": "dotnet-minimalapi",
       "frontend": "blazor-webassembly",
       "ui": "radzen-blazor",
-      "qa": ["dotnet-xunit", "blazor-bunit"],
+      "qa": [
+        "dotnet-xunit",
+        "blazor-bunit"
+      ],
       "auth": "azure-ad",
       "db": "postgres",
       "archi": "mvc",
@@ -145,7 +170,9 @@
       "backend": "node-express",
       "frontend": "vue",
       "ui": "vuetify",
-      "qa": ["node-vitest"],
+      "qa": [
+        "node-vitest"
+      ],
       "auth": "auth-local",
       "db": "postgres",
       "archi": "mvc",
@@ -159,7 +186,10 @@
       "backend": "node-express",
       "frontend": "angular",
       "ui": "shadcn",
-      "qa": ["node-vitest", "angular-jasmine"],
+      "qa": [
+        "node-vitest",
+        "angular-jasmine"
+      ],
       "auth": "auth-local",
       "db": "postgres",
       "archi": "mvc",
@@ -173,7 +203,10 @@
       "backend": "python-fastapi",
       "frontend": "vue",
       "ui": "vuetify",
-      "qa": ["python-pytest", "node-vitest"],
+      "qa": [
+        "python-pytest",
+        "node-vitest"
+      ],
       "auth": "auth-local",
       "db": "postgres",
       "archi": "mvc",
@@ -187,7 +220,10 @@
       "backend": "python-fastapi",
       "frontend": "angular",
       "ui": "shadcn",
-      "qa": ["python-pytest", "angular-jasmine"],
+      "qa": [
+        "python-pytest",
+        "angular-jasmine"
+      ],
       "auth": "auth-local",
       "db": "postgres",
       "archi": "mvc",
@@ -198,10 +234,13 @@
   "componentLevels": {
     "_doc": "Per-component validation level — `validated` (🟢) | `experimental` (🟡) | `untested` (🔴). MUST stay in sync with the `Validation:` header of each .sdd/stacks/{cat}/{stack-id}.md file. Asserted by tests/test_combos_cross_check.py at CI time.",
     "backend": {
+      "django": "experimental",
       "dotnet-minimalapi": "validated",
       "kotlin-spring-boot": "validated",
-      "python-fastapi": "bench-validated",
-      "node-express": "bench-validated"
+      "laravel": "experimental",
+      "nestjs": "experimental",
+      "node-express": "bench-validated",
+      "python-fastapi": "bench-validated"
     },
     "frontend": {
       "react": "validated",
@@ -215,15 +254,18 @@
       "radzen-blazor": "validated"
     },
     "qa": {
-      "dotnet-xunit": "validated",
-      "kotlin-junit": "validated",
-      "node-vitest": "validated",
-      "code-quality": "validated",
-      "python-pytest": "bench-validated",
       "angular-jasmine": "bench-validated",
       "blazor-bunit": "validated",
+      "code-quality": "validated",
+      "dotnet-xunit": "validated",
+      "flutter-test": "experimental",
+      "kotlin-junit": "validated",
       "mutation-testing": "experimental",
-      "playwright": "experimental"
+      "node-vitest": "validated",
+      "php-pest": "experimental",
+      "playwright": "experimental",
+      "python-pytest": "bench-validated",
+      "swift-testing": "experimental"
     },
     "auth": {
       "azure-ad": "validated",
@@ -249,16 +291,34 @@
       "_doc": "Fullstack monolithe stacks. poc-only = utilise interne SDD console uniquement, non destine prod externe (cf. audit P3 2026-06-05). bench-validated = runtime OK lors du bench 2026-06-05 (scaffolding semi-manuel mainteneur, cf. BENCH-GLOBAL-REPORT.md). experimental = stack OK mais combo jamais teste runtime.",
       "angular-universal": "bench-validated",
       "blazor-server": "bench-validated",
+      "django-templates": "experimental",
       "kotlin-mustache": "bench-validated",
+      "laravel-blade": "experimental",
       "next": "bench-validated",
       "node-react": "poc-only",
-      "nuxt": "bench-validated"
+      "nuxt": "bench-validated",
+      "symfony-twig": "experimental"
     },
     "mobiles": {
-      "_doc": "Mobile native stacks. scaffold-validated = scaffolding runtime OK mais build/runtime APK/IPA pas teste cette session. bench-validated = runtime OK lors du bench 2026-06-05 (MAUI Windows desktop, RN Expo Web).",
+      "_doc": "Mobile stacks. scaffold-validated = scaffolding runtime OK mais build/runtime APK/IPA pas teste. bench-validated = runtime OK lors du bench 2026-06-05 (MAUI Windows desktop, RN Expo Web). experimental = catalog resolu contre les registres amont mais AUCUN run runtime. MAJ 2026-09-02 : delphi-fmx etait absent de cette table alors que le stack existe depuis 2026-06-21 (oubli d'enregistrement) ; ajout de flutter / kotlin-multiplatform / swiftui / ionic-capacitor. Les 4 nouveaux sont experimental par construction — ne pas promouvoir sans bench.",
+      "delphi-fmx": "experimental",
+      "flutter": "experimental",
+      "ionic-capacitor": "experimental",
       "kotlin-android": "scaffold-validated",
+      "kotlin-multiplatform": "experimental",
       "maui": "bench-validated",
-      "react-native": "bench-validated"
+      "react-native": "bench-validated",
+      "swiftui": "experimental"
+    },
+    "desktop": {
+      "_doc": "Clients desktop (categorie creee 2026-09-02). Meme modele single-project que `mobiles` : preflight les detecte en frontendKind=desktop, et ils sont exclusifs de mobiles/* et frontend/*. Les 7 sont experimental par construction — catalogs resolus contre les registres amont (NuGet, npm, Maven Central, PyPI, GitHub, download.qt.io) mais AUCUN build runtime execute. Trois exigent un hote specifique : delphi-vcl / wpf / winforms sont Windows-only.",
+      "delphi-vcl": "experimental",
+      "electron": "experimental",
+      "javafx": "experimental",
+      "pyside": "experimental",
+      "qt-cpp": "experimental",
+      "winforms": "experimental",
+      "wpf": "experimental"
     }
   },
   "levelPriority": {

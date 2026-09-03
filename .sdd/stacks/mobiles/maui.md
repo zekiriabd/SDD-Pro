@@ -3,9 +3,9 @@
 > §2.4 (Librairies) regeneree depuis `maui.libs.json` — ne pas editer manuellement (`python .sdd/python/sdd_admin/sync_stack_md.py --stack-id maui`).
 
 Status: Experimental
-Validation: 🟢 bench-validated runtime — Windows desktop (2026-06-05 — CalcABCMaui, MAUI workloads installés, cible `net9.0-windows10.0.19041.0` WinUI3, build 5.88s 0 err 4 warn (Frame obsolète), fenêtre WinUI3 PID 15972 246MB lancée, HttpClient → FastAPI :44329, AC-1/2/3 🟢. Cibles iOS/Android/macOS non testées sans toolchain. Bug fix : `-f net8.0` rejeté par template SDK 10 → `-f net9.0`. Pipeline `/sdd-full` complet pas encore validé end-to-end — scaffolding manuel mainteneur, cf. `docs/benchmarks/known-gaps.md`)
+Validation: 🟢 bench-validated runtime — Windows desktop (2026-06-05 — CalcABCMaui, MAUI workloads installés, cible `net9.0-windows10.0.19041.0` WinUI3, build 5.88s 0 err 4 warn (Frame obsolète), fenêtre WinUI3 PID 15972 246MB lancée, HttpClient → FastAPI :44329, AC-1/2/3 🟢. Cibles iOS/Android/macOS non testées sans toolchain. Bug fix : `-f net8.0` rejeté par template SDK 10 → `-f net9.0`. Pipeline `/sdd-full` complet pas encore validé end-to-end — scaffolding manuel mainteneur, cf. `docs/benchmarks/known-gaps.md`. **Rebase 2026-09-02** : le bench ci-dessus a tourne sur `net9.0` ; le stack cible desormais **`net10.0` (LTS active)** car .NET 9 est passe en support *maintenance*. Le runtime n'a pas ete re-benche sur net10 — la cible Windows reste le seul runtime observe. 3 references NuGet inexistantes ont ete retirees du catalog au meme audit, cf. §2.3.)
 Tech FEAT ID: tech-maui
-Scope: **mobile cross-platform** — application **.NET MAUI 9** (Multi-platform App UI) dans UN seul projet `{AppName}/`. Single codebase C# / XAML qui cible iOS + Android (+ macOS Catalyst + Windows en option). UI MAUI + MVVM + acces APIs natives + auth vivent dans le meme `.csproj`. Pas de separation `{BackendName}` / `{LibName}`.
+Scope: **mobile cross-platform** — application **.NET MAUI 10** (Multi-platform App UI) dans UN seul projet `{AppName}/`. Single codebase C# / XAML qui cible iOS + Android (+ macOS Catalyst + Windows en option). UI MAUI + MVVM + acces APIs natives + auth vivent dans le meme `.csproj`. Pas de separation `{BackendName}` / `{LibName}`.
 
 > **Backend separe** : ce stack est PUREMENT client mobile. Il consomme une API backend distincte declaree en `## Active Tech Specs` (ex. `backend/dotnet-minimalapi.md`, `backend/node-express.md`). Pour un app purement client → Microsoft Graph / Azure Mobile Apps / BaaS via env vars.
 
@@ -15,9 +15,10 @@ Scope: **mobile cross-platform** — application **.NET MAUI 9** (Multi-platform
 
 ## 1.1 Pattern applicatif
 
-**Application .NET MAUI 9 Multi-platform** cible iOS + Android (Windows + Mac Catalyst en TargetFramework optionnel) :
+**Application .NET MAUI 10 Multi-platform** cible iOS + Android (Windows + Mac Catalyst en TargetFramework optionnel) :
 
-- **MAUI 9** sur **.NET 9 LTS** — single project multi-target (`net9.0-android;net9.0-ios`)
+- **MAUI 10** sur **.NET 10 LTS** — single project multi-target (`net10.0-android;net10.0-ios`).
+  .NET 9 est passe en support **maintenance** (cf. §2.3) : ne plus scaffolder de nouveau projet dessus.
 - **MVVM source-gen** via **CommunityToolkit.Mvvm 8.4** — `[ObservableProperty]` + `[RelayCommand]` (zero boilerplate, code propre)
 - **CommunityToolkit.Maui 11** — Behaviors, Converters, Popups, Snackbar, MediaElement, TouchBehavior — standard de facto
 - **DI native MAUI** via `MauiAppBuilder.Services` (Microsoft.Extensions.DependencyInjection)
@@ -30,7 +31,7 @@ Architecture cible (un seul `.csproj`) :
 
 ```
 {AppName}/
-├── {AppName}.csproj            ── multi-target (net9.0-android;net9.0-ios[;net9.0-maccatalyst;net9.0-windows10.0.19041.0])
+├── {AppName}.csproj            ── multi-target (net10.0-android;net10.0-ios[;net10.0-maccatalyst;net10.0-windows10.0.19041.0])
 ├── MauiProgram.cs              ── bootstrap DI + register ViewModels/Services
 ├── App.xaml(.cs)               ── App entry point
 ├── AppShell.xaml(.cs)          ── Shell navigation (Tabs + flyout)
@@ -112,7 +113,7 @@ Un seul projet sous `workspace/src/{AppName}/`. **Convention single-project — 
 - **Services enregistres Singleton** (HttpClient, AuthService, DatabaseService)
 - **Bindings explicites** via `x:DataType` (Compiled Bindings) — JAMAIS de binding non-typed (slow, runtime errors silencieux)
 - **Async/await partout** sur les operations I/O — pas de `.Wait()`, pas de `.Result` (deadlock UI thread)
-- **TargetFramework `net9.0-android` + `net9.0-ios`** par defaut. macOS + Windows en TargetFrameworks optionnels (capability `desktop-targets`)
+- **TargetFramework `net10.0-android` + `net10.0-ios`** par defaut. macOS + Windows en TargetFrameworks optionnels (capability `desktop-targets`)
 
 **SOLID / Clean Code** : meme rigueur que `.sdd/stacks/fullstack/blazor-server.md §1.5` (heritage .NET).
 
@@ -126,7 +127,7 @@ Un seul projet sous `workspace/src/{AppName}/`. **Convention single-project — 
 - **Tokens JWT / OAuth** dans `SecureStorage` (Keychain iOS, Android Keystore) — JAMAIS dans `Preferences`
 - **Pas de secret client-side** — utiliser backend proxy
 - **Permissions runtime** demandees juste-a-temps (`Permissions.RequestAsync<Permissions.Camera>()`) — pas au demarrage
-- **Certificate pinning** (capability `cert-pinning`) pour apps sensibles
+- **Certificate pinning** pour apps sensibles — via `HttpClientHandler.ServerCertificateCustomValidationCallback` (handler natif par plateforme). **Aucun paquet NuGet** : cf. §2.3, la capability `cert-pinning` du catalog pointait vers un paquet inexistant
 - **Deep links signes** : Universal Links iOS (apple-app-site-association) / App Links Android (assetlinks.json) — pas de scheme custom seul (hijackable)
 
 ---
@@ -152,10 +153,10 @@ Ce stack est CLIENT mobile — la persistance "DB" reelle vit cote backend. Opti
 
 | Plateforme | TargetFramework | Par defaut |
 |---|---|---|
-| Android | `net9.0-android` | ✅ |
-| iOS | `net9.0-ios` | ✅ |
-| Mac Catalyst | `net9.0-maccatalyst` | ❌ (capability `desktop-targets`) |
-| Windows | `net9.0-windows10.0.19041.0` | ❌ (capability `desktop-targets`) |
+| Android | `net10.0-android` | ✅ |
+| iOS | `net10.0-ios` | ✅ |
+| Mac Catalyst | `net10.0-maccatalyst` | ❌ (capability `desktop-targets`) |
+| Windows | `net10.0-windows10.0.19041.0` | ❌ (capability `desktop-targets`) |
 
 Single-target Android-only ou iOS-only → utiliser **Xamarin classic-style** = mauvais choix (deprecated 2024). Pour single-platform natif, preferer SwiftUI (iOS) ou Jetpack Compose (Android) direct.
 
@@ -167,8 +168,8 @@ Single-target Android-only ou iOS-only → utiliser **Xamarin classic-style** = 
 
 - **Stack ID** : `mobile-maui`
 - **Langage** : C# 13
-- **Runtime** : .NET 9 LTS (`net9.0-android` + `net9.0-ios`)
-- **Framework** : .NET MAUI 9.0
+- **Runtime** : .NET 10 LTS (`net10.0-android36.0` + `net10.0-ios26.0`)
+- **Framework** : .NET MAUI 10.0 (`Microsoft.Maui.Controls` 10.0.100)
 - **MVVM** : CommunityToolkit.Mvvm 8.4 (source-gen)
 - **UI Toolkit** : CommunityToolkit.Maui 11.0 (Behaviors, Converters, Popup, Snackbar, MediaElement)
 - **Plateformes** : iOS 15.0+ / Android API 24+ (Android 7.0)
@@ -179,17 +180,17 @@ Single-target Android-only ou iOS-only → utiliser **Xamarin classic-style** = 
 ## 2.2 Outils
 
 - **Project file** : `workspace/src/{AppName}/{AppName}.csproj`
-- **Build** : `dotnet build workspace/src/{AppName}/{AppName}.csproj -f net9.0-android --nologo` (build per-TargetFramework — sur Mac requis pour iOS)
-- **Run Android (emulateur ouvert)** : `dotnet build -t:Run -f net9.0-android workspace/src/{AppName}/{AppName}.csproj`
-- **Run iOS (simulateur — macOS uniquement)** : `dotnet build -t:Run -f net9.0-ios workspace/src/{AppName}/{AppName}.csproj`
-- **Publish Android APK/AAB** : `dotnet publish -f net9.0-android -c Release -p:AndroidPackageFormat=apk` (ou `aab` pour Play Store)
-- **Publish iOS IPA** : `dotnet publish -f net9.0-ios -c Release -p:ArchiveOnBuild=true` (macOS + Apple Developer certificate)
+- **Build** : `dotnet build workspace/src/{AppName}/{AppName}.csproj -f net10.0-android --nologo` (build per-TargetFramework — sur Mac requis pour iOS)
+- **Run Android (emulateur ouvert)** : `dotnet build -t:Run -f net10.0-android workspace/src/{AppName}/{AppName}.csproj`
+- **Run iOS (simulateur — macOS uniquement)** : `dotnet build -t:Run -f net10.0-ios workspace/src/{AppName}/{AppName}.csproj`
+- **Publish Android APK/AAB** : `dotnet publish -f net10.0-android -c Release -p:AndroidPackageFormat=apk` (ou `aab` pour Play Store)
+- **Publish iOS IPA** : `dotnet publish -f net10.0-ios -c Release -p:ArchiveOnBuild=true` (macOS + Apple Developer certificate)
 - **Smoke Command** :
 
 ```bash
 dotnet restore workspace/src/{AppName}/{AppName}.csproj
-dotnet build workspace/src/{AppName}/{AppName}.csproj -f net9.0-android --nologo --no-restore
-test -d workspace/src/{AppName}/bin/Debug/net9.0-android
+dotnet build workspace/src/{AppName}/{AppName}.csproj -f net10.0-android --nologo --no-restore
+test -d workspace/src/{AppName}/bin/Debug/net10.0-android
 ```
 
 - **Smoke Timeout** : 300s (premiere build MAUI ~3-4min, incrementale ~30s)
@@ -209,10 +210,10 @@ if [ ! -f "workspace/src/{AppName}/{AppName}.csproj" ]; then
 
 # STEP 1 — Scaffold projet MAUI
 mkdir -p workspace/src/{AppName}
-dotnet new maui -n {AppName} -o workspace/src/{AppName} --framework net9.0 --force
+dotnet new maui -n {AppName} -o workspace/src/{AppName} --framework net10.0 --force
 
 # STEP 2 — Retarget TargetFrameworks (par defaut maui template inclut Windows + Mac que SDD_Pro skip)
-# Edit {AppName}.csproj : <TargetFrameworks>net9.0-android;net9.0-ios</TargetFrameworks> (retirer maccatalyst + windows si non desires)
+# Edit {AppName}.csproj : <TargetFrameworks>net10.0-android;net10.0-ios</TargetFrameworks> (retirer maccatalyst + windows si non desires)
 # Cet edit passe par Read+Edit du csproj (pattern Blazor Server §2.2.1) — pas via sed/rm bash.
 
 # STEP 3 — Ajouter packages CORE (cf. §2.4)
@@ -264,12 +265,62 @@ JSON
 
 # STEP 7 — Restore + build sanity check
 dotnet restore {AppName}.csproj
-dotnet build {AppName}.csproj -f net9.0-android --nologo --no-restore || true
+dotnet build {AppName}.csproj -f net10.0-android --nologo --no-restore || true
 
 fi
 ```
 
 ---
+
+## 2.3 Cible .NET et references NuGet (audit 2026-09-02)
+
+### Pourquoi net10.0
+
+| Channel | Etat support Microsoft | Verdict SDD_Pro |
+|---|---|---|
+| `net10.0` | **LTS — active** (runtime 10.0.11, SDK 10.0.400) | **cible du stack** |
+| `net9.0` | STS — *maintenance* | ne plus scaffolder ; migration attendue |
+| `net8.0` | LTS — *maintenance* | rejete par le template `dotnet new maui` (bench 2026-06-05) |
+| `net11.0` | preview | interdit (cf. §5) |
+
+Suffixes de plateforme retenus, alignes sur ceux publies par
+`CommunityToolkit.Maui` 15.0.1 (paquet de reference du stack) :
+`net10.0-android36.0`, `net10.0-ios26.0`, `net10.0-maccatalyst26.0`,
+`net10.0-windows10.0.19041.0`.
+
+### References NuGet corrigees
+
+Trois entrees du catalog pointaient vers des paquets ou des versions qui
+**n'existent pas sur nuget.org** — toute US declenchant la capability
+concernee echouait au `dotnet restore` :
+
+| Capability | Entree fautive | Realite nuget.org | Correction |
+|---|---|---|---|
+| `cert-pinning` | `Plugin.MauiCertPinning` 1.0.0 | **le paquet n'existe pas** (404) | Capability **supprimee** du catalog. Le pinning se fait sans dependance, via `HttpClientHandler.ServerCertificateCustomValidationCallback` par plateforme (cf. §1.4) |
+| `biometric` | `Plugin.Fingerprint` 3.0.0 | derniere stable **2.1.5** ; la 3.0.0 n'existe qu'en `3.0.0-beta.1` | pin sur `2.1.5` |
+| `in-app-rating` | `Plugin.Maui.AppRating` 2.0.0 | derniere publiee **1.3.0** | pin sur `1.3.0` |
+
+Corrige aussi au meme passage :
+
+- `LiveChartsCore.SkiaSharpView.Maui` : `2.0.0-rc4.1` → **`2.0.5`**, premiere
+  release stable. C'etait le dernier `PRERELEASE` signale par
+  `validate_libs_catalog.py` sur ce stack.
+- `Sentry.Maui` : `5.3.0` → **`6.9.0`**. nuget.org expose egalement un
+  `14.12.1-dump1` qui n'est pas une release Sentry — ne pas le prendre pour
+  la derniere version.
+- Ajout en CORE de `Microsoft.Extensions.Configuration.Json` : le manifest
+  declarait `appsettings.json` et le STEP 6 de §2.2.1 le genere, mais aucun
+  paquet ne savait le **lire**.
+- Ajout de la capability `maui-unit-tests` (xUnit + NSubstitute + Shouldly) :
+  le stack n'avait aucun moyen declare de tester ses ViewModels.
+
+> `Plugin.Firebase` 4.2.1 ne publie que des assets `net9.0-*`. Il reste
+> consommable depuis un projet `net10.0-*` par compatibilite NuGet, mais
+> emet un warning de restore. Si l'US n'a besoin que de notifications
+> locales, preferer la capability `local-notification`.
+
+---
+
 
 <!-- LIBS_CATALOG_START -->
 ### 2.4 Librairies
@@ -280,17 +331,20 @@ fi
 
 | Lib | Version | Role |
 |-----|---------|------|
-| CommunityToolkit.Mvvm | 8.4.0 | Source-gen MVVM (ObservableProperty + RelayCommand) — top-1 standard 2024-2025 |
-| CommunityToolkit.Maui | 11.0.0 | Toolkit officiel communautaire — Behaviors, Converters, Popup, Snackbar, MediaElement |
-| CommunityToolkit.Maui.Markup | 5.1.0 | Fluent C# markup (alternative XAML) |
-| sqlite-net-pcl | 1.9.172 | ORM SQLite local — top-1 standard de facto MAUI |
-| SQLitePCLRaw.bundle_green | 2.1.10 | Bundle SQLite native (peer sqlite-net-pcl) |
-| Microsoft.Extensions.Http | 9.0.0 | HttpClientFactory DI-friendly |
-| Microsoft.Extensions.Http.Resilience | 9.0.0 | Retry / circuit breaker / timeout (succede a Polly direct en .NET 8+) |
-| Refit | 8.0.0 | REST client typed — top-1 wrapper HttpClient C# |
-| Refit.HttpClientFactory | 8.0.0 | Integration Refit + DI HttpClientFactory |
-| FluentValidation | 11.10.0 | Validation forms / models |
-| Serilog.Extensions.Logging | 9.0.0 | Logger structure (peer ILogger<T>) |
+| CommunityToolkit.Mvvm | 8.4.2 | Source-gen MVVM (ObservableProperty + RelayCommand) — top-1 standard |
+| CommunityToolkit.Maui | 15.0.1 | Toolkit officiel communautaire — Behaviors, Converters, Popup, Snackbar, MediaElement. Sert de reference d'alignement net10 pour ce stack |
+| CommunityToolkit.Maui.Markup | 8.0.0 | Fluent C# markup (alternative XAML) |
+| sqlite-net-pcl | 1.11.285 | ORM SQLite local — top-1 standard de facto MAUI |
+| SQLitePCLRaw.bundle_green | 2.1.11 | Bundle SQLite native (peer sqlite-net-pcl) |
+| Microsoft.Extensions.Http | 10.0.11 | HttpClientFactory DI-friendly |
+| Microsoft.Extensions.Http.Resilience | 10.9.0 | Retry / circuit breaker / timeout (succede a Polly direct en .NET 8+) |
+| Microsoft.Extensions.Options | 10.0.11 | Binding fortement type de appsettings.json vers des records d'options (IOptions<T>) |
+| Microsoft.Extensions.Configuration.Json | 10.0.11 | Lecture de appsettings.json declare au manifest — sans ce paquet la config n'est pas chargee |
+| Microsoft.Extensions.Logging.Debug | 10.0.11 | Provider ILogger vers la fenetre Debug de l'IDE |
+| Refit | 15.2.0 | REST client typed — top-1 wrapper HttpClient C# |
+| Refit.HttpClientFactory | 15.2.0 | Integration Refit + DI HttpClientFactory |
+| FluentValidation | 12.1.1 | Validation forms / models |
+| Serilog.Extensions.Logging | 10.0.0 | Logger structure (peer ILogger<T>) |
 | Serilog.Sinks.Debug | 3.0.0 | Sink Debug (console IDE pendant dev) |
 
 ### 2.4.b Librairies ON-DEMAND (installees si l'US declenche)
@@ -299,22 +353,27 @@ Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'U
 
 | Capability | Lib | Version | Triggers |
 |---|---|---|---|
-| ef-sqlite | Microsoft.EntityFrameworkCore.Sqlite (alt) | 9.0.0 | ef-core, entity.*framework, ef-sqlite |
-| msal | Microsoft.Identity.Client | 4.66.0 | msal, azure-ad, auth-azure-ad, sso |
-| charts | LiveChartsCore.SkiaSharpView.Maui | 2.0.0-rc4.1 | chart, graph, visualisation, courbe |
-| charts | Microcharts.Maui (alt) | 1.0.0 | microcharts, chart.*simple |
-| skia | SkiaSharp.Views.Maui.Controls | 3.116.1 | skia, dessin.*custom, canvas |
-| barcode | ZXing.Net.Maui.Controls | 0.4.0 | barcode, qr.*code, scan.*qr |
-| firebase-push | Plugin.Firebase | 3.1.0 | firebase, push.*notification, fcm, notification |
-| audio | Plugin.Maui.Audio | 3.0.1 | audio, lecture.*son, enregistrement.*audio |
-| biometric | Plugin.Fingerprint | 3.0.0 | biometric, fingerprint, face-id, touch-id |
-| in-app-rating | Plugin.Maui.AppRating | 2.0.0 | rating, app-store-rating, demande.*review |
-| in-app-billing | Plugin.InAppBilling | 8.0.5 | in-app-purchase, abonnement, billing |
-| maps | Microsoft.Maui.Controls.Maps | 9.0.40 | maps, carte, marker |
-| stripe | Stripe.net | 47.1.0 | stripe, paiement, payment |
-| sentry | Sentry.Maui | 5.3.0 | sentry, error.*tracking, monitoring.*erreurs |
-| localization | Microsoft.Extensions.Localization | 9.0.0 | i18n, localization, multi.*langue |
-| cert-pinning | Plugin.MauiCertPinning | 1.0.0 | cert-pinning, ssl-pinning |
+| ef-sqlite | Microsoft.EntityFrameworkCore.Sqlite (alt) | 10.0.11 | ef-core, entity.*framework, ef-sqlite |
+| msal | Microsoft.Identity.Client | 4.88.0 | msal, azure-ad, entra, auth-azure-ad, sso |
+| charts | LiveChartsCore.SkiaSharpView.Maui | 2.0.5 | chart, graph, visualisation, courbe |
+| charts | Microcharts.Maui (alt) | 2.0.0.3 | microcharts, chart.*simple |
+| skia | SkiaSharp.Views.Maui.Controls | 4.151.1 | skia, dessin.*custom, canvas |
+| barcode | ZXing.Net.Maui.Controls | 0.10.4 | barcode, qr.*code, scan.*qr |
+| firebase-push | Plugin.Firebase | 4.2.1 | firebase, push.*notification, fcm, notification.*distante |
+| local-notification | Plugin.LocalNotification | 14.1.1 | notification.*locale, rappel, reminder, notification.*planifiee |
+| audio | Plugin.Maui.Audio | 4.0.0 | audio, lecture.*son, enregistrement.*audio |
+| biometric | Plugin.Fingerprint | 2.1.5 | biometric, fingerprint, face-id, touch-id |
+| in-app-rating | Plugin.Maui.AppRating | 1.3.0 | rating, app-store-rating, demande.*review |
+| in-app-billing | Plugin.InAppBilling | 10.0.0 | in-app-purchase, abonnement, billing |
+| maps | Microsoft.Maui.Controls.Maps | 10.0.100 | maps, carte, marker |
+| stripe | Stripe.net | 52.4.1 | stripe, paiement, payment |
+| sentry | Sentry.Maui | 6.9.0 | sentry, error.*tracking, monitoring.*erreurs |
+| localization | Microsoft.Extensions.Localization | 10.0.11 | i18n, localization, multi.*langue |
+| maui-unit-tests | xunit | 2.9.3 | tests.*unitaires, xunit, viewmodel.*test |
+| maui-unit-tests | xunit.runner.visualstudio | 4.0.0 | tests.*unitaires, xunit |
+| maui-unit-tests | Microsoft.NET.Test.Sdk | 18.9.0 | tests.*unitaires, xunit |
+| maui-unit-tests | NSubstitute | 6.2.0 | mock, stub, substitute, tests.*unitaires |
+| maui-unit-tests | Shouldly (alt) | 4.3.0 | assertions, should, tests.*unitaires |
 <!-- LIBS_CATALOG_END -->
 
 ---
@@ -411,6 +470,9 @@ Le backend expose `/api/v1/{domain}`. Cote MAUI : maintenir une **MinSupportedAp
 - Pas de provisioning profile valide pour iOS App Store
 - `<UseMaui>true</UseMaui>` absent du csproj
 - Mix `TargetFramework` + `TargetFrameworks` (utiliser uniquement le plural)
+- Cibler un TFM en **preview** (`net11.0-*`) — SDD_Pro ne scaffolde que sur un channel LTS `active` (cf. §2.3)
+- Cibler `net9.0-*` sur un nouveau projet — channel passe en *maintenance* (cf. §2.3)
+- Referencer un paquet NuGet sans avoir verifie qu'il existe et que la version est publiee : `Plugin.MauiCertPinning`, `Plugin.Fingerprint 3.0.0` et `Plugin.Maui.AppRating 2.0.0` etaient dans ce catalog et faisaient echouer `dotnet restore` (audit 2026-09-02)
 
 ---
 
@@ -466,7 +528,7 @@ Ce stack est optimise pour :
 5. **Composer** `appsettings.json` (MauiAsset) depuis `## Active Mobile Config` (`MOBILE_API_BASE_URL`) + `## Active Auth Specs`. **JAMAIS** ecrire les secrets en clair — utiliser plutot SecureStorage runtime + injection a la premiere connexion.
 6. **`## Active UI Specs`** : aucun design system web n'est compatible (`shadcn`/`vuetify`/`radzen-blazor` → WARNING bloquant). MAUI utilise son propre theming via `Resources/Styles/`. Alternative : capability `syncfusion-maui` (suite Syncfusion commerciale).
 7. **Phase B (DB)** : SKIP — pas de DB serveur. Si `ef-sqlite` capability → tables EF Core locale generees au premier run via `db.EnsureCreatedAsync()`.
-8. **Phase C (ADRs)** : creer `ADR-{ts}-stack-mobile-maui.md` documentant .NET 9 + MAUI + CommunityToolkit + sqlite-net-pcl
+8. **Phase C (ADRs)** : creer `ADR-{ts}-stack-mobile-maui.md` documentant .NET 10 LTS + MAUI 10 + CommunityToolkit 15 + sqlite-net-pcl
 
 ---
 
@@ -505,7 +567,7 @@ Ce stack est optimise pour :
 ```bash
 cd workspace/src/{AppName}
 dotnet restore {AppName}.csproj
-dotnet build {AppName}.csproj -f net9.0-android --nologo --no-restore
+dotnet build {AppName}.csproj -f net10.0-android --nologo --no-restore
 test -f MauiProgram.cs
 test -f App.xaml
 test -f AppShell.xaml
@@ -519,4 +581,4 @@ grep -q "sqlite-net-pcl" {AppName}.csproj
 echo "smoke OK"
 ```
 
-Smoke complet (~300s premiere build) : `dotnet build -f net9.0-android` doit produire `bin/Debug/net9.0-android/{AppName}.dll` + `.apk` debug. Run optionnel via Android Studio AVD ou `dotnet build -t:Run -f net9.0-android` apres avoir demarre un emulateur.
+Smoke complet (~300s premiere build) : `dotnet build -f net10.0-android` doit produire `bin/Debug/net10.0-android/{AppName}.dll` + `.apk` debug. Run optionnel via Android Studio AVD ou `dotnet build -t:Run -f net10.0-android` apres avoir demarre un emulateur.

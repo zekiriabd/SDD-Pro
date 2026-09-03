@@ -1,0 +1,174 @@
+{
+  "$schema": "../../templates/libs-catalog.schema.json",
+  "stackId": "qt-cpp",
+  "category": "desktop",
+  "schemaVersion": 1,
+  "buildSystem": "cmake",
+  "manifest": {
+    "files": [
+      "workspace/src/{AppName}/CMakeLists.txt",
+      "workspace/src/{AppName}/CMakePresets.json",
+      "workspace/src/{AppName}/src/main.cpp"
+    ]
+  },
+  "metadata": {
+    "lastUpdated": "2026-09-02",
+    "platforms": [
+      "windows",
+      "linux",
+      "macos"
+    ],
+    "qtVersion": "6.8 LTS",
+    "cppStandard": "C++20",
+    "notes": "Client desktop C++/Qt, VRAIMENT multiplateforme (Windows, Linux, macOS) et compile en natif. Qt 6.8 retenue : c'est une version LTS au sens de la politique de support Qt (verifie sur download.qt.io, qui expose 6.5, 6.8, 6.9, 6.10 et 6.11 — 6.5 et 6.8 sont les lignes LTS). La 6.11 est la plus recente mais n'est pas LTS. LICENCE — POINT DECISIF : Qt est en double licence LGPL-3.0 / commerciale. En LGPL, une application a code ferme DOIT lier Qt dynamiquement ET permettre le remplacement des bibliotheques Qt par l'utilisateur ; un binaire statique a code ferme exige une licence COMMERCIALE, dont le cout est significatif. Ce point doit etre arbitre AVANT le choix du stack, pas apres — cf. .md 2.3. AUCUNE INSTALL PAR CLI : les dependances sont resolues par find_package() contre un toolchain (Qt online installer, vcpkg ou Conan) ; buildSystem=cmake et les entrees ci-dessous decrivent les find_package a ecrire, pas des commandes."
+  },
+  "versions": {
+    "qt": "6.8",
+    "cmake": "3.21",
+    "cpp-standard": "20",
+    "qt-widgets": "6.8",
+    "qt-quick": "6.8",
+    "qt-network": "6.8",
+    "qt-sql": "6.8",
+    "qt-concurrent": "6.8",
+    "qt-charts": "6.8",
+    "qt-test": "6.8",
+    "qt-svg": "6.8",
+    "qt-printsupport": "6.8",
+    "qt-webengine": "6.8",
+    "qt-multimedia": "6.8",
+    "qt-linguisttools": "6.8"
+  },
+  "core": [
+    {
+      "module": "Qt6::Core",
+      "ref": "qt",
+      "license": "LGPL-3.0-or-later OR Commercial",
+      "rationale": "Socle Qt : QObject, signaux/slots, boucle d'evenements, conteneurs"
+    },
+    {
+      "module": "Qt6::Gui",
+      "ref": "qt",
+      "rationale": "Primitives graphiques et gestion des fenetres"
+    },
+    {
+      "module": "Qt6::Widgets",
+      "ref": "qt-widgets",
+      "rationale": "Controles desktop classiques. Retenu plutot que Qt Quick/QML : pour une application metier desktop, les Widgets donnent le rendu natif de chaque OS et un modele de layout adapte au clavier/souris"
+    },
+    {
+      "module": "Qt6::Network",
+      "ref": "qt-network",
+      "rationale": "QNetworkAccessManager — client HTTP vers le backend separe optionnel"
+    },
+    {
+      "module": "Qt6::Test",
+      "ref": "qt-test",
+      "rationale": "Framework de tests Qt (QTest) — inclus dans la distribution, aucune dependance externe"
+    }
+  ],
+  "onDemand": [
+    {
+      "module": "Qt6::Sql",
+      "ref": "qt-sql",
+      "capability": "local-db",
+      "rationale": "QSqlDatabase + pilote QSQLITE pour une base locale",
+      "triggers": [
+        "base.*locale",
+        "sqlite",
+        "base.*donnees",
+        "hors.*ligne"
+      ]
+    },
+    {
+      "module": "Qt6::Concurrent",
+      "ref": "qt-concurrent",
+      "capability": "threading",
+      "rationale": "QtConcurrent::run et QFuture — l'UI Qt etant mono-thread, tout travail long doit en sortir",
+      "triggers": [
+        "thread",
+        "parallel",
+        "tache.*fond",
+        "traitement.*long"
+      ]
+    },
+    {
+      "module": "Qt6::Charts",
+      "ref": "qt-charts",
+      "capability": "charts",
+      "rationale": "ATTENTION LICENCE : Qt Charts est en GPL-3.0 ou commerciale — il n'est PAS couvert par la LGPL comme le reste de Qt. L'utiliser dans une application a code ferme impose une licence commerciale, meme en liaison dynamique",
+      "triggers": [
+        "chart",
+        "graphique",
+        "courbe",
+        "visualisation.*donnees"
+      ]
+    },
+    {
+      "module": "Qt6::Svg",
+      "ref": "qt-svg",
+      "capability": "svg",
+      "triggers": [
+        "svg",
+        "icone.*vectorielle"
+      ]
+    },
+    {
+      "module": "Qt6::PrintSupport",
+      "ref": "qt-printsupport",
+      "capability": "printing",
+      "triggers": [
+        "impression",
+        "imprimer",
+        "\\bpdf\\b"
+      ]
+    },
+    {
+      "module": "Qt6::Multimedia",
+      "ref": "qt-multimedia",
+      "capability": "media",
+      "triggers": [
+        "audio",
+        "video",
+        "lecture.*media",
+        "camera"
+      ]
+    },
+    {
+      "module": "Qt6::WebEngineWidgets",
+      "ref": "qt-webengine",
+      "capability": "webview",
+      "rationale": "Chromium embarque. ATTENTION : ajoute plus de 100 Mo au paquet livre et complique fortement la compilation. A n'activer que si l'US l'exige",
+      "triggers": [
+        "webview",
+        "contenu.*web",
+        "navigateur.*embarque"
+      ]
+    },
+    {
+      "module": "Qt6::LinguistTools",
+      "ref": "qt-linguisttools",
+      "capability": "i18n",
+      "rationale": "lupdate / lrelease pour les fichiers .ts",
+      "triggers": [
+        "i18n",
+        "traduction",
+        "multi.*langue",
+        "localisation"
+      ]
+    },
+    {
+      "module": "Qt6::Quick",
+      "ref": "qt-quick",
+      "capability": "qml-ui",
+      "rationale": "UI declarative QML — pertinente pour une interface tactile ou tres animee, mais EXCLUSIVE de Qt Widgets : les deux modeles de rendu ne se melangent pas dans un meme ecran",
+      "triggers": [
+        "qml",
+        "interface.*animee",
+        "tactile",
+        "quick"
+      ],
+      "alternative": true
+    }
+  ]
+}

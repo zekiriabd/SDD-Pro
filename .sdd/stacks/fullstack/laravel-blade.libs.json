@@ -1,0 +1,89 @@
+{
+  "$schema": "../../templates/libs-catalog.schema.json",
+  "stackId": "laravel-blade",
+  "category": "fullstack",
+  "schemaVersion": 1,
+  "buildSystem": "composer",
+  "manifest": {
+    "files": [
+      "workspace/src/{AppName}/composer.json",
+      "workspace/src/{AppName}/package.json",
+      "workspace/src/{AppName}/artisan",
+      "workspace/src/{AppName}/routes/web.php",
+      "workspace/src/{AppName}/resources/views/layouts/app.blade.php",
+      "workspace/src/{AppName}/vite.config.js",
+      "workspace/src/{AppName}/.env.example"
+    ]
+  },
+  "metadata": {
+    "lastUpdated": "2026-09-02",
+    "runtime": "php 8.4",
+    "framework": "laravel 13 + blade + livewire 4",
+    "rendering": "SSR",
+    "notes": "Monolithe SSR Laravel : Blade rend le HTML cote serveur, Livewire apporte l'interactivite sans ecrire de JavaScript. UN seul projet {AppName}/ — pas de separation {BackendName}/{AppName}. DEUX GESTIONNAIRES DE PAQUETS : `composer` pour PHP (buildSystem declare) et `npm` pour les assets (Vite + Tailwind + Alpine), declares dans metadata.npmAssets faute d'un second buildSystem possible par catalog. PLANCHER PHP 8.4.1 — impose par l'outillage de test (pest 5 / phpunit 13), pas par le framework, exactement comme backend/laravel. LIVEWIRE OU API+SPA, PAS LES DEUX : ce stack rend du HTML ; si le besoin est une API JSON consommee par un frontend separe, c'est backend/laravel qu'il faut declarer.",
+    "npmAssets": {
+      "_doc": "Dependances npm du pipeline d'assets. Elles ne sont PAS dans core[]/onDemand[] : un catalog n'a qu'un buildSystem, et c'est `composer` ici. arch les installe au STEP npm de la 2.2.1.",
+      "vite": "8.2.2",
+      "laravel-vite-plugin": "3.2.0",
+      "tailwindcss": "4.3.3",
+      "@tailwindcss/vite": "4.3.3",
+      "alpinejs": "3.17.1",
+      "axios": "1.20.0"
+    }
+  },
+  "versions": {
+    "php": "8.4",
+    "laravel": "13.30.1",
+    "livewire": "4.4.3",
+    "tinker": "3.0.2",
+    "prompts": "0.3.24",
+    "pint": "1.30.5",
+    "sanctum": "4.3.3",
+    "breeze": "2.4.2",
+    "horizon": "5.48.3",
+    "telescope": "5.23.0",
+    "scout": "11.6.1",
+    "spatie-permission": "8.3.0",
+    "spatie-medialibrary": "11.23.6",
+    "commonmark": "2.10.0",
+    "predis": "3.6.0",
+    "flysystem-s3": "3.35.3",
+    "sentry-laravel": "4.27.0",
+    "debugbar": "4.4.3",
+    "collision": "8.9.5",
+    "pest": "5.1.3",
+    "pest-laravel": "5.0.1",
+    "mockery": "1.6.15",
+    "faker": "1.24.1",
+    "larastan": "3.11.0",
+    "phpstan": "2.2.12"
+  },
+  "core": [
+    { "module": "laravel/framework", "ref": "laravel", "rationale": "Framework — Eloquent, migrations, routing web, sessions, validation", "license": "MIT" },
+    { "module": "livewire/livewire", "ref": "livewire", "rationale": "Composants interactifs rendus SERVEUR. C'est ce qui distingue ce stack d'un Laravel API : pas de SPA, pas de build JS pour la logique — l'etat vit en PHP", "license": "MIT" },
+    { "module": "laravel/tinker", "ref": "tinker", "rationale": "REPL applicatif" },
+    { "module": "laravel/prompts", "ref": "prompts", "rationale": "Invites CLI des commandes artisan generees" },
+    { "module": "laravel/pint", "ref": "pint", "rationale": "Formateur officiel (dev)" },
+    { "module": "larastan/larastan", "ref": "larastan", "rationale": "Analyse statique avec connaissance d'Eloquent (dev)" },
+    { "module": "phpstan/phpstan", "ref": "phpstan", "rationale": "Moteur d'analyse statique (dev)" },
+    { "module": "pestphp/pest", "ref": "pest", "rationale": "Runner de tests (dev) — cf. qa/php-pest.md. Impose le plancher PHP 8.4" },
+    { "module": "pestphp/pest-plugin-laravel", "ref": "pest-laravel", "rationale": "Helpers Laravel pour Pest (dev)" },
+    { "module": "mockery/mockery", "ref": "mockery", "rationale": "Mocking (dev)" },
+    { "module": "fakerphp/faker", "ref": "faker", "rationale": "Donnees de test (dev) — requis par les factories" },
+    { "module": "nunomaduro/collision", "ref": "collision", "rationale": "Rapport d'erreurs lisible en CLI (dev)" }
+  ],
+  "onDemand": [
+    { "module": "laravel/breeze", "ref": "breeze", "capability": "auth-scaffold", "triggers": ["login", "inscription", "authentification", "mot.*de.*passe.*oublie", "breeze"], "rationale": "Scaffolding complet des vues d'authentification en Blade (login, register, reset, verification). dev-dependency : il genere du code puis peut etre retire" },
+    { "module": "laravel/sanctum", "ref": "sanctum", "capability": "api-tokens", "triggers": ["api.*token", "endpoint.*json", "sanctum"], "rationale": "Uniquement si le monolithe expose AUSSI quelques endpoints JSON (webhook, appli mobile). Pour une vraie API, declarer backend/laravel" },
+    { "module": "spatie/laravel-permission", "ref": "spatie-permission", "capability": "rbac", "triggers": ["role", "permission", "habilitation", "rbac"] },
+    { "module": "spatie/laravel-medialibrary", "ref": "spatie-medialibrary", "capability": "media", "triggers": ["upload.*fichier", "media", "piece.*jointe", "galerie"] },
+    { "module": "league/commonmark", "ref": "commonmark", "capability": "markdown", "triggers": ["markdown", "contenu.*riche", "commonmark"], "rationale": "Rendu Markdown -> HTML dans une vue Blade" },
+    { "module": "laravel/scout", "ref": "scout", "capability": "search", "triggers": ["recherche.*plein.*texte", "full.*text", "scout"] },
+    { "module": "laravel/horizon", "ref": "horizon", "capability": "queues", "triggers": ["queue", "job.*asynchrone", "worker", "horizon"] },
+    { "module": "predis/predis", "ref": "predis", "capability": "redis", "triggers": ["redis", "cache.*redis", "queue.*redis"] },
+    { "module": "league/flysystem-aws-s3-v3", "ref": "flysystem-s3", "capability": "object-storage", "triggers": ["\\bs3\\b", "stockage.*objet"] },
+    { "module": "sentry/sentry-laravel", "ref": "sentry-laravel", "capability": "sentry", "triggers": ["sentry", "error.*tracking", "monitoring.*erreurs"] },
+    { "module": "barryvdh/laravel-debugbar", "ref": "debugbar", "capability": "dev-profiling", "triggers": ["debugbar", "profiler.*requetes", "n\\+1"], "rationale": "dev uniquement — affiche une barre dans le HTML rendu, a ne JAMAIS activer en production" },
+    { "module": "laravel/telescope", "ref": "telescope", "capability": "dev-profiling", "triggers": ["telescope"], "alternative": true }
+  ]
+}
