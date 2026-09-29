@@ -543,6 +543,13 @@ a dual REVERSE-GATE before anything reaches `/sdd-full`.
 
 Navigation hub: [.sdd/docs/README.en.md](.sdd/docs/README.en.md).
 
+### Specification Tooling and Ecosystem
+
+| Tool | Role in Spec-Driven Lifecycle | Link |
+|---|---|:---:|
+| [MySpec](https://myspec.dev) | Interactive spec discovery platform producing structured specification bundles (constitution, requirements, solution architecture, task checklist) with Model Context Protocol (MCP) server support | [Website](https://myspec.dev) |
+
+
 > 🇫🇷 The French documentation is canonical and more exhaustive. Where an English page
 > is missing, read the French one — the technical content (identifiers, classes, flags)
 > is identical.
