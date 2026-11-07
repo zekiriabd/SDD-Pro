@@ -25,7 +25,7 @@ SCRIPT = REPO_ROOT / ".sdd" / "python" / "sdd_scripts" / "gate_decide.py"
 def run_script(args: list[str], status_file: Path) -> subprocess.CompletedProcess:
     """Invoke gate_decide.py with given args + --status-file override."""
     cmd = [sys.executable, str(SCRIPT)] + args + ["--status-file", str(status_file)]
-    return subprocess.run(cmd, capture_output=True, text=True, cwd=REPO_ROOT)
+    return subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=REPO_ROOT)
 
 
 def init_status(path: Path) -> None:

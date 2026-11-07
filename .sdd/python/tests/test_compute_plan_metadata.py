@@ -31,7 +31,7 @@ class TestComputePlanMetadata(unittest.TestCase):
     def _run(self, *args: str) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
             [sys.executable, str(SCRIPT), *args],
-            capture_output=True, text=True,
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
         )
 
     def test_yaml_output_minimal(self) -> None:

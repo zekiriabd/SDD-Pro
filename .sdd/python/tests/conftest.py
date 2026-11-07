@@ -38,6 +38,15 @@ import sys
 import warnings
 from pathlib import Path
 
+# Audit encodage (2026-11-07) : sous Windows, un script Python lancé en
+# sous-processus écrit sur un pipe dans l'encodage locale (cp1252) sauf s'il
+# reconfigure stdout — d'où des sorties mi-UTF-8 mi-cp1252 et des
+# `UnicodeDecodeError` dans les threads lecteurs de `subprocess`. Le mode UTF-8
+# de Python (PEP 540), hérité par chaque sous-processus via `os.environ`, aligne
+# tous les enfants sur UTF-8 — cohérent avec le `encoding="utf-8"` explicite
+# des appelants.
+os.environ.setdefault("PYTHONUTF8", "1")
+
 import pytest
 
 _PY_ROOT = Path(__file__).resolve().parent.parent

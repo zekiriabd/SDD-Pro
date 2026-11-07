@@ -87,7 +87,7 @@ def test_e2e_api_only_fixture_produces_units(tmp_path):
     result = subprocess.run(
         [sys.executable, "-m", "sdd_reverse_scripts.reverse_inventory",
          "--project", str(project), "--json"],
-        capture_output=True, text=True, cwd=str(PY_ROOT),
+        capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(PY_ROOT),
     )
     assert result.returncode == 0, result.stderr
     report = json.loads(result.stdout)
@@ -104,7 +104,7 @@ def test_webforms_does_not_gain_spurious_code_units(tmp_path):
     result = subprocess.run(
         [sys.executable, "-m", "sdd_reverse_scripts.reverse_inventory",
          "--project", str(project), "--json"],
-        capture_output=True, text=True, cwd=str(PY_ROOT),
+        capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(PY_ROOT),
     )
     assert result.returncode == 0, result.stderr
     report = json.loads(result.stdout)

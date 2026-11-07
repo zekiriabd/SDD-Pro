@@ -4,6 +4,48 @@ Format : [version] — date courte. Sections : `Breaking`, `Added`, `Changed`, `
 
 ---
 
+## [v7.1.2-dev] — 2026-11-07 (audit de validation : gate, états des runs, télémétrie, encodage)
+
+### Fixed
+
+- **Gate de livraison contourné sous Git Bash** : MSYS réécrit l'argument
+  `/sdd-full` en `C:/Program Files/Git/sdd-full` ; stockée telle quelle, la
+  commande ne matchait plus `COMMAND_TO_WORKFLOW` et le gate était sauté pour
+  ce run. `delivery_wiring.normalize_command()` + `workflow_for_command`
+  tolérant ; `sdd_state.py new-run` restaure `/sdd-full`. Le run FEAT 15
+  concerné, re-soumis au gate, est clos `failed` (aucune preuve d'exécution).
+- **Runs rouverts par la télémétrie** : `record_token_usage._ensure_run_row`
+  faisait un upsert `status='running'`, `command='hook'` à chaque
+  enregistrement → un run clos était rouvert et un `/sdd-full` rebaptisé
+  `hook`. Désormais création seule ; le cycle de vie appartient à
+  l'orchestrateur (`run_end` / `run_close.py`).
+- **Runs `hook` jamais clos** : `SessionEnd` clôt le run ouvert par les hooks
+  de la session (`completed`) et retire son marker ; les runs de pipeline ne
+  sont jamais touchés.
+- **`verify_telemetry_health --clean-suspects` supprimait de la vraie
+  télémétrie** : le plancher « run suspect » ne sommait que `input_tokens`
+  (~1-600 par appel avec le prompt caching). Le volume d'entrée inclut
+  désormais `cache_read` + `cache_creation`.
+- **Course de reprise de verrou (module reverse)** : `file_locks_local`
+  gagne le compare-and-delete de `sdd_lib.file_locks` (un lock repris par un
+  autre prétendant entre lecture et `unlink` n'est plus supprimé).
+  Snapshots de parité régénérés.
+- **Encodage Windows** : 86 appels `subprocess` en `text=True` (dont 7 hooks
+  et scripts de production) décodaient en cp1252 une sortie UTF-8 →
+  `UnicodeDecodeError` dans les threads lecteurs, sorties perdues.
+  `encoding="utf-8", errors="replace"` explicite + `PYTHONUTF8=1` (env de
+  `.claude/settings.json` et `conftest.py`) pour aligner les enfants.
+- **`framework_smoke --json`** : la sortie était précédée d'une ligne texte
+  (`[CHECK OK]` du check exit-codes appelé in-process) → JSON invalide.
+
+### Changed
+
+- **Smoke complet 47 s → 16 s** : la sous-suite pytest (389 tests) tourne en
+  parallèle via `pytest-xdist` (dépendance dev déjà déclarée) quand il est
+  installé ; seuils `smoke-timing` recalibrés 5500/8000 → 20000/30000 ms.
+
+---
+
 ## [v7.1.1-dev] — 2026-11-07 (TDD non bloquant, reviewers confinés, settings durcis)
 
 ### Changed

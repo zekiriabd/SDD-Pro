@@ -269,7 +269,7 @@ class TestPlaceholderResolutionEndToEnd(unittest.TestCase):
         env.update(env_overrides)
         res = subprocess.run(
             [sys.executable, str(self._SCRIPT), "--json"],
-            capture_output=True, text=True, env=env, timeout=60,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", env=env, timeout=60,
             cwd=str(self._STACK.parents[2]),
         )
         return res.returncode, json.loads(res.stdout)

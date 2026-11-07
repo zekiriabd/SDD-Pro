@@ -114,7 +114,7 @@ def test_cli_events_subprocess(repo):
 
     def call(event: str, payload: dict) -> int:
         return subprocess.run([sys.executable, str(HOOK), "--event", event],
-                              input=json.dumps(payload), capture_output=True, text=True,
+                              input=json.dumps(payload), capture_output=True, text=True, encoding="utf-8", errors="replace",
                               env=env, check=False).returncode
 
     assert call("pre", _p("dev-backend", "a")) == HOOK_ALLOW

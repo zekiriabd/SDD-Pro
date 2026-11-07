@@ -57,7 +57,7 @@ class TestCli(unittest.TestCase):
         result = subprocess.run(
             [sys.executable, str(SCRIPT), "--help"],
             capture_output=True,
-            text=True,
+            text=True, encoding="utf-8", errors="replace",
             timeout=15,
         )
         self.assertEqual(result.returncode, 0)
@@ -68,7 +68,7 @@ class TestCli(unittest.TestCase):
         result = subprocess.run(
             [sys.executable, str(SCRIPT)],
             capture_output=True,
-            text=True,
+            text=True, encoding="utf-8", errors="replace",
             timeout=15,
         )
         self.assertNotEqual(result.returncode, 0)
@@ -84,7 +84,7 @@ class TestCli(unittest.TestCase):
             result = subprocess.run(
                 [sys.executable, str(SCRIPT), "--feat-number", "999"],
                 capture_output=True,
-                text=True,
+                text=True, encoding="utf-8", errors="replace",
                 timeout=15,
                 env=env,
             )
@@ -108,7 +108,7 @@ class TestHappyPath(unittest.TestCase):
             result = subprocess.run(
                 [sys.executable, str(SCRIPT), "--feat-number", "1", "--json"],
                 capture_output=True,
-                text=True,
+                text=True, encoding="utf-8", errors="replace",
                 timeout=20,
                 env=env,
             )
@@ -119,7 +119,7 @@ class TestHappyPath(unittest.TestCase):
             # Idempotent re-run
             result2 = subprocess.run(
                 [sys.executable, str(SCRIPT), "--feat-number", "1", "--json"],
-                capture_output=True, text=True, timeout=20, env=env,
+                capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=20, env=env,
             )
             self.assertEqual(result2.returncode, 0)
 

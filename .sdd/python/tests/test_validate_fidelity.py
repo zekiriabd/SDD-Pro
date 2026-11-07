@@ -29,7 +29,7 @@ from sdd_scripts.validate_fidelity import hex_to_rgb, rgb_distance_pct  # noqa: 
 
 def _run(args: list[str]) -> subprocess.CompletedProcess:
     cmd = [sys.executable, str(SCRIPT)] + args
-    return subprocess.run(cmd, capture_output=True, text=True)
+    return subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
 
 
 class TestPureFunctions(unittest.TestCase):

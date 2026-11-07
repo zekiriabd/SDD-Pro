@@ -272,7 +272,7 @@ class TestScriptInvocation(unittest.TestCase):
             # Invoke in a sandbox where FEAT 999 doesn't exist
             result = subprocess.run(
                 [sys.executable, str(SCRIPT), "--feat-number", "999", "--json"],
-                capture_output=True, text=True, cwd=tmp,
+                capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=tmp,
             )
             # Either exit 1 (no FEAT found) or JSON with errors
             self.assertNotEqual(result.returncode, 0)

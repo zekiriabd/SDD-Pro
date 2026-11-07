@@ -84,7 +84,7 @@ def test_subprocess_inherits_isolation(tmp_path):
     """A script launched with cwd=real repo must not resolve the runtime DB."""
     code = ("import sys; sys.path.insert(0, r'%s'); "
             "from sdd_lib.console_db import default_db_path; print(default_db_path())") % _PY_ROOT
-    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True,
+    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, encoding="utf-8", errors="replace",
                          cwd=str(_PY_ROOT.parent.parent), check=True).stdout.strip()
     runtime = paths.runtime_console_db_path()
     assert runtime is None or Path(out).resolve() != runtime.resolve()
@@ -445,19 +445,19 @@ def test_run_close_cli(tmp_path):
         console_db.upsert_run(conn, run_id="rc-1", command="hook")
     cmd = [sys.executable, str(SCRIPTS / "run_close.py"), "--run-id", "rc-1",
            "--status", "partial", "--verdict", "WARN"]
-    r1 = subprocess.run(cmd, capture_output=True, text=True)
-    r2 = subprocess.run(cmd, capture_output=True, text=True)
+    r1 = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    r2 = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
     assert r1.returncode == 0, r1.stderr
     assert json.loads(r1.stdout)["status"] == "CLOSED"
     assert json.loads(r2.stdout)["status"] == "ALREADY_CLOSED"
     r3 = subprocess.run([sys.executable, str(SCRIPTS / "run_close.py"), "--run-id", "nope",
-                         "--status", "failed"], capture_output=True, text=True)
+                         "--status", "failed"], capture_output=True, text=True, encoding="utf-8", errors="replace")
     assert r3.returncode == 1
 
 
 def _state(*args: str) -> subprocess.CompletedProcess:
     return subprocess.run([sys.executable, str(SCRIPTS / "sdd_state.py"), *args],
-                          capture_output=True, text=True)
+                          capture_output=True, text=True, encoding="utf-8", errors="replace")
 
 
 @pytest.mark.parametrize("command,phase_status,run_status", [
@@ -493,7 +493,7 @@ def test_final_phase_closes_run(command, phase_status, run_status):
 
 def _gate(*args: str) -> subprocess.CompletedProcess:
     return subprocess.run([sys.executable, str(SCRIPTS / "gate_decide.py"), *args],
-                          capture_output=True, text=True)
+                          capture_output=True, text=True, encoding="utf-8", errors="replace")
 
 
 def test_gate_db_is_source_status_json_is_export(tmp_path):

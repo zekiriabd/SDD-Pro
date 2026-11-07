@@ -51,17 +51,32 @@ DEFAULT_TTL_SECONDS = 30
 _CORRUPT_GRACE_SECONDS = 2.0
 
 
-def _takeover(p: Path, payload: str) -> int:
+def _read_raw(p: Path) -> str | None:
+    """Payload brut (strippé) du lock, ou None si absent/illisible."""
+    try:
+        return p.read_text(encoding="utf-8", errors="replace").strip()
+    except OSError:
+        return None
+
+
+def _takeover(p: Path, payload: str, observed_raw: str | None) -> int:
     """Remplace un lock existant (stale TTL / pid mort / corrompu ancien).
 
     Audit 2026-06-11 (race stale-takeover) : l'ancien chemin écrasait via
     atomic_write_text → N prétendants détectant le même lock stale
     retournaient TOUS exit 2 (N « détenteurs »). Ici : unlink + re-création
     O_EXCL — un seul prétendant gagne, les autres reçoivent 1 (LOCK_HELD).
-    Fenêtre résiduelle théorique (unlink d'un lock recréé entre read et
-    unlink) bornée par la grâce mtime du caller — acceptable vs l'ancien
-    écrasement systématique.
+
+    Audit 2026-11-07 (alignement sdd_lib.file_locks.takeover_stale_lock) :
+    compare-and-delete — juste avant l'unlink, le payload est relu et doit
+    toujours valoir `observed_raw` (celui sur lequel le caller a jugé le lock
+    stale). Sinon un autre prétendant a déjà repris le lock : l'unlinker
+    créerait deux détenteurs → refus (1, LOCK_HELD). Implémentation locale
+    (isolation D4 : aucune dépendance au package partagé).
     """
+    current = _read_raw(p)
+    if current is not None and current != (observed_raw or "").strip():
+        return 1  # payload changé sous nos pieds — un autre a repris le lock
     try:
         p.unlink()
     except FileNotFoundError:
@@ -161,8 +176,16 @@ def acquire_lock(
             os.close(fd)
         return 0
 
-    existing = read_lock(p)
+    observed_raw = _read_raw(p)
+    try:
+        existing = json.loads(observed_raw) if observed_raw else None
+    except json.JSONDecodeError:
+        existing = None
+    if existing is not None and not isinstance(existing, dict):
+        existing = None
     if existing is None:
+        if observed_raw is None and not p.exists():
+            return 1  # lock disparu entre-temps — ne jamais voler, retry caller
         # Present but unparseable. Two very different cases (audit 2026-06-11 M3) :
         # (a) un GAGNANT entre son os.open(O_EXCL) et son os.write — le fichier
         #     est frais et vide ; l'écraser ici = 2 détenteurs simultanés
@@ -175,7 +198,7 @@ def acquire_lock(
             return 1  # lock disparu/instatable entre-temps — ne jamais voler, retry caller
         if age_s < _CORRUPT_GRACE_SECONDS:
             return 1
-        return _takeover(p, payload)
+        return _takeover(p, payload, observed_raw)
 
     # Existing lock found — decide.
     existing_agent = existing.get("agent_id", "")
@@ -194,14 +217,14 @@ def acquire_lock(
 
     # Stale by TTL : takeover exclusif (un seul prétendant gagne).
     if age >= ttl:
-        return _takeover(p, payload)
+        return _takeover(p, payload, observed_raw)
 
     # Within TTL but pid check : only if same host AND psutil available.
     if existing_host == host:
         alive = _is_pid_alive(existing_pid)
         if alive is False:
             # Pid dead on same host — takeover even before TTL.
-            return _takeover(p, payload)
+            return _takeover(p, payload, observed_raw)
         # alive is True OR None (no psutil) → fall through to LOCK_HELD.
 
     return 1

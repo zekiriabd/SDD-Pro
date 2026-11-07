@@ -215,7 +215,14 @@ def open_run(feat_number: int, command: str, tags: list[str] | None = None) -> s
     else:
         run_id = get_or_create_run_id(force_new=True)
     tags = list(tags or [])
-    command = command or "unknown"
+    command = (command or "").strip() or "unknown"
+    # Audit gates (2026-11-07) : Git Bash (MSYS) réécrit `/sdd-full` en
+    # `C:/Program Files/Git/sdd-full`. Stockée telle quelle, la commande
+    # échappait au gate de livraison et aux comparaisons `== "/sdd-full"`.
+    # On ne restaure que les valeurs ainsi déformées (chemin multi-segments).
+    if ":" in command or command.replace("\\", "/").lstrip("/").count("/") >= 1:
+        from sdd_lib.delivery_wiring import normalize_command
+        command = "/" + normalize_command(command)
     feat_name = get_feat_name(feat_number)
     now = iso_now()
     ensure_initialized()

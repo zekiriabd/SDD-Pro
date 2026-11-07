@@ -67,7 +67,7 @@ def main() -> int:
         result = subprocess.run(
             [sys.executable, str(script), "--auto-detect", "--quiet"],
             capture_output=True,
-            text=True,
+            text=True, encoding="utf-8", errors="replace",
             timeout=10,  # very generous: typical run is < 100ms even for 50 US files
         )
     except (subprocess.TimeoutExpired, OSError) as e:

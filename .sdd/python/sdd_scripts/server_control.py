@@ -117,7 +117,7 @@ def process_image(pid: int) -> str | None:
                 return cells[0].strip('"').lower()
         return None
     res = subprocess.run(["ps", "-p", str(pid), "-o", "comm="],
-                         capture_output=True, text=True, check=False)
+                         capture_output=True, text=True, encoding="utf-8", errors="replace", check=False)
     name = res.stdout.strip()
     return Path(name).name.lower() if name else None
 
@@ -132,7 +132,7 @@ def _image_matches(recorded: str | None, actual: str | None) -> bool:
 
 
 def _windows_listener_pids(port: int) -> set[int]:
-    result = subprocess.run(["netstat", "-ano", "-p", "tcp"], capture_output=True, text=True, check=False)
+    result = subprocess.run(["netstat", "-ano", "-p", "tcp"], capture_output=True, text=True, encoding="utf-8", errors="replace", check=False)
     pattern = re.compile(r"^\s*TCP\s+\S+:(\d+)\s+\S+\s+LISTENING\s+(\d+)\s*$", re.I)
     return {int(match.group(2)) for line in result.stdout.splitlines()
             if (match := pattern.match(line)) and int(match.group(1)) == port}
@@ -143,7 +143,7 @@ def _unix_listener_pids(port: int) -> set[int]:
     if not lsof:
         return set()
     result = subprocess.run([lsof, "-ti", f":{port}", "-sTCP:LISTEN"],
-                            capture_output=True, text=True, check=False)
+                            capture_output=True, text=True, encoding="utf-8", errors="replace", check=False)
     return {int(pid) for pid in result.stdout.split() if pid.isdigit()}
 
 

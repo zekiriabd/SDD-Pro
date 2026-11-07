@@ -48,7 +48,7 @@ def _launch(module: str, stdin: str = "{}") -> subprocess.CompletedProcess:
     env = {k: v for k, v in os.environ.items() if k not in CI_VARS}
     env["PYTHONIOENCODING"] = "utf-8"
     return subprocess.run([sys.executable, str(LAUNCHER), module], input=stdin,
-                          capture_output=True, text=True, env=env, timeout=60)
+                          capture_output=True, text=True, encoding="utf-8", errors="replace", env=env, timeout=60)
 
 
 def test_hook_crash_is_fail_closed():

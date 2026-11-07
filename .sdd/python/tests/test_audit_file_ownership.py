@@ -63,7 +63,7 @@ def _run_hook(payload: dict, repo: Path, env_extra: dict[str, str] | None = None
         input=json.dumps(payload),
         env=_clean_env(extra),
         capture_output=True,
-        text=True,
+        text=True, encoding="utf-8", errors="replace",
         check=False,
     )
 
@@ -295,13 +295,13 @@ class TestHookLifecycle(unittest.TestCase):
             ["git", "commit", "-qm", "init", "--no-gpg-sign"],
         ):
             res = subprocess.run(cmd, cwd=self.repo, env=env,
-                                 capture_output=True, text=True)
+                                 capture_output=True, text=True, encoding="utf-8", errors="replace")
             if res.returncode != 0 and cmd[1] == "init":
                 self.skipTest("git not available")
         # Sanity: git status must NOT see the violation file (proves it's ignored).
         self._write_modified_file("workspace/us/1-2-Auth.md")
         gs = subprocess.run(["git", "status", "--porcelain", "--untracked-files=all"],
-                            cwd=self.repo, env=env, capture_output=True, text=True)
+                            cwd=self.repo, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace")
         self.assertNotIn("1-2-Auth", gs.stdout,
                          "precondition: the violation file must be gitignored")
         # The hook (walk-based) must still detect the ownership violation.

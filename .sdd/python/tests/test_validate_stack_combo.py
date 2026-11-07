@@ -28,7 +28,7 @@ class TestCli(unittest.TestCase):
     def test_help_succeeds(self) -> None:
         result = subprocess.run(
             [sys.executable, str(SCRIPT), "--help"],
-            capture_output=True, text=True, timeout=15,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=15,
         )
         self.assertEqual(result.returncode, 0)
         self.assertIn("--json", result.stdout)
@@ -37,7 +37,7 @@ class TestCli(unittest.TestCase):
         """--json must emit valid JSON regardless of verdict."""
         result = subprocess.run(
             [sys.executable, str(SCRIPT), "--json", "--quiet"],
-            capture_output=True, text=True, timeout=20,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=20,
             cwd=str(REPO_ROOT),
         )
         # Exit code may be 0 or non-zero depending on workspace state ;
@@ -52,7 +52,7 @@ class TestCli(unittest.TestCase):
         """--quiet → stdout is either empty or pure JSON."""
         result = subprocess.run(
             [sys.executable, str(SCRIPT), "--quiet"],
-            capture_output=True, text=True, timeout=20,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=20,
             cwd=str(REPO_ROOT),
         )
         # Without --json, --quiet should produce minimal stdout

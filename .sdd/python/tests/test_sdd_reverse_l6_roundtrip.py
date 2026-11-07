@@ -24,7 +24,7 @@ from tests.fixture_utils import copy_legacy_fixture  # noqa: E402
 
 def _run(module, *args):
     r = subprocess.run([sys.executable, "-m", module, *args],
-                       capture_output=True, text=True, cwd=str(PY_ROOT))
+                       capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(PY_ROOT))
     assert r.returncode == 0, f"{module} failed: {r.stderr}"
     return r
 

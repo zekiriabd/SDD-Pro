@@ -73,7 +73,7 @@ def main() -> int:
         result = subprocess.run(
             [sys.executable, str(script), "--json"],
             capture_output=True,
-            text=True,
+            text=True, encoding="utf-8", errors="replace",
             cwd=str(root),
             timeout=15,
         )

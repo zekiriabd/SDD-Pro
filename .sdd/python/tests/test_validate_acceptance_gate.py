@@ -42,7 +42,7 @@ def _run_hook(payload: dict, env_extra: dict[str, str] | None = None,
         input=json.dumps(payload),
         env=env,
         cwd=str(cwd) if cwd else None,
-        capture_output=True, text=True,
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
         check=False, timeout=15,
     )
 

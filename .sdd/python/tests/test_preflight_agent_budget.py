@@ -50,7 +50,7 @@ def _run_hook(payload: dict, env_extra: dict[str, str] | None = None) -> subproc
         input=json.dumps(payload),
         env=_clean_env(env_extra),
         capture_output=True,
-        text=True,
+        text=True, encoding="utf-8", errors="replace",
         check=False,
     )
 

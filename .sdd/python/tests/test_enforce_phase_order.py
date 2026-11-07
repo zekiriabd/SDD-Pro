@@ -152,7 +152,7 @@ def test_plan_mode_accepts_disk_readiness(repo):
 def test_subprocess_exit_code(repo):
     env = {k: v for k, v in os.environ.items()}
     proc = subprocess.run([sys.executable, str(HOOK)], input=json.dumps(_payload("dev-backend")),
-                          capture_output=True, text=True, env=env, check=False)
+                          capture_output=True, text=True, encoding="utf-8", errors="replace", env=env, check=False)
     assert proc.returncode == HOOK_DENY
     assert "[PHASE_ORDER_VIOLATION]" in proc.stderr
 

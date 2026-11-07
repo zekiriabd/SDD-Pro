@@ -186,7 +186,7 @@ class TestCostCapHookBehaviourOnDbError(unittest.TestCase):
             [sys.executable, str(HOOK)],
             input=json.dumps(payload),
             env=_clean_env(extra),
-            capture_output=True, text=True, check=False,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", check=False,
         )
 
     def test_corrupt_db_blocks_in_ci(self):
@@ -235,7 +235,7 @@ class TestCostCapAbsentDbAllows(unittest.TestCase):
             [sys.executable, str(HOOK)],
             input=json.dumps(payload),
             env=_clean_env({"SDD_REPO_ROOT": str(self.repo), "CI": "true"}),
-            capture_output=True, text=True, check=False,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", check=False,
         )
         self.assertEqual(r.returncode, 0,
                          f"Fresh repo (no console.db) must allow ; got {r.returncode}\n"
@@ -261,7 +261,7 @@ class TestVerifyTelemetryHealth(unittest.TestCase):
         r = subprocess.run(
             [sys.executable, str(VERIFY), "--json"],
             env=_clean_env({"SDD_REPO_ROOT": str(self.repo)}),
-            capture_output=True, text=True, check=False,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", check=False,
         )
         # ABSENT exits via fail-set "polluted" → not in fail set → OK exit
         self.assertEqual(r.returncode, 0)
@@ -279,7 +279,7 @@ class TestVerifyTelemetryHealth(unittest.TestCase):
         r = subprocess.run(
             [sys.executable, str(VERIFY), "--json"],
             env=_clean_env({"SDD_REPO_ROOT": str(self.repo)}),
-            capture_output=True, text=True, check=False,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", check=False,
         )
         self.assertEqual(r.returncode, 0)
         payload = json.loads(r.stdout)
@@ -304,7 +304,7 @@ class TestVerifyTelemetryHealth(unittest.TestCase):
         r = subprocess.run(
             [sys.executable, str(VERIFY), "--json"],
             env=_clean_env({"SDD_REPO_ROOT": str(self.repo)}),
-            capture_output=True, text=True, check=False,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", check=False,
         )
         self.assertEqual(r.returncode, 0)
         payload = json.loads(r.stdout)
@@ -325,7 +325,7 @@ class TestVerifyTelemetryHealth(unittest.TestCase):
         r = subprocess.run(
             [sys.executable, str(VERIFY), "--json"],
             env=_clean_env({"SDD_REPO_ROOT": str(self.repo)}),
-            capture_output=True, text=True, check=False,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", check=False,
         )
         # UNREADABLE not in fail set (only "polluted") → exit 0
         # But the verdict field signals the operator clearly

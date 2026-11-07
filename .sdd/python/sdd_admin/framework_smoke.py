@@ -316,7 +316,7 @@ def _check_bom_files(claude_root: Path, checks: "Checks") -> None:
         res = subprocess.run(
             [sys.executable, str(strip_bom_path), "--check"],
             cwd=claude_root.parent,
-            capture_output=True, text=True, timeout=15,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=15,
         )
         stdout = (res.stdout or "").strip()
         m_strip = re.search(r"would strip\s+(\d+)\s+files", stdout)
@@ -346,7 +346,7 @@ def _check_telemetry_health(claude_root: Path, checks: "Checks") -> None:
         res = subprocess.run(
             [sys.executable, str(telemetry_path), "--json", "--fail-on", "polluted"],
             cwd=claude_root.parent,
-            capture_output=True, text=True, timeout=15,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=15,
         )
         try:
             payload = json.loads(res.stdout) if res.stdout.strip() else {}
@@ -385,7 +385,7 @@ def _check_project_config_schema(py_dir: Path, claude_root: Path, checks: "Check
         res = subprocess.run(
             [sys.executable, str(pcfg_validator), "--json"],
             cwd=claude_root.parent,
-            capture_output=True, text=True, timeout=10,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=10,
         )
         try:
             payload = json.loads(res.stdout) if res.stdout.strip() else {}
@@ -442,7 +442,23 @@ def _pytest_smoke_cmd(pytests_dir: Path) -> list[str]:
     smoke, others = smoke_test_modules(pytests_dir)
     ignores = [f"--ignore={p}" for p in others] if smoke else []
     return [sys.executable, "-m", "pytest", "-m", "smoke", "-q",
-            "--tb=line", "--no-header", *ignores, str(pytests_dir)]
+            "--tb=line", "--no-header", *_xdist_args(), *ignores, str(pytests_dir)]
+
+
+def _xdist_args() -> list[str]:
+    """Parallélisme du smoke pytest si `pytest-xdist` (dépendance dev) est installé.
+
+    Perf (audit timing 2026-11-07) : 389 tests smoke (vs ~220 à la calibration
+    des seuils), majoritairement subprocess — ~29 s en série sous Windows,
+    ~15 s en `-n auto`. `--dist loadfile` garde chaque module sur un seul
+    worker (les tests d'un même module partagent fixtures et répertoires de
+    build). `-p xdist` explicite : l'env hermétique coupe l'autoload des
+    plugins. Absent → exécution série inchangée (jamais une dépendance dure).
+    """
+    import importlib.util
+    if importlib.util.find_spec("xdist") is None:
+        return []
+    return ["-p", "xdist", "-n", "auto", "--dist", "loadfile"]
 
 
 def _pytest_smoke_env() -> dict[str, str]:
@@ -467,7 +483,7 @@ def _check_pytest_smoke(pytests_dir: Path, claude_root: Path, checks: "Checks") 
         res = subprocess.run(
             _pytest_smoke_cmd(pytests_dir),
             cwd=claude_root.parent, env=_pytest_smoke_env(),
-            capture_output=True, text=True, timeout=60,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60,
         )
         if res.returncode == 0:
             last_line = next(
@@ -809,7 +825,13 @@ def _compute_timing(t_start: float, skip_heavy: bool, checks: "Checks") -> None:
         # 3-5). Pytest standalone seul = ~4300ms ; framework_smoke = ~5100ms
         # warm-cache, ~6500-7000ms cold-cache (AV scanning fresh files).
         # Hard FAIL implicite @ 8000ms+ = vraie régression nette (>1.5× warm baseline).
-        ok_thr, warn_thr = 5500, 8000
+        # Audit timing (2026-11-07) : recalibrage 5500/8000 → 20000/30000. La
+        # suite smoke compte 389 tests (vs ~220 à la calibration précédente),
+        # majoritairement subprocess. Mesuré Windows 11, pytest-xdist actif
+        # (`_xdist_args`) : 16-17 s (était 41-47 s en série). Le seuil garde un
+        # vrai signal : sans xdist (dépendance dev absente) ou sur une
+        # régression nette, le smoke repasse au-delà de 30 s → WARN.
+        ok_thr, warn_thr = 20000, 30000
         ctx = "full smoke"
     if elapsed_ms < ok_thr:
         checks.add("smoke-timing", "OK",
@@ -981,7 +1003,7 @@ def main() -> int:
         try:
             result = subprocess.run(
                 [sys.executable, str(drift_script), "--json"],
-                capture_output=True, text=True, check=False,
+                capture_output=True, text=True, encoding="utf-8", errors="replace", check=False,
                 timeout=60,
             )
             drift = json.loads(result.stdout) if result.stdout.strip() else {}
@@ -1063,8 +1085,14 @@ def main() -> int:
     # still uses hardcoded `return [0-3]` (drift gate for the
     # sdd_lib/exit_codes.py convention).
     try:
+        import contextlib  # noqa: E402
+        import io  # noqa: E402
         from sdd_admin.migrate_exit_codes import main as _mig_main  # noqa: E402
-        rc = _mig_main(["--check"])
+        # Appel in-process : son « [CHECK OK] » partait sur stdout et
+        # corrompait la sortie `--json` (JSON précédé d'une ligne texte —
+        # audit 2026-11-07). Le verdict passe par `checks`, pas par stdout.
+        with contextlib.redirect_stdout(io.StringIO()):
+            rc = _mig_main(["--check"])
         if rc == SUCCESS:
             checks.add(
                 "exit-codes-consistency", "OK",

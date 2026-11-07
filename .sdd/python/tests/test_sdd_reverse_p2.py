@@ -85,7 +85,7 @@ def _run_status_cli(cwd: Path) -> dict:
     project_root = Path(__file__).resolve().parents[1]  # .sdd/python/
     result = subprocess.run(
         [sys.executable, "-m", "sdd_reverse_scripts.reverse_status", "--json"],
-        capture_output=True, text=True, cwd=str(cwd),
+        capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(cwd),
         env={
             **dict(__import__("os").environ),
             "PYTHONPATH": str(project_root),

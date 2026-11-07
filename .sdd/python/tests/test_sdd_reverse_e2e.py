@@ -25,7 +25,7 @@ def _run_inventory(project: Path) -> dict:
     result = subprocess.run(
         [sys.executable, "-m", "sdd_reverse_scripts.reverse_inventory",
          "--project", str(project), "--json"],
-        capture_output=True, text=True, cwd=str(PROJECT_ROOT),
+        capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(PROJECT_ROOT),
     )
     assert result.returncode == 0, f"reverse_inventory failed: {result.stderr}"
     return json.loads(result.stdout)

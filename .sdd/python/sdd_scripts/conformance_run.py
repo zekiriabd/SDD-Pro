@@ -681,7 +681,7 @@ def _invoke_bootstrap_dry(root: Path, timeout_s: float, log_dir: Path) -> tuple[
             cwd=str(root),
             timeout=timeout_s,
             capture_output=True,
-            text=True,
+            text=True, encoding="utf-8", errors="replace",
             check=False,
         )
     except subprocess.TimeoutExpired:

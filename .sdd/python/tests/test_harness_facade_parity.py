@@ -67,7 +67,7 @@ def _build(harness: str, out: Path) -> subprocess.CompletedProcess:
         [sys.executable, str(repo_root() / ".sdd" / "harness_build.py"),
          "--harness", harness, "--provider", "anthropic",
          "--out", str(out), "--commands-only", "--memory-only"],
-        capture_output=True, text=True, timeout=300, cwd=str(repo_root()),
+        capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300, cwd=str(repo_root()),
     )
 
 
@@ -136,7 +136,7 @@ def test_claude_facade_matches_a_fresh_build():
          "--harness", "claude-code", "--provider", "anthropic",
          "--out", str(out), "--agents-only", "--commands-only",
          "--memory-only", "--rules-only"],
-        capture_output=True, text=True, timeout=300, cwd=str(root))
+        capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300, cwd=str(root))
     assert proc.returncode == 0, f"{proc.stdout}\n{proc.stderr}"
 
     drifted: list[str] = []
@@ -175,7 +175,7 @@ def test_claude_facade_has_no_orphan_files():
          "--harness", "claude-code", "--provider", "anthropic",
          "--out", str(out), "--agents-only", "--commands-only",
          "--memory-only", "--rules-only"],
-        capture_output=True, text=True, timeout=300, cwd=str(root))
+        capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300, cwd=str(root))
     assert proc.returncode == 0, f"{proc.stdout}\n{proc.stderr}"
 
     orphans: list[str] = []

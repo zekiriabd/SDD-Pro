@@ -329,7 +329,7 @@ class TestValidatorIntegration(unittest.TestCase):
             args.append("--strict")
         if us_path is not None:
             args.extend(["--us-path", str(us_path)])
-        result = subprocess.run(args, capture_output=True, text=True)
+        result = subprocess.run(args, capture_output=True, text=True, encoding="utf-8", errors="replace")
         # JSON on stdout; errors on stderr (3-line ERROR/CAUSE/FIX)
         payload: dict[str, object] = {}
         if result.stdout.strip():

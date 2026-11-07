@@ -96,7 +96,7 @@ def main() -> int:
         cmd.append("--allow-reverse-low")
     try:
         result = subprocess.run(
-            cmd, capture_output=True, text=True, cwd=str(root), timeout=15
+            cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(root), timeout=15
         )
     except (subprocess.TimeoutExpired, OSError) as exc:
         return _infra_deny(skill, f"check_reverse_feat_for_full.py n'a pas pu s'executer : {exc}")

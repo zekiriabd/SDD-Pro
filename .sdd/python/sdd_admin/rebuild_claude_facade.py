@@ -182,7 +182,7 @@ def rebuild(force: bool = False, provider: str = "anthropic", verbose: bool = Tr
         "--out", str(build_dir),
     ]
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120)
     except (subprocess.TimeoutExpired, OSError) as exc:
         print(f"[rebuild_claude_facade] harness_build failed: {exc}", file=sys.stderr)
         return FAIL_FAST

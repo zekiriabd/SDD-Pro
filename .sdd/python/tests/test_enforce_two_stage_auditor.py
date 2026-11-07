@@ -56,7 +56,7 @@ def _run_hook(payload: dict, repo: Path,
         input=json.dumps(payload),
         env=_clean_env(repo, env_extra),
         capture_output=True,
-        text=True,
+        text=True, encoding="utf-8", errors="replace",
         check=False,
     )
 

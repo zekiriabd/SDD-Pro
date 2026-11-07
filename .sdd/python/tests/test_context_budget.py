@@ -188,7 +188,7 @@ def _setup_fake_repo(root: Path, agent: str, reads_patterns: list[str]) -> None:
 
 def _run_budget(args: list[str], cwd: Path) -> subprocess.CompletedProcess:
     cmd = [sys.executable, str(SCRIPT)] + args
-    return subprocess.run(cmd, capture_output=True, text=True, cwd=str(cwd))
+    return subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(cwd))
 
 
 class TestIntegration(unittest.TestCase):

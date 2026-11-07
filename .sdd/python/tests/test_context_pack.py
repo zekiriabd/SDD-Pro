@@ -408,7 +408,7 @@ class TestPackLifecycleOnTheRealRepo(unittest.TestCase):
         r = subprocess.run(
             [_sys.executable, "-m", "sdd_scripts.context_budget",
              "--agent", "arch", "--feat-number", "1", "--json"],
-            capture_output=True, text=True,
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
             cwd=str(Path(__file__).resolve().parent.parent))
         self.assertEqual(r.returncode, 0,
                          f"la gate arch doit passer avec le pack : {r.stdout} {r.stderr}")
@@ -428,7 +428,7 @@ class TestPackLifecycleOnTheRealRepo(unittest.TestCase):
             r = subprocess.run(
                 [_sys.executable, "-m", "sdd_scripts.context_budget",
                  "--agent", "arch", "--feat-number", "1"],
-                capture_output=True, text=True,
+                capture_output=True, text=True, encoding="utf-8", errors="replace",
                 cwd=str(Path(__file__).resolve().parent.parent))
             self.assertNotEqual(r.returncode, 0, "un pack absent doit faire échouer la gate")
             self.assertIn("PACK_UNUSABLE", r.stdout + r.stderr)

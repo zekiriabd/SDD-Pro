@@ -164,7 +164,7 @@ def main() -> int:
             [sys.executable, "-m", "sdd_scripts.complexity_router",
              "--feat-number", str(feat_n)],
             cwd=str(root),
-            capture_output=True, text=True, timeout=10,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=10,
             env={**os.environ, "PYTHONPATH": str(root / ".sdd" / "python")},
         )
     except (subprocess.TimeoutExpired, subprocess.SubprocessError, OSError) as exc:

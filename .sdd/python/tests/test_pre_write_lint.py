@@ -44,7 +44,7 @@ def _run_hook(payload: dict, env_extra: dict[str, str] | None = None) -> subproc
         [sys.executable, str(HOOK)],
         input=json.dumps(payload),
         env=env,
-        capture_output=True, text=True,
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
         check=False, timeout=10,
     )
 

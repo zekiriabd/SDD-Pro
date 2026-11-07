@@ -359,7 +359,7 @@ def _auto_ingest_orphan_jsons(feat_n: int) -> list[str]:
                  "--type", type_arg, "--feat", str(feat_n),
                  "--path", str(path), "--keep-json"],
                 cwd=str(root),
-                capture_output=True, text=True, timeout=30,
+                capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30,
                 env={**os.environ, "PYTHONPATH": str(root / ".sdd" / "python")},
             )
             if result.returncode == 0:

@@ -252,7 +252,7 @@ def main() -> int:
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            text=True,
+            text=True, encoding="utf-8", errors="replace",
             check=False,
             timeout=30,
         )

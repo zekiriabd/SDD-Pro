@@ -38,6 +38,10 @@ from sdd_lib.paths import workspace_root, repo_root  # noqa: E402
 TEST_POLLUTION_COMMANDS = {"/x", "/a", "/b", "/cmd1", "/cmd2", "/y", "/z", "unknown"}
 
 # Sanity floors for a real /sdd-full run (one-shot, FEAT 3 US ballpark)
+# Volume d'entrée = input + cache_read + cache_creation (audit télémétrie
+# 2026-11-07) : avec le prompt caching, `input_tokens` seul vaut ~1-600 par
+# appel — le plancher le comparait à 50 000 et classait TOUT run court réel
+# en « données de test », que `--clean-suspects` SUPPRIMAIT alors.
 MIN_REAL_INPUT_TOKENS_PER_RUN = 50_000   # < this : almost certainly fake
 MIN_REAL_OUTPUT_TOKENS_PER_RUN = 10_000
 
@@ -146,7 +150,8 @@ def audit_db(db_path: Path) -> dict:
 
         # 4. Sanity floor on per-run token volumes
         cur.execute(
-            "SELECT run_id, SUM(input_tokens), SUM(output_tokens) "
+            "SELECT run_id, SUM(COALESCE(input_tokens, 0) + COALESCE(cache_read_tokens, 0) "
+            "+ COALESCE(cache_creation_tokens, 0)), SUM(output_tokens) "
             "FROM token_usage WHERE run_id IS NOT NULL GROUP BY run_id"
         )
         suspicious = []
@@ -203,7 +208,8 @@ def clean_suspects(db_path: Path, *, dry_run: bool = False) -> dict:
     cur = conn.cursor()
     try:
         cur.execute(
-            "SELECT run_id, SUM(input_tokens), SUM(output_tokens) "
+            "SELECT run_id, SUM(COALESCE(input_tokens, 0) + COALESCE(cache_read_tokens, 0) "
+            "+ COALESCE(cache_creation_tokens, 0)), SUM(output_tokens) "
             "FROM token_usage WHERE run_id IS NOT NULL GROUP BY run_id"
         )
         suspect_run_ids = [

@@ -73,7 +73,7 @@ def test_hook_subprocess_writes_under_tmp(_isolate_audit_dir: Path):
     subprocess.run(
         [sys.executable, str(_PY_ROOT / "sdd_hooks" / "pre_write_lint.py")],
         input=json.dumps(payload), env=env, cwd=REPO_ROOT,
-        capture_output=True, text=True, check=False, timeout=30,
+        capture_output=True, text=True, encoding="utf-8", errors="replace", check=False, timeout=30,
     )
     after = runtime_log.stat().st_size if runtime_log.exists() else None
     assert after == before, "le hook a écrit dans la piste d'audit de production"

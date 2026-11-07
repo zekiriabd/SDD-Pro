@@ -197,6 +197,30 @@ def test_file_locks_local_stale_recovery(tmp_path: Path) -> None:
     assert fresh["agent_id"] == "agent-A"
 
 
+def test_file_locks_local_takeover_refuses_lock_retaken_meanwhile(tmp_path: Path) -> None:
+    """Compare-and-delete (audit 2026-11-07) : stale lock observé par A, repris
+    par B avant l'unlink de A → A NE DOIT PAS supprimer le lock frais de B.
+
+    Sans le compare-and-delete, A unlinkait le lock de B puis le recréait :
+    deux prétendants se croyaient détenteurs.
+    """
+    from sdd_reverse import file_locks_local as fl
+
+    lock = tmp_path / ".alloc.lock"
+    stale_payload = json.dumps({
+        "agent_id": "agent-dead", "pid": 99999,
+        "ts_unix": int(time.time()) - 3600, "host": "ghost",
+    })
+    fresh_b = json.dumps({
+        "agent_id": "agent-B", "pid": 1, "ts_unix": int(time.time()), "host": "h",
+    })
+    lock.write_text(fresh_b, encoding="utf-8")  # B a déjà repris le lock
+    # A appelle le takeover sur la base du payload stale qu'il avait observé.
+    assert fl._takeover(lock, '{"agent_id": "agent-A"}', stale_payload) == 1
+    held = fl.read_lock(lock)
+    assert held is not None and held["agent_id"] == "agent-B"
+
+
 def test_file_locks_local_corrupted_lock_recovery(tmp_path: Path) -> None:
     """OLD corrupted JSON in lock file → takeover (exit 2).
 

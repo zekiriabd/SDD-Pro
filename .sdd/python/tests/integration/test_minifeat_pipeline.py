@@ -141,7 +141,7 @@ class TestMiniFeatPipeline(unittest.TestCase):
             [sys.executable, "-m", module, *args],
             cwd=str(self.root),
             env=env,
-            capture_output=True, text=True, timeout=60,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60,
         )
         if r.returncode not in expected_codes:
             self.fail(

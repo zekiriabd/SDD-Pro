@@ -422,15 +422,24 @@ def _resolve_run_id() -> str | None:
 
 
 def _ensure_run_row(conn, run_id: str | None) -> str | None:
-    """Upsert the parent `runs` row (FK token_usage.run_id → runs.run_id).
+    """Create the parent `runs` row if missing (FK token_usage.run_id → runs.run_id).
 
     Idempotent and inexpensive. On failure, fall back to a NULL run_id so the
     token row itself is preserved.
+
+    Audit états (2026-11-07) : CREATE-ONLY. L'ancien upsert inconditionnel
+    réécrivait `status='running'` et `command='hook'` à CHAQUE enregistrement
+    de tokens → un run clos (`completed`/`failed`) était rouvert et un run
+    `sdd-full` rebaptisé `hook` (constaté : run FEAT 15 avec `ended_at` posé
+    mais `status='running'`). Le cycle de vie d'un run existant appartient à
+    son orchestrateur (`run_end` / `run_close.py`), jamais au hook télémétrie.
     """
     if not run_id:
         return None
     try:
-        from sdd_lib.console_db import upsert_run
+        from sdd_lib.console_db import get_run, upsert_run
+        if get_run(conn, run_id) is not None:
+            return run_id
         upsert_run(conn, run_id=run_id,
                    command=os.environ.get("SDD_RUN_COMMAND") or "hook",
                    status="running")
@@ -804,6 +813,8 @@ def main() -> int:
             _handle_session_stop(payload, hook_event)
         else:
             _handle_subagent_stop(payload, hook_event)
+        if hook_event == "SessionEnd":
+            _close_session_hook_run()
     except Exception as exc:
         # Telemetry must never break the pipeline — but we must NOT swallow
         # silently either, or we regress to pre-fix state (0 rows accumulated).
@@ -814,6 +825,40 @@ def main() -> int:
         _record_telemetry_failure(audit_dir, exc)
         return HOOK_ALLOW
     return HOOK_ALLOW
+
+
+def _close_session_hook_run() -> bool:
+    """SessionEnd : clôture le run ouvert paresseusement par les hooks de la session.
+
+    Audit états (2026-11-07) : les runs `command='hook'` n'étaient jamais
+    clos (13/13 `running`/`stale` dans la base live). Périmètre strict :
+      * run_id lu UNIQUEMENT (env `SDD_RUN_ID` ou marker de session) — jamais
+        généré ici, pour ne pas créer de marker orphelin en fin de session ;
+      * seul un run `command='hook'` encore `running` est clos (`completed`) ;
+        un run de pipeline (`sdd-full`, `dev-run`…) garde son cycle de vie
+        propre (`run_close.py` / `sdd_state.py end-run`, gate de livraison) ;
+      * le marker de session est retiré s'il pointe encore sur ce run.
+    Retourne True si un run a été clos.
+    """
+    from sdd_lib.console_db import connect, ensure_initialized, get_run, run_end
+    from sdd_lib.run_id import _marker_path, _read_marker, clear_run_id_marker, resolve_session_id
+
+    run_id = (os.environ.get("SDD_RUN_ID") or "").strip()
+    if not run_id:
+        sid = resolve_session_id(_SESSION_ID)
+        if not sid:
+            return False  # marker legacy partagé : jamais clos depuis une session
+        run_id = _read_marker(_marker_path(sid), ttl_seconds=None) or ""
+    if not run_id:
+        return False
+    ensure_initialized()
+    with connect() as conn:
+        row = get_run(conn, run_id)
+        if row is None or row["command"] != "hook" or row["status"] != "running":
+            return False
+        closed = run_end(conn, run_id, "completed", source="SessionEnd")
+    clear_run_id_marker(_SESSION_ID, run_id=run_id)
+    return bool(closed)
 
 
 def _record_telemetry_failure(audit_dir: Path, exc: Exception) -> None:

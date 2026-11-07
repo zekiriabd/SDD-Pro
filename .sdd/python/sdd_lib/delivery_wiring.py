@@ -95,8 +95,22 @@ def family_of(check: str) -> str | None:
     return None
 
 
+def normalize_command(command: str | None) -> str:
+    """Nom canonique d'une commande slash (`sdd-full`, `dev-run`…).
+
+    Audit gates (2026-11-07) : sous Git Bash (MSYS), un argument `/sdd-full`
+    est réécrit en chemin Windows (`C:/Program Files/Git/sdd-full`) avant
+    d'atteindre Python. Stocké tel quel, il ne matchait plus
+    `COMMAND_TO_WORKFLOW` → le gate de livraison était silencieusement SAUTÉ
+    pour ce run. On garde le dernier segment de chemin, sans slash initial.
+    """
+    raw = (command or "").strip().replace("\\", "/").lower()
+    return raw.rstrip("/").rsplit("/", 1)[-1]
+
+
 def workflow_for_command(command: str | None) -> str | None:
-    return COMMAND_TO_WORKFLOW.get((command or "").strip().lower())
+    raw = (command or "").strip().lower()
+    return COMMAND_TO_WORKFLOW.get(raw) or COMMAND_TO_WORKFLOW.get(normalize_command(raw))
 
 
 def _as_list(value: Any) -> list[str]:

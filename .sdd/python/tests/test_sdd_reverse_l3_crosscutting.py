@@ -102,7 +102,7 @@ def test_generate_cli_idempotent_allocation(tmp_path):
     inv = subprocess.run(
         [sys.executable, "-m", "sdd_reverse_scripts.reverse_inventory",
          "--project", str(project), "--json"],
-        capture_output=True, text=True, cwd=str(PY_ROOT),
+        capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(PY_ROOT),
     )
     assert inv.returncode == 0, inv.stderr
 
@@ -113,7 +113,7 @@ def test_generate_cli_idempotent_allocation(tmp_path):
         r = subprocess.run(
             [sys.executable, "-m", "sdd_reverse_scripts.generate_crosscutting_feats",
              "--project", str(project), "--feats-dir", str(feats_dir), "--json"],
-            capture_output=True, text=True, cwd=str(PY_ROOT),
+            capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(PY_ROOT),
         )
         assert r.returncode == 0, r.stderr
         return json.loads(r.stdout)
@@ -127,6 +127,6 @@ def test_generate_cli_idempotent_allocation(tmp_path):
         v = subprocess.run(
             [sys.executable, "-m", "sdd_reverse_scripts.validate_reverse_feat",
              "--feat-path", str(feats_dir / fname), "--json"],
-            capture_output=True, text=True, cwd=str(PY_ROOT),
+            capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(PY_ROOT),
         )
         assert v.returncode == 0, f"{fname} failed validation: {v.stdout} {v.stderr}"

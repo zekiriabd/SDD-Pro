@@ -81,7 +81,7 @@ def main() -> int:
             [sys.executable, "-m", "sdd_scripts.quality_scan",
              "--feat-number", str(feat_n)],
             cwd=str(repo_root()),
-            capture_output=True, text=True, timeout=120,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120,
         )
         if scan.returncode != 0:
             print(f"WARNING: quality_scan exited {scan.returncode}, reading stale DB",

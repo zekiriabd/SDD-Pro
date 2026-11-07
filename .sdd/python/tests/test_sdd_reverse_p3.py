@@ -142,7 +142,7 @@ def _run_sync(args: list[str]) -> tuple[int, str, str]:
     """Invoke sync_parity_snapshots CLI; return (rc, stdout, stderr)."""
     result = subprocess.run(
         [sys.executable, "-m", "sdd_reverse_scripts.sync_parity_snapshots", *args],
-        capture_output=True, text=True, cwd=str(PYTHON_ROOT),
+        capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(PYTHON_ROOT),
     )
     return result.returncode, result.stdout, result.stderr
 

@@ -61,7 +61,7 @@ def run_quality_scan(feat_n: int) -> tuple[bool, str]:
         "--feat-number", str(feat_n),
     ]
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        proc = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120)
     except subprocess.TimeoutExpired:
         return False, "TIMEOUT (>120s)"
     tail = (proc.stdout or proc.stderr or "").strip().splitlines()
@@ -90,7 +90,7 @@ def run_pattern_scan(feat_n: int) -> tuple[bool, str]:
     ]
     try:
         proc = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=180,
+            cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=180,
             cwd=str(Path(__file__).resolve().parent.parent),
         )
     except subprocess.TimeoutExpired:

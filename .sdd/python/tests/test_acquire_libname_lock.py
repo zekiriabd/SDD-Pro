@@ -29,7 +29,7 @@ def run_acquire(lib_path: Path, entity: str, agent_id: str, *,
     # Audit 2026-11-07 : --lib-path must live under the allowed lock root
     # (workspace/src by default) — tests use the system temp dir as root.
     env = dict(os.environ, SDD_LIBNAME_LOCK_ROOT=str(Path(tempfile.gettempdir()).resolve()))
-    proc = subprocess.run(cmd, capture_output=True, text=True, check=False, env=env)
+    proc = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", check=False, env=env)
     try:
         payload = json.loads(proc.stdout.strip().splitlines()[-1])
     except (json.JSONDecodeError, IndexError):

@@ -29,7 +29,7 @@ class TestCli(unittest.TestCase):
     def test_help_succeeds(self) -> None:
         result = subprocess.run(
             [sys.executable, str(SCRIPT), "--help"],
-            capture_output=True, text=True, timeout=15,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=15,
         )
         self.assertEqual(result.returncode, 0)
         self.assertIn("--feat-number", result.stdout)
@@ -39,7 +39,7 @@ class TestCli(unittest.TestCase):
         result = subprocess.run(
             [sys.executable, str(SCRIPT),
              "--feat-number", "1", "--strictness", "bogus"],
-            capture_output=True, text=True, timeout=15,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=15,
         )
         self.assertNotEqual(result.returncode, 0)
 
@@ -53,7 +53,7 @@ class TestCli(unittest.TestCase):
             result = subprocess.run(
                 [sys.executable, str(SCRIPT),
                  "--feat-number", "9999", "--json"],
-                capture_output=True, text=True, timeout=15, env=env,
+                capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=15, env=env,
             )
             # Exit code policy is script-specific (validate_semantic returns 0
             # for "FEAT absente" with a warning verdict — see source). What

@@ -184,7 +184,7 @@ def _run_check(project_dir: Path, cmd: list[str]) -> tuple[bool, str]:
             cmd,
             cwd=str(project_dir),
             capture_output=True,
-            text=True,
+            text=True, encoding="utf-8", errors="replace",
             timeout=DEFAULT_TIMEOUT,
         )
         tail = (result.stdout or result.stderr or "")[-500:]
