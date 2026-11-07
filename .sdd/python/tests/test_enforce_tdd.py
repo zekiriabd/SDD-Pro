@@ -29,16 +29,56 @@ def test_mode_env_explicit_wins(monkeypatch):
     assert mod._resolve_mode() == "off"
 
 
-def test_mode_default_warn_interactive(monkeypatch):
+# Décision Tech Lead 2026-11-07 : le TDD ne bloque JAMAIS le dev par défaut
+# (backend → frontend → tests écrits par qa APRÈS). CoverageMin < 100 → off ;
+# CoverageMin = 100 → warn (signal, la QA tranche). strict = opt-in explicite.
+
+@pytest.mark.parametrize("cov", [0, 50, 80, 99])
+def test_mode_default_off_when_coverage_below_100(monkeypatch, cov):
     monkeypatch.delenv("SDD_TDD_MODE", raising=False)
-    monkeypatch.setattr(mod, "is_ci", lambda: False)
+    monkeypatch.setattr(mod, "_coverage_min", lambda: cov)
+    assert mod._resolve_mode() == "off"
+
+
+def test_mode_default_warn_when_coverage_100(monkeypatch):
+    monkeypatch.delenv("SDD_TDD_MODE", raising=False)
+    monkeypatch.setattr(mod, "_coverage_min", lambda: 100)
     assert mod._resolve_mode() == "warn"
 
 
-def test_mode_default_strict_in_ci(monkeypatch):
+@pytest.mark.parametrize("ci", [True, False])
+def test_mode_default_never_strict_even_in_ci(monkeypatch, ci):
     monkeypatch.delenv("SDD_TDD_MODE", raising=False)
-    monkeypatch.setattr(mod, "is_ci", lambda: True)
+    monkeypatch.setattr(mod, "is_ci", lambda: ci)
+    monkeypatch.setattr(mod, "_coverage_min", lambda: 100)
+    assert mod._resolve_mode() != "strict"
+
+
+def test_mode_explicit_strict_wins_over_coverage(monkeypatch):
+    monkeypatch.setenv("SDD_TDD_MODE", "strict")
+    monkeypatch.setattr(mod, "_coverage_min", lambda: 80)
     assert mod._resolve_mode() == "strict"
+
+
+def test_coverage_min_reads_stack_md(monkeypatch, tmp_path):
+    stack = tmp_path / "stack.md"
+    stack.write_text("## Project Config\nCoverageMin: 100\n", encoding="utf-8")
+    import sdd_lib.layered_config as lc
+    import sdd_lib.project_config as pc
+    monkeypatch.setattr(lc, "read_layered_config", lambda **_: {})
+    monkeypatch.setattr(pc, "stack_md_path", lambda: stack)
+    assert mod._coverage_min() == 100
+
+
+def test_coverage_min_defaults_to_80_on_error(monkeypatch):
+    import sdd_lib.layered_config as lc
+    import sdd_lib.project_config as pc
+
+    def boom(**_):
+        raise RuntimeError("config illisible")
+    monkeypatch.setattr(lc, "read_layered_config", boom)
+    monkeypatch.setattr(pc, "stack_md_path", lambda: Path("/nonexistent/stack.md"))
+    assert mod._coverage_min() == 80
 
 
 # ---------------------------------------------------------------------------
@@ -185,12 +225,30 @@ def test_kotlin_internal_fun_detected():
     assert mod._content_introduces_new_symbol("internal fun compute(x: Int) = x", ".kt")
 
 
-def test_subagent_default_is_strict(monkeypatch, tmp_path):
-    monkeypatch.setattr(mod, "is_ci", lambda: False)
+@pytest.mark.parametrize("cov", [80, 100])
+@pytest.mark.parametrize("agent", ["dev-backend", "dev-frontend"])
+def test_dev_subagent_never_blocked_by_default(monkeypatch, tmp_path, cov, agent):
+    """Le TDD n'interbloque plus dev-* (qui n'a pas le droit d'écrire de tests)."""
+    monkeypatch.setattr(mod, "is_ci", lambda: True)
+    monkeypatch.setattr(mod, "_coverage_min", lambda: cov)
+    payload = {**_write_payload(), "agent_id": "a1", "agent_type": agent}
+    assert _run_main(monkeypatch, tmp_path, payload=payload, mode=None) == HOOK_ALLOW
+
+
+def test_coverage_100_warns_without_blocking(monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr(mod, "_coverage_min", lambda: 100)
     payload = {**_write_payload(), "agent_id": "a1", "agent_type": "dev-backend"}
-    assert _run_main(monkeypatch, tmp_path, payload=payload, mode=None) == HOOK_DENY
+    assert _run_main(monkeypatch, tmp_path, payload=payload, mode=None) == HOOK_ALLOW
+    assert "WARN [TDD_NO_TEST_FIRST]" in capsys.readouterr().err
 
 
-def test_main_session_default_is_warn(monkeypatch, tmp_path):
-    monkeypatch.setattr(mod, "is_ci", lambda: False)
+def test_coverage_below_100_is_silent(monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr(mod, "_coverage_min", lambda: 80)
+    payload = {**_write_payload(), "agent_id": "a1", "agent_type": "dev-backend"}
+    assert _run_main(monkeypatch, tmp_path, payload=payload, mode=None) == HOOK_ALLOW
+    assert "TDD_NO_TEST_FIRST" not in capsys.readouterr().err
+
+
+def test_main_session_default_never_blocks(monkeypatch, tmp_path):
+    monkeypatch.setattr(mod, "_coverage_min", lambda: 100)
     assert _run_main(monkeypatch, tmp_path, payload=_write_payload(), mode=None) == HOOK_ALLOW

@@ -1,120 +1,66 @@
 ---
 name: test-driven-development
-description: Use whenever the agent is about to write production code (a new function, class, endpoint, method, or component) to enforce the RED-GREEN-REFACTOR cycle (emprunt Superpowers v5.1). NO production code without a failing test first. Triggers on intentions to write code into workspace/src/, *.cs/*.ts/*.py/*.kt files, or any creation of a method/class/function/endpoint. If the agent realizes it has already written production code without a test, the skill mandates deleting that code and restarting with RED-GREEN-REFACTOR. Non-negotiable for SDDPro v7.0.0+ test-first contract.
+description: Use ONLY when the Tech Lead explicitly asks for TDD / RED-GREEN-REFACTOR / test-first on a piece of work, or when the project explicitly opts in with SDD_TDD_MODE=strict. Do NOT trigger in the standard SDDPro pipeline — there, dev-backend and dev-frontend write production code WITHOUT tests (writing tests is forbidden to them, [QA_OWNERSHIP_VIOLATION]) and the qa agent writes the unit tests AFTER development; the verdict comes from the QA coverage gate (CoverageMin in stack.md). Never delete production code because it has no test yet. When CoverageMin < 100 the TDD discipline does not apply at all.
 ---
 
-# Skill — Test-Driven Development (RED-GREEN-REFACTOR)
+# Skill — Test-Driven Development (opt-in, non bloquant)
 
-> **Emprunt direct Superpowers v5.1** : "NO PRODUCTION CODE WITHOUT A
-> FAILING TEST FIRST. Delete code written before tests — start over."
-> Ce skill matérialise le contrat **test-first** au niveau du pipeline
-> SDD_Pro, complémentaire au QA agent (qui RUN les tests) et à l'API
-> Gate (qui les vérifie post-hoc).
+> **Décision Tech Lead 2026-11-07** : le TDD ne bloque **jamais** le
+> développement. L'organisation SDD-Pro est séquentielle :
+>
+> ```
+> backend (dev-backend) → frontend (dev-frontend) → tests unitaires (qa) → verdict QA
+> ```
+>
+> Les tests sont écrits par `qa` **après** le développement. C'est le gate
+> QA (couverture vs `CoverageMin`, puis delivery gate `verify_tests
+> --coverage`) qui dit si c'est bon ou pas — pas ce skill, pas le hook.
 
-## L'invariant non-négociable
+## Règle d'application (selon `CoverageMin` du `stack.md`)
 
-```
-RED   → écrire UN test qui échoue (et le faire échouer pour la bonne raison)
-GREEN → écrire le code MINIMAL pour le passer
-REFACTOR → améliorer code + tests tant que tests restent verts
-```
+| `CoverageMin` | Hook `enforce_tdd` (défaut) | Ce skill |
+|---|---|---|
+| **< 100** (ex. 80) | `off` — aucun contrôle | **Ne s'applique pas** |
+| **= 100** | `warn` — signal `[TDD_NO_TEST_FIRST]`, jamais de blocage | Ne s'applique pas automatiquement ; la QA tranche |
+| `SDD_TDD_MODE=strict` (opt-in humain explicite) | `strict` — bloque | S'applique (cycle ci-dessous) |
 
-**Aucune** ligne de code de production sans un test écrit **avant** qui
-le justifie. Si l'agent réalise qu'il a écrit du code sans test : **supprimer
-le code**, écrire le test, recommencer en RED.
+## Ce que dev-backend / dev-frontend font (pipeline standard)
 
-## Quand ce skill s'active
+- Écrivent le code de production de l'US **sans** écrire de tests.
+- Ne suppriment **jamais** du code au motif qu'il n'a pas encore de test.
+- Un `WARN [TDD_NO_TEST_FIRST]` éventuel (`CoverageMin = 100`) est
+  informatif : il signale à la QA les unités à couvrir en priorité.
 
-| Intention détectée | Action TDD |
-|---|---|
-| "Écris une fonction qui …" | Skill bloque → "écris d'abord le test qui définit le contrat" |
-| "Ajoute un endpoint POST /api/foo" | Skill bloque → "écris d'abord le test d'intégration HTTP du happy path" |
-| "Crée une classe `UserService`" | Skill bloque → "écris d'abord 1 test du method principal" |
-| Création fichier `*.cs|*.ts|*.py|*.kt` sous `workspace/src/` sans test correspondant sous `*.Tests/` ou `__tests__/` | Skill flag → demande le test d'abord |
-| "Je vais refactor X" | Skill ALLOWS (refactor = test reste vert ; pas de nouveau contrat) |
-| "Je vais corriger un bug" | Skill **exige un test de régression rouge AVANT le fix** |
+## Ce que qa fait
 
-## Le cycle complet (étapes)
+- Génère les tests unitaires **après** le développement (`/qa-generate`).
+- Mesure la couverture et la compare à `CoverageMin` → verdict 🟢/🟡/🔴.
+- La delivery gate exige des tests réellement exécutés et réussis.
 
-### 1. RED — écrire le test rouge
+## Cycle RED-GREEN-REFACTOR (uniquement si opt-in explicite)
 
-- Identifier l'unité minimale à tester (1 behavior, pas N)
-- Écrire le test dans le bon répertoire :
-  - .NET : `workspace/src/{BackendName}.Tests/Unit/`
-  - Node/TS : `__tests__/` ou `*.test.ts` à côté
-  - Python : `tests/test_*.py`
-  - Kotlin : `src/test/kotlin/`
-- **Lancer le test, vérifier qu'il échoue** — et qu'il échoue pour la
-  bonne raison (assertion failure, pas import error / syntax error)
-- Si le test passe immédiatement → soit le code existe déjà, soit le
-  test ne teste rien. STOP, repenser.
+Quand le Tech Lead demande explicitement du TDD (ou `SDD_TDD_MODE=strict`) :
 
-### 2. GREEN — écrire le code minimal
+1. **RED** — écrire UN test qui échoue pour la bonne raison (assertion,
+   pas erreur d'import). Répertoires : .NET `workspace/src/{BackendName}.Tests/Unit/`,
+   Node/TS `__tests__/` ou `*.test.ts`, Python `tests/test_*.py`,
+   Kotlin `src/test/kotlin/`.
+2. **GREEN** — écrire le code minimal qui fait passer le test.
+3. **REFACTOR** — améliorer en gardant les tests verts.
 
-- Écrire le **strict minimum** pour faire passer le test
-- Pas de features bonus, pas de optimisation prématurée, pas de
-  "tant que j'y suis"
-- Lancer le test, vérifier qu'il passe
-- Si d'autres tests cassent → la GREEN est cassée, fix d'abord
+Dans ce mode, qui écrit le test RED dépend de l'organisation choisie par le
+Tech Lead (spawn `qa` en mode test-first avant dev-*, cf.
+`@.sdd/docs/delivery-gates.md`) — dev-* n'écrit toujours pas de tests.
 
-### 3. REFACTOR — améliorer sans casser
+## Tests de régression (bug fix)
 
-- Renommer pour la lisibilité
-- Extraire pour la réutilisation (DRY justifié)
-- Lancer tous les tests après chaque modif
-- Si un test casse → revert immédiat
-
-### 4. COMMIT (ou checkpoint)
-
-- 1 test + 1 fix = 1 commit
-- Message : "test+code: <behavior>" ou "fix: <bug> (+ regression test)"
-- Préserve la traçabilité RED → GREEN → REFACTOR
-
-## Anti-patterns refusés
-
-| Rationalization | Réponse TDD |
-|---|---|
-| "Je vais tester après, c'est plus rapide" | **NON.** Code écrit avant test = supprimer + recommencer. Test après-coup passe sans avoir prouvé quoi que ce soit (tu n'as jamais vu RED). |
-| "Le code est trivial, pas besoin de test" | **NON.** Trivial = test trivial = 30 secondes à écrire. Si trivial, ce n'est pas une perte de temps. Si vraiment trivial (1 ligne `return x + 1`), tolérance OK. |
-| "J'ai déjà testé manuellement" | **NON.** Test manuel = pas de regression. Si tu casses le code dans 3 mois, rien ne l'attrape. |
-| "Je connais le code, pas besoin" | **NON.** Le futur toi ne connaîtra plus dans 6 mois. |
-| "Je vais juste refactor, c'est sûr" | **OUI** — si tests existants couvrent le behavior. Si pas de test sur cette unité → écrire test d'abord (test de **caractérisation** : capturer le behavior actuel). |
-| "Je vais commit le test et le fix en même temps après avoir tout codé" | **NON.** Le séquencement (RED puis GREEN) est la valeur. Sans le RED visible, tu n'as jamais validé que le test attrape la régression. |
-| "Le coverage est déjà à 80%, ça suffit" | **NON.** Coverage = lignes touchées, pas behaviors testés. Le seuil `CoverageMin` est un **plancher**, pas une autorisation à skipper les tests pour les nouvelles features. |
-
-## Tests de régression (sur bug fix)
-
-Quand un bug est rapporté :
-
-1. **Écrire le test qui reproduit le bug** — doit échouer (RED prouve la bug)
-2. **Vérifier qu'il échoue** — log de l'output rouge
-3. **Fixer le code** — minimal change pour passer le test
-4. **Vérifier que le test passe** (GREEN)
-5. **(Optional) Refactor**
-
-Si tu fixes le bug AVANT le test : tu n'as JAMAIS prouvé que ton test
-attrape la régression. Tu pourrais ne tester rien. **Toujours RED first.**
-
-## Intégration SDD_Pro
-
-| Composant | Rôle vs TDD |
-|---|---|
-| `dev-backend` / `dev-frontend` | Produit le code prod ; doit créer les tests **avant** (ou supprimer + recommencer) |
-| `qa` agent | Génère / complète les tests post-dev — ne remplace PAS TDD préventif |
-| API Gate | Vérifie tests d'intégration HTTP — pas un substitut au TDD unitaire |
-| Coverage (`CoverageMin`) | Plancher quantitatif — n'enforce pas le test-first |
-| **Ce skill** | Enforce le test-first au moment de la création du code |
+Recommandé, non bloquant : sur un bug signalé, demander à `qa` un test qui
+reproduit le bug, puis corriger. C'est une bonne pratique, pas un gate.
 
 ## Pointeurs
 
-- `@.sdd/rules/quality.md §A` — coverage threshold
-- `@.sdd/rules/build-and-loop.md §A` — API Gate (tests d'intégration HTTP)
+- `@.sdd/python/sdd_hooks/enforce_tdd.py` — hook (mode dérivé de `CoverageMin`)
+- `@.sdd/rules/quality.md §A` — seuil de couverture
 - `@.claude/agents/qa.md` — agent QA post-dev
-- `@.sdd/python/sdd_hooks/enforce_tdd.py` — hook PreToolUse Write qui détecte
-  écriture code prod sans test associé (audit P3 TDD 2026-06-08)
-- **Origine** : Superpowers v5.1 `test-driven-development` skill (Jesse Vincent
-  et al., 2025). Adopté par SDD_Pro v7.0.0+.
-
-> **Règle mentale** : "Si je peux écrire le code, je peux écrire le test
-> qui le justifie. Si je ne peux pas écrire le test, je ne comprends pas
-> ce que je dois faire. STOP, clarifier le behavior d'abord."
+- **Origine** : Superpowers v5.1 `test-driven-development`, adapté à
+  l'organisation séquentielle SDD-Pro (2026-11-07).

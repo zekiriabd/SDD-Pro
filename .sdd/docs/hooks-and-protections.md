@@ -140,7 +140,7 @@ détection par motif, contournable par construction.
 |---|---|
 | Rôle | Nouveau symbole de production sous `workspace/src/` sans test compagnon → `[TDD_NO_TEST_FIRST]`. Symboles `public`, `internal`, `private`, `protected` et classes sans modificateur (C#), `internal`/`private fun` (Kotlin), etc. Un compagnon **sans aucun cas de test** (`[Fact]`, `[Test]`, `@Test`, `it(`, `test(`, `def test_`) ne compte pas. |
 | Mode shell (2026-11) | Incident : 19 `.cs` créés sans test par heredoc. Cibles extraites par `sdd_lib/shell_write_targets.py` (§1.14), même décision que le mode fichier. Contenu connu (heredoc, `echo`, `Set-Content -Value`, here-string) → regex de symbole ; `cp`/`mv`/`Copy-Item` → contenu du fichier source ; contenu inconnu (`curl -o`, `python -c`) → **fail-closed sur un fichier nouveau** seulement (modifier un fichier existant = refactor). Un test avec de vrais cas écrit dans la **même commande** compte comme compagnon. |
-| Bloque ? | **DENY** : CI, sous-agent. **WARN** : session principale. |
+| Bloque ? | **Jamais par défaut** (décision 2026-11-07 : backend → frontend → tests par `qa` après le dev ; verdict = gate QA). `CoverageMin` < 100 → **off** ; `CoverageMin` = 100 → **WARN** ; **DENY** uniquement si `SDD_TDD_MODE=strict` (opt-in humain). |
 | Bypass | `SDD_TDD_MODE=off\|warn\|strict`, `SDD_DISABLE_TDD=1`. |
 | Contournable (*heuristique*) | compagnon trouvé par nom (`*{stem}*`) : un test sans rapport portant le même nom suffit ; détection regex des symboles. |
 
@@ -199,6 +199,18 @@ cible. **Non détecté** : chemins dynamiques (`$VAR`, `Path(a) / b`),
 substitution `$(…)`, script intermédiaire qui écrit, `xargs` alimenté par
 pipe. Tests : `tests/test_shell_write_bypass.py`.
 
+### 1.15 `confine_reviewers` — PreToolUse `Edit|Write|MultiEdit|NotebookEdit` **et** `Bash|PowerShell` (2026-11-07)
+
+| | |
+|---|---|
+| Rôle | Rend réellement read-only les 5 reviewers (`code-reviewer`, `security-reviewer`, `spec-compliance-reviewer`, `arch-reviewer`, `adversarial-reviewer`). Ils gardent `Write`/`Bash` (rapports + scripts de validation/ingestion), mais : écriture **uniquement** sous `workspace/.sys/.validation/` ; shell limité, segment par segment, aux commandes de lecture (`grep`, `rg`, `cat`, `ls`, `find` sans `-delete`/`-exec`, `git diff|log|status|show…`, cmdlets PowerShell de lecture) et à `python -m sdd_scripts.*|sdd_lib.*|sdd_admin.*` ou `python .sdd/python/**.py`. |
+| Refusé | `python -c`, `python -`, interpréteurs (`bash -c`, `node -e`, `pwsh`), `$(…)`/backticks/`<(…)`, préfixe `VAR=x`, `sed -i`, `awk`, `cp`/`mv`/`rm`, `git` en écriture, toute cible d'écriture shell hors `.validation/`, cible non résolue (`$D/x`). → `[REVIEWER_CONFINEMENT_VIOLATION]`. |
+| Bloque ? | **DENY** toujours pour les reviewers ; agents non reviewers et session principale non concernés. |
+| Bypass | **aucun** (constante de module). Audit : `workspace/.sys/.audit/reviewer-confinement.jsonl`. |
+| Contournable | un script `.sdd/python/**` qui écrirait dans `workspace/src/` (code framework, lui-même protégé par `protect_framework`). |
+
+Tests : `tests/test_confine_reviewers.py`.
+
 ---
 
 ## 2. Tableau de synthèse
@@ -214,7 +226,8 @@ pipe. Tests : `tests/test_shell_write_bypass.py`.
 | `enforce_two_stage_auditor` | oui | — | `SDD_BYPASS_TWO_STAGE`, `legacy-parallel` | jugement AC de l'agent Stage A |
 | `validate_acceptance_gate` | oui (post-hoc) | — | `SDD_ALLOW_ACCEPTANCE_BYPASS` | réécriture non détectée du JSON |
 | `audit_file_ownership` | oui (post-hoc) | strict | `SDD_AUDIT_OWNERSHIP_MODE` | écritures shell ; repli mtime |
-| `enforce_tdd` | oui (CI, sous-agent) | warn session principale | `SDD_TDD_MODE`, `SDD_DISABLE_TDD` | appariement par nom |
+| `enforce_tdd` | non (sauf `SDD_TDD_MODE=strict`) | off si `CoverageMin` < 100, warn si = 100 | `SDD_TDD_MODE`, `SDD_DISABLE_TDD` | appariement par nom |
+| `confine_reviewers` | oui, toujours (5 reviewers) | — | aucun | script `.sdd/python` qui écrirait hors `.validation/` |
 | `preflight_stack_combo` | oui | — | `SDD_ALLOW_UNTESTED_COMBO` | — |
 | `preflight_reverse_gate` | oui | — | `SDD_ALLOW_REVERSE_LOW` | FEAT non créée / sans numéro |
 | `validate_augment_contract` | oui (post-hoc) | — | — | aucun plan = rien à vérifier |

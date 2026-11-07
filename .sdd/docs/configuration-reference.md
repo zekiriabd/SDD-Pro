@@ -46,7 +46,7 @@ All Project Config keys + their layered defaults, ranges, and behaviour. Source 
 | `PlanCacheStrict` | `false` | DEPRECATED no-op | Was used by retired `dev-*-strict` variants |
 | `PlanReviewDefault` | `true` | `true \| false` | Default for `--plan` flag on `/sdd-full` |
 | `QaFailOnSddFull` | `true` | `true \| false` | QA 🔴 RED blocks `/sdd-full` post-STEP 4.5 (symmetry with standalone) |
-| `QAMode` | `manual` | `off \| quality-only \| tests-only \| tests+coverage \| full \| manual` | What `/qa-generate` runs |
+| `QAMode` | `tests+coverage` | `off \| quality-only \| tests-only \| tests+coverage \| full \| manual` | What `/qa-generate` runs |
 | `ReviewFailOn` | `serious` | `info \| minor \| moderate \| serious \| critical` | Aggregate threshold for `/sdd-review` 🔴 |
 | `ReviewFailOnSddFull` | `true` | `true \| false` | `/sdd-review` 🔴 blocks `/sdd-full` |
 | `ReviewMode` | `full` | `full \| scans-only \| read-only \| manual \| off` | Master switch for review batch |

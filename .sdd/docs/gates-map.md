@@ -31,7 +31,7 @@
 | 3.5 | Readiness FEAT↔US↔stack | **primaire** | `sdd_scripts/validate_readiness.py` (`/feat-validate`) | ✅ | `--force` / `--no-validate` |
 | 3.6 | Plan-then-review (checkpoint humain) | **primaire** (conditionnel) | procédure 3.6 + `sdd_scripts/gate_decide.py` | ✅ si WARN+force ou `--plan` | `--no-plan-on-warn` |
 | 3.6.quart | Cumul de flags bypass | **defense-in-depth** | `sdd_scripts/preflight_force_cumul.py` (sentinelle `SDD_FORCE_CUMUL_OK`) | court-circuité si 1.bis OK | idem 1.bis |
-| 4.5 | QA (tests + coverage) | **primaire** | `/qa-generate` + `QaFailOnSddFull` | ❌ (`QAMode: manual` défaut → skip) | `QaFailOnSddFull: false` |
+| 4.5 | QA (tests + coverage) | **primaire** | `/qa-generate` + `QaFailOnSddFull` | ✅ (`QAMode: tests+coverage` défaut depuis 2026-11-07 ; `manual`/`off` → skip, puis delivery gate bloque sans tests réels) | `QaFailOnSddFull: false` |
 | 4.7 | Spec-compliance post-dev | **primaire** (lecteur pur du rapport Stage A — cf. autorité unique `feat-validate.md §4.5.3`) | `/feat-validate --post-dev` | ✅ | `SpecComplianceRequiredForFeatValidate: false` |
 | 4.8 | Review qualité consolidé | **primaire** | `sdd_scripts/sdd_review.py` + `ReviewFailOnSddFull` | ✅ (`ReviewMode: full` défaut) | `ReviewFailOnSddFull: false` |
 | 4.9 | Drift inline rules | **observability** (jamais bloquant) | `sdd_scripts/validate_inline_rules.py` | ❌ | n/a |
@@ -56,7 +56,8 @@
 | PreToolUse / PostToolUse Agent + SubagentStop + Stop | Parallélisme borné (`MaxParallel`) | **primaire** | `sdd_hooks/enforce_max_parallel.py` | `SDD_ALLOW_PARALLEL_EXCESS=1` (audit-loggué) |
 | PreToolUse Agent | Séquencement two-stage auditors | **defense-in-depth** (de auditor_batch.A) | `sdd_hooks/enforce_two_stage_auditor.py` | `AuditorBatchMode: legacy-parallel` |
 | PreToolUse Skill | Combo stack hors SLA | **primaire** | `sdd_hooks/preflight_stack_combo.py` | `SDD_ALLOW_UNTESTED_COMBO=1` |
-| PreToolUse Edit/Write + Bash/PowerShell | TDD test-first | **primaire** (warn interactif / strict CI) | `sdd_hooks/enforce_tdd.py` | `SDD_DISABLE_TDD=1` |
+| PreToolUse Edit/Write + Bash/PowerShell | TDD test-first | **observabilité** (off si `CoverageMin` < 100, warn si = 100 ; strict = opt-in `SDD_TDD_MODE` — ne bloque jamais le dev, verdict = gate QA) | `sdd_hooks/enforce_tdd.py` | `SDD_DISABLE_TDD=1` |
+| PreToolUse Edit/Write + Bash/PowerShell | Confinement reviewers read-only (écriture ⊂ `workspace/.sys/.validation/`, shell en liste blanche) | **primaire** (DENY, 5 reviewers) | `sdd_hooks/confine_reviewers.py` | aucun |
 | PreToolUse Bash | Set d'env bypass mid-session | **primaire** | `sdd_hooks/block_env_bypass.py` | aucun |
 | PostToolUse Edit/Write | Cohérence stack / contrat augment | **defense-in-depth** | `sdd_hooks/validate_stack_consistency.py`, `sdd_hooks/validate_augment_contract.py` | n/a |
 | SubagentStop qa | Acceptance Gate (test/lint/build/coverage/smoke/E2E) | **primaire** | `sdd_hooks/validate_acceptance_gate.py` + `sdd_scripts/validate_acceptance.py` | `SDD_ALLOW_ACCEPTANCE_BYPASS=1` |
@@ -75,7 +76,7 @@ readiness (3.5) → staleness plans (6.0.bis, si plans) → API Gate (6.b)
 
 + les caps continus (coût run, budget agent, combo SLA, acceptance post-qa).
 Le reste : 4 gates manuelles opt-in, 1 defense-in-depth court-circuitée,
-2 observability, QA 4.5 skippée (`QAMode: manual` défaut).
+2 observability, QA 4.5 active par défaut (`QAMode: tests+coverage` depuis 2026-11-07).
 
 **Paires assumées (pas des doublons)** :
 - 4.7 lit le rapport produit par auditor_batch.A (lecteur/producteur — autorité unique,

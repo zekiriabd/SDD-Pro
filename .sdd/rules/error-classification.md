@@ -33,10 +33,10 @@ et inlinés dans les agents (po, dev-*, qa).
 
 > **Note granularité (Sprint 2.4 audit 2026-06-07 ; recount CTO audit
 > 2026-06-07 ; clarification méthodologique audit consolidé 2026-06-07 ;
-réciprocité émetteurs↔taxonomie audit 2026-06-12 ; ajout `[DB_STRUCTURE_CHANGE_FORBIDDEN]` audit 2026-06-13 ; ajout `[PRICING_UNKNOWN]` + `[SECRET_PROVIDER_LEAK_RISK]` audit R2/R5 2026-07-26 ; ajout `[AUDITOR_RUNTIME_ERROR]` + `[PACK_UNUSABLE]` audit M6 2026-08-30 ; ajout de 9 classes hooks/spawn/config/lock audit 2026-11-06 ; ajout `[DELIVERY_GATE_BLOCKED]` gate de livraison par preuves 2026-11-07)** : **203 classes** recensées dans ce fichier (201 actives + 2 dépréciées).
+réciprocité émetteurs↔taxonomie audit 2026-06-12 ; ajout `[DB_STRUCTURE_CHANGE_FORBIDDEN]` audit 2026-06-13 ; ajout `[PRICING_UNKNOWN]` + `[SECRET_PROVIDER_LEAK_RISK]` audit R2/R5 2026-07-26 ; ajout `[AUDITOR_RUNTIME_ERROR]` + `[PACK_UNUSABLE]` audit M6 2026-08-30 ; ajout de 9 classes hooks/spawn/config/lock audit 2026-11-06 ; ajout `[DELIVERY_GATE_BLOCKED]` gate de livraison par preuves 2026-11-07 ; ajout `[REVIEWER_CONFINEMENT_VIOLATION]` confinement des reviewers 2026-11-07)** : **204 classes** recensées dans ce fichier (202 actives + 2 dépréciées).
 >
 > **Source de vérité** : somme déterministe de la colonne "Classes" du
-> quick-ref §0 ci-dessous (`9+27+14+5+7+3+12+4+11+12+23+16+9+44+6+1 = 203`).
+> quick-ref §0 ci-dessous (`9+27+15+5+7+3+12+4+11+12+23+16+9+44+6+1 = 204`).
 > Ce nombre est utilisé dans toute communication commerciale (CLAUDE.md,
 > WHY-SDD-PRO.md, getting-started.md, README.md) et enforcé par le test
 > `tests/test_error_classification_count.py` (gate CI : tout drift entre
@@ -80,13 +80,13 @@ réciprocité émetteurs↔taxonomie audit 2026-06-12 ; ajout `[DB_STRUCTURE_CHA
 
 ---
 
-## 0. Quick reference — 16 familles (203 classes)
+## 0. Quick reference — 16 familles (204 classes)
 
 | # | Famille | Classes | Émetteur principal | Comportement build_loop |
 |---|---|---:|---|---|
 | §1.1 | **Runtime** (`[NETWORK]`/`[AUTH]`/`[PERMISSION]`/`[NOT_FOUND]`/`[TIMEOUT]`/`[DISK]`/`[ENV_*]`/`[INFRA_BLOCKED]`) | 9 | tous | STOP |
 | §1.2 | **Pipeline** (`[STACK_MALFORMED]`/`[FEAT_*]`/`[PLAN_*]`/`[READINESS_*]`/`[INVALID_*]`/`[POC_*]`/`[PO_HASH_*]`/...) | 27 | po, arch, validate_plan.py | STOP |
-| §1.3 | **Contrat ownership** (`[PRESERVES_VIOLATED]`/`[ADDS_VIOLATED]`/`[LAYER_VIOLATION]`/`[FILE_*]`/`[US_*]`/`[DB_STRUCTURE_CHANGE_FORBIDDEN]`) | 14 | dev-*, arch, set_us_status.py | STOP |
+| §1.3 | **Contrat ownership** (`[PRESERVES_VIOLATED]`/`[ADDS_VIOLATED]`/`[LAYER_VIOLATION]`/`[FILE_*]`/`[US_*]`/`[DB_STRUCTURE_CHANGE_FORBIDDEN]`/`[REVIEWER_CONFINEMENT_VIOLATION]`) | 15 | dev-*, arch, set_us_status.py, confine_reviewers | STOP |
 | §1.4 | **Build** (`[BUILD_*]`/`[DEP_MISSING]`/`[CIRCULAR_DEP]`) | 5 | dev-* | **ITÈRE** sur `[BUILD_CORRECTIBLE]` uniquement |
 | §1.5 | **Anti-derive** (`[DERIVE_VIOLATION]`/`[STACK_LIBRARY_*]`/`[REFACTOR_HORS_SCOPE]`/...) | 7 | dev-* | STOP |
 | §1.6 | **UI fidelity** (`[UI_FIDELITY_GAP]`/`[UI_TOKEN_VIOLATION]`/`[FRONTEND_BACKEND_CONTRACT_GAP]`) | 3 | dev-frontend | STOP/retry |
@@ -174,6 +174,7 @@ le tableau d'actions par famille.
 | `[LAYER_VIOLATION]` | Code dans couche interdite (ex. business in UI) | dev-* STEP build |
 | `[FILE_OWNERSHIP]` | Path interdit par `ownership.md §1` (Partie A) | hook SubagentStop |
 | `[FILE_OWNERSHIP_NESTED]` | Projet front imbriqué dans back (cf. §1.bis) | arch/dev-* STEP 1.bis |
+| `[REVIEWER_CONFINEMENT_VIOLATION]` | Un reviewer read-only (`code-reviewer`, `security-reviewer`, `spec-compliance-reviewer`, `arch-reviewer`, `adversarial-reviewer`) tente d'écrire hors `workspace/.sys/.validation/` ou de lancer une commande shell hors liste blanche (lecture seule + scripts `.sdd/python`) — bloquant, sans bypass (2026-11-07) | hook PreToolUse `confine_reviewers` |
 | `[STATUS_FLIP_FAILED]` | `Status: Done` non persisté sur disque | dev-* post-write |
 | `[US_STATUS_INVALID]` | Valeur de status hors 7 valides v6.8 (`Draft\|Ready\|InProgress\|Review\|Done\|Deferred\|Cancelled`) | `set_us_status.py` |
 | `[US_STATUS_TRANSITION_INVALID]` | Transition rejetée par le graphe ou sortie d'état terminal sans `--force` | `set_us_status.py` |

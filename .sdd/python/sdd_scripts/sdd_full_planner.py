@@ -903,7 +903,7 @@ def collect_context(root: Path, feat_n: int, flags: dict[str, Any],
         return ctx
     ctx["config"] = {
         "PlanReviewDefault": _as_bool(config.get("PlanReviewDefault"), False),
-        "QAMode": _as_mode(config.get("QAMode"), "manual"),
+        "QAMode": _as_mode(config.get("QAMode"), "tests+coverage"),
         "QaFailOnSddFull": _as_bool(config.get("QaFailOnSddFull"), True),
         "ReviewMode": _as_mode(config.get("ReviewMode"), "full"),
         "ReviewFailOnSddFull": _as_bool(config.get("ReviewFailOnSddFull"), True),

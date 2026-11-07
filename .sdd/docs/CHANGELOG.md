@@ -4,6 +4,44 @@ Format : [version] — date courte. Sections : `Breaking`, `Added`, `Changed`, `
 
 ---
 
+## [v7.1.1-dev] — 2026-11-07 (TDD non bloquant, reviewers confinés, settings durcis)
+
+### Changed
+
+- **Le TDD ne bloque plus le développement** (décision Tech Lead). Organisation
+  séquentielle : backend → frontend → tests unitaires par `qa` après le dev ;
+  le verdict appartient au gate QA (`CoverageMin`, puis delivery gate).
+  `enforce_tdd` dérive son mode de `CoverageMin` : **off** si < 100, **warn**
+  si = 100, **strict** uniquement via `SDD_TDD_MODE` explicite. Corrige
+  l'interblocage du défaut `strict` sous-agent (dev-* n'a pas le droit
+  d'écrire de tests). Skill `test-driven-development` réécrit : opt-in
+  explicite, ne demande plus jamais de supprimer du code.
+- **`QAMode` par défaut : `manual` → `tests+coverage`** (`config.base.yml` +
+  repli du planner). `manual` sautait la QA puis la delivery gate bloquait
+  faute de tests réels ; le verdict appartenant désormais à la QA, elle
+  tourne par défaut. Aligné sur `stack.md.template`.
+
+### Added
+
+- **Hook `confine_reviewers`** (PreToolUse écriture + shell) : les 5 reviewers
+  gardent `Write`/`Bash` mais n'écrivent que sous `workspace/.sys/.validation/`
+  et ne lancent que des commandes de lecture ou des scripts `.sdd/python`.
+  Sans bypass. Nouvelle classe `[REVIEWER_CONFINEMENT_VIOLATION]` (§1.3, 204
+  classes).
+
+### Security
+
+- **`.claude/settings.json`** : retrait des auto-approbations à risque
+  (scripts `c:/tmp/*`, chaîne `cp .sdd/.build/claude/* → .claude/` qui
+  redéployait les prompts sans validation, 8 entrées sur un chemin mort) ;
+  ajout d'une liste `deny` (git push/reset --hard/clean, curl|sh,
+  Invoke-Expression, sudo, suppression de `.sdd`/`.claude`/`.git`, lecture
+  de la clé HMAC `~/.sdd/delivery-gate.key`, `.env`, `*.pfx`, `*.pem`) ;
+  `timeout` explicite sur les 34 hooks (30 s PreToolUse, 120 s Stop) au lieu
+  des 600 s par défaut.
+
+---
+
 ## [v7.1.0-dev] — 2026-11-07 (correction de l'audit du 2026-11-07)
 
 > Audit en quatre lots (hooks, tokens/coûts, architecture, code Python) :

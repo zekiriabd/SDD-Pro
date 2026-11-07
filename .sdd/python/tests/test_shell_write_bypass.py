@@ -236,6 +236,9 @@ def tdd_repo(tmp_path, monkeypatch):
     (tmp_path / "workspace" / "src" / "Api" / "Services").mkdir(parents=True)
     (tmp_path / "workspace" / "src" / "Api.Tests").mkdir(parents=True)
     monkeypatch.setattr(tdd, "repo_root", lambda: tmp_path)
+    # Section = détection : strict explicite (plus un défaut depuis 2026-11-07,
+    # le TDD ne bloque pas le dev). Les tests « défaut » le retirent.
+    monkeypatch.setenv("SDD_TDD_MODE", "strict")
     return tmp_path
 
 
@@ -279,7 +282,16 @@ def test_tdd_subagent_shell_bypasses_denied(tdd_repo, monkeypatch, capsys):
         assert "[TDD_NO_TEST_FIRST]" in capsys.readouterr().err, cmd
 
 
+def test_tdd_subagent_shell_default_never_blocks(tdd_repo, monkeypatch):
+    monkeypatch.delenv("SDD_TDD_MODE", raising=False)
+    monkeypatch.setattr(tdd, "_coverage_min", lambda: 100)
+    cmd = f"cat > {PROD} <<'EOF'\n{CLS}\nEOF"
+    assert _tdd(monkeypatch, _sub({"tool_name": "Bash", "tool_input": {"command": cmd}})) == HOOK_ALLOW
+
+
 def test_tdd_main_session_shell_warns_only(tdd_repo, monkeypatch, capsys):
+    monkeypatch.delenv("SDD_TDD_MODE", raising=False)
+    monkeypatch.setattr(tdd, "_coverage_min", lambda: 100)
     cmd = f"cat > {PROD} <<'EOF'\n{CLS}\nEOF"
     assert _tdd(monkeypatch, {"tool_name": "Bash", "tool_input": {"command": cmd}}) == HOOK_ALLOW
     assert "WARN [TDD_NO_TEST_FIRST]" in capsys.readouterr().err

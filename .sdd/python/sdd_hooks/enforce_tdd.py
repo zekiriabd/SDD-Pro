@@ -14,8 +14,9 @@ corresponding test file exists OR is being created in the same tool batch.
   - Content contains a NEW public function/class definition (regex per language)
   - No companion test file exists for the same logical unit
 
-**Modes** (env var `SDD_TDD_MODE`, default `strict` CI + sous-agents /
-`warn` session principale — audit 2026-11) :
+**Modes** (env var `SDD_TDD_MODE` ; défaut 2026-11-07 dérivé de `CoverageMin` :
+`off` si < 100, `warn` si = 100 — JAMAIS `strict` par défaut, le TDD ne bloque
+pas le développement ; le verdict tests appartient au gate QA post-dev) :
   - `off`     → no-op
   - `warn`    → stderr WARN [TDD_NO_TEST_FIRST] + audit log, exit 0
   - `strict`  → exit 2 (block Write) with structured RED-first guidance
@@ -52,11 +53,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from sdd_lib.ci import is_ci  # noqa: E402
+from sdd_lib.ci import is_ci  # noqa: E402,F401 — conservé (compat tests monkeypatch)
 from sdd_lib.exit_codes import HOOK_ALLOW, HOOK_DENY  # noqa: E402
 from sdd_lib.hook_input import (  # noqa: E402
     get_file_path,
-    is_subagent_call,
+    is_subagent_call,  # noqa: F401 — conservé (compat)
     read_hook_input,
 )
 from sdd_lib.paths import normalize, repo_root  # noqa: E402
@@ -145,22 +146,66 @@ _NEW_SYMBOL_PATTERNS: dict[str, list[str]] = {
 }
 
 
-def _resolve_mode(payload: dict | None = None) -> str:
-    """Return TDD mode from env or default by context.
+#: Seuil au-delà duquel le TDD est « appliqué » (signal) — en deçà il est off.
+_TDD_FULL_COVERAGE = 100
+#: Défaut framework de CoverageMin quand stack.md / team.yml ne le fixent pas.
+_DEFAULT_COVERAGE_MIN = 80
 
-    Default (audit 2026-11) : `strict` in CI and for any call emitted from a
-    sub-agent (`is_subagent_call`) — dev-backend / dev-frontend are the
-    actual producers of production code ; `warn` for the main session
-    (Tech Lead humain). `SDD_TDD_MODE` (protected by block_env_bypass)
-    overrides.
+
+def _coverage_min() -> int:
+    """CoverageMin effectif du projet (layered config → stack.md → défaut 80).
+
+    Même source que le gate coverage QA (`parse_coverage.detect_coverage_min`),
+    sans importer ce module (il tire console_db — trop lourd pour un hook
+    déclenché à chaque Write/Bash). Toute erreur → défaut (80 → TDD off).
+    """
+    try:
+        import contextlib
+        import io
+        from sdd_lib.layered_config import read_layered_config
+        # read_layered_config émet des WARN [ENV_MISSING] sur stderr sans
+        # rapport avec CoverageMin — muets ici (hook appelé à chaque outil).
+        with contextlib.redirect_stderr(io.StringIO()):
+            raw = read_layered_config(keys=("CoverageMin",)).get("CoverageMin")
+        if raw not in (None, ""):
+            return int(str(raw).strip())
+    except Exception:  # noqa: BLE001 — config illisible : défaut, jamais bloquant
+        pass
+    try:
+        from sdd_lib.project_config import stack_md_path
+        text = stack_md_path().read_text(encoding="utf-8", errors="replace")
+        m = re.search(r"(?m)^\s*CoverageMin\s*:\s*(\d+)", text)
+        if m:
+            return int(m.group(1))
+    except Exception:  # noqa: BLE001
+        pass
+    return _DEFAULT_COVERAGE_MIN
+
+
+def _resolve_mode(payload: dict | None = None) -> str:
+    """Return TDD mode — le TDD ne bloque JAMAIS le développement par défaut.
+
+    Organisation SDD-Pro (décision Tech Lead 2026-11-07) : backend → frontend
+    → tests unitaires écrits par `qa` APRÈS le développement. Le verdict sur
+    les tests appartient au gate QA (coverage vs `CoverageMin`, puis delivery
+    gate `verify_tests --coverage`), pas à ce hook :
+
+      - `SDD_TDD_MODE` explicite (off|warn|strict, protégé par
+        block_env_bypass) → honoré. `strict` = opt-in humain uniquement.
+      - `CoverageMin` < 100 → `off` : le projet n'exige pas une couverture
+        totale, la discipline test-first ne s'applique pas.
+      - `CoverageMin` = 100 → `warn` : signal `[TDD_NO_TEST_FIRST]` en
+        stderr + audit, jamais de blocage ; la QA tranche ensuite.
+
+    L'ancien défaut `strict` (CI + sous-agents, audit 2026-11) interbloquait
+    dev-backend/dev-frontend, à qui l'écriture de tests est interdite
+    (`[QA_OWNERSHIP_VIOLATION]`). `payload` est conservé pour compatibilité.
     """
     explicit = os.environ.get("SDD_TDD_MODE", "").strip().lower()
     if explicit in ("off", "warn", "strict"):
         return explicit
-    if is_ci():
-        return "strict"
-    if payload is not None and is_subagent_call(payload):
-        return "strict"
+    if _coverage_min() < _TDD_FULL_COVERAGE:
+        return "off"
     return "warn"
 
 

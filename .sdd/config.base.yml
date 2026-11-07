@@ -21,7 +21,10 @@
 #   Violation → [CONFIG_SECURITY_DOWNGRADE] ConfigError.
 
 # --- QA & Coverage ---
-QAMode: manual
+# Défaut tests+coverage (2026-11-07) : les tests unitaires sont écrits par
+# qa APRÈS le dev et la delivery gate exige des tests réels — `manual`
+# sautait la QA puis bloquait la livraison faute de preuves.
+QAMode: tests+coverage
 CoverageMin: 80
 
 # --- Pipeline parallelism ---

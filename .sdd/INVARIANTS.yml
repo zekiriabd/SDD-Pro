@@ -309,9 +309,10 @@ invariants:
       - .sdd/python/sdd_lib/shell_write_targets.py  # extraction des écritures shell (heredoc, Set-Content…)
       - .sdd/skills/test-driven-development/SKILL.md
     bypasses:
+      - "Default (2026-11-07): CoverageMin < 100 -> off ; CoverageMin = 100 -> warn (never blocks dev ; verdict = QA coverage gate)"
       - "Env: SDD_TDD_MODE=off (no enforcement)"
-      - "Env: SDD_TDD_MODE=warn (default interactive : warn, no block)"
-      - "Env: SDD_TDD_MODE=strict (default CI : exit 2 = block)"
+      - "Env: SDD_TDD_MODE=warn (signal only, no block)"
+      - "Env: SDD_TDD_MODE=strict (explicit human opt-in : exit 2 = block)"
       - "Env: SDD_DISABLE_TDD=1 (one-shot, audit-logged)"
     added: 2026-06-08
     audit_ref: P3-TDD (emprunt Superpowers v5.1)
