@@ -28,6 +28,13 @@ Usage:
     python feat_to_pseudo_us.py --feat-number 1 --force        # overwrite real US
     python feat_to_pseudo_us.py --feat-number 1 --json         # machine output
     python feat_to_pseudo_us.py --feat-number 1 --dry-run      # preview only
+    python feat_to_pseudo_us.py --feat-number 1 --open-run --json
+        # + ouvre le run `/sdd-poc` dans console.db (`run_id` dans la sortie)
+
+Gate de livraison (2026-11-07, `.sdd/docs/delivery-gates.md`) : `/sdd-poc`
+ouvre son run ICI (`--open-run`, commande `/sdd-poc`) ; sa clôture en succès
+(`run_close.py` / `sdd_state.py end-run`) est soumise à
+`authorize_delivery(workflow="sdd-poc")` — preuve build seule, aucune QA.
 
 Exit codes (sdd_lib.exit_codes convention) :
     0  SUCCESS — pseudo-US written (or already up-to-date, idempotent)
@@ -50,6 +57,9 @@ from sdd_lib.atomic_write import atomic_write_text  # noqa: E402
 from sdd_lib.exit_codes import FAIL_FAST, INFRA_BLOCKED, SUCCESS  # noqa: E402
 from sdd_lib.paths import workspace_root, iso_now, repo_root  # noqa: E402
 from sdd_lib.stderr import error_block, warn  # noqa: E402
+
+#: Commande enregistrée dans `runs.command` — mappée au workflow `sdd-poc` du gate.
+POC_RUN_COMMAND = "/sdd-poc"
 
 # Stable IDs in the FEAT (cf. CLAUDE.md §2)
 SFD_LINE_RE = re.compile(r"(?m)^- (SFD-\d+):\s*(.+)$")
@@ -322,7 +332,7 @@ def handle_html_mockup(
     return {"action": "none-available", "src": None, "dst": None}
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(
         description="Convert a FEAT into a single POC pseudo-US (used by /sdd-poc).",
     )
@@ -342,11 +352,40 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Machine-readable JSON output on stdout",
     )
-    return p.parse_args()
+    p.add_argument(
+        "--open-run",
+        action="store_true",
+        help="Open the /sdd-poc run in console.db once the pseudo-US is in place "
+             "(run_id in output) — its success close is gated on a build proof",
+    )
+    return p.parse_args(argv)
 
 
-def main() -> int:
-    args = parse_args()
+def open_poc_run(feat_number: int) -> str:
+    """Ouvre le run `/sdd-poc` (console.db) — clôture gardée par le gate build."""
+    from sdd_scripts.sdd_state import open_run
+    return open_run(feat_number, POC_RUN_COMMAND, ["poc"])
+
+
+def _finish(result: dict, args: argparse.Namespace) -> int:
+    """Ouvre le run /sdd-poc si demandé (jamais en dry-run), puis émet le résultat."""
+    if getattr(args, "open_run", False) and not args.dry_run:
+        try:
+            result["run_id"] = open_poc_run(args.feat_number)
+            result["run_command"] = POC_RUN_COMMAND
+        except Exception as e:  # noqa: BLE001 — run non ouvert = POC non traçable
+            error_block(
+                f"feat_to_pseudo_us — cannot open {POC_RUN_COMMAND} run for FEAT {args.feat_number}",
+                f"[INFRA_BLOCKED] console.db indisponible ({type(e).__name__}: {e})",
+                "vérifier workspace/db/console.db puis relancer /sdd-poc",
+            )
+            return INFRA_BLOCKED
+    _emit_result(result, args.json)
+    return SUCCESS
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv)
     root = repo_root()
     result: dict = {
         "feat_number": args.feat_number,
@@ -410,8 +449,7 @@ def main() -> int:
                     result["mockup"] = handle_html_mockup(
                         root, args.feat_number, feat_basename, us_name, args.dry_run
                     )
-                    _emit_result(result, args.json)
-                    return SUCCESS
+                    return _finish(result, args)
             except OSError:
                 pass  # fall through to re-write
 
@@ -461,8 +499,7 @@ def main() -> int:
         root, args.feat_number, feat_basename, us_name, args.dry_run
     )
 
-    _emit_result(result, args.json)
-    return SUCCESS
+    return _finish(result, args)
 
 
 def _emit_result(result: dict, as_json: bool) -> None:
@@ -481,6 +518,8 @@ def _emit_result(result: dict, as_json: bool) -> None:
         print(f"[SKIP] pseudo-US already up-to-date : {us_path}")
     else:
         print(f"[INFO] action={action} us_path={us_path}")
+    if result.get("run_id"):
+        print(f"[OK] run {result.get('run_command')} opened : {result['run_id']}")
 
     if mockup:
         m_action = mockup.get("action")

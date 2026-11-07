@@ -194,6 +194,9 @@ def persist_report(report: ReviewReport, md_path: Path) -> None:
         "scans_run":       report.scans_run,
         "skipped_sources": report.skipped_sources,
         "top_classes":     dict(Counter(report.counts_by_class).most_common(10)),
+        # Gate de livraison (2026-11-07) : verdict d'audit vs verdict final.
+        "quality_verdict": getattr(report, "quality_verdict", report.verdict),
+        "delivery_gate":   getattr(report, "delivery_gate", None),
     }
     ensure_initialized()
     with connect() as conn:

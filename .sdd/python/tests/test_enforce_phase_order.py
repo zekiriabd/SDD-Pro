@@ -155,3 +155,120 @@ def test_subprocess_exit_code(repo):
                           capture_output=True, text=True, env=env, check=False)
     assert proc.returncode == HOOK_DENY
     assert "[PHASE_ORDER_VIOLATION]" in proc.stderr
+
+
+# --- QA test-first (TDD RED) — interblocage enforce_tdd ↔ qa ← dev_run (2026-11-07)
+
+_TF_PROMPT = "Mode TEST-FIRST (TDD RED) : écrire les tests de l'US 1-2 (FEAT 1) avant le code"
+
+
+@pytest.mark.parametrize("readiness", ["pass", "warn"])
+def test_qa_test_first_allowed_after_readiness(repo, readiness):
+    _run(repo, {"readiness": readiness})
+    code, msg = H.evaluate(_payload("qa", _TF_PROMPT), repo)
+    assert code == HOOK_ALLOW and "[PHASE_ORDER_TEST_FIRST]" in msg
+
+
+@pytest.mark.parametrize("readiness", [None, "fail", "skip"])
+def test_qa_test_first_denied_without_readiness(repo, readiness):
+    _run(repo, {"us_generate": "pass", **({"readiness": readiness} if readiness else {})})
+    code, msg = H.evaluate(_payload("qa", _TF_PROMPT), repo)
+    assert code == HOOK_DENY and "[PHASE_ORDER_VIOLATION]" in msg and "TEST-FIRST" in msg
+
+
+def test_qa_test_first_denied_without_any_run(repo):
+    code, msg = H.evaluate(_payload("qa", _TF_PROMPT), repo)
+    assert code == HOOK_DENY and "aucun run" in msg
+
+
+def test_qa_without_marker_still_needs_dev_run(repo):
+    _run(repo, {"readiness": "pass"})
+    code, msg = H.evaluate(_payload("qa", "Tests et coverage FEAT 1"), repo)
+    assert code == HOOK_DENY and "dev_run" in msg
+
+
+@pytest.mark.parametrize("dev_status", ["pass", "warn"])
+def test_qa_post_dev_marker_ignored_evidence_required(repo, monkeypatch, dev_status):
+    """Un prompt « test-first » après livraison dev_run ne contourne pas la preuve build."""
+    from tests._delivery_fake import install_fake_gate
+    gate = install_fake_gate(monkeypatch)
+    _run(repo, {"readiness": "pass", "dev_run": dev_status})
+    code, msg = H.evaluate(_payload("qa", _TF_PROMPT), repo)
+    assert code == HOOK_DENY and "[DELIVERY_EVIDENCE_MISSING]" in msg
+    gate.prove(1, "build")
+    code, msg = H.evaluate(_payload("qa", _TF_PROMPT), repo)
+    assert code == HOOK_ALLOW and "TEST_FIRST" not in msg
+
+
+def test_qa_post_dev_declared_failure_denied_even_with_marker(repo, monkeypatch):
+    from tests._delivery_fake import install_fake_gate
+    install_fake_gate(monkeypatch).prove(1, "build")
+    db = console_db_path(repo)
+    _run(repo, {"readiness": "pass"})
+    with connect(db) as conn:
+        upsert_run_phase(conn, run_id="r1", phase="dev_run", status="warn",
+                         payload={"buildVerified": False})
+    code, msg = H.evaluate(_payload("qa", _TF_PROMPT), repo)
+    assert code == HOOK_DENY and "buildVerified=false" in msg
+
+
+def test_qa_api_gate_running_unchanged_with_marker(repo):
+    _run(repo, {"readiness": "skip", "dev_run": "running"})
+    code, msg = H.evaluate(_payload("qa", _TF_PROMPT), repo)
+    assert code == HOOK_ALLOW and msg == ""
+
+
+@pytest.mark.parametrize("text", [
+    "test-first", "Test First", "--test-first", "TDD RED", "tdd: red", "TDD/RED"])
+def test_test_first_marker_variants(text):
+    assert H.is_test_first_qa(_payload("qa", f"{text} FEAT 1"))
+    assert not H.is_test_first_qa(_payload("dev-backend", f"{text} FEAT 1"))
+
+
+def test_test_first_marker_absent():
+    assert not H.is_test_first_qa(_payload("qa", "Couverture FEAT 1, tests rouges à corriger"))
+
+
+# --- Extraction FEAT/US : dates et plages de lignes ignorées (2026-11-07)
+
+def _disk(repo: Path, *us: str, feats: tuple[str, ...] = ()) -> None:
+    for name in us:
+        (repo / "workspace" / "us" / f"{name}.md").write_text("# US", encoding="utf-8")
+    for name in feats:
+        (repo / "workspace" / "feats" / f"{name}.md").write_text("# FEAT", encoding="utf-8")
+
+
+@pytest.mark.parametrize("text", [
+    "Rapport du 2026-10-10, sans US",
+    "audit 2026-11-07T10:30 — v7.0.0",
+    "cf. enforce_phase_order.py:84-92",
+])
+def test_dates_and_line_ranges_ignored_syntax_only(text):
+    assert H.extract_feat(_payload("x", text)) is None
+
+
+def test_line_range_rejected_against_disk(repo):
+    _disk(repo, "1-2-Login", feats=("1-Auth",))
+    # `84-92` est syntaxiquement une US : seule la validation disque l'écarte.
+    assert H.extract_feat(_payload("x", "corriger lignes 84-92 puis US 1-2-Login"), repo) == 1
+    assert H.extract_feat(_payload("x", "corriger lignes 84-92"), repo) is None
+    assert H.extract_feat(_payload("x", "corriger lignes 84-92")) == 84  # syntaxe seule
+
+
+def test_real_us_found_after_date(repo):
+    _disk(repo, "3-1-Consulter-Fiche", feats=("3-Avoir",))
+    p = _payload("x", "Run du 2026-10-10 : implémenter workspace/us/3-1-Consulter-Fiche.md")
+    assert H.extract_feat(p, repo) == 3
+
+
+def test_unknown_explicit_feat_skipped(repo):
+    _disk(repo, "2-1-Login", feats=("2-Auth",))
+    assert H.extract_feat(_payload("x", "FEAT 9 obsolète — traiter FEAT 2"), repo) == 2
+
+
+def test_date_does_not_allow_phase_of_other_feat(repo):
+    """Une date `…-10-10` ne doit pas résoudre la FEAT 10 (faux ALLOW)."""
+    _disk(repo, "10-1-Export", feats=("10-Export",))
+    _run(repo, {"readiness": "pass"}, feat_n=10)
+    code, msg = H.evaluate(_payload("dev-backend", "Livraison prévue 2026-10-10"), repo)
+    assert code == HOOK_DENY and "FEAT identifiable" in msg

@@ -355,3 +355,136 @@ def test_reviewer_allowed_with_build_proof(repo, gate, hook):
     gate.prove(1, "build")
     assert hook.evaluate(_hook_payload("spec-compliance-reviewer",
                                        "Audit FEAT 1"), repo)[0] == HOOK_ALLOW
+
+
+# --------------------------------------------------------------------------- #
+# /sdd-poc : ouverture du run par feat_to_pseudo_us.py --open-run
+# --------------------------------------------------------------------------- #
+
+def _poc_open(repo: Path, capsys) -> str:
+    from sdd_scripts import feat_to_pseudo_us as F
+    (repo / "workspace" / "us" / "1-1-Login.md").unlink()  # pas d'US réelle
+    assert F.main(["--feat-number", "1", "--open-run", "--json"]) == 0
+    out = json.loads(capsys.readouterr().out)
+    assert out["run_command"] == "/sdd-poc" and out["run_id"]
+    row = _run_row(repo, out["run_id"])
+    assert row["command"] == "/sdd-poc" and row["status"] == "running"
+    assert row["feat_n"] == 1
+    return out["run_id"]
+
+
+def test_sdd_poc_open_run_close_without_build_refused(repo, gate, capsys):
+    from sdd_scripts import run_close
+    rid = _poc_open(repo, capsys)
+    assert run_close.main(["--run-id", rid, "--status", "completed",
+                           "--verdict", "GREEN"]) == 2
+    row = _run_row(repo, rid)
+    assert row["status"] == "failed" and "[DELIVERY_GATE_BLOCKED]" in row["error_message"]
+    assert gate.calls[-1]["workflow"] == "sdd-poc"
+
+
+def test_sdd_poc_open_run_end_run_without_build_refused(repo, gate, capsys):
+    from sdd_scripts import sdd_state
+    rid = _poc_open(repo, capsys)
+    ns = argparse.Namespace(run_id=rid, status="success", verdict="GREEN")
+    assert sdd_state.action_end_run(ns) == 2
+    assert _run_row(repo, rid)["status"] == "failed"
+
+
+def test_sdd_poc_open_run_build_only_delivers_without_qa(repo, gate, capsys):
+    from sdd_scripts.run_close import close_run
+    rid = _poc_open(repo, capsys)
+    gate.prove(1, "build")  # ni tests, ni coverage, ni spec, ni readiness
+    res = close_run(rid, "completed", "GREEN")
+    assert res["run_status"] == "completed" and not res.get("delivery_blocked")
+    assert res["delivery_gate"]["required"] == ["build"]
+
+
+def test_sdd_poc_dry_run_opens_no_run(repo, gate, capsys):
+    from sdd_scripts import feat_to_pseudo_us as F
+    (repo / "workspace" / "us" / "1-1-Login.md").unlink()
+    assert F.main(["--feat-number", "1", "--open-run", "--dry-run", "--json"]) == 0
+    assert "run_id" not in json.loads(capsys.readouterr().out)
+
+
+# --------------------------------------------------------------------------- #
+# sdd_review.py : pas de verdict final vert sans authorize_delivery(sdd-review)
+# --------------------------------------------------------------------------- #
+
+def _review(repo: Path, monkeypatch, capsys) -> tuple[int, dict]:
+    from sdd_lib.console_db import ensure_initialized as _init
+    from sdd_scripts import sdd_review as R
+    _init(console_db_path(repo))
+    monkeypatch.setattr(sys, "argv", ["sdd_review.py", "--feat-number", "1",
+                                      "--skip-scans", "--json", "--fail-on", "serious"])
+    rc = R.main()
+    out = capsys.readouterr().out
+    return rc, json.loads(out[out.index("{"):])
+
+
+def _persisted_review_verdict(repo: Path) -> str:
+    with connect(console_db_path(repo)) as conn:
+        return conn.execute("SELECT verdict FROM validation_reports WHERE feat_n=1 "
+                            "AND report_type='review' ORDER BY rowid DESC").fetchone()[0]
+
+
+def test_sdd_review_green_audit_without_evidence_is_red(repo, gate, monkeypatch, capsys):
+    rc, out = _review(repo, monkeypatch, capsys)
+    assert out["quality_verdict"] == "green"           # audit sans finding
+    assert out["verdict"] == "red" and rc == 1         # mais aucune preuve
+    assert out["delivery_gate"]["allowed"] is False
+    assert "[DELIVERY_GATE_BLOCKED]" in out["delivery_gate"]["message"]
+    assert gate.calls[-1]["workflow"] == "sdd-review"
+    assert _persisted_review_verdict(repo) == "RED"
+    flag = repo / "workspace" / ".sys" / ".validation" / "1-review-consolidated.flag"
+    assert "verdict=red" in flag.read_text(encoding="utf-8")
+
+
+def test_sdd_review_partial_evidence_still_red(repo, gate, monkeypatch, capsys):
+    gate.prove(1, "build")  # spec_compliance manquante
+    rc, out = _review(repo, monkeypatch, capsys)
+    assert out["verdict"] == "red" and rc == 1
+
+
+def test_sdd_review_green_with_evidence(repo, gate, monkeypatch, capsys):
+    gate.prove(1, *ALL_SDD_FULL)
+    rc, out = _review(repo, monkeypatch, capsys)
+    assert rc == 0 and out["verdict"] == "green" and out["delivery_gate"]["allowed"]
+    assert _persisted_review_verdict(repo) == "GREEN"
+
+
+def test_sdd_review_gate_module_absent_fails_closed(repo, monkeypatch, capsys):
+    monkeypatch.setitem(sys.modules, "sdd_lib.delivery_gate", None)
+    rc, out = _review(repo, monkeypatch, capsys)
+    assert out["verdict"] == "red" and rc == 1
+    assert out["delivery_gate"]["available"] is False
+
+
+# --------------------------------------------------------------------------- #
+# gate_decide.py : gates humaines pré-livraison, sans effet de livraison
+# --------------------------------------------------------------------------- #
+
+def test_gate_decide_after_code_validated_does_not_deliver(repo, gate, capsys):
+    from sdd_scripts import gate_decide as G
+    _new_run(repo, phases=DECLARED_ALL_PASS)
+    status_file = repo / "workspace" / "console" / "status.json"
+    assert G.main(["set", "--feat-num", "1", "--phase", "afterCode",
+                   "--decision", "validated", "--answered-by", "lead@x",
+                   "--status-file", str(status_file)]) == 0
+    capsys.readouterr()
+    assert _run_row(repo)["status"] == "running"   # aucune clôture / livraison
+    assert gate.calls == []                         # ne consulte ni ne remplace le gate
+    a = _next(repo, manual_gates=["code"])
+    assert a["action"] == "script" and a["phase_id"] == "verify-build"  # preuve exigée
+
+
+def test_gate_decide_skipped_after_code_does_not_deliver(repo, gate, capsys):
+    from sdd_scripts import gate_decide as G
+    _new_run(repo, phases=DECLARED_ALL_PASS)
+    gate.prove(1, "build")
+    status_file = repo / "workspace" / "console" / "status.json"
+    assert G.main(["set", "--feat-num", "1", "--phase", "afterCode",
+                   "--decision", "skipped", "--status-file", str(status_file)]) == 0
+    capsys.readouterr()
+    a = _next(repo, manual_gates=["code"])
+    assert a["action"] != "done" and a["phase_id"] == "verify-tests"

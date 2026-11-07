@@ -11,6 +11,8 @@ est la colle entre ce gate et les points où une livraison est déclarée :
     commande porte un workflow de livraison est soumis au gate ; refus →
     `failed` + verdict RED + `[DELIVERY_GATE_BLOCKED]` ;
   - `dev_run_args.py --end pass|warn` ;
+  - verdict final de `sdd_review.py` (GREEN/YELLOW → workflow `sdd-review`) ;
+  - run `/sdd-poc` ouvert par `feat_to_pseudo_us.py --open-run` (clôture ci-dessus) ;
   - hook `enforce_phase_order` (preuve build pour qa / reviewers).
 
 Invariants (SSoT `.sdd/docs/delivery-gates.md`) :

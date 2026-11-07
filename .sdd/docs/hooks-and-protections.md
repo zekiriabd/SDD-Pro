@@ -58,7 +58,7 @@ détection par motif, contournable par construction.
 | Script | `.sdd/python/sdd_hooks/protect_framework.py` |
 | Périmètre fichier | `FRAMEWORK_OWNED` (`.sdd/**` foyer + façades `.claude/` `.codex/` `.gemini/`, faits db-reverse `workspace/old/*/.sys/db-*.json`) **+ artefacts de gate** `workspace/.sys/.validation/`, `.acceptance/`, `.audit/`, `.state/` |
 | Exception artefacts | un agent peut écrire les fichiers que **son** bloc `writes:` de `loader.yml` déclare (rapports d'auditeurs, `{n}-api-tests.json` de qa, sentinels `.state/*.flag` d'arch/dev-*). `acceptance.json` n'est déclaré pour aucun agent : il n'est produit que par `validate_acceptance.py`. |
-| Mode shell (*heuristique*) | tokenise la commande (segments `&&` `\|\|` `\|` `;` `&` hors guillemets) et refuse : redirection `>`/`>>` vers un chemin protégé ; `tee`, `cp`, `mv`, `rm`, `mkdir`, `touch`, `Set-Content`, `Add-Content`, `Out-File`, `Copy-Item`, `Move-Item`, `Remove-Item`, `New-Item`… sur un chemin protégé ; `sed -i` / `perl -i` ; `git checkout|restore|clean|reset|rm|mv|stash` sur `.sdd`/`.claude` ; `python -c` / `node -e` / `pwsh -Command` contenant une écriture (`open(..,'w')`, `write_text`, `unlink`, `shutil.`…) et un chemin protégé. |
+| Mode shell (*heuristique*) | cibles d'écriture extraites par le module partagé `sdd_lib/shell_write_targets.py` (§1.14), puis **même décision que le mode fichier** sur chaque cible (`[FRAMEWORK_PROTECTED]`, exception `loader.yml writes:` pour les artefacts de gate). En shell, les 4 racines `.sdd/` `.claude/` `.codex/` `.gemini/` sont protégées en entier (sauf `.claude/worktrees/`), et un ancêtre d'un chemin protégé compte pour `rm`/`mv`/`cp`/`git`/archives (`rm -rf .sdd`, `git checkout -- .`). Chemins relatifs résolus depuis le `cwd` du payload et les `cd` de la commande ; une copie DEPUIS `.sdd/` n'est plus refusée (seule la destination est une écriture). |
 | Bloque ? | **DENY** : CI, sous-agent. **WARN** : session principale. |
 | Bypass | `SDD_PROTECT_FRAMEWORK_MODE=warn\|strict\|off` (env du process Claude Code). `SDD_PROTECT_FRAMEWORK_FAIL_OPEN=1` (debug du hook seulement). |
 | Fail-open ? | Non : exception interne → DENY `[HOOK_CRASH]`. |
@@ -84,6 +84,7 @@ détection par motif, contournable par construction.
 | Sensibles selon contenu | sous `workspace/src/` : `appsettings*.json`, `application*.yml\|yaml\|properties`, `config/default.json` — refus seulement s'ils contiennent une **valeur réelle** (ni vide ni `${VAR}`) sur une clé `*Password`/`*Pwd`/`*Secret`/`*Token`/`*ApiKey`, un `Password=`/`Pwd=` en clair dans une chaîne de connexion ou `user:pass@` dans une URI. (Choix : `arch` doit pouvoir Read puis Edit ces fichiers pour y mettre des placeholders.) |
 | Bloque ? | **DENY** `[SECRET_ACCESS_FORBIDDEN]` : sous-agent. **WARN** : session principale. |
 | Bypass | `SDD_ALLOW_SECRET_ACCESS=1` (env du process Claude Code). |
+| Shell | tout token de chaque segment (`cat`, `type`, `Get-Content`, `less`, `more`, `head`, `tail`, `grep`, `source`, `< .env`, `cp`), chemins dans le code inline (`python -c "open('.env')"`, `[IO.File]::ReadAllText`), code des heredocs d'interpréteur (`python - <<EOF`), globs passés à une commande de lecture (`cat .en*`, `Get-Content .e?v`). Le corps d'un heredoc de **données** (`cat > notes.md <<EOF`) n'est plus analysé (faux positif corrigé). |
 | Contournable (*heuristique*) | `grep -r Password workspace/src` sur un répertoire entier, chemin construit dynamiquement, copie préalable sous un autre nom. Clés `*Token`/`*Secret` camelCase : seuil d'entropie (≥ 16 car., ou ≥ 8 avec lettre + chiffre + symbole) pour éviter les faux positifs → un secret court et simple passe. |
 
 ### 1.4 `preflight_secret_scan` — PreToolUse `Agent`
@@ -133,11 +134,12 @@ détection par motif, contournable par construction.
 | Bloque ? | **DENY** par défaut (session et CI) : l'agent reçoit la liste et doit corriger avant de s'arrêter. `SDD_AUDIT_OWNERSHIP_MODE=warn` → WARN ; `off` → journal seul (`.sys/.audit/ownership-violations.log`). |
 | Limite | écritures faites via Bash/PowerShell absentes du transcript (non auditées si un transcript existe) ; post-hoc : rien n'est annulé. |
 
-### 1.9 `enforce_tdd` — PreToolUse `Edit|Write|MultiEdit`
+### 1.9 `enforce_tdd` — PreToolUse `Edit|Write|MultiEdit` **et** `Bash|PowerShell`
 
 | | |
 |---|---|
 | Rôle | Nouveau symbole de production sous `workspace/src/` sans test compagnon → `[TDD_NO_TEST_FIRST]`. Symboles `public`, `internal`, `private`, `protected` et classes sans modificateur (C#), `internal`/`private fun` (Kotlin), etc. Un compagnon **sans aucun cas de test** (`[Fact]`, `[Test]`, `@Test`, `it(`, `test(`, `def test_`) ne compte pas. |
+| Mode shell (2026-11) | Incident : 19 `.cs` créés sans test par heredoc. Cibles extraites par `sdd_lib/shell_write_targets.py` (§1.14), même décision que le mode fichier. Contenu connu (heredoc, `echo`, `Set-Content -Value`, here-string) → regex de symbole ; `cp`/`mv`/`Copy-Item` → contenu du fichier source ; contenu inconnu (`curl -o`, `python -c`) → **fail-closed sur un fichier nouveau** seulement (modifier un fichier existant = refactor). Un test avec de vrais cas écrit dans la **même commande** compte comme compagnon. |
 | Bloque ? | **DENY** : CI, sous-agent. **WARN** : session principale. |
 | Bypass | `SDD_TDD_MODE=off\|warn\|strict`, `SDD_DISABLE_TDD=1`. |
 | Contournable (*heuristique*) | compagnon trouvé par nom (`*{stem}*`) : un test sans rapport portant le même nom suffit ; détection regex des symboles. |
@@ -175,6 +177,27 @@ l'écriture a déjà eu lieu.
 | `session_start` | SessionStart | Bannière, jamais bloquant. |
 | `statusline`, `framework_smoke` | Stop | Informatifs. |
 | `enforce_phase_order`, `enforce_max_parallel` | (autre lot) | Voir leurs docstrings. |
+
+
+### 1.14 Module partagé `sdd_lib/shell_write_targets.py` (2026-11)
+
+Extraction **conservatrice** des cibles d'écriture/suppression/déplacement
+d'une commande Bash ou PowerShell, sans décision (chaque hook applique la
+sienne). Reconnaît : redirections (`>`, `>>`, `N>`, `&>`, `*>`) et heredocs ;
+`tee`, `touch`, `mkdir`, `cp`/`mv`/`rm`, `dd of=`, `install`, `rsync` ;
+`sed -i`, `perl -i`, `find -delete|-exec rm` ; `git checkout|restore|clean|…` ;
+`curl -o`, `wget -O`, `tar -C`, `unzip -d` ; cmdlets `Set-Content`,
+`Add-Content`, `Out-File`, `New-Item`, `Copy-Item`, `Move-Item`,
+`Remove-Item`, `Tee-Object`, `Invoke-WebRequest -OutFile` (+ alias) ; code
+inline `python -c`/`node -e`/`pwsh -Command`, heredoc d'interpréteur et
+`[IO.File]::WriteAllText` — **chaque littéral-chemin** du code est une cible
+dès qu'un marqueur d'écriture y figure (l'appelant ne bloque que si un chemin
+protégé y est écrit littéralement) ; `bash -c`, `cmd /c`, `eval`,
+`Invoke-Expression` analysés récursivement ; `cd`/`Set-Location` suivis.
+Lecture/build (`cat`, `grep`, `git status`, `pytest`, `dotnet build`) → aucune
+cible. **Non détecté** : chemins dynamiques (`$VAR`, `Path(a) / b`),
+substitution `$(…)`, script intermédiaire qui écrit, `xargs` alimenté par
+pipe. Tests : `tests/test_shell_write_bypass.py`.
 
 ---
 

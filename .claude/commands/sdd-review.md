@@ -264,6 +264,15 @@ jamais bloquant par design.
 
 ---
 
+## STEP 2.9 — Preuve spec-compliance (avant le verdict)
+
+Le verdict final de `sdd_review.py` (STEP 3) consulte le gate de livraison :
+enregistrer d'abord la preuve spec (le script lit lui-même le rapport Stage A) :
+
+```bash
+python .sdd/python/sdd_scripts/delivery_gate.py record-spec --feat-number {n} --report workspace/.sys/.validation/{n}-spec-compliance.json --run-id "$SDD_RUN_ID"
+```
+
 ## STEP 3 — Exécuter l'orchestrateur Python (déterministe)
 
 ```bash
@@ -276,8 +285,9 @@ python .sdd/python/sdd_scripts/sdd_review.py \
 ```
 
 Exit codes :
-- `0` → 🟢 GREEN ou 🟡 YELLOW (verdict sous le seuil)
-- `1` → 🔴 RED (verdict ≥ ReviewFailOn)
+- `0` → 🟢 GREEN ou 🟡 YELLOW (verdict sous le seuil) **et** livraison autorisée
+- `1` → 🔴 RED (verdict ≥ ReviewFailOn **ou** gate de livraison refusé —
+  `quality_verdict` garde le verdict d'audit, `delivery_gate` le détail)
 - `2` → erreur infra (FEAT absente, DB inaccessible, args malformés)
 - `3` → `--ensure-scans` actif et au moins une source obligatoire manquante (v7.0.0)
 
@@ -297,7 +307,10 @@ Le script effectue automatiquement :
    - 🔴 RED si ≥ 1 finding `critical`/`blocker` OU ≥ 1 ≥ `ReviewFailOn`
    - 🟡 YELLOW si findings sous le seuil mais non vides
    - 🟢 GREEN sinon
-5. **STEP 3.5** — Persister `validation_reports` (report_type=`review`).
+5. **STEP 3.4.bis** — Gate de livraison : GREEN/YELLOW →
+   `authorize_delivery(workflow="sdd-review")` (via `sdd_lib.delivery_wiring`,
+   fail-closed) ; refus → verdict final RED `[DELIVERY_GATE_BLOCKED]`.
+6. **STEP 3.5** — Persister `validation_reports` (report_type=`review`).
    Aucun fichier écrit ; rapport rendu à la demande via
    `query_console_db.py review --feat {n} --format md`.
 
@@ -311,7 +324,8 @@ build et des tests réellement exécutés — y compris en `AuditorBatchMode:
 legacy-parallel` / `SDD_BYPASS_TWO_STAGE=1` (vitesse, pas dispense de preuve) :
 
 ```bash
-python .sdd/python/sdd_scripts/delivery_gate.py record-spec --feat-number {n} --report workspace/.sys/.validation/{n}-spec-compliance.json --run-id "$SDD_RUN_ID"
+# record-spec : fait en STEP 2.9 ; le verdict de sdd_review.py intègre déjà ce
+# gate — authorize reste la confirmation explicite avant tout [DONE]
 python .sdd/python/sdd_scripts/delivery_gate.py authorize --feat-number {n} --workflow sdd-review --run-id "$SDD_RUN_ID" --json
 ```
 

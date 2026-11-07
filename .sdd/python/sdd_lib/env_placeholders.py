@@ -123,6 +123,16 @@ def resolve_config(
     from sdd_lib.paths import workspace_root
     env_base = workspace_root(root).parent
     env_map = {**load_dotenv(env_base), **os.environ}
+    if os.name == "nt":
+        # Windows env var names are case-insensitive and `os.environ` stores
+        # them UPPER-CASED : copying it into a plain dict lost every
+        # mixed-case shell var (`${FrontendLocalPort}` never resolved from the
+        # shell, only from a dotenv file). Re-key the shell values under the
+        # exact names the placeholders use — the shell still wins.
+        for var in {m.group(1) for v in config.values() if isinstance(v, str)
+                    for m in _PLACEHOLDER_RE.finditer(v)}:
+            if var in os.environ:  # case-insensitive lookup on nt
+                env_map[var] = os.environ[var]
     unresolved: set[str] = set()
     out = {k: resolve_value(v, env_map, unresolved) for k, v in config.items()}
 

@@ -12,15 +12,19 @@ Deux points d'entrée dans le MÊME module (dispatch sur `tool_name`) :
     vocation à produire — sauf les fichiers que `loader.yml` (`writes:`)
     attribue explicitement à l'agent appelant (rapports d'auditeurs,
     `{n}-api-tests.json` de qa, sentinels `.state/*.flag` d'arch/dev-*).
-  * matcher `Bash|PowerShell` → mode shell : même politique appliquée aux
-    commandes qui ÉCRIVENT sur ces chemins (redirections, `tee`, `sed -i`,
-    `cp`/`mv`/`rm`, `Set-Content`/`Out-File`/`Remove-Item`…, `python -c`
-    ouvrant un fichier en écriture, `git checkout --`/`git restore` sur
-    `.sdd`/`.claude`). **Heuristique assumée** : tokenisation de la ligne
-    de commande, pas d'interprétation shell — un contournement par
-    variable (`D=.sdd; rm -rf $D`) ou par script intermédiaire n'est pas
-    détecté. Ce mode est une barrière contre l'écriture *accidentelle* ou
-    *paresseuse* d'un agent, pas une sandbox.
+  * matcher `Bash|PowerShell` → mode shell : les cibles d'écriture de la
+    commande sont extraites par `sdd_lib.shell_write_targets` (redirections
+    et heredocs, `tee`, `sed -i`, `cp`/`mv`/`rm`, `Set-Content`/`Out-File`/
+    `New-Item`/`Copy-Item`/`Remove-Item`…, `python -c` / heredoc Python
+    ouvrant un fichier en écriture, `[IO.File]::WriteAllText`, `bash -c`,
+    `git checkout --`/`git restore`, `cd X && …` suivi) puis CHAQUE cible
+    passe par la décision du mode fichier (`_decide_framework`,
+    `_decide_gate_artifact` avec l'exception `loader.yml writes:`). Les
+    chemins relatifs sont résolus depuis le `cwd` du payload. **Heuristique
+    assumée** : pas d'interprétation shell — un contournement par variable
+    (`D=.sdd; rm -rf $D`) ou par script intermédiaire n'est pas détecté. Ce
+    mode est une barrière contre l'écriture *accidentelle* ou *paresseuse*
+    d'un agent, pas une sandbox.
 
 Politique de mode (audit sécurité 2026-11) :
 
@@ -150,17 +154,6 @@ GATE_ARTIFACT_DIRS: tuple[str, ...] = (
     "workspace/.sys/.state/",
 )
 
-#: Préfixes de chemin (normalisés `/`, relatifs à la racine) qui, dans une
-#: commande shell, désignent un périmètre protégé.
-_SHELL_PROTECTED_PREFIXES: tuple[str, ...] = (
-    ".sdd/", ".claude/", ".codex/", ".gemini/", *GATE_ARTIFACT_DIRS,
-)
-_SHELL_PROTECTED_EXACT: tuple[str, ...] = (
-    ".sdd", ".claude", ".codex", ".gemini", "workspace/.sys",
-    *(d.rstrip("/") for d in GATE_ARTIFACT_DIRS),
-)
-
-
 def _rel_to_repo(file_path: str, repo: Path) -> str | None:
     """Canonical repo-relative path (forward slashes) or None if outside."""
     try:
@@ -264,193 +257,128 @@ def _resolve_mode(payload: dict | None = None) -> str:
 # --------------------------------------------------------------------------- #
 # Mode shell (Bash | PowerShell)
 # --------------------------------------------------------------------------- #
+#
+# Extraction des cibles : `sdd_lib.shell_write_targets` (partagé avec
+# enforce_tdd). Décision : EXACTEMENT celle du mode fichier
+# (`_decide_framework` / `_decide_gate_artifact`), appliquée à chaque cible.
 
-#: Commandes qui écrivent / détruisent (sans leurs options). PowerShell en
-#: casse insensible (comparaison en lower()).
-_WRITE_CMDS: frozenset[str] = frozenset({
-    "tee", "cp", "mv", "rm", "rmdir", "mkdir", "touch", "truncate", "ln",
-    "install", "rsync", "dd", "chmod", "chown", "patch", "unzip",
-    "copy-item", "move-item", "remove-item", "rename-item", "new-item",
-    "set-content", "add-content", "out-file", "clear-content", "copy", "move",
-    "del", "erase", "rd", "ren", "xcopy", "robocopy", "cpi", "mi", "ri", "ni",
-    "sc", "ac", "rni",
-})
-#: Commandes qui n'écrivent qu'avec un flag in-place.
-_INPLACE_CMDS: dict[str, re.Pattern[str]] = {
-    "sed": re.compile(r"(?:^|\s)-[a-zA-Z]*i"),
-    "perl": re.compile(r"(?:^|\s)-[a-zA-Z]*i"),
-}
-#: Interpréteurs inline : écriture si un marqueur d'écriture Python/JS/PS
-#: apparaît dans le même segment.
-_INLINE_INTERPRETERS: frozenset[str] = frozenset({
-    "python", "python3", "py", "node", "pwsh", "powershell",
-})
-#: Flag qui fait de l'interpréteur un exécuteur de code inline (`python -c`,
-#: `node -e`, `pwsh -Command`). Sans ce flag, `python .sdd/python/x.py` est
-#: l'exécution légitime d'un script framework, jamais flaggée.
-_INLINE_PATH_RE = re.compile(
-    r"(?:^|[\s'\"(=,])(?:\./)?((?:\.sdd|\.claude|\.codex|\.gemini|workspace/\.sys)/[^\s'\"),]*)"
-)
-_INLINE_FLAG_RE = re.compile(r"(?:^|\s)-(?:c|e|Command|command|EncodedCommand|ec)(?:\s|$)")
-_INLINE_WRITE_MARKER = re.compile(
-    r"open\s*\([^)]*['\"][wax]\+?b?['\"]|write_text|write_bytes|unlink|rmtree|"
-    r"os\.remove|os\.rename|os\.replace|shutil\.|makedirs|mkdir|writeFile|"
-    r"rmSync|unlinkSync|Set-Content|Out-File|Remove-Item|WriteAllText|"
-    r"WriteAllBytes|\[IO\.File\]::Write",
-    re.IGNORECASE,
-)
-#: Sous-commandes git qui réécrivent l'arbre de travail.
-_GIT_TREE_CMDS: frozenset[str] = frozenset({
-    "checkout", "restore", "clean", "rm", "mv", "reset", "stash", "revert",
-})
-_TOKEN_RE = re.compile(r"""("[^"]*"|'[^']*'|\S+)""")
-_REDIRECT_RE = re.compile(r"(?<![0-9])(?:>>?|>\|)\s*")
+#: Opérations pour lesquelles une cible qui est un ANCÊTRE d'un chemin protégé
+#: (`rm -rf .sdd`, `git checkout -- .`, `cp -r x .claude`) touche le périmètre.
+_ANCESTOR_OPS = frozenset({"delete", "move", "git", "archive", "copy", "inplace"})
+#: … et celles pour lesquelles la racine du dépôt elle-même compte.
+_ROOT_OPS = frozenset({"delete", "git", "archive"})
 
 
-def _norm_token(tok: str) -> str:
-    return tok.strip("\"'`").replace("\\", "/")
+#: En mode shell, les 4 racines framework sont protégées EN ENTIER (comme
+#: avant l'extraction partagée) : un agent n'a aucune raison d'écrire par
+#: shell sous `.sdd/docs/` ou `.claude/skills/`. Exception : les worktrees
+#: d'isolation d'agents (`.claude/worktrees/…`) sont des copies de travail.
+_SHELL_FRAMEWORK_ROOTS: tuple[str, ...] = (".sdd/", ".claude/", ".codex/", ".gemini/")
+_SHELL_EXEMPT_PREFIXES: tuple[str, ...] = (".claude/worktrees/",)
 
 
-def _is_protected_token(tok: str, repo: Path) -> bool:
-    t = _norm_token(tok)
-    if not t:
-        return False
-    if t.startswith("./"):
-        t = t[2:]
-    if t in _SHELL_PROTECTED_EXACT or t.startswith(_SHELL_PROTECTED_PREFIXES):
-        return True
-    # Variante `-Path .sdd/x`, `--out=.sdd/x` (option=valeur).
-    if "=" in t:
-        _, _, val = t.partition("=")
-        val = val.lstrip("./")
-        if val in _SHELL_PROTECTED_EXACT or val.startswith(_SHELL_PROTECTED_PREFIXES):
-            return True
-    # Chemin absolu sous le dépôt.
-    if re.match(r"^(?:[A-Za-z]:)?/", t):
-        rel = _rel_to_repo(t, repo)
-        if rel and (rel in _SHELL_PROTECTED_EXACT or rel.startswith(_SHELL_PROTECTED_PREFIXES)):
-            return True
-    return False
+def _owned_roots() -> tuple[str, ...]:
+    roots = [o.rstrip("/") for o in FRAMEWORK_OWNED if "*" not in o]
+    return (*roots, *(r.rstrip("/") for r in _SHELL_FRAMEWORK_ROOTS),
+            *(d.rstrip("/") for d in GATE_ARTIFACT_DIRS))
 
 
-def _split_segments(cmd: str) -> list[str]:
-    """Split on `&&`, `||`, `|`, `;`, newline — OUTSIDE quotes only.
+def _shell_base(payload: dict | None, repo: Path) -> Path:
+    """Répertoire courant de l'outil shell (`cwd` du payload), sinon la racine."""
+    cwd = (payload or {}).get("cwd")
+    if isinstance(cwd, str) and cwd.strip():
+        try:
+            p = Path(cwd)
+            if p.is_dir():
+                return p
+        except OSError:
+            pass
+    return repo
 
-    `python -c "import x; x.write()"` must stay one segment (the `;` is
-    Python, not shell).
+
+def _target_rel(t, repo: Path, base: Path) -> str | None:
+    """Chemin relatif au dépôt d'une cible shell ; `None` si hors dépôt.
+
+    cwd inconnu (`cd $VAR`) → fail-closed : chemin relatif pris depuis la
+    racine du dépôt.
     """
-    out: list[str] = []
-    buf: list[str] = []
-    quote = ""
-    i, n = 0, len(cmd)
-    while i < n:
-        ch = cmd[i]
-        if quote:
-            buf.append(ch)
-            if ch == quote:
-                quote = ""
-            i += 1
-            continue
-        if ch in ("'", '"'):
-            quote = ch
-            buf.append(ch)
-            i += 1
-            continue
-        if ch in ";\n|&":
-            # `&` seul = séparateur (bash background / PS call operator),
-            # sauf dans une redirection `2>&1` / `&>`.
-            if ch == "&" and not cmd.startswith("&&", i) and (
-                    (i > 0 and cmd[i - 1] == ">") or cmd.startswith("&>", i)):
-                buf.append(ch)
-                i += 1
-                continue
-            out.append("".join(buf))
-            buf = []
-            i += 2 if cmd.startswith(("&&", "||"), i) else 1
-            continue
-        buf.append(ch)
-        i += 1
-    out.append("".join(buf))
-    return [seg.strip() for seg in out if seg.strip()]
+    from sdd_lib.shell_write_targets import resolve_target
+    if "$" in t.path or "%" in t.path:
+        return None
+    abs_p = resolve_target(t, base)
+    if abs_p is None:
+        abs_p = repo / t.path
+    rel = _rel_to_repo(str(abs_p), repo)
+    if rel in (None, "."):
+        return "" if rel == "." else None
+    return rel
 
 
-def check_shell_command(cmd: str, repo: Path | None = None) -> list[str]:
-    """Return human-readable reasons for every protected-path write detected.
+def _shell_protected(t, rel: str) -> str | None:
+    """'framework' | 'gate' | None pour une cible shell déjà relativisée."""
+    r = rel.rstrip("/")
+    if (r + "/").startswith(_SHELL_EXEMPT_PREFIXES):
+        return None
+    if r and (_matches_owned(r) or (r + "/").startswith(_SHELL_FRAMEWORK_ROOTS)):
+        return "framework"
+    if r and any((r + "/").startswith(d) for d in GATE_ARTIFACT_DIRS):
+        return "gate"
+    if t.op in _ANCESTOR_OPS and (r or t.op in _ROOT_OPS):
+        prefix = (r + "/") if r else ""
+        for root in _owned_roots():
+            if root.startswith(prefix) or root == r:
+                return "gate" if root.startswith("workspace/.sys/") else "framework"
+    return None
 
-    Empty list = nothing suspicious. Heuristic (see module docstring).
+
+def shell_protected_targets(cmd: str, repo: Path | None = None,
+                            payload: dict | None = None) -> list[tuple[object, str, str]]:
+    """`(WriteTarget, rel, kind)` pour chaque cible protégée de `cmd`."""
+    from sdd_lib.shell_write_targets import extract_write_targets
+    repo = repo or repo_root()
+    base = _shell_base(payload, repo)
+    out: list[tuple[object, str, str]] = []
+    for t in extract_write_targets(cmd):
+        rel = _target_rel(t, repo, base)
+        if rel is None:
+            continue
+        kind = _shell_protected(t, rel)
+        if kind:
+            out.append((t, rel or ".", kind))
+    return out
+
+
+def check_shell_command(cmd: str, repo: Path | None = None,
+                        payload: dict | None = None) -> list[str]:
+    """Raisons lisibles pour chaque écriture shell sur un chemin protégé.
+
+    Liste vide = rien de suspect. Heuristique (cf. docstring du module et de
+    `sdd_lib.shell_write_targets`).
     """
     if not cmd or not cmd.strip():
         return []
-    repo = repo or repo_root()
-    reasons: list[str] = []
-    for segment in _split_segments(cmd):
-        if not segment.strip():
-            continue
-        # (a) redirection `>`/`>>` vers un chemin protégé
-        for m in _REDIRECT_RE.finditer(segment):
-            rest = segment[m.end():]
-            tm = _TOKEN_RE.match(rest)
-            if tm and _is_protected_token(tm.group(1), repo):
-                reasons.append(f"redirection `{m.group(0).strip()}` vers {_norm_token(tm.group(1))}")
-        tokens = [t for t in _TOKEN_RE.findall(segment)]
-        if not tokens:
-            continue
-        protected = [_norm_token(t) for t in tokens if _is_protected_token(t, repo)]
-        words = [_norm_token(t).lower() for t in tokens]
-        head0 = words[0].rsplit("/", 1)[-1].removesuffix(".exe")
-        if (head0 in _INLINE_INTERPRETERS and _INLINE_FLAG_RE.search(segment)
-                and _INLINE_WRITE_MARKER.search(segment)):
-            # Code inline : le chemin est À L'INTÉRIEUR d'une chaîne
-            # (`open('.sdd/x','w')`), pas un token — recherche par sous-chaîne.
-            inner = _INLINE_PATH_RE.findall(segment.replace("\\", "/"))
-            if inner or protected:
-                reasons.append(f"`{head0}` inline avec écriture sur "
-                               f"{', '.join(sorted(set(inner + protected)))}")
-                continue
-        if not protected:
-            continue
-        # Ignore un éventuel préfixe `sudo` / chemin d'exécutable.
-        head = words[0].rsplit("/", 1)[-1]
-        head = head.removesuffix(".exe")
-        if head == "sudo" and len(words) > 1:
-            head = words[1].rsplit("/", 1)[-1]
-        # (b) commande d'écriture + chemin protégé dans le même segment
-        if head in _WRITE_CMDS:
-            reasons.append(f"`{head}` sur {', '.join(protected)}")
-            continue
-        if head in _INPLACE_CMDS and _INPLACE_CMDS[head].search(segment):
-            reasons.append(f"`{head} -i` sur {', '.join(protected)}")
-            continue
-        # (c) git checkout -- / restore / clean … sur .sdd / .claude
-        if head == "git":
-            sub = next((w for w in words[1:] if not w.startswith("-")), "")
-            if sub in _GIT_TREE_CMDS:
-                reasons.append(f"`git {sub}` sur {', '.join(protected)}")
-                continue
-        # (e) pipeline PowerShell `... | Out-File path` est déjà couvert par le
-        #     split sur `|` (le segment aval commence par Out-File).
-    return reasons
+    return [t.describe() for t, _rel, _kind in shell_protected_targets(cmd, repo, payload)]
 
 
 def _main_shell(payload: dict, mode: str) -> int:
     cmd = get_nested(payload, "tool_input", "command")
     if not isinstance(cmd, str) or not cmd.strip():
         return HOOK_ALLOW
-    reasons = check_shell_command(cmd, repo_root())
-    if not reasons:
+    repo = repo_root()
+    hits = shell_protected_targets(cmd, repo, payload)
+    if not hits:
         return HOOK_ALLOW
-    detail = " ; ".join(reasons[:4])
-    if mode == "strict":
-        warn("ERROR: protect-framework — commande shell qui écrit sur un chemin protégé")
-        warn(f"CAUSE: [FRAMEWORK_PROTECTED] {detail}")
-        warn("FIX: les fichiers framework (.sdd/, .claude/, .codex/, .gemini/) et les "
-             "artefacts de gate (workspace/.sys/{.validation,.acceptance,.audit,.state}/) "
-             "ne se modifient pas depuis un agent ; Tech Lead : SDD_PROTECT_FRAMEWORK_MODE=warn "
-             "dans l'environnement du process Claude Code (jamais inline)")
-        return HOOK_DENY
-    warn(f"WARNING: protect-framework — commande shell écrivant sur un chemin protégé : {detail}")
-    warn("         Maintenance framework autorisee deliberement (Tech Lead, mode warn).")
-    return HOOK_ALLOW
+    rc = HOOK_ALLOW
+    for t, rel, kind in hits[:4]:
+        shown = f"{rel} [shell : {t.describe()}]"
+        if kind == "framework":
+            res = _decide_framework(shown, mode)
+        else:
+            res = _decide_gate_artifact(shown, rel, payload, mode, repo)
+        if res == HOOK_DENY:
+            rc = HOOK_DENY
+            break
+    return rc
 
 
 # --------------------------------------------------------------------------- #

@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -43,9 +44,33 @@ def _resolve_definition(schema: dict, ref: str) -> dict:
     return schema.get("definitions", {}).get(name, {})
 
 
+# A value that is EXACTLY one `${VAR}` placeholder (same syntax as
+# `sdd_lib.env_placeholders._PLACEHOLDER_RE`, braces only).
+_UNRESOLVED_PLACEHOLDER_RE = re.compile(r"^\$\{\w+\}$")
+
+
+def is_unresolved_placeholder(value: Any) -> bool:
+    """True when `value` is a bare `${VAR}` left literal by the env resolver.
+
+    `workspace/stack/stack.md` is versioned, so the project rule
+    (`rules/library-and-stack.md` « Secrets / config en clair », CLAUDE.md §9)
+    IMPOSES `${VAR}` placeholders there. `read_layered_config` resolves them
+    from the dotenv files / the process env and coerces the result ; when the
+    variable is unset the placeholder stays literal and `env_placeholders`
+    already emits the runtime `WARN [ENV_MISSING]`. The schema types the
+    RESOLVED value, so an unresolved placeholder is deferred, not a
+    TYPE_MISMATCH. A literal of the wrong type (`"three"`, `80${X}`,
+    `${A}${B}`) is still rejected.
+    """
+    return isinstance(value, str) and bool(_UNRESOLVED_PLACEHOLDER_RE.match(value.strip()))
+
+
 def _validate_value(key: str, value: Any, prop_schema: dict, schema: dict,
                     errors: list[dict]) -> None:
     """Validate `value` against `prop_schema` (with $ref resolution)."""
+    if is_unresolved_placeholder(value):
+        # Deferred to resolution time — reported by [ENV_MISSING], not here.
+        return
     if "$ref" in prop_schema:
         prop_schema = _resolve_definition(schema, prop_schema["$ref"])
 
@@ -151,11 +176,13 @@ def main() -> int:
         return INFRA_BLOCKED
 
     findings = validate_config(cfg, schema, strict_unknown=args.strict_unknown)
+    deferred = sorted(k for k, v in cfg.items() if is_unresolved_placeholder(v))
 
     if args.json:
         print(json.dumps({
             "config_keys": len(cfg),
             "findings": findings,
+            "deferred_placeholders": deferred,
             "summary": {
                 "errors": len(findings),
                 "valid": not findings,
@@ -164,6 +191,9 @@ def main() -> int:
     else:
         if not findings:
             print(f"[OK] Project Config valid ({len(cfg)} keys validated)")
+            if deferred:
+                print(f"[INFO] {len(deferred)} unresolved ${{VAR}} placeholder(s) "
+                      f"deferred to runtime ([ENV_MISSING]): {', '.join(deferred)}")
         else:
             print(f"[ERROR] Project Config has {len(findings)} issue(s):")
             for f in findings:

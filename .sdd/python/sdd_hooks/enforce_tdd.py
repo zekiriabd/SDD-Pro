@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""SDD_Pro PreToolUse hook (Edit / Write) — TDD enforcement (RED-GREEN-REFACTOR).
+"""SDD_Pro PreToolUse hook (Edit / Write / Bash / PowerShell) — TDD enforcement (RED-GREEN-REFACTOR).
 
 Audit P3 TDD (2026-06-08) — enforce test-first discipline (emprunt Superpowers
 v5.1 `test-driven-development` skill). When the agent attempts to Write or
@@ -25,6 +25,17 @@ corresponding test file exists OR is being created in the same tool batch.
   - Edit of EXISTING code (refactor, no new behavior) → allowed
   - Test file itself (`*.Tests/`, `__tests__/`, etc.) → allowed
   - Non-production paths (`workspace/`, `.claude/`) → allowed
+
+**Shell mode** (matcher `Bash|PowerShell`, audit 2026-11) : the write
+targets of the command are extracted by `sdd_lib.shell_write_targets`
+(`cat > X.cs <<EOF`, `Set-Content`, `Out-File`, `tee`, `cp`/`mv`/
+`Copy-Item`, `python -c "open(...,'w')"`, `[IO.File]::WriteAllText`…) and
+EACH target goes through the same decision as the file mode (same modes,
+same bypasses, same `[TDD_NO_TEST_FIRST]` message). Content known (heredoc,
+`-Value`, `echo`) → symbol regex ; copy/move → source file content ;
+unknown content → fail-closed on a NEW file only. A test file with real
+cases written by the same command (test + prod in one batch) counts as the
+companion.
 
 **Idempotent guard** : the hook is read-only on disk (Glob for companion
 test). No side effects beyond stderr audit logging.
@@ -250,6 +261,126 @@ def _has_companion_test(prod_path: Path, root: Path) -> bool:
     return False
 
 
+def _repo_rel(file_path: str, root: Path) -> str:
+    """Repo-relative forward-slash path (input absolute or relative)."""
+    path_norm = normalize(file_path)
+    try:
+        if Path(path_norm).is_absolute():
+            path_norm = str(Path(path_norm).relative_to(root)).replace("\\", "/")
+    except (ValueError, OSError):
+        pass
+    return path_norm
+
+
+def _violation(path_norm: str, content: str | None, root: Path,
+               batch_tests: tuple[tuple[str, str], ...] = ()) -> str | None:
+    """Return the extension when writing `content` at `path_norm` breaks
+    test-first, else None. Shared by file mode and shell mode.
+
+    `content is None` (shell write whose content is unknown) : fail-closed
+    on a NEW file only — modifying an existing file with unknown content is
+    treated like an Edit without new symbol (refactor).
+    `batch_tests` : `(test_path, content)` written by the SAME shell command
+    (test + prod in one heredoc batch) — a companion with real test cases
+    there satisfies the contract.
+    """
+    if not _is_production_path(path_norm):
+        return None
+    ext = _get_extension(path_norm)
+    if not ext:
+        return None
+    prod_path = root / path_norm
+    if content is None:
+        if prod_path.exists():
+            return None
+    else:
+        if not isinstance(content, str) or not content.strip():
+            return None
+        if not _content_introduces_new_symbol(content, ext):
+            # Pure refactor / value change / config tweak — TDD allows
+            return None
+    stem = prod_path.stem
+    for tpath, tcontent in batch_tests:
+        if stem and stem.lower() in tpath.lower().rsplit("/", 1)[-1] \
+                and _TEST_CASE_MARKERS.search(tcontent or ""):
+            return None
+    if _has_companion_test(prod_path, root):
+        return None
+    return ext
+
+
+def _message(ext: str, path_norm: str, via: str = "") -> str:
+    return (
+        f"[TDD_NO_TEST_FIRST] About to write a NEW production symbol "
+        f"({ext}) at {path_norm}{via}, but no companion test file detected.\n"
+        f"  RED-GREEN-REFACTOR contract (SDDPro v7.0.0+ emprunt Superpowers v5.1) :\n"
+        f"    1. Write the FAILING test first (in *.Tests/, __tests__/, tests/, or src/test/)\n"
+        f"    2. Run the test, confirm RED\n"
+        f"    3. Then write the minimal production code to make it GREEN\n"
+        f"    4. Refactor if needed\n"
+        f"  Bypass options :\n"
+        f"    - SDD_TDD_MODE=warn (default interactive) — this becomes WARN only\n"
+        f"    - SDD_TDD_MODE=off — disable TDD enforcement entirely\n"
+        f"    - SDD_DISABLE_TDD=1 — one-shot bypass (audit-logged)\n"
+        f"  Skill reference : @.sdd/skills/test-driven-development/SKILL.md\n"
+    )
+
+
+def _emit(mode: str, msg: str) -> int:
+    if mode == "strict":
+        sys.stderr.write(f"ERROR: {msg}")
+        return HOOK_DENY
+    # warn mode
+    sys.stderr.write(f"WARN {msg}")
+    return HOOK_ALLOW
+
+
+#: Opérations shell qui PRODUISENT un fichier (les suppressions ne
+#: concernent pas le contrat test-first).
+_SHELL_PRODUCING_OPS = frozenset({"redirect", "write", "copy", "move", "inplace",
+                                  "inline", "download", "git", "archive"})
+
+
+def _shell_content(t, base: Path) -> str | None:
+    """Contenu écrit par une cible shell : connu (heredoc, -Value…), sinon
+    lu depuis la source d'une copie/déplacement, sinon None (inconnu)."""
+    if t.content is not None:
+        return t.content
+    for src in t.sources:
+        sp = Path(src) if Path(src).is_absolute() else base / (t.cwd or "") / src
+        try:
+            if sp.is_file() and sp.stat().st_size <= 2_000_000:
+                return sp.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+    return None
+
+
+def _main_shell(payload: dict, mode: str, root: Path) -> int:
+    from sdd_lib.shell_write_targets import extract_write_targets, resolve_target
+    cmd = (payload.get("tool_input") or {}).get("command")
+    if not isinstance(cmd, str) or not cmd.strip():
+        return HOOK_ALLOW
+    cwd = payload.get("cwd")
+    base = Path(cwd) if isinstance(cwd, str) and cwd.strip() and Path(cwd).is_dir() else root
+    writes: list[tuple[object, str, str | None]] = []
+    for t in extract_write_targets(cmd):
+        if t.op not in _SHELL_PRODUCING_OPS or "$" in t.path:
+            continue
+        abs_p = resolve_target(t, base) or (root / t.path)
+        path_norm = _repo_rel(str(abs_p), root)
+        if Path(path_norm).is_absolute() or path_norm.startswith("../"):
+            continue  # hors dépôt
+        writes.append((t, path_norm, _shell_content(t, base)))
+    batch_tests = tuple((pn, c or "") for _t, pn, c in writes
+                        if pn.startswith("workspace/src/") and not _is_production_path(pn))
+    for t, path_norm, content in writes:
+        ext = _violation(path_norm, content, root, batch_tests)
+        if ext:
+            return _emit(mode, _message(ext, path_norm, f" [shell : {t.describe()}]"))
+    return HOOK_ALLOW
+
+
 def main() -> int:
     """Hook entry. Narrow exception scope per audit P3 C3 pattern."""
     try:
@@ -268,6 +399,12 @@ def main() -> int:
         return HOOK_ALLOW
 
     tool_name = payload.get("tool_name", "")
+    if tool_name in ("Bash", "PowerShell"):
+        try:
+            root = repo_root()
+        except (OSError, RuntimeError):
+            return HOOK_ALLOW
+        return _main_shell(payload, mode, root)
     if tool_name not in ("Write", "Edit", "MultiEdit"):
         return HOOK_ALLOW
 
@@ -279,21 +416,9 @@ def main() -> int:
         root = repo_root()
     except (OSError, RuntimeError):
         return HOOK_ALLOW
-    path_norm = normalize(file_path)
     # Make path relative to repo_root for consistent matching against
     # `workspace/src/` prefix (handles both absolute and relative inputs).
-    try:
-        if Path(path_norm).is_absolute():
-            path_norm = str(Path(path_norm).relative_to(root)).replace("\\", "/")
-    except (ValueError, OSError):
-        pass
-
-    if not _is_production_path(path_norm):
-        return HOOK_ALLOW
-
-    ext = _get_extension(path_norm)
-    if not ext:
-        return HOOK_ALLOW
+    path_norm = _repo_rel(file_path, root)
 
     # Extract proposed content (Write tool) or new_string (Edit tool)
     tool_input = payload.get("tool_input", {})
@@ -301,37 +426,11 @@ def main() -> int:
     if not isinstance(content, str) or not content.strip():
         return HOOK_ALLOW
 
-    if not _content_introduces_new_symbol(content, ext):
-        # Pure refactor / value change / config tweak — TDD allows
+    ext = _violation(path_norm, content, root)
+    if not ext:
         return HOOK_ALLOW
-
-    prod_path = root / path_norm
-    if _has_companion_test(prod_path, root):
-        return HOOK_ALLOW
-
     # No companion test found for a new production symbol → flag
-    msg = (
-        f"[TDD_NO_TEST_FIRST] About to write a NEW production symbol "
-        f"({ext}) at {path_norm}, but no companion test file detected.\n"
-        f"  RED-GREEN-REFACTOR contract (SDDPro v7.0.0+ emprunt Superpowers v5.1) :\n"
-        f"    1. Write the FAILING test first (in *.Tests/, __tests__/, tests/, or src/test/)\n"
-        f"    2. Run the test, confirm RED\n"
-        f"    3. Then write the minimal production code to make it GREEN\n"
-        f"    4. Refactor if needed\n"
-        f"  Bypass options :\n"
-        f"    - SDD_TDD_MODE=warn (default interactive) — this becomes WARN only\n"
-        f"    - SDD_TDD_MODE=off — disable TDD enforcement entirely\n"
-        f"    - SDD_DISABLE_TDD=1 — one-shot bypass (audit-logged)\n"
-        f"  Skill reference : @.sdd/skills/test-driven-development/SKILL.md\n"
-    )
-
-    if mode == "strict":
-        sys.stderr.write(f"ERROR: {msg}")
-        return HOOK_DENY
-
-    # warn mode
-    sys.stderr.write(f"WARN {msg}")
-    return HOOK_ALLOW
+    return _emit(mode, _message(ext, path_norm))
 
 
 if __name__ == "__main__":

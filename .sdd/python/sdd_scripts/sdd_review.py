@@ -22,9 +22,16 @@ Usage :
     python sdd_review.py --feat-number 1 --fail-on critical   # override
 
 Exit codes :
-    0 → 🟢 GREEN (or YELLOW under FailOn threshold)
-    1 → 🔴 RED (issues at/above FailOn)
+    0 → 🟢 GREEN (or YELLOW under FailOn threshold) — ET livraison autorisée
+    1 → 🔴 RED (issues at/above FailOn, OU gate de livraison refusé)
     2 → infra error (missing FEAT, DB unreachable, bad args)
+
+Gate de livraison (2026-11-07, `.sdd/docs/delivery-gates.md`) : un verdict
+GREEN/YELLOW n'est final que si `authorize_delivery(workflow="sdd-review")`
+l'autorise (preuves build + tests + spec_compliance, via
+`sdd_lib.delivery_wiring` — fail-closed). Sinon le verdict final devient RED
+(`[DELIVERY_GATE_BLOCKED]`), le verdict d'audit reste visible dans
+`quality_verdict`. Aucun flag (`--no-spec-gate`, `--fail-on`…) ne lève ce gate.
 
 **v7.0.0 M2 refactor** : helpers extracted to `_review_fetch.py` (DB +
 dedup) and `_review_report.py` (compute + render + persist). Public
@@ -40,6 +47,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from sdd_lib.delivery_wiring import authorize as authorize_delivery_wired  # noqa: E402
+from sdd_lib.delivery_wiring import blocked_message  # noqa: E402
 from sdd_lib.exit_codes import FAIL_FAST, SUCCESS  # noqa: E402
 from sdd_lib.paths import workspace_root, repo_root  # noqa: E402
 
@@ -428,6 +437,42 @@ def _detect_stale_reports(feat_n: int) -> list[str]:
     return warnings
 
 
+#: Workflow du gate de livraison consulté par le verdict final.
+DELIVERY_WORKFLOW = "sdd-review"
+
+
+def apply_delivery_gate(report: ReviewReport) -> dict | None:
+    """Soumet un verdict GREEN/YELLOW au gate de livraison (preuves seules).
+
+    Un verdict d'audit vert ne vaut pas livraison : sans
+    `authorize_delivery(workflow="sdd-review")` autorisé, le verdict FINAL
+    devient `red` (le verdict d'audit est conservé dans `quality_verdict`).
+    Un verdict déjà `red` n'a pas besoin du gate (rien n'est déclaré livré).
+    Retourne la décision (dict) ou None si non consultée.
+    """
+    setattr(report, "quality_verdict", report.verdict)
+    if report.verdict == "red":
+        return None
+    decision = authorize_delivery_wired(
+        feat_n=report.feat_n, workflow=DELIVERY_WORKFLOW,
+        run_id=(os.environ.get("SDD_RUN_ID") or "").strip() or None)
+    data = decision.to_dict()
+    if decision.allowed:
+        report.scans_run.append("delivery-gate:authorized")
+    else:
+        report.verdict = "red"
+        report.scans_run.append("delivery-gate:blocked")
+        data["message"] = blocked_message(report.feat_n, DELIVERY_WORKFLOW, decision)
+        print(f"ERROR: /sdd-review FEAT {report.feat_n} — verdict "
+              f"{report.quality_verdict.upper()} non livrable, verdict final RED",
+              file=sys.stderr)
+        print(f"CAUSE: {data['message']}", file=sys.stderr)
+        print("FIX: verify_build.py / verify_tests.py --coverage / delivery_gate.py "
+              "record-spec puis relancer /sdd-review", file=sys.stderr)
+    setattr(report, "delivery_gate", data)
+    return data
+
+
 def main() -> int:
     # Windows console: force UTF-8 to avoid charmap codec on emoji/icons
     if sys.stdout.encoding and sys.stdout.encoding.lower() not in ("utf-8", "utf8"):
@@ -575,6 +620,9 @@ def main() -> int:
     report = compute_report(feat_n, findings, missing, fail_on)
     report.scans_run = scans_run
 
+    # STEP 6.bis — gate de livraison : pas de verdict final vert sans preuves.
+    apply_delivery_gate(report)
+
     # STEP 7 — Persist DB (SQLite is the single source of truth).
     # 2026-07-06 : review.md is NO LONGER written to disk. The consolidated
     # report is recomputed on-demand from console.db via
@@ -601,6 +649,8 @@ def main() -> int:
         print(json.dumps({
             "feat_n": report.feat_n,
             "verdict": report.verdict,
+            "quality_verdict": getattr(report, "quality_verdict", report.verdict),
+            "delivery_gate": getattr(report, "delivery_gate", None),
             "fail_on": report.fail_on,
             "total": len(report.all_findings),
             "triggering": len(report.triggering_findings),
@@ -618,6 +668,9 @@ def main() -> int:
               f"{len(report.all_findings)} findings "
               f"({len(report.triggering_findings)} ≥ {fail_on}) → "
               f"{report.verdict.upper()}")
+        dg = getattr(report, "delivery_gate", None)
+        if dg and not dg.get("allowed"):
+            print(f"   delivery: {dg.get('message')}")
         print(f"   owner: {report.counts_by_owner}")
         print(f"   source: {report.counts_by_source}")
         print(f"   report (on-demand): python .sdd/python/sdd_scripts/"

@@ -56,7 +56,7 @@
 | PreToolUse / PostToolUse Agent + SubagentStop + Stop | Parallélisme borné (`MaxParallel`) | **primaire** | `sdd_hooks/enforce_max_parallel.py` | `SDD_ALLOW_PARALLEL_EXCESS=1` (audit-loggué) |
 | PreToolUse Agent | Séquencement two-stage auditors | **defense-in-depth** (de auditor_batch.A) | `sdd_hooks/enforce_two_stage_auditor.py` | `AuditorBatchMode: legacy-parallel` |
 | PreToolUse Skill | Combo stack hors SLA | **primaire** | `sdd_hooks/preflight_stack_combo.py` | `SDD_ALLOW_UNTESTED_COMBO=1` |
-| PreToolUse Edit/Write | TDD test-first | **primaire** (warn interactif / strict CI) | `sdd_hooks/enforce_tdd.py` | `SDD_DISABLE_TDD=1` |
+| PreToolUse Edit/Write + Bash/PowerShell | TDD test-first | **primaire** (warn interactif / strict CI) | `sdd_hooks/enforce_tdd.py` | `SDD_DISABLE_TDD=1` |
 | PreToolUse Bash | Set d'env bypass mid-session | **primaire** | `sdd_hooks/block_env_bypass.py` | aucun |
 | PostToolUse Edit/Write | Cohérence stack / contrat augment | **defense-in-depth** | `sdd_hooks/validate_stack_consistency.py`, `sdd_hooks/validate_augment_contract.py` | n/a |
 | SubagentStop qa | Acceptance Gate (test/lint/build/coverage/smoke/E2E) | **primaire** | `sdd_hooks/validate_acceptance_gate.py` + `sdd_scripts/validate_acceptance.py` | `SDD_ALLOW_ACCEPTANCE_BYPASS=1` |

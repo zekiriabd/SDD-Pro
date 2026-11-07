@@ -189,10 +189,13 @@ def _row_to_dict(row, phases: list[Any] | None = None) -> dict[str, Any]:
     return out
 
 
-def action_new_run(args: argparse.Namespace) -> int:
-    if args.feat_number <= 0:
-        warn("new-run requires --feat-number > 0")
-        return FAIL_FAST
+def open_run(feat_number: int, command: str, tags: list[str] | None = None) -> str:
+    """Ouvre un run `running` dans console.db et retourne son run_id.
+
+    Point d'ouverture unique (`new-run`, `feat_to_pseudo_us.py --open-run`
+    pour /sdd-poc) : la clôture d'un run de workflow de livraison passe
+    ensuite par le gate (`run_close.py` / `end-run`).
+    """
     # v7.0.0-alpha audit Sprint 1.1 (2026-06-06) — single source of truth for run_id.
     # Previously generated a 12-char uuid here while hooks resolved their own id via
     # sdd_lib.run_id.get_or_create_run_id() — two ids never matched, token_usage rows
@@ -211,26 +214,36 @@ def action_new_run(args: argparse.Namespace) -> int:
         warn(f"[new-run] reusing inherited SDD_RUN_ID={run_id} (M7 parent-orchestrator propagation)")
     else:
         run_id = get_or_create_run_id(force_new=True)
-    tags = [t.strip() for t in args.tags.split(",") if t.strip()] if args.tags else []
-    command = args.command or "unknown"
-    feat_name = get_feat_name(args.feat_number)
+    tags = list(tags or [])
+    command = command or "unknown"
+    feat_name = get_feat_name(feat_number)
     now = iso_now()
     ensure_initialized()
     with connect() as conn:
         upsert_run(
             conn,
             run_id=run_id, command=command,
-            feat_n=args.feat_number, feat_name=feat_name,
+            feat_n=feat_number, feat_name=feat_name,
             started_at=now, status="running", tags=tags,
         )
         insert_event(
             conn,
             event_type="run.start", ts=now, run_id=run_id,
-            feat_n=args.feat_number,
+            feat_n=feat_number,
             payload={"cmd": command, "tags": tags},
         )
-    print(run_id)
+    return run_id
+
+
+def action_new_run(args: argparse.Namespace) -> int:
+    if args.feat_number <= 0:
+        warn("new-run requires --feat-number > 0")
+        return FAIL_FAST
+    tags = [t.strip() for t in args.tags.split(",") if t.strip()] if args.tags else []
+    print(open_run(args.feat_number, args.command, tags))
     return SUCCESS
+
+
 def action_set_phase(args: argparse.Namespace) -> int:
     # Audit F-M2 (2026-08-30) : validation du nom de phase. Avant ce fix,
     # --phase acceptait du texte libre ; un nom hors _PIPELINE_PHASES_ORDER

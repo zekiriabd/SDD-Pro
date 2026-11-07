@@ -305,7 +305,8 @@ invariants:
       Test files themselves = allowed. Framework code (.claude/) = allowed.
     severity: major
     enforcers:
-      - .sdd/python/sdd_hooks/enforce_tdd.py  # PreToolUse Edit|Write|MultiEdit
+      - .sdd/python/sdd_hooks/enforce_tdd.py  # PreToolUse Edit|Write|MultiEdit + Bash|PowerShell
+      - .sdd/python/sdd_lib/shell_write_targets.py  # extraction des écritures shell (heredoc, Set-Content…)
       - .sdd/skills/test-driven-development/SKILL.md
     bypasses:
       - "Env: SDD_TDD_MODE=off (no enforcement)"

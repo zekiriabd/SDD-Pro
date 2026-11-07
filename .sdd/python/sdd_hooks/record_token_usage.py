@@ -69,6 +69,7 @@ from sdd_lib.hook_input import (  # noqa: E402
 )
 from sdd_lib.paths import audit_dir_path, workspace_root, iso_now_ms, repo_root  # noqa: E402
 from sdd_lib.exit_codes import HOOK_ALLOW  # noqa: E402
+from sdd_lib.feat_us_ids import FEAT_FILE_RE, US_FILE_RE, US_RE, known_ids  # noqa: E402
 from sdd_lib.stderr import warn  # noqa: E402
 from sdd_lib.transcript_usage import (  # noqa: E402
     TranscriptUsage,
@@ -276,44 +277,21 @@ def _find_model(payload: dict[str, Any], subagent: str | None = None) -> str | N
     return _model_from_agent_tier(subagent)
 
 
-# Audit télémétrie 2026-11-07 : l'ancien motif `\b(\d{1,3})-(\d{1,3})` prenait
-# n'importe quel « N-M » d'un prompt libre pour une US — dates (`2026-10-10` →
-# US `10-10`, `11-06`, `09-02`), plages de lignes (`84-92`, `201-215`) — et
-# attribuait le coût à des FEAT inexistantes. Deux défenses :
-#   1. le motif refuse un N-M précédé d'un mot / `-` / `.` / `:` ou suivi d'un
-#      séparateur + chiffre (dates, versions, heures) — un chemin
-#      `workspace/us/15-1-Name.md` ou une fin de phrase `US 15-2.` restent lus ;
-#   2. `_known_ids()` confronte chaque candidat aux US/FEAT réellement présentes
-#      sur disque (`workspace/us/{n}-{m}-*.md`, `workspace/feats/{n}-*.md`) —
-#      seule parade contre une plage `84-92`, syntaxiquement identique à une US.
-_US_RE = re.compile(
-    r"(?<![\w\-.:])(\d{1,3})-(\d{1,3})(?:-[A-Za-z][A-Za-z0-9\-]*)?(?!\w|[\-.:/]\d)"
-)
+# Audit télémétrie 2026-11-07 : défense contre les faux « N-M » (dates,
+# plages de lignes) — motif + validation disque factorisés dans
+# `sdd_lib/feat_us_ids.py` (partagés avec `enforce_phase_order`).
+_US_RE = US_RE
 _FEAT_RE = re.compile(
     r"(?i)\b(?:FEAT|feat-?|sdd-full|us-generate|dev-run|dev-plan|qa-generate)"
     r"\s*[-:]?\s*(\d{1,3})(?![\d\-./:]\d|\d)",
 )
-_US_FILE_RE = re.compile(r"^(\d{1,3})-(\d{1,3})-")
-_FEAT_FILE_RE = re.compile(r"^(\d{1,3})-[A-Za-z]")
+_US_FILE_RE = US_FILE_RE
+_FEAT_FILE_RE = FEAT_FILE_RE
 
 
 def _known_ids(root: Path | None = None) -> tuple[set[str], set[int]] | None:
-    """US ids (`n-m`) and FEAT numbers present on disk, or None if unknowable.
-
-    None (workspace introuvable ou sans aucune US/FEAT) → pas de validation :
-    l'extraction retombe sur le seul contrat syntaxique.
-    """
-    try:
-        ws = workspace_root(root or repo_root())
-        us = {f"{int(m.group(1))}-{int(m.group(2))}"
-              for f in (ws / "us").glob("*.md") if (m := _US_FILE_RE.match(f.name))}
-        feats = {int(m.group(1))
-                 for f in (ws / "feats").glob("*.md") if (m := _FEAT_FILE_RE.match(f.name))}
-    except OSError:
-        return None
-    if not us and not feats:
-        return None
-    return us, feats
+    """US ids (`n-m`) and FEAT numbers present on disk, or None if unknowable."""
+    return known_ids(root)
 
 
 def _extract_feat_and_us_from_text(

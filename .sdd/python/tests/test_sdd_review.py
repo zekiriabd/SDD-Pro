@@ -6,6 +6,10 @@ deduplicate_findings helper). This file covers :
   - resolve_arch_required (ArchReviewMode=full gate)
   - CLI main() : standard / --skip-scans / --ensure-scans / --json
   - Exit code mapping (0 GREEN | 1 RED | 2 bad args | 3 ensure-scans MISS)
+  - Gate de livraison (2026-11-07) : ces repos n'ont AUCUNE preuve
+    (`delivery_evidence` vide) → un audit GREEN/YELLOW reste visible dans
+    `quality_verdict` mais le verdict FINAL est RED (exit 1). Le cas autorisé
+    est couvert par `test_delivery_gate_wiring.py` (faux module central).
 
 Strategy : subprocess invocation on isolated tmp $SDD_REPO_ROOT with a
 seeded console.db (so we can assert on the verdict + markdown output).
@@ -220,11 +224,14 @@ class TestCliExitCodes(unittest.TestCase):
         self.assertIn("invalid --fail-on", r.stderr)
 
     def test_empty_db_green_verdict(self):
-        """No findings → verdict GREEN → exit 0."""
+        """No findings → audit GREEN ; sans preuve de livraison → final RED, exit 1."""
         r = _run("--feat-number", "1", "--skip-scans", "--json", repo=self.repo)
-        self.assertEqual(r.returncode, 0, f"STDERR={r.stderr}")
+        self.assertEqual(r.returncode, 1, f"STDERR={r.stderr}")
         payload = json.loads(r.stdout[r.stdout.index("{"):])
-        self.assertEqual(payload["verdict"], "green")
+        self.assertEqual(payload["quality_verdict"], "green")
+        self.assertEqual(payload["verdict"], "red")
+        self.assertFalse(payload["delivery_gate"]["allowed"])
+        self.assertIn("[DELIVERY_GATE_BLOCKED]", r.stderr)
         self.assertEqual(payload["total"], 0)
 
     def test_critical_finding_red_verdict(self):
@@ -238,14 +245,15 @@ class TestCliExitCodes(unittest.TestCase):
         self.assertGreater(payload["triggering"], 0)
 
     def test_minor_finding_below_threshold(self):
-        """1 minor finding with fail_on=serious → verdict YELLOW → exit 0."""
+        """1 minor finding with fail_on=serious → audit YELLOW ; sans preuve → final RED."""
         _seed_qa_quality(self.repo, feat_n=1, severity="info")  # → minor
         r = _run("--feat-number", "1", "--skip-scans", "--json",
                  "--fail-on", "serious", repo=self.repo)
-        self.assertEqual(r.returncode, 0)
+        self.assertEqual(r.returncode, 1)
         payload = json.loads(r.stdout[r.stdout.index("{"):])
-        # Below threshold : verdict could be green or yellow depending on logic
-        self.assertIn(payload["verdict"], ("green", "yellow"))
+        # Below threshold : audit verdict could be green or yellow depending on logic
+        self.assertIn(payload["quality_verdict"], ("green", "yellow"))
+        self.assertEqual(payload["verdict"], "red")
 
 
 # ============================================================================
@@ -308,7 +316,7 @@ class TestOutputArtefacts(unittest.TestCase):
         # created under the removed qa/ tree, (b) a validation_reports
         # row exists for the FEAT.
         r = _run("--feat-number", "1", "--skip-scans", repo=self.repo)
-        self.assertEqual(r.returncode, 0)
+        self.assertEqual(r.returncode, 1)  # aucune preuve de livraison → RED
         legacy_md = (self.repo / "workspace" / "qa" / "feat-1"
                      / "review.md")
         self.assertFalse(legacy_md.exists(),
@@ -327,12 +335,12 @@ class TestOutputArtefacts(unittest.TestCase):
 
     def test_json_output_well_formed(self):
         r = _run("--feat-number", "1", "--skip-scans", "--json", repo=self.repo)
-        self.assertEqual(r.returncode, 0)
+        self.assertEqual(r.returncode, 1)  # aucune preuve de livraison → RED
         # JSON starts somewhere in stdout (may be preceded by stderr noise)
         json_start = r.stdout.index("{")
         payload = json.loads(r.stdout[json_start:])
-        for key in ("feat_n", "verdict", "fail_on", "total", "triggering",
-                    "counts", "source"):
+        for key in ("feat_n", "verdict", "quality_verdict", "delivery_gate",
+                    "fail_on", "total", "triggering", "counts", "source"):
             self.assertIn(key, payload, f"missing key {key} in JSON output")
 
 

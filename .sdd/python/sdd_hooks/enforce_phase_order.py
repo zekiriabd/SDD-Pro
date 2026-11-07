@@ -13,6 +13,7 @@ prompt, d'après `run_phases` (console.db) du run courant de la FEAT :
                                        (skip = --no-validate, décision tracée)
     qa                                 dev_run ∈ {running, pass, warn}
                                        (running : l'API gate tourne DANS /dev-run)
+                                       ou, marqueur TEST-FIRST, readiness ∈ {pass, warn}
     spec-compliance-reviewer           dev_run ∈ {pass, warn}
     code-reviewer, security-reviewer,  qa ∈ {pass, warn, skip}
     arch-reviewer, adversarial-reviewer (skip = QAMode off/manual, tracé)
@@ -36,6 +37,25 @@ suffisante :
   - `qa` de l'API gate (dev_run `running`, DANS /dev-run) : inchangé ;
   - /sdd-poc (pas de QA ni de reviewers) : inchangé.
 Ces refus de preuve n'ont AUCUN bypass (`SDD_ALLOW_PHASE_SKIP` ne s'y applique pas).
+
+QA test-first (TDD RED, 2026-11-07). `enforce_tdd` (strict pour les sous-agents)
+exige un test compagnon AVANT le code de production de dev-* ; seul `qa` écrit
+des tests ; or `qa` exigeait dev_run → interblocage. Règle exacte :
+    qa est ALLOW en mode TEST-FIRST  ⇔  prompt/description contient le marqueur
+    explicite `test-first` | `test first` | `--test-first` | `TDD RED`
+    ET dev_run ∉ {running, pass, warn} (absente, fail…)
+    ET readiness ∈ {pass, warn}   (skip/--no-validate NE suffit PAS).
+Sinon (readiness absente/fail) → DENY `[PHASE_ORDER_VIOLATION]`. Dès que dev_run
+est running/pass/warn, le marqueur est IGNORÉ : `qa` suit la règle nominale
+(API gate pendant running ; preuve BUILD exigée après pass/warn) — un prompt
+« test-first » ne contourne donc jamais le gate de livraison. Le spawn test-first
+n'enregistre aucune phase et ne constitue aucune preuve (`[PHASE_ORDER_TEST_FIRST]`
+en WARN).
+
+Extraction FEAT/US (2026-11-07) : motif US et validation disque partagés avec
+`record_token_usage` (`sdd_lib/feat_us_ids.py`) — dates (`2026-10-10`) et plages
+de lignes (`84-92`) ne sont plus prises pour des US ; un candidat absent de
+`workspace/us` / `workspace/feats` est ignoré.
 
 Autres règles :
   - agent hors registre SDD (`general-purpose`, `Explore`…) ou agent SDD sans
@@ -68,6 +88,7 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sdd_lib.exit_codes import HOOK_ALLOW, HOOK_DENY  # noqa: E402
+from sdd_lib.feat_us_ids import iter_us_candidates, known_ids  # noqa: E402
 from sdd_lib.hook_input import get_nested, read_hook_input  # noqa: E402
 from sdd_lib.paths import console_db_path, repo_root, workspace_root  # noqa: E402
 from sdd_hooks.enforce_max_parallel import (  # noqa: E402
@@ -99,15 +120,20 @@ REQUIREMENTS: dict[str, tuple[str, frozenset[str], str]] = {
                              "/qa-generate {n} d'abord (phase qa)"),
 }
 
+#: FEAT explicite. `(?![\-./:]\d)` : `FEAT 2026-10-10` / `feat-11.6` ne sont pas
+#: des FEAT (dates, versions) — même défense que `sdd_lib/feat_us_ids.US_RE`.
 _FEAT_PATTERNS = (
-    r"\bFEAT[\s:#-]*(\d{1,4})\b",
-    r"\bfeat[-_](\d{1,4})\b",
+    r"\bFEAT[\s:#-]*(\d{1,4})\b(?![\-./:]\d)",
+    r"\bfeat[-_](\d{1,4})\b(?![\-./:]\d)",
     r"--feat(?:-number)?[\s=]+(\d{1,4})\b",
     r"args\s*=\s*[\"'](\d{1,4})",
     r"/(?:sdd-full|dev-run|dev-plan|qa-generate|sdd-review|feat-validate|us-generate)\s+(\d{1,4})\b",
 )
-_US_PATTERN = r"(?<![\d.])\b(\d{1,3})-(\d{1,3})(?:-[A-Za-z][\w-]*)?\b"
 _PLAN_MODE_RE = re.compile(r"(:plan\b|mode\s+plan\b|plan[- ]only|--plan-only)", re.IGNORECASE)
+#: Marqueur explicite du mode TEST-FIRST de `qa` (cf. docstring « QA test-first »).
+_TEST_FIRST_RE = re.compile(
+    r"(--test-first\b|\btest[- ]first\b|\bTDD[\s:/-]*RED\b)", re.IGNORECASE)
+_TEST_FIRST_READINESS = frozenset({"pass", "warn"})
 _POC_MARKER = "generated-by: feat_to_pseudo_us.py"
 
 
@@ -180,20 +206,38 @@ def evidence_denial(agent: str, feat_n: int, run_id: str | None,
     return None
 
 
-def extract_feat(payload: dict[str, Any]) -> int | None:
-    """FEAT N depuis prompt + description (FEAT explicite > US `{n}-{m}`)."""
-    text = " ".join(str(get_nested(payload, "tool_input", k) or "")
+def _prompt_text(payload: dict[str, Any]) -> str:
+    return " ".join(str(get_nested(payload, "tool_input", k) or "")
                     for k in ("prompt", "description"))
+
+
+def extract_feat(payload: dict[str, Any], root: Path | None = None) -> int | None:
+    """FEAT N depuis prompt + description (FEAT explicite > US `{n}-{m}`).
+
+    `root` fourni : chaque candidat est confronté aux FEAT/US présentes sur
+    disque (`sdd_lib.feat_us_ids.known_ids`) — une date (`2026-10-10`) ou une
+    plage de lignes (`84-92`) n'est jamais prise pour une US, et un candidat
+    inconnu est ignoré au profit du suivant. Workspace sans FEAT ni US →
+    contrat syntaxique seul.
+    """
+    text = _prompt_text(payload)
     if not text.strip():
         return None
+    known = known_ids(root) if root is not None else None
+    known_feats = known[1] if known else set()
     for pat in _FEAT_PATTERNS:
-        m = re.search(pat, text, re.IGNORECASE)
-        if m:
-            return int(m.group(1))
-    m = re.search(_US_PATTERN, text)
-    if m:
-        return int(m.group(1))
+        for m in re.finditer(pat, text, re.IGNORECASE):
+            n = int(m.group(1))
+            if not known_feats or n in known_feats:
+                return n
+    for n, _us_id in iter_us_candidates(text, known):
+        return n
     return None
+
+
+def is_test_first_qa(payload: dict[str, Any]) -> bool:
+    """Prompt de `qa` portant le marqueur explicite TEST-FIRST / TDD RED."""
+    return agent_type_of(payload) == "qa" and bool(_TEST_FIRST_RE.search(_prompt_text(payload)))
 
 
 def _current_run_phases(db: Path, feat_n: int) -> tuple[str | None, dict[str, str]]:
@@ -285,7 +329,7 @@ def evaluate(payload: dict[str, Any], root: Path) -> tuple[int, str]:
         note_denied(root, payload.get("tool_use_id"))
         return HOOK_DENY, msg
 
-    feat_n = extract_feat(payload)
+    feat_n = extract_feat(payload, root)
     if feat_n is None:
         return deny(
             f"ERROR: [PHASE_ORDER_VIOLATION] '{agent}' spawné sans FEAT identifiable dans le prompt\n"
@@ -310,6 +354,26 @@ def evaluate(payload: dict[str, Any], root: Path) -> tuple[int, str]:
         )
 
     status = phases.get(phase)
+    # QA TEST-FIRST (TDD RED) : fenêtre ouverte uniquement AVANT toute livraison
+    # dev_run (statut absent / fail…, hors running qui reste l'API gate). Une
+    # fois dev_run pass/warn, le marqueur est ignoré → QA de livraison + preuves.
+    if (agent == "qa" and status not in accepted and is_test_first_qa(payload)):
+        readiness = phases.get("readiness")
+        if readiness in _TEST_FIRST_READINESS:
+            return HOOK_ALLOW, (
+                f"WARN [PHASE_ORDER_TEST_FIRST] FEAT {feat_n} — 'qa' autorisé en mode "
+                f"TEST-FIRST (readiness {readiness}, dev_run {status or 'absente'}) : tests RED "
+                f"uniquement, ne vaut ni phase qa ni preuve de livraison.\n")
+        seen_r = readiness if readiness else ("absente" if run_id else "aucun run enregistré")
+        return deny(
+            f"ERROR: [PHASE_ORDER_VIOLATION] spawn de 'qa' (TEST-FIRST) refusé pour FEAT {feat_n} — "
+            f"readiness : {seen_r} (attendu : {', '.join(sorted(_TEST_FIRST_READINESS))})\n"
+            f"CAUSE: le mode test-first écrit les tests RED depuis les US ; il exige une "
+            f"readiness GO/WARN enregistrée (console.db run_phases, run {run_id or '—'}).\n"
+            f"FIX: /feat-validate {feat_n} (ou /sdd-full {feat_n}) ; bypass audit-loggué "
+            f"{BYPASS_ENV}=1.\n"
+        )
+
     if status in accepted:
         # Statut déclaré = condition nécessaire ; la preuve d'exécution est
         # exigée en plus (aucun bypass — SDD_ALLOW_PHASE_SKIP ne s'applique pas).

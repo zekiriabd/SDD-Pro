@@ -408,15 +408,65 @@ def _check_project_config_schema(py_dir: Path, claude_root: Path, checks: "Check
                    f"validate_project_config invocation failed: {e}")
 
 
+#: Textual signature of a smoke-marked test module (`@pytest.mark.smoke`,
+#: `pytestmark = pytest.mark.smoke`, `[pytest.mark.smoke, ...]`, `@mark.smoke`).
+_SMOKE_MARK_RE = re.compile(r"\bmark\.smoke\b")
+
+
+def smoke_test_modules(pytests_dir: Path) -> tuple[list[Path], list[Path]]:
+    """Split `test_*.py` modules into (smoke-marked, others) by a text scan.
+
+    Perf (audit timing 2026-11-07) : `pytest -m smoke <dir>` IMPORTS all ~216
+    test modules to deselect ~3000 tests and keep ~390 — ~2.5 s of pure
+    collection on Windows. The non-smoke modules are passed as `--ignore`, so
+    pytest never imports them. `-m smoke` stays the real selector : the scan
+    only has to be a SUPERSET of the modules holding smoke tests (a module
+    whose text never names `mark.smoke` cannot carry the marker — no conftest
+    adds it dynamically). Guarded by
+    `tests/test_framework_smoke_selection.py` (full-collection comparison).
+    """
+    smoke: list[Path] = []
+    others: list[Path] = []
+    for p in sorted(pytests_dir.glob("test_*.py")):
+        try:
+            text = p.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            smoke.append(p)  # unreadable → let pytest decide (fail-safe)
+            continue
+        (smoke if _SMOKE_MARK_RE.search(text) else others).append(p)
+    return smoke, others
+
+
+def _pytest_smoke_cmd(pytests_dir: Path) -> list[str]:
+    """argv of the smoke pytest run (shared with its guard test)."""
+    smoke, others = smoke_test_modules(pytests_dir)
+    ignores = [f"--ignore={p}" for p in others] if smoke else []
+    return [sys.executable, "-m", "pytest", "-m", "smoke", "-q",
+            "--tb=line", "--no-header", *ignores, str(pytests_dir)]
+
+
+def _pytest_smoke_env() -> dict[str, str]:
+    """Hermetic env : no auto-loaded third-party pytest plugins.
+
+    Perf + hermeticity (audit timing 2026-11-07) : setuptools entry-point
+    plugins installed in the developer's interpreter (measured here :
+    `langsmith`, `anyio`, `pytest-cov`) cost ~1.2 s of import at EACH pytest
+    start and are used by no test of the suite (the smoke gate must not
+    depend on what happens to be pip-installed). Project conftest.py files
+    are still loaded — only `pytest11` entry points are disabled.
+    """
+    import os
+    return {**os.environ, "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"}
+
+
 def _check_pytest_smoke(pytests_dir: Path, claude_root: Path, checks: "Checks") -> None:
     """#18.bis pytest smoke suite invocation (closes 'smoke gate lying' gap)."""
     if not pytests_dir.is_dir():
         return
     try:
         res = subprocess.run(
-            [sys.executable, "-m", "pytest", "-m", "smoke", "-q",
-             "--tb=line", "--no-header", str(pytests_dir)],
-            cwd=claude_root.parent,
+            _pytest_smoke_cmd(pytests_dir),
+            cwd=claude_root.parent, env=_pytest_smoke_env(),
             capture_output=True, text=True, timeout=60,
         )
         if res.returncode == 0:
@@ -635,8 +685,10 @@ def _check_harness_parity(claude_root: Path, checks: "Checks") -> None:
 
     with tempfile.TemporaryDirectory(prefix="sdd-harness-smoke-", dir=str(build_dir)) as tmp:
         tmp_root = Path(tmp)
-        failures: list[str] = []
-        for harness, provider, min_cmds, min_agents in harnesses:
+
+        def _verify(harness: str, provider: str, min_cmds: int,
+                    min_agents: "int | None") -> "str | None":
+            """Build + verify ONE harness ; returns a failure string or None."""
             out_dir = tmp_root / harness
             args = [
                 sys.executable, str(harness_build),
@@ -654,27 +706,23 @@ def _check_harness_parity(claude_root: Path, checks: "Checks") -> None:
                     errors="replace", timeout=30,
                 )
             except (OSError, subprocess.TimeoutExpired) as exc:
-                failures.append(f"{harness}: invocation error {exc}")
-                continue
+                return f"{harness}: invocation error {exc}"
             if res.returncode != 0:
                 stderr = (res.stderr or "").strip().splitlines()
                 last = stderr[-1] if stderr else "no stderr"
-                failures.append(f"{harness}: exit {res.returncode} ({last[:100]})")
-                continue
+                return f"{harness}: exit {res.returncode} ({last[:100]})"
 
             # Count emitted commands (subdir varies : Claude=commands, Codex=prompts, Gemini=commands).
             cmd_subdir = {"claude-code": "commands", "codex": "prompts", "gemini-cli": "commands"}[harness]
             cmd_ext = {"claude-code": "*.md", "codex": "*.md", "gemini-cli": "*.toml"}[harness]
             n_cmds = len(list((out_dir / cmd_subdir).glob(cmd_ext))) if (out_dir / cmd_subdir).is_dir() else 0
             if n_cmds < min_cmds:
-                failures.append(f"{harness}: only {n_cmds}/{min_cmds} commands emitted")
-                continue
+                return f"{harness}: only {n_cmds}/{min_cmds} commands emitted"
 
             if min_agents is not None:
                 n_agents = len(list((out_dir / "agents").glob("*.md"))) if (out_dir / "agents").is_dir() else 0
                 if n_agents < min_agents:
-                    failures.append(f"{harness}: only {n_agents}/{min_agents} agents emitted")
-                    continue
+                    return f"{harness}: only {n_agents}/{min_agents} agents emitted"
 
             # Dead-ref anti-regression : `.claude/docs/` must NEVER appear in memory files.
             memory_name = {"claude-code": "CLAUDE.md", "codex": "AGENTS.md", "gemini-cli": "GEMINI.md"}[harness]
@@ -682,7 +730,18 @@ def _check_harness_parity(claude_root: Path, checks: "Checks") -> None:
             if memory_file.is_file():
                 text = memory_file.read_text(encoding="utf-8", errors="replace")
                 if ".claude/docs/" in text:
-                    failures.append(f"{harness}: dead ref `.claude/docs/` in {memory_name}")
+                    return f"{harness}: dead ref `.claude/docs/` in {memory_name}"
+
+            return None
+
+        # Perf (audit timing 2026-11-07) : the 3 builds are independent
+        # (sources read-only, each writes ONLY its own `--out` subdir of
+        # this private tempdir) → run concurrently (~0.7 s → ~0.3 s).
+        # Failure order stays deterministic (harnesses order).
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=len(harnesses)) as ex:
+            results = list(ex.map(lambda h: _verify(*h), harnesses))
+        failures: list[str] = [r for r in results if r]
 
         if not failures:
             checks.add("harness-parity", "OK",
@@ -694,6 +753,47 @@ def _check_harness_parity(claude_root: Path, checks: "Checks") -> None:
             checks.add("harness-parity", "FAIL",
                        f"harness_build regression: {detail}{more}. "
                        f"Run `python .sdd/harness_build.py --harness <X>` to reproduce.")
+
+
+def _run_heavy_checks(sdd_root: Path, py_dir: Path, claude_root: Path,
+                      checks: "Checks") -> None:
+    """#15-#20 heavy checks — concurrent where provably safe, report order fixed.
+
+    Perf (audit timing 2026-11-07) : the pytest smoke run dominates (~80 % of
+    the smoke). The checks that are READ-ONLY on a scope the smoke tests never
+    write (console.db read, stack.md/config, `stacks/**`, ADR dir, in-process
+    pricing) overlap with it. Two checks stay SERIAL, after pytest :
+      - `framework-bom-check` : `rglob("*.md")` over the whole `.sdd/`, which
+        includes `.sdd/.build/` where the harness parity tests (and
+        `_check_harness_parity`) create/delete build dirs — a directory
+        vanishing under `rglob` raises `FileNotFoundError` ;
+      - `harness-parity` : WRITES under `.sdd/.build/`, which several smoke
+        tests scan (`reverse_smoke._unreferenced_reverse_scripts`).
+    Results are merged in the historical order, so the report is unchanged.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    def _isolated(fn, *args) -> list[dict]:
+        local = Checks()
+        fn(*args, local)
+        return local.items
+
+    pytests_dir = sdd_root / "python" / "tests"
+    with ThreadPoolExecutor(max_workers=6) as ex:
+        f_pytest = ex.submit(_isolated, _check_pytest_smoke, pytests_dir, claude_root)
+        f_telemetry = ex.submit(_isolated, _check_telemetry_health, claude_root)
+        f_pcfg = ex.submit(_isolated, _check_project_config_schema, py_dir, claude_root)
+        f_headers = ex.submit(_isolated, _check_stack_md_headers, claude_root)
+        f_pricing = ex.submit(_isolated, _check_pricing_freshness)
+        f_adr = ex.submit(_isolated, _check_adr_naming, claude_root)
+        pytest_items = f_pytest.result()  # serial checks below must not overlap it
+    bom_items = _isolated(_check_bom_files, claude_root)
+    harness_items = _isolated(_check_harness_parity, claude_root)
+
+    for items in (bom_items, f_telemetry.result(), f_pcfg.result(), pytest_items,
+                  f_headers.result(), f_pricing.result(), f_adr.result(),
+                  harness_items):
+        checks.items.extend(items)
 
 
 def _compute_timing(t_start: float, skip_heavy: bool, checks: "Checks") -> None:
@@ -1049,15 +1149,7 @@ def main() -> int:
     skip_heavy = args.silent_on_pass
 
     if not skip_heavy:
-        _check_bom_files(claude_root, checks)
-        _check_telemetry_health(claude_root, checks)
-        _check_project_config_schema(py_dir, claude_root, checks)
-        pytests_dir = sdd_root / "python" / "tests"
-        _check_pytest_smoke(pytests_dir, claude_root, checks)
-        _check_stack_md_headers(claude_root, checks)
-        _check_pricing_freshness(checks)
-        _check_adr_naming(claude_root, checks)
-        _check_harness_parity(claude_root, checks)
+        _run_heavy_checks(sdd_root, py_dir, claude_root, checks)
 
     _compute_timing(t_start, skip_heavy, checks)
     return _emit_report(checks, args, claude_root)

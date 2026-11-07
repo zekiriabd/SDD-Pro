@@ -43,12 +43,13 @@ Arguments: $ARGUMENTS
 Enchaîne uniquement les phases strictement nécessaires :
 
 ```
-PHASE 1 — Pseudo-US        (script feat_to_pseudo_us.py, déterministe)
+PHASE 1 — Pseudo-US + run  (script feat_to_pseudo_us.py --open-run, déterministe)
 PHASE 2 — Plans (opt-in)   (--with-plans → /dev-plan en mode :plan)
 PHASE 3 — Bootstrap + DB   (/arch-init, idempotent)
 PHASE 4 — Backend code     (agent dev-backend sur {n}-1)
 PHASE 5 — Frontend code    (agent dev-frontend sur {n}-1, SANS API Gate)
-PHASE 6 — Verdict POC      (bannière "ne pas déployer en prod")
+PHASE 6 — Gate build      (verify_build.py → run_close.py, gardé par le code)
+PHASE 7 — Verdict POC      (bannière "ne pas déployer en prod")
 ```
 
 **Délégation minimaliste** : `/sdd-poc` invoque **directement 2 agents
@@ -167,16 +168,26 @@ tourne. **Ne jamais la supprimer ou la condenser.**
 
 ```bash
 python .sdd/python/sdd_scripts/feat_to_pseudo_us.py \
-  --feat-number {n} {--force si $force} --json
+  --feat-number {n} {--force si $force} --open-run --json
 ```
+
+`--open-run` **ouvre le run `/sdd-poc`** dans console.db (même résolveur que
+`sdd_state.py new-run`, hérite de `$SDD_RUN_ID` s'il est posé) et renvoie son
+`run_id`. La clôture de ce run en succès est soumise **par le code** au gate de
+livraison `sdd-poc` (preuve build seule — `.sdd/docs/delivery-gates.md`).
 
 | Exit | Sens | Action |
 |---|---|---|
-| `0` SUCCESS | pseudo-US écrite ou déjà à jour | parser stdout JSON → `us_name`, continuer STEP 5 |
+| `0` SUCCESS | pseudo-US écrite ou déjà à jour, run ouvert | parser stdout JSON → `us_name`, `run_id` ; `export SDD_RUN_ID=$run_id` ; continuer STEP 5 |
 | `1` FAIL_FAST | FEAT introuvable/ambiguë OU US réelle existante sans `--force` | STOP, propager ERROR |
 | `3` INFRA_BLOCKED | erreur écriture, permission denied | STOP, propager ERROR |
 
-Stocker `$us_name`, `$us_id = "{n}-1"`. Émettre :
+Stocker `$us_name`, `$us_id = "{n}-1"`, `$RUN_ID` (= `run_id`).
+
+**Tout STOP à partir d'ici** (ERROR arch / dev-* / build) clôt d'abord le run en
+échec : `python .sdd/python/sdd_scripts/run_close.py --run-id "$RUN_ID" --status failed --error "[CLASS] …"`.
+
+Émettre :
 `[PO] Pseudo-US {n}-1-{us_name} générée (POC mode). (10%)`
 
 ---
@@ -261,19 +272,23 @@ POC = **build seul** (pas de QA, pas de review imposées — c'est voulu), mais 
 build **réellement exécuté** et réussi (`.sdd/docs/delivery-gates.md`) :
 
 ```bash
-python .sdd/python/sdd_scripts/verify_build.py --feat-number {n}
-python .sdd/python/sdd_scripts/delivery_gate.py authorize --feat-number {n} --workflow sdd-poc --json
+python .sdd/python/sdd_scripts/verify_build.py --feat-number {n} --run-id "$RUN_ID"
+# clôture GARDÉE : completed → authorize_delivery(workflow=sdd-poc) ;
+# sans preuve build → run clos failed / RED, exit 2 [DELIVERY_GATE_BLOCKED]
+python .sdd/python/sdd_scripts/run_close.py --run-id "$RUN_ID" --status completed --verdict GREEN
 ```
 
-**Aucun `[DONE]` si `authorize` sort ≠ 0** : émettre
+**Aucun `[DONE]` si `run_close.py` sort ≠ 0** (exit 2 = livraison refusée, run
+déjà clos `failed`) : émettre
 `🔴 [DONE/FAIL] FEAT {n} — [DELIVERY_GATE_BLOCKED] build non prouvé → verify_build.py. (90%)`.
-Les lignes « build vert » des agents dev-* ne valent pas preuve.
+Les lignes « build vert » des agents dev-* ne valent pas preuve. Aucune QA,
+aucun test, aucune review n'est exigé (profil `sdd-poc` = build seul).
 
 ---
 
 ## STEP 8 — Verdict POC (LOAD-BEARING bannière finale)
 
-Émettre **un seul bloc final** (uniquement si STEP 7.5 exit 0) :
+Émettre **un seul bloc final** (uniquement si `run_close.py` STEP 7.5 exit 0) :
 
 ```
 [DONE] FEAT {n}-{FeatName} livrée en mode POC. (100%)
@@ -322,7 +337,9 @@ avec préfixe `[CLASS]` préservé (cf. `error-classification.md §1`).
 - **Pas de Q/R utilisateur** après STEP 1.
 - **Bannières POC obligatoires** au STEP 3 et STEP 8 (load-bearing
   safety — supprimer l'une = violation).
-- **Aucun gate** : pas de plan-review, readiness, API Gate, QA, sdd-review.
+- **Aucun gate de qualité** : pas de plan-review, readiness, API Gate, QA,
+  sdd-review. **Seul gate : la livraison** (preuve build réelle), appliquée par
+  le code à la clôture du run `/sdd-poc` (`run_close.py`, STEP 7.5).
 - **Pas d'audit log** : `/sdd-poc` n'est pas un bypass de gate (comme
   `--force`) — c'est un **profile** distinct, choisi explicitement.
 

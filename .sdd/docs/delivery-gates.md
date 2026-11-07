@@ -15,10 +15,10 @@
 | Workflow | Preuves requises (`WORKFLOW_REQUIREMENTS`) | Points de sortie gardés (code) | Points de sortie gardés (prompt) |
 |---|---|---|---|
 | `/sdd-full` | readiness, build, tests, coverage, spec_compliance | `sdd_full_planner.compute_next_action` (étapes `verify-build` après dev_run, `verify-tests` après qa, `record-spec` après spec post-dev, `record-readiness` + gate final avant spec-book/`done`) ; `run_close.py` ; `sdd_state.py end-run` ; `sdd_state.py set-phase sdd_review` (clôture finale) | `sdd-full.md` STEP 2 (`authorize --workflow sdd-full` avant `[DONE]`) |
-| `/sdd-poc` | build (**pas de QA imposée**) | `run_close.py` / `sdd_state.py end-run` si run `/sdd-poc` | `sdd-poc.md` STEP 7.5 (`verify_build.py` + `authorize --workflow sdd-poc`) |
+| `/sdd-poc` | build (**pas de QA imposée**) | run **ouvert par le code** : `feat_to_pseudo_us.py --open-run` (commande `/sdd-poc`, même ouverture que `sdd_state.py new-run`) ; clôture `run_close.py` / `sdd_state.py end-run` (`completed` sans preuve build → `failed`, exit 2) | `sdd-poc.md` STEP 4 (`--open-run`) + STEP 7.5 (`verify_build.py` puis `run_close.py --status completed`) |
 | `/dev-run` | readiness, build | `dev_run_args.py --end pass\|warn` (refus → `dev_run=fail`, run `/dev-run` clos `failed`, exit 2) ; clôtures de run | `dev-run.md` STEP 7 |
 | `/qa-generate` | build, tests, coverage | clôtures de run `/qa-generate` | `qa-generate.md` STEP 7 |
-| `/sdd-review` | build, tests, spec_compliance | clôtures de run `/sdd-review` | `sdd-review.md` STEP 3.9 |
+| `/sdd-review` | build, tests, spec_compliance | verdict final de `sdd_review.py` (GREEN/YELLOW → `authorize_delivery(workflow="sdd-review")` via `delivery_wiring` ; refus ou module absent → verdict final `red`, exit 1, `quality_verdict` garde l'audit, persisté RED) ; clôtures de run `/sdd-review` | `sdd-review.md` STEP 2.9 (`record-spec` avant le verdict) + STEP 3.9 |
 | `/sdd-deploy` | build | clôtures de run `/sdd-deploy` (commande à venir) | — |
 
 Règle prompt commune : **aucun `[DONE]` / `[DONE/WARN]` si
@@ -36,6 +36,24 @@ exigent la preuve build ; Stage B exige aussi la preuve tests si `qa` est
 déclarée pass/warn ; un payload `buildVerified:false` / `executed:false` refuse
 même en `warn`. `[DELIVERY_EVIDENCE_MISSING]`, sans bypass. API gate (`qa`
 pendant `dev_run=running`) et `/sdd-poc` inchangés.
+
+`qa` TEST-FIRST (TDD RED, lève l'interblocage avec `enforce_tdd` strict) :
+prompt portant `test-first` / `--test-first` / `TDD RED`, dev_run ∉
+{running, pass, warn} et readiness ∈ {pass, warn} → ALLOW
+(`[PHASE_ORDER_TEST_FIRST]`, WARN). N'enregistre aucune phase, ne vaut aucune
+preuve ; dès dev_run running/pass/warn le marqueur est ignoré (règle nominale
++ preuve build). Détail : docstring du hook.
+
+Gates manuelles `gate_decide.py` (`afterUS` / `afterReadiness` / `afterPlan` /
+`afterCode`) : **revues humaines pré-livraison, sans effet de livraison**.
+Une décision `validated` / `skipped` (y compris `afterCode`) ne fait que
+débloquer l'étape suivante du planner ; elle ne clôt aucun run, n'écrit aucune
+preuve et ne consulte pas `authorize_delivery`. Après `afterCode`, le planner
+exige toujours `verify-build` (puis `verify-tests`, `record-spec`,
+`record-readiness`) : une validation humaine **s'ajoute** aux preuves, ne les
+remplace jamais. Aucun code ajouté côté `gate_decide.py` (rien à garder) ;
+non-régression : `test_gate_decide_after_code_*` dans
+`tests/test_delivery_gate_wiring.py`.
 
 Relance / `--resume` : une preuve absente ou **périmée** (empreinte des
 sources ou des FEAT/US changée) replanifie `verify-*` ; un statut `pass`

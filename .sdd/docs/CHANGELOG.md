@@ -25,6 +25,7 @@ Format : [version] — date courte. Sections : `Breaking`, `Added`, `Changed`, `
 
 ### Added
 
+- **Écritures shell couvertes** (`sdd_lib/shell_write_targets.py`) : `protect_framework` et `enforce_tdd` (désormais câblé sur `Bash|PowerShell`) appliquent leur décision du mode fichier à chaque cible extraite d'une commande (heredoc `cat > X <<EOF`, `Set-Content`, `Out-File`, `tee`, `cp`/`mv`, `sed -i`, `python -c open(…,'w')`, `[IO.File]::WriteAllText`, `bash -c`, `cd X && …`) ; `block_secret_access` couvre les globs (`cat .en*`) et les heredocs d'interpréteur. Incident : 19 `.cs` créés sans test par heredoc, écritures sous `.sdd/` par shell.
 - `enforce_phase_order` (ordre readiness → dev → qa → reviewers) et
   `enforce_max_parallel` (`MaxParallel` appliqué, réservation en PreToolUse).
 - `block_secret_access` : un sous-agent ne lit ni `.env*` ni les configs

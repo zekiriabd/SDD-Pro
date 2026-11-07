@@ -22,3 +22,15 @@ def test_unresolved_braced_is_reported():
     missing: set[str] = set()
     assert resolve_value("${NOPE}", {}, missing) == "${NOPE}"
     assert missing == {"NOPE"}
+
+
+def test_mixed_case_shell_var_resolved(monkeypatch, tmp_path):
+    """Windows : `os.environ` upper-cases names ; a mixed-case placeholder
+    (`${FrontendLocalPort}`, the stack.md convention) must still resolve from
+    the shell (regression 2026-11-07 : it only ever resolved from a dotenv)."""
+    from sdd_lib.env_placeholders import resolve_config
+
+    monkeypatch.setenv("SddMixedCasePort", "5173")
+    (tmp_path / "workspace").mkdir()  # isolate the dotenv lookup from the repo
+    out = resolve_config({"Port": "${SddMixedCasePort}"}, tmp_path, warn_unresolved=False)
+    assert out == {"Port": "5173"}

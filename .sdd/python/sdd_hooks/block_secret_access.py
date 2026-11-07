@@ -32,7 +32,12 @@ Détection par tool :
   * Glob : `tool_input.pattern` (+ `path`) — un glob qui vise nommément ces
     fichiers.
   * Bash / PowerShell : tout token de la commande qui désigne un tel
-    fichier (`cat`, `type`, `Get-Content`, `grep`, `cp`, `python -c open(…)`…).
+    fichier (`cat`, `type`, `Get-Content`, `less`, `head`, `grep`, `cp`,
+    `source`, `< .env`, `python -c open(…)`, `[IO.File]::ReadAllText(…)`…),
+    les globs passés à une commande de lecture (`cat .en*`, `type .e?v`) et
+    le code des heredocs d'interpréteur (`python - <<EOF open('.env') EOF`).
+    Le corps d'un heredoc de DONNÉES (`cat > f <<EOF`) n'est pas analysé
+    (découpage partagé `sdd_lib.shell_write_targets.split_segments`).
     Heuristique : un `grep -r Password workspace/src` (répertoire entier)
     n'est PAS détecté, pas plus qu'un chemin construit dynamiquement.
 
@@ -282,16 +287,80 @@ def _candidate_paths(payload: dict) -> list[str]:
     elif tool in ("bash", "powershell"):
         cmd = ti.get("command")
         if isinstance(cmd, str):
-            for tok in _TOKEN_RE.findall(cmd):
+            out.extend(_shell_candidate_paths(cmd))
+    return out
+
+
+#: Commandes qui LISENT le contenu de leurs arguments (pour l'expansion de
+#: glob : `cat .en*`, `Get-Content .e?v`). Un glob passé à une autre
+#: commande (`find -name "*.pem"`, `ls`) n'est pas une lecture de contenu.
+_READER_HEADS = frozenset({
+    "cat", "tac", "type", "gc", "get-content", "less", "more", "head", "tail", "bat",
+    "nl", "strings", "xxd", "od", "hexdump", "base64", "sed", "awk", "grep", "egrep",
+    "fgrep", "rg", "findstr", "select-string", "sls", "source", ".", "cp", "copy",
+    "copy-item", "cpi", "import-csv", "iconv", "sort", "uniq", "cut", "diff", "cmp",
+    "vi", "vim", "nano", "notepad", "code", "openssl", "jq", "yq", "dos2unix",
+})
+#: Noms représentatifs de fichiers secrets, testés contre les globs.
+_SECRET_PROBES = (".env", ".env.local", ".env.production", "id_rsa", "key.pem",
+                  "cert.pfx", "cert.p12")
+_INNER_SECRET_RE = re.compile(
+    r"[\w.\-/:]*?(?:\.env[\w.]*|\.pem|\.pfx|\.p12|id_rsa\w*|"
+    r"appsettings[\w.]*\.json|application[\w.\-]*\.(?:ya?ml|properties)|"
+    r"config/default\.json|secrets/[\w.\-/]*)")
+_INTERP_HEADS = frozenset({"python", "python3", "py", "node", "ruby", "perl", "php",
+                           "pwsh", "powershell", "bash", "sh", "zsh", "cmd"})
+
+
+def _head_word(tok: str) -> str:
+    h = _norm(tok).lower().rsplit("/", 1)[-1]
+    for suf in (".exe", ".cmd", ".bat"):
+        if h.endswith(suf):
+            h = h[: -len(suf)]
+    return h
+
+
+def _shell_candidate_paths(cmd: str) -> list[str]:
+    """Chemins candidats d'une commande Bash/PowerShell.
+
+    * chaque token de chaque segment (lecture, copie, `source`, redirection
+      d'entrée `< .env`…), plus les chemins enfouis dans du code inline
+      (`python -c "open('.env')"`, `[IO.File]::ReadAllText('.env')`) ;
+    * corps de heredoc / here-string : analysés seulement quand ils sont du
+      CODE (interpréteur en tête) — un heredoc de données écrit dans un
+      fichier (`cat > notes.md <<EOF … .pem … EOF`) n'est pas une lecture ;
+    * globs passés à une commande de lecture (`cat .en*`, `type .e?v`) :
+      développés contre des noms de fichiers secrets représentatifs.
+    """
+    from sdd_lib.shell_write_targets import split_segments
+    out: list[str] = []
+    for seg in split_segments(cmd):
+        text = seg.text
+        words = [_norm(t) for t in _TOKEN_RE.findall(text)]
+        while words and (re.match(r"^[A-Za-z_]\w*=", words[0])
+                         or _head_word(words[0]) in ("sudo", "env", "command", "exec")):
+            words = words[1:]
+        head = _head_word(words[0]) if words else ""
+        code_parts = [text]
+        if head in _INTERP_HEADS:
+            code_parts += list(seg.heredocs) + list(seg.herestrings.values())
+        for part in code_parts:
+            for tok in _TOKEN_RE.findall(part):
                 t = _norm(tok)
                 if "=" in t and not t.startswith(("/", ".")):
                     t = t.split("=", 1)[1]
                 # code inline : chemins dans des chaînes Python/PS
-                for inner in re.findall(r"[\w.\-/:]*?(?:\.env[\w.]*|\.pem|\.pfx|\.p12|id_rsa\w*|"
-                                        r"appsettings[\w.]*\.json|application[\w.\-]*\.(?:ya?ml|properties)|"
-                                        r"config/default\.json|secrets/[\w.\-/]*)", t):
-                    out.append(inner)
+                out.extend(_INNER_SECRET_RE.findall(t))
                 out.append(t)
+        if head in _READER_HEADS:
+            for t in words[1:]:
+                if t.startswith("-") or not any(ch in t for ch in "*?["):
+                    continue
+                pat = t.rsplit("/", 1)[-1]
+                if pat and pat not in ("*", "*.*") and any(fnmatch(probe, pat) for probe in _SECRET_PROBES):
+                    # Le glob lui-même n'est pas classable : on rend le nom
+                    # secret qu'il atteindrait (`.en*` → `.env`).
+                    out.append(next(pr for pr in _SECRET_PROBES if fnmatch(pr, pat)))
     return out
 
 
