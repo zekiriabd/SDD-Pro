@@ -82,6 +82,10 @@ __all__ = [
 
 
 
+#: Valeurs admises pour la clé `effort:` du frontmatter agent (Claude Code).
+_VALID_EFFORTS: frozenset[str] = frozenset({"low", "medium", "high", "xhigh", "max"})
+
+
 class BuildSafetyError(RuntimeError):
     """Violation d'un invariant de sécurité (sortie hors `.sdd/.build/`)."""
 
@@ -114,9 +118,14 @@ def _ensure_under_build(out_dir: Path, sdd_home: Path) -> Path:
 
 
 def compose_frontmatter(fields: dict[str, str]) -> str:
-    """Recompose le frontmatter Claude Code (ordre canonique name/desc/model/tools)."""
+    """Recompose le frontmatter Claude Code (ordre canonique name/desc/model/effort/tools).
+
+    `effort` (2026-11-07) : niveau de raisonnement Claude Code par agent
+    (`low|medium|high|xhigh|max`), surcharge le niveau de session. Porté par
+    le pivot `.sdd/agents/*.md` (clé `effort:`) et miroité dans `loader.yml`.
+    """
     lines = ["---"]
-    for key in ("name", "description", "model", "tools"):
+    for key in ("name", "description", "model", "effort", "tools"):
         lines.append(f"{key}: {fields[key]}")
     lines.append("---")
     return "\n".join(lines) + "\n"
@@ -199,14 +208,18 @@ class Adapter(ABC):
     def emit_rules(self, out_dir: Path) -> list[EmitResult]:
         """Régénère la couche rules du harness sous `out_dir`."""
 
+    def emit_skills(self, out_dir: Path) -> list[EmitResult]:
+        """Émet la couche skills (passthrough). Non transpilée hors claude-code."""
+        raise NotImplementedError(f"skills non transpilés pour {self.name}")
+
 
 class ClaudeAdapter(Adapter):
     """Adaptateur Claude Code — mode identité (couches AGENTS + COMMANDES).
 
     Pour chaque pivot `.sdd/agents/{name}.agent.yaml` :
     1. résout `model_tier` -> `model:` concret via la `tier_map` de
-       `providers/{provider}.yaml` (deep -> claude-opus-4-8,
-       balanced -> claude-sonnet-4-6, fast -> claude-haiku-4-5) ;
+       `providers/{provider}.yaml` (deep -> claude-opus-5-5,
+       balanced -> claude-sonnet-5-5, fast -> claude-haiku-5-5) ;
     2. recompose le frontmatter Claude Code {name, description, model, tools} ;
     3. RÉATTACHE le corps markdown lu depuis `body_source` (le
        `.claude/agents/{name}.md` d'origine — lecture seule) ;
@@ -249,9 +262,15 @@ class ClaudeAdapter(Adapter):
         else:
             tools_list = [str(t).strip() for t in (tools_raw or []) if str(t).strip()]
 
-        for key in ("name", "description", "model_tier"):
+        for key in ("name", "description", "model_tier", "effort"):
             if key not in pivot:
                 return EmitResult(agent, None, f"pivot incomplet: clé '{key}' absente")
+        effort = str(pivot["effort"]).strip()
+        if effort not in _VALID_EFFORTS:
+            return EmitResult(
+                agent, None,
+                f"effort {effort!r} invalide (attendu : {', '.join(sorted(_VALID_EFFORTS))})",
+            )
 
         model = tier_map.get(str(pivot["model_tier"]))
         if model is None:
@@ -270,6 +289,7 @@ class ClaudeAdapter(Adapter):
                 "name": pivot["name"],
                 "description": " ".join(str(pivot["description"]).split("\n")),
                 "model": model,
+                "effort": effort,
                 "tools": tools_line,
             }
         )
@@ -399,6 +419,68 @@ class ClaudeAdapter(Adapter):
             target.write_text(content, encoding="utf-8", newline="\n")
             results.append(EmitResult(name, target))
         return results
+
+
+    # ------------------------------------------------------------------ #
+    # Couche SKILLS (passthrough — arborescences .sdd/skills/<name>/)        #
+    # ------------------------------------------------------------------ #
+
+    def _skills_manifest(self) -> list[dict]:
+        return _load_skills_manifest(self._sdd_home)
+
+    def emit_skills(self, out_dir: Path, only: set[str] | None = None) -> list[EmitResult]:
+        """Copie les skills (toutes, ou restreintes à `only`) sous `{out_dir}/skills/<name>/`.
+
+        Audit 2026-11-06 (run FEAT 15) : `skills-manifest.yaml` déclarait
+        `claude-code: native-autotrigger` mais `.claude/skills/` n'existait pas —
+        Claude Code ne découvre les skills que sous `.claude/skills/<name>/SKILL.md`,
+        donc les 13 skills n'étaient JAMAIS chargés. Émission = passthrough :
+        l'arborescence `source` de chaque entrée du manifest est copiée telle
+        quelle (SKILL.md + fichiers annexes : references/, scripts/, LICENSE…),
+        sans réécriture. Les `__pycache__` sont ignorés.
+        """
+        import shutil
+
+        safe_out = _ensure_under_build(Path(out_dir), self._sdd_home)
+        skills_out = safe_out / "skills"
+        skills_out.mkdir(parents=True, exist_ok=True)
+        results: list[EmitResult] = []
+        for entry in self._skills_manifest():
+            name = str(entry.get("name") or "")
+            if not name:
+                results.append(EmitResult("<sans-nom>", None, "entrée manifest sans 'name'"))
+                continue
+            if only is not None and name not in only:
+                continue
+            source = entry.get("source")
+            if not source:
+                results.append(EmitResult(name, None, "entrée manifest sans 'source'"))
+                continue
+            src_dir = (self._repo_root / str(source)).resolve()
+            if not (src_dir / "SKILL.md").is_file():
+                results.append(EmitResult(name, None, f"SKILL.md introuvable: {src_dir}"))
+                continue
+            target = skills_out / name
+            if target.exists():
+                shutil.rmtree(target)
+            shutil.copytree(
+                src_dir, target,
+                ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
+            )
+            results.append(EmitResult(name, target / "SKILL.md"))
+        return results
+
+
+def _load_skills_manifest(sdd_home: Path) -> list[dict]:
+    """Charge la liste des skills depuis `.sdd/skills-manifest.yaml`."""
+    manifest_path = sdd_home / "skills-manifest.yaml"
+    if not manifest_path.is_file():
+        raise ConfigError(f"manifest skills introuvable: {manifest_path}")
+    data = load_yaml(manifest_path)
+    skills = data.get("skills")
+    if not isinstance(skills, list) or not skills:
+        raise ConfigError(f"manifest skills vide ou malformé: {manifest_path}")
+    return skills
 
 
 def _load_rules_manifest(sdd_home: Path) -> list[dict]:
@@ -937,6 +1019,11 @@ def main(argv: list[str] | None = None) -> int:
         help="émet la couche rules (claude-code — mode identité)",
     )
     parser.add_argument(
+        "--skills-only",
+        action="store_true",
+        help="émet la couche skills (claude-code — passthrough .sdd/skills/<name>/)",
+    )
+    parser.add_argument(
         "--provider",
         default=None,
         help="provider de modèle (anthropic | openai | google | moonshot) — "
@@ -957,13 +1044,14 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    if not (args.agents_only or args.commands_only or args.memory_only or args.rules_only):
+    if not (args.agents_only or args.commands_only or args.memory_only
+            or args.rules_only or args.skills_only):
         print(
             "ERROR: harness_build — mode non supporté\n"
             "CAUSE: [INVALID_MODE] préciser --agents-only, --commands-only, "
-            "--rules-only et/ou --memory-only (mode identité Phase 2)\n"
-            "FIX: relancer avec --agents-only, --commands-only, --rules-only "
-            "et/ou --memory-only",
+            "--rules-only, --skills-only et/ou --memory-only (mode identité Phase 2)\n"
+            "FIX: relancer avec --agents-only, --commands-only, --rules-only, "
+            "--skills-only et/ou --memory-only",
             file=sys.stderr,
         )
         return 2
@@ -1049,6 +1137,13 @@ def main(argv: list[str] | None = None) -> int:
                 f"[harness_build] {harness}: "
                 f"{sum(1 for r in rule_results if r.ok)} rule(s) régénérée(s) sous {args.out}"
             )
+        if args.skills_only:
+            skill_results = adapter.emit_skills(args.out)
+            results.extend(skill_results)
+            print(
+                f"[harness_build] {harness}: "
+                f"{sum(1 for r in skill_results if r.ok)} skill(s) régénéré(s) sous {args.out}"
+            )
         if args.memory_only:
             memory_written = adapter.emit_memory_file(args.out)
             print(
@@ -1059,7 +1154,7 @@ def main(argv: list[str] | None = None) -> int:
             "ERROR: harness_build — couche non transpilée pour ce harnais\n"
             f"CAUSE: [INVALID_MODE] {exc}\n"
             "FIX: pour codex/gemini-cli : --memory-only + --commands-only supportés "
-            "(agents/rules hors périmètre — émulés au runtime / inline)",
+            "(agents/rules/skills hors périmètre — émulés au runtime / inline)",
             file=sys.stderr,
         )
         return 2

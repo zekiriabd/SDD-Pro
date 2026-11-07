@@ -14,6 +14,13 @@ Why we can measure even without v7.1 harness wiring:
     baseline reported in `docs/cache-strategy.md` (40.8% hit, 2026-05-20)
     was measured this way.
 
+Audit tokens 2026-11-07 : la lecture passe par `sdd_lib.transcript_usage`
+(lecteur partagé avec le hook `record_token_usage`). Un même message est
+écrit plusieurs fois dans le JSONL (un enregistrement par bloc streamé, même
+`message.id`, même `usage`) — l'ancien parseur comptait chaque ligne comme un
+tour, gonflant tours ET tokens de ×2 à ×4. Désormais dédupliqué par
+`message.id` (dernière occurrence).
+
 Usage::
 
     # Default (current SDD_Pro repo, last 7 days)
@@ -60,6 +67,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sdd_lib.exit_codes import CORRECTIBLE, FAIL_FAST, SUCCESS  # noqa: E402
 from sdd_lib.paths import repo_root  # noqa: E402
+from sdd_lib.transcript_usage import read_transcript_usage  # noqa: E402
 
 
 @dataclass
@@ -141,56 +149,36 @@ def iter_jsonl_files(logs_dir: Path) -> list[Path]:
 
 
 def parse_logs(logs_dir: Path, since_epoch: float | None = None) -> CacheStats:
+    """Agrège tous les transcripts du dossier (dédupliqués par message.id)."""
     stats = CacheStats()
     for jsonl in iter_jsonl_files(logs_dir):
-        if since_epoch is not None and jsonl.stat().st_mtime < since_epoch:
-            continue
         try:
-            with open(jsonl, "r", encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    try:
-                        obj = json.loads(line)
-                    except json.JSONDecodeError:
-                        continue
-                    msg = obj.get("message")
-                    if not isinstance(msg, dict):
-                        continue
-                    usage = msg.get("usage")
-                    if not isinstance(usage, dict):
-                        continue
-                    stats.turns += 1
-                    stats.input_tokens += int(usage.get("input_tokens", 0) or 0)
-                    stats.cache_read_input_tokens += int(
-                        usage.get("cache_read_input_tokens", 0) or 0
-                    )
-                    stats.cache_creation_input_tokens += int(
-                        usage.get("cache_creation_input_tokens", 0) or 0
-                    )
-                    stats.output_tokens += int(usage.get("output_tokens", 0) or 0)
-                    cc = usage.get("cache_creation") or {}
-                    if isinstance(cc, dict):
-                        stats.ephemeral_5m += int(cc.get("ephemeral_5m_input_tokens", 0) or 0)
-                        stats.ephemeral_1h += int(cc.get("ephemeral_1h_input_tokens", 0) or 0)
-                    model = msg.get("model")
-                    if isinstance(model, str):
-                        bucket = stats.per_model.setdefault(model, {
-                            "turns": 0, "input": 0, "cache_read": 0,
-                            "cache_creation": 0, "output": 0,
-                        })
-                        bucket["turns"] += 1
-                        bucket["input"] += int(usage.get("input_tokens", 0) or 0)
-                        bucket["cache_read"] += int(
-                            usage.get("cache_read_input_tokens", 0) or 0
-                        )
-                        bucket["cache_creation"] += int(
-                            usage.get("cache_creation_input_tokens", 0) or 0
-                        )
-                        bucket["output"] += int(usage.get("output_tokens", 0) or 0)
+            if since_epoch is not None and jsonl.stat().st_mtime < since_epoch:
+                continue
         except OSError:
             continue
+        usage = read_transcript_usage(jsonl)
+        if not usage.found:
+            continue
+        for model, totals in usage.by_model.items():
+            stats.turns += totals.turns
+            stats.input_tokens += totals.input_tokens
+            stats.cache_read_input_tokens += totals.cache_read_input_tokens
+            stats.cache_creation_input_tokens += totals.cache_creation_input_tokens
+            stats.output_tokens += totals.output_tokens
+            stats.ephemeral_5m += totals.ephemeral_5m_input_tokens
+            stats.ephemeral_1h += totals.ephemeral_1h_input_tokens
+            if model == "<unrecorded>":
+                continue
+            bucket = stats.per_model.setdefault(model, {
+                "turns": 0, "input": 0, "cache_read": 0,
+                "cache_creation": 0, "output": 0,
+            })
+            bucket["turns"] += totals.turns
+            bucket["input"] += totals.input_tokens
+            bucket["cache_read"] += totals.cache_read_input_tokens
+            bucket["cache_creation"] += totals.cache_creation_input_tokens
+            bucket["output"] += totals.output_tokens
     return stats
 
 

@@ -74,7 +74,7 @@ n'est pas passé et `{n}` la cible explicitement.
 
 ## STEP 2 — Rédiger les sections humaines (agent, borné)
 
-Pour chaque FEAT à humaniser, spawn l'agent `specbook-writer` (Sonnet 4.6) avec
+Pour chaque FEAT à humaniser, spawn l'agent `specbook-writer` (Sonnet 5.5) avec
 l'identifiant de FEAT. Parallélisme borné (`MaxParallel`, défaut 3) — les
 sections sont des fichiers disjoints (`sections/{feat-id}.md`), donc parallèle-safe.
 Chaque agent écrit sa section vulgarisée en cache. Une FEAT inchangée est

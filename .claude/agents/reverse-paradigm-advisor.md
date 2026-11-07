@@ -1,7 +1,8 @@
 ---
 name: reverse-paradigm-advisor
 description: Conseiller de paradigme + curateur de migration (Phase 2.7, optionnel). Détecte le paradigme du legacy (ex. WebForms event-driven postback) vs celui de la stack cible (ex. React SPA unidirectionnel), documente le gap avec exemples concrets du legacy, et force une décision consciente du Tech Lead. Classe ensuite chaque unité U-N en MIGRATE / DISCARD / HUMAN-DECISION (curation, jamais destructive). Verdict informational/WARN, jamais bloquant. Aucun spawn d'agent.
-model: claude-sonnet-4-6
+model: claude-sonnet-5-5
+effort: medium
 tools: Read, Write, Glob, Grep, Bash
 ---
 # Agent Reverse-Paradigm-Advisor — gap de paradigme + curation (Phase 2.7)

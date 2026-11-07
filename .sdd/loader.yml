@@ -123,12 +123,13 @@ updated: "2026-08-30"
 # =========================================================================
 
 # -------------------------------------------------------------------------
-# Agent: po (Sonnet 4.6)
+# Agent: po (Sonnet 5.5)
 # Phase: 2 (US generation)
 # Token footprint estimé: ~5-15 KB par invocation
 # -------------------------------------------------------------------------
 po:
   model_tier: balanced   # parité frontmatter agents/po.md — enforced par tests/test_loader_model_parity.py
+  effort: medium   # Claude Code `effort:` (low|medium|high|xhigh|max) — surcharge le niveau de session ; parité frontmatter agents/po.md (tests/test_loader_model_parity.py). Politique 2026-11-07 : high = agents qui génèrent du code ou bootstrappent (dev-*, arch) ; medium = tout le reste (découpage, revue, documentation — raisonnement court, coût réduit).
   reads:
     # Order: stable → semi → volatile (cache_control canonical order, cf. sdd_lib/cache_control.py)
     - .sdd/templates/us.template.md         # cache_layer: stable (template invariant)
@@ -154,13 +155,14 @@ po:
 # -------------------------------------------------------------------------
 
 # -------------------------------------------------------------------------
-# Agent: arch (Sonnet 4.6)
+# Agent: arch (Sonnet 5.5)
 # Phase: 3 (bootstrap + DB scaffolding + digest)
 # Token footprint estimé: ~10-30 KB (lecture stacks complète)
 # Une seule invocation par projet (idempotent)
 # -------------------------------------------------------------------------
 arch:
   model_tier: balanced   # parité frontmatter agents/arch.md — enforced par tests/test_loader_model_parity.py
+  effort: high   # Claude Code `effort:` (low|medium|high|xhigh|max) — surcharge le niveau de session ; parité frontmatter agents/arch.md (tests/test_loader_model_parity.py). Politique 2026-11-07 : high = agents qui génèrent du code ou bootstrappent (dev-*, arch) ; medium = tout le reste (découpage, revue, documentation — raisonnement court, coût réduit).
   reads:
     # Order: stable → semi → volatile (cache_control canonical order, cf. sdd_lib/cache_control.py)
     # v7.0.x audit 2026-06-08 — stack.md unified to `stable` across all 9 agents
@@ -251,26 +253,30 @@ arch:
     - workspace/src/**/*.razor             # responsabilité dev-frontend
 
 # -------------------------------------------------------------------------
-# Agent: dev-backend (Opus 4.8 — depuis 2026-05-08, split modèles)
+# Agent: dev-backend (Opus 5.5 — depuis 2026-05-08, split modèles)
 # Phase: 4 (génération code serveur)
 # Token footprint estimé: ~3-7 KB par US (grâce à CLAUDE.md projet)
 # Invocations parallèles : 1 par US backend
 # -------------------------------------------------------------------------
 dev-backend:
   model_tier: deep   # parité frontmatter agents/dev-backend.md — enforced par tests/test_loader_model_parity.py
+  effort: high   # Claude Code `effort:` (low|medium|high|xhigh|max) — surcharge le niveau de session ; parité frontmatter agents/dev-backend.md (tests/test_loader_model_parity.py). Politique 2026-11-07 : high = agents qui génèrent du code ou bootstrappent (dev-*, arch) ; medium = tout le reste (découpage, revue, documentation — raisonnement court, coût réduit).
   # cache_layer annotations v7.0.0 P2 #11 — gain estimé -50% coût Opus
   # après implémentation cache_control markers (v7.1).
   # Order: stable → semi → volatile (cache_control canonical order, cf. sdd_lib/cache_control.py)
   reads:
     # --- stable (invariant inter-FEAT, cachable 5 min TTL) ---
     - { path: workspace/stack/stack.md, cache_layer: stable }                # Project Config
+    # Stacks : lecture PAR SECTION (TOC Grep + Read offset/limit), jamais entière —
+    # cf. agents/dev-backend.md STEP 3 item 3 (audit tokens 2026-11-06 : stacks de
+    # 29-62 KB lus intégralement, jusqu'à 4× par run).
     - { path: ".sdd/stacks/backend/{active}.md", cache_layer: stable }
     # fullstack/* chargeable mais 🟡 expérimental (aucun combo validé bout-en-bout) — n'utiliser que si AppType=fullstack.
     - { path: ".sdd/stacks/fullstack/{active}.md", cache_layer: stable, status: experimental }
     - { path: ".sdd/stacks/archi/{ArchiPattern}.md", cache_layer: stable }  # MVC | DDD | microservice (🟡 expérimental pour microservice)
     - { path: ".sdd/stacks/auth/{active}.md", cache_layer: stable }
     - { path: .sdd/rules/dev-shared-preflight.md, cache_layer: stable }   # v7.0.0 — STEP 0/0.5/1/1.bis hoist cross-agent
-    - { path: .sdd/rules/build-and-loop.md, cache_layer: stable }         # v7.0.0 — SSOT patterns dev-* (ex backend-first + dev-shared)
+    - { path: .sdd/rules/build-and-loop.md, cache_layer: stable }         # v7.0.0 — SSOT patterns dev-* ; Read BORNÉ Partie B §1.bis-§7.8 (offset/limit, 2026-11-06)
     - { path: .sdd/digests/error-classification.dev-backend.md, cache_layer: stable }   # v6.1 — taxonomie classes + pilotage build_loop
     # --- semi-stable (invariant intra-FEAT, invalidé par /arch-init) ---
     - { path: "workspace/src/{Project}/CLAUDE.md", cache_layer: semi }        # CLAUDE.md projet
@@ -328,7 +334,7 @@ dev-backend:
     - "frontend-only US"                # skipped sans erreur
 
 # -------------------------------------------------------------------------
-# Agent: dev-frontend (Opus 4.8 — depuis 2026-05-08, split modèles)
+# Agent: dev-frontend (Opus 5.5 — depuis 2026-05-08, split modèles)
 # Phase: 4 (génération code client)
 # Token footprint estimé: ~5-10 KB par US (HTML + CLAUDE.md + stacks)
 # Invocations parallèles : 1 par US frontend
@@ -337,16 +343,19 @@ dev-backend:
 # -------------------------------------------------------------------------
 dev-frontend:
   model_tier: deep   # parité frontmatter agents/dev-frontend.md — enforced par tests/test_loader_model_parity.py
+  effort: high   # Claude Code `effort:` (low|medium|high|xhigh|max) — surcharge le niveau de session ; parité frontmatter agents/dev-frontend.md (tests/test_loader_model_parity.py). Politique 2026-11-07 : high = agents qui génèrent du code ou bootstrappent (dev-*, arch) ; medium = tout le reste (découpage, revue, documentation — raisonnement court, coût réduit).
   # cache_layer annotations v7.0.0 P2 #11 — symétrie avec dev-backend
   # Order: stable → semi → volatile (cache_control canonical order, cf. sdd_lib/cache_control.py)
   reads:
     # --- stable (invariant inter-FEAT, cachable 5 min TTL) ---
     - workspace/stack/stack.md              # lu UNE FOIS en STEP 0 Phase B (v5.0) · cache_layer: stable
+    # Stacks : lecture PAR SECTION (TOC Grep + Read offset/limit), jamais entière —
+    # cf. agents/dev-frontend.md STEP 4 item 4 (audit tokens 2026-11-06).
     - .sdd/stacks/frontend/{active}.md  # fallback si CLAUDE.md insuffisant · cache_layer: stable
     - .sdd/stacks/ui/{active}.md        # mapping composants DS (§2 + §7) · cache_layer: stable
     - .sdd/stacks/auth/{active}.md      # patterns d'injection auth client · cache_layer: stable
     - .sdd/rules/dev-shared-preflight.md   # v7.0.0 — STEP 0/0.5/1/1.bis hoist cross-agent · cache_layer: stable
-    - .sdd/rules/build-and-loop.md         # v7.0.0 — SSOT patterns dev-* (ex backend-first + dev-shared) · cache_layer: stable
+    - .sdd/rules/build-and-loop.md         # v7.0.0 — SSOT patterns dev-* ; Read BORNÉ Partie B §1.bis-§7.8 (offset/limit, 2026-11-06) · cache_layer: stable
     - .sdd/digests/error-classification.dev-frontend.md   # v6.1 — taxonomie classes + pilotage build_loop · cache_layer: stable
     # --- semi-stable (invariant intra-FEAT) ---
     - workspace/src/{Project}/CLAUDE.md    # CLAUDE.md par projet · cache_layer: semi
@@ -408,7 +417,7 @@ dev-frontend:
 #  en fin de fichier — cf. section "## Removed agents (backward-compat)".)
 
 # -------------------------------------------------------------------------
-# Agent: elicitor (Sonnet 4.6) — v3, P3
+# Agent: elicitor (Sonnet 5.5) — v3, P3
 # Phase: 1.5 (élicitation structurée, optionnelle)
 # Token footprint estimé:
 #   - interactif: ~10-15 KB (5×1-2 questions + synthèse)
@@ -416,6 +425,7 @@ dev-frontend:
 # -------------------------------------------------------------------------
 elicitor:
   model_tier: balanced   # parité frontmatter agents/elicitor.md — enforced par tests/test_loader_model_parity.py
+  effort: medium   # Claude Code `effort:` (low|medium|high|xhigh|max) — surcharge le niveau de session ; parité frontmatter agents/elicitor.md (tests/test_loader_model_parity.py). Politique 2026-11-07 : high = agents qui génèrent du code ou bootstrappent (dev-*, arch) ; medium = tout le reste (découpage, revue, documentation — raisonnement court, coût réduit).
   reads:
     # Order: stable → semi → volatile (cache_control canonical order, cf. sdd_lib/cache_control.py)
     - .sdd/templates/risks-assumptions.template.md  # cache_layer: stable
@@ -447,7 +457,7 @@ elicitor:
     - quick: "--quick flag, génération directe sans question"
 
 # -------------------------------------------------------------------------
-# Agent: qa (Sonnet 4.6) — v3.1.0
+# Agent: qa (Sonnet 5.5) — v3.1.0
 # Phase: 5 (tests unitaires + coverage + quality scan)
 # Token footprint estimé:
 #   - quality-only: ~3 KB (rapport seulement, scan déterministe)
@@ -457,6 +467,7 @@ elicitor:
 # -------------------------------------------------------------------------
 qa:
   model_tier: balanced   # parité frontmatter agents/qa.md — enforced par tests/test_loader_model_parity.py
+  effort: medium   # Claude Code `effort:` (low|medium|high|xhigh|max) — surcharge le niveau de session ; parité frontmatter agents/qa.md (tests/test_loader_model_parity.py). Politique 2026-11-07 : high = agents qui génèrent du code ou bootstrappent (dev-*, arch) ; medium = tout le reste (découpage, revue, documentation — raisonnement court, coût réduit).
   reads:
     # Order: stable → semi → volatile (cache_control canonical order, cf. sdd_lib/cache_control.py)
     # F-M4 (audit 2026-08-30) : stack.md était en forbidden_reads alors que
@@ -513,7 +524,7 @@ qa:
 #  — cf. section "## Removed agents (backward-compat)".)
 
 # -------------------------------------------------------------------------
-# Agent: code-reviewer (Sonnet 4.6) — depuis v6.3.1
+# Agent: code-reviewer (Sonnet 5.5) — depuis v6.3.1
 # Phase: 6.4 (post-dev backend + API Gate + frontend, avant /qa-generate)
 # Token footprint estimé: ~8-15 KB par feature de 3-5 US
 # Invocation: manuelle en v6.3.1.0 ("review le code de la FEAT N")
@@ -522,12 +533,13 @@ qa:
 # -------------------------------------------------------------------------
 code-reviewer:
   model_tier: balanced   # parité frontmatter agents/code-reviewer.md — enforced par tests/test_loader_model_parity.py
+  effort: medium   # Claude Code `effort:` (low|medium|high|xhigh|max) — surcharge le niveau de session ; parité frontmatter agents/code-reviewer.md (tests/test_loader_model_parity.py). Politique 2026-11-07 : high = agents qui génèrent du code ou bootstrappent (dev-*, arch) ; medium = tout le reste (découpage, revue, documentation — raisonnement court, coût réduit).
   reads:
     - .sdd/rules/auditor-coordination.md    # matrice ownership findings 1 domaine = 1 owner (v7.0.1-dev, audit 2026-06-11 M7) · cache_layer: stable
     # Order: stable → semi → volatile (cache_control canonical order, cf. sdd_lib/cache_control.py)
     - workspace/stack/stack.md             # Project Config (CodeReviewMode, CodeReviewFailOn) · cache_layer: stable
     - .sdd/digests/error-classification.code-reviewer.md      # taxonomie [REVIEW_*] §1.10 + classes réutilisées §1.3/§1.6 · cache_layer: stable
-    - .sdd/rules/build-and-loop.md            # Partie B : anti-derive bullets, plan structure, QA ownership (was dev-shared.md, consolidated v7.0.0) · cache_layer: stable
+    - .sdd/rules/build-and-loop.md            # Read BORNÉ §3.bis-§5 (anti-derive, QA ownership, stack-completeness — 2026-11-06) · cache_layer: stable
     - .sdd/stacks/backend/{active}.md   # §1.3 layer mapping + §3 conventions + §2.4 libs · cache_layer: stable
     - .sdd/stacks/frontend/{active}.md  # §1.3 + §3 (frontend uniquement) · cache_layer: stable
     - workspace/src/{BackendName}/CLAUDE.md  # architecture backend · cache_layer: semi
@@ -538,7 +550,7 @@ code-reviewer:
     - workspace/feats/{n}-*.md             # FEAT parente (passif, intent métier) · cache_layer: volatile
     - workspace/us/{n}-*.md               # toutes les US ciblées (passif) · cache_layer: volatile
     - workspace/plans/{n}-*.{back,front}.md  # mode preferred : lecture sélective via plan · cache_layer: volatile
-    # Budget cible : ≤ 15 KB par invocation (Sonnet 4.6)
+    # Budget cible : ≤ 15 KB par invocation (Sonnet 5.5)
     # Anti-pattern strict : ne JAMAIS Glob workspace/src/**/* (lecture sélective via plans ou convention)
   writes:
     - workspace/.sys/.validation/{n}-code-review.md     # rapport humain
@@ -589,7 +601,7 @@ code-reviewer:
   idempotent: true                                # peut être ré-invoqué sans risque
 
 # -------------------------------------------------------------------------
-# Agent: arch-reviewer (Sonnet 4.6) — depuis v6.11.0
+# Agent: arch-reviewer (Sonnet 5.5) — depuis v6.11.0
 # Phase: 4.8 (post-QA, dans /sdd-review via /sdd-full STEP 4.8)
 # Token footprint estimé: ~6-12 KB par feature de 3-5 US
 # Invocation: spawn par /sdd-review STEP 3.0 si ArchReviewMode=full
@@ -597,6 +609,7 @@ code-reviewer:
 # -------------------------------------------------------------------------
 arch-reviewer:
   model_tier: balanced   # parité frontmatter agents/arch-reviewer.md — enforced par tests/test_loader_model_parity.py
+  effort: medium   # Claude Code `effort:` (low|medium|high|xhigh|max) — surcharge le niveau de session ; parité frontmatter agents/arch-reviewer.md (tests/test_loader_model_parity.py). Politique 2026-11-07 : high = agents qui génèrent du code ou bootstrappent (dev-*, arch) ; medium = tout le reste (découpage, revue, documentation — raisonnement court, coût réduit).
   reads:
     - .sdd/rules/auditor-coordination.md    # matrice ownership findings 1 domaine = 1 owner (v7.0.1-dev, audit 2026-06-11 M7) · cache_layer: stable
     # Order: stable → semi → volatile (cache_control canonical order, cf. sdd_lib/cache_control.py)
@@ -611,7 +624,7 @@ arch-reviewer:
     - workspace/src/{AppName}/**             # code production · cache_layer: semi
     - workspace/src/{LibName}/**             # lib partagée si présente · cache_layer: semi
     - workspace/plans/{n}-*.{back,front}.md  # lecture sélective des fichiers à reviewer · cache_layer: volatile
-    # Budget cible : ≤ 12 KB par invocation (Sonnet 4.6)
+    # Budget cible : ≤ 12 KB par invocation (Sonnet 5.5)
   writes:
     - workspace/.sys/.validation/{n}-arch-review.md     # rapport humain
     - workspace/.sys/.validation/{n}-arch-review.json   # transport vers DB
@@ -665,7 +678,7 @@ arch-reviewer:
 # -------------------------------------------------------------------------
 
 # -------------------------------------------------------------------------
-# Agent: adversarial-reviewer (Sonnet 4.6) — depuis v7.0.0 (R1 BMAD, 2026-05-24)
+# Agent: adversarial-reviewer (Sonnet 5.5) — depuis v7.0.0 (R1 BMAD, 2026-05-24)
 # Phase: 99% (post-agrégation `/sdd-review`, opt-in `--adversarial`)
 # Token footprint estimé: ~8-15 KB par FEAT
 # Invocation: spawn par /sdd-review --adversarial (manuel) OU auto si
@@ -675,6 +688,7 @@ arch-reviewer:
 # -------------------------------------------------------------------------
 adversarial-reviewer:
   model_tier: balanced   # parité frontmatter agents/adversarial-reviewer.md — enforced par tests/test_loader_model_parity.py
+  effort: medium   # Claude Code `effort:` (low|medium|high|xhigh|max) — surcharge le niveau de session ; parité frontmatter agents/adversarial-reviewer.md (tests/test_loader_model_parity.py). Politique 2026-11-07 : high = agents qui génèrent du code ou bootstrappent (dev-*, arch) ; medium = tout le reste (découpage, revue, documentation — raisonnement court, coût réduit).
   reads:
     - .sdd/rules/auditor-coordination.md    # matrice ownership findings 1 domaine = 1 owner (v7.0.1-dev, audit 2026-06-11 M7) · cache_layer: stable
     # Order: stable → semi → volatile (cache_control canonical order, cf. sdd_lib/cache_control.py)
@@ -726,7 +740,7 @@ adversarial-reviewer:
   idempotent: true
 
 # -------------------------------------------------------------------------
-# Agent: security-reviewer (Sonnet 4.6)
+# Agent: security-reviewer (Sonnet 5.5)
 # Phase: 6.4 (mode scan uniquement, post-dev — dev-run STEP 6.4 batch auditors)
 # Token footprint estimé: ~10-20 KB par feature
 #
@@ -737,6 +751,7 @@ adversarial-reviewer:
 # -------------------------------------------------------------------------
 security-reviewer:
   model_tier: balanced   # parité frontmatter agents/security-reviewer.md — enforced par tests/test_loader_model_parity.py
+  effort: medium   # Claude Code `effort:` (low|medium|high|xhigh|max) — surcharge le niveau de session ; parité frontmatter agents/security-reviewer.md (tests/test_loader_model_parity.py). Politique 2026-11-07 : high = agents qui génèrent du code ou bootstrappent (dev-*, arch) ; medium = tout le reste (découpage, revue, documentation — raisonnement court, coût réduit).
   reads:
     - .sdd/rules/auditor-coordination.md    # matrice ownership findings 1 domaine = 1 owner (v7.0.1-dev, audit 2026-06-11 M7) · cache_layer: stable
     # Order: stable → semi → volatile (cache_control canonical order, cf. sdd_lib/cache_control.py)
@@ -801,15 +816,16 @@ security-reviewer:
 #  — cf. section "## Removed agents (backward-compat)".)
 
 # -------------------------------------------------------------------------
-# Agent: spec-compliance-reviewer (Sonnet 4.6) — depuis v6.5.2
+# Agent: spec-compliance-reviewer (Sonnet 5.5) — depuis v6.5.2
 # Phase: 6.4 (post-dev, parallèle à code-reviewer + a11y + security scan)
-# Token footprint estimé: ~8-15 KB par feature (Sonnet 4.6, sélectif via plans + AC ciblage)
+# Token footprint estimé: ~8-15 KB par feature (Sonnet 5.5, sélectif via plans + AC ciblage)
 # Pattern: "Do not trust the report" hérité de superpowers v5.1 — re-lit le
 #          code matérialisé AC-par-AC indépendamment des rapports dev-*.
 # Activation: opt-in via SpecComplianceMode (défaut: manual = skip).
 # -------------------------------------------------------------------------
 spec-compliance-reviewer:
   model_tier: balanced   # parité frontmatter agents/spec-compliance-reviewer.md — enforced par tests/test_loader_model_parity.py
+  effort: medium   # Claude Code `effort:` (low|medium|high|xhigh|max) — surcharge le niveau de session ; parité frontmatter agents/spec-compliance-reviewer.md (tests/test_loader_model_parity.py). Politique 2026-11-07 : high = agents qui génèrent du code ou bootstrappent (dev-*, arch) ; medium = tout le reste (découpage, revue, documentation — raisonnement court, coût réduit).
   reads:
     - .sdd/rules/auditor-coordination.md    # matrice ownership findings 1 domaine = 1 owner (v7.0.1-dev, audit 2026-06-11 M7) · cache_layer: stable
     # Order: stable → semi → volatile (cache_control canonical order, cf. sdd_lib/cache_control.py)
@@ -853,7 +869,7 @@ spec-compliance-reviewer:
   idempotent: true                                # peut être ré-invoqué sans risque
 
 # -------------------------------------------------------------------------
-# Agent constitutioner (Sonnet 4.6) — externalisé d'arch Phase D 2026-05-13
+# Agent constitutioner (Sonnet 5.5) — externalisé d'arch Phase D 2026-05-13
 # Rôle: ADRs (atomic timestamp) + §4/§6/§1 constitution.md + INDEX.md
 #       ADRs + read-back v5.0.
 # Invocation: `/arch-init` STEP 3.5 après sentinel disque posé par arch (no-spawn préservé).
@@ -862,11 +878,14 @@ spec-compliance-reviewer:
 # -------------------------------------------------------------------------
 constitutioner:
   model_tier: balanced   # parité frontmatter agents/constitutioner.md — enforced par tests/test_loader_model_parity.py
+  effort: medium   # Claude Code `effort:` (low|medium|high|xhigh|max) — surcharge le niveau de session ; parité frontmatter agents/constitutioner.md (tests/test_loader_model_parity.py). Politique 2026-11-07 : high = agents qui génèrent du code ou bootstrappent (dev-*, arch) ; medium = tout le reste (découpage, revue, documentation — raisonnement court, coût réduit).
   reads:
     # Order: stable → semi → volatile (cache_control canonical order, cf. sdd_lib/cache_control.py)
     - workspace/stack/stack.md                   # cache_layer: stable
     - .sdd/templates/adr.template.md                # cache_layer: stable
-    - .sdd/rules/ownership.md                       # Partie B §3 numérotation atomique ADR (was file-ownership.md, consolidated v7.0.0) · cache_layer: stable
+    # ownership.md : PLUS de Read explicite (2026-11-06) — auto-injectée par son
+    # frontmatter `paths: workspace/.sys/.context/**` dès l'accès à constitution.md ;
+    # le Read la chargeait 2× (26 KB). Section utile : Partie A §3 / Partie B §4.
     - .sdd/digests/error-classification.constitutioner.md            # cache_layer: stable
     - workspace/.sys/.context/constitution.md   # cache_layer: semi
     - workspace/.sys/.context/adrs/ADR-*.md     # idempotence par slug · cache_layer: semi
@@ -894,9 +913,10 @@ constitutioner:
 # les FEATs/US ; n'écrit QUE la section en cache.
 specbook-writer:
   model_tier: balanced   # parité frontmatter agents/specbook-writer.md — enforced par tests/test_loader_model_parity.py
+  effort: medium   # Claude Code `effort:` (low|medium|high|xhigh|max) — surcharge le niveau de session ; parité frontmatter agents/specbook-writer.md (tests/test_loader_model_parity.py). Politique 2026-11-07 : high = agents qui génèrent du code ou bootstrappent (dev-*, arch) ; medium = tout le reste (découpage, revue, documentation — raisonnement court, coût réduit).
   reads:
-    - .sdd/rules/output-protocol.md                 # cache_layer: stable
-    - .sdd/rules/error-classification.md             # cache_layer: stable
+    # output-protocol.md : rule inconditionnelle, déjà injectée — plus de Read (2026-11-06)
+    - .sdd/digests/error-classification.specbook-writer.md   # digest (ex error-classification.md entier, 47 KB → ~12 KB, audit tokens 2026-11-06) · cache_layer: stable
     - workspace/feats/{n}-*.md                          # FEAT source · cache_layer: semi
     - workspace/us/{n}-*-*.md                           # US filles (enrichissement optionnel) · cache_layer: volatile
   writes:
@@ -929,7 +949,7 @@ specbook-writer:
 # - Coverage parsing 100% déterministe (Python parse_coverage.py) → 0 token
 # - Quality scan 100% déterministe (Python quality_scan.py) → 0 token
 # - Linter / type checker stack-native (subprocess) → 0 token
-# - Sonnet 4.6 (pas Opus) sur génération de tests
+# - Sonnet 5.5 (pas Opus) sur génération de tests
 # - Lecture sélective stricte par US (jamais Glob *)
 # - Total Phase 5 : ~17-27k tokens par feature en mode "full"
 
@@ -947,8 +967,8 @@ specbook-writer:
 # | Agent retiré              | Version | ADR / Raison                                     | Remplacement v7.0.0                              |
 # |---------------------------|---------|--------------------------------------------------|--------------------------------------------------|
 # | `validator`               | v6.0    | Coût ~1.4M tokens/run, faux positifs sémantiques | `feat-validate` 100% déterministe (Python)       |
-# | `dev-backend-strict`      | v7.0.0  | Maintenance double > ROI réel                    | `dev-backend` (Opus 4.8) — plan v2 conservé      |
-# | `dev-frontend-strict`     | v7.0.0  | idem                                             | `dev-frontend` (Opus 4.8) — plan v2 conservé     |
+# | `dev-backend-strict`      | v7.0.0  | Maintenance double > ROI réel                    | `dev-backend` (Opus 5.5) — plan v2 conservé      |
+# | `dev-frontend-strict`     | v7.0.0  | idem                                             | `dev-frontend` (Opus 5.5) — plan v2 conservé     |
 # | `dashboard`               | v7.0.0  | 100% mécanique, jamais raisonnement LLM          | `sdd_scripts/index_adrs.py` (0 token, ~50 ms)    |
 # | `accessibility-auditor`   | v7.0.0  | WCAG mieux couvert par tooling CI                | `axe-core` CI (mapping `[A11Y_*]` cf. legacy.md) |
 # | `performance-auditor`     | v7.0.0  | Core Web Vitals mieux mesurés par browser réel   | `Lighthouse CI` + `wrk/k6` (mapping `[PERF_*]`)  |

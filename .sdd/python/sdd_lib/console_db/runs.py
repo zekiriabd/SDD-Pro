@@ -7,16 +7,34 @@ or `/dev-run` execution and its auditor markers.
 Public API (re-exported via `sdd_lib.console_db.__init__`) :
     upsert_run, upsert_run_phase, insert_event,
     list_runs, get_run, get_run_phases,
-    insert_gate,
+    run_end, RUN_TERMINAL_STATUSES, RUN_END_STATUSES,
+    insert_gate, get_latest_gate, list_latest_gates,
     record_auditor_run, auditor_ran
+
+Audit « fiabilité des données et des états » (2026-11-07) :
+    - ``run_end()`` : clôture idempotente d'un run (``completed|partial|
+      failed``) — avant, les runs ouverts par les hooks (``command='hook'``)
+      restaient ``running`` pour toujours.
+    - ``get_latest_gate()`` / ``list_latest_gates()`` : la table ``gates`` est
+      désormais la **source de vérité** des gates manuels ; ``status.json``
+      n'est plus qu'un export dérivé (cf. ``gate_decide.export_status_json``).
 """
 from __future__ import annotations
 
+import json
 import sqlite3
 from typing import Any
 
 from sdd_lib.console_db.core import _jdumps
 from sdd_lib.paths import iso_now_ms
+
+#: Statuts acceptés par ``run_end()``. ``completed`` est le nom canonique ;
+#: ``success`` reste accepté (alias historique de ``sdd_state.py end-run``).
+RUN_END_STATUSES: frozenset[str] = frozenset(
+    {"completed", "success", "partial", "failed", "cancelled", "stale"}
+)
+#: Statuts qui signifient « le run n'est plus actif ».
+RUN_TERMINAL_STATUSES: frozenset[str] = RUN_END_STATUSES
 
 
 # ============================================================
@@ -146,6 +164,91 @@ def get_run_phases(conn: sqlite3.Connection, run_id: str) -> list[sqlite3.Row]:
     ).fetchall()
 
 
+def run_end(
+    conn: sqlite3.Connection,
+    run_id: str,
+    status: str = "completed",
+    verdict: str | None = None,
+    *,
+    ended_at: str | None = None,
+    error_message: str | None = None,
+    source: str | None = None,
+) -> bool:
+    """Close a run idempotently.
+
+    Args:
+        run_id: the run to close (must exist — returns False otherwise, no
+            row is invented).
+        status: ``completed`` (canonical) | ``success`` (alias) | ``partial``
+            | ``failed`` | ``cancelled`` | ``stale``.
+        verdict: optional aggregated verdict (``GREEN``/``WARN``/``RED``…),
+            stored in ``params_json.verdict`` (the ``runs`` table has no
+            dedicated column — schema unchanged).
+        ended_at: ISO-8601 UTC ; defaults to now. An already-ended run keeps
+            its original ``ended_at``.
+        error_message / source: free-text context (source = who closed :
+            ``sdd_state.end-run``, ``run_close.py``, ``set-phase:sdd_review``…).
+
+    Idempotence : if the run is already terminal with the SAME status (and
+    same verdict when one is given), nothing is written and no event is
+    emitted → returns False. A different terminal status re-closes the run
+    (last word wins) and emits a ``run.end`` event carrying ``previous``.
+
+    Returns True if a row was updated.
+
+    Raises ValueError on an unknown status.
+    """
+    if status not in RUN_END_STATUSES:
+        raise ValueError(
+            f"run_end: status {status!r} invalide — attendu un de "
+            f"{sorted(RUN_END_STATUSES)}"
+        )
+    row = get_run(conn, run_id)
+    if row is None:
+        return False
+    try:
+        params = json.loads(row["params_json"]) if row["params_json"] else {}
+    except (TypeError, ValueError):
+        params = {"_raw_params": row["params_json"]}
+    if not isinstance(params, dict):
+        params = {"_raw_params": params}
+    prev_status = row["status"]
+    prev_verdict = params.get("verdict")
+    if prev_status in RUN_TERMINAL_STATUSES and prev_status == status \
+            and (verdict is None or verdict == prev_verdict):
+        return False  # already closed the same way — no-op
+
+    now = iso_now_ms()
+    if verdict is not None:
+        params["verdict"] = verdict
+    if source:
+        params["closed_by"] = source
+    conn.execute(
+        """
+        UPDATE runs
+           SET status = ?,
+               ended_at = COALESCE(ended_at, ?),
+               updated_at = ?,
+               params_json = ?,
+               error_message = COALESCE(?, error_message)
+         WHERE run_id = ?
+        """,
+        (status, ended_at or now, now, _jdumps(params), error_message, run_id),
+    )
+    payload: dict[str, Any] = {"status": status}
+    if verdict is not None:
+        payload["verdict"] = verdict
+    if prev_status in RUN_TERMINAL_STATUSES:
+        payload["previous"] = prev_status
+    if source:
+        payload["source"] = source
+    insert_event(
+        conn, event_type="run.end", ts=now, run_id=run_id,
+        feat_n=row["feat_n"], payload=payload,
+    )
+    return True
+
+
 # ============================================================
 # GATES
 # ============================================================
@@ -169,6 +272,81 @@ def insert_gate(
         (run_id, feat_n, gate_name, decided_at or iso_now_ms(), decision, by_user,
          _jdumps(payload)),
     )
+
+
+def _gate_row_to_state(row: sqlite3.Row) -> dict[str, Any]:
+    """Project a ``gates`` row onto the status.json gate shape."""
+    try:
+        payload = json.loads(row["payload_json"]) if row["payload_json"] else {}
+    except (TypeError, ValueError):
+        payload = {}
+    if not isinstance(payload, dict):
+        payload = {}
+    state: dict[str, Any] = {"decision": row["decision"]}
+    for key in ("askedAt", "answeredAt", "answeredBy"):
+        if payload.get(key) is not None:
+            state[key] = payload[key]
+    if row["by_user"] and "answeredBy" not in state:
+        state["answeredBy"] = row["by_user"]
+    if row["decision"] in ("validated", "skipped") and "answeredAt" not in state:
+        state["answeredAt"] = row["decided_at"]
+    if row["decision"] == "pending" and "askedAt" not in state:
+        state["askedAt"] = row["decided_at"]
+    state["decidedAt"] = row["decided_at"]
+    return state
+
+
+def get_latest_gate(
+    conn: sqlite3.Connection,
+    *,
+    feat_n: int,
+    gate_name: str,
+) -> dict[str, Any] | None:
+    """Current state of a manual gate = its most recent ``gates`` row.
+
+    Returns a dict shaped like a status.json gate
+    (``decision`` + ``askedAt``/``answeredAt``/``answeredBy`` when known,
+    plus ``decidedAt``), or None if the gate was never posed.
+    """
+    row = conn.execute(
+        """
+        SELECT * FROM gates
+         WHERE feat_n = ? AND gate_name = ?
+         ORDER BY id DESC
+         LIMIT 1
+        """,
+        (feat_n, gate_name),
+    ).fetchone()
+    return _gate_row_to_state(row) if row is not None else None
+
+
+def list_latest_gates(
+    conn: sqlite3.Connection,
+    *,
+    feat_n: int | None = None,
+) -> dict[str, dict[str, dict[str, Any]]]:
+    """``{feat_key: {gate_name: state}}`` — latest row per (feat_n, gate_name).
+
+    This is the projection exported to ``workspace/console/status.json``.
+    """
+    sql = """
+        SELECT g.* FROM gates g
+          JOIN (
+            SELECT feat_n, gate_name, MAX(id) AS max_id
+              FROM gates
+             WHERE feat_n IS NOT NULL
+             GROUP BY feat_n, gate_name
+          ) last ON last.max_id = g.id
+    """
+    params: tuple[Any, ...] = ()
+    if feat_n is not None:
+        sql += " WHERE g.feat_n = ?"
+        params = (feat_n,)
+    sql += " ORDER BY g.feat_n, g.gate_name"
+    out: dict[str, dict[str, dict[str, Any]]] = {}
+    for row in conn.execute(sql, params).fetchall():
+        out.setdefault(str(row["feat_n"]), {})[row["gate_name"]] = _gate_row_to_state(row)
+    return out
 
 
 # ============================================================

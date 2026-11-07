@@ -3,9 +3,10 @@
 Tests both the OWNERSHIP_MATRIX patterns (static, in-process) and the full
 hook lifecycle (subprocess, tmp workspace, env-controlled cutoff).
 
-The hook is intentionally non-blocking (always exit 0) — it appends
-violations to workspace/.sys/.audit/ownership-violations.log and
-emits stderr WARN/ERROR depending on $SDD_AUDIT_OWNERSHIP_MODE.
+Audit 2026-11 : les payloads sont ceux, documentés, de l'événement
+SubagentStop (`agent_type`, `agent_id`, `agent_transcript_path`) — plus de
+faux `tool_input.subagent_type`. Mode par défaut = strict : une violation
+→ exit 2 (en session comme en CI). `warn` → exit 0 + stderr, `off` → log seul.
 """
 from __future__ import annotations
 
@@ -65,6 +66,26 @@ def _run_hook(payload: dict, repo: Path, env_extra: dict[str, str] | None = None
         text=True,
         check=False,
     )
+
+
+def _stop_payload(agent: str, transcript: Path | None = None) -> dict:
+    """Payload SubagentStop réel (doc Claude Code)."""
+    p = {"hook_event_name": "SubagentStop", "agent_type": agent,
+         "agent_id": "a0123456789"}
+    if transcript is not None:
+        p["agent_transcript_path"] = str(transcript)
+    return p
+
+
+def _write_transcript(path: Path, writes: list[tuple[str, str]]) -> Path:
+    """JSONL transcript with one assistant tool_use per (tool, file_path)."""
+    lines = []
+    for tool, fp in writes:
+        key = "notebook_path" if tool == "NotebookEdit" else "file_path"
+        lines.append(json.dumps({"type": "assistant", "message": {"content": [
+            {"type": "tool_use", "name": tool, "input": {key: fp}}]}}))
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return path
 
 
 def _read_log(repo: Path) -> str:
@@ -183,7 +204,7 @@ class TestHookLifecycle(unittest.TestCase):
     def test_unknown_subagent_exits_silently(self):
         """Custom agents not in matrix → silent skip (backward-compat)."""
         self._write_modified_file("workspace/src/Backend/Services/X.cs")
-        payload = {"tool_input": {"subagent_type": "custom-agent"}}
+        payload = {"hook_event_name": "SubagentStop", "agent_type": "custom-agent", "agent_id": "a1"}
         r = _run_hook(payload, self.repo, dispatch_start="2020-01-01T00:00:00Z")
         self.assertEqual(r.returncode, 0)
         self.assertEqual(_read_log(self.repo), "")
@@ -191,7 +212,7 @@ class TestHookLifecycle(unittest.TestCase):
     def test_dev_backend_writing_in_scope_no_violation(self):
         """dev-backend writing in Services/ → no log line."""
         self._write_modified_file("workspace/src/Backend/Services/AuthService.cs")
-        payload = {"tool_input": {"subagent_type": "dev-backend"}}
+        payload = _stop_payload("dev-backend")
         r = _run_hook(payload, self.repo, dispatch_start="2020-01-01T00:00:00Z")
         self.assertEqual(r.returncode, 0)
         self.assertEqual(_read_log(self.repo), "")
@@ -199,10 +220,10 @@ class TestHookLifecycle(unittest.TestCase):
     def test_dev_backend_writing_us_logs_violation(self):
         """dev-backend writing in workspace/us/ → violation logged."""
         self._write_modified_file("workspace/us/1-2-Auth.md")
-        payload = {"tool_input": {"subagent_type": "dev-backend"}}
+        payload = _stop_payload("dev-backend")
         r = _run_hook(payload, self.repo, dispatch_start="2020-01-01T00:00:00Z",
                       env_extra={"SDD_AUDIT_OWNERSHIP_MODE": "warn"})
-        self.assertEqual(r.returncode, 0, "Hook must never block (always exit 0)")
+        self.assertEqual(r.returncode, 0, "warn mode never blocks")
         log = _read_log(self.repo)
         self.assertIn("[FILE_OWNERSHIP]", log)
         self.assertIn("dev-backend", log)
@@ -211,7 +232,7 @@ class TestHookLifecycle(unittest.TestCase):
     def test_off_mode_silences_stderr_but_log_still_written(self):
         """Off mode suppresses stderr emission; the audit log keeps tracking."""
         self._write_modified_file("workspace/us/1-2-Auth.md")
-        payload = {"tool_input": {"subagent_type": "dev-backend"}}
+        payload = _stop_payload("dev-backend")
         r = _run_hook(payload, self.repo, dispatch_start="2020-01-01T00:00:00Z",
                       env_extra={"SDD_AUDIT_OWNERSHIP_MODE": "off"})
         self.assertEqual(r.returncode, 0)
@@ -221,13 +242,13 @@ class TestHookLifecycle(unittest.TestCase):
         self.assertIn("[FILE_OWNERSHIP]", _read_log(self.repo))
 
     def test_strict_mode_emits_visible_error(self):
-        """Strict mode (CI or explicit) → ERROR + FIX hints on stderr."""
+        """Strict mode (explicit) → DENY + ERROR/CAUSE/FIX on stderr."""
         self._write_modified_file("workspace/us/1-2-Auth.md")
-        payload = {"tool_input": {"subagent_type": "dev-backend"}}
+        payload = _stop_payload("dev-backend")
         r = _run_hook(payload, self.repo, dispatch_start="2020-01-01T00:00:00Z",
                       env_extra={"SDD_AUDIT_OWNERSHIP_MODE": "strict"})
-        self.assertEqual(r.returncode, 0)  # still non-blocking
-        self.assertIn("ERROR audit-file-ownership", r.stderr)
+        self.assertEqual(r.returncode, 2)
+        self.assertIn("ERROR: audit-file-ownership", r.stderr)
         self.assertIn("[FILE_OWNERSHIP]", r.stderr)
         self.assertIn("FIX", r.stderr)
 
@@ -236,7 +257,7 @@ class TestHookLifecycle(unittest.TestCase):
         p = self._write_modified_file("workspace/us/1-2-Auth.md")
         # Force the file's mtime to 1970 (well before any cutoff)
         os.utime(p, (1, 1))
-        payload = {"tool_input": {"subagent_type": "dev-backend"}}
+        payload = _stop_payload("dev-backend")
         # cutoff = today → 1970 file is ignored
         r = _run_hook(payload, self.repo,
                       dispatch_start="2026-01-01T00:00:00Z",
@@ -248,7 +269,7 @@ class TestHookLifecycle(unittest.TestCase):
     def test_audit_directory_is_ignored(self):
         """Files written under .sys/.audit/ are not subject to ownership check."""
         self._write_modified_file("workspace/.sys/.audit/some-trace.log")
-        payload = {"tool_input": {"subagent_type": "dev-backend"}}
+        payload = _stop_payload("dev-backend")
         r = _run_hook(payload, self.repo, dispatch_start="2020-01-01T00:00:00Z")
         self.assertEqual(r.returncode, 0)
         self.assertNotIn("[FILE_OWNERSHIP]", _read_log(self.repo))
@@ -284,13 +305,59 @@ class TestHookLifecycle(unittest.TestCase):
         self.assertNotIn("1-2-Auth", gs.stdout,
                          "precondition: the violation file must be gitignored")
         # The hook (walk-based) must still detect the ownership violation.
-        payload = {"tool_input": {"subagent_type": "dev-backend"}}
+        payload = _stop_payload("dev-backend")
         r = _run_hook(payload, self.repo, dispatch_start="2020-01-01T00:00:00Z",
                       env_extra={"SDD_AUDIT_OWNERSHIP_MODE": "warn"})
         self.assertEqual(r.returncode, 0)
         log = _read_log(self.repo)
         self.assertIn("[FILE_OWNERSHIP]", log)
         self.assertIn("workspace/us/1-2-Auth.md", log)
+
+
+    # ── Audit 2026-11 : payload réel + défaut strict + attribution transcript ──
+
+    def test_default_mode_denies_in_interactive_session(self):
+        """Sans env var ni CI : violation → exit 2 (plus seulement en CI)."""
+        self._write_modified_file("workspace/us/1-2-Auth.md")
+        r = _run_hook(_stop_payload("dev-backend"), self.repo,
+                      dispatch_start="2020-01-01T00:00:00Z")
+        self.assertEqual(r.returncode, 2, r.stderr)
+        self.assertIn("[FILE_OWNERSHIP]", r.stderr)
+
+    def test_real_payload_without_tool_input_is_scanned(self):
+        """Régression : le payload SubagentStop n'a PAS de tool_input."""
+        self._write_modified_file("workspace/us/1-2-Auth.md")
+        payload = _stop_payload("dev-backend")
+        self.assertNotIn("tool_input", payload)
+        r = _run_hook(payload, self.repo, dispatch_start="2020-01-01T00:00:00Z",
+                      env_extra={"SDD_AUDIT_OWNERSHIP_MODE": "warn"})
+        self.assertIn("workspace/us/1-2-Auth.md", _read_log(self.repo))
+
+    def test_transcript_attribution_ignores_parallel_agent_files(self):
+        """Fichier écrit par un AUTRE agent en parallèle → pas imputé."""
+        self._write_modified_file("workspace/us/1-2-Auth.md")  # écrit par po
+        own = self._write_modified_file("workspace/src/Backend/Services/A.cs")
+        tr = _write_transcript(self.repo / "t.jsonl", [("Write", str(own))])
+        r = _run_hook(_stop_payload("dev-backend", tr), self.repo,
+                      dispatch_start="2020-01-01T00:00:00Z")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(_read_log(self.repo), "")
+
+    def test_transcript_violation_denies(self):
+        bad = self._write_modified_file("workspace/feats/1-Auth.md")
+        tr = _write_transcript(self.repo / "t.jsonl",
+                               [("Edit", "workspace/feats/1-Auth.md")])
+        r = _run_hook(_stop_payload("dev-backend", tr), self.repo)
+        self.assertEqual(r.returncode, 2, r.stderr)
+        self.assertIn("source=transcript", _read_log(self.repo))
+        self.assertTrue(bad.is_file())
+
+    def test_unreadable_transcript_falls_back_to_walk(self):
+        self._write_modified_file("workspace/us/1-2-Auth.md")
+        r = _run_hook(_stop_payload("dev-backend", self.repo / "missing.jsonl"),
+                      self.repo, dispatch_start="2020-01-01T00:00:00Z")
+        self.assertEqual(r.returncode, 2, r.stderr)
+        self.assertIn("source=walk", _read_log(self.repo))
 
 
 if __name__ == "__main__":

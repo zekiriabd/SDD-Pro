@@ -1,41 +1,49 @@
 #!/usr/bin/env python3
 """SDD_Pro PreToolUse hook for Agent invocations — Two-stage auditor enforcement.
 
-Audit P3 B + B.bis (2026-06-08) — enforce the v7.0.0+ two-stage auditor
-pattern at the harness level (not just the .md docs).
+Audit P3 B + B.bis (2026-06-08), durci audit sécurité 2026-11.
 
-When a slash command spawns `code-reviewer`, `security-reviewer`, or
-`arch-reviewer` for a given FEAT, this hook checks :
+Quand un spawn vise `code-reviewer`, `security-reviewer` ou `arch-reviewer`
+(Stage B) pour une FEAT, le hook exige que Stage A (`spec-compliance-reviewer`)
+ait produit, pour cette FEAT, un verdict non-RED de moins de 24 h.
 
-  1. Is `AuditorBatchMode` set to `two-stage` in layered config ? (default yes)
-  2. Has `spec-compliance-reviewer` already run AND produced a non-RED verdict
-     for this FEAT ? Source autoritaire (audit 2026-06-11 M1) :
-     `workspace/.sys/.validation/{n}-spec-compliance.json`
-     champ `summary.verdict` (cf. auditor-orchestration.md §3), fraîcheur 24 h.
-     Fallback si rapport absent : présence de rows fraîches dans
-     `qa_spec_compliance` (comportement historique, ne voit pas le verdict).
+Source du verdict (audit 2026-11 — le verdict n'est plus LU, il est RECALCULÉ) :
 
-If (1) AND NOT (2) → BLOCK with exit 2 + structured message :
-"Stage A (spec-compliance) must run BEFORE Stage B (code/security/arch).
-Spawn spec-compliance-reviewer first, OR set AuditorBatchMode=legacy-parallel."
+  1. **console.db `qa_spec_compliance`** (autoritaire). Ces lignes par AC sont
+     écrites par le script `ingest_agent_report.py` après validation
+     déterministe (`validate_spec_compliance.py`). Le hook recalcule le
+     verdict à partir des statuts/sévérités des AC et du seuil
+     `SpecComplianceFailOn` (défaut `serious`) — il ne fait pas confiance à
+     un champ `verdict` écrit par un LLM.
+  2. Repli : `workspace/.sys/.validation/{n}-spec-compliance.json` (< 24 h),
+     verdict RECALCULÉ depuis `us[].acs[]` ; `summary.verdict` n'est jamais
+     lu. Le fichier n'est inscriptible que par `spec-compliance-reviewer`
+     (`protect_framework` + `loader.yml writes:`).
+  3. Ni l'un ni l'autre → DENY.
 
-Bypass (B.bis) :
-  - `AuditorBatchMode: legacy-parallel` in Project Config → hook is no-op
-  - `SDD_BYPASS_TWO_STAGE=1` env var → hook is no-op (audit-logged)
-  - Spawning `spec-compliance-reviewer` itself → always allowed (Stage A)
-  - Spawning `adversarial-reviewer` → always allowed (informational, post-review)
+Limite assumée : les statuts AC restent le jugement de l'agent Stage A — le
+hook garantit l'ordre et la cohérence verdict↔AC, pas la justesse du
+jugement (aucun script ne peut re-dériver la conformité AC sans LLM).
 
-Idempotent guard : the hook reads the DB read-only, no side effects.
-Fast : ~50ms typical (SQLite predicate query + config read).
+Fail-closed (audit 2026-11) :
+  - FEAT non extractible du prompt → DENY `[TWO_STAGE_FEAT_UNKNOWN]`
+  - console.db absent ET pas de rapport JSON exploitable → DENY `[INFRA_BLOCKED]`
+  - payload illisible → DENY `[INFRA_BLOCKED]`
 
-Migrated pattern from preflight_agent_budget.py (2026-06-08).
+Bypass :
+  - `AuditorBatchMode: legacy-parallel` (Project Config) → no-op
+  - `SDD_BYPASS_TWO_STAGE=1` (environnement du process Claude Code ; protégé
+    par block_env_bypass) → no-op audit-loggué
+  - `spec-compliance-reviewer` / `adversarial-reviewer` → toujours autorisés
 """
 from __future__ import annotations
 
+import json
 import os
 import re
 import sqlite3
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -49,30 +57,22 @@ from sdd_lib.hook_input import (  # noqa: E402
 from sdd_lib.paths import workspace_root, repo_root  # noqa: E402
 
 
-#: Stage B reviewers — spawning any of these requires Stage A first
-_STAGE_B_AGENTS = frozenset({
-    "code-reviewer",
-    "security-reviewer",
-    "arch-reviewer",
-})
-
-#: Stage A — always allowed (this IS the gate)
+_STAGE_B_AGENTS = frozenset({"code-reviewer", "security-reviewer", "arch-reviewer"})
 _STAGE_A_AGENTS = frozenset({"spec-compliance-reviewer"})
-
-#: Out of scope — never gated by this hook
 _INFORMATIONAL_AGENTS = frozenset({"adversarial-reviewer"})
+
+_FRESHNESS_SECONDS = 24 * 3600
+_SEVERITY_ORDER = ("critical", "serious", "moderate", "minor")
+#: Statuts AC qui ne constituent PAS une issue.
+_OK_STATUSES = frozenset({"verified", "ui_present", "ui_only"})
+_DEFAULT_FAIL_ON = "serious"
 
 
 def _extract_feat_number_from_prompt(payload: dict) -> int | None:
-    """Best-effort extraction of FEAT number from the Agent prompt arg.
-
-    Looks for patterns : "FEAT {n}", "feat-{n}", "audit FEAT {n}",
-    "args=\"{n}\"", "args=\"{n}-{m}\"".
-    """
+    """Best-effort extraction of FEAT number from the Agent prompt arg."""
     prompt = get_nested(payload, "tool_input", "prompt")
     if not isinstance(prompt, str):
         return None
-    # Common patterns
     for pattern in (
         r"FEAT\s+(\d+)",
         r"feat[-_](\d+)",
@@ -89,88 +89,102 @@ def _extract_feat_number_from_prompt(payload: dict) -> int | None:
     return None
 
 
-#: Fraîcheur max du rapport Stage A (alignée sur la fenêtre DB 24 h)
-_REPORT_FRESHNESS_SECONDS = 24 * 3600
+def _fail_on(root: Path) -> str:
+    try:
+        from sdd_lib.layered_config import read_layered_config
+        v = (read_layered_config(root=root, keys=("SpecComplianceFailOn",))
+             .get("SpecComplianceFailOn") or "").strip().lower()
+        if v in _SEVERITY_ORDER:
+            return v
+    except Exception:
+        pass
+    return _DEFAULT_FAIL_ON
 
-_PASS_TOKENS = ("green", "warn", "yellow", "\U0001f7e2", "\U0001f7e1")
-_RED_TOKENS = ("red", "\U0001f534")
 
+def verdict_from_acs(acs: list[tuple[str | None, str | None]], fail_on: str) -> str:
+    """'red' | 'pass' recalculé depuis des `(status, severity)` par AC.
 
-def _stage_a_verdict_from_report(feat_n: int, root: Path) -> str | None:
-    """Lit le verdict Stage A depuis le rapport JSON autoritaire.
-
-    Returns 'pass' (🟢/🟡), 'red' (🔴), ou None (rapport absent, stale > 24h,
-    corrompu, ou verdict non reconnu → le caller retombe sur le check DB).
-
-    Audit 2026-06-11 M1 : avant ce fix, le hook ne vérifiait que l'EXISTENCE
-    de rows qa_spec_compliance — un Stage A 🔴 RED laissait spawner les 3
-    reviewers Stage B, annulant l'économie promise par le two-stage gate.
+    Même règle que `validate_spec_compliance._expected_verdict` : RED dès
+    qu'une AC non vérifiée a une sévérité au moins égale à `fail_on`. Une AC
+    non vérifiée SANS sévérité exploitable compte comme `critical`
+    (fail-closed : un statut négatif ne peut pas être neutralisé en omettant
+    la sévérité).
     """
-    import json
-    import time
+    if not acs:
+        return "red"
+    limit = _SEVERITY_ORDER.index(fail_on) if fail_on in _SEVERITY_ORDER else 1
+    for status, severity in acs:
+        st = (status or "").strip().lower()
+        if st in _OK_STATUSES:
+            continue
+        sev = (severity or "").strip().lower()
+        idx = _SEVERITY_ORDER.index(sev) if sev in _SEVERITY_ORDER else 0
+        if idx <= limit:
+            return "red"
+    return "pass"
 
-    report = (
-        workspace_root(root) / ".sys" / ".validation"
-        / f"{feat_n}-spec-compliance.json"
-    )
+
+def _db_path(root: Path) -> Path:
+    try:
+        from sdd_lib.paths import console_db_path
+        return console_db_path(root)
+    except Exception:
+        return workspace_root(root) / "db" / "console.db"
+
+
+class _DbUnavailable(Exception):
+    """console.db absent, illisible ou sans schéma → [INFRA_BLOCKED]."""
+
+
+def _acs_from_db(feat_n: int, root: Path) -> list[tuple[str | None, str | None]]:
+    """Rows fraîches (≤ 24 h). Lève `_DbUnavailable` si la base est absente,
+    illisible ou sans table (`sdd_lib.console_db.ConsoleDbUnavailable` est
+    une `sqlite3.OperationalError` : même traitement). Liste vide = base
+    saine sans verdict Stage A."""
+    db_path = _db_path(root)
+    if not db_path.is_file():
+        raise _DbUnavailable(f"console.db absent ({db_path})")
+    try:
+        conn = sqlite3.connect(f"file:{db_path.as_posix()}?mode=ro", uri=True)
+    except sqlite3.Error as exc:
+        raise _DbUnavailable(f"console.db illisible : {exc}") from exc
+    try:
+        rows = conn.execute(
+            "SELECT verdict, severity FROM qa_spec_compliance "
+            "WHERE feat_n = ? AND extracted_at > datetime('now', '-24 hours')",
+            (feat_n,),
+        ).fetchall()
+    except sqlite3.Error as exc:
+        raise _DbUnavailable(f"console.db illisible : {exc}") from exc
+    finally:
+        conn.close()
+    return [(r[0], r[1]) for r in rows]
+
+
+def _acs_from_report(feat_n: int, root: Path) -> list[tuple[str | None, str | None]] | None:
+    """AC du rapport JSON frais ; None si absent, périmé ou illisible."""
+    report = workspace_root(root) / ".sys" / ".validation" / f"{feat_n}-spec-compliance.json"
     if not report.is_file():
         return None
     try:
-        if (time.time() - report.stat().st_mtime) > _REPORT_FRESHNESS_SECONDS:
+        if (time.time() - report.stat().st_mtime) > _FRESHNESS_SECONDS:
             return None
         data = json.loads(report.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None
-    summary = data.get("summary") if isinstance(data, dict) else None
-    raw = ""
-    if isinstance(summary, dict):
-        raw = str(summary.get("verdict") or "")
-    if not raw and isinstance(data, dict):
-        raw = str(data.get("verdict") or "")
-    v = raw.strip().lower()
-    if not v:
+    if not isinstance(data, dict):
         return None
-    if any(tok in v for tok in _RED_TOKENS):
-        return "red"
-    if any(tok in v for tok in _PASS_TOKENS):
-        return "pass"
-    return None
-
-
-def _stage_a_completed(feat_n: int, root: Path) -> bool:
-    """True if spec-compliance has fresh (≤ 24h) rows in qa_spec_compliance.
-
-    Mirrors the logic of query_spec_compliance_present() but inlined here
-    to keep the hook lightweight (no subprocess).
-    """
-    db_path = workspace_root(root) / "db" / "console.db"
-    if not db_path.is_file():
-        # No DB yet — can't enforce, fail-safe to allow
-        return True
-
-    try:
-        conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
-    except sqlite3.Error:
-        return True  # fail-safe
-
-    try:
-        row = conn.execute(
-            "SELECT COUNT(*) FROM qa_spec_compliance "
-            "WHERE feat_n = ? "
-            "AND extracted_at > datetime('now', '-24 hours')",
-            (feat_n,),
-        ).fetchone()
-    except sqlite3.Error:
-        # Table may not exist on a fresh project
-        return True
-    finally:
-        conn.close()
-
-    return row and row[0] > 0
+    acs: list[tuple[str | None, str | None]] = []
+    for us in data.get("us") or []:
+        if not isinstance(us, dict):
+            continue
+        for ac in us.get("acs") or []:
+            if isinstance(ac, dict):
+                acs.append((ac.get("status"), ac.get("severity")))
+    return acs or None
 
 
 def _resolve_batch_mode(root: Path) -> str:
-    """Read AuditorBatchMode from layered config. Default 'two-stage'."""
     try:
         from sdd_lib.layered_config import read_layered_config
         cfg = read_layered_config(root=root, keys=("AuditorBatchMode",))
@@ -182,44 +196,39 @@ def _resolve_batch_mode(root: Path) -> str:
     return "two-stage"
 
 
+def _deny(sub_type: str, feat: str, cls: str, cause: str, fix: str) -> int:
+    sys.stderr.write(
+        f"ERROR: [TWO_STAGE_GATE_VIOLATION] Cannot spawn '{sub_type}' (Stage B) for FEAT {feat}\n"
+        f"CAUSE: [{cls}] {cause}\n"
+        f"FIX: {fix}\n"
+    )
+    return HOOK_DENY
+
+
 def main() -> int:
-    # Defensive : never fail the pipeline on a hook crash.
-    #
-    # Audit P3 C3 (2026-06-08) narrow scope : we catch ONLY the recoverable
-    # categories (malformed JSON, OS errors, unicode issues) and let system
-    # exceptions (KeyboardInterrupt, MemoryError, SystemExit) propagate.
-    # Without this narrowing, a corrupted payload silently bypasses the
-    # gate AND masks legitimate crash signals.
-    import json as _json
     try:
         payload = read_hook_input()
-    except (_json.JSONDecodeError, OSError, UnicodeError, ValueError) as exc:
+    except (json.JSONDecodeError, OSError, UnicodeError, ValueError) as exc:
         sys.stderr.write(
-            f"WARN [TWO_STAGE_PAYLOAD_INVALID] {type(exc).__name__}: {exc}. "
-            f"Allowing tool call (fail-safe). Investigate harness payload format.\n"
+            f"ERROR: two-stage auditor — payload illisible\n"
+            f"CAUSE: [INFRA_BLOCKED] {type(exc).__name__}: {exc}\n"
+            f"FIX: verifier le format du payload hook (fail-closed)\n"
         )
-        return HOOK_ALLOW
+        return HOOK_DENY
 
-    # Only intercept Agent tool calls
     tool_name = payload.get("tool_name", "")
-    if tool_name != "Agent" and tool_name != "Task":
+    if tool_name not in ("Agent", "Task"):
         return HOOK_ALLOW
 
     sub_type = get_subagent_type(payload)
     if not sub_type:
         return HOOK_ALLOW
-
     sub_type_lower = sub_type.strip().lower()
-
-    # Always-allow paths
-    if sub_type_lower in _STAGE_A_AGENTS:
-        return HOOK_ALLOW
-    if sub_type_lower in _INFORMATIONAL_AGENTS:
+    if sub_type_lower in _STAGE_A_AGENTS or sub_type_lower in _INFORMATIONAL_AGENTS:
         return HOOK_ALLOW
     if sub_type_lower not in _STAGE_B_AGENTS:
         return HOOK_ALLOW
 
-    # Bypass (B.bis)
     if os.environ.get("SDD_BYPASS_TWO_STAGE") == "1":
         sys.stderr.write(
             "WARN [TWO_STAGE_BYPASSED] SDD_BYPASS_TWO_STAGE=1 active — Stage B "
@@ -229,60 +238,55 @@ def main() -> int:
         return HOOK_ALLOW
 
     root = repo_root()
-
-    batch_mode = _resolve_batch_mode(root)
-    if batch_mode == "legacy-parallel":
-        # Explicit opt-in to legacy v6.x parallel batch — no enforcement
+    if _resolve_batch_mode(root) == "legacy-parallel":
         return HOOK_ALLOW
 
     feat_n = _extract_feat_number_from_prompt(payload)
     if feat_n is None:
-        # Can't extract FEAT — fail-safe allow (don't block on parse failures)
-        sys.stderr.write(
-            f"WARN [TWO_STAGE_FEAT_UNKNOWN] cannot extract FEAT number from "
-            f"prompt to enforce two-stage gate on '{sub_type}'. Allowing.\n"
+        return _deny(
+            sub_type, "?", "TWO_STAGE_FEAT_UNKNOWN",
+            "numero de FEAT introuvable dans le prompt — le gate ne peut pas verifier Stage A",
+            "inclure `FEAT {n}` dans le prompt du spawn (convention /sdd-review, /dev-run) "
+            "OU AuditorBatchMode: legacy-parallel / SDD_BYPASS_TWO_STAGE=1 (audit-logged)",
         )
-        return HOOK_ALLOW
 
-    # Source autoritaire : verdict du rapport JSON Stage A (audit 2026-06-11 M1)
-    report_verdict = _stage_a_verdict_from_report(feat_n, root)
-    if report_verdict == "pass":
-        return HOOK_ALLOW
-    if report_verdict == "red":
-        sys.stderr.write(
-            f"ERROR: [TWO_STAGE_GATE_VIOLATION] Cannot spawn '{sub_type}' (Stage B) "
-            f"for FEAT {feat_n} — Stage A (spec-compliance) verdict is RED.\n"
-            f"CAUSE: reviewing code that fails its spec is wasteful — it will be "
-            f"rewritten (auditor-orchestration.md §3.2).\n"
-            f"FIX:\n"
-            f"  1. Read workspace/.sys/.validation/{feat_n}-spec-compliance.md "
-            f"(ACs not_verified + suggestions)\n"
-            f"  2. Fix the code, re-run spec-compliance-reviewer (Stage A)\n"
-            f"  3. OR set AuditorBatchMode: legacy-parallel / SDD_BYPASS_TWO_STAGE=1 "
-            f"(audit-logged)\n"
+    fail_on = _fail_on(root)
+    try:
+        acs = _acs_from_db(feat_n, root)
+    except _DbUnavailable as exc:
+        return _deny(
+            sub_type, str(feat_n), "INFRA_BLOCKED",
+            f"{exc} — impossible de verifier le gate Stage A (fail-closed)",
+            "initialiser/reparer la base (python .sdd/python/sdd_scripts/init_console_db.py) "
+            f"puis relancer spec-compliance-reviewer pour FEAT {feat_n}",
         )
-        return HOOK_DENY
+    source = "console.db"
+    if not acs:
+        report_acs = _acs_from_report(feat_n, root)
+        if report_acs:
+            acs, source = report_acs, "rapport JSON (verdict recalcule)"
 
-    # Rapport absent/illisible → fallback historique : présence de rows fraîches
-    if _stage_a_completed(feat_n, root):
-        return HOOK_ALLOW
+    if not acs:
+        return _deny(
+            sub_type, str(feat_n), "TWO_STAGE_GATE_VIOLATION",
+            "Stage A (spec-compliance-reviewer) n'a produit aucun verdict frais (< 24 h) — "
+            "AuditorBatchMode=two-stage exige le gate spec avant le batch qualite",
+            f"1. Spawn `Agent: spec-compliance-reviewer` avec FEAT {feat_n} (+ ingest "
+            "console.db) ; 2. OR AuditorBatchMode: legacy-parallel ; 3. OR "
+            "SDD_BYPASS_TWO_STAGE=1 (audit-logged)",
+        )
 
-    # BLOCK : Stage B agent spawning before Stage A gate
-    sys.stderr.write(
-        f"ERROR: [TWO_STAGE_GATE_VIOLATION] Cannot spawn '{sub_type}' (Stage B) "
-        f"for FEAT {feat_n} before Stage A (spec-compliance-reviewer) has run.\n"
-        f"CAUSE: AuditorBatchMode=two-stage (v7.0.0+ pattern superpowers) requires "
-        f"spec-compliance to gate the quality batch. Spawning code/security/arch "
-        f"reviewers on code that may not match its spec is wasteful — the code "
-        f"may be rewritten.\n"
-        f"FIX:\n"
-        f"  1. Spawn `Agent: spec-compliance-reviewer` first with FEAT {feat_n}\n"
-        f"  2. If Stage A returns RED, fix spec gaps before re-running Stage B\n"
-        f"  3. OR set Project Config `AuditorBatchMode: legacy-parallel` to keep "
-        f"v6.x behavior (audit-logged)\n"
-        f"  4. OR pass `SDD_BYPASS_TWO_STAGE=1` env var (one-shot bypass, audit-logged)\n"
-    )
-    return HOOK_DENY
+    if verdict_from_acs(acs, fail_on) == "red":
+        return _deny(
+            sub_type, str(feat_n), "TWO_STAGE_GATE_VIOLATION",
+            f"Stage A verdict RED recalcule depuis {source} (SpecComplianceFailOn={fail_on}) "
+            "— reviewer du code qui ne respecte pas sa spec = travail jete "
+            "(auditor-orchestration.md §3.2)",
+            f"lire workspace/.sys/.validation/{feat_n}-spec-compliance.md, corriger le code, "
+            "relancer Stage A ; OR AuditorBatchMode: legacy-parallel / "
+            "SDD_BYPASS_TWO_STAGE=1 (audit-logged)",
+        )
+    return HOOK_ALLOW
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 # GENERATED FROM .sdd/ — DO NOT EDIT
 # Combo harnais=codex x provider=anthropic. IDs/endpoints « à valider » (providers/*.yaml) ; conformance run requis avant SLA.
-model = "claude-sonnet-4-6"
+model = "claude-sonnet-5-5"
 model_provider = "anthropic"
 approval_policy = "on-failure"
 sandbox_mode = "workspace-write"

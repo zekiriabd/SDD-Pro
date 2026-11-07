@@ -23,9 +23,10 @@ Bypass (audit-logged via the script's own contract): set
 script returns 0. Mirrors the `SDD_ALLOW_UNTESTED_COMBO` pattern of
 `preflight_stack_combo.py`.
 
-Fail-open philosophy: any uncertainty (no feat number in args, FEAT glob
-matches 0 or >1 files, script missing, subprocess error) → ALLOW. The gate
-only ever blocks on an unambiguous reverse+low/medium verdict (script exit 1).
+Fail-closed (audit 2026-11) : script absent, timeout, exit 2 (FEAT
+illisible) ou FEAT ambiguë (> 1 fichier) → DENY `[INFRA_BLOCKED]`. Restent
+ALLOW : skill hors pipeline, pas de numéro de FEAT dans les args, FEAT pas
+encore créée (le pipeline lèvera lui-même `[FEAT_NOT_FOUND]`).
 """
 from __future__ import annotations
 
@@ -78,13 +79,16 @@ def main() -> int:
     root = _resolve_project_root()
     feats_dir = workspace_root(root) / "feats"
     matches = sorted(feats_dir.glob(f"{feat_n}-*.md")) if feats_dir.is_dir() else []
-    if len(matches) != 1:
-        # 0 = FEAT not created yet (or wrong dir) ; >1 = ambiguous → fail-open.
+    if not matches:
+        # FEAT pas encore créée : le pipeline échouera lui-même (FEAT_NOT_FOUND).
         return HOOK_ALLOW
+    if len(matches) > 1:
+        return _infra_deny(skill, f"FEAT {feat_n} ambigue ({len(matches)} fichiers "
+                                  f"{feat_n}-*.md) — impossible de verifier le REVERSE-GATE")
 
     script = root / ".sdd" / "python" / "sdd_reverse_scripts" / "check_reverse_feat_for_full.py"
     if not script.is_file():
-        return HOOK_ALLOW  # reverse module absent (degraded install) → fail-open
+        return _infra_deny(skill, f"check_reverse_feat_for_full.py absent ({script})")
 
     cmd = [sys.executable, str(script), "--feat-path", str(matches[0]), "--json"]
     bypass = os.environ.get("SDD_ALLOW_REVERSE_LOW", "").lower() in ("1", "true", "yes")
@@ -95,8 +99,7 @@ def main() -> int:
             cmd, capture_output=True, text=True, cwd=str(root), timeout=15
         )
     except (subprocess.TimeoutExpired, OSError) as exc:
-        sys.stderr.write(f"[reverse-gate] /{skill} : script error {exc} — fail-open\n")
-        return HOOK_ALLOW
+        return _infra_deny(skill, f"check_reverse_feat_for_full.py n'a pas pu s'executer : {exc}")
 
     code = result.returncode
     if code == 0:
@@ -115,9 +118,20 @@ def main() -> int:
             f"bypass (audit-logged) via SDD_ALLOW_REVERSE_LOW=1\n"
         )
         return HOOK_DENY
-    # Script infra error (exit 2: FEAT unreadable / ambiguous glob) → fail-open.
-    sys.stderr.write(f"[reverse-gate] /{skill} : check exit {code} — fail-open\n")
-    return HOOK_ALLOW
+    # Audit 2026-11 : exit 2 (FEAT illisible) ou inattendu → fail-closed.
+    return _infra_deny(skill, f"check_reverse_feat_for_full.py exit {code} — FEAT {feat_n} "
+                              f"non verifiable")
+
+
+def _infra_deny(skill: str | None, cause: str) -> int:
+    sys.stderr.write(
+        f"ERROR: /{skill} blocked — REVERSE-GATE non verifiable\n"
+        f"CAUSE: [INFRA_BLOCKED] {cause}\n"
+        f"FIX: reparer l'installation (.sdd/python/sdd_reverse_scripts) ou lever "
+        f"l'ambiguite du numero de FEAT ; bypass audit-loggue : SDD_ALLOW_REVERSE_LOW=1 "
+        f"dans l'environnement du process Claude Code\n"
+    )
+    return HOOK_DENY
 
 
 if __name__ == "__main__":

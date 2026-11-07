@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
   "createdAt": "2026-06-10T08:42:50Z",
-  "updatedAt": "2026-08-24T12:16:26Z",
+  "updatedAt": "2026-11-07T07:27:04Z",
   "purpose": "ADV-16 parity tracking. Drift detection: if any hash here differs from current sdd_lib/* hash, reverse helpers may need a refresh sync. WARN-only via reverse_smoke.py (V2).",
   "snapshots": {
-    "sdd_lib/atomic_write.py": "eeaeb38496e81cd94cef0a638b915283abec069c8a2dceb0fbdf3cdb044e919f",
-    "sdd_lib/file_locks.py": "b77381cc9c09102069f48ff8a89ca75cd09932d61421ce00d01abc8f89ab1f87",
-    "sdd_reverse/atomic_write_local.py": "685b56d14d37f8dd50db1364c40b1b3d8ea858836c9b880a86d565a16c33d460",
+    "sdd_lib/atomic_write.py": "d96b9a21318c3f3dce6713a86ce1f271c644346b5aef12acb4aa89c24aa530ab",
+    "sdd_lib/file_locks.py": "c5a710eccafc2f0cd4ae7cf221288da7312b8fd863201aba71d8c908170277ee",
+    "sdd_reverse/atomic_write_local.py": "7c187c433366999a6d5309f7a90f79c571b6a256f9d9eb74d7956b015aa2c17a",
     "sdd_reverse/file_locks_local.py": "d405a85de8b7c1fa2cb32ebbf02c9beab4aa72011c0aa106afbadd32ff7eb36e"
   },
   "_note": "Audit 2026-06-11 MA-9: sdd_reverse/atomic_write_local.py IS a genuine port of sdd_lib/atomic_write.py (semantic + constant parity enforced). sdd_reverse/file_locks_local.py is NOT — its API (acquire_lock/release_lock/read_lock + JSON payload + TTL) deliberately diverges from sdd_lib/file_locks.py (try_create_exclusive/tuple). The 'sdd_lib/file_locks.py' entry is kept for drift-AWARENESS only (informational hash watch consumed by test_local_helpers_parity.py); it does NOT imply API equivalence and nothing actionable follows a hash change beyond a human glance.",

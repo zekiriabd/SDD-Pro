@@ -1,4 +1,4 @@
-"""env_placeholders.py — Resolve ${VAR}/$VAR placeholders in stack.md values.
+"""env_placeholders.py — Resolve ${VAR} placeholders in stack.md values.
 
 Zero-dependency, best-effort placeholder expansion shared by the Project
 Config readers (`project_config.read_project_config` and
@@ -31,9 +31,12 @@ import re
 import sys
 from pathlib import Path
 
-# `${VAR}` or bare `$VAR`. Mirrors the convention in stack_db_config.py so
-# both resolvers accept the exact same placeholder syntax.
-_PLACEHOLDER_RE = re.compile(r"\$\{(\w+)\}|\$(\w+)")
+# `${VAR}` ONLY (audit sécurité 2026-11). The former bare `$VAR` form also
+# expanded any `$word` inside a literal value — e.g. a password `pa$word1`
+# became `pa` + value-of-`word1` (or stayed literal with a spurious
+# [ENV_MISSING] WARN naming part of the secret). Explicit braces are the
+# only placeholder syntax documented for stack.md.
+_PLACEHOLDER_RE = re.compile(r"\$\{(\w+)\}")
 
 # .env candidates searched relative to the repo root (first hit wins per key;
 # the real environment still overrides). Same list as the DB resolver.
@@ -70,7 +73,7 @@ def load_dotenv(base: Path) -> dict[str, str]:
 
 
 def resolve_value(value: str, env: dict[str, str], unresolved: set[str]) -> str:
-    """Expand ${VAR}/$VAR in `value` from `env`; record misses in `unresolved`.
+    """Expand ${VAR} in `value` from `env`; record misses in `unresolved`.
 
     Unresolved placeholders are left literal (returned as `${VAR}`). Non-string
     input is returned unchanged.
@@ -79,7 +82,7 @@ def resolve_value(value: str, env: dict[str, str], unresolved: set[str]) -> str:
         return value
 
     def _sub(m: re.Match) -> str:
-        var = m.group(1) or m.group(2)
+        var = m.group(1)
         if var in env:
             return env[var]
         unresolved.add(var)
@@ -104,7 +107,7 @@ def resolve_config(
     *,
     warn_unresolved: bool = True,
 ) -> dict[str, str]:
-    """Return a copy of `config` with every value's ${VAR}/$VAR expanded.
+    """Return a copy of `config` with every value's ${VAR} expanded.
 
     `.env` (under `root`) provides defaults; the real process environment
     overrides them. Unresolved placeholders stay literal; when

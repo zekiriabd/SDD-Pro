@@ -68,6 +68,10 @@ PROJECT_CONFIG_KEYS = (
     # Stacks
     "AppName",
     "BackendName",
+    # Lot orchestration mécanique (2026-11-07) — phases dev de /dev-run
+    "GatedWorkflow",
+    "ApiGateRequired",
+    "MaxParallel",
 )
 
 # Coûts tokens estimés par phase (cf. agents/*.md "Token footprint cible")
@@ -160,9 +164,9 @@ def _active_stacks(root: Path) -> dict[str, str | None]:
     """
     text = read_stack_md_text(root)
     if text is None:
-        return {"backend": None, "frontend": None, "ui": None, "auth": None, "fullstack": None, "mobiles": None}
+        return {"backend": None, "frontend": None, "ui": None, "auth": None, "fullstack": None, "mobiles": None, "desktop": None}
 
-    # v6.7.5 — categories etendues: + fullstack + mobiles
+    # v6.7.5 — categories etendues: + fullstack + mobiles (+ desktop, batch 2026-09-02)
     # v6.7.7 — respect `#` commented lines (skip them)
     # audit 2026-08-25 — parsing délégué au SSoT bi-racine
     # `project_config.parse_active_stack_ids` : la regex locale n'acceptait
@@ -170,7 +174,7 @@ def _active_stacks(root: Path) -> dict[str, str | None]:
     # renvoyait 0 stack actif ici alors que `sdd_full_planner` en voyait 8.
     stacks: dict[str, str | None] = {
         "backend": None, "frontend": None, "ui": None, "auth": None,
-        "fullstack": None, "mobiles": None,
+        "fullstack": None, "mobiles": None, "desktop": None,
     }
     parsed = parse_active_stack_ids(text, first_only=True)
     for category in stacks:
@@ -235,7 +239,64 @@ def _validate_stack_coherence(stacks: dict[str, str | None]) -> str | None:
     return f"[{err['code']}] {err['message']}"
 
 
-def plan(feat_number: int) -> dict[str, object]:
+def decide_dev_phases(
+    stacks: dict[str, str | None],
+    config: dict[str, object],
+    *,
+    unsequenced: bool = False,
+    us_count: int = 0,
+) -> dict[str, dict[str, object]]:
+    """Phases dev de /dev-run (lot orchestration mécanique, 2026-11-07).
+
+    Décision MÉCANIQUE de ce qui doit être spawné — plus d'appel « pour voir »
+    à un agent qui sortirait en `skipped` :
+
+    - ``dev_backend`` / ``api_gate`` : désactivés sans stack ``backend/*`` ni
+      ``fullstack/*``. Un client ``desktop/*`` (frontendKind=desktop de
+      preflight.py) ou ``mobiles/*`` sans backend n'a AUCUN projet serveur :
+      spawner ``dev-backend:plan`` puis ``dev-backend`` y coûtait ~2,5 $ pour
+      deux sorties « frontend-only US » (constat projet desktop/wpf).
+    - ``api_gate`` : désactivé aussi si ``GatedWorkflow: false`` ou
+      ``--unsequenced`` (legacy parallèle) avec ``ApiGateRequired: false``.
+    - ``dev_frontend`` : désactivé sans ``frontend/*``, ``fullstack/*``,
+      ``mobiles/*`` ni ``desktop/*``.
+
+    Les phases désactivées sont enregistrées ``skip`` dans run_phases par
+    ``dev_run_args.py preflight``.
+    """
+    has_backend = bool(stacks.get("backend") or stacks.get("fullstack"))
+    has_client = bool(stacks.get("frontend") or stacks.get("fullstack")
+                      or stacks.get("mobiles") or stacks.get("desktop"))
+    frontend_kind = ("desktop" if stacks.get("desktop") else
+                     "mobile" if stacks.get("mobiles") else
+                     "web" if (stacks.get("frontend") or stacks.get("fullstack")) else None)
+    gated = _bool_flag(None if config.get("GatedWorkflow") is None
+                       else str(config.get("GatedWorkflow")), default=True) and not unsequenced
+    api_required = _bool_flag(None if config.get("ApiGateRequired") is None
+                              else str(config.get("ApiGateRequired")), default=True)
+
+    def ph(enabled: bool, reason: str | None) -> dict[str, object]:
+        return {"enabled": enabled, "skip_reason": None if enabled else reason}
+
+    no_us = us_count == 0
+    out = {
+        "dev_backend": ph(has_backend and not no_us,
+                          "aucune US" if no_us else
+                          f"aucun stack backend/* ni fullstack/* (frontendKind={frontend_kind})"),
+        "api_gate": ph(has_backend and not no_us and (gated or api_required),
+                       "aucune US" if no_us else
+                       "pas de backend" if not has_backend else
+                       "GatedWorkflow=false/--unsequenced + ApiGateRequired=false"),
+        "dev_frontend": ph(has_client and not no_us,
+                           "aucune US" if no_us else
+                           "aucun stack frontend/*, fullstack/*, mobiles/* ni desktop/*"),
+    }
+    out["_meta"] = {"frontend_kind": frontend_kind, "gated": gated,  # type: ignore[assignment]
+                    "has_backend": has_backend, "has_client": has_client}
+    return out
+
+
+def plan(feat_number: int, *, unsequenced: bool = False) -> dict[str, object]:
     """Construit le plan d'exécution des phases auditor pour la FEAT N."""
     root = repo_root()
 
@@ -375,6 +436,11 @@ def plan(feat_number: int) -> dict[str, object]:
         has_frontend_code=has_frontend_code,
     )
 
+    # 5.bis Phases dev de /dev-run (lot orchestration mécanique)
+    dev_phases = decide_dev_phases(stacks, config, unsequenced=unsequenced,
+                                   us_count=len(us_contents))
+    dev_meta = dev_phases.pop("_meta", {})
+
     # 6. Summary
     phases_enabled = sum(1 for p in phases.values() if p["enabled"])
     phases_skipped = sum(1 for p in phases.values() if not p["enabled"])
@@ -406,6 +472,8 @@ def plan(feat_number: int) -> dict[str, object]:
             "has_security_ac": has_security_ac,
         },
         "phases": phases,
+        "dev_phases": dev_phases,
+        "dev_meta": dev_meta,
         "summary": {
             "phases_enabled": phases_enabled,
             "phases_skipped": phases_skipped,
@@ -498,10 +566,12 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="SDD_Pro phase planner (v6.4.1)")
     parser.add_argument("--feat-number", type=int, required=True, help="numéro de FEAT")
     parser.add_argument("--json", action="store_true", help="output JSON (default)")
+    parser.add_argument("--unsequenced", action="store_true",
+                        help="mode legacy parallèle (/dev-run --unsequenced) — API gate optionnelle")
     args = parser.parse_args(argv)
 
     try:
-        result = plan(feat_number=args.feat_number)
+        result = plan(feat_number=args.feat_number, unsequenced=args.unsequenced)
     except FileNotFoundError as exc:
         sys.stderr.write(f"[NOT_FOUND] {exc}\n")
         return FAIL_FAST

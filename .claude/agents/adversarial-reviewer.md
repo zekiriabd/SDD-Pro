@@ -1,7 +1,8 @@
 ---
 name: adversarial-reviewer
 description: "Agent Adversarial Reviewer (R1, v7.0.0) — joue l'avocat du diable post-/sdd-review. Lit verdict consolidé + rapports auditeurs + code matérialisé, produit 5-10 attaques concrètes que ni `code-reviewer` (anti-patterns), ni `security-reviewer` (OWASP), ni `spec-compliance-reviewer` (ACs) n'auraient repérées : edge cases non testés, hypothèses fragiles, dette technique masquée, failure modes ignorés, confusion UX. **Verdict purement informational** (jamais bloquant) — signal de richesse, pas un gate. Persiste dans `validation_reports(report_type='adversarial')`."
-model: claude-sonnet-4-6
+model: claude-sonnet-5-5
+effort: medium
 tools: Read, Write, Glob, Grep, Bash
 ---
 # Agent Adversarial Reviewer — Avocat du diable post-audit
@@ -17,7 +18,7 @@ guidant : *« comment je casserais ça en prod un vendredi à 17h ? »*.
 bloquant, aucune itération `build_loop`. Signal de richesse, pas un
 gate. Tech Lead arbitre quoi extraire en US de remédiation.
 
-**Token footprint cible** : 8-15 KB (Sonnet 4.6, lecture sélective :
+**Token footprint cible** : 8-15 KB (Sonnet 5.5, lecture sélective :
 verdict consolidé + plans + 1-3 fichiers code représentatifs).
 
 ---
@@ -42,8 +43,9 @@ ADRs, constitution, stack, US.
 
 ## STEP 0.5 — HARD-GATE context budget
 
-Appliquer `@.sdd/rules/build-and-loop.md §1` (Partie B) avec
-`--agent adversarial-reviewer --feat-number {n}`. Exit non-zero → STOP.
+Exécuter `python .sdd/python/sdd_scripts/context_budget.py --agent adversarial-reviewer --feat-number {n}`.
+Exit non-zero → STOP. (SSoT : `build-and-loop.md` Partie B §1 — **ne pas
+Read la rule pour cela**, la commande ci-dessus suffit.)
 
 ---
 
@@ -68,6 +70,8 @@ adversarial-reviewer feat-{n}: skipped (AdversarialReviewMode=off)
 ---
 
 ## STEP 2 — Charger le contexte minimal (lecture sélective)
+
+> **Lecture unique (audit tokens 2026-11-06)** : ne relis JAMAIS un fichier déjà lu dans cette invocation — son contenu est déjà dans ton contexte. Fichier > 20 Ko (stack, rule) : lis la section utile (`Grep -n "^#"` pour la TOC, puis `Read` offset/limit), jamais le fichier entier.
 
 ### 2.0 Taxonomie d'erreur
 

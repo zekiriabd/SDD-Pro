@@ -79,3 +79,39 @@ class TestValidateAcceptanceGate(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ── Audit sécurité 2026-11 : rapport corrompu / bypass inline / verdict forgé ──
+
+def _repo_with_report(tmp: Path, content: str) -> Path:
+    (tmp / ".claude").mkdir()
+    rp = tmp / "workspace" / ".sys" / ".acceptance" / "acceptance.json"
+    rp.parent.mkdir(parents=True)
+    rp.write_text(content, encoding="utf-8")
+    return tmp
+
+
+class TestAcceptanceGateHardening(unittest.TestCase):
+    def _run(self, content: str) -> subprocess.CompletedProcess:
+        with TemporaryDirectory() as td:
+            root = _repo_with_report(Path(td), content)
+            return _run_hook({"agent_type": "qa"},
+                             {"SDD_REPO_ROOT": str(root), "CLAUDE_PROJECT_DIR": str(root)},
+                             cwd=root)
+
+    def test_corrupt_json_denies(self):
+        r = self._run("{not json")
+        self.assertEqual(r.returncode, 2, r.stderr)
+        self.assertIn("[INFRA_BLOCKED]", r.stderr)
+
+    def test_bypass_verdict_without_env_denies(self):
+        r = self._run(json.dumps({"verdict": "bypass", "mode": "bypass"}))
+        self.assertEqual(r.returncode, 2, r.stderr)
+
+    def test_unknown_verdict_denies(self):
+        r = self._run(json.dumps({"verdict": "ok", "mode": "strict"}))
+        self.assertEqual(r.returncode, 2, r.stderr)
+
+    def test_pass_verdict_allows(self):
+        r = self._run(json.dumps({"verdict": "pass", "mode": "strict"}))
+        self.assertEqual(r.returncode, 0, r.stderr)

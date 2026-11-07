@@ -113,3 +113,18 @@ def test_feat_not_found_fail_open(monkeypatch, tmp_path):
 def test_no_feat_number_in_args_fail_open(monkeypatch, tmp_path):
     _setup(tmp_path, {"1-X.md": _REVERSE_LOW})
     assert _run(monkeypatch, tmp_path, "sdd-full", "") == HOOK_ALLOW
+
+
+# ── Audit sécurité 2026-11 : fail-closed ──
+
+def test_script_absent_denies(monkeypatch, tmp_path):
+    _setup(tmp_path, {"2-X.md": _REVERSE_LOW})
+    monkeypatch.setattr(gate, "_resolve_project_root", lambda: tmp_path)
+    monkeypatch.setattr(gate, "read_hook_input",
+                        lambda: {"tool_input": {"skill": "sdd-full", "args": "2"}})
+    assert gate.main() == HOOK_DENY
+
+
+def test_ambiguous_feat_denies(monkeypatch, tmp_path):
+    _setup(tmp_path, {"5-A.md": _FORWARD, "5-B.md": _FORWARD})
+    assert _run(monkeypatch, tmp_path, "sdd-full", "5") == HOOK_DENY

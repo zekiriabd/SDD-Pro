@@ -30,7 +30,14 @@ cross-package, et coûtait quelques ms par invocation.
 pip install -e .sdd/python
 ```
 
-Cela rend les packages `sdd_lib`, `sdd_scripts`, `sdd_hooks`, `sdd_admin`
+Versions figées (environnement de référence, 2026-11-07) : le fichier de
+contraintes `requirements.lock.txt` pinne les extras réellement installés —
+`pip install -e ".sdd/python[dev,reverse]" -c .sdd/python/requirements.lock.txt`.
+Les extras non installés à la génération (`pytest-xdist`, `oracledb`,
+`mysql-connector-python`, `build`, `twine`) y sont listés comme non pinnés.
+
+Cela rend les packages `sdd_lib`, `sdd_scripts`, `sdd_hooks`, `sdd_admin`,
+`sdd_reverse` (+ `sdd_reverse.dialects`) et `sdd_reverse_scripts`
 importables nativement (pas de sys.path hack côté caller). Les scripts
 continuent à fonctionner avec les anciens callers (`python .sdd/python/sdd_scripts/X.py`)
 ET avec la nouvelle CLI entry-point (`sdd-smoke` directement après install).

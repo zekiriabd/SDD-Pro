@@ -1,14 +1,24 @@
 """atomic_write_local.py — Anti-corruption helper (ADV-2 closure).
 
-Duplicate of sdd_lib/atomic_write.py for module isolation (D4 strict).
-Parity tests against the original live in tests/test_local_helpers_parity.py.
+Duplicate of sdd_lib/atomic_write.py for module isolation (D4 strict —
+`sdd_reverse/*` MUST NOT import from `sdd_lib/`). The isolation is wanted
+(audit 2026-06-11 MA-9), so the fix below is applied to the copy rather than
+replaced by an import. Parity tests against the original live in
+tests/test_local_helpers_parity.py.
 
 Public API:
     atomic_write_text(path, content, encoding="utf-8") -> None
     atomic_write_bytes(path, content) -> None
     find_orphan_tmps(root) -> Iterator[Path]
 
-Crash safety: writes to {path}.sddtmp, fsync, then os.replace().
+Crash safety: writes to a UNIQUE temp file `.{name}.{random}.sddtmp` in the
+destination directory, fsync, then os.replace().
+
+Audit « fiabilité des données et des états » (2026-11-07 — synced with
+sdd_lib/atomic_write.py) : the temp name used to be deterministic
+(`{name}.sddtmp`) → two concurrent writers of the same destination shared
+one temp file and corrupted each other. `tempfile.NamedTemporaryFile(
+dir=parent, delete=False)` gives each writer its own O_EXCL file.
 
 Windows hardening (synced 2026-06-10 — sdd_lib v7.0.0 RUPT-5 closure):
     `os.replace()` on Windows NTFS is NOT atomic under sharing violations
@@ -22,6 +32,7 @@ from __future__ import annotations
 import os
 import random
 import sys
+import tempfile
 import time
 from pathlib import Path
 from typing import Iterator
@@ -74,9 +85,9 @@ def _replace_with_retry(tmp: Path, dst: Path) -> None:
 def atomic_write_text(path: str | Path, content: str, encoding: str = "utf-8") -> None:
     """Write `content` to `path` atomically (POSIX + Windows NT+).
 
-    Strategy: create parent dirs, write `.sddtmp`, fsync, os.replace with
-    Windows sharing-violation retry. If anything fails after open(),
-    best-effort cleanup of the tmp file.
+    Strategy: create parent dirs, write a unique `.sddtmp`, fsync, os.replace
+    with Windows sharing-violation retry. If anything fails after open(),
+    best-effort cleanup of OUR tmp file (never another writer's).
     """
     atomic_write_bytes(path, content.encode(encoding))
 
@@ -84,9 +95,16 @@ def atomic_write_text(path: str | Path, content: str, encoding: str = "utf-8") -
 def atomic_write_bytes(path: str | Path, content: bytes) -> None:
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
-    tmp = target.with_name(target.name + TMP_SUFFIX)
+    tmp: Path | None = None
     try:
-        with open(tmp, "wb") as f:
+        with tempfile.NamedTemporaryFile(
+            mode="wb",
+            dir=str(target.parent),
+            prefix=f".{target.name}.",
+            suffix=TMP_SUFFIX,
+            delete=False,
+        ) as f:
+            tmp = Path(f.name)
             f.write(content)
             f.flush()
             try:
@@ -97,7 +115,7 @@ def atomic_write_bytes(path: str | Path, content: bytes) -> None:
         _replace_with_retry(tmp, target)
     except Exception:
         # Best-effort cleanup; re-raise the original exception.
-        if tmp.exists():
+        if tmp is not None and tmp.exists():
             try:
                 tmp.unlink()
             except OSError:

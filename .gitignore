@@ -160,3 +160,17 @@ Thumbs.db
 # Backup transient de sync_parity_snapshots (régénéré à chaque sync — le
 # fichier autoritatif _parity_snapshots.json reste versionné)
 .sdd/python/sdd_reverse/_parity_snapshots.prev.json
+
+# Fichiers sensibles — ignorés PARTOUT dans le dépôt (Tech Lead 2026-11-07, FEAT 16).
+# Identifiants, coffre DPAPI, clés et certificats ne doivent jamais être versionnés,
+# y compris les modèles .env.example (ils révèlent la liste des comptes utilisés).
+**/.env
+**/.env.*
+**/secrets.dat
+**/secrets.dat.*
+**/*.pfx
+**/*.p12
+**/*.pem
+**/*.key
+**/*.snk
+**/credentials.json

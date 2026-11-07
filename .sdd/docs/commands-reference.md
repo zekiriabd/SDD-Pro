@@ -164,7 +164,7 @@ The 4 macro-orchestrators (`sdd-bootstrap`, `sdd-full`, `sdd-poc`, `sdd-review`)
 | **Phase** | 5 (QA) |
 | **Args** | `{n}` |
 | **Flags** | `--mode {full\|tests-only\|tests+coverage\|quality-only}` |
-| **Agents spawn** | `qa` (Sonnet 4.6) |
+| **Agents spawn** | `qa` (Sonnet 5.5) |
 | **Prerequisites** | FEAT + US + code production matérialisé |
 | **Idempotent** | ✅ |
 | **Outputs** | `*.Tests/` ; télémétrie QA → `console.db` (`qa_coverage`/`qa_quality`/`qa_api_tests`) ; rapport à la demande `query_console_db.py feat-stats --feat {n} --format md` |
@@ -332,7 +332,7 @@ Building blocks invoked by the user-facing commands. Use these for **targeted de
 | **Phase** | 2 (US) |
 | **Args** | `{n}` |
 | **Flags** | `--allow-large-feat` (bypass hard cap 10 US), `--replace-pseudo` (supprime la pseudo-US POC de `/sdd-poc` avant génération — migration POC → standard) |
-| **Agents spawn** | `po` (Sonnet 4.6) |
+| **Agents spawn** | `po` (Sonnet 5.5) |
 | **Outputs** | `us/{n}-{m}-{Name}.md` (1-6 fichiers) |
 
 ```bash
@@ -351,7 +351,7 @@ Building blocks invoked by the user-facing commands. Use these for **targeted de
 | **Phase** | 3 (arch) |
 | **Args** | aucun |
 | **Flags** | aucun |
-| **Agents spawn** | `arch` (Sonnet 4.6), puis `constitutioner` si sentinel posé |
+| **Agents spawn** | `arch` (Sonnet 5.5), puis `constitutioner` si sentinel posé |
 | **Outputs** | `src/{BackendName,AppName,LibName}/`, `.sln`, `db/schema.{json,md}`, ADRs |
 
 ```bash
@@ -387,7 +387,7 @@ Building blocks invoked by the user-facing commands. Use these for **targeted de
 | **Phase** | 4 (dev) |
 | **Args** | `{n}-{m}` (1 US) |
 | **Flags** | aucun |
-| **Agents spawn** | `dev-backend` (**Opus 4.8**) |
+| **Agents spawn** | `dev-backend` (**Opus 5.5**) |
 | **Outputs** | `src/{BackendName}/`, `{LibName}/` (via lock) |
 
 ```bash
@@ -405,7 +405,7 @@ Building blocks invoked by the user-facing commands. Use these for **targeted de
 | **Phase** | 4 (dev) |
 | **Args** | `{n}-{m}` (1 US) |
 | **Flags** | aucun |
-| **Agents spawn** | `dev-frontend` (**Opus 4.8**) |
+| **Agents spawn** | `dev-frontend` (**Opus 5.5**) |
 | **Outputs** | `src/{AppName}/` (Pages, Components, theme.css) |
 
 ```bash
@@ -423,7 +423,7 @@ Building blocks invoked by the user-facing commands. Use these for **targeted de
 | **Phase** | 1.5 (post-cadrage élicitation) |
 | **Args** | `{n}` |
 | **Flags** | `--quick` (one-shot inférence, sans Q/R) |
-| **Agents spawn** | `elicitor` (Sonnet 4.6) |
+| **Agents spawn** | `elicitor` (Sonnet 5.5) |
 | **Outputs** | append FEAT (FAIL/EDGE/RACI/RedTeam sections), `constitution.md §7` |
 
 ```bash

@@ -1,7 +1,8 @@
 ---
 name: qa
-description: 'Agent QA — génère tests unitaires (backend + frontend) à partir des US et du code généré, parse la coverage, exécute le quality scan (sonar-like). Strict scope test : ne modifie JAMAIS le code de production. Token-efficient (Sonnet 4.6 + scripts déterministes pour coverage et quality).'
+description: 'Agent QA — génère tests unitaires (backend + frontend) à partir des US et du code généré, parse la coverage, exécute le quality scan (sonar-like). Strict scope test : ne modifie JAMAIS le code de production. Token-efficient (Sonnet 5.5 + scripts déterministes pour coverage et quality).'
 model_tier: balanced
+effort: medium
 tier_default: balanced
 tier_floor: balanced
 tier_ceiling: deep
@@ -56,8 +57,9 @@ FIX: relancer /qa-generate {n} avec n entier
 
 ## STEP 1.5 - HARD-GATE context budget
 
-Appliquer `@.sdd/rules/build-and-loop.md §1` (Partie B) avec
-`--agent qa --feat-number {n}`. Exit non-zero → STOP.
+Exécuter `python .sdd/python/sdd_scripts/context_budget.py --agent qa --feat-number {n}`.
+Exit non-zero → STOP. (SSoT : `build-and-loop.md` Partie B §1 — **ne pas
+Read la rule pour cela**, la commande ci-dessus suffit.)
 
 ---
 
@@ -130,6 +132,8 @@ Lire les sections `## Active QA Specs` de `workspace/stack/stack.md`.
 
 ## STEP 3 — Charger le contexte minimal
 
+> **Lecture unique (audit tokens 2026-11-06)** : ne relis JAMAIS un fichier déjà lu dans cette invocation — son contenu est déjà dans ton contexte. Fichier > 20 Ko (stack, rule) : lis la section utile (`Grep -n "^#"` pour la TOC, puis `Read` offset/limit), jamais le fichier entier.
+
 Read **uniquement** :
 
 1. `workspace/feats/{n}-*.md` (FEAT parente, lecture passive pour ACs)
@@ -152,7 +156,9 @@ Read **uniquement** :
    `[QA_INIT_FAILED]`, `[QA_TEST_INVALID]`, `[QA_OUTPUT_INVALID]`,
    `[QA_PRECONDITION_FAILED]`, `[QA_OWNERSHIP_VIOLATION]`,
    `[API_GATE_RED]`. Ordre de priorité émission documenté §1.7.
-10. **`.sdd/rules/build-and-loop.md`** — contrat API Gate (post-dev
+10. **`.sdd/rules/build-and-loop.md` Partie A UNIQUEMENT** (`Read` offset=61
+    limit=155, lignes 61-215 ; recaler par `Grep -n "^# Partie"` si décalage —
+    Partie B = patterns dev-*, hors scope QA) — contrat API Gate (post-dev
     backend, pré-dev frontend). Substance opérationnelle vit dans
     `commands/qa-generate.md STEP 3` (mode `api-tests`), Read le fichier
     source si cas-limite (stratégie fixtures in-memory par stack QA §1.2,

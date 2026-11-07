@@ -1,7 +1,7 @@
 ---
 command: sdd-reverse-feat
 phase: 3c
-description: Phase 3c du workflow reverse — composition de la FEAT métier propre à partir des User Stories 3b (barreau haut de l'escalier). Spawn agent reverse-feat-composer avec modèle routé par complexité (Sonnet 4.6 si unité simple, Opus 4.8 si complexe — ADR governance-reverse-complexity-ladder). Lit us/{n}-{m}-{Name}.md + plans/{n}-{FeatName}.analysis.md, écrit feats/{n}-{FeatName}.md consommable par /sdd-full.
+description: Phase 3c du workflow reverse — composition de la FEAT métier propre à partir des User Stories 3b (barreau haut de l'escalier). Spawn agent reverse-feat-composer avec modèle routé par complexité (Sonnet 5.5 si unité simple, Opus 5.5 si complexe — ADR governance-reverse-complexity-ladder). Lit us/{n}-{m}-{Name}.md + plans/{n}-{FeatName}.analysis.md, écrit feats/{n}-{FeatName}.md consommable par /sdd-full.
 loader: .sdd/loader.reverse.yml
 ---
 # /sdd-reverse-feat {U-N} [--json]

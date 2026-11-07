@@ -2,6 +2,7 @@
 name: reverse-sql-analyst
 description: Spécialiste des PROCÉDURES STOCKÉES du reverse base de données (rung 1) — et des packages Oracle (1 package = 1 US, même angle opération). Pour UNE procédure, lit son context pack déterministe (contrat, structure des tables touchées, résumé de ce qu'elle appelle, appelants) et produit UNE User Story — capability, effets données, règles métier, un AC négatif par branche d'erreur, evidence file:line, confidence. Les fonctions, vues et triggers relèvent des spécialistes dédiés (function / view / trigger analysts). Ne compose PAS la FEAT (rung 2). Lecture seule, aucune connexion base, aucun spawn d'agent.
 model_tier: deep
+effort: medium
 tier_default: deep
 tier_floor: balanced
 tier_ceiling: deep
@@ -57,6 +58,8 @@ spawnnent désormais avec `--object`, comme pour les trois autres spécialistes)
    du `unit.language` (ex. `tsql` → high).
 
 ## STEP 1 — Lecture sélective stricte (lecture seule)
+
+> **Lecture unique (audit tokens 2026-11-06)** : ne relis JAMAIS un fichier déjà lu dans cette invocation — son contenu est déjà dans ton contexte. Fichier > 20 Ko (stack, rule) : lis la section utile (`Grep -n "^#"` pour la TOC, puis `Read` offset/limit), jamais le fichier entier.
 
 Lire **uniquement** :
 1. **Ton context pack** `.sys/db-context/packs/{schema}.{proc}.md` — le slice

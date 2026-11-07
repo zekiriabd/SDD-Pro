@@ -42,8 +42,8 @@
 |---|---|---|---|:---:|---|
 | 6.0.bis | Staleness des plans | **primaire** | `sdd_scripts/validate_plan.py` (exit 2 = `[PLAN_STALE]`) | ✅ (si plans présents) | re-`/dev-plan` (pas de bypass) |
 | 6.b | API Gate back→front | **primaire** | agent `qa` mode api-tests (`build-and-loop.md` Partie A) | ✅ (`GatedWorkflow: true` défaut) | `GatedWorkflow: false` (audit-log) |
-| 6.4.A | Spec-compliance (Stage A, two-stage) | **primaire — PRODUCTEUR du verdict spec** | agent `spec-compliance-reviewer` (`auditor-orchestration.md §3`) | ✅ | `--legacy-auditor-parallel` / `SpecComplianceFailOn` |
-| 6.4.B | Qualité (code/security/arch batch) | **primaire** | agents reviewers (`auditor-orchestration.md §4`, ownership `auditor-coordination.md`) | ✅ | `{Kind}FailOn` (hors hard-blocking) |
+| auditor_batch.A | Spec-compliance (Stage A, two-stage, après qa) | **primaire — PRODUCTEUR du verdict spec** | agent `spec-compliance-reviewer` (`auditor-orchestration.md §3`) | ✅ | `--legacy-auditor-parallel` / `SpecComplianceFailOn` |
+| auditor_batch.B | Qualité (code/security/arch batch) | **primaire** | agents reviewers (`auditor-orchestration.md §4`, ownership `auditor-coordination.md`) | ✅ | `{Kind}FailOn` (hors hard-blocking) |
 
 ## 4. Gates hooks automatiques (cross-commandes, Claude Code)
 
@@ -51,8 +51,10 @@
 |---|---|---|---|---|
 | PreToolUse Agent | Coût cumulé par run | **primaire** | `sdd_hooks/preflight_cost_cap.py` | `SDD_DISABLE_COST_CAP=1` |
 | PreToolUse Agent | Context budget par agent | **primaire** | `sdd_hooks/preflight_agent_budget.py` | config |
-| PostToolUse/SubagentStop Agent | Télémétrie coût réel (`token_usage`, source de `preflight_cost_cap.py`) | **defense-in-depth** (alimente le cap ci-dessus) | `sdd_hooks/record_token_usage.py` | n/a |
-| PreToolUse Agent | Séquencement two-stage auditors | **defense-in-depth** (de 6.4.A) | `sdd_hooks/enforce_two_stage_auditor.py` | `AuditorBatchMode: legacy-parallel` |
+| SubagentStop + Stop | Télémétrie coût réel (`token_usage` sommé sur tous les tours des transcripts JSONL, orchestrateur compris ; source de `preflight_cost_cap.py`) | **defense-in-depth** (alimente le cap ci-dessus) | `sdd_hooks/record_token_usage.py` + `sdd_lib/transcript_usage.py` | `SDD_TOKEN_USAGE_MODE=off` |
+| PreToolUse Agent | Ordre des phases (dev après readiness, qa après dev_run, reviewers après qa) | **primaire** | `sdd_hooks/enforce_phase_order.py` | `SDD_ALLOW_PHASE_SKIP=1` (audit-loggué) |
+| PreToolUse / PostToolUse Agent + SubagentStop + Stop | Parallélisme borné (`MaxParallel`) | **primaire** | `sdd_hooks/enforce_max_parallel.py` | `SDD_ALLOW_PARALLEL_EXCESS=1` (audit-loggué) |
+| PreToolUse Agent | Séquencement two-stage auditors | **defense-in-depth** (de auditor_batch.A) | `sdd_hooks/enforce_two_stage_auditor.py` | `AuditorBatchMode: legacy-parallel` |
 | PreToolUse Skill | Combo stack hors SLA | **primaire** | `sdd_hooks/preflight_stack_combo.py` | `SDD_ALLOW_UNTESTED_COMBO=1` |
 | PreToolUse Edit/Write | TDD test-first | **primaire** (warn interactif / strict CI) | `sdd_hooks/enforce_tdd.py` | `SDD_DISABLE_TDD=1` |
 | PreToolUse Bash | Set d'env bypass mid-session | **primaire** | `sdd_hooks/block_env_bypass.py` | aucun |
@@ -68,7 +70,7 @@ les gates réellement bloquantes sont **6** — pas 12 :
 
 ```
 readiness (3.5) → staleness plans (6.0.bis, si plans) → API Gate (6.b)
-→ spec Stage A (6.4.A) → quality batch (6.4.B) → review consolidé (4.8)
+→ qa → spec Stage A (auditor_batch.A) → quality batch (auditor_batch.B) → review consolidé (4.8)
 ```
 
 + les caps continus (coût run, budget agent, combo SLA, acceptance post-qa).
@@ -76,9 +78,9 @@ Le reste : 4 gates manuelles opt-in, 1 defense-in-depth court-circuitée,
 2 observability, QA 4.5 skippée (`QAMode: manual` défaut).
 
 **Paires assumées (pas des doublons)** :
-- 4.7 lit le rapport produit par 6.4.A (lecteur/producteur — autorité unique,
+- 4.7 lit le rapport produit par auditor_batch.A (lecteur/producteur — autorité unique,
   cf. `feat-validate.md §4.5.3`) ;
-- 4.8 agrège la DB sans re-spawner les reviewers de 6.4.B (consolidation,
+- 4.8 agrège la DB sans re-spawner les reviewers de auditor_batch.B (consolidation,
   pas re-run) ;
 - 1.bis / 3.6.quart : primaire + filet sentinelle.
 

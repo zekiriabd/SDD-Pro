@@ -1,5 +1,5 @@
 <!-- GENERATED FROM .sdd/ (commande /sdd-reverse-audit) — DO NOT EDIT -->
-<!-- Phase 2 du workflow reverse — audit informational. Spawn reverse-tech-auditor (Sonnet 4.6) après exécution du script déterministe reverse_audit.py (deps-graph + merge db-schema). Output non bloquant pour Phase 3. -->
+<!-- Phase 2 du workflow reverse — audit informational. Spawn reverse-tech-auditor (Sonnet 5.5) après exécution du script déterministe reverse_audit.py (deps-graph + merge db-schema). Output non bloquant pour Phase 3. -->
 <!-- ============================================================ -->
 <!-- IMPORTANT — SPAWN SEMANTICS UNDER CODEX (audit R10 2026-07-26) -->
 <!-- Toute mention `Task tool (subagent_type=X)`, `Agent(X)`, ou    -->

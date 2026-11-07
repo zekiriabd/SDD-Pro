@@ -246,5 +246,67 @@ class TestBlockEnvBypassP0V2Vectors(unittest.TestCase):
         self.assertEqual(_run_with_command("printf 'hello\\n'"), 0)
 
 
+# ── Audit sécurité 2026-11 : périmètre étendu, PowerShell, quoting, indirection ──
+
+_DENY_2026_11 = [
+    'SDD_ALLOW_UNTESTED_COMB"O"=1 claude',             # quoting partiel
+    "SDD\\_ALLOW_FORCE=1 x",                           # backslash
+    "SDD_TDD_MODE=off python x.py",                    # SDD_*_MODE
+    "SDD_BYPASS_TWO_STAGE=1 x",
+    "SDD_TOKEN_USAGE_MODE=off x",
+    "SDD_PRE_WRITE_LINT_STRICT=0 x",
+    "SDD_GLOB_SCOPE_STRICT=0 x",
+    "SDD_CONSOLE_DB_PATH=/tmp/x.db python y.py",
+    "setx SDD_HOOK_X 1",
+    "CI= python validate_acceptance.py",               # CI
+    "unset CI",
+    "env -u CI python x.py",
+    "Remove-Item env:CI",
+    "$env:SDD_PROTECT_FRAMEWORK_MODE = 'off'",         # PowerShell
+    "${env:SDD_AUDIT_OWNERSHIP_MODE}='off'",
+    "Set-Item -Path env:SDD_BUDGET_MODE -Value off",
+    "[Environment]::SetEnvironmentVariable('CI', $null)",
+    "python -c \"import os; os.environ['SDD_TDD_MODE']='off'\"",
+    "python -c \"import os; os.putenv('SDD_DISABLE_TDD','1')\"",
+    "python -c \"import subprocess,os; subprocess.run(['x'], "
+    "env={**os.environ, 'SDD_ALLOW_ACCEPTANCE_BYPASS':'1'})\"",
+    "node -e \"process.env.SDD_TDD_MODE='off'\"",
+    "V=SDD_ALLOW_FORCE; export $V=1",                  # indirection
+    "$v='SDD_TDD_MODE'; Set-Item \"env:$v\" off",
+    "cmd /c \"set SDD_ALLOW_FORCE=1 && x\"",
+    "bash <<'EOF'\nSDD_ALLOW_FORCE=1 claude\nEOF",      # heredoc exécuté
+]
+
+_ALLOW_2026_11 = [
+    "git commit -m 'fix CI = broken'",
+    "python -m pytest .sdd/python/tests -q",
+    "python -c \"import os; print(os.environ.get('SDD_TDD_MODE'))\"",
+    "python -c \"import os; x = os.environ['SDD_TDD_MODE'] == 'off'\"",
+    "[ \"$SDD_TDD_MODE\" = strict ] && echo y",
+    "Get-ChildItem env:SDD_TDD_MODE",
+    "echo $env:CI",
+    "npm run ci",
+    "dotnet test --ci",
+]
+
+
+@pytest.mark.parametrize("command", _DENY_2026_11)
+def test_2026_11_vectors_denied(command):
+    assert _run_with_command(command) == 2, command
+
+
+@pytest.mark.parametrize("command", _ALLOW_2026_11)
+def test_2026_11_no_false_positive(command):
+    assert _run_with_command(command) == 0, command
+
+
+def test_powershell_tool_payload_shape():
+    """Le tool PowerShell porte tool_input.command, comme Bash."""
+    payload = json.dumps({"tool_name": "PowerShell",
+                          "tool_input": {"command": "$env:SDD_TDD_MODE='off'"}})
+    with patch.object(sys, "stdin", io.StringIO(payload)):
+        assert beb.main() == 2
+
+
 if __name__ == "__main__":
     unittest.main()

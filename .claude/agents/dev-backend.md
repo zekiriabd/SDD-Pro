@@ -1,7 +1,8 @@
 ---
 name: dev-backend
 description: Agent Dev-Backend — pour UNE US donnée, lit l'US (workspace/us/{n}-{m}-{Name}.md) + le mockup HTML (optionnel, passif) + les stacks backend/auth actifs, planifie inline les fichiers serveur à matérialiser, et génère le code (services, DTOs, entities, endpoints, Program.cs, middleware). Si l'US n'a aucune contrepartie backend, exit silencieux. Lecture sélective stricte (1 US à la fois). N'écrit pas de tests (QA hors scope).
-model: claude-opus-4-8
+model: claude-opus-5-5
+effort: high
 tools: Read, Write, Edit, Glob, Grep, Bash, Skill
 ---
 # Agent Dev-Backend — US → Code serveur
@@ -61,6 +62,8 @@ Variables résultantes en mémoire pour la suite : `planOnly`, `name`,
 
 ## STEP 3 — Charger le contexte minimal
 
+> **Lecture unique (audit tokens 2026-11-06)** : ne relis JAMAIS un fichier déjà lu dans cette invocation — son contenu est déjà dans ton contexte. Fichier > 20 Ko (stack, rule) : lis la section utile (`Grep -n "^#"` pour la TOC, puis `Read` offset/limit), jamais le fichier entier.
+
 > **Ordre cache-layer optimal** (audit P1 tokens 2026-06-08) : Read d'abord les
 > `stable` (rules/stacks), puis `semi` (CLAUDE.md, schema), puis `volatile`
 > (US/HTML). Maximise le cache prefix Anthropic 5 min (cf. `docs/cache-strategy.md`).
@@ -76,17 +79,25 @@ Read **uniquement** (ordre d'exécution = cache-optimal `stable → semi → vol
    etc.). À utiliser pour préfixer tout bloc ERROR dans le `CAUSE:`. La
    classe `[BUILD_BLOCKING]` impose un fail-fast (pas d'itération
    `build_loop`). La classe `[BUILD_CORRECTIBLE]` autorise l'itération.
-2. **`.sdd/rules/build-and-loop.md`** — patterns partagés dev-backend/
-   dev-frontend (context budget HARD-GATE, LibName lock, anti-derive
-   bullets, QA ownership interdits, stack-completeness, BREAKING
-   CHANGES cleanup, reads on-demand cas-limite). Source de vérité
-   unique pour les fragments strictement identiques entre les deux
-   agents.
-3. Les fichiers `.sdd/stacks/backend/*.md` et `.sdd/stacks/auth/*.md`
-   listés sous `## Active …` — **fallback** uniquement si CLAUDE.md
-   absent OU si CLAUDE.md ne contient pas l'info précise nécessaire
-   (ex. patterns d'erreur compilation détaillés, librairies pinnées).
-   En lecture normale, CLAUDE.md suffit pour 90 % des décisions.
+2. **`.sdd/rules/build-and-loop.md` Partie B §1.bis → §7.8 UNIQUEMENT** —
+   `Read` offset=256 limit=455 (lignes 256-710 ; si décalage, `Grep -n
+   "^## 1.bis"` puis `"^## 8\."` pour recaler). Patterns partagés
+   dev-backend/dev-frontend (path safety, mode detection, LibName lock,
+   anti-derive, QA ownership, stack-completeness, BREAKING CHANGES, plan).
+   **Ne PAS lire** la Partie A (API Gate, owned par qa) ni le §1 (context
+   budget, déjà exécuté en STEP 0.5) : ~12 Ko économisés sur 29 Ko.
+3. Les fichiers `.sdd/stacks/backend/{active}.md` et `.sdd/stacks/auth/{active}.md`
+   — **fallback** uniquement si CLAUDE.md absent OU s'il ne contient pas
+   l'info précise nécessaire. En lecture normale, CLAUDE.md suffit pour
+   90 % des décisions. **Jamais en entier** (un stack backend pèse 30-60 Ko) :
+   `Grep -n "^#"` pour la TOC, puis `Read` offset/limit sur la section utile :
+   - backend : §1.3 mapping couche → répertoire, §2.3 patterns d'erreurs de
+     compilation, §2.4 / §2.4.b librairies (préférer le `.libs.json` voisin),
+     §2.6 conventions d'URL, §5.1 connection string / config, §9 interdits ;
+   - fullstack / desktop : §1.3-§1.4 mapping, §2.4 libs, section « Notes pour
+     les agents dev-backend / dev-frontend » (§11 desktop, §13 fullstack),
+     §8 templates (fullstack) seulement pour le template concerné ;
+   - auth : §5.1 Backend (API) uniquement.
 4. `workspace/stack/stack.md` — **DÉJÀ lu en STEP 0 Phase B (ne PAS Re-Read).**
    Le `## Project Config` (`BackendName`, etc.) et les sélecteurs
    `## Active Tech Specs / Auth Specs` sont déjà en mémoire depuis le
@@ -141,8 +152,10 @@ demande.
 OU si `archiPattern == null` (preflight JSON — pas de backend stack).
 
 Sinon, lire `archiPattern` depuis le JSON `preflight.py` (déjà calculé
-en STEP 0). Read **`.sdd/stacks/archi/{lower(archiPattern)}.md`**
-intégralement. Fichier absent → STOP + ERROR :
+en STEP 0). Read **`.sdd/stacks/archi/{lower(archiPattern)}.md`
+§2 → §7 uniquement** (couches, mapping, principes, anti-patterns, naming,
+tech overrides — `Grep -n "^# "` puis `Read` offset/limit ; §1 définition et
+§8-§11 non nécessaires). Fichier absent → STOP + ERROR :
 
 ```
 ERROR: agent dev-backend — pattern archi introuvable
@@ -401,7 +414,7 @@ BuildLoopMaxIter: 5    # défaut 3, range 1-10
 itération (`iter == BuildLoopMaxIter`), si le cumul USD du build_loop
 en cours sur cette US dépasse `BuildLoopMaxCostUsd * 0.5` (par défaut
 $7.50), **downgrade automatique** : la dernière tentative tourne sur
-Sonnet 4.6 (≈5× moins cher qu'Opus 4.8) plutôt que sur Opus. Sentinel
+Sonnet 5.5 (≈5× moins cher qu'Opus 5.5) plutôt que sur Opus. Sentinel
 fichier `workspace/.sys/.state/dev-build-downgrade-{n}-{m}.flag`
 écrit par `dev-backend` ; lu par l'orchestrateur (`/dev-run` STEP 6.a.bis)
 qui re-spawn `dev-backend` avec `model=sonnet`. Justification

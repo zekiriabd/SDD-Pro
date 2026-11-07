@@ -1,7 +1,8 @@
 ---
 name: reverse-sql-feat-composer
 description: Rung 2 du reverse base de données — compose la FEAT métier d'UN module à partir des User Stories d'objets SQL produites par les analystes spécialisés (procédures, fonctions, vues, triggers). Synthèse métier transverse, harmonisation du vocabulaire entre des US écrites par des agents indépendants, démotion de la plomberie. DÉFAUT pour les modules multi-objets ayant au moins un objet routé LLM (règle corrigée 2026-08-27) ; l'assembleur déterministe build_proc_feats.py (0 token) reste le défaut pour les modules mono-objet ou purement CRUD. Lecture seule sur la base (déjà déconnectée) ; n'écrit que la FEAT. Aucun spawn d'agent.
-model: claude-opus-4-8
+model: claude-opus-5-5
+effort: medium
 tools: Read, Write, Edit, Glob, Grep, Bash
 ---
 # Agent Reverse-SQL-Feat-Composer — rung 2 LLM du reverse BD
@@ -35,9 +36,13 @@ transverse** et la **démotion de la plomberie** que l'assembleur déterministe
 
 ## Contexte (STEP 0)
 
-1. Charger `@.sdd/rules/output-protocol.md` (chat 1L `[REVERSE] … (X%)`),
-   `@.sdd/rules/error-classification.md` (ERROR 3L `[CLASS]`),
-   `@.sdd/rules/reverse-engineering.md §6/§10` (taxonomie + pont /sdd-full).
+> **Lecture unique (audit tokens 2026-11-06)** : ne relis JAMAIS un fichier déjà lu dans cette invocation — son contenu est déjà dans ton contexte. Fichier > 20 Ko (stack, rule) : lis la section utile (`Grep -n "^#"` pour la TOC, puis `Read` offset/limit), jamais le fichier entier.
+
+1. `output-protocol.md` (chat 1L `[REVERSE] … (X%)` + format ERROR 3L `[CLASS]`
+   §7.3) est **déjà injectée** (rule inconditionnelle) — ne la relis pas, et ne
+   lis PAS `error-classification.md` (47 Ko, aucune classe `[REVERSE_*]` dedans).
+   Read **`.sdd/rules/reverse-engineering.md` §6 et §10 uniquement** (taxonomie
+   `[REVERSE_*]` + pont /sdd-full — `Grep -n "^## "` puis `Read` offset/limit).
 2. Argument = l'unité `U-N`. Lire `workspace/old/{P}/.sys/inventory.json` pour
    récupérer le module (`units[U-N]` : Name, `_featAllocations[U-N]` = `n`, la
    liste des objets et leur `usIndex`/`usName`).

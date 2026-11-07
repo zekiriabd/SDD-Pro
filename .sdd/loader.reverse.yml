@@ -17,6 +17,7 @@ agents:
 
   reverse-inventory:
     model_tier: balanced
+    effort: medium   # Claude Code `effort:` — parité frontmatter agents/reverse-inventory.md (test_loader_model_parity.py) ; high = analyse/composition/extraction UI (raisonnement long), medium = le reste
     phase: 1
     reads:
       - workspace/old/{P}/**                                   # recursive scan
@@ -35,6 +36,7 @@ agents:
 
   reverse-tech-auditor:
     model_tier: balanced
+    effort: medium   # Claude Code `effort:` — parité frontmatter agents/reverse-tech-auditor.md (test_loader_model_parity.py) ; high = analyse/composition/extraction UI (raisonnement long), medium = le reste
     phase: 2
     optional: true
     available_from: v0.2.0   # V2 — implemented
@@ -52,7 +54,8 @@ agents:
     # deps-graph.json is produced by deterministic script reverse_audit.py, not the agent.
 
   reverse-tech-analyst:
-    model_tier: deep       # DEFAULT (complex units). Routed to claude-sonnet-4-6 for `simple` units by /sdd-reverse-analyze (ADR governance-reverse-complexity-ladder, classifier sdd_reverse/code_unit_complexity.py). Structure unchanged — model-only routing.
+    model_tier: deep       # DEFAULT (complex units). Routed to claude-sonnet-5-5 for `simple` units by /sdd-reverse-analyze (ADR governance-reverse-complexity-ladder, classifier sdd_reverse/code_unit_complexity.py). Structure unchanged — model-only routing.
+    effort: high   # Claude Code `effort:` — parité frontmatter agents/reverse-tech-analyst.md (test_loader_model_parity.py) ; high = analyse/composition/extraction UI (raisonnement long), medium = le reste
     phase: 3a
     available_from: v0.7.0       # ADR governance-major-reverse-spec-ladder — barreau bas de l'escalier
     reads:
@@ -70,6 +73,7 @@ agents:
 
   reverse-us-writer:
     model_tier: balanced     # 3b = altitude-lift sur l'analyse 3a (forbidden_reads sur le code legacy) → Sonnet suffit, -33% coût Opus reverse (audit 2026-06-11). 3a/3c restent Opus.
+    effort: medium   # Claude Code `effort:` — parité frontmatter agents/reverse-us-writer.md (test_loader_model_parity.py) ; high = analyse/composition/extraction UI (raisonnement long), medium = le reste
     phase: 3b
     available_from: v0.7.0       # ADR governance-major-reverse-spec-ladder — barreau moyen
     reads:
@@ -83,7 +87,8 @@ agents:
       - workspace/old/{P}/{evidenceFiles}                      # 3b NEVER reads legacy code — only the 3a analysis
 
   reverse-feat-composer:
-    model_tier: deep       # DEFAULT (complex units). Routed to claude-sonnet-4-6 for `simple` units by /sdd-reverse-feat (ADR governance-reverse-complexity-ladder, same classifier as 3a → class stable across the ladder).
+    model_tier: deep       # DEFAULT (complex units). Routed to claude-sonnet-5-5 for `simple` units by /sdd-reverse-feat (ADR governance-reverse-complexity-ladder, same classifier as 3a → class stable across the ladder).
+    effort: high   # Claude Code `effort:` — parité frontmatter agents/reverse-feat-composer.md (test_loader_model_parity.py) ; high = analyse/composition/extraction UI (raisonnement long), medium = le reste
     phase: 3c
     available_from: v0.7.0       # ADR governance-major-reverse-spec-ladder — barreau haut (remplace reverse-functional-extractor, décommissionné D2)
     reads:
@@ -100,6 +105,7 @@ agents:
 
   reverse-completeness-reviewer:
     model_tier: balanced
+    effort: medium   # Claude Code `effort:` — parité frontmatter agents/reverse-completeness-reviewer.md (test_loader_model_parity.py) ; high = analyse/composition/extraction UI (raisonnement long), medium = le reste
     phase: "3-review"
     optional: true
     available_from: v0.5.0       # L5 — back-side completeness review (informational)
@@ -115,6 +121,7 @@ agents:
 
   reverse-ui-extractor:
     model_tier: deep
+    effort: high   # Claude Code `effort:` — parité frontmatter agents/reverse-ui-extractor.md (test_loader_model_parity.py) ; high = analyse/composition/extraction UI (raisonnement long), medium = le reste
     phase: 4
     optional: true
     available_from: v0.2.0     # V2 — implemented
@@ -127,6 +134,7 @@ agents:
 
   reverse-parity-inspector:
     model_tier: balanced
+    effort: medium   # Claude Code `effort:` — parité frontmatter agents/reverse-parity-inspector.md (test_loader_model_parity.py) ; high = analyse/composition/extraction UI (raisonnement long), medium = le reste
     phase: "3.8"
     optional: true
     available_from: v0.9.0     # emprunt Reversa (Inspector) — audit comparatif 2026-06-12
@@ -145,6 +153,7 @@ agents:
 
   reverse-paradigm-advisor:
     model_tier: balanced
+    effort: medium   # Claude Code `effort:` — parité frontmatter agents/reverse-paradigm-advisor.md (test_loader_model_parity.py) ; high = analyse/composition/extraction UI (raisonnement long), medium = le reste
     phase: "2.7"
     optional: true
     available_from: v0.9.0     # emprunt Reversa (Paradigm Advisor + Curator) — audit comparatif 2026-06-12
@@ -161,6 +170,7 @@ agents:
 
   reverse-clarifier:
     model_tier: balanced
+    effort: medium   # Claude Code `effort:` — parité frontmatter agents/reverse-clarifier.md (test_loader_model_parity.py) ; high = analyse/composition/extraction UI (raisonnement long), medium = le reste
     phase: "3.9"
     optional: true
     available_from: v0.9.0     # emprunt Reversa (questions.md interactif) — audit comparatif 2026-06-12
@@ -183,6 +193,7 @@ agents:
 
   reverse-sql-analyst:
     model_tier: deep
+    effort: medium   # Claude Code `effort:` — parité frontmatter agents/reverse-sql-analyst.md (test_loader_model_parity.py) ; high = analyse/composition/extraction UI (raisonnement long), medium = le reste
     phase: "proc-1"
     optional: true
     available_from: v1.0.0       # stored-procedure reverse — DB live READ-ONLY → US (1 proc = 1 US)
@@ -203,6 +214,7 @@ agents:
 
   reverse-sql-feat-composer:
     model_tier: deep
+    effort: medium   # Claude Code `effort:` — parité frontmatter agents/reverse-sql-feat-composer.md (test_loader_model_parity.py) ; high = analyse/composition/extraction UI (raisonnement long), medium = le reste
     phase: "proc-2"
     optional: true              # routage par module (DÉFAUT depuis 2026-08-26) : build_proc_feats.py (0 token) si module mono-objet/CRUD pur ; composer LLM si multi-objets + ≥ 1 objet analysé par LLM
     available_from: v1.1.0      # 2026-07-24 — LLM module-FEAT composer, parity with code ladder 3c
@@ -236,6 +248,7 @@ agents:
 
   reverse-db-architect:
     model_tier: deep
+    effort: medium   # Claude Code `effort:` — parité frontmatter agents/reverse-db-architect.md (test_loader_model_parity.py) ; high = analyse/composition/extraction UI (raisonnement long), medium = le reste
     phase: "db-0b"
     optional: false             # Phase 0.B — obligatoire avant toute remontee en US
     available_from: v1.2.0      # 2026-08-26 — Database Architect (interpretation layer)
@@ -256,6 +269,7 @@ agents:
 
   reverse-sql-function-analyst:
     model_tier: balanced
+    effort: medium   # Claude Code `effort:` — parité frontmatter agents/reverse-sql-function-analyst.md (test_loader_model_parity.py) ; high = analyse/composition/extraction UI (raisonnement long), medium = le reste
     phase: "db-1"
     optional: true
     available_from: v1.2.0      # 2026-08-26 — functions specialist (side-effect-free calculation)
@@ -272,6 +286,7 @@ agents:
 
   reverse-sql-view-analyst:
     model_tier: balanced
+    effort: medium   # Claude Code `effort:` — parité frontmatter agents/reverse-sql-view-analyst.md (test_loader_model_parity.py) ; high = analyse/composition/extraction UI (raisonnement long), medium = le reste
     phase: "db-1"
     optional: true
     available_from: v1.2.0      # 2026-08-26 — views specialist (projection / reporting)
@@ -288,6 +303,7 @@ agents:
 
   reverse-sql-trigger-analyst:
     model_tier: deep
+    effort: medium   # Claude Code `effort:` — parité frontmatter agents/reverse-sql-trigger-analyst.md (test_loader_model_parity.py) ; high = analyse/composition/extraction UI (raisonnement long), medium = le reste
     phase: "db-1"
     optional: true
     available_from: v1.2.0      # 2026-08-26 — triggers specialist (event-driven invariants)

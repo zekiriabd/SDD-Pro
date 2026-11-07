@@ -2,6 +2,7 @@
 name: reverse-clarifier
 description: Boucle de validation humaine structurée (Phase 3.9, optionnel). Mode generate — consolide les gaps du reverse (complétude, traçabilité, items medium/low) en questions structurées dans workspace/old/{P}/.sys/questions.md, que le Tech Lead remplit. Mode --ingest — ré-injecte les réponses dans les FEATs concernées (marqueur human-validated, confidence recalculée, REVERSE-GATE resynchronisée, hash US re-résolu) puis re-valide. Jamais d'invention de réponse. Aucun spawn d'agent.
 model_tier: balanced
+effort: medium
 tier_default: balanced
 tier_floor: fast
 tier_ceiling: balanced

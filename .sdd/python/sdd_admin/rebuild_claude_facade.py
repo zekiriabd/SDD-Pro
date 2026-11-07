@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""rebuild_claude_facade — regenerate .claude/{agents,commands,rules,CLAUDE.md}.
+"""rebuild_claude_facade — regenerate .claude/{agents,commands,rules,skills,CLAUDE.md}.
 
 Why this exists (2026-07-25) :
 - The SSoT for SDD_Pro is `.sdd/` (agents, commands, rules, memory pivot).
@@ -13,6 +13,12 @@ Why this exists (2026-07-25) :
     * Manual : `python .sdd/python/sdd_admin/rebuild_claude_facade.py`
 
 Idempotent : safe to re-run. Never mutates `.sdd/`.
+
+2026-11-06 (audit run FEAT 15) : the skills layer joins the façade. Claude
+Code only discovers skills under `<claude_dir>/skills/<name>/SKILL.md`; the
+13 SDD skills lived in `.sdd/skills/` only and were never loaded. They are
+now emitted (passthrough copy) by `harness_build.py --skills-only` and
+copied here next to agents/commands/rules.
 """
 from __future__ import annotations
 
@@ -35,12 +41,38 @@ def _repo_root() -> Path:
     return _HERE.parents[3]  # .sdd/python/sdd_admin/X.py -> repo
 
 
-#: Source dir under `.sdd/` -> façade dir under `.claude/`.
+#: Source dir under `.sdd/` -> façade dir under `.claude/` (flat *.md slots).
 _FACADE_SLOTS: tuple[tuple[str, str], ...] = (
     ("agents", "agents"),
     ("commands", "commands"),
     ("rules", "rules"),
 )
+
+#: Skills slot : nested trees `.sdd/skills/<name>/**` -> `<claude_dir>/skills/<name>/**`.
+_SKILLS_SLOT = "skills"
+
+
+def _skills_source_newer(repo: Path, claude_dir: Path) -> str | None:
+    """Drift check for the skills tree (any source file newer than its copy)."""
+    src_root = repo / ".sdd" / _SKILLS_SLOT
+    dst_root = claude_dir / _SKILLS_SLOT
+    if not src_root.is_dir():
+        return None
+    for src in src_root.rglob("*"):
+        if not src.is_file() or "__pycache__" in src.parts:
+            continue
+        rel = src.relative_to(src_root)
+        if len(rel.parts) < 2 or not (src_root / rel.parts[0] / "SKILL.md").is_file():
+            continue  # loose file at the root (e.g. VENDORED.md) — not a skill
+        dst = dst_root / rel
+        try:
+            if not dst.is_file():
+                return f"{_SKILLS_SLOT}/{rel.as_posix()} absent de la façade"
+            if src.stat().st_mtime_ns > dst.stat().st_mtime_ns:
+                return f".sdd/{_SKILLS_SLOT}/{rel.as_posix()} plus récent que la façade"
+        except OSError:
+            return f"{_SKILLS_SLOT}/{rel.as_posix()} illisible (stat)"
+    return None
 
 
 def _sources_newer_than_facade(repo: Path, claude_dir: Path) -> str | None:
@@ -79,6 +111,9 @@ def _sources_newer_than_facade(repo: Path, claude_dir: Path) -> str | None:
             except OSError:
                 # Unreadable stat → rebuild rather than assume freshness.
                 return f"{src_name}/{src.name} illisible (stat)"
+    skills_reason = _skills_source_newer(repo, claude_dir)
+    if skills_reason:
+        return skills_reason
     # The memory layer (CLAUDE.md) is compiled from the entrypoint sources.
     facade_md = claude_dir / "CLAUDE.md"
     for src_name in ("CLAUDE.md", "entrypoint-body.md"):
@@ -112,7 +147,7 @@ def _needs_rebuild(claude_dir: Path, repo: Path | None = None) -> bool:
 
 
 def rebuild(force: bool = False, provider: str = "anthropic", verbose: bool = True) -> int:
-    """Regenerate .claude/{agents,commands,rules,CLAUDE.md} from .sdd/.
+    """Regenerate .claude/{agents,commands,rules,skills,CLAUDE.md} from .sdd/.
 
     Returns 0 on success (or noop if not needed and not forced), non-zero
     on failure. Never raises — failure is logged to stderr.
@@ -142,6 +177,7 @@ def rebuild(force: bool = False, provider: str = "anthropic", verbose: bool = Tr
         "--agents-only",
         "--commands-only",
         "--rules-only",
+        "--skills-only",
         "--memory-only",
         "--out", str(build_dir),
     ]
@@ -171,6 +207,13 @@ def rebuild(force: bool = False, provider: str = "anthropic", verbose: bool = Tr
                 existing.unlink()
             for src_file in src.glob("*.md"):
                 shutil.copy2(src_file, dst / src_file.name)
+        # skills : nested trees, replaced wholesale (façade = disposable build product)
+        skills_src = build_dir / _SKILLS_SLOT
+        skills_dst = claude_dir / _SKILLS_SLOT
+        if skills_src.is_dir():
+            if skills_dst.exists():
+                shutil.rmtree(skills_dst)
+            shutil.copytree(skills_src, skills_dst)
         # CLAUDE.md at the root of .claude/
         claude_md_src = build_dir / "CLAUDE.md"
         if claude_md_src.is_file():
@@ -184,9 +227,10 @@ def rebuild(force: bool = False, provider: str = "anthropic", verbose: bool = Tr
         n_agents = len(list((claude_dir / "agents").glob("*.md")))
         n_commands = len(list((claude_dir / "commands").glob("*.md")))
         n_rules = len(list((claude_dir / "rules").glob("*.md")))
+        n_skills = len(list((claude_dir / _SKILLS_SLOT).glob("*/SKILL.md")))
         print(
             f"[rebuild_claude_facade] OK: {n_agents} agents, {n_commands} commands, "
-            f"{n_rules} rules, CLAUDE.md deployed."
+            f"{n_rules} rules, {n_skills} skills, CLAUDE.md deployed."
         )
     return SUCCESS
 
@@ -194,7 +238,7 @@ def rebuild(force: bool = False, provider: str = "anthropic", verbose: bool = Tr
 def main() -> int:
     import argparse
     parser = argparse.ArgumentParser(
-        description="Regenerate .claude/{agents,commands,rules,CLAUDE.md} from .sdd/.",
+        description="Regenerate .claude/{agents,commands,rules,skills,CLAUDE.md} from .sdd/.",
     )
     parser.add_argument("--force", action="store_true",
                         help="Rebuild even if .claude/ appears complete.")

@@ -197,12 +197,14 @@ class TestCostCapHookBehaviourOnDbError(unittest.TestCase):
                          f"STDERR={r.stderr}")
         self.assertIn("[TELEMETRY_UNAVAILABLE]", r.stderr)
 
-    def test_corrupt_db_warns_but_allows_interactive(self):
-        """No CI env → ERROR visible + ALLOW (operator awareness)."""
+    def test_corrupt_db_blocks_in_interactive_too(self):
+        """Audit tokens 2026-11-07 — fail-closed partout : console.db illisible
+        → DENY [INFRA_BLOCKED] même hors CI (avant : WARN + ALLOW, cap OFF
+        silencieusement pour tout le run)."""
         r = self._run_hook()
-        self.assertEqual(r.returncode, 0, f"Expected ALLOW interactive, got {r.returncode}")
+        self.assertEqual(r.returncode, 2, f"Expected DENY interactive, got {r.returncode}")
+        self.assertIn("[INFRA_BLOCKED]", r.stderr)
         self.assertIn("[TELEMETRY_UNAVAILABLE]", r.stderr)
-        self.assertIn("cap is OFF", r.stderr)
 
     def test_disable_env_overrides_blocking(self):
         """SDD_DISABLE_COST_CAP=1 must bypass even DB errors."""

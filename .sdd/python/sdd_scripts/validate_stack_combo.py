@@ -62,7 +62,7 @@ from sdd_lib.combos import (  # noqa: E402
     get_level_priority,
     get_validated_combos,
 )
-from sdd_lib.paths import workspace_root, repo_root  # noqa: E402
+from sdd_lib.paths import audit_dir_path, workspace_root, repo_root  # noqa: E402
 from sdd_lib.project_config import (  # noqa: E402
     parse_active_stack_ids,
     read_stack_md_text,
@@ -193,7 +193,7 @@ def _build_signature(components: dict) -> str:
 
 def _audit_log(signature: str, status: str, bypass: bool) -> None:
     """Log untested combo attempts to audit trail."""
-    audit_dir = workspace_root(repo_root()) / ".sys" / ".audit"
+    audit_dir = audit_dir_path(repo_root())
     audit_dir.mkdir(parents=True, exist_ok=True)
     audit_file = audit_dir / "untested-combo.log"
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")

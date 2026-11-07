@@ -73,7 +73,7 @@ class TestMainWithInjectedRunner(unittest.TestCase):
         # that always returns a valid JSON matching the default schema.
         from sdd_lib.spawn_agent import RunResult
 
-        def fake_runner(argv, timeout_s, cwd):
+        def fake_runner(argv, timeout_s, cwd, stdin_text=None):
             return RunResult(exit_code=0, stdout='{"result": "OK from fake runner"}')
 
         # Instead of monkey-patching the runner through CLI (which uses
@@ -101,7 +101,7 @@ class TestMainWithInjectedRunner(unittest.TestCase):
         # (CLI → library → JSON output), not the LLM behavior.
         from sdd_lib.spawn_agent import RunResult
 
-        def fake_runner(argv, timeout_s, cwd):
+        def fake_runner(argv, timeout_s, cwd, stdin_text=None):
             return RunResult(
                 exit_code=0,
                 stdout='{"result": "hello", "notes": "wired"}',

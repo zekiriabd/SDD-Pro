@@ -1,200 +1,85 @@
-# SDD_Pro — Prompt Caching Strategy (v7.0.0 GA P0-performance)
+# SDD_Pro — Coûts et cache de prompt (révision 2026-11-07)
 
-> **STATUS v7.0.0 GA (révision 2026-06-07 audit CTO)** :
-> - Phase 1 — **annotations `cache_layer: stable|semi|volatile` complétées** sur les 12 agents dans [`loader.yml`](../loader.yml) (audit CTO 2026-06-07) ✅
-> - Phase 2 — **helper Python `sdd_lib.cache_control`** parse les annotations et émet le manifest pour le harness ✅ (cf. [`tests/test_cache_control.py`](../python/tests/test_cache_control.py) — 8 tests)
-> - Phase 3 — **wiring harness** (envoi des markers `cache_control: ephemeral` à l'API Anthropic) : reste planifié v7.1 (refacto harness sub-agent spawning)
+> **STATUS (audit tokens 2026-11-06, transcripts réels du run FEAT 15)** — cette
+> page remplace la version v7.0.0 GA, dont les chiffres étaient des **artefacts de
+> télémétrie** : le hook de mesure n'enregistrait que le **dernier tour** de chaque
+> sous-agent. D'où les « 7 lignes, `input` = 1, hit 99,2 %, ~$0.56 / FEAT M » de
+> l'ex-§1.2 — un sous-comptage de ×7 à ×126 selon l'agent. Ces chiffres sont
+> **retirés** ; ne pas les citer.
 >
-> Baseline auto-cache Claude Code (sans markers explicites) : ~99% hit sur runs courts <5min. L'ajout de markers `cache_control` apportera un gain mesurable surtout sur les pipelines longs (`/sdd-full` ≥ 30 min) où le TTL 5min expire entre agents distants temporellement.
+> - Le cache de prompt est **l'auto-cache de Claude Code**. SDD-Pro ne pose aucun
+>   marqueur `cache_control` et **ne peut pas en poser** : le harnais compose
+>   lui-même le prompt des sous-agents (outil `Agent`), sans point d'injection.
+> - `sdd_lib/cache_control.py` (annotations `cache_layer:` → breakpoints) est
+>   **déprécié / sans effet** : son « Phase 3 wiring v7.1 » ne peut pas être livré
+>   dans Claude Code (constat déjà fait dans `sdd_scripts/context_pack.py`). Le
+>   fichier est conservé (dépendances de tests et d'autres lots) mais ne produit
+>   aucun gain. Les annotations `cache_layer:` de `loader.yml` restent un **ordre
+>   de lecture conseillé** (stable → semi → volatile), rien de plus.
 
-## 0. Manifest Phase 1 (v7.0.0 GA — disponible aujourd'hui)
+## 1. Mesures réelles — run FEAT 15 (2026-11-06)
 
-Exécution :
-```bash
-cd .sdd/python && python -m sdd_lib.cache_control
-```
+Source : transcripts JSONL Claude Code du run (tous les tours de chaque
+sous-agent, pas seulement le dernier), tarifs génération **4.x**.
 
-Sortie attendue : 12 agents × ~3-13 reads annotés, distribution ~37% stable / 35% semi / 28% volatile (cf. Phase 2 ci-dessus).
-
-Le helper produit pour chaque agent une liste de 1-3 **cache breakpoints** ordonnés stable → semi → volatile (Anthropic max 4 breakpoints par requête, dont 1 réservé au system prompt).
-
-API programmatique :
-```python
-from sdd_lib.cache_control import cache_breakpoints_for, report
-# Manifest texte pour audit
-print(report())
-# Manifest programmatique pour un agent
-breakpoints = cache_breakpoints_for("dev-backend")
-# → [("stable", [".sdd/rules/build-and-loop.md", ...]),
-#    ("semi", ["workspace/db/schema.json", ...]),
-#    ("volatile", ["workspace/us/{n}-{m}-*.md"])]
-```
-
-## 0.bis Phase 3 wiring (v7.1 — TODO harness)
-
-Le harness Claude Code spawn des sub-agents via tool `Agent`. Pour activer le caching :
-
-1. Lire le manifest via `cache_breakpoints_for(agent_name)`
-2. Pour chaque (`layer`, `paths`) tuple, concaténer les contenus en un seul content block
-3. Ajouter `"cache_control": {"type": "ephemeral"}` sur les blocks **stable** et **semi** (PAS sur **volatile** qui changent à chaque US/run)
-4. Ordonner les blocks : `[stable, semi, volatile]` (cache-friendly — préfixe cache, suffixe variable)
-
-Gain attendu post-wiring : `cache_read` (Anthropic `$0.30/MTok` Sonnet 4.6) au lieu de `input` (`$3.00/MTok`) sur les 70% de reads stable+semi → **-65% coût input** sur les sessions >5min.
-
-## 1. Baseline mesurée
-
-### 1.1 Mesure historique 2026-05-20 (roi-report FEAT 2)
-
-Source : `roi-report-2026-05-20-FEAT2-postfix.json` (snapshot historique ; `report_roi.py` émet désormais sur stdout, cf. 2026-07-06).
-
-| Métrique | Valeur |
+| Poste | Mesure |
 |---|---:|
-| Cache hit rate global (FEAT 2) | 40.8 % |
-| `input` tokens (full price) | 1 183 153 |
-| `cache_read` tokens (90 % discount) | 816 432 |
-| `cache_creation` tokens (1.25× premium) | 20 210 |
+| Sous-agents (tous tours, toutes invocations) | **≈ 87 $** |
+| Orchestrateur (session principale) | **≈ 14 $** |
+| Périmètre | 2 US, stack **desktop** (WPF), **sans backend** |
+| Hit rate cache mesuré | **91,8 %** — auto-cache Claude Code, pas un levier SDD-Pro |
+| Contexte d'un agent dev au 1er tour | ≈ 48 k tokens |
+| Contexte d'un agent dev au dernier tour | 180-220 k tokens (sur 44-74 tours) |
 
-> Cette mesure considérait `cache_read / (input + cache_read)` mais avec une
-> base `input` qui incluait des tokens transient (préfix non-cachable). Voir §1.2.
+Lecture : le coût est dominé par la **croissance du contexte au fil des tours**
+(chaque tour relit tout le contexte accumulé, même en cache à 0,1×), pas par le
+contexte initial. Les leviers réels sont donc : (1) un contexte initial plus
+petit (Reads bornés, pas de relecture — lot 2026-11-07), (2) moins de tours
+(build loop qui converge vite), (3) un `effort:` adapté au rôle (`medium` hors
+dev-*/arch, lot 2026-11-07), (4) le tier de modèle.
 
-### 1.2 Mesure CTO 2026-06-06 (FEAT 4, run de1a78f4a4f1 → 20260606T182956-87ba)
+## 2. Extrapolation `/sdd-full` (estimation, non mesurée)
 
-Source : `console.db` table `token_usage`, agrégé sur la session.
+| Scénario | Estimation |
+|---|---:|
+| `/sdd-full` FEAT de 3 US back-front, nominal (tarifs 4.x) | **≈ 170 $** |
+| Fourchette (convergence du build loop, taille des stacks, nb de reviewers) | **100 à 250 $** |
+| Même scénario sur la génération 5.5 | ≈ -30 % (tarifs), **non re-mesuré** |
 
-| Agent | input | output | cache_read | cache_write |
-|---|---:|---:|---:|---:|
-| `code-reviewer` (Sonnet) | 1 | 2 514 | 170 349 | 499 |
-| security-reviewer (Sonnet) | 1 | 2 403 | 176 892 | 592 |
-| `dev-frontend` | 1 | 971 | 122 013 | 908 |
-| spec-compliance (Sonnet) | 1 | 727 | 115 728 | 1 439 |
-| `dev-backend` | 1 | 852 | 112 983 | 417 |
-| `constitutioner` | 1 | 587 | 82 159 | 2 236 |
-| `po` | 1 | 207 | 82 627 | 626 |
-| **Total** | **7** | **8 261** | **862 751** | **6 717** |
+Toute affirmation de coût doit citer un run mesuré sur **tous les tours**
+(`python -m sdd_admin.measure_cache_hit_rate` lit les JSONL complets ; le ledger
+`token_usage` de `console.db` n'est fiable que depuis la correction du hook
+« dernier tour »). Aucune cible de coût n'est engagée tant que 3 runs comparables
+n'ont pas été mesurés (cf. `poc-roi-methodology.md`).
 
-**Cache hit rate effectif** = `862 751 / (7 + 862 751 + 6 717)` = **99.2 %**.
-**Coût Opus 4.8 1M context** estimé : ~**$0.56 / FEAT M**.
-
-### 1.3 Pourquoi l'écart 40.8% → 99.2%
-
-- **2026-05-20** : le run mesuré incluait probablement un agent legacy
-  (a11y/perf/dashboard, supprimés v7.0.0) qui re-lisait du contexte non
-  partagé avec les autres agents → cache miss artificiel.
-- **2026-06-06** : pipeline v7.0.0-alpha avec 12 agents (au lieu de 15-16),
-  réutilisation maximale du contexte stack/rules/CLAUDE.md cross-agent,
-  caching auto Claude Code en plein régime.
-- Le **format de mesure** a aussi changé : v6.x divisait par `(input + cr)`
-  excluant `cache_write` du dénominateur, v7.x inclut tous les flux pour
-  une vraie fraction.
-
-### 1.4 Monitoring continu (v7.0.x, audit 2026-06-08)
-
-Script de mesure runtime contre les logs JSONL Claude Code :
+## 3. Monitoring du hit rate
 
 ```bash
 cd .sdd/python && python -m sdd_admin.measure_cache_hit_rate --days 7
-# or for CI / dashboards:
-python -m sdd_admin.measure_cache_hit_rate --days 30 --json
+python -m sdd_admin.measure_cache_hit_rate --days 30 --json   # CI / dashboards
 ```
 
-Lecture : `~/.claude/projects/<encoded-cwd>/**/*.jsonl`, agrège les
-`usage.cache_read_input_tokens` / `cache_creation_input_tokens` /
-`input_tokens` par session et par modèle (Opus/Sonnet/Haiku).
+Lit `~/.claude/projects/<encoded-cwd>/**/*.jsonl` et agrège
+`cache_read_input_tokens` / `cache_creation_input_tokens` / `input_tokens` par
+session et par modèle. Utile pour détecter une **régression** (ex. un Read
+non déterministe en tête de contexte qui casse le préfixe), pas pour revendiquer
+un gain : le hit rate élevé est une propriété du harnais.
 
-**Mesure 30 jours (audit 2026-06-08, agrégat session-mix réel)** :
-93.8 % hit globalement, Opus 4.7 à 94.5 %, Sonnet 4.6 à 93.7 %, Haiku
-4.5 à 85.0 %. L'écart avec les 99.2 % de §1.2 vient de la fenêtre :
-mesure CTO ciblait une session courte (1 FEAT), monitoring 30 j inclut
-des restarts, sessions multi-FEAT, et cache_creation aux warmups.
+## 4. Ce qui reste valable de l'ancienne stratégie
 
-Utiliser ce script pour détecter une régression du hit rate après
-modification de `loader.yml` ou ajout de nouveaux Reads non annotés.
+- **Ordre de lecture stable → semi → volatile** dans chaque STEP contexte :
+  maximise le préfixe commun entre invocations, donc l'auto-cache. Gratuit.
+- **Schema slices** (`workspace/db/schema-slice-{n}-{m}.json`, Levier 4) :
+  réduisent réellement le contexte des dev-* et de qa.
+- **Lecture par section** des stacks et des rules (lot 2026-11-07) : un stack
+  de 30-60 Ko lu en entier, plusieurs fois par run, pesait davantage que tout
+  le reste du contexte initial.
 
-## 2. Implémentation `cache_control` explicite (P2, optionnel)
+## 5. Historique (non normatif)
 
-Le gain marginal d'ajouter des markers `cache_control: ephemeral` sur les
-prompts est désormais estimé à **~1-3% supplémentaires** (vs les 99.2%
-auto). Effort 1 jour, ROI faible. Maintenu en backlog v7.2+ pour sessions
-batch (CI nocturne, multi-FEAT séquentielles) où le TTL 5min auto peut
-expirer entre étapes.
-
-## 2. Stratégie cible
-
-### 2.1 Couches stables (cachables longuement)
-
-Ces fichiers sont **invariants entre invocations d'une même FEAT** et
-souvent entre FEATs d'un même projet. Marquer `cache_control: ephemeral`
-avec TTL 5 min :
-
-| Layer | Taille typique | Fréquence ré-utilisation |
-|---|---:|---:|
-| `loader.yml` | ~43 KB | 100 % des invocations dev-*/qa |
-| Stacks actifs (backend + frontend + ui + auth + qa) | ~50-80 KB | 100 % |
-| Règles consolidées (5 fichiers) | ~50 KB | 100 % |
-| `stack.md` (Project Config) | ~3-5 KB | 100 % |
-| Constitution (§1-§8) | ~2-5 KB | 100 % |
-| Templates pertinents | ~10-15 KB | 100 % |
-
-**Total cachable invariant** : ~150-200 KB ≈ ~40-50 ktokens.
-
-### 2.2 Couches semi-stables (cache courte durée)
-
-- `CLAUDE.md` per-project (~5 KB) : invariant tant que `arch` n'a pas re-tourné.
-- Schema.json DB (~5-15 KB) : invariant entre US d'une même FEAT.
-  - **Levier 4 v7.0.x** : préférer `workspace/db/schema-slice-{n}-{m}.json`
-    (slice per-US, ~30-60 % de la taille du schema complet, contient les
-    tables référencées par l'US + FK transitive). Généré par
-    `python -m sdd_scripts.generate_schema_slice --us-path <us.md>` avant
-    spawn dev-backend / qa. Fallback automatique sur schema complet si
-    le slice est absent (préservé par `loader.yml` ordering).
-
-### 2.3 Couches volatiles (jamais cachables)
-
-- US courante (chaque dev-* lit 1 US différente)
-- Plan inline / from-plan (varie par US)
-- Mockup HTML (varie par US)
-
-## 3. Placement des markers `cache_control`
-
-Anthropic API : `cache_control: {type: "ephemeral"}` sur les blocs system
-ou content. **Maximum 4 cache breakpoints** par requête.
-
-Stratégie recommandée pour `dev-backend` (le plus coûteux) :
-
-```
-[1] System prompt (agent .md inline)              → CACHE 1 (longue durée)
-[2] Stacks + règles concaténés                    → CACHE 2 (longue durée)
-[3] CLAUDE.md projet + schema.json                → CACHE 3 (courte durée)
-[4] US + HTML mockup + plan                       → NO CACHE (volatile)
-```
-
-## 4. Implémentation
-
-**v7.0.0** : pas encore implémenté côté harness Claude Code (les calls
-Anthropic API par les hooks/agents passent par la Tool Agent qui gère
-le caching de manière implicite via prompt assembly order).
-
-**Recommandation v7.1** : instrumenter `loader.yml` avec un nouveau champ
-`cache_layer: stable|semi-stable|volatile` par entrée `reads:`. Le
-preflight injecte les markers lors de la composition du prompt.
-
-## 5. Mesure cible
-
-Critère release v7.0.0 final :
-- Cache hit rate ≥ 60 % sur 3 FEAT M consécutifs (vs 40.8 % actuel)
-- Coût Opus / FEAT M ≤ $15 (vs ~$20 actuel sur FEAT 2 mesuré)
-
-**Statut audit 2026-06-08** : critère **atteint et dépassé**. Hit rate
-mesuré 93.8 % sur 30 j (Opus 4.7 à 94.5 %). Monitoring continu via
-`sdd_admin.measure_cache_hit_rate` (cf. §1.4).
-
-## 6. ADR à créer
-
-`ADR-{ts}-governance-cache-strategy-v7` une fois implémenté.
-
----
-
-*Sources :*
-- *audit CTO 2026-05-20 §4.2*
-- *report_roi.py output (roi-report-2026-05-20-FEAT2-postfix.json, snapshot historique)*
-- *Anthropic prompt caching docs (TTL 5 min, max 4 breakpoints, 1.25× write / 0.1× read pricing)*
+- 2026-05-20 : 40,8 % de hit sur FEAT 2 (`roi-report-2026-05-20-FEAT2-postfix.json`)
+  — mesure de format différent, conservée pour mémoire.
+- 2026-06-06 / 2026-06-08 : « 99,2 % » et « 93,8 % sur 30 j » — mesures
+  dernier-tour, invalidées par l'audit du 2026-11-06.
+- Critère release v7.0.0 « coût Opus / FEAT M ≤ $15 » : déclaré atteint sur la
+  base de ces mesures invalides ; **retiré**.

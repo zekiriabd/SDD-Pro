@@ -1,15 +1,19 @@
 #!/usr/bin/env python3
 """SDD_Pro PreToolUse.Agent hook — hard $ cost cap per run (v7.0.0 P0 §4.3).
 
-Queries console.db `token_usage` table for the current run (matched by RunId
-emitted via env $SDD_RUN_ID, or fallback to "all-time-today" window) and
-computes cumulative USD spent so far. If the next Agent spawn would push
-the run past `MaxCostPerRun` (layered config), blocks with exit 2 +
-[COST_CAP_EXCEEDED].
+Queries console.db `token_usage` table for the current run (matched by the
+stable run_id from `sdd_lib.run_id`) and computes cumulative USD spent so far
+over EVERY row of the run — sub-agents AND the orchestrator row
+(`agent='orchestrator'`, written on `Stop` by `record_token_usage` from the
+session transcript, audit tokens 2026-11-07). If cumulative cost reaches
+`MaxCostPerRun` (layered config), blocks with exit 2 + [COST_CAP_EXCEEDED].
 
-Pricing table mirrors sdd_scripts/report_roi.py (single source of truth would
-be ideal, but the script imports cycle is intentionally avoided here for
-hook startup speed — keep these in sync).
+Pricing SSoT : `sdd_lib/pricing.py` (`estimate_cost`). A row whose model is
+NULL or unknown is priced at the CONSERVATIVE tariff (most expensive known)
+and reported as a WARN — it is never a reason to DENY (audit tokens
+2026-11-07 : the previous `[PRICING_UNKNOWN]` DENY fired on EVERY spawn in CI
+as soon as one unattributed row existed — a self-inflicted denial of
+service, while the cap itself kept under-counting).
 
 Bypass (conscient uniquement) :
   - Set MaxCostPerRun: 0 in stack.md ## Project Config (disables cap, git blame trace)
@@ -20,6 +24,10 @@ Default behaviour (v7.0.0 audit P0 R1 fix 2026-05-20) :
   - >= 100% du cap : **HARD BLOCK systématique** (exit 2), peu importe contexte
     interactif OU CI. Le comportement antérieur "WARN-only en interactif"
     laissait les Tech Leads dépasser silencieusement le budget.
+  - console.db présent mais ILLISIBLE : **DENY [INFRA_BLOCKED]** (exit 2),
+    interactif comme CI — fail-closed (audit tokens 2026-11-07 ; avant :
+    WARN + ALLOW en interactif, le cap était silencieusement OFF).
+    `db absent` (fresh checkout, pré-bootstrap) reste un ALLOW légitime.
 
 This hook is INTENTIONALLY decoupled from preflight_agent_budget.py because:
   - context_budget = per-invocation estimated input tokens (predictive)
@@ -34,10 +42,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from sdd_lib.ci import is_ci as _detect_ci  # noqa: E402  # SSoT audit 2026-06-07
 from sdd_lib.exit_codes import HOOK_ALLOW, HOOK_DENY  # noqa: E402
 from sdd_lib.hook_input import read_hook_input, get_subagent_type  # noqa: E402
-from sdd_lib.pricing import get_pricing, has_known_pricing  # noqa: E402  # v7.0.1 SSoT (normalizes [1m] suffix — audit CR-1); has_known_pricing added v7.0.2 audit R2 (fail-closed non-Anthropic)
+from sdd_lib.pricing import (  # noqa: E402  # v7.0.1 SSoT (normalizes [1m] suffix — audit CR-1)
+    CONSERVATIVE_MODEL_ID,
+    estimate_cost,
+    has_known_pricing,
+)
 from sdd_lib.run_id import get_or_create_run_id  # noqa: E402  # v7.0.1 stable scoping
 from sdd_lib.stderr import warn  # noqa: E402
 
@@ -163,9 +174,9 @@ def _check_telemetry_health() -> None:
     accumulated since last successful run, so the operator knows the cost
     cap is operating on incomplete data."""
     try:
-        from sdd_lib.paths import workspace_root, repo_root
+        from sdd_lib.paths import audit_dir_path, workspace_root, repo_root
         counter_path = (
-            workspace_root(repo_root()) / ".sys" / ".audit"
+            audit_dir_path(repo_root())
             / "token-telemetry-failure-count"
         )
         if not counter_path.is_file():
@@ -185,20 +196,15 @@ def _check_telemetry_health() -> None:
 
 
 # --------------------------------------------------------------------------- #
-# SDD agent registry — scope of the fail-closed [PRICING_UNKNOWN] guard
-# (audit C-1, 2026-08-30)
+# SDD agent registry — scope of the [PRICING_UNKNOWN] *report* (audit C-1,
+# 2026-08-30 ; downgraded from DENY to WARN by audit tokens 2026-11-07)
 # --------------------------------------------------------------------------- #
 #
-# The guard exists to protect the SDD cost cap from under-counting a model it
-# cannot price. It has no business blocking a CI run because of a subagent SDD
-# does not own : Claude Code's built-ins (Explore, general-purpose, …) are
-# recorded in `token_usage` like any other spawn, they carry `model IS NULL`
-# (the Agent hook payload has no model field, and `_model_from_agent_tier`
-# resolves nothing for an agent with no `.sdd/agents/{name}.md`), and before
-# this fix every one of them tripped a HOOK_DENY in CI.
-#
-# Their tokens are still priced and still counted against the cap — only the
-# *blocking* verdict is scoped to the agents the loader manifest declares.
+# Unpriced rows (NULL or unknown model) are split by ownership so the WARN
+# tells the operator whether the gap is in an agent SDD routes (fixable in
+# `.sdd/agents/*.md` / provider YAML) or in a Claude Code built-in (Explore,
+# general-purpose, …). Both are priced at the CONSERVATIVE tariff and counted
+# against the cap ; neither can DENY a spawn on its own.
 _AGENT_REGISTRY_CACHE: frozenset[str] | None = None
 _AGENT_REGISTRY_LOADED = False
 
@@ -230,10 +236,12 @@ def _sdd_agent_registry() -> frozenset[str] | None:
 
 
 def _blocks_on_unknown_pricing(agent: object) -> bool:
-    """True when an unpriced row from `agent` may block (DENY) in CI.
+    """True when an unpriced row from `agent` belongs to the SDD-owned bucket.
 
-    Fail-closed by default : only an agent that is positively identified AND
-    positively absent from the SDD registry is exempted.
+    Name kept for the audit trail (C-1) ; since audit tokens 2026-11-07 the
+    bucket only drives the WARN wording — no bucket can DENY. Only an agent
+    that is positively identified AND positively absent from the SDD registry
+    lands in the "foreign" bucket.
     """
     registry = _sdd_agent_registry()
     if registry is None:
@@ -266,6 +274,22 @@ _COST_CACHE: dict[
 _COST_CACHE_TTL_SEC = 30.0
 
 
+#: `session_id` du payload PreToolUse courant (posé par `main()`).
+_SESSION_ID: str | None = None
+
+
+def _current_run_id() -> str:
+    """run_id scopé à la session Claude Code quand le payload la porte.
+
+    Sans `session_id`, `get_or_create_run_id` retombe en mode legacy (marker
+    partagé 24 h) — appel sans argument conservé pour ce cas (et pour les
+    tests qui substituent la fonction par un lambda sans paramètre).
+    """
+    if _SESSION_ID:
+        return get_or_create_run_id(session_id=_SESSION_ID)
+    return get_or_create_run_id()
+
+
 def _compute_run_cost() -> tuple[float, int, str, tuple[str, ...], tuple[str, ...]]:
     """Aggregate USD spent so far in the current run.
 
@@ -291,17 +315,17 @@ def _compute_run_cost() -> tuple[float, int, str, tuple[str, ...], tuple[str, ..
 
     Returns (cost_usd, call_count, scope_label, unknown_models,
     unknown_models_out_of_registry). The last two split the unpriced rows by
-    ownership (audit C-1, 2026-08-30) : only the first list may produce a
-    HOOK_DENY — the second belongs to subagents SDD does not declare and is
-    reported as a WARN. Both are priced into `cost_usd` either way.
+    ownership (audit C-1, 2026-08-30) for the WARN wording — neither produces
+    a HOOK_DENY (audit tokens 2026-11-07). Both are priced into `cost_usd`
+    at the CONSERVATIVE tariff.
 
     Scope label conventions (v7.0.0-alpha telemetry-trust fix) :
       - "run={id} (no rows yet)" : DB readable, run scope empty → safe ALLOW
       - "db absent"              : console.db file missing → safe ALLOW
                                     (fresh checkout / pre-bootstrap)
-      - "db error: {detail}"     : DB exists but unreadable → caller MUST
-                                    treat as untrusted (block in strict CI,
-                                    visible WARN in interactive). Previously
+      - "db error: {detail}"     : DB exists but unreadable → caller DENIES
+                                    with [INFRA_BLOCKED] in every context
+                                    (audit tokens 2026-11-07). Previously
                                     this state silently returned 0.0 → the
                                     cap was bypassed every time telemetry
                                     failed (root cause filed by user
@@ -311,6 +335,10 @@ def _compute_run_cost() -> tuple[float, int, str, tuple[str, ...], tuple[str, ..
         from sdd_lib.console_db import connect_ro, default_db_path
     except Exception as e:
         return 0.0, 0, f"db error: import failed: {e}", (), ()
+    try:
+        from sdd_lib.console_db import ConsoleDbUnavailable
+    except Exception:  # noqa: BLE001 — API antérieure : classe absente
+        ConsoleDbUnavailable = None  # type: ignore[assignment]
 
     # Distinguish absent (legit fresh state) from unreadable (suspect).
     try:
@@ -322,7 +350,7 @@ def _compute_run_cost() -> tuple[float, int, str, tuple[str, ...], tuple[str, ..
 
     # v7.0.1 : always resolve a stable run_id (env > marker file > generate).
     # Avoids the legacy "today window" fallback which collided across parallel runs.
-    run_id = get_or_create_run_id()
+    run_id = _current_run_id()
 
     # Cache check (C3 fix) : skip SQLite if same run_id within TTL.
     import time
@@ -349,43 +377,40 @@ def _compute_run_cost() -> tuple[float, int, str, tuple[str, ...], tuple[str, ..
                 return 0.0, 0, f"run={run_id[:8]} (no rows yet)", (), ()
             scope = f"run={run_id[:8]}"
     except Exception as e:
+        # `ConsoleDbUnavailable` (lot données/états, sous-classe de
+        # sqlite3.OperationalError) = lecture `connect_ro` impossible sans
+        # `allow_stale` : nommé explicitement, classé [INFRA_BLOCKED] → DENY.
+        if ConsoleDbUnavailable is not None and isinstance(e, ConsoleDbUnavailable):
+            return 0.0, 0, f"db error: ConsoleDbUnavailable: {e}", (), ()
         # SCOPE = "db error: ..." signals the caller that 0.0 is NOT a
         # legitimate "no cost yet" but a "cap unenforceable" condition.
         return 0.0, 0, f"db error: {e}", (), ()
 
     total = 0.0
-    unknown: list[str] = []  # audit R2 : models with no known pricing (Sonnet fallback = under-count)
+    unknown: list[str] = []  # unpriced models consumed by SDD-registry agents (or unattributed)
     foreign: list[str] = []  # audit C-1 : same, but consumed outside the SDD registry
     for row in rows:
         model, inp, outp, cc, cr = row[:5]
         agent = row[5] if len(row) > 5 else None
-        # Audit C2 (2026-08-29) — fail-closed on a NULL/empty model too.
-        # The pre-fix guard was `if model and not has_known_pricing(model)`.
-        # Every row in the live console.db has `model IS NULL` (the Agent hook
-        # payload carries no model field), and NULL short-circuits the truthy
-        # test — so the [PRICING_UNKNOWN] safety valve could never fire on the
-        # exact population it exists to protect. An unrecorded model is *more*
-        # suspect than an unrecognized one, not less : the cost is estimated at
-        # Sonnet rates either way.
-        #
-        # Audit C-1 (2026-08-30) — that fail-closed stance is right for the
-        # agents SDD_Pro declares and wrong for everybody else : a built-in
-        # Claude Code subagent (Explore, general-purpose…) also lands here with
-        # `model IS NULL`, and denying a CI run over a spawn the framework
-        # neither routes nor prices protects nothing. Unpriced rows are
-        # therefore split by ownership — SDD agents keep the DENY, the rest are
-        # reported. Both are still priced into the total.
+        # Audit C2 (2026-08-29) — a NULL/empty model is flagged too (the
+        # pre-fix guard `if model and ...` let NULL slip through unreported).
+        # Audit C-1 (2026-08-30) — split by ownership for the WARN wording.
+        # Audit tokens 2026-11-07 — flagged rows are REPORTED, never a DENY :
+        # `estimate_cost` prices them at the most expensive known tariff, so
+        # the cap can only trip early on them. (The DENY turned every CI run
+        # with one unattributed row into a wall ; meanwhile the real
+        # under-count — zeros from the async Agent tool — went unnoticed.)
         key = (model or "").strip()
         label = key or "<unrecorded>"
         if not key or not has_known_pricing(key):
             bucket = unknown if _blocks_on_unknown_pricing(agent) else foreign
             if label not in bucket:
                 bucket.append(label)
-        p = get_pricing(model)
-        total += (inp or 0) * p["input"] / 1_000_000
-        total += (outp or 0) * p["output"] / 1_000_000
-        total += (cc or 0) * p["cache_creation"] / 1_000_000
-        total += (cr or 0) * p["cache_read"] / 1_000_000
+        total += estimate_cost(
+            model, input_tokens=inp or 0, output_tokens=outp or 0,
+            cache_creation_tokens=cc or 0, cache_read_tokens=cr or 0,
+            warn_unknown=False,  # the WARN is emitted once by main(), with context
+        )
 
     unknown_tuple = tuple(unknown)
     foreign_tuple = tuple(foreign)
@@ -424,7 +449,7 @@ def _compute_us_cost(feat_n: int, us_id: str) -> tuple[float, int, str]:
     except Exception:
         pass
 
-    run_id = get_or_create_run_id()
+    run_id = _current_run_id()
     cache_key = (run_id, feat_n, us_id)
 
     import time
@@ -454,11 +479,11 @@ def _compute_us_cost(feat_n: int, us_id: str) -> tuple[float, int, str]:
 
     total = 0.0
     for model, inp, outp, cc, cr in rows:
-        p = get_pricing(model)
-        total += (inp or 0) * p["input"] / 1_000_000
-        total += (outp or 0) * p["output"] / 1_000_000
-        total += (cc or 0) * p["cache_creation"] / 1_000_000
-        total += (cr or 0) * p["cache_read"] / 1_000_000
+        total += estimate_cost(
+            model, input_tokens=inp or 0, output_tokens=outp or 0,
+            cache_creation_tokens=cc or 0, cache_read_tokens=cr or 0,
+            warn_unknown=False,
+        )
 
     _US_COST_CACHE[cache_key] = (now, total, len(rows))
     return total, len(rows), scope
@@ -503,6 +528,9 @@ def main() -> int:
     payload = read_hook_input()
     if not payload:
         return HOOK_ALLOW
+    global _SESSION_ID
+    sid = payload.get("session_id")
+    _SESSION_ID = sid.strip() if isinstance(sid, str) and sid.strip() else None
     subagent = get_subagent_type(payload)
     if not subagent:
         return HOOK_ALLOW
@@ -520,61 +548,41 @@ def main() -> int:
     # Previously this branch was conflated with the legitimate empty state
     # → the cap silently became inoperative every time telemetry failed
     # (root cause filed by user 2026-05-21 : DB locked, WAL inaccessible,
-    # corrupted schema, etc.). New semantics :
-    #   - CI (auto strict)              → DENY [TELEMETRY_UNAVAILABLE]
-    #                                     (can't enforce cap, abort the run)
-    #   - Interactive (or SDD_BUDGET_MODE=warn)
-    #                                   → visible ERROR on stderr + ALLOW
-    #                                     (operator awareness, manual decision)
-    # Bypass requires explicit SDD_DISABLE_COST_CAP=1 (no silent fallthrough).
-    if scope.startswith("db error:"):
-        is_ci = _detect_ci()
-        warn("ERROR preflight-cost-cap : telemetry unavailable — cap cannot be enforced")
-        warn(f"CAUSE: [TELEMETRY_UNAVAILABLE] {scope}")
-        if is_ci:
-            warn("FIX (CI strict) : investigate console.db readability "
-                 "(WAL lock, FS permissions) ; bypass one-shot : "
-                 "export SDD_DISABLE_COST_CAP=1")
-            return HOOK_DENY
-        warn("FIX (interactive) : run `python .sdd/python/sdd_admin/"
-             "verify_telemetry_health.py` to diagnose ; allowing this "
-             "invocation but cap is OFF for the run")
-        return HOOK_ALLOW
-
-    # v7.0.2 audit R2 — unknown-pricing detection (multi-provider fail-closed).
-    # If any consumed model is neither in canonical PRICING nor in a provider
-    # YAML, cost was estimated with Sonnet FALLBACK_PRICING → under-count risk
-    # up to 5× for premium models (OpenAI o1, Gemini Pro, Kimi K3).
-    # Policy :
-    #   - CI (auto strict)                              → DENY [PRICING_UNKNOWN]
-    #   - Interactive (or SDD_ALLOW_UNKNOWN_PRICING=1)  → visible WARN + ALLOW
-    #   - Bypass one-shot                               : SDD_ALLOW_UNKNOWN_PRICING=1
-    #   - Bypass hard (cost cap globally off)           : SDD_DISABLE_COST_CAP=1
+    # corrupted schema, etc.).
     #
-    # Audit C-1 (2026-08-30) — the DENY is scoped to the agents the loader
-    # declares. Unpriced spawns from outside the registry (Claude Code
-    # built-ins) are surfaced here and counted in the total, but they never
-    # abort a CI run : SDD prices what SDD routes.
-    if foreign_unknown:
-        warn("WARN preflight-cost-cap : pricing inconnu pour "
-             f"{list(foreign_unknown)!r} sur des subagents hors registre SDD "
-             "— coût compté au tarif de repli, jamais bloquant (le "
-             "fail-closed [PRICING_UNKNOWN] ne couvre que les agents du loader)")
-    if unknown_models:
-        is_ci = _detect_ci()
-        bypass = (os.environ.get("SDD_ALLOW_UNKNOWN_PRICING", "").strip().lower()
-                  in ("1", "true", "yes"))
-        warn("ERROR preflight-cost-cap : unknown pricing for model(s) "
-             f"{list(unknown_models)!r} — cost cap unreliable")
-        warn(f"CAUSE: [PRICING_UNKNOWN] cost estimated with FALLBACK_PRICING "
-             f"(Sonnet rates) — 5× under-count risk on premium models")
-        warn(f"FIX: (a) add pricing to `.sdd/providers/{{provider}}.yaml` "
-             f"and bump `PRICING_LAST_REVIEWED` in `sdd_lib/pricing.py` ; "
-             f"(b) bypass one-shot : export SDD_ALLOW_UNKNOWN_PRICING=1")
-        if is_ci and not bypass:
-            return HOOK_DENY
-        # interactive OR bypass → visible WARN + continue (cap still enforced
-        # on the known-model subset, just under-counted for unknown ones)
+    # Audit tokens 2026-11-07 — fail-closed in EVERY context. The former
+    # "interactive → WARN + ALLOW, cap OFF for the run" branch was a silent
+    # bypass of a `severity: critical` invariant (cost-cap-per-run) : a Tech
+    # Lead with a locked WAL file ran uncapped without having asked for it.
+    # The only bypass is the explicit, audit-logged SDD_DISABLE_COST_CAP=1.
+    if scope.startswith("db error:"):
+        warn("ERROR: preflight-cost-cap — console.db illisible, cap inapplicable")
+        warn(f"CAUSE: [INFRA_BLOCKED] telemetry unavailable "
+             f"([TELEMETRY_UNAVAILABLE]) — {scope}")
+        warn("FIX: diagnostiquer avec `python .sdd/python/sdd_admin/"
+             "verify_telemetry_health.py` (WAL lock, permissions FS, fichier "
+             "corrompu) ; bypass one-shot conscient : export SDD_DISABLE_COST_CAP=1")
+        return HOOK_DENY
+
+    # Unpriced rows (audit R2 2026-07-26 → C-1 2026-08-30 → tokens 2026-11-07).
+    # A model absent from canonical PRICING and every provider YAML — NULL
+    # included — is priced at the CONSERVATIVE tariff (most expensive known),
+    # so the cap errs early, never late. That makes a DENY pointless and the
+    # former CI-only DENY was actively harmful : one unattributed row and
+    # every subsequent spawn of the run was refused. Report, count, continue.
+    # `SDD_ALLOW_UNKNOWN_PRICING` is accepted for backward compatibility but
+    # no longer changes anything.
+    if unknown_models or foreign_unknown:
+        parts = []
+        if unknown_models:
+            parts.append(f"agents SDD : {list(unknown_models)!r}")
+        if foreign_unknown:
+            parts.append(f"subagents hors registre : {list(foreign_unknown)!r}")
+        warn("WARN preflight-cost-cap : [PRICING_UNKNOWN] modèle(s) sans tarif — "
+             + " ; ".join(parts)
+             + f" — comptés au tarif conservateur ({CONSERVATIVE_MODEL_ID}), "
+             "jamais bloquant. FIX : ajouter le tarif dans sdd_lib/pricing.py "
+             "ou .sdd/providers/{provider}.yaml, bumper PRICING_LAST_REVIEWED.")
 
     # 80%-100% : WARN (let the operator know early, do not block — head-up only)
     if cap * 0.8 <= cost < cap:

@@ -15,10 +15,13 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # .sdd/python
 
 from sdd_lib.spawn_agent import (  # noqa: E402
+    GEMINI_STDIN_MARKER,
     AgentSpec,
     RunResult,
     SpawnConfig,
     _build_argv,
+    _build_invocation,
+    _classify_os_error,
     build_prompt,
     extract_json,
     spawn_agent,
@@ -39,7 +42,7 @@ SCHEMA = {
 
 
 def _runner(stdout="", exit_code=0, stderr=""):
-    return lambda argv, timeout, cwd: RunResult(exit_code, stdout, stderr)
+    return lambda argv, timeout, cwd, stdin_text=None: RunResult(exit_code, stdout, stderr)
 
 
 def _spec():
@@ -74,20 +77,89 @@ def test_build_prompt_includes_schema_and_correction():
 # --------------------------------------------------------------------- #
 
 
-def test_argv_codex():
-    argv = _build_argv(SpawnConfig(harness="codex", model="gpt-5.2"), "P")
+def test_argv_codex_legacy_argv_transport():
+    argv = _build_argv(SpawnConfig(harness="codex", model="gpt-5.2", prompt_transport="argv"), "P")
     expected = "codex.cmd" if os.name == "nt" else "codex"
     assert argv[:2] == [expected, "exec"] and "--model" in argv and argv[-1] == "P"
 
 
-def test_argv_gemini():
-    argv = _build_argv(SpawnConfig(harness="gemini-cli", model="gemini-3-flash"), "P")
-    assert argv[0] == "gemini" and "-p" in argv and "-m" in argv
+def test_argv_gemini_legacy_argv_transport():
+    argv = _build_argv(
+        SpawnConfig(harness="gemini-cli", model="gemini-3-flash", prompt_transport="argv"), "P"
+    )
+    assert argv[0] == "gemini" and "-p" in argv and "-m" in argv and "P" in argv
 
 
-def test_argv_claude():
-    argv = _build_argv(SpawnConfig(harness="claude-code"), "P")
-    assert argv[0] == "claude" and "-p" in argv
+def test_argv_claude_legacy_argv_transport():
+    argv = _build_argv(SpawnConfig(harness="claude-code", prompt_transport="argv"), "P")
+    assert argv[0] == "claude" and argv[1:3] == ["-p", "P"]
+
+
+# --- transport stdin (défaut depuis l'audit 2026-11-07 : WinError 206) --- #
+
+
+def test_stdin_transport_is_default():
+    assert SpawnConfig().prompt_transport == "stdin"
+
+
+def test_invocation_codex_stdin_uses_dash_and_keeps_prompt_out_of_argv():
+    big = "X" * 40_000  # > 32 Ko : aurait levé WinError 206 en argv
+    argv, stdin_text = _build_invocation(SpawnConfig(harness="codex", model="gpt-5.2"), big)
+    assert argv[-1] == "-" and "--model" in argv
+    assert big not in argv and stdin_text == big
+
+
+def test_invocation_claude_stdin_has_no_positional_prompt():
+    argv, stdin_text = _build_invocation(SpawnConfig(harness="claude-code", model="m"), "PROMPT")
+    assert argv[:2] == ["claude", "-p"] and "PROMPT" not in argv
+    assert "--model" in argv and stdin_text == "PROMPT"
+
+
+def test_invocation_gemini_stdin_passes_short_marker():
+    argv, stdin_text = _build_invocation(SpawnConfig(harness="gemini-cli", model="g"), "PROMPT")
+    assert argv[:3] == ["gemini", "-p", GEMINI_STDIN_MARKER]
+    assert "PROMPT" not in argv and stdin_text == "PROMPT"
+
+
+def test_invocation_argv_transport_has_no_stdin():
+    _argv, stdin_text = _build_invocation(SpawnConfig(harness="codex", prompt_transport="argv"), "P")
+    assert stdin_text is None
+
+
+def test_invalid_transport_rejected():
+    with pytest.raises(ValueError):
+        SpawnConfig(prompt_transport="pipe")
+
+
+def test_runner_receives_full_prompt_on_stdin():
+    seen = {}
+
+    def capture(argv, timeout, cwd, stdin_text):
+        seen["argv"], seen["stdin"] = argv, stdin_text
+        return RunResult(0, '{"stories":[{"id":"1-1"}]}')
+
+    r = spawn_agent(_spec(), SpawnConfig(harness="codex", runner=capture))
+    assert r["ok"]
+    assert "Tu es PO" in seen["stdin"] and "Découpe la FEAT" in seen["stdin"]
+    assert all("Tu es PO" not in a for a in seen["argv"])
+
+
+def test_legacy_three_arg_runner_still_works_in_argv_transport():
+    def legacy(argv, timeout, cwd):
+        return RunResult(0, '{"stories":[{"id":"1-1"}]}')
+
+    r = spawn_agent(_spec(), SpawnConfig(runner=legacy, prompt_transport="argv"))
+    assert r["ok"]
+
+
+def test_legacy_three_arg_runner_refused_in_stdin_transport():
+    """Un runner qui ne peut pas transmettre stdin ne doit pas spawner à vide."""
+    def legacy(argv, timeout, cwd):
+        return RunResult(0, "{}")
+
+    results = spawn_many([_spec()], SpawnConfig(runner=legacy))
+    assert results[0]["error_class"] == "[SPAWN_INTERNAL_ERROR]"
+    assert "stdin" in results[0]["detail"]
 
 
 def test_invalid_harness_rejected():
@@ -118,7 +190,7 @@ def test_spawn_empty_output():
 
 
 def test_spawn_binary_not_found():
-    def boom(argv, timeout, cwd):
+    def boom(argv, timeout, cwd, stdin_text=None):
         raise FileNotFoundError()
 
     r = spawn_agent(_spec(), SpawnConfig(runner=boom))
@@ -126,11 +198,58 @@ def test_spawn_binary_not_found():
 
 
 def test_spawn_timeout():
-    def slow(argv, timeout, cwd):
+    def slow(argv, timeout, cwd, stdin_text=None):
         raise TimeoutError()
 
     r = spawn_agent(_spec(), SpawnConfig(runner=slow))
     assert not r["ok"] and r["error_class"] == "[TIMEOUT]"
+
+
+# --- OSError de spawn (WinError 206 / E2BIG) : classé, jamais propagé --- #
+
+
+def _winerror_206() -> OSError:
+    exc = OSError(22, "The filename or extension is too long")
+    exc.winerror = 206  # type: ignore[attr-defined]
+    return exc
+
+
+def test_classify_os_error():
+    import errno
+
+    assert _classify_os_error(_winerror_206()) == "[SPAWN_ARGV_TOO_LONG]"
+    assert _classify_os_error(OSError(errno.E2BIG, "Argument list too long")) == "[SPAWN_ARGV_TOO_LONG]"
+    assert _classify_os_error(PermissionError(13, "denied")) == "[SPAWN_OS_ERROR]"
+
+
+def test_spawn_argv_too_long_is_classified_with_3l_report():
+    def boom(argv, timeout, cwd, stdin_text=None):
+        raise _winerror_206()
+
+    r = spawn_agent(_spec(), SpawnConfig(harness="claude-code", runner=boom, prompt_transport="argv"))
+    assert not r["ok"] and r["error_class"] == "[SPAWN_ARGV_TOO_LONG]"
+    lines = r["error_report"].splitlines()
+    assert lines[0].startswith("ERROR: spawn_agent po (claude-code) failed")
+    assert lines[1].startswith("CAUSE: [SPAWN_ARGV_TOO_LONG]")
+    assert lines[2].startswith("FIX:") and "stdin" in lines[2]
+    assert r["attempts"] == 1  # pas de retry schéma sur une erreur OS
+
+
+def test_spawn_generic_os_error_is_classified():
+    def boom(argv, timeout, cwd, stdin_text=None):
+        raise PermissionError(13, "Permission denied")
+
+    r = spawn_agent(_spec(), SpawnConfig(runner=boom))
+    assert not r["ok"] and r["error_class"] == "[SPAWN_OS_ERROR]"
+    assert "PermissionError" in r["detail"]
+
+
+def test_spawn_many_os_error_captured_not_raised():
+    def boom(argv, timeout, cwd, stdin_text=None):
+        raise _winerror_206()
+
+    results = spawn_many([_spec(), _spec()], SpawnConfig(runner=boom))
+    assert [r["error_class"] for r in results] == ["[SPAWN_ARGV_TOO_LONG]"] * 2
 
 
 def test_schema_retry_triggers_second_attempt():
@@ -168,7 +287,7 @@ def test_spawn_many_empty():
 
 
 def test_spawn_many_failures_are_captured_not_raised():
-    def boom(argv, timeout, cwd):
+    def boom(argv, timeout, cwd, stdin_text=None):
         raise FileNotFoundError()
 
     results = spawn_many([_spec(), _spec()], SpawnConfig(runner=boom))

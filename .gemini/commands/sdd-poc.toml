@@ -244,9 +244,25 @@ Invoquer l'agent `dev-frontend` avec `{n}-1`. Substance complète :
 
 ---
 
+## STEP 7.5 — Gate de livraison POC (build seul, OBLIGATOIRE)
+
+POC = **build seul** (pas de QA, pas de review imposées — c'est voulu), mais un
+build **réellement exécuté** et réussi (`.sdd/docs/delivery-gates.md`) :
+
+```bash
+python .sdd/python/sdd_scripts/verify_build.py --feat-number {n}
+python .sdd/python/sdd_scripts/delivery_gate.py authorize --feat-number {n} --workflow sdd-poc --json
+```
+
+**Aucun `[DONE]` si `authorize` sort ≠ 0** : émettre
+`🔴 [DONE/FAIL] FEAT {n} — [DELIVERY_GATE_BLOCKED] build non prouvé → verify_build.py. (90%)`.
+Les lignes « build vert » des agents dev-* ne valent pas preuve.
+
+---
+
 ## STEP 8 — Verdict POC (LOAD-BEARING bannière finale)
 
-Émettre **un seul bloc final** :
+Émettre **un seul bloc final** (uniquement si STEP 7.5 exit 0) :
 
 ```
 [DONE] FEAT {n}-{FeatName} livrée en mode POC. (100%)

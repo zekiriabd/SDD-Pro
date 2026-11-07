@@ -163,6 +163,7 @@ class TestMatchersAgainstRealAgents(unittest.TestCase):
         "resolve_po_hash_sentinel": frozenset({"po"}),
         "validate_acceptance_gate": frozenset({"qa"}),
         "record_token_usage": None,  # télémétrie générique : tous agents OK
+        "enforce_max_parallel": None,  # libère le créneau de TOUT sous-agent
     }
 
     def test_every_subagent_stop_hook_has_declared_scope(self):

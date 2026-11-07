@@ -1,7 +1,10 @@
 """SDD_Pro Console DB — helper sub-package for SQLite access (v7.0.0-alpha CRIT-12).
 
-Source de vérité unique pour télémétrie/QA/runs.
-Localisation par défaut : workspace/db/console.db
+Source de vérité unique pour télémétrie/QA/runs **et gates manuels**
+(audit 2026-11-07 : `workspace/console/status.json` n'est plus qu'un export
+dérivé — cf. `sdd_scripts/gate_decide.py`).
+Localisation par défaut : workspace/db/console.db — relocalisable via
+`$SDD_CONSOLE_DB_PATH` (chemin absolu ; positionné par `tests/conftest.py`).
 
 Usage minimal :
     from sdd_lib.console_db import connect, insert_event, upsert_run
@@ -12,7 +15,7 @@ Usage minimal :
 Pragmas appliqués automatiquement à la connexion :
     - journal_mode = WAL          → lectures concurrentes pendant écritures
     - synchronous  = NORMAL       → bon compromis durabilité/perf en WAL
-    - busy_timeout = 5000 ms      → tolère 5s d'attente sur lock
+    - busy_timeout = 30000 ms     → tolère 30s d'attente sur lock
     - foreign_keys = ON
 
 v7.0.0-alpha (audit CRIT-12, 2026-06-04) — éclatement du monolithe 912 L
@@ -45,6 +48,8 @@ from sdd_lib.console_db.core import (
     MIGRATIONS_DIR,
     SCHEMA_SQL_PATH,
     SCHEMA_VERSION,
+    STALE_RUN_AFTER_SECONDS,
+    ConsoleDbUnavailable,
     _jdumps,
     apply_pending_migrations,
     connect,
@@ -55,17 +60,24 @@ from sdd_lib.console_db.core import (
     ensure_initialized,
     ensure_us_row,
     load_schema_sql,
+    mark_stale_runs,
+    split_sql_statements,
 )
 
 # --- runs (model d'exécution : runs/phases/events/gates/auditor_runs) ---
 from sdd_lib.console_db.runs import (
+    RUN_END_STATUSES,
+    RUN_TERMINAL_STATUSES,
     auditor_ran,
+    get_latest_gate,
     get_run,
     get_run_phases,
     insert_event,
     insert_gate,
+    list_latest_gates,
     list_runs,
     record_auditor_run,
+    run_end,
     upsert_run,
     upsert_run_phase,
 )
@@ -94,14 +106,17 @@ __all__ = [
     # core constants
     "AUDITOR_IDS", "BASE_SCHEMA_VERSION", "DEFAULT_DB_PATH",
     "MIGRATIONS_DIR", "SCHEMA_SQL_PATH", "SCHEMA_VERSION",
+    "STALE_RUN_AFTER_SECONDS", "ConsoleDbUnavailable",
     # core helpers
     "apply_pending_migrations", "connect", "connect_ro",
     "current_schema_version", "default_db_path", "ensure_feat_row",
     "ensure_initialized", "ensure_us_row", "load_schema_sql",
+    "mark_stale_runs", "split_sql_statements",
     # runs
-    "auditor_ran", "get_run", "get_run_phases", "insert_event",
-    "insert_gate", "list_runs", "record_auditor_run",
-    "upsert_run", "upsert_run_phase",
+    "RUN_END_STATUSES", "RUN_TERMINAL_STATUSES",
+    "auditor_ran", "get_latest_gate", "get_run", "get_run_phases",
+    "insert_event", "insert_gate", "list_latest_gates", "list_runs",
+    "record_auditor_run", "run_end", "upsert_run", "upsert_run_phase",
     # qa
     "insert_context_budget", "insert_qa_a11y_batch", "insert_qa_api_tests",
     "insert_qa_code_review_batch", "insert_qa_coverage",

@@ -437,3 +437,43 @@ class TestPlanIntegration:
         assert result["phases"]["code_review"]["enabled"] is False
         assert result["phases"]["security_scan"]["enabled"] is False
         assert result["phases"]["spec_compliance"]["enabled"] is False
+
+
+# -----------------------------------------------------------------------------
+# Lot orchestration mécanique (2026-11-07) — phases dev mécaniques
+# -----------------------------------------------------------------------------
+
+from sdd_scripts.phase_planner import decide_dev_phases  # noqa: E402
+
+
+def test_dev_phases_desktop_skips_backend_and_api_gate():
+    stacks = {"desktop": "wpf", "backend": None, "fullstack": None}
+    out = decide_dev_phases(stacks, {}, us_count=2)
+    meta = out.pop("_meta")
+    assert meta["frontend_kind"] == "desktop"
+    assert out["dev_backend"]["enabled"] is False
+    assert "frontendKind=desktop" in out["dev_backend"]["skip_reason"]
+    assert out["api_gate"]["enabled"] is False
+    assert out["dev_frontend"]["enabled"] is True
+
+
+def test_dev_phases_back_front_all_enabled():
+    out = decide_dev_phases({"backend": "dotnet-minimalapi", "frontend": "react"}, {}, us_count=1)
+    assert all(out[k]["enabled"] for k in ("dev_backend", "api_gate", "dev_frontend"))
+
+
+def test_dev_phases_api_gate_off_when_unsequenced_and_not_required():
+    out = decide_dev_phases({"backend": "x", "frontend": "y"},
+                            {"ApiGateRequired": "false"}, unsequenced=True, us_count=1)
+    assert out["api_gate"]["enabled"] is False
+    assert out["dev_backend"]["enabled"] is True
+
+
+def test_plan_exposes_dev_phases_for_desktop(tmp_path, monkeypatch):
+    stack = "## Project Config\nAppName: Desk\n\n## Active Tech Specs\n - .sdd/stacks/desktop/wpf.md\n"
+    ws = _make_workspace(tmp_path, stack_md=stack, feat_content=FEAT_BASIC,
+                         us_contents=["# US"])
+    monkeypatch.setenv("SDD_REPO_ROOT", str(ws))
+    result = plan(feat_number=1)
+    assert result["dev_phases"]["dev_backend"]["enabled"] is False
+    assert result["dev_meta"]["frontend_kind"] == "desktop"

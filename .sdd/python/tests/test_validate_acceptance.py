@@ -177,9 +177,19 @@ class TestAcceptanceGateHook(unittest.TestCase):
         with patch.dict(os.environ, {"SDD_ALLOW_ACCEPTANCE_BYPASS": "1"}):
             self.assertEqual(vag.main(), 0)
 
-    def test_bypass_verdict_allows(self):
+    def test_bypass_verdict_without_hook_env_denies(self):
+        """Audit 2026-11 : verdict=bypass n'est honoré que si le bypass est
+        posé dans l'environnement du HOOK (process Claude Code)."""
         self._write_report({"verdict": "bypass", "mode": "bypass", "failures": []})
-        rc = vag.main()
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("SDD_ALLOW_ACCEPTANCE_BYPASS", None)
+            rc = vag.main()
+        self.assertEqual(rc, 2)
+
+    def test_bypass_verdict_with_hook_env_allows(self):
+        self._write_report({"verdict": "bypass", "mode": "bypass", "failures": []})
+        with patch.dict(os.environ, {"SDD_ALLOW_ACCEPTANCE_BYPASS": "1"}):
+            rc = vag.main()
         self.assertEqual(rc, 0)
 
     def test_warn_verdict_allows(self):
@@ -198,10 +208,11 @@ class TestAcceptanceGateHook(unittest.TestCase):
         rc = vag.main()
         self.assertEqual(rc, 2)  # HOOK_DENY
 
-    def test_corrupted_json_allows_with_warn(self):
+    def test_corrupted_json_denies(self):
+        """Audit 2026-11 : rapport corrompu = fail-closed."""
         (self.report_dir / "acceptance.json").write_text("{broken json", encoding="utf-8")
         rc = vag.main()
-        self.assertEqual(rc, 0)  # graceful
+        self.assertEqual(rc, 2)
 
     def test_envvar_bypass_allows(self):
         self._write_report({
@@ -212,10 +223,11 @@ class TestAcceptanceGateHook(unittest.TestCase):
             rc = vag.main()
         self.assertEqual(rc, 0)
 
-    def test_unknown_verdict_allows(self):
+    def test_unknown_verdict_denies(self):
+        """Audit 2026-11 : verdict hors contrat = fail-closed."""
         self._write_report({"verdict": "weird", "mode": "strict"})
         rc = vag.main()
-        self.assertEqual(rc, 0)
+        self.assertEqual(rc, 2)
 
 
 class TestProjectsScopingFlag(unittest.TestCase):

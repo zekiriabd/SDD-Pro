@@ -1,0 +1,35 @@
+# requirements.lock.txt — versions EXACTES réellement installées et utilisées
+# par la suite de tests du framework (générée 2026-11-07, Python 3.11.5,
+# Windows, `pip freeze` filtré sur les paquets déclarés dans les extras de
+# pyproject.toml + leurs dépendances transitives).
+#
+# Usage (fichier de CONTRAINTES, pas de requirements : il pinne sans ajouter) :
+#   pip install -e ".sdd/python[dev,reverse]" -c .sdd/python/requirements.lock.txt
+#   pip install -e ".sdd/python[reverse-db]"  -c .sdd/python/requirements.lock.txt
+#
+# Régénération : installer les extras, puis
+#   python -m pip freeze | grep -i -E "^(pyyaml|pyodbc|psycopg2-binary|oracledb|mysql-connector-python|pytest|pytest-cov|pytest-xdist|build|twine|coverage|iniconfig|pluggy|packaging|colorama|pygments)=="
+#
+# NON PINNÉS (déclarés dans les extras mais absents de l'environnement de
+# référence — aucune version n'a été vérifiée, donc aucune n'est inventée) :
+#   pytest-xdist (dev), oracledb + mysql-connector-python (reverse-db),
+#   build + twine (build). Ils restent bornés par les plages de pyproject.toml.
+
+# --- extra `reverse` / `dev` / `reverse-db` ---
+PyYAML==6.0.3
+
+# --- extra `reverse-db` (drivers lecture seule) ---
+pyodbc==5.3.0
+psycopg2-binary==2.9.12
+
+# --- extra `dev` ---
+pytest==9.0.3
+pytest-cov==7.1.0
+
+# --- transitives de pytest / pytest-cov ---
+colorama==0.4.6
+coverage==7.14.0
+iniconfig==2.3.0
+packaging==26.2
+pluggy==1.6.0
+Pygments==2.17.2

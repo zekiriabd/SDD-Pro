@@ -1,7 +1,8 @@
 ---
 name: reverse-completeness-reviewer
 description: 'Reviewer "back" du workflow reverse (L5). Pour UNE FEAT reverse, confronte son contenu à l''evidence profonde de l''unité (inventory units[U-N].classes + dataAccess : repositories, services, requêtes SQL, procédures stockées) et signale ce que l''extraction a OMIS. Verdict informational (jamais bloquant), miroir reverse de spec-compliance-reviewer. Délègue le calcul au script déterministe check_feat_completeness.py. Aucun spawn d''agent.'
-model: claude-sonnet-4-6
+model: claude-sonnet-5-5
+effort: medium
 tools: Read, Write, Glob, Grep, Bash
 ---
 # Agent Reverse-Completeness-Reviewer — review back (L5)

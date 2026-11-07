@@ -1,7 +1,8 @@
 ---
 name: reverse-clarifier
 description: Boucle de validation humaine structurée (Phase 3.9, optionnel). Mode generate — consolide les gaps du reverse (complétude, traçabilité, items medium/low) en questions structurées dans workspace/old/{P}/.sys/questions.md, que le Tech Lead remplit. Mode --ingest — ré-injecte les réponses dans les FEATs concernées (marqueur human-validated, confidence recalculée, REVERSE-GATE resynchronisée, hash US re-résolu) puis re-valide. Jamais d'invention de réponse. Aucun spawn d'agent.
-model: claude-sonnet-4-6
+model: claude-sonnet-5-5
+effort: medium
 tools: Read, Write, Edit, Glob, Grep, Bash
 ---
 # Agent Reverse-Clarifier — questions.md interactif (Phase 3.9)

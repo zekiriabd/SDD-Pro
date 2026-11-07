@@ -14,10 +14,10 @@
 > Lecture sélective, anti-derive, isolation par US et famille.
 
 > **Slim entry point** : budget cible ~155 lignes (ADR
-> `governance-major-prompts-trim`) — **actuellement ~240 lignes, hors budget**
-> (audit 2026-08-29). Le trim réel est un chantier séparé : chaque section
-> porte des cross-références vers `@.sdd/docs/` et `@.sdd/rules/` qu'une coupe
-> à l'aveugle casserait. Substance déléguée à `@.sdd/docs/` et `@.sdd/rules/`.
+> `governance-major-prompts-trim`) — **réel après trim 2026-11-07 : 237 lignes /
+> 16 Ko** (était 257 lignes / 23 Ko ; narration des batches stacks déplacée dans
+> `validated-combos.md §0.2`). Budget non atteint : les sections restantes portent
+> des cross-références qu'une coupe à l'aveugle casserait.
 
 ---
 
@@ -128,7 +128,9 @@ PostgreSQL réelle. SSoT : `@.sdd/docs/reverse-engineering-workflow.md`
 
 ## 4. Agents (29 : 13 LLM forward + 16 reverse, + 1 rubric déterministe)
 
-**Cœur** : `po`, `arch` (Sonnet 4.6) ; `dev-backend`, `dev-frontend` (Opus 4.8).
+**Cœur** : `po`, `arch` (tier `balanced`, Sonnet 5.5) ; `dev-backend`, `dev-frontend`
+(tier `deep`, Opus 5.5). Modèle = `model_tier` résolu par `providers/*.yaml` ;
+`effort:` par agent (`high` : dev-*, arch, 3 reverse ; `medium` : le reste).
 **Support** : `elicitor`, `constitutioner`, `qa`, `specbook-writer` (vulgarise
 FEAT en langage humain, cache `workspace/docs/.sys/sections/`).
 **Auditors** : `code-reviewer`, `security-reviewer`, `spec-compliance-reviewer`,
@@ -169,54 +171,31 @@ Détail modèles + retraits v7.0.0 (`a11y`/`perf`/`dashboard`/`*-strict`) :
 **2 principes** : `.sdd/docs/principles/{source-first,us-granularity}.md`.
 Templates : `@.sdd/docs/conventions.md §14-§15`.
 
-> **Chargement paresseux (TOK-C1 audit 2026-06-12, resserré TOK-C2 audit tokens
-> 2026-08-30)** : 11 des 12 rules portent une frontmatter `paths:` (path-scoped
-> rules, mécanisme natif Claude Code) → elles ne s'auto-injectent qu'au contact de
-> fichiers de leur périmètre (`workspace/src`, `workspace/old`, `.sys/.validation`,
-> `.sdd/stacks`…) au lieu de polluer **chaque** session et **chaque** sous-agent.
-> Seule `output-protocol.md` reste inconditionnelle — elle porte aussi le noyau
-> universel error-classification (§7.3/§7.5 : format ERROR 3L + règle mentale
-> `[CLASS]`) ; la taxonomie complète `error-classification.md` est path-scoped
-> depuis 2026-08-30 (canal agent = digests `.sdd/digests/error-classification.{agent}.md`).
-> Cas particulier : `build-and-loop.md` + `dev-shared-preflight.md` ont une portée
-> réduite à leur propre fichier (auto-injection pipeline retirée — leurs consommateurs
-> les lisent explicitement en STEP contexte ; l'ex-portée `workspace/src/**` doublait
-> ce chargement). Les agents continuent de Read explicitement leurs rules/digests en
-> STEP contexte. **Vérification** : dans une session fraîche, `/memory` liste les
-> rules chargées ; hors-pipeline il ne doit rester que `output-protocol.md`.
-> Économie : ~190-240 KB de contexte en session hors-périmètre ; fixe par sous-agent
-> ramené de ~78 KB à ~27 KB (CLAUDE.md + output-protocol).
+> **Chargement paresseux** : 11 des 12 rules portent une frontmatter `paths:` et ne
+> s'auto-injectent qu'au contact de leur périmètre ; seule `output-protocol.md` est
+> inconditionnelle (elle porte aussi le noyau error-classification §7.3/§7.5 ; la
+> taxonomie complète passe par les digests `.sdd/digests/`). `build-and-loop.md` et
+> `dev-shared-preflight.md` ne sont jamais auto-injectées (Read borné explicite).
+> **Fixe mesuré par sous-agent** (2026-11-07) : ce fichier ~16 Ko + `output-protocol`
+> 15 Ko ≈ 31 Ko, **plus** les Reads de STEP contexte de chaque agent (rules par
+> section, digest, stacks par section) et les rules path-scoped injectées au contact
+> de `workspace/src/**` (`ownership` 26 Ko, `library-and-stack` 35 Ko, `quality` 20 Ko).
+> Vérification : `/memory` dans une session fraîche.
 
 ---
 
 ## 6. Stacks (56 actifs — SSoT = entête `Validation:` du `.md`)
 
-> **Recount 2026-09-02** (quatre batches : `mobiles/` +4 stacks +2 QA,
-> `backend/` +3 stacks +1 QA, `fullstack/` +3 stacks, **`desktop/` +7 stacks —
-> nouvelle catégorie** ; historique : ajout `mobiles/delphi-fmx`
-> 2026-06-21 ; ajout `fullstack/aspnet-mvc-razor` 2026-06-10 ; downgrade
-> `mobiles/kotlin-android` 🟢→🟡, audit CTO 2026-06-07) :
-> **28 🟢 (validated/bench-validated) + 28 🟡 = 56 total**.
-> Validation auto : `python .sdd/python/sdd_admin/framework_smoke.py`, check
-> **`stack-md-headers`** (nom corrigé audit 2026-08-29 — il n'existe pas de
-> check `stacks-count`). ⚠️ Ce check émet **WARN, pas FAIL**, sur un drift de
-> compte : c'est un signal consultatif, pas une barrière dure.
+**28 🟢 (validated / bench-validated) + 28 🟡 = 56** (recount 2026-09-02). Liste
+des 🟡, historique des batches 2026-09-02 (mobiles, backend, fullstack, nouvelle
+catégorie `desktop/`) et tiers : `@.sdd/docs/validated-combos.md §0-§2`. Check
+`stack-md-headers` de `framework_smoke.py` = WARN (pas FAIL) sur drift de compte.
 
-**🟡 (28)** : 26 experimental (`archi/ddd`, `archi/microservice`, `qa/mutation-testing` (opt-in), `qa/playwright` (opt-in), `fullstack/aspnet-mvc-razor`, `mobiles/delphi-fmx`, + les 6 ajouts du batch mobiles 2026-09-02 : `mobiles/flutter`, `mobiles/kotlin-multiplatform`, `mobiles/swiftui`, `mobiles/ionic-capacitor`, `qa/flutter-test`, `qa/swift-testing`, + les 4 ajouts du batch backend 2026-09-02 : `backend/django`, `backend/nestjs`, `backend/laravel`, `qa/php-pest`, + les 3 ajouts du batch fullstack 2026-09-02 : `fullstack/laravel-blade`, `fullstack/symfony-twig`, `fullstack/django-templates`, + les 7 stacks de la nouvelle catégorie `desktop/` : `delphi-vcl`, `wpf`, `qt-cpp`, `electron`, `winforms`, `javafx`, `pyside`) + 1 POC-only (`fullstack/node-react` — console SDD interne, non destiné prod externe) + 1 scaffold-validated (`mobiles/kotlin-android` — APK runtime pending, SDK absent au bench).
-
-> **Batch mobiles 2026-09-02** — le catalogue `mobiles/` passe de 4 à 8 stacks et couvre désormais le top marché : `flutter`, `react-native` (Expo), `kotlin-multiplatform`, `swiftui`, `kotlin-android`, `maui`, `ionic-capacitor`, `delphi-fmx`. Les 4 **nouveaux** sont 🟡 par construction : chaque version de leur `.libs.json` est résolue contre le registre amont (pub.dev, npm, `maven-metadata.xml`, GitHub Releases) et les contraintes inter-paquets sont vérifiées, mais **aucun build runtime n'a été exécuté**. Les 4 **existants** ont été audités au même passage — 12 défauts bloquants corrigés, dont 4 références de paquet ou de version **inexistantes au registre** (`@azure/msal-react-native`, `Plugin.MauiCertPinning`, `Plugin.Fingerprint 3.0.0`, `Plugin.Maui.AppRating 2.0.0`) qui faisaient échouer l'install de leur capability. Détail par stack : §2.3 de chaque `.md`.
-
-> **Batch backend 2026-09-02** — `backend/` passe de 4 à 7 stacks et couvre le top marché : `dotnet-minimalapi`, `node-express`, `kotlin-spring-boot`, `python-fastapi`, `django`, `nestjs`, `laravel`. Les 4 existants ont été rebasés sur les registres amont (leurs catalogs étaient figés en mai-juin 2026) et **3 défauts de cohérence** corrigés : (1) `dotnet-minimalapi` faisait cohabiter EF Core **9** avec des paquets ASP.NET **10** sur un TFM `net10.0` — le pin en 9.x était justifié par « Npgsql.EF 10.x est preview-only », cause disparue ; EF passe en 10.0.11, **sauf pour `mysql`/`mariadb`** où Pomelo n'a aucune 10.x et impose de rester en 9.0.4 ; (2) `node-express` pinnait `@types/express` **5.x** avec `express` **4.x** — le compilateur validait le code contre un autre runtime ; (3) `qa/node-vitest` pinnait `@types/supertest` **6.x** avec `supertest` **7.x**, même classe de défaut. **Aucune montée en majeure** sur les stacks 🟢/bench-validated (Spring Boot reste en 3.5.x face à la 4.1.1, Express en 4.x face à la 5.2.1) : elle invaliderait la validation runtime qui porte leur badge, et ne peut pas être re-jouée ici. Détail et justification : §2.3 de chaque `.md`.
-
-> **Batch fullstack 2026-09-02** — `fullstack/` passe de 7 à 10 stacks et couvre le top marché SSR : `laravel-blade`, `aspnet-mvc-razor`, `symfony-twig`, `next`, `nuxt`, `blazor-server`, `django-templates` (+ `angular-universal`, `kotlin-mustache`, `node-react`). **Le défaut le plus grave de tout l'audit a été trouvé ici** : `blazor-server` **et** `aspnet-mvc-razor` pinnaient `ef-core` en **10.0.6** avec `npgsql-ef` en **9.0.4** — exactement la combinaison du post-mortem DemoApp 2026-05-22 (NU1608 → `MissingMethodException` au premier accès `DbSet`). Le correctif avait été appliqué à `backend/dotnet-minimalapi` le 2026-06-07 et **jamais propagé** : la même faille latente vivait dans deux autres stacks. Corrigé (EF 10.0.11 + Npgsql.EF 10.0.3, désormais stable), avec la contrainte résiduelle Pomelo/MySQL documentée. Autre phantom fermé : `FluentValidation.AspNetCore` **11.10.0** n'existe pas (le paquet compagnon s'arrête à 11.3.1 — la version avait été recopiée depuis le paquet `FluentValidation`). Les **deux WARN `PRERELEASE`** du catalogue sont également fermés : `next-auth` 5.0.0-beta.25 → **4.24.15** (le dist-tag `latest` pointe sur la 4, la ligne 5 est encore en beta) et `nuxt-ui` 3.0.0-alpha.10 → **4.11.0** (désormais stable). `validate_libs_catalog.py` ne remonte plus aucun warning. Détail et justification : §2.3 de chaque `.md`.
-
-> **Batch desktop 2026-09-02 — NOUVELLE CATÉGORIE `desktop/`** (7 stacks) : `delphi-vcl`, `wpf`, `qt-cpp`, `electron`, `winforms`, `javafx`, `pyside`. Ce n'est pas qu'un ajout de fichiers : la catégorie a dû être **câblée dans le framework** — enum `category` du schéma, `preflight.py` (détection `frontendKind=desktop`, exclusivité avec `mobiles/*` et `frontend/*`, globs de fichier-projet `CMakeLists.txt` / `*.sln`), `validate_stack_md_headers.py`, et un quatrième `buildSystem` (`cmake`). **Trois stacks sont Windows-only** (`delphi-vcl`, `wpf`, `winforms`) et portent un gate d'hôte bloquant ; deux portent une **contrainte de licence structurante** (`qt-cpp` : LGPL vs commerciale, avec le piège `Qt6::Charts` qui est en GPL ; `pyside` : PySide6 LGPL retenu **contre** PyQt6 GPL). Pièges de résolution évités et documentés : builds `-ea` de JavaFX sur Maven Central, suffixes `-ci` / `-nblumhardt` / `-g` sur NuGet — tous invisibles aux filtres de prerelease usuels, d'où un filtre **strict** (`^\d+(\.\d+){1,3}$`) appliqué à tout le batch. Détail par stack : §2.3 de chaque `.md`.
-
-**🟢 (28)** : tous les autres (cf. table détaillée + tiers `validated` / `bench-validated` / `scaffold-validated` dans `@.sdd/docs/validated-combos.md §1-§2`).
-
-**Engagement commercial — 13 combos SLA** : 2 `validated` end-to-end (C1, C2) + 11 `bench-validated runtime` (C3-C13). SSoT machine : `@.sdd/templates/combos.json`. Marquage runtime via hook `preflight_stack_combo` (`SDD_ALLOW_UNTESTED_COMBO=1` = bypass audit-loggué). Les stacks 🟡 ne sont **jamais vendus en offre standalone** (pas de SLA sur la dimension isolée). **Exception documentée (GOV-C1, 2026-06-12)** : un *pattern* archi 🟡 peut apparaître **à l'intérieur d'un combo `validated`** dont le run `/sdd-full` bout-en-bout a été vérifié — cas unique **C2** (`archi/ddd`, validé sur workspace réel 2026-05-11 ; cf. `combos.json` C2 `notes`). Le SLA porte sur le **combo** vérifié, pas sur la dimension 🟡 isolée.
-
-Détail tiers, matrice dimensions, 23 combinaisons bench 2026-06-05, cible C3-prod, exceptions `.libs.json` : `@.sdd/docs/validated-combos.md`.
+**13 combos SLA** : C1-C2 `validated`, C3-C13 `bench-validated runtime` (SSoT
+`@.sdd/templates/combos.json`, hook `preflight_stack_combo`, bypass audit-loggué
+`SDD_ALLOW_UNTESTED_COMBO=1`). Un stack 🟡 n'est jamais vendu seul (exception
+GOV-C1 : `archi/ddd` dans C2). ⚠️ Badges obtenus sur la génération de modèles
+4.x — **non re-benchés en 5.5** (`validated-combos.md §0.1`).
 
 ---
 
@@ -251,7 +230,8 @@ Anti-derive, ERROR 3L disque, idempotence, lecture sélective, parallélisme bor
 - **Commercial / DSI** : `@.sdd/docs/{WHY-SDD-PRO,COMPLIANCE,SLA,KNOWN-LIMITATIONS}.md`
 - **ROI & roadmap** : `@.sdd/docs/{poc-roi-methodology,roadmap-v7-v8,cache-strategy,validated-combos,orphan-cleanup-policy}.md`
 - **Règles** : `@.sdd/rules/` (5 consolidées + 1 protocole + 1 hoist + 2 orchestration auditors + 1 annexe + 1 module reverse + 1 socle SQL — cf. §5)
-- **Skills auto-triggered** (v7.0.0+ emprunt superpowers) : `@.sdd/skills/` — 13 skills (`using-sddpro`, `starting-a-new-feat`, `starting-a-reverse-eng`, `debugging-failed-pipeline`, `test-driven-development`, `frontend-design`, `webapp-testing`, `a11y-local`, `sarif-parsing`, `semgrep`, `codeql`, `insecure-defaults`, `c4-model`) — inventaire complet dans `@.sdd/skills-manifest.yaml`.
+- **Skills auto-triggered** (v7.0.0+ emprunt superpowers) : `@.sdd/skills/`, émis vers
+  `.claude/skills/` par `harness_build.py --skills-only` (2026-11-07) — 13 skills (`using-sddpro`, `starting-a-new-feat`, `starting-a-reverse-eng`, `debugging-failed-pipeline`, `test-driven-development`, `frontend-design`, `webapp-testing`, `a11y-local`, `sarif-parsing`, `semgrep`, `codeql`, `insecure-defaults`, `c4-model`) — inventaire complet dans `@.sdd/skills-manifest.yaml`.
 - **Invariants manifest** (v7.0.0+ audit P3 E4) : `@.sdd/INVARIANTS.yml` — 20 contrats load-bearing (two-stage gate, file ownership, cost cap, schema strict, TDD test-first, harness-parity, etc.) avec pointer vers chaque enforcer (hook/script/smoke test). Test `tests/test_invariants_manifest.py` vérifie que chaque enforcer existe sur disque. Anti-rot manifest : retirer un enforcer sans mettre à jour le manifest = FAIL au smoke.
 - **Multi-harness / multi-provider** (réel, testé, **volontairement gaté** — documenté ici depuis l'audit 2026-08-29 : le système existait sans aucune mention dans cette page) : `.sdd/harness_build.py` transpile le foyer neutre `.sdd/` vers 4 adaptateurs — `claude-code` (façade `.claude/`, la seule utilisée au quotidien), `codex` (`.codex/prompts/`), `gemini-cli` (`.gemini/commands/`), `antigravity`. Providers déclarés dans `.sdd/providers/*.yaml` (`anthropic`, `openai`, `google`, `moonshot` : `tier_map`, `pricing`, rétention télémétrie). Tout combo harnais/provider non-Claude/Anthropic est marqué **`COMBO UNTESTED`** et bloqué par le hook `preflight_stack_combo` (bypass audit-loggué `SDD_ALLOW_UNTESTED_COMBO=1`) — présence ≠ support. Parité façade ↔ foyer enforcée par `tests/test_harness_facade_parity.py` (invariant `harness-parity`, `severity: critical`).
 - **Python** : `@.sdd/python/README.md`

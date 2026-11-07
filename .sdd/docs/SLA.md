@@ -90,7 +90,7 @@ Voir `@.sdd/docs/validated-combos.md §1.2` pour la liste détaillée.
 
 **Non couvert** :
 - Bugs du code généré (sortie du LLM) — relèvent du Tech Lead client.
-- Performance LLM (latence Anthropic, qualité Opus 4.8) — relève Anthropic.
+- Performance LLM (latence Anthropic, qualité Opus 5.5) — relève Anthropic.
 - Bugs dans les libs externes utilisées par le code généré (EF Core, Spring,
   Prisma, etc.) — relèvent du vendor de la lib.
 - Sécurité applicative au-delà du scan `security-reviewer`.

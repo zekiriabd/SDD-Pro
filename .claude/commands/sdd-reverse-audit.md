@@ -1,5 +1,5 @@
 ---
-description: Phase 2 du workflow reverse — audit informational. Spawn reverse-tech-auditor (Sonnet 4.6) après exécution du script déterministe reverse_audit.py (deps-graph + merge db-schema). Output non bloquant pour Phase 3.
+description: Phase 2 du workflow reverse — audit informational. Spawn reverse-tech-auditor (Sonnet 5.5) après exécution du script déterministe reverse_audit.py (deps-graph + merge db-schema). Output non bloquant pour Phase 3.
 ---
 # /sdd-reverse-audit {LegacyProject} [--force-enrichment-on Entity.field] [--json]
 

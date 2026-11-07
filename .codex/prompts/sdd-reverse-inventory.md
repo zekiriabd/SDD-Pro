@@ -1,5 +1,5 @@
 <!-- GENERATED FROM .sdd/ (commande /sdd-reverse-inventory) — DO NOT EDIT -->
-<!-- Phase 1 du workflow reverse — cartographie déterministe d'un projet legacy. Spawn agent reverse-inventory (Sonnet 4.6) qui délègue au script reverse_inventory.py + enrichit inventory.md. Output bloquant pour Phase 3 (/sdd-reverse {U-N}). -->
+<!-- Phase 1 du workflow reverse — cartographie déterministe d'un projet legacy. Spawn agent reverse-inventory (Sonnet 5.5) qui délègue au script reverse_inventory.py + enrichit inventory.md. Output bloquant pour Phase 3 (/sdd-reverse {U-N}). -->
 <!-- ============================================================ -->
 <!-- IMPORTANT — SPAWN SEMANTICS UNDER CODEX (audit R10 2026-07-26) -->
 <!-- Toute mention `Task tool (subagent_type=X)`, `Agent(X)`, ou    -->

@@ -40,7 +40,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sdd_lib.exit_codes import HOOK_ALLOW, HOOK_DENY  # noqa: E402
 from sdd_lib.hook_input import read_hook_input  # noqa: E402
-from sdd_lib.paths import workspace_root, project_root_for_hook  # noqa: E402
+from sdd_lib.paths import audit_dir_path, workspace_root, project_root_for_hook  # noqa: E402
 from sdd_lib.stderr import warn  # noqa: E402
 
 
@@ -81,7 +81,7 @@ def _audit_log(pattern: str, mode: str, decision: str) -> None:
     import json
     try:
         root = project_root_for_hook()
-        audit_dir = workspace_root(root) / ".sys" / ".audit"
+        audit_dir = audit_dir_path(root)
         audit_dir.mkdir(parents=True, exist_ok=True)
         line = {
             "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),

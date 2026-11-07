@@ -2,6 +2,7 @@
 name: reverse-ui-extractor
 description: Pour UNE unité U-N donnée (Phase 4 reverse), lit les templates legacy + CSS + le FEAT déjà produit par Phase 3, et synthétise 1 à N écrans HTML sémantiques préservant la structure visuelle legacy SANS clonage pixel-perfect. Délègue parsing à css_palette_extractor + ui_template_parser. Output workspace/ui/{n}-{m}-{Name}.html. Aucun spawn d'agent.
 model_tier: deep
+effort: high
 tier_default: deep
 tier_floor: balanced
 tier_ceiling: deep
@@ -28,6 +29,8 @@ Arguments requis : `{U-N}` (ex. `U-3`).
 Sinon → STOP + ERROR `[REVERSE_UNIT_NOT_FOUND]` ou `[REVERSE_NO_SOURCE]`.
 
 ## STEP 1 — Lecture sélective
+
+> **Lecture unique (audit tokens 2026-11-06)** : ne relis JAMAIS un fichier déjà lu dans cette invocation — son contenu est déjà dans ton contexte. Fichier > 20 Ko (stack, rule) : lis la section utile (`Grep -n "^#"` pour la TOC, puis `Read` offset/limit), jamais le fichier entier.
 
 Read en mémoire :
 1. `workspace/old/{P}/.sys/inventory.json` → `units[id={U-N}]`

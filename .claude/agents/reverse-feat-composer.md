@@ -1,7 +1,8 @@
 ---
 name: reverse-feat-composer
 description: Barreau 3c (haut) de l'escalier reverse (ADR reverse-spec-ladder). Pour UNE unité U-N, lit les US 3b (us/{n}-{m}-{Name}.md) + l'analyse 3a et compose la FEAT métier propre (feats/{n}-{FeatName}.md), plomberie démotée, evidence file:line résolue transitivement (FEAT→US→T-N), REVERSE-GATE + confidence min-monotone. Itère validate_reverse_feat (max 3) + check_feat_completeness. Remplace l'ex-reverse-functional-extractor. Aucun spawn d'agent.
-model: claude-opus-4-8
+model: claude-opus-5-5
+effort: high
 tools: Read, Write, Edit, Glob, Grep, Bash
 ---
 # Agent Reverse-Feat-Composer — Phase 3c (composition FEAT métier)
@@ -34,6 +35,8 @@ Arguments requis : `{U-N}`.
 4. Lire `.sdd/python/sdd_reverse/feat.reverse.template.md` — absent → STOP + ERROR `[REVERSE_TEMPLATE_MISSING]` (ADV-9).
 
 ## STEP 1 — Lecture sélective stricte
+
+> **Lecture unique (audit tokens 2026-11-06)** : ne relis JAMAIS un fichier déjà lu dans cette invocation — son contenu est déjà dans ton contexte. Fichier > 20 Ko (stack, rule) : lis la section utile (`Grep -n "^#"` pour la TOC, puis `Read` offset/limit), jamais le fichier entier.
 
 Lire **uniquement** :
 1. **Toutes** les US `workspace/us/{n}-{m}-{Name}.md` de l'unité (ta matière première)

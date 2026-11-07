@@ -1,5 +1,5 @@
 ---
-description: Phase 4 du workflow reverse — extraction UI sémantique d'UNE unité U-N en mockup(s) HTML statique. Spawn agent reverse-ui-extractor (Opus 4.8). Output workspace/ui/{n}-{m}-{Name}.html consommable par dev-frontend lors de /sdd-full.
+description: Phase 4 du workflow reverse — extraction UI sémantique d'UNE unité U-N en mockup(s) HTML statique. Spawn agent reverse-ui-extractor (Opus 5.5). Output workspace/ui/{n}-{m}-{Name}.html consommable par dev-frontend lors de /sdd-full.
 ---
 # /sdd-reverse-ui {U-N} [--json]
 

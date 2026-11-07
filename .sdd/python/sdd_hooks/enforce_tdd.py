@@ -14,7 +14,8 @@ corresponding test file exists OR is being created in the same tool batch.
   - Content contains a NEW public function/class definition (regex per language)
   - No companion test file exists for the same logical unit
 
-**Modes** (env var `SDD_TDD_MODE`, default `warn` interactive / `strict` CI) :
+**Modes** (env var `SDD_TDD_MODE`, default `strict` CI + sous-agents /
+`warn` session principale — audit 2026-11) :
   - `off`     → no-op
   - `warn`    → stderr WARN [TDD_NO_TEST_FIRST] + audit log, exit 0
   - `strict`  → exit 2 (block Write) with structured RED-first guidance
@@ -44,6 +45,7 @@ from sdd_lib.ci import is_ci  # noqa: E402
 from sdd_lib.exit_codes import HOOK_ALLOW, HOOK_DENY  # noqa: E402
 from sdd_lib.hook_input import (  # noqa: E402
     get_file_path,
+    is_subagent_call,
     read_hook_input,
 )
 from sdd_lib.paths import normalize, repo_root  # noqa: E402
@@ -91,9 +93,12 @@ _NON_PROD_PATH_MARKERS = (
 #: (skill prompts user); false positives create noise but the WARN can be
 #: bypassed.
 _NEW_SYMBOL_PATTERNS: dict[str, list[str]] = {
+    # Audit 2026-11 : `internal`/`private`/`protected` et classes sans
+    # modificateur (internal implicite en C#) comptent aussi — l'ancien
+    # filtre `public` seul laissait passer tout le code `internal sealed`.
     ".cs": [
-        r"^\s*public\s+(?:static\s+|async\s+|virtual\s+|override\s+)?(?:class|record|struct|interface)\s+\w+",
-        r"^\s*public\s+(?:static\s+|async\s+|virtual\s+|override\s+)?\w[\w<>?,\[\]\s]*\s+\w+\s*\(",
+        r"^\s*(?:(?:public|internal|private|protected|static|sealed|abstract|partial|file|readonly|unsafe|new)\s+)*(?:class|record|struct|interface)\s+\w+",
+        r"^\s*(?:public|internal|private|protected)\s+(?:(?:static|async|virtual|override|sealed|abstract|partial|new|extern|unsafe)\s+)*\w[\w<>?,\[\]\s]*\s+\w+\s*\(",
     ],
     ".ts": [
         r"^\s*export\s+(?:async\s+)?(?:function|class|const|interface|type)\s+\w+",
@@ -116,12 +121,12 @@ _NEW_SYMBOL_PATTERNS: dict[str, list[str]] = {
         r"^\s*class\s+[a-zA-Z]\w*\s*[:\(]",
     ],
     ".kt": [
-        r"^\s*(?:public\s+)?(?:open\s+)?(?:suspend\s+)?fun\s+\w+\s*\(",
-        r"^\s*(?:public\s+)?(?:open\s+|abstract\s+)?(?:class|interface|object)\s+\w+",
+        r"^\s*(?:(?:public|internal|private|protected|open|override|suspend|inline|operator|infix|tailrec)\s+)*fun\s+(?:<[^>]*>\s*)?[\w.]+\s*\(",
+        r"^\s*(?:(?:public|internal|private|protected|open|abstract|sealed|data|enum|inner|value|annotation)\s+)*(?:class|interface|object)\s+\w+",
     ],
     ".java": [
-        r"^\s*public\s+(?:static\s+|abstract\s+|final\s+)?(?:class|interface)\s+\w+",
-        r"^\s*public\s+(?:static\s+|abstract\s+|final\s+)?\w[\w<>?,\[\]\s]*\s+\w+\s*\(",
+        r"^\s*(?:(?:public|protected|private|static|abstract|final|sealed)\s+)*(?:class|interface|record|enum)\s+\w+",
+        r"^\s*(?:public|protected|private)\s+(?:(?:static|abstract|final|synchronized)\s+)*\w[\w<>?,\[\]\s]*\s+\w+\s*\(",
     ],
     ".razor": [
         r"@code\s*\{",  # presence of code block in Razor
@@ -129,17 +134,44 @@ _NEW_SYMBOL_PATTERNS: dict[str, list[str]] = {
 }
 
 
-def _resolve_mode() -> str:
+def _resolve_mode(payload: dict | None = None) -> str:
     """Return TDD mode from env or default by context.
 
-    Default : `warn` interactive (dev local), `strict` in CI.
+    Default (audit 2026-11) : `strict` in CI and for any call emitted from a
+    sub-agent (`is_subagent_call`) — dev-backend / dev-frontend are the
+    actual producers of production code ; `warn` for the main session
+    (Tech Lead humain). `SDD_TDD_MODE` (protected by block_env_bypass)
+    overrides.
     """
     explicit = os.environ.get("SDD_TDD_MODE", "").strip().lower()
     if explicit in ("off", "warn", "strict"):
         return explicit
     if is_ci():
         return "strict"
+    if payload is not None and is_subagent_call(payload):
+        return "strict"
     return "warn"
+
+
+#: Marqueurs d'un VRAI test (au moins un cas). Un fichier compagnon qui n'en
+#: contient aucun (squelette vide) ne satisfait pas le contrat test-first.
+_TEST_CASE_MARKERS = re.compile(
+    r"\[(?:Fact|Theory|Test|TestMethod|TestCase|DataTestMethod)\b"
+    r"|@Test\b|@ParameterizedTest\b"
+    r"|\b(?:it|test)\s*(?:\.\w+\s*)?\("
+    r"|^\s*(?:async\s+)?def\s+test_\w*\s*\("
+    r"|\bfun\s+`[^`]+`\s*\(",
+    re.MULTILINE,
+)
+
+
+def _has_test_cases(path: Path) -> bool:
+    try:
+        if path.stat().st_size > 2_000_000:
+            return True
+        return bool(_TEST_CASE_MARKERS.search(path.read_text(encoding="utf-8", errors="replace")))
+    except OSError:
+        return False
 
 
 def _is_production_path(path_norm: str) -> bool:
@@ -210,7 +242,9 @@ def _has_companion_test(prod_path: Path, root: Path) -> bool:
                 matches = list(td.rglob(pattern))
             except OSError:
                 continue
-            if matches:
+            # Audit 2026-11 : un compagnon vide (0 [Fact]/[Test]/it(/def test_)
+            # ne compte pas.
+            if any(m.is_file() and _has_test_cases(m) for m in matches):
                 return True
 
     return False
@@ -223,7 +257,7 @@ def main() -> int:
     except (_json.JSONDecodeError, OSError, UnicodeError, ValueError):
         return HOOK_ALLOW
 
-    mode = _resolve_mode()
+    mode = _resolve_mode(payload)
     if mode == "off":
         return HOOK_ALLOW
     if os.environ.get("SDD_DISABLE_TDD") == "1":

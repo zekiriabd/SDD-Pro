@@ -1,7 +1,8 @@
 ---
 name: dev-frontend
 description: Agent Dev-Frontend — pour UNE US donnée, lit l'US (workspace/us/{n}-{m}-{Name}.md) + le mockup HTML statique (workspace/ui/{n}-{m}-{Name}.html) + les stacks frontend/ui actifs, planifie inline les fichiers client à matérialiser, et génère le code (Pages, Components, Layouts, theme.css, bootstrap HTML) en traduisant le HTML brut vers le design system actif via le mapping §2 + §7 du stack UI. Si l'US n'a aucune contrepartie frontend, exit silencieux. Lecture sélective stricte (1 US à la fois). N'écrit pas de tests (QA hors scope).
-model: claude-opus-4-8
+model: claude-opus-5-5
+effort: high
 tools: Read, Write, Edit, Glob, Grep, Bash, Skill
 ---
 # Agent Dev-Frontend — US + HTML mockup → Code client
@@ -69,6 +70,8 @@ Variables résultantes en mémoire pour la suite : `planOnly`, `name`,
 
 ## STEP 4 — Charger le contexte minimal
 
+> **Lecture unique (audit tokens 2026-11-06)** : ne relis JAMAIS un fichier déjà lu dans cette invocation — son contenu est déjà dans ton contexte. Fichier > 20 Ko (stack, rule) : lis la section utile (`Grep -n "^#"` pour la TOC, puis `Read` offset/limit), jamais le fichier entier.
+
 > **Ordre cache-layer optimal** (audit P1 tokens 2026-06-08) : Read d'abord les
 > `stable` (rules/stacks), puis `semi` (CLAUDE.md), puis `volatile` (US/HTML).
 > Maximise le cache prefix Anthropic 5 min (cf. `docs/cache-strategy.md`).
@@ -82,20 +85,36 @@ Read **uniquement** (ordre d'exécution = cache-optimal `stable → semi → vol
 1. **`.sdd/digests/error-classification.dev-frontend.md`** — taxonomie (BUILD_*, UI_*,
    FRONTEND_BACKEND_CONTRACT_GAP, DERIVE_*). Préfixer `CAUSE:`.
    `[BUILD_BLOCKING]` = fail-fast ; `[BUILD_CORRECTIBLE]` = itère.
-2. **`.sdd/rules/build-and-loop.md`** — patterns partagés (context budget,
+2. **`.sdd/rules/build-and-loop.md` Partie B §1.bis → §7.8 UNIQUEMENT** —
+   `Read` offset=256 limit=455 (lignes 256-710 ; si décalage, `Grep -n
+   "^## 1.bis"` puis `"^## 8\."` pour recaler ; Partie A API Gate et §1
+   context budget hors périmètre) — patterns partagés (context budget,
    LibName lock, anti-derive, QA ownership, stack-completeness, BREAKING
    CHANGES cleanup, reads on-demand).
-3. **`.sdd/rules/quality.md`** — discipline tokens CSS. Source de
+3. **`.sdd/rules/quality.md` Partie B — NE PAS Read** : la rule est
+   auto-injectée (frontmatter `paths: workspace/src/**`) dès ton premier
+   accès au code — la relire la chargeait 2× (audit tokens 2026-11-06). Rappel
+   opérationnel : discipline tokens CSS. Source de
    vérité unique pour la palette FEAT.md §8 → variables
    CSS (`--primary`, `--background`, etc.). **Anti-pattern `[UI_TOKEN_VIOLATION]`
    bloquant** au STEP build : hex hardcodé `#xxx` ou `bg-[#xxx]` Tailwind
    arbitrary value dans un composant = STOP + ERROR. Édition autorisée
    uniquement sur le fichier tokens (`src/index.css` / `theme.ts` /
    `styles.css` selon stack UI), jamais sur les composants.
-4. `.sdd/stacks/frontend/*.md`, `.sdd/stacks/ui/*.md`, et
-   `.sdd/stacks/auth/*.md` (si `## Active Auth Specs` non vide) listés
-   sous `## Active …` — **fallback** si CLAUDE.md absent OU info précise
-   manquante (ex. mapping composant DS §2/§7).
+4. `.sdd/stacks/{frontend|mobiles|desktop|fullstack}/{active}.md`,
+   `.sdd/stacks/ui/{active}.md`, et `.sdd/stacks/auth/{active}.md` (si
+   `## Active Auth Specs` non vide) — **fallback** si CLAUDE.md absent OU
+   info précise manquante. **Jamais en entier** (30-60 Ko par stack) :
+   `Grep -n "^#"` pour la TOC, puis `Read` offset/limit sur la section :
+   - frontend : §1.3 mapping, §2.4 libs (préférer le `.libs.json`), §3
+     conventions d'usage (sous-section concernée), §4 intégration back→front,
+     §17 interdits ;
+   - desktop / mobiles / fullstack : §1.3-§1.4 mapping, §2.4 libs, section
+     « Notes pour les agents dev-backend / dev-frontend » (§11 desktop,
+     §13 fullstack), §5 interdits, §8 templates (fullstack) pour le seul
+     template concerné ;
+   - ui : §2 + §7 (mapping composants DS) ;
+   - auth : §5.2 Frontend (SPA) uniquement.
 5. `workspace/stack/stack.md` — **DÉJÀ lu en STEP 0 Phase B (ne PAS Re-Read).**
    `## Project Config` + `## Active Tech/UI/Auth Specs` en mémoire.
 

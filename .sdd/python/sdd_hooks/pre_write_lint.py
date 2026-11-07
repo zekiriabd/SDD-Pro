@@ -52,7 +52,7 @@ from sdd_lib.exit_codes import HOOK_ALLOW, HOOK_DENY  # noqa: E402
 from sdd_lib.hook_input import (  # noqa: E402
     get_file_path, get_nested, get_tool_name, read_hook_input,
 )
-from sdd_lib.paths import workspace_root, repo_root  # noqa: E402
+from sdd_lib.paths import audit_dir_path, workspace_root, repo_root  # noqa: E402
 from sdd_lib.stderr import error_block, warn  # noqa: E402
 
 
@@ -194,10 +194,31 @@ def _check_patterns(path: str, content: str) -> list[tuple[str, str, int]]:
     return violations
 
 
-def main() -> int:
-    if os.environ.get("SDD_DISABLE_PRE_WRITE_LINT", "").strip() == "1":
-        return HOOK_ALLOW
+def _is_secret_bearing_target(file_path: str) -> bool:
+    """stack.md ou config générée (appsettings*/application*.yml/default.json)."""
+    from sdd_hooks.block_secret_access import classify_secret_path
+    norm = file_path.replace("\\", "/")
+    if norm.endswith("workspace/stack/stack.md") or norm == "stack/stack.md":
+        return True
+    return classify_secret_path(norm) == "config"
 
+
+def check_secret_write(file_path: str, new_content: str) -> list[tuple[str, str, int]]:
+    """Valeurs secrètes RÉELLES introduites par l'écriture (vide si OK).
+
+    Audit sécurité 2026-11 : `stack.md` est versionné et les configs générées
+    sont lues par les agents — seuls des placeholders `${VAR}` y sont admis
+    sur les clés Password/Secret/Token/ApiKey/ConnectionString (et `Password=`
+    dans une chaîne de connexion). Indépendant de SDD_PRE_WRITE_LINT_STRICT et
+    de SDD_DISABLE_PRE_WRITE_LINT : c'est un garde de sécurité, pas un lint.
+    """
+    if not new_content or not _is_secret_bearing_target(file_path):
+        return []
+    from sdd_hooks.block_secret_access import find_secret_values
+    return find_secret_values(new_content)
+
+
+def main() -> int:
     payload = read_hook_input()
     if not payload:
         return HOOK_ALLOW
@@ -208,6 +229,26 @@ def main() -> int:
 
     file_path = get_file_path(payload)
     if not file_path:
+        return HOOK_ALLOW
+
+    # ── Garde secrets (toujours actif, DENY) ────────────────────────────
+    secret_hits = check_secret_write(file_path, _extract_new_content(payload, tool_name))
+    if secret_hits:
+        if os.environ.get("SDD_ALLOW_SECRET_IN_CONFIG", "").strip().lower() in ("1", "true", "yes"):
+            warn(f"WARN [SECRET_ACCESS_FORBIDDEN] bypass SDD_ALLOW_SECRET_IN_CONFIG=1 — "
+                 f"valeur reelle ecrite dans {file_path}")
+        else:
+            shown = ", ".join(f"{k}={v} (L{n})" for k, v, n in secret_hits[:4])
+            error_block(
+                f"pre-write-lint — secret en clair dans {file_path}",
+                f"[SECRET_ACCESS_FORBIDDEN] valeur reelle sur une cle sensible : {shown}",
+                "ecrire un placeholder ${VAR} (valeur reelle dans l'environnement / .env) ; "
+                "bypass Tech Lead : SDD_ALLOW_SECRET_IN_CONFIG=1 dans l'environnement du "
+                "process Claude Code",
+            )
+            return HOOK_DENY
+
+    if os.environ.get("SDD_DISABLE_PRE_WRITE_LINT", "").strip() == "1":
         return HOOK_ALLOW
 
     if _is_test_path(file_path):
@@ -226,7 +267,7 @@ def main() -> int:
         return HOOK_ALLOW
 
     # Log every violation
-    log_dir = workspace_root(root) / ".sys" / ".audit"
+    log_dir = audit_dir_path(root)
     log_dir.mkdir(parents=True, exist_ok=True)
     log_path = log_dir / "pre-write-lint.log"
     from datetime import datetime, timezone

@@ -1,7 +1,8 @@
 ---
 name: reverse-sql-function-analyst
 description: Spécialiste des FONCTIONS SQL (scalaires, inline, table) du reverse base de données. Pour UNE fonction, lit son context pack déterministe et produit UNE User Story décrivant le calcul métier réutilisable qu'elle porte — contrat d'entrée/sortie, formule, cas limites, valeur par défaut. Angle propre — une fonction n'ayant pas d'effet de bord, sa User Story parle de règle de calcul et jamais de données modifiées. Ce sont les feuilles du graphe de dépendances, dont les résumés alimentent toutes les vagues suivantes. Lecture seule, aucune connexion base, aucun spawn d'agent.
-model: claude-sonnet-4-6
+model: claude-sonnet-5-5
+effort: medium
 tools: Read, Write, Edit, Glob, Grep
 ---
 # Agent Reverse-SQL-Function-Analyst — spécialiste fonctions
@@ -35,6 +36,8 @@ Arguments : `{U-N}` (module) + `--object {schema.nom}` (la fonction).
    `NULL`, atomicité, erreurs → AC négatifs, équivalences multi-dialecte).
 
 ## STEP 1 — Lecture sélective stricte
+
+> **Lecture unique (audit tokens 2026-11-06)** : ne relis JAMAIS un fichier déjà lu dans cette invocation — son contenu est déjà dans ton contexte. Fichier > 20 Ko (stack, rule) : lis la section utile (`Grep -n "^#"` pour la TOC, puis `Read` offset/limit), jamais le fichier entier.
 
 Lire **uniquement** :
 

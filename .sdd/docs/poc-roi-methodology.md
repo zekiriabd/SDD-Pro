@@ -10,7 +10,7 @@
 ## 1. Objectif
 
 Démontrer (ou réfuter) sur **chiffres mesurés** les promesses du framework :
-- Réduction tokens/FEAT (claims v7 : -45 KB auditors-trim, -110 KB prompts-trim, -65 % cumul)
+- Réduction tokens/FEAT (claims v7 : -45 KB auditors-trim, -110 KB prompts-trim ; l'ex-claim « -65 % cumul » est **retiré** — jamais mesuré, il reposait sur un wiring `cache_control` impossible dans Claude Code, cf. `cache-strategy.md`)
 - Wall-clock par FEAT vs équipe humaine
 - Qualité output (coverage, AC verified, bugs en review)
 - Reproductibilité cross-machine
@@ -132,7 +132,7 @@ Wall-clock par phase remonte automatiquement dans `console.db` table `run_phases
 | **Wall-clock total** | `console.db` `runs.ended_at - runs.started_at` |
 | **Wall-clock par phase** | `console.db` `run_phases.{started_at,ended_at}` |
 | **Tokens input/output/cache** | `console.db` `token_usage` (un row par invocation LLM) |
-| **Coût $ Anthropic** | tokens × pricing (`Sonnet 4.6: $3/M input, $15/M output, $0.3/M cache read`) |
+| **Coût $ Anthropic** | tokens (tous les tours) × pricing du provider (`.sdd/providers/anthropic.yaml` — pour mémoire, tarifs 4.x : Sonnet 4.6 $3/M input, $15/M output, $0.3/M cache read) |
 | **Coverage** | `qa_coverage` table (déjà writter par `parse_coverage.py`) |
 | **AC verified** | `qa_spec_compliance` table |
 | **Quality scan issues** | `qa_quality` table (count par sévérité) |
@@ -262,8 +262,10 @@ Pour que v7.0.0 puisse être taguée (post-2026-06-19), le PoC doit avoir :
 | FEAT M quality serious+ | framework ≤ humain + 50 % | WARN, ne bloque pas |
 | Variance 3 runs | ≤ 15 % écart-type | WARN, investiguer flake |
 
-> Ces seuils sont volontairement **conservateurs**. Si les ADRs v7 disent
-> « -65 % tokens », le PoC doit le démontrer (au moins -40 % en pratique).
+> Ces seuils sont volontairement **conservateurs**. Aucun pourcentage de gain
+> n'est revendiqué tant qu'il n'a pas été mesuré sur **tous les tours** des
+> sous-agents (transcripts JSONL) — les télémétries « dernier tour » antérieures
+> au 2026-11-06 sous-comptaient de ×7 à ×126.
 
 ---
 

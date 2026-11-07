@@ -6,7 +6,7 @@ Verifies that after a code edit under workspace/src/, the
 file are respected (deterministic substring check, 0 token LLM).
 
 - If edited file is NOT under workspace/src/ -> exit 0 (skip)
-- If tool_name == 'Write' (file creation) -> exit 0 (contract only on Edit)
+- Write is checked too (audit 2026-11 — overwriting an augment file bypassed preserves:)
 - If file is a test file -> exit 0 (QA ownership)
 - If no plan matches -> exit 0 (inline mode, can't validate)
 - If preserves: violated -> exit 2 + ERROR [PRESERVES_VIOLATED]
@@ -119,10 +119,11 @@ def main() -> int:
     norm = normalize(file_path)
     if "workspace/src/" not in norm:
         return HOOK_ALLOW
-    tool_name = get_tool_name(payload)
-    if tool_name == "Write":
-        # preserves:/adds: only applies to augmentation Edits, not file creation
-        return HOOK_ALLOW
+    # Audit sécurité 2026-11 : `Write` n'est plus exempté. Un Write qui ÉCRASE
+    # un fichier `operation: augment` contournait entièrement `preserves:`
+    # (réécriture complète sans l'identifiant à préserver). Pour une vraie
+    # création (`operation: create`), `preserves:` est vide et `adds:` doit
+    # être présent — la vérification reste correcte dans les deux cas.
     if any(pat in norm for pat in TEST_PATTERNS):
         return HOOK_ALLOW  # QA ownership, no contract (normalized 2026-06-06)
 

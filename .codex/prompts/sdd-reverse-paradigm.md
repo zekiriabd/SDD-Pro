@@ -1,5 +1,5 @@
 <!-- GENERATED FROM .sdd/ (commande /sdd-reverse-paradigm) — DO NOT EDIT -->
-<!-- Analyse de gap de paradigme legacy↔stack cible + curation des unités (MIGRATE / DISCARD / HUMAN-DECISION). Spawn agent reverse-paradigm-advisor (Sonnet 4.6). Verdict informational/WARN, jamais bloquant, jamais destructif. Emprunt Reversa (agents Paradigm Advisor + Curator) — audit comparatif 2026-06-12. -->
+<!-- Analyse de gap de paradigme legacy↔stack cible + curation des unités (MIGRATE / DISCARD / HUMAN-DECISION). Spawn agent reverse-paradigm-advisor (Sonnet 5.5). Verdict informational/WARN, jamais bloquant, jamais destructif. Emprunt Reversa (agents Paradigm Advisor + Curator) — audit comparatif 2026-06-12. -->
 <!-- ============================================================ -->
 <!-- IMPORTANT — SPAWN SEMANTICS UNDER CODEX (audit R10 2026-07-26) -->
 <!-- Toute mention `Task tool (subagent_type=X)`, `Agent(X)`, ou    -->

@@ -19,12 +19,32 @@ Propriétés :
   conforme, 1 re-prompt automatique avec l'erreur de validation (opt-in).
 - **Déterministe** : aucune horloge/aléa dans la logique de décision.
 
+Transport du prompt (audit 2026-11-07) : le prompt auto-porteur dépasse
+couramment 32 Ko (system prompt d'agent + tâche + schéma). Passé en argv, il
+franchit la limite Windows ``CreateProcess`` (``OSError WinError 206``) ou
+``E2BIG`` sous POSIX — erreur qui n'était pas capturée. Par défaut le prompt
+est donc envoyé sur **stdin** (``prompt_transport="stdin"``) :
+- ``codex exec … -`` — ``-`` = « lire les instructions sur stdin » (aide
+  ``codex exec --help`` : « If not provided as an argument (or if `-` is
+  used), instructions are read from stdin »).
+- ``claude -p`` sans argument positionnel — le mode print lit le prompt sur
+  stdin quand aucun texte n'est fourni (``cat prompt | claude -p``).
+- ``gemini -p "<marqueur court>"`` — Gemini CLI concatène stdin (non-TTY) et
+  ``--prompt`` ; le marqueur garde l'invocation explicitement headless.
+``prompt_transport="argv"`` conserve l'ancien comportement (prompts courts,
+débogage). Tout ``OSError`` résiduel est classé ``[SPAWN_ARGV_TOO_LONG]`` /
+``[SPAWN_OS_ERROR]`` (rapport ERROR 3L dans ``error_report``).
+
 Statut : composant prêt ; le VERDICT live (P0.4) et les runs de conformité
-(§10) attendent CLI + clés. Non câblé au pipeline (Phase 3+).
+(§10) attendent CLI + clés. **Non câblé au pipeline Claude Code** : en
+session, le tool Agent est le seul mécanisme de spawn. Ce wrapper est
+utilisable par un orchestrateur hors-LLM (CI, script, harnais non-Claude).
 """
 
 from __future__ import annotations
 
+import errno
+import inspect
 import json
 import os
 import re
@@ -38,6 +58,7 @@ __all__ = [
     "HARNESSES",
     "SpawnConfig",
     "AgentSpec",
+    "PROMPT_TRANSPORTS",
     "build_prompt",
     "extract_json",
     "validate_schema",
@@ -51,8 +72,17 @@ HARNESSES: tuple[str, ...] = ("codex", "gemini-cli", "antigravity", "claude-code
 DEFAULT_TIMEOUT_S = 180.0
 DEFAULT_MAX_PARALLEL = 3
 
-#: (exit_code, stdout, stderr). Peut lever FileNotFoundError / TimeoutError.
-Runner = Callable[[list[str], float, Optional[str]], "RunResult"]
+#: Transports du prompt vers le CLI : stdin (défaut, pas de limite argv) | argv.
+PROMPT_TRANSPORTS: tuple[str, ...] = ("stdin", "argv")
+
+#: Marqueur court passé en ``-p`` à Gemini CLI quand le prompt complet arrive
+#: sur stdin (Gemini concatène stdin + ``--prompt``).
+GEMINI_STDIN_MARKER = "Exécute les instructions reçues sur l'entrée standard."
+
+#: Runner : (argv, timeout_s, cwd, stdin_text) -> RunResult. Peut lever
+#: FileNotFoundError / TimeoutError / OSError. Un runner à 3 paramètres
+#: (argv, timeout_s, cwd) reste accepté (compat tests/callers pré-2026-11).
+Runner = Callable[..., "RunResult"]
 
 
 @dataclass(frozen=True)
@@ -78,6 +108,7 @@ class SpawnConfig:
     max_parallel: int = DEFAULT_MAX_PARALLEL
     schema_retry: bool = True            # 1 re-prompt sur JSON invalide (§10.2)
     runner: Optional[Runner] = None      # None -> subprocess réel ; injecté en test
+    prompt_transport: str = "stdin"      # stdin (défaut) | argv (legacy, prompts courts)
 
     def __post_init__(self) -> None:
         if self.harness not in HARNESSES:
@@ -86,6 +117,11 @@ class SpawnConfig:
             )
         if self.max_parallel < 1:
             raise ValueError(f"max_parallel doit être >= 1 (reçu {self.max_parallel})")
+        if self.prompt_transport not in PROMPT_TRANSPORTS:
+            raise ValueError(
+                f"prompt_transport {self.prompt_transport!r} inconnu "
+                f"(attendu: {'|'.join(PROMPT_TRANSPORTS)})"
+            )
 
     def binary(self) -> str:
         if self.bin:
@@ -111,34 +147,53 @@ class AgentSpec:
 # --------------------------------------------------------------------------- #
 
 
-def _build_argv(cfg: SpawnConfig, prompt: str) -> list[str]:
-    """argv du sous-processus selon le harnais (non-interactif, prompt porteur)."""
+def _build_invocation(cfg: SpawnConfig, prompt: str) -> tuple[list[str], Optional[str]]:
+    """(argv, stdin_text) du sous-processus selon le harnais et le transport.
+
+    ``stdin_text`` vaut ``None`` en transport ``argv`` (prompt porté par argv,
+    comportement historique) et le prompt complet en transport ``stdin``.
+    """
     b = cfg.binary()
+    via_stdin = cfg.prompt_transport == "stdin"
+    stdin_text: Optional[str] = prompt if via_stdin else None
     if cfg.harness == "codex":
         argv = [b, "exec", "--sandbox", cfg.sandbox, "--skip-git-repo-check"]
         if cfg.model:
             argv += ["--model", cfg.model]
         argv += list(cfg.extra_args)
-        argv.append(prompt)
-        return argv
+        # `-` : codex exec lit les instructions sur stdin (cf. `codex exec --help`).
+        argv.append("-" if via_stdin else prompt)
+        return argv, stdin_text
     if cfg.harness in ("gemini-cli", "antigravity"):
-        argv = [b, "-p", prompt]
+        # Gemini CLI concatène stdin (non-TTY) et --prompt : le marqueur court
+        # garde l'invocation headless, le prompt complet voyage sur stdin.
+        argv = [b, "-p", GEMINI_STDIN_MARKER if via_stdin else prompt]
         if cfg.model:
             argv += ["-m", cfg.model]
-        return argv + list(cfg.extra_args)
-    # claude-code (headless print mode) — le chemin natif reste le tool Task ;
-    # ce mode existe pour l'uniformité des conformance runs.
-    argv = [b, "-p", prompt]
+        return argv + list(cfg.extra_args), stdin_text
+    # claude-code (headless print mode) — le chemin natif reste le tool Agent ;
+    # ce mode existe pour l'uniformité des conformance runs. Sans argument
+    # positionnel, `claude -p` lit le prompt sur stdin.
+    argv = [b, "-p"]
+    if not via_stdin:
+        argv.append(prompt)
     if cfg.model:
         argv += ["--model", cfg.model]
-    return argv + list(cfg.extra_args)
+    return argv + list(cfg.extra_args), stdin_text
 
 
+def _build_argv(cfg: SpawnConfig, prompt: str) -> list[str]:
+    """argv du sous-processus (compat : voir `_build_invocation` pour stdin)."""
+    return _build_invocation(cfg, prompt)[0]
 
-def _default_runner(argv: list[str], timeout_s: float, cwd: Optional[str]) -> RunResult:
+
+def _default_runner(
+    argv: list[str], timeout_s: float, cwd: Optional[str], stdin_text: Optional[str] = None
+) -> RunResult:
     """Runner réel (subprocess). Seul contact avec un binaire externe."""
     proc = subprocess.run(
         argv,
+        input=stdin_text,
         capture_output=True,
         text=True,
         encoding="utf-8",
@@ -147,6 +202,33 @@ def _default_runner(argv: list[str], timeout_s: float, cwd: Optional[str]) -> Ru
         cwd=cwd,
     )
     return RunResult(exit_code=proc.returncode, stdout=proc.stdout or "", stderr=proc.stderr or "")
+
+
+def _call_runner(
+    runner: Runner, argv: list[str], timeout_s: float, cwd: Optional[str], stdin_text: Optional[str]
+) -> RunResult:
+    """Appelle le runner en respectant son arité (3 params legacy ou 4).
+
+    Un runner legacy (``argv, timeout_s, cwd``) ne sait pas transmettre le
+    prompt : s'il est utilisé en transport ``stdin``, le prompt serait perdu
+    silencieusement — on refuse explicitement plutôt que de spawner à vide.
+    """
+    try:
+        params = inspect.signature(runner).parameters
+        accepts_stdin = len(params) >= 4 or any(
+            p.kind == inspect.Parameter.VAR_POSITIONAL for p in params.values()
+        )
+    except (TypeError, ValueError):  # builtins / callables sans signature
+        accepts_stdin = True
+    if accepts_stdin:
+        return runner(argv, timeout_s, cwd, stdin_text)
+    if stdin_text is not None:
+        raise TypeError(
+            "runner à 3 paramètres (argv, timeout_s, cwd) incompatible avec "
+            "prompt_transport='stdin' — accepter un 4e paramètre stdin_text "
+            "ou passer prompt_transport='argv'"
+        )
+    return runner(argv, timeout_s, cwd)
 
 
 # --------------------------------------------------------------------------- #
@@ -264,7 +346,7 @@ def validate_schema(obj: Any, schema: dict, path: str = "$") -> list[str]:
 def _invoke(prompt: str, cfg: SpawnConfig) -> RunResult:
     """Lance le sous-processus via le runner (réel ou injecté), cwd isolé."""
     runner = cfg.runner or _default_runner
-    argv = _build_argv(cfg, prompt)
+    argv, stdin_text = _build_invocation(cfg, prompt)
     cwd: Optional[str] = None
     tmp = None
     if cfg.isolate_cwd and cfg.runner is None:
@@ -273,7 +355,7 @@ def _invoke(prompt: str, cfg: SpawnConfig) -> RunResult:
         tmp = tempfile.mkdtemp(prefix="sdd-spawn-")
         cwd = tmp
     try:
-        return runner(argv, cfg.timeout_s, cwd)
+        return _call_runner(runner, argv, cfg.timeout_s, cwd, stdin_text)
     finally:
         if tmp is not None:
             import shutil
@@ -281,7 +363,31 @@ def _invoke(prompt: str, cfg: SpawnConfig) -> RunResult:
             shutil.rmtree(tmp, ignore_errors=True)
 
 
-def _attempt(prompt: str, cfg: SpawnConfig, schema: dict) -> dict:
+#: Windows ERROR_FILENAME_EXCED_RANGE — levé par CreateProcess quand la ligne
+#: de commande dépasse ~32 Ko (prompt complet passé en argv).
+_WINERROR_ARGV_TOO_LONG = 206
+
+
+def _classify_os_error(exc: OSError) -> str:
+    """Classe un OSError de spawn : ligne de commande trop longue ou autre."""
+    if getattr(exc, "winerror", None) == _WINERROR_ARGV_TOO_LONG:
+        return "[SPAWN_ARGV_TOO_LONG]"
+    if exc.errno == errno.E2BIG:
+        return "[SPAWN_ARGV_TOO_LONG]"
+    return "[SPAWN_OS_ERROR]"
+
+
+def _error_report(label: str, cfg: SpawnConfig, klass: str, detail: str, fix: str) -> str:
+    """Rapport ERROR 3L (format disque SSoT, output-protocol.md §7.3)."""
+    what = label or cfg.harness
+    return (
+        f"ERROR: spawn_agent {what} ({cfg.harness}) failed\n"
+        f"CAUSE: {klass} {detail}\n"
+        f"FIX: {fix}"
+    )
+
+
+def _attempt(prompt: str, cfg: SpawnConfig, schema: dict, label: str = "") -> dict:
     """Un essai : invoque, extrait, valide. Retourne un résultat structuré."""
     t0 = time.monotonic()
     try:
@@ -290,6 +396,27 @@ def _attempt(prompt: str, cfg: SpawnConfig, schema: dict) -> dict:
         return {"ok": False, "parsed": None, "raw": "", "error_class": "[SPAWN_BINARY_NOT_FOUND]"}
     except (subprocess.TimeoutExpired, TimeoutError):
         return {"ok": False, "parsed": None, "raw": "", "error_class": "[TIMEOUT]"}
+    except OSError as exc:
+        # WinError 206 / E2BIG : prompt (> 32 Ko) passé en argv — non capturé
+        # avant l'audit 2026-11-07, le spawn remontait une exception brute.
+        klass = _classify_os_error(exc)
+        detail = (
+            f"{type(exc).__name__}: {str(exc)[:200]} "
+            f"(prompt {len(prompt)} chars, transport={cfg.prompt_transport})"
+        )
+        if klass == "[SPAWN_ARGV_TOO_LONG]":
+            fix = ("passer le prompt sur stdin (SpawnConfig(prompt_transport='stdin'), "
+                   "défaut) au lieu d'argv")
+        else:
+            fix = f"vérifier le binaire {cfg.binary()!r}, ses droits d'exécution et le cwd isolé"
+        return {
+            "ok": False,
+            "parsed": None,
+            "raw": "",
+            "error_class": klass,
+            "detail": detail,
+            "error_report": _error_report(label, cfg, klass, detail, fix),
+        }
     latency_ms = int((time.monotonic() - t0) * 1000)
     raw = run.stdout or ""
     base = {"raw": raw, "latency_ms": latency_ms, "exit_code": run.exit_code}
@@ -323,7 +450,7 @@ def spawn_agent(spec: AgentSpec, cfg: Optional[SpawnConfig] = None) -> dict:
     """
     cfg = cfg or SpawnConfig()
     prompt = build_prompt(spec.system_prompt, spec.task, spec.output_schema)
-    result = _attempt(prompt, cfg, spec.output_schema)
+    result = _attempt(prompt, cfg, spec.output_schema, spec.label)
     attempts = 1
     if not result["ok"] and cfg.schema_retry and result["error_class"] in _RETRYABLE:
         errs = "; ".join(result.get("schema_errors", []) or ["sortie non-JSON"])
@@ -333,7 +460,7 @@ def spawn_agent(spec: AgentSpec, cfg: Optional[SpawnConfig] = None) -> dict:
             spec.output_schema,
             correction=f"Ta réponse précédente n'était pas un JSON conforme: {errs}.",
         )
-        result = _attempt(retry_prompt, cfg, spec.output_schema)
+        result = _attempt(retry_prompt, cfg, spec.output_schema, spec.label)
         attempts = 2
     result.update({"harness": cfg.harness, "label": spec.label, "attempts": attempts})
     return result

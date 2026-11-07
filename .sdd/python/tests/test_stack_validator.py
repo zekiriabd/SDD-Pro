@@ -94,6 +94,24 @@ class TestStackValidator(unittest.TestCase):
         self.assertIsNotNone(err)
         self.assertEqual(err["code"], "STACK_MALFORMED")
 
+    def test_desktop_only_valid(self) -> None:
+        err = validate_active_stacks_coherence({
+            "backend": None, "frontend": None,
+            "ui": None, "auth": None,
+            "fullstack": None, "mobiles": None, "desktop": "wpf",
+        })
+        self.assertIsNone(err)
+
+    def test_desktop_plus_mobile_invalid(self) -> None:
+        err = validate_active_stacks_coherence({
+            "backend": None, "frontend": None,
+            "ui": None, "auth": None,
+            "fullstack": None, "mobiles": "maui", "desktop": "wpf",
+        })
+        self.assertIsNotNone(err)
+        self.assertEqual(err["code"], "STACK_MALFORMED")
+        self.assertIn("desktop", err["message"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -16,6 +16,14 @@ Migrated from .claude/scripts/context-budget.ps1 (2026-05-13).
 Usage:
     python context_budget.py --agent po [--feat-number 1] [--us-id 1-2]
                              [--json] [--allow-unbounded-globs]
+                             [--model claude-opus-5-5] [--bytes-per-token 3.5]
+
+Estimation (audit tokens 2026-11-07) :
+    tokens ≈ octets / 3.5 (mesure empirique sur du Markdown + code mixte FR/EN ;
+    l'ancien 4.0 sous-estimait de ~12 %), coût = `sdd_lib.pricing.estimate_cost`
+    au tarif d'ENTRÉE du modèle réel de l'agent (`--model`, sinon pin `model:`
+    ou `model_tier` de `.sdd/agents/{agent}.md` via la tier_map du provider),
+    tarif conservateur si inconnu — plus de `3.0 $/Mtok` figé.
 
 Exit codes:
     0 = pass (within budget, no errors)
@@ -92,26 +100,62 @@ DEFAULT_BUDGETS: dict[str, int] = {
     "dev-frontend": 240_000,
     "qa":           280_000,
     "dashboard":    180_000,
-    # Auditors — les 5 reviewers cross-fichier scannent le code matérialisé
-    # complet (workspace/src/{AppName,BackendName}/**) qui pèse
-    # facilement 2-3 MB sur une FEAT moyenne. Budget calé à 4 MB (= ~1 Mtok)
-    # pour absorber le scope réel. L'anti-context-bomb reste effectif via
-    # [UNBOUNDED_GLOB] (refus des reads sans borne FEAT/US).
+    # Auditors — audit tokens 2026-11-07 : les 4 MB (≈1,1 Mtok) posés en
+    # 2026-06 n'étaient pas une barrière mais une absence de barrière — aucun
+    # reviewer n'a jamais lu 4 MB et, s'il le faisait, il déborderait la
+    # fenêtre de 1 Mtok de son modèle AVANT que la gate ne dise quoi que ce
+    # soit. Ramené à 600 000 octets ≈ 170 ktok par `BYTES_PER_TOKEN`, soit le
+    # volume réel d'une FEAT moyenne (2-3 MB de src → le reviewer ne lit que le
+    # diff de la FEAT + les US, pas l'arbre entier). La gate reste en mode
+    # warn côté hook (`SDD_BUDGET_MODE=warn`, défaut interactif) : un
+    # dépassement est visible, pas bloquant hors CI/strict. L'anti-context-bomb
+    # reste effectif via [UNBOUNDED_GLOB] (refus des reads sans borne FEAT/US).
     # accessibility-auditor garde un budget serré : il ne lit que l'HTML/
     # markup (US + mockups), pas le code prod.
     "accessibility-auditor":     80_000,   # Haiku, scan WCAG déterministe (HTML/markup)
-    "code-reviewer":          4_000_000,   # Sonnet, anti-patterns cross-fichier
-    "arch-reviewer":          4_000_000,   # Sonnet, layer mapping + ADRs §6
-    "security-reviewer":      4_000_000,   # Sonnet, OWASP scan + threat-model
-    "performance-auditor":    4_000_000,   # Sonnet, CWV + SLO heuristiques
-    "spec-compliance-reviewer": 4_000_000, # Sonnet, AC-by-AC re-lecture code
+    "code-reviewer":            600_000,   # Sonnet, anti-patterns cross-fichier
+    "arch-reviewer":            600_000,   # Sonnet, layer mapping + ADRs §6
+    "security-reviewer":        600_000,   # Sonnet, OWASP scan + threat-model
+    "performance-auditor":      600_000,   # Sonnet, CWV + SLO heuristiques
+    "spec-compliance-reviewer": 600_000,   # Sonnet, AC-by-AC re-lecture code
     # Audit 2026-06-06 RUPT-1 — adversarial-reviewer (R1 v7.2.0 opt-in).
-    # Sonnet 4.6. Read-only sur console.db (consolidated review, via
-    # query_console_db) + workspace/src/{App,Backend}Name/** (code).
-    # Verdict purement informational, jamais bloquant — mais consomme un
-    # budget équivalent aux 4 autres reviewers (mêmes patterns de lecture).
-    "adversarial-reviewer":   4_000_000,
+    # Read-only sur console.db (consolidated review, via query_console_db)
+    # + workspace/src/{App,Backend}Name/** (code). Verdict purement
+    # informational, jamais bloquant — même budget que les 4 autres reviewers.
+    "adversarial-reviewer":     600_000,
 }
+
+#: Octets par token — mesure empirique (audit tokens 2026-11-07) sur du
+#: Markdown + code mixte FR/EN tel que lu par les agents. L'ancien 4.0
+#: sous-estimait d'environ 12 %.
+BYTES_PER_TOKEN: float = 3.5
+
+
+def resolve_agent_model(agent: str, explicit: str | None = None) -> str | None:
+    """Modèle réel de l'agent : `--model` > pin `model:` > `model_tier` → tier_map.
+
+    Réutilise la résolution de `sdd_hooks.record_token_usage` (même source de
+    vérité que la télémétrie : `.sdd/agents/{agent}.md` + provider YAML). Un
+    échec de résolution rend ``None`` — `pricing.estimate_cost` applique alors
+    le tarif conservateur et le signale sur stderr.
+    """
+    if explicit and explicit.strip():
+        return explicit.strip()
+    try:
+        from sdd_hooks.record_token_usage import _model_from_agent_tier
+        return _model_from_agent_tier(agent)
+    except Exception:  # noqa: BLE001 — jamais bloquant, tarif conservateur
+        return None
+
+
+def estimate_input_cost(model: str | None, estimated_tokens: int,
+                        usd_per_million: float | None = None) -> float:
+    """Coût d'entrée estimé : tarif explicite si fourni, sinon pricing par modèle."""
+    if usd_per_million is not None:
+        return round((estimated_tokens / 1_000_000.0) * usd_per_million, 6)
+    from sdd_lib.pricing import estimate_cost
+    return round(estimate_cost(model, input_tokens=estimated_tokens), 6)
+
 
 # Exclude these from context budget
 EXCLUDE_DIR_RE = re.compile(r"(^|/)(node_modules|bin|obj|TestResults|build|dist|coverage)(/|$)")
@@ -139,8 +183,13 @@ def parse_args() -> argparse.Namespace:
                         "(audit 2026-08-28 correction #4 ; sinon calculée "
                         "seulement quand le budget est dépassé)")
     p.add_argument("--allow-unbounded-globs", action="store_true")
-    p.add_argument("--bytes-per-token", type=int, default=4)
-    p.add_argument("--input-usd-per-million-tokens", type=float, default=3.0)
+    p.add_argument("--bytes-per-token", type=float, default=BYTES_PER_TOKEN)
+    p.add_argument("--model", default=None,
+                   help="modèle réel de l'agent pour le coût (défaut : pin "
+                        "`model:` ou `model_tier` de .sdd/agents/{agent}.md)")
+    p.add_argument("--input-usd-per-million-tokens", type=float, default=None,
+                   help="tarif d'entrée explicite (défaut : sdd_lib.pricing "
+                        "par modèle, conservateur si inconnu)")
     return p.parse_args()
 
 
@@ -336,7 +385,7 @@ def _pack_state(agent: str) -> tuple[bool, str]:
         return False, f"verification impossible: {exc}"
 
 
-def _pack_projection(agent: str, budget_bytes: int, bytes_per_token: int) -> dict | None:
+def _pack_projection(agent: str, budget_bytes: int, bytes_per_token: float) -> dict | None:
     """Ce que la gate dirait si l'agent lisait son pack au lieu de ses sources.
 
     Best-effort et strictement informationnel : toute erreur retourne ``None``.
@@ -357,7 +406,7 @@ def _pack_projection(agent: str, budget_bytes: int, bytes_per_token: int) -> dic
             "gain_pct": -m["reduction_pct"],
             "sections_dropped": sum(len(s["sections_dropped"]) for s in m["sources"]),
             "over_budget": m["over_budget"],
-            "estimated_tokens": math.ceil(m["bytes_after"] / max(bytes_per_token, 1)),
+            "estimated_tokens": math.ceil(m["bytes_after"] / max(bytes_per_token, 1e-9)),
         }
     except Exception:  # noqa: BLE001 — informationnel, jamais bloquant
         return None
@@ -429,9 +478,11 @@ def main() -> int:
                 })
 
     total_bytes = sum(e["bytes"] for e in expanded)
-    estimated_tokens = math.ceil(total_bytes / max(args.bytes_per_token, 1))
+    bytes_per_token = max(float(args.bytes_per_token), 1e-9)
+    estimated_tokens = math.ceil(total_bytes / bytes_per_token)
     budget_bytes = DEFAULT_BUDGETS[args.agent]
-    budget_tokens = math.ceil(budget_bytes / max(args.bytes_per_token, 1))
+    budget_tokens = math.ceil(budget_bytes / bytes_per_token)
+    model = resolve_agent_model(args.agent, args.model)
 
     if total_bytes > budget_bytes:
         errors.append({
@@ -497,11 +548,13 @@ def main() -> int:
             })
 
     elapsed_ms = int((time.monotonic() - started) * 1000)
-    cost = round((estimated_tokens / 1_000_000.0) * args.input_usd_per_million_tokens, 6)
+    cost = estimate_input_cost(model, estimated_tokens, args.input_usd_per_million_tokens)
     record = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "runId": run_id,
         "agent": args.agent,
+        "model": model,
+        "bytesPerToken": bytes_per_token,
         "FeatNumber": args.feat_number if args.feat_number > 0 else None,
         "usId": args.us_id or None,
         "result": "pass" if not errors else "fail",

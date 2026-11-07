@@ -39,7 +39,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from sdd_lib.paths import workspace_root, repo_root  # noqa: E402
+from sdd_lib.paths import audit_dir_path, workspace_root, repo_root  # noqa: E402
 from sdd_lib.exit_codes import SUCCESS  # noqa: E402
 
 DEFAULT_MAX_BYTES = 1 * 1024 * 1024   # 1 MiB
@@ -168,7 +168,7 @@ def rotate_if_due(throttle_hours: int = 24) -> bool:
     best-effort housekeeping task, not a security gate).
     """
     try:
-        audit_dir = workspace_root(repo_root()) / ".sys" / ".audit"
+        audit_dir = audit_dir_path(repo_root())
         if not audit_dir.is_dir():
             return False
         marker = audit_dir / ".last-rotation"
@@ -207,7 +207,7 @@ def main() -> int:
                    help="Suppress per-file 'skip' lines (only show actions).")
     args = p.parse_args()
 
-    audit_dir = workspace_root(repo_root()) / ".sys" / ".audit"
+    audit_dir = audit_dir_path(repo_root())
     if not audit_dir.is_dir():
         if not args.quiet:
             print(f"audit dir absent ({audit_dir}) — nothing to rotate")

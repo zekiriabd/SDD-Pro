@@ -19,7 +19,7 @@ Arguments: {{args}}
 
 <!-- @llm-only-flags-file : tous les flags CLI de cette commande slash sont interprétés par Claude. -->
 
-Délègue à l'agent `qa` (Sonnet 4.6) pour générer les tests unitaires
+Délègue à l'agent `qa` (Sonnet 5.5) pour générer les tests unitaires
 (backend + frontend) d'une FEAT, exécuter le coverage parsing
 (Python, 0 token) et le quality scan sonar-like (Python, 0 token).
 
@@ -301,6 +301,20 @@ elif stats.coverage.coverage_passed == false:     → RED  (cf. quality.md §A.3
 elif stats.quality.errors > 0:                    → YELLOW
 else:                                              → GREEN
 ```
+
+**Gate de livraison QA (OBLIGATOIRE, `.sdd/docs/delivery-gates.md`)** — les
+tests générés doivent avoir été **exécutés ET réussis** par un script
+indépendant ; le rapport de l'agent `qa` ne vaut pas preuve :
+
+```bash
+python .sdd/python/sdd_scripts/verify_build.py --feat-number {n} --run-id "$SDD_RUN_ID"
+python .sdd/python/sdd_scripts/verify_tests.py --feat-number {n} --run-id "$SDD_RUN_ID" --coverage
+python .sdd/python/sdd_scripts/delivery_gate.py authorize --feat-number {n} --workflow qa-generate --run-id "$SDD_RUN_ID" --json
+```
+
+Exit ≠ 0 → verdict 🔴 `[DELIVERY_GATE_BLOCKED]` quel que soit le calcul
+ci-dessus, et **aucun `[DONE]`** (ni `[DONE/WARN]`). Sous `/sdd-full`, le
+planner planifie lui-même `verify-tests` après la phase `qa`.
 
 **Acceptance Gate automatique (post-STEP 7, v7.0.0)** : un hook
 `SubagentStop` matcher=qa déclenche `sdd_scripts/validate_acceptance.py`

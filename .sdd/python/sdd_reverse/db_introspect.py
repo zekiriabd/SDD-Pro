@@ -61,48 +61,95 @@ class ReverseDbError(Exception):
 # Connection layer (live — lazy driver)
 # --------------------------------------------------------------------------- #
 
+def _odbc_value(value: Any) -> str:
+    """Quote an ODBC connection-string value (audit sécurité 2026-11).
+
+    ODBC grammar : a value containing `;`, `{`, `}`, `=` or leading/trailing
+    spaces must be wrapped in `{...}` with every `}` doubled. Unescaped, a
+    password like `a;Database=master` silently rewrote the connection target
+    (attribute injection) and `}` broke the parse.
+    """
+    s = "" if value is None else str(value)
+    if s and not any(c in s for c in ";{}=") and s == s.strip():
+        return s
+    return "{" + s.replace("}", "}}") + "}"
+
+
+def _libpq_value(value: Any) -> str:
+    """Quote a libpq DSN value : empty / spaces / quotes / backslashes → '…'."""
+    s = "" if value is None else str(value)
+    if s and not any(c in s for c in " '\\\t\n"):
+        return s
+    return "'" + s.replace("\\", "\\\\").replace("'", "\\'") + "'"
+
+
 def compose_connection_string(cfg: Any, dialect: Dialect) -> str:
     """Build a connection string in RAM. Never logged, never persisted.
 
-    Read-only intent is signalled where the driver supports it (defence in
-    depth) — the guard, not the connection, is the real read-only authority.
+    Values are escaped per driver grammar (ODBC `{…}`, libpq `'…'`) — audit
+    2026-11 : an unescaped `;` in a password injected connection attributes.
+
+    Read-only — honest status (audit 2026-11) :
+      * PostgreSQL : `set_session(readonly=True)` is enforced BY THE SERVER
+        (any write in the session fails) — a real barrier.
+      * SQL Server : `ApplicationIntent=ReadOnly` only routes to a readable
+        secondary in an Availability Group ; on a standalone instance it
+        changes nothing. pyodbc `readonly=True` sets SQL_ATTR_ACCESS_MODE,
+        which the Microsoft driver does not enforce. Neither is a barrier.
+        The session runs in an explicit transaction that is ROLLED BACK
+        before close (see `introspect`), so even a statement slipping past
+        the guard would not be committed.
+      * Oracle / MySQL : `SET TRANSACTION READ ONLY` /
+        `SET SESSION TRANSACTION READ ONLY` — server-enforced while active.
+    The real authority is `readonly_guard.assert_readonly` on every statement
+    plus a least-privilege login (db_datareader + VIEW DEFINITION).
     """
     port = cfg.port or str(dialect.default_port)
     if dialect.id == "sqlserver":
         server = f"{cfg.host},{port}" if cfg.host else cfg.host
         parts = [
             "DRIVER={ODBC Driver 18 for SQL Server}",
-            f"SERVER={server}",
-            f"DATABASE={cfg.name}",
+            f"SERVER={_odbc_value(server)}",
+            f"DATABASE={_odbc_value(cfg.name)}",
             "Encrypt=yes",
             "TrustServerCertificate=yes",
             "ApplicationIntent=ReadOnly",
             "Connection Timeout=10",
         ]
         if cfg.user:
-            parts += [f"UID={cfg.user}", f"PWD={cfg.password}"]
+            parts += [f"UID={_odbc_value(cfg.user)}", f"PWD={_odbc_value(cfg.password)}"]
         else:
             parts.append("Trusted_Connection=yes")
         return ";".join(parts) + ";"
     if dialect.id == "postgresql":
         # libpq DSN (psycopg2/psycopg accept this). connect_timeout fast-fails.
         parts = [
-            f"host={cfg.host}",
-            f"port={port}",
-            f"dbname={cfg.name}",
+            f"host={_libpq_value(cfg.host)}",
+            f"port={_libpq_value(port)}",
+            f"dbname={_libpq_value(cfg.name)}",
             "connect_timeout=10",
         ]
         if cfg.user:
-            parts.append(f"user={cfg.user}")
+            parts.append(f"user={_libpq_value(cfg.user)}")
         if cfg.password:
-            parts.append(f"password={cfg.password}")
+            parts.append(f"password={_libpq_value(cfg.password)}")
         return " ".join(parts)
     if dialect.id == "oracle":
         # python-oracledb easy-connect: user/password@host:port/service.
         cred = f"{cfg.user}/{cfg.password}@" if cfg.user else ""
         return f"{cred}{cfg.host}:{port}/{cfg.name}"
     if dialect.id == "mysql":
-        # Semicolon DSN parsed by _connect_mysql into connector kwargs.
+        # Semicolon DSN parsed by _connect_mysql into connector kwargs. That
+        # naive parser has no escape syntax : a `;` in a value would split it
+        # (attribute injection) → refused explicitly (audit 2026-11).
+        for label, v in (("host", cfg.host), ("database", cfg.name),
+                         ("user", cfg.user), ("password", cfg.password)):
+            if v and ";" in str(v):
+                raise ReverseDbError(
+                    f"[REVERSE_DB_CONFIG_MISSING] mysql {label} contains ';' "
+                    "(unsupported by the DSN parser)",
+                    "[REVERSE_DB_CONFIG_MISSING]",
+                )
         parts = [f"host={cfg.host}", f"port={port}", f"database={cfg.name}"]
         if cfg.user:
             parts.append(f"user={cfg.user}")
@@ -141,7 +188,11 @@ def _connect_pyodbc(conn_str: str):  # noqa: ANN202
             "[REVERSE_DB_UNREACHABLE]",
         ) from exc
     try:
-        conn = pyodbc.connect(conn_str, readonly=True, timeout=10)
+        # autocommit=False : every statement runs inside a driver-opened
+        # transaction that `introspect` ROLLS BACK before close (audit
+        # 2026-11). `readonly=True` is kept but is NOT enforced by the MS
+        # driver — see compose_connection_string docstring.
+        conn = pyodbc.connect(conn_str, readonly=True, timeout=10, autocommit=False)
     except pyodbc.Error as exc:  # type: ignore[attr-defined]
         msg = str(exc)
         klass = "[REVERSE_DB_AUTH_FAILED]" if _looks_like_auth(msg) else "[REVERSE_DB_UNREACHABLE]"
@@ -196,15 +247,41 @@ def _connect_oracledb(conn_str: str):  # noqa: ANN202
     return conn
 
 
+#: kwargs acceptés à la fois par mysql-connector-python et PyMySQL (audit
+#: 2026-11-07). Toute autre clé du DSN (ex. `sslmode`, `Encrypt`) faisait
+#: lever un TypeError au `connect(**kv)`, classé à tort UNREACHABLE.
+_MYSQL_ALLOWED_KWARGS = frozenset({"host", "port", "user", "password", "database", "connect_timeout"})
+_MYSQL_KWARG_ALIASES = {"db": "database", "passwd": "password", "username": "user",
+                        "server": "host", "connection_timeout": "connect_timeout"}
+_MYSQL_INT_KWARGS = ("port", "connect_timeout")
+
+
 def _connect_mysql(conn_str: str):  # noqa: ANN202
-    kv = dict(
+    raw = dict(
         part.split("=", 1) for part in conn_str.split(";") if "=" in part
     )
-    if "port" in kv:
-        try:
-            kv["port"] = int(kv["port"])
-        except ValueError:
-            kv.pop("port")
+    kv: dict = {}
+    dropped: list[str] = []
+    for key, value in raw.items():
+        k = key.strip().lower()
+        k = _MYSQL_KWARG_ALIASES.get(k, k)
+        if k in _MYSQL_ALLOWED_KWARGS:
+            kv[k] = value.strip()
+        else:
+            dropped.append(key.strip())  # nom seul — jamais la valeur
+    for k in _MYSQL_INT_KWARGS:
+        if k in kv:
+            try:
+                kv[k] = int(kv[k])
+            except ValueError:
+                kv.pop(k)
+    kv.setdefault("connect_timeout", 10)
+    if dropped:
+        import sys as _sys
+        _sys.stderr.write(
+            "WARNING: [REVERSE_DB_CONNECT_FAILED] mysql DSN keys ignored (not accepted "
+            f"by the driver): {', '.join(sorted(dropped))}\n"
+        )
     driver = None
     try:
         import mysql.connector as driver  # type: ignore
@@ -219,6 +296,14 @@ def _connect_mysql(conn_str: str):  # noqa: ANN202
             ) from exc
     try:
         conn = driver.connect(**kv)
+    except TypeError as exc:
+        # Signature du driver incompatible (kwarg refusé) : erreur de config,
+        # pas de réseau — classée à part, sans jamais logguer de valeur.
+        klass = "[REVERSE_DB_CONNECT_FAILED]"
+        raise ReverseDbError(
+            f"{klass} {driver.__name__}.connect rejected kwargs {sorted(kv)}: {str(exc)[:120]}",
+            klass,
+        ) from exc
     except Exception as exc:
         msg = str(exc)
         klass = "[REVERSE_DB_AUTH_FAILED]" if _looks_like_auth(msg) else "[REVERSE_DB_UNREACHABLE]"
@@ -236,12 +321,19 @@ def _harden_session(conn, pragma: str) -> None:
     these three `SET TRANSACTION ...` calls used to bypass it entirely.
     A pragma the engine rejects (unsupported syntax, insufficient right) is
     non-fatal: the read-only guarantee rests on the guard, not on the pragma.
+    Audit 2026-11 : the rejection is no longer swallowed silently — a WARN
+    names the pragma and the exception type (never the connection string).
     """
     assert_session_pragma(pragma)
     try:
         conn.cursor().execute(pragma)
-    except Exception:  # pragma: no cover - best effort, engine-dependent
-        pass
+    except Exception as exc:  # engine-dependent
+        import sys as _sys
+        _sys.stderr.write(
+            f"WARN [REVERSE_DB_UNREACHABLE] session pragma refused by the engine "
+            f"({pragma!r} → {type(exc).__name__}: {str(exc)[:120]}) — read-only "
+            f"relies on readonly_guard + least-privilege login only\n"
+        )
 
 
 def _looks_like_auth(msg: str) -> bool:
@@ -622,6 +714,13 @@ def introspect(
             catalog_objects, w2 = dsl.fetch_catalog_objects(conn, dialect)
             schema_warnings = w1 + w2
     finally:
+        # Audit 2026-11 : explicit ROLLBACK before close — whatever ran in the
+        # session (guarded catalog reads only) is never committed. Required on
+        # SQL Server where no connection flag enforces read-only.
+        try:
+            conn.rollback()
+        except Exception:  # pragma: no cover - autocommit drivers / closed conn
+            pass
         try:
             conn.close()
         except Exception:  # pragma: no cover

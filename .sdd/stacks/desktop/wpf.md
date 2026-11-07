@@ -28,17 +28,30 @@ Architecture cible :
 ├── Views/
 │   ├── MainWindow.xaml
 │   └── {Domaine}/{Name}View.xaml
+├── Controls/                      ── UserControls reutilisables
+├── Converters/                    ── IValueConverter
+├── Resources/                     ── styles, templates, dictionnaires
+├── appsettings.json
+└── {AppName}.csproj               ── net10.0-windows + UseWPF, reference {AppName}.Core
+
+{AppName}.Core/                    ── code testable SANS WPF (TFM net10.0)
 ├── ViewModels/
 │   ├── MainViewModel.cs
 │   └── {Domaine}/{Name}ViewModel.cs
 ├── Models/                        ── entites et DTOs
 ├── Services/                      ── logique metier, acces API/base
-├── Controls/                      ── UserControls reutilisables
-├── Converters/                    ── IValueConverter
-├── Resources/                     ── styles, templates, dictionnaires
-├── appsettings.json
-└── {AppName}.csproj               ── net10.0-windows + UseWPF
+└── {AppName}.Core.csproj          ── net10.0, RootNamespace={AppName}
+
+{AppName}.Tests/                   ── net10.0, reference {AppName}.Core (JAMAIS {AppName})
 ```
+
+> **Pourquoi `{AppName}.Core`** (post-mortem PolEmploiAuto 2026-10-10) : un
+> projet de test `net10.0` ne peut pas référencer un projet `net10.0-windows`
+> (NuGet `NU1201`, `SkipGetTargetFrameworkProperties` n'y change rien). Les
+> ViewModels, Services et Models — déjà sans référence WPF (§1.4) — vivent donc
+> dans une bibliothèque `net10.0` que l'app **et** les tests référencent.
+> `RootNamespace={AppName}` garde les namespaces `{AppName}.ViewModels…`
+> identiques : aucun `using` ne change.
 
 **Différence vs `desktop/winforms`** : le data binding. WinForms n'a pas
 d'équivalent déclaratif, ce qui impose le pattern MVP et beaucoup de code de
@@ -53,31 +66,31 @@ est Windows-only.
 
 ## 1.2 Couches
 
-- **Views** (`Views/`) : XAML + code-behind **vide** (au plus un `InitializeComponent`).
-- **ViewModels** (`ViewModels/`) : état et commandes de l'écran. Aucune référence à un type WPF — c'est ce qui les rend testables.
-- **Services** (`Services/`) : logique métier, accès API et base. Injectés par interface.
-- **Models** (`Models/`) : entités et DTOs.
+- **Views** (`{AppName}/Views/`) : XAML + code-behind **vide** (au plus un `InitializeComponent`).
+- **ViewModels** (`{AppName}.Core/ViewModels/`) : état et commandes de l'écran. Aucune référence à un type WPF — c'est ce qui les rend testables, et ce que le TFM `net10.0` du projet Core garantit à la compilation.
+- **Services** (`{AppName}.Core/Services/`) : logique métier, accès API et base. Injectés par interface. Un service qui a besoin de WPF (rare : presse-papiers, `MessageBox`) a son interface dans Core et son implémentation dans `{AppName}/Services/`.
+- **Models** (`{AppName}.Core/Models/`) : entités et DTOs.
 - **Converters** (`Converters/`) : adaptation de types pour le binding (bool → Visibility…).
 
 ---
 
 ## 1.3 Mapping couche → repertoire
 
-Un seul projet sous `workspace/src/{AppName}/`. **Convention single-project — `{BackendName}` et `{LibName}` ne s'appliquent pas.** Arch lève WARNING `[STACK_MALFORMED]` si `LibStrategy` déclare un mode `monorepo`.
+Deux projets applicatifs : `workspace/src/{AppName}/` (WPF) et `workspace/src/{AppName}.Core/` (`net10.0`, code testable — §1). **`{BackendName}` et `{LibName}` ne s'appliquent pas** (`{AppName}.Core` est une dépendance interne de l'app, pas une lib partagée). Arch lève WARNING `[STACK_MALFORMED]` si `LibStrategy` déclare un mode `monorepo`.
 
 | Layer | Path |
 |---|---|
 | Bootstrap | `App.xaml` + `App.xaml.cs` (Host + DI) |
 | Fenêtre principale | `Views/MainWindow.xaml` |
 | Vue | `Views/{Domaine}/{Name}View.xaml` |
-| ViewModel | `ViewModels/{Domaine}/{Name}ViewModel.cs` |
-| Service | `Services/{Name}Service.cs` + `I{Name}Service.cs` |
-| Modèle | `Models/{Name}.cs` |
+| ViewModel | `../{AppName}.Core/ViewModels/{Domaine}/{Name}ViewModel.cs` |
+| Service | `../{AppName}.Core/Services/{Name}Service.cs` + `I{Name}Service.cs` |
+| Modèle | `../{AppName}.Core/Models/{Name}.cs` |
 | UserControl | `Controls/{Name}Control.xaml` |
 | Converter | `Converters/{Name}Converter.cs` |
 | Styles / templates | `Resources/{Styles,Templates,Colors}.xaml` |
 | Configuration | `appsettings.json` |
-| Test | projet séparé `{AppName}.Tests/` (TFM `net10.0`, **sans** `-windows`) |
+| Test | projet séparé `{AppName}.Tests/` (TFM `net10.0`, **sans** `-windows`, référence `{AppName}.Core`) |
 
 ---
 
@@ -214,11 +227,33 @@ PY
 # STEP 5 — Projet de tests : TFM net10.0 SANS suffixe -windows
 #   Un projet de test n'a pas besoin de WPF, et le suffixe -windows le
 #   rendrait non executable sur un agent CI Linux.
-dotnet new xunit -n {AppName}.Tests -o ../{AppName}.Tests --framework net10.0 --force
-dotnet add ../{AppName}.Tests reference {AppName}.csproj
+#   Il reference {AppName}.Core, JAMAIS {AppName} : net10.0 -> net10.0-windows
+#   echoue en NU1201 (post-mortem PolEmploiAuto 2026-10-10, cf. §1).
+dotnet new classlib -n {AppName}.Core -o ../{AppName}.Core --framework net10.0 --force
+rm -f ../{AppName}.Core/Class1.cs
+mkdir -p ../{AppName}.Core/{ViewModels,Services,Models}
+python - <<'PY'
+import pathlib
+p = pathlib.Path("../{AppName}.Core/{AppName}.Core.csproj")
+s = p.read_text(encoding="utf-8")
+if "<RootNamespace>" not in s:
+    s = s.replace("<TargetFramework>net10.0</TargetFramework>",
+                  "<TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>{AppName}</RootNamespace>")
+    p.write_text(s, encoding="utf-8")
+PY
+# CommunityToolkit.Mvvm vit dans Core (les ViewModels y sont)
+dotnet add ../{AppName}.Core package CommunityToolkit.Mvvm --version 8.4.2
+dotnet add reference ../{AppName}.Core/{AppName}.Core.csproj
+rmdir ViewModels Services Models 2>/dev/null || true
 
-# STEP 6 — Gate
+dotnet new xunit -n {AppName}.Tests -o ../{AppName}.Tests --framework net10.0 --force
+dotnet add ../{AppName}.Tests reference ../{AppName}.Core/{AppName}.Core.csproj
+
+# STEP 6 — Gate : build du projet de TESTS (il tire Core) + de l'app.
+#   Un build de l'app seule ne compile pas les tests et masque un NU1201.
 dotnet build -c Debug --nologo
+dotnet build ../{AppName}.Tests -c Debug --nologo
 
 fi
 ```
@@ -226,9 +261,10 @@ fi
 **Contrat post-init** :
 - `{AppName}.csproj` cible `net10.0-windows` avec `<UseWPF>true</UseWPF>`
 - `appsettings.json` est marqué `CopyToOutputDirectory`
-- L'arborescence MVVM existe
-- `{AppName}.Tests` cible `net10.0` (**sans** `-windows`)
-- `dotnet build` sort 0
+- L'arborescence MVVM existe (`Views/` dans l'app ; `ViewModels/`, `Services/`, `Models/` dans `{AppName}.Core`)
+- `{AppName}.Core` cible `net10.0` (**sans** `-windows`), `RootNamespace={AppName}`
+- `{AppName}.Tests` cible `net10.0` (**sans** `-windows`) et référence `{AppName}.Core`, jamais `{AppName}`
+- `dotnet build` de l'app **et** du projet de tests sort 0
 
 ---
 
@@ -315,17 +351,19 @@ Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'U
 | control-library | HandyControl | 3.5.1 | controle.*avance, handycontrol, composant.*riche |
 | charts | LiveChartsCore.SkiaSharpView.WPF | 2.0.5 | chart, graphique, courbe, visualisation.*donnees |
 | local-db | Microsoft.EntityFrameworkCore.Sqlite | 10.0.11 | base.*locale, sqlite, hors.*ligne, donnees.*locales |
-| http-client | Refit.HttpClientFactory | 15.2.0 | appel.*api, backend, rest, http |
+| http-client | Refit.HttpClientFactory | 15.2.0 | appel.*api, api.*rest, backend.*(distant|s[eé]par), refit |
 | validation | FluentValidation | 12.1.1 | validation, formulaire, regle.*saisie |
 | mapping | AutoMapper | 16.2.0 | mapping, dto.*vers.*viewmodel |
 | webview | Microsoft.Web.WebView2 | 1.0.4191.47 | webview, contenu.*web, afficher.*page |
+| browser-automation | Microsoft.Playwright | 1.63.0 | playwright, automatis\w*.*(site|navigat|web), pilot\w*.*(site|navigat), navigateur.*automat, scraping |
 | excel | ClosedXML | 0.105.1 | excel, xlsx, export.*tableur |
-| pdf | QuestPDF | 2026.8.0 | \bpdf\b, impression, export.*pdf |
+| pdf | QuestPDF | 2026.8.0 | export.*pdf, impression, questpdf |
+| pdf-read | PdfPig | 0.1.16 | lecture.*pdf, lire.*pdf, extraire.*pdf, extraction.*pdf, contenu.*pdf, pdfpig |
 | auto-update | Velopack | 1.2.0 | mise.*a.*jour, auto-update, installeur, deploiement.*poste |
 | unit-tests | xunit | 2.9.3 | tests.*unitaires, xunit, viewmodel.*test |
 | unit-tests | NSubstitute | 6.2.0 | mock, substitute, tests.*unitaires |
 | unit-tests | Shouldly | 4.3.0 | assertions, should |
-| ui-automation | FlaUI.UIA3 | 5.0.0 | test.*ui, automation, test.*bout.*en.*bout, flaui |
+| ui-automation | FlaUI.UIA3 | 5.0.0 | test.*ui, ui.*automation, test.*bout.*en.*bout, flaui |
 <!-- LIBS_CATALOG_END -->
 
 ---
@@ -489,8 +527,9 @@ Ce stack est optimisé pour :
 | Path | Owner |
 |---|---|
 | `Views/**`, `Controls/**`, `Resources/**` | `dev-frontend` |
-| `ViewModels/**` | `dev-frontend` |
-| `Services/**`, `Models/**` | `dev-frontend` |
+| `{AppName}.Core/ViewModels/**` | `dev-frontend` |
+| `{AppName}.Core/Services/**`, `{AppName}.Core/Models/**` | `dev-frontend` |
+| `{AppName}.Core/{AppName}.Core.csproj` | `arch` (create) + `dev-frontend` (deps on-demand sans WPF) |
 | `Converters/**` | `dev-frontend` |
 | `App.xaml.cs` (Host + DI) | `arch` (create) + `dev-frontend` (enregistrements) |
 | `appsettings.json` | `arch` (create) + `dev-frontend` (ajout de clés) |
@@ -508,7 +547,7 @@ cd workspace/src/{AppName}
 dotnet restore
 
 test -f App.xaml
-test -d ViewModels
+test -d ../{AppName}.Core/ViewModels
 
 # TFM : le suffixe -windows est load-bearing (cf. 2.3)
 grep -q "net10.0-windows" {AppName}.csproj
@@ -516,6 +555,10 @@ grep -q "<UseWPF>true</UseWPF>" {AppName}.csproj
 
 # Le projet de test NE doit PAS cibler -windows (cf. 2.3)
 ! grep -q "net10.0-windows" ../{AppName}.Tests/{AppName}.Tests.csproj
+# Core non plus, et les tests referencent Core — jamais l'app WPF (NU1201, cf. §1)
+! grep -q "net10.0-windows" ../{AppName}.Core/{AppName}.Core.csproj
+grep -q "{AppName}.Core.csproj" ../{AppName}.Tests/{AppName}.Tests.csproj
+! grep -q 'Include="..\{AppName}\{AppName}.csproj"' ../{AppName}.Tests/{AppName}.Tests.csproj
 
 # Sans cela, la configuration est vide au runtime
 grep -q "CopyToOutputDirectory" {AppName}.csproj

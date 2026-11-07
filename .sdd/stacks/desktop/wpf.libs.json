@@ -13,7 +13,7 @@
     ]
   },
   "metadata": {
-    "lastUpdated": "2026-09-02",
+    "lastUpdated": "2026-10-10",
     "platforms": [
       "windows"
     ],
@@ -40,8 +40,10 @@
     "fluentvalidation": "12.1.1",
     "automapper": "16.2.0",
     "webview2": "1.0.4191.47",
+    "playwright": "1.63.0",
     "closedxml": "0.105.1",
     "questpdf": "2026.8.0",
+    "pdfpig": "0.1.16",
     "velopack": "1.2.0",
     "xunit": "2.9.3",
     "nsubstitute": "6.2.0",
@@ -152,12 +154,12 @@
       "module": "Refit.HttpClientFactory",
       "ref": "refit",
       "capability": "http-client",
-      "rationale": "Client REST type vers le backend separe declare en ## Active Tech Specs",
+      "rationale": "Client REST type vers le backend separe declare en ## Active Tech Specs. Triggers resserres 2026-10-10 : 'backend', 'rest' et 'http' seuls matchaient « pas de backend », « restant » ou toute URL https://",
       "triggers": [
         "appel.*api",
-        "backend",
-        "rest",
-        "http"
+        "api.*rest",
+        "backend.*(distant|s[eé]par)",
+        "refit"
       ]
     },
     {
@@ -191,6 +193,20 @@
       ]
     },
     {
+      "module": "Microsoft.Playwright",
+      "ref": "playwright",
+      "capability": "browser-automation",
+      "license": "MIT",
+      "rationale": "Pilotage d'un navigateur reel (connexion, formulaires, clics, telechargements) depuis l'app. Telechargements interceptes nativement (IPage.RunAndWaitForDownloadAsync), selecteurs CSS/texte, attentes automatiques. Sur Windows, utiliser Channel=\"msedge\" (Edge installe d'office) evite de telecharger les navigateurs Playwright ; sinon lancer playwright.ps1 install chromium apres build",
+      "triggers": [
+        "playwright",
+        "automatis\\w*.*(site|navigat|web)",
+        "pilot\\w*.*(site|navigat)",
+        "navigateur.*automat",
+        "scraping"
+      ]
+    },
+    {
       "module": "ClosedXML",
       "ref": "closedxml",
       "capability": "excel",
@@ -205,9 +221,25 @@
       "ref": "questpdf",
       "capability": "pdf",
       "triggers": [
-        "\\bpdf\\b",
+        "export.*pdf",
         "impression",
-        "export.*pdf"
+        "questpdf"
+      ],
+      "rationale": "GENERATION de PDF (factures, rapports). Ne lit pas un PDF existant : pour l'extraction de texte, capability pdf-read (PdfPig). Triggers resserres 2026-10-10 : l'ancien \bpdf\b installait QuestPDF des qu'une US mentionnait un PDF, y compris en simple lecture"
+    },
+    {
+      "module": "PdfPig",
+      "ref": "pdfpig",
+      "capability": "pdf-read",
+      "license": "Apache-2.0",
+      "rationale": "LECTURE de PDF texte : extraction des mots avec leur position, pages, metadonnees. Pur .NET, sans dependance native. Top-1 libre (Apache-2.0) — iText 7 est AGPL, les autres alternatives sont payantes. Package NuGet 'PdfPig' (l'ancien id UglyToad.PdfPig n'est plus publie). Pin 0.1.16 : les 0.1.17-alpha-* sont des nightlies",
+      "triggers": [
+        "lecture.*pdf",
+        "lire.*pdf",
+        "extraire.*pdf",
+        "extraction.*pdf",
+        "contenu.*pdf",
+        "pdfpig"
       ]
     },
     {
@@ -257,10 +289,10 @@
       "module": "FlaUI.UIA3",
       "ref": "flaui",
       "capability": "ui-automation",
-      "rationale": "Pilotage de l'UI via UI Automation — le seul moyen de tester un ecran WPF de bout en bout",
+      "rationale": "Pilotage de l'UI via UI Automation — le seul moyen de tester un ecran WPF de bout en bout. Trigger 'automation' seul retire 2026-10-10 : il matchait browser-automation et installait un outil de test dans le code de production",
       "triggers": [
         "test.*ui",
-        "automation",
+        "ui.*automation",
         "test.*bout.*en.*bout",
         "flaui"
       ]

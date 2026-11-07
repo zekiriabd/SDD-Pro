@@ -1,5 +1,5 @@
 <!-- GENERATED FROM .sdd/ (commande /sdd-reverse-questions) — DO NOT EDIT -->
-<!-- Boucle de validation humaine structurée. Mode generate (défaut) — consolide les gaps reverse (complétude, traçabilité, items medium/low, AC non dérivables, curation HUMAN-DECISION) en questions.md à remplir par le Tech Lead. Mode --ingest — ré-injecte les réponses dans les FEATs (human-validated, confidence, REVERSE-GATE, hash US). Spawn agent reverse-clarifier (Sonnet 4.6). Emprunt Reversa (questions.md + answer_mode) — audit comparatif 2026-06-12. -->
+<!-- Boucle de validation humaine structurée. Mode generate (défaut) — consolide les gaps reverse (complétude, traçabilité, items medium/low, AC non dérivables, curation HUMAN-DECISION) en questions.md à remplir par le Tech Lead. Mode --ingest — ré-injecte les réponses dans les FEATs (human-validated, confidence, REVERSE-GATE, hash US). Spawn agent reverse-clarifier (Sonnet 5.5). Emprunt Reversa (questions.md + answer_mode) — audit comparatif 2026-06-12. -->
 <!-- ============================================================ -->
 <!-- IMPORTANT — SPAWN SEMANTICS UNDER CODEX (audit R10 2026-07-26) -->
 <!-- Toute mention `Task tool (subagent_type=X)`, `Agent(X)`, ou    -->

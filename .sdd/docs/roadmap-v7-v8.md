@@ -12,7 +12,7 @@
 
 | # | Item | État | Détail |
 |---|---|:---:|---|
-| 1 | PoC ROI 3 runs FEAT M | 🟡 partiel | 1 run FEAT 2 mesuré ($23.76, 40.8% cache hit). Manque : 2 runs supplémentaires pour variance. |
+| 1 | PoC ROI 3 runs FEAT M | 🔴 à refaire | Les mesures antérieures (« $23.76 FEAT 2 », 40,8 % / 99,2 % de hit) sont des artefacts de télémétrie « dernier tour » (sous-comptage ×7 à ×126, audit 2026-11-06). Seule mesure valide : run FEAT 15 (2026-11-06) ≈ 87 $ sous-agents + 14 $ orchestrateur pour 2 US desktop sans backend ; extrapolation `/sdd-full` 3 US back-front ≈ 170 $ (100-250 $, tarifs 4.x). Cf. `cache-strategy.md §1-§2`. |
 | 2 | Mutation testing | 🟢 stack + STEP 8.5 câblés | `stacks/qa/mutation-testing.md` + `qa.md` STEP 8.5. À valider sur PoC. |
 | 3 | MaxCostPerRun $50 | 🟢 done | Config + `preflight_cost_cap.py` hook + classe `[COST_CAP_EXCEEDED]` + **hard-block sans condition is_ci (R1 fix post-audit)** + **scope by run_id (trou #1 fix)** + **telemetry health alert (trou #2 fix)**. |
 | 4 | SDD_ALLOW_FORCE verrou bypasses | 🟢 done | sdd-full STEP 3.6.quart + classe `[FORCE_CUMUL_REJECTED]`. |
@@ -57,7 +57,7 @@
 | 21 | Console web packagée | Embarquer `workspace/console/` dans framework (template + serveur Node minimal). Actuellement couplage soft. | 3-5 jours |
 | ~~22~~ | ~~Sweep stubs backward-compat~~ | ✅ **DONE v7.0.0-alpha post-audit 2026-05-20** : 8 stubs supprimés + 2 principes relocés à `docs/principles/`. 45+11+7 refs migrées dans agents/commands/python/stacks. Banners des 4 rules consolidées mis à jour. 0 ref orpheline (vérifié grep). |
 | ~~R7~~ | ~~Réactivation a11y/perf via ingest CI déterministe~~ | ✅ **DONE 2026-05-24 (pré-GA, inclus dans v7.0.0)** : Option B livrée. `sdd_scripts/ingest_axe.py` (axe-core JSON → `qa_a11y`, 53 assertions) + `sdd_scripts/ingest_lighthouse.py` (Lighthouse → `qa_performance`). Template CI `templates/ci-quality.github-actions.yml.template` instrumenté (steps Python + dérivation FEAT depuis branche). `error-classification.md §1.9/§1.12` MAJ. Pas de coût LLM. `/sdd-review` lit déjà `qa_a11y`/`qa_performance` (aggrégation inchangée). |
-| ~~R1~~ | ~~Adversarial review mode (BMAD pattern)~~ | ✅ **DONE 2026-05-24 (pré-GA, inclus dans v7.0.0)** : agent `adversarial-reviewer` (Sonnet 4.6, 240L, joue l'avocat du diable) + flag `/sdd-review --adversarial` + classe `[ADV_*]` (§1.15 — 5 angles : edge_case, fragile_assumption, hidden_tech_debt, failure_mode, ux_confusion). Verdict **purement informational** (jamais bloquant — pas mixé dans verdict consolidé). Persistance dans `validation_reports(report_type='adversarial')` via `ingest_agent_report --type adversarial` (7 nouveaux tests unit). Anti-duplication §2.5 stricte : drop des findings déjà émis par autres reviewers. 12ᵉ agent au framework. |
+| ~~R1~~ | ~~Adversarial review mode (BMAD pattern)~~ | ✅ **DONE 2026-05-24 (pré-GA, inclus dans v7.0.0)** : agent `adversarial-reviewer` (Sonnet 5.5, 240L, joue l'avocat du diable) + flag `/sdd-review --adversarial` + classe `[ADV_*]` (§1.15 — 5 angles : edge_case, fragile_assumption, hidden_tech_debt, failure_mode, ux_confusion). Verdict **purement informational** (jamais bloquant — pas mixé dans verdict consolidé). Persistance dans `validation_reports(report_type='adversarial')` via `ingest_agent_report --type adversarial` (7 nouveaux tests unit). Anti-duplication §2.5 stricte : drop des findings déjà émis par autres reviewers. 12ᵉ agent au framework. |
 | 23 | Refactor 5 gros stacks `.md` > 800 L | `dotnet-minimalapi` (1016), `kotlin-spring-boot` (982), `react` (933), `python-fastapi` (849), `azure-ad` (795). Migrer §2.4 vers `.libs.json` (déjà partiellement fait via `sync_stack_md.py`), §3 conventions vers `docs/stacks/{id}-conventions.md`, garder `.md` à ~400 L (overview + layer mapping + scope). | 5× 1.5h = ~8h |
 
 **Décision M4 audit v7.0.0-alpha (2026-05-21)** : item 23 deferred v7.1.
@@ -91,8 +91,8 @@ Ordre suggéré (par dépendances) :
 | Critère | Cible | Mesure |
 |---|---|---|
 | Combos validés bout-en-bout | ≥ 5 | PoC ROI par combo |
-| Cache hit rate moyen Opus | ≥ 60 % | report_roi.py agrégé |
-| Coût FEAT M médian | ≤ $15 | report_roi.py |
+| Cache hit rate | — (retiré : auto-cache Claude Code, 91,8 % mesuré, pas un levier SDD-Pro) | `measure_cache_hit_rate` (régression uniquement) |
+| Coût FEAT M médian | **à fixer après 3 runs mesurés sur tous les tours** (référence actuelle : ≈ 170 $ estimés pour 3 US back-front, tarifs 4.x) — l'ex-cible « ≤ $15 » reposait sur des mesures invalides | transcripts JSONL complets |
 | Mutation score moyen | ≥ 60 % | qa_mutation aggregate |
 | E2E coverage AC | ≥ 80 % AC UI | qa_e2e aggregate |
 | Variance 3 runs FEAT M | ≤ 15 % | report_roi.py |

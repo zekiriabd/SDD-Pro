@@ -94,14 +94,17 @@ class TestModelCost(unittest.TestCase):
         # 0.1 + 0.05 = 0.15
         self.assertAlmostEqual(c, 0.15, places=2)
 
-    def test_unknown_model_falls_back_to_sonnet(self) -> None:
+    # Audit tokens 2026-11-07 — repli = tarif CONSERVATEUR (le plus cher
+    # connu), plus Sonnet 4.6 : un modèle inconnu ne peut plus sous-compter.
+    def test_unknown_model_falls_back_to_conservative(self) -> None:
+        from sdd_lib.pricing import CONSERVATIVE_PRICING as P
         c = model_cost("claude-future-99", 100_000, 10_000, 0, 0)
-        self.assertAlmostEqual(c, 0.45, places=2)
+        self.assertAlmostEqual(c, 0.1 * P["input"] + 0.01 * P["output"], places=4)
 
     def test_none_model_falls_back(self) -> None:
+        from sdd_lib.pricing import CONSERVATIVE_PRICING as P
         c = model_cost(None, 1_000_000, 0, 0, 0)
-        # 1M * 3 / 1M = 3.0
-        self.assertAlmostEqual(c, 3.0, places=2)
+        self.assertAlmostEqual(c, P["input"], places=4)
 
     def test_cache_creation_billed(self) -> None:
         # Cache creation is 1.25/M on Sonnet

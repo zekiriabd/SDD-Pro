@@ -45,8 +45,8 @@
 
 | Terme canonique | Définition | v7.0.0 |
 |---|---|---|
-| **Inline** | Mode dev-* par défaut : agent planifie inline + matérialise dans la même invocation. Modèle Opus 4.8. | conservé |
-| **From-Plan** | Mode dev-* déclenché par présence d'un plan v1 ou v2 dans `workspace/plans/`. Modèle Opus 4.8 (les variants `dev-*-strict` Sonnet ont été supprimés v7.0.0, cf. `architecture.md §2-3` et `governance-major-auditors-trim`). | conservé (devient default si plan présent) |
+| **Inline** | Mode dev-* par défaut : agent planifie inline + matérialise dans la même invocation. Modèle Opus 5.5. | conservé |
+| **From-Plan** | Mode dev-* déclenché par présence d'un plan v1 ou v2 dans `workspace/plans/`. Modèle Opus 5.5 (les variants `dev-*-strict` Sonnet ont été supprimés v7.0.0, cf. `architecture.md §2-3` et `governance-major-auditors-trim`). | conservé (devient default si plan présent) |
 | **Plan Only** | Génère uniquement le plan, ne matérialise pas le code. Invoqué par `/dev-plan {n}` (préféré) ou `:plan` suffix (déprécié v7). | `:plan` suffix retiré |
 | **From-Plan Classic** | Variante Opus 4.7 de From-Plan (legacy v6). | **supprimé v7** |
 | **Plan Only** vs **`:plan` suffix** | 2 façons d'invoquer la même chose. | suffix supprimé |
@@ -113,22 +113,22 @@ Forme rejetée : `gate` (générique) sans qualificatif → toujours préfixer.
 
 | Agent | Modèle | Rôle | Phase |
 |---|---|---|---|
-| `po` (Product Owner) | Sonnet 4.6 | FEAT → User Stories | 2 |
-| `arch` (Architect) | Sonnet 4.6 | Bootstrap arch + DB + scaffolding | 3 |
-| `dev-backend` | Opus 4.8 | Code serveur 1 US | 4 |
-| `dev-frontend` | Opus 4.8 | Code client 1 US | 4 |
-| `qa` | Sonnet 4.6 | Tests + coverage + quality scan | 5 |
-| `elicitor` | Sonnet 4.6 | Élicitation FEAT (Pre-mortem, Red Team, etc.) | 1.5 |
-| `constitutioner` | Sonnet 4.6 | Maintien `constitution.md` post-arch | 4 |
-| `complexity-router` | Haiku 4.5 | Routage POC vs full vs critical (opt-in v7.0.0+) | 0 (pré-pipeline) |
-| `adversarial-reviewer` | Sonnet 4.6 | Avocat du diable post-review (opt-out — actif par défaut) | 5+ |
+| `po` (Product Owner) | Sonnet 5.5 | FEAT → User Stories | 2 |
+| `arch` (Architect) | Sonnet 5.5 | Bootstrap arch + DB + scaffolding | 3 |
+| `dev-backend` | Opus 5.5 | Code serveur 1 US | 4 |
+| `dev-frontend` | Opus 5.5 | Code client 1 US | 4 |
+| `qa` | Sonnet 5.5 | Tests + coverage + quality scan | 5 |
+| `elicitor` | Sonnet 5.5 | Élicitation FEAT (Pre-mortem, Red Team, etc.) | 1.5 |
+| `constitutioner` | Sonnet 5.5 | Maintien `constitution.md` post-arch | 4 |
+| `complexity-router` | Haiku 5.5 | Routage POC vs full vs critical (opt-in v7.0.0+) | 0 (pré-pipeline) |
+| `adversarial-reviewer` | Sonnet 5.5 | Avocat du diable post-review (opt-out — actif par défaut) | 5+ |
 | ~~`dashboard`~~ | — | **RETIRÉ v7.0.0** — INDEX.md généré par `index_adrs.py` (déterministe) |
 | ~~`accessibility-auditor`~~ | — | **RETIRÉ v7.0.0** — remplacé par `axe-core` au CI projet |
-| `code-reviewer` | Sonnet 4.6 | Review cross-fichier anti-patterns | 5 |
-| `security-reviewer` | Sonnet 4.6 | Scan OWASP Top 10 (mode `scan`). Mode `threat-model` retiré v7.0.0 → template humain | 5 |
+| `code-reviewer` | Sonnet 5.5 | Review cross-fichier anti-patterns | 5 |
+| `security-reviewer` | Sonnet 5.5 | Scan OWASP Top 10 (mode `scan`). Mode `threat-model` retiré v7.0.0 → template humain | 5 |
 | ~~`performance-auditor`~~ | — | **RETIRÉ v7.0.0** — remplacé par Lighthouse CI + wrk/k6 au CI projet |
-| `spec-compliance-reviewer` | Sonnet 4.6 | Vérification AC-par-AC du code livré | 5 |
-| `arch-reviewer` | Sonnet 4.6 | Conformité pattern d'archi (MVC/DDD) | 5 |
+| `spec-compliance-reviewer` | Sonnet 5.5 | Vérification AC-par-AC du code livré | 5 |
+| `arch-reviewer` | Sonnet 5.5 | Conformité pattern d'archi (MVC/DDD) | 5 |
 | ~~`dev-backend-strict`, `dev-frontend-strict`~~ | — | **RETIRÉ v7.0.0** — variants Sonnet supprimés, `PlanCacheStrict` est DEPRECATED no-op |
 
 **Terminologie cross-agents** :

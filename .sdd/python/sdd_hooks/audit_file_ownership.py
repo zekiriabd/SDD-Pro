@@ -1,21 +1,31 @@
 #!/usr/bin/env python3
-"""SDD_Pro SubagentStop hook.
+"""SDD_Pro SubagentStop hook — enforcement de la matrice d'ownership.
 
 Audits the matrice file-ownership.md §1 after each sub-agent dispatch.
-For files modified during the dispatch window, checks the path matches
-one of the "Owner" patterns allowed for that agent.
 
-- Detect agent via input JSON (`tool_input.subagent_type`)
-- Glob files modified since env $SDD_DISPATCH_START_TS (ISO 8601),
-  fallback to last 5 minutes
-- Append violations to workspace/.sys/.audit/ownership-violations.log
-- Silent on chat (minimal-verbosity), Tech Lead consults log post-batch
-- Non-blocking (always exit 0)
+- Agent : `agent_type` du payload SubagentStop (audit 2026-11 — l'ancienne
+  lecture de `tool_input.subagent_type`, absent de cet événement, faisait
+  sortir le hook en ALLOW AVANT tout scan : la matrice n'était jamais
+  appliquée en conditions réelles, seuls les tests fabriquaient un faux
+  payload).
+- Fichiers écrits : extraits du transcript du sous-agent
+  (`agent_transcript_path` → tool_use Write/Edit/MultiEdit/NotebookEdit),
+  attribution exacte même avec plusieurs agents en parallèle. Repli si le
+  transcript est absent/illisible : walk de `workspace/` sur les fichiers
+  modifiés depuis $SDD_DISPATCH_START_TS (marker run-id, sinon now-5min) —
+  attribution approximative en cas d'agents parallèles.
+- Violations journalisées dans workspace/.sys/.audit/ownership-violations.log
+- Mode `SDD_AUDIT_OWNERSHIP_MODE` = strict (défaut, session ET CI) | warn | off :
+  strict → exit 2 (le sous-agent ne peut pas s'arrêter, il reçoit la liste
+  et doit corriger) ; warn → stderr + exit 0 ; off → log seul.
+- Limite : une écriture faite via Bash/PowerShell n'apparaît pas dans le
+  transcript (le repli walk ne s'applique que sans transcript).
 
 Migrated from .claude/scripts/audit-file-ownership.ps1 (2026-05-13).
 """
 from __future__ import annotations
 
+import json
 import os
 import re
 import sys
@@ -24,8 +34,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from sdd_lib.hook_input import get_subagent_type, read_hook_input  # noqa: E402
-from sdd_lib.paths import workspace_root, normalize, repo_root  # noqa: E402
+from sdd_lib.hook_input import (  # noqa: E402
+    get_agent_transcript_path,
+    get_caller_agent_type,
+    get_subagent_type,
+    read_hook_input,
+)
+from sdd_lib.paths import audit_dir_path, workspace_root, normalize, repo_root  # noqa: E402
 from sdd_lib.stderr import warn  # noqa: E402
 from sdd_lib.exit_codes import HOOK_ALLOW, HOOK_DENY  # noqa: E402
 
@@ -233,9 +248,82 @@ def _iter_modified_files(workspace: Path, cutoff: datetime) -> list[Path]:
     return _iter_modified_files_walk(workspace, cutoff)
 
 
+#: Tools whose `input.file_path` / `notebook_path` is a disk write.
+_WRITE_TOOLS: frozenset[str] = frozenset({"Write", "Edit", "MultiEdit", "NotebookEdit"})
+
+
+def _iter_tool_uses(node):
+    """Yield every `{"type": "tool_use", ...}` dict nested in a transcript line."""
+    if isinstance(node, dict):
+        if node.get("type") == "tool_use":
+            yield node
+        for v in node.values():
+            yield from _iter_tool_uses(v)
+    elif isinstance(node, list):
+        for v in node:
+            yield from _iter_tool_uses(v)
+
+
+def files_written_from_transcript(transcript: Path, root: Path) -> list[Path] | None:
+    """Exact list of files the sub-agent wrote via Write/Edit/MultiEdit/NotebookEdit.
+
+    Audit 2026-11 : avec `MaxParallel: 3`, dev-backend et dev-frontend tournent
+    en parallèle — un scan par fenêtre de mtime attribue à l'un les fichiers
+    de l'autre (faux positifs → DENY injustifié). Le transcript
+    (`agent_transcript_path`, payload SubagentStop documenté) donne
+    l'attribution exacte. Limite assumée : une écriture via Bash/PowerShell
+    n'apparaît pas ici (couverte a priori par `protect_framework` mode shell).
+
+    Returns None if the transcript is unreadable (caller falls back to the walk).
+    """
+    try:
+        text = transcript.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    out: list[Path] = []
+    seen: set[str] = set()
+    for line in text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            obj = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        for tu in _iter_tool_uses(obj):
+            if tu.get("name") not in _WRITE_TOOLS:
+                continue
+            inp = tu.get("input") or {}
+            fp = inp.get("file_path") or inp.get("notebook_path")
+            if not isinstance(fp, str) or not fp.strip():
+                continue
+            p = Path(fp)
+            if not p.is_absolute():
+                p = root / p
+            key = normalize(str(p)).lower()
+            if key not in seen:
+                seen.add(key)
+                out.append(p)
+    return out
+
+
+def _resolve_mode() -> str:
+    """`SDD_AUDIT_OWNERSHIP_MODE` = strict|warn|off ; défaut **strict** partout.
+
+    Audit 2026-11 : l'ancien défaut (`warn` interactif, DENY seulement en CI)
+    faisait de la matrice d'ownership un simple journal en usage réel. La
+    variable est protégée par `block_env_bypass` (`SDD_AUDIT_*`) : un agent ne
+    peut pas la positionner à chaud.
+    """
+    mode = (os.environ.get("SDD_AUDIT_OWNERSHIP_MODE") or "").strip().lower()
+    return mode if mode in ("warn", "strict", "off") else "strict"
+
+
 def main() -> int:
     payload = read_hook_input()
-    subagent = get_subagent_type(payload)
+    # SubagentStop porte `agent_type` (pas `tool_input.subagent_type`) —
+    # get_caller_agent_type d'abord, get_subagent_type en compat.
+    subagent = get_caller_agent_type(payload) or get_subagent_type(payload)
     if not subagent or subagent not in _COMPILED_OWNERSHIP:
         return HOOK_ALLOW
     allowed = _COMPILED_OWNERSHIP[subagent]  # M7 : reuse precompiled patterns
@@ -244,26 +332,41 @@ def main() -> int:
     workspace = workspace_root(root)
     if not workspace.is_dir():
         return HOOK_ALLOW
-    cutoff = _parse_cutoff()
-    modified = _iter_modified_files(workspace, cutoff)
+
+    source = "walk"
+    modified: list[Path] | None = None
+    transcript = get_agent_transcript_path(payload)
+    if transcript:
+        modified = files_written_from_transcript(Path(transcript), root)
+        if modified is not None:
+            source = "transcript"
+    if modified is None:
+        cutoff = _parse_cutoff()
+        modified = _iter_modified_files(workspace, cutoff)
     if not modified:
         return HOOK_ALLOW
+
+    ws_resolved = workspace.resolve()
     violations: list[str] = []
     for f in modified:
         try:
-            rel = normalize(f.relative_to(root))
-        except ValueError:
+            f.resolve().relative_to(ws_resolved)
+        except (ValueError, OSError):
+            # Hors workspace : relève de protect_framework (framework) ou
+            # n'est pas un livrable — la matrice ne couvre que workspace/.
             continue
-
+        try:
+            rel = normalize(f.resolve().relative_to(root.resolve()))
+        except (ValueError, OSError):
+            rel = "workspace/" + normalize(f.resolve().relative_to(ws_resolved))
         if any(ign.search(rel) for ign in IGNORE_PATTERNS):
             continue
-
         if not any(pat.match(rel) for pat in allowed):
             violations.append(rel)
 
     if not violations:
         return HOOK_ALLOW
-    audit_dir = workspace_root(root) / ".sys" / ".audit"
+    audit_dir = audit_dir_path(workspace=workspace)
     audit_dir.mkdir(parents=True, exist_ok=True)
     log_file = audit_dir / "ownership-violations.log"
 
@@ -272,56 +375,27 @@ def main() -> int:
         for v in violations:
             fh.write(
                 f"{timestamp} [FILE_OWNERSHIP] {subagent} wrote {v} "
-                f"(pattern hors matrice ownership.md §1)\n"
+                f"(pattern hors matrice ownership.md §1, source={source})\n"
             )
 
-    # v7.0.0 audit hardening 2026-05-20 — mode resolution :
-    #   - $SDD_AUDIT_OWNERSHIP_MODE = warn|strict|off
-    #   - default : 'strict' in CI (any CI env var), 'warn' otherwise
-    #
-    # v7.0.1 audit P0 v2 (2026-06-08) — strict mode is now BLOCKING in CI
-    # (HOOK_DENY = exit 2). Previously strict was only verbosity tweak +
-    # exit 0 — which contradicted INVARIANTS.yml "file-ownership-matrix-enforced"
-    # invariant (purely informational despite the load-bearing claim).
-    #
-    # Behavior matrix :
-    #   strict + CI         → HOOK_DENY (exit 2, blocks SubagentStop)
-    #   strict + interactive → WARN only, exit 0 (preserve dev ergonomics)
-    #   warn                → WARN only, exit 0 (legacy non-blocking)
-    #   off                 → silent, exit 0
-    mode = (os.environ.get("SDD_AUDIT_OWNERSHIP_MODE") or "").strip().lower()
-    is_ci = any(
-        (os.environ.get(v, "").strip().lower() not in ("", "0", "false", "no"))
-        for v in (
-            "CI", "GITHUB_ACTIONS", "GITLAB_CI", "CIRCLECI",
-            "JENKINS_URL", "BUILDKITE", "TRAVIS", "TF_BUILD",
-            "BITBUCKET_BUILD_NUMBER",
-        )
-    )
-    if mode not in ("warn", "strict", "off"):
-        mode = "strict" if is_ci else "warn"
-
-    if mode != "off":
-        msg_level = "ERROR" if mode == "strict" else "WARN"
+    mode = _resolve_mode()
+    if mode == "off":
+        return HOOK_ALLOW
+    shown = ", ".join(violations[:5]) + (f" (+{len(violations) - 5})" if len(violations) > 5 else "")
+    if mode == "warn":
         warn(
-            f"{msg_level} audit-file-ownership : {subagent} a viole la matrice "
-            f"ownership.md §1 ({len(violations)} fichier(s) hors perimetre) — "
-            f"voir {log_file.relative_to(root).as_posix()}"
+            f"WARN audit-file-ownership : {subagent} a ecrit {len(violations)} fichier(s) "
+            f"hors matrice ownership.md §1 : {shown}"
         )
-        if mode == "strict":
-            warn(f"CAUSE: [FILE_OWNERSHIP] cf. log ci-dessus pour la liste")
-            warn(f"FIX: (a) corriger le prompt agent ou la matrice ownership.md")
-            warn(f"     (b) bypass interactif : export SDD_AUDIT_OWNERSHIP_MODE=warn")
-            # v7.0.1 P0 v2 : block in CI strict mode. Bypass via
-            # SDD_AUDIT_OWNERSHIP_MODE=warn (audit-loggué dans hook stderr).
-            if is_ci:
-                warn(
-                    f"     (c) CI BLOCKING : audit_file_ownership returns HOOK_DENY "
-                    f"in strict mode CI (audit P0 v2 2026-06-08). Set "
-                    f"SDD_AUDIT_OWNERSHIP_MODE=warn explicitly to bypass."
-                )
-                return HOOK_DENY
+        return HOOK_ALLOW
+    warn(f"ERROR: audit-file-ownership — {subagent} a ecrit hors de son perimetre")
+    warn(f"CAUSE: [FILE_OWNERSHIP] {len(violations)} fichier(s) hors matrice ownership.md §1 "
+         f"(source={source}) : {shown}")
+    warn("FIX: annuler/deplacer ces ecritures (elles appartiennent a un autre agent) puis terminer ; "
+         "Tech Lead : SDD_AUDIT_OWNERSHIP_MODE=warn dans l'environnement du process Claude Code "
+         "si la matrice est en retard sur un besoin legitime")
+    return HOOK_DENY
 
-    return HOOK_ALLOW
+
 if __name__ == "__main__":
     sys.exit(main())

@@ -134,17 +134,36 @@ def _resolve_mode() -> str:
     return "warn"
 
 
+#: Agents dont le prompt LIT effectivement son pack (`loader.yml` `reads:` ->
+#: `workspace/.sys/.context/packs/{agent}.md`). Audit 2026-11-06 (run FEAT 15) :
+#: le hook reconstruisait 8 packs (353 KB) avant CHAQUE spawn, et seul `arch`
+#: lisait le sien — les 7 autres (dev-backend, dev-frontend, qa, constitutioner,
+#: code-reviewer, security-reviewer, spec-compliance-reviewer) etaient produits
+#: pour personne. Mesure avant decision : aucun de ces 7 packs n'est plus petit
+#: que ses sources (`reduction_pct` de -1,5 % a -4,4 % — le manifeste en tete
+#: pese plus que les sections retirees, car le slicing par role ne retire
+#: presque rien sur les stacks actifs). Les faire lire par dev-* aurait donc
+#: COUTE du contexte. Decision : ne construire que les packs consommes. Toute
+#: bascule d'un agent vers son pack passe par `loader.yml` (reads:) + cet
+#: ensemble, et doit etre precedee d'une mesure `build_context_pack --agent X`
+#: montrant un `reduction_pct` positif.
+PACK_CONSUMERS: frozenset[str] = frozenset({"arch"})
+
+
 def _ensure_context_pack(subagent: str) -> None:
     """Construit (ou reconstruit) le pack de contexte de l'agent avant son spawn.
 
-    Ne reconstruit que si necessaire : `pack_is_fresh` compare l'empreinte des
-    sources au sidecar, ce qui coute quelques millisecondes contre ~70 ms de
-    slicing. Sur un run a douze spawns, la difference se voit.
+    Uniquement pour les agents de `PACK_CONSUMERS` (ceux dont `loader.yml`
+    declare le pack en `reads:`). Ne reconstruit que si necessaire :
+    `pack_is_fresh` compare l'empreinte des sources au sidecar, ce qui coute
+    quelques millisecondes contre ~70 ms de slicing.
 
     Silencieux en cas de succes, WARN en cas d'echec, jamais bloquant : un
     hook de preparation de contexte ne doit pas casser un pipeline. Si le pack
     manque, c'est la gate de budget juste apres qui le signalera bruyamment.
     """
+    if subagent not in PACK_CONSUMERS:
+        return
     try:
         from sdd_scripts.build_context_pack import (
             PACKABLE_AGENTS, build_for_agent, pack_is_fresh,
@@ -197,7 +216,8 @@ def main() -> int:
     haystack = f"{prompt} {descr}"
     feat_number, us_id = extract_us_and_feat(haystack)
 
-    # Context pack : construit AVANT le spawn (audit 2026-08-28, correction #4).
+    # Context pack : construit AVANT le spawn (audit 2026-08-28, correction #4),
+    # pour les SEULS agents consommateurs (`PACK_CONSUMERS`, audit 2026-11-06).
     #
     # C'est le producteur garanti du pack. `loader.yml` fait lire à `arch` son
     # pack au lieu des stacks entiers ; il faut donc que le pack existe et soit

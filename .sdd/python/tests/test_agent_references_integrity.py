@@ -104,8 +104,8 @@ _NON_AGENT_WORDS = {
     "verdict",   # `agent verdict`
     "actif",     # FR `agent actif`
     "active",    # `agent active`
-    "haiku",     # `agent Haiku 4.5`
-    "sonnet",    # `agent Sonnet 4.6`
+    "haiku",     # `agent Haiku 5.5`
+    "sonnet",    # `agent Sonnet 5.5`
     "opus",      # `agent Opus 4.7`
     "llm",       # `agent LLM`
     "sdd",       # `agent SDD`

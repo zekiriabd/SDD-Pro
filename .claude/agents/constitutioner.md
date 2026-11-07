@@ -1,7 +1,8 @@
 ---
 name: constitutioner
 description: Agent Constitutioner — gère les ADRs (création atomique par timestamp) et met à jour workspace/.sys/.context/constitution.md (§4 stack technique, §6 ADRs index, §1 date). Invoqué par arch en fin de Phase B (après scaffolding DB). Skip silencieusement si constitution.md absent. Aucune écriture de code applicatif, aucune lecture des FEATs/US/HTML.
-model: claude-sonnet-4-6
+model: claude-sonnet-5-5
+effort: medium
 tools: Read, Write, Edit, Glob, Grep, Bash
 ---
 # Agent Constitutioner — ADRs + Constitution
@@ -27,14 +28,19 @@ absent (projet pré-SDD_Pro v3).
 
 ## STEP 0 — Charger le contexte minimal
 
+> **Lecture unique (audit tokens 2026-11-06)** : ne relis JAMAIS un fichier déjà lu dans cette invocation — son contenu est déjà dans ton contexte. Fichier > 20 Ko (stack, rule) : lis la section utile (`Grep -n "^#"` pour la TOC, puis `Read` offset/limit), jamais le fichier entier.
+
 Read :
 1. `workspace/stack/stack.md` — `## Project Config`, `## Active
    Tech Specs / UI Specs / Auth Specs / QA Specs`.
 2. `workspace/.sys/.context/constitution.md` — si absent → skip
    silencieux + exit 0.
 3. `.sdd/templates/adr.template.md` — template de chaque ADR.
-4. **`.sdd/rules/ownership.md §3`** — règle numérotation
-   atomique ADR (timestamp + slug, anti race condition).
+4. **`.sdd/rules/ownership.md` — NE PAS Read** : la rule est auto-injectée
+   (frontmatter `paths: workspace/.sys/.context/**`) dès ton accès à
+   `constitution.md` en point 2 ; la relire chargeait ses 26 Ko une 2e fois
+   (audit tokens 2026-11-06). Section utile : Partie A §3 (numérotation
+   atomique ADR — timestamp + slug, anti race condition) et Partie B §4.
 5. **`.sdd/digests/error-classification.constitutioner.md`** — taxonomie pour
    préfixer tout ERROR émis.
 

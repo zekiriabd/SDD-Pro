@@ -572,14 +572,14 @@ def main() -> int:
         add_err("STACK_COMBO_INVALID", combo_err)
 
     auto_app_type, auto_frontend_kind = detect_app_type_auto(
-        be_ids, fe_ids, fs_ids, mobile_ids
+        be_ids, fe_ids, fs_ids, mobile_ids, desktop_ids
     )
     explicit_app_type = get_explicit_app_type(stack_content)
 
     if explicit_app_type is None:
         app_type = auto_app_type
         frontend_kind = auto_frontend_kind
-        result["appTypeSource"] = "auto" if (be_ids or fe_ids or fs_ids or mobile_ids) else "default"
+        result["appTypeSource"] = "auto" if (be_ids or fe_ids or fs_ids or mobile_ids or desktop_ids) else "default"
     else:
         # Legacy mobile-* → translate to back-front + mobile frontend kind
         if explicit_app_type in LEGACY_MOBILE_APP_TYPES:
@@ -686,9 +686,17 @@ def main() -> int:
     else:
         key_name = "BackendName" if args.family == "backend" else "AppName"
     pc_match = re.search(rf"(?m)^\s*{key_name}\s*:\s*(\S+)", pc_block)
+    # Client mobile/desktop SANS backend/* : il n'y a pas de projet backend,
+    # donc pas de BackendName a exiger (mobiles/*.md et desktop/*.md
+    # demandent meme de ne PAS en declarer). dev-backend sort en silence
+    # (cf. B1.quater). Avant 2026-10-10, ce cas levait STACK_MALFORMED.
+    no_backend_client = (
+        args.family == "backend" and app_type == "back-front" and not be_ids
+        and result.get("frontendKind") in ("mobile", "desktop")
+    )
     if pc_match:
         result["appOrBackendName"] = pc_match.group(1)
-    else:
+    elif not no_backend_client:
         add_err("STACK_MALFORMED", f"renseigner {key_name} dans ## Project Config")
 
     # B3 — Project CLAUDE.md present

@@ -26,10 +26,47 @@
 # updating this manifest = test failure.
 
 schema_version: 1
-generated_at: 2026-08-30
-total: 20
+generated_at: 2026-11-07
+total: 22
 
 invariants:
+
+  - id: phase-order-per-feat
+    name: Agents SDD spawnés dans l'ordre readiness → dev_run → qa → reviewers
+    description: |
+      dev-backend / dev-frontend exigent une phase `readiness` pass|warn|skip
+      enregistrée dans console.db (run courant de la FEAT) ; `qa` exige
+      `dev_run` running|pass|warn ; `spec-compliance-reviewer` exige `dev_run`
+      pass|warn ; code/security/arch/adversarial reviewers exigent `qa`
+      pass|warn|skip. Agent soumis à prérequis sans FEAT extractible du prompt
+      = DENY ; base illisible = DENY [INFRA_BLOCKED]. Le planner /sdd-full lit
+      le même état (next-action) — plus d'état sérialisé par le LLM.
+    severity: critical
+    enforcers:
+      - .sdd/python/sdd_hooks/enforce_phase_order.py  # PreToolUse matcher=Agent
+      - .sdd/python/sdd_scripts/sdd_full_planner.py  # next-action / record (état console.db)
+      - .sdd/python/sdd_scripts/dev_run_args.py  # --preflight : readiness + dev_run running
+    bypasses:
+      - "Env: SDD_ALLOW_PHASE_SKIP=1 (audit-logged workspace/.sys/.audit/bypass.log)"
+      - "FEAT POC (toutes les US generated-by: feat_to_pseudo_us.py) : dev-* sans readiness"
+    added: 2026-11-07
+    audit_ref: lot orchestration mécanique (constat 2 — séquencement non appliqué)
+
+  - id: max-parallel-enforced
+    name: MaxParallel borne les sous-agents SDD en vol par session
+    description: |
+      Au plus `MaxParallel` (Project Config, défaut 3) sous-agents du registre
+      SDD en vol dans une session. Réservation atomique sous verrou en
+      PreToolUse (borne aussi un lot d'appels Agent parallèles d'un même
+      message), libération PostToolUse (foreground) / SubagentStop / Stop.
+      Entrées > 2 h périmées (jamais bloquantes après crash).
+    severity: major
+    enforcers:
+      - .sdd/python/sdd_hooks/enforce_max_parallel.py  # --event pre|post|stop|sweep
+    bypasses:
+      - "Env: SDD_ALLOW_PARALLEL_EXCESS=1 (audit-logged workspace/.sys/.audit/bypass.log)"
+    added: 2026-11-07
+    audit_ref: lot orchestration mécanique (constat 3 — MaxParallel sans mécanisme)
 
   - id: spec-gate-before-quality-batch
     name: Two-stage auditor — Stage A (spec) before Stage B (code/security/arch)
@@ -291,17 +328,15 @@ invariants:
 
       Périmètre couvert par la parité byte-identique (recount audit 2026-08-29,
       ajout des 4 analystes SQL reverse le 2026-08-26) : agents (29), commandes
-      (41), rules (12), CLAUDE.md +
+      (41), rules (12), skills (13), CLAUDE.md +
       variantes memory par harnais (AGENTS.md / GEMINI.md). Les skills
-      (`.sdd/skills/`, 13 SKILL.md) ne sont PAS transpilés par
-      `harness_build.py` — sous Claude Code ils sont chargés directement
-      depuis `.sdd/skills/` (dépendance auto-découverte par le harnais) ;
-      sous Codex / Gemini / Antigravity ils sont **absents runtime** et
-      leur substance doit être inlinée via prompts si l'agent en dépend.
-      Cette omission de la parité byte-identique est intentionnelle
-      (skills = enrichissement optionnel, non load-bearing pour le pipeline
-      forward). Toute évolution vers une injection statique dans
-      `AGENTS.md`/`GEMINI.md` doit ré-ouvrir cette invariant.
+      (`.sdd/skills/*/SKILL.md`) sont désormais transpilés par
+      `harness_build.py --skills-only` vers `.claude/skills/` (2026-11-07),
+      parité vérifiée par `test_harness_skills.py`. Sous Codex / Gemini /
+      Antigravity ils restent **absents runtime** (pas de mécanisme skills
+      équivalent) : leur substance doit être inlinée via prompts si l'agent
+      en dépend — toute injection statique dans `AGENTS.md`/`GEMINI.md`
+      doit ré-ouvrir cette invariant.
 
       Le golden test `test_harness_identity{,_commands}.py` compare
       sémantiquement la régénération à la façade vivante (post-normalisation
@@ -332,6 +367,7 @@ invariants:
       # COMMITÉE à une régénération fraîche, pour les 3 harnais, agents et
       # rules inclus.
       - .sdd/python/tests/test_harness_facade_parity.py  # façade committée ↔ build frais (3 harnais)
+      - .sdd/python/tests/test_harness_skills.py  # skills .sdd/skills ↔ .claude/skills (--skills-only)
       - .sdd/harness_build.py  # transpileur idempotent, garde `_ensure_under_build`
       - .sdd/python/sdd_hooks/protect_framework.py  # bloque l'édition manuelle des façades
     bypasses:

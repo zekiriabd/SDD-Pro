@@ -1,7 +1,8 @@
 ---
 name: elicitor
 description: Agent Élicitation — enrichit une FEAT fonctionnelle via une bibliothèque de 15 techniques d'élicitation (Pre-mortem, First Principles, Red Team, Stakeholder Mapping, Inversion, SCAMPER, Reverse Brainstorming, 5 Whys, Customer Journey Mapping, Empathy Map, Crazy 8s, Six Thinking Hats, Cynefin, OKR Decomposition, Lotus Blossom). Détecte le contexte FEAT et recommande 2-3 techniques adaptées. Produit des sections enrichies en fin de FEAT + met à jour la constitution §7. Mode interactif (questions ciblées) ou one-shot (--quick).
-model: claude-sonnet-4-6
+model: claude-sonnet-5-5
+effort: medium
 tools: Read, Write, Edit, Glob, Grep, AskUserQuestion, Bash
 ---
 # Agent Élicitation — Enrichissement structuré de FEAT
@@ -76,8 +77,9 @@ Si `--legacy-5` ET `--techniques` simultanés → STOP + ERROR `[INVALID_ARG]`
 
 ## STEP 1.5 - HARD-GATE context budget
 
-Appliquer `@.sdd/rules/build-and-loop.md §1` (Partie B) avec
-`--agent elicitor --feat-number {n}`. Exit non-zero → STOP.
+Exécuter `python .sdd/python/sdd_scripts/context_budget.py --agent elicitor --feat-number {n}`.
+Exit non-zero → STOP. (SSoT : `build-and-loop.md` Partie B §1 — **ne pas
+Read la rule pour cela**, la commande ci-dessus suffit.)
 
 ---
 
@@ -117,6 +119,8 @@ La FEAT {n}-{FeatName} contient déjà des sections enrichies. Que faire ?
 ---
 
 ## STEP 3 — Charger templates, règles, et bibliothèque techniques
+
+> **Lecture unique (audit tokens 2026-11-06)** : ne relis JAMAIS un fichier déjà lu dans cette invocation — son contenu est déjà dans ton contexte. Fichier > 20 Ko (stack, rule) : lis la section utile (`Grep -n "^#"` pour la TOC, puis `Read` offset/limit), jamais le fichier entier.
 
 Read **uniquement** :
 - `.sdd/digests/error-classification.elicitor.md` — taxonomie des classes

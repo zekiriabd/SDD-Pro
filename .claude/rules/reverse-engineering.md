@@ -199,6 +199,7 @@ Format ERROR 3-lignes disque, 1 ligne chat (cf. `error-classification.md §2` qu
 | `[REVERSE_DB_OBJECTS_PARTIAL]` | NON (WARN) | db-reverse : une famille d'**objets sans corps** (job/séquence/synonyme/linked server/type utilisateur) n'est pas lisible. Cas NORMAL et fréquent : `msdb` non accordé au login d'introspection, extension `pg_cron` absente, `CHECK_CONSTRAINTS` inexistant avant MySQL 8.0.16. Émis par `db_schema_live.fetch_catalog_objects`. |
 | `[REVERSE_DB_HOMONYM]` | NON (info) | db-reverse : une même nom de table existe dans ≥ 2 schémas (`dbo.Orders` **et** `sales.Orders`). Légitime, mais signalé car tout consommateur qui indexe les entités par nom nu les fusionnerait — utiliser `qualifiedName`. Émis par `db_schema_live.build_live_schema`. |
 | `[REVERSE_OBJECT_KIND_MISMATCH]` | NON (info) | db-reverse : un analyste d'objet SQL (procédure/fonction/vue/trigger) reçoit un objet hors de sa famille (ex. une vue routée vers `reverse-sql-analyst`). L'agent décline plutôt que d'écrire une User Story sous le mauvais angle métier — re-dispatch vers le bon spécialiste. Émis par les 4 analystes d'objet (garde de type ajoutée/complétée à l'audit 2026-08-29 M4). |
+| `[REVERSE_DB_CONNECT_FAILED]` | **OUI** | db-reverse : connexion à la base refusée pour une cause de **configuration** (signature du driver incompatible, clés DSN rejetées — classées à part d'un échec réseau, sans jamais logguer de valeur). Émis par `sdd_reverse/db_introspect.py`. Fix : corriger `## Active Database` dans `stack.md`. |
 | `[REVERSE_DB_PACK_MISSING]` | **OUI** | db-reverse : le pack de contexte déterministe `.sys/db-context/packs/{schema}.{objet}.md` d'un objet est absent — l'analyste n'a aucun contexte sanctionné et s'arrête plutôt que d'improviser. Émis par les agents analystes/compositeur SQL. Fix : relancer `/sdd-db-context`. |
 | `[REVERSE_DB_CONTEXT_STALE]` | **OUI** | db-reverse : les hypothèses de `reverse-db-architect` ont été construites sur un `contextVersion` qui ne correspond plus aux faits courants (audit 2026-08-29 M2 — la version couvre désormais aussi un hash de corps par objet) — la fusion est refusée. Émis par `db_context_build.py`. Fix : relancer l'architecte sur le contexte à jour. |
 | `[REVERSE_FILE_UNREADABLE]` | NON (WARN, Phase 1) | Un fichier legacy **dans le périmètre** n'a pas pu être lu (permissions, I/O, encodage indécodable) : il n'a contribué **aucune** evidence. Avant l'audit 2026-08-29 (M3), `scan_legacy.read_text_normalized` renvoyait `""` sur toute `OSError` et le scan l'absorbait dans `files_skipped` — les 7 extracteurs (data-access, config, db-schema, deps, templates UI, CSS, dépendances) recevaient un fichier vide sans le moindre signal, et un reverse dont toute la promesse est « on ne rapporte que ce qui est littéralement dans la source » rapportait une source incomplète comme si elle était complète. Émis par `scan_legacy._record_read_issue` (dédupliqué par chemin, WARN agrégé + événement `structured_log`, exposé dans `ScanResult.to_dict().filesUnreadable`). Jamais bloquant : l'extraction best-effort continue, seul son silence est corrigé. |
@@ -293,8 +294,9 @@ encore câblés. État vérifié par grep croisé code/prompts :
 > `LARGE_FILE_SAMPLED`, audit 2026-08-29 M3)
 > + 3 classes db-reverse issues du remède de l'audit 2026-08-29 sur les
 > barrières facts/hypothèses et guard de type (`OBJECT_KIND_MISMATCH`,
-> `DB_PACK_MISSING`, `DB_CONTEXT_STALE`, M4/M2/m5) :
-> **45 classes** (29 scripts déterministes + 13 prompts
+> `DB_PACK_MISSING`, `DB_CONTEXT_STALE`, M4/M2/m5)
+> + `DB_CONNECT_FAILED` (2026-11-06, `db_introspect.py`) :
+> **46 classes** (30 scripts déterministes + 13 prompts
 > agents/commandes + 2 enforced par `reverse_smoke` + 1 hook). Règle : aucune
 > classe `[REVERSE_*]` ne vit dans §6 sans émetteur identifié.
 >
@@ -383,8 +385,8 @@ l'ADR `governance-reverse-complexity-ladder` (2026-06-29), un classifieur
 **déterministe** (`sdd_reverse/code_unit_complexity.py`, 0 token, signaux L0 de
 `inventory.json`) étiquette chaque unité `simple | complex`, et les commandes
 `/sdd-reverse-analyze` (3a) + `/sdd-reverse-feat` (3c) **routent le modèle** :
-unité `simple` → Sonnet 4.6 sur tout l'escalier ; unité `complex` → 3a/3c
-restent Opus 4.8 (3b est Sonnet dans les deux cas).
+unité `simple` → Sonnet 5.5 sur tout l'escalier ; unité `complex` → 3a/3c
+restent Opus 5.5 (3b est Sonnet dans les deux cas).
 
 **Périmètre = modèle uniquement.** La **structure** de l'escalier (3 barreaux,
 3 artefacts, fil D3, confidence min-monotone) est **inchangée** — ce n'est PAS le

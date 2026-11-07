@@ -29,7 +29,14 @@ pytestmark = pytest.mark.smoke
 
 
 def _run_hook(payload: dict, env_extra: dict[str, str] | None = None) -> subprocess.CompletedProcess:
-    env = {k: v for k, v in os.environ.items() if not k.startswith("SDD_")}
+    # Purge les SDD_* (comportement du hook) mais garde la redirection
+    # console.db / .audit du conftest — sinon le hook écrit dans la piste
+    # d'audit de production (audit 2026-11-07 : « MyApp/Service.kt »).
+    from sdd_lib import paths
+    keep = (paths.CONSOLE_DB_PATH_ENV, paths.CONSOLE_DB_PATH_MODE_ENV,
+            paths.AUDIT_DIR_ENV, paths.AUDIT_DIR_MODE_ENV)
+    env = {k: v for k, v in os.environ.items()
+           if not k.startswith("SDD_") or k in keep}
     env.setdefault("PYTHONIOENCODING", "utf-8")
     if env_extra:
         env.update(env_extra)

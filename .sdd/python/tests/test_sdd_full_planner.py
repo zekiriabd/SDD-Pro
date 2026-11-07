@@ -347,7 +347,8 @@ class TestBuildRecap(unittest.TestCase):
     def _setup_db(self, root: Path) -> Path:
         """Create a minimal console.db with one run and phases."""
         import sqlite3
-        db_path = root / "workspace" / "db" / "console.db"
+        from sdd_lib.paths import console_db_path
+        db_path = console_db_path(root)  # honore $SDD_CONSOLE_DB_PATH (conftest)
         db_path.parent.mkdir(parents=True, exist_ok=True)
         conn = sqlite3.connect(db_path)
         conn.executescript("""
@@ -452,6 +453,8 @@ class TestBuildRecap(unittest.TestCase):
     def test_recap_no_db_returns_error(self) -> None:
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
+            from sdd_lib.paths import console_db_path
+            self.assertFalse(console_db_path(root).exists())
             recap = sdd_full_planner.build_recap(root, "test123")
             self.assertIn("error", recap)
 
@@ -489,7 +492,8 @@ class TestRecapFalsePositiveDefense(unittest.TestCase):
                               runs_status: str = "success") -> None:
         """Setup console.db with a runs row + dev_run phase row."""
         import sqlite3
-        db_path = root / "workspace" / "db" / "console.db"
+        from sdd_lib.paths import console_db_path
+        db_path = console_db_path(root)  # honore $SDD_CONSOLE_DB_PATH (conftest)
         db_path.parent.mkdir(parents=True, exist_ok=True)
         conn = sqlite3.connect(db_path)
         conn.executescript("""

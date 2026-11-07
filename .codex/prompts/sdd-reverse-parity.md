@@ -1,5 +1,5 @@
 <!-- GENERATED FROM .sdd/ (commande /sdd-reverse-parity) — DO NOT EDIT -->
-<!-- Génération des specs de parité comportementale Gherkin (.feature) pour UNE FEAT reverse. Spawn agent reverse-parity-inspector (Sonnet 4.6), validation déterministe validate_parity_features.py. Verdict informational, jamais bloquant. Emprunt Reversa (agent Inspector) — audit comparatif 2026-06-12. -->
+<!-- Génération des specs de parité comportementale Gherkin (.feature) pour UNE FEAT reverse. Spawn agent reverse-parity-inspector (Sonnet 5.5), validation déterministe validate_parity_features.py. Verdict informational, jamais bloquant. Emprunt Reversa (agent Inspector) — audit comparatif 2026-06-12. -->
 <!-- ============================================================ -->
 <!-- IMPORTANT — SPAWN SEMANTICS UNDER CODEX (audit R10 2026-07-26) -->
 <!-- Toute mention `Task tool (subagent_type=X)`, `Agent(X)`, ou    -->

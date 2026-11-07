@@ -2,6 +2,7 @@
 name: reverse-sql-trigger-analyst
 description: Spécialiste des TRIGGERS du reverse base de données. Pour UN trigger, lit son context pack déterministe et produit UNE User Story de règle événementielle — quel événement le déclenche, sur quelle table, quelle règle il applique, quelle cascade il provoque et dans quel cas il rejette la transaction. Angle propre — un trigger étant un invariant que l'application ne voit pas et ne peut pas contourner, c'est souvent la règle de gestion la plus critique et la plus invisible du système. Jamais routé sur un tier bas. Lecture seule, aucune connexion base, aucun spawn d'agent.
 model_tier: deep
+effort: medium
 tier_default: deep
 tier_floor: balanced
 tier_ceiling: deep
@@ -38,6 +39,8 @@ Arguments : `{U-N}` (module) + `--object {schema.nom}` (le trigger).
    `NULL`, atomicité, erreurs → AC négatifs, équivalences multi-dialecte).
 
 ## STEP 1 — Lecture sélective stricte
+
+> **Lecture unique (audit tokens 2026-11-06)** : ne relis JAMAIS un fichier déjà lu dans cette invocation — son contenu est déjà dans ton contexte. Fichier > 20 Ko (stack, rule) : lis la section utile (`Grep -n "^#"` pour la TOC, puis `Read` offset/limit), jamais le fichier entier.
 
 Lire **uniquement** : (1) ton **context pack**, (2) le corps du trigger
 `.sys/proc-snapshot/{schema}.{nom}.sql`, (3) le template d'US.

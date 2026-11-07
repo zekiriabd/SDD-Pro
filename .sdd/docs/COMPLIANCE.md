@@ -21,8 +21,8 @@ sous le contrôle direct de l'utilisateur (clé API ou compte org Anthropic).
 ```
 ┌──────────────────────┐       ┌──────────────────────┐
 │ Poste Dev / CI       │──────▶│ API Anthropic        │
-│ (Claude Code +       │◀──────│ (Claude Opus 4.8 /   │
-│  SDD_Pro framework)  │ HTTPS │  Sonnet 4.6)         │
+│ (Claude Code +       │◀──────│ (Claude Opus 5.5 /   │
+│  SDD_Pro framework)  │ HTTPS │  Sonnet 5.5)         │
 └──────────────────────┘       └──────────────────────┘
        │
        │ Reads/Writes
@@ -107,7 +107,7 @@ documentation Claude Code pour le routing.
 
 ### 4.3 OWASP Top 10 (code généré)
 
-SDD_Pro inclut un **`security-reviewer` agent** (Sonnet 4.6) qui scanne le
+SDD_Pro inclut un **`security-reviewer` agent** (Sonnet 5.5) qui scanne le
 code généré contre les 23 classes `[SEC_*]` mappées OWASP/CWE :
 
 - Hard-blocking : `[SEC_SQL_INJECTION]` (CWE-89), `[SEC_COMMAND_INJECTION]`

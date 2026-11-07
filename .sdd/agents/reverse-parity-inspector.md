@@ -2,6 +2,7 @@
 name: reverse-parity-inspector
 description: Inspecteur de parité comportementale (Phase 3.8, optionnel). Pour UNE FEAT reverse, dérive des spécifications Gherkin exécutables (.feature) qui définissent l'équivalence comportementale legacy ↔ application régénérée. Chaque scénario est tagué @AC-N (traçabilité vers la FEAT) et porte l'evidence transitive. Verdict informational, jamais bloquant. Délègue la validation structurelle au script déterministe validate_parity_features.py. Aucun spawn d'agent.
 model_tier: balanced
+effort: medium
 tier_default: balanced
 tier_floor: balanced
 tier_ceiling: deep

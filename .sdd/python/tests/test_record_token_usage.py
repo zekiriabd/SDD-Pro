@@ -15,6 +15,7 @@ if str(_PY_ROOT) not in sys.path:
 from sdd_hooks.record_token_usage import (
     USAGE_FIELDS,
     _extract_feat_and_us,
+    _extract_feat_and_us_from_text,
     _find_model,
     _find_usage,
     _hook_event_name,
@@ -131,6 +132,63 @@ class TestExtractFeatAndUs(unittest.TestCase):
         self.assertIsNone(us_id)
 
 
+class TestExtractFeatAndUsMisattribution(unittest.TestCase):
+    """Audit télémétrie 2026-11-07 : dates et plages lues comme des US (FEAT 84, 201)."""
+
+    KNOWN = ({"15-1", "15-2", "6-3"}, {6, 15})
+
+    def test_dates_are_not_us(self):
+        for text in ("audit 2026-11-06", "run 2026-10-10T12:00", "sdd-full 2026-11-07"):
+            with self.subTest(text=text):
+                self.assertEqual(_extract_feat_and_us_from_text(text), (None, None))
+
+    def test_versions_and_times_are_not_us(self):
+        for text in ("v1.2-3", "à 10:10-11"):
+            with self.subTest(text=text):
+                self.assertEqual(_extract_feat_and_us_from_text(text), (None, None))
+
+    def test_line_range_rejected_when_not_on_disk(self):
+        text = "lis les lignes 84-92 du fichier"
+        self.assertEqual(_extract_feat_and_us_from_text(text), (84, "84-92"))  # syntaxe seule
+        self.assertEqual(_extract_feat_and_us_from_text(text, self.KNOWN), (None, None))
+
+    def test_skips_unknown_candidate_and_falls_back_to_feat(self):
+        text = "lines 201-215 then /dev-run 15"
+        self.assertEqual(_extract_feat_and_us_from_text(text, self.KNOWN), (15, None))
+
+    def test_unknown_feat_rejected(self):
+        self.assertEqual(_extract_feat_and_us_from_text("FEAT 84", self.KNOWN), (None, None))
+
+    def test_real_us_still_found(self):
+        for text, expected in (
+            ("ts 2026-10-10 puis US 15-1-Consulter-Mes-Donnees", (15, "15-1")),
+            ("Lis workspace/us/15-1-Consulter-Mes-Donnees.md", (15, "15-1")),
+            ("US 15-2.", (15, "15-2")),
+            ("(US 6-3)", (6, "6-3")),
+        ):
+            with self.subTest(text=text):
+                self.assertEqual(_extract_feat_and_us_from_text(text, self.KNOWN), expected)
+
+    def test_known_ids_reads_workspace(self):
+        import tempfile
+        from sdd_hooks.record_token_usage import _known_ids
+        with tempfile.TemporaryDirectory() as d:
+            ws = Path(d) / "workspace"
+            (ws / "us").mkdir(parents=True)
+            (ws / "feats").mkdir()
+            (ws / "us" / "15-1-Consulter-Mes-Donnees.md").write_text("x", encoding="utf-8")
+            (ws / "feats" / "15-Mes-donnees.md").write_text("x", encoding="utf-8")
+            (ws / "us" / "notes.md").write_text("x", encoding="utf-8")
+            self.assertEqual(_known_ids(Path(d)), ({"15-1"}, {15}))
+
+    def test_known_ids_none_without_workspace_content(self):
+        import tempfile
+        from sdd_hooks.record_token_usage import _known_ids
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "workspace").mkdir()
+            self.assertIsNone(_known_ids(Path(d)))
+
+
 class TestHookEventName(unittest.TestCase):
     def test_explicit_hook_event_name_post_tool_use_with_tool_name(self):
         payload = {"hook_event_name": "PostToolUse", "tool_name": "Agent"}
@@ -192,101 +250,32 @@ class TestMainBehaviour(unittest.TestCase):
                     self.assertEqual(rc, 0)
                     mock_read.assert_not_called()
 
-    def test_record_mode_writes_db_row(self):
-        """v6.10: hook now writes to console.db (token_usage table)."""
-        import sqlite3
+    def test_post_tool_use_usage_is_no_longer_a_source(self):
+        """Audit tokens 2026-11-07 : `tool_response.usage` ne porte que le
+        dernier appel API (synchrone) ou rien (asynchrone). Le hook n'écrit
+        plus AUCUNE ligne au PostToolUse — la source est le transcript lu au
+        SubagentStop (cf. tests/test_transcript_usage.py)."""
         import tempfile
         from sdd_hooks import record_token_usage as mod
         from sdd_lib import console_db
 
-        payload = {
-            "hook_event_name": "PostToolUse",
-            "tool_name": "Agent",
-            "tool_input": {
-                "subagent_type": "dev-backend",
-                "prompt": "implement 1-2-Auth backend",
-            },
-            "tool_response": {
-                "model": "claude-opus-4-7",
-                "usage": {
-                    "input_tokens": 5000,
-                    "output_tokens": 800,
-                    "cache_creation_input_tokens": 100,
-                    "cache_read_input_tokens": 2000,
-                },
-            },
-        }
-
-        with mock.patch.dict(os.environ, {"SDD_TOKEN_USAGE_MODE": "record"}, clear=False):
-            with mock.patch.object(mod, "read_hook_input", return_value=payload):
-                with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
-                    tmp_root = Path(tmp)
-                    (tmp_root / ".claude").mkdir()
-                    # Patch repo_root in BOTH modules so default_db_path() resolves
-                    # to the temp directory.
-                    with mock.patch.object(mod, "repo_root", return_value=tmp_root), \
-                         mock.patch.object(console_db.core, "repo_root", return_value=tmp_root):
-                        rc = mod.main()
-                        self.assertEqual(rc, 0)
-
-                        db_path = tmp_root / "workspace" / "db" / "console.db"
-                        self.assertTrue(db_path.is_file(),
-                                        f"console.db should exist at {db_path}")
-                        conn = sqlite3.connect(str(db_path))
-                        conn.row_factory = sqlite3.Row
-                        try:
-                            row = conn.execute(
-                                "SELECT * FROM token_usage ORDER BY id DESC LIMIT 1"
-                            ).fetchone()
-                        finally:
-                            conn.close()
-                        self.assertIsNotNone(row, "token_usage should contain one row")
-                        self.assertEqual(row["agent"], "dev-backend")
-                        self.assertEqual(row["model"], "claude-opus-4-7")
-                        self.assertEqual(row["input_tokens"], 5000)
-                        self.assertEqual(row["output_tokens"], 800)
-                        self.assertEqual(row["cache_creation_tokens"], 100)
-                        self.assertEqual(row["cache_read_tokens"], 2000)
-                        self.assertEqual(row["feat_n"], 1)
-                        self.assertEqual(row["us_id"], "1-2")
-
-    def test_record_mode_handles_missing_usage(self):
-        """v6.10: missing usage still inserts a DB row with zeros."""
-        import sqlite3
-        import tempfile
-        from sdd_hooks import record_token_usage as mod
-        from sdd_lib import console_db
-
-        payload = {
-            "tool_input": {"subagent_type": "po", "prompt": "us-generate 1"},
-            "tool_response": {"message": "no usage exposed by Claude Code"},
-        }
-
-        with mock.patch.dict(os.environ, {"SDD_TOKEN_USAGE_MODE": "record"}, clear=False):
-            with mock.patch.object(mod, "read_hook_input", return_value=payload):
-                with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
-                    tmp_root = Path(tmp)
-                    (tmp_root / ".claude").mkdir()
-                    with mock.patch.object(mod, "repo_root", return_value=tmp_root), \
-                         mock.patch.object(console_db.core, "repo_root", return_value=tmp_root):
-                        rc = mod.main()
-                        self.assertEqual(rc, 0)
-
-                        db_path = tmp_root / "workspace" / "db" / "console.db"
-                        self.assertTrue(db_path.is_file())
-                        conn = sqlite3.connect(str(db_path))
-                        conn.row_factory = sqlite3.Row
-                        try:
-                            row = conn.execute(
-                                "SELECT * FROM token_usage ORDER BY id DESC LIMIT 1"
-                            ).fetchone()
-                        finally:
-                            conn.close()
-                        self.assertIsNotNone(row)
-                        self.assertEqual(row["input_tokens"], 0)
-                        self.assertEqual(row["output_tokens"], 0)
-                        self.assertEqual(row["cache_creation_tokens"], 0)
-                        self.assertEqual(row["cache_read_tokens"], 0)
+        for tool_response in ({"model": "claude-opus-4-7",
+                               "usage": {"input_tokens": 5000, "output_tokens": 800}},
+                              {"message": "no usage exposed by Claude Code"}):
+            payload = {
+                "hook_event_name": "PostToolUse", "tool_name": "Agent",
+                "tool_input": {"subagent_type": "dev-backend", "prompt": "1-2-Auth"},
+                "tool_response": tool_response,
+            }
+            mod._MODE_CACHE = None
+            with mock.patch.dict(os.environ, {"SDD_TOKEN_USAGE_MODE": "record"}, clear=False),                  mock.patch.object(mod, "read_hook_input", return_value=payload),                  tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+                tmp_root = Path(tmp)
+                (tmp_root / ".claude").mkdir()
+                with mock.patch.object(mod, "repo_root", return_value=tmp_root),                      mock.patch.object(console_db.core, "repo_root", return_value=tmp_root):
+                    self.assertEqual(mod.main(), 0)
+                    db_path = tmp_root / "workspace" / "db" / "console.db"
+                    self.assertFalse(db_path.is_file(),
+                                     "PostToolUse must not create token_usage rows")
 
     def test_empty_payload_returns_zero(self):
         from sdd_hooks import record_token_usage as mod

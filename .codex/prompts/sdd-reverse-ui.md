@@ -1,5 +1,5 @@
 <!-- GENERATED FROM .sdd/ (commande /sdd-reverse-ui) — DO NOT EDIT -->
-<!-- Phase 4 du workflow reverse — extraction UI sémantique d'UNE unité U-N en mockup(s) HTML statique. Spawn agent reverse-ui-extractor (Opus 4.8). Output workspace/ui/{n}-{m}-{Name}.html consommable par dev-frontend lors de /sdd-full. -->
+<!-- Phase 4 du workflow reverse — extraction UI sémantique d'UNE unité U-N en mockup(s) HTML statique. Spawn agent reverse-ui-extractor (Opus 5.5). Output workspace/ui/{n}-{m}-{Name}.html consommable par dev-frontend lors de /sdd-full. -->
 <!-- ============================================================ -->
 <!-- IMPORTANT — SPAWN SEMANTICS UNDER CODEX (audit R10 2026-07-26) -->
 <!-- Toute mention `Task tool (subagent_type=X)`, `Agent(X)`, ou    -->

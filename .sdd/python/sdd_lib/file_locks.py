@@ -2,6 +2,32 @@
 
 Uses `O_EXCL` semantics via `os.open(O_CREAT | O_EXCL | O_WRONLY)` which is
 atomic on POSIX (Linux/macOS) and Windows alike (via Python's CRT layer).
+
+Audit « fiabilité des données et des états » (2026-11-07) — **stale takeover
+without a grace window = lock theft**. `acquire_with_retry()` used to
+`unlink()` any lock whose payload timestamp exceeded the TTL, with no look at
+the file itself. Race : contender A reads a stale lock ; contender B takes it
+over (unlink + O_EXCL recreate, fresh payload) ; A then unlinks B's brand-new
+lock and acquires → two holders. The reverse module's `file_locks_local.py`
+already had an mtime grace (`_CORRUPT_GRACE_SECONDS`) ; `sdd_lib` is now
+aligned and goes one step further :
+
+  * **mtime grace** (`TAKEOVER_GRACE_SECONDS`, 2 s like the reverse copy) —
+    an EMPTY/unparseable lock file (re)created less than 2 s ago is never
+    taken over (window between a winner's `os.open(O_EXCL)` and its
+    `os.write`) ;
+  * **compare-and-delete** — right before `unlink()`, the content is re-read
+    and must still equal the stale content observed ; any change (new owner,
+    file emptied) aborts the takeover and the caller retries.
+
+Both are exposed through `takeover_stale_lock()` so `acquire_libname_lock.py`
+shares exactly the same recovery path.
+
+Formats : two payload formats coexist by design (`read_lock()` handles both) —
+`AGENT:TS_SECONDS` for LibName entity locks and `PREFIX:PID:TS_MS` for the
+console lock, whose format and 10 s TTL are mirrored byte-for-byte by the
+Node console (`workspace/console/lib/atomic-write.js`) and therefore cannot
+be unified with the reverse module's JSON payload (30 s TTL).
 """
 from __future__ import annotations
 
@@ -11,6 +37,11 @@ import random
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+
+#: Grace window on the lock FILE's mtime : a lock touched/created more
+#: recently than this is never taken over, regardless of payload staleness.
+#: Aligned with `sdd_reverse/file_locks_local._CORRUPT_GRACE_SECONDS`.
+TAKEOVER_GRACE_SECONDS = 2.0
 
 
 def try_create_exclusive(path: Path, content: str) -> bool:
@@ -84,6 +115,14 @@ def read_lock(path: Path) -> tuple[str, int] | None:
     return (agent, 0)
 
 
+def read_lock_raw(path: Path) -> str | None:
+    """Raw payload of a lock file (stripped), or None if unreadable/absent."""
+    try:
+        return path.read_text(encoding="ascii", errors="replace").strip()
+    except (OSError, UnicodeError):
+        return None
+
+
 def overwrite_lock(path: Path, content: str) -> None:
     """Overwrite an existing lock file (used for stale recovery)."""
     path.write_text(content, encoding="ascii", newline="")
@@ -91,6 +130,69 @@ def overwrite_lock(path: Path, content: str) -> None:
 
 def _now_ms() -> int:
     return int(datetime.now(timezone.utc).timestamp() * 1000)
+
+
+def lock_file_age_seconds(path: Path) -> float | None:
+    """Age of the lock FILE (mtime), or None if it vanished."""
+    try:
+        return time.time() - path.stat().st_mtime
+    except OSError:
+        return None
+
+
+def _payload_has_timestamp(content: str | None) -> bool:
+    """True iff the lock payload ends with a numeric timestamp segment."""
+    if not content:
+        return False
+    parts = content.strip().split(":")
+    return len(parts) >= 2 and parts[-1].strip().isdigit()
+
+
+def takeover_stale_lock(
+    lock_path: Path,
+    *,
+    observed_content: str | None,
+    new_content: str,
+    grace_seconds: float = TAKEOVER_GRACE_SECONDS,
+) -> bool:
+    """Replace a lock the caller has judged stale — safely.
+
+    Steps :
+      1. mtime grace — only when the observed payload is EMPTY/unparseable
+         (same rule as ``sdd_reverse/file_locks_local``) : a lock file
+         created < ``grace_seconds`` ago with no payload is a winner caught
+         between its ``os.open(O_EXCL)`` and its ``os.write`` → refuse.
+      2. compare-and-delete : re-read the payload ; if it differs from
+         ``observed_content`` (the stale payload the caller based its decision
+         on) → refuse (another contender already took over).
+      3. ``unlink()`` then ``O_EXCL`` recreate with ``new_content`` — exactly
+         one contender wins the recreate.
+
+    Returns True iff THIS caller now holds the lock. On any refusal the
+    caller should re-inspect / retry (the lock is held by someone else).
+    """
+    age = lock_file_age_seconds(lock_path)
+    if age is None:
+        # Vanished between the caller's read and now → just try to create.
+        try:
+            return try_create_exclusive(lock_path, new_content)
+        except OSError:
+            return False
+    if age < grace_seconds and not _payload_has_timestamp(observed_content):
+        return False
+    current = read_lock_raw(lock_path)
+    if current is not None and current != (observed_content or "").strip():
+        return False  # payload changed under us — someone else took over
+    try:
+        lock_path.unlink()
+    except FileNotFoundError:
+        pass  # another contender unlinked it — race the O_EXCL recreate
+    except OSError:
+        return False
+    try:
+        return try_create_exclusive(lock_path, new_content)
+    except OSError:
+        return False
 
 
 def acquire_with_retry(
@@ -107,8 +209,10 @@ def acquire_with_retry(
     Mirrors the console Node.js side (`workspace/console/lib/atomic-write.js`)
     for cross-language symmetry on `workspace/console/.status.lock`.
 
-    Stale recovery: if the existing lock file is older than `ttl_ms`,
-    it is unlinked and the loop retries.
+    Stale recovery: if the existing lock payload is older than `ttl_ms` AND
+    the lock file itself is older than `TAKEOVER_GRACE_SECONDS`, it is taken
+    over via `takeover_stale_lock()` (compare-and-delete + O_EXCL recreate).
+    A takeover refused (someone else won) counts as a contended attempt.
 
     Raises RuntimeError ([LOCK_HELD]) after `retry_count` failed attempts.
     """
@@ -120,12 +224,12 @@ def acquire_with_retry(
         except OSError as e:
             if e.errno != errno.EEXIST:
                 raise
+            content = read_lock_raw(lock_path)
             try:
-                content = lock_path.read_text(encoding="ascii", errors="replace").strip()
-                parts = content.split(":")
+                parts = (content or "").split(":")
                 ts_str = parts[-1] if parts else ""
                 ts = int(ts_str) if ts_str.isdigit() else 0
-            except (OSError, ValueError):
+            except ValueError:
                 ts = 0
             if not ts:
                 # Audit 2026-06-11 M4 — payload vide/corrompu (crash mid-write,
@@ -139,11 +243,13 @@ def acquire_with_retry(
                     ts = 0  # lock disparu entre EEXIST et stat → retry simple
             now = _now_ms()
             if ts and (now - ts) > ttl_ms:
-                try:
-                    lock_path.unlink()
-                except OSError:
-                    pass
-                continue
+                payload = f"{payload_prefix}:{os.getpid()}:{_now_ms()}"
+                if takeover_stale_lock(
+                    lock_path, observed_content=content, new_content=payload,
+                ):
+                    return
+                # Takeover refused (grace window / someone else won) → treat
+                # as contention : backoff + retry.
             # v7.0.1 audit AP-3 2026-06-08 — backoff WITH jitter to avoid
             # thundering herd under high MaxParallel. Previous : pure linear
             # backoff_ms*(attempt+1) caused all parallel agents to retry in

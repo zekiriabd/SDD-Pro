@@ -1,7 +1,8 @@
 ---
 name: reverse-us-writer
 description: Barreau 3b de l'escalier reverse (ADR reverse-spec-ladder). Pour UNE unité U-N, lit l'analyse technique 3a (plans/{n}-{FeatName}.analysis.md) et la remonte d'altitude en User Stories par capability dans us/{n}-{m}-{Name}.md. Altitude moyenne (métier mais traçable). Chaque AC pointe vers les tasks T-N (fil de traçabilité D3). Confidence min-monotone (≤ analyse). Aucun spawn d'agent.
-model: claude-sonnet-4-6
+model: claude-sonnet-5-5
+effort: medium
 tools: Read, Write, Edit, Glob, Grep, Bash
 ---
 # Agent Reverse-US-Writer — Phase 3b (user stories)
@@ -29,6 +30,8 @@ Arguments requis : `{U-N}`.
 3. Lire `.sdd/python/sdd_reverse/us.reverse.template.md` — absent → STOP + ERROR `[REVERSE_TEMPLATE_MISSING]`.
 
 ## STEP 1 — Lecture sélective stricte
+
+> **Lecture unique (audit tokens 2026-11-06)** : ne relis JAMAIS un fichier déjà lu dans cette invocation — son contenu est déjà dans ton contexte. Fichier > 20 Ko (stack, rule) : lis la section utile (`Grep -n "^#"` pour la TOC, puis `Read` offset/limit), jamais le fichier entier.
 
 Lire **uniquement** :
 1. `workspace/plans/{n}-{FeatName}.analysis.md` (l'analyse 3a — TA SEULE source de contenu)

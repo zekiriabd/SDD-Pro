@@ -66,6 +66,54 @@ class TestPyprojectStructure:
                 f"Declared package {pkg!r} missing at {pkg_path}"
             )
 
+    def test_every_importable_package_is_declared(self):
+        """Audit 2026-11-07 : `sdd_reverse*` manquaient — un `pip install .`
+        non éditable livrait les extras reverse sans leur code. Tout dossier
+        portant un `__init__.py` (hors tests/caches) doit être déclaré."""
+        cfg = _load_pyproject()
+        declared = set(cfg["tool"]["setuptools"]["packages"])
+        python_dir = REPO_ROOT / ".sdd" / "python"
+        skip = {"tests", "__pycache__", ".cache", "build"}
+        on_disk = set()
+        for init in python_dir.rglob("__init__.py"):
+            rel = init.parent.relative_to(python_dir)
+            if not rel.parts or any(p in skip or p.endswith(".egg-info") for p in rel.parts):
+                continue
+            on_disk.add(".".join(rel.parts))
+        missing = sorted(on_disk - declared)
+        assert not missing, f"paquets non déclarés dans [tool.setuptools] packages : {missing}"
+
+    def test_reverse_package_data_declared(self):
+        cfg = _load_pyproject()
+        data = cfg["tool"]["setuptools"]["package-data"].get("sdd_reverse", [])
+        for pattern in ("*.yml", "*.md", "*.json", "*.feature"):
+            assert pattern in data, f"sdd_reverse package-data sans {pattern!r}"
+
+    def test_lockfile_referenced_and_consistent(self):
+        """Le lockfile promis existe, est référencé, et ses pins respectent
+        les plages des extras (sinon `-c requirements.lock.txt` échoue)."""
+        import re
+        lock = REPO_ROOT / ".sdd" / "python" / "requirements.lock.txt"
+        assert lock.is_file(), "requirements.lock.txt absent"
+        assert "requirements.lock.txt" in PYPROJECT_PATH.read_text(encoding="utf-8")
+        pins = {}
+        for line in lock.read_text(encoding="utf-8").splitlines():
+            m = re.match(r"^([A-Za-z0-9_.-]+)==([0-9][^\s#]*)", line.strip())
+            if m:
+                pins[m.group(1).lower()] = tuple(int(x) for x in m.group(2).split(".")[:3])
+        assert pins, "aucun pin dans requirements.lock.txt"
+        cfg = _load_pyproject()
+        for extra, reqs in cfg["project"]["optional-dependencies"].items():
+            for req in reqs:
+                m = re.match(r"^([A-Za-z0-9_.-]+)>=([0-9.]+),<([0-9.]+)$", req.replace(" ", ""))
+                if not m or m.group(1).lower() not in pins:
+                    continue
+                lo = tuple(int(x) for x in m.group(2).split("."))
+                hi = tuple(int(x) for x in m.group(3).split("."))
+                v = pins[m.group(1).lower()]
+                assert lo <= v[: len(lo)] and v[: len(hi)] < hi, (
+                    f"[{extra}] {req} incompatible avec le pin {m.group(1)}=={'.'.join(map(str, v))}")
+
     def test_scripts_entry_points_resolvable(self):
         """For each declared `[project.scripts]`, the module:function must be importable."""
         cfg = _load_pyproject()

@@ -20,6 +20,12 @@ if str(_PY_ROOT) not in sys.path:
 from sdd_scripts import acquire_libname_lock as alm  # noqa: E402
 
 
+@pytest.fixture(autouse=True)
+def _lock_root_is_tmp(tmp_path, monkeypatch):
+    """Audit 2026-11-07 : --lib-path must live under the allowed lock root."""
+    monkeypatch.setenv("SDD_LIBNAME_LOCK_ROOT", str(tmp_path.resolve()))
+
+
 @pytest.fixture()
 def lib_path(tmp_path):
     p = tmp_path / "Shared"
@@ -191,3 +197,36 @@ def test_acquire_after_release_works(monkeypatch, capsys, lib_path):
     assert rc == 0
     p = _payload(capsys)
     assert p["status"] == "ACQUIRED"
+
+
+# ---------- Input validation (audit 2026-11-07) ----------
+
+
+@pytest.mark.parametrize("entity", ["../../x", "a/b", "a\b", "", "x" * 65, "Foo.lock"])
+def test_invalid_entity_rejected(monkeypatch, capsys, lib_path, entity):
+    rc = _run(monkeypatch, ["--lib-path", str(lib_path), "--entity", entity,
+                            "--agent-id", "agent-1"])
+    assert rc == 3
+    p = _payload(capsys)
+    assert p["error_class"] == "[LIBNAME_LOCK_INVALID_ARG]"
+    assert not (lib_path / ".locks").exists()
+
+
+def test_lib_path_traversal_outside_root_rejected(monkeypatch, capsys, lib_path):
+    escaped = lib_path / ".." / ".." / "elsewhere"
+    rc = _run(monkeypatch, ["--lib-path", str(escaped), "--entity", "Foo",
+                            "--agent-id", "agent-1"])
+    assert rc == 3
+    assert "outside the allowed lock root" in _payload(capsys)["message"]
+
+
+def test_lib_path_equal_to_root_rejected(monkeypatch, capsys, tmp_path):
+    rc = _run(monkeypatch, ["--lib-path", str(tmp_path), "--entity", "Foo",
+                            "--agent-id", "agent-1"])
+    assert rc == 3
+
+
+def test_default_root_is_workspace_src(monkeypatch):
+    monkeypatch.delenv("SDD_LIBNAME_LOCK_ROOT", raising=False)
+    root = alm.allowed_lock_root()
+    assert root.name == "src" and root.parent.name == "workspace"

@@ -2,6 +2,7 @@
 name: reverse-inventory
 description: 'Pour un projet legacy déposé dans workspace/old/{LegacyProject}/, cartographie déterministe : détecte langages/frameworks, énumère pages, identifie unités fonctionnelles candidates avec IDs stables U-N + evidence file:line, extrait DB schema basique. Lecture massive autorisée (récursive) sur workspace/old/{P}/** uniquement. Délègue 99% du travail au script déterministe reverse_inventory.py (0 token), enrichit uniquement le markdown FR de sortie. Aucun spawn d''agent.'
 model_tier: balanced
+effort: medium
 tier_default: balanced
 tier_floor: fast
 tier_ceiling: balanced

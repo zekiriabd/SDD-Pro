@@ -61,10 +61,80 @@ class TestGetPricing(unittest.TestCase):
         self.assertEqual(p["input"], 5.00)
         self.assertEqual(p["output"], 25.00)
 
-    def test_unknown_model_falls_back_to_sonnet(self) -> None:
+    def test_unknown_model_uses_conservative_tariff(self) -> None:
+        """Audit tokens 2026-11-07 — plus de repli silencieux sur Sonnet 4.6 :
+        tarif le plus cher connu (un cost cap doit sur-estimer l'inconnu)."""
         p = pricing.get_pricing("claude-unknown-future-model")
-        # Fallback = sonnet pricing
-        self.assertEqual(p, pricing.PRICING["claude-sonnet-4-6"])
+        self.assertEqual(p, pricing.CONSERVATIVE_PRICING)
+        most = max(v["output"] for v in pricing.PRICING.values())
+        self.assertEqual(p["output"], most)
+        self.assertNotEqual(p, pricing.PRICING["claude-sonnet-4-6"])
+
+    def test_unknown_model_warns_once_on_stderr(self) -> None:
+        import contextlib
+        import io
+        pricing._WARNED_UNKNOWN.discard("'claude-warn-probe-xyz'")
+        buf = io.StringIO()
+        with contextlib.redirect_stderr(buf):
+            pricing.get_pricing("claude-warn-probe-xyz")
+            pricing.get_pricing("claude-warn-probe-xyz")
+        out = buf.getvalue()
+        self.assertEqual(out.count("WARN [pricing]"), 1, out)
+        self.assertIn("claude-warn-probe-xyz", out)
+
+    def test_unknown_warning_can_be_silenced(self) -> None:
+        import contextlib
+        import io
+        buf = io.StringIO()
+        with contextlib.redirect_stderr(buf):
+            pricing.get_pricing("claude-silent-probe-xyz", warn_unknown=False)
+        self.assertEqual(buf.getvalue(), "")
+
+
+class TestGeneration55(unittest.TestCase):
+    """Audit tokens 2026-11-07 — tarifs exacts publiés (USD/Mtok)."""
+
+    EXPECTED = {
+        "claude-opus-5-5":   (4.00, 20.00, 0.20, 5.00),
+        "claude-sonnet-5-5": (2.00, 10.00, 0.20, 2.50),
+        "claude-haiku-5-5":  (0.10, 0.50, 0.01, 0.125),
+        "claude-fable-5-1":  (10.00, 50.00, 0.25, 12.50),
+        "claude-opus-5":     (5.00, 25.00, 0.50, 6.25),
+        "claude-sonnet-5":   (2.00, 10.00, 0.20, 2.50),
+        "claude-fable-5":    (10.00, 50.00, 1.00, 12.50),
+    }
+
+    def test_exact_rates(self) -> None:
+        for model, expected in self.EXPECTED.items():
+            p = pricing.PRICING[model]
+            got = (p["input"], p["output"], p["cache_read"], p["cache_creation"])
+            self.assertEqual(got, expected, model)
+
+    def test_provider_yaml_mirrors_canonical(self) -> None:
+        import yaml
+        from sdd_lib.paths import providers_dir
+        data = yaml.safe_load((providers_dir() / "anthropic.yaml").read_text(encoding="utf-8"))
+        for model in self.EXPECTED:
+            self.assertIn(model, data["pricing"], model)
+            for k in ("input", "output", "cache_read", "cache_creation"):
+                self.assertAlmostEqual(float(data["pricing"][model][k]),
+                                       pricing.PRICING[model][k], msg=f"{model}.{k}")
+
+    def test_tier_map_points_to_55_with_1m_context(self) -> None:
+        from sdd_lib.config_loader import load_provider
+        prov = load_provider("anthropic")
+        self.assertEqual(prov["tier_map"], {"deep": "claude-opus-5-5",
+                                            "balanced": "claude-sonnet-5-5",
+                                            "fast": "claude-haiku-5-5"})
+        self.assertEqual(set(prov["context_window"].values()), {1_000_000})
+        for model in prov["tier_map"].values():
+            self.assertTrue(pricing.has_known_pricing(model), model)
+
+    def test_estimate_cost(self) -> None:
+        c = pricing.estimate_cost("claude-opus-5-5", input_tokens=1_000_000,
+                                  output_tokens=1_000_000, cache_read_tokens=1_000_000,
+                                  cache_creation_tokens=1_000_000)
+        self.assertAlmostEqual(c, 4.00 + 20.00 + 0.20 + 5.00)
 
 
 class TestAsTuple(unittest.TestCase):
@@ -75,8 +145,8 @@ class TestAsTuple(unittest.TestCase):
 
     def test_tuple_unknown_model(self) -> None:
         t = pricing.as_tuple("claude-unknown")
-        # Sonnet fallback as tuple
-        self.assertEqual(t, (3.00, 15.00, 3.75, 0.30))
+        c = pricing.CONSERVATIVE_PRICING  # tarif conservateur (audit 2026-11-07)
+        self.assertEqual(t, (c["input"], c["output"], c["cache_creation"], c["cache_read"]))
 
 
 class TestMultiProviderPricing(unittest.TestCase):

@@ -2,6 +2,7 @@
 name: reverse-tech-analyst
 description: Barreau 3a de l'escalier reverse (ADR reverse-spec-ladder). Pour UNE unité U-N, lit l'evidence + DB schema + tech-audit optionnel et produit une ANALYSE TECHNIQUE legacy (comportements observés, accès données, calculs, effets de bord) dans plans/{n}-{FeatName}.analysis.md. Photo fidèle du code, evidence file:line par task, confidence cap par langage, bias toward present. NE produit PAS de FEAT (c'est 3c). Aucun spawn d'agent.
 model_tier: deep
+effort: high
 tier_default: deep
 tier_floor: balanced
 tier_ceiling: deep
@@ -47,6 +48,8 @@ FIX: lancer /sdd-reverse-inventory --refresh puis revérifier units[]
 ```
 
 ## STEP 1 — Lecture sélective stricte
+
+> **Lecture unique (audit tokens 2026-11-06)** : ne relis JAMAIS un fichier déjà lu dans cette invocation — son contenu est déjà dans ton contexte. Fichier > 20 Ko (stack, rule) : lis la section utile (`Grep -n "^#"` pour la TOC, puis `Read` offset/limit), jamais le fichier entier.
 
 Lire **uniquement** :
 1. `workspace/old/{P}/.sys/inventory.json` → `units[id={U-N}]`

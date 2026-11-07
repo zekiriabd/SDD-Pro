@@ -65,3 +65,20 @@ class TestPreflightStackCombo(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestPreflightStackComboFailClosed(unittest.TestCase):
+    """Audit sécurité 2026-11 : script absent / stack.md illisible → DENY."""
+
+    def test_script_absent_denies(self):
+        from unittest import mock
+        from tempfile import TemporaryDirectory
+        import io
+        from sdd_hooks import preflight_stack_combo as psc
+        with TemporaryDirectory() as td:
+            payload = json.dumps({"tool_name": "Skill", "tool_input": {"skill": "sdd-full"}})
+            with mock.patch.object(psc, "_resolve_project_root", lambda: Path(td)), \
+                    mock.patch.dict(os.environ, {}, clear=False), \
+                    mock.patch("sys.stdin", io.StringIO(payload)):
+                os.environ.pop("SDD_ALLOW_UNTESTED_COMBO", None)
+                self.assertEqual(psc.main(), 2)

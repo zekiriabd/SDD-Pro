@@ -1,7 +1,8 @@
 ---
 name: reverse-inventory
 description: 'Pour un projet legacy déposé dans workspace/old/{LegacyProject}/, cartographie déterministe : détecte langages/frameworks, énumère pages, identifie unités fonctionnelles candidates avec IDs stables U-N + evidence file:line, extrait DB schema basique. Lecture massive autorisée (récursive) sur workspace/old/{P}/** uniquement. Délègue 99% du travail au script déterministe reverse_inventory.py (0 token), enrichit uniquement le markdown FR de sortie. Aucun spawn d''agent.'
-model: claude-sonnet-4-6
+model: claude-sonnet-5-5
+effort: medium
 tools: Read, Write, Edit, Glob, Grep, Bash
 ---
 # Agent Reverse-Inventory — Phase 1 cartographie

@@ -113,7 +113,7 @@ métriques ROI agrégées requièrent une consolidation manuelle.
 Si Anthropic indisponible (panne API, modification policy, retrait
 modèle), SDD_Pro est inutilisable. Cf. `COMPLIANCE.md §8 Q2`.
 
-### 4.2 Variance qualité Opus 4.8 / Sonnet 4.6
+### 4.2 Variance qualité (tiers deep / balanced — Opus 5.5 / Sonnet 5.5)
 
 Les LLM ne sont pas déterministes. Sur 2 runs identiques de `/sdd-full`,
 le code généré peut différer (naming variables, ordering d'imports,
@@ -124,9 +124,18 @@ imprévisible.
 **Mitigation** : tests unitaires + Acceptance Gate forcent un
 comportement observable identique même si le code intern diffère.
 
+### 4.2.bis Badges de combos obtenus en 4.x, non re-benchés en 5.5
+
+Les badges `validated` (C1, C2) et `bench-validated runtime` (C3-C13) ont été
+obtenus avec la génération de modèles **4.x** (Opus 4.7/4.8, Sonnet 4.6). Le
+passage du 2026-11-07 à la génération **5.5** (tier_map `deep`/`balanced`/`fast`)
+et l'ajout d'un `effort: medium` sur les agents hors dev-*/arch **n'ont pas été
+re-benchés**. Le comportement d'un combo badgé sur 5.5 est plausible mais non
+prouvé — cf. `validated-combos.md §0.1`.
+
 ### 4.3 Limite de contexte
 
-Claude Opus 4.8 supporte 1M tokens. Le framework limite le **context
+Le modèle du tier `deep` (Opus 5.5) dispose d'une fenêtre de 1M tokens. Le framework limite le **context
 budget par agent** (ledger `console.db` table `context_budget`) pour
 éviter l'explosion. Une FEAT trop grosse (> 10 US, > 50k LOC code
 existant à lire) peut hitter la limite.
@@ -206,9 +215,11 @@ Chaque équipe doit installer le framework localement.
 
 ### 6.2 Pricing dépendant d'Anthropic
 
-Le coût USD par FEAT dépend du pricing Claude API (Opus 4.8 + Sonnet 4.6 +
-cache hit rate). Si Anthropic change ses tarifs, le ROI varie. Voir
-`cache-strategy.md` pour les optimisations cache.
+Le coût USD par FEAT dépend du pricing Claude API (tiers deep + balanced) et,
+surtout, de la croissance du contexte au fil des tours. Mesure réelle (run
+FEAT 15, 2026-11-06, tarifs 4.x) : ≈ 101 $ pour 2 US desktop sans backend ;
+extrapolation `/sdd-full` 3 US back-front ≈ 170 $ (100-250 $). Voir
+`cache-strategy.md §1-§2`.
 
 ### 6.3 Adoption marché à 0
 

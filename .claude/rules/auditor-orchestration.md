@@ -1,6 +1,6 @@
 ---
-# TOK-C1 (audit 2026-06-12) : chargement paresseux (path-scoped rule). Lue par dev-run/sdd-full
-# au STEP 6.4 (Read explicite) ; auto-injection au contact des rapports de validation/qa.
+# TOK-C1 (audit 2026-06-12) : chargement paresseux (path-scoped rule). Lue par sdd-full
+# (phase auditor_batch) et sdd-review (Read explicite) ; auto-injection au contact des rapports.
 paths:
   - "workspace/.sys/.validation/**"
   - "workspace/db/**"
@@ -14,8 +14,16 @@ paths:
 > par invocation `/dev-run`. `dev-run.md` conserve uniquement le pointer + le
 > rationale séquentiel (pourquoi 6.4 après 6.c, où on est dans la pipeline).
 >
-> **Périmètre** : règle lue par `dev-run.md`/`sdd-full.md` au STEP 6.4 quand
-> `AuditorBatchMode != "off"`. Pas lue par les agents auditors eux-mêmes
+> **Changement 2026-11-07 (correction d'audit)** : les auditeurs ne sont plus
+> lancés par `/dev-run` (ex-STEP 6.4). Ils forment la phase `auditor_batch` de
+> `/sdd-full`, rendue par `sdd_full_planner.py next-action` **après `qa`**, et
+> `/sdd-review {n}` en usage isolé. Le hook `enforce_phase_order` refuse les
+> reviewers sans phase `qa` enregistrée (spec-compliance : sans `dev_run`).
+> Les numéros « STEP 6.4.x » ci-dessous sont conservés comme identifiants de
+> section ; ils ne désignent plus une étape de `/dev-run`.
+>
+> **Périmètre** : règle lue par `/sdd-full` (phase `auditor_batch`) et
+> `/sdd-review` quand `AuditorBatchMode != "off"`. Pas lue par les agents auditors eux-mêmes
 > (ils ont leur propre prompt agent).
 
 ## TOC
@@ -39,7 +47,7 @@ réécrit, et les findings code/security/arch deviennent obsolètes.
 
 Après v7.0.0 : **spec-compliance tourne SEUL en Stage A** (gate), puis si
 🟢/🟡 les 3 autres auditors tournent en parallèle en Stage B. Économie
-typique sur spec RED : **3 invocations Sonnet 4.6** (~9-15 KB context chacune).
+typique sur spec RED : **3 invocations Sonnet 5.5** (~9-15 KB context chacune).
 
 ```
 Stage A : spec-compliance-reviewer (SEUL — gate strict)
@@ -129,7 +137,7 @@ Rapport : workspace/.sys/.validation/{n}-spec-compliance.md
 ⊘ code-reviewer / security-reviewer / arch-reviewer : skipped (gate failed)
    Rationale : reviewer le code et son architecture serait gaspilleur tant
    que le code ne respecte pas la spec — il va être réécrit. Économie :
-   3 invocations Sonnet 4.6.
+   3 invocations Sonnet 5.5.
 
 Débloquer :
   1. Lire {n}-spec-compliance.md §Findings (ACs not_verified + suggestions)
@@ -281,9 +289,12 @@ Distinct de `--unsequenced` (qui adresse la gate API back/front, pas auditor).
 
 ## 8. Enforcement
 
-- `commands/dev-run.md §STEP 6.4` : Read par référence au STEP 6.4.
-  Substance opérationnelle ICI, pas dans dev-run.md (cf. hoist v7.0.1
-  audit REFACTOR-4 2026-06-08).
+- Séquencement : `sdd_full_planner.py next-action` (action `procedure`,
+  phase `auditor_batch`) puis `record --phase auditor_batch --verdict …`.
+  Substance opérationnelle ICI (hoist v7.0.1 REFACTOR-4, déplacée hors de
+  `/dev-run` le 2026-11-07).
+- Ordre mécanique : hooks `enforce_phase_order` (reviewers après `qa`) et
+  `enforce_two_stage_auditor` (Stage B après Stage A vert/jaune).
 - **Ownership des findings entre reviewers** :
   `@.sdd/rules/auditor-coordination.md` (matrice SSoT, v7.0.1-dev — cette
   règle-ci séquence les stages, la coordination délimite QUI émet QUOI).

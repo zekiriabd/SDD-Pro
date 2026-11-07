@@ -415,6 +415,48 @@ def _emit(args, project, inventory, introspection):
               f"{_clustering_summary(report)}. (Phase 1 OK)")
 
 
+#: Secret embarqué dans une chaîne de connexion passée en argv.
+_ARGV_SECRET_RE = re.compile(
+    r"(?:^|[;\s])(?:password|pwd)\s*=\s*[^;\s]"      # ADO.NET / ODBC / libpq
+    r"|[?&]password=[^&\s]"                           # JDBC / URI query
+    r"|://[^/@\s:]+:[^@\s]+@"                         # URI user:pass@
+    r"|^[^/@\s:]+/[^@\s]+@",                          # Oracle user/pass@
+    re.IGNORECASE,
+)
+
+#: Env var portant la chaîne de connexion complète (jamais en argv).
+CONN_ENV_VAR = "SDD_DB_CONN"
+
+
+def resolve_conn_str(arg_value: str | None, *, stdin=None, environ=None) -> str | None:
+    """Resolve the connection string : `--conn-str` > `$SDD_DB_CONN` > None (stack.md).
+
+    * `--conn-str -` reads ONE line from stdin (no secret in argv / history).
+    * `--conn-str VALUE` is accepted only if VALUE carries no password
+      (`Password=`, `pwd=`, `?password=`, `user:pass@`, Oracle `user/pass@`) —
+      otherwise `ConnStringError` pointing to SDD_DB_CONN / stack.md.
+    """
+    import os as _os
+    env = _os.environ if environ is None else environ
+    if arg_value is not None:
+        if arg_value.strip() == "-":
+            src = sys.stdin if stdin is None else stdin
+            value = (src.readline() or "").strip()
+            if not value:
+                raise ConnStringError(
+                    "[REVERSE_DB_CONFIG_MISSING] --conn-str - : empty stdin")
+            return value
+        if _ARGV_SECRET_RE.search(arg_value):
+            raise ConnStringError(
+                "[REVERSE_DB_CONFIG_MISSING] --conn-str refused : the value carries a "
+                "password (argv leaks to shell history, process list and the agent "
+                f"transcript). Put it in env {CONN_ENV_VAR}, pipe it with "
+                "`--conn-str -`, or use stack.md '## Active Database' with ${DB_PASSWORD}")
+        return arg_value
+    value = (env.get(CONN_ENV_VAR) or "").strip()
+    return value or None
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Phase 1 stored-procedure reverse (read-only).")
     g = ap.add_mutually_exclusive_group(required=True)
@@ -426,9 +468,15 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--workspace", default="workspace", help="workspace root")
     # M6 — accept the form the Tech Lead actually has, instead of forcing a
     # manual decomposition into stack.md keys before anything can run.
+    # Audit sécurité 2026-11 : un mot de passe en argv finit dans l'historique
+    # shell, la liste des process et le transcript de l'agent. `--conn-str`
+    # n'accepte plus qu'une chaîne SANS secret, ou `-` (lecture sur stdin).
+    # Source recommandée : variable d'env SDD_DB_CONN, ou stack.md.
     ap.add_argument("--conn-str", dest="conn_str", default=None,
-                    help="full connection string (ADO.NET/ODBC, JDBC, URI, libpq "
-                         "DSN or Oracle easy-connect) — overrides stack.md")
+                    help="connection string WITHOUT password (ADO.NET/ODBC, JDBC, URI, "
+                         "libpq DSN, Oracle easy-connect), or '-' to read it from stdin. "
+                         "A value carrying a password is refused — use env SDD_DB_CONN "
+                         "or stack.md '## Active Database'. Overrides stack.md")
     ap.add_argument("--db-type", default=None,
                     help="DatabaseType override / hint when --conn-str omits the engine")
     # M6 — scope control, so a 3000-object database is runnable at all.
@@ -467,11 +515,12 @@ def main(argv: list[str] | None = None) -> int:
             project = args.project or introspection.get("database") or "Database"
             project_root = ws / "old" / project
         else:
-            if args.conn_str:
+            conn_str = resolve_conn_str(args.conn_str)
+            if conn_str:
                 # M6 — a connection string is the primary input, no manual
                 # decomposition into stack.md required. Never logged.
                 cfg = parse_connection_string(
-                    args.conn_str, db_type_hint=(args.db_type or "")).to_db_config()
+                    conn_str, db_type_hint=(args.db_type or "")).to_db_config()
             else:
                 cfg = read_db_config(args.stack)
                 if args.db_type:
@@ -504,7 +553,7 @@ def main(argv: list[str] | None = None) -> int:
         print("ERROR: db-reverse Phase 1 failed", file=sys.stderr)
         print(f"CAUSE: {exc}", file=sys.stderr)
         sys.stderr.write("FIX: vérifier '## Active Database' de stack.md (ou "
-                         "--conn-str) + accès lecture seule.\n")
+                         "env SDD_DB_CONN / --conn-str - sur stdin) + accès lecture seule.\n")
         return 2
 
     prior_inventory = _load_json(project_root / ".sys" / INVENTORY_NAME)

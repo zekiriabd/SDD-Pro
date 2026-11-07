@@ -23,6 +23,13 @@ Usage:
     python sdd_state.py list-runs  [--feat-number N] [--limit 10]
     python sdd_state.py emit-event --run-id R --event-type T [--payload-json '{}']
 
+Clôture des runs (audit « fiabilité des données et des états », 2026-11-07) :
+    `end-run` délègue à `sdd_lib.console_db.run_end` (idempotent) et supprime le
+    marker run_id de la session ; `set-phase --phase sdd_review` avec un statut
+    terminal (pass|warn|skip|fail) clôture AUSSI le run (phase finale du
+    pipeline) : pass/skip → completed, warn → completed (verdict WARN),
+    fail → failed (verdict RED). Avant, les runs restaient `running` à vie.
+
 Migrated from .claude/scripts/sdd-state.ps1 (2026-05-13), refactored to SQLite
 (2026-05-17, v6.10).
 """
@@ -42,11 +49,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sdd_lib.console_db import (  # noqa: E402
     connect, ensure_initialized, get_run, get_run_phases, insert_event, list_runs,
-    upsert_run, upsert_run_phase,
+    run_end, upsert_run, upsert_run_phase,
 )
 from sdd_lib.paths import workspace_root, iso_now_ms as iso_now, repo_root  # noqa: E402
 from sdd_lib.stderr import warn  # noqa: E402
 from sdd_lib.exit_codes import FAIL_FAST, SUCCESS  # noqa: E402
+from sdd_lib.delivery_wiring import gate_run_close  # noqa: E402
+
+#: Exit code d'une clôture en succès rétrogradée par le gate de livraison.
+DELIVERY_BLOCKED_EXIT = 2
 
 
 VALID_PHASE_STATUSES = {
@@ -73,7 +84,9 @@ def parse_args() -> argparse.Namespace:
     s_end = sub.add_parser("end-run")
     s_end.add_argument("--run-id", required=True)
     s_end.add_argument("--status", default="success",
-                       choices=["success", "partial", "failed"])
+                       choices=["success", "completed", "partial", "failed"])
+    s_end.add_argument("--verdict", default=None,
+                       help="Verdict agrégé optionnel (GREEN|WARN|RED)")
 
     s_get = sub.add_parser("get-run",
         help="Return the active (or latest, if --latest) run row for a FEAT as JSON.")
@@ -238,6 +251,16 @@ def action_set_phase(args: argparse.Namespace) -> int:
     ensure_initialized()
     now = iso_now()
     payload = parse_payload(args.payload_json)
+    # Gate de livraison (2026-11-07) : la phase finale clôt le run ; un
+    # `completed|partial` n'est écrit que si authorize_delivery l'autorise.
+    closing = _FINAL_PHASE_CLOSE.get(args.status) if args.phase == FINAL_PHASE else None
+    gate_error: str | None = None
+    if closing is not None:
+        g_status, g_verdict, gate_error, _ = gate_run_close(args.run_id, *closing)
+        if g_status != closing[0]:
+            closing = (g_status, g_verdict)
+        else:
+            gate_error = None
     with connect() as conn:
         row = get_run(conn, args.run_id)
         if row is None:
@@ -288,10 +311,30 @@ def action_set_phase(args: argparse.Namespace) -> int:
             conn, event_type=event_type, ts=now, run_id=args.run_id,
             feat_n=feat_n, phase=args.phase, payload=evt_payload,
         )
+
+        if closing is not None:
+            run_status, verdict = closing
+            run_end(conn, args.run_id, run_status, verdict, error_message=gate_error,
+                    source=f"set-phase:{FINAL_PHASE}")
+    if closing is not None:
+        _clear_marker(args.run_id)
+    if gate_error:
+        warn(f"ERROR: run {args.run_id} — livraison refusée, run clos failed\n"
+             f"CAUSE: {gate_error}\n"
+             f"FIX: verify_build.py / verify_tests.py / delivery_gate.py record-* "
+             f"puis delivery_gate.py authorize (exit 0)")
+        return DELIVERY_BLOCKED_EXIT
     return SUCCESS
 def action_end_run(args: argparse.Namespace) -> int:
     ensure_initialized()
     now = iso_now()
+    # Gate de livraison (2026-11-07) : success|completed|partial d'un run de
+    # workflow de livraison → authorize_delivery ; refus → failed/RED.
+    requested = args.status
+    args.status, gated_verdict, gate_error, _ = gate_run_close(
+        args.run_id, args.status, getattr(args, "verdict", None))
+    if args.status != requested:
+        args.verdict = gated_verdict
     with connect() as conn:
         row = get_run(conn, args.run_id)
         if row is None:
@@ -305,16 +348,38 @@ def action_end_run(args: argparse.Namespace) -> int:
         except (ValueError, AttributeError, TypeError):
             dur_ms = 0
 
-        upsert_run(
-            conn, run_id=args.run_id, command=row["command"],
-            ended_at=now, status=args.status,
+        updated = run_end(
+            conn, args.run_id, args.status, getattr(args, "verdict", None),
+            ended_at=now, error_message=gate_error, source="sdd_state.end-run",
         )
-        insert_event(
-            conn, event_type="run.end", ts=now, run_id=args.run_id,
-            feat_n=feat_n, payload={"status": args.status, "durationMs": dur_ms},
-        )
-    print(f"run {args.run_id} ended status={args.status} durationMs={dur_ms}")
+        if updated:
+            # run_end emitted the canonical run.end event ; enrich with duration
+            # for report_roi (kept as a separate, typed event field).
+            conn.execute(
+                "UPDATE events SET payload_json = json_set(COALESCE(payload_json,'{}'),"
+                " '$.durationMs', ?) WHERE id = (SELECT MAX(id) FROM events "
+                " WHERE run_id = ? AND event_type = 'run.end')",
+                (dur_ms, args.run_id),
+            )
+    _clear_marker(args.run_id)
+    state = "ended" if updated else "already ended (idempotent)"
+    print(f"run {args.run_id} {state} status={args.status} durationMs={dur_ms}")
+    if args.status != requested:
+        warn(f"ERROR: run {args.run_id} — end-run {requested} refusé, run clos failed\n"
+             f"CAUSE: {gate_error}\n"
+             f"FIX: verify_build.py / verify_tests.py / delivery_gate.py record-* "
+             f"puis delivery_gate.py authorize (exit 0)")
+        return DELIVERY_BLOCKED_EXIT
     return SUCCESS
+def _clear_marker(run_id: str) -> None:
+    """Drop the session run_id marker once its run is closed (best effort)."""
+    try:
+        from sdd_lib.run_id import clear_run_id_marker
+        clear_run_id_marker(run_id=run_id)
+    except Exception:  # noqa: BLE001 — never fail a close on marker cleanup
+        pass
+
+
 def action_get_run(args: argparse.Namespace) -> int:
     ensure_initialized()
     with connect() as conn:
@@ -449,6 +514,19 @@ _PIPELINE_PHASES_ORDER: tuple[tuple[str, str], ...] = (
 
 _RESUME_DONE_STATUSES = {"pass", "warn", "success", "skip"}
 
+#: Final pipeline phase — its terminal status closes the run (audit 2026-11-07).
+FINAL_PHASE = "sdd_review"
+#: set-phase status → (run status, verdict) for FINAL_PHASE.
+_FINAL_PHASE_CLOSE: dict[str, tuple[str, str | None]] = {
+    "pass":    ("completed", "GREEN"),
+    "success": ("completed", "GREEN"),
+    "warn":    ("completed", "WARN"),
+    "skip":    ("completed", None),
+    "fail":    ("failed", "RED"),
+    "failed":  ("failed", "RED"),
+    "partial": ("partial", "WARN"),
+}
+
 #: Phases auxiliaires trackées hors routing --resume (observabilité seule).
 #: Elles n'apparaissent PAS dans _PIPELINE_PHASES_ORDER (resume-target les
 #: ignore) mais sont des noms légitimes pour `set-phase` — émises par
@@ -457,7 +535,10 @@ _RESUME_DONE_STATUSES = {"pass", "warn", "success", "skip"}
 _AUX_PHASES: frozenset[str] = frozenset({
     "doc_refresh",            # sdd-full STEP 4.45 (refresh INDEX ADRs)
     "feat_validate_postdev",  # sdd-full STEP 4.7 (spec-compliance gate post-dev)
-    "auditor_batch",          # dev-run STEP 6.4.5 (two-stage auditor)
+    "auditor_batch",          # sdd-full phase auditor_batch (two-stage auditor, après qa)
+    "dev_backend",            # dev-run preflight (phase_planner.decide_dev_phases)
+    "api_gate",               # dev-run preflight / STEP 6.b
+    "dev_frontend",           # dev-run preflight (phase_planner.decide_dev_phases)
 })
 
 #: Alias legacy (pré-audit F-M2 2026-08-30) → nom canonique. Les vieux

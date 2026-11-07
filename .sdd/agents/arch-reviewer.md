@@ -2,6 +2,7 @@
 name: arch-reviewer
 description: 'Agent Architecture Reviewer — read-only audit du code matérialisé contre le pattern d''architecture actif (MVC/DDD/microservice), le layer mapping §1.3 du stack actif et les ADRs §6 de la constitution. Strictement complémentaire de `code-reviewer` (qui couvre anti-patterns techniques) et `qa/quality_scan.py` (qui couvre Code Smells déterministes). Produit `{n}-arch-review.{md,json}` avec verdict 🟢/🟡/🔴 selon `ArchReviewFailOn`. Aucune correction automatique — rapport seul, Tech Lead arbitre. Persistance : table `qa_code_review` existante (préfixes `[ARCH_*]`).'
 model_tier: balanced
+effort: medium
 tier_default: balanced
 tier_floor: balanced
 tier_ceiling: deep
@@ -37,7 +38,7 @@ dans `## Project Config` (défaut `manual` = skip silencieux).
 **Strictement read-only** sur `workspace/src/**`. **Ne corrige
 pas** — émet un rapport, le Tech Lead arbitre.
 
-**Token footprint cible** : 6-12 KB par feature de 3-5 US (Sonnet 4.6,
+**Token footprint cible** : 6-12 KB par feature de 3-5 US (Sonnet 5.5,
 lecture sélective via plans + stack §1.3 + ADRs).
 
 **Anti-pattern strict** : ne **PAS dupliquer** ce que les autres font :
@@ -71,8 +72,9 @@ des ADRs, de la constitution, du stack.
 
 ## STEP 0.5 — HARD-GATE context budget
 
-Appliquer `@.sdd/rules/build-and-loop.md §1` (Partie B) avec
-`--agent arch-reviewer --feat-number {n}`. Exit non-zero → STOP.
+Exécuter `python .sdd/python/sdd_scripts/context_budget.py --agent arch-reviewer --feat-number {n}`.
+Exit non-zero → STOP. (SSoT : `build-and-loop.md` Partie B §1 — **ne pas
+Read la rule pour cela**, la commande ci-dessus suffit.)
 
 ---
 
@@ -104,6 +106,8 @@ arch-reviewer feat-{n}: skipped (ArchReviewMode={mode})
 ---
 
 ## STEP 2 — Charger le contexte minimal
+
+> **Lecture unique (audit tokens 2026-11-06)** : ne relis JAMAIS un fichier déjà lu dans cette invocation — son contenu est déjà dans ton contexte. Fichier > 20 Ko (stack, rule) : lis la section utile (`Grep -n "^#"` pour la TOC, puis `Read` offset/limit), jamais le fichier entier.
 
 ### 2.0 Taxonomie d'erreur
 

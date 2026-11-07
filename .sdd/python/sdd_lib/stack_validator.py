@@ -38,6 +38,9 @@ def validate_active_stacks_coherence(stacks: dict[str, Any]) -> dict[str, str] |
     - fullstack + (backend OR frontend) → mutuellement exclusif
     - frontend + mobiles → frontendKind unique
     - fullstack + mobiles → idem
+    - desktop + (fullstack OR frontend OR mobiles) → un seul client
+      (catégorie desktop/ ajoutée 2026-09-02, alignée sur
+      preflight.validate_stack_combo — câblage manquant ici jusqu'au 2026-10-10)
 
     Aucun cas n'est marqué WARN — toute incohérence est bloquante car
     elle empêche la sélection univoque d'AppType par les commands.
@@ -48,7 +51,7 @@ def validate_active_stacks_coherence(stacks: dict[str, Any]) -> dict[str, str] |
             "code": "STACK_MALFORMED",
             "message": (
                 "aucun stack actif dans workspace/stack/stack.md — "
-                "décommenter au moins un stack backend/frontend/fullstack/mobiles "
+                "décommenter au moins un stack backend/frontend/fullstack/mobiles/desktop "
                 "dans `## Active Tech Specs`."
             ),
         }
@@ -56,6 +59,7 @@ def validate_active_stacks_coherence(stacks: dict[str, Any]) -> dict[str, str] |
     has_backend = bool(stacks.get("backend"))
     has_frontend = bool(stacks.get("frontend"))
     has_mobiles = bool(stacks.get("mobiles"))
+    has_desktop = bool(stacks.get("desktop"))
 
     if has_fullstack and (has_backend or has_frontend):
         return {
@@ -81,6 +85,14 @@ def validate_active_stacks_coherence(stacks: dict[str, Any]) -> dict[str, str] |
             "message": (
                 f"mix interdit : fullstack/* + mobiles/* — décider un AppType unique "
                 f"(fullstack={stacks.get('fullstack')!r} vs mobiles={stacks.get('mobiles')!r})."
+            ),
+        }
+    if has_desktop and (has_fullstack or has_frontend or has_mobiles):
+        return {
+            "code": "STACK_MALFORMED",
+            "message": (
+                f"mix interdit : desktop/* est exclusif de fullstack/*, frontend/* et "
+                f"mobiles/* — un seul client par projet (desktop={stacks.get('desktop')!r})."
             ),
         }
     return None

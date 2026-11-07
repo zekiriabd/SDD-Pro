@@ -45,7 +45,7 @@ paths:
 2. **Pré-emit best-effort** : un reviewer Stage B peut Read le rapport
    d'un pair s'il existe déjà au démarrage et exclure les findings
    couverts (ex. security-reviewer lit `{n}-code-review.json`). En
-   parallèle `/dev-run §6.4.B` le fichier est souvent absent → skip
+   parallèle Stage B (phase `auditor_batch` de `/sdd-full`) le fichier est souvent absent → skip
    silent, le post-hoc prend le relais. **Jamais bloquant.**
 
 ## 3. Règles mentales

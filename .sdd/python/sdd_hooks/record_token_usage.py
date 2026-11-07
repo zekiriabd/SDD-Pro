@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""SDD_Pro telemetry hook — record real token usage per subagent invocation.
+"""SDD_Pro telemetry hook — record REAL token usage per agent, from transcripts.
 
-Fires on `PostToolUse` (matcher=Agent) and `SubagentStop` to capture token
-usage exposed by Claude Code in the tool_response payload.
+Fires on `SubagentStop` (sous-agents), `Stop` (session principale =
+orchestrateur) et `PostToolUse` matcher=Agent (legacy, voir §PostToolUse).
 
 Mode resolved with explicit precedence (highest wins) :
     1. env $SDD_TOKEN_USAGE_MODE (debug override, dev/CI)
@@ -11,46 +11,44 @@ Mode resolved with explicit precedence (highest wins) :
     3. "off" (hard default if config unreadable)
 
 Modes:
-    - "off"    : silent skip, exit 0 (v6.4.2 strict behaviour)
-    - "record" : insert row into workspace/db/console.db (token_usage)
+    - "off"    : silent skip, exit 0
+    - "record" : insert/update rows in workspace/db/console.db (token_usage)
     - "debug"  : record + dump full payload to .audit/token-debug/
 
-v7.0.0 — config-aware mode resolution. Previous versions only read the env
-var, which silently ignored the v7.0.0 default flip in config.base.yml
-(TokenUsageMode: "record"). Now the layered config is honored, env var
-remains a debug escape hatch.
+Audit tokens 2026-11-07 — pourquoi ce hook enregistrait des zéros
+-----------------------------------------------------------------
+Le tool `Agent` est asynchrone : son `PostToolUse` se déclenche au LANCEMENT
+du sous-agent, sans `usage`. Le payload `SubagentStop` ne porte pas d'usage
+non plus. Résultat sur le run réel du 2026-11-06 : 157 lignes, 65 tokens
+d'entrée cumulés, pour ≈100 $ facturés. Quand octobre remontait quelque
+chose, c'était le seul dernier tour (sous-comptage ×7 à ×126).
 
-v6.10 — telemetry now persists in console.db (token_usage table). The
-former token-usage.jsonl ledger has been retired; readers must query the
-DB via sdd_lib.console_db.connect().
+La donnée réelle vit dans les transcripts JSONL de Claude Code
+(`sdd_lib/transcript_usage.py` sait les lire, dédupliqués par `message.id`) :
 
-Design: defensive multi-path lookup of the `usage` block — Claude Code
-hook payload schema may evolve, and the same field can live under
-`tool_response.usage`, `tool_response.message.usage`, or top-level
-`usage`. We try them all and tag the source for forensics.
+  * `SubagentStop` → transcript du sous-agent (`agent_transcript_path`, sinon
+    `<dir>/<session>/subagents/agent-<agent_id>.jsonl`, sinon le plus récent
+    sous `subagents/`). Somme de TOUS les tours, une ligne par modèle réel,
+    `agent` = `agent_type` du payload. Idempotent par `agent_id` (ledger).
+  * `Stop` → transcript de la session (`transcript_path`). L'usage de
+    l'orchestrateur (`agent='orchestrator'`) est **upserté** par
+    (run_id, session_id, modèle) : chaque Stop recalcule le total de la
+    session et met à jour la ligne au lieu d'en ajouter une. Si le run_id
+    change au sein d'une même session, seule la différence est attribuée au
+    nouveau run.
+  * `PostToolUse` Agent → plus AUCUNE ligne. Asynchrone : pas d'usage ;
+    synchrone : `tool_response.usage` = dernier appel seulement. Le câblage
+    peut être retiré de settings.json (no-op conservé pour compatibilité).
 
-Output schema (one JSON object per line in token-usage.jsonl):
-    {
-      "ts": "2026-05-15T14:32:18.123Z",
-      "hook_event": "PostToolUse.Agent" | "SubagentStop",
-      "subagent_type": "dev-backend" | null,
-      "feat": 1 | null,
-      "us_id": "1-2" | null,
-      "model": "claude-opus-4-8" | null,
-      "input_tokens": 42153,
-      "output_tokens": 8721,
-      "cache_creation_input_tokens": 3210,
-      "cache_read_input_tokens": 15432,
-      "raw_usage_found": true,
-      "usage_source_path": "tool_response.usage"
-    }
+Le ledger `workspace/.sys/.state/token-usage-ledger.json` (verrou
+`.lock`, écriture atomique) tient l'idempotence sans toucher au schéma de
+`console.db` (lot distinct). La provenance (`usage_source=transcript|payload`)
+est tracée dans `agent_journal.notes`.
 
 Non-blocking by design — always exit 0. A failure of telemetry must never
-break the pipeline. The ledger is informational, consumed by
-report_token_usage.py for aggregation.
-
-v6.5.1 — additive feature, opt-in via env var. Default mode "off"
-guarantees byte-identical behaviour vs v6.4.2 when not enabled.
+break the pipeline, but it must never be silent either : every write failure
+lands in `.audit/token-telemetry-failures.log` + a counter read by
+`preflight_cost_cap`.
 """
 from __future__ import annotations
 
@@ -69,11 +67,28 @@ from sdd_lib.hook_input import (  # noqa: E402
     get_subagent_type,
     read_hook_input,
 )
-from sdd_lib.paths import workspace_root, iso_now_ms, repo_root  # noqa: E402
+from sdd_lib.paths import audit_dir_path, workspace_root, iso_now_ms, repo_root  # noqa: E402
 from sdd_lib.exit_codes import HOOK_ALLOW  # noqa: E402
+from sdd_lib.stderr import warn  # noqa: E402
+from sdd_lib.transcript_usage import (  # noqa: E402
+    TranscriptUsage,
+    UsageTotals,
+    locate_session_transcript,
+    locate_subagent_transcript,
+    read_transcript_usage,
+)
 
 # Valid modes (lower-cased, env + config normalized to these)
 VALID_MODES: frozenset[str] = frozenset({"off", "record", "debug"})
+
+#: Label de la ligne `token_usage` portant l'usage de la session principale.
+ORCHESTRATOR_AGENT = "orchestrator"
+
+#: Événements de hook traités comme « session principale ».
+_SESSION_EVENTS: frozenset[str] = frozenset({"Stop", "SessionEnd"})
+
+#: Nombre maximal de sous-agents mémorisés dans le ledger (idempotence).
+_LEDGER_MAX_SUBAGENTS = 2000
 
 # Module-level memo of the resolved mode. The mode is invariant within a
 # pipeline run (config files are not edited mid-run, env vars set at spawn),
@@ -123,8 +138,9 @@ def _resolve_mode() -> str:
     return "off"
 
 
-# Candidate paths in the payload where `usage` may live.
-# Tried in order; first hit wins. usage_source_path is recorded for forensics.
+# Candidate paths in the payload where `usage` may live (legacy synchronous
+# harnesses). Tried in order; first hit wins. usage_source_path is recorded
+# for forensics.
 USAGE_CANDIDATE_PATHS: tuple[tuple[str, ...], ...] = (
     ("tool_response", "usage"),
     ("tool_response", "message", "usage"),
@@ -176,17 +192,15 @@ def _model_from_agent_tier(subagent: str | None) -> str | None:
     every row of the live console.db : the `PostToolUse.Agent` /
     `SubagentStop` payloads simply do not carry a `model` field (they wrap a
     *tool* response, not a raw API message), so `_find_model` always returned
-    None. A NULL model makes `preflight_cost_cap` price the row with
-    FALLBACK_PRICING (Sonnet) — a silent ~5x under-count for the Opus-tier
-    dev agents, and it also defeated the `[PRICING_UNKNOWN]` guard.
+    None.
 
-    We therefore reconstruct the id deterministically from what SDD_Pro
-    *does* know : the agent's `model_tier` (or `tier_default`) frontmatter in
-    `.sdd/agents/{name}.md`, mapped through the active provider's `tier_map`
-    (`.sdd/providers/{provider}.yaml`). This is an approximation of the
-    routed model, not a billing oracle — but it is a *correct-tier*
-    approximation, which is exactly what the cost cap needs, and it is
-    strictly better than NULL.
+    Since the audit tokens 2026-11-07 the transcript carries the REAL model
+    per message, so this is only reached when the transcript is unavailable
+    (legacy payload path). We reconstruct the id deterministically from what
+    SDD_Pro *does* know : the agent's `model_tier` (or `tier_default`)
+    frontmatter in `.sdd/agents/{name}.md`, mapped through the active
+    provider's `tier_map` (`.sdd/providers/{provider}.yaml`). A correct-tier
+    approximation, strictly better than NULL.
 
     Never raises : telemetry must not break a pipeline.
     """
@@ -236,8 +250,8 @@ def _find_model(payload: dict[str, Any], subagent: str | None = None) -> str | N
          see :func:`_model_from_agent_tier`.
 
     Returning None here writes a NULL `token_usage.model`, which the cost cap
-    now treats as `[PRICING_UNKNOWN]` rather than silently pricing at Sonnet
-    rates — so a None result is loud, not free.
+    prices at the conservative tariff and reports — a None result is loud,
+    not free.
     """
     candidates = (
         ("tool_response", "model"),
@@ -262,24 +276,76 @@ def _find_model(payload: dict[str, Any], subagent: str | None = None) -> str | N
     return _model_from_agent_tier(subagent)
 
 
-def _extract_feat_and_us(payload: dict[str, Any]) -> tuple[int | None, str | None]:
-    """Re-use the regex pattern from preflight_agent_budget for consistency."""
+# Audit télémétrie 2026-11-07 : l'ancien motif `\b(\d{1,3})-(\d{1,3})` prenait
+# n'importe quel « N-M » d'un prompt libre pour une US — dates (`2026-10-10` →
+# US `10-10`, `11-06`, `09-02`), plages de lignes (`84-92`, `201-215`) — et
+# attribuait le coût à des FEAT inexistantes. Deux défenses :
+#   1. le motif refuse un N-M précédé d'un mot / `-` / `.` / `:` ou suivi d'un
+#      séparateur + chiffre (dates, versions, heures) — un chemin
+#      `workspace/us/15-1-Name.md` ou une fin de phrase `US 15-2.` restent lus ;
+#   2. `_known_ids()` confronte chaque candidat aux US/FEAT réellement présentes
+#      sur disque (`workspace/us/{n}-{m}-*.md`, `workspace/feats/{n}-*.md`) —
+#      seule parade contre une plage `84-92`, syntaxiquement identique à une US.
+_US_RE = re.compile(
+    r"(?<![\w\-.:])(\d{1,3})-(\d{1,3})(?:-[A-Za-z][A-Za-z0-9\-]*)?(?!\w|[\-.:/]\d)"
+)
+_FEAT_RE = re.compile(
+    r"(?i)\b(?:FEAT|feat-?|sdd-full|us-generate|dev-run|dev-plan|qa-generate)"
+    r"\s*[-:]?\s*(\d{1,3})(?![\d\-./:]\d|\d)",
+)
+_US_FILE_RE = re.compile(r"^(\d{1,3})-(\d{1,3})-")
+_FEAT_FILE_RE = re.compile(r"^(\d{1,3})-[A-Za-z]")
+
+
+def _known_ids(root: Path | None = None) -> tuple[set[str], set[int]] | None:
+    """US ids (`n-m`) and FEAT numbers present on disk, or None if unknowable.
+
+    None (workspace introuvable ou sans aucune US/FEAT) → pas de validation :
+    l'extraction retombe sur le seul contrat syntaxique.
+    """
+    try:
+        ws = workspace_root(root or repo_root())
+        us = {f"{int(m.group(1))}-{int(m.group(2))}"
+              for f in (ws / "us").glob("*.md") if (m := _US_FILE_RE.match(f.name))}
+        feats = {int(m.group(1))
+                 for f in (ws / "feats").glob("*.md") if (m := _FEAT_FILE_RE.match(f.name))}
+    except OSError:
+        return None
+    if not us and not feats:
+        return None
+    return us, feats
+
+
+def _extract_feat_and_us_from_text(
+    haystack: str,
+    known: tuple[set[str], set[int]] | None = None,
+) -> tuple[int | None, str | None]:
+    """First US (`n-m`) or FEAT number found in a free-text haystack.
+
+    `known` = `(us_ids, feat_numbers)` from `_known_ids()` : when given, a
+    candidate absent from disk is skipped and the next match is tried.
+    """
+    text = haystack or ""
+    known_us, known_feats = known if known is not None else (None, None)
+    for m in _US_RE.finditer(text):
+        us_id = f"{int(m.group(1))}-{int(m.group(2))}"
+        if known_us is None or us_id in known_us:
+            return int(m.group(1)), us_id
+    for m in _FEAT_RE.finditer(text):
+        n = int(m.group(1))
+        if known_feats is None or n in known_feats:
+            return n, None
+    return None, None
+
+
+def _extract_feat_and_us(
+    payload: dict[str, Any],
+    known: tuple[set[str], set[int]] | None = None,
+) -> tuple[int | None, str | None]:
+    """Same contract as `_extract_feat_and_us_from_text`, on prompt + description."""
     prompt = get_nested(payload, "tool_input", "prompt", default="") or ""
     descr = get_nested(payload, "tool_input", "description", default="") or ""
-    haystack = f"{prompt} {descr}"
-
-    m_us = re.search(r"\b(\d{1,3})-(\d{1,3})(?:-[A-Za-z][A-Za-z0-9\-]*)?\b", haystack)
-    if m_us:
-        return int(m_us.group(1)), f"{m_us.group(1)}-{m_us.group(2)}"
-
-    m_feat = re.search(
-        r"(?i)\b(?:FEAT|feat-?|sdd-full|us-generate|dev-run|dev-plan|qa-generate)"
-        r"\s*[-:]?\s*(\d{1,3})\b",
-        haystack,
-    )
-    if m_feat:
-        return int(m_feat.group(1)), None
-    return None, None
+    return _extract_feat_and_us_from_text(f"{prompt} {descr}", known)
 
 
 def _hook_event_name(payload: dict[str, Any]) -> str:
@@ -300,61 +366,147 @@ def _hook_event_name(payload: dict[str, Any]) -> str:
     return "SubagentStop"
 
 
-def _persist_to_db(entry: dict[str, Any]) -> None:
-    """Insert one row into console.db (table token_usage).
+# --------------------------------------------------------------------------- #
+# Ledger d'idempotence (sidecar JSON, hors schéma console.db)
+# --------------------------------------------------------------------------- #
 
-    Concurrent inserts are handled by SQLite WAL + busy_timeout=5s,
-    so we don't need a per-file lock anymore.
+def _ledger_path(root: Path | None = None) -> Path:
+    return workspace_root(root or repo_root()) / ".sys" / ".state" / "token-usage-ledger.json"
 
-    v7.0.0 audit P1 fix 2026-05-20 — scope par run_id (env $SDD_RUN_ID,
-    set par sdd_state.py au début de /sdd-full). Permet à
-    preflight_cost_cap.py de filtrer par run_id exact au lieu de la
-    fenêtre temporelle started_at/ended_at (fragile en concurrence)."""
-    ensure_initialized()
+
+def _load_ledger(path: Path) -> dict[str, Any]:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        data = {}
+    if not isinstance(data, dict):
+        data = {}
+    subs = data.get("subagents")
+    sess = data.get("sessions")
+    data["subagents"] = subs if isinstance(subs, dict) else {}
+    data["sessions"] = sess if isinstance(sess, dict) else {}
+    return data
+
+
+def _save_ledger(path: Path, data: dict[str, Any]) -> None:
+    subs = data.get("subagents") or {}
+    if len(subs) > _LEDGER_MAX_SUBAGENTS:
+        # Garder les plus récents (clé de tri : ts ISO, lexicographique).
+        keep = sorted(subs.items(), key=lambda kv: str(kv[1].get("ts") or ""))[-_LEDGER_MAX_SUBAGENTS:]
+        data["subagents"] = dict(keep)
+    from sdd_lib.atomic_write import atomic_write_text
+    atomic_write_text(path, json.dumps(data, ensure_ascii=False, indent=1) + "\n")
+
+
+class _LedgerLock:
+    """Verrou fichier O_EXCL autour du ledger (SubagentStop parallèles)."""
+
+    def __init__(self, ledger: Path) -> None:
+        self._lock = ledger.with_name(ledger.name + ".lock")
+        self._held = False
+
+    def __enter__(self) -> "_LedgerLock":
+        from sdd_lib.file_locks import acquire_with_retry
+        self._lock.parent.mkdir(parents=True, exist_ok=True)
+        acquire_with_retry(self._lock, payload_prefix="token-usage",
+                           ttl_ms=5000, retry_count=20, backoff_ms=50)
+        self._held = True
+        return self
+
+    def __exit__(self, *_exc: Any) -> bool:
+        if self._held:
+            from sdd_lib.file_locks import release
+            release(self._lock)
+        return False
+
+
+# --------------------------------------------------------------------------- #
+# Persistance console.db
+# --------------------------------------------------------------------------- #
+
+#: `session_id` du payload courant — transmis à `get_or_create_run_id` pour
+#: que le run_id soit scopé à la session Claude Code (sans lui, le run_id
+#: retombe en mode legacy partagé 24 h ; API du lot données/états 2026-11-07).
+_SESSION_ID: str | None = None
+
+
+def _resolve_run_id() -> str | None:
     # v7.0.1 : always resolve a stable run_id via sdd_lib/run_id helper
     # (env > workspace marker > generated). Avoids null run_id rows that
     # broke per-run aggregation in preflight_cost_cap.
     try:
         from sdd_lib.run_id import get_or_create_run_id
-        run_id = get_or_create_run_id()
+        if _SESSION_ID:
+            return get_or_create_run_id(session_id=_SESSION_ID)
+        return get_or_create_run_id()
     except Exception:
-        run_id = (os.environ.get("SDD_RUN_ID") or "").strip() or None
+        return (os.environ.get("SDD_RUN_ID") or "").strip() or None
+
+
+def _ensure_run_row(conn, run_id: str | None) -> str | None:
+    """Upsert the parent `runs` row (FK token_usage.run_id → runs.run_id).
+
+    Idempotent and inexpensive. On failure, fall back to a NULL run_id so the
+    token row itself is preserved.
+    """
+    if not run_id:
+        return None
+    try:
+        from sdd_lib.console_db import upsert_run
+        upsert_run(conn, run_id=run_id,
+                   command=os.environ.get("SDD_RUN_COMMAND") or "hook",
+                   status="running")
+        return run_id
+    except Exception:
+        return None
+
+
+def _insert_row(conn, entry: dict[str, Any], run_id: str | None) -> int:
+    insert_token_usage(
+        conn,
+        agent=entry.get("subagent_type") or "unknown",
+        model=entry.get("model"),
+        ts=entry.get("ts"),
+        run_id=run_id,
+        feat_n=entry.get("feat"),
+        us_id=entry.get("us_id"),
+        input_tokens=int(entry.get("input_tokens") or 0),
+        output_tokens=int(entry.get("output_tokens") or 0),
+        cache_creation_tokens=int(entry.get("cache_creation_input_tokens") or 0),
+        cache_read_tokens=int(entry.get("cache_read_input_tokens") or 0),
+    )
+    row = conn.execute("SELECT last_insert_rowid()").fetchone()
+    return int(row[0]) if row else 0
+
+
+def _update_row(conn, row_id: int, entry: dict[str, Any]) -> bool:
+    cur = conn.execute(
+        "UPDATE token_usage SET ts = ?, model = ?, input_tokens = ?, output_tokens = ?, "
+        "cache_creation_tokens = ?, cache_read_tokens = ? WHERE id = ?",
+        (
+            entry.get("ts"), entry.get("model"),
+            int(entry.get("input_tokens") or 0),
+            int(entry.get("output_tokens") or 0),
+            int(entry.get("cache_creation_input_tokens") or 0),
+            int(entry.get("cache_read_input_tokens") or 0),
+            int(row_id),
+        ),
+    )
+    return cur.rowcount > 0
+
+
+def _persist_to_db(entry: dict[str, Any]) -> None:
+    """Insert one row into console.db (table token_usage) + journal it.
+
+    Used by the payload path (usage carried by the hook payload itself) and
+    by the SubagentStop path (one call per model). Concurrent inserts are
+    handled by SQLite WAL + busy_timeout=5s.
+    """
+    ensure_initialized()
+    run_id = _resolve_run_id()
     with connect() as conn:
-        # v7.0.0-alpha P0 fix 2026-05-21 — upsert a parent runs row before
-        # inserting token_usage. Required by FK constraint
-        # token_usage.run_id -> runs(run_id). Previously masked by the
-        # silently-broken `find_project_root` import (ran the except branch,
-        # producing NULL run_id rows which SQLite allowed). With run_id.py
-        # fixed, we always have a valid run_id but no guarantee that the
-        # orchestrator (/sdd-full STEP 1.ter) was the one that created
-        # the runs row — e.g. ad-hoc Agent calls outside /sdd-full. The
-        # upsert is idempotent and inexpensive.
-        if run_id:
-            try:
-                from sdd_lib.console_db import upsert_run
-                upsert_run(
-                    conn,
-                    run_id=run_id,
-                    command=os.environ.get("SDD_RUN_COMMAND") or "hook",
-                    status="running",
-                )
-            except Exception:
-                # Defensive : never break the token record path on a parent
-                # upsert error — fall back to NULL run_id to preserve the row.
-                run_id = None
-        insert_token_usage(
-            conn,
-            agent=entry.get("subagent_type") or entry.get("hook_event") or "unknown",
-            model=entry.get("model"),
-            ts=entry.get("ts"),
-            run_id=run_id,
-            feat_n=entry.get("feat"),
-            us_id=entry.get("us_id"),
-            input_tokens=int(entry.get("input_tokens") or 0),
-            output_tokens=int(entry.get("output_tokens") or 0),
-            cache_creation_tokens=int(entry.get("cache_creation_input_tokens") or 0),
-            cache_read_tokens=int(entry.get("cache_read_input_tokens") or 0),
-        )
+        run_id = _ensure_run_row(conn, run_id)
+        _insert_row(conn, entry, run_id)
         _record_journal_entry(conn, entry, run_id)
 
 
@@ -364,19 +516,17 @@ def _record_journal_entry(conn, entry: dict[str, Any], run_id: str | None) -> No
     `token_usage` answers « combien ». The journal answers « quoi, pour qui,
     avec quelle fiabilité de prix, et avec quelle issue » — and it is the only
     table that carries `pricing_source`, without which a cost total silently
-    mixes real Opus rates with Sonnet fallback rates.
+    mixes real rates with conservative fallback rates.
 
     Two deliberate limits of what a hook can know, recorded honestly rather
     than guessed :
 
     - `outcome` is `ok` on SubagentStop (the agent completed) and `unknown` on
-      PostToolUse (the tool returned, which does not prove the agent
-      succeeded). Writing `ok` everywhere would make the `failed` counter a
-      decoration.
+      PostToolUse / Stop (the tool returned or the turn ended, which does not
+      prove the agent succeeded). Writing `ok` everywhere would make the
+      `failed` counter a decoration.
     - `context_hash` stays NULL. The hook does not assemble the agent's
-      context, so it cannot hash it. It becomes populated when the runner
-      builds the pack (correction #1 + #4) — and `replay_plan()` already
-      treats a missing hash as « not replayable » rather than as a cache hit.
+      context, so it cannot hash it.
 
     Never raises : telemetry must not break a pipeline.
     """
@@ -400,7 +550,9 @@ def _record_journal_entry(conn, entry: dict[str, Any], run_id: str | None) -> No
             cache_creation_tokens=int(entry.get("cache_creation_input_tokens") or 0),
             outcome=outcome,
             decision=hook_event or None,
-            notes=f"usage_source={entry.get('usage_source_path') or 'none'}",
+            notes=(f"usage_source={entry.get('usage_source') or 'none'}"
+                   + (f" turns={entry['turns']}" if entry.get("turns") else "")
+                   + (f" transcript={entry['transcript']}" if entry.get("transcript") else "")),
         )
     except Exception:
         pass
@@ -421,6 +573,227 @@ def _debug_dump_payload(payload: dict[str, Any], audit_dir: Path) -> None:
         pass
 
 
+# --------------------------------------------------------------------------- #
+# Construction des entrées depuis un transcript
+# --------------------------------------------------------------------------- #
+
+def _entry_from_totals(
+    *,
+    hook_event: str,
+    agent: str,
+    model: str | None,
+    totals: UsageTotals,
+    feat: int | None,
+    us_id: str | None,
+    transcript: Path | None,
+    usage_source: str,
+) -> dict[str, Any]:
+    return {
+        "ts": iso_now_ms(),
+        "hook_event": hook_event,
+        "subagent_type": agent,
+        "feat": feat,
+        "us_id": us_id,
+        "model": model,
+        "input_tokens": totals.input_tokens,
+        "output_tokens": totals.output_tokens,
+        "cache_creation_input_tokens": totals.cache_creation_input_tokens,
+        "cache_read_input_tokens": totals.cache_read_input_tokens,
+        "turns": totals.turns,
+        "usage_source": usage_source,
+        "transcript": transcript.name if transcript else None,
+    }
+
+
+def _entries_from_transcript(
+    usage: TranscriptUsage,
+    *,
+    hook_event: str,
+    agent: str,
+    feat: int | None,
+    us_id: str | None,
+    fallback_model: str | None,
+) -> list[dict[str, Any]]:
+    """Une entrée par modèle réel du transcript (modèle manquant → fallback)."""
+    entries: list[dict[str, Any]] = []
+    for model, totals in usage.by_model.items():
+        if totals.is_empty:
+            continue
+        real_model = None if model == "<unrecorded>" else model
+        entries.append(_entry_from_totals(
+            hook_event=hook_event, agent=agent,
+            model=real_model or fallback_model, totals=totals,
+            feat=feat, us_id=us_id, transcript=usage.path,
+            usage_source="transcript",
+        ))
+    return entries
+
+
+# --------------------------------------------------------------------------- #
+# Branches par événement
+# --------------------------------------------------------------------------- #
+
+def _handle_post_tool_use(payload: dict[str, Any], hook_event: str) -> None:
+    """PostToolUse Agent : n'écrit PLUS RIEN (audit tokens 2026-11-07).
+
+    Deux raisons, l'une ou l'autre suffit :
+      * Agent asynchrone (Claude Code) : le hook part au LANCEMENT du
+        sous-agent, sans usage — la ligne « 0/0/0/0 » qu'on insérait ici était
+        du bruit pur (157 lignes, 65 tokens sur le run du 2026-11-06).
+      * Agent synchrone : `tool_response.usage` ne porte que le DERNIER appel
+        API du sous-agent, pas la somme de ses tours (sous-comptage ×7 à ×126
+        constaté en octobre). Le compter EN PLUS du SubagentStop serait un
+        double comptage partiel.
+    La seule source est le transcript, lu au SubagentStop.
+    """
+    return None
+
+
+def _subagent_label(payload: dict[str, Any]) -> str:
+    """`agent_type` (SubagentStop natif) — PAS `subagent_type` (PostToolUse)."""
+    for key in ("agent_type", "agentType"):
+        v = payload.get(key)
+        if isinstance(v, str) and v.strip():
+            return v.strip()
+    return get_subagent_type(payload) or "unknown-subagent"
+
+
+def _handle_subagent_stop(payload: dict[str, Any], hook_event: str) -> None:
+    agent = _subagent_label(payload)
+    agent_id = payload.get("agent_id") or payload.get("agentId")
+    agent_id = agent_id.strip() if isinstance(agent_id, str) and agent_id.strip() else None
+
+    transcript, strategy = locate_subagent_transcript(payload)
+    entries: list[dict[str, Any]] = []
+    if transcript is not None:
+        usage = read_transcript_usage(transcript)
+        if agent_id is None and usage.agent_id:
+            agent_id = usage.agent_id
+        known = _known_ids()
+        feat, us_id = _extract_feat_and_us_from_text(usage.first_user_text or "", known)
+        if feat is None:
+            feat, us_id = _extract_feat_and_us(payload, known)
+        entries = _entries_from_transcript(
+            usage, hook_event=hook_event, agent=agent, feat=feat, us_id=us_id,
+            fallback_model=_find_model(payload, agent),
+        )
+        if not entries:
+            warn(f"WARN [token-usage] SubagentStop {agent} : transcript sans "
+                 f"usage ({transcript.name}, {usage.lines_total} lignes) — aucune ligne écrite")
+            return
+    else:
+        # Dernier recours : un usage porté par le payload (harnais synchrone).
+        usage_dict, usage_path = _find_usage(payload)
+        if usage_dict is None:
+            warn(f"WARN [token-usage] SubagentStop {agent} : transcript introuvable "
+                 f"({strategy}) et payload sans usage — aucune ligne écrite "
+                 f"(coût NON compté pour ce sous-agent)")
+            return
+        totals = UsageTotals()
+        totals.add(usage_dict)
+        if totals.is_empty:
+            return
+        feat, us_id = _extract_feat_and_us(payload, _known_ids())
+        entries = [_entry_from_totals(
+            hook_event=hook_event, agent=agent, model=_find_model(payload, agent),
+            totals=totals, feat=feat, us_id=us_id, transcript=None,
+            usage_source=f"payload:{usage_path}",
+        )]
+
+    ledger_file = _ledger_path()
+    ensure_initialized()
+    run_id = _resolve_run_id()
+    with _LedgerLock(ledger_file):
+        ledger = _load_ledger(ledger_file)
+        if agent_id and agent_id in ledger["subagents"]:
+            return  # déjà enregistré (double déclenchement du hook)
+        with connect() as conn:
+            run_id = _ensure_run_row(conn, run_id)
+            row_ids = []
+            for entry in entries:
+                row_ids.append(_insert_row(conn, entry, run_id))
+                _record_journal_entry(conn, entry, run_id)
+        if agent_id:
+            ledger["subagents"][agent_id] = {
+                "ts": iso_now_ms(), "agent": agent, "run_id": run_id,
+                "row_ids": row_ids, "strategy": strategy,
+            }
+            _save_ledger(ledger_file, ledger)
+
+
+def _totals_minus(current: UsageTotals, prior: dict[str, int]) -> UsageTotals:
+    out = UsageTotals()
+    out.turns = max(current.turns - int(prior.get("turns") or 0), 0)
+    out.input_tokens = max(current.input_tokens - int(prior.get("input_tokens") or 0), 0)
+    out.output_tokens = max(current.output_tokens - int(prior.get("output_tokens") or 0), 0)
+    out.cache_creation_input_tokens = max(
+        current.cache_creation_input_tokens - int(prior.get("cache_creation_input_tokens") or 0), 0)
+    out.cache_read_input_tokens = max(
+        current.cache_read_input_tokens - int(prior.get("cache_read_input_tokens") or 0), 0)
+    return out
+
+
+def _handle_session_stop(payload: dict[str, Any], hook_event: str) -> None:
+    """Stop : usage de l'orchestrateur, upsert par (run_id, session_id, modèle)."""
+    transcript = locate_session_transcript(payload)
+    if transcript is None:
+        tp = payload.get("transcript_path")
+        warn(f"WARN [token-usage] Stop : transcript_path absent ou introuvable "
+             f"({tp!r}) — usage orchestrateur NON compté")
+        return
+    usage = read_transcript_usage(transcript)
+    session_id = payload.get("session_id") or usage.session_id or transcript.stem
+    if not usage.by_model:
+        return  # session sans tour assistant (rien à compter)
+
+    ledger_file = _ledger_path()
+    ensure_initialized()
+    run_id = _resolve_run_id()
+    with _LedgerLock(ledger_file):
+        ledger = _load_ledger(ledger_file)
+        sess: list[dict[str, Any]] = ledger["sessions"].setdefault(str(session_id), [])
+        if not isinstance(sess, list):
+            sess = []
+            ledger["sessions"][str(session_id)] = sess
+        with connect() as conn:
+            run_id = _ensure_run_row(conn, run_id)
+            for model_key, totals in usage.by_model.items():
+                if totals.is_empty:
+                    continue
+                model = None if model_key == "<unrecorded>" else model_key
+                # Ce qui a déjà été attribué à D'AUTRES runs sur cette session.
+                prior: dict[str, int] = {}
+                current_entry: dict[str, Any] | None = None
+                for e in sess:
+                    if e.get("model") != model_key:
+                        continue
+                    if e.get("run_id") == run_id and current_entry is None:
+                        current_entry = e
+                        continue
+                    for k, v in (e.get("totals") or {}).items():
+                        prior[k] = prior.get(k, 0) + int(v or 0)
+                delta = _totals_minus(totals, prior)
+                entry = _entry_from_totals(
+                    hook_event=hook_event, agent=ORCHESTRATOR_AGENT, model=model,
+                    totals=delta, feat=None, us_id=None, transcript=transcript,
+                    usage_source="transcript",
+                )
+                if current_entry is not None and _update_row(conn, int(current_entry.get("row_id") or 0), entry):
+                    current_entry["totals"] = delta.as_dict()
+                    current_entry["ts"] = entry["ts"]
+                    continue
+                if delta.is_empty:
+                    continue
+                row_id = _insert_row(conn, entry, run_id)
+                _record_journal_entry(conn, entry, run_id)
+                if current_entry is not None:
+                    current_entry.update({"row_id": row_id, "totals": delta.as_dict(), "ts": entry["ts"]})
+                else:
+                    sess.append({"run_id": run_id, "model": model_key, "row_id": row_id,
+                                 "totals": delta.as_dict(), "ts": entry["ts"]})
+        _save_ledger(ledger_file, ledger)
+
+
 def main() -> int:
     mode = _resolve_mode()
     if mode not in {"record", "debug"}:
@@ -433,7 +806,7 @@ def main() -> int:
     if not payload:
         return HOOK_ALLOW
     root = repo_root()
-    audit_dir = workspace_root(root) / ".sys" / ".audit"
+    audit_dir = audit_dir_path(root)
 
     if mode == "debug":
         try:
@@ -441,39 +814,30 @@ def main() -> int:
         except Exception:
             pass  # never block on debug dump
 
-    usage_dict, usage_path = _find_usage(payload)
-    feat, us_id = _extract_feat_and_us(payload)
-    subagent = get_subagent_type(payload)
+    global _SESSION_ID
+    sid = payload.get("session_id")
+    _SESSION_ID = sid.strip() if isinstance(sid, str) and sid.strip() else None
 
-    entry: dict[str, Any] = {
-        "ts": iso_now_ms(),
-        "hook_event": _hook_event_name(payload),
-        "subagent_type": subagent,
-        "feat": feat,
-        "us_id": us_id,
-        "model": _find_model(payload, subagent),
-        "raw_usage_found": usage_dict is not None,
-        "usage_source_path": usage_path,
-    }
-
-    if usage_dict is not None:
-        for field in USAGE_FIELDS:
-            val = usage_dict.get(field)
-            entry[field] = val if isinstance(val, int) else None
-    else:
-        for field in USAGE_FIELDS:
-            entry[field] = None
-
+    hook_event = _hook_event_name(payload)
     try:
-        _persist_to_db(entry)
+        if hook_event.startswith("PostToolUse"):
+            _handle_post_tool_use(payload, hook_event)
+        elif hook_event in _SESSION_EVENTS:
+            _handle_session_stop(payload, hook_event)
+        else:
+            _handle_subagent_stop(payload, hook_event)
     except Exception as exc:
         # Telemetry must never break the pipeline — but we must NOT swallow
         # silently either, or we regress to pre-fix state (0 rows accumulated).
-        # v7.0.0 audit fix : log failure to a fail counter file ; preflight hook
-        # reads it and emits a visible WARN when telemetry is going dark.
+        # Log failure to a fail counter file ; preflight_cost_cap reads it and
+        # emits a visible WARN when telemetry is going dark.
+        warn(f"WARN [token-usage] {hook_event} : écriture télémétrie échouée "
+             f"({type(exc).__name__}: {str(exc)[:160]})")
         _record_telemetry_failure(audit_dir, exc)
         return HOOK_ALLOW
     return HOOK_ALLOW
+
+
 def _record_telemetry_failure(audit_dir: Path, exc: Exception) -> None:
     """Append failure to .audit/token-telemetry-failures.log + maintain counter.
 
@@ -482,8 +846,7 @@ def _record_telemetry_failure(audit_dir: Path, exc: Exception) -> None:
 
     Counter file `.audit/token-telemetry-failure-count` holds the integer
     count since last successful insert. Read by preflight_cost_cap to emit
-    a visible operator alert when telemetry is broken (≥ 3 consecutive
-    failures or any failure within last 5 min)."""
+    a visible operator alert when telemetry is broken."""
     try:
         audit_dir.mkdir(parents=True, exist_ok=True)
         log_path = audit_dir / "token-telemetry-failures.log"
@@ -500,19 +863,9 @@ def _record_telemetry_failure(audit_dir: Path, exc: Exception) -> None:
                     "message": str(exc)[:200],
                 }) + "\n"
             )
-        # Bump counter — BEST-EFFORT, EVENTUAL CONSISTENCY.
-        #
-        # v7.0.1 audit AP-4 2026-06-08 : the read-modify-write below is
-        # NOT atomic. Two parallel hook invocations can race and lose
-        # increments. This is intentionally acceptable :
-        #   - The counter is a DIAGNOSTIC (operator alert when telemetry
-        #     is broken), not a billing primitive.
-        #   - Telemetry failures are rare (~0/1000 invocations normally).
-        #   - The threshold check (≥ 3 consecutive) tolerates undercount
-        #     by 1-2 — operator will still see the alert after enough
-        #     failures accumulate.
-        # If exact counting becomes required, replace with file_locks lock
-        # or SQLite atomic INCREMENT (console_db.token_telemetry_failures).
+        # Bump counter — BEST-EFFORT, EVENTUAL CONSISTENCY (audit AP-4
+        # 2026-06-08 : the read-modify-write is not atomic ; the counter is a
+        # diagnostic, not a billing primitive).
         try:
             cur = int(counter_path.read_text(encoding="utf-8").strip() or "0")
         except (OSError, ValueError):

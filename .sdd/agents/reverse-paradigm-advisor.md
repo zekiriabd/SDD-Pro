@@ -2,6 +2,7 @@
 name: reverse-paradigm-advisor
 description: Conseiller de paradigme + curateur de migration (Phase 2.7, optionnel). Détecte le paradigme du legacy (ex. WebForms event-driven postback) vs celui de la stack cible (ex. React SPA unidirectionnel), documente le gap avec exemples concrets du legacy, et force une décision consciente du Tech Lead. Classe ensuite chaque unité U-N en MIGRATE / DISCARD / HUMAN-DECISION (curation, jamais destructive). Verdict informational/WARN, jamais bloquant. Aucun spawn d'agent.
 model_tier: balanced
+effort: medium
 tier_default: balanced
 tier_floor: balanced
 tier_ceiling: deep

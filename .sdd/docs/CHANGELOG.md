@@ -4,6 +4,64 @@ Format : [version] — date courte. Sections : `Breaking`, `Added`, `Changed`, `
 
 ---
 
+## [v7.1.0-dev] — 2026-11-07 (correction de l'audit du 2026-11-07)
+
+> Audit en quatre lots (hooks, tokens/coûts, architecture, code Python) :
+> la gouvernance était largement déclarative. Cette version rend les
+> contrôles effectifs à l'exécution. Rien n'a été re-benché en 5.5 :
+> les badges validated/bench-validated restent ceux de la génération 4.x.
+
+### Breaking
+
+- **Auditeurs sortis de `/dev-run`** : le two-stage (spec Stage A puis
+  code/security/arch Stage B) est la phase `auditor_batch` de `/sdd-full`,
+  **après `qa`**. `/dev-run` seul ne lance plus d'auditeurs ; `/sdd-review`
+  exige une phase `qa` enregistrée.
+- **Hooks fail-closed** : un crash d'un hook de gate refuse l'outil
+  (`[HOOK_CRASH]`, exit 2) ; seuls les hooks informatifs restent exit 0.
+- **Sous-agents en mode strict** : `protect_framework`, `enforce_tdd`,
+  `block_secret_access` refusent (exit 2) tout appel portant `agent_id` /
+  `agent_type` ; la session principale reste en warn.
+
+### Added
+
+- `enforce_phase_order` (ordre readiness → dev → qa → reviewers) et
+  `enforce_max_parallel` (`MaxParallel` appliqué, réservation en PreToolUse).
+- `block_secret_access` : un sous-agent ne lit ni `.env*` ni les configs
+  générées contenant des secrets réels.
+- `sdd_lib/transcript_usage.py` : usage réel sommé sur **tous** les tours des
+  transcripts JSONL ; l'orchestrateur est compté sur `Stop`.
+- `run_close.py`, `console_db.run_end()`, run-id par session, balayage
+  `stale` des runs inactifs > 24 h.
+- `.claude/skills/` généré depuis `.sdd/skills/` (13 skills chargés).
+- `effort:` par agent (`high` dev/arch, `medium` le reste).
+- `requirements.lock.txt`, paquets `sdd_reverse*` déclarés.
+
+### Fixed
+
+- **Coût réel** : `token_usage` enregistrait 0 (Agent asynchrone, payload sans
+  usage) ou le dernier tour seulement (×7 à ×126 sous-compté). Le cost cap
+  était donc indéclenchable ; il bloque désormais (premier déclenchement réel
+  mesuré : 32,15 $ ≥ 30 $).
+- `audit_file_ownership` ne s'exécutait jamais (`subagent_type` au lieu
+  d'`agent_type` sur `SubagentStop`).
+- `block_env_bypass` : PowerShell, heredocs, `os.environ`, quoting partiel et
+  interrupteurs `SDD_*_MODE` / `SDD_BYPASS_*` / `CI` désormais couverts.
+- `console.db` : migrations transactionnelles idempotentes, plus de lecture
+  `immutable` silencieuse, tests isolés via `SDD_CONSOLE_DB_PATH`.
+- `atomic_write` (tmp unique), `file_locks` (reprise de lock sans vol).
+- `/sdd-full` 855 → 189 lignes, `/dev-run` 919 → 249 : boucle
+  `sdd_full_planner.py next-action` sur l'état réel ; phases backend sautées
+  mécaniquement sans stack `backend/*`.
+- Modèles : tier_map deep/balanced/fast → `claude-opus-5-5` /
+  `claude-sonnet-5-5` / `claude-haiku-5-5` ; tarifs famille 5 ; modèle
+  inconnu = tarif conservateur.
+- Façades Codex/Gemini (36 → 56 stacks) + test de parité des fichiers mémoire.
+- Docs de coût : chiffres « 0,56 $/FEAT », « 99,2 % », « -65 % » retirés,
+  remplacés par les mesures du run FEAT 15 (≈ 100 $ pour 2 US).
+
+---
+
 ## [v7.0.4-dev] — 2026-08-31 (garde anti-fuite workspace/stack)
 
 > Suite de `408c511` (squelette `workspace/` versionné) et de la PR #2. La

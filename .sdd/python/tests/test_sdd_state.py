@@ -326,7 +326,9 @@ class TestSddState(unittest.TestCase):
     # ---- end-run ----
 
     def test_end_run_success_updates_state_and_emits_event(self) -> None:
-        run_id = self._new_run(feat=1)
+        # run hors workflow de livraison : un /sdd-full sans preuve serait
+        # rétrogradé failed par le gate (cf. test_delivery_gate_wiring.py).
+        run_id = self._new_run(feat=1, command="/us-generate")
         result = _run(
             ["end-run", "--run-id", run_id, "--status", "success"],
             cwd=self.fake,

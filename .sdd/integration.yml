@@ -94,7 +94,14 @@ contract:
 #   Reste : 2 advisory (complexity-router, pipeline-planner — tous deux en
 #   attente du Runner), 2 orphan (build-loop-trace, libname-lock), 2
 #   harness-blocked (prompt-cache-manifest, spawn-agent).
-debt_ceiling: 6
+# 2026-11-07 lot orchestration mécanique : `pipeline-planner` advisory →
+#   integrated (sdd-full.md = boucle next-action/record sur l'état console.db)
+#   → dette 5. MAIS +2 orphan : `phase-order-hook` et `max-parallel-hook`
+#   sont livrés et testés, leur câblage dans `.claude/settings.json` est
+#   réservé au coordinateur (hors périmètre du lot). Plafond 7 assumé ; il
+#   redescend à 5 dès que les deux hooks sont câblés (statut → integrated,
+#   callers: .claude/settings.json).
+debt_ceiling: 5
 
 components:
 
@@ -331,26 +338,62 @@ components:
   - id: pipeline-planner
     module: .sdd/python/sdd_scripts/sdd_full_planner.py
     symbol: sdd_full_planner
-    status: advisory
+    status: integrated
     owner: sdd_scripts
     callers:
       - .sdd/commands/sdd-full.md
-    trigger: "présenté comme « pattern recommandé » à côté de 19 STEPs Markdown"
-    output: "plan JSON + next-action + recap"
-    integration_test: .sdd/python/tests/test_sdd_full_planner.py
-    observability: "workspace/.sys/.state/plan-{n}.json"
-    reason: >-
-      Deux sources de vérité décrivent le même workflow (audit P1-9). Le
-      planner est optionnel, donc en pratique non emprunté ; et il a déjà
-      divergé : il déclare `manual_gates` sans émettre d'action de pause,
-      et ignore Flyway, la gate spec-compliance 4.7 et la détection de
-      drift 4.9.
-    exit_plan: >-
-      Promotion en runner autoritaire (correction #1 + #3) : le Python
-      devient la spécification, les STEPs Markdown sont régénérés depuis
-      lui. Nécessite un hook d'autorité, sans quoi le runner rejoint la
-      liste des composants advisory.
+    trigger: >-
+      /sdd-full : STEP 0 `args` (flags argparse) puis boucle
+      `next-action --feat N` → action exécutée → `record` jusqu'à done/stop.
+    output: "prochaine action JSON (skill/script/procedure/gate/checkpoint/stop/done) + run_phases"
+    integration_test: .sdd/python/tests/test_sdd_full_planner_runner.py
+    observability: "console.db run_phases + events planner.step ; `recap --run-id R`"
+    note: >-
+      Ferme l'audit P1-9 (lot orchestration mécanique 2026-11-07). L'état
+      n'est plus sérialisé par le LLM (`--state-inline` déprécié, ignoré avec
+      --feat) : il est lu dans console.db + disque. Le planner porte gates
+      manuelles, Flyway, tableau readiness, plan-review, spec 4.7, drift 4.9
+      (recap), audit --force, QA/review bloquantes. Autorité : hook
+      `enforce_phase_order` (câblé dans .claude/settings.json).
     debt_ref: audit-2026-08-28 P1-9
+
+  - id: dev-run-preflight
+    module: .sdd/python/sdd_scripts/dev_run_args.py
+    symbol: dev_run_args
+    status: integrated
+    owner: sdd_scripts
+    callers:
+      - .sdd/commands/dev-run.md
+    trigger: "/dev-run STEP 1 — `dev_run_args.py --input {raw} --preflight` (obligatoire)"
+    output: >-
+      flags argparse + run + readiness enregistrée + phase-plan-{n}.json +
+      phases dev sautées mécaniquement (desktop/mobile sans backend)
+    integration_test: .sdd/python/tests/test_dev_run_preflight.py
+    observability: "console.db run_phases (readiness, dev_backend/api_gate skip, dev_run)"
+
+  - id: phase-order-hook
+    module: .sdd/python/sdd_hooks/enforce_phase_order.py
+    symbol: enforce_phase_order
+    status: integrated
+    owner: sdd_hooks
+    callers:
+      - .claude/settings.json
+    trigger: "PreToolUse matcher=Agent (câblé 2026-11-07)"
+    output: "exit 2 [PHASE_ORDER_VIOLATION] / [INFRA_BLOCKED]"
+    integration_test: .sdd/python/tests/test_enforce_phase_order.py
+    observability: "stderr du hook + workspace/.sys/.audit/bypass.log"
+
+  - id: max-parallel-hook
+    module: .sdd/python/sdd_hooks/enforce_max_parallel.py
+    symbol: enforce_max_parallel
+    status: integrated
+    owner: sdd_hooks
+    callers:
+      - .claude/settings.json
+    trigger: "--event pre (PreToolUse Agent), post (PostToolUse Agent), stop (SubagentStop), sweep (Stop) — câblé 2026-11-07"
+    output: "exit 2 [MAX_PARALLEL_EXCEEDED] ; workspace/.sys/.state/inflight.json"
+    integration_test: .sdd/python/tests/test_enforce_max_parallel.py
+    observability: "workspace/.sys/.state/inflight.json + bypass.log"
 
   - id: wave-barrier
     module: .sdd/python/sdd_reverse/wave_barrier.py

@@ -7,8 +7,9 @@
 | Quick legend |
 |---|
 | 🟢 GREEN / 🟡 WARN / 🔴 RED = canonical verdict palette |
-| `model: Sonnet 4.6` = cheaper, fast — used for orchestration + auditors |
-| `model: Opus 4.8` = stronger reasoning — used only for `dev-backend` + `dev-frontend` |
+| tier `balanced` (currently Sonnet 5.5) = cheaper, fast — used for orchestration + auditors, `effort: medium` (arch: `high`) |
+| tier `deep` (currently Opus 5.5) = stronger reasoning — used for `dev-backend` + `dev-frontend` (`effort: high`) |
+| Tier → model ID resolved by `.sdd/providers/{provider}.yaml` `tier_map` — change the generation there, not here |
 | **Hard-blocking** classes force 🔴 RED regardless of severity thresholds |
 
 ---
@@ -22,7 +23,7 @@ The agents that turn FEAT specs into running code.
 | Field | Value |
 |---|---|
 | **Role** | Découpe une FEAT en User Stories structurées (cible 1-3, max 6) avec traçabilité 100% SFD/BR/AC/FD. |
-| **Model** | Sonnet 4.6 |
+| **Model** | Sonnet 5.5 |
 | **Phase** | 2 (US generation) |
 | **Triggers** | `/us-generate {n}`, `/sdd-full {n}`, `/feat-generate` (pipeline) |
 | **Inputs (Reads)** | `workspace/feats/{n}-*.md`, `.sdd/templates/us.template.md`, `constitution.md` |
@@ -42,7 +43,7 @@ The agents that turn FEAT specs into running code.
 | Field | Value |
 |---|---|
 | **Role** | Bootstrap projets vides + propagation `stack.md` vers configs natives + scaffolding DB Database-First (READ-ONLY). |
-| **Model** | Sonnet 4.6 |
+| **Model** | Sonnet 5.5 |
 | **Phase** | 3 (bootstrap + DB scaffolding) |
 | **Triggers** | `/arch-init`, `/sdd-full {n}`, `/dev-run {n}` |
 | **Inputs (Reads)** | `stack.md`, `.sdd/stacks/{cat}/{active}.md`, `.sdd/templates/adr.template.md`, `constitution.md` |
@@ -62,7 +63,7 @@ The agents that turn FEAT specs into running code.
 | Field | Value |
 |---|---|
 | **Role** | Pour UNE US, planifie + génère le code serveur (Services, DTOs, Endpoints, Mappers, Program.cs). |
-| **Model** | **Opus 4.8** |
+| **Model** | **Opus 5.5** |
 | **Phase** | 4 (génération code serveur, parallèle 1/US) |
 | **Triggers** | `/dev-backend {n}-{m}`, `/dev-run {n}`, `/sdd-full {n}` |
 | **Inputs (Reads)** | `us/{n}-{m}-*.md`, `ui/{n}-{m}-*.html` (passif), `src/{BackendName}/CLAUDE.md`, `stack.md`, stacks backend/auth |
@@ -82,7 +83,7 @@ The agents that turn FEAT specs into running code.
 | Field | Value |
 |---|---|
 | **Role** | Pour UNE US + mockup HTML, planifie + génère le code client (Pages, Components, theme.css) via mapping HTML→DS. |
-| **Model** | **Opus 4.8** |
+| **Model** | **Opus 5.5** |
 | **Phase** | 4 (génération code client, parallèle 1/US, post-API Gate) |
 | **Triggers** | `/dev-frontend {n}-{m}`, `/dev-run {n}`, `/sdd-full {n}` |
 | **Inputs (Reads)** | `us/{n}-{m}-*.md`, `ui/{n}-{m}-*.html`, `src/{AppName}/CLAUDE.md`, stacks frontend/ui/auth |
@@ -106,7 +107,7 @@ The agents that prepare the ground or enrich the spec.
 | Field | Value |
 |---|---|
 | **Role** | Enrichit une FEAT via 5 techniques (Pre-mortem, First Principles, Red Team, Stakeholder Mapping, Inversion). |
-| **Model** | Sonnet 4.6 |
+| **Model** | Sonnet 5.5 |
 | **Phase** | 1.5 (élicitation, optionnelle) |
 | **Triggers** | `/feat-deepen {n} [--quick]` |
 | **Inputs (Reads)** | `workspace/feats/{n}-*.md`, `.sdd/templates/risks-assumptions.template.md`, `constitution.md` |
@@ -126,7 +127,7 @@ The agents that prepare the ground or enrich the spec.
 | Field | Value |
 |---|---|
 | **Role** | Crée ADRs (timestamp atomique + rand4) + met à jour constitution.md §1/§4/§6 + régénère ADRs INDEX.md. |
-| **Model** | Sonnet 4.6 |
+| **Model** | Sonnet 5.5 |
 | **Phase** | 3.5 (post-arch Phase B, externalisé depuis 2026-05-13) |
 | **Triggers** | spawn par `/arch-init STEP 3.5` via sentinel disque `.sys/.state/arch-ready-for-constitutioner.flag` |
 | **Inputs (Reads)** | `stack.md`, `constitution.md`, ADRs existants (idempotence), template ADR |
@@ -146,7 +147,7 @@ The agents that prepare the ground or enrich the spec.
 | Field | Value |
 |---|---|
 | **Role** | Génère tests unitaires (back+front) + parse coverage + quality scan déterministe pour une FEAT. |
-| **Model** | Sonnet 4.6 |
+| **Model** | Sonnet 5.5 |
 | **Phase** | 5 (tests + coverage + quality) |
 | **Triggers** | `/qa-generate {n}`, `/sdd-full {n}` |
 | **Inputs (Reads)** | `us/{n}-*.md`, `src/{Backend,App,Lib}Name/**` (read-only), stacks QA, `db/schema.json` |
@@ -170,9 +171,9 @@ Cross-file post-dev reviewers — each with a distinct angle. **5 verdicts → c
 | Field | Value |
 |---|---|
 | **Role** | Review cross-fichier post-dev (anti-patterns stack, layer violations, contract drift front↔back, smells). |
-| **Model** | Sonnet 4.6 |
-| **Phase** | 6.4 batch parallèle (post-dev, pré-qa) |
-| **Triggers** | `/sdd-full {n}`, `/sdd-review {n}`, `/dev-run` STEP 6.4 (si `CodeReviewMode: full`) |
+| **Model** | Sonnet 5.5 |
+| **Phase** | `auditor_batch` Stage B (post-qa) |
+| **Triggers** | `/sdd-full {n}` (phase `auditor_batch`), `/sdd-review {n}` (si `CodeReviewMode: full`) |
 | **Inputs (Reads)** | `stack.md`, FEAT+US, CLAUDE.md projets, stacks backend/frontend §1.3, `plans/{n}-*.{back,front}.md`, code `src/**` |
 | **Outputs (Writes)** | `.sys/.validation/{n}-code-review.{md,json}` |
 | **Tools** | Read, Write, Glob, Grep, Bash |
@@ -190,7 +191,7 @@ Cross-file post-dev reviewers — each with a distinct angle. **5 verdicts → c
 | Field | Value |
 |---|---|
 | **Role** | Scan OWASP Top 10 2021 du code généré (secrets, injections, XSS, authz, crypto, CORS, JWT, SSRF). |
-| **Model** | Sonnet 4.6 |
+| **Model** | Sonnet 5.5 |
 | **Phase** | 6.5 batch (mode `scan` post-dev ; mode `threat-model` retiré v7.0.0) |
 | **Triggers** | `/sdd-full {n}`, `/sdd-review {n}`, `/dev-run` (si `SecurityMode: full`) |
 | **Inputs (Reads)** | `stack.md`, FEAT+US, CLAUDE.md projets, stacks backend/frontend, code `src/**`, `{n}-code-review.json` (dé-dup) |
@@ -210,8 +211,8 @@ Cross-file post-dev reviewers — each with a distinct angle. **5 verdicts → c
 | Field | Value |
 |---|---|
 | **Role** | Re-lit le code AC-par-AC pour vérifier que chaque Acceptance Criteria est matérialisée ("Do not trust the report"). |
-| **Model** | Sonnet 4.6 |
-| **Phase** | 6.4 batch parallèle (post-dev) |
+| **Model** | Sonnet 5.5 |
+| **Phase** | `auditor_batch` Stage B (post-qa) |
 | **Triggers** | `/sdd-full {n}`, `/sdd-review {n}` (si `SpecComplianceMode: full`) |
 | **Inputs (Reads)** | `stack.md`, FEAT+US (source ACs), `plans/{n}-*.{back,front}.md`, code `src/**` ; **ne lit jamais** les rapports des autres auditeurs |
 | **Outputs (Writes)** | `.sys/.validation/{n}-spec-compliance.{md,json}` |
@@ -230,8 +231,8 @@ Cross-file post-dev reviewers — each with a distinct angle. **5 verdicts → c
 | Field | Value |
 |---|---|
 | **Role** | Audit du code matérialisé contre le pattern d'archi actif (MVC/DDD/microservice), layer mapping §1.3, ADRs §6. |
-| **Model** | Sonnet 4.6 |
-| **Phase** | 6.4 batch parallèle (post-dev, opt-in) |
+| **Model** | Sonnet 5.5 |
+| **Phase** | `auditor_batch` Stage B (post-qa, opt-in) |
 | **Triggers** | `/sdd-review {n}` STEP 3.5 (si `ArchReviewMode: full`) |
 | **Inputs (Reads)** | `stack.md`, `stacks/archi/{mvc\|ddd\|microservice}.md`, stacks backend/frontend §1.3, `constitution.md §2/§6`, ADRs, plans, code `src/**` |
 | **Outputs (Writes)** | `.sys/.validation/{n}-arch-review.{md,json}` |
@@ -250,7 +251,7 @@ Cross-file post-dev reviewers — each with a distinct angle. **5 verdicts → c
 | Field | Value |
 |---|---|
 | **Role** | Avocat du diable post-audit — produit 5-10 attaques concrètes (edge cases, hypothèses fragiles, dette masquée, failure modes, UX). |
-| **Model** | Sonnet 4.6 |
+| **Model** | Sonnet 5.5 |
 | **Phase** | 99% (post-agrégation `/sdd-review`, opt-in `--adversarial`) |
 | **Triggers** | `/sdd-review {n} --adversarial` (manuel) ou auto si `AdversarialReviewMode: full` |
 | **Inputs (Reads)** | `stack.md`, FEAT+US, plans, verdict review via `query_console_db.py review` (précondition), headers des autres `*-review.md`, ≤3 fichiers code ciblés |
@@ -318,10 +319,10 @@ Shared SQL expertise base for the five SQL agents:
 | `dev-backend` | 4 | **Opus** | ✅ (code) | ✅ | ✅ (N US) |
 | `dev-frontend` | 4 | **Opus** | ✅ (code) | ✅ | ✅ (N US) |
 | `qa` | 5 | Sonnet | ✅ (tests) | ✅ | ❌ |
-| `code-reviewer` | 6.4 | Sonnet | ❌ (read-only) | conditional | ✅ (batch 4) |
+| `code-reviewer` | auditor_batch | Sonnet | ❌ (read-only) | conditional | ✅ (batch 4) |
 | `security-reviewer` | 6.5 | Sonnet | ❌ | conditional + 8 hard | ✅ |
-| `spec-compliance-reviewer` | 6.4 | Sonnet | ❌ | conditional | ✅ |
-| `arch-reviewer` | 6.4 | Sonnet | ❌ | conditional | ✅ |
+| `spec-compliance-reviewer` | auditor_batch (Stage A) | Sonnet | ❌ | conditional | ✅ |
+| `arch-reviewer` | auditor_batch | Sonnet | ❌ | conditional | ✅ |
 | `adversarial-reviewer` | 99% | Sonnet | ❌ | **NEVER** (informational) | ❌ (post-aggregate) |
 
 ---

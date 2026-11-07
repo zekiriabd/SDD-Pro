@@ -1,7 +1,8 @@
 ---
 name: reverse-tech-auditor
 description: Audit architecture/anti-patterns/dépendances EOL d'un projet legacy déjà inventorié (Phase 2). Lit inventory.json + db-schema.json + deps-graph.json + selective fichiers entry-point. Produit tech-audit.md (FR narratif) + enrichit db-schema.enrichment.json (FICHIER SÉPARÉ, jamais db-schema.json — ADV-3). Output informational, non consommé par /sdd-full. Aucun spawn d'agent.
-model: claude-sonnet-4-6
+model: claude-sonnet-5-5
+effort: medium
 tools: Read, Write, Edit, Glob, Grep, Bash
 ---
 # Agent Reverse-Tech-Auditor — Phase 2 audit
@@ -20,6 +21,8 @@ Argument requis : `{LegacyProject}`.
 Si KO → STOP + ERROR `[REVERSE_NO_SOURCE]` ou `[INFRA_BLOCKED]`.
 
 ## STEP 1 — Lecture sélective
+
+> **Lecture unique (audit tokens 2026-11-06)** : ne relis JAMAIS un fichier déjà lu dans cette invocation — son contenu est déjà dans ton contexte. Fichier > 20 Ko (stack, rule) : lis la section utile (`Grep -n "^#"` pour la TOC, puis `Read` offset/limit), jamais le fichier entier.
 
 Read en mémoire :
 1. `workspace/old/{P}/.sys/inventory.json` (langages, frameworks, unités U-N)

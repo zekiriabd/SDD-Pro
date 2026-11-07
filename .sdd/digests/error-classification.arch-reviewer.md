@@ -2,7 +2,7 @@
 > **GENERATED — do not edit.** Slice of `@.claude/rules/error-classification.md` for the `arch-reviewer` agent (audit 2026-06-12, block 5). Regenerate via `python .sdd/python/sdd_admin/sync_error_class_digests.py`.
 >
 > Contains the §0 quick-ref (full 16-family map) + this agent's families + the universal format/loop sections. For a class OUTSIDE this slice, §0 names its family — Read the full file on-demand (rule `build-and-loop.md §8`).
-## 0. Quick reference — 16 familles (193 classes)
+## 0. Quick reference — 16 familles (203 classes)
 
 | # | Famille | Classes | Émetteur principal | Comportement build_loop |
 |---|---|---:|---|---|
@@ -12,14 +12,14 @@
 | §1.4 | **Build** (`[BUILD_*]`/`[DEP_MISSING]`/`[CIRCULAR_DEP]`) | 5 | dev-* | **ITÈRE** sur `[BUILD_CORRECTIBLE]` uniquement |
 | §1.5 | **Anti-derive** (`[DERIVE_VIOLATION]`/`[STACK_LIBRARY_*]`/`[REFACTOR_HORS_SCOPE]`/...) | 7 | dev-* | STOP |
 | §1.6 | **UI fidelity** (`[UI_FIDELITY_GAP]`/`[UI_TOKEN_VIOLATION]`/`[FRONTEND_BACKEND_CONTRACT_GAP]`) | 3 | dev-frontend | STOP/retry |
-| §1.7 | **QA** (`[QA_TEST_FAILED]`/`[QA_COVERAGE_GAP]`/`[QA_OWNERSHIP_*]`/`[ACCEPTANCE_GATE_FAILED]`/`[ACCEPTANCE_REPORT_MISSING]`/...) | 11 | qa | STOP (RED bloquant) |
-| §1.8 | **Parallélisme** (`[LIBNAME_LOCK_HELD]`/`[LOCK_HELD]`/`[LIBNAME_SIGNATURE_CONFLICT]`) | 3 | dev-* | STOP |
+| §1.7 | **QA** (`[QA_TEST_FAILED]`/`[QA_COVERAGE_GAP]`/`[QA_OWNERSHIP_*]`/`[ACCEPTANCE_GATE_FAILED]`/`[ACCEPTANCE_REPORT_MISSING]`/`[DELIVERY_GATE_BLOCKED]`/...) | 12 | qa | STOP (RED bloquant) |
+| §1.8 | **Parallélisme** (`[LIBNAME_LOCK_HELD]`/`[LOCK_HELD]`/`[LIBNAME_SIGNATURE_CONFLICT]`/`[LIBNAME_LOCK_INVALID_ARG]`) | 4 | dev-* | STOP |
 | §1.9 | **A11Y** (`[A11Y_*]`) — héritage, réactivé via `ingest_axe.py` | 11 | CI ingest (Lighthouse/axe) | report only |
 | §1.10 | **Code Review** (`[REVIEW_*]`) — `code-reviewer` agent | 12 | code-reviewer | report only (verdict 🟢/🟡/🔴) |
 | §1.11 | **Security** (`[SEC_*]`) — OWASP Top 10 2021 | 23 | security-reviewer | report only + 8 hard-blocking |
 | §1.12 | **Perf** (`[PERF_*]`) — héritage, réactivé via `ingest_lighthouse.py` | 16 | CI ingest | report only |
 | §1.13 | **Spec Compliance** (`[SPEC_*]`) — AC-by-AC verification | 9 | spec-compliance-reviewer | report only |
-| §1.14 | **Tooling/Governance** (`[SCAN_*]`/`[DISCOVER_*]`/`[CHECKPOINT_*]`/`[CONFIG_*]`/`[PROFILE_*]`/`[DRIFT_*]`/`[ARCH_*]`/`[REVIEW_*]`/`[AUDITOR_RUNTIME_ERROR]`/`[STACK_COMBO_*]`/`[FRAMEWORK_PROTECTED]`/`[ENV_BYPASS_BLOCKED]`/`[PRICING_UNKNOWN]`/`[SECRET_PROVIDER_LEAK_RISK]`/`[PACK_UNUSABLE]`/hooks préflight) | 36 | scripts mono-shot + hooks | mostly info, qq. bloquantes |
+| §1.14 | **Tooling/Governance** (`[SCAN_*]`/`[DISCOVER_*]`/`[CHECKPOINT_*]`/`[CONFIG_*]`/`[PROFILE_*]`/`[DRIFT_*]`/`[ARCH_*]`/`[REVIEW_*]`/`[AUDITOR_RUNTIME_ERROR]`/`[STACK_COMBO_*]`/`[FRAMEWORK_PROTECTED]`/`[ENV_BYPASS_BLOCKED]`/`[PRICING_UNKNOWN]`/`[SECRET_PROVIDER_LEAK_RISK]`/`[PACK_UNUSABLE]`/`[HOOK_CRASH]`/`[SPAWN_*]`/hooks préflight) | 44 | scripts mono-shot + hooks | mostly info, qq. bloquantes |
 | §1.15 | **Adversarial** (`[ADV_*]`) — opt-out (actif par défaut, `--no-adversarial` pour skip) | 6 | adversarial-reviewer | informational |
 | §1.16 | **Inconnue** (`[UNKNOWN]`) | 1 | fallback | report only |
 
@@ -89,7 +89,7 @@ hard-blocking par défaut sauf annoté `(bloquant)`.
 | `[PROFILE_EXISTS]` / `[PROFILE_NOT_FOUND]` / `[PROFILE_NO_TEAM_CONFIG]` | `/sdd-profile` exit 1 ou 2 | command |
 | `[DRIFT_SUSPECTED]` | Inline rule agent .md non-synchro avec `rules/X.md` source | WARN |
 
-**Architecture Review** (agent `arch-reviewer` Sonnet 4.6, read-only ;
+**Architecture Review** (agent `arch-reviewer` Sonnet 5.5, read-only ;
 verdict 🟢/🟡/🔴 selon `ArchReviewFailOn` ; persiste dans `qa_code_review`) :
 
 | Préfixe | Sévérité |
@@ -113,7 +113,7 @@ Substance : `agents/arch-reviewer.md §5`.
 | `[REVIEW_SOURCES_MISSING]` | Sources de review absentes (code matérialisé / rapports auditors introuvables au démarrage de `/sdd-review`) | WARN |
 
 **Two-stage auditor gate** (`auditor-orchestration.md §4.1-§4.2`, appliqué
-par les orchestrateurs `/sdd-full` et `/dev-run` STEP 6.4) :
+par les orchestrateurs `/sdd-full` phase `auditor_batch` et `/sdd-review`) :
 
 | Préfixe | Sens | Bloquant |
 |---|---|:---:|
@@ -131,10 +131,20 @@ pour la réciprocité émetteurs↔taxonomie, audit 2026-06-12) :
 | `[ENV_BYPASS_BLOCKED]` | Tentative de bypass d'une protection via env var interdite | OUI (hook `block_env_bypass`) |
 | `[GLOB_SCOPE_TOO_BROAD]` | Glob non borné (token explosion) | WARN (strict via `SDD_GLOB_SCOPE_STRICT=1`, hook `preflight_glob_scope`) |
 | `[TELEMETRY_UNAVAILABLE]` | `console.db` télémétrie indisponible au precheck coût | info, fail-open (hook `preflight_cost_cap`) |
-| `[PRICING_UNKNOWN]` | Modèle sans pricing connu (ni canonical `pricing.py` ni provider YAML, `model` NULL inclus) — coût cappé sur `FALLBACK_PRICING` Sonnet, risque under-count 5×. **Périmètre du blocage = les agents du registre SDD** (`.sdd/agents/*.md`, projection du loader) ; un usage attribué à un subagent hors registre (built-ins du harnais) est compté dans le total mais rapporté en WARN, jamais bloquant (audit C-1 2026-08-30). Un usage non attribué (`unknown`, nom d'événement de hook) reste fail-closed. | OUI en CI, WARN interactif (hook `preflight_cost_cap`, audit R2 2026-07-26). Bypass : `SDD_ALLOW_UNKNOWN_PRICING=1` |
+| `[PRICING_UNKNOWN]` | Modèle sans pricing connu (ni canonical `pricing.py` ni provider YAML, `model` NULL inclus). **Ne bloque plus (2026-11-06)** : la ligne d'usage est comptée au **tarif conservateur** (le plus cher connu du provider) et un WARN est émis — le cost cap reste donc sur-estimé, jamais sous-estimé, sans arrêter un pipeline sur un ID de modèle nouveau (ex. migration de génération). | WARN (CI et interactif — hook `preflight_cost_cap`) |
 | `[SECRET_PROVIDER_LEAK_RISK]` | Secrets détectés dans `workspace/stack/stack.md` alors que provider actif est non-Anthropic (retention par défaut : OpenAI 30j, Google 55j, Moonshot inconnu) | WARN (jamais bloquant — hook `preflight_secret_scan`, audit R5 2026-07-26). Bypass : `SDD_ALLOW_SECRET_TO_PROVIDER=1` |
 | `[AGENT_REMOVED_V7]` | Spawn d'un agent retiré en v7.0.0 (a11y/perf/dashboard/*-strict) | OUI (hook `preflight_agent_budget`) |
 | `[BUDGET_PRECHECK_TIMEOUT]` | Timeout du precheck budget agent | info, fail-open (hook `preflight_agent_budget`) |
+| `[HOOK_CRASH]` | Exception non gérée dans un hook de gate (dispatcher `_hook.py`, `protect_framework.py`). Un hook de **gate** qui plante est traité en **DENY fail-closed** : l'outil n'est pas exécuté (un crash ne doit jamais ouvrir une protection). | OUI (hooks de gate) |
+| `[TWO_STAGE_FEAT_UNKNOWN]` | Spawn d'un reviewer Stage B dont la FEAT n'est pas extractible du prompt (`enforce_two_stage_auditor`). Fail-closed : l'auditeur n'est pas lancé sans FEAT identifiée. | OUI |
+| `[TWO_STAGE_GATE_VIOLATION]` | Reviewer Stage B lancé alors que le verdict spec-compliance (Stage A), **recalculé** depuis `console.db.qa_spec_compliance`, est absent ou 🔴. | OUI |
+| `[SECRET_ACCESS_FORBIDDEN]` | Tentative de lecture/affichage d'un fichier ou d'une variable porteuse de secret (`.env`, clés, `stack.md` secrets en clair) par un outil | OUI (hook `block_secret_access`) |
+| `[PHASE_ORDER_VIOLATION]` | Spawn d'un agent hors de l'ordre de phases du pipeline (ex. `dev-frontend` avant la gate API, reviewer avant la fin du dev) | OUI (hook `enforce_phase_order`) |
+| `[MAX_PARALLEL_EXCEEDED]` | Nombre de sous-agents simultanés au-delà de `MaxParallel` (Project Config) | OUI (hook `enforce_max_parallel`) |
+| `[SPAWN_ARGV_TOO_LONG]` | Prompt de spawn d'agent trop long pour la ligne de commande de l'OS (limite argv, Windows ~32 K) — passer par fichier / stdin | OUI (`sdd_lib/spawn_agent.py`) |
+| `[SPAWN_OS_ERROR]` | Échec OS au lancement d'un sous-agent (binaire introuvable, permission, ressource) — distinct d'un échec de l'agent lui-même | OUI (`sdd_lib/spawn_agent.py`) |
+| `[CONFIG_READ_FAILED]` | `stack.md` / Project Config illisible au démarrage de `/sdd-review` (fichier absent, encodage, parse) | OUI (`sdd_scripts/sdd_review.py`) |
+| `[CONFIG_INVALID_VALUE]` | Clé de Project Config présente mais valeur hors domaine (mode inconnu, seuil non numérique) | OUI (`sdd_scripts/sdd_review.py`) |
 | `[PACK_UNUSABLE]` | Pack de contexte déclaré dans `loader.yml` (`reads:`) mais inutilisable : absent ou périmé (empreinte des sources changée). Une **ERREUR, pas un warning** — un pack manquant pèse 0 octet et produirait un vert trompeur sur un agent privé de contexte de stack. FIX : `python -m sdd_scripts.build_context_pack --agent {agent}` (le hook `preflight_agent_budget` reconstruit le pack avant chaque spawn). | OUI (gate `context_budget.py`, audit 2026-08-28) |
 
 > Réciprocité enforced par `tests/test_error_classification_reciprocity.py` :

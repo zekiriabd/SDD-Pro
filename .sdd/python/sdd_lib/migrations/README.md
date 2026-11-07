@@ -16,8 +16,9 @@ Exemples valides :
 ## Sémantique
 
 - **Forward-only** : aucun rollback automatique. Si une migration est mauvaise, écrire une migration corrective `{N+1}`.
-- **Idempotent recommandé** : préférer `CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`, `ALTER TABLE ... ADD COLUMN` (SQLite refuse l'ajout de colonne existante, donc protéger par check `PRAGMA table_info`).
-- **Atomique** : chaque fichier `.sql` est exécuté dans une seule transaction implicite (`executescript()` wrappe). Si échec mid-script, rollback automatique → la version `schema_version` n'est PAS incrémentée.
+- **Idempotent** : préférer `CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`. Les `ALTER TABLE ... ADD COLUMN` sont **automatiquement gardés** par le runner (`PRAGMA table_info` : colonne déjà présente → statement sauté) depuis l'audit 2026-11-07 — un rejeu concurrent ne produit plus `duplicate column name`.
+- **Atomique** (audit 2026-11-07) : chaque fichier `.sql` est exécuté statement par statement dans **une transaction explicite `BEGIN IMMEDIATE`** qui contient AUSSI l'INSERT `schema_version`. Échec mid-script → `ROLLBACK` : ni DDL partiel ni version. (Avant : `executescript()` committait puis l'INSERT de version partait dans une 2e transaction.) La version est re-vérifiée à l'intérieur du verrou → deux writers concurrents sérialisent, le second voit la migration faite et la saute.
+- **Interdit dans un fichier de migration** : `BEGIN`/`COMMIT`/`ROLLBACK` explicites (le runner possède la transaction).
 - **Append-only** : ne jamais éditer un fichier de migration déjà mergé. Écrire une nouvelle migration corrective.
 
 ## Workflow (auteur)
@@ -33,11 +34,12 @@ Exemples valides :
 ## Workflow (runtime)
 
 `ensure_initialized()` :
-1. Lit la version courante via `current_schema_version()`.
+1. Lit la version courante via `current_schema_version()` (DB relocalisable via `$SDD_CONSOLE_DB_PATH`).
 2. Si `None` → DB fresh, charge `console_db_schema.sql` complet (init v1).
 3. Si `current < SCHEMA_VERSION` → `apply_pending_migrations()` exécute toutes les migrations `> current ET ≤ SCHEMA_VERSION` dans l'ordre.
 4. Si `current > SCHEMA_VERSION` → DB en avance sur le framework (autre checkout/branche), aucune migration appliquée, WARN stderr.
 5. Si `current == SCHEMA_VERSION` → no-op.
+6. Dans tous les cas (sauf DB en avance) : migration de données légère `mark_stale_runs()` — tout run `running` sans activité depuis > 24 h passe `stale` (idempotent).
 
 ## Garanties
 

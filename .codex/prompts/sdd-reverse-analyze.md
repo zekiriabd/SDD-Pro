@@ -1,5 +1,5 @@
 <!-- GENERATED FROM .sdd/ (commande /sdd-reverse-analyze) — DO NOT EDIT -->
-<!-- Phase 3a du workflow reverse — analyse technique fidèle d'UNE unité U-N (barreau bas de l'escalier reverse). Spawn agent reverse-tech-analyst avec modèle routé par complexité (Sonnet 4.6 si unité simple, Opus 4.8 si complexe — ADR governance-reverse-complexity-ladder). Output workspace/plans/{n}-{FeatName}.analysis.md, consommé par /sdd-reverse-stories (3b). -->
+<!-- Phase 3a du workflow reverse — analyse technique fidèle d'UNE unité U-N (barreau bas de l'escalier reverse). Spawn agent reverse-tech-analyst avec modèle routé par complexité (Sonnet 5.5 si unité simple, Opus 5.5 si complexe — ADR governance-reverse-complexity-ladder). Output workspace/plans/{n}-{FeatName}.analysis.md, consommé par /sdd-reverse-stories (3b). -->
 <!-- ============================================================ -->
 <!-- IMPORTANT — SPAWN SEMANTICS UNDER CODEX (audit R10 2026-07-26) -->
 <!-- Toute mention `Task tool (subagent_type=X)`, `Agent(X)`, ou    -->

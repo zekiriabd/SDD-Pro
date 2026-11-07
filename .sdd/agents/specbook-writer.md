@@ -2,6 +2,7 @@
 name: specbook-writer
 description: Agent Cahier des charges — pour UNE FEAT (workspace/feats/{n}-{Name}.md, forward OU reverse), rédige une section fonctionnelle en langage humain simple (destinée à un gérant / lecteur non-IT) et la met en cache dans workspace/docs/.sys/sections/{feat-id}.md. Vulgarise la partie technique sans la supprimer. Ne réécrit JAMAIS la FEAT source ni le code. Le rendu final .docx est produit par le script déterministe generate_specbook.py (0 token). Aucun spawn d'agent.
 model_tier: balanced
+effort: medium
 tier_default: balanced
 tier_floor: fast
 tier_ceiling: balanced
@@ -24,8 +25,13 @@ Tu n'assembles PAS le document Word (c'est `generate_specbook.py`). Tu écris
 
 ## Contexte (STEP 0)
 
-1. Charger `@.sdd/rules/output-protocol.md` (chat 1L `[SPECBOOK] … (X%)`)
-   et `@.sdd/rules/error-classification.md` (bloc ERROR 3L `[CLASS]`).
+> **Lecture unique (audit tokens 2026-11-06)** : ne relis JAMAIS un fichier déjà lu dans cette invocation — son contenu est déjà dans ton contexte. Fichier > 20 Ko (stack, rule) : lis la section utile (`Grep -n "^#"` pour la TOC, puis `Read` offset/limit), jamais le fichier entier.
+
+1. `output-protocol.md` (chat 1L `[SPECBOOK] … (X%)` + format ERROR 3L
+   `[CLASS]` §7.3) est **déjà injectée** (rule inconditionnelle) — ne la relis
+   pas. Read **`.sdd/digests/error-classification.specbook-writer.md`** (taxonomie
+   des classes que tu émets — `[FEAT_NOT_FOUND]`, `[FEAT_AMBIGUOUS]`…) au lieu
+   de `error-classification.md` entier (47 Ko → ~12 Ko, audit tokens 2026-11-06).
 2. Argument = un identifiant de FEAT `{n}` ou un chemin. Résoudre le fichier :
    `Glob workspace/feats/{n}-*.md`. 0 match → ERROR `[FEAT_NOT_FOUND]`.
    ≥ 2 match → ERROR `[FEAT_AMBIGUOUS]`.

@@ -325,10 +325,13 @@ def test_gate_mirror_write_failure_is_visible(tmp_path, monkeypatch):
     with redirect_stderr(buf):
         rc = gate_decide.main()
 
-    assert rc == 0, "a telemetry failure must not fail the gate"
+    # Audit « fiabilité des états » 2026-11-07 — console.db is now the SOURCE
+    # of truth for gates (status.json is a derived export). A failed write is
+    # therefore an INFRA_BLOCKED failure (exit 3), loud, and no export is
+    # produced that would pretend the decision exists.
+    assert rc == 3, "a source-of-truth write failure must surface as INFRA_BLOCKED"
     out = buf.getvalue()
-    assert "mirror console.db" in out
+    assert "[INFRA_BLOCKED]" in out
     assert "db locked" in out
     assert "afterUS" in out
-    # The decision itself is still persisted where the console UI reads it.
-    assert status_file.is_file()
+    assert not status_file.is_file()

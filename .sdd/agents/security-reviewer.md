@@ -2,6 +2,7 @@
 name: security-reviewer
 description: 'Agent Security Reviewer — scan déterministe + Sonnet du code généré contre OWASP Top 10 2021 (secrets hardcoded, injections SQL/cmd, XSS, broken authz/authn, crypto faible, CORS permissif, cookies insecure, headers manquants, logging secrets, stack traces exposées). Strictement read-only sur le code. Verdict 🟢/🟡/🔴 selon `SecurityFailOn` + hard-blocking sur 5 classes critiques. Complémentaire de `code-reviewer` (coordination §6 sur secrets). Mode unique : `scan` post-dev. Pour le threat modeling pré-dev, utiliser le template humain `templates/threat-model.template.md`.'
 model_tier: balanced
+effort: medium
 tier_default: balanced
 tier_floor: balanced
 tier_ceiling: deep
@@ -47,8 +48,9 @@ constitution ni des US (read-only strict).
 
 ## STEP 0.5 — HARD-GATE context budget
 
-Appliquer `@.sdd/rules/build-and-loop.md §1` (Partie B) avec
-`--agent security-reviewer --feat-number {n}`. Exit non-zero → STOP.
+Exécuter `python .sdd/python/sdd_scripts/context_budget.py --agent security-reviewer --feat-number {n}`.
+Exit non-zero → STOP. (SSoT : `build-and-loop.md` Partie B §1 — **ne pas
+Read la rule pour cela**, la commande ci-dessus suffit.)
 
 ---
 
@@ -103,6 +105,8 @@ Précondition bloquante absente → STOP + ERROR `[QA_PRECONDITION_FAILED]` : `c
 ---
 
 ## STEP 3 — Charger contexte minimal
+
+> **Lecture unique (audit tokens 2026-11-06)** : ne relis JAMAIS un fichier déjà lu dans cette invocation — son contenu est déjà dans ton contexte. Fichier > 20 Ko (stack, rule) : lis la section utile (`Grep -n "^#"` pour la TOC, puis `Read` offset/limit), jamais le fichier entier.
 
 1. `.sdd/digests/error-classification.security-reviewer.md` §1.11 (taxonomie `[SEC_*]`)
 2. `workspace/feats/{n}-*.md` (FEAT parente)
@@ -463,7 +467,7 @@ L'agent est strictement idempotent :
 
 ## Choix modèle
 
-Sonnet 4.6 — raisonnement contextuel sur matches Grep (nuance
+Sonnet 5.5 — raisonnement contextuel sur matches Grep (nuance
 `process.env.X` vs literal) + coordination dé-duplication avec
 `code-reviewer`. Coût cible ~10-20 KB / scan.
 

@@ -1,5 +1,5 @@
 # GENERATED FROM .sdd/ — DO NOT EDIT
-description = "Analyse de gap de paradigme legacy↔stack cible + curation des unités (MIGRATE / DISCARD / HUMAN-DECISION). Spawn agent reverse-paradigm-advisor (Sonnet 4.6). Verdict informational/WARN, jamais bloquant, jamais destructif. Emprunt Reversa (agents Paradigm Advisor + Curator) — audit comparatif 2026-06-12."
+description = "Analyse de gap de paradigme legacy↔stack cible + curation des unités (MIGRATE / DISCARD / HUMAN-DECISION). Spawn agent reverse-paradigm-advisor (Sonnet 5.5). Verdict informational/WARN, jamais bloquant, jamais destructif. Emprunt Reversa (agents Paradigm Advisor + Curator) — audit comparatif 2026-06-12."
 prompt = """
 <!-- GENERATED FROM .sdd/ (commande /sdd-reverse-paradigm) — DO NOT EDIT. -->
 <!-- IMPORTANT — Les instructions `Task(subagent_type=X)` / `Agent(X)` -->

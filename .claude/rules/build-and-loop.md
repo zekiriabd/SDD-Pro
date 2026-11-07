@@ -8,8 +8,16 @@
 # (mécanisme natif Claude Code — vérifié 2026-08-30) : portée réduite au fichier
 # lui-même (la rule ne s'injecte qu'en maintenance framework de sa propre source).
 # Chargement pipeline = Read explicite uniquement.
+# Lecture EXPLICITE uniquement (audit tokens 2026-11-06, run FEAT 15) : l'ex-portée
+# « son propre fichier » faisait s'auto-injecter cette rule (via la façade
+# .claude/rules/) à CHAQUE Read/cat de .sdd/rules/build-and-loop.md — donc
+# en DOUBLE du Read explicite que ses consommateurs font en STEP contexte
+# (2 × 29 KB par agent dev-*). Le glob ci-dessous ne matche volontairement
+# aucun fichier réel : la rule n'est JAMAIS auto-injectée, elle est lue par
+# section (offset/limit) par les agents qui en ont besoin. Une rule sans
+# `paths:` serait inconditionnelle (chargée par toutes les sessions) — pire.
 paths:
-  - ".sdd/rules/build-and-loop.md"
+  - ".sdd/rules/.explicit-read-only/build-and-loop.md"
   - ".claude/rules/build-and-loop.md"
 ---
 
@@ -675,14 +683,14 @@ Classes d'erreur retournées (cf. `error-classification.md`) :
 ### 7.7 Mode dispatch (simplifié v7.0.0)
 
 Extension de §1.ter.4. Quand `FROM_PLAN_PATH != null`, le caller (`/dev-run`)
-lance toujours `dev-*` classique (Opus 4.8). Avant le spawn, gate de
+lance toujours `dev-*` classique (Opus 5.5). Avant le spawn, gate de
 staleness via `validate_plan.py` (exit 2 → STOP) :
 
 ```
 FROM_PLAN_PATH != null :
   ├─ validate_plan.py --plan-path $PATH --us-path $US
   │   ├─ exit 0 ou 1 → MODE = FROM_PLAN (classique)
-  │   │                → spawn dev-* (Opus 4.8)
+  │   │                → spawn dev-* (Opus 5.5)
   │   └─ exit 2      → STOP + ERROR [PLAN_STALE] ou [PLAN_INVALID]
   │                    Tech Lead doit relancer /dev-plan
 ```

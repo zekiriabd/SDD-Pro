@@ -9,7 +9,12 @@ Ce test enforce :
   1. chaque entrée agent de loader.yml porte un champ `model_tier:` ;
   2. sa valeur matche le `model_tier:` du frontmatter de
      `.sdd/agents/{agent}.md` (SSoT pivot neutre) ;
-  3. symétriquement pour loader.reverse.yml ↔ agents/reverse-*.md.
+  3. symétriquement pour loader.reverse.yml ↔ agents/reverse-*.md ;
+  4. (2026-11-07) même parité pour `effort:` (niveau de raisonnement Claude
+     Code par agent : low|medium|high|xhigh|max) — loader ↔ frontmatter,
+     valeur dans l'enum. Politique : high = dev-backend/dev-frontend/arch +
+     reverse-tech-analyst/reverse-feat-composer/reverse-ui-extractor ;
+     medium = tout le reste.
 
 Historique : le test comparait auparavant `model: claude-opus-4-8` avec
 `model:` du frontmatter — pré-migration. Post-Batch C, l'invariant est
@@ -43,6 +48,13 @@ _TOP_KEY_RE = re.compile(r"^([a-z][a-z0-9-]*):\s*$", re.MULTILINE)
 # La regex tolère aussi `model:` pour rétrocompat historique (façades .claude/).
 _MODEL_LINE_RE = re.compile(r"^\s{2}model_tier:\s*(\S+)", re.MULTILINE)
 _FRONTMATTER_MODEL_RE = re.compile(r"^model_tier:\s*(\S+)", re.MULTILINE)
+_EFFORT_LINE_RE = re.compile(r"^\s{2}effort:\s*(\S+)", re.MULTILINE)
+_FRONTMATTER_EFFORT_RE = re.compile(r"^effort:\s*(\S+)", re.MULTILINE)
+VALID_EFFORTS = {"low", "medium", "high", "xhigh", "max"}
+EXPECTED_HIGH_EFFORT = {
+    "dev-backend", "dev-frontend", "arch",
+    "reverse-tech-analyst", "reverse-feat-composer", "reverse-ui-extractor",
+}
 
 
 def _loader_agent_models(loader_path: Path) -> dict[str, str | None]:
@@ -71,6 +83,50 @@ def _frontmatter_model(agent_md: Path) -> str | None:
     return m.group(1).strip() if m else None
 
 
+def _frontmatter_effort(agent_md: Path) -> str | None:
+    head = agent_md.read_text(encoding="utf-8")[:2000]
+    m = _FRONTMATTER_EFFORT_RE.search(head)
+    return m.group(1).strip() if m else None
+
+
+def _loader_agent_efforts(loader_path: Path) -> dict[str, str | None]:
+    """Map agent_key -> effort déclaré dans loader.yml (même parser ligne-à-ligne)."""
+    text = loader_path.read_text(encoding="utf-8")
+    keys = [(m.group(1), m.start()) for m in _TOP_KEY_RE.finditer(text)]
+    out: dict[str, str | None] = {}
+    for i, (key, start) in enumerate(keys):
+        if key in _NON_AGENT_KEYS:
+            continue
+        end = keys[i + 1][1] if i + 1 < len(keys) else len(text)
+        m = _EFFORT_LINE_RE.search(text[start:end])
+        out[key] = m.group(1).strip() if m else None
+    return out
+
+
+def _check_effort_parity(agents: dict[str, str | None]) -> list[str]:
+    """Parité effort loader ↔ frontmatter + enum + politique high/medium."""
+    mismatches = []
+    for agent, loader_effort in agents.items():
+        md = _AGENTS_DIR / f"{agent}.md"
+        if not md.is_file():
+            mismatches.append(f"{agent}: .md manquant")
+            continue
+        fm_effort = _frontmatter_effort(md)
+        if loader_effort is None:
+            mismatches.append(f"{agent}: loader sans effort:")
+        elif fm_effort is None:
+            mismatches.append(f"{agent}: frontmatter sans effort:")
+        elif fm_effort != loader_effort:
+            mismatches.append(f"{agent}: loader effort={loader_effort} != frontmatter={fm_effort}")
+        elif fm_effort not in VALID_EFFORTS:
+            mismatches.append(f"{agent}: effort {fm_effort!r} hors enum {sorted(VALID_EFFORTS)}")
+        else:
+            expected = "high" if agent in EXPECTED_HIGH_EFFORT else "medium"
+            if fm_effort != expected:
+                mismatches.append(f"{agent}: effort={fm_effort} != politique {expected}")
+    return mismatches
+
+
 class TestForwardLoaderModelParity(unittest.TestCase):
     def setUp(self):
         self.models = _loader_agent_models(_CLAUDE_DIR / "loader.yml")
@@ -90,6 +146,12 @@ class TestForwardLoaderModelParity(unittest.TestCase):
                 mismatches.append(f"{agent}: frontmatter sans model:")
             elif fm_model != loader_model:
                 mismatches.append(f"{agent}: loader={loader_model} != frontmatter={fm_model}")
+        self.assertEqual(mismatches, [], msg="; ".join(mismatches))
+
+    def test_loader_effort_matches_agent_frontmatter(self):
+        efforts = _loader_agent_efforts(_CLAUDE_DIR / "loader.yml")
+        self.assertEqual(set(efforts), set(self.models))
+        mismatches = _check_effort_parity(efforts)
         self.assertEqual(mismatches, [], msg="; ".join(mismatches))
 
     def test_forward_roster_is_complete(self):
@@ -133,6 +195,22 @@ class TestReverseLoaderModelParity(unittest.TestCase):
                 mismatches.append(f"{agent}: pas de model_tier: dans loader.reverse.yml")
             elif fm_tier != loader_tier:
                 mismatches.append(f"{agent}: loader={loader_tier} != frontmatter={fm_tier}")
+        self.assertEqual(mismatches, [], msg="; ".join(mismatches))
+
+    def test_reverse_loader_effort_matches_frontmatters(self):
+        import yaml
+
+        doc = yaml.safe_load(
+            (_CLAUDE_DIR / "loader.reverse.yml").read_text(encoding="utf-8")
+        )
+        entries = doc.get("agents") or {}
+        efforts = {
+            a: (spec or {}).get("effort")
+            for a, spec in entries.items()
+            if a.startswith("reverse-")
+        }
+        self.assertGreaterEqual(len(efforts), 7)
+        mismatches = _check_effort_parity(efforts)
         self.assertEqual(mismatches, [], msg="; ".join(mismatches))
 
 

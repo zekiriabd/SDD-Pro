@@ -163,40 +163,50 @@ déclarés dans le manifest autonome `loader.reverse.yml` (jamais référencé p
 
 | Agent | Modèle | Phase reverse |
 |---|---|---|
-| `reverse-inventory` | Sonnet 4.6 | 1 (cartographie) |
-| `reverse-tech-auditor` | Sonnet 4.6 | 2 (audit informational) |
-| `reverse-tech-analyst` | Opus 4.8 | 3a (analyse technique) |
-| `reverse-us-writer` | Sonnet 4.6 | 3b (user stories) |
-| `reverse-feat-composer` | Opus 4.8 | 3c (FEAT métier) |
-| `reverse-ui-extractor` | Opus 4.8 | 4 (mockups HTML) |
-| `reverse-completeness-reviewer` | Sonnet 4.6 | L5 (revue back) |
+| `reverse-inventory` | Sonnet 5.5 | 1 (cartographie) |
+| `reverse-tech-auditor` | Sonnet 5.5 | 2 (audit informational) |
+| `reverse-tech-analyst` | Opus 5.5 | 3a (analyse technique) |
+| `reverse-us-writer` | Sonnet 5.5 | 3b (user stories) |
+| `reverse-feat-composer` | Opus 5.5 | 3c (FEAT métier) |
+| `reverse-ui-extractor` | Opus 5.5 | 4 (mockups HTML) |
+| `reverse-completeness-reviewer` | Sonnet 5.5 | L5 (revue back) |
 
 SSoT : `docs/reverse-engineering-workflow.md` + `rules/reverse-engineering.md`
 + `loader.reverse.yml`. Ce document ne détaille que les 12 agents forward.
 
 ## 2. Modèles assignés par agent
 
+> **Règle** : chaque agent déclare un **tier** (`model_tier: deep | balanced | fast`)
+> et un **effort** (`effort: high | medium`) dans son frontmatter `.sdd/agents/*.md` ;
+> l'ID de modèle est résolu par la `tier_map` de `.sdd/providers/{provider}.yaml`.
+> Les IDs ci-dessous sont la résolution **courante** (génération 5.5 depuis
+> 2026-11-07 : deep → `claude-opus-5-5`, balanced → `claude-sonnet-5-5`,
+> fast → `claude-haiku-5-5`) — une migration de génération se fait dans la
+> `tier_map`, pas dans cette table. Effort : `high` pour dev-backend, dev-frontend,
+> arch (+ reverse-tech-analyst, reverse-feat-composer, reverse-ui-extractor) ;
+> `medium` pour tous les autres.
+
 | Agent          | Modèle              | Justification                                       |
 |----------------|---------------------|-----------------------------------------------------|
-| `po`           | `claude-sonnet-4-6` | Découpage logique, traçabilité — pas de multimodal  |
-| `arch`         | `claude-sonnet-4-6` | Init solution + projets vides + introspection DB + scaffolding |
-| `dev-backend`  | **`claude-opus-4-8`** | Raisonnement fin sur génération code serveur, `preserves:`/`adds:`, layer mapping |
-| `dev-frontend` | **`claude-opus-4-8`** | Raisonnement fin sur génération code client + fidélité HTML→DS |
+| `po`           | `claude-sonnet-5-5` | Découpage logique, traçabilité — pas de multimodal  |
+| `arch`         | `claude-sonnet-5-5` | Init solution + projets vides + introspection DB + scaffolding |
+| `dev-backend`  | **`claude-opus-5-5`** | Raisonnement fin sur génération code serveur, `preserves:`/`adds:`, layer mapping |
+| `dev-frontend` | **`claude-opus-5-5`** | Raisonnement fin sur génération code client + fidélité HTML→DS |
 | ~~`dev-backend-strict` (v6.2)~~ | — | **RETIRÉ v7.0.0** (governance-major-prompts-trim) — variants strict supprimés, plus de routing différencié |
 | ~~`dev-frontend-strict` (v6.2)~~ | — | **RETIRÉ v7.0.0** (idem) |
-| `elicitor`     | `claude-sonnet-4-6` | Élicitation structurée 5 techniques                 |
-| `constitutioner` | `claude-sonnet-4-6` | Sub-agent de `arch` Phase D : crée ADRs + maj constitution §1/§4/§6 + INDEX.md |
-| `qa`           | `claude-sonnet-4-6` | Génération tests unitaires                          |
+| `elicitor`     | `claude-sonnet-5-5` | Élicitation structurée 5 techniques                 |
+| `constitutioner` | `claude-sonnet-5-5` | Sub-agent de `arch` Phase D : crée ADRs + maj constitution §1/§4/§6 + INDEX.md |
+| `qa`           | `claude-sonnet-5-5` | Génération tests unitaires                          |
 | ~~`dashboard`~~ | — | **RETIRÉ v7.0.0** (governance-major-auditors-trim) → remplacé par `index_adrs.py` (déterministe, 0 token) + console web pour métriques |
 | ~~`accessibility-auditor` (v6.3.0)~~ | — | **RETIRÉ v7.0.0** (governance-major-auditors-trim) → remplacé par `axe-core` au CI du projet généré ; schéma `[A11Y_*]` archivé dans `error-classification-legacy.md §1` |
-| `code-reviewer` (v6.3.1) | `claude-sonnet-4-6` | Review post-dev cross-fichier : anti-patterns stack, layer violations, contract drift, smells (complémentaire de qa/quality_scan.py) |
-| `security-reviewer` (v6.3.2) | `claude-sonnet-4-6` | Mode `scan` (post-dev OWASP Top 10 2021, 21 classes `[SEC_*]`, 8 hard-blocking). Mode `threat-model` retiré v7.0.0 (→ template humain `templates/threat-model.template.md`) |
+| `code-reviewer` (v6.3.1) | `claude-sonnet-5-5` | Review post-dev cross-fichier : anti-patterns stack, layer violations, contract drift, smells (complémentaire de qa/quality_scan.py) |
+| `security-reviewer` (v6.3.2) | `claude-sonnet-5-5` | Mode `scan` (post-dev OWASP Top 10 2021, 21 classes `[SEC_*]`, 8 hard-blocking). Mode `threat-model` retiré v7.0.0 (→ template humain `templates/threat-model.template.md`) |
 | ~~`performance-auditor` (v6.4.0)~~ | — | **RETIRÉ v7.0.0** (governance-major-auditors-trim) → remplacé par Lighthouse CI + wrk/k6 au CI du projet généré ; schéma `[PERF_*]` archivé dans `error-classification-legacy.md §2` |
 
-> **Split modèles (v7.0.0)** : Opus 4.8 sur les agents qui génèrent du
+> **Split modèles (v7.0.0)** : Opus 5.5 sur les agents qui génèrent du
 > code applicatif (`dev-backend`, `dev-frontend`) — la qualité du code
 > généré justifie le coût supplémentaire (preserves/adds contractuels,
-> layer mapping strict, fidélité libellés HTML). Sonnet 4.6 sur les
+> layer mapping strict, fidélité libellés HTML). Sonnet 5.5 sur les
 > agents de transformation déterministe et les auditeurs (po, arch,
 > elicitor, qa, constitutioner, code-reviewer, security-reviewer,
 > spec-compliance-reviewer, arch-reviewer).

@@ -2,6 +2,7 @@
 name: spec-compliance-reviewer
 description: Agent Spec Compliance Reviewer — vérifie indépendamment que chaque Acceptance Criteria (AC) de chaque US est implémentée dans le code matérialisé. Re-lit le code sans faire confiance au rapport dev-*, sur le pattern "Do not trust the report" (superpowers v5.1). Produit `spec-compliance.{md,json}` avec verdict 🟢/🟡/🔴 selon `SpecComplianceFailOn`. Strictement read-only sur le code généré.
 model_tier: balanced
+effort: medium
 tier_default: balanced
 tier_floor: balanced
 tier_ceiling: deep
@@ -29,7 +30,7 @@ de superpowers v5.1) :
 `/dev-run` STEP 6.4 (cf. `commands/dev-run.md §6.4.A`). Tourne SEUL avant
 les autres reviewers — pattern emprunt superpowers v5.1. Si verdict 🔴
 RED, les 3 autres auditors (`code-reviewer`, `security-reviewer`,
-`arch-reviewer`) sont **skippés** (économie ~3 invocations Sonnet 4.6).
+`arch-reviewer`) sont **skippés** (économie ~3 invocations Sonnet 5.5).
 Si 🟢/🟡, Stage B (batch parallèle 3 reviewers) tourne après. Skip
 conditionnel via `phase_planner.py` selon `SpecComplianceMode`. Fallback
 legacy parallèle 4-batch disponible via `AuditorBatchMode: legacy-parallel`
@@ -39,7 +40,7 @@ legacy parallèle 4-batch disponible via `AuditorBatchMode: legacy-parallel`
 `workspace/us/**`. **Ne corrige pas, ne re-Read pas le rapport
 des autres agents** — émet son rapport indépendant.
 
-**Token footprint cible** : 8-15 KB par FEAT de 3-5 US (Sonnet 4.6,
+**Token footprint cible** : 8-15 KB par FEAT de 3-5 US (Sonnet 5.5,
 sélectif via plans v2 + lecture ciblée par AC).
 
 **Couvre le gap** que ni `code-reviewer` (focus qualité) ni
@@ -65,8 +66,9 @@ existants (`*-code-review.{md,json}`, etc.) — la review est indépendante.
 
 ## STEP 0.5 — HARD-GATE context budget
 
-Appliquer `@.sdd/rules/build-and-loop.md §1` (Partie B) avec
-`--agent spec-compliance-reviewer --feat-number {n}`. Exit non-zero → STOP.
+Exécuter `python .sdd/python/sdd_scripts/context_budget.py --agent spec-compliance-reviewer --feat-number {n}`.
+Exit non-zero → STOP. (SSoT : `build-and-loop.md` Partie B §1 — **ne pas
+Read la rule pour cela**, la commande ci-dessus suffit.)
 
 ---
 
@@ -130,6 +132,8 @@ warnings — le Tech Lead arbitre.
 ---
 
 ## STEP 3 — Charger le contexte minimal
+
+> **Lecture unique (audit tokens 2026-11-06)** : ne relis JAMAIS un fichier déjà lu dans cette invocation — son contenu est déjà dans ton contexte. Fichier > 20 Ko (stack, rule) : lis la section utile (`Grep -n "^#"` pour la TOC, puis `Read` offset/limit), jamais le fichier entier.
 
 Read **uniquement** :
 

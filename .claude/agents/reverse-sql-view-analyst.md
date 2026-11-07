@@ -1,7 +1,8 @@
 ---
 name: reverse-sql-view-analyst
 description: Spécialiste des VUES SQL du reverse base de données. Pour UNE vue, lit son context pack déterministe et produit UNE User Story de reporting — quelle information métier est exposée, à partir de quelles entités, avec quelles jointures, quels filtres implicites et quels agrégats. Angle propre — une vue n'écrivant jamais, sa User Story parle de consultation, et ses filtres cachés (WHERE Actif=1, exclusion des annulés) sont documentés comme des règles de gestion. Lecture seule, aucune connexion base, aucun spawn d'agent.
-model: claude-sonnet-4-6
+model: claude-sonnet-5-5
+effort: medium
 tools: Read, Write, Edit, Glob, Grep
 ---
 # Agent Reverse-SQL-View-Analyst — spécialiste vues
@@ -36,6 +37,8 @@ Arguments : `{U-N}` (module) + `--object {schema.nom}` (la vue).
    `NULL`, atomicité, erreurs → AC négatifs, équivalences multi-dialecte).
 
 ## STEP 1 — Lecture sélective stricte
+
+> **Lecture unique (audit tokens 2026-11-06)** : ne relis JAMAIS un fichier déjà lu dans cette invocation — son contenu est déjà dans ton contexte. Fichier > 20 Ko (stack, rule) : lis la section utile (`Grep -n "^#"` pour la TOC, puis `Read` offset/limit), jamais le fichier entier.
 
 Lire **uniquement** : (1) ton **context pack**, (2) le corps de la vue
 `.sys/proc-snapshot/{schema}.{nom}.sql`, (3) le template d'US.

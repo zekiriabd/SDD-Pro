@@ -85,6 +85,127 @@ def workspace_root(repo_root: Path | None = None) -> Path:
     return nested_workspace
 
 
+#: Env var relocating `console.db` (absolute path). Honored by
+#: `console_db_path()` → `sdd_lib.console_db.default_db_path()`. Set by the
+#: pytest `conftest.py` (autouse) so the suite never touches the runtime DB
+#: (audit « fiabilité des données » 2026-11-07 : pytest faisait passer `gates`
+#: de 49 à 56 lignes dans `workspace/db/console.db`).
+CONSOLE_DB_PATH_ENV = "SDD_CONSOLE_DB_PATH"
+
+#: Mode of `$SDD_CONSOLE_DB_PATH` :
+#:   - unset / ``override`` (default, production contract) : the env path
+#:     ALWAYS wins.
+#:   - ``fallback`` (set by `tests/conftest.py`) : the env path is used only
+#:     when the default resolution would land on the REAL framework repo's
+#:     runtime DB. Tests that already isolate via a fake repo
+#:     (`$SDD_REPO_ROOT`, mocked `repo_root`, `cwd=fake_repo`) keep their own
+#:     `<fake>/workspace/db/console.db` and its path assertions.
+CONSOLE_DB_PATH_MODE_ENV = "SDD_CONSOLE_DB_PATH_MODE"
+
+
+def _framework_repo_root() -> Path | None:
+    """Repo root that physically contains this file (walk-up, no env/CWD)."""
+    for parent in Path(__file__).resolve().parents:
+        if _looks_like_repo_root(parent):
+            return parent
+    return None
+
+
+def runtime_console_db_path() -> Path | None:
+    """The real runtime DB of the framework checkout this code lives in."""
+    root = _framework_repo_root()
+    return workspace_root(root) / "db" / "console.db" if root is not None else None
+
+
+def _override_path(override: str) -> Path:
+    p = Path(override)
+    if not p.is_absolute():
+        import sys
+        print(
+            f"WARN sdd_lib.paths: {CONSOLE_DB_PATH_ENV}={override!r} is not "
+            "absolute — resolved against CWD (pass an absolute path).",
+            file=sys.stderr,
+        )
+    return p.resolve()
+
+
+def console_db_path(repo_root_path: Path | None = None) -> Path:
+    """Resolve the console.db location.
+
+    Resolution order :
+      1. `$SDD_CONSOLE_DB_PATH` — explicit relocation (tests, CI, multi-run
+         isolation). Expected absolute ; a relative value is resolved against
+         CWD with a WARN on stderr (never silently ignored). With
+         `$SDD_CONSOLE_DB_PATH_MODE=fallback` it only replaces a resolution
+         that would hit the real runtime DB (see `CONSOLE_DB_PATH_MODE_ENV`).
+      2. `<workspace_root>/db/console.db` (default, workspace-scoped).
+
+    `repo_root_path` is an optional pre-resolved repo root (avoids a redundant
+    walk-up when the caller already has it) — only used for case 2.
+    """
+    override = os.environ.get(CONSOLE_DB_PATH_ENV, "").strip()
+    mode = os.environ.get(CONSOLE_DB_PATH_MODE_ENV, "override").strip().lower()
+    if override and mode != "fallback":
+        return _override_path(override)
+    root = repo_root_path if repo_root_path is not None else repo_root()
+    default = workspace_root(root) / "db" / "console.db"
+    if override:  # fallback mode
+        runtime = runtime_console_db_path()
+        try:
+            hits_runtime = runtime is not None and default.resolve() == runtime.resolve()
+        except OSError:
+            hits_runtime = True  # fail safe : redirect
+        if hits_runtime:
+            return _override_path(override)
+    return default
+
+
+#: Env var relocating `workspace/.sys/.audit/` (absolute path). Same contract
+#: as `$SDD_CONSOLE_DB_PATH` : mode `override` by default, `fallback` (set by
+#: `tests/conftest.py`) redirects only a resolution that would hit the REAL
+#: framework repo's audit dir. Audit 2026-11-07 : pytest écrivait dans la piste
+#: d'audit de production (`pre-write-lint.log` « MyApp/Service.kt »,
+#: `env-bypass.jsonl` par lots de 42/84 commandes factices).
+AUDIT_DIR_ENV = "SDD_AUDIT_DIR"
+AUDIT_DIR_MODE_ENV = "SDD_AUDIT_DIR_MODE"
+
+
+def runtime_audit_dir() -> Path | None:
+    """The real audit dir of the framework checkout this code lives in."""
+    root = _framework_repo_root()
+    return workspace_root(root) / ".sys" / ".audit" if root is not None else None
+
+
+def audit_dir_path(repo_root_path: Path | None = None, *, workspace: Path | None = None) -> Path:
+    """Resolve `workspace/.sys/.audit/` — the single entry point for audit logs.
+
+    Resolution order :
+      1. `$SDD_AUDIT_DIR` (mode `override`, default) — explicit relocation.
+      2. `<workspace>/.sys/.audit` — `workspace` if given, else
+         `workspace_root(repo_root_path or repo_root())`. With
+         `$SDD_AUDIT_DIR_MODE=fallback`, `$SDD_AUDIT_DIR` replaces this only
+         when it is the real runtime audit dir.
+    Never creates the directory (callers `mkdir` before writing).
+    """
+    override = os.environ.get(AUDIT_DIR_ENV, "").strip()
+    mode = os.environ.get(AUDIT_DIR_MODE_ENV, "override").strip().lower()
+    if override and mode != "fallback":
+        return Path(override).resolve()
+    if workspace is None:
+        root = repo_root_path if repo_root_path is not None else repo_root()
+        workspace = workspace_root(root)
+    default = Path(workspace) / ".sys" / ".audit"
+    if override:  # fallback mode
+        runtime = runtime_audit_dir()
+        try:
+            hits_runtime = runtime is not None and default.resolve() == runtime.resolve()
+        except OSError:
+            hits_runtime = True  # fail safe : redirect
+        if hits_runtime:
+            return Path(override).resolve()
+    return default
+
+
 def repo_root() -> Path:
     """Locate the SDD_Pro repo root.
 

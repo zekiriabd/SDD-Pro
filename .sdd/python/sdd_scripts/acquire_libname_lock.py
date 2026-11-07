@@ -26,12 +26,21 @@ Exit codes:
 
 Output: single JSON line on stdout.
 
+Input validation (audit « fiabilité des données » 2026-11-07) :
+    --entity / --agent-id must match ``^[A-Za-z0-9_-]{1,64}$`` (no ``..``,
+    no separators — they become a file name / a lock payload field), and
+    --lib-path must resolve (symlinks followed) UNDER ``<workspace>/src``.
+    ``$SDD_LIBNAME_LOCK_ROOT`` (absolute) overrides that root (tests, CI).
+    Violations → exit 3 + ``error_class: [LIBNAME_LOCK_INVALID_ARG]``.
+
 Migrated from .claude/scripts/acquire-libname-lock.ps1 (2026-05-13).
 """
 from __future__ import annotations
 
 import argparse
 import json
+import os
+import re
 import sys
 import time
 from pathlib import Path
@@ -40,40 +49,60 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sdd_lib.file_locks import (  # noqa: E402
     read_lock,
+    read_lock_raw,
+    takeover_stale_lock,
     try_create_exclusive,
 )
+from sdd_lib.paths import repo_root, workspace_root  # noqa: E402
+
+#: Allowed shape for --entity / --agent-id (file name + payload field).
+SAFE_NAME_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+#: Env override of the allowed lock root (absolute path).
+LOCK_ROOT_ENV = "SDD_LIBNAME_LOCK_ROOT"
 
 
-def _stale_recover_via_excl(lock_file: Path, payload: str) -> bool:
-    """TOCTOU-safe stale lock recovery (audit 2026-06-06 D8).
+def allowed_lock_root() -> Path:
+    """Root under which --lib-path must live (``<workspace>/src`` by default)."""
+    override = os.environ.get(LOCK_ROOT_ENV, "").strip()
+    if override:
+        return Path(override).resolve()
+    return (workspace_root(repo_root()) / "src").resolve()
 
-    Two agents A and B may detect the same stale lock at T0. Both call this
-    function around T1. Algorithm :
 
-      1. Each agent unlink()s the existing lock (best-effort, ignore missing).
-      2. Each agent attempts `try_create_exclusive(lock_file, payload)`.
-      3. POSIX/Windows guarantee that exactly ONE create succeeds when the
-         file does not exist — the other gets EEXIST.
+def validate_args(lib_path: str, entity: str, agent_id: str) -> str | None:
+    """Return an error message, or None when the arguments are acceptable."""
+    if not SAFE_NAME_RE.match(entity or ""):
+        return f"invalid --entity {entity!r} (expected ^[A-Za-z0-9_-]{{1,64}}$)"
+    if not SAFE_NAME_RE.match(agent_id or ""):
+        return f"invalid --agent-id {agent_id!r} (expected ^[A-Za-z0-9_-]{{1,64}}$)"
+    root = allowed_lock_root()
+    try:
+        resolved = Path(lib_path).resolve()
+    except (OSError, RuntimeError) as exc:
+        return f"invalid --lib-path {lib_path!r}: {exc}"
+    if resolved == root or root not in resolved.parents:
+        return (f"--lib-path {lib_path!r} resolves to {resolved}, outside the "
+                f"allowed lock root {root} (workspace/src/<LibName>)")
+    return None
 
-    Returns True if THIS agent won the recovery race (and now holds the
-    lock), False if another agent claimed it first.
 
-    Pre-D8 implementation used `overwrite_lock` (`path.write_text`) which is
-    last-write-wins : both A and B "succeeded" but only B's payload remained,
-    while A also believed it held the lock → 2 concurrent entity writes
-    downstream.
+def _stale_recover_via_excl(lock_file: Path, payload: str,
+                            observed: str | None = None) -> bool:
+    """TOCTOU-safe stale lock recovery (audit 2026-06-06 D8 + 2026-11-07).
+
+    Delegates to ``sdd_lib.file_locks.takeover_stale_lock`` :
+      * compare-and-delete — the lock is only unlinked if its payload is
+        still the stale one we observed (another agent that already took it
+        over is never robbed) ;
+      * mtime grace on EMPTY/unparseable payloads (a winner between its
+        ``O_EXCL`` create and its write) ;
+      * ``O_EXCL`` recreate — exactly one contender wins.
+
+    Returns True if THIS agent now holds the lock.
     """
-    try:
-        lock_file.unlink()
-    except FileNotFoundError:
-        pass  # Already gone — another agent unlinked it ; no-op for us.
-    except OSError:
-        # Permission denied or similar — let try_create_exclusive race anyway.
-        pass
-    try:
-        return try_create_exclusive(lock_file, payload)
-    except OSError:
-        return False
+    if observed is None:
+        observed = read_lock_raw(lock_file)
+    return takeover_stale_lock(lock_file, observed_content=observed, new_content=payload)
 
 
 def parse_args() -> argparse.Namespace:
@@ -94,6 +123,13 @@ def emit(obj: dict, exit_code: int) -> int:
 
 def main() -> int:
     args = parse_args()
+    problem = validate_args(args.lib_path, args.entity, args.agent_id)
+    if problem:
+        return emit({
+            "status": "ERROR",
+            "error_class": "[LIBNAME_LOCK_INVALID_ARG]",
+            "message": problem,
+        }, 3)
     lib_path = Path(args.lib_path)
     if not lib_path.is_dir():
         return emit({"status": "ERROR", "message": f"LibPath not found: {args.lib_path}"}, 3)
@@ -181,6 +217,7 @@ def main() -> int:
         }, 0)
 
     # Lock file already existed — inspect ownership + age
+    observed_raw = read_lock_raw(lock_file)
     existing = read_lock(lock_file)
     if not existing:
         # Corrupt or unreadable; treat as stale and override via
@@ -189,7 +226,7 @@ def main() -> int:
         # (audit 2026-06-06 D8 — formerly used overwrite_lock which is
         # `path.write_text` non-atomic ; 2 agents could both write,
         # last-write-wins, both believe they hold the lock).
-        if _stale_recover_via_excl(lock_file, payload):
+        if _stale_recover_via_excl(lock_file, payload, observed_raw):
             return emit({
                 "status": "ACQUIRED-STALE-OVERRIDE",
                 "entity": args.entity,
@@ -223,7 +260,7 @@ def main() -> int:
         # Pre-D8 `overwrite_lock` could see 2 concurrent agents both succeed
         # in write_text, both believing they hold the lock → 2 concurrent
         # entity file writes downstream.
-        if _stale_recover_via_excl(lock_file, payload):
+        if _stale_recover_via_excl(lock_file, payload, observed_raw):
             return emit({
                 "status": "ACQUIRED-STALE-OVERRIDE",
                 "entity": args.entity,

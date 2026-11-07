@@ -2,6 +2,7 @@
 name: arch
 description: 'Agent Arch — bootstrap idempotent de la solution / des projets vides selon les stacks actifs (Init Commands §2.2.1) + propagation des blocs `## Active Database` / `## Active Auth Specs` de stack.md vers les fichiers de configuration applicatifs (appsettings.json / application.yml / config/default.json / app/config.py) + (si DatabaseType ≠ none) introspection READ-ONLY de la base et scaffolding Database-First (entities + DbContext). Pas de code applicatif (responsabilité dev-backend / dev-frontend). Idempotent : skip si projet déjà initialisé, scaffolding incrémental, configs régénérables.'
 model_tier: balanced
+effort: high
 tier_default: balanced
 tier_floor: balanced
 tier_ceiling: deep
@@ -56,12 +57,15 @@ d'env vars. `stack.md` reste source humaine, propagée par STEP 4.5.
 
 ## STEP 0.5 - HARD-GATE context budget
 
-Appliquer `@.sdd/rules/build-and-loop.md §1` (Partie B) avec
-`--agent arch` (pas de `--feat-number` — niveau projet). Exit non-zero → STOP.
+Exécuter `python .sdd/python/sdd_scripts/context_budget.py --agent arch` (pas de
+`--feat-number` — niveau projet). Exit non-zero → STOP. (SSoT : `build-and-loop.md`
+Partie B §1 — **ne pas Read la rule pour cela**.)
 
 ---
 
 ## STEP 1 — Charger le contexte minimal
+
+> **Lecture unique (audit tokens 2026-11-06)** : ne relis JAMAIS un fichier déjà lu dans cette invocation — son contenu est déjà dans ton contexte. Fichier > 20 Ko (stack, rule) : lis la section utile (`Grep -n "^#"` pour la TOC, puis `Read` offset/limit), jamais le fichier entier.
 
 Read **uniquement** :
 
@@ -235,8 +239,10 @@ Procédure :
 
 1. Lire `archiPattern` depuis le JSON `preflight.py` (déjà calculé en
    STEP 0/2). Valeurs possibles : `MVC` (défaut), `DDD`, `microservice`.
-2. Read **`.sdd/stacks/archi/{lower(archiPattern)}.md`** intégralement.
-   Fichier absent → STOP + ERROR :
+2. Le pattern **`.sdd/stacks/archi/{lower(archiPattern)}.md` est DÉJÀ dans
+   ton pack** (`pack_sources:` de `loader.yml`, lu en STEP 1) — ne le relis
+   pas. Read le fichier (§2-§7 uniquement, offset/limit) seulement si le
+   manifeste du pack le déclare absent. Fichier absent du disque → STOP + ERROR :
    ```
    ERROR: agent arch — pattern archi introuvable
    CAUSE: [STACK_MALFORMED] .sdd/stacks/archi/{pattern}.md absent

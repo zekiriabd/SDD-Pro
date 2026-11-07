@@ -57,9 +57,13 @@ dependencies = []
 #
 # Mitigation v7.0.1 :
 #   1. Plancher MINOR `>=X.Y` au lieu de `>=X.0` (limite la fenêtre).
-#   2. PIN ABSOLU recommandé via lockfile (uv / pip-compile) — voir
-#      `.sdd/python/requirements-dev.lock.txt` à générer une fois
-#      (sprint 9.1, requires uv install in CI).
+#   2. PIN ABSOLU via fichier de contraintes `.sdd/python/requirements.lock.txt`
+#      (généré 2026-11-07 depuis l'environnement de référence — `pip freeze`
+#      filtré sur les extras ; les paquets d'extras non installés y sont listés
+#      comme NON pinnés plutôt qu'inventés). Usage :
+#        pip install -e ".sdd/python[dev,reverse]" -c .sdd/python/requirements.lock.txt
+#      (l'ex-promesse `requirements-dev.lock.txt` « sprint 9.1 » n'avait jamais
+#      été tenue).
 #   3. Dependabot config `.github/dependabot.yml` pour bump auto + review.
 [project.optional-dependencies]
 # Reverse-engineering module deps (audit fix 2026-06-12) — `sdd_reverse`
@@ -86,8 +90,11 @@ reverse-db = [
     "mysql-connector-python>=8.0,<10.0",  # MySQL / MariaDB (information_schema)
 ]
 dev = [
-    "pytest>=8.0,<9.0",          # 8.x stable, contain to MAJOR
-    "pytest-cov>=5.0,<7.0",      # 5+ supports modern coverage, sub-7 cap
+    # Plafonds relevés 2026-11-07 : la suite tourne réellement sous pytest
+    # 9.0.3 / pytest-cov 7.1.0 (cf. requirements.lock.txt) — les anciens caps
+    # `<9.0` / `<7.0` rendaient le lockfile incompatible avec ses propres extras.
+    "pytest>=8.0,<10.0",
+    "pytest-cov>=5.0,<8.0",
     # pytest-xdist : parallel test execution (audit P2 perf 2026-06-08).
     # 1479 tests in ~40 s serial → ~10-12 s with `-n auto` on 4-core CI.
     "pytest-xdist>=3.5,<4.0",
@@ -124,13 +131,20 @@ sdd-smoke = "sdd_admin.framework_smoke:main"
 # sdd-context-budget = "sdd_scripts.context_budget:main"
 
 [tool.setuptools]
+# Audit 2026-11-07 : le module reverse (`sdd_reverse`, son sous-paquet
+# `sdd_reverse.dialects`, et `sdd_reverse_scripts`) était absent — un
+# `pip install .` non éditable livrait les extras `reverse`/`reverse-db`
+# sans le code qu'ils servent.
 packages = ["sdd_lib", "sdd_lib.console_db", "sdd_lib.migrations",
-            "sdd_scripts", "sdd_hooks", "sdd_admin"]
+            "sdd_scripts", "sdd_hooks", "sdd_admin",
+            "sdd_reverse", "sdd_reverse.dialects", "sdd_reverse_scripts"]
 include-package-data = true
 
 [tool.setuptools.package-data]
 "sdd_lib" = ["console_db_schema.sql", "migrations/*.sql"]
 sdd_scripts = ["*.yaml", "*.yml"]
+# Templates US/FEAT/analyse/parité, signatures de langage, snapshots de parité.
+sdd_reverse = ["*.yml", "*.yaml", "*.md", "*.json", "*.feature", "dialects/*.py"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

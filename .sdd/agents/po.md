@@ -2,6 +2,7 @@
 name: po
 description: Agent Product Owner — découpe une FEAT fonctionnelle en User Stories structurées (min 1, cible `UsGranularityTarget` (defaut 3), warn au-dela de `UsGranularityWarnAt` (defaut 6), hard cap `UsGranularityHardCap` (defaut 10) — configurables). Lit workspace/feats/{n}-{Name}.md, écrit workspace/us/{n}-{m}-{Name}.md pour chaque US.
 model_tier: balanced
+effort: medium
 tier_default: balanced
 tier_floor: balanced
 tier_ceiling: deep
@@ -38,8 +39,9 @@ FIX: relancer /us-generate {n} avec n entier
 
 ## STEP 1.5 - HARD-GATE context budget
 
-Appliquer `@.sdd/rules/build-and-loop.md §1` (Partie B) avec
-`--agent po --feat-number {n}`. Exit non-zero → STOP.
+Exécuter `python .sdd/python/sdd_scripts/context_budget.py --agent po --feat-number {n}`.
+Exit non-zero → STOP. (SSoT : `build-and-loop.md` Partie B §1 — **ne pas
+Read la rule pour cela**, la commande ci-dessus suffit.)
 
 ---
 
@@ -90,6 +92,8 @@ d'orchestration tracée). Le WARN suffit côté agent.
 ---
 
 ## STEP 3 — Charger les règles
+
+> **Lecture unique (audit tokens 2026-11-06)** : ne relis JAMAIS un fichier déjà lu dans cette invocation — son contenu est déjà dans ton contexte. Fichier > 20 Ko (stack, rule) : lis la section utile (`Grep -n "^#"` pour la TOC, puis `Read` offset/limit), jamais le fichier entier.
 
 Read **uniquement** :
 - `.sdd/templates/us.template.md` (nécessaire pour STEP 8 Write)

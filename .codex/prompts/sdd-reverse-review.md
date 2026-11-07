@@ -1,5 +1,5 @@
 <!-- GENERATED FROM .sdd/ (commande /sdd-reverse-review) — DO NOT EDIT -->
-<!-- Revue de complétude back (L5) d'UNE FEAT reverse. Spawn agent reverse-completeness-reviewer (Sonnet 4.6) après le check déterministe check_feat_completeness.py. Verdict informational, jamais bloquant. Commande wrapper créée 2026-06-10 (audit M11) pour que /sdd-reverse-full reste un pur séquenceur de commandes (no-spawn §9). -->
+<!-- Revue de complétude back (L5) d'UNE FEAT reverse. Spawn agent reverse-completeness-reviewer (Sonnet 5.5) après le check déterministe check_feat_completeness.py. Verdict informational, jamais bloquant. Commande wrapper créée 2026-06-10 (audit M11) pour que /sdd-reverse-full reste un pur séquenceur de commandes (no-spawn §9). -->
 <!-- ============================================================ -->
 <!-- IMPORTANT — SPAWN SEMANTICS UNDER CODEX (audit R10 2026-07-26) -->
 <!-- Toute mention `Task tool (subagent_type=X)`, `Agent(X)`, ou    -->

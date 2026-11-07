@@ -435,7 +435,7 @@ workspace/
 ---
 name: reverse-inventory
 description: Cartographie d'un projet legacy déposé dans workspace/old/{P}/. Détecte langages/frameworks, énumère les pages, identifie les unités fonctionnelles candidates (U-N), extrait un schéma DB basique. Produit inventory.{md,json} + db-schema.{json,md} + language-detected.json.
-model: claude-sonnet-4-6
+model: claude-sonnet-5-5
 tools: Read, Write, Glob, Grep, Bash
 ---
 ```
@@ -472,7 +472,7 @@ Cette gate empêche un cache de version antérieure de cascader des `KeyError` e
 ---
 name: reverse-tech-auditor
 description: Audit architecture/anti-patterns/dépendances EOL d'un projet legacy déjà inventoryé. Enrichit db-schema avec relations dérivées, index, contraintes. Output informational, non consommé par /sdd-full.
-model: claude-sonnet-4-6
+model: claude-sonnet-5-5
 tools: Read, Write, Glob, Grep, Bash
 ---
 ```
@@ -487,7 +487,7 @@ tools: Read, Write, Glob, Grep, Bash
 - `workspace/old/{P}/.sys/deps-graph.json` (schéma §5.4)
 - `workspace/old/{P}/.sys/db-schema.enrichment.json` (**fichier séparé** — corrigé ADV-3)
 
-**Stratégie d'enrichissement durcie (ADV-3)** : `reverse-tech-auditor` est un LLM Sonnet 4.6 avec tool `Write`. Pour éviter toute corruption silencieuse de `db-schema.json` (suppression d'entities, merge incorrect), la séparation suivante est imposée :
+**Stratégie d'enrichissement durcie (ADV-3)** : `reverse-tech-auditor` est un LLM Sonnet 5.5 avec tool `Write`. Pour éviter toute corruption silencieuse de `db-schema.json` (suppression d'entities, merge incorrect), la séparation suivante est imposée :
 
 1. L'agent écrit ses additions dans un fichier **distinct** : `db-schema.enrichment.json` (relations dérivées, index, contraintes nouvelles, fields manquants). Il **ne touche jamais** `db-schema.json`.
 2. Schéma `db-schema.enrichment.json` (mode additif strict) :
@@ -526,7 +526,7 @@ tools: Read, Write, Glob, Grep, Bash
 | Barreau | Agent (`.claude/agents/`) | Modèle | Input principal | Output |
 |---|---|---|---|---|
 | **3a** | `reverse-tech-analyst.md` | tier `deep` **routé par complexité** (`code_unit_complexity.py`, ADR `governance-reverse-complexity-ladder` 2026-06-29 — Sonnet si unité simple, Opus sinon) | `units[U-N].evidenceFiles` + db-schema (+ tech-audit opt.) | `workspace/plans/{n}-{Name}.analysis.md` (analyse technique fidèle, tasks T-N, evidence file:line) |
-| **3b** | `reverse-us-writer.md` | Sonnet 4.6 (downgrade audité 2026-06-11) | analyse 3a | `workspace/us/{n}-{m}-{Name}.md` (US par capability, AC → covers T-N, ligne header `Confidence:`) |
+| **3b** | `reverse-us-writer.md` | Sonnet 5.5 (downgrade audité 2026-06-11) | analyse 3a | `workspace/us/{n}-{m}-{Name}.md` (US par capability, AC → covers T-N, ligne header `Confidence:`) |
 | **3c** | `reverse-feat-composer.md` | tier `deep` **routé par complexité** (même ADR — Sonnet si unité simple, Opus sinon) | US 3b + analyse 3a | `workspace/feats/{n}-{Name}.md` (FEAT métier, plomberie démotée, REVERSE-GATE) |
 
 **Invariants de l'escalier** :
@@ -591,7 +591,7 @@ if iter == 3 and exit != 0:
 ---
 name: reverse-ui-extractor
 description: Pour UNE unité U-N donnée, lit les templates legacy + CSS + le FEAT déjà produit, et synthétise 1 à N écrans HTML sémantiques préservant la structure visuelle legacy (sans clonage pixel-perfect).
-model: claude-opus-4-8
+model: claude-opus-5-5
 tools: Read, Write, Edit, Glob, Grep, Bash
 ---
 ```
@@ -672,10 +672,10 @@ décompilation lui-même (palier V3, §13.3).
 
 | Agent | Modèle | Phase | Mode |
 |---|---|---|---|
-| `reverse-inventory` | Sonnet 4.6 | 1 | Synthèse + délégation scripts |
-| `reverse-tech-auditor` | Sonnet 4.6 | 2 (opt) | Audit, informational |
+| `reverse-inventory` | Sonnet 5.5 | 1 | Synthèse + délégation scripts |
+| `reverse-tech-auditor` | Sonnet 5.5 | 2 (opt) | Audit, informational |
 | `reverse-tech-analyst` (3a) | tier `deep`, routé par complexité (ADR 2026-06-29) | 3 | Analyse technique fidèle, anti-hallucination strict |
-| `reverse-us-writer` (3b) | Sonnet 4.6 | 3 | Altitude-lift US (jamais de lecture code legacy) |
+| `reverse-us-writer` (3b) | Sonnet 5.5 | 3 | Altitude-lift US (jamais de lecture code legacy) |
 | `reverse-feat-composer` (3c) | tier `deep`, routé par complexité (ADR 2026-06-29) | 3 | Composition FEAT métier, plomberie démotée |
 | `reverse-ui-extractor` | tier `deep` (fixe, non routé) | 4 (V2) | Génération HTML sémantique |
 

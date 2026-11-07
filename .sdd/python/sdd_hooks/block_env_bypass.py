@@ -1,26 +1,54 @@
 #!/usr/bin/env python3
-"""SDD_Pro PreToolUse hook (matcher=Bash) — block envvar bypass attempts.
+"""SDD_Pro PreToolUse hook (matcher=`Bash|PowerShell`) — block envvar bypass attempts.
 
-Defense-in-depth complement to settings.json `permissions.deny` Bash patterns,
-which are case-sensitive and miss obvious bypass variants:
-  - sDd_AlLoW_X=1 (case)
-  - "SDD_ALLOW_X"=1 (quoted)
-  - export   SDD_ALLOW_X=1 (extra whitespace)
-  - bash -c 'SDD_ALLOW_X=1 …' (nested shell)
-  - SDD_ALLOW_X="1" (quoted value)
+Ce que ce hook protège (audit sécurité 2026-11, docstring corrigé) :
+  Les variables de bypass/mode des gardes SDD (`SDD_ALLOW_*`, `SDD_DISABLE_*`,
+  `SDD_*_MODE`, `SDD_BYPASS_*`, `SDD_PROTECT_*`, `SDD_TDD_*`, `SDD_BUDGET_*`,
+  `SDD_TOKEN_USAGE_*`, `SDD_AUDIT_*`, `SDD_PRE_WRITE_LINT_*`, `SDD_HOOK_*`,
+  `SDD_*_STRICT`, `SDD_REPO_ROOT`, `SDD_CONSOLE_DB_PATH`, et `CI`) ne
+  doivent JAMAIS être positionnées depuis une commande d'agent.
 
-This hook receives the Bash invocation payload on stdin (Claude Code PreToolUse
-schema), normalizes the command string, and rejects ANY case-insensitive
-occurrence of the protected envvar names being SET to a truthy value, regardless
-of escaping/casing/quoting.
+  Précision de modèle de menace : une assignation faite dans le shell de
+  l'outil Bash/PowerShell n'atteint PAS l'environnement du process Claude
+  Code — donc pas celui des hooks. Le risque réel est ailleurs : les
+  *scripts* lancés depuis ce shell (ex. `SDD_ALLOW_ACCEPTANCE_BYPASS=1
+  python validate_acceptance.py` écrit un verdict `bypass` que le gate lit
+  ensuite), et la persistance éventuelle des variables d'une commande Bash
+  à la suivante. Le seul canal légitime pour un bypass reste
+  l'environnement du process Claude Code (shell parent, ou bloc `env` de
+  `.claude/settings.local.json`), jamais une commande.
 
-Exit codes:
-  0 = ALLOW
-  2 = DENY (hook protocol — Claude refuses the tool call)
+  Il n'existe PAS de règle `permissions.deny` correspondante dans
+  `.claude/settings.json` (l'ancien docstring en citait) : ce hook est la
+  seule barrière, et elle est heuristique (regex sur la ligne de commande,
+  pas d'interprétation shell).
 
-Bypass for legitimate use cases (rare): set SDD_ALLOW_ENV_BYPASS=1 in the parent
-shell BEFORE starting Claude Code. That envvar itself is in the protected set so
-it cannot be set mid-session — only inherited from the parent process.
+Formes détectées (insensible à la casse, après normalisation des quotes et
+backslashes — `SDD_ALLOW_UNTESTED_COMB"O"=1` est vu comme
+`SDD_ALLOW_UNTESTED_COMBO=1`) :
+  - POSIX : `[export|declare -x|typeset -x|readonly] NAME=val`, inline
+    `NAME=val cmd`, `env [-i] NAME=val`, `unset NAME`, `env -u NAME`,
+    `bash -c "…NAME=…"`, `eval`/`source`/`printf` contenant NAME
+  - PowerShell : `$env:NAME = …`, `${env:NAME} = …`, `Set-Item/New-Item/
+    Set-Variable/Remove-Item env:NAME`, `[Environment]::SetEnvironmentVariable`
+  - Windows : `setx NAME …`, `set NAME=…`
+  - Interpréteurs inline : `os.environ[NAME] = …`, `os.environ.update/
+    setdefault(…NAME…)`, `os.putenv(NAME…)`, `process.env.NAME = …`, dict
+    `{NAME: …}` passé en `env=` à un sous-process
+  - Indirection : `V=SDD_X; export $V`, `$v='SDD_X'; Set-Item "env:$v" 1`
+    (nom protégé en VALEUR d'assignation + mot-clé de positionnement)
+  - Heredocs : le corps est désormais SCANNÉ (bash l'exécute ; l'ancien
+    strip ouvrait `bash <<EOF … SDD_ALLOW_X=1 … EOF`). Conséquence
+    assumée : un message de commit en heredoc qui documente
+    `SDD_ALLOW_X=1` est refusé — utiliser `git commit -F fichier`.
+
+Contournements connus (non couverts, heuristique) : construction du nom par
+concaténation dynamique (`"SDD_AL""LOW"` dans un langage tiers, base64,
+`chr()`), script écrit sur disque puis exécuté, variables positionnées par
+un outil externe.
+
+Exit codes : 0 = ALLOW, 2 = DENY. Tout refus est journalisé
+(`workspace/.sys/.audit/env-bypass.jsonl`, valeurs de secrets masquées).
 """
 from __future__ import annotations
 
@@ -32,23 +60,17 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from sdd_lib.exit_codes import HOOK_ALLOW, HOOK_DENY  # noqa: E402
-from sdd_lib.paths import workspace_root, project_root_for_hook  # noqa: E402
+from sdd_lib.paths import audit_dir_path, workspace_root, project_root_for_hook  # noqa: E402
 
 
 def _resolve_project_root() -> Path | None:
     """DRY shim — delegate to `sdd_lib.paths.project_root_for_hook`.
 
-    Audit CTO 2026-06-07 — replaced the 7-line duplicate that pre-dated
-    the introduction of `project_root_for_hook` (SSoT P1-5 fix 2026-06-07).
-    The SSoT additionally hardens against `CLAUDE_PROJECT_DIR` symlink
-    pointing outside the repo (defense against substituted env var).
-
-    Returns the resolved root if a `.claude/` directory exists at it,
-    else None (preserves the "skip silently in isolated tmpdir" semantic
-    of the original implementation).
+    Returns the resolved root if a `.claude/` or `.sdd/` directory exists at
+    it, else None (preserves the "skip silently in isolated tmpdir" semantic).
     """
     root = project_root_for_hook()
-    if (root / ".claude").is_dir():
+    if (root / ".claude").is_dir() or (root / ".sdd").is_dir():
         return root
     return None
 
@@ -78,38 +100,22 @@ def _mask_secrets(text: str) -> str:
     """Replace `SECRET_NAME=value` patterns with `SECRET_NAME=***` in audit text.
 
     Conservative masking : only the VALUE is replaced. The key NAME is
-    preserved so forensics can identify which secret was exposed without
-    leaking the secret itself. Pattern matches common secret naming
-    conventions (PASSWORD/SECRET/TOKEN/KEY/JWT/etc.) case-insensitive.
+    preserved so forensics can identify which secret was exposed.
 
     Example :
         in:  `export DB_PASSWORD=hunter2 SDD_ALLOW_FORCE=1`
         out: `export DB_PASSWORD=*** SDD_ALLOW_FORCE=1`
-
-    The SDD_ALLOW_* / SDD_DISABLE_* names themselves are NOT masked (they
-    are the protected names we are auditing, not secrets).
     """
     return _SECRET_MASK_RE.sub(r"\g<prefix>\g<quote>***\g<quote>", text)
 
 
 def _audit_log(match: str, cmd: str, bypass_set: bool) -> None:
-    """Persist a JSONL audit line for env-bypass denials.
-
-    Non-blocking: any I/O failure here must NOT change the deny decision.
-    Path is anchored to CLAUDE_PROJECT_DIR (fallback : walk-up looking for
-    `.claude/`) under workspace/.sys/.audit/env-bypass.jsonl.
-
-    v7.0.1 audit P1 v2 (2026-06-08) — secret masking : `command_excerpt`
-    is passed through `_mask_secrets()` before persistence to prevent
-    leaks like `MY_DB_PASSWORD=hunter2` ending up in plain text in the
-    audit log (which is gitignored but still on filesystem with potential
-    read access by other tools / VSCode extensions).
-    """
+    """Persist a JSONL audit line for env-bypass denials (never raises)."""
     try:
         root = _resolve_project_root()
         if root is None:
             return  # no project — skip silently (e.g. pytest in isolated tmpdir)
-        audit_dir = workspace_root(root) / ".sys" / ".audit"
+        audit_dir = audit_dir_path(root)
         audit_dir.mkdir(parents=True, exist_ok=True)
         masked_excerpt = _mask_secrets(cmd[:240])
         line = {
@@ -127,160 +133,145 @@ def _audit_log(match: str, cmd: str, bypass_set: bool) -> None:
         pass
 
 
-# Protected envvar name patterns (case-insensitive substring match on var name).
-# These names, when SET to a truthy value, bypass cost caps, security gates, or
-# other guardrails. Setting them mid-session would let an agent or executed
-# script silently disable protections.
+# Protected envvar name patterns (case-insensitive). Positionner l'une de
+# ces variables désactive ou affaiblit un garde (cost cap, gates, TDD,
+# ownership, protection framework, détection CI, emplacement de console.db…).
 PROTECTED_PATTERNS = [
-    r"SDD_ALLOW_[A-Z_]*",
-    r"SDD_DISABLE_[A-Z_]*",
+    r"SDD_(?:ALLOW|DISABLE|BYPASS|PROTECT|TDD|BUDGET|TOKEN_USAGE|AUDIT|"
+    r"PRE_WRITE_LINT|HOOK)_[A-Z0-9_]*",
+    r"SDD_[A-Z0-9_]*_(?:MODE|STRICT)",
+    r"SDD_(?:REPO_ROOT|CONSOLE_DB_PATH)",
+    r"CI",
 ]
 
-# Compile a single regex that catches:
-#   [export ]   ?   NAME   ? = ? "?value"?
-#   $env:NAME = "value"
-#   setx NAME value
-#   Set-Variable env:NAME value
-# Where NAME matches any PROTECTED_PATTERNS, case-insensitively.
-_NAME_GROUP = "(?:" + "|".join(PROTECTED_PATTERNS) + ")"
+_NAME = r"(?:" + "|".join(PROTECTED_PATTERNS) + r")(?![A-Za-z0-9_])"
+#: Frontière gauche d'un nom en position d'assignation POSIX.
+_LB = r"(?:^|(?<=[\s;&|`(){]))"
 
 _BYPASS_REGEXES = [
-    # POSIX: [export] NAME=val   |   NAME="val"   |   NAME='val'
-    re.compile(rf"(?:^|[\s;&|`(])(?:export\s+)?[\"']?{_NAME_GROUP}[\"']?\s*=\s*[\"']?\S",
+    # POSIX : [export|declare -x|typeset -x|readonly|local] NAME=val, inline NAME=val
+    re.compile(rf"{_LB}(?:(?:export|declare|typeset|readonly|local)\s+(?:-[a-zA-Z]+\s+)*)?{_NAME}=",
                re.IGNORECASE),
-    # PowerShell: $env:NAME = "val"
-    re.compile(rf"\$env:[\"']?{_NAME_GROUP}[\"']?\s*=", re.IGNORECASE),
-    # Windows: setx NAME val
-    re.compile(rf"\bsetx\s+[\"']?{_NAME_GROUP}[\"']?\s+\S", re.IGNORECASE),
-    # PowerShell: Set-Variable / Set-Item env:NAME val
-    re.compile(rf"\b(?:Set-Variable|Set-Item)\s+(?:-Name\s+)?[\"']?env:{_NAME_GROUP}[\"']?",
+    # POSIX : env [-i] NAME=val / env -u NAME (unset) / unset NAME
+    re.compile(rf"\benv\s+(?:-[a-zA-Z]+\s+)*{_NAME}=", re.IGNORECASE),
+    re.compile(rf"\benv\s+(?:-[a-zA-Z]+\s+)*-u\s*{_NAME}", re.IGNORECASE),
+    re.compile(rf"\bunset\s+(?:-[a-zA-Z]+\s+)*{_NAME}", re.IGNORECASE),
+    # PowerShell : $env:NAME = …  /  ${env:NAME} = …
+    re.compile(rf"\$\{{?env:{_NAME}\}}?\s*=", re.IGNORECASE),
+    # PowerShell : Set-Item / New-Item / Set-Variable / Remove-Item / Clear-Item env:NAME
+    re.compile(rf"\b(?:Set-Item|New-Item|Set-Variable|Remove-Item|Clear-Item|si|ni|ri|sv)\s+"
+               rf"(?:-(?:Path|Name|LiteralPath)\s+)?env:{_NAME}", re.IGNORECASE),
+    # .NET : [Environment]::SetEnvironmentVariable("NAME", …)
+    re.compile(rf"\[(?:System\.)?Environment\]::SetEnvironmentVariable\s*\(\s*{_NAME}",
                re.IGNORECASE),
-    # PowerShell: New-Item env:NAME (creating new env var without -Path)
-    re.compile(rf"\bNew-Item\s+(?:-Path\s+)?[\"']?env:{_NAME_GROUP}[\"']?",
-               re.IGNORECASE),
-    # PowerShell: [Environment]::SetEnvironmentVariable("NAME", "val")
-    re.compile(rf"\[(?:System\.)?Environment\]::SetEnvironmentVariable\s*\(\s*[\"']?{_NAME_GROUP}[\"']?",
-               re.IGNORECASE),
-    # v7.0.1 audit P0 v2 (2026-06-08) — bypass vectors étendus :
-    #
-    # POSIX: env VAR=val cmd ... (env-as-prefix invocation, not subshell)
-    # Example: `env SDD_ALLOW_FORCE=1 claude /sdd-full 1` — env tool sets var
-    # inline for the subprocess without touching parent shell.
-    re.compile(rf"\benv\s+(?:-[a-zA-Z]+\s+)*[\"']?{_NAME_GROUP}[\"']?\s*=",
-               re.IGNORECASE),
-    # POSIX: eval / source / . (dot-source) reading text with VAR=val.
-    # Example: `eval "$(echo SDD_ALLOW_X=1 cmd)"` — eval expands then executes.
-    # We block any eval/source/`.` invocation containing the protected name in
-    # arg context (won't catch every obfuscation — base64 / printf still need
-    # the protected name to land in the eventual eval'd string).
-    re.compile(rf"\b(?:eval|source|\.)\s+[\"'`(].*?{_NAME_GROUP}",
+    # Windows : setx NAME val / set NAME=val (cmd.exe)
+    re.compile(rf"\bsetx\s+(?:/[a-zA-Z]+\s+)*{_NAME}\s+\S", re.IGNORECASE),
+    re.compile(rf"\bset\s+{_NAME}=", re.IGNORECASE),
+    # Interpréteurs : os.environ[NAME] = / os.environ.update|setdefault(…NAME…) / os.putenv(NAME
+    re.compile(rf"os\s*\.\s*environ\s*\[\s*{_NAME}\s*\]\s*=(?!=)", re.IGNORECASE),
+    re.compile(rf"os\s*\.\s*environ\s*\.\s*(?:update|setdefault|__setitem__)\s*\([^)]*?{_NAME}",
                re.IGNORECASE | re.DOTALL),
-    # POSIX: printf "VAR=val" piped to eval / source.
-    # Example: `printf 'SDD_ALLOW_X=1\nclaude\n' | bash`
-    re.compile(rf"\bprintf\s+[\"'].*?{_NAME_GROUP}\s*=",
-               re.IGNORECASE | re.DOTALL),
-    # POSIX: IFS or similar field separator hack with bash -c containing protected name.
-    # Example: `IFS=; bash -c "SDD_ALLOW_X=1 cmd"`.
-    re.compile(rf"\bbash\s+-c\s+[\"'].*?{_NAME_GROUP}\s*=",
+    re.compile(rf"os\s*\.\s*putenv\s*\(\s*{_NAME}", re.IGNORECASE),
+    # Node : process.env.NAME = / process.env[NAME] =
+    re.compile(rf"process\s*\.\s*env\s*(?:\.\s*{_NAME}|\[\s*{_NAME}\s*\])\s*=(?!=)", re.IGNORECASE),
+    # eval / source / . / printf / bash -c portant le nom protégé
+    re.compile(rf"\b(?:eval|source)\s+.*?{_NAME}", re.IGNORECASE | re.DOTALL),
+    re.compile(rf"(?:^|[\s;&|])\.\s+\S*.*?{_NAME}\s*=", re.IGNORECASE | re.DOTALL),
+    re.compile(rf"\bprintf\s+.*?{_NAME}\s*=", re.IGNORECASE | re.DOTALL),
+    re.compile(rf"\b(?:bash|sh|zsh|cmd|pwsh|powershell)(?:\.exe)?\s+(?:/c|-c|-Command)\s+.*?{_NAME}\s*=",
                re.IGNORECASE | re.DOTALL),
 ]
 
-# Audit consolidé 2026-06-07 Sprint 3-5 — Strip heredoc bodies AVANT le scan
-# bypass. Sinon `git commit -m "$(cat <<'EOF'\n... SDD_ALLOW_X=1 ...\nEOF)"`
-# fait matcher la doc/message commit comme une vraie tentative de bypass.
-# Pattern : `<<['\"]?TAG['\"]?\n ... \nTAG` (heredoc bash) ou son équivalent
-# multiline. La regex DOTALL capture le body et le retire AVANT le scan.
-_HEREDOC_RE = re.compile(
-    r"<<-?\s*['\"]?(\w+)['\"]?\s*\n.*?\n\1\b",
-    re.MULTILINE | re.DOTALL,
+#: Dict passé en `env=` à un sous-process dans du code inline :
+#: `{**os.environ, "SDD_X": "1"}` → normalisé `SDD_X:1`.
+_INLINE_INTERP_RE = re.compile(r"\b(?:python3?|py|node)(?:\.exe)?\s+(?:-[a-zA-Z]*\s+)*-[ce]\b",
+                               re.IGNORECASE)
+_DICT_KEY_RE = re.compile(rf"(?:^|[\s{{,(]){_NAME}\s*:\s*\S", re.IGNORECASE)
+
+#: Indirection : un nom protégé en VALEUR d'assignation, plus un mot-clé
+#: de positionnement d'env quelque part dans la commande.
+_VALUE_IS_NAME_RE = re.compile(rf"[A-Za-z_]\w*\s*=\s*{_NAME}", re.IGNORECASE)
+_SETTER_KEYWORD_RE = re.compile(
+    r"\bexport\b|\bdeclare\b|\btypeset\b|\benv\s|\bsetx\b|\$env:|env:\$|"
+    r"Set-Item|New-Item|Set-Variable|SetEnvironmentVariable|os\.environ|os\.putenv|"
+    r"process\.env|\beval\b",
+    re.IGNORECASE,
 )
 
 
-def _strip_heredocs(cmd: str) -> str:
-    """Remove heredoc bodies (between `<<TAG` and matching `TAG`) from a shell command.
+def _normalize(cmd: str) -> str:
+    """Retire les quotes, backticks d'échappement PowerShell et backslashes
+    pour défaire le quoting partiel (`SDD_ALLOW_X"Y"` → `SDD_ALLOW_XY`,
+    `SDD\\_ALLOW_X` → `SDD_ALLOW_X`, ``$env:SDD_`ALLOW_X`` → ...)."""
+    return re.sub(r"[\"'`\\]", "", cmd)
 
-    The bypass scan is intended to catch ACTUAL envvar assignment in the
-    executable command, not envvar mentions inside heredoc bodies (commit
-    messages, doc strings, here-strings). Without this strip, any commit
-    message that legitimately documents `SDD_ALLOW_FORCE=1` (e.g. in this
-    very hook's docstring referenced by example) would falsely trigger.
+
+def _matches_bypass(cmd: str) -> str | None:
+    """Return the matching excerpt (for logging) or None if clean.
+
+    Scan sur la commande brute ET sur sa forme normalisée. Les corps de
+    heredoc ne sont plus retirés (audit 2026-11 — bash les exécute).
     """
-    # Iteratively strip — there may be multiple heredocs.
-    prev = None
-    while prev != cmd:
-        prev = cmd
-        cmd = _HEREDOC_RE.sub("", cmd)
-    return cmd
+    if not cmd:
+        return None
+    for text in (cmd, _normalize(cmd)):
+        for rx in _BYPASS_REGEXES:
+            m = rx.search(text)
+            if m:
+                return m.group(0)[:120]
+        if _INLINE_INTERP_RE.search(text):
+            m = _DICT_KEY_RE.search(text)
+            if m:
+                return m.group(0).strip()[:120]
+        m = _VALUE_IS_NAME_RE.search(text)
+        if m and _SETTER_KEYWORD_RE.search(text):
+            return m.group(0)[:120]
+    return None
 
 
 def _read_payload() -> dict:
     try:
         raw = sys.stdin.read() or "{}"
-        return json.loads(raw)
+        data = json.loads(raw)
+        return data if isinstance(data, dict) else {}
     except json.JSONDecodeError:
         return {}
 
 
 def _extract_command(payload: dict) -> str:
-    # Claude Code Bash tool payload shape: {"tool_input": {"command": "..."}, ...}
+    # Bash and PowerShell tool payloads: {"tool_input": {"command": "..."}, ...}
     tool_input = payload.get("tool_input") or {}
-    cmd = tool_input.get("command")
-    if isinstance(cmd, str):
-        return cmd
-    return ""
-
-
-def _matches_bypass(cmd: str) -> str | None:
-    """Return the matching pattern (for logging) or None if clean.
-
-    Strips heredoc bodies first (audit Sprint 3-5 closure) — a commit message
-    or doc string containing the literal `SDD_ALLOW_X=1` no longer triggers
-    a false positive. Only ACTUAL assignment in executable command position
-    is flagged.
-    """
-    if not cmd:
-        return None
-    cleaned = _strip_heredocs(cmd)
-    for rx in _BYPASS_REGEXES:
-        m = rx.search(cleaned)
-        if m:
-            return m.group(0)[:120]
-    return None
+    cmd = tool_input.get("command") if isinstance(tool_input, dict) else None
+    return cmd if isinstance(cmd, str) else ""
 
 
 def main() -> int:
-    # Inherited-from-parent bypass: must be set BEFORE Claude Code starts.
-    # We can't reliably distinguish "inherited" from "just-set" inside the same
-    # session, but we can detect the canonical pattern: if it's set AND the
-    # current Bash command does NOT try to set it, allow.
     payload = _read_payload()
     cmd = _extract_command(payload)
     match = _matches_bypass(cmd)
     if match is None:
         return HOOK_ALLOW
 
-    # Allow only if the parent-process bypass flag was set BEFORE this command
-    # tries to set an envvar — and the command itself is NOT trying to set
-    # one of the protected names (which would re-enable a bypass mid-session).
+    # Même avec SDD_ALLOW_ENV_BYPASS hérité du process parent, une commande
+    # ne peut pas positionner un nom protégé — defense-in-depth.
     bypass_set = os.environ.get("SDD_ALLOW_ENV_BYPASS", "").lower() in ("1", "true", "yes")
     if bypass_set:
-        # Even with the bypass flag set, refuse to let the command itself set
-        # one of the protected vars — defense-in-depth.
         sys.stderr.write(
             "[block-env-bypass] WARN: SDD_ALLOW_ENV_BYPASS=1 inherited, but still "
             "blocking attempt to set protected envvar mid-session.\n"
             f"matched: {match}\n"
         )
 
-    # Persistent audit (C5 audit 2026-06-06 hardening — JSONL ledger for forensics).
     _audit_log(match, cmd, bypass_set)
 
     sys.stderr.write(
-        "ERROR: Bash command attempts to set a protected SDD_* envvar mid-session.\n"
+        "ERROR: shell command attempts to set/unset a protected SDD_* / CI envvar.\n"
         f"CAUSE: [ENV_BYPASS_BLOCKED] matched pattern: {match}\n"
-        "FIX: protected envvars (SDD_ALLOW_*, SDD_DISABLE_*) must be set in the\n"
-        "     parent shell BEFORE starting Claude Code. Setting them mid-session\n"
-        "     would bypass cost-cap / acceptance-gate / security guardrails.\n"
+        "FIX: protected envvars (SDD_ALLOW_*, SDD_DISABLE_*, SDD_*_MODE, SDD_BYPASS_*,\n"
+        "     SDD_PROTECT_*, SDD_TDD_*, SDD_BUDGET_*, SDD_AUDIT_*, CI, ...) must be set in\n"
+        "     the environment of the Claude Code process (parent shell or settings `env`),\n"
+        "     never inline in a command. A commit message documenting one of them:\n"
+        "     use `git commit -F <file>` instead of a heredoc.\n"
         "AUDIT: persisted to workspace/.sys/.audit/env-bypass.jsonl\n"
     )
     return HOOK_DENY

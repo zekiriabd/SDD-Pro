@@ -116,7 +116,7 @@ CREATE TABLE IF NOT EXISTS runs (
     started_at     TEXT    NOT NULL,
     ended_at       TEXT,
     updated_at     TEXT,
-    status         TEXT    NOT NULL,       -- running|success|partial|failed|cancelled
+    status         TEXT    NOT NULL,       -- running|completed|success(alias)|partial|failed|cancelled|stale (run_end + mark_stale_runs, audit 2026-11-07)
     current_phase  TEXT,
     tags_json      TEXT,                   -- ex. ["force", "rebuild-arch"]
     params_json    TEXT,

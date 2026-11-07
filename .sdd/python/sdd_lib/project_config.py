@@ -36,7 +36,7 @@ _KV_RE = re.compile(r"^[-*]?\s*([A-Za-z][A-Za-z0-9_.]*)\s*:\s*(.+?)\s*$")
 _STACK_ROOT_ALT = r"(?:\.claude|\.sdd)"
 CANONICAL_STACK_ROOT = ".sdd"
 STACK_CATEGORIES: tuple[str, ...] = (
-    "backend", "frontend", "fullstack", "mobiles", "ui", "qa", "auth", "archi",
+    "backend", "frontend", "fullstack", "mobiles", "desktop", "ui", "qa", "auth", "archi",
 )
 _ACTIVE_STACK_RE = re.compile(rf"^\s*-\s*({_STACK_ROOT_ALT}/stacks/[^\s]+\.md)\s*$")
 _STACK_PATH_ANY_RE = re.compile(rf"{_STACK_ROOT_ALT}/stacks/")

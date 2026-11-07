@@ -13,7 +13,7 @@ via `sdd_lib.harness_diff` l'ÉGALITÉ SÉMANTIQUE avec le
 ÉCART CONNU byte-identité vs sémantique (accepté au stade proof-of-concept) :
 - l'ordre des clés du frontmatter régénéré peut différer du vivant ;
 - les commentaires inline du frontmatter vivant sont perdus (ex.
-  `specbook-writer` porte `model: claude-sonnet-4-6   # ...` — la valeur
+  `specbook-writer` porte `model: claude-sonnet-5-5   # ...` — la valeur
   est préservée, le commentaire non) ;
 - CRLF vs LF.
 La byte-identité stricte est un durcissement Phase 2 ultérieur.

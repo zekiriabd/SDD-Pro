@@ -287,6 +287,16 @@
       "default": 80,
       "description": "Acceptance Gate : plancher coverage propre à la gate. Distinct du `CoverageMin` global consommé par /qa-generate — garder les deux alignés sauf volonté explicite d'une gate plus stricte que le verdict QA."
     },
+    "DeliveryGate.BuildCommand": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Gate de livraison : commande de build exécutée par sdd_scripts/verify_build.py (remplace la commande détectée par type de projet, ex. MSBuild de Visual Studio quand dotnet.exe est inutilisable). Valeur entre backticks dans stack.md. Ne lève aucune validation : la preuve reste exigée."
+    },
+    "DeliveryGate.TestCommand": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Gate de livraison : commande de tests exécutée par sdd_scripts/verify_tests.py ; le jeton `{results_dir}` désigne le dossier temporaire où le rapport TRX/JUnit doit être écrit. Valeur entre backticks dans stack.md."
+    },
     "ApiGateMinPerEndpoint": {
       "$ref": "#/definitions/PositiveInt",
       "default": 2,

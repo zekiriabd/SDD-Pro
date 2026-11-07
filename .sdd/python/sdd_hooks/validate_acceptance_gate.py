@@ -89,14 +89,53 @@ def main() -> int:
         )
         return HOOK_DENY
 
+    # Audit sécurité 2026-11 — un rapport corrompu n'est plus un laissez-passer.
     try:
         payload = json.loads(report_path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as e:
-        sys.stderr.write(f"[acceptance-gate] WARN: cannot parse acceptance.json: {e}\n")
-        return HOOK_ALLOW  # corrupt report is not the hook's job to enforce — log and pass
+        if not isinstance(payload, dict):
+            raise ValueError("top-level JSON is not an object")
+    except (OSError, UnicodeDecodeError, ValueError) as e:
+        sys.stderr.write(
+            "ERROR: AcceptanceGate — acceptance.json illisible\n"
+            f"CAUSE: [INFRA_BLOCKED] {type(e).__name__}: {e}\n"
+            "FIX: relancer `python .sdd/python/sdd_scripts/validate_acceptance.py` (le "
+            "rapport est produit par ce script, jamais ecrit a la main) ; bypass : "
+            "SDD_ALLOW_ACCEPTANCE_BYPASS=1 dans l'environnement du process Claude Code\n"
+        )
+        return HOOK_DENY
+
+    # Rapport périmé (> 24 h) = rapport d'un run précédent, pas de ce dispatch qa.
+    try:
+        import time
+        if time.time() - report_path.stat().st_mtime > 24 * 3600:
+            sys.stderr.write(
+                "ERROR: AcceptanceGate — acceptance.json perime (> 24 h)\n"
+                "CAUSE: [ACCEPTANCE_REPORT_MISSING] aucun rapport frais pour ce dispatch qa\n"
+                "FIX: relancer validate_acceptance.py avant la fin de l'agent qa\n"
+            )
+            return HOOK_DENY
+    except OSError:
+        pass
 
     verdict = (payload.get("verdict") or "").lower()
     mode = (payload.get("mode") or "").lower()
+
+    # Audit 2026-11 — le verdict `bypass` est écrit par le script quand SA
+    # variable d'env est posée ; un agent pourrait l'obtenir via un préfixe
+    # inline (`SDD_ALLOW_ACCEPTANCE_BYPASS=1 python …`, bloqué par
+    # block_env_bypass, mais heuristique). Le hook n'honore ce verdict que si
+    # le bypass est aussi posé dans SON environnement (process Claude Code) —
+    # cas déjà traité en tête de main(). Sinon : DENY.
+    if verdict == "bypass":
+        sys.stderr.write(
+            "ERROR: AcceptanceGate — verdict `bypass` non autorise\n"
+            "CAUSE: [ACCEPTANCE_GATE_FAILED] acceptance.json porte verdict=bypass mais "
+            "SDD_ALLOW_ACCEPTANCE_BYPASS n'est pas pose dans l'environnement du process "
+            "Claude Code (bypass inline refuse)\n"
+            "FIX: relancer validate_acceptance.py sans bypass, ou poser le bypass dans "
+            "l'environnement du process Claude Code (audit-loggue)\n"
+        )
+        return HOOK_DENY
 
     # Audit C1 (2026-08-29) — `unresolved` means validate_acceptance.py could
     # not determine the gate mode (no workspace/stack/stack.md, which is
@@ -116,7 +155,7 @@ def main() -> int:
         )
         return HOOK_DENY
 
-    if verdict in ("pass", "warn", "skipped", "bypass"):
+    if verdict in ("pass", "warn", "skipped"):
         if verdict == "warn":
             failures = payload.get("failures", [])
             sys.stderr.write(
@@ -138,9 +177,22 @@ def main() -> int:
         )
         return HOOK_DENY
 
-    # Unknown verdict — non-blocking
-    sys.stderr.write(f"[acceptance-gate] WARN: unknown verdict='{verdict}' mode='{mode}'\n")
-    return HOOK_ALLOW
+    if verdict == "fail":
+        # fail hors mode strict (warn) : signalé, non bloquant par contrat.
+        sys.stderr.write(
+            f"[acceptance-gate] WARN: verdict=fail en mode '{mode}' (non strict) — non bloquant\n"
+        )
+        return HOOK_ALLOW
+
+    # Audit 2026-11 — verdict inconnu = rapport non produit par le script
+    # (forgé ou schéma cassé) : fail-closed.
+    sys.stderr.write(
+        "ERROR: AcceptanceGate — verdict inconnu\n"
+        f"CAUSE: [ACCEPTANCE_GATE_FAILED] verdict='{verdict}' mode='{mode}' hors contrat "
+        "validate_acceptance.py (pass|warn|skipped|fail|unresolved)\n"
+        "FIX: relancer validate_acceptance.py ; ne jamais ecrire acceptance.json a la main\n"
+    )
+    return HOOK_DENY
 
 
 if __name__ == "__main__":

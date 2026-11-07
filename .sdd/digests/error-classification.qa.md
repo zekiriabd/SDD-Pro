@@ -2,7 +2,7 @@
 > **GENERATED — do not edit.** Slice of `@.claude/rules/error-classification.md` for the `qa` agent (audit 2026-06-12, block 5). Regenerate via `python .sdd/python/sdd_admin/sync_error_class_digests.py`.
 >
 > Contains the §0 quick-ref (full 16-family map) + this agent's families + the universal format/loop sections. For a class OUTSIDE this slice, §0 names its family — Read the full file on-demand (rule `build-and-loop.md §8`).
-## 0. Quick reference — 16 familles (193 classes)
+## 0. Quick reference — 16 familles (203 classes)
 
 | # | Famille | Classes | Émetteur principal | Comportement build_loop |
 |---|---|---:|---|---|
@@ -12,14 +12,14 @@
 | §1.4 | **Build** (`[BUILD_*]`/`[DEP_MISSING]`/`[CIRCULAR_DEP]`) | 5 | dev-* | **ITÈRE** sur `[BUILD_CORRECTIBLE]` uniquement |
 | §1.5 | **Anti-derive** (`[DERIVE_VIOLATION]`/`[STACK_LIBRARY_*]`/`[REFACTOR_HORS_SCOPE]`/...) | 7 | dev-* | STOP |
 | §1.6 | **UI fidelity** (`[UI_FIDELITY_GAP]`/`[UI_TOKEN_VIOLATION]`/`[FRONTEND_BACKEND_CONTRACT_GAP]`) | 3 | dev-frontend | STOP/retry |
-| §1.7 | **QA** (`[QA_TEST_FAILED]`/`[QA_COVERAGE_GAP]`/`[QA_OWNERSHIP_*]`/`[ACCEPTANCE_GATE_FAILED]`/`[ACCEPTANCE_REPORT_MISSING]`/...) | 11 | qa | STOP (RED bloquant) |
-| §1.8 | **Parallélisme** (`[LIBNAME_LOCK_HELD]`/`[LOCK_HELD]`/`[LIBNAME_SIGNATURE_CONFLICT]`) | 3 | dev-* | STOP |
+| §1.7 | **QA** (`[QA_TEST_FAILED]`/`[QA_COVERAGE_GAP]`/`[QA_OWNERSHIP_*]`/`[ACCEPTANCE_GATE_FAILED]`/`[ACCEPTANCE_REPORT_MISSING]`/`[DELIVERY_GATE_BLOCKED]`/...) | 12 | qa | STOP (RED bloquant) |
+| §1.8 | **Parallélisme** (`[LIBNAME_LOCK_HELD]`/`[LOCK_HELD]`/`[LIBNAME_SIGNATURE_CONFLICT]`/`[LIBNAME_LOCK_INVALID_ARG]`) | 4 | dev-* | STOP |
 | §1.9 | **A11Y** (`[A11Y_*]`) — héritage, réactivé via `ingest_axe.py` | 11 | CI ingest (Lighthouse/axe) | report only |
 | §1.10 | **Code Review** (`[REVIEW_*]`) — `code-reviewer` agent | 12 | code-reviewer | report only (verdict 🟢/🟡/🔴) |
 | §1.11 | **Security** (`[SEC_*]`) — OWASP Top 10 2021 | 23 | security-reviewer | report only + 8 hard-blocking |
 | §1.12 | **Perf** (`[PERF_*]`) — héritage, réactivé via `ingest_lighthouse.py` | 16 | CI ingest | report only |
 | §1.13 | **Spec Compliance** (`[SPEC_*]`) — AC-by-AC verification | 9 | spec-compliance-reviewer | report only |
-| §1.14 | **Tooling/Governance** (`[SCAN_*]`/`[DISCOVER_*]`/`[CHECKPOINT_*]`/`[CONFIG_*]`/`[PROFILE_*]`/`[DRIFT_*]`/`[ARCH_*]`/`[REVIEW_*]`/`[AUDITOR_RUNTIME_ERROR]`/`[STACK_COMBO_*]`/`[FRAMEWORK_PROTECTED]`/`[ENV_BYPASS_BLOCKED]`/`[PRICING_UNKNOWN]`/`[SECRET_PROVIDER_LEAK_RISK]`/`[PACK_UNUSABLE]`/hooks préflight) | 36 | scripts mono-shot + hooks | mostly info, qq. bloquantes |
+| §1.14 | **Tooling/Governance** (`[SCAN_*]`/`[DISCOVER_*]`/`[CHECKPOINT_*]`/`[CONFIG_*]`/`[PROFILE_*]`/`[DRIFT_*]`/`[ARCH_*]`/`[REVIEW_*]`/`[AUDITOR_RUNTIME_ERROR]`/`[STACK_COMBO_*]`/`[FRAMEWORK_PROTECTED]`/`[ENV_BYPASS_BLOCKED]`/`[PRICING_UNKNOWN]`/`[SECRET_PROVIDER_LEAK_RISK]`/`[PACK_UNUSABLE]`/`[HOOK_CRASH]`/`[SPAWN_*]`/hooks préflight) | 44 | scripts mono-shot + hooks | mostly info, qq. bloquantes |
 | §1.15 | **Adversarial** (`[ADV_*]`) — opt-out (actif par défaut, `--no-adversarial` pour skip) | 6 | adversarial-reviewer | informational |
 | §1.16 | **Inconnue** (`[UNKNOWN]`) | 1 | fallback | report only |
 
@@ -82,6 +82,7 @@ convergence.
 | `[API_GATE_RED]` | API Gate (cf. `build-and-loop.md §A`) RED, frontend bloqué | dev-run STEP 6.b |
 | `[ACCEPTANCE_GATE_FAILED]` | Acceptance Gate (`validate_acceptance.py`) fail en mode `strict` (`test`/`lint`/`build`/`coverage`/`smoke`/`E2E` KO). Bypass : `SDD_ALLOW_ACCEPTANCE_BYPASS=1`. Cf. `quality.md §C`. | qa STEP 9.bis + hook `SubagentStop` matcher=qa |
 | `[ACCEPTANCE_REPORT_MISSING]` | Hook acceptance gate (`validate_acceptance_gate.py`) ne trouve pas le rapport attendu produit par l'agent qa (gate ne peut pas statuer) | hook `SubagentStop` matcher=qa |
+| `[DELIVERY_GATE_BLOCKED]` | Gate de livraison par preuves (`sdd_lib/delivery_gate.py` `authorize_delivery`) : un check obligatoire du workflow (`WORKFLOW_REQUIREMENTS` — build / tests / coverage / spec_compliance / readiness) est absent, en échec, périmé (sources modifiées), instable (échec + succès sur le même état), non authentifié (HMAC) ou incohérent (artefact disparu, 0 test). Ne lit que `delivery_evidence` (jamais `run_phases`). **Aucun bypass** : ni flag, ni `SDD_ALLOW_*`/`SDD_BYPASS_*`/`SDD_FORCE*` (consignés `delivery-gate.jsonl`). | `sdd_scripts/delivery_gate.py authorize` (fin de `/sdd-full`, `/sdd-poc`, `/dev-run`, `/qa-generate`, `/sdd-review`, futur `/sdd-deploy`) |
 
 Priorité d'émission : `[QA_TEST_FAILED] > [QA_COVERAGE_GAP]` ;
 `[API_GATE_RED] > tout autre QA_*`.

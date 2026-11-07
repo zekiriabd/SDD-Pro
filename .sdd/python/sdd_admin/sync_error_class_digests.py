@@ -65,6 +65,9 @@ AGENT_FAMILIES: dict[str, list[str]] = {
     "spec-compliance-reviewer":  ["1.13"],
     "arch-reviewer":             ["1.14"],
     "adversarial-reviewer":      ["1.15"],
+    # 2026-11-06 (audit tokens, run FEAT 15) : specbook-writer lisait
+    # error-classification.md ENTIER (47 KB) pour 2 classes FEAT_*.
+    "specbook-writer":           ["1.2"],
 }
 
 # Universal sections every digest carries (always relevant: the ERROR format,

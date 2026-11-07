@@ -21,7 +21,7 @@ le path, calcul du verdict 🟢/🟡/🔴 contre `ReviewFailOn`, persistance dan
 écrit, non encore wired à une commande user-facing).
 
 **Phase C (✅ déjà câblée v7.0.0)** : agent `arch-reviewer` (Pattern + Layers
-+ ADRs) auto-invoqué par `/dev-run` STEP 6.4 (auditor batch) et `/sdd-review`
++ ADRs) auto-invoqué par `/sdd-full` (phase `auditor_batch`, après `qa`) et `/sdd-review`
 STEP 3.0. Cf. `agents/arch-reviewer.md`.
 
 ---
@@ -140,7 +140,7 @@ présent (on est dans un run orchestré) ET que le rapport
 `workspace/.sys/.validation/{n}-spec-compliance.json` du run courant
 existe, alors `/sdd-review` est un **lecteur pur** : il lit le verdict et
 **skip le re-spawn** de `spec-compliance-reviewer`. Le producteur unique est
-`/dev-run §6.4.A` (Stage A) — re-spawner ici produirait un 2ᵉ/3ᵉ verdict
+la phase `auditor_batch` de `/sdd-full` (Stage A) — re-spawner ici produirait un 2ᵉ/3ᵉ verdict
 redondant pour la même FEAT dans le même run. Aller directement à la lecture
 du verdict ci-dessous.
 
@@ -205,7 +205,7 @@ ou baisser SpecComplianceFailOn en Project Config.
 vérifier quels reviewers sont absents ou stale dans `console.db` (TTL 24h)
 et les spawner **simultanément** en un seul message multi-`Agent`.
 
-> **Principe** : `/dev-run §6.4.B` fait déjà ce batch en parallèle lors du
+> **Principe** : la phase `auditor_batch` de `/sdd-full` fait déjà ce batch en parallèle lors du
 > pipeline complet (cf. `@.sdd/rules/auditor-orchestration.md §4`). Le fallback
 > standalone ici reproduit exactement le même comportement pour les appels
 > `/sdd-review` isolés (sans run préalable). Si toutes les sources sont fraîches
@@ -303,6 +303,24 @@ Le script effectue automatiquement :
 
 ---
 
+## STEP 3.9 — Gate de livraison review (OBLIGATOIRE, `@.sdd/docs/delivery-gates.md`)
+
+Avant tout verdict final : la conformité spec doit être **prouvée** (rapport
+Stage A enregistré par le script, jamais recopié par l'orchestrateur), sur un
+build et des tests réellement exécutés — y compris en `AuditorBatchMode:
+legacy-parallel` / `SDD_BYPASS_TWO_STAGE=1` (vitesse, pas dispense de preuve) :
+
+```bash
+python .sdd/python/sdd_scripts/delivery_gate.py record-spec --feat-number {n} --report workspace/.sys/.validation/{n}-spec-compliance.json --run-id "$SDD_RUN_ID"
+python .sdd/python/sdd_scripts/delivery_gate.py authorize --feat-number {n} --workflow sdd-review --run-id "$SDD_RUN_ID" --json
+```
+
+Exit ≠ 0 → `🔴 [DONE/FAIL] FEAT {n} — [DELIVERY_GATE_BLOCKED] …` ; **aucun
+`[DONE]`** ni `[DONE/WARN]`. Preuve build/tests manquante : `verify_build.py` /
+`verify_tests.py --coverage` (cf. `/qa-generate`).
+
+---
+
 ## STEP 4 — Restituer le résultat dans le chat
 
 **Format compressé** (cf. mémoire utilisateur — 1L succès, 2L max erreur) :
@@ -365,7 +383,7 @@ Agent: adversarial-reviewer
 ## STEP 5 — Suite manuelle (auto-fix Phase B à venir)
 
 Phase C (arch-reviewer) est câblée via le two-stage gate (cf. STEP 3.0.bis +
-STEP 3.0 ci-dessus et `/dev-run` STEP 6.4). Tant que
+STEP 3.0 ci-dessus et la phase `auditor_batch` de `/sdd-full`). Tant que
 Phase B (auto-fix dispatcher `dispatch_fixes.py`, à venir v7.2) n'est pas
 livrée, le Tech Lead arbitre les findings :
 
@@ -424,7 +442,7 @@ AdversarialMaxAttacks:      10
 | Avant | `/sdd-review` | Après |
 |---|---|---|
 | `/qa-generate` | ⚠️ pas obligatoire mais recommandé (quality + coverage déjà à jour) | — |
-| `/dev-run` STEP 6.4 | déjà fait (two-stage gate) : spec-compliance (Stage A) + code-reviewer + security-scan + arch-reviewer (Stage B) | — |
+| `/dev-run` | ne lance plus d'auditeurs (2026-11-07) ; `/sdd-review` exige `qa` enregistré (hook `enforce_phase_order`, bypass `SDD_ALLOW_PHASE_SKIP=1` audit-loggué) | — |
 | `/sdd-full` | tout fait : qa + two-stage auditors | rapport consolidé déjà produit ; auto-fix (Phase B `--fix`) à venir v7.2 |
 
 `/sdd-review` est **idempotent** : re-runs lisent l'état actuel de la DB,

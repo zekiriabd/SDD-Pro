@@ -3,7 +3,7 @@
   "harness": "gemini-cli",
   "provider": "anthropic",
   "model": {
-    "name": "claude-sonnet-4-6"
+    "name": "claude-sonnet-5-5"
   },
   "security": {
     "auth": {

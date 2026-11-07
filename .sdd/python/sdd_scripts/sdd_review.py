@@ -104,6 +104,29 @@ ENSURE_SCANS_REQUIRED_DEFAULT = ("quality", "code-review", "security", "spec")
 ENSURE_SCANS_OPTIONAL = ("arch", "a11y", "perf")
 
 
+class ConfigReadFailed(RuntimeError):
+    """`read_layered_config` a levé une erreur non-policy (I/O, parse, bug).
+
+    Audit 2026-11-07 : les `except Exception: return <défaut>` masquaient ces
+    échecs — `/sdd-review` rendait un verdict calculé contre un seuil par
+    défaut (`ReviewFailOn=serious`) que personne n'avait choisi. Pour un seuil
+    de verdict, l'échec est désormais explicite (exit 2, ERROR 3L).
+    """
+
+    def __init__(self, key: str, exc: BaseException) -> None:
+        super().__init__(f"{key}: {type(exc).__name__}: {exc}")
+        self.key = key
+        self.exc = exc
+
+
+def _warn_config_read_failed(key: str, exc: BaseException, fallback: str) -> None:
+    """Trace stderr explicite d'un échec de lecture config (jamais silencieux)."""
+    sys.stderr.write(
+        f"WARNING: [CONFIG_READ_FAILED] read_layered_config({key}) a échoué "
+        f"({type(exc).__name__}: {str(exc)[:200]}) — repli sur {fallback}.\n"
+    )
+
+
 def resolve_arch_required() -> bool:
     """Return True iff ArchReviewMode is `full` in layered config (base ← team ← project).
 
@@ -116,7 +139,8 @@ def resolve_arch_required() -> bool:
         cfg = read_layered_config(keys=("ArchReviewMode",))
     except ConfigError:
         raise  # [CONFIG_SECURITY_DOWNGRADE] must surface
-    except Exception:
+    except Exception as exc:  # noqa: BLE001 — tracé, jamais silencieux
+        _warn_config_read_failed("ArchReviewMode", exc, "arch non requis (ArchReviewMode≠full)")
         return False
     return (cfg.get("ArchReviewMode") or "").strip().lower() == "full"
 
@@ -132,10 +156,15 @@ def resolve_auditor_batch_mode() -> str:
         cfg = read_layered_config(keys=("AuditorBatchMode",))
     except ConfigError:
         raise  # [CONFIG_SECURITY_DOWNGRADE] must surface
-    except Exception:
+    except Exception as exc:  # noqa: BLE001 — tracé, repli sur le mode le plus sûr
+        _warn_config_read_failed("AuditorBatchMode", exc, "'two-stage' (mode le plus strict)")
         return "two-stage"
     v = (cfg.get("AuditorBatchMode") or "two-stage").strip().lower()
     if v not in ("two-stage", "legacy-parallel"):
+        sys.stderr.write(
+            f"WARNING: [CONFIG_INVALID_VALUE] AuditorBatchMode={v!r} inconnu "
+            f"(attendu two-stage|legacy-parallel) — repli sur 'two-stage'.\n"
+        )
         return "two-stage"
     return v
 
@@ -163,11 +192,10 @@ def check_spec_gate(feat_n: int, no_spec_gate_flag: bool) -> tuple[bool, str]:
     if no_spec_gate_flag:
         return True, ""
 
-    try:
-        if resolve_auditor_batch_mode() == "legacy-parallel":
-            return True, ""
-    except Exception:
-        # Fail-safe — proceed with normal aggregation if config unreachable.
+    # resolve_auditor_batch_mode() trace déjà ses échecs de lecture et replie
+    # sur 'two-stage' ; seul un ConfigError (downgrade de policy) remonte ici
+    # et doit rester visible — plus de `except Exception` silencieux.
+    if resolve_auditor_batch_mode() == "legacy-parallel":
         return True, ""
 
     spec_json = (
@@ -221,7 +249,11 @@ def resolve_fail_on(cli_value: str | None) -> str:
 
     A project that relaxes `ReviewFailOn` below the team baseline raises
     `ConfigError` `[CONFIG_SECURITY_DOWNGRADE]` which is re-raised here
-    (no silent swallow). Other I/O errors fall back to default 'serious'.
+    (no silent swallow). Any OTHER read failure raises `ConfigReadFailed`
+    (audit 2026-11-07) : the verdict threshold is never silently defaulted
+    when the config could not be read. Key absent → 'serious' (documented
+    default) ; key present with an invalid value → 'serious' plus a stderr
+    `[CONFIG_INVALID_VALUE]` warning.
     """
     if cli_value:
         return cli_value.strip().lower()
@@ -230,11 +262,16 @@ def resolve_fail_on(cli_value: str | None) -> str:
         cfg = read_layered_config(keys=("ReviewFailOn",))
     except ConfigError:
         raise  # [CONFIG_SECURITY_DOWNGRADE] must surface
-    except Exception:
-        return "serious"
+    except Exception as exc:  # noqa: BLE001 — re-levé typé, jamais avalé
+        raise ConfigReadFailed("ReviewFailOn", exc) from exc
     v = (cfg.get("ReviewFailOn") or "").strip().lower()
     if v in SEVERITY_RANK:
         return v
+    if v:
+        sys.stderr.write(
+            f"WARNING: [CONFIG_INVALID_VALUE] ReviewFailOn={v!r} hors "
+            f"{'|'.join(SEVERITY_RANK)} — repli sur 'serious'.\n"
+        )
     return "serious"
 
 
@@ -402,7 +439,16 @@ def main() -> int:
 
     args = parse_args()
     feat_n = args.feat_number
-    fail_on = resolve_fail_on(args.fail_on)
+    try:
+        fail_on = resolve_fail_on(args.fail_on)
+    except ConfigReadFailed as exc:
+        print(f"ERROR: /sdd-review FEAT {feat_n} — verdict threshold unresolved",
+              file=sys.stderr)
+        print(f"CAUSE: [CONFIG_READ_FAILED] {exc}", file=sys.stderr)
+        print("FIX: corriger workspace/stack/stack.md ## Project Config (ou "
+              ".sdd/config.base.yml / team config), ou passer --fail-on explicitement",
+              file=sys.stderr)
+        return 2  # infra/args error — see module docstring exit codes
     if fail_on not in SEVERITY_RANK:
         print(f"ERROR: invalid --fail-on '{fail_on}'", file=sys.stderr)
         return 2  # legacy exit code preserved — see sdd_lib/exit_codes.py docstring

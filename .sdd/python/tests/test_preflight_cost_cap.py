@@ -112,16 +112,19 @@ class TestPricingTable(unittest.TestCase):
         self.assertEqual(p["input"], 5.00)
         self.assertEqual(p["output"], 25.00)
 
+    # Audit tokens 2026-11-07 — les ratios 1.25x / 0.10x valent pour la
+    # famille 4.x seulement ; la génération 5 publie des tarifs de cache
+    # explicites (opus-5-5 : 0.20 en lecture pour 4.00 en entrée).
     def test_cache_creation_is_125x_input(self):
-        """Anthropic convention : cache_creation = input * 1.25."""
-        for model, p in PRICING.items():
+        """Anthropic convention (4.x) : cache_creation = input * 1.25."""
+        for model, p in ((m, q) for m, q in PRICING.items() if "-4-" in m):
             self.assertAlmostEqual(p["cache_creation"], p["input"] * 1.25,
                                    places=2,
                                    msg=f"{model} cache_creation mismatch")
 
     def test_cache_read_is_10pct_input(self):
-        """Anthropic convention : cache_read = input * 0.10."""
-        for model, p in PRICING.items():
+        """Anthropic convention (4.x) : cache_read = input * 0.10."""
+        for model, p in ((m, q) for m, q in PRICING.items() if "-4-" in m):
             self.assertAlmostEqual(p["cache_read"], p["input"] * 0.10,
                                    places=2,
                                    msg=f"{model} cache_read mismatch")

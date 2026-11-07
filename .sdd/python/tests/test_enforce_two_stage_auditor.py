@@ -104,13 +104,30 @@ def _seed_spec_compliance(db_path: Path, feat_n: int,
         conn.close()
 
 
-def _write_report(repo: Path, feat_n: int, verdict: str) -> Path:
-    """Write the authoritative Stage A JSON report (audit 2026-06-11 M1)."""
+def _write_report(repo: Path, feat_n: int, verdict: str,
+                  acs: list[dict] | None = None) -> Path:
+    """Write the Stage A JSON report.
+
+    Audit 2026-11 : le hook RECALCULE le verdict depuis `us[].acs[]` ;
+    `summary.verdict` n'est plus lu. Les AC par défaut sont dérivées de
+    `verdict` (green → verified ; warn → not_verified minor ; red →
+    not_verified critical) sauf si `acs` est fourni explicitement.
+    """
+    v = verdict.lower()
+    if acs is None:
+        if "red" in v or "🔴" in verdict:
+            acs = [{"ac_id": "AC-1", "status": "not_verified", "severity": "critical"}]
+        elif "warn" in v or "🟡" in verdict:
+            acs = [{"ac_id": "AC-1", "status": "not_verified", "severity": "minor"}]
+        else:
+            acs = [{"ac_id": "AC-1", "status": "verified"}]
     report = (repo / "workspace" / ".sys" / ".validation"
               / f"{feat_n}-spec-compliance.json")
     report.parent.mkdir(parents=True, exist_ok=True)
     report.write_text(
-        json.dumps({"summary": {"verdict": verdict}}), encoding="utf-8",
+        json.dumps({"summary": {"verdict": verdict},
+                    "us": [{"us_id": f"{feat_n}-1", "acs": acs}]}),
+        encoding="utf-8",
     )
     return report
 
@@ -270,19 +287,20 @@ class TestBypasses(unittest.TestCase):
         self.assertEqual(proc.returncode, HOOK_ALLOW, msg=proc.stderr)
         self.assertIn("TWO_STAGE_BYPASSED", proc.stderr)
 
-    def test_no_db_fails_safe_allow(self):
-        """No console.db yet → cannot enforce → fail-safe ALLOW."""
+    def test_no_db_denies_infra_blocked(self):
+        """Audit 2026-11 : no console.db and no report → DENY [INFRA_BLOCKED]."""
         # Fresh repo without DB init
         tmp2 = tempfile.TemporaryDirectory()
         try:
             repo2 = _make_repo(Path(tmp2.name))
             proc = _run_hook(_stage_b_payload(1, "code-reviewer"), repo2)
-            self.assertEqual(proc.returncode, HOOK_ALLOW, msg=proc.stderr)
+            self.assertEqual(proc.returncode, HOOK_DENY, msg=proc.stderr)
+            self.assertIn("[INFRA_BLOCKED]", proc.stderr)
         finally:
             tmp2.cleanup()
 
-    def test_feat_unextractable_fails_safe_allow(self):
-        """Prompt without a parseable FEAT number → fail-safe ALLOW."""
+    def test_feat_unextractable_denies(self):
+        """Audit 2026-11 : prompt without a FEAT number → DENY [TWO_STAGE_FEAT_UNKNOWN]."""
         payload = {
             "tool_name": "Agent",
             "tool_input": {
@@ -291,7 +309,55 @@ class TestBypasses(unittest.TestCase):
             },
         }
         proc = _run_hook(payload, self.repo)
+        self.assertEqual(proc.returncode, HOOK_DENY, msg=proc.stderr)
+        self.assertIn("[TWO_STAGE_FEAT_UNKNOWN]", proc.stderr)
+
+
+class TestVerdictIsRecomputed(unittest.TestCase):
+    """Audit 2026-11 — un `summary.verdict` forgé ne suffit plus."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.repo = _make_repo(Path(self._tmp.name))
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def test_forged_green_summary_with_red_acs_denies(self):
+        _init_db(self.repo)
+        _write_report(self.repo, 1, "🟢 GREEN", acs=[
+            {"ac_id": "AC-1", "status": "not_verified", "severity": "serious"}])
+        proc = _run_hook(_stage_b_payload(1, "code-reviewer"), self.repo)
+        self.assertEqual(proc.returncode, HOOK_DENY, msg=proc.stderr)
+
+    def test_summary_only_report_is_not_trusted(self):
+        _init_db(self.repo)
+        report = _write_report(self.repo, 1, "green")
+        report.write_text(json.dumps({"summary": {"verdict": "green"}}), encoding="utf-8")
+        proc = _run_hook(_stage_b_payload(1, "code-reviewer"), self.repo)
+        self.assertEqual(proc.returncode, HOOK_DENY, msg=proc.stderr)
+
+    def test_db_minor_issue_below_threshold_allows(self):
+        db = _init_db(self.repo)
+        conn = sqlite3.connect(str(db))
+        try:
+            conn.execute("PRAGMA foreign_keys = OFF")
+            conn.execute(
+                "INSERT INTO qa_spec_compliance (feat_n, us_id, ac_id, extracted_at, "
+                "verdict, severity) VALUES (1, '1-1', 'AC-1', datetime('now'), "
+                "'not_verified', 'minor')")
+            conn.commit()
+        finally:
+            conn.close()
+        proc = _run_hook(_stage_b_payload(1, "code-reviewer"), self.repo)
         self.assertEqual(proc.returncode, HOOK_ALLOW, msg=proc.stderr)
+
+    def test_db_takes_precedence_over_report(self):
+        db = _init_db(self.repo)
+        _seed_spec_compliance(db, feat_n=1, verdict="not_verified")
+        _write_report(self.repo, 1, "green")
+        proc = _run_hook(_stage_b_payload(1, "code-reviewer"), self.repo)
+        self.assertEqual(proc.returncode, HOOK_DENY, msg=proc.stderr)
 
 
 if __name__ == "__main__":

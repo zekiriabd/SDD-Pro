@@ -85,7 +85,7 @@ NEW_SYMBOL = "public class AuthService { public void Login() {} }"
 
 
 def _run_main(monkeypatch, tmp_path: Path, *, payload: dict, mode: str = "strict",
-              companion_test: bool = False) -> int:
+              companion_test: bool = False, companion_body: str | None = None) -> int:
     (tmp_path / ".claude").mkdir(exist_ok=True)
     (tmp_path / "workspace" / "src" / "Backend" / "Services").mkdir(
         parents=True, exist_ok=True)
@@ -93,8 +93,13 @@ def _run_main(monkeypatch, tmp_path: Path, *, payload: dict, mode: str = "strict
         tests_dir = tmp_path / "workspace" / "src" / "Backend.Tests"
         tests_dir.mkdir(parents=True, exist_ok=True)
         (tests_dir / "AuthServiceTests.cs").write_text(
-            "public class AuthServiceTests {}", encoding="utf-8")
-    monkeypatch.setenv("SDD_TDD_MODE", mode)
+            companion_body if companion_body is not None else
+            "public class AuthServiceTests { [Fact] public void Login_fails() {} }",
+            encoding="utf-8")
+    if mode is None:
+        monkeypatch.delenv("SDD_TDD_MODE", raising=False)
+    else:
+        monkeypatch.setenv("SDD_TDD_MODE", mode)
     monkeypatch.delenv("SDD_DISABLE_TDD", raising=False)
     monkeypatch.setattr(mod, "read_hook_input", lambda: payload)
     monkeypatch.setattr(mod, "repo_root", lambda: tmp_path)
@@ -155,3 +160,37 @@ def test_non_write_tool_is_allowed(monkeypatch, tmp_path):
     payload = {"tool_name": "Read", "tool_input": {"file_path": PROD_REL}}
     rc = _run_main(monkeypatch, tmp_path, payload=payload)
     assert rc == HOOK_ALLOW
+
+
+# ---------------------------------------------------------------------------
+# Audit sécurité 2026-11
+# ---------------------------------------------------------------------------
+
+def test_empty_companion_test_does_not_count(monkeypatch, tmp_path):
+    rc = _run_main(monkeypatch, tmp_path, payload=_write_payload(), companion_test=True,
+                   companion_body="public class AuthServiceTests { }")
+    assert rc == HOOK_DENY
+
+
+@pytest.mark.parametrize("content", [
+    "internal sealed class AuthService { }",
+    "class AuthService { }",
+    "private static void Helper() { }",
+])
+def test_internal_and_private_symbols_detected(content):
+    assert mod._content_introduces_new_symbol(content, ".cs") is True
+
+
+def test_kotlin_internal_fun_detected():
+    assert mod._content_introduces_new_symbol("internal fun compute(x: Int) = x", ".kt")
+
+
+def test_subagent_default_is_strict(monkeypatch, tmp_path):
+    monkeypatch.setattr(mod, "is_ci", lambda: False)
+    payload = {**_write_payload(), "agent_id": "a1", "agent_type": "dev-backend"}
+    assert _run_main(monkeypatch, tmp_path, payload=payload, mode=None) == HOOK_DENY
+
+
+def test_main_session_default_is_warn(monkeypatch, tmp_path):
+    monkeypatch.setattr(mod, "is_ci", lambda: False)
+    assert _run_main(monkeypatch, tmp_path, payload=_write_payload(), mode=None) == HOOK_ALLOW

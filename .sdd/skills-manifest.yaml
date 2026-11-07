@@ -23,9 +23,13 @@
 #                 cas — ils tournent hors pipeline).
 #   gemini-cli  : idem codex.
 #
-# NOTE — aucune transpilation skills n'est câblée en Phase 2 (ni identité
-# Claude, ni variantes). Ce manifest est un artefact de CONCEPTION qui borne
-# le travail Phase 1 et documente honnêtement le gap multi-harnais.
+# NOTE (2026-11-07, audit run FEAT 15) — claude-code : émission CÂBLÉE.
+# `harness_build.py --skills-only` copie chaque `source` (SKILL.md + annexes)
+# vers `{out}/skills/<name>/`, et `rebuild_claude_facade.py` la recopie dans
+# `.claude/skills/` (seul emplacement découvert par Claude Code — avant ce
+# correctif, `.claude/skills/` n'existait pas et aucun skill n'était chargé).
+# Parité vérifiée par `tests/test_harness_skills.py`. Variantes codex/gemini :
+# toujours non transpilées (NotImplementedError), cf. harness_support.
 
 schema: sdd.skills-manifest/v1
 

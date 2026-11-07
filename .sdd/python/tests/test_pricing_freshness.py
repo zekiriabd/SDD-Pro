@@ -141,7 +141,10 @@ def test_every_agent_frontmatter_model_is_priced():
 
 
 def test_pricing_fallback_for_unknown_model():
-    """Unknown model → Sonnet midpoint, never crash."""
+    """Unknown model → conservative (most expensive) tariff, never crash.
+
+    Audit tokens 2026-11-07 : the former Sonnet midpoint under-counted any
+    premium model the table did not know yet."""
     p = pricing.get_pricing("claude-unknown-99")
-    sonnet = pricing.get_pricing("claude-sonnet-4-6")
-    assert p == sonnet
+    assert p == pricing.CONSERVATIVE_PRICING
+    assert p["output"] >= max(v["output"] for v in pricing.PRICING.values())

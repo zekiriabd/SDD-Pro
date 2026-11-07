@@ -5,7 +5,7 @@ vérifie qu'un `.md` d'agent régénéré par `harness_build.py` (ClaudeAdapter)
 est sémantiquement équivalent au `.claude/agents/{name}.md` vivant.
 
 Deux niveaux de comparaison :
-1. **Frontmatter** — champs {name, description, model, tools} comparés par
+1. **Frontmatter** — champs {name, description, model, effort, tools} comparés par
    VALEUR (ordre des clés non significatif, `tools` normalisé en liste).
 2. **Corps markdown** — égalité STRICTE après normalisation des fins de
    ligne (CRLF/CR -> LF) et retrait d'un BOM éventuel.
@@ -44,7 +44,7 @@ __all__ = [
 ]
 
 # Champs du contrat sémantique agent Claude Code (mode identité).
-FRONTMATTER_FIELDS: tuple[str, ...] = ("name", "description", "model", "tools")
+FRONTMATTER_FIELDS: tuple[str, ...] = ("name", "description", "model", "effort", "tools")
 
 _FENCE_RE = re.compile(r"^---\n(.*?)\n---\n?", re.DOTALL)
 # Commentaire inline YAML : espace(s) + '#' + reste de ligne.

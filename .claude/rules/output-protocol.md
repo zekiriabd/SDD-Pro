@@ -130,7 +130,7 @@ après cette ligne sauf bloc ERROR si verdict 🔴 (cf. §7).
 | `[SECURITY]` | agent `security-reviewer` | 5 |
 | `[ARCH-REVIEW]` | agent `arch-reviewer` | 5 |
 | `[ADV-REVIEW]` | agent `adversarial-reviewer` (opt-out — actif par défaut, skip avec `--no-adversarial`) | 5 |
-| `[REVERSE]` | les 12 agents `reverse-*` + 18 commandes `/sdd-reverse*` + `/sdd-db-reverse*` (module reverse — suffixes d'état et format : `rules/reverse-engineering.md §7`) | reverse 1-4 |
+| `[REVERSE]` | les 16 agents `reverse-*` + 19 commandes `/sdd-reverse*` + `/sdd-db-*` (module reverse — suffixes d'état et format : `rules/reverse-engineering.md §7`) | reverse 1-4 |
 | `[SPECBOOK]` | agent `specbook-writer` (invoqué par `/spec-book` — vulgarise FEAT en langage humain, cache `workspace/docs/.sys/sections/`) | 5 (post-livraison) |
 | `[DONE]` | verdict final pipeline | 100% |
 
@@ -261,7 +261,7 @@ dans les sessions/agents ordinaires. Son contrat universel vit ici :
 - **Taxonomie complète** (16 familles, comportement build_loop §3) :
   `@.sdd/rules/error-classification.md` (Read on-demand). **Tranche par
   agent** : `.sdd/digests/error-classification.{agent}.md` (Read en STEP
-  contexte — canal nominal des 12 agents mappés).
+  contexte — canal nominal des 13 agents mappés, dont `specbook-writer` depuis 2026-11-07).
 
 ---
 

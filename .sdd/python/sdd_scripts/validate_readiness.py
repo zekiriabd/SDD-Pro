@@ -464,7 +464,7 @@ def main() -> int:
         # Construire dict catégorisé depuis Active Tech Specs (lignes - .sdd/stacks/X/Y.md)
         stacks_dict: dict[str, str | None] = {
             "backend": None, "frontend": None, "ui": None, "auth": None,
-            "fullstack": None, "mobiles": None,
+            "fullstack": None, "mobiles": None, "desktop": None,
         }
         for cat, ids in parse_active_stack_ids(active_tech_body, first_only=True).items():
             if cat in stacks_dict and stacks_dict[cat] is None:
@@ -480,16 +480,17 @@ def main() -> int:
             rep.add_err(
                 "STACK-INCOHERENT",
                 f"{coherence_err['code']}: {coherence_err['message']}",
-                "Corriger workspace/stack/stack.md (un seul AppType actif : fullstack OU back+front OU mobile).",
+                "Corriger workspace/stack/stack.md (un seul AppType actif : fullstack OU back+front OU mobile OU desktop).",
             )
         else:
             has_backend = stacks_dict["backend"] is not None
             has_frontend = stacks_dict["frontend"] is not None
             has_fullstack = stacks_dict["fullstack"] is not None
             has_mobiles = stacks_dict["mobiles"] is not None
+            has_desktop = stacks_dict["desktop"] is not None
             rep.add_pass(
                 "STACK-ACTIVE",
-                f"Stacks actifs : backend={has_backend}, frontend={has_frontend}, fullstack={has_fullstack}, mobiles={has_mobiles}",
+                f"Stacks actifs : backend={has_backend}, frontend={has_frontend}, fullstack={has_fullstack}, mobiles={has_mobiles}, desktop={has_desktop}",
             )
 
         # v7.0.0-alpha Sprint 1.3 (2026-06-06) — Required Stack validation

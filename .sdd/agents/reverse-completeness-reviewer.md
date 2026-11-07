@@ -2,6 +2,7 @@
 name: reverse-completeness-reviewer
 description: 'Reviewer "back" du workflow reverse (L5). Pour UNE FEAT reverse, confronte son contenu à l''evidence profonde de l''unité (inventory units[U-N].classes + dataAccess : repositories, services, requêtes SQL, procédures stockées) et signale ce que l''extraction a OMIS. Verdict informational (jamais bloquant), miroir reverse de spec-compliance-reviewer. Délègue le calcul au script déterministe check_feat_completeness.py. Aucun spawn d''agent.'
 model_tier: balanced
+effort: medium
 tier_default: balanced
 tier_floor: balanced
 tier_ceiling: balanced

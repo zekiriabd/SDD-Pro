@@ -5,13 +5,16 @@ endpoint_kind: native            # API Anthropic native (référence)
 base_url_env: ANTHROPIC_BASE_URL # défaut SDK : https://api.anthropic.com
 auth_env: ANTHROPIC_API_KEY
 tier_map:
-  deep: claude-opus-4-8
-  balanced: claude-sonnet-4-6
-  fast: claude-haiku-4-5
+  # Audit tokens 2026-11-07 — génération 5.5 (ex-4.x : opus-4-8 / sonnet-4-6
+  # / haiku-4-5). Un agent qui pin `model:` dans sa frontmatter garde son pin ;
+  # la tier_map ne sert qu'aux agents routés par `model_tier`.
+  deep: claude-opus-5-5
+  balanced: claude-sonnet-5-5
+  fast: claude-haiku-5-5
 context_window:
-  deep: 200000
-  balanced: 200000
-  fast: 200000
+  deep: 1000000
+  balanced: 1000000
+  fast: 1000000
 capabilities:
   structured_output_fidelity: unknown   # référence de facto — à formaliser au 1er conformance run (§10)
   tool_calling: native
@@ -23,11 +26,22 @@ telemetry:
   optout_available: true               # Zero Data Retention (enterprise + special API keys)
   optout_mechanism: "Anthropic ZDR flag (enterprise / trust-center request)"
   reference_url: "https://trust.anthropic.com/"
-pricing:                 # USD per million tokens — aligned with sdd_lib/pricing.py PRICING (2026-08-30)
+pricing:                 # USD per million tokens — aligned with sdd_lib/pricing.py PRICING (2026-11-07)
   # SSoT machine : sdd_lib/pricing.py. Ce bloc miroir permet à
   # impact_report.py de valider `pricing_present=True` (évite le warning
   # [TELEMETRY_UNAVAILABLE] à chaque `harness_build`). Toute modification
   # doit être répercutée dans pricing.py + bump `PRICING_LAST_REVIEWED`.
+  # Génération 5 — cache_read / cache_creation ne sont PAS un ratio fixe de
+  # `input` sur cette génération : valeurs explicites, jamais dérivées.
+  claude-opus-5-5:   {input:  4.00, output: 20.00, cache_read: 0.20, cache_creation:  5.00}
+  claude-sonnet-5-5: {input:  2.00, output: 10.00, cache_read: 0.20, cache_creation:  2.50}
+  claude-haiku-5-5:  {input:  0.10, output:  0.50, cache_read: 0.01, cache_creation:  0.125}
+  claude-fable-5-1:  {input: 10.00, output: 50.00, cache_read: 0.25, cache_creation: 12.50}
+  claude-fable-5:    {input: 10.00, output: 50.00, cache_read: 1.00, cache_creation: 12.50}
+  claude-opus-5:     {input:  5.00, output: 25.00, cache_read: 0.50, cache_creation:  6.25}
+  claude-sonnet-5:   {input:  2.00, output: 10.00, cache_read: 0.20, cache_creation:  2.50}
+  # Génération 4.x — conservée (agents pinnés par `model:` + lignes historiques)
   claude-opus-4-8:   {input:  5.00, output: 25.00, cache_read: 0.50, cache_creation:  6.25}
+  claude-opus-4-7:   {input:  5.00, output: 25.00, cache_read: 0.50, cache_creation:  6.25}
   claude-sonnet-4-6: {input:  3.00, output: 15.00, cache_read: 0.30, cache_creation:  3.75}
   claude-haiku-4-5:  {input:  1.00, output:  5.00, cache_read: 0.10, cache_creation:  1.25}

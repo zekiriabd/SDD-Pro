@@ -121,3 +121,23 @@ class TestParseIdList(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestWriteIsCovered(unittest.TestCase):
+    """Audit sécurité 2026-11 : un Write qui écrase un fichier augment est vérifié."""
+
+    def test_write_overwrite_dropping_preserved_id_denies(self):
+        import tempfile
+        from unittest import mock
+        from sdd_hooks import validate_augment_contract as vac
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "workspace" / "plans").mkdir(parents=True)
+            (root / "workspace" / "plans" / "1-2-Auth.back.md").write_text(PLAN_SAMPLE, encoding="utf-8")
+            target = root / "workspace" / "src" / "SimBackend" / "Services" / "AuthService.cs"
+            target.parent.mkdir(parents=True)
+            target.write_text("class AuthService { AUTH-REFRESH-V2 }", encoding="utf-8")
+            payload = {"tool_name": "Write", "tool_input": {"file_path": str(target)}}
+            with mock.patch.object(vac, "read_hook_input", lambda: payload), \
+                    mock.patch.object(vac, "repo_root", lambda: root):
+                self.assertEqual(vac.main(), 2)

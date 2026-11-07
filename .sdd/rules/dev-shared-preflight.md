@@ -5,9 +5,16 @@
 # La clé `paths:` reste présente car une rule SANS `paths:` est inconditionnelle
 # (mécanisme natif Claude Code — vérifié 2026-08-30) : portée réduite au fichier
 # lui-même (maintenance framework). Chargement pipeline = Read explicite uniquement.
+# Lecture EXPLICITE uniquement (audit tokens 2026-11-06, run FEAT 15) : l'ex-portée
+# « son propre fichier » faisait s'auto-injecter cette rule (via la façade
+# .claude/rules/) à CHAQUE Read/cat de .sdd/rules/dev-shared-preflight.md — donc
+# en DOUBLE du Read explicite que ses consommateurs font en STEP contexte
+# (2 × 5 KB par agent dev-*). Le glob ci-dessous ne matche volontairement
+# aucun fichier réel : la rule n'est JAMAIS auto-injectée, elle est lue par
+# section (offset/limit) par les agents qui en ont besoin. Une rule sans
+# `paths:` serait inconditionnelle (chargée par toutes les sessions) — pire.
 paths:
-  - ".sdd/rules/dev-shared-preflight.md"
-  - ".claude/rules/dev-shared-preflight.md"
+  - ".sdd/rules/.explicit-read-only/dev-shared-preflight.md"
 ---
 
 # Règle — Dev-shared preflight (STEP 0/0.5/1/1.bis cross-agent, v7.0.0)

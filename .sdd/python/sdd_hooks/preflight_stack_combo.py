@@ -11,6 +11,9 @@ Exit semantics (propagated to Claude Code hook decision):
     0  validated OR experimental w/ WARN OR non-applicable skill (continue silent)
     2  untested combo + SDD_ALLOW_UNTESTED_COMBO not set (BLOCK + stderr message)
 
+Fail-closed (audit 2026-11) : script absent, timeout, stack.md illisible
+(exit 4) ou code inattendu → exit 2 `[INFRA_BLOCKED]` (avant : fail-open).
+
 Non-blocking by design for `experimental` combos (exit 1 from script → exit 0 here +
 log warn). Only `untested` (script exit 2) and `invalid` (exit 3) actually block.
 
@@ -64,8 +67,8 @@ def main() -> int:
     root = _resolve_project_root()
     script = root / ".sdd" / "python" / "sdd_scripts" / "validate_stack_combo.py"
     if not script.is_file():
-        # Script absent (degraded install) — fail-open
-        return HOOK_ALLOW
+        # Audit 2026-11 : script absent = install dégradée → fail-closed.
+        return _infra_deny(skill, f"validate_stack_combo.py absent ({script})")
     try:
         result = subprocess.run(
             [sys.executable, str(script), "--json"],
@@ -75,8 +78,7 @@ def main() -> int:
             timeout=15,
         )
     except (subprocess.TimeoutExpired, OSError) as exc:
-        sys.stderr.write(f"[stack-combo] script execution failed: {exc} — fail-open\n")
-        return HOOK_ALLOW
+        return _infra_deny(skill, f"validate_stack_combo.py n'a pas pu s'executer : {exc}")
     # Parse JSON output for status
     status = "unknown"
     signature = "?"
@@ -117,13 +119,20 @@ def main() -> int:
         )
         return HOOK_DENY
     if code == 4:
-        # io_error (stack.md absent) — fail-open with warn
-        sys.stderr.write(
-            f"[stack-combo] /{skill} WARN — stack.md illisible (peut-être projet vierge)\n"
-        )
-        return HOOK_ALLOW
-    # Unknown exit code — fail-open
-    sys.stderr.write(f"[stack-combo] unknown exit {code} — fail-open\n")
-    return HOOK_ALLOW
+        # Audit 2026-11 : stack.md illisible → le combo n'est pas vérifiable,
+        # le pipeline ne peut de toute façon pas tourner sans stack.md.
+        return _infra_deny(skill, "workspace/stack/stack.md absent ou illisible (exit 4)")
+    return _infra_deny(skill, f"validate_stack_combo.py exit inattendu {code}")
+
+
+def _infra_deny(skill: str | None, cause: str) -> int:
+    sys.stderr.write(
+        f"ERROR: /{skill} blocked — combo stack non verifiable\n"
+        f"CAUSE: [INFRA_BLOCKED] {cause}\n"
+        f"FIX: /sdd-bootstrap ou /sdd-discover-stack pour creer stack.md, reparer "
+        f"l'installation .sdd/python ; bypass audit-loggue : SDD_ALLOW_UNTESTED_COMBO=1 "
+        f"dans l'environnement du process Claude Code\n"
+    )
+    return HOOK_DENY
 if __name__ == "__main__":
     sys.exit(main())
