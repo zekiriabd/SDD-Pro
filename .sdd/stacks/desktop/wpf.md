@@ -375,18 +375,18 @@ Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'U
 | unit-tests | NSubstitute | 6.2.0 | mock, substitute, tests.*unitaires |
 | unit-tests | Shouldly | 4.3.0 | assertions, should |
 | ui-automation | FlaUI.UIA3 | 5.0.0 | test.*ui, ui.*automation, test.*bout.*en.*bout, flaui |
-| llm-text-to-orm | System.Security.Cryptography.Pkcs | 10.0.14 | nounouflowllm, assistant.?donn[eé]es, text.?to.?orm |
-| llm-text-to-orm | Microsoft.Agents.AI | 1.28.0 | nounouflowllm, assistant.?donn[eé]es, text.?to.?orm, ichatclient, agent.?framework, vues?.?ia, sch[eé]ma.?ia, interroger |
-| llm-text-to-orm | Microsoft.Extensions.AI | 10.11.0 | nounouflowllm, assistant.?donn[eé]es, text.?to.?orm, ichatclient, agent.?framework, vues?.?ia, sch[eé]ma.?ia, interroger |
-| llm-text-to-orm | Anthropic | 13.8.0 | nounouflowllm, assistant.?donn[eé]es, text.?to.?orm, ichatclient, agent.?framework, vues?.?ia, sch[eé]ma.?ia, interroger |
-| llm-text-to-orm | Microsoft.Extensions.AI.OpenAI | 10.11.0 | nounouflowllm, assistant.?donn[eé]es, text.?to.?orm, ichatclient, agent.?framework, vues?.?ia, sch[eé]ma.?ia, interroger |
-| llm-text-to-orm | Google.GenAI | 2.1.0 | nounouflowllm, assistant.?donn[eé]es, text.?to.?orm, ichatclient, agent.?framework, vues?.?ia, sch[eé]ma.?ia, interroger |
-| llm-text-to-orm | Microsoft.EntityFrameworkCore.SqlServer | 10.0.11 | nounouflowllm, assistant.?donn[eé]es, text.?to.?orm, ichatclient, agent.?framework, vues?.?ia, sch[eé]ma.?ia, interroger |
-| llm-text-to-orm | System.Linq.Dynamic.Core | 1.7.4 | nounouflowllm, assistant.?donn[eé]es, text.?to.?orm, ichatclient, agent.?framework, vues?.?ia, sch[eé]ma.?ia, interroger |
-| llm-text-to-orm | Raffinert.FuzzySharp | 6.0.1 | nounouflowllm, assistant.?donn[eé]es, text.?to.?orm, ichatclient, agent.?framework, vues?.?ia, sch[eé]ma.?ia, interroger |
-| llm-text-to-orm | Microsoft.Extensions.Http.Resilience | 10.11.0 | nounouflowllm, assistant.?donn[eé]es, text.?to.?orm, ichatclient, agent.?framework, vues?.?ia, sch[eé]ma.?ia, interroger |
-| llm-text-to-orm | Microsoft.ML.Tokenizers | 2.0.1 | nounouflowllm, assistant.?donn[eé]es, text.?to.?orm, ichatclient, agent.?framework, vues?.?ia, sch[eé]ma.?ia, interroger |
-| llm-text-to-orm | Microsoft.ML.Tokenizers.Data.O200kBase | 2.0.1 | nounouflowllm, assistant.?donn[eé]es, text.?to.?orm, ichatclient, agent.?framework, vues?.?ia, sch[eé]ma.?ia, interroger |
+| llm-text-to-orm | System.Security.Cryptography.Pkcs | 10.0.14 | assistant.?donn[eé]es, text.?to.?orm |
+| llm-text-to-orm | Microsoft.Agents.AI | 1.28.0 | assistant.?donn[eé]es, text.?to.?orm, ichatclient, agent.?framework, vues?.?ia, sch[eé]ma.?ia, interroger |
+| llm-text-to-orm | Microsoft.Extensions.AI | 10.11.0 | assistant.?donn[eé]es, text.?to.?orm, ichatclient, agent.?framework, vues?.?ia, sch[eé]ma.?ia, interroger |
+| llm-text-to-orm | Anthropic | 13.8.0 | assistant.?donn[eé]es, text.?to.?orm, ichatclient, agent.?framework, vues?.?ia, sch[eé]ma.?ia, interroger |
+| llm-text-to-orm | Microsoft.Extensions.AI.OpenAI | 10.11.0 | assistant.?donn[eé]es, text.?to.?orm, ichatclient, agent.?framework, vues?.?ia, sch[eé]ma.?ia, interroger |
+| llm-text-to-orm | Google.GenAI | 2.1.0 | assistant.?donn[eé]es, text.?to.?orm, ichatclient, agent.?framework, vues?.?ia, sch[eé]ma.?ia, interroger |
+| llm-text-to-orm | Microsoft.EntityFrameworkCore.SqlServer | 10.0.11 | assistant.?donn[eé]es, text.?to.?orm, ichatclient, agent.?framework, vues?.?ia, sch[eé]ma.?ia, interroger |
+| llm-text-to-orm | System.Linq.Dynamic.Core | 1.7.4 | assistant.?donn[eé]es, text.?to.?orm, ichatclient, agent.?framework, vues?.?ia, sch[eé]ma.?ia, interroger |
+| llm-text-to-orm | Raffinert.FuzzySharp | 6.0.1 | assistant.?donn[eé]es, text.?to.?orm, ichatclient, agent.?framework, vues?.?ia, sch[eé]ma.?ia, interroger |
+| llm-text-to-orm | Microsoft.Extensions.Http.Resilience | 10.11.0 | assistant.?donn[eé]es, text.?to.?orm, ichatclient, agent.?framework, vues?.?ia, sch[eé]ma.?ia, interroger |
+| llm-text-to-orm | Microsoft.ML.Tokenizers | 2.0.1 | assistant.?donn[eé]es, text.?to.?orm, ichatclient, agent.?framework, vues?.?ia, sch[eé]ma.?ia, interroger |
+| llm-text-to-orm | Microsoft.ML.Tokenizers.Data.O200kBase | 2.0.1 | assistant.?donn[eé]es, text.?to.?orm, ichatclient, agent.?framework, vues?.?ia, sch[eé]ma.?ia, interroger |
 | speech-dictation | System.Speech | 10.0.14 | dict[eé]e, dicter, reconnaissance.?vocale, micro(phone)?, speech.?to.?text |
 <!-- LIBS_CATALOG_END -->
 

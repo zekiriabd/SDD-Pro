@@ -79,13 +79,8 @@ OWNERSHIP_MATRIX: dict[str, list[str]] = {
         r"^workspace/src/[^/]+/(Views|ViewModels|Services|Models|Converters|Controls|Resources|Behaviors)/.+",
         r"^workspace/src/[^/]+/(App|MainWindow)\.xaml(\.cs)?$",
         r"^workspace/src/[^/]+/appsettings(\.[A-Za-z]+)?\.json$",
-        # Bibliothèque d'assistant de données NounouFlowLLM (wpf.md §1.3 « Bibliothèque
-        # AssistantDonnees », FEAT 32-35, décision PO 2026-11-12) : dossiers métier,
-        # fichiers racine .cs, vocabulaire, README et gestion centrale des paquets
-        # prévue par les plans validés.
-        r"^workspace/src/NounouFlowLLM(\.Evaluation)?/(Agent|Catalogue|Donnees|Fournisseurs|Requetes|Reponses|Securite|Semantique|Evaluation|JeuQuestions|Configuration|Execution|Indicateurs|Rapport)/.+",
-        r"^workspace/src/NounouFlowLLM(\.Evaluation)?/[^/]+\.cs$",
-        r"^workspace/src/NounouFlowLLM(\.Evaluation)?/(semantique\.json|README\.md|appsettings\.example\.json|Directory\.Packages\.props|NounouFlowLLM[^/]*\.csproj|Agent/PromptFixe\.reference\.txt)$",
+        # Dossiers propres à un projet (bibliothèque métier, etc.) : jamais en dur
+        # ici — déclarés par le projet dans PROJECT_EXTRA_FILE (cf. plus bas).
     ],
     "qa": [
         r"^workspace/src/.+\.Tests/.+",
@@ -175,6 +170,49 @@ _COMPILED_OWNERSHIP: dict[str, list[re.Pattern[str]]] = {
     agent: [re.compile(p) for p in patterns]
     for agent, patterns in OWNERSHIP_MATRIX.items()
 }
+
+
+#: Extension de la matrice propre au projet (2026-11-13) : chemins métier d'un
+#: projet (ex. dossiers d'une bibliothèque) qu'aucune règle générique ne couvre.
+#: Fichier local sous workspace/ (non versionné) : aucun nom de projet client ne
+#: vit dans le framework. Format : {"dev-frontend": ["^workspace/src/MaLib/.+"]}.
+PROJECT_EXTRA_FILE = Path(".sys") / ".context" / "ownership-extra.json"
+#: Une extension ne peut ouvrir que du code applicatif : elle n'élargit jamais
+#: un agent sur les specs, l'état du pipeline ou les rapports.
+_EXTRA_ALLOWED_PREFIX = "^workspace/src/"
+
+
+def load_project_extra(workspace: Path) -> dict[str, list[re.Pattern[str]]]:
+    """Motifs supplémentaires déclarés par le projet, par agent connu de la matrice.
+
+    Fichier absent → aucune extension. Fichier illisible ou motif invalide →
+    WARN et motif ignoré (la matrice reste la plus stricte).
+    """
+    path = workspace / PROJECT_EXTRA_FILE
+    if not path.is_file():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        warn(f"WARN audit-file-ownership : {PROJECT_EXTRA_FILE} illisible ({type(exc).__name__}) — ignoré")
+        return {}
+    if not isinstance(data, dict):
+        warn(f"WARN audit-file-ownership : {PROJECT_EXTRA_FILE} doit être un objet agent → motifs — ignoré")
+        return {}
+    extra: dict[str, list[re.Pattern[str]]] = {}
+    for agent, patterns in data.items():
+        if agent not in OWNERSHIP_MATRIX or not isinstance(patterns, list):
+            continue
+        for pattern in patterns:
+            if not isinstance(pattern, str) or not pattern.startswith(_EXTRA_ALLOWED_PREFIX):
+                warn(f"WARN audit-file-ownership : motif ignoré pour {agent} "
+                     f"(doit commencer par {_EXTRA_ALLOWED_PREFIX}) : {pattern!r}")
+                continue
+            try:
+                extra.setdefault(agent, []).append(re.compile(pattern))
+            except re.error:
+                warn(f"WARN audit-file-ownership : motif invalide ignoré pour {agent} : {pattern!r}")
+    return extra
 
 
 def _parse_cutoff() -> datetime:
@@ -345,6 +383,7 @@ def main() -> int:
     workspace = workspace_root(root)
     if not workspace.is_dir():
         return HOOK_ALLOW
+    allowed = allowed + load_project_extra(workspace).get(subagent, [])
 
     source = "walk"
     modified: list[Path] | None = None

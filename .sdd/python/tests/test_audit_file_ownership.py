@@ -360,5 +360,69 @@ class TestHookLifecycle(unittest.TestCase):
         self.assertIn("source=walk", _read_log(self.repo))
 
 
+class TestProjectExtra(unittest.TestCase):
+    """Extension de matrice propre au projet (workspace/.sys/.context/ownership-extra.json)."""
+
+    LIB_FILE = "workspace/src/MaLib/Agent/Boucle.cs"
+
+    def setUp(self):
+        import tempfile
+        self._tmp = tempfile.TemporaryDirectory()
+        self.repo = _make_repo(Path(self._tmp.name))
+        target = self.repo / self.LIB_FILE
+        target.parent.mkdir(parents=True)
+        target.write_text("// lib\n", encoding="utf-8")
+        self.transcript = _write_transcript(self.repo / "t.jsonl", [("Write", self.LIB_FILE)])
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _write_extra(self, content: str) -> None:
+        path = self.repo / "workspace" / ".sys" / ".context" / "ownership-extra.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
+
+    def _run(self) -> subprocess.CompletedProcess:
+        return _run_hook(_stop_payload("dev-frontend", self.transcript), self.repo)
+
+    def test_framework_matrix_names_no_project(self):
+        """Aucun nom de projet client en dur dans la matrice du framework."""
+        named = [p for pats in OWNERSHIP_MATRIX.values() for p in pats
+                 if re.match(r"\^workspace/src/[A-Za-z0-9_]", p)]
+        self.assertEqual(named, [], "projet nommé en dur : passer par ownership-extra.json")
+
+    def test_without_extra_lib_folder_is_violation(self):
+        self.assertEqual(self._run().returncode, 2)
+
+    def test_extra_opens_project_lib_folder(self):
+        self._write_extra(json.dumps({"dev-frontend": [r"^workspace/src/MaLib/Agent/.+"]}))
+        r = self._run()
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(_read_log(self.repo), "")
+
+    def test_extra_outside_src_is_ignored(self):
+        """Une extension ne peut pas ouvrir les specs (ni rien hors workspace/src/)."""
+        self.transcript = _write_transcript(self.repo / "t.jsonl", [("Write", "workspace/us/1-1-X.md")])
+        us = self.repo / "workspace" / "us" / "1-1-X.md"
+        us.parent.mkdir(parents=True)
+        us.write_text("x\n", encoding="utf-8")
+        self._write_extra(json.dumps({"dev-frontend": [r"^workspace/us/.+"]}))
+        r = self._run()
+        self.assertEqual(r.returncode, 2)
+        self.assertIn("motif ignoré", r.stderr)
+
+    def test_malformed_extra_keeps_strict_matrix(self):
+        self._write_extra("{ pas du json")
+        r = self._run()
+        self.assertEqual(r.returncode, 2)
+        self.assertIn("illisible", r.stderr)
+
+    def test_invalid_regex_is_ignored(self):
+        self._write_extra(json.dumps({"dev-frontend": ["^workspace/src/(MaLib"]}))
+        r = self._run()
+        self.assertEqual(r.returncode, 2)
+        self.assertIn("motif invalide", r.stderr)
+
+
 if __name__ == "__main__":
     unittest.main()
