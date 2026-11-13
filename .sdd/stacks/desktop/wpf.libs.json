@@ -13,7 +13,7 @@
     ]
   },
   "metadata": {
-    "lastUpdated": "2026-10-10",
+    "lastUpdated": "2026-11-11",
     "platforms": [
       "windows"
     ],
@@ -24,14 +24,14 @@
   "versions": {
     "dotnet": "net10.0-windows",
     "communitytoolkit-mvvm": "8.4.2",
-    "extensions-di": "10.0.11",
-    "extensions-hosting": "10.0.11",
-    "extensions-config-json": "10.0.11",
-    "extensions-logging": "10.0.11",
+    "extensions-di": "10.0.13",
+    "extensions-hosting": "10.0.13",
+    "extensions-config-json": "10.0.13",
+    "extensions-logging": "10.0.13",
     "serilog-hosting": "10.0.0",
     "serilog-file": "7.0.0",
     "xaml-behaviors": "1.1.158",
-    "wpf-ui": "3.4.2.7",
+    "wpf-ui": "4.3.0",
     "material-design": "5.3.2",
     "handycontrol": "3.5.1",
     "livecharts-wpf": "2.0.5",
@@ -48,7 +48,20 @@
     "xunit": "2.9.3",
     "nsubstitute": "6.2.0",
     "shouldly": "4.3.0",
-    "flaui": "5.0.0"
+    "flaui": "5.0.0",
+    "agents-ai": "1.28.0",
+    "extensions-ai": "10.11.0",
+    "anthropic-sdk": "13.8.0",
+    "extensions-ai-openai": "10.11.0",
+    "google-genai": "2.1.0",
+    "efcore-sqlserver-llm": "10.0.11",
+    "linq-dynamic": "1.7.4",
+    "fuzzysharp": "6.0.1",
+    "http-resilience": "10.11.0",
+    "ml-tokenizers": "2.0.1",
+    "ml-tokenizers-data": "2.0.1",
+    "crypto-pkcs": "10.0.14",
+    "system-speech": "10.0.14"
   },
   "core": [
     {
@@ -94,17 +107,22 @@
   ],
   "onDemand": [
     {
-      "module": "Wpf.Ui",
+      "module": "WPF-UI",
       "ref": "wpf-ui",
       "capability": "modern-theme",
-      "rationale": "Theme Fluent/WinUI 3. Le rendu WPF par defaut date de 2006 — un theme est quasi systematiquement requis",
+      "rationale": "Theme Fluent/WinUI 3 (lepoco/wpfui). Le rendu WPF par defaut date de 2006 — un theme est quasi systematiquement requis. ATTENTION id NuGet : le paquet est 'WPF-UI' (namespace Wpf.Ui). L'id 'Wpf.Ui' existe sur NuGet mais appartient a un AUTRE editeur sans rapport (corrige 2026-11-11 : le catalog pointait vers lui en 3.4.2.7). Ne pas combiner avec le theme Fluent natif .NET 9+ (Application.ThemeMode, experimental WPF0001) : deux dictionnaires de theme concurrents",
       "triggers": [
-        "theme",
+        "th[eè]me",
         "fluent",
         "winui",
+        "wpf-ui",
         "apparence.*moderne",
-        "dark.*mode"
-      ]
+        "dark.*mode",
+        "mode.*sombre",
+        "clair.*sombre",
+        "sombre.*clair"
+      ],
+      "license": "MIT"
     },
     {
       "module": "MaterialDesignThemes",
@@ -133,10 +151,18 @@
       "capability": "charts",
       "triggers": [
         "chart",
-        "graphique",
+        "graphiques?.*(donn|stat|[eé]vol|chiffr|indicat)",
+        "diagramme",
+        "histogramme",
         "courbe",
-        "visualisation.*donnees"
-      ]
+        "camembert",
+        "visualisation.*donn[eé]es",
+        "tableau.*de.*bord",
+        "dashboard",
+        "livecharts"
+      ],
+      "license": "MIT",
+      "rationale": "Graphiques (LiveCharts2, rendu SkiaSharp). Series exposees par le ViewModel (ISeries[]), aucune construction de graphique en code-behind. Trigger 'graphique' seul retire 2026-11-11 : il matchait « interface graphique » et « charte graphique »"
     },
     {
       "module": "Microsoft.EntityFrameworkCore.Sqlite",
@@ -296,6 +322,219 @@
         "test.*bout.*en.*bout",
         "flaui"
       ]
+    },
+    {
+      "module": "System.Security.Cryptography.Pkcs",
+      "ref": "crypto-pkcs",
+      "capability": "llm-text-to-orm",
+      "rationale": "Correctif de securite epingle : remplace la version transitive 9.0.11 vulnerable (GHSA-846f-f764-76mx eleve, GHSA-2fmv-rv2c-59x7 moyen) tiree par Microsoft.EntityFrameworkCore.SqlServer -> Microsoft.Data.SqlClient. Meme correctif que NounouFlow.Core (2026-11-07). Ajoute 2026-11-12.",
+      "triggers": [
+        "nounouflowllm",
+        "assistant.?donn[eé]es",
+        "text.?to.?orm"
+      ],
+      "license": "MIT"
+    },
+    {
+      "module": "Microsoft.Agents.AI",
+      "ref": "agents-ai",
+      "capability": "llm-text-to-orm",
+      "rationale": "Agent unique sur IChatClient (Microsoft Agent Framework 1.x) — FEAT 33, spec AssistantDonnees §6. Approuve PO 2026-11-12.",
+      "triggers": [
+        "nounouflowllm",
+        "assistant.?donn[eé]es",
+        "text.?to.?orm",
+        "ichatclient",
+        "agent.?framework",
+        "vues?.?ia\b",
+        "sch[eé]ma.?ia\b",
+        "interroger"
+      ],
+      "license": "MIT"
+    },
+    {
+      "module": "Microsoft.Extensions.AI",
+      "ref": "extensions-ai",
+      "capability": "llm-text-to-orm",
+      "rationale": "Abstraction IChatClient, appel de fonctions, sorties structurees, usage. Ligne 10.x alignee .NET 10 (11.0.0 trop recente). Approuve PO 2026-11-12.",
+      "triggers": [
+        "nounouflowllm",
+        "assistant.?donn[eé]es",
+        "text.?to.?orm",
+        "ichatclient",
+        "agent.?framework",
+        "vues?.?ia\b",
+        "sch[eé]ma.?ia\b",
+        "interroger"
+      ],
+      "license": "MIT"
+    },
+    {
+      "module": "Anthropic",
+      "ref": "anthropic-sdk",
+      "capability": "llm-text-to-orm",
+      "rationale": "SDK C# officiel Anthropic (>= v10 ; <= 3.x = tryAGI, autre editeur). Integration IChatClient via AsIChatClient (doc officielle platform.claude.com). Fournisseur actif par defaut, modele claude-haiku-5-5. Approuve PO 2026-11-12.",
+      "triggers": [
+        "nounouflowllm",
+        "assistant.?donn[eé]es",
+        "text.?to.?orm",
+        "ichatclient",
+        "agent.?framework",
+        "vues?.?ia\b",
+        "sch[eé]ma.?ia\b",
+        "interroger"
+      ],
+      "license": "Apache-2.0"
+    },
+    {
+      "module": "Microsoft.Extensions.AI.OpenAI",
+      "ref": "extensions-ai-openai",
+      "capability": "llm-text-to-orm",
+      "rationale": "Connecteur IChatClient officiel OpenAI (configurable). Approuve PO 2026-11-12.",
+      "triggers": [
+        "nounouflowllm",
+        "assistant.?donn[eé]es",
+        "text.?to.?orm",
+        "ichatclient",
+        "agent.?framework",
+        "vues?.?ia\b",
+        "sch[eé]ma.?ia\b",
+        "interroger"
+      ],
+      "license": "MIT"
+    },
+    {
+      "module": "Google.GenAI",
+      "ref": "google-genai",
+      "capability": "llm-text-to-orm",
+      "rationale": "SDK officiel Google Gemini, AsIChatClient (configurable). Approuve PO 2026-11-12.",
+      "triggers": [
+        "nounouflowllm",
+        "assistant.?donn[eé]es",
+        "text.?to.?orm",
+        "ichatclient",
+        "agent.?framework",
+        "vues?.?ia\b",
+        "sch[eé]ma.?ia\b",
+        "interroger"
+      ],
+      "license": "Apache-2.0"
+    },
+    {
+      "module": "Microsoft.EntityFrameworkCore.SqlServer",
+      "ref": "efcore-sqlserver-llm",
+      "capability": "llm-text-to-orm",
+      "rationale": "Acces lecture seule aux vues ia.* (HasNoKey().ToView), meme version que l'application. Approuve PO 2026-11-12.",
+      "triggers": [
+        "nounouflowllm",
+        "assistant.?donn[eé]es",
+        "text.?to.?orm",
+        "ichatclient",
+        "agent.?framework",
+        "vues?.?ia\b",
+        "sch[eé]ma.?ia\b",
+        "interroger"
+      ],
+      "license": "MIT"
+    },
+    {
+      "module": "System.Linq.Dynamic.Core",
+      "ref": "linq-dynamic",
+      "capability": "llm-text-to-orm",
+      "rationale": "Plan de requete -> IQueryable (valeurs en parametres). Version >= 1.6.0 OBLIGATOIRE : CVE-2023-32571 (RCE, < 1.3.0) et CVE-2024-51417 (< 1.6.0). Approuve PO 2026-11-12.",
+      "triggers": [
+        "nounouflowllm",
+        "assistant.?donn[eé]es",
+        "text.?to.?orm",
+        "ichatclient",
+        "agent.?framework",
+        "vues?.?ia\b",
+        "sch[eé]ma.?ia\b",
+        "interroger"
+      ],
+      "license": "Apache-2.0"
+    },
+    {
+      "module": "Raffinert.FuzzySharp",
+      "ref": "fuzzysharp",
+      "capability": "llm-text-to-orm",
+      "rationale": "Recherche approximative de noms en memoire. Remplace FuzzySharp 2.0.2 (abandonne depuis 2020) — 'ou equivalent' autorise par la spec ; API differente (scores double, pas de scoreCutoff). Approuve PO 2026-11-12.",
+      "triggers": [
+        "nounouflowllm",
+        "assistant.?donn[eé]es",
+        "text.?to.?orm",
+        "ichatclient",
+        "agent.?framework",
+        "vues?.?ia\b",
+        "sch[eé]ma.?ia\b",
+        "interroger"
+      ],
+      "license": "MIT"
+    },
+    {
+      "module": "Microsoft.Extensions.Http.Resilience",
+      "ref": "http-resilience",
+      "capability": "llm-text-to-orm",
+      "rationale": "Deux nouvelles tentatives au plus sur 429 et 5xx. Approuve PO 2026-11-12.",
+      "triggers": [
+        "nounouflowllm",
+        "assistant.?donn[eé]es",
+        "text.?to.?orm",
+        "ichatclient",
+        "agent.?framework",
+        "vues?.?ia\b",
+        "sch[eé]ma.?ia\b",
+        "interroger"
+      ],
+      "license": "MIT"
+    },
+    {
+      "module": "Microsoft.ML.Tokenizers",
+      "ref": "ml-tokenizers",
+      "capability": "llm-text-to-orm",
+      "rationale": "Comptage local approximatif des jetons (test de plafond du prompt fixe). 3.0.0 trop recente. Approuve PO 2026-11-12.",
+      "triggers": [
+        "nounouflowllm",
+        "assistant.?donn[eé]es",
+        "text.?to.?orm",
+        "ichatclient",
+        "agent.?framework",
+        "vues?.?ia\b",
+        "sch[eé]ma.?ia\b",
+        "interroger"
+      ],
+      "license": "MIT"
+    },
+    {
+      "module": "Microsoft.ML.Tokenizers.Data.O200kBase",
+      "ref": "ml-tokenizers-data",
+      "capability": "llm-text-to-orm",
+      "rationale": "Donnees de vocabulaire hors ligne pour Microsoft.ML.Tokenizers (version a aligner sur ml-tokenizers). Approuve PO 2026-11-12.",
+      "triggers": [
+        "nounouflowllm",
+        "assistant.?donn[eé]es",
+        "text.?to.?orm",
+        "ichatclient",
+        "agent.?framework",
+        "vues?.?ia\b",
+        "sch[eé]ma.?ia\b",
+        "interroger"
+      ],
+      "license": "MIT"
+    },
+    {
+      "module": "System.Speech",
+      "ref": "system-speech",
+      "capability": "speech-dictation",
+      "rationale": "Dictee vocale hors ligne de la question (FEAT 38 US 38-6) avec le moteur SAPI francais installe sous Windows ; la reconnaissance WinRT (Windows.Media.SpeechRecognition) echoue en application de bureau non empaquetee (0x800455A0). Paquet officiel Microsoft, gratuit. Approuve PO 2026-11-12.",
+      "triggers": [
+        "dict[eé]e",
+        "dicter",
+        "reconnaissance.?vocale",
+        "micro(phone)?\b",
+        "speech.?to.?text"
+      ],
+      "license": "MIT"
     }
   ]
 }

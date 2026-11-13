@@ -73,6 +73,19 @@ OWNERSHIP_MATRIX: dict[str, list[str]] = {
         r"^.+\.razor\.css$",
         r"^workspace/plans/.+\.front\.md$",
         r"^workspace/\.sys/\.context/adrs/ADR-.+\.md$",
+        # desktop/wpf (wpf.md §1.3 layer mapping) — 2026-11-12, décision PO : la
+        # matrice ne couvrait que les dossiers web ; un projet WPF + Core écrit
+        # Views/ViewModels/Services/Models/Converters/Controls/Resources.
+        r"^workspace/src/[^/]+/(Views|ViewModels|Services|Models|Converters|Controls|Resources|Behaviors)/.+",
+        r"^workspace/src/[^/]+/(App|MainWindow)\.xaml(\.cs)?$",
+        r"^workspace/src/[^/]+/appsettings(\.[A-Za-z]+)?\.json$",
+        # Bibliothèque d'assistant de données NounouFlowLLM (wpf.md §1.3 « Bibliothèque
+        # AssistantDonnees », FEAT 32-35, décision PO 2026-11-12) : dossiers métier,
+        # fichiers racine .cs, vocabulaire, README et gestion centrale des paquets
+        # prévue par les plans validés.
+        r"^workspace/src/NounouFlowLLM(\.Evaluation)?/(Agent|Catalogue|Donnees|Fournisseurs|Requetes|Reponses|Securite|Semantique|Evaluation|JeuQuestions|Configuration|Execution|Indicateurs|Rapport)/.+",
+        r"^workspace/src/NounouFlowLLM(\.Evaluation)?/[^/]+\.cs$",
+        r"^workspace/src/NounouFlowLLM(\.Evaluation)?/(semantique\.json|README\.md|appsettings\.example\.json|Directory\.Packages\.props|NounouFlowLLM[^/]*\.csproj|Agent/PromptFixe\.reference\.txt)$",
     ],
     "qa": [
         r"^workspace/src/.+\.Tests/.+",

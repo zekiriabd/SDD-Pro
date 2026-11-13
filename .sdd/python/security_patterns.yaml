@@ -203,7 +203,9 @@ classes:
     description: "Weak hash (MD5/SHA-1) or cipher (DES/RC4)"
     patterns:
       - lang: any
-        regex: '(?i)\b(MD5|SHA-?1|DES|RC4|ECB)\b'
+        # DES/ECB sensibles à la casse : en (?i) ils matchaient le mot français
+        # « des » dans les commentaires (465 faux positifs, audit 2026-11-07 FEAT 17).
+        regex: '(?i:\b(?:MD5|SHA-?1|RC4)\b)|\b(?:DES|ECB)\b'
         hint: "Weak crypto algorithm"
 
   - prefix: "[SEC_CRYPTO_NO_SALT]"

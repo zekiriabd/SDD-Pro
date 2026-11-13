@@ -98,7 +98,10 @@ DEFAULT_BUDGETS: dict[str, int] = {
     "constitutioner":  90_000,   # security audit 2026-06-06 — manquant, KeyError sur invocation
     "dev-backend":  220_000,
     "dev-frontend": 240_000,
-    "qa":           280_000,
+    # 2026-11-11 (décision Tech Lead, FEAT 26 desktop/wpf) : 280_000 → 320_000. Une US WPF
+    # (ViewModel Core + vue + convertisseurs + socle partagé) cite ~16-22 fichiers src par plan ;
+    # à 280_000 deux des trois US du tableau de bord dépassaient de ~5 %. QA lancée US par US.
+    "qa":           320_000,
     "dashboard":    180_000,
     # Auditors — audit tokens 2026-11-07 : les 4 MB (≈1,1 Mtok) posés en
     # 2026-06 n'étaient pas une barrière mais une absence de barrière — aucun
@@ -161,6 +164,47 @@ def estimate_input_cost(model: str | None, estimated_tokens: int,
 EXCLUDE_DIR_RE = re.compile(r"(^|/)(node_modules|bin|obj|TestResults|build|dist|coverage)(/|$)")
 EXCLUDE_CSS_RE = re.compile(r"/wwwroot/css/(bootstrap|open-iconic)/")
 EXCLUDE_EXT_RE = re.compile(r"\.(dll|exe|pdb|cache|map|woff|ttf|otf|eot|ico|png|jpg|jpeg|svg)$")
+# Gabarits de données embarqués comme ressources (ex. modèle de contrat HTML
+# de 0,9 Mo copié en sortie) : ce sont des données, jamais lues par un agent
+# (copie par `cp` + sha256). Les compter faisait échouer le budget qa de toute
+# FEAT du projet (audit 2026-11-07, FEAT 17).
+EXCLUDE_ASSET_RE = re.compile(r"(^|/)Resources/.+\.(html?|pdf)$", re.IGNORECASE)
+
+#: Agents dont les reads `workspace/src/{Project}/**/*` sont des lectures
+#: « read-only sélectif » : le budget ne compte que les fichiers de production
+#: cités dans les plans de la FEAT (`- path:` de `workspace/plans/{n}-*.md`),
+#: pas l'arbre entier du projet. Sans plan → comportement historique (arbre).
+PLAN_SCOPED_SRC_AGENTS: tuple[str, ...] = (
+    "qa",
+    # Auditeurs (audit 2026-11-07, FEAT 18) : ils relisent le code de la FEAT,
+    # pas l'arbre entier — même périmètre que qa.
+    "spec-compliance-reviewer", "code-reviewer", "security-reviewer",
+    "arch-reviewer", "adversarial-reviewer",
+)
+_PLAN_PATH_RE = re.compile(r"^\s*-\s*path:\s*(\S+)\s*$")
+
+
+def plan_scoped_src_files(root: Path, feat_number: int, us_id: str = "") -> set[str]:
+    """Chemins `workspace/src/...` cités par les plans de la FEAT (ou de l'US)."""
+    if feat_number <= 0 and not us_id:
+        return set()
+    plans_dir = root / "workspace" / "plans"
+    if not plans_dir.is_dir():
+        return set()
+    prefix = f"{us_id}-" if us_id else f"{feat_number}-"
+    out: set[str] = set()
+    for plan in sorted(plans_dir.glob(f"{prefix}*.md")):
+        if not plan.name.endswith((".back.md", ".front.md")):
+            continue
+        try:
+            text = plan.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        for line in text.splitlines():
+            m = _PLAN_PATH_RE.match(line)
+            if m and m.group(1).replace("\\", "/").startswith("workspace/src/"):
+                out.add(m.group(1).replace("\\", "/").strip("`'\""))
+    return out
 
 
 def parse_args() -> argparse.Namespace:
@@ -198,6 +242,7 @@ def is_excluded(rel_path: str) -> bool:
         EXCLUDE_DIR_RE.search(rel_path)
         or EXCLUDE_CSS_RE.search(rel_path)
         or EXCLUDE_EXT_RE.search(rel_path)
+        or EXCLUDE_ASSET_RE.search(rel_path)
     )
 
 
@@ -435,6 +480,16 @@ def main() -> int:
     warnings: list[dict[str, Any]] = []
     expanded: list[dict[str, Any]] = []
     seen: set[str] = set()
+    plan_scope: set[str] = (
+        plan_scoped_src_files(root, args.feat_number, args.us_id)
+        if args.agent in PLAN_SCOPED_SRC_AGENTS else set()
+    )
+    if plan_scope:
+        warnings.append({
+            "code": "PLAN_SCOPED_SRC",
+            "pattern": "workspace/src/{Project}/**/*",
+            "message": f"reads src/** limités aux {len(plan_scope)} fichiers cités par les plans",
+        })
 
     for read_pat in reads:
         if is_unbounded_glob(read_pat) and not args.allow_unbounded_globs:
@@ -465,6 +520,9 @@ def main() -> int:
                 if rel in seen:
                     continue
                 if is_excluded(rel):
+                    continue
+                if (plan_scope and "**" in read_pat
+                        and rel.startswith("workspace/src/") and rel not in plan_scope):
                     continue
                 try:
                     size = fp.stat().st_size

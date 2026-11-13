@@ -395,3 +395,45 @@ def test_main_archi_pattern_ambiguous_errors(fake_repo):
     ])
     codes = [e["code"] for e in out["errors"]]
     assert "STACK_MALFORMED" in codes
+
+
+# ---------- B5 UI_DS_NOT_SELECTED : web only (2026-11-11) ----------
+
+STACK_WPF = """\
+## Active Tech Specs
+- .sdd/stacks/desktop/wpf.md
+
+## Project Config
+AppName: DeskApp
+"""
+
+STACK_REACT_NO_DS = """\
+## Active Tech Specs
+- .sdd/stacks/backend/dotnet-minimalapi.md
+- .sdd/stacks/frontend/react.md
+
+## Project Config
+AppName: WebApp
+BackendName: ApiSrv
+"""
+
+
+def test_main_desktop_with_mockup_does_not_require_ui_ds(fake_repo):
+    _bootstrap(fake_repo, stack=STACK_WPF, us=["1-2-X.md"],
+               html=["1-2-X.html"], project_dirs=["DeskApp"])
+    rc, out = _run([
+        "--family", "frontend", "--arg", "1-2:plan",
+        "--workspace-root", str(fake_repo),
+    ])
+    assert out["frontendKind"] == "desktop"
+    assert "UI_DS_NOT_SELECTED" not in [e["code"] for e in out["errors"]]
+
+
+def test_main_web_with_mockup_still_requires_ui_ds(fake_repo):
+    _bootstrap(fake_repo, stack=STACK_REACT_NO_DS, us=["1-2-X.md"],
+               html=["1-2-X.html"], project_dirs=["WebApp"])
+    rc, out = _run([
+        "--family", "frontend", "--arg", "1-2:plan",
+        "--workspace-root", str(fake_repo),
+    ])
+    assert "UI_DS_NOT_SELECTED" in [e["code"] for e in out["errors"]]

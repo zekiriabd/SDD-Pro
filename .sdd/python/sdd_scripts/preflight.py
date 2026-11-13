@@ -747,9 +747,14 @@ def main() -> int:
     # B5 — UI DS selected if HTML mockup present (frontend, back-front only)
     # v6.7.5+ : skip pour fullstack/mobile-* (gerent leur UI en interne — NativeWind RN,
     # MAUI Resources/Styles, Mustache CSS custom, Tailwind Next/Nuxt, Material Angular, Radzen Blazor)
+    # 2026-11-11 : skip aussi frontendKind mobile/desktop — depuis 2026-09-02 ils sont
+    # classes back-front et tombaient ici alors qu'aucun DS ui/* web ne leur est
+    # applicable (WPF : Resources/Styles + capability modern-theme). dev-frontend.md
+    # STEP 5 restreint deja l'exigence a frontendKind=web.
     if (
         args.family == "frontend"
         and app_type == "back-front"
+        and result.get("frontendKind") not in ("mobile", "desktop")
         and result["htmlPath"]
         and not ui_ids
     ):

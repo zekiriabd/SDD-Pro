@@ -49,7 +49,10 @@ classes:
     description: "Blocking call inside async context"
     patterns:
       - lang: csharp
-        regex: '\.Result\b|\.Wait\(\)|\.GetAwaiter\(\)\.GetResult\(\)'
+        # `.Result` seulement sur un appel (`GetAsync().Result`) ou une variable
+        # « task » : un `.Result` nu matchait toute propriété nommée Result
+        # (`outcome.Result == …`, record) — faux positifs, audit 2026-11-07 FEAT 17/19.
+        regex: '\)\.Result\b|\b\w*[Tt]ask\w*\.Result\b|\.Wait\(\)|\.GetAwaiter\(\)\.GetResult\(\)'
         hint: ".Result/.Wait() deadlock risk"
       - lang: kotlin
         regex: 'runBlocking\s*\{'
@@ -65,9 +68,11 @@ classes:
       - lang: csharp
         regex: 'File\.(Read|Write)(AllText|AllBytes|AllLines)\('
         hint: "Use File.ReadAllTextAsync / WriteAllTextAsync"
+        enclosing_async: true   # 2026-11-11 : seulement dans une methode async (sinon faux positif)
       - lang: csharp
         regex: 'Thread\.Sleep\('
         hint: "Use Task.Delay (preserves async context)"
+        enclosing_async: true
 
   - prefix: "[REVIEW_ANTI_PATTERN_KEY_INDEX]"
     category: react-stability

@@ -190,5 +190,59 @@ class TestFindFeatName(unittest.TestCase):
             self.assertIsNone(find_feat_name(Path(td), 99))
 
 
+class TestPlanScopedCoverage(unittest.TestCase):
+    """Audit 2026-11-07 (FEAT 17) : couverture mesurée sur le code des plans."""
+
+    def test_scope_keeps_only_plan_files(self) -> None:
+        from sdd_scripts.parse_coverage import plan_scoped_code_files, scope_cobertura
+        with TemporaryDirectory() as td:
+            ws = Path(td)
+            (ws / "plans").mkdir()
+            (ws / "plans" / "5-1-X.front.md").write_text(
+                "- path: workspace/src/App.Core/A.cs\n- path: workspace/src/App/V.xaml\n",
+                encoding="utf-8")
+            scope = plan_scoped_code_files(ws, 5)
+            self.assertEqual(set(scope), {"app.core/a.cs"})
+            xml = ws / "c.xml"
+            xml.write_text(
+                '<coverage><sources><source>C:\\r\\src\\App.Core\\</source></sources>'
+                '<packages><package><classes>'
+                '<class filename="A.cs" line-rate="0.5"><lines>'
+                '<line number="1" hits="1"/><line number="2" hits="0"/></lines></class>'
+                '<class filename="Old.cs" line-rate="0"><lines>'
+                '<line number="1" hits="0"/></lines></class>'
+                '</classes></package></packages></coverage>', encoding="utf-8")
+            res = scope_cobertura(xml, scope)
+            self.assertIsNotNone(res)
+            self.assertEqual((res["covered"], res["total"]), (1, 2))
+            self.assertIsNone(scope_cobertura(xml, {"other/z.cs"}))
+
+    def test_augmented_file_counts_only_added_methods(self) -> None:
+        from sdd_scripts.parse_coverage import plan_scoped_code_files, scope_cobertura
+        with TemporaryDirectory() as td:
+            ws = Path(td)
+            (ws / "plans").mkdir()
+            (ws / "plans" / "6-1-Y.front.md").write_text(
+                "## Files\n\n- path: workspace/src/App.Core/Svc.cs\n"
+                "  operation: augment\n  adds:\n    - SaveFooAsync (nouvelle méthode)\n"
+                "  description: x\n", encoding="utf-8")
+            scope = plan_scoped_code_files(ws, 6)
+            self.assertEqual(scope["app.core/svc.cs"]["op"], "augment")
+            self.assertIn("SaveFooAsync", scope["app.core/svc.cs"]["adds"])
+            xml = ws / "c.xml"
+            xml.write_text(
+                '<coverage><sources><source>C:/r/src/App.Core/</source></sources>'
+                '<packages><package><classes>'
+                '<class name="App.Svc" filename="Svc.cs"><methods>'
+                '<method name="OldMethod"><lines><line number="1" hits="0"/>'
+                '<line number="2" hits="0"/></lines></method></methods></class>'
+                '<class name="App.Svc/&lt;SaveFooAsync&gt;d__3" filename="Svc.cs"><methods>'
+                '<method name="MoveNext"><lines><line number="10" hits="1"/>'
+                '</lines></method></methods></class>'
+                '</classes></package></packages></coverage>', encoding="utf-8")
+            res = scope_cobertura(xml, scope)
+            self.assertEqual((res["covered"], res["total"]), (1, 1))
+
+
 if __name__ == "__main__":
     unittest.main()

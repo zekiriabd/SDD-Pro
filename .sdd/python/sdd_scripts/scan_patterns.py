@@ -207,6 +207,7 @@ def load_catalog(name: str, root: Path) -> dict[str, Any]:
                 "lang": str(pat.get("lang") or "any"),
                 "file_glob": pat.get("file_glob"),
                 "hint": str(pat.get("hint") or ""),
+                "enclosing_async": bool(pat.get("enclosing_async")),
             })
         if compiled:
             classes.append({
@@ -290,6 +291,26 @@ def _snippet(line: str) -> str:
     return s if len(s) <= SNIPPET_MAX else s[: SNIPPET_MAX - 1] + "…"
 
 
+# 2026-11-11 (FEAT 26) : `enclosing_async: true` limite un motif aux occurrences situées dans une méthode
+# déclarée `async`. [REVIEW_ANTI_PATTERN_SYNC_IO_IN_ASYNC] annonçait « inside async method » mais signalait
+# tout File.ReadAllText/WriteAllText, y compris dans du code entièrement synchrone (faux positifs serious).
+# Heuristique C# : la déclaration englobante est la dernière ligne de signature (modificateurs puis `(`)
+# au-dessus de l'occurrence ; une lambda `async` sur la ligne même compte aussi.
+_CS_METHOD_DECL = re.compile(
+    r"^\s*(?:\[[^\]]*\]\s*)*(?:(?:public|private|protected|internal|static|override|virtual|sealed|async|"
+    r"partial|extern|unsafe|new)\s+)+[\w<>\[\],.?\s]+?\s+\w+\s*(?:<[^>]*>)?\s*\(")
+
+
+def _in_async_method(lines: list[str], line_no: int) -> bool:
+    current = lines[line_no - 1] if 0 < line_no <= len(lines) else ""
+    if re.search(r"\basync\b", current):
+        return True
+    for idx in range(line_no - 2, -1, -1):
+        if _CS_METHOD_DECL.match(lines[idx]):
+            return re.search(r"\basync\b", lines[idx]) is not None
+    return False
+
+
 def scan_files(catalog: dict[str, Any], files: Iterable[Path], repo: Path) -> list[dict[str, Any]]:
     """Retourne la liste des findings, triée par sévérité décroissante puis chemin.
 
@@ -339,6 +360,8 @@ def scan_files(catalog: dict[str, Any], files: Iterable[Path], repo: Path) -> li
 
                 for m in pat["regex"].finditer(text):
                     ln = text[: m.start()].count("\n") + 1
+                    if pat.get("enclosing_async") and not _in_async_method(lines, ln):
+                        continue
                     src = lines[ln - 1] if 0 < ln <= len(lines) else ""
                     findings.append(_finding(
                         cls, pat, rel, line=ln,
@@ -591,6 +614,17 @@ def run_catalog(catalog_name: str, *, feat_n: int, scan_root: Path, repo: Path,
     """
     catalog = load_catalog(catalog_name, catalog_root or repo_root())
     files = iter_source_files(scan_root, repo)
+    # Périmètre FEAT (audit 2026-11-07, FEAT 17) : quand des plans existent, ne
+    # scanner que le code qu'ils citent — sinon une FEAT hérite de tous les
+    # findings historiques du projet (685 findings « unknown » sur FEAT 17).
+    plan_scope_n = 0
+    if feat_n > 0:
+        from sdd_scripts.context_budget import plan_scoped_src_files
+        scope = plan_scoped_src_files(repo, feat_n)
+        if scope:
+            scoped = [f for f in files if normalize(str(f.relative_to(repo))) in scope]
+            if scoped:
+                files, plan_scope_n = scoped, len(scope)
     findings = scan_files(catalog, files, repo)
     effective_fail_on = _resolve_fail_on(CATALOGS[catalog_name]["fail_on_key"], fail_on)
     verdict, reasons = compute_verdict(findings, effective_fail_on)
@@ -603,6 +637,7 @@ def run_catalog(catalog_name: str, *, feat_n: int, scan_root: Path, repo: Path,
             else normalize(str(cfile))
         ),
         "files_scanned": len(files),
+        "plan_scope_files": plan_scope_n,
         "scan_root": normalize(str(scan_root.relative_to(repo))) if _under(scan_root, repo) else str(scan_root),
         "scanned_classes": len(catalog["classes"]),
         "llm_only_classes": catalog["llm_only"],

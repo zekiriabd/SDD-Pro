@@ -297,5 +297,30 @@ class TestDefaultBudgetsCoverage(unittest.TestCase):
         )
 
 
+class TestPlanScopedSrc(unittest.TestCase):
+    """Audit 2026-11-07 (FEAT 17) : le budget qa ne compte que le code cité par
+    les plans de la FEAT, et jamais les gabarits de données en ressources."""
+
+    def test_resource_html_template_is_excluded(self) -> None:
+        from sdd_scripts.context_budget import is_excluded as _ex
+        self.assertTrue(_ex("workspace/src/App/Resources/ContratTemplate/modele.html"))
+        self.assertFalse(_ex("workspace/src/App/Views/Page.xaml"))
+        self.assertFalse(_ex("workspace/ui/1-1-Login.html"))
+
+    def test_plan_paths_are_collected_for_feat(self) -> None:
+        from sdd_scripts.context_budget import plan_scoped_src_files
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            plans = root / "workspace" / "plans"
+            plans.mkdir(parents=True)
+            (plans / "7-1-Foo.front.md").write_text(
+                "## Files\n\n- path: workspace/src/App/A.cs\n  layer: X\n"
+                "- path: workspace/db/schema.md\n", encoding="utf-8")
+            (plans / "8-1-Bar.front.md").write_text(
+                "- path: workspace/src/App/B.cs\n", encoding="utf-8")
+            self.assertEqual(plan_scoped_src_files(root, 7), {"workspace/src/App/A.cs"})
+            self.assertEqual(plan_scoped_src_files(root, 9), set())
+
+
 if __name__ == "__main__":
     unittest.main()

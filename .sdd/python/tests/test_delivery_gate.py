@@ -374,7 +374,9 @@ def test_spec_compliance_red_blocks_full(repo, monkeypatch):
 
 @pytest.mark.parametrize("verdict,serious,acs,ok", [
     ("YELLOW", 0, 3, True), ("YELLOW", 1, 3, False), ("GREEN", 0, 0, False),
-    ("UNKNOWN", 0, 3, False)])
+    ("UNKNOWN", 0, 3, False),
+    # format réel du reviewer (audit 2026-11-07) : « 🟡 WARN » = YELLOW
+    ("🟡 WARN", 0, 3, True), ("🟡 WARN", 1, 3, False), ("🟢 GREEN", 0, 3, True)])
 def test_spec_report_evaluation(verdict, serious, acs, ok):
     payload = {"feat": FEAT, "config": {"fail_on": "serious"},
                "summary": {"verdict": verdict, "total_acs": acs,

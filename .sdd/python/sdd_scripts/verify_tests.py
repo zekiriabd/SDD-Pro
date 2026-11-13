@@ -238,6 +238,18 @@ def main(argv: list[str] | None = None) -> int:
                 cov_d: dict = {"threshold": threshold, "files": [
                     {"name": f.relative_to(rd).as_posix(), "sha256": dg.sha256_file(f)}
                     for f, _ in cov_files]}
+                # Périmètre FEAT (audit 2026-11-07) : même règle que
+                # parse_coverage.py — code créé + méthodes `adds:` des plans.
+                from sdd_scripts.parse_coverage import plan_scoped_code_files, scope_cobertura
+                scope = plan_scoped_code_files(root / "workspace", args.feat_number)
+                if scope:
+                    # Plusieurs rapports (un par projet de tests) : fusion ligne à ligne
+                    # (max des hits) au lieu d'une somme qui recompterait à 0 une ligne
+                    # couverte par un autre rapport (2026-11-12).
+                    merged = scope_cobertura([f for f, _ in cov_files], scope)
+                    if merged:
+                        cov_files = [(cov_files[0][0], (merged["covered"], merged["total"]))]
+                        cov_d["scope"] = f"plans FEAT {args.feat_number} ({len(scope)} fichiers)"
                 covered = sum(c for _, (c, _v) in cov_files)
                 valid = sum(v for _, (_c, v) in cov_files)
                 pct = round(100.0 * covered / valid, 2) if valid > 0 else None

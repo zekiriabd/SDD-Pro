@@ -363,3 +363,26 @@ class TestNoClobbering(unittest.TestCase):
                 "SELECT COUNT(*) FROM qa_security "
                 "WHERE feat_n=1 AND detector='deterministic'").fetchone()[0]
         self.assertEqual(n, 1)
+
+
+# ---------- enclosing_async (2026-11-11, FEAT 26) ----------
+
+def test_sync_io_only_flagged_inside_async_method(tmp_path):
+    from sdd_scripts import scan_patterns as sp
+    src = tmp_path / "Prefs.cs"
+    src.write_text(
+        "public static class Prefs\n"
+        "{\n"
+        "    public static void Save(string p) {\n"
+        "        File.WriteAllText(p, \"x\");\n"
+        "    }\n"
+        "    public async Task SaveAsync(string p)\n"
+        "    {\n"
+        "        File.WriteAllText(p, \"y\");\n"
+        "        await Task.Yield();\n"
+        "    }\n"
+        "}\n", encoding="utf-8")
+    catalog = sp.load_catalog("code-review", sp.repo_root())
+    findings = [f for f in sp.scan_files(catalog, [src], tmp_path)
+                if f["issue_class"] == "[REVIEW_ANTI_PATTERN_SYNC_IO_IN_ASYNC]"]
+    assert [f["line"] for f in findings] == [8]

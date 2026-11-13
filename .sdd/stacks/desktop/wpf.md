@@ -306,10 +306,21 @@ lettre.
 
 ### Un thème est quasi obligatoire
 
-Le rendu WPF par défaut date de 2006. La capability `modern-theme` (`Wpf.Ui`,
-thème Fluent/WinUI 3) n'est pas cosmétique : sans elle, une application neuve
-paraît immédiatement datée. Elle est en on-demand plutôt qu'en CORE parce que
-le choix du thème est un arbitrage produit, pas une contrainte technique.
+Le rendu WPF par défaut date de 2006. La capability `modern-theme` (paquet
+NuGet **`WPF-UI`**, lepoco/wpfui, thème Fluent/WinUI 3) n'est pas cosmétique :
+sans elle, une application neuve paraît immédiatement datée. Elle est en
+on-demand plutôt qu'en CORE parce que le choix du thème est un arbitrage
+produit, pas une contrainte technique. Pour l'imposer sur un projet :
+`Capabilities: modern-theme` en Project Config.
+
+> ⚠️ **Faux-ami NuGet (corrigé 2026-11-11)** : l'id `Wpf.Ui` existe sur NuGet
+> mais appartient à un **autre éditeur**, sans rapport avec WPF UI. Le vrai
+> paquet s'appelle `WPF-UI` (son *namespace* est `Wpf.Ui`). Le catalog
+> pointait jusqu'ici vers `Wpf.Ui` 3.4.2.7 — ne jamais réintroduire cet id.
+
+> **Thème Fluent natif .NET 9+** (`Application.ThemeMode`) : pas de paquet,
+> encore expérimental (`WPF0001`), et concurrent de `WPF-UI` (deux
+> dictionnaires de thème). On n'utilise **jamais les deux** dans la même app.
 
 ### Ce qui n'a PAS été validé
 
@@ -332,10 +343,10 @@ le choix du thème est un arbitrage produit, pas une contrainte technique.
 | Lib | Version | Role |
 |-----|---------|------|
 | CommunityToolkit.Mvvm | 8.4.2 | MVVM par source generators : [ObservableProperty] et [RelayCommand] remplacent le INotifyPropertyChanged ecrit a la main. Sans lui, chaque propriete liee coute une dizaine de lignes de boilerplate |
-| Microsoft.Extensions.DependencyInjection | 10.0.11 | Conteneur DI — WPF n'en fournit aucun, les ViewModels seraient sinon instancies dans le code-behind |
-| Microsoft.Extensions.Hosting | 10.0.11 | Generic Host : cycle de vie, configuration et DI cables ensemble au demarrage de l'App |
-| Microsoft.Extensions.Configuration.Json | 10.0.11 | Lecture d'appsettings.json declare au manifest |
-| Microsoft.Extensions.Logging | 10.0.11 |  |
+| Microsoft.Extensions.DependencyInjection | 10.0.13 | Conteneur DI — WPF n'en fournit aucun, les ViewModels seraient sinon instancies dans le code-behind |
+| Microsoft.Extensions.Hosting | 10.0.13 | Generic Host : cycle de vie, configuration et DI cables ensemble au demarrage de l'App |
+| Microsoft.Extensions.Configuration.Json | 10.0.13 | Lecture d'appsettings.json declare au manifest |
+| Microsoft.Extensions.Logging | 10.0.13 |  |
 | Serilog.Extensions.Hosting | 10.0.0 | Logs structures branches sur le Generic Host |
 | Serilog.Sinks.File | 7.0.0 | Sink fichier — sur un client desktop il n'y a pas de collecteur central : le fichier local EST le journal de diagnostic. Pin 7.0.0 : nuget expose un 8.0.0-nblumhardt-* qui est une prerelease |
 | Microsoft.Xaml.Behaviors.Wpf | 1.1.158 | Behaviors et triggers declaratifs — evite le code-behind pour brancher un evenement sur une commande |
@@ -346,10 +357,10 @@ Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'U
 
 | Capability | Lib | Version | Triggers |
 |---|---|---|---|
-| modern-theme | Wpf.Ui | 3.4.2.7 | theme, fluent, winui, apparence.*moderne, dark.*mode |
+| modern-theme | WPF-UI | 4.3.0 | th[eè]me, fluent, winui, wpf-ui, apparence.*moderne, dark.*mode, mode.*sombre, clair.*sombre, sombre.*clair |
 | modern-theme | MaterialDesignThemes (alt) | 5.3.2 | material.*design |
 | control-library | HandyControl | 3.5.1 | controle.*avance, handycontrol, composant.*riche |
-| charts | LiveChartsCore.SkiaSharpView.WPF | 2.0.5 | chart, graphique, courbe, visualisation.*donnees |
+| charts | LiveChartsCore.SkiaSharpView.WPF | 2.0.5 | chart, graphiques?.*(donn|stat|[eé]vol|chiffr|indicat), diagramme, histogramme, courbe, camembert, visualisation.*donn[eé]es, tableau.*de.*bord, dashboard, livecharts |
 | local-db | Microsoft.EntityFrameworkCore.Sqlite | 10.0.11 | base.*locale, sqlite, hors.*ligne, donnees.*locales |
 | http-client | Refit.HttpClientFactory | 15.2.0 | appel.*api, api.*rest, backend.*(distant|s[eé]par), refit |
 | validation | FluentValidation | 12.1.1 | validation, formulaire, regle.*saisie |
@@ -364,6 +375,19 @@ Triggers (regex case-insensitive) cherches par `detect_capabilities.py` dans l'U
 | unit-tests | NSubstitute | 6.2.0 | mock, substitute, tests.*unitaires |
 | unit-tests | Shouldly | 4.3.0 | assertions, should |
 | ui-automation | FlaUI.UIA3 | 5.0.0 | test.*ui, ui.*automation, test.*bout.*en.*bout, flaui |
+| llm-text-to-orm | System.Security.Cryptography.Pkcs | 10.0.14 | nounouflowllm, assistant.?donn[eé]es, text.?to.?orm |
+| llm-text-to-orm | Microsoft.Agents.AI | 1.28.0 | nounouflowllm, assistant.?donn[eé]es, text.?to.?orm, ichatclient, agent.?framework, vues?.?ia, sch[eé]ma.?ia, interroger |
+| llm-text-to-orm | Microsoft.Extensions.AI | 10.11.0 | nounouflowllm, assistant.?donn[eé]es, text.?to.?orm, ichatclient, agent.?framework, vues?.?ia, sch[eé]ma.?ia, interroger |
+| llm-text-to-orm | Anthropic | 13.8.0 | nounouflowllm, assistant.?donn[eé]es, text.?to.?orm, ichatclient, agent.?framework, vues?.?ia, sch[eé]ma.?ia, interroger |
+| llm-text-to-orm | Microsoft.Extensions.AI.OpenAI | 10.11.0 | nounouflowllm, assistant.?donn[eé]es, text.?to.?orm, ichatclient, agent.?framework, vues?.?ia, sch[eé]ma.?ia, interroger |
+| llm-text-to-orm | Google.GenAI | 2.1.0 | nounouflowllm, assistant.?donn[eé]es, text.?to.?orm, ichatclient, agent.?framework, vues?.?ia, sch[eé]ma.?ia, interroger |
+| llm-text-to-orm | Microsoft.EntityFrameworkCore.SqlServer | 10.0.11 | nounouflowllm, assistant.?donn[eé]es, text.?to.?orm, ichatclient, agent.?framework, vues?.?ia, sch[eé]ma.?ia, interroger |
+| llm-text-to-orm | System.Linq.Dynamic.Core | 1.7.4 | nounouflowllm, assistant.?donn[eé]es, text.?to.?orm, ichatclient, agent.?framework, vues?.?ia, sch[eé]ma.?ia, interroger |
+| llm-text-to-orm | Raffinert.FuzzySharp | 6.0.1 | nounouflowllm, assistant.?donn[eé]es, text.?to.?orm, ichatclient, agent.?framework, vues?.?ia, sch[eé]ma.?ia, interroger |
+| llm-text-to-orm | Microsoft.Extensions.Http.Resilience | 10.11.0 | nounouflowllm, assistant.?donn[eé]es, text.?to.?orm, ichatclient, agent.?framework, vues?.?ia, sch[eé]ma.?ia, interroger |
+| llm-text-to-orm | Microsoft.ML.Tokenizers | 2.0.1 | nounouflowllm, assistant.?donn[eé]es, text.?to.?orm, ichatclient, agent.?framework, vues?.?ia, sch[eé]ma.?ia, interroger |
+| llm-text-to-orm | Microsoft.ML.Tokenizers.Data.O200kBase | 2.0.1 | nounouflowllm, assistant.?donn[eé]es, text.?to.?orm, ichatclient, agent.?framework, vues?.?ia, sch[eé]ma.?ia, interroger |
+| speech-dictation | System.Speech | 10.0.14 | dict[eé]e, dicter, reconnaissance.?vocale, micro(phone)?, speech.?to.?text |
 <!-- LIBS_CATALOG_END -->
 
 ---
@@ -535,6 +559,83 @@ Ce stack est optimisé pour :
 | `appsettings.json` | `arch` (create) + `dev-frontend` (ajout de clés) |
 | `{AppName}.csproj` | `arch` (create) + `dev-frontend` (deps on-demand) |
 | `{AppName}.Tests/**` | `qa` |
+
+### 11.1 Capability `modern-theme` — usage de `WPF-UI` (4.x)
+
+Ne s'applique que si la capability est installée. Namespace XAML :
+`xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"`.
+
+**Câblage (une seule fois, première US qui déclenche)** :
+
+1. `App.xaml` : en **tête** de `MergedDictionaries`, `<ui:ThemesDictionary Theme="Light" />`
+   puis `<ui:ControlsDictionary />`. Les dictionnaires du projet viennent
+   **après** (ils surchargent, ils ne remplacent pas).
+2. Fenêtre principale : `ui:FluentWindow` (au lieu de `Window`) avec
+   `ExtendsContentIntoTitleBar="True"` + `WindowBackdropType="Mica"`, et un
+   `ui:TitleBar` en première ligne de la grille.
+3. Changement de thème : `ApplicationThemeManager.Apply(ApplicationTheme.Dark)`
+   derrière un service de l'app (`IThemeService` maison) — jamais appelé
+   depuis un ViewModel de `{AppName}.Core` (Core n'a pas WPF).
+4. Navigation multi-écrans : `ui:NavigationView` + `ui:NavigationViewItem
+   TargetPageType="{x:Type views:XxxPage}"`. Les pages sont résolues par le
+   conteneur DI : implémenter `INavigationViewPageProvider` dans l'app via
+   `IServiceProvider` (pas de paquet `WPF-UI.DependencyInjection` — absent du catalog).
+
+**Mockup HTML → contrôle** :
+
+| HTML du mockup | Contrôle WPF-UI |
+|---|---|
+| `<button class="primary">` / secondaire | `ui:Button Appearance="Primary"` / `Appearance="Secondary"` |
+| `<input type=text placeholder=…>` | `ui:TextBox PlaceholderText="…"` |
+| `<input type=password>` | `ui:PasswordBox` |
+| `<input type=number>` | `ui:NumberBox` |
+| carte / panneau (`.card`) | `ui:Card` ; ligne cliquable → `ui:CardAction` |
+| bandeau alerte / succès / erreur | `ui:InfoBar Severity="Warning\|Success\|Error"` |
+| toast éphémère | `ISnackbarService` + `ui:SnackbarPresenter` dans la fenêtre |
+| modale de confirmation | `IContentDialogService` + `ContentPresenter` hôte dans la fenêtre |
+| spinner / chargement | `ui:ProgressRing IsIndeterminate="True"` |
+| icône | `ui:SymbolIcon Symbol="Home24"` (Fluent System Icons) |
+| `<nav>` latérale | `ui:NavigationView` (cf. 4) |
+| `<table>` | `DataGrid` natif (stylé par `ControlsDictionary`) |
+
+**Interdits** : couleurs codées en dur dans les vues (utiliser les ressources
+du thème, ex. `{DynamicResource TextFillColorPrimaryBrush}`) ; `StaticResource`
+sur une ressource de thème (casse le basculement clair/sombre).
+
+### 11.2 Capability `charts` — usage de LiveCharts2
+
+Namespace XAML :
+`xmlns:lvc="clr-namespace:LiveChartsCore.SkiaSharpView.WPF;assembly=LiveChartsCore.SkiaSharpView.WPF"`.
+
+**TFM obligatoire avec cette capability (constaté 2026-11-11)** : `{AppName}.csproj` doit cibler
+`net10.0-windows10.0.19041.0` (et non `net10.0-windows`, qui vaut Windows 7). LiveCharts2 2.0.5 ne fournit
+`SkiaSharp.Views.WPF` / `OpenTK` en assemblys .NET modernes que pour `net8.0-windows10.0.19041` ; avec
+`net10.0-windows`, NuGet retombe sur les assemblys .NET Framework (avertissements `NU1701`). Le dossier de sortie
+devient `bin/Debug/net10.0-windows10.0.19041.0/`. Le projet Core et le projet de tests restent en `net10.0`.
+
+**Frontière Core / app (load-bearing)** : le paquet du catalog est le paquet
+**WPF** — il ne s'installe que dans `{AppName}.csproj`, jamais dans
+`{AppName}.Core` (sinon Core tire WPF et les tests net10.0 cassent, cf. §2.3).
+Donc :
+
+- le ViewModel (Core) expose des **données métier** :
+  `ObservableCollection<PointMensuel>` (record `Libelle`, `Valeur`), jamais
+  `ISeries` ni type LiveCharts ;
+- la conversion données → séries vit dans l'app (`Converters/` :
+  `IValueConverter` vers `ISeries[]` / `Axis[]`) ;
+- la vue lie : `<lvc:CartesianChart Series="{Binding Points, Converter={StaticResource XxxSeriesConverter}}" />`.
+
+| Besoin du mockup / de l'US | Contrôle | Série |
+|---|---|---|
+| évolution dans le temps | `lvc:CartesianChart` | `LineSeries<double>` |
+| comparaison de catégories | `lvc:CartesianChart` | `ColumnSeries<double>` (`RowSeries` si horizontal) |
+| répartition / camembert | `lvc:PieChart` | `PieSeries<double>` (une par part) |
+| jauge / pourcentage | `lvc:PieChart` | `GaugeGenerator` |
+
+Règles : libellés d'axe via `Axis.Labels` (pas de formatage dans la vue) ;
+collection observable pour une mise à jour live (pas de réassignation de
+`Series` à chaque rafraîchissement) ; graphe vide → afficher un état vide
+explicite (texte), pas un graphe sans série.
 
 ---
 

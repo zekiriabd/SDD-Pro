@@ -80,6 +80,117 @@ def parse_cobertura(path: Path) -> dict[str, Any]:
     return {"covered": covered, "total": total, "bcovered": bcovered, "btotal": btotal, "files": files}
 
 
+_PLAN_PATH_RE = re.compile(r"^\s*-\s*path:\s*(\S+)\s*$")
+
+
+_PLAN_KEY_RE = re.compile(r"^\s{2,}([a-z_]+):\s*(.*)$")
+_IDENT_RE = re.compile(r"\b([A-Z][A-Za-z0-9_]{3,})\b")
+_ASYNC_CLASS_RE = re.compile(r"<([A-Za-z0-9_]+)>[a-z]__")
+
+
+def plan_scoped_code_files(workspace: Path, feat_number: int) -> dict[str, dict[str, Any]]:
+    """Code de production touché par la FEAT, d'après ses plans.
+
+    Audit 2026-11-07 (FEAT 17/19) : la couverture était mesurée sur tout
+    l'assembly (38 % — code historique non testé). Retour :
+    `{chemin relatif à src/ en minuscules: {"op": "create"|"augment"|…, "adds": set}}`.
+    Un fichier créé compte en entier ; un fichier augmenté ne compte que les
+    méthodes nommées dans `adds:` (sinon un fichier partagé par 5 FEAT impute
+    à chacune tout l'historique du fichier).
+    """
+    plans_dir = workspace / "plans"
+    out: dict[str, dict[str, Any]] = {}
+    if not plans_dir.is_dir():
+        return out
+    for plan in sorted(plans_dir.glob(f"{feat_number}-*.md")):
+        if not plan.name.endswith((".back.md", ".front.md")):
+            continue
+        cur: dict[str, Any] | None = None
+        in_adds = False
+        for line in plan.read_text(encoding="utf-8", errors="replace").splitlines():
+            m = _PLAN_PATH_RE.match(line)
+            if m:
+                in_adds = False
+                p = m.group(1).replace("\\", "/").strip("`'\"")
+                if p.startswith("workspace/src/") and not p.endswith(
+                        (".xaml", ".csproj", ".md", ".json", ".html")):
+                    cur = out.setdefault(p[len("workspace/src/"):].lower(),
+                                         {"op": "?", "adds": set()})
+                else:
+                    cur = None
+                continue
+            if cur is None:
+                continue
+            k = _PLAN_KEY_RE.match(line)
+            if k:
+                in_adds = k.group(1) == "adds"
+                if k.group(1) == "operation":
+                    op = k.group(2).strip()
+                    # « create » gagne si un autre plan de la FEAT augmente le fichier
+                    if cur["op"] != "create":
+                        cur["op"] = op
+                elif in_adds:
+                    cur["adds"].update(_IDENT_RE.findall(k.group(2)))
+                continue
+            if in_adds and line.strip().startswith("-"):
+                cur["adds"].update(_IDENT_RE.findall(line))
+            elif line.strip() and not line.startswith(" "):
+                in_adds = False
+    return out
+
+
+def _method_key(cls_name: str, method_name: str) -> str:
+    """Nom de méthode source (machines d'état async/lambdas → méthode englobante)."""
+    m = _ASYNC_CLASS_RE.search(cls_name)
+    return m.group(1) if m else method_name
+
+
+def scope_cobertura(path: Path | list[Path], scope: dict[str, dict[str, Any]] | set[str]) -> dict[str, Any] | None:
+    """Recalcule la couverture Cobertura sur le seul code touché par la FEAT.
+
+    ``path`` peut être une liste de rapports (plusieurs projets de tests dans la même
+    commande) : les lignes sont fusionnées par fichier et numéro avec le maximum des
+    hits, pour qu'une ligne couverte par un rapport ne soit pas recomptée à 0 par un
+    autre rapport qui instrumente le même module (2026-11-12).
+    """
+    if isinstance(scope, set):
+        scope = {s: {"op": "create", "adds": set()} for s in scope}
+    paths = path if isinstance(path, list) else [path]
+    per_file: dict[str, dict[str, int]] = {}
+    for p in paths:
+        _scope_into(p, scope, per_file)
+    if not per_file:
+        return None
+    covered = sum(1 for d in per_file.values() for h in d.values() if h > 0)
+    total = sum(len(d) for d in per_file.values())
+    files = [{"path": f, "lines_pct": _round2(sum(1 for h in d.values() if h > 0), len(d))}
+             for f, d in sorted(per_file.items()) if d]
+    return {"covered": covered, "total": total, "bcovered": 0, "btotal": 0, "files": files}
+
+
+def _scope_into(path: Path, scope: dict[str, dict[str, Any]], per_file: dict[str, dict[str, int]]) -> None:
+    root = ET.parse(path).getroot()
+    sources = [(s.text or "").replace("\\", "/") for s in root.iter("source")]
+    base = sources[0] if sources else ""
+    for cls in root.iter("class"):
+        fn = (base + (cls.get("filename") or "")).replace("\\", "/")
+        key = fn.lower()
+        rel = next((s for s in scope if key.endswith("/" + s) or key.endswith(s)), None)
+        if rel is None:
+            continue
+        info = scope[rel]
+        lines = per_file.setdefault(rel, {})
+        if info["op"] == "augment":
+            selected = [ln for meth in cls.iter("method")
+                        if _method_key(cls.get("name") or "", meth.get("name") or "") in info["adds"]
+                        for ln in meth.iter("line")]
+        else:
+            selected = list(cls.iter("line"))
+        for ln in selected:
+            n = ln.get("number") or ""
+            lines[n] = max(lines.get(n, 0), int(ln.get("hits") or 0))
+
+
 def parse_lcov(path: Path) -> dict[str, Any]:
     """Parse `lcov.info` (Vitest/c8/Jest/Karma)."""
     covered = 0
@@ -285,10 +396,20 @@ def main() -> int:
         print(f"No source directory: {src_dir}")
         return FAIL_FAST
 
-    # 1. Cobertura XML
-    for f in src_dir.rglob("coverage.cobertura.xml"):
+    # 1. Cobertura XML — le plus récent par projet de tests (les anciens
+    # TestResults/{guid}/ ne doivent pas être additionnés), recalculé sur le
+    # périmètre des plans de la FEAT quand ils existent.
+    scope = plan_scoped_code_files(workspace_root(root), args.feat_number)
+    # Un seul rapport : le plus récent de l'arbre (vstest peut écrire sous
+    # src/TestResults/ comme sous {Projet}.Tests/TestResults/ — regrouper par
+    # dossier laissait un rapport périmé l'emporter, audit QA FEAT 18).
+    cobertura_files = sorted(src_dir.rglob("coverage.cobertura.xml"),
+                             key=lambda p: p.stat().st_mtime)
+    for f in cobertura_files[-1:]:
         try:
-            parsed = parse_cobertura(f)
+            parsed = (scope_cobertura(f, scope) if scope else None) or parse_cobertura(f)
+            if scope and parsed.get("btotal") == 0 and parsed.get("files"):
+                print(f"Coverage scope: {len(parsed['files'])} fichiers de code des plans FEAT {args.feat_number}")
             stack_id = "qa-dotnet-xunit" if ".Tests" in str(f) else "qa-cobertura"
             tool = "coverlet" if stack_id == "qa-dotnet-xunit" else "cobertura"
             stacks_found.append(build_stack_entry(parsed, stack_id, tool))

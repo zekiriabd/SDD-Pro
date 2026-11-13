@@ -88,8 +88,12 @@ def cmd_requirements(args: argparse.Namespace) -> int:
 # ---------------------------------------------------------------------------
 
 def _normalize_verdict(raw: object) -> str:
-    m = re.search(r"GREEN|YELLOW|RED", str(raw or "").upper())
-    return m.group(0) if m else "UNKNOWN"
+    # spec-compliance-reviewer émet GREEN / WARN / RED (« 🟡 WARN ») : WARN est le
+    # YELLOW du gate (audit 2026-11-07, FEAT 18 — lu UNKNOWN donc refusé à tort).
+    m = re.search(r"GREEN|YELLOW|WARN|RED", str(raw or "").upper())
+    if not m:
+        return "UNKNOWN"
+    return "YELLOW" if m.group(0) == "WARN" else m.group(0)
 
 
 def evaluate_spec_report(payload: dict, feat_n: int) -> tuple[bool, dict]:
