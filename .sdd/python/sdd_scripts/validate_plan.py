@@ -376,9 +376,14 @@ def validate_staleness(report: PlanReport, us_path: Path | None) -> None:
         report.add_warning("PLAN_US_READ_FAILED", f"lecture US impossible : {e}")
         report.us_hash_match = None
         return
-    actual = sha256_hex(us_content)
+    # 2026-11-13 : empreinte insensible à la ligne `Status:` (set_us_status la
+    # réécrit au fil du pipeline) ; l'empreinte brute historique reste acceptée
+    # pour les plans écrits avant ce correctif (sdd_lib.us_hash).
+    from sdd_lib.us_hash import us_hash_candidates
+    candidates = us_hash_candidates(us_content)
+    actual = candidates[0]
     declared = us_hash_decl.replace("sha256:", "").strip()
-    report.us_hash_match = (actual == declared)
+    report.us_hash_match = declared in candidates
     if not report.us_hash_match:
         report.add_error(
             "PLAN_STALE",

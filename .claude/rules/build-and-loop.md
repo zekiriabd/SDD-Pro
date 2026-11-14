@@ -602,7 +602,7 @@ stack-{backend|frontend}: {active stack id}
 
 # Champs v2 obligatoires
 plan-schema-version: 2
-us-hash: sha256:{hash SHA-256 du fichier US au moment de la planification}
+us-hash: sha256:{hash SHA-256 de l'US au moment de la planification, valeur de `Status:` neutralisée — sdd_lib.us_hash ; calculé par compute_plan_metadata.py}
 strict-ready: true
 
 # Champs v2 optionnels

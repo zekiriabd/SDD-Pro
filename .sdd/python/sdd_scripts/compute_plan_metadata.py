@@ -2,7 +2,7 @@
 """SDD_Pro Plan metadata generator — v2 frontmatter helper (v6.2).
 
 Computes deterministic metadata fields for v2 plan frontmatter:
-- `us-hash`        : SHA-256 of the US file (anti-staleness signal)
+- `us-hash`        : SHA-256 of the US file with the `Status:` value neutralised (sdd_lib.us_hash, 2026-11-13)
 - `claude-md-hash` : SHA-256 of the project CLAUDE.md (drift detection)
 - `generated-at`   : UTC ISO-8601 timestamp (second precision)
 - `plan-schema-version: 2` + `strict-ready: true` (literal)
@@ -54,6 +54,12 @@ def sha256_of_file(path: Path) -> str:
     return hashlib.sha256(content.encode("utf-8")).hexdigest()
 
 
+def us_hash_of_file(path: Path) -> str:
+    """`us-hash` d'une US : insensible à la valeur de `Status:` (sdd_lib.us_hash, 2026-11-13)."""
+    from sdd_lib.us_hash import us_content_hash
+    return us_content_hash(path.read_text(encoding="utf-8"))
+
+
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(
         description="Emit v2 plan frontmatter metadata block (us-hash, claude-md-hash, ...).",
@@ -81,7 +87,7 @@ def main() -> int:
         )
         return FAIL_FAST
     try:
-        us_hash = sha256_of_file(us_path)
+        us_hash = us_hash_of_file(us_path)
     except OSError as e:
         error_block(
             error_line=f"compute_plan_metadata --us-path {us_path}",
