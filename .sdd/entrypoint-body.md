@@ -203,7 +203,7 @@ GOV-C1 : `archi/ddd` dans C2). ⚠️ Badges obtenus sur la génération de mod�
 
 Anti-derive, ERROR 3L disque, idempotence, lecture sélective, parallélisme borné
 (`MaxParallel: 3`), plan inline, capabilities core vs on-demand, chat executive 1L
-(`@.sdd/rules/output-protocol.md`), gates manuels opt-in. Détail : `@.sdd/docs/conventions.md §1-§13`.
+(`@.sdd/rules/output-protocol.md`) — **en pipeline, tableau d'avancement obligatoire à chaque étape, seul (§2.4)**, gates manuels opt-in. Détail : `@.sdd/docs/conventions.md §1-§13`.
 
 ## 8. Loader manifest
 

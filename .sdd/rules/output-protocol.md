@@ -22,7 +22,7 @@
 ## TOC
 
 - §1 — Principe et périmètre (qui parle au chat)
-- §2 — Format canonique (1 ligne par update)
+- §2 — Format canonique (1 ligne par update) + §2.4 tableau d'avancement (orchestrateur)
 - §3 — Mapping agent → label `[AGENT]` (19 labels)
 - §4 — Plages de progression par phase (anti-régression)
 - §5 — Patterns interdits en chat (liste fermée)
@@ -104,6 +104,44 @@ build_loop / hooks / dashboards).
 
 Verdict agrégé : `🟢 GREEN` | `🟡 WARN` | `🔴 RED`. Pas d'autre texte
 après cette ligne sauf bloc ERROR si verdict 🔴 (cf. §7).
+
+### 2.4 Tableau d'avancement — orchestrateur de pipeline (décision Tech Lead 2026-11-13)
+
+Pendant un pipeline multi-phases (`/sdd-full`, `/dev-run`, `/qa-generate`,
+`/sdd-review`), **Claude orchestrateur** rend l'avancement sous la forme d'**un
+tableau Markdown stable**, réémis à chaque point d'avancement, au lieu d'une
+suite de lignes `[AGENT] … (X%)` :
+
+```
+| Étape | % |
+|---|---|
+| FEAT + User Stories | 100 % |
+| Contrôle de préparation | 100 % (GO) |
+| Plans techniques | 60 % |
+| Code | 0 % |
+| Tests (QA) | 0 % |
+| Revues | 0 % |
+| Livraison | 0 % |
+```
+
+Règles :
+- **Mêmes lignes, même ordre, d'un bout à l'autre du run** : seuls les `%` et
+  l'état entre parenthèses (`GO`, `🟢`, `🟡 WARN`, `🔴`, `2/3 US`…) changent. Une
+  phase sautée garde sa ligne (`— (sautée)`), jamais supprimée.
+- Libellés **métier** (pas de nom d'agent, de commande ni de chemin, cf. §5).
+- **Le tableau seul**, sans texte autour : ni lignes `[AGENT] … (X%)`, ni
+  lignes de batch, ni récap intermédiaire. Seules exceptions, sous le tableau :
+  une erreur bloquante (format §7.2) ou une action requise de l'utilisateur
+  (gate, checkpoint, question).
+- Le `%` d'une ligne suit l'avancement de sa phase (ex. 2 US sur 3 codées →
+  `67 %`) ; monotone croissant comme §4, sauf `[…/FIXING]` (§8).
+- Fin de run : dernier tableau (toutes lignes à 100 % ou bloquée) puis la ligne
+  `[DONE]` du §9.
+
+**Périmètre** : orchestrateur uniquement. Les sous-agents, invoqués hors chat
+utilisateur, gardent le format 1 ligne §2.1-§2.3 pour leurs rapports.
+**Bypass** : `SDD_CHAT_VERBOSE=1` (§10) rétablit le mode verbeux ;
+`SDD_CHAT_MINIMAL=1` (§10.bis) prime pour la CI.
 
 ---
 
@@ -292,6 +330,9 @@ cap $) : format §7.2, ex. :
 [DONE/WARN] FEAT 1-Auth livrée — 🟡 WARN (3 issues serious, voir query_console_db.py review --feat 1 --format md). (100%)
 [DONE/FAIL] FEAT 1-Auth — 🔴 RED, pipeline interrompu — voir query_console_db.py review --feat 1 --format md. (66%)
 ```
+
+Sous orchestration de pipeline, cette ligne suit le dernier tableau
+d'avancement (§2.4).
 
 Après `[DONE]`, **aucune** ligne supplémentaire (pas de "next steps", "consider",
 "feel free to ask"). Le Tech Lead sait quoi faire.

@@ -370,6 +370,15 @@ Voir `/sdd-full` STEP 4.5 pour la logique d'invocation auto.
 
 ## Chat Output Protocol
 
+> **OBLIGATOIRE (décision Tech Lead 2026-11-13, `output-protocol.md §2.4`)** :
+> pendant toute la commande, l'orchestrateur affiche à **chaque** point
+> d'avancement le **tableau d'avancement** (Étape | %, mêmes lignes du début à
+> la fin, seuls les `%` et l'état changent), **et rien d'autre autour** : ni
+> lignes `[AGENT] … (X%)`, ni log d'action, ni récap intermédiaire. Seules
+> exceptions sous le tableau : erreur bloquante (§7.2) ou action requise de
+> l'utilisateur. Le tableau prime sur la granularité « 1 ligne par update »
+> ci-dessous.
+
 > Cette commande applique strictement `@.sdd/rules/output-protocol.md`.
 > Substance non dupliquée — la règle est SSoT.
 
