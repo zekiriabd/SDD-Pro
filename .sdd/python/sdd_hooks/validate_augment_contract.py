@@ -111,6 +111,39 @@ def _parse_id_list(text: str, key: str) -> list[str]:
     return items
 
 
+_BACKTICK_TOKEN = re.compile(r"`([^`]+)`")
+_CTOR = re.compile(r"^(?P<type>[A-Za-z_]\w*)\.ctor\b")
+
+
+def _identifier_present(declared: str, content: str) -> bool:
+    """True if the identifier declared in `preserves:`/`adds:` is in `content`.
+
+    Plans declare identifiers in several shapes (faux positifs 2026-11-13) :
+    - plain token: ``RetrieveAsync``;
+    - qualified member: ``Type.Member`` or ``Type.Member(args)`` -> the code
+      contains the member, rarely the qualified name;
+    - constructor: ``Type.ctor(args)`` -> the code contains ``Type(``;
+    - prose entry with backtick-quoted identifier(s):
+      ``"`ApplyTaxCardAsync` : libellé ... — FAIT"`` -> check the quoted tokens.
+    """
+    if declared in content:
+        return True
+    tokens = _BACKTICK_TOKEN.findall(declared) or [declared]
+    return all(_token_present(token.strip(), content) for token in tokens)
+
+
+def _token_present(token: str, content: str) -> bool:
+    if not token or token in content:
+        return True
+    ctor = _CTOR.match(token)
+    if ctor:
+        return re.search(rf"\b{re.escape(ctor.group('type'))}\s*\(", content) is not None
+    member = token.split("(", 1)[0].rsplit(".", 1)[-1].strip()
+    if not member or not re.fullmatch(r"[A-Za-z_]\w*", member):
+        return False
+    return re.search(rf"\b{re.escape(member)}\b", content) is not None
+
+
 def main() -> int:
     payload = read_hook_input()
     file_path = get_file_path(payload)
@@ -164,7 +197,7 @@ def main() -> int:
     plan_name = matching_plan.name
 
     for preserved_id in _parse_id_list(block_text, "preserves"):
-        if preserved_id not in content:
+        if not _identifier_present(preserved_id, content):
             error_block(
                 f"PostToolUse hook on {file_path}",
                 f"[PRESERVES_VIOLATED] identifiant '{preserved_id}' "
@@ -174,7 +207,7 @@ def main() -> int:
             return HOOK_DENY
 
     for added_id in _parse_id_list(block_text, "adds"):
-        if added_id not in content:
+        if not _identifier_present(added_id, content):
             error_block(
                 f"PostToolUse hook on {file_path}",
                 f"[ADDS_VIOLATED] identifiant '{added_id}' "

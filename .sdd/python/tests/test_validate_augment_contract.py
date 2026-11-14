@@ -141,3 +141,45 @@ class TestWriteIsCovered(unittest.TestCase):
             with mock.patch.object(vac, "read_hook_input", lambda: payload), \
                     mock.patch.object(vac, "repo_root", lambda: root):
                 self.assertEqual(vac.main(), 2)
+
+
+class TestIdentifierShapes(unittest.TestCase):
+    """Faux positifs 2026-11-13 : identifiants qualifiés, constructeurs, entrées en prose."""
+
+    CODE = (
+        "public sealed class PayrollAutomationService(IPayrollSessionService session)\n"
+        "{\n    public Task RetrieveAsync() => Task.CompletedTask;\n"
+        "    private Task ApplyTaxCardAsync() => Task.CompletedTask;\n}\n"
+    )
+
+    def _present(self, declared: str) -> bool:
+        from sdd_hooks.validate_augment_contract import _identifier_present
+        return _identifier_present(declared, self.CODE)
+
+    def test_plain_token(self):
+        self.assertTrue(self._present("RetrieveAsync"))
+
+    def test_qualified_member(self):
+        self.assertTrue(self._present("PayrollAutomationService.RetrieveAsync"))
+
+    def test_qualified_member_with_signature(self):
+        self.assertTrue(self._present("PayrollAutomationService.RetrieveAsync(PortalCredentials)"))
+
+    def test_constructor(self):
+        self.assertTrue(self._present("PayrollAutomationService.ctor(IPayrollSessionService)"))
+
+    def test_prose_entry_with_backticks(self):
+        self.assertTrue(self._present(
+            "`ApplyTaxCardAsync` : « Dernière collecte · le JJ/MM/AAAA » ou « Jamais lancée » — FAIT"))
+
+    def test_missing_member_still_detected(self):
+        self.assertFalse(self._present("PayrollAutomationService.SendAsync"))
+
+    def test_missing_constructor_still_detected(self):
+        self.assertFalse(self._present("AutreService.ctor(IPayrollSessionService)"))
+
+    def test_missing_backtick_token_still_detected(self):
+        self.assertFalse(self._present("`SupprimeAsync` : libellé — FAIT"))
+
+    def test_member_matches_whole_word_only(self):
+        self.assertFalse(self._present("Type.Retrieve"))
