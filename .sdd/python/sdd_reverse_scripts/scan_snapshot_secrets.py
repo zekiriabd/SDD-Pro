@@ -9,7 +9,7 @@ Lead is expected to:
   3. Re-provision the secret via a vault / environment variable.
 
 CLI:
-    python scan_snapshot_secrets.py --project NounouJob [--workspace workspace]
+    python scan_snapshot_secrets.py --project LegacyApp [--workspace workspace]
                                      [--json] [--exit-on-found]
 
 Exit codes: 0 clean · 1 secrets found (only when --exit-on-found) · 2 IO error

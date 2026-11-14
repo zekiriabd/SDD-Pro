@@ -33,10 +33,10 @@ pytestmark = pytest.mark.skipif(
     reason="hors checkout git (sdist / tarball) — l'index n'est pas observable",
 )
 
-# Le SEUL fichier de contenu autorisé sous workspace/ (décision Tech Lead
-# 408c511 : stack.md = SSoT de configuration projet, il voyage avec le repo).
-# Tout le reste ne peut être qu'un `.gitkeep` matérialisant le squelette.
-ALLOWED_CONTENT = {"workspace/stack/stack.md"}
+# Aucun fichier de contenu autorisé sous workspace/ : seuls les `.gitkeep` du
+# squelette sont versionnés. stack.md a été retiré de l'index le 2026-11-14
+# (décision Tech Lead — nom du projet client et chemins locaux, révoque 408c511).
+ALLOWED_CONTENT: set[str] = set()
 
 # Familles de fichiers qui portent des secrets par contrat SDD (stack.md §
 # Active Database / Auth / SMTP propagé par l'agent `arch`).
@@ -101,17 +101,14 @@ def test_only_skeleton_and_stack_md_tracked_under_workspace():
     ]
     assert not unexpected, (
         f"contenu runtime trackés sous workspace/ : {unexpected} — "
-        "seuls les .gitkeep du squelette et workspace/stack/stack.md sont versionnés."
+        "seuls les .gitkeep du squelette sont versionnés."
     )
 
 
-def test_stack_md_stays_tracked():
-    """Pendant du test précédent : la décision 408c511 ne doit pas régresser.
-
-    Si stack.md sort de l'index, un `git clone` ne restitue plus la config
-    projet et `bootstrap.py` repart de zéro sans le signaler.
-    """
-    assert "workspace/stack/stack.md" in _tracked_under_workspace()
+def test_stack_md_is_not_tracked():
+    """Décision 2026-11-14 : stack.md porte le nom du projet client et des
+    chemins locaux — il reste local et ne doit jamais revenir dans l'index."""
+    assert "workspace/stack/stack.md" not in _tracked_under_workspace()
 
 
 def _is_ignored(path: str) -> bool:
@@ -141,6 +138,7 @@ def _is_ignored(path: str) -> bool:
         "workspace/src/MyApp/appsettings.json",
         "workspace/feats/1-Auth.md",
         "workspace/.sys/.audit/tokens.jsonl",
+        "workspace/stack/stack.md",
     ],
 )
 def test_runtime_paths_are_ignored(path: str):
@@ -150,7 +148,6 @@ def test_runtime_paths_are_ignored(path: str):
 @pytest.mark.parametrize(
     "path",
     [
-        "workspace/stack/stack.md",
         "workspace/stack/.gitkeep",
         "workspace/feats/.gitkeep",
         "workspace/.sys/.audit/.gitkeep",

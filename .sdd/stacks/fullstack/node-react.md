@@ -560,14 +560,14 @@ import config from 'config';
 const globalForPrisma = globalThis;
 const databaseUrl = config.get('db.url');
 export const prisma =
-  globalForPrisma.__nounouPrisma ||
+  globalForPrisma.__appPrisma ||
   new PrismaClient({
     datasources: { db: { url: databaseUrl } },
     log: ['warn', 'error'],
   });
 
 if (process.env.NODE_ENV !== 'production') {
-  globalForPrisma.__nounouPrisma = prisma;
+  globalForPrisma.__appPrisma = prisma;
 }
 ```
 

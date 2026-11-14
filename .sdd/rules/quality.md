@@ -332,7 +332,7 @@ Exemple `src/index.css` (combo react+shadcn) :
 ```css
 @layer base {
   :root {
-    /* Tokens projet — override FEAT.md §8 palette "Nounou Care" */
+    /* Tokens projet — override FEAT.md §8 palette "Acme Care" */
     --background: 210 40% 98%;
     --foreground: 222 47% 11%;
     --primary: 217 91% 60%;          /* Bleu marque #2563eb */

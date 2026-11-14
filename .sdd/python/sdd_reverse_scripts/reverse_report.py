@@ -7,7 +7,7 @@ runs this after a reverse run to get a single-page decision surface before
 launching /sdd-full on the high-confidence FEATs.
 
 CLI:
-    python reverse_report.py --project NounouJob [--workspace workspace] [--json]
+    python reverse_report.py --project LegacyApp [--workspace workspace] [--json]
 
 Output: Markdown to stdout (redirect to workspace/old/{DB}/.sys/reverse-report.md)
 

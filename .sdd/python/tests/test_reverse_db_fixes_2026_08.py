@@ -102,13 +102,13 @@ class TestBug1ParentFeat:
     def test_fixes_wrong_parent_feat(self, tmp_path):
         from sdd_reverse_scripts.build_proc_feats import _fix_parent_feat
         us = tmp_path / "1-1-Test.md"
-        self._write_us(us, "1-NounouJob")
+        self._write_us(us, "1-LegacyApp")
         us_index = {"dbo.usp_Test": {"path": us}}
         fixed = _fix_parent_feat(us_index, 1, "Contrat")
         assert len(fixed) == 1
         text = us.read_text(encoding="utf-8")
         assert "parent-feat: 1-Contrat" in text
-        assert "1-NounouJob" not in text
+        assert "1-LegacyApp" not in text
 
     def test_does_not_touch_correct_parent_feat(self, tmp_path):
         from sdd_reverse_scripts.build_proc_feats import _fix_parent_feat

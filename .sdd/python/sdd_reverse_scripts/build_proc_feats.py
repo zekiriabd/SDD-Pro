@@ -181,8 +181,8 @@ def _fix_parent_feat(us_index: dict[str, dict], n: int, module_name: str) -> lis
     """Correct 'Parent FEAT: {n}-{wrong}' in every US of this module.
 
     LLM analyst agents sometimes guess the database name instead of the module
-    name for the 'Parent FEAT:' field (BUG-1: observed on NounouJob run,
-    'parent-feat: 1-NounouJob' instead of '1-Contrat'). The assembler is the
+    name for the 'Parent FEAT:' field (BUG-1: observed on LegacyApp run,
+    'parent-feat: 1-LegacyApp' instead of '1-Contrat'). The assembler is the
     only component that knows the authoritative module name from inventory, so it
     fixes the US files in-place after loading the US index.
     """

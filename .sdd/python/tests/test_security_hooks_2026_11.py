@@ -32,9 +32,9 @@ LAUNCHER = _PY_ROOT / "_hook.py"
 CI_VARS = ("CI", "GITHUB_ACTIONS", "GITLAB_CI", "CIRCLECI", "JENKINS_URL",
            "BUILDKITE", "TRAVIS", "TF_BUILD", "BITBUCKET_BUILD_NUMBER")
 
-#: Ligne au format exact de workspace/src/PolEmploiAuto/appsettings.json L37/L40
+#: Ligne au format exact de workspace/src/DesktopApp/appsettings.json L37/L40
 #: (valeur factice) — le fichier réel avait un mot de passe en clair à ces lignes.
-POLEMPLOI_LINE = ('    "NounouFlow": "Server=LAPTOP-X;Database=NounouFlow;User ID=u;'
+DESKTOP_APP_LINE = ('    "DesktopApp": "Server=LAPTOP-X;Database=DesktopApp;User ID=u;'
                   'Password=Fake2002.;TrustServerCertificate=True;MultipleActiveResultSets=True;"')
 
 
@@ -192,8 +192,8 @@ def test_internal_exception_is_fail_closed(monkeypatch, pf_env):
 
 # ── block_secret_access ────────────────────────────────────────────────────
 
-def test_polemploi_connection_string_password_detected():
-    hits = bsa.find_secret_values(POLEMPLOI_LINE)
+def test_desktop_app_connection_string_password_detected():
+    hits = bsa.find_secret_values(DESKTOP_APP_LINE)
     assert hits and hits[0][0] == "Password"
     assert "Fake2002" not in json.dumps(hits)  # valeur jamais restituée en clair
 
@@ -244,7 +244,7 @@ def test_main_session_reading_dotenv_warns(monkeypatch, capsys):
 def test_subagent_reading_config_with_real_secret_denied(monkeypatch, tmp_path):
     cfg = tmp_path / "workspace" / "src" / "App" / "appsettings.json"
     cfg.parent.mkdir(parents=True)
-    cfg.write_text("{\n" + POLEMPLOI_LINE + "\n}\n", encoding="utf-8")
+    cfg.write_text("{\n" + DESKTOP_APP_LINE + "\n}\n", encoding="utf-8")
     p = _sub({"tool_name": "Read", "tool_input": {"file_path": str(cfg)}})
     assert _bsa(monkeypatch, p) == HOOK_DENY
 
@@ -291,7 +291,7 @@ def test_spawn_denied_when_agent_reads_config_with_secret(monkeypatch, tmp_path)
     ws = tmp_path / "workspace"
     cfg = ws / "src" / "Back" / "appsettings.json"
     cfg.parent.mkdir(parents=True)
-    cfg.write_text("{\n" + POLEMPLOI_LINE + "\n}\n", encoding="utf-8")
+    cfg.write_text("{\n" + DESKTOP_APP_LINE + "\n}\n", encoding="utf-8")
     monkeypatch.setattr(pss, "read_hook_input",
                         lambda: {"tool_name": "Agent", "tool_input": {"subagent_type": "code-reviewer"}})
     monkeypatch.setattr(pss, "_resolve_stack_md", lambda: None)
@@ -315,7 +315,7 @@ def test_spawn_allowed_for_agent_not_reading_configs(monkeypatch, tmp_path):
 # ── pre_write_lint : garde secrets ─────────────────────────────────────────
 
 @pytest.mark.parametrize("path,content,denied", [
-    ("workspace/src/App/appsettings.json", POLEMPLOI_LINE, True),
+    ("workspace/src/App/appsettings.json", DESKTOP_APP_LINE, True),
     ("workspace/src/App/appsettings.json", '"D": "Server=h;Password=${DB_PASSWORD};"', False),
     ("workspace/stack/stack.md", " - DB_PASSWORD: hunter22", True),
     ("workspace/stack/stack.md", " - DB_PASSWORD: ${DB_PASSWORD}", False),
@@ -336,6 +336,6 @@ def test_secret_write_guard(monkeypatch, path, content, denied):
 def test_secret_write_guard_ignores_lint_disable(monkeypatch):
     monkeypatch.setenv("SDD_DISABLE_PRE_WRITE_LINT", "1")
     payload = {"tool_name": "Edit", "tool_input": {
-        "file_path": "workspace/src/App/appsettings.json", "new_string": POLEMPLOI_LINE}}
+        "file_path": "workspace/src/App/appsettings.json", "new_string": DESKTOP_APP_LINE}}
     monkeypatch.setattr(pwl, "read_hook_input", lambda: payload)
     assert pwl.main() == HOOK_DENY

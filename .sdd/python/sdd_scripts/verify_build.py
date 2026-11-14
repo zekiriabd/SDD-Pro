@@ -12,7 +12,7 @@ produits (chemin + sha256) et enregistre une preuve signée
 Commande :
   - ``DeliveryGate.BuildCommand`` (``## Project Config`` de stack.md) si
     posée — exécutée telle quelle (shell) depuis ``workspace/src`` ;
-    ex. ``"C:\\…\\MSBuild.exe" PolEmploiAuto.slnx -restore -m -nologo -v:minimal``
+    ex. ``"C:\\…\\MSBuild.exe" DesktopApp.slnx -restore -m -nologo -v:minimal``
     quand ``dotnet.exe`` est inaccessible ;
   - sinon détection (même logique que ``validate_acceptance.py``) :
     ``*.slnx/*.sln`` à la racine → ``dotnet build <sln>`` ; ``*.csproj`` →

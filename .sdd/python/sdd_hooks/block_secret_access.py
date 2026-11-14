@@ -124,7 +124,7 @@ def _is_real_secret(key: str, value: str) -> bool:
     * autres clés `*Token|*Secret|*ApiKey` (camelCase JSON/YAML) : seuil
       d'entropie — ≥ 16 caractères, ou ≥ 8 avec lettre + chiffre + symbole.
       Évite les faux positifs du type `"SemainePaireToken": "semainePaire"`
-      (jeton de formulaire, pas un secret — cas réel PolEmploiAuto).
+      (jeton de formulaire, pas un secret — cas réel DesktopApp).
     """
     v = (value or "").strip().strip("\"'").strip()
     if is_placeholder(v):

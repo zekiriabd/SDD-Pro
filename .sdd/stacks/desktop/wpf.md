@@ -45,7 +45,7 @@ Architecture cible :
 {AppName}.Tests/                   ── net10.0, reference {AppName}.Core (JAMAIS {AppName})
 ```
 
-> **Pourquoi `{AppName}.Core`** (post-mortem PolEmploiAuto 2026-10-10) : un
+> **Pourquoi `{AppName}.Core`** (post-mortem DesktopApp 2026-10-10) : un
 > projet de test `net10.0` ne peut pas référencer un projet `net10.0-windows`
 > (NuGet `NU1201`, `SkipGetTargetFrameworkProperties` n'y change rien). Les
 > ViewModels, Services et Models — déjà sans référence WPF (§1.4) — vivent donc
@@ -228,7 +228,7 @@ PY
 #   Un projet de test n'a pas besoin de WPF, et le suffixe -windows le
 #   rendrait non executable sur un agent CI Linux.
 #   Il reference {AppName}.Core, JAMAIS {AppName} : net10.0 -> net10.0-windows
-#   echoue en NU1201 (post-mortem PolEmploiAuto 2026-10-10, cf. §1).
+#   echoue en NU1201 (post-mortem DesktopApp 2026-10-10, cf. §1).
 dotnet new classlib -n {AppName}.Core -o ../{AppName}.Core --framework net10.0 --force
 rm -f ../{AppName}.Core/Class1.cs
 mkdir -p ../{AppName}.Core/{ViewModels,Services,Models}
