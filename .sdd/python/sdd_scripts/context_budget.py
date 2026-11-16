@@ -116,11 +116,11 @@ DEFAULT_BUDGETS: dict[str, int] = {
     # accessibility-auditor garde un budget serré : il ne lit que l'HTML/
     # markup (US + mockups), pas le code prod.
     "accessibility-auditor":     80_000,   # Haiku, scan WCAG déterministe (HTML/markup)
-    "code-reviewer":            600_000,   # Sonnet, anti-patterns cross-fichier
-    "arch-reviewer":            600_000,   # Sonnet, layer mapping + ADRs §6
-    "security-reviewer":        600_000,   # Sonnet, OWASP scan + threat-model
+    "code-reviewer":            850_000,   # Sonnet, anti-patterns cross-fichier (relevé 600→850 Ko, décision Tech Lead 2026-11-16)
+    "arch-reviewer":            850_000,   # Sonnet, layer mapping + ADRs §6 (relevé 600→850 Ko, décision Tech Lead 2026-11-16)
+    "security-reviewer":        850_000,   # Sonnet, OWASP scan + threat-model (relevé 600→850 Ko, décision Tech Lead 2026-11-16)
     "performance-auditor":      600_000,   # Sonnet, CWV + SLO heuristiques
-    "spec-compliance-reviewer": 600_000,   # Sonnet, AC-by-AC re-lecture code
+    "spec-compliance-reviewer": 850_000,   # Sonnet, AC-by-AC re-lecture code (relevé 600→850 Ko, décision Tech Lead 2026-11-16 : FEAT 51 à 9 plans = 790 Ko)
     # Audit 2026-06-06 RUPT-1 — adversarial-reviewer (R1 v7.2.0 opt-in).
     # Read-only sur console.db (consolidated review, via query_console_db)
     # + workspace/src/{App,Backend}Name/** (code). Verdict purement

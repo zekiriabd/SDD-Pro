@@ -434,10 +434,16 @@ class TestContextBudget:
     def test_auditor_budgets_are_a_real_barrier(self):
         from sdd_scripts.context_budget import BYTES_PER_TOKEN, DEFAULT_BUDGETS
         assert BYTES_PER_TOKEN == 3.5
+        # 2026-11-16 (décision Tech Lead, FEAT 51 à 9 plans ≈ 790-830 Ko) : plafond
+        # relevé 600_000 → 850_000 pour les 4 reviewers bloquants ; reste une vraie
+        # barrière (≈ 243 ktok, très en dessous de la fenêtre 1 Mtok du modèle).
+        # adversarial-reviewer (informational) garde 600_000.
         for a in ("code-reviewer", "arch-reviewer", "security-reviewer",
-                  "spec-compliance-reviewer", "adversarial-reviewer"):
-            assert DEFAULT_BUDGETS[a] <= 600_000, a
-            assert DEFAULT_BUDGETS[a] / BYTES_PER_TOKEN < 200_000, a
+                  "spec-compliance-reviewer"):
+            assert DEFAULT_BUDGETS[a] <= 850_000, a
+            assert DEFAULT_BUDGETS[a] / BYTES_PER_TOKEN < 250_000, a
+        assert DEFAULT_BUDGETS["adversarial-reviewer"] <= 600_000
+        assert DEFAULT_BUDGETS["adversarial-reviewer"] / BYTES_PER_TOKEN < 200_000
 
     def test_cost_uses_model_pricing(self):
         from sdd_scripts.context_budget import estimate_input_cost
